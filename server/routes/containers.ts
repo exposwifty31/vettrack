@@ -477,7 +477,7 @@ router.post(
 
           const capture = await captureConsumableBillingForDispenseLine(tx, {
             clinicId,
-            billingItemId: container.billingItemId,
+            containerId,
             inventoryLogId,
             itemId: lineItem.itemId,
             patientId: animalId ?? null,

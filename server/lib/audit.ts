@@ -122,7 +122,16 @@ export type AuditActionType =
   | "dispense_confirmed"
   | "dispense_emergency_created"
   | "medication_task_dose_corrected"
-  | "medication_task_cancelled";
+  | "medication_task_cancelled"
+  | "formulary_created"
+  | "formulary_version_created"
+  | "formulary_deleted"
+  | "inventory_item_deactivated"
+  | "inventory_item_price_added"
+  | "purchase_order_created"
+  | "purchase_order_submitted"
+  | "purchase_order_received"
+  | "purchase_order_cancelled";
 
 export interface LogAuditParams {
   clinicId: string;

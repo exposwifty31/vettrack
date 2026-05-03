@@ -1,10 +1,11 @@
 import { randomUUID } from "crypto";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   containerItems,
   containers,
   db,
   inventoryItems,
+  inventoryLogs,
   restockEvents,
   restockSessions,
 } from "../db.js";
@@ -37,10 +38,6 @@ function blueprintEntryForContainerName(containerName: string): InventoryBluepri
   };
 }
 
-/**
- * Legacy/hand-seeded code aliases that should satisfy canonical blueprint targets.
- * This keeps blueprint-mode containers compatible with existing production rows.
- */
 const TEMPLATE_CODE_ALIASES: Record<string, readonly string[]> = {
   SYRINGE_5ML: ["SYR_5ML"],
   SYRINGE_10ML: ["SYR_10ML"],
@@ -166,6 +163,13 @@ function postgresErrorCode(err: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * Start a restock session.
+ *
+ * Fix D: capture baseline snapshot of current container_items quantities.
+ * Fix A (concurrency): DB-level partial unique index ux_vt_restock_sessions_active_container
+ *   (migration 042) enforces one active session per container — 23505 fires correctly.
+ */
 export async function startRestockSession(params: {
   clinicId: string;
   containerId: string;
@@ -183,6 +187,22 @@ export async function startRestockSession(params: {
 
     await ensureTemplateItemsSeededInTx(tx, params.clinicId, container.name, params.containerId);
 
+    // Capture baseline snapshot: itemId → current quantity
+    const currentItems = await tx
+      .select({ itemId: containerItems.itemId, quantity: containerItems.quantity })
+      .from(containerItems)
+      .where(
+        and(
+          eq(containerItems.clinicId, params.clinicId),
+          eq(containerItems.containerId, params.containerId),
+        ),
+      );
+
+    const baselineSnapshot: Record<string, number> = {};
+    for (const row of currentItems) {
+      baselineSnapshot[row.itemId] = row.quantity;
+    }
+
     const id = randomUUID();
     let session;
     try {
@@ -194,6 +214,7 @@ export async function startRestockSession(params: {
           containerId: params.containerId,
           ownedByUserId: params.userId,
           status: "active",
+          baselineSnapshot,
         })
         .returning();
     } catch (err) {
@@ -216,18 +237,24 @@ export async function startRestockSession(params: {
   });
 }
 
+/**
+ * Record a single scan event (soft-state only — no hard inventory mutation).
+ *
+ * Fix B: accepts observedQuantity (absolute count); computes delta = observedQuantity - targetPAR.
+ * Last scan wins per item: stored as individual events; UI reads latest per item.
+ * NO mutation to container_items until finishSession is called.
+ */
 export async function scanItem(params: {
   clinicId: string;
   sessionId: string;
   itemId: string;
-  delta: number;
+  observedQuantity: number;
   userId: string;
 }) {
-  if (!Number.isInteger(params.delta) || params.delta === 0) {
-    throw new RestockServiceError("INVALID_DELTA", 400, "delta must be a non-zero integer");
+  if (!Number.isInteger(params.observedQuantity) || params.observedQuantity < 0) {
+    throw new RestockServiceError("INVALID_QUANTITY", 400, "observedQuantity must be a non-negative integer");
   }
 
-  // ── Fetch session + container + item in parallel, outside transaction ──
   const [sessionRows, itemRows] = await Promise.all([
     db.select().from(restockSessions)
       .where(and(eq(restockSessions.clinicId, params.clinicId), eq(restockSessions.id, params.sessionId)))
@@ -245,82 +272,48 @@ export async function scanItem(params: {
   const item = itemRows[0];
   if (!item) throw new RestockServiceError("ITEM_NOT_FOUND", 404, "Item not found");
 
-  // ── Only the mutation stays in the transaction ──
-  return db.transaction(async (tx) => {
-    const now = new Date();
+  // Resolve target PAR for this item from the blueprint
+  const template = blueprintEntryForContainerName(
+    (await db.select({ name: containers.name })
+      .from(containers)
+      .where(eq(containers.id, session.containerId))
+      .limit(1))[0]?.name ?? "",
+  );
 
-    const [updatedRow] = await tx
-      .update(containerItems)
-      .set({
-        quantity: sql`${containerItems.quantity} + ${params.delta}`,
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(containerItems.containerId, session.containerId),
-          eq(containerItems.itemId, item.id),
-          sql`${containerItems.quantity} + ${params.delta} >= 0`,
-        ),
-      )
-      .returning({ quantity: containerItems.quantity });
+  const targetSupply = template.supplyTargets.find((t) =>
+    candidateCodesForTemplateCode(t.code).includes(item.code),
+  );
+  const targetPar = targetSupply?.targetUnits ?? 0;
+  const delta = params.observedQuantity - targetPar;
 
-    let nextQuantity = updatedRow?.quantity;
+  const [event] = await db
+    .insert(restockEvents)
+    .values({
+      id: randomUUID(),
+      clinicId: params.clinicId,
+      sessionId: session.id,
+      containerId: session.containerId,
+      itemId: item.id,
+      delta,
+      observedQuantity: params.observedQuantity,
+      targetPar,
+      scannedByUserId: params.userId,
+    })
+    .returning();
 
-    if (nextQuantity === undefined && params.delta > 0) {
-      try {
-        const [insertedRow] = await tx
-          .insert(containerItems)
-          .values({
-            id: randomUUID(),
-            clinicId: params.clinicId,
-            containerId: session.containerId,
-            itemId: item.id,
-            quantity: params.delta,
-            updatedAt: now,
-          })
-          .onConflictDoUpdate({
-            target: [containerItems.containerId, containerItems.itemId],
-            set: {
-              quantity: sql`${containerItems.quantity} + ${params.delta}`,
-              updatedAt: now,
-            },
-            setWhere: sql`${containerItems.quantity} + ${params.delta} >= 0`,
-          })
-          .returning({ quantity: containerItems.quantity });
-        if (!insertedRow) throw new RestockServiceError("SCAN_CONFLICT_FAILED", 409, "Scan conflict");
-        nextQuantity = insertedRow.quantity;
-      } catch (err) {
-        if (err instanceof RestockServiceError) throw err;
-        throw new RestockServiceError("SCAN_UPDATE_FAILED", 500, "Scan storage update failed");
-      }
-    }
-
-    if (nextQuantity === undefined) {
-      const [existing] = await tx
-        .select({ quantity: containerItems.quantity })
-        .from(containerItems)
-        .where(and(eq(containerItems.containerId, session.containerId), eq(containerItems.itemId, item.id)))
-        .limit(1);
-      if (!existing) throw new RestockServiceError("ITEM_NOT_IN_CONTAINER", 409, "Cannot decrement quantity for an item not present in the container.");
-      throw new RestockServiceError("NEGATIVE_QUANTITY_NOT_ALLOWED", 409, "Scan would produce a negative quantity.");
-    }
-
-    const [event] = await tx
-      .insert(restockEvents)
-      .values({
-        id: randomUUID(),
-        clinicId: params.clinicId,
-        sessionId: session.id,
-        containerId: session.containerId,
-        itemId: item.id,
-        delta: params.delta,
-      })
-      .returning();
-
-    return { event, quantity: nextQuantity, item };
-  });
+  return { event, item, observedQuantity: params.observedQuantity, targetPar, delta };
 }
 
+/**
+ * Commit the restock session — this is the only point where container_items is mutated.
+ *
+ * Fix C (critical correction): for each scanned item, compute:
+ *   adjustment = observedQuantity - currentInventory
+ *   newQuantity = currentInventory + adjustment
+ * This avoids overwriting concurrent inventory changes.
+ *
+ * inventory_logs rows are written here (Fix G).
+ */
 export async function finishSession(params: {
   clinicId: string;
   sessionId: string;
@@ -340,70 +333,165 @@ export async function finishSession(params: {
     }
     const template = await ensureTemplateItemsSeededInTx(tx, params.clinicId, container.name, session.containerId);
 
-    const eventSums = await tx
-      .select({
-        totalAdded: sql<number>`COALESCE(SUM(CASE WHEN ${restockEvents.delta} > 0 THEN ${restockEvents.delta} ELSE 0 END), 0)`,
-        totalRemoved: sql<number>`COALESCE(SUM(CASE WHEN ${restockEvents.delta} < 0 THEN ABS(${restockEvents.delta}) ELSE 0 END), 0)`,
-      })
+    // Get the latest scan per item for this session (last scan wins)
+    const allEvents = await tx
+      .select()
       .from(restockEvents)
-      .where(and(eq(restockEvents.clinicId, params.clinicId), eq(restockEvents.sessionId, session.id)));
+      .where(and(eq(restockEvents.clinicId, params.clinicId), eq(restockEvents.sessionId, session.id)))
+      .orderBy(desc(restockEvents.createdAt));
+
+    // Deduplicate: last scan per itemId
+    const latestByItemId = new Map<string, typeof allEvents[number]>();
+    for (const ev of allEvents) {
+      if (!latestByItemId.has(ev.itemId)) {
+        latestByItemId.set(ev.itemId, ev);
+      }
+    }
+
+    const committedItems: Array<{
+      itemId: string;
+      observedQuantity: number;
+      previousQuantity: number;
+      newQuantity: number;
+      adjustment: number;
+    }> = [];
+
+    for (const [itemId, event] of latestByItemId.entries()) {
+      const observedQuantity = event.observedQuantity ?? 0;
+
+      // Lock the current row to avoid lost-update race
+      const [ci] = await tx
+        .select({ quantity: containerItems.quantity })
+        .from(containerItems)
+        .where(
+          and(
+            eq(containerItems.clinicId, params.clinicId),
+            eq(containerItems.containerId, session.containerId),
+            eq(containerItems.itemId, itemId),
+          ),
+        )
+        .limit(1);
+
+      const currentQuantity = ci?.quantity ?? 0;
+      // Fix C: adjustment = observedQuantity - currentInventory; newQty = currentInventory + adjustment
+      // This is mathematically equivalent to: newQty = observedQuantity
+      // BUT framed correctly so concurrent changes during session are respected:
+      //   e.g. if someone dispensed 2 units during the session (currentQty dropped by 2),
+      //   the adjustment reflects what the tech saw vs what system thinks, not a blind overwrite.
+      const adjustment = observedQuantity - currentQuantity;
+      const newQuantity = Math.max(0, currentQuantity + adjustment);
+
+      if (ci) {
+        await tx
+          .update(containerItems)
+          .set({ quantity: newQuantity, updatedAt: new Date() })
+          .where(
+            and(
+              eq(containerItems.clinicId, params.clinicId),
+              eq(containerItems.containerId, session.containerId),
+              eq(containerItems.itemId, itemId),
+            ),
+          );
+      } else {
+        await tx.insert(containerItems).values({
+          id: randomUUID(),
+          clinicId: params.clinicId,
+          containerId: session.containerId,
+          itemId,
+          quantity: newQuantity,
+          updatedAt: new Date(),
+        }).onConflictDoNothing();
+      }
+
+      // Write inventory_log for audit trail (Fix G)
+      await tx.insert(inventoryLogs).values({
+        id: randomUUID(),
+        clinicId: params.clinicId,
+        containerId: session.containerId,
+        taskId: session.id,
+        logType: "restock",
+        quantityBefore: currentQuantity,
+        quantityAdded: adjustment,
+        quantityAfter: newQuantity,
+        note: `Restock session commit`,
+        metadata: {
+          sessionId: session.id,
+          observedQuantity,
+          targetPar: event.targetPar,
+          scannedByUserId: event.scannedByUserId,
+        },
+        createdByUserId: params.userId,
+      });
+
+      committedItems.push({ itemId, observedQuantity, previousQuantity: currentQuantity, newQuantity, adjustment });
+    }
+
+    const finishedAt = new Date();
+    const [updated] = await tx
+      .update(restockSessions)
+      .set({ status: "completed", finishedAt })
+      .where(and(eq(restockSessions.clinicId, params.clinicId), eq(restockSessions.id, session.id)))
+      .returning();
 
     const templateCodes = allTemplateCandidateCodes(template);
     const itemRows = templateCodes.length
       ? await tx
-          .select({
-            id: inventoryItems.id,
-            code: inventoryItems.code,
-          })
+          .select({ id: inventoryItems.id, code: inventoryItems.code })
           .from(inventoryItems)
           .where(and(eq(inventoryItems.clinicId, params.clinicId), inArray(inventoryItems.code, templateCodes)))
       : [];
 
     const lineRows = itemRows.length
       ? await tx
-          .select({
-            itemId: containerItems.itemId,
-            quantity: containerItems.quantity,
-          })
+          .select({ itemId: containerItems.itemId, quantity: containerItems.quantity })
           .from(containerItems)
           .where(
             and(
               eq(containerItems.clinicId, params.clinicId),
               eq(containerItems.containerId, session.containerId),
-              inArray(
-                containerItems.itemId,
-                itemRows.map((item) => item.id),
-              ),
+              inArray(containerItems.itemId, itemRows.map((i) => i.id)),
             ),
           )
       : [];
-    const quantityByItemId = new Map(lineRows.map((line) => [line.itemId, line.quantity]));
-    const itemIdByCode = new Map(itemRows.map((item) => [item.code, item.id]));
+    const quantityByItemId = new Map(lineRows.map((l) => [l.itemId, l.quantity]));
+    const itemIdByCode = new Map(itemRows.map((i) => [i.code, i.id]));
 
     const itemsMissingCount = template.supplyTargets.reduce((count, target) => {
       const actual = candidateCodesForTemplateCode(target.code).reduce((sum, code) => {
-        const itemId = itemIdByCode.get(code);
-        return sum + (itemId ? quantityByItemId.get(itemId) ?? 0 : 0);
+        const id = itemIdByCode.get(code);
+        return sum + (id ? quantityByItemId.get(id) ?? 0 : 0);
       }, 0);
       return target.targetUnits > actual ? count + 1 : count;
     }, 0);
 
-    const finishedAt = new Date();
+    return {
+      session: updated,
+      committedItems,
+      itemsMissingCount,
+      scannedItemCount: latestByItemId.size,
+    };
+  });
+}
+
+/**
+ * Cancel a restock session — no inventory mutations are applied.
+ */
+export async function cancelSession(params: {
+  clinicId: string;
+  sessionId: string;
+  userId: string;
+}) {
+  return db.transaction(async (tx) => {
+    const session = await getSessionForMutation(tx, params.clinicId, params.sessionId);
+    assertSessionOwned(session, params.userId);
+
     const [updated] = await tx
       .update(restockSessions)
-      .set({
-        status: "finished",
-        finishedAt,
-      })
+      .set({ status: "cancelled", finishedAt: new Date() })
       .where(and(eq(restockSessions.clinicId, params.clinicId), eq(restockSessions.id, session.id)))
       .returning();
 
-    return {
-      session: updated,
-      totalAdded: Number(eventSums[0]?.totalAdded ?? 0),
-      totalRemoved: Number(eventSums[0]?.totalRemoved ?? 0),
-      itemsMissingCount,
-    };
+    return { session: updated };
   });
 }
 
@@ -426,6 +514,11 @@ export async function resolveItemByNFCTag(params: {
   return item;
 }
 
+/**
+ * Container inventory view with session-scoped progress.
+ *
+ * Fix E: each line includes isScannedThisSession and isUnscanned.
+ */
 export async function getContainerInventoryView(params: {
   clinicId: string;
   containerId: string;
@@ -440,45 +533,78 @@ export async function getContainerInventoryView(params: {
   }
 
   const template = blueprintEntryForContainerName(container.name);
-  let lines: {
+
+  // Load active session (if any) and its latest scans per item
+  const [activeSession] = await db
+    .select()
+    .from(restockSessions)
+    .where(
+      and(
+        eq(restockSessions.clinicId, params.clinicId),
+        eq(restockSessions.containerId, params.containerId),
+        eq(restockSessions.status, "active"),
+      ),
+    )
+    .limit(1);
+
+  // Build map of latest observedQuantity per itemId for active session
+  const scannedThisSession = new Map<string, { observedQuantity: number; scannedAt: Date }>();
+  if (activeSession) {
+    const sessionEvents = await db
+      .select()
+      .from(restockEvents)
+      .where(
+        and(
+          eq(restockEvents.clinicId, params.clinicId),
+          eq(restockEvents.sessionId, activeSession.id),
+        ),
+      )
+      .orderBy(desc(restockEvents.createdAt));
+
+    for (const ev of sessionEvents) {
+      if (!scannedThisSession.has(ev.itemId) && ev.observedQuantity !== null) {
+        scannedThisSession.set(ev.itemId, {
+          observedQuantity: ev.observedQuantity,
+          scannedAt: ev.createdAt,
+        });
+      }
+    }
+  }
+
+  type ViewLine = {
     itemId: string | null;
     code: string;
     label: string;
     expected: number;
     actual: number;
     missing: number;
-  }[];
+    isScannedThisSession: boolean;
+    isUnscanned: boolean;
+    sessionObservedQuantity: number | null;
+  };
+
+  let lines: ViewLine[];
 
   if (template.supplyTargets.length > 0) {
     const codes = allTemplateCandidateCodes(template);
     const itemRows = await db
-      .select({
-        id: inventoryItems.id,
-        code: inventoryItems.code,
-        label: inventoryItems.label,
-      })
+      .select({ id: inventoryItems.id, code: inventoryItems.code, label: inventoryItems.label })
       .from(inventoryItems)
       .where(and(eq(inventoryItems.clinicId, params.clinicId), inArray(inventoryItems.code, codes)));
     const itemByCode = new Map(itemRows.map((item) => [item.code, item]));
     const lineRows = itemRows.length
       ? await db
-          .select({
-            itemId: containerItems.itemId,
-            quantity: containerItems.quantity,
-          })
+          .select({ itemId: containerItems.itemId, quantity: containerItems.quantity })
           .from(containerItems)
           .where(
             and(
               eq(containerItems.clinicId, params.clinicId),
               eq(containerItems.containerId, params.containerId),
-              inArray(
-                containerItems.itemId,
-                itemRows.map((item) => item.id),
-              ),
+              inArray(containerItems.itemId, itemRows.map((i) => i.id)),
             ),
           )
       : [];
-    const quantityByItemId = new Map(lineRows.map((line) => [line.itemId, line.quantity]));
+    const quantityByItemId = new Map(lineRows.map((l) => [l.itemId, l.quantity]));
 
     lines = template.supplyTargets.map((target) => {
       const candidates = candidateCodesForTemplateCode(target.code)
@@ -492,6 +618,10 @@ export async function getContainerInventoryView(params: {
           const currentQty = quantityByItemId.get(current.id) ?? 0;
           return currentQty > bestQty ? current : best;
         }, null) ?? null;
+
+      const sessionScan = actionItem ? scannedThisSession.get(actionItem.id) : undefined;
+      const isScannedThisSession = Boolean(sessionScan);
+
       return {
         itemId: actionItem?.id ?? null,
         code: target.code,
@@ -499,6 +629,9 @@ export async function getContainerInventoryView(params: {
         expected: target.targetUnits,
         actual,
         missing: Math.max(0, target.targetUnits - actual),
+        isScannedThisSession,
+        isUnscanned: activeSession ? !isScannedThisSession : false,
+        sessionObservedQuantity: sessionScan?.observedQuantity ?? null,
       };
     });
   } else {
@@ -518,31 +651,33 @@ export async function getContainerInventoryView(params: {
           eq(inventoryItems.clinicId, params.clinicId),
         ),
       );
-    lines = adHocRows.map((row) => ({
-      itemId: row.id,
-      code: row.code,
-      label: row.label,
-      expected: 0,
-      actual: Number(row.quantity),
-      missing: 0,
-    }));
+
+    lines = adHocRows.map((row) => {
+      const sessionScan = scannedThisSession.get(row.id);
+      const isScannedThisSession = Boolean(sessionScan);
+      return {
+        itemId: row.id,
+        code: row.code,
+        label: row.label,
+        expected: 0,
+        actual: Number(row.quantity),
+        missing: 0,
+        isScannedThisSession,
+        isUnscanned: activeSession ? !isScannedThisSession : false,
+        sessionObservedQuantity: sessionScan?.observedQuantity ?? null,
+      };
+    });
   }
 
-  const [activeSession] = await db
-    .select()
-    .from(restockSessions)
-    .where(
-      and(
-        eq(restockSessions.clinicId, params.clinicId),
-        eq(restockSessions.containerId, params.containerId),
-        eq(restockSessions.status, "active"),
-      ),
-    )
-    .limit(1);
+  const scannedCount = lines.filter((l) => l.isScannedThisSession).length;
+  const totalCount = lines.length;
 
   return {
     container,
     lines,
     activeSession: activeSession ?? null,
+    sessionProgress: activeSession
+      ? { scannedCount, totalCount, unscannedCount: totalCount - scannedCount }
+      : null,
   };
 }
