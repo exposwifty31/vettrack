@@ -1,15 +1,16 @@
 import type { AuditDbExecutor } from "./audit.js";
-import { eventOutbox } from "../db.js";
+import { db, eventOutbox } from "../db.js";
 import { REALTIME_PAYLOAD_VERSION } from "./realtime-outbox-version.js";
 
 export { REALTIME_PAYLOAD_VERSION };
 
 /**
  * Inserts a domain realtime row into `vt_event_outbox` inside an existing transaction
- * (same atomic unit as the clinical write).
+ * (same atomic unit as the clinical write), or directly via the global `db` client when
+ * called outside a transaction (fire-and-forget outbox pattern for route handlers).
  */
 export async function insertRealtimeDomainEvent(
-  tx: AuditDbExecutor,
+  tx: AuditDbExecutor | typeof db,
   params: {
     clinicId: string;
     type: string;
