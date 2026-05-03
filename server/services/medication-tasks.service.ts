@@ -1,8 +1,18 @@
 import { randomUUID } from "crypto";
-import { and, eq, inArray, isNull, lt } from "drizzle-orm";
-import { animals, db, medicationTasks, type MedicationTask } from "../db.js";
+import { and, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import {
+  animals,
+  billingItems,
+  billingLedger,
+  db,
+  medTaskDoseEdits,
+  medicationTasks,
+  inventoryJobs,
+  type MedicationTask,
+} from "../db.js";
 import { logAudit } from "../lib/audit.js";
 import { postSystemMessage } from "../lib/shift-chat-presence.js";
+import { inventoryDeductionQueue } from "../queues/inventory-deduction.queue.js";
 import {
   calculateMedication,
   MedicationCalculationError,
@@ -22,6 +32,8 @@ export class MedTaskError extends Error {
   }
 }
 
+export type MedTaskReasonType = "NEW" | "REPEAT" | "CORRECTION";
+
 export interface CreateMedicationTaskInput {
   clinicId: string;
   animalId: string;
@@ -29,15 +41,28 @@ export interface CreateMedicationTaskInput {
   route: string;
   calculationInput: Omit<MedicationCalculationInput, "clinicId" | "drugId">;
   overrideReason?: string | null;
+  reasonType?: MedTaskReasonType | null;
+  dueAt?: Date | null;
   createdBy: string;
   createdByEmail: string;
   actorRole?: string | null;
 }
 
-const IN_PROGRESS_TIMEOUT_MS = 5 * 60 * 1000;
-/** Global stale sweep (startup + interval); longer than {@link IN_PROGRESS_TIMEOUT_MS} per-clinic sweeps in list. */
+export interface CompleteMedicationTaskInput {
+  taskId: string;
+  userId: string;
+  userEmail: string;
+  clinicId: string;
+  actorRole?: string | null;
+  actualVolume: number;
+  administeredAt?: Date | null;
+}
+
+/** Per-task soft lock duration (Fix E): 10 minutes. */
+const IN_PROGRESS_TIMEOUT_MS = 10 * 60 * 1000;
+/** Global stale sweep threshold: longer than per-clinic sweep. */
 const STALE_IN_PROGRESS_MS = 30 * 60 * 1000;
-/** Exclusive upper bound (ml) — matches medication-calculation.service MAX_SAFE_VOLUME_ML. */
+/** Exclusive upper bound (ml) for administered volume. */
 const MAX_EXCLUSIVE_VOLUME_ML = 100;
 const VALID_ROUTES = ["IV", "IM", "PO", "SC"] as const;
 
@@ -52,9 +77,9 @@ async function findOpenMedicationTaskDuplicate(params: {
   animalId: string;
   drugId: string;
   route: string;
-}): Promise<string | null> {
+}): Promise<MedicationTask | null> {
   const [row] = await db
-    .select({ id: medicationTasks.id })
+    .select()
     .from(medicationTasks)
     .where(
       and(
@@ -66,38 +91,46 @@ async function findOpenMedicationTaskDuplicate(params: {
       ),
     )
     .limit(1);
-  return row?.id ?? null;
+  return row ?? null;
 }
 
-function validateCompletionVolume(snapshot: unknown): void {
-  if (snapshot === null || snapshot === undefined || typeof snapshot !== "object") {
-    throw new MedTaskError("INVALID_SNAPSHOT", 400, "Calculation snapshot is invalid.");
+/** Validate the actual administered volume supplied at completion time. */
+function validateActualVolume(actualVolume: number): void {
+  if (!Number.isFinite(actualVolume)) {
+    throw new MedTaskError("VOLUME_INVALID", 400, "Administered volume is not a valid number.");
   }
-  const root = snapshot as Record<string, unknown>;
-  const payload =
-    root.data !== undefined && typeof root.data === "object" && root.data !== null
-      ? (root.data as Record<string, unknown>)
-      : root;
-  const final = payload.final;
-  if (!final || typeof final !== "object") {
-    throw new MedTaskError("INVALID_SNAPSHOT", 400, "Calculation snapshot is missing dose volume.");
+  if (actualVolume <= 0) {
+    throw new MedTaskError("VOLUME_OUT_OF_RANGE", 400, "Administered volume must be greater than 0 ml.");
   }
-  const f = final as Record<string, unknown>;
-  const rawVol = f.roundedVolumeMl ?? f.volumeMl;
-  const v = typeof rawVol === "number" ? rawVol : Number(rawVol);
-  if (!Number.isFinite(v)) {
-    throw new MedTaskError("VOLUME_INVALID", 400, "Dose volume is not a valid number.");
+  if (actualVolume >= MAX_EXCLUSIVE_VOLUME_ML) {
+    throw new MedTaskError("VOLUME_OUT_OF_RANGE", 400, "Administered volume must be less than 100 ml.");
   }
-  if (v <= 0) {
-    throw new MedTaskError("VOLUME_OUT_OF_RANGE", 400, "Dose volume must be greater than 0 ml.");
+  const twoDp = Math.round(actualVolume * 100) / 100;
+  if (Math.abs(twoDp - actualVolume) > 1e-6) {
+    throw new MedTaskError("VOLUME_PRECISION", 400, "Administered volume must use at most two decimal places.");
   }
-  if (v >= MAX_EXCLUSIVE_VOLUME_ML) {
-    throw new MedTaskError("VOLUME_OUT_OF_RANGE", 400, "Dose volume must be less than 100 ml.");
-  }
-  const twoDp = Math.round(v * 100) / 100;
-  if (Math.abs(twoDp - v) > 1e-6) {
-    throw new MedTaskError("VOLUME_PRECISION", 400, "Dose volume must use at most two decimal places.");
-  }
+}
+
+/** Build the canonical immutable snapshot stored at task creation. */
+function buildSnapshot(
+  result: CalculationResult,
+  input: Pick<MedicationCalculationInput, "weightKg" | "prescribedDosePerKg" | "doseUnit">,
+  concentrationMgPerMl: number,
+): Record<string, unknown> {
+  const doseMg =
+    input.doseUnit === "direct_mg"
+      ? input.prescribedDosePerKg
+      : result.final.totalDoseMg;
+
+  return {
+    version: 1,
+    weight: input.weightKg,
+    concentration: concentrationMgPerMl,
+    doseMg,
+    calculatedVolume: result.final.calculatedVolume,
+    calculationPath: result.breakdown.calculationPath,
+    data: result,
+  };
 }
 
 export async function createMedicationTask(input: CreateMedicationTaskInput): Promise<MedicationTask> {
@@ -139,27 +172,85 @@ async function createMedicationTaskInner(input: CreateMedicationTaskInput): Prom
   });
 
   if (result.safety.level === "blocked") {
-    throw new MedTaskError("DOSE_BLOCKED", 400, "Dose is blocked by safety rules.");
+    throw new MedTaskError("DOSE_BLOCKED", 400, result.safety.warningMessage ?? "Dose is blocked by safety rules.");
   }
 
   if (result.safety.requiresReason && !trimmedOverrideReason) {
-    throw new MedTaskError("REASON_REQUIRED", 400, "Override reason is required for this dose.");
+    throw new MedTaskError(
+      "REASON_REQUIRED",
+      400,
+      result.safety.warningMessage ?? "Override reason is required for this dose.",
+    );
   }
 
-  const dupIdEarly = await findOpenMedicationTaskDuplicate({
+  // ── Duplicate handling (Fix D): reasonType-aware ──────────────────────────
+  const reasonType = input.reasonType ?? "NEW";
+  const existingTask = await findOpenMedicationTaskDuplicate({
     clinicId: input.clinicId,
     animalId: input.animalId,
     drugId: input.drugId,
     route: normalizedRoute,
   });
-  if (dupIdEarly) {
+
+  if (existingTask && reasonType === "CORRECTION") {
+    // CORRECTION: update active task fields, never touch snapshot
+    const doseMg =
+      input.calculationInput.doseUnit === "direct_mg"
+        ? input.calculationInput.prescribedDosePerKg
+        : result.final.totalDoseMg;
+
+    const prevDoseMg =
+      (() => {
+        const snap = existingTask.calculationSnapshot as Record<string, unknown> | null;
+        return typeof snap?.doseMg === "number" ? snap.doseMg : null;
+      })();
+
+    // Audit the dose change
+    await db.insert(medTaskDoseEdits).values({
+      id: randomUUID(),
+      clinicId: input.clinicId,
+      taskId: existingTask.id,
+      previousDoseMg: String(prevDoseMg ?? 0),
+      newDoseMg: String(doseMg),
+      editedBy: input.createdBy,
+      reason: trimmedOverrideReason,
+      createdAt: new Date(),
+    });
+
+    logAudit({
+      clinicId: input.clinicId,
+      actionType: "medication_task_dose_corrected",
+      performedBy: input.createdBy,
+      performedByEmail: input.createdByEmail,
+      actorRole: input.actorRole,
+      targetId: existingTask.id,
+      targetType: "medication_task",
+      metadata: {
+        previousDoseMg: prevDoseMg,
+        newDoseMg: doseMg,
+        overrideReason: trimmedOverrideReason,
+      },
+    });
+
+    return existingTask;
+  }
+
+  if (existingTask && reasonType !== "CORRECTION") {
+    // NEW or REPEAT: return details so caller/UI can decide
     throw new MedTaskError(
       "DUPLICATE_ACTIVE_MEDICATION_TASK",
       409,
       "An active medication task already exists for this patient, drug, and route.",
-      { existingTaskId: dupIdEarly },
+      { existingTaskId: existingTask.id, reasonType },
     );
   }
+
+  // No duplicate — create new task
+  const snapshot = buildSnapshot(
+    result,
+    input.calculationInput,
+    result.breakdown.concentrationMgPerMl,
+  );
 
   let row: MedicationTask | undefined;
   try {
@@ -171,31 +262,29 @@ async function createMedicationTaskInner(input: CreateMedicationTaskInput): Prom
         animalId: input.animalId,
         drugId: input.drugId,
         route: normalizedRoute,
-        calculationSnapshot: {
-          version: 1,
-          data: result,
-        },
+        calculationSnapshot: snapshot,
         safetyLevel: result.safety.level,
         overrideReason: trimmedOverrideReason,
         status: "pending",
+        dueAt: input.dueAt ?? null,
         createdBy: input.createdBy,
       })
       .returning();
     row = inserted[0];
   } catch (err) {
     if (isPostgresUniqueViolation(err)) {
-      const dupId = await findOpenMedicationTaskDuplicate({
+      const dup = await findOpenMedicationTaskDuplicate({
         clinicId: input.clinicId,
         animalId: input.animalId,
         drugId: input.drugId,
         route: normalizedRoute,
       });
-      if (dupId) {
+      if (dup) {
         throw new MedTaskError(
           "DUPLICATE_ACTIVE_MEDICATION_TASK",
           409,
           "An active medication task already exists for this patient, drug, and route.",
-          { existingTaskId: dupId },
+          { existingTaskId: dup.id },
         );
       }
     }
@@ -220,6 +309,8 @@ async function createMedicationTaskInner(input: CreateMedicationTaskInput): Prom
       route: row.route,
       safetyLevel: row.safetyLevel,
       overrideReason: row.overrideReason,
+      reasonType,
+      dueAt: row.dueAt?.toISOString() ?? null,
     },
   });
 
@@ -287,86 +378,237 @@ export async function takeMedicationTask(
   }
 }
 
-export async function completeMedicationTask(
+/**
+ * Complete a medication task.
+ *
+ * Fix F (approved): strictly atomic + idempotent.
+ *   1. Validate actualVolume.
+ *   2. DB transaction: insert billing ledger row (deterministic key) +
+ *      update task (status=completed, actualVolume, administeredAt, inventoryStatus=PENDING).
+ *      If billing insert fails → transaction rolls back; task remains in_progress.
+ *   3. After commit: enqueue BullMQ inventory deduction job.
+ */
+export async function completeMedicationTask(input: CompleteMedicationTaskInput): Promise<MedicationTask> {
+  const { taskId, userId, userEmail, clinicId, actorRole, actualVolume, administeredAt } = input;
+  try {
+    validateActualVolume(actualVolume);
+
+    const completedTask = await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(medicationTasks)
+        .where(and(eq(medicationTasks.id, taskId), eq(medicationTasks.clinicId, clinicId)))
+        .limit(1);
+
+      if (!existing) {
+        throw new MedTaskError("NOT_FOUND", 404, "Medication task was not found.");
+      }
+      if (existing.status === "completed") {
+        throw new MedTaskError("TASK_ALREADY_COMPLETED", 409, "Task is already completed.");
+      }
+      if (existing.status === "cancelled") {
+        throw new MedTaskError("TASK_CANCELLED", 409, "Task has been cancelled.");
+      }
+      if (existing.status !== "in_progress") {
+        throw new MedTaskError("INVALID_STATE", 409, "Task must be in progress to complete.");
+      }
+      if (existing.assignedTo !== userId) {
+        throw new MedTaskError("NOT_ASSIGNED_USER", 403, "Only the assigned user can complete this task.");
+      }
+      if (existing.completedAt) {
+        throw new MedTaskError("TASK_ALREADY_COMPLETED", 409, "Task is already completed.");
+      }
+
+      // Insert billing ledger row with deterministic idempotency key
+      const billingIdempotencyKey = `med-task-complete:${taskId}`;
+      const [existingBilling] = await tx
+        .select({ id: billingLedger.id })
+        .from(billingLedger)
+        .where(
+          and(
+            eq(billingLedger.clinicId, clinicId),
+            eq(billingLedger.idempotencyKey, billingIdempotencyKey),
+          ),
+        )
+        .limit(1);
+
+      let billingId: string;
+      if (existingBilling) {
+        billingId = existingBilling.id;
+      } else {
+        const [defaultBillingItem] = await tx
+          .select({ id: billingItems.id, unitPriceCents: billingItems.unitPriceCents })
+          .from(billingItems)
+          .where(and(eq(billingItems.clinicId, clinicId), eq(billingItems.code, "DEFAULT_MEDICATION")))
+          .limit(1);
+
+        const unitPrice = defaultBillingItem?.unitPriceCents ?? 0;
+        billingId = randomUUID();
+        await tx.insert(billingLedger).values({
+          id: billingId,
+          clinicId,
+          animalId: existing.animalId,
+          itemType: "CONSUMABLE",
+          itemId: existing.drugId,
+          quantity: 1,
+          unitPriceCents: unitPrice,
+          totalAmountCents: unitPrice,
+          idempotencyKey: billingIdempotencyKey,
+          status: "pending",
+        });
+      }
+
+      const now = new Date();
+      const [updated] = await tx
+        .update(medicationTasks)
+        .set({
+          status: "completed",
+          completedAt: now,
+          actualVolume: String(actualVolume),
+          administeredAt: administeredAt ?? now,
+          inventoryStatus: "PENDING",
+        })
+        .where(
+          and(
+            eq(medicationTasks.id, taskId),
+            eq(medicationTasks.clinicId, clinicId),
+            eq(medicationTasks.status, "in_progress"),
+            eq(medicationTasks.assignedTo, userId),
+            isNull(medicationTasks.completedAt),
+          ),
+        )
+        .returning();
+
+      if (!updated) {
+        throw new MedTaskError("INVALID_STATE", 409, "Task state changed during completion. Please retry.");
+      }
+
+      return updated;
+    });
+
+    logAudit({
+      clinicId,
+      actionType: "medication_task_completed",
+      performedBy: userId,
+      performedByEmail: userEmail,
+      actorRole,
+      targetId: completedTask.id,
+      targetType: "medication_task",
+      metadata: {
+        animalId: completedTask.animalId,
+        drugId: completedTask.drugId,
+        route: completedTask.route,
+        actualVolume,
+        administeredAt: (administeredAt ?? completedTask.completedAt)?.toISOString() ?? null,
+        safetyLevel: completedTask.safetyLevel,
+      },
+    });
+
+    // Enqueue inventory deduction job after commit (async, non-blocking)
+    try {
+      const snap = completedTask.calculationSnapshot as Record<string, unknown> | null;
+      const calcVolume =
+        typeof (snap as Record<string, unknown> | null)?.calculatedVolume === "number"
+          ? ((snap as Record<string, unknown>).calculatedVolume as number)
+          : actualVolume;
+
+      const jobId = randomUUID();
+      await db.insert(inventoryJobs).values({
+        id: jobId,
+        clinicId,
+        taskId: completedTask.id,
+        containerId: completedTask.drugId, // placeholder; worker resolves actual container
+        requiredVolumeMl: String(calcVolume),
+        animalId: completedTask.animalId,
+        status: "pending",
+        retryCount: 0,
+        failureReason: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        resolvedAt: null,
+      }).onConflictDoNothing();
+
+      await inventoryDeductionQueue.add({
+        taskId: completedTask.id,
+        containerId: completedTask.drugId,
+        requiredVolumeMl: calcVolume,
+        clinicId,
+        animalId: completedTask.animalId,
+      });
+    } catch (err) {
+      // Enqueue failure is non-fatal — recovery job will pick it up
+      console.error("[completeMedicationTask] inventory job enqueue failed", {
+        taskId: completedTask.id,
+        err: err instanceof Error ? err.message : String(err),
+      });
+      // Mark inventoryStatus=FAILED so it's visible immediately
+      await db
+        .update(medicationTasks)
+        .set({ inventoryStatus: "FAILED" })
+        .where(and(eq(medicationTasks.id, taskId), eq(medicationTasks.clinicId, clinicId)));
+    }
+
+    return completedTask;
+  } catch (err) {
+    if (err instanceof MedTaskError) throw err;
+    console.error("[completeMedicationTask] unexpected error", err);
+    throw new MedTaskError("INTERNAL_ERROR", 500, "Failed to complete task. Please retry.");
+  }
+}
+
+export async function cancelMedicationTask(
   taskId: string,
   userId: string,
   userEmail: string,
   clinicId: string,
   actorRole?: string | null,
+  reason?: string | null,
 ): Promise<MedicationTask> {
   try {
-    const [pre] = await db
-      .select({ calculationSnapshot: medicationTasks.calculationSnapshot })
-      .from(medicationTasks)
-      .where(and(eq(medicationTasks.id, taskId), eq(medicationTasks.clinicId, clinicId)))
-      .limit(1);
-
-    if (!pre) {
-      throw new MedTaskError("NOT_FOUND", 404, "Medication task was not found.");
-    }
-    validateCompletionVolume(pre.calculationSnapshot);
-
     const rows = await db
       .update(medicationTasks)
       .set({
-        status: "completed",
-        completedAt: new Date(),
+        status: "cancelled",
+        cancelledAt: new Date(),
+        cancelledBy: userId,
+        assignedTo: null,
       })
       .where(
         and(
           eq(medicationTasks.id, taskId),
           eq(medicationTasks.clinicId, clinicId),
-          eq(medicationTasks.status, "in_progress"),
-          eq(medicationTasks.assignedTo, userId),
+          inArray(medicationTasks.status, ["pending", "in_progress"]),
           isNull(medicationTasks.completedAt),
         ),
       )
       .returning();
 
-    if (rows.length > 0) {
-      const task = rows[0];
-      logAudit({
-        clinicId: task.clinicId,
-        actionType: "medication_task_completed",
-        performedBy: userId,
-        performedByEmail: userEmail,
-        actorRole,
-        targetId: task.id,
-        targetType: "medication_task",
-        metadata: {
-          animalId: task.animalId,
-          drugId: task.drugId,
-          route: task.route,
-          safetyLevel: task.safetyLevel,
-          overrideReason: task.overrideReason,
-          calculationSnapshot: task.calculationSnapshot,
-          startedAt: task.startedAt?.toISOString() ?? null,
-          completedAt: task.completedAt?.toISOString() ?? null,
-        },
-      });
-      return task;
+    if (rows.length === 0) {
+      const [existing] = await db
+        .select({ status: medicationTasks.status })
+        .from(medicationTasks)
+        .where(and(eq(medicationTasks.id, taskId), eq(medicationTasks.clinicId, clinicId)))
+        .limit(1);
+      if (!existing) throw new MedTaskError("NOT_FOUND", 404, "Medication task not found.");
+      throw new MedTaskError("INVALID_STATE", 409, `Cannot cancel task with status '${existing.status}'.`);
     }
 
-    const [existing] = await db
-      .select()
-      .from(medicationTasks)
-      .where(and(eq(medicationTasks.id, taskId), eq(medicationTasks.clinicId, clinicId)))
-      .limit(1);
-
-    if (!existing) {
-      throw new MedTaskError("NOT_FOUND", 404, "Medication task was not found.");
-    }
-    if (existing.status === "completed") {
-      throw new MedTaskError("TASK_ALREADY_COMPLETED", 409, "Task is already completed.");
-    }
-    if (existing.assignedTo !== userId) {
-      throw new MedTaskError("NOT_ASSIGNED_USER", 403, "Only the assigned user can complete this task.");
-    }
-    throw new MedTaskError("INVALID_STATE", 409, "Task must be in progress to complete.");
+    const task = rows[0];
+    logAudit({
+      clinicId,
+      actionType: "medication_task_cancelled",
+      performedBy: userId,
+      performedByEmail: userEmail,
+      actorRole,
+      targetId: task.id,
+      targetType: "medication_task",
+      metadata: { reason: reason ?? null, previousAssignee: task.assignedTo },
+    });
+    return task;
   } catch (err) {
     if (err instanceof MedTaskError) throw err;
-    console.error("[completeMedicationTask] unexpected error", err);
-    throw new MedTaskError("INTERNAL_ERROR", 500, "Failed to complete task. Please retry.");
+    console.error("[cancelMedicationTask] unexpected error", err);
+    throw new MedTaskError("INTERNAL_ERROR", 500, "Failed to cancel task.");
   }
 }
 
@@ -392,7 +634,6 @@ export async function releaseExpiredMedicationTasks(clinicId?: string): Promise<
         status: "pending",
         assignedTo: null,
         startedAt: null,
-        completedAt: null,
       })
       .where(whereExpr)
       .returning({
@@ -412,6 +653,7 @@ export async function releaseExpiredMedicationTasks(clinicId?: string): Promise<
         targetType: "medication_task",
         metadata: {
           reason: "in_progress_timeout",
+          timeoutMs: IN_PROGRESS_TIMEOUT_MS,
           previousAssignee: row.assignedTo,
         },
       });
@@ -432,7 +674,6 @@ export async function releaseStaleMedicationTasks(): Promise<number> {
         status: "pending",
         assignedTo: null,
         startedAt: null,
-        completedAt: null,
       })
       .where(
         and(
@@ -472,7 +713,6 @@ export async function releaseStaleMedicationTasks(): Promise<number> {
 
 export async function listMedicationTasks(clinicId: string): Promise<MedicationTask[]> {
   try {
-    await releaseExpiredMedicationTasks(clinicId);
     return await db
       .select()
       .from(medicationTasks)
@@ -486,4 +726,20 @@ export async function listMedicationTasks(clinicId: string): Promise<MedicationT
     console.error("[listMedicationTasks] unexpected error", err);
     throw new MedTaskError("INTERNAL_ERROR", 500, "Failed to list medication tasks.");
   }
+}
+
+/** Called by the inventory deduction worker after job outcome. */
+export async function updateMedicationTaskInventoryStatus(
+  taskId: string,
+  clinicId: string,
+  inventoryStatus: "SUCCESS" | "FAILED",
+  inventoryMismatch?: boolean,
+): Promise<void> {
+  await db
+    .update(medicationTasks)
+    .set({
+      inventoryStatus,
+      inventoryMismatch: inventoryMismatch ?? false,
+    })
+    .where(and(eq(medicationTasks.id, taskId), eq(medicationTasks.clinicId, clinicId)));
 }

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import {
+  cancelSession,
   finishSession,
   getContainerInventoryView,
   resolveItemByNFCTag,
@@ -22,10 +23,15 @@ const scanSchema = z.object({
   sessionId: z.string().uuid(),
   itemId: z.string().uuid().optional(),
   nfcTagId: z.string().trim().min(1).max(200).optional(),
-  delta: z.number().int().refine((v) => v !== 0, { message: "delta must be non-zero" }),
+  /** Absolute observed quantity (what the technician counted). */
+  observedQuantity: z.number().int().min(0),
 });
 
 const finishSchema = z.object({
+  sessionId: z.string().uuid(),
+});
+
+const cancelSchema = z.object({
   sessionId: z.string().uuid(),
 });
 
@@ -133,7 +139,7 @@ router.post(
         clinicId: req.clinicId!,
         sessionId: body.sessionId,
         itemId,
-        delta: body.delta,
+        observedQuantity: body.observedQuantity,
         userId: req.authUser!.id,
       });
       res.json(result);
@@ -155,6 +161,29 @@ router.post(
     try {
       const body = req.body as z.infer<typeof finishSchema>;
       const result = await finishSession({
+        clinicId: req.clinicId!,
+        sessionId: body.sessionId,
+        userId: req.authUser!.id,
+      });
+      res.json(result);
+    } catch (err) {
+      console.error(err);
+      const mapped = mapErrorToHttp(err, requestId);
+      res.status(mapped.status).json(mapped.body);
+    }
+  },
+);
+
+router.post(
+  "/cancel",
+  requireAuth,
+  requireEffectiveRole("technician"),
+  validateBody(cancelSchema),
+  async (req, res) => {
+    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    try {
+      const body = req.body as z.infer<typeof cancelSchema>;
+      const result = await cancelSession({
         clinicId: req.clinicId!,
         sessionId: body.sessionId,
         userId: req.authUser!.id,
