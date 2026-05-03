@@ -1434,6 +1434,10 @@ export async function completeTask(
         totalAmountCents: medicationBilling.unitPriceCents,
         idempotencyKey,
         status: "pending",
+        entryType: "CHARGE",
+        sourceType: "TASK",
+        taskId,
+        createdBy: actor.userId,
       }).onConflictDoNothing();
     }
 

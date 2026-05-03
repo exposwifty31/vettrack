@@ -140,6 +140,8 @@ export type ShiftReportEmailPayload = {
   managerEmail: string;
 };
 
+export type PushPriority = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
+
 export type NotificationJobData =
   | {
       type: "task_notification";
@@ -208,6 +210,29 @@ export type NotificationJobData =
       body: string;
       tag: string;
       notificationRequestOutboxId?: number;
+    }
+  /** Generic queued push notification (Fix E/F/G: priority + idempotency, sent via queue). */
+  | {
+      type: "push_to_user";
+      clinicId: string;
+      userId: string;
+      title: string;
+      body: string;
+      tag: string;
+      url?: string;
+      priority: PushPriority;
+      idempotencyKey: string;
+    }
+  | {
+      type: "push_to_role";
+      clinicId: string;
+      role: string;
+      title: string;
+      body: string;
+      tag: string;
+      url?: string;
+      priority: PushPriority;
+      idempotencyKey: string;
     };
 
 /**
@@ -507,6 +532,82 @@ export async function enqueueShiftReportEmailJob(payload: ShiftReportEmailPayloa
   } catch (err) {
     markQueueFailure();
     console.error("[queue] shift_report_email add failed:", (err as Error).message);
+  }
+}
+
+/**
+ * Priority-aware BullMQ job options.
+ * CRITICAL: 5 attempts, short backoff — fast retries.
+ * HIGH:     3 attempts, standard backoff.
+ * NORMAL:   3 attempts, standard backoff.
+ * LOW:      2 attempts, long backoff — less urgent.
+ */
+/**
+ * Priority-aware BullMQ job options (Fix C).
+ * BullMQ numeric priority: lower number = higher processing precedence.
+ *   CRITICAL → 1 (processed before all others)
+ *   HIGH     → 2
+ *   NORMAL   → 3
+ *   LOW      → 4 (processed last)
+ */
+function jobOptionsForPriority(priority: PushPriority, idempotencyKey: string) {
+  const jobId = `push:${idempotencyKey}`;
+  const base = defaultJobOptions();
+  switch (priority) {
+    case "CRITICAL":
+      return { ...base, priority: 1, attempts: 5, backoff: { type: "exponential" as const, delay: 1000 }, jobId };
+    case "HIGH":
+      return { ...base, priority: 2, attempts: 3, backoff: { type: "exponential" as const, delay: 2000 }, jobId };
+    case "LOW":
+      return { ...base, priority: 4, attempts: 2, backoff: { type: "exponential" as const, delay: 10000 }, jobId };
+    default:
+      return { ...base, priority: 3, jobId };
+  }
+}
+
+/**
+ * Enqueue a prioritised push notification (Fix E/F/G).
+ * Routes through BullMQ — idempotencyKey prevents duplicates via jobId.
+ * On enqueue failure: falls back to direct sendPushToUser/Role (Fix F safeguard).
+ * CRITICAL alerts bypass grouping (Fix H) — never delayed in the queue.
+ */
+export async function enqueuePushNotification(
+  data: Extract<NotificationJobData, { type: "push_to_user" | "push_to_role" }>,
+  directFallback: () => Promise<void>,
+): Promise<void> {
+  if (isCircuitOpen("queue")) {
+    console.warn("[queue] circuit open; falling back to direct push");
+    await directFallback().catch((err) =>
+      console.error("[push-fallback] direct send failed:", (err as Error).message),
+    );
+    return;
+  }
+  if (!getRedisUrl()) {
+    await directFallback().catch((err) =>
+      console.error("[push-fallback] direct send failed (no redis):", (err as Error).message),
+    );
+    return;
+  }
+  const q = await getNotificationsQueue();
+  if (!q) {
+    await directFallback().catch((err) =>
+      console.error("[push-fallback] direct send failed (queue unavailable):", (err as Error).message),
+    );
+    return;
+  }
+  try {
+    const opts = jobOptionsForPriority(data.priority, data.idempotencyKey);
+    await timedRedisOp("queue.add.push_notification", () =>
+      q.add("send_notification", data, opts),
+    );
+    queueMetrics.enqueued++;
+    incrementMetric("queue_jobs_enqueued");
+  } catch (err) {
+    markQueueFailure();
+    console.error("[queue] push_notification enqueue failed; using direct fallback:", (err as Error).message);
+    await directFallback().catch((fErr) =>
+      console.error("[push-fallback] direct send also failed:", (fErr as Error).message),
+    );
   }
 }
 

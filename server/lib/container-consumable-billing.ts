@@ -26,6 +26,14 @@ export interface BillingLineInput {
   formularyId?: string | null;
   /** For DRUG items: formularyVersion to persist in pricingSnapshot. */
   formularyVersion?: number | null;
+  /** Source type for the billing row (default: DISPENSE). */
+  sourceType?: "DISPENSE" | "TASK" | "MANUAL";
+  /** Dispense event that triggered this charge. */
+  dispenseEventId?: string | null;
+  /** Task that triggered this charge (if applicable). */
+  taskId?: string | null;
+  /** UserId who triggered this billing entry. */
+  createdBy?: string | null;
   /** When set (only from routes gated by `VETTRACK_TEST_FORCE_BILLING_FAIL`), throws to verify TX rollback. */
   testForceBillingFail?: boolean;
 }
@@ -148,6 +156,13 @@ export async function captureConsumableBillingForDispenseLine(
     idempotencyKey,
     status: "pending",
     pricingSnapshot: snapshot,
+    entryType: "CHARGE",
+    sourceType: input.sourceType ?? "DISPENSE",
+    dispenseEventId: input.dispenseEventId ?? null,
+    taskId: input.taskId ?? null,
+    createdBy: input.createdBy ?? null,
+    formularyId: priceResolution.formularyId ?? null,
+    formularyVersion: priceResolution.formularyVersion ?? null,
   });
 
   return { billingEventId: ledgerId, rowTotalCents, pricingSnapshot: snapshot };

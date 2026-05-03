@@ -13,6 +13,7 @@ import {
   type DispenseEvent,
 } from "../db.js";
 import { logAudit } from "../lib/audit.js";
+import { postSystemMessage } from "../lib/shift-chat-presence.js";
 import { captureConsumableBillingForDispenseLine } from "../lib/container-consumable-billing.js";
 
 export class DispenseError extends Error {
@@ -190,6 +191,9 @@ export async function confirmDispense(input: ConfirmDispenseInput): Promise<Disp
         patientId: event.patientId ?? null,
         qty: lineItem.quantity,
         idempotencyKey: ledgerIdempotencyKey,
+        sourceType: "DISPENSE",
+        dispenseEventId: event.id,
+        createdBy: confirmedBy,
       });
       if (capture.billingEventId && !billingEventId) {
         billingEventId = capture.billingEventId;
@@ -418,6 +422,13 @@ export async function scanUnresolvedEmergencyDispenses(clinicId?: string): Promi
       title: `Emergency dispense unresolved (${tier.toLowerCase()} priority) — ${Math.round(ageMs / 60000)} min ago`,
       createdAt: new Date(),
     }).onConflictDoNothing();
+
+    postSystemMessage(event.clinicId, "emergency_dispense_unresolved", {
+      dispenseEventId: event.id,
+      patientId: event.patientId ?? null,
+      ageMinutes: Math.round(ageMs / 60000),
+      tier,
+    }).catch(() => {});
   }
 }
 

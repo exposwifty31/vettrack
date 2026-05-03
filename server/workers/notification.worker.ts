@@ -8,6 +8,7 @@ import crypto from "crypto";
 import { Worker } from "bullmq";
 import nodemailer from "nodemailer";
 import { dispatchTaskNotificationSync } from "../lib/task-notification.js";
+import { postSystemMessage } from "../lib/shift-chat-presence.js";
 import {
   NOTIFICATION_DLQ_NAME,
   NOTIFICATION_QUEUE_NAME,
@@ -230,6 +231,61 @@ async function processSendNotification(data: NotificationJobData): Promise<void>
       }),
       10_000,
       "code blue broadcast",
+    );
+    return;
+  }
+  if (data.type === "push_to_user") {
+    // Fix H: group LOW and NORMAL by (type, tag, clinicId) within a time window.
+    // CRITICAL is never grouped — always sent immediately.
+    if (data.priority === "LOW" || data.priority === "NORMAL") {
+      const windowSec = data.priority === "LOW" ? 300 : 120; // LOW=5min, NORMAL=2min
+      const groupKey = `push-group:${data.clinicId}:${data.tag}`;
+      const r = await getRedis();
+      if (r) {
+        const existing = await r.get(groupKey);
+        if (existing) {
+          incrementMetric("push_grouped_skipped");
+          return; // Deduplicated within window
+        }
+        await r.set(groupKey, "1", "EX", windowSec);
+      }
+    }
+    await withTimeout(
+      sendPushToUser(data.clinicId, data.userId, {
+        title: data.title,
+        body: data.body,
+        tag: data.tag,
+        url: data.url,
+      }),
+      5_000,
+      `push_to_user [${data.priority}]`,
+    );
+    return;
+  }
+  if (data.type === "push_to_role") {
+    // Fix H: same grouping logic for role pushes.
+    if (data.priority === "LOW" || data.priority === "NORMAL") {
+      const windowSec = data.priority === "LOW" ? 300 : 120;
+      const groupKey = `push-group:${data.clinicId}:${data.role}:${data.tag}`;
+      const r = await getRedis();
+      if (r) {
+        const existing = await r.get(groupKey);
+        if (existing) {
+          incrementMetric("push_grouped_skipped");
+          return;
+        }
+        await r.set(groupKey, "1", "EX", windowSec);
+      }
+    }
+    await withTimeout(
+      sendPushToRole(data.clinicId, data.role, {
+        title: data.title,
+        body: data.body,
+        tag: data.tag,
+        url: data.url,
+      }),
+      5_000,
+      `push_to_role [${data.priority}]`,
     );
     return;
   }
@@ -605,13 +661,45 @@ async function main(): Promise<void> {
     NOTIFICATION_DLQ_NAME,
     async (job) => {
       incrementMetric("queue_jobs_dead_letter");
+      const data = job.data as {
+        sourceQueue?: string;
+        sourceJobId?: string;
+        attemptsMade?: number;
+        reason?: string;
+        data?: unknown;
+      };
       console.error("DLQ_JOB_RECEIVED", {
         id: job.id,
-        sourceQueue: job.data?.sourceQueue,
-        sourceJobId: job.data?.sourceJobId,
-        attemptsMade: job.data?.attemptsMade,
-        reason: job.data?.reason,
+        sourceQueue: data?.sourceQueue,
+        sourceJobId: data?.sourceJobId,
+        attemptsMade: data?.attemptsMade,
+        reason: data?.reason,
       });
+
+      // Fix D: escalate CRITICAL push jobs that have exhausted all retries.
+      // Only fires when: (1) job has failed after max retries, (2) no successful retry exists.
+      const innerData = data?.data as Record<string, unknown> | undefined;
+      const isCriticalPush =
+        innerData &&
+        (innerData.type === "push_to_user" || innerData.type === "push_to_role") &&
+        innerData.priority === "CRITICAL";
+
+      if (isCriticalPush) {
+        const clinicId = typeof innerData.clinicId === "string" ? innerData.clinicId : null;
+        if (clinicId) {
+          postSystemMessage(clinicId, "critical_push_delivery_failed", {
+            sourceJobId: data?.sourceJobId ?? null,
+            reason: data?.reason ?? "unknown",
+            pushType: innerData.type,
+            tag: typeof innerData.tag === "string" ? innerData.tag : null,
+          }).catch(() => {});
+        }
+        console.error("[dlq] CRITICAL push job permanently failed — escalation triggered", {
+          sourceJobId: data?.sourceJobId,
+          clinicId,
+          reason: data?.reason,
+        });
+      }
     },
     { connection, concurrency: 1 },
   );

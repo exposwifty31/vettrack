@@ -15,8 +15,9 @@ import {
   hospitalizations,
   users,
 } from "../db.js";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, isNull } from "drizzle-orm";
 import { sql } from "drizzle-orm";
+import { inventoryJobs } from "../db.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
@@ -709,25 +710,90 @@ router.get("/sessions/:id/dispenses", requireAuth, requireAdmin, async (req, res
 
 /**
  * PATCH /api/code-blue/sessions/:id/reconcile
- * Marks a session as reconciled. Idempotent. Admin only.
+ * Fix D: Validates billing completeness + no failed inventory jobs before marking reconciled.
+ * Pass ?force=true + body.forceReason to override gaps. Admin only.
  */
-router.patch("/sessions/:id/reconcile", requireAuth, requireAdmin, async (req, res) => {
+const reconcileSchema = z.object({
+  forceReason: z.string().min(1).max(500).optional(),
+});
+
+router.patch("/sessions/:id/reconcile", requireAuth, requireAdmin, validateBody(reconcileSchema), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
     const sessionId = req.params.id;
+    const force = req.query.force === "true";
+    const { forceReason } = req.body as z.infer<typeof reconcileSchema>;
+
+    if (force && !forceReason?.trim()) {
+      return res.status(400).json(apiError({ code: "FORCE_REASON_REQUIRED", reason: "FORCE_REASON_REQUIRED", message: "forceReason is required when force=true", requestId }));
+    }
+
+    const [session] = await db
+      .select({ startedAt: codeBlueSessions.startedAt, endedAt: codeBlueSessions.endedAt, isReconciled: codeBlueSessions.isReconciled })
+      .from(codeBlueSessions)
+      .where(and(eq(codeBlueSessions.id, sessionId), eq(codeBlueSessions.clinicId, clinicId)))
+      .limit(1);
+
+    if (!session) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "SESSION_NOT_FOUND", message: "Session not found", requestId }));
+    if (session.isReconciled) return res.json({ id: sessionId, isReconciled: true, alreadyReconciled: true });
+
+    if (!force) {
+      // Fix D: verify billing completeness and no failed inventory jobs
+      const sessionEnd = session.endedAt ?? new Date();
+      const dispenseVsBillingResult = await pool.query<{ dispense_count: number; billed_count: number }>(
+        `SELECT
+           COUNT(il.id)::int AS dispense_count,
+           COUNT(bl.id) FILTER (WHERE bl.id IS NOT NULL AND bl.status != 'voided')::int AS billed_count
+         FROM vt_inventory_logs il
+         LEFT JOIN vt_billing_ledger bl
+           ON bl.idempotency_key = 'adjustment_' || il.id
+         WHERE il.clinic_id = $1
+           AND il.quantity_added < 0
+           AND il.created_at >= $2
+           AND il.created_at <= $3`,
+        [clinicId, session.startedAt.toISOString(), sessionEnd.toISOString()],
+      );
+
+      const dispenseCount = dispenseVsBillingResult.rows[0]?.dispense_count ?? 0;
+      const billedCount = dispenseVsBillingResult.rows[0]?.billed_count ?? 0;
+      const billingGapCount = dispenseCount - billedCount;
+
+      // Check failed inventory jobs overlapping this session window
+      const failedJobsResult = await pool.query<{ count: number }>(
+        `SELECT COUNT(*)::int AS count
+         FROM vt_inventory_jobs
+         WHERE clinic_id = $1
+           AND status = 'failed'
+           AND created_at >= $2
+           AND created_at <= $3`,
+        [clinicId, session.startedAt.toISOString(), sessionEnd.toISOString()],
+      );
+      const failedJobCount = failedJobsResult.rows[0]?.count ?? 0;
+
+      if (billingGapCount > 0 || failedJobCount > 0) {
+        return res.status(409).json({
+          code: "UNRESOLVED_RECONCILIATION",
+          error: "UNRESOLVED_RECONCILIATION",
+          reason: "UNRESOLVED_RECONCILIATION",
+          message: "Cannot reconcile: billing or inventory gaps remain. Resolve gaps or pass ?force=true with forceReason.",
+          billingGapCount,
+          failedInventoryJobCount: failedJobCount,
+          dispenseCount,
+          billedCount,
+          requestId,
+        });
+      }
+    }
+
     const [updated] = await db
       .update(codeBlueSessions)
-      .set({
-        isReconciled: true,
-        reconciledAt: new Date(),
-        reconciledByUserId: req.authUser!.id,
-      })
+      .set({ isReconciled: true, reconciledAt: new Date(), reconciledByUserId: req.authUser!.id })
       .where(and(eq(codeBlueSessions.id, sessionId), eq(codeBlueSessions.clinicId, clinicId)))
       .returning({ id: codeBlueSessions.id, isReconciled: codeBlueSessions.isReconciled, reconciledAt: codeBlueSessions.reconciledAt });
-    if (!updated) {
-      return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "SESSION_NOT_FOUND", message: "Session not found", requestId }));
-    }
+
+    if (!updated) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "SESSION_NOT_FOUND", message: "Session not found", requestId }));
+
     logAudit({
       clinicId,
       actionType: "code_blue_session_reconciled",
@@ -736,11 +802,13 @@ router.patch("/sessions/:id/reconcile", requireAuth, requireAdmin, async (req, r
       targetId: sessionId,
       targetType: "code_blue_session",
       actorRole: resolveAuditActorRole(req),
+      metadata: { force, forceReason: forceReason?.trim() ?? null },
     });
-    res.json(updated);
+
+    return res.json(updated);
   } catch (err) {
     console.error(err);
-    res.status(500).json(
+    return res.status(500).json(
       apiError({ code: "INTERNAL_ERROR", reason: "RECONCILE_FAILED", message: "Failed to reconcile session", requestId }),
     );
   }

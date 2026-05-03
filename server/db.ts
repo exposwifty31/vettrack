@@ -405,6 +405,23 @@ export const billingLedger = pgTable("vt_billing_ledger", {
    * priceSource, resolutionPath[], contextUsed, formularyId?, formularyVersion?
    */
   pricingSnapshot: jsonb("pricing_snapshot"),
+  /** CHARGE = original charge; REVERSAL = negates a prior charge (append-only correction). */
+  entryType: varchar("entry_type", { length: 10 }).notNull().default("CHARGE"),
+  /** For REVERSAL rows only: references the original CHARGE row being reversed. */
+  reversesId: text("reverses_id"),
+  /** Reason for reversal — required on REVERSAL entries. */
+  reversalReason: text("reversal_reason"),
+  /** Source traceability: which task produced this charge. */
+  taskId: text("task_id"),
+  /** Source traceability: which dispense event produced this charge. */
+  dispenseEventId: text("dispense_event_id"),
+  /** Who created this billing entry (userId). */
+  createdBy: text("created_by"),
+  /** Formulary reference if charge was derived from a medication task. */
+  formularyId: text("formulary_id"),
+  formularyVersion: integer("formulary_version"),
+  /** Indicates the origin of this charge: TASK | DISPENSE | MANUAL */
+  sourceType: varchar("source_type", { length: 10 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   externalId: text("external_id"),
   externalSource: text("external_source"),
@@ -831,6 +848,12 @@ export const alertAcks = pgTable("vt_alert_acks", {
   acknowledgedAt: timestamp("acknowledged_at").defaultNow().notNull(),
   remindAt: timestamp("remind_at"),
   remindedAt: timestamp("reminded_at"),
+  /** Two-level status: SEEN = awareness (alerts continue); RESOLVED = handled (alerts stop). */
+  ackStatus: varchar("ack_status", { length: 10 }).notNull().default("SEEN"),
+  /** Set when user marks as RESOLVED. Persisted — row is never deleted. */
+  resolvedAt: timestamp("resolved_at"),
+  resolvedById: text("resolved_by_id"),
+  resolutionNote: text("resolution_note"),
 });
 
 export const undoTokens = pgTable("vt_undo_tokens", {
@@ -880,6 +903,10 @@ export const integrationSyncConflicts = pgTable("vt_integration_sync_conflicts",
   status: text("status").notNull().default("open"),
   policyUsed: text("policy_used").notNull(),
   payloadSnapshot: jsonb("payload_snapshot"),
+  /** LOW = auto-resolved (external_wins / vettrack_wins); HIGH = manual review required. */
+  severity: varchar("severity", { length: 10 }).notNull().default("HIGH"),
+  /** How the conflict was resolved: 'auto_external_wins' | 'auto_vettrack_wins' | 'pending_manual' */
+  resolution: varchar("resolution", { length: 30 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   resolvedAt: timestamp("resolved_at"),
 });
@@ -1047,6 +1074,10 @@ export const eventOutbox = pgTable(
     eventVersion: integer("event_version").notNull().default(1),
     /** Set on publish failure: `transient` (auto-retry) vs `permanent` (excluded from publisher loop). */
     errorType: varchar("error_type", { length: 20 }),
+    /** Severity level for client-side prioritisation: INFO | WARNING | CRITICAL */
+    level: varchar("level", { length: 10 }).notNull().default("INFO"),
+    /** Domain category for filtering: TASK | PATIENT | INVENTORY | ALERT | SYSTEM */
+    category: varchar("category", { length: 20 }).notNull().default("SYSTEM"),
   },
   (table) => ({
     unpublishedIdx: index("idx_vt_event_outbox_unpublished").on(table.id).where(sql`${table.publishedAt} IS NULL`),
@@ -1576,6 +1607,34 @@ export const erBaselineSnapshots = pgTable(
     ),
   }),
 );
+
+/**
+ * Persisted per-shift handover snapshot.
+ * Written on shift end — the incoming shift reads this to understand the state
+ * they're inheriting. Immutable after creation.
+ */
+export const shiftHandoverSnapshots = pgTable(
+  "vt_shift_handover_snapshots",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    shiftSessionId: text("shift_session_id")
+      .notNull()
+      .references(() => shiftSessions.id, { onDelete: "restrict" }),
+    generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Full patient-centric JSON payload — array of per-patient objects. */
+    patientsPayload: jsonb("patients_payload").notNull(),
+    /** Summary counts: {patientCount, pendingTaskCount, overdueCount, unresolvedEmergencyCount} */
+    summaryCounts: jsonb("summary_counts").notNull(),
+    createdBy: text("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  },
+  (table) => ({
+    clinicShiftIdx: index("idx_vt_shift_handover_snapshots_clinic_shift").on(table.clinicId, table.shiftSessionId),
+    clinicGeneratedIdx: index("idx_vt_shift_handover_snapshots_clinic_generated").on(table.clinicId, table.generatedAt),
+  }),
+);
+
+export type ShiftHandoverSnapshot = typeof shiftHandoverSnapshots.$inferSelect;
 
 /** Operational / system follow-ups (e.g. billing reconciliation). */
 export const operationalTasks = pgTable(

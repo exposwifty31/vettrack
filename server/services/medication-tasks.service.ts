@@ -459,6 +459,12 @@ export async function completeMedicationTask(input: CompleteMedicationTaskInput)
           totalAmountCents: unitPrice,
           idempotencyKey: billingIdempotencyKey,
           status: "pending",
+          entryType: "CHARGE",
+          sourceType: "TASK",
+          taskId,
+          createdBy: userId,
+          formularyId: existing.formularyId ?? null,
+          formularyVersion: existing.formularyVersion ?? null,
         });
       }
 

@@ -8,6 +8,13 @@ import { idempotencyMiddleware } from "../middleware/idempotency.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { enqueueBillingWebhookJob } from "../lib/queue.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
+import { invalidateAnalyticsCache } from "../lib/analytics-cache.js";
+
+/** Invalidate both billing-specific and general analytics caches for a clinic. */
+function invalidateBillingCaches(clinicId: string): void {
+  invalidateAnalyticsCache(`billing:${clinicId}`);
+  invalidateAnalyticsCache(clinicId);
+}
 
 const router = Router();
 
@@ -40,6 +47,12 @@ const createChargeSchema = z.object({
   quantity: z.number().int().min(1),
   unitPriceCents: z.number().int().min(0),
   note: z.string().max(500).optional(),
+  /** Optional: Idempotency-Key header value used to build deterministic key. */
+  idempotencyKeyHint: z.string().max(200).optional(),
+});
+
+const reverseChargeSchema = z.object({
+  reversalReason: z.string().min(1).max(500),
 });
 
 // GET /api/billing — list ledger entries for the clinic
@@ -390,7 +403,17 @@ router.post(
     const b = req.body as z.infer<typeof createChargeSchema>;
     const id = randomUUID();
     const totalAmountCents = b.quantity * b.unitPriceCents;
-    const idempotencyKey = `manual_${clinicId}_${Date.now()}_${id}`;
+
+    // Fix C: deterministic idempotency key.
+    // Use Idempotency-Key header if provided; otherwise derive from content to
+    // ensure replayed requests don't create duplicates within a 5-minute window.
+    const headerKey = typeof req.headers["idempotency-key"] === "string"
+      ? req.headers["idempotency-key"].trim()
+      : null;
+    const roundedMinute = Math.floor(Date.now() / (5 * 60 * 1000));
+    const idempotencyKey = headerKey
+      ? `manual:header:${headerKey}`
+      : `manual:${clinicId}:${b.itemId}:${totalAmountCents}:${roundedMinute}`;
 
     await db.insert(billingLedger).values({
       id,
@@ -403,7 +426,10 @@ router.post(
       totalAmountCents,
       idempotencyKey,
       status: "pending",
-    });
+      entryType: "CHARGE",
+      sourceType: "MANUAL",
+      createdBy: req.authUser!.id,
+    }).onConflictDoNothing();
 
     const [row] = await db.select().from(billingLedger).where(eq(billingLedger.id, id)).limit(1);
 
@@ -415,8 +441,10 @@ router.post(
       performedByEmail: req.authUser!.email ?? "",
       targetId: id,
       targetType: "billing_entry",
-      metadata: { itemType: b.itemType, itemId: b.itemId, quantity: b.quantity, totalAmountCents, animalId: b.animalId ?? null },
+      metadata: { itemType: b.itemType, itemId: b.itemId, quantity: b.quantity, totalAmountCents, animalId: b.animalId ?? null, sourceType: "MANUAL" },
     });
+
+    invalidateBillingCaches(clinicId);
 
     // Fire webhook if configured (config lookup handled inside enqueueBillingWebhookJob)
     try {
@@ -445,7 +473,111 @@ router.post(
   }
 });
 
-// PATCH /api/billing/:id/void — void a charge
+/**
+ * POST /api/billing/:id/reverse — append-only correction (Fix A).
+ * Creates a new REVERSAL entry with totalAmountCents = -original.
+ * The original CHARGE row is NEVER modified.
+ * Cannot reverse a REVERSAL (prevents double reversals).
+ */
+router.post(
+  "/:id/reverse",
+  requireAuth,
+  requireAdmin,
+  idempotencyMiddleware("billing:reverse"),
+  validateUuid("id"),
+  validateBody(reverseChargeSchema),
+  async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  try {
+    const clinicId = req.clinicId!;
+    const { reversalReason } = req.body as z.infer<typeof reverseChargeSchema>;
+
+    const [original] = await db
+      .select()
+      .from(billingLedger)
+      .where(and(eq(billingLedger.clinicId, clinicId), eq(billingLedger.id, req.params.id)))
+      .limit(1);
+
+    if (!original) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "ENTRY_NOT_FOUND", message: "Billing entry not found", requestId }));
+
+    if (original.entryType === "REVERSAL") {
+      return res.status(409).json(apiError({ code: "CONFLICT", reason: "CANNOT_REVERSE_REVERSAL", message: "A REVERSAL entry cannot itself be reversed", requestId }));
+    }
+
+    // Check if a reversal already exists for this charge (idempotent guard)
+    const existingReversal = await db
+      .select({ id: billingLedger.id })
+      .from(billingLedger)
+      .where(and(eq(billingLedger.clinicId, clinicId), eq(billingLedger.reversesId, original.id)))
+      .limit(1);
+    if (existingReversal.length > 0) {
+      return res.status(409).json(apiError({ code: "CONFLICT", reason: "ALREADY_REVERSED", message: "A reversal already exists for this charge", requestId }));
+    }
+
+    const reversalId = randomUUID();
+    const reversalIdempotencyKey = `reversal:${original.id}`;
+
+    const [reversal] = await db.insert(billingLedger).values({
+      id: reversalId,
+      clinicId,
+      animalId: original.animalId,
+      itemType: original.itemType,
+      itemId: original.itemId,
+      quantity: -original.quantity,
+      unitPriceCents: original.unitPriceCents,
+      totalAmountCents: -original.totalAmountCents,
+      idempotencyKey: reversalIdempotencyKey,
+      status: "pending",
+      entryType: "REVERSAL",
+      reversesId: original.id,
+      reversalReason,
+      sourceType: original.sourceType,
+      taskId: original.taskId,
+      dispenseEventId: original.dispenseEventId,
+      createdBy: req.authUser!.id,
+      formularyId: original.formularyId,
+      formularyVersion: original.formularyVersion,
+    }).onConflictDoNothing().returning();
+
+    if (!reversal) {
+      // Idempotent replay — return existing reversal
+      const [existingRev] = await db.select().from(billingLedger).where(and(eq(billingLedger.clinicId, clinicId), eq(billingLedger.idempotencyKey, reversalIdempotencyKey))).limit(1);
+      if (existingRev) return res.json(existingRev);
+      return res.status(500).json(apiError({ code: "INTERNAL_ERROR", reason: "REVERSAL_FAILED", message: "Failed to create reversal entry", requestId }));
+    }
+
+    logAudit({
+      actorRole: resolveAuditActorRole(req),
+      clinicId,
+      actionType: "billing_reversed",
+      performedBy: req.authUser!.id,
+      performedByEmail: req.authUser!.email,
+      targetId: reversalId,
+      targetType: "billing_entry",
+      metadata: {
+        originalId: original.id,
+        originalAmount: original.totalAmountCents,
+        reversalAmount: -original.totalAmountCents,
+        reversalReason,
+        itemType: original.itemType,
+        itemId: original.itemId,
+      },
+    });
+
+    invalidateBillingCaches(clinicId);
+
+    return res.status(201).json(reversal);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json(apiError({ code: "INTERNAL_ERROR", reason: "BILLING_REVERSE_FAILED", message: "Failed to create reversal", requestId }));
+  }
+});
+
+/**
+ * PATCH /api/billing/:id/void — deprecated alias for reverse.
+ * Kept for backward compatibility; delegates to the reverse logic.
+ * @deprecated Use POST /:id/reverse instead.
+ */
 router.patch(
   "/:id/void",
   requireAuth,
@@ -456,21 +588,33 @@ router.patch(
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
-    const [existing] = await db
-      .select()
-      .from(billingLedger)
-      .where(and(eq(billingLedger.clinicId, clinicId), eq(billingLedger.id, req.params.id)))
-      .limit(1);
+    const [original] = await db.select().from(billingLedger).where(and(eq(billingLedger.clinicId, clinicId), eq(billingLedger.id, req.params.id))).limit(1);
+    if (!original) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "ENTRY_NOT_FOUND", message: "Billing entry not found", requestId }));
+    if (original.entryType === "REVERSAL") return res.status(409).json(apiError({ code: "CONFLICT", reason: "CANNOT_REVERSE_REVERSAL", message: "Cannot void a REVERSAL entry", requestId }));
 
-    if (!existing) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "ENTRY_NOT_FOUND", message: "Billing entry not found", requestId }));
-    if (existing.status === "voided") return res.status(409).json(apiError({ code: "CONFLICT", reason: "ALREADY_VOIDED", message: "Billing entry is already voided", requestId }));
+    const existingReversal = await db.select({ id: billingLedger.id }).from(billingLedger).where(and(eq(billingLedger.clinicId, clinicId), eq(billingLedger.reversesId, original.id))).limit(1);
+    if (existingReversal.length > 0) return res.status(409).json(apiError({ code: "CONFLICT", reason: "ALREADY_VOIDED", message: "Billing entry is already voided", requestId }));
 
-    await db
-      .update(billingLedger)
-      .set({ status: "voided" })
-      .where(eq(billingLedger.id, req.params.id));
-
-    const [updated] = await db.select().from(billingLedger).where(eq(billingLedger.id, req.params.id)).limit(1);
+    const reversalId = randomUUID();
+    const [reversal] = await db.insert(billingLedger).values({
+      id: reversalId,
+      clinicId,
+      animalId: original.animalId,
+      itemType: original.itemType,
+      itemId: original.itemId,
+      quantity: -original.quantity,
+      unitPriceCents: original.unitPriceCents,
+      totalAmountCents: -original.totalAmountCents,
+      idempotencyKey: `reversal:${original.id}`,
+      status: "pending",
+      entryType: "REVERSAL",
+      reversesId: original.id,
+      reversalReason: "voided via legacy endpoint",
+      sourceType: original.sourceType,
+      taskId: original.taskId,
+      dispenseEventId: original.dispenseEventId,
+      createdBy: req.authUser!.id,
+    }).onConflictDoNothing().returning();
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
@@ -480,18 +624,14 @@ router.patch(
       performedByEmail: req.authUser!.email,
       targetId: req.params.id,
       targetType: "billing_ledger",
-      metadata: {
-        previousStatus: existing.status,
-        itemType: existing.itemType,
-        itemId: existing.itemId,
-        totalAmountCents: existing.totalAmountCents,
-      },
+      metadata: { originalId: original.id, reversalId: reversal?.id ?? null, totalAmountCents: original.totalAmountCents, via: "void_endpoint" },
     });
 
-    res.json(updated);
+    invalidateBillingCaches(clinicId);
+    return res.json(reversal ?? { message: "Reversal already exists" });
   } catch (err) {
     console.error(err);
-    res.status(500).json(apiError({ code: "INTERNAL_ERROR", reason: "BILLING_VOID_FAILED", message: "Failed to void billing entry", requestId }));
+    return res.status(500).json(apiError({ code: "INTERNAL_ERROR", reason: "BILLING_VOID_FAILED", message: "Failed to void billing entry", requestId }));
   }
 });
 
@@ -526,6 +666,7 @@ router.patch(
       metadata: { ids, updatedCount: result.rowCount ?? 0 },
     });
 
+    invalidateBillingCaches(clinicId);
     res.json({ updated: result.rowCount ?? 0 });
   } catch (err) {
     console.error(err);

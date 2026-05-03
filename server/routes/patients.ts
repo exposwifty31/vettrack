@@ -315,7 +315,16 @@ router.post("/", requireEffectiveRole("technician"), async (req, res) => {
       .limit(1);
 
     const r = rows[0]!;
-    res.status(201).json({ patient: hospitalizationRow(r.h, r.a, r.o, r.vetName ?? null) });
+    const result = hospitalizationRow(r.h, r.a, r.o, r.vetName ?? null);
+
+    postSystemMessage(clinicId, "hosp_admitted", {
+      hospitalizationId: hospId,
+      animalId,
+      animalName: r.a.name,
+      admittedAt: r.h.admittedAt?.toISOString() ?? new Date().toISOString(),
+    }).catch(() => {});
+
+    res.status(201).json({ patient: result });
   } catch (err) {
     console.error("[patients] admit failed", err);
     res.status(500).json(apiError({ code: "INTERNAL_ERROR", reason: "PATIENTS_ADMIT_FAILED", message: "Failed to admit patient", requestId }));

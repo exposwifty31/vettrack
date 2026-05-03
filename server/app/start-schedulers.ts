@@ -22,6 +22,8 @@ import { startEventOutboxPublisher } from "../lib/event-publisher.js";
 import { startOutboxJanitor } from "../lib/outbox-janitor.js";
 import { startAlertReminderScheduler } from "../lib/alert-reminder.js";
 import { scanUnresolvedEmergencyDispenses } from "../services/dispense.service.js";
+import { startOutboxDlqScanner } from "../lib/outbox-dlq-scanner.js";
+import { startCodeBlueReconciliationScanner } from "../lib/code-blue-reconciliation-scanner.js";
 
 export async function startBackgroundSchedulers() {
   await initVapid();
@@ -56,4 +58,10 @@ export async function startBackgroundSchedulers() {
     });
   }, EMERGENCY_DISPENSE_SCAN_INTERVAL_MS);
   void scanUnresolvedEmergencyDispenses().catch(() => {});
+
+  // Fix E (DLQ): proactive DLQ health scanner — alerts when dead_letter_count > 5.
+  startOutboxDlqScanner();
+
+  // Fix E (Code Blue): scanner for unreconciled sessions — alerts every 30 min per session.
+  startCodeBlueReconciliationScanner();
 }

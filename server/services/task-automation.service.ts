@@ -7,6 +7,7 @@ import { and, asc, eq, inArray, isNotNull, isNull, lt, lte, gte, notInArray, sql
 import { appointments, db, users } from "../db.js";
 import { logAudit } from "../lib/audit.js";
 import { checkIdempotentAsync, markIdempotentAsync } from "../lib/idempotency.js";
+import { postSystemMessage } from "../lib/shift-chat-presence.js";
 import { incrementMetric } from "../lib/metrics.js";
 import { broadcast } from "../lib/realtime.js";
 import {
@@ -297,6 +298,12 @@ export async function executeAutomationJob(payload: AutomationExecutePayload): P
           tag: "automation-escalation",
           rateLimitAs: "escalation",
         });
+        postSystemMessage(c, "task_escalated", {
+          taskId,
+          escalatedTo: adminId,
+          animalId: task.animalId ?? null,
+          taskType: task.taskType ?? null,
+        }).catch(() => {});
         await markIdempotentAsync(idempotencyKey);
         return;
       }

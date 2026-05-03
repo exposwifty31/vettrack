@@ -9,7 +9,7 @@ import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { writeLimiter } from "../middleware/rate-limiters.js";
 import { validateBody } from "../middleware/validate.js";
 import { sendPushToUser, sendPushToRole } from "../lib/push.js";
-import { enqueueNotificationJob } from "../lib/queue.js";
+import { enqueueNotificationJob, enqueuePushNotification } from "../lib/queue.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
 import { touchPresence, getPresence } from "../lib/shift-chat-presence.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
@@ -222,44 +222,65 @@ router.post(
         })
         .returning();
 
-      // ── Push notifications ──────────────────────────────────────────────────
+      // ── Push notifications (Fix F/G: all routed through queue with fallback) ─
 
-      // @mentions → push to each mentioned user
+      // @mentions → HIGH priority push to each mentioned user
       for (const mentionedUserId of mentionedUserIds) {
-        sendPushToUser(clinicId, mentionedUserId, {
-          title: `${user.name ?? "מישהו"} אזכר אותך`,
-          body: body.slice(0, 80),
-          tag: `shift-chat-mention-${message!.id}`,
-        }).catch(() => {});
+        const idempotencyKey = `shift-chat-mention-${message!.id}-${mentionedUserId}`;
+        enqueuePushNotification(
+          {
+            type: "push_to_user",
+            clinicId,
+            userId: mentionedUserId,
+            title: `${user.name ?? "מישהו"} אזכר אותך`,
+            body: body.slice(0, 80),
+            tag: `shift-chat-mention-${message!.id}`,
+            priority: "HIGH",
+            idempotencyKey,
+          },
+          async () => { await sendPushToUser(clinicId, mentionedUserId, { title: `${user.name ?? "מישהו"} אזכר אותך`, body: body.slice(0, 80), tag: `shift-chat-mention-${message!.id}` }); },
+        ).catch(() => {});
       }
 
-      // URGENT flag → push to all shift members
+      // URGENT flag → CRITICAL priority push to all shift members
       if (isUrgent) {
-        sendPushToRole(clinicId, "technician", {
-          title: "⚡ הודעה דחופה במשמרת",
-          body: body.slice(0, 80),
-          tag: `shift-chat-urgent-${message!.id}`,
-        }).catch(() => {});
-        sendPushToRole(clinicId, "vet", {
-          title: "⚡ הודעה דחופה במשמרת",
-          body: body.slice(0, 80),
-          tag: `shift-chat-urgent-${message!.id}`,
-        }).catch(() => {});
+        for (const role of ["technician", "vet"] as const) {
+          const idempotencyKey = `shift-chat-urgent-${message!.id}-${role}`;
+          enqueuePushNotification(
+            {
+              type: "push_to_role",
+              clinicId,
+              role,
+              title: "⚡ הודעה דחופה במשמרת",
+              body: body.slice(0, 80),
+              tag: `shift-chat-urgent-${message!.id}`,
+              priority: "CRITICAL",
+              idempotencyKey,
+            },
+            async () => { await sendPushToRole(clinicId, role, { title: "⚡ הודעה דחופה במשמרת", body: body.slice(0, 80), tag: `shift-chat-urgent-${message!.id}` }); },
+          ).catch(() => {});
+        }
       }
 
-      // Broadcast → push to all technicians
+      // Broadcast → NORMAL priority push to all technicians
       if (type === "broadcast" && broadcastKey) {
         const template = BROADCAST_TEMPLATES[broadcastKey]!;
-        sendPushToRole(clinicId, "technician", {
-          title: `📢 ${template.label}`,
-          body: template.subtitle,
-          tag: `shift-chat-broadcast-${message!.id}`,
-        }).catch(() => {});
-        sendPushToRole(clinicId, "senior_technician", {
-          title: `📢 ${template.label}`,
-          body: template.subtitle,
-          tag: `shift-chat-broadcast-${message!.id}`,
-        }).catch(() => {});
+        for (const role of ["technician", "senior_technician"] as const) {
+          const idempotencyKey = `shift-chat-broadcast-${message!.id}-${role}`;
+          enqueuePushNotification(
+            {
+              type: "push_to_role",
+              clinicId,
+              role,
+              title: `📢 ${template.label}`,
+              body: template.subtitle,
+              tag: `shift-chat-broadcast-${message!.id}`,
+              priority: "NORMAL",
+              idempotencyKey,
+            },
+            async () => { await sendPushToRole(clinicId, role, { title: `📢 ${template.label}`, body: template.subtitle, tag: `shift-chat-broadcast-${message!.id}` }); },
+          ).catch(() => {});
+        }
       }
 
       logAudit({
@@ -310,8 +331,9 @@ router.post(
       if (!message) {
         return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "MESSAGE_NOT_FOUND", message: "Message not found" }));
       }
-      if (message.type !== "broadcast") {
-        return res.status(400).json(apiError({ code: "BAD_REQUEST", reason: "NOT_BROADCAST", message: "Only broadcast messages can be acknowledged" }));
+      // Fix A: allow acks on broadcast and system messages; block regular user messages.
+      if (message.type === "regular") {
+        return res.status(400).json(apiError({ code: "BAD_REQUEST", reason: "REGULAR_MESSAGE_NOT_ACKABLE", message: "Regular user messages cannot be acknowledged — only broadcast and system messages support acknowledgement" }));
       }
 
       const respondedAt = new Date();

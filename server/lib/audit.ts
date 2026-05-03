@@ -132,7 +132,11 @@ export type AuditActionType =
   | "purchase_order_submitted"
   | "purchase_order_received"
   | "purchase_order_cancelled"
-  | "task_approved";
+  | "task_approved"
+  | "alert_seen"
+  | "alert_resolved"
+  | "alert_reopened"
+  | "billing_reversed";
 
 export interface LogAuditParams {
   clinicId: string;
