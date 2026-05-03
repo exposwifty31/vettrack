@@ -34,7 +34,7 @@ import inboundIntegrationWebhooks from "./integrations/webhooks/inbound.router.j
 import { startBackgroundSchedulers } from "./app/start-schedulers.js";
 import { ensureClinicPhase2Defaults } from "./lib/ensure-clinic-phase2-defaults.js";
 import { recoverPendingInventoryJobs } from "./lib/inventory-job-recovery.js";
-import { releaseStaleMedicationTasks } from "./services/medication-tasks.service.js";
+import { releaseStaleMedicationTasks, releaseExpiredMedicationTasks } from "./services/medication-tasks.service.js";
 import healthRoutes from "./routes/health.js";
 import { resolveAuthModeFromEnv, describeAuthMode } from "./lib/auth-mode.js";
 import { preloadClinicErModeCaches } from "./lib/er-mode.js";
@@ -347,6 +347,7 @@ runMigrations()
     runInventoryRecovery();
     setInterval(runInventoryRecovery, 10 * 60 * 1000);
 
+    // Global stale sweep every 5 minutes (30-minute threshold).
     setInterval(() => {
       releaseStaleMedicationTasks()
         .then((n) => {
@@ -354,6 +355,15 @@ runMigrations()
         })
         .catch((err) => console.error("[medication-task-recovery] interval failed:", err));
     }, 5 * 60 * 1000);
+
+    // Per-task 10-minute soft-lock release (Fix E: proactive, not tied to list load).
+    setInterval(() => {
+      releaseExpiredMedicationTasks()
+        .then((n) => {
+          if (n > 0) console.log(`[medication-task-lock] released ${n} expired soft-lock(s)`);
+        })
+        .catch((err) => console.error("[medication-task-lock] interval failed:", err));
+    }, 2 * 60 * 1000);
   })
   .catch((err) => {
     console.error("💥 Migration failed, aborting scheduler start", err);

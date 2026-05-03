@@ -118,7 +118,25 @@ export type AuditActionType =
   | "inventory_job_retried"
   | "test_scheduled_notification_scenario_created"
   | "outbox_dlq_retry_all"
-  | "outbox_dlq_drop";
+  | "outbox_dlq_drop"
+  | "dispense_confirmed"
+  | "dispense_emergency_created"
+  | "medication_task_dose_corrected"
+  | "medication_task_cancelled"
+  | "formulary_created"
+  | "formulary_version_created"
+  | "formulary_deleted"
+  | "inventory_item_deactivated"
+  | "inventory_item_price_added"
+  | "purchase_order_created"
+  | "purchase_order_submitted"
+  | "purchase_order_received"
+  | "purchase_order_cancelled"
+  | "task_approved"
+  | "alert_seen"
+  | "alert_resolved"
+  | "alert_reopened"
+  | "billing_reversed";
 
 export interface LogAuditParams {
   clinicId: string;

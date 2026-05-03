@@ -73,7 +73,8 @@ export function extractPatientConflictPolicy(metadata: unknown): ConflictPolicy 
   ) {
     return p;
   }
-  return "external_wins";
+  // Default: internal system is authoritative — all unresolved conflicts require manual review.
+  return "manual_required";
 }
 
 export function resolvePatientInboundConflict(

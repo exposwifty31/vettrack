@@ -2,7 +2,7 @@ import { Router } from "express";
 import { randomUUID } from "crypto";
 import { db, pool, equipment, scanLogs } from "../db.js";
 import { gte, desc, eq, and, isNull, sql } from "drizzle-orm";
-import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { subDays } from "date-fns";
 import { analyticsCache } from "../lib/analytics-cache.js";
 import { computeUsageTrends } from "../lib/analytics-engine.js";
@@ -46,7 +46,7 @@ function apiError(params: { code: string; reason: string; message: string; reque
   };
 }
 
-router.get("/", requireAuth, async (req, res) => {
+router.get("/", requireAuth, requireAdmin, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
@@ -171,7 +171,7 @@ router.get("/", requireAuth, async (req, res) => {
 });
 
 // GET /api/analytics/billing — billing analytics for the dashboard
-router.get("/billing", requireAuth, async (req, res) => {
+router.get("/billing", requireAuth, requireAdmin, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
@@ -360,7 +360,7 @@ router.get("/billing", requireAuth, async (req, res) => {
 });
 
 /** GET /api/analytics/outcome-kpi-roi — Phase 7 leadership dashboard (real DB comparison windows). */
-router.get("/outcome-kpi-roi", requireAuth, async (req, res) => {
+router.get("/outcome-kpi-roi", requireAuth, requireAdmin, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;

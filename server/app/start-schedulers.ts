@@ -21,6 +21,9 @@ import { startSystemHealthMonitor } from "../services/system-health-monitor.js";
 import { startEventOutboxPublisher } from "../lib/event-publisher.js";
 import { startOutboxJanitor } from "../lib/outbox-janitor.js";
 import { startAlertReminderScheduler } from "../lib/alert-reminder.js";
+import { scanUnresolvedEmergencyDispenses } from "../services/dispense.service.js";
+import { startOutboxDlqScanner } from "../lib/outbox-dlq-scanner.js";
+import { startCodeBlueReconciliationScanner } from "../lib/code-blue-reconciliation-scanner.js";
 
 export async function startBackgroundSchedulers() {
   await initVapid();
@@ -45,4 +48,20 @@ export async function startBackgroundSchedulers() {
   startErHandoffSlaScheduler();
   startErIntakeEscalationScheduler();
   startShadowInventoryScheduler();
+
+  // Scan for unresolved emergency dispenses every 10 minutes.
+  // Emits escalating operational alerts at 30/60/120-minute thresholds.
+  const EMERGENCY_DISPENSE_SCAN_INTERVAL_MS = 10 * 60 * 1000;
+  setInterval(() => {
+    scanUnresolvedEmergencyDispenses().catch((err) => {
+      console.error("[emergency-dispense-scanner] scan failed:", err);
+    });
+  }, EMERGENCY_DISPENSE_SCAN_INTERVAL_MS);
+  void scanUnresolvedEmergencyDispenses().catch(() => {});
+
+  // Fix E (DLQ): proactive DLQ health scanner — alerts when dead_letter_count > 5.
+  startOutboxDlqScanner();
+
+  // Fix E (Code Blue): scanner for unreconciled sessions — alerts every 30 min per session.
+  startCodeBlueReconciliationScanner();
 }

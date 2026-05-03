@@ -1,5 +1,5 @@
 import { db, alertAcks, equipment } from "../db.js";
-import { eq, isNull, and } from "drizzle-orm";
+import { eq, isNull, and, ne } from "drizzle-orm";
 import { sendPushToUser } from "./push.js";
 import { postSystemMessage } from "./shift-chat-presence.js";
 
@@ -47,6 +47,9 @@ async function checkAndSendReminders(): Promise<void> {
   try {
     const now = new Date();
 
+    // Two-level reminder logic:
+    //   SEEN acks with remindAt due → remind (condition check required)
+    //   RESOLVED acks with remindAt due → check if condition came back; if yes, re-open to SEEN
     const pendingAcks = await db
       .select()
       .from(alertAcks)
@@ -75,10 +78,49 @@ async function checkAndSendReminders(): Promise<void> {
         .where(and(eq(equipment.clinicId, ack.clinicId), eq(equipment.id, ack.equipmentId), isNull(equipment.deletedAt)))
         .limit(1);
 
-      if (!eqRow) continue;
+      if (!eqRow) {
+        // Equipment gone — stamp remindedAt so we don't loop
+        await db.update(alertAcks).set({ remindedAt: now }).where(eq(alertAcks.id, ack.id));
+        continue;
+      }
 
       const stillActive = isAlertStillActive(ack.alertType, eqRow);
 
+      if (ack.ackStatus === "RESOLVED") {
+        if (stillActive) {
+          // Critical rule: condition persists after user marked RESOLVED → re-open to SEEN
+          await db
+            .update(alertAcks)
+            .set({
+              ackStatus: "SEEN",
+              resolvedAt: null,
+              resolvedById: null,
+              resolutionNote: null,
+              remindAt: new Date(Date.now() + REMINDER_DELAY_MS),
+              remindedAt: null,
+            })
+            .where(eq(alertAcks.id, ack.id));
+
+          await sendPushToUser(ack.clinicId, ack.acknowledgedById, {
+            title: "Alert re-opened",
+            body: `The ${ack.alertType.replace(/_/g, " ")} alert on "${eqRow.name}" was re-opened — condition still active`,
+            tag: `reopen:${ack.equipmentId}:${ack.alertType}`,
+            url: `/equipment/${ack.equipmentId}`,
+          }).catch(() => {});
+
+          postSystemMessage(ack.clinicId, "alert_reopened", {
+            equipmentId: ack.equipmentId,
+            equipmentName: eqRow.name,
+            alertType: ack.alertType,
+          }).catch(() => {});
+        } else {
+          // Condition truly resolved — stamp remindedAt
+          await db.update(alertAcks).set({ remindedAt: now }).where(eq(alertAcks.id, ack.id));
+        }
+        continue;
+      }
+
+      // SEEN ack — remind if condition still active
       if (stillActive) {
         try {
           await sendPushToUser(ack.clinicId, ack.acknowledgedById, {

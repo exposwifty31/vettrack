@@ -9,8 +9,10 @@ import {
   createMedicationTask,
   takeMedicationTask,
   completeMedicationTask,
+  cancelMedicationTask,
   listMedicationTasks,
   MedTaskError,
+  type MedTaskReasonType,
 } from "../services/medication-tasks.service.js";
 import { MedicationCalculationError, type CalculationResult } from "../services/medication-calculation.service.js";
 import type { MedicationTask } from "../db.js";
@@ -25,10 +27,21 @@ const createTaskSchema = z.object({
   calculationInput: z.object({
     weightKg: z.number().finite().positive(),
     prescribedDosePerKg: z.number().finite().positive(),
-    doseUnit: z.enum(["mg_per_kg", "mcg_per_kg", "mEq_per_kg", "tablet"]),
+    doseUnit: z.enum(["mg_per_kg", "mcg_per_kg", "mEq_per_kg", "tablet", "direct_mg"]),
     concentrationMgPerMl: z.number().finite().positive().optional(),
   }),
   overrideReason: z.string().trim().max(1000).optional().nullable(),
+  reasonType: z.enum(["NEW", "REPEAT", "CORRECTION"]).optional().nullable(),
+  dueAt: z.string().datetime({ offset: true }).optional().nullable(),
+});
+
+const completeTaskSchema = z.object({
+  actualVolume: z.number().finite().positive(),
+  administeredAt: z.string().datetime({ offset: true }).optional().nullable(),
+});
+
+const cancelTaskSchema = z.object({
+  reason: z.string().trim().max(500).optional().nullable(),
 });
 
 function resolveRequestId(res: Response, incomingHeader: unknown): string {
@@ -62,6 +75,13 @@ function serializeTask(task: MedicationTask) {
   const snapshotContainer = rawSnapshot as
     | {
         version?: number;
+        weight?: number;
+        concentration?: number;
+        doseMg?: number;
+        calculatedVolume?: number;
+        calculationPath?: string;
+        formularyId?: string | null;
+        formularyVersion?: number | null;
         data?: Partial<CalculationResult>;
       }
     | null;
@@ -87,13 +107,32 @@ function serializeTask(task: MedicationTask) {
     createdAt: task.createdAt?.toISOString() ?? null,
     startedAt: task.startedAt?.toISOString() ?? null,
     completedAt: task.completedAt?.toISOString() ?? null,
+    cancelledAt: task.cancelledAt?.toISOString() ?? null,
+    cancelledBy: task.cancelledBy,
+    dueAt: task.dueAt?.toISOString() ?? null,
+    actualVolume: task.actualVolume !== null ? Number(task.actualVolume) : null,
+    administeredAt: task.administeredAt?.toISOString() ?? null,
+    inventoryStatus: task.inventoryStatus ?? null,
+    inventoryMismatch: task.inventoryMismatch,
     safetyLevel: task.safetyLevel,
     overrideReason: task.overrideReason,
+    formularyId: task.formularyId ?? null,
+    formularyVersion: task.formularyVersion ?? null,
     calculation: {
       version: snapshotVersion,
+      weight: snapshotContainer?.weight ?? null,
+      concentration: snapshotContainer?.concentration ?? null,
+      doseMg: snapshotContainer?.doseMg ?? null,
+      calculatedVolume: snapshotContainer?.calculatedVolume ?? null,
+      calculationPath: snapshotContainer?.calculationPath ?? null,
+      formularyId: snapshotContainer?.formularyId ?? null,
+      formularyVersion: snapshotContainer?.formularyVersion ?? null,
       breakdown: snapshot?.breakdown ?? null,
       final: snapshot?.final ?? null,
-      safety: snapshot?.safety ?? null,
+      safety: snapshot ? {
+        ...snapshot.safety,
+        warningMessage: (snapshot as Partial<CalculationResult>).safety?.warningMessage ?? null,
+      } : null,
       snapshot: snapshotContainer?.data ? snapshotContainer : legacySnapshot,
     },
   };
@@ -153,7 +192,6 @@ router.post("/", idempotencyMiddleware("medication-tasks:create"), async (req, r
   }
 
   const parsed = createTaskSchema.safeParse(req.body);
-
   if (!parsed.success) {
     return res.status(400).json(
       apiError({
@@ -173,6 +211,8 @@ router.post("/", idempotencyMiddleware("medication-tasks:create"), async (req, r
       route: parsed.data.route,
       calculationInput: parsed.data.calculationInput,
       overrideReason: parsed.data.overrideReason ?? null,
+      reasonType: (parsed.data.reasonType as MedTaskReasonType | null) ?? "NEW",
+      dueAt: parsed.data.dueAt ? new Date(parsed.data.dueAt) : null,
       createdBy: req.authUser!.id,
       createdByEmail: req.authUser!.email,
       actorRole: resolveAuditActorRole(req),
@@ -203,13 +243,47 @@ router.post("/:id/take", idempotencyMiddleware("medication-tasks:take"), async (
 
 router.post("/:id/complete", idempotencyMiddleware("medication-tasks:complete"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+
+  const parsed = completeTaskSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json(
+      apiError({
+        code: "VALIDATION_ERROR",
+        reason: "VALIDATION_ERROR",
+        message: parsed.error.issues[0]?.message ?? "actualVolume is required",
+        requestId,
+      }),
+    );
+  }
+
   try {
-    const task = await completeMedicationTask(
+    const task = await completeMedicationTask({
+      taskId: req.params.id,
+      userId: req.authUser!.id,
+      userEmail: req.authUser!.email,
+      clinicId: req.clinicId!,
+      actorRole: resolveAuditActorRole(req),
+      actualVolume: parsed.data.actualVolume,
+      administeredAt: parsed.data.administeredAt ? new Date(parsed.data.administeredAt) : null,
+    });
+    return res.json(serializeTask(task));
+  } catch (err) {
+    sendError(res, err, requestId);
+    return;
+  }
+});
+
+router.post("/:id/cancel", async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const parsed = cancelTaskSchema.safeParse(req.body);
+  try {
+    const task = await cancelMedicationTask(
       req.params.id,
       req.authUser!.id,
       req.authUser!.email,
       req.clinicId!,
       resolveAuditActorRole(req),
+      parsed.success ? (parsed.data.reason ?? null) : null,
     );
     return res.json(serializeTask(task));
   } catch (err) {

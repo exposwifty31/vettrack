@@ -1816,7 +1816,7 @@ function FormularySection() {
       standardDose: String(entry.standardDose),
       minDose: entry.minDose != null ? String(entry.minDose) : "",
       maxDose: entry.maxDose != null ? String(entry.maxDose) : "",
-      doseUnit: entry.doseUnit,
+      doseUnit: (DOSE_UNITS as readonly string[]).includes(entry.doseUnit) ? entry.doseUnit : "mg_per_kg",
       defaultRoute: entry.defaultRoute ?? null,
       unitType: entry.unitType ?? null,
       unitVolumeMl: entry.unitVolumeMl != null ? String(entry.unitVolumeMl) : "",

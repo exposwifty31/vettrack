@@ -35,7 +35,7 @@ import {
   resolvePatientInboundConflict,
   type LocalPatientRow,
 } from "../integrations/conflicts/conflict-engine.js";
-import { insertOpenPatientConflict } from "../integrations/conflicts/repository.js";
+import { insertPatientConflict } from "../integrations/conflicts/repository.js";
 import { markWebhookEventTerminal } from "../integrations/webhooks/repository.js";
 import { recordSyncFailureAnomaly } from "../integrations/anomaly/sync-failure-hooks.js";
 import {
@@ -195,16 +195,35 @@ async function handleInboundPatients(
 
       const resolution = resolvePatientInboundConflict(conflictPolicy, local, patient);
 
-      if (resolution.kind === "manual_conflict") {
-        await insertOpenPatientConflict({
-          id: nanoid(),
-          clinicId,
-          adapterId,
-          localId: local.id,
-          externalId: patient.externalId,
+      // Fix B: log ALL conflicts regardless of resolution kind.
+      // manual_conflict → severity HIGH (requires review).
+      // auto-resolved → severity LOW (logged for visibility, not blocking).
+      const diffFields = resolution.snapshot?.diffFields ?? [];
+      const conflictResolution =
+        resolution.kind === "manual_conflict" ? "pending_manual" :
+        resolution.kind === "keep_local" ? "auto_vettrack_wins" :
+        "auto_external_wins";
+      const conflictSeverity = resolution.kind === "manual_conflict" ? "HIGH" as const : "LOW" as const;
+
+      await insertPatientConflict({
+        id: nanoid(),
+        clinicId,
+        adapterId,
+        localId: local.id,
+        externalId: patient.externalId,
+        policyUsed: conflictPolicy,
+        payloadSnapshot: resolution.snapshot ?? {
+          entityType: "patient",
           policyUsed: conflictPolicy,
-          payloadSnapshot: resolution.snapshot!,
-        });
+          diffFields,
+          localUpdatedAtIso: local.updatedAt.toISOString(),
+          externalUpdatedAtIso: patient.externalUpdatedAt ?? null,
+        },
+        severity: conflictSeverity,
+        resolution: conflictResolution,
+      }).catch(() => {});
+
+      if (resolution.kind === "manual_conflict") {
         failed++;
         continue;
       }

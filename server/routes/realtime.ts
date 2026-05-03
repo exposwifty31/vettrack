@@ -37,6 +37,8 @@ function outboxRowToSse(row: PublishedOutboxRow): string {
     id: row.id,
     outboxId: row.id,
     eventVersion: row.eventVersion,
+    level: row.level ?? "INFO",
+    category: row.category ?? "SYSTEM",
   };
   return `id: ${row.id}\ndata: ${JSON.stringify(envelope)}\n\n`;
 }
@@ -74,6 +76,8 @@ async function replayPublishedOutboxAfter(
       occurredAt: eventOutbox.occurredAt,
       publishedAt: eventOutbox.publishedAt,
       eventVersion: eventOutbox.eventVersion,
+      level: eventOutbox.level,
+      category: eventOutbox.category,
     })
     .from(eventOutbox)
     .where(
@@ -97,6 +101,8 @@ async function replayPublishedOutboxAfter(
       occurredAt: row.occurredAt,
       publishedAt,
       eventVersion: row.eventVersion,
+      level: row.level ?? "INFO",
+      category: row.category ?? "SYSTEM",
     };
     if (!safeWriteSse(res, outboxRowToSse(published))) return false;
     incrementMetric("realtime_events_sent");
@@ -178,6 +184,8 @@ router.get("/replay", requireAuth, async (req, res) => {
         occurredAt: eventOutbox.occurredAt,
         publishedAt: eventOutbox.publishedAt,
         eventVersion: eventOutbox.eventVersion,
+        level: eventOutbox.level,
+        category: eventOutbox.category,
       })
       .from(eventOutbox)
       .where(
@@ -197,6 +205,8 @@ router.get("/replay", requireAuth, async (req, res) => {
       timestamp: row.occurredAt.toISOString(),
       outboxId: row.id,
       eventVersion: row.eventVersion,
+      level: row.level ?? "INFO",
+      category: row.category ?? "SYSTEM",
       publishedAt: row.publishedAt ? row.publishedAt.toISOString() : null,
     }));
 

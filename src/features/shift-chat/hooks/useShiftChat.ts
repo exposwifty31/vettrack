@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { shiftChatApi } from "../api";
 import type { ShiftMessage, PostMessageInput } from "../types";
 import { useAuth } from "@/hooks/use-auth";
+import { t } from "@/lib/i18n";
 
 const QUERY_KEY = ["/api/shift-chat/messages"] as const;
 const POLL_INTERVAL_MS = 3_000;
@@ -79,6 +81,14 @@ export function useShiftChat(isOpen: boolean) {
   const sendMutation = useMutation({
     mutationFn: (input: PostMessageInput) => shiftChatApi.postMessage(input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("NO_OPEN_SHIFT") || msg.toLowerCase().includes("no active shift")) {
+        toast.error(t.shiftChat.errors.noOpenShift);
+      } else {
+        toast.error(t.shiftChat.errors.sendFailed);
+      }
+    },
   });
 
   // ── Ack broadcast ──────────────────────────────────────────────────────────
@@ -86,6 +96,9 @@ export function useShiftChat(isOpen: boolean) {
     mutationFn: ({ id, status }: { id: string; status: "acknowledged" | "snoozed" }) =>
       shiftChatApi.ackMessage(id, status),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+    onError: () => {
+      toast.error(t.shiftChat.errors.ackFailed);
+    },
   });
 
   // ── Typing indicator (debounced) ───────────────────────────────────────────
@@ -108,12 +121,18 @@ export function useShiftChat(isOpen: boolean) {
     mutationFn: ({ messageId, emoji }: { messageId: string; emoji: "👍" | "✅" | "👀" }) =>
       shiftChatApi.react(messageId, emoji),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+    onError: () => {
+      toast.error(t.shiftChat.errors.reactFailed);
+    },
   });
 
   // ── Pin ────────────────────────────────────────────────────────────────────
   const pinMutation = useMutation({
     mutationFn: (messageId: string) => shiftChatApi.pinMessage(messageId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+    onError: () => {
+      toast.error(t.shiftChat.errors.pinFailed);
+    },
   });
 
   return {

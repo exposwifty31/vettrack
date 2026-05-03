@@ -175,7 +175,9 @@ describe("Phase 5 route error contract checks (static)", () => {
       alertAcks.includes("resolveRequestId") &&
         alertAcks.includes("reason: \"ALERT_ACKS_LIST_FAILED\"") &&
         alertAcks.includes("reason: \"MISSING_ALERT_ACK_FIELDS\"") &&
-        alertAcks.includes("reason: \"ALERT_ACK_DELETE_FAILED\""),
+        // ALERT_ACK_DELETE_FAILED removed — DELETE endpoint replaced by PATCH /:id/resolve
+        (alertAcks.includes("reason: \"ALERT_ACK_DELETE_FAILED\"") ||
+          alertAcks.includes("reason: \"ALERT_RESOLVE_FAILED\"")),
     ).toBe(true);
   });
 

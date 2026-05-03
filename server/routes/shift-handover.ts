@@ -1,20 +1,40 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { and, asc, desc, eq, gte, isNotNull, isNull, lte, sql } from "drizzle-orm";
-import { animals, appointments, billingItems, billingLedger, containerItems, containers, db, equipment, inventoryItems, inventoryLogs, scanLogs, serverConfig, shiftSessions, usageSessions, users } from "../db.js";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import {
+  alertAcks,
+  animals,
+  appointments,
+  billingItems,
+  billingLedger,
+  codeBlueSessions,
+  containerItems,
+  containers,
+  db,
+  dispenseEvents,
+  equipment,
+  hospitalizations,
+  inventoryItems,
+  inventoryJobs,
+  inventoryLogs,
+  medicationTasks,
+  scanLogs,
+  serverConfig,
+  shiftHandoverSnapshots,
+  shiftSessions,
+  usageSessions,
+  users,
+} from "../db.js";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { enqueueShiftReportEmailJob } from "../lib/queue.js";
 import { postSystemMessage } from "../lib/shift-chat-presence.js";
+import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 
 const router = Router();
 
 const startSessionSchema = z.object({
-  note: z.string().max(500).optional(),
-});
-
-const endSessionSchema = z.object({
   note: z.string().max(500).optional(),
 });
 
@@ -299,7 +319,15 @@ router.post(
   },
 );
 
+const endSessionSchema = z.object({
+  note: z.string().max(500).optional(),
+  overrideReason: z.string().min(1).max(500).optional(),
+});
+
 // POST /api/shift-handover/session/end
+// Fix B: blocks closure if pending medication tasks or unreconciled Code Blue sessions exist.
+// Pass ?override=true + body.overrideReason to force close.
+// Fix C: persists handover snapshot on successful close.
 router.post(
   "/session/end",
   requireAuth,
@@ -312,22 +340,92 @@ router.post(
       const open = await getOpenShiftSession(clinicId);
       if (!open) {
         return res.status(404).json(
-          apiError({
-            code: "NOT_FOUND",
-            reason: "NO_OPEN_SHIFT",
-            message: "No open shift session",
-            requestId,
-          }),
+          apiError({ code: "NOT_FOUND", reason: "NO_OPEN_SHIFT", message: "No open shift session", requestId }),
         );
       }
-      const { note } = req.body as z.infer<typeof endSessionSchema>;
+      const { note, overrideReason } = req.body as z.infer<typeof endSessionSchema>;
+      const override = req.query.override === "true";
+
+      if (override && !overrideReason?.trim()) {
+        return res.status(400).json(
+          apiError({ code: "OVERRIDE_REASON_REQUIRED", reason: "OVERRIDE_REASON_REQUIRED", message: "overrideReason is required when override=true", requestId }),
+        );
+      }
+
+      // Fix B: pre-flight checks
+      if (!override) {
+        const blockingConditions: Array<{ type: string; count: number; ids?: string[] }> = [];
+
+        // 1. Pending / in-progress medication tasks for active patients
+        const activeHospAnimalIds = (
+          await db
+            .select({ animalId: hospitalizations.animalId })
+            .from(hospitalizations)
+            .where(and(eq(hospitalizations.clinicId, clinicId), isNull(hospitalizations.dischargedAt)))
+        ).map((r) => r.animalId);
+
+        if (activeHospAnimalIds.length > 0) {
+          const openMedTasks = await db
+            .select({ id: medicationTasks.id })
+            .from(medicationTasks)
+            .where(
+              and(
+                eq(medicationTasks.clinicId, clinicId),
+                inArray(medicationTasks.animalId, activeHospAnimalIds),
+                inArray(medicationTasks.status, ["pending", "in_progress", "approved"]),
+              ),
+            );
+          if (openMedTasks.length > 0) {
+            blockingConditions.push({ type: "pending_medication_tasks", count: openMedTasks.length, ids: openMedTasks.map((t) => t.id) });
+          }
+        }
+
+        // 2. Unreconciled ended Code Blue sessions
+        const unreconciledCB = await db
+          .select({ id: codeBlueSessions.id })
+          .from(codeBlueSessions)
+          .where(
+            and(
+              eq(codeBlueSessions.clinicId, clinicId),
+              eq(codeBlueSessions.status, "ended"),
+              eq(codeBlueSessions.isReconciled, false),
+            ),
+          );
+        if (unreconciledCB.length > 0) {
+          blockingConditions.push({ type: "unreconciled_code_blue_sessions", count: unreconciledCB.length, ids: unreconciledCB.map((s) => s.id) });
+        }
+
+        if (blockingConditions.length > 0) {
+          return res.status(409).json({
+            code: "BLOCKING_CONDITIONS_PREVENT_SHIFT_END",
+            error: "BLOCKING_CONDITIONS_PREVENT_SHIFT_END",
+            reason: "BLOCKING_CONDITIONS_PREVENT_SHIFT_END",
+            message: "Shift closure blocked: resolve the listed conditions or pass ?override=true with overrideReason.",
+            blockingConditions,
+            requestId,
+          });
+        }
+      }
+
       const endedAt = new Date();
-      const mergedNote =
-        note?.trim() ? [open.note, note.trim()].filter(Boolean).join(" | ") : open.note;
+      const mergedNote = note?.trim() ? [open.note, note.trim()].filter(Boolean).join(" | ") : open.note;
+
+      // Fix C: build and persist patient-centric handover snapshot BEFORE closing
+      const { patients: patientPayload, summaryCounts } = await buildPatientHandoverPayload(clinicId);
+      await db.insert(shiftHandoverSnapshots).values({
+        id: randomUUID(),
+        clinicId,
+        shiftSessionId: open.id,
+        generatedAt: endedAt,
+        patientsPayload: patientPayload,
+        summaryCounts,
+        createdBy: req.authUser!.id,
+      }).onConflictDoNothing();
 
       postSystemMessage(clinicId, "shift_summary", {
         endedAt: endedAt.toISOString(),
         note: mergedNote ?? null,
+        summaryCounts,
       }).catch(() => {});
 
       await db
@@ -335,47 +433,44 @@ router.post(
         .set({ endedAt, note: mergedNote })
         .where(and(eq(shiftSessions.id, open.id), eq(shiftSessions.clinicId, clinicId)));
 
-      // Fire-and-forget: look up manager_email and enqueue shift report email.
-      // Use key pattern `{clinicId}:manager_email` for clinic-scoped config.
+      if (override && overrideReason?.trim()) {
+        logAudit({
+          clinicId,
+          actionType: "shift_session_ended",
+          performedBy: req.authUser!.id,
+          performedByEmail: req.authUser!.email ?? "",
+          actorRole: resolveAuditActorRole(req),
+          targetId: open.id,
+          targetType: "shift_session",
+          metadata: { override: true, overrideReason: overrideReason.trim(), summaryCounts },
+        });
+      }
+
       void (async () => {
         try {
           const configKey = `${clinicId}:manager_email`;
-          const [cfgRow] = await db
-            .select()
-            .from(serverConfig)
-            .where(eq(serverConfig.key, configKey))
-            .limit(1);
+          const [cfgRow] = await db.select().from(serverConfig).where(eq(serverConfig.key, configKey)).limit(1);
           if (cfgRow?.value) {
-            await enqueueShiftReportEmailJob({
-              clinicId,
-              shiftSessionId: open.id,
-              managerEmail: cfgRow.value,
-            });
-          } else {
-            console.log("[shift-handover] no manager_email configured for clinic", clinicId);
+            await enqueueShiftReportEmailJob({ clinicId, shiftSessionId: open.id, managerEmail: cfgRow.value });
           }
         } catch (emailErr) {
           console.error("[shift-handover] failed to enqueue shift_report_email:", (emailErr as Error).message);
         }
       })();
 
-      res.json({
+      return res.json({
         id: open.id,
         clinicId,
         startedAt: open.startedAt,
         endedAt: endedAt.toISOString(),
         startedByUserId: open.startedByUserId,
         note: mergedNote,
+        summaryCounts,
       });
     } catch (err) {
       console.error(err);
-      res.status(500).json(
-        apiError({
-          code: "INTERNAL_ERROR",
-          reason: "SHIFT_END_FAILED",
-          message: "Failed to end shift session",
-          requestId,
-        }),
+      return res.status(500).json(
+        apiError({ code: "INTERNAL_ERROR", reason: "SHIFT_END_FAILED", message: "Failed to end shift session", requestId }),
       );
     }
   },
@@ -747,5 +842,189 @@ router.patch(
     }
   },
 );
+
+// ─── Patient-centric handover helper ────────────────────────────────────────
+
+async function buildPatientHandoverPayload(clinicId: string): Promise<{
+  patients: Array<{
+    hospitalizationId: string;
+    animalId: string;
+    animalName: string;
+    status: string;
+    ward: string | null;
+    bay: string | null;
+    pendingMedicationTasks: Array<{ id: string; status: string; drugId: string; dueAt: string | null }>;
+    overdueMedicationCount: number;
+    activeAlerts: Array<{ alertType: string; ackStatus: string }>;
+    unresolvedEmergencyDispenses: Array<{ id: string; createdAt: string }>;
+  }>;
+  summaryCounts: {
+    patientCount: number;
+    pendingTaskCount: number;
+    overdueCount: number;
+    unresolvedEmergencyCount: number;
+  };
+}> {
+  const now = new Date();
+
+  // 1. Active hospitalizations
+  const hospRows = await db
+    .select({ hosp: hospitalizations, animal: animals })
+    .from(hospitalizations)
+    .innerJoin(animals, eq(hospitalizations.animalId, animals.id))
+    .where(
+      and(
+        eq(hospitalizations.clinicId, clinicId),
+        isNull(hospitalizations.dischargedAt),
+      ),
+    )
+    .orderBy(hospitalizations.admittedAt);
+
+  // 2. Pending/in-progress medication tasks for these animals
+  const animalIds = hospRows.map((r) => r.hosp.animalId);
+  const medTaskRows = animalIds.length
+    ? await db
+        .select({
+          id: medicationTasks.id,
+          animalId: medicationTasks.animalId,
+          status: medicationTasks.status,
+          drugId: medicationTasks.drugId,
+          dueAt: medicationTasks.dueAt,
+        })
+        .from(medicationTasks)
+        .where(
+          and(
+            eq(medicationTasks.clinicId, clinicId),
+            inArray(medicationTasks.animalId, animalIds),
+            inArray(medicationTasks.status, ["pending", "in_progress", "approved"]),
+          ),
+        )
+    : [];
+
+  // 3. Active alert acks (SEEN only — RESOLVED ones are closed)
+  const alertRows = animalIds.length
+    ? await db
+        .select({ equipmentId: alertAcks.equipmentId, alertType: alertAcks.alertType, ackStatus: alertAcks.ackStatus })
+        .from(alertAcks)
+        .where(
+          and(
+            eq(alertAcks.clinicId, clinicId),
+            eq(alertAcks.ackStatus, "SEEN"),
+          ),
+        )
+    : [];
+
+  // 4. Unresolved emergency dispenses per patient
+  const emergencyRows = animalIds.length
+    ? await db
+        .select({ id: dispenseEvents.id, patientId: dispenseEvents.patientId, createdAt: dispenseEvents.createdAt })
+        .from(dispenseEvents)
+        .where(
+          and(
+            eq(dispenseEvents.clinicId, clinicId),
+            eq(dispenseEvents.status, "EMERGENCY_PENDING"),
+            inArray(dispenseEvents.patientId, animalIds),
+          ),
+        )
+    : [];
+
+  // Group everything by animalId
+  const tasksByAnimal = new Map<string, typeof medTaskRows>();
+  for (const t of medTaskRows) {
+    if (!t.animalId) continue;
+    const arr = tasksByAnimal.get(t.animalId) ?? [];
+    arr.push(t);
+    tasksByAnimal.set(t.animalId, arr);
+  }
+
+  const emergenciesByAnimal = new Map<string, typeof emergencyRows>();
+  for (const e of emergencyRows) {
+    if (!e.patientId) continue;
+    const arr = emergenciesByAnimal.get(e.patientId) ?? [];
+    arr.push(e);
+    emergenciesByAnimal.set(e.patientId, arr);
+  }
+
+  const patients = hospRows.map(({ hosp, animal }) => {
+    const tasks = tasksByAnimal.get(hosp.animalId) ?? [];
+    const overdueCount = tasks.filter(
+      (t) => t.dueAt && new Date(t.dueAt) < now,
+    ).length;
+    const emergencies = emergenciesByAnimal.get(hosp.animalId) ?? [];
+
+    return {
+      hospitalizationId: hosp.id,
+      animalId: hosp.animalId,
+      animalName: animal.name,
+      status: hosp.status,
+      ward: hosp.ward,
+      bay: hosp.bay,
+      pendingMedicationTasks: tasks.map((t) => ({
+        id: t.id,
+        status: t.status,
+        drugId: t.drugId,
+        dueAt: t.dueAt?.toISOString() ?? null,
+      })),
+      overdueMedicationCount: overdueCount,
+      activeAlerts: alertRows.map((a) => ({ alertType: a.alertType, ackStatus: a.ackStatus })),
+      unresolvedEmergencyDispenses: emergencies.map((e) => ({
+        id: e.id,
+        createdAt: e.createdAt.toISOString(),
+      })),
+    };
+  });
+
+  const summaryCounts = {
+    patientCount: patients.length,
+    pendingTaskCount: patients.reduce((s, p) => s + p.pendingMedicationTasks.length, 0),
+    overdueCount: patients.reduce((s, p) => s + p.overdueMedicationCount, 0),
+    unresolvedEmergencyCount: patients.reduce((s, p) => s + p.unresolvedEmergencyDispenses.length, 0),
+  };
+
+  return { patients, summaryCounts };
+}
+
+// ─── Fix A: GET /api/shift-handover/patients ─────────────────────────────────
+// Patient-centric handover view — current hospitalization state with tasks,
+// overdue medications, alerts, and unresolved emergencies per patient.
+
+router.get("/patients", requireAuth, requireEffectiveRole("technician"), async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  try {
+    const clinicId = req.clinicId!;
+    const { patients, summaryCounts } = await buildPatientHandoverPayload(clinicId);
+    res.json({ patients, summaryCounts, generatedAt: new Date().toISOString() });
+  } catch (err) {
+    console.error("[shift-handover] patients endpoint failed", err);
+    res.status(500).json(
+      apiError({ code: "INTERNAL_ERROR", reason: "HANDOVER_PATIENTS_FAILED", message: "Failed to load patient handover data", requestId }),
+    );
+  }
+});
+
+// ─── Fix C: GET /api/shift-handover/snapshot — latest persisted snapshot ─────
+router.get("/snapshot/latest", requireAuth, requireEffectiveRole("technician"), async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  try {
+    const clinicId = req.clinicId!;
+    const [row] = await db
+      .select()
+      .from(shiftHandoverSnapshots)
+      .where(eq(shiftHandoverSnapshots.clinicId, clinicId))
+      .orderBy(desc(shiftHandoverSnapshots.generatedAt))
+      .limit(1);
+    if (!row) {
+      return res.status(404).json(
+        apiError({ code: "NOT_FOUND", reason: "NO_SNAPSHOT", message: "No handover snapshot found for this clinic", requestId }),
+      );
+    }
+    return res.json(row);
+  } catch (err) {
+    console.error("[shift-handover] snapshot/latest failed", err);
+    return res.status(500).json(
+      apiError({ code: "INTERNAL_ERROR", reason: "SNAPSHOT_FAILED", message: "Failed to load handover snapshot", requestId }),
+    );
+  }
+});
 
 export default router;

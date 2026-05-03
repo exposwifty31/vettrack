@@ -27,6 +27,10 @@ export type PublishedOutboxRow = {
   occurredAt: Date;
   publishedAt: Date;
   eventVersion: number;
+  /** Severity for client-side prioritisation: INFO | WARNING | CRITICAL */
+  level: string;
+  /** Domain category for filtering: TASK | PATIENT | INVENTORY | ALERT | SYSTEM */
+  category: string;
 };
 
 /** Emits after rows are committed as published (`published` / row.type / clinic-scoped). */
@@ -55,7 +59,7 @@ async function publishOneBatch(): Promise<void> {
   try {
     const rows = await db.transaction(async (tx) => {
       const locked = await tx.execute(sql`
-        SELECT id, clinic_id, type, payload, occurred_at, event_version
+        SELECT id, clinic_id, type, payload, occurred_at, event_version, level, category
         FROM vt_event_outbox
         WHERE published_at IS NULL
           AND (error_type IS NULL OR error_type <> 'permanent')
@@ -72,6 +76,8 @@ async function publishOneBatch(): Promise<void> {
         payload: unknown;
         occurred_at: Date | string;
         event_version: number;
+        level: string;
+        category: string;
       }>;
 
       if (raw.length === 0) return [];
@@ -93,6 +99,8 @@ async function publishOneBatch(): Promise<void> {
         occurredAt: parseOccurredAt(r.occurred_at),
         publishedAt,
         eventVersion: Number(r.event_version ?? 1),
+        level: r.level ?? "INFO",
+        category: r.category ?? "SYSTEM",
       })) satisfies PublishedOutboxRow[];
     });
 

@@ -1,6 +1,6 @@
-import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
+import { pathToFileURL } from "url";
 
 const PATTERNS: Array<{ name: string; regex: RegExp }> = [
   { name: "Hardcoded JWT secret", regex: /jwt[_\-]?secret\s*[:=]\s*["'][^"']{8,}["']/i },
@@ -14,6 +14,20 @@ const PATTERNS: Array<{ name: string; regex: RegExp }> = [
   { name: "Private key block", regex: /-----BEGIN (RSA |EC )?PRIVATE KEY-----/ },
 ];
 
+
+export const ALLOWLIST_BY_PATTERN: Record<string, Array<{ path: RegExp; line: RegExp }>> = {
+  "Database URL with credentials": [
+    {
+      path: /^tests\/.*$/,
+      line: /postgres:\/\/[^\s"']+@(?:localhost|127\.0\.0\.1):\d+\/[A-Za-z0-9_-]+/i,
+    },
+    {
+      path: /^setup-vm\.sh$/,
+      line: /DATABASE_URL=postgres:\/\/[^\s"']+@localhost:5432\/vettrack/i,
+    },
+  ],
+};
+
 const EXCLUDE_DIRS = ["node_modules", ".git", "dist", ".local", "attached_assets"];
 const EXCLUDE_FILES = [
   "scan-secrets.ts",
@@ -24,7 +38,7 @@ const EXCLUDE_FILES = [
   "*.log",
 ];
 
-function shouldExclude(filePath: string): boolean {
+export function shouldExclude(filePath: string): boolean {
   for (const dir of EXCLUDE_DIRS) {
     if (filePath.includes(`/${dir}/`) || filePath.startsWith(`${dir}/`)) return true;
   }
@@ -39,7 +53,13 @@ function shouldExclude(filePath: string): boolean {
   return false;
 }
 
-function scanFile(filePath: string): Array<{ pattern: string; line: number; content: string }> {
+export function isAllowedHit(pattern: string, relPath: string, line: string): boolean {
+  const allowlisted = ALLOWLIST_BY_PATTERN[pattern];
+  if (!allowlisted) return false;
+  return allowlisted.some((rule) => rule.path.test(relPath) && rule.line.test(line));
+}
+
+export function scanFile(filePath: string, relPath: string): Array<{ pattern: string; line: number; content: string }> {
   const hits: Array<{ pattern: string; line: number; content: string }> = [];
   let content: string;
   try {
@@ -51,7 +71,7 @@ function scanFile(filePath: string): Array<{ pattern: string; line: number; cont
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     for (const { name, regex } of PATTERNS) {
-      if (regex.test(line)) {
+      if (regex.test(line) && !isAllowedHit(name, relPath, line)) {
         hits.push({ pattern: name, line: i + 1, content: line.trim().slice(0, 120) });
       }
     }
@@ -59,7 +79,7 @@ function scanFile(filePath: string): Array<{ pattern: string; line: number; cont
   return hits;
 }
 
-function getFiles(dir: string): string[] {
+export function getFiles(dir: string): string[] {
   const files: string[] = [];
   let entries: fs.Dirent[];
   try {
@@ -83,14 +103,14 @@ function getFiles(dir: string): string[] {
   return files;
 }
 
-function main() {
+export function main() {
   const rootDir = process.cwd();
   const files = getFiles(rootDir);
   let totalHits = 0;
 
   for (const file of files) {
     const relPath = path.relative(rootDir, file);
-    const hits = scanFile(file);
+    const hits = scanFile(file, relPath);
     if (hits.length > 0) {
       for (const hit of hits) {
         console.log(`\n[SECRET SCAN] ${hit.pattern}`);
@@ -109,4 +129,7 @@ function main() {
   }
 }
 
-main();
+const entryArg = process.argv[1] ? pathToFileURL(process.argv[1]).href : "";
+if (import.meta.url === entryArg) {
+  main();
+}

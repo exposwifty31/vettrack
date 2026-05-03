@@ -112,18 +112,19 @@ describe("Active Patients — schema & discharge safety", () => {
   });
 
   it("Discharge sets dischargedAt AND status=discharged atomically", () => {
-    const dischargeBlock =
-      patientsRoute.match(/router\.patch\("\/:id\/discharge"[\s\S]*?}\);/m)?.[0] ?? "";
+    // Use a larger window since the discharge handler now includes pre-flight checks
+    const start = patientsRoute.indexOf('router.patch("/:id/discharge"');
+    const dischargeBlock = start >= 0 ? patientsRoute.slice(start, start + 6000) : "";
     expect(dischargeBlock).toContain('status: "discharged"');
     expect(dischargeBlock).toContain("dischargedAt: now");
   });
 
   it("Status update and discharge both guard against already-discharged records", () => {
     // Both patches filter isNull(hospitalizations.dischargedAt)
-    const statusBlock =
-      patientsRoute.match(/router\.patch\("\/:id\/status"[\s\S]*?}\);/m)?.[0] ?? "";
-    const dischargeBlock =
-      patientsRoute.match(/router\.patch\("\/:id\/discharge"[\s\S]*?}\);/m)?.[0] ?? "";
+    const statusStart = patientsRoute.indexOf('router.patch("/:id/status"');
+    const statusBlock = statusStart >= 0 ? patientsRoute.slice(statusStart, statusStart + 2000) : "";
+    const dischargeStart = patientsRoute.indexOf('router.patch("/:id/discharge"');
+    const dischargeBlock = dischargeStart >= 0 ? patientsRoute.slice(dischargeStart, dischargeStart + 6000) : "";
     expect(statusBlock).toContain("isNull(hospitalizations.dischargedAt)");
     expect(dischargeBlock).toContain("isNull(hospitalizations.dischargedAt)");
   });

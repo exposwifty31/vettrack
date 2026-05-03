@@ -467,7 +467,7 @@ router.patch(
       .set({ acceptedByUserId: userId, updatedAt: new Date() })
       .where(and(eq(erIntakeEvents.id, id), eq(erIntakeEvents.clinicId, clinicId)));
 
-    await insertRealtimeDomainEvent(db, {
+    await insertRealtimeDomainEvent(db as Parameters<typeof insertRealtimeDomainEvent>[0], {
       clinicId,
       type: "er:intake:accepted",
       payload: { intakeId: id, acceptedByUserId: userId },
@@ -522,7 +522,7 @@ router.post("/admission-state", requireEffectiveRole("vet"), async (req: Request
 
   const row = await enterAdmissionState(clinicId, userId, parsed.data.intakeEventId);
 
-  await insertRealtimeDomainEvent(db, {
+  await insertRealtimeDomainEvent(db as Parameters<typeof insertRealtimeDomainEvent>[0], {
     clinicId,
     type: "er:admission-state:entered",
     payload: { userId, intakeEventId: parsed.data.intakeEventId },
@@ -552,7 +552,7 @@ router.delete("/admission-state", requireEffectiveRole("vet"), async (req: Reque
 
   const result = await exitAdmissionState(clinicId, userId);
 
-  await insertRealtimeDomainEvent(db, {
+  await insertRealtimeDomainEvent(db as Parameters<typeof insertRealtimeDomainEvent>[0], {
     clinicId,
     type: "er:admission-state:cleared",
     payload: { userId },
@@ -626,14 +626,14 @@ router.post(
     await clearAdmissionStateForUser(clinicId, userId);
 
     if (intake.assignedUserId) {
-      await insertRealtimeDomainEvent(db, {
+      await insertRealtimeDomainEvent(db as Parameters<typeof insertRealtimeDomainEvent>[0], {
         clinicId,
         type: "er:admission-complete:notify-staff",
         payload: { intakeId: id, notifyUserId: intake.assignedUserId },
       });
     }
 
-    await insertRealtimeDomainEvent(db, {
+    await insertRealtimeDomainEvent(db as Parameters<typeof insertRealtimeDomainEvent>[0], {
       clinicId,
       type: "er:intake:admission-complete",
       payload: { intakeId: id, completedByUserId: userId },
@@ -716,7 +716,7 @@ router.patch(
       .set(updates)
       .where(and(eq(erIntakeEvents.id, id), eq(erIntakeEvents.clinicId, clinicId)));
 
-    await insertRealtimeDomainEvent(db, {
+    await insertRealtimeDomainEvent(db as Parameters<typeof insertRealtimeDomainEvent>[0], {
       clinicId,
       type: "er:intake:enriched",
       payload: {

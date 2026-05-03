@@ -1701,5 +1701,15 @@
       "title": "Equipment expiring soon",
       "body": "{name} — expires {date}"
     }
+  },
+
+  "shiftChat": {
+    "errors": {
+      "noOpenShift": "No active shift. Start a shift before sending messages.",
+      "sendFailed": "Failed to send message. Please try again.",
+      "ackFailed": "Failed to acknowledge message.",
+      "reactFailed": "Failed to add reaction.",
+      "pinFailed": "Failed to pin message."
+    }
   }
 }

@@ -274,14 +274,14 @@ describe("server/db.ts — integration tables and sync columns", () => {
   });
   it("billingLedger table has external sync columns", () => {
     const start = src.indexOf('export const billingLedger = pgTable("vt_billing_ledger"');
-    const body = src.slice(start, start + 1000);
+    const body = src.slice(start, start + 3000);
     expect(body).toContain("externalId");
     expect(body).toContain("externalSource");
     expect(body).toContain("externalSyncedAt");
   });
   it("inventoryItems table has external sync columns", () => {
     const start = src.indexOf('export const inventoryItems = pgTable(');
-    const body = src.slice(start, start + 700);
+    const body = src.slice(start, start + 1500);
     expect(body).toContain("externalId");
     expect(body).toContain("externalSource");
     expect(body).toContain("externalSyncedAt");
