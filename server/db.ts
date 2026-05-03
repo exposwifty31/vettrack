@@ -198,18 +198,23 @@ export const drugFormulary = pgTable(
     unitVolumeMl: numeric("unit_volume_ml", { precision: 10, scale: 4 }),
     unitType: varchar("unit_type", { length: 20 }),
     criBufferPct: numeric("cri_buffer_pct", { precision: 5, scale: 4 }),
+    /** Monotonically increasing version per (clinicId, genericName, concentration) lineage. */
+    version: integer("version").notNull().default(1),
+    /** Only one active version per (clinicId, genericName, concentration). Superseded rows have isActive=false. */
+    isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     deletedAt: timestamp("deleted_at"),
   },
   (table) => ({
-    clinicGenericConcUnique: uniqueIndex("vt_drug_formulary_clinic_generic_conc_uq")
+    clinicGenericConcActiveUnique: uniqueIndex("vt_drug_formulary_clinic_generic_conc_active_uq")
       .on(table.clinicId, sql`lower(trim(${table.genericName}))`, table.concentrationMgMl)
-      .where(sql`${table.deletedAt} is null`),
+      .where(sql`${table.isActive} = true AND ${table.deletedAt} is null`),
     clinicNameSearchIdx: index("vt_drug_formulary_clinic_name_search_idx").on(
       table.clinicId,
       sql`lower(${table.name})`,
     ),
+    clinicActiveIdx: index("idx_drug_formulary_clinic_active").on(table.clinicId, table.isActive),
   }),
 );
 
@@ -288,6 +293,10 @@ export const medicationTasks = pgTable(
     status: varchar("status", { length: 20 }).notNull().default("pending"),
     assignedTo: text("assigned_to"),
     createdBy: text("created_by").notNull(),
+    /** Formulary row id used at task creation — clinical source of truth. */
+    formularyId: text("formulary_id"),
+    /** Formulary version at the time of task creation — immutable reference. */
+    formularyVersion: integer("formulary_version"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp("started_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
@@ -380,6 +389,12 @@ export const billingLedger = pgTable("vt_billing_ledger", {
   totalAmountCents: integer("total_amount_cents").notNull(),
   idempotencyKey: text("idempotency_key").notNull().unique(),
   status: billingLedgerStatusEnum("status").notNull().default("pending"),
+  /**
+   * Immutable snapshot of how price was resolved at billing time.
+   * Persists: priceCents, currency, contextType, contextId, resolvedAt,
+   * priceSource, resolutionPath[], contextUsed, formularyId?, formularyVersion?
+   */
+  pricingSnapshot: jsonb("pricing_snapshot"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   externalId: text("external_id"),
   externalSource: text("external_source"),
@@ -421,10 +436,20 @@ export const inventoryItems = pgTable(
     clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
     code: text("code").notNull(),
     label: text("label").notNull(),
+    /** Classification: DRUG | CONSUMABLE | EQUIPMENT */
+    itemType: varchar("item_type", { length: 20 }).notNull().default("CONSUMABLE"),
+    /** Physical unit for this SKU (e.g. mL, mg, vial, unit, tablet). */
+    unit: varchar("unit", { length: 30 }),
     nfcTagId: text("nfc_tag_id").unique(),
     category: text("category"),
     isBillable: boolean("is_billable").notNull().default(true),
     minimumDispenseToCapture: integer("minimum_dispense_to_capture").notNull().default(1),
+    /** Soft-delete: inactive items cannot be used in new operations. */
+    isActive: boolean("is_active").notNull().default(true),
+    /** For DRUG-type items: references the drug formulary entry (clinical source of truth). */
+    formularyId: text("formulary_id").references(() => drugFormulary.id, { onDelete: "restrict" }),
+    /** Formulary version captured at the time of item-formulary linkage. */
+    formularyVersion: integer("formulary_version"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     externalId: text("external_id"),
     externalSource: text("external_source"),
@@ -433,8 +458,43 @@ export const inventoryItems = pgTable(
   (table) => ({
     clinicCodeUnique: uniqueIndex("vt_items_clinic_code_unique").on(table.clinicId, table.code),
     clinicIdx: index("idx_items_clinic").on(table.clinicId),
+    clinicActiveIdx: index("idx_items_clinic_active").on(table.clinicId, table.isActive),
+    formularyIdx: index("idx_items_formulary_id").on(table.formularyId),
   }),
 );
+
+/**
+ * Context-aware pricing for inventory items.
+ * Resolution order (most-specific first):
+ *   1. exact (containerId + usageType)
+ *   2. container-level (containerId, no usageType)
+ *   3. usage-level (usageType, no containerId)
+ *   4. global (contextType=GLOBAL)
+ * Missing price → PRICE_NOT_FOUND error (no silent fallback).
+ */
+export const inventoryItemPrices = pgTable(
+  "vt_inventory_item_prices",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    itemId: text("item_id").notNull().references(() => inventoryItems.id, { onDelete: "restrict" }),
+    /** CONTAINER | USAGE | GLOBAL */
+    contextType: varchar("context_type", { length: 20 }).notNull(),
+    /** containerId for CONTAINER context, usageType string for USAGE context, null for GLOBAL */
+    contextId: text("context_id"),
+    priceCents: integer("price_cents").notNull(),
+    currency: varchar("currency", { length: 10 }).notNull().default("ILS"),
+    effectiveFrom: timestamp("effective_from", { withTimezone: true }).notNull().defaultNow(),
+    createdBy: text("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    itemContextIdx: index("idx_vt_item_prices_item_context").on(table.clinicId, table.itemId, table.contextType),
+    effectiveFromIdx: index("idx_vt_item_prices_effective").on(table.itemId, table.effectiveFrom),
+  }),
+);
+
+export type InventoryItemPrice = typeof inventoryItemPrices.$inferSelect;
 
 export const containerItems = pgTable(
   "vt_container_items",

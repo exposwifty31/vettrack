@@ -129,6 +129,8 @@ function buildSnapshot(
     doseMg,
     calculatedVolume: result.final.calculatedVolume,
     calculationPath: result.breakdown.calculationPath,
+    formularyId: result.formularyId ?? null,
+    formularyVersion: result.formularyVersion ?? null,
     data: result,
   };
 }
@@ -268,6 +270,8 @@ async function createMedicationTaskInner(input: CreateMedicationTaskInput): Prom
         status: "pending",
         dueAt: input.dueAt ?? null,
         createdBy: input.createdBy,
+        formularyId: result.formularyId ?? null,
+        formularyVersion: result.formularyVersion ?? null,
       })
       .returning();
     row = inserted[0];

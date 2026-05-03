@@ -194,8 +194,8 @@ router.post("/", requireAuth, requireAdmin, validateBody(createPoSchema), async 
     logAudit({
       actorRole: resolveAuditActorRole(req),
       clinicId,
-      actionType: "task_created",
-      performedBy: req.authUser!.name || req.authUser!.id,
+      actionType: "purchase_order_created",
+      performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email ?? "",
       targetId: orderId,
       targetType: "purchase_order",
@@ -231,8 +231,8 @@ router.patch("/:id/submit", requireAuth, requireAdmin, validateUuid("id"), async
     logAudit({
       actorRole: resolveAuditActorRole(req),
       clinicId,
-      actionType: "task_updated",
-      performedBy: req.authUser!.name || req.authUser!.id,
+      actionType: "purchase_order_submitted",
+      performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email ?? "",
       targetId: req.params.id,
       targetType: "purchase_order",
@@ -269,17 +269,30 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
 
     const allLines = await db.select().from(poLines).where(eq(poLines.purchaseOrderId, req.params.id));
 
+    // Collect per-line delta for audit metadata
+    const receiveAuditLines: Array<{ itemId: string; quantityReceivedBefore: number; quantityReceivedAfter: number; delta: number }> = [];
+
     await db.transaction(async (tx) => {
       for (const incoming of b.lines) {
         const line = allLines.find((l) => l.id === incoming.lineId);
         if (!line) continue;
         if (incoming.quantityReceived <= 0) continue;
 
+        const before = line.quantityReceived;
+        const after = before + incoming.quantityReceived;
+
         // Update line received quantity
         await tx
           .update(poLines)
-          .set({ quantityReceived: line.quantityReceived + incoming.quantityReceived })
+          .set({ quantityReceived: after })
           .where(eq(poLines.id, line.id));
+
+        receiveAuditLines.push({
+          itemId: line.itemId,
+          quantityReceivedBefore: before,
+          quantityReceivedAfter: after,
+          delta: incoming.quantityReceived,
+        });
 
         // Upsert containerItems quantity
         const [existingCi] = await tx
@@ -294,7 +307,6 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
             .set({ quantity: existingCi.quantity + incoming.quantityReceived, updatedAt: new Date() })
             .where(eq(containerItems.id, existingCi.id));
 
-          // Audit log
           await tx.insert(inventoryLogs).values({
             id: randomUUID(),
             clinicId,
@@ -361,8 +373,8 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
     logAudit({
       actorRole: resolveAuditActorRole(req),
       clinicId,
-      actionType: "task_updated",
-      performedBy: req.authUser!.name || req.authUser!.id,
+      actionType: "purchase_order_received",
+      performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email ?? "",
       targetId: req.params.id,
       targetType: "purchase_order",
@@ -370,6 +382,7 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
         previousStatus: existing.status,
         newStatus: updated?.status ?? existing.status,
         receiveLineCount: b.lines.length,
+        lines: receiveAuditLines,
       },
     });
     res.json({ ...updated, lines: updatedLines });
@@ -394,6 +407,18 @@ router.patch("/:id/cancel", requireAuth, requireAdmin, validateUuid("id"), async
     if (existing.status === "received") return res.status(409).json(apiError({ code: "CONFLICT", reason: "ALREADY_RECEIVED", message: "Cannot cancel a received order", requestId }));
     if (existing.status === "cancelled") return res.status(409).json(apiError({ code: "CONFLICT", reason: "ALREADY_CANCELLED", message: "Order is already cancelled", requestId }));
 
+    // Fix C: block cancellation if any line has already been received
+    const allPoLines = await db.select({ quantityReceived: poLines.quantityReceived }).from(poLines).where(eq(poLines.purchaseOrderId, req.params.id));
+    const anyReceived = allPoLines.some((l) => l.quantityReceived > 0);
+    if (anyReceived) {
+      return res.status(409).json(apiError({
+        code: "PARTIAL_RECEIPT_CANNOT_CANCEL",
+        reason: "PARTIAL_RECEIPT_CANNOT_CANCEL",
+        message: "Cannot cancel a purchase order that has already received stock. Some lines have quantityReceived > 0.",
+        requestId,
+      }));
+    }
+
     await db
       .update(purchaseOrders)
       .set({ status: "cancelled", updatedAt: new Date() })
@@ -403,8 +428,8 @@ router.patch("/:id/cancel", requireAuth, requireAdmin, validateUuid("id"), async
     logAudit({
       actorRole: resolveAuditActorRole(req),
       clinicId,
-      actionType: "task_cancelled",
-      performedBy: req.authUser!.name || req.authUser!.id,
+      actionType: "purchase_order_cancelled",
+      performedBy: req.authUser!.id,
       performedByEmail: req.authUser!.email ?? "",
       targetId: req.params.id,
       targetType: "purchase_order",

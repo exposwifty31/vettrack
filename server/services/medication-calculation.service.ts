@@ -41,6 +41,10 @@ export interface MedicationCalculationInput {
 
 export interface CalculationResult {
   outputUnit?: "ml" | "tablet";
+  /** Formulary row referenced during this calculation. Populated by calculateMedication(). */
+  formularyId?: string;
+  /** Formulary version at calculation time. Populated by calculateMedication(). */
+  formularyVersion?: number;
   breakdown: {
     weightKg: number;
     prescribedDosePerKg: number;
@@ -131,6 +135,8 @@ export async function calculateMedication(input: MedicationCalculationInput): Pr
       concentrationMgMl: drugFormulary.concentrationMgMl,
       standardDose: drugFormulary.standardDose,
       doseUnit: drugFormulary.doseUnit,
+      version: drugFormulary.version,
+      isActive: drugFormulary.isActive,
     })
     .from(drugFormulary)
     .where(
@@ -182,6 +188,8 @@ export async function calculateMedication(input: MedicationCalculationInput): Pr
     const tier = justificationTier(deviationRatio);
 
     return {
+      formularyId: drug.id,
+      formularyVersion: drug.version,
       breakdown: {
         weightKg: input.weightKg,
         prescribedDosePerKg: prescribedDoseMgPerKg,
@@ -224,6 +232,8 @@ export async function calculateMedication(input: MedicationCalculationInput): Pr
     const tier = justificationTier(deviationRatio);
 
     return {
+      formularyId: drug.id,
+      formularyVersion: drug.version,
       breakdown: {
         weightKg: input.weightKg,
         prescribedDosePerKg: input.prescribedDosePerKg,
@@ -276,6 +286,8 @@ export async function calculateMedication(input: MedicationCalculationInput): Pr
   const tier = justificationTier(deviationRatio);
 
   return {
+    formularyId: drug.id,
+    formularyVersion: drug.version,
     breakdown: {
       weightKg: input.weightKg,
       prescribedDosePerKg: input.prescribedDosePerKg,

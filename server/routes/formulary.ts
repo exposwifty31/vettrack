@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db, drugFormulary } from "../db.js";
 import { normalizeJsonStringArray, syncFormularyFromSeed } from "../lib/formulary-seed-sync.js";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
+import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 
 const router = Router();
 
@@ -20,6 +21,23 @@ const createOrUpsertFormularySchema = z.object({
   minDose: z.number().finite().positive().optional().nullable(),
   maxDose: z.number().finite().positive().optional().nullable(),
   doseUnit: z.enum(["mg_per_kg", "mcg_per_kg", "mEq_per_kg", "tablet"]),
+  defaultRoute: z.string().trim().max(100).optional().nullable(),
+  unitType: z.enum(["vial", "ampule", "tablet", "capsule", "bag"]).optional().nullable(),
+  unitVolumeMl: z.number().finite().positive().optional().nullable(),
+});
+
+const patchSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  genericName: z.string().trim().min(1).max(200).optional(),
+  brandNames: z.array(z.string().trim().min(1)).max(50).optional(),
+  targetSpecies: z.array(z.string().trim().min(1)).max(20).optional().nullable(),
+  category: z.string().trim().max(120).optional().nullable(),
+  dosageNotes: z.string().trim().max(2000).optional().nullable(),
+  concentrationMgMl: z.number().finite().positive().optional(),
+  standardDose: z.number().finite().positive().optional(),
+  minDose: z.number().finite().positive().optional().nullable(),
+  maxDose: z.number().finite().positive().optional().nullable(),
+  doseUnit: z.enum(["mg_per_kg", "mcg_per_kg", "mEq_per_kg", "tablet"]).optional(),
   defaultRoute: z.string().trim().max(100).optional().nullable(),
   unitType: z.enum(["vial", "ampule", "tablet", "capsule", "bag"]).optional().nullable(),
   unitVolumeMl: z.number().finite().positive().optional().nullable(),
@@ -65,6 +83,8 @@ function toResponseRow(row: typeof drugFormulary.$inferSelect) {
     defaultRoute: row.defaultRoute ?? null,
     unitType: row.unitType ?? null,
     unitVolumeMl: row.unitVolumeMl != null ? Number(row.unitVolumeMl) : null,
+    version: row.version,
+    isActive: row.isActive,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -91,7 +111,13 @@ router.get("/", requireAuth, requireEffectiveRole("technician"), async (req, res
     const rows = await db
       .select()
       .from(drugFormulary)
-      .where(and(eq(drugFormulary.clinicId, clinicId), isNull(drugFormulary.deletedAt)))
+      .where(
+        and(
+          eq(drugFormulary.clinicId, clinicId),
+          isNull(drugFormulary.deletedAt),
+          eq(drugFormulary.isActive, true),
+        ),
+      )
       .orderBy(asc(drugFormulary.name));
 
     return res.json(rows.map(toResponseRow));
@@ -138,36 +164,12 @@ router.post("/", requireAuth, requireEffectiveRole("vet"), async (req, res) => {
           eq(drugFormulary.clinicId, clinicId),
           sql`lower(trim(${drugFormulary.genericName})) = ${normalizedLowerGeneric}`,
           eq(drugFormulary.concentrationMgMl, String(payload.concentrationMgMl)),
+          isNull(drugFormulary.deletedAt),
         ),
       )
       .limit(1);
 
-    if (existing) {
-      if (existing.deletedAt) {
-        const [reactivated] = await db
-          .update(drugFormulary)
-          .set({
-            name: normalizedName,
-            genericName: normalizedGeneric,
-            brandNames: payload.brandNames ?? [],
-            targetSpecies: payload.targetSpecies ?? null,
-            category: payload.category ?? null,
-            dosageNotes: payload.dosageNotes ?? null,
-            concentrationMgMl: String(payload.concentrationMgMl),
-            standardDose: String(payload.standardDose),
-            minDose: payload.minDose != null ? String(payload.minDose) : null,
-            maxDose: payload.maxDose != null ? String(payload.maxDose) : null,
-            doseUnit: payload.doseUnit,
-            defaultRoute: payload.defaultRoute ?? null,
-            unitType: payload.unitType ?? null,
-            unitVolumeMl: payload.unitVolumeMl != null ? String(payload.unitVolumeMl) : null,
-            deletedAt: null,
-            updatedAt: now,
-          })
-          .where(and(eq(drugFormulary.id, existing.id), eq(drugFormulary.clinicId, clinicId)))
-          .returning();
-        return res.json(toResponseRow(reactivated));
-      }
+    if (existing && existing.isActive) {
       return res.status(409).json(
         apiError({
           code: "CONFLICT",
@@ -177,6 +179,9 @@ router.post("/", requireAuth, requireEffectiveRole("vet"), async (req, res) => {
         }),
       );
     }
+
+    // Reactivate a soft-deleted entry by creating a new version
+    const startVersion = existing ? existing.version + 1 : 1;
 
     const [created] = await db
       .insert(drugFormulary)
@@ -197,11 +202,30 @@ router.post("/", requireAuth, requireEffectiveRole("vet"), async (req, res) => {
         defaultRoute: payload.defaultRoute ?? null,
         unitType: payload.unitType ?? null,
         unitVolumeMl: payload.unitVolumeMl != null ? String(payload.unitVolumeMl) : null,
+        version: startVersion,
+        isActive: true,
         createdAt: now,
         updatedAt: now,
         deletedAt: null,
       })
       .returning();
+
+    logAudit({
+      clinicId,
+      actionType: "formulary_created",
+      performedBy: req.authUser!.id,
+      performedByEmail: req.authUser!.email,
+      actorRole: resolveAuditActorRole(req),
+      targetId: created.id,
+      targetType: "formulary",
+      metadata: {
+        genericName: normalizedGeneric,
+        concentrationMgMl: payload.concentrationMgMl,
+        standardDose: payload.standardDose,
+        doseUnit: payload.doseUnit,
+        version: created.version,
+      },
+    });
 
     return res.status(201).json(toResponseRow(created));
   } catch (err) {
@@ -216,7 +240,7 @@ router.post("/", requireAuth, requireEffectiveRole("vet"), async (req, res) => {
         }),
       );
     }
-    console.error("[formulary] upsert failed", err);
+    console.error("[formulary] create failed", err);
     return res.status(500).json(
       apiError({
         code: "INTERNAL_ERROR",
@@ -228,6 +252,13 @@ router.post("/", requireAuth, requireEffectiveRole("vet"), async (req, res) => {
   }
 });
 
+/**
+ * PATCH /:id — create a new version of a formulary entry.
+ *
+ * Fix E (versioning): the existing row is set to isActive=false; a new row is
+ * inserted with version = old.version + 1, isActive = true, and all updated fields.
+ * Old versions remain immutable and are never overwritten.
+ */
 router.patch("/:id", requireAuth, requireEffectiveRole("vet"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   const clinicId = req.clinicId!;
@@ -238,22 +269,6 @@ router.patch("/:id", requireAuth, requireEffectiveRole("vet"), async (req, res) 
     );
   }
 
-  const patchSchema = z.object({
-    name: z.string().trim().min(1).max(200).optional(),
-    genericName: z.string().trim().min(1).max(200).optional(),
-    brandNames: z.array(z.string().trim().min(1)).max(50).optional(),
-    targetSpecies: z.array(z.string().trim().min(1)).max(20).optional().nullable(),
-    category: z.string().trim().max(120).optional().nullable(),
-    dosageNotes: z.string().trim().max(2000).optional().nullable(),
-    concentrationMgMl: z.number().finite().positive().optional(),
-    standardDose: z.number().finite().positive().optional(),
-    minDose: z.number().finite().positive().optional().nullable(),
-    maxDose: z.number().finite().positive().optional().nullable(),
-    doseUnit: z.enum(["mg_per_kg", "mcg_per_kg", "mEq_per_kg", "tablet"]).optional(),
-    defaultRoute: z.string().trim().max(100).optional().nullable(),
-    unitType: z.enum(["vial", "ampule", "tablet", "capsule", "bag"]).optional().nullable(),
-    unitVolumeMl: z.number().finite().positive().optional().nullable(),
-  });
   const parsed = patchSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json(
@@ -269,54 +284,102 @@ router.patch("/:id", requireAuth, requireEffectiveRole("vet"), async (req, res) 
   }
 
   try {
-    const now = new Date();
-    const updateFields: Record<string, unknown> = { updatedAt: now };
-    if (patch.name !== undefined) updateFields.name = patch.name.trim();
-    if (patch.genericName !== undefined) updateFields.genericName = patch.genericName.trim();
-    if (patch.brandNames !== undefined) updateFields.brandNames = patch.brandNames;
-    if ("targetSpecies" in patch) updateFields.targetSpecies = patch.targetSpecies ?? null;
-    if ("category" in patch) updateFields.category = patch.category ?? null;
-    if ("dosageNotes" in patch) updateFields.dosageNotes = patch.dosageNotes ?? null;
-    if (patch.concentrationMgMl !== undefined) updateFields.concentrationMgMl = String(patch.concentrationMgMl);
-    if (patch.standardDose !== undefined) updateFields.standardDose = String(patch.standardDose);
-    if ("minDose" in patch) updateFields.minDose = patch.minDose != null ? String(patch.minDose) : null;
-    if ("maxDose" in patch) updateFields.maxDose = patch.maxDose != null ? String(patch.maxDose) : null;
-    if (patch.doseUnit !== undefined) updateFields.doseUnit = patch.doseUnit;
-    if ("defaultRoute" in patch) updateFields.defaultRoute = patch.defaultRoute ?? null;
-    if ("unitType" in patch) updateFields.unitType = patch.unitType ?? null;
-    if ("unitVolumeMl" in patch) updateFields.unitVolumeMl = patch.unitVolumeMl != null ? String(patch.unitVolumeMl) : null;
+    const [existing] = await db
+      .select()
+      .from(drugFormulary)
+      .where(and(eq(drugFormulary.id, id), eq(drugFormulary.clinicId, clinicId), isNull(drugFormulary.deletedAt), eq(drugFormulary.isActive, true)))
+      .limit(1);
 
-    let updated: typeof drugFormulary.$inferSelect | undefined;
-    try {
-      const rows = await db
-        .update(drugFormulary)
-        .set(updateFields)
-        .where(and(eq(drugFormulary.id, id), eq(drugFormulary.clinicId, clinicId), isNull(drugFormulary.deletedAt)))
-        .returning();
-      updated = rows[0];
-    } catch (err) {
-      const code = typeof err === "object" && err !== null && "code" in err ? String((err as { code: unknown }).code) : "";
-      if (code === "23505") {
-        return res.status(409).json(
-          apiError({
-            code: "CONFLICT",
-            reason: "FORMULARY_DUPLICATE_GENERIC_CONCENTRATION",
-            message: "Update would duplicate generic name and concentration",
-            requestId,
-          }),
-        );
-      }
-      throw err;
-    }
-
-    if (!updated) {
+    if (!existing) {
       return res.status(404).json(
         apiError({ code: "NOT_FOUND", reason: "FORMULARY_NOT_FOUND", message: "Formulary entry not found", requestId }),
       );
     }
 
-    return res.json(toResponseRow(updated));
+    const now = new Date();
+    const newRow = await db.transaction(async (tx) => {
+      // Retire current version
+      await tx
+        .update(drugFormulary)
+        .set({ isActive: false, updatedAt: now })
+        .where(and(eq(drugFormulary.id, id), eq(drugFormulary.clinicId, clinicId)));
+
+      // Insert new version with updated fields
+      const [newEntry] = await tx
+        .insert(drugFormulary)
+        .values({
+          id: randomUUID(),
+          clinicId,
+          name: patch.name?.trim() ?? existing.name,
+          genericName: patch.genericName?.trim() ?? existing.genericName,
+          brandNames: patch.brandNames ?? (existing.brandNames as string[]),
+          targetSpecies: "targetSpecies" in patch ? (patch.targetSpecies ?? null) : existing.targetSpecies,
+          category: "category" in patch ? (patch.category ?? null) : existing.category,
+          dosageNotes: "dosageNotes" in patch ? (patch.dosageNotes ?? null) : existing.dosageNotes,
+          concentrationMgMl: patch.concentrationMgMl !== undefined
+            ? String(patch.concentrationMgMl)
+            : existing.concentrationMgMl,
+          standardDose: patch.standardDose !== undefined ? String(patch.standardDose) : existing.standardDose,
+          minDose: "minDose" in patch
+            ? (patch.minDose != null ? String(patch.minDose) : null)
+            : existing.minDose,
+          maxDose: "maxDose" in patch
+            ? (patch.maxDose != null ? String(patch.maxDose) : null)
+            : existing.maxDose,
+          doseUnit: patch.doseUnit ?? existing.doseUnit,
+          defaultRoute: "defaultRoute" in patch ? (patch.defaultRoute ?? null) : existing.defaultRoute,
+          unitType: "unitType" in patch ? (patch.unitType ?? null) : existing.unitType,
+          unitVolumeMl: "unitVolumeMl" in patch
+            ? (patch.unitVolumeMl != null ? String(patch.unitVolumeMl) : null)
+            : existing.unitVolumeMl,
+          version: existing.version + 1,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+          deletedAt: null,
+        })
+        .returning();
+
+      return newEntry;
+    });
+
+    logAudit({
+      clinicId,
+      actionType: "formulary_version_created",
+      performedBy: req.authUser!.id,
+      performedByEmail: req.authUser!.email,
+      actorRole: resolveAuditActorRole(req),
+      targetId: newRow.id,
+      targetType: "formulary",
+      metadata: {
+        supersededId: id,
+        previousVersion: existing.version,
+        newVersion: newRow.version,
+        previousValues: {
+          standardDose: existing.standardDose,
+          concentrationMgMl: existing.concentrationMgMl,
+          minDose: existing.minDose,
+          maxDose: existing.maxDose,
+          doseUnit: existing.doseUnit,
+          defaultRoute: existing.defaultRoute,
+        },
+        patchedFields: Object.keys(patch),
+      },
+    });
+
+    return res.json(toResponseRow(newRow));
   } catch (err) {
+    const code = typeof err === "object" && err !== null && "code" in err ? String((err as { code: unknown }).code) : "";
+    if (code === "23505") {
+      return res.status(409).json(
+        apiError({
+          code: "CONFLICT",
+          reason: "FORMULARY_DUPLICATE_GENERIC_CONCENTRATION",
+          message: "Update would duplicate generic name and concentration",
+          requestId,
+        }),
+      );
+    }
     console.error("[formulary] patch failed", err);
     return res.status(500).json(
       apiError({ code: "INTERNAL_ERROR", reason: "FORMULARY_PATCH_FAILED", message: "Failed to update formulary entry", requestId }),
@@ -330,46 +393,49 @@ router.delete("/:id", requireAuth, requireEffectiveRole("vet"), async (req, res)
   const id = req.params.id?.trim();
   if (!id) {
     return res.status(400).json(
-      apiError({
-        code: "VALIDATION_FAILED",
-        reason: "MISSING_ID_PARAM",
-        message: "id param is required",
-        requestId,
-      }),
+      apiError({ code: "VALIDATION_FAILED", reason: "MISSING_ID_PARAM", message: "id param is required", requestId }),
     );
   }
 
   try {
     const [deleted] = await db
       .update(drugFormulary)
-      .set({
-        deletedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(and(eq(drugFormulary.id, id), eq(drugFormulary.clinicId, clinicId), isNull(drugFormulary.deletedAt)))
-      .returning({ id: drugFormulary.id });
+      .set({ deletedAt: new Date(), isActive: false, updatedAt: new Date() })
+      .where(
+        and(
+          eq(drugFormulary.id, id),
+          eq(drugFormulary.clinicId, clinicId),
+          isNull(drugFormulary.deletedAt),
+          eq(drugFormulary.isActive, true),
+        ),
+      )
+      .returning({ id: drugFormulary.id, genericName: drugFormulary.genericName, version: drugFormulary.version });
 
     if (!deleted) {
       return res.status(404).json(
-        apiError({
-          code: "NOT_FOUND",
-          reason: "FORMULARY_NOT_FOUND",
-          message: "Formulary entry not found",
-          requestId,
-        }),
+        apiError({ code: "NOT_FOUND", reason: "FORMULARY_NOT_FOUND", message: "Formulary entry not found", requestId }),
       );
     }
+
+    logAudit({
+      clinicId,
+      actionType: "formulary_deleted",
+      performedBy: req.authUser!.id,
+      performedByEmail: req.authUser!.email,
+      actorRole: resolveAuditActorRole(req),
+      targetId: id,
+      targetType: "formulary",
+      metadata: {
+        genericName: deleted.genericName,
+        version: deleted.version,
+      },
+    });
 
     return res.status(204).send();
   } catch (err) {
     console.error("[formulary] delete failed", err);
     return res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "FORMULARY_DELETE_FAILED",
-        message: "Failed to delete formulary entry",
-        requestId,
-      }),
+      apiError({ code: "INTERNAL_ERROR", reason: "FORMULARY_DELETE_FAILED", message: "Failed to delete formulary entry", requestId }),
     );
   }
 });

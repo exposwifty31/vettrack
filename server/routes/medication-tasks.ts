@@ -114,6 +114,8 @@ function serializeTask(task: MedicationTask) {
     inventoryMismatch: task.inventoryMismatch,
     safetyLevel: task.safetyLevel,
     overrideReason: task.overrideReason,
+    formularyId: task.formularyId ?? null,
+    formularyVersion: task.formularyVersion ?? null,
     calculation: {
       version: snapshotVersion,
       weight: snapshotContainer?.weight ?? null,
@@ -121,6 +123,8 @@ function serializeTask(task: MedicationTask) {
       doseMg: snapshotContainer?.doseMg ?? null,
       calculatedVolume: snapshotContainer?.calculatedVolume ?? null,
       calculationPath: snapshotContainer?.calculationPath ?? null,
+      formularyId: snapshotContainer?.formularyId ?? null,
+      formularyVersion: snapshotContainer?.formularyVersion ?? null,
       breakdown: snapshot?.breakdown ?? null,
       final: snapshot?.final ?? null,
       safety: snapshot ? {
