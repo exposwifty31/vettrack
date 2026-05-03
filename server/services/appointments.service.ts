@@ -21,6 +21,7 @@ export type AppointmentStatus =
   | "assigned"
   | "scheduled"
   | "arrived"
+  | "approved"
   | "in_progress"
   | "completed"
   | "cancelled"
@@ -77,6 +78,12 @@ export interface AppointmentInput {
   metadata?: Record<string, unknown> | null;
   priority?: TaskPriority;
   taskType?: TaskType | null;
+  /** Links this task to a specific hospitalization episode (required for medication taskType). */
+  hospitalizationId?: string | null;
+  /** Scheduling context / purpose label. */
+  appointmentType?: string | null;
+  /** Who created this appointment/task (userId). */
+  createdBy?: string | null;
 }
 
 export interface AppointmentUpdateInput {
@@ -93,6 +100,8 @@ export interface AppointmentUpdateInput {
   metadata?: Record<string, unknown> | null;
   priority?: TaskPriority;
   taskType?: TaskType | null;
+  hospitalizationId?: string | null;
+  appointmentType?: string | null;
 }
 
 export class AppointmentServiceError extends Error {
@@ -804,6 +813,9 @@ function serializeAppointment(row: AppointmentRecord) {
     scheduledAt: row.scheduledAt ? new Date(row.scheduledAt).toISOString() : null,
     completedAt: row.completedAt ? new Date(row.completedAt).toISOString() : null,
     metadata: row.metadata ?? null,
+    hospitalizationId: row.hospitalizationId ?? null,
+    appointmentType: row.appointmentType ?? null,
+    createdBy: row.createdBy ?? null,
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
   };
@@ -938,6 +950,9 @@ export async function createAppointment(clinicIdInput: string, payload: Appointm
       containerId: isMedicationTaskType(taskType)
         ? extractMedicationContainerIdFromMetadata(metadataRecord ?? null)
         : null,
+      hospitalizationId: payload.hospitalizationId?.trim() || null,
+      appointmentType: payload.appointmentType?.trim() || null,
+      createdBy: payload.createdBy?.trim() || actor?.userId || null,
       createdAt: now,
       updatedAt: now,
     })
@@ -1133,6 +1148,12 @@ export async function updateAppointment(
       priority: nextPriority,
       taskType: nextTaskType,
       containerId: nextContainerIdForRow,
+      ...(payload.hospitalizationId !== undefined
+        ? { hospitalizationId: payload.hospitalizationId?.trim() || null }
+        : {}),
+      ...(payload.appointmentType !== undefined
+        ? { appointmentType: payload.appointmentType?.trim() || null }
+        : {}),
       updatedAt: new Date(),
     })
     .where(and(eq(appointments.id, appointmentId), eq(appointments.clinicId, clinicId)))
@@ -1235,11 +1256,23 @@ export async function startTask(clinicIdInput: string, taskId: string, actor: Ta
   }
 
   const from = existing.status as AppointmentStatus;
-  if (!["scheduled", "assigned", "arrived"].includes(from)) {
-    throw new AppointmentServiceError("INVALID_STATUS_TRANSITION", 400, "Task cannot be started from this status", {
-      from,
-      to: "in_progress",
-    });
+  if (isMedicationTask) {
+    // Fix C/D: medication tasks must pass through 'approved' before a technician can start.
+    if (from !== "approved") {
+      throw new AppointmentServiceError("VET_APPROVAL_REQUIRED", 400, "Medication tasks must be approved by a vet before they can be started", {
+        from,
+        to: "in_progress",
+        required: "approved",
+      });
+    }
+  } else {
+    // Non-medication tasks (maintenance, repair, inspection) may start from pre-work states.
+    if (!["scheduled", "assigned", "arrived", "approved"].includes(from)) {
+      throw new AppointmentServiceError("INVALID_STATUS_TRANSITION", 400, "Task cannot be started from this status", {
+        from,
+        to: "in_progress",
+      });
+    }
   }
 
   await assertVetInClinic(clinicId, vetId);
@@ -1325,17 +1358,9 @@ export async function completeTask(
     throw new AppointmentServiceError("TASK_NOT_OWNED_BY_TECH", 403, "Only the assigned technician can complete this task");
   }
 
-  // Technicians must wait for vet approval before completing a medication task
-  if (isMedicationTask && actorRole === "technician") {
-    const approvalMeta = medicationMetadataFromUnknown(existing.metadata);
-    if (!approvalMeta.vetApproved) {
-      throw new AppointmentServiceError(
-        "VET_APPROVAL_REQUIRED",
-        403,
-        "Veterinarian must approve this medication before the technician can complete it",
-      );
-    }
-  }
+  // Vet approval is now enforced by the state machine (pending → approved → in_progress).
+  // By the time a task is in_progress, it has already passed through 'approved'.
+  // No separate metadata.vetApproved check is needed here.
 
   const from = existing.status as AppointmentStatus;
   if (from !== "in_progress") {
@@ -1475,6 +1500,13 @@ export async function completeTask(
   return serialized;
 }
 
+/**
+ * Vet approval gate — transitions medication task from pending → approved.
+ *
+ * Fix C/D: approval is now a first-class status transition, not a metadata flag.
+ * This must happen BEFORE startTask (which requires 'approved' for medication tasks).
+ * Allowed from: pending | assigned | scheduled (pre-start states).
+ */
 export async function vetApproveTask(clinicIdInput: string, taskId: string, actor: TaskAuditActor) {
   const clinicId = assertClinicId(clinicIdInput);
 
@@ -1490,28 +1522,34 @@ export async function vetApproveTask(clinicIdInput: string, taskId: string, acto
 
   const isMedicationTask = isMedicationTaskType(existing.taskType as TaskType | null);
   if (!isMedicationTask) {
-    throw new AppointmentServiceError("NOT_A_MEDICATION_TASK", 400, "Task is not a medication task");
+    throw new AppointmentServiceError("NOT_A_MEDICATION_TASK", 400, "Vet approval is only applicable to medication tasks");
   }
 
-  if (existing.status !== "in_progress") {
-    throw new AppointmentServiceError("INVALID_TASK_STATUS", 400, "Task must be in_progress for vet approval", {
-      status: existing.status,
-    });
-  }
-
-  const metadata = medicationMetadataFromUnknown(existing.metadata);
-  if (metadata.vetApproved) {
+  // Idempotent: already approved or further along
+  if (existing.status === "approved") {
     return serializeAppointment(existing);
   }
 
+  const allowedFromStatuses: AppointmentStatus[] = ["pending", "assigned", "scheduled", "arrived"];
+  const from = existing.status as AppointmentStatus;
+  if (!allowedFromStatuses.includes(from)) {
+    throw new AppointmentServiceError("INVALID_STATUS_TRANSITION", 400, "Task cannot be approved from its current status", {
+      from,
+      to: "approved",
+      allowedFrom: allowedFromStatuses,
+    });
+  }
+
   const actorIdentifier = actor.clerkId?.trim() || actor.userId;
-  metadata.vetApproved = true;
-  metadata.vetApprovedBy = actorIdentifier;
-  metadata.vetApprovedAt = new Date().toISOString();
+  const previousSnapshot = { ...serializeAppointment(existing) };
+  const now = new Date();
 
   const [updated] = await db
     .update(appointments)
-    .set({ metadata, updatedAt: new Date() })
+    .set({
+      status: "approved",
+      updatedAt: now,
+    })
     .where(and(eq(appointments.id, taskId), eq(appointments.clinicId, clinicId)))
     .returning();
 
@@ -1522,14 +1560,20 @@ export async function vetApproveTask(clinicIdInput: string, taskId: string, acto
   const serialized = serializeAppointment(updated);
   logAudit({
     clinicId,
-    actionType: "task_updated",
+    actionType: "task_approved",
     performedBy: actor.userId,
     performedByEmail: actor.email,
     actorRole: resolveAuditActorRole({ effectiveRole: actor.role }),
     targetId: taskId,
     targetType: "task",
-    metadata: { action: "vet_approved", vetApprovedBy: actorIdentifier },
+    metadata: {
+      approvedBy: actorIdentifier,
+      previousStatus: from,
+      newStatus: "approved",
+      previousState: previousSnapshot,
+    },
   });
+  broadcast(clinicId, { type: "TASK_APPROVED", payload: serialized });
   broadcast(clinicId, { type: "TASK_UPDATED", payload: serialized });
   return serialized;
 }

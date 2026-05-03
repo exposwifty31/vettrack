@@ -107,7 +107,17 @@ export const appointments = pgTable("vt_appointments", {
   endTime: timestamp("end_time", { withTimezone: true }).notNull(),
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
   completedAt: timestamp("completed_at", { withTimezone: true }),
+  /**
+   * Extended status values include 'approved' (vet gate for medication tasks).
+   * Full machine: pending → approved → in_progress → completed | cancelled
+   */
   status: varchar("status", { length: 20 }).notNull().default("scheduled"),
+  /** Links this task to the specific hospitalization episode it belongs to. */
+  hospitalizationId: text("hospitalization_id"),
+  /** Scheduling type/purpose (e.g. 'checkup', 'followup', 'medication', 'maintenance'). */
+  appointmentType: varchar("appointment_type", { length: 40 }),
+  /** Who created this appointment/task. */
+  createdBy: text("created_by"),
   conflictOverride: boolean("conflict_override").notNull().default(false),
   overrideReason: text("override_reason"),
   notes: text("notes"),

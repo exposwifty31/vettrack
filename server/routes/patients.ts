@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { and, desc, eq, ilike, isNull, or } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, isNull, ne, or } from "drizzle-orm";
 import { z } from "zod";
-import { animals, db, hospitalizations, owners, users, type HospitalizationStatus } from "../db.js";
+import { animals, appointments, db, dispenseEvents, hospitalizations, inventoryJobs, owners, users, type HospitalizationStatus } from "../db.js";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
+import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { postSystemMessage } from "../lib/shift-chat-presence.js";
 
 const router = Router();
@@ -66,6 +67,7 @@ const statusSchema = z.object({
 
 const dischargeSchema = z.object({
   dischargeNotes: z.string().max(1000).optional(),
+  overrideReason: z.string().min(1).max(500).optional(),
 });
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -360,6 +362,17 @@ router.patch("/:id/status", async (req, res) => {
 });
 
 // ─── PATCH /api/patients/:id/discharge ──────────────────────────────────────
+//
+// Fix B: pre-flight checks before discharge is committed.
+// Blocks if any of the following exist for this hospitalization:
+//   1. Open tasks (not completed or cancelled)
+//   2. Unresolved emergency dispense events (EMERGENCY_PENDING)
+//   3. Failed inventory jobs (inventoryStatus = FAILED)
+//
+// Pass ?override=true + body.overrideReason to force discharge despite violations.
+// Override is audited.
+
+const OPEN_TASK_STATUSES = ["pending", "assigned", "scheduled", "arrived", "approved", "in_progress"] as const;
 
 router.patch("/:id/discharge", async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -369,8 +382,84 @@ router.patch("/:id/discharge", async (req, res) => {
   try {
     const clinicId = req.clinicId!;
     const { id } = req.params;
-    const now = new Date();
+    const override = req.query.override === "true";
+    const overrideReason = parse.data.overrideReason?.trim() ?? null;
 
+    if (override && !overrideReason) {
+      return res.status(400).json(apiError({ code: "OVERRIDE_REASON_REQUIRED", reason: "OVERRIDE_REASON_REQUIRED", message: "overrideReason is required when override=true", requestId }));
+    }
+
+    // Verify hospitalization exists and is not already discharged
+    const [hosp] = await db
+      .select({ id: hospitalizations.id, animalId: hospitalizations.animalId })
+      .from(hospitalizations)
+      .where(and(eq(hospitalizations.id, id), eq(hospitalizations.clinicId, clinicId), isNull(hospitalizations.dischargedAt)))
+      .limit(1);
+
+    if (!hosp) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "HOSPITALIZATION_NOT_FOUND", message: "Hospitalization not found or already discharged", requestId }));
+
+    // ── Pre-flight checks ──────────────────────────────────────────────────
+    if (!override) {
+      const blockingConditions: Array<{ type: string; ids: string[] }> = [];
+
+      // 1. Open tasks linked to this hospitalization
+      const openTasks = await db
+        .select({ id: appointments.id, status: appointments.status })
+        .from(appointments)
+        .where(
+          and(
+            eq(appointments.clinicId, clinicId),
+            eq(appointments.hospitalizationId, id),
+            inArray(appointments.status, [...OPEN_TASK_STATUSES]),
+          ),
+        );
+      if (openTasks.length > 0) {
+        blockingConditions.push({ type: "open_tasks", ids: openTasks.map((t) => t.id) });
+      }
+
+      // 2. Unresolved emergency dispense events for this patient
+      const unresolvedDispenses = await db
+        .select({ id: dispenseEvents.id })
+        .from(dispenseEvents)
+        .where(
+          and(
+            eq(dispenseEvents.clinicId, clinicId),
+            eq(dispenseEvents.patientId, hosp.animalId),
+            eq(dispenseEvents.status, "EMERGENCY_PENDING"),
+          ),
+        );
+      if (unresolvedDispenses.length > 0) {
+        blockingConditions.push({ type: "unresolved_emergency_dispenses", ids: unresolvedDispenses.map((d) => d.id) });
+      }
+
+      // 3. Failed inventory jobs for this patient's tasks
+      const failedInventoryJobs = await db
+        .select({ id: inventoryJobs.id })
+        .from(inventoryJobs)
+        .where(
+          and(
+            eq(inventoryJobs.clinicId, clinicId),
+            eq(inventoryJobs.animalId, hosp.animalId),
+            eq(inventoryJobs.status, "failed"),
+          ),
+        );
+      if (failedInventoryJobs.length > 0) {
+        blockingConditions.push({ type: "failed_inventory_jobs", ids: failedInventoryJobs.map((j) => j.id) });
+      }
+
+      if (blockingConditions.length > 0) {
+        return res.status(409).json({
+          code: "BLOCKING_CONDITIONS_PREVENT_DISCHARGE",
+          error: "BLOCKING_CONDITIONS_PREVENT_DISCHARGE",
+          reason: "BLOCKING_CONDITIONS_PREVENT_DISCHARGE",
+          message: "Discharge blocked: one or more clinical conditions must be resolved before discharging this patient. Pass ?override=true with overrideReason to force discharge.",
+          blockingConditions,
+          requestId,
+        });
+      }
+    }
+
+    const now = new Date();
     const updated = await db
       .update(hospitalizations)
       .set({
@@ -383,6 +472,29 @@ router.patch("/:id/discharge", async (req, res) => {
       .returning({ id: hospitalizations.id, dischargedAt: hospitalizations.dischargedAt });
 
     if (!updated.length) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "HOSPITALIZATION_NOT_FOUND", message: "Hospitalization not found or already discharged", requestId }));
+
+    logAudit({
+      clinicId,
+      actionType: "patient_discharged",
+      performedBy: req.authUser!.id,
+      performedByEmail: req.authUser!.email ?? "",
+      actorRole: resolveAuditActorRole(req),
+      targetId: id,
+      targetType: "hospitalization",
+      metadata: {
+        dischargedAt: updated[0]!.dischargedAt?.toISOString() ?? null,
+        dischargeNotes: parse.data.dischargeNotes?.trim() || null,
+        override,
+        overrideReason,
+      },
+    });
+
+    postSystemMessage(clinicId, "hosp_discharged", {
+      hospitalizationId: id,
+      status: "discharged",
+      updatedAt: now.toISOString(),
+    }).catch(() => {});
+
     res.json({ id: updated[0]!.id, dischargedAt: updated[0]!.dischargedAt });
   } catch (err) {
     console.error("[patients] discharge failed", err);

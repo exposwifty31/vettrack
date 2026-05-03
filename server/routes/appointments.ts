@@ -67,6 +67,7 @@ const statusSchema = z.enum([
   "assigned",
   "scheduled",
   "arrived",
+  "approved",
   "in_progress",
   "completed",
   "cancelled",
@@ -90,6 +91,8 @@ const createAppointmentSchema = z.object({
   priority: prioritySchema.optional(),
   taskType: taskTypeSchema.optional().nullable(),
   metadata: metadataSchema,
+  hospitalizationId: z.string().trim().min(1).optional().nullable(),
+  appointmentType: z.string().trim().max(40).optional().nullable(),
 });
 
 const updateAppointmentSchema = z
@@ -107,6 +110,8 @@ const updateAppointmentSchema = z
     priority: prioritySchema.optional(),
     taskType: taskTypeSchema.optional().nullable(),
     metadata: metadataSchema,
+    hospitalizationId: z.string().trim().min(1).optional().nullable(),
+    appointmentType: z.string().trim().max(40).optional().nullable(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field must be provided",
