@@ -552,6 +552,8 @@ const translations = {
     ariaOperationalToggle: d.erOperationalControl.ariaOperationalToggle,
   },
 
+  shiftChat: d.shiftChat,
+
 } as const;
 
 return translations;
