@@ -3,6 +3,7 @@ export type RealtimeEventType =
   | "TASK_CREATED"
   | "TASK_STARTED"
   | "TASK_COMPLETED"
+  | "TASK_APPROVED"
   | "TASK_UPDATED"
   | "TASK_CANCELLED"
   | "AUTOMATION_TRIGGERED"
