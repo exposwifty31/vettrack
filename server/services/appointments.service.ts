@@ -134,6 +134,7 @@ const VALID_STATUS_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]> =
   assigned: ["arrived", "in_progress", "completed", "cancelled", "no_show"],
   scheduled: ["arrived", "in_progress", "completed", "cancelled", "no_show"],
   arrived: ["in_progress", "completed", "cancelled", "no_show"],
+  approved: ["in_progress", "cancelled"],
   in_progress: ["completed", "cancelled"],
   completed: [],
   cancelled: [],
