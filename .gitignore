@@ -56,3 +56,9 @@ __pycache__/
 desktop/cleaner/build/
 desktop/cleaner/dist/
 .worktrees/
+
+# Playwright
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

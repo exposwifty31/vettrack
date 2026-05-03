@@ -5,6 +5,7 @@ import { ErModeGuard } from "@/guards/ErModeGuard";
 import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { useAuth } from "@/hooks/use-auth";
 import { shouldShowPostSignupLanding } from "@/lib/post-signup-landing";
+import  PendingPage  from "@/pages/pending";
 
 const HomePage = lazy(() => import("@/pages/home"));
 const LandingPage = lazy(() => import("@/pages/landing"));
@@ -126,6 +127,11 @@ export function AppRoutes() {
         <Route path="/billing"><AuthGuard><BillingLedgerPage /></AuthGuard></Route>
         <Route path="/analytics/shift-leaderboard"><AuthGuard><ShiftLeaderboardPage /></AuthGuard></Route>
         <Route path="/patients"><AuthGuard><PatientsPage /></AuthGuard></Route>
+        <Route path="/pending">
+  <AuthGuard>
+    <PendingPage />
+  </AuthGuard>
+</Route>
         <Route path="/patients/:id"><AuthGuard><PatientDetailPage /></AuthGuard></Route>
         <Route path="/inventory-items"><AuthGuard><InventoryItemsPage /></AuthGuard></Route>
         <Route path="/procurement"><AuthGuard><ProcurementPage /></AuthGuard></Route>

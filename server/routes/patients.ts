@@ -161,6 +161,71 @@ router.get("/", async (req, res) => {
   }
 });
 
+// ─── GET /api/patients/pending ──────────────────────────────────────────────
+
+router.get("/pending", async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+
+  try {
+    const clinicId = req.clinicId!;
+    const now = new Date();
+
+    const rows = await db
+      .select({
+        h: hospitalizations,
+        a: animals,
+        o: owners,
+        vetName: users.name,
+      })
+      .from(hospitalizations)
+      .innerJoin(animals, eq(hospitalizations.animalId, animals.id))
+      .leftJoin(owners, eq(animals.ownerId, owners.id))
+      .leftJoin(users, eq(hospitalizations.admittingVetId, users.id))
+      .where(
+        and(
+          eq(hospitalizations.clinicId, clinicId),
+          isNull(hospitalizations.dischargedAt),
+
+          // 🔥 תנאי Pending
+          or(
+            isNull(hospitalizations.admittingVetId),
+            isNull(hospitalizations.ward),
+            eq(hospitalizations.ward, ""),
+            isNull(hospitalizations.bay),
+            eq(hospitalizations.bay, "")
+          )
+        )
+      )
+      .orderBy(desc(hospitalizations.admittedAt));
+
+    const patients = rows.map((r) => {
+      const base = hospitalizationRow(r.h, r.a, r.o, r.vetName ?? null);
+
+      const admittedAt = new Date(base.admittedAt);
+      const waitingMinutes = Math.floor(
+        (now.getTime() - admittedAt.getTime()) / 60000
+      );
+
+      return {
+        ...base,
+        waitingMinutes,
+      };
+    });
+
+    res.json({ patients });
+  } catch (err) {
+    console.error("[patients] pending failed", err);
+    res.status(500).json(
+      apiError({
+        code: "INTERNAL_ERROR",
+        reason: "PATIENTS_PENDING_FAILED",
+        message: "Failed to list pending patients",
+        requestId,
+      })
+    );
+  }
+});
+
 // ─── GET /api/patients/search ────────────────────────────────────────────────
 // Search existing animals by name (for admit autocomplete)
 
@@ -391,3 +456,62 @@ router.patch("/:id/discharge", async (req, res) => {
 });
 
 export default router;
+
+router.patch("/:id/assign", async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+
+  try {
+    const clinicId = req.clinicId!;
+    const { id } = req.params;
+
+    // 👇 פתרון ל-TypeScript
+    const userId = (req as any).user.id;
+
+    const now = new Date();
+    const { ward, bay } = req.body || {};
+
+    // 👇 בונים אובייקט בצורה בטוחה
+    const updateData: any = {
+      admittingVetId: userId,
+      updatedAt: now,
+    };
+
+    if (ward !== undefined) updateData.ward = ward;
+    if (bay !== undefined) updateData.bay = bay;
+
+    const updated = await db
+      .update(hospitalizations)
+      .set(updateData)
+      .where(
+        and(
+          eq(hospitalizations.id, id),
+          eq(hospitalizations.clinicId, clinicId),
+          isNull(hospitalizations.dischargedAt)
+        )
+      )
+      .returning({ id: hospitalizations.id });
+
+    if (!updated.length) {
+      return res.status(404).json(
+        apiError({
+          code: "NOT_FOUND",
+          reason: "HOSPITALIZATION_NOT_FOUND",
+          message: "Hospitalization not found",
+          requestId,
+        })
+      );
+    }
+
+    res.json({ id: updated[0]!.id, assigned: true });
+  } catch (err) {
+    console.error("[patients] assign failed", err);
+    res.status(500).json(
+      apiError({
+        code: "INTERNAL_ERROR",
+        reason: "PATIENTS_ASSIGN_FAILED",
+        message: "Failed to assign patient",
+        requestId,
+      })
+    );
+  }
+});
