@@ -127,11 +127,7 @@ export function AppRoutes() {
         <Route path="/billing"><AuthGuard><BillingLedgerPage /></AuthGuard></Route>
         <Route path="/analytics/shift-leaderboard"><AuthGuard><ShiftLeaderboardPage /></AuthGuard></Route>
         <Route path="/patients"><AuthGuard><PatientsPage /></AuthGuard></Route>
-        <Route path="/pending">
-  <AuthGuard>
-    <PendingPage />
-  </AuthGuard>
-</Route>
+        <Route path="/pending"> <AuthGuard><PendingPage /></AuthGuard></Route>
         <Route path="/patients/:id"><AuthGuard><PatientDetailPage /></AuthGuard></Route>
         <Route path="/inventory-items"><AuthGuard><InventoryItemsPage /></AuthGuard></Route>
         <Route path="/procurement"><AuthGuard><ProcurementPage /></AuthGuard></Route>
