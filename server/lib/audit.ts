@@ -118,7 +118,11 @@ export type AuditActionType =
   | "inventory_job_retried"
   | "test_scheduled_notification_scenario_created"
   | "outbox_dlq_retry_all"
-  | "outbox_dlq_drop";
+  | "outbox_dlq_drop"
+  | "dispense_confirmed"
+  | "dispense_emergency_created"
+  | "medication_task_dose_corrected"
+  | "medication_task_cancelled";
 
 export interface LogAuditParams {
   clinicId: string;
