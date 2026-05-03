@@ -184,7 +184,7 @@ export async function confirmDispense(input: ConfirmDispenseInput): Promise<Disp
       const ledgerIdempotencyKey = `dispense-event:${event.id}:item:${lineItem.itemId}`;
       const capture = await captureConsumableBillingForDispenseLine(tx, {
         clinicId,
-        billingItemId: container.billingItemId ?? null,
+        containerId: event.containerId,
         inventoryLogId,
         itemId: lineItem.itemId,
         patientId: event.patientId ?? null,

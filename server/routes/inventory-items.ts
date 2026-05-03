@@ -222,7 +222,7 @@ router.patch("/:id", requireAuth, requireAdmin, validateUuid("id"), validateBody
     if (b.nfcTagId !== undefined) updates.nfcTagId = b.nfcTagId?.trim() || null;
     if (b.isBillable !== undefined) updates.isBillable = b.isBillable;
     if (b.minimumDispenseToCapture !== undefined) updates.minimumDispenseToCapture = b.minimumDispenseToCapture;
-    if (formularyRef !== null) {
+    if (formularyRef != null) {
       updates.formularyId = formularyRef.formularyId;
       updates.formularyVersion = formularyRef.formularyVersion;
     } else if (resolvedType !== "DRUG") {

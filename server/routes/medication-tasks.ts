@@ -80,6 +80,8 @@ function serializeTask(task: MedicationTask) {
         doseMg?: number;
         calculatedVolume?: number;
         calculationPath?: string;
+        formularyId?: string | null;
+        formularyVersion?: number | null;
         data?: Partial<CalculationResult>;
       }
     | null;
