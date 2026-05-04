@@ -55,6 +55,30 @@ const reverseChargeSchema = z.object({
   reversalReason: z.string().min(1).max(500),
 });
 
+const leakageOnePagerSchema = z.object({
+  summary: z.object({
+    totalGapValueCents: z.number().int().nonnegative(),
+    totalGapQty: z.number().int().nonnegative(),
+    totalDispensedQty: z.number().int().nonnegative().optional(),
+    totalBilledQty: z.number().int().nonnegative().optional(),
+    overallLeakagePct: z.number().min(0).max(100).optional(),
+  }),
+  eventsCount: z.number().int().nonnegative().optional(),
+  periodDays: z.number().int().min(1).max(365).optional(),
+  shift: z.string().min(1).max(120).optional(),
+  primaryEquipment: z.string().min(1).max(200).optional(),
+  topContributor: z.string().min(1).max(200).optional(),
+});
+
+function formatUsdFromCents(cents: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
+}
+
 // GET /api/billing — list ledger entries for the clinic
 router.get("/", requireAuth, requireEffectiveRole("vet"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -290,6 +314,54 @@ router.get("/leakage-report", requireAuth, requireEffectiveRole("vet"), async (r
     );
   }
 });
+
+// POST /api/billing/leakage-report/one-pager — human-readable manager summary from leakage summary data
+router.post(
+  "/leakage-report/one-pager",
+  requireAuth,
+  requireEffectiveRole("vet"),
+  validateBody(leakageOnePagerSchema),
+  async (req, res) => {
+    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    try {
+      const payload = leakageOnePagerSchema.parse(req.body);
+      const periodDays = payload.periodDays ?? 7;
+      const eventsCount = payload.eventsCount ?? payload.summary.totalGapQty;
+      const shift = payload.shift ?? "mixed shifts";
+      const primaryEquipment = payload.primaryEquipment ?? "general consumables";
+      const topContributor = payload.topContributor ?? primaryEquipment;
+      const totalMissed = formatUsdFromCents(payload.summary.totalGapValueCents);
+
+      const text = `In the last ${periodDays} days, your clinic missed approximately ${totalMissed} in billable activity across ${eventsCount} events. Most leakage occurred during ${shift}, primarily from ${primaryEquipment}. Top contributor: ${topContributor}.`;
+
+      res.json({
+        periodDays,
+        text,
+        meta: {
+          totalGapValueCents: payload.summary.totalGapValueCents,
+          totalGapQty: payload.summary.totalGapQty,
+          overallLeakagePct: payload.summary.overallLeakagePct ?? null,
+          totalDispensedQty: payload.summary.totalDispensedQty ?? null,
+          totalBilledQty: payload.summary.totalBilledQty ?? null,
+          eventsCount,
+          shift,
+          primaryEquipment,
+          topContributor,
+        },
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json(
+        apiError({
+          code: "INTERNAL_ERROR",
+          reason: "LEAKAGE_ONE_PAGER_FAILED",
+          message: "Failed to generate leakage one-pager summary",
+          requestId,
+        }),
+      );
+    }
+  },
+);
 
 // GET /api/billing/shift-total — total billing captured since current open shift started
 router.get("/shift-total", requireAuth, async (req, res) => {

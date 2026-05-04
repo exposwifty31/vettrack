@@ -4,6 +4,7 @@ import { pool } from "../db.js";
 import { isPostgresqlConfigured } from "../lib/postgresql.js";
 import { safeRedisGet, getRedisUrl } from "../lib/redis.js";
 import https from "https";
+import { withDbRetry, withDbTimeout } from "../lib/db-resilience.js";
 
 const router = Router();
 
@@ -47,7 +48,7 @@ router.get("/startup", async (_req, res) => {
   let databaseReachable = false;
   if (checks.hasDatabaseUrl) {
     try {
-      await pool.query("SELECT 1");
+      await withDbRetry(() => withDbTimeout(() => pool.query("SELECT 1")));
       databaseReachable = true;
     } catch {
       return res.status(503).json({
@@ -146,7 +147,7 @@ router.get("/", async (_req, res) => {
   let allOk = true;
 
   try {
-    await pool.query("SELECT 1");
+    await withDbRetry(() => withDbTimeout(() => pool.query("SELECT 1")));
     checks.db = "ok";
   } catch {
     checks.db = "fail";
@@ -214,23 +215,21 @@ router.get("/data-integrity", async (req, res) => {
   }
 
   try {
-    const [nullCountsResult, mismatchCountsResult, orphanCountsResult, fallbackResult] = await Promise.all([
-      pool.query<{ table_name: string; null_or_empty_count: string }>(
-        "SELECT table_name, null_or_empty_count::text FROM vt_data_integrity_null_clinic_counts ORDER BY table_name"
-      ),
-      pool.query<{ check_name: string; mismatch_count: string }>(
-        "SELECT check_name, mismatch_count::text FROM vt_data_integrity_cross_tenant_mismatch_counts ORDER BY check_name"
-      ),
-      pool.query<{ check_name: string; orphan_count: string }>(
-        "SELECT check_name, orphan_count::text FROM vt_data_integrity_orphan_counts ORDER BY check_name"
-      ),
-      pool.query<{ table_name: string; fallback_row_count: string }>(`
-        SELECT table_name, fallback_row_count::text
-        FROM vt_clinic_backfill_fallback_audit
-        WHERE migration_name = '025_data_integrity_hardening.sql'
-        ORDER BY table_name
-      `),
-    ]);
+    const nullCountsResult = await withDbRetry(() => withDbTimeout(() => pool.query<{ table_name: string; null_or_empty_count: string }>(
+      "SELECT table_name, null_or_empty_count::text FROM vt_data_integrity_null_clinic_counts ORDER BY table_name"
+    )));
+    const mismatchCountsResult = await withDbRetry(() => withDbTimeout(() => pool.query<{ check_name: string; mismatch_count: string }>(
+      "SELECT check_name, mismatch_count::text FROM vt_data_integrity_cross_tenant_mismatch_counts ORDER BY check_name"
+    )));
+    const orphanCountsResult = await withDbRetry(() => withDbTimeout(() => pool.query<{ check_name: string; orphan_count: string }>(
+      "SELECT check_name, orphan_count::text FROM vt_data_integrity_orphan_counts ORDER BY check_name"
+    )));
+    const fallbackResult = await withDbRetry(() => withDbTimeout(() => pool.query<{ table_name: string; fallback_row_count: string }>(`
+      SELECT table_name, fallback_row_count::text
+      FROM vt_clinic_backfill_fallback_audit
+      WHERE migration_name = '025_data_integrity_hardening.sql'
+      ORDER BY table_name
+    `)));
 
     const nullClinicCounts = Object.fromEntries(
       nullCountsResult.rows.map((row) => [row.table_name, Number.parseInt(row.null_or_empty_count, 10)])
