@@ -9,7 +9,7 @@
   },
   "scripts": {
     "predev": "kill-port 3001 5000 >/dev/null 2>&1 || true",
-    "dev:api": "cross-env PORT=3001 tsx watch server/index.ts",
+    "dev:api": "cross-env PORT=3001 NODE_ENV=test tsx server/index.ts",
     "dev:web": "vite --port 5000 --host",
     "dev:ci": "concurrently -k -p \"[{name}]\" -n \"api,web\" -c \"cyan,teal\" \"pnpm dev:api\" \"pnpm dev:web\"",
     "dev": "concurrently -k -p \"[{name}]\" -n \"api,web\" -c \"cyan,teal\" \"cross-env PORT=3001 tsx watch server/index.ts\" \"vite --port 5000 --host\"",
