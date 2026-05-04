@@ -21,7 +21,10 @@
     "test": "vitest run",
     "test:signup": "playwright test tests/signup-flow.spec.ts --reporter=list",
     "db:migrate": "tsx scripts/run-migrations.ts",
-    "migrate": "tsx scripts/run-migrations.ts"
+    "migrate": "tsx scripts/run-migrations.ts",
+    "db:push": "drizzle-kit push",
+    "dev:db:push": "cross-env-shell \"drizzle-kit push\"",
+    "seed:dev": "tsx server/seed.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1037.0",
