@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { sql } from "drizzle-orm";
 import { Pool } from "pg";
-import { getPostgresqlConnectionString } from "./lib/postgresql";
+import { getPostgresqlConnectionString } from "./lib/postgresql.js";
 import {
   pgTable,
   pgEnum,
