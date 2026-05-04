@@ -26,6 +26,10 @@ import { startOutboxDlqScanner } from "../lib/outbox-dlq-scanner.js";
 import { startCodeBlueReconciliationScanner } from "../lib/code-blue-reconciliation-scanner.js";
 
 export async function startBackgroundSchedulers() {
+  if (process.env.NODE_ENV === "test") {
+    console.log("[test-mode] startBackgroundSchedulers: no-op");
+    return;
+  }
   await initVapid();
   startEventOutboxPublisher();
   startOutboxJanitor();

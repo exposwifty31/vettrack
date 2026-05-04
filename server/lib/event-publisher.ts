@@ -172,6 +172,7 @@ async function publishOneBatch(): Promise<void> {
  * Safe across processes via `FOR UPDATE SKIP LOCKED`.
  */
 export function startEventOutboxPublisher(): void {
+  if (process.env.NODE_ENV === "test") return;
   if (publisherStarted) return;
   publisherStarted = true;
 

@@ -342,6 +342,7 @@ function startResilientInterval(params: {
   setInterval(runOnce, params.intervalMs);
 }
 
+const isTestMode = process.env.NODE_ENV === "test";
 const PORT = resolvePort(process.env.PORT);
 app.listen(PORT, "0.0.0.0", () => {
   if (process.env.NODE_ENV !== "production") {
@@ -352,6 +353,20 @@ app.listen(PORT, "0.0.0.0", () => {
 
 runMigrations()
   .then(async () => {
+    // ensureClinicPhase2Defaults always runs — test suites that touch the DB
+    // need the dev-clinic-default row to exist after migrations.
+    try {
+      await ensureClinicPhase2Defaults();
+      console.log("✅ Clinic billing / inventory defaults ensured");
+    } catch (err) {
+      console.error("Clinic Phase 2 defaults failed (non-fatal)", err);
+    }
+
+    if (isTestMode) {
+      console.log("[test-mode] Background schedulers, recovery jobs, and ER cache preload disabled");
+      return;
+    }
+
     try {
       const releasedStaleTasks = await releaseStaleMedicationTasks();
       console.log(`[startup] Released ${releasedStaleTasks} stale medication task(s)`);
@@ -360,17 +375,11 @@ runMigrations()
     }
 
     try {
-      await ensureClinicPhase2Defaults();
-      console.log("✅ Clinic billing / inventory defaults ensured");
-    } catch (err) {
-      console.error("Clinic Phase 2 defaults failed (non-fatal)", err);
-    }
-
-    try {
       await preloadClinicErModeCaches();
     } catch (err) {
       console.error("ER mode cache preload failed (non-fatal)", err);
     }
+
     startBackgroundSchedulers().catch((err) => {
       console.error("Failed to initialize push notifications", err);
     });

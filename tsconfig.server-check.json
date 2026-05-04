@@ -5,13 +5,7 @@
     "allowImportingTsExtensions": false,
     "moduleResolution": "node16",
     "module": "Node16",
-    "moduleDetection": "force",
-    "baseUrl": ".",
-    "paths": {
-      "*": ["./*"],
-      "@/*": ["./src/*"],
-      "@assets/*": ["./attached_assets/*"]
-    }
+    "moduleDetection": "force"
   },
   "include": [
     "server/**/*.ts",
