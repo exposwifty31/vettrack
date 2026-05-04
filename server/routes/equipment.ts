@@ -90,6 +90,11 @@ const seenSchema = z.object({
   packageCode: z.enum(["fluid_protocol"]).optional().nullable(),
 });
 
+// Body schema for the top-level POST /scan alias (accepts any string ID, not UUID-only).
+const quickScanBodySchema = z.object({
+  equipmentId: z.string().min(1).max(100),
+});
+
 const bulkIdsSchema = z.object({
   ids: z.array(z.string()).min(1).max(100),
 });
@@ -959,6 +964,176 @@ router.post("/:id/restore", requireAuth, requireAdmin, validateUuid("id"), async
         code: "INTERNAL_ERROR",
         reason: "EQUIPMENT_RESTORE_FAILED",
         message: "Failed to restore equipment",
+        requestId,
+      }),
+    );
+  }
+});
+
+// POST /api/equipment/scan — quick-scan alias for pilot/demo flows.
+// Body: { equipmentId: string }  (accepts plain string IDs like "eq1", not UUID-only)
+// Toggle semantics: available → checkout · held by caller → return · held by other → 409
+router.post("/scan", requireAuth, checkoutLimiter, requireEffectiveRole("student"), validateBody(quickScanBodySchema), async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  try {
+    const clinicId = req.clinicId!;
+    const { equipmentId } = req.body as z.infer<typeof quickScanBodySchema>;
+    const now = new Date();
+
+    // Object ref avoids TypeScript narrowing `action` to its initial literal
+    // through control flow analysis across the async transaction callback.
+    const scan = { action: "checkout" as "checkout" | "return" | "blocked" };
+    let updatedEquipment: EquipmentRow | null = null;
+    let scanLogId = "";
+    let undoToken = "";
+
+    await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(equipment)
+        .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, equipmentId), isNull(equipment.deletedAt)))
+        .limit(1);
+
+      if (!existing) return;
+
+      if (existing.checkedOutById && existing.checkedOutById !== req.authUser!.id) {
+        scan.action = "blocked";
+        updatedEquipment = existing;
+        return;
+      }
+
+      if (!existing.checkedOutById) {
+        scan.action = "checkout";
+        const [updatedRow] = await tx
+          .update(equipment)
+          .set({
+            checkedOutById: req.authUser!.id,
+            checkedOutByEmail: req.authUser!.email,
+            checkedOutAt: now,
+            checkedOutLocation: null,
+            lastSeen: now,
+            lastStatus: existing.status,
+          })
+          .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, equipmentId)))
+          .returning();
+        updatedEquipment = updatedRow;
+        const logId = randomUUID();
+        await tx.insert(scanLogs).values({
+          id: logId,
+          clinicId,
+          equipmentId,
+          userId: req.authUser!.id,
+          userEmail: req.authUser!.email,
+          status: existing.status,
+          note: "Quick scan — checked out",
+          timestamp: now,
+        });
+        undoToken = await insertUndoToken(tx, {
+          clinicId,
+          equipmentId,
+          actorId: req.authUser!.id,
+          scanLogId: logId,
+          previousState: snapshotState(existing),
+        });
+        scanLogId = logId;
+      } else {
+        scan.action = "return";
+        const [updatedRow] = await tx
+          .update(equipment)
+          .set({
+            checkedOutById: null,
+            checkedOutByEmail: null,
+            checkedOutAt: null,
+            checkedOutLocation: null,
+            status: "ok",
+            lastSeen: now,
+            lastStatus: "ok",
+          })
+          .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, equipmentId)))
+          .returning();
+        updatedEquipment = updatedRow;
+        const logId = randomUUID();
+        await tx.insert(scanLogs).values({
+          id: logId,
+          clinicId,
+          equipmentId,
+          userId: req.authUser!.id,
+          userEmail: req.authUser!.email,
+          status: "ok",
+          note: "Quick scan — returned",
+          timestamp: now,
+        });
+        undoToken = await insertUndoToken(tx, {
+          clinicId,
+          equipmentId,
+          actorId: req.authUser!.id,
+          scanLogId: logId,
+          previousState: snapshotState(existing),
+        });
+        await tx.insert(equipmentReturns).values({
+          id: randomUUID(),
+          clinicId,
+          equipmentId,
+          returnedById: req.authUser!.id,
+          returnedByEmail: req.authUser!.email,
+          returnedAt: now,
+          isPluggedIn: true,
+          plugInDeadlineMinutes: 30,
+          plugInAlertSentAt: null,
+          chargeAlertJobId: null,
+        });
+        scanLogId = logId;
+      }
+    });
+
+    if (!updatedEquipment) {
+      return res.status(404).json(
+        apiError({
+          code: "NOT_FOUND",
+          reason: "EQUIPMENT_NOT_FOUND",
+          message: "Equipment not found",
+          requestId,
+        }),
+      );
+    }
+
+    if (scan.action === "blocked") {
+      const held = updatedEquipment as EquipmentRow;
+      return res.status(409).json({
+        ...apiError({
+          code: "CONFLICT",
+          reason: "EQUIPMENT_ALREADY_CHECKED_OUT",
+          message: "Equipment is currently checked out by another user",
+          requestId,
+        }),
+        checkedOutByEmail: held.checkedOutByEmail,
+      });
+    }
+
+    const u = updatedEquipment as EquipmentRow;
+
+    logAudit({
+      actorRole: resolveAuditActorRole(req),
+      clinicId,
+      actionType: scan.action === "checkout" ? "equipment_checked_out" : "equipment_returned",
+      performedBy: req.authUser!.id,
+      performedByEmail: req.authUser!.email,
+      targetId: equipmentId,
+      targetType: "equipment",
+      metadata: { name: u.name, via: "quick_scan" },
+    });
+
+    invalidateAnalyticsCache(clinicId);
+    trackSyncSuccess();
+    res.json({ equipment: updatedEquipment, action: scan.action, scanLogId, undoToken });
+  } catch (err) {
+    console.error(err);
+    trackSyncFail();
+    res.status(500).json(
+      apiError({
+        code: "INTERNAL_ERROR",
+        reason: "EQUIPMENT_SCAN_FAILED",
+        message: "Scan failed",
         requestId,
       }),
     );
