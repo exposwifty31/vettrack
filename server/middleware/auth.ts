@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import * as Sentry from "@sentry/node";
 import { getAuth, clerkClient } from "@clerk/express";
-import { db, users } from "../db.js";
+import { clinics, db, users } from "../db.js";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { STABILITY_TOKEN } from "../lib/stability-token.js";
@@ -125,6 +125,13 @@ if (isProduction && !hasClerkSecret) {
 }
 
 async function ensureDevUserRecord(devUser: AuthUser): Promise<AuthUser> {
+  await db
+    .insert(clinics)
+    .values({
+      id: devUser.clinicId,
+    })
+    .onConflictDoNothing();
+
   const [row] = await db
     .insert(users)
     .values({
