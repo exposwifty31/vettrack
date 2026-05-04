@@ -38,6 +38,7 @@ jobs:
         SESSION_SECRET: ci-test-secret-that-is-long-enough-32chars
         NODE_ENV: test
         PORT: 3001
+        TEST_MODE: "true"
     - name: Wait for API readiness
       run: |
         for i in {1..60}; do
