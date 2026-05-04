@@ -302,6 +302,46 @@ function resolvePort(value: string | undefined): number {
   return parsed;
 }
 
+
+function startResilientInterval(params: {
+  name: string;
+  intervalMs: number;
+  task: () => Promise<void>;
+  retryBaseMs?: number;
+  maxRetryMs?: number;
+}): void {
+  let inFlight = false;
+  let failureCount = 0;
+  let lastLogAt = 0;
+
+  const runOnce = () => {
+    if (inFlight) return;
+    inFlight = true;
+    void params.task().then(() => {
+      failureCount = 0;
+    }).catch((err) => {
+      failureCount += 1;
+      const base = params.retryBaseMs ?? 500;
+      const max = params.maxRetryMs ?? 60_000;
+      const backoff = Math.min(max, base * 2 ** Math.max(0, failureCount - 1));
+      const jitter = Math.round(backoff * (0.5 + Math.random()));
+      const now = Date.now();
+      if (now - lastLogAt > 30_000) {
+        lastLogAt = now;
+        console.error(`[${params.name}] failed; retrying in ~${jitter}ms`, err);
+      }
+      setTimeout(() => {
+        if (!inFlight) runOnce();
+      }, jitter);
+    }).finally(() => {
+      inFlight = false;
+    });
+  };
+
+  runOnce();
+  setInterval(runOnce, params.intervalMs);
+}
+
 const PORT = resolvePort(process.env.PORT);
 app.listen(PORT, "0.0.0.0", () => {
   if (process.env.NODE_ENV !== "production") {
@@ -347,23 +387,23 @@ runMigrations()
     runInventoryRecovery();
     setInterval(runInventoryRecovery, 10 * 60 * 1000);
 
-    // Global stale sweep every 5 minutes (30-minute threshold).
-    setInterval(() => {
-      releaseStaleMedicationTasks()
-        .then((n) => {
-          if (n > 0) console.log(`[medication-task-recovery] released ${n} stale task(s)`);
-        })
-        .catch((err) => console.error("[medication-task-recovery] interval failed:", err));
-    }, 5 * 60 * 1000);
+    startResilientInterval({
+      name: "medication-task-recovery",
+      intervalMs: 5 * 60 * 1000,
+      task: async () => {
+        const n = await releaseStaleMedicationTasks();
+        if (n > 0) console.log(`[medication-task-recovery] released ${n} stale task(s)`);
+      },
+    });
 
-    // Per-task 10-minute soft-lock release (Fix E: proactive, not tied to list load).
-    setInterval(() => {
-      releaseExpiredMedicationTasks()
-        .then((n) => {
-          if (n > 0) console.log(`[medication-task-lock] released ${n} expired soft-lock(s)`);
-        })
-        .catch((err) => console.error("[medication-task-lock] interval failed:", err));
-    }, 2 * 60 * 1000);
+    startResilientInterval({
+      name: "medication-task-lock",
+      intervalMs: 2 * 60 * 1000,
+      task: async () => {
+        const n = await releaseExpiredMedicationTasks();
+        if (n > 0) console.log(`[medication-task-lock] released ${n} expired soft-lock(s)`);
+      },
+    });
   })
   .catch((err) => {
     console.error("💥 Migration failed, aborting scheduler start", err);

@@ -69,6 +69,8 @@ export interface SystemHealthAlertPayload {
 
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 let started = false;
+let tickInFlight = false;
+let lastTickErrorLogAt = 0;
 
 let lastFailedPublishAttempts: number | null = null;
 let lastGapResyncCount: number | null = null;
@@ -387,8 +389,16 @@ export function startSystemHealthMonitor(): void {
     console.error("[system-health-monitor] initial tick failed", err);
   });
   intervalHandle = setInterval(() => {
+    if (tickInFlight) return;
+    tickInFlight = true;
     void runSystemHealthMonitorTick().catch((err) => {
-      console.error("[system-health-monitor] tick failed", err);
+      const now = Date.now();
+      if (now - lastTickErrorLogAt > 30_000) {
+        lastTickErrorLogAt = now;
+        console.error("[system-health-monitor] tick failed", err);
+      }
+    }).finally(() => {
+      tickInFlight = false;
     });
   }, INTERVAL_MS);
 }
@@ -399,6 +409,8 @@ export function stopSystemHealthMonitorForTests(): void {
     intervalHandle = null;
   }
   started = false;
+  tickInFlight = false;
+  lastTickErrorLogAt = 0;
   lastFailedPublishAttempts = null;
   lastGapResyncCount = null;
   criticalWebhookDedupeMemory.clear();
