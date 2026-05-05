@@ -289,13 +289,13 @@ export async function containerDispenseWithResult(
     }
 
     if (res.status >= 500) {
-      toast.error(t.api.serverError);
+      toast.error(t.api.serverError, { id: "server-error" });
     }
 
     return { ok: false, error: errCode, message };
   } catch (err) {
     if (isNetworkError(err)) {
-      toast.error(t.api.networkUnavailable);
+      toast.error(t.api.networkUnavailable, { id: "network-error" });
     }
     throw err;
   }
@@ -330,7 +330,7 @@ export async function request<T>(
     }
     if (!res.ok) {
       if (!silent && res.status >= 500) {
-        toast.error(t.api.serverError);
+        toast.error(t.api.serverError, { id: "server-error" });
       }
       const error = await res.json().catch(() => ({ error: "Request failed" })) as ApiErrorPayload;
       if (isOfflineResponse(res.status, error)) {
@@ -342,7 +342,7 @@ export async function request<T>(
     return res.json();
   } catch (err) {
     if (!silent && isNetworkError(err)) {
-      toast.error(t.api.networkUnavailable);
+      toast.error(t.api.networkUnavailable, { id: "network-error" });
     }
     if (isNetworkError(err) && offline) {
       const clientTimestamp = Date.now();

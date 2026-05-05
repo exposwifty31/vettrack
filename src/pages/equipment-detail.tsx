@@ -359,6 +359,7 @@ export default function EquipmentDetailPage() {
 
       queryClient.setQueryData([`/api/equipment/${id}`], updated);
       queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}/logs`] });
+      invalidateAll();
 
       if (prev && !isStudentEquipmentRole) {
         startUndoTimer({
