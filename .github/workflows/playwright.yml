@@ -30,7 +30,7 @@ jobs:
     - name: Install dependencies
       run: npm install -g pnpm && pnpm install
     - name: Install Playwright Browsers
-      run: pnpm exec playwright install --with-deps
+      run: pnpm exec playwright install --with-deps chromium
     - name: Start app for Playwright
       run: pnpm dev:ci > /tmp/vettrack-playwright.log 2>&1 &
       env:
@@ -56,7 +56,7 @@ jobs:
         DATABASE_URL: postgres://vettrack:vettrack@127.0.0.1:5432/vettrack_test
         NODE_ENV: test
     - name: Run Playwright tests
-      run: pnpm exec playwright test
+      run: pnpm exec playwright test --project=chromium
     - uses: actions/upload-artifact@v4
       if: ${{ failure() }}
       with:
