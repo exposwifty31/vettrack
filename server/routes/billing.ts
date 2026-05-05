@@ -40,6 +40,119 @@ function apiError(params: { code: string; reason: string; message: string; reque
   };
 }
 
+type LeakageReportItem = {
+  containerId: string;
+  containerName: string;
+  unitPriceCents: number;
+  dispensedQty: number;
+  billedQty: number;
+  gapQty: number;
+  gapValueCents: number;
+  leakagePct: number;
+  shift: "day" | "night";
+  userId: string | null;
+  reason: "scan without billing";
+  severity: "HIGH" | "MEDIUM";
+};
+
+async function buildLeakageReport(
+  clinicId: string,
+  fromDate: Date,
+  toDate: Date,
+  severityThresholdCents: number,
+): Promise<{
+  items: LeakageReportItem[];
+  summary: {
+    totalDispensedQty: number;
+    totalBilledQty: number;
+    totalGapQty: number;
+    totalGapValueCents: number;
+    overallLeakagePct: number;
+  };
+}> {
+  const dispenseResult = await pool.query<{
+    container_id: string;
+    container_name: string;
+    billing_item_id: string | null;
+    unit_price_cents: number;
+    dispensed_qty: number;
+    created_hour: number;
+    user_id: string | null;
+  }>(
+    `SELECT
+       c.id                              AS container_id,
+       c.name                            AS container_name,
+       bi.id                             AS billing_item_id,
+       COALESCE(bi.unit_price_cents, 0)  AS unit_price_cents,
+       SUM(ABS(il.quantity_added))::int  AS dispensed_qty,
+       EXTRACT(HOUR FROM il.created_at)::int AS created_hour,
+       il.user_id                        AS user_id
+     FROM vt_inventory_logs il
+     JOIN vt_containers c ON c.id = il.container_id
+     LEFT JOIN vt_billing_items bi
+       ON bi.id = c.billing_item_id AND bi.clinic_id = $1
+     WHERE il.clinic_id = $1
+       AND il.log_type  = 'adjustment'
+       AND il.quantity_added < 0
+       AND il.created_at >= $2
+       AND il.created_at <= $3
+     GROUP BY c.id, c.name, bi.id, bi.unit_price_cents, EXTRACT(HOUR FROM il.created_at), il.user_id
+     HAVING SUM(ABS(il.quantity_added)) > 0`,
+    [clinicId, fromDate, toDate],
+  );
+
+  const billedResult = await pool.query<{ item_id: string; billed_qty: number }>(
+    `SELECT item_id, SUM(quantity)::int AS billed_qty
+     FROM vt_billing_ledger
+     WHERE clinic_id  = $1
+       AND item_type  = 'CONSUMABLE'
+       AND status    != 'voided'
+       AND created_at >= $2
+       AND created_at <= $3
+     GROUP BY item_id`,
+    [clinicId, fromDate, toDate],
+  );
+
+  const billedMap = new Map<string, number>();
+  for (const r of billedResult.rows) billedMap.set(r.item_id, r.billed_qty);
+
+  const items = dispenseResult.rows
+    .map((r): LeakageReportItem => {
+      const billedQty =
+        (r.billing_item_id ? (billedMap.get(r.billing_item_id) ?? 0) : 0) +
+        (billedMap.get(r.container_id) ?? 0);
+      const gapQty = Math.max(0, r.dispensed_qty - billedQty);
+      const gapValueCents = gapQty * r.unit_price_cents;
+      const shift: "day" | "night" = r.created_hour >= 7 && r.created_hour < 19 ? "day" : "night";
+      const severity: "HIGH" | "MEDIUM" = r.unit_price_cents > severityThresholdCents ? "HIGH" : "MEDIUM";
+      return {
+        containerId: r.container_id,
+        containerName: r.container_name,
+        unitPriceCents: r.unit_price_cents,
+        dispensedQty: r.dispensed_qty,
+        billedQty,
+        gapQty,
+        gapValueCents,
+        leakagePct: r.dispensed_qty > 0 ? Math.round((gapQty / r.dispensed_qty) * 100) : 0,
+        shift,
+        userId: r.user_id,
+        reason: "scan without billing",
+        severity,
+      };
+    })
+    .sort((a, b) => b.gapValueCents - a.gapValueCents);
+
+  const totalDispensedQty = items.reduce((s, i) => s + i.dispensedQty, 0);
+  const totalBilledQty = items.reduce((s, i) => s + i.billedQty, 0);
+  const totalGapQty = items.reduce((s, i) => s + i.gapQty, 0);
+  const totalGapValueCents = items.reduce((s, i) => s + i.gapValueCents, 0);
+  const overallLeakagePct = totalDispensedQty > 0
+    ? Math.round((totalGapQty / totalDispensedQty) * 100)
+    : 0;
+
+  return { items, summary: { totalDispensedQty, totalBilledQty, totalGapQty, totalGapValueCents, overallLeakagePct } };
+}
+
 const createChargeSchema = z.object({
   animalId: z.string().min(1).optional(),
   itemType: z.enum(["EQUIPMENT", "CONSUMABLE"]),
@@ -201,105 +314,14 @@ router.get("/leakage-report", requireAuth, requireEffectiveRole("vet"), async (r
       );
     }
 
-    // All dispensed quantities grouped by container in the window.
-    // inventory_logs.quantity_added < 0 means a deduction (dispense).
-    // bi.id is included because auto-billing stores billing_item_id as item_id
-    // in vt_billing_ledger — we need it to match billed quantities correctly.
-    const dispenseResult = await pool.query<{
-      container_id: string;
-      container_name: string;
-      billing_item_id: string | null;
-      unit_price_cents: number;
-      dispensed_qty: number;
-    }>(
-      `SELECT
-         c.id                              AS container_id,
-         c.name                            AS container_name,
-         bi.id                             AS billing_item_id,
-         COALESCE(bi.unit_price_cents, 0)  AS unit_price_cents,
-         SUM(ABS(il.quantity_added))::int  AS dispensed_qty
-       FROM vt_inventory_logs il
-       JOIN vt_containers c ON c.id = il.container_id
-       LEFT JOIN vt_billing_items bi
-         ON bi.id = c.billing_item_id AND bi.clinic_id = $1
-       WHERE il.clinic_id = $1
-         AND il.log_type  = 'adjustment'
-         AND il.quantity_added < 0
-         AND il.created_at >= $2
-         AND il.created_at <= $3
-       GROUP BY c.id, c.name, bi.id, bi.unit_price_cents
-       HAVING SUM(ABS(il.quantity_added)) > 0`,
-      [clinicId, fromDate, toDate],
-    );
-
-    // All billing entries for CONSUMABLE items grouped by item_id.
-    // Auto-billing stores billing_item_id as item_id; manual billing uses
-    // whatever the caller passed. We match via billing_item_id from the
-    // dispense query so the two sides align correctly.
-    const billedResult = await pool.query<{
-      item_id: string;
-      billed_qty: number;
-    }>(
-      `SELECT
-         item_id,
-         SUM(quantity)::int AS billed_qty
-       FROM vt_billing_ledger
-       WHERE clinic_id  = $1
-         AND item_type  = 'CONSUMABLE'
-         AND status    != 'voided'
-         AND created_at >= $2
-         AND created_at <= $3
-       GROUP BY item_id`,
-      [clinicId, fromDate, toDate],
-    );
-
-    const billedMap = new Map<string, number>();
-    for (const r of billedResult.rows) {
-      billedMap.set(r.item_id, r.billed_qty);
-    }
-
-    const items = dispenseResult.rows
-      .map((r) => {
-        // Match by billing_item_id (what auto-billing stores) then fall back
-        // to container_id so manually-entered charges keyed by container still count.
-        const billedQty =
-          (r.billing_item_id ? (billedMap.get(r.billing_item_id) ?? 0) : 0) +
-          (billedMap.get(r.container_id) ?? 0);
-        const gapQty = Math.max(0, r.dispensed_qty - billedQty);
-        const gapValueCents = gapQty * r.unit_price_cents;
-        return {
-          containerId: r.container_id,
-          containerName: r.container_name,
-          unitPriceCents: r.unit_price_cents,
-          dispensedQty: r.dispensed_qty,
-          billedQty,
-          gapQty,
-          gapValueCents,
-          leakagePct: r.dispensed_qty > 0
-            ? Math.round((gapQty / r.dispensed_qty) * 100)
-            : 0,
-        };
-      })
-      .sort((a, b) => b.gapValueCents - a.gapValueCents);
-
-    const totalDispensedQty = items.reduce((s, i) => s + i.dispensedQty, 0);
-    const totalBilledQty    = items.reduce((s, i) => s + i.billedQty, 0);
-    const totalGapQty       = items.reduce((s, i) => s + i.gapQty, 0);
-    const totalGapValueCents = items.reduce((s, i) => s + i.gapValueCents, 0);
-    const overallLeakagePct = totalDispensedQty > 0
-      ? Math.round((totalGapQty / totalDispensedQty) * 100)
-      : 0;
+    const thresholdParam = Number((req.query as Record<string, string>).thresholdCents ?? "5000");
+    const severityThresholdCents = Number.isFinite(thresholdParam) && thresholdParam >= 0 ? Math.floor(thresholdParam) : 5000;
+    const { items, summary } = await buildLeakageReport(clinicId, fromDate, toDate, severityThresholdCents);
 
     res.json({
       from: fromDate.toISOString(),
       to: toDate.toISOString(),
-      summary: {
-        totalDispensedQty,
-        totalBilledQty,
-        totalGapQty,
-        totalGapValueCents,
-        overallLeakagePct,
-      },
+      summary,
       items,
     });
   } catch (err) {
@@ -362,6 +384,58 @@ router.post(
     }
   },
 );
+
+router.get("/leakage-summary", requireAuth, requireEffectiveRole("vet"), async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  try {
+    const clinicId = req.clinicId!;
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const { from: fromParam, to: toParam } = req.query as Record<string, string>;
+    const fromDate = fromParam ? new Date(fromParam) : thirtyDaysAgo;
+    const toDate = toParam ? new Date(toParam) : now;
+    const thresholdParam = Number((req.query as Record<string, string>).thresholdCents ?? "5000");
+    const severityThresholdCents = Number.isFinite(thresholdParam) && thresholdParam >= 0 ? Math.floor(thresholdParam) : 5000;
+    const { items, summary } = await buildLeakageReport(clinicId, fromDate, toDate, severityThresholdCents);
+    const days = Math.max(1, Math.ceil((toDate.getTime() - fromDate.getTime()) / (24 * 60 * 60 * 1000)));
+    const top3 = items.slice(0, 3).map((i) => ({ containerId: i.containerId, containerName: i.containerName, gapValueCents: i.gapValueCents }));
+    return res.json({
+      total_unbilled_events: summary.totalGapQty,
+      total_estimated_loss: summary.totalGapValueCents,
+      avg_loss_per_day: Math.round(summary.totalGapValueCents / days),
+      top_3_equipment_by_loss: top3,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json(apiError({ code: "INTERNAL_ERROR", reason: "LEAKAGE_SUMMARY_FAILED", message: "Failed to compute leakage summary", requestId }));
+  }
+});
+
+router.get("/leakage-report.csv", requireAuth, requireEffectiveRole("vet"), async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  try {
+    const clinicId = req.clinicId!;
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const { from: fromParam, to: toParam } = req.query as Record<string, string>;
+    const fromDate = fromParam ? new Date(fromParam) : thirtyDaysAgo;
+    const toDate = toParam ? new Date(toParam) : now;
+    const thresholdParam = Number((req.query as Record<string, string>).thresholdCents ?? "5000");
+    const severityThresholdCents = Number.isFinite(thresholdParam) && thresholdParam >= 0 ? Math.floor(thresholdParam) : 5000;
+    const { items } = await buildLeakageReport(clinicId, fromDate, toDate, severityThresholdCents);
+    const escape = (v: string) => `"${String(v).replace(/\"/g, "\"\"")}"`;
+    const header = ["container_id", "container_name", "user_id", "shift", "dispensed_qty", "billed_qty", "gap_qty", "gap_value_cents", "reason", "severity"].map(escape).join(",");
+    const rows = items.map((r) =>
+      [r.containerId, r.containerName, r.userId ?? "", r.shift, String(r.dispensedQty), String(r.billedQty), String(r.gapQty), String(r.gapValueCents), r.reason, r.severity].map(escape).join(","));
+    const csv = [header, ...rows].join("\r\n");
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", 'attachment; filename="leakage-report.csv"');
+    return res.send(csv);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json(apiError({ code: "INTERNAL_ERROR", reason: "LEAKAGE_REPORT_EXPORT_FAILED", message: "Failed to export leakage report CSV", requestId }));
+  }
+});
 
 // GET /api/billing/shift-total — total billing captured since current open shift started
 router.get("/shift-total", requireAuth, async (req, res) => {
