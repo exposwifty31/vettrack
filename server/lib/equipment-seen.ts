@@ -151,8 +151,10 @@ export async function processEquipmentSeenInTx(params: {
   bodyRoomId: string | null | undefined;
   packageCode?: BillingPackageCode | null;
   now: Date;
+  /** Optional: scanLogId from the checkout scan that triggered this seen event. */
+  scanLogId?: string | null;
 }): Promise<SeenResult> {
-  const { tx, clinicId, equipmentId, bodyRoomId, packageCode, now } = params;
+  const { tx, clinicId, equipmentId, bodyRoomId, packageCode, now, scanLogId = null } = params;
 
   const [eqRow] = await tx
     .select()
@@ -210,6 +212,42 @@ export async function processEquipmentSeenInTx(params: {
     };
   }
 
+  // Create/get usage session BEFORE billing insert so we can link usageSessionId on the ledger row.
+  let usageSessionId: string;
+  const [open] = await tx
+    .select({ id: usageSessions.id })
+    .from(usageSessions)
+    .where(
+      and(
+        eq(usageSessions.clinicId, clinicId),
+        eq(usageSessions.animalId, animal.id),
+        eq(usageSessions.equipmentId, equipmentId),
+        eq(usageSessions.status, "open"),
+      ),
+    )
+    .limit(1);
+
+  if (open) {
+    usageSessionId = open.id;
+    await tx
+      .update(usageSessions)
+      .set({ lastBilledThrough: now })
+      .where(eq(usageSessions.id, open.id));
+  } else {
+    usageSessionId = randomUUID();
+    await tx.insert(usageSessions).values({
+      id: usageSessionId,
+      clinicId,
+      animalId: animal.id,
+      equipmentId,
+      billingItemId: billing.id,
+      startedAt: now,
+      endedAt: null,
+      lastBilledThrough: now,
+      status: "open",
+    });
+  }
+
   const ledgerId = randomUUID();
   const qty = 1;
   const totalCents = billing.unitPriceCents * qty;
@@ -225,6 +263,8 @@ export async function processEquipmentSeenInTx(params: {
     totalAmountCents: totalCents,
     idempotencyKey,
     status: "pending",
+    scanLogId: scanLogId ?? null,
+    usageSessionId,
   });
   await markIdempotentAsync(redisSeenKey);
 
@@ -267,45 +307,11 @@ export async function processEquipmentSeenInTx(params: {
         totalAmountCents: pkgBilling.unitPriceCents * item.quantity,
         idempotencyKey: itemIdempotencyKey,
         status: "pending",
+        usageSessionId,
       });
       await markIdempotentAsync(redisPackageKey);
       packageLedgerIds.push(pkgLedgerId);
     }
-  }
-
-  let usageSessionId: string;
-  const [open] = await tx
-    .select({ id: usageSessions.id })
-    .from(usageSessions)
-    .where(
-      and(
-        eq(usageSessions.clinicId, clinicId),
-        eq(usageSessions.animalId, animal.id),
-        eq(usageSessions.equipmentId, equipmentId),
-        eq(usageSessions.status, "open"),
-      ),
-    )
-    .limit(1);
-
-  if (open) {
-    usageSessionId = open.id;
-    await tx
-      .update(usageSessions)
-      .set({ lastBilledThrough: now })
-      .where(eq(usageSessions.id, open.id));
-  } else {
-    usageSessionId = randomUUID();
-    await tx.insert(usageSessions).values({
-      id: usageSessionId,
-      clinicId,
-      animalId: animal.id,
-      equipmentId,
-      billingItemId: billing.id,
-      startedAt: now,
-      endedAt: null,
-      lastBilledThrough: now,
-      status: "open",
-    });
   }
 
   await tx
@@ -330,6 +336,8 @@ export async function recordEquipmentSeen(params: {
   equipmentId: string;
   roomId: string | null | undefined;
   packageCode?: BillingPackageCode | null;
+  /** Optional: scanLogId from the checkout scan that triggered this seen event, for billing traceability. */
+  scanLogId?: string | null;
 }): Promise<SeenResult> {
   const now = new Date();
   return db.transaction(async (tx) =>
@@ -340,6 +348,7 @@ export async function recordEquipmentSeen(params: {
       bodyRoomId: params.roomId,
       packageCode: params.packageCode ?? null,
       now,
+      scanLogId: params.scanLogId ?? null,
     }),
   );
 }
