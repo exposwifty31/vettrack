@@ -34,6 +34,17 @@ export class PageErrorBoundary extends Component<Props, State> {
   }
 
   reset = () => {
+    // React.lazy() caches a rejected promise, so remounting throws the same
+    // error immediately. Module evaluation failures (broken optimized dep,
+    // missing export) are only recoverable with a full page reload.
+    const isModuleError =
+      this.state.errorMessage.includes("Importing binding") ||
+      this.state.errorMessage.includes("does not provide an export") ||
+      this.state.errorMessage.includes("Failed to fetch dynamically imported");
+    if (isModuleError) {
+      window.location.reload();
+      return;
+    }
     this.setState({ hasError: false, errorMessage: "" });
   };
 
