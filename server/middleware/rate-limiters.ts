@@ -51,4 +51,10 @@ export const writeLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many write operations. Please wait a moment." },
+  // In test/CI mode the entire Playwright suite runs from a single IP against a
+  // single server process, so sequential tests exhaust the per-IP window.
+  // Skip limiting only when NODE_ENV=test or TEST_MODE=true; production is never
+  // in either of those states.
+  skip: () =>
+    process.env.NODE_ENV === "test" || process.env.TEST_MODE === "true",
 });

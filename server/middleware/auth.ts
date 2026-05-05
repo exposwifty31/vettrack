@@ -168,6 +168,22 @@ async function ensureDevUserRecord(devUser: AuthUser): Promise<AuthUser> {
   };
 }
 
+/**
+ * Guarantees a vt_clinics row exists for `clerkOrgId` before we attempt
+ * to insert/upsert a vt_users row that references it via FK.
+ *
+ * Uses INSERT … ON CONFLICT DO NOTHING so concurrent first-logins for the
+ * same org are safe and the operation is idempotent across retries.
+ */
+async function ensureClinicExistsForOrg(
+  clerkOrgId: string,
+): Promise<void> {
+  await db
+    .insert(clinics)
+    .values({ id: clerkOrgId })
+    .onConflictDoNothing();
+}
+
 export type ResolveResult =
   | { ok: true; user: AuthUser }
   | { ok: false; status: number; body: Record<string, string> };
@@ -352,6 +368,11 @@ export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
   const isAdminEmail = clerkEmail && ADMIN_EMAILS.includes(clerkEmail.toLowerCase());
   const defaultStatus = isAdminEmail ? "active" : "pending";
   const defaultRole: UserRole = isAdminEmail ? "admin" : "technician";
+
+  // Guarantee the clinic row exists before inserting the user. A new Clerk
+  // organization has no matching vt_clinics row until this fires; without it
+  // the user insert violates the vt_users_clinic_id_fk FK constraint.
+  await ensureClinicExistsForOrg(clerkOrgId);
 
   // SECURITY: Role is ALWAYS resolved from the database record.
   // The onConflictDoUpdate set clause deliberately excludes `role` so that
