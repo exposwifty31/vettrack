@@ -88,6 +88,8 @@ const revertSchema = z.object({
 const seenSchema = z.object({
   roomId: z.string().uuid().optional().nullable(),
   packageCode: z.enum(["fluid_protocol"]).optional().nullable(),
+  /** Caller may pass the scanLogId from a checkout scan to link billing back to the care event. */
+  scanLogId: z.string().uuid().optional().nullable(),
 });
 
 // Body schema for the top-level POST /scan alias (accepts any string ID, not UUID-only).
@@ -1450,12 +1452,13 @@ router.post(
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
     try {
       const clinicId = req.clinicId!;
-      const { roomId, packageCode } = req.body as z.infer<typeof seenSchema>;
+      const { roomId, packageCode, scanLogId } = req.body as z.infer<typeof seenSchema>;
       const result = await recordEquipmentSeen({
         clinicId,
         equipmentId: req.params.id,
         roomId: roomId ?? null,
         packageCode: packageCode ?? null,
+        scanLogId: scanLogId ?? null,
       });
       if (!result.ok) {
         return res.status(404).json(

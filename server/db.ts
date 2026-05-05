@@ -422,6 +422,10 @@ export const billingLedger = pgTable("vt_billing_ledger", {
   formularyVersion: integer("formulary_version"),
   /** Indicates the origin of this charge: TASK | DISPENSE | MANUAL */
   sourceType: varchar("source_type", { length: 10 }),
+  /** Source traceability: which scan log event produced this charge (nullable — populated when billing is triggered via scan). */
+  scanLogId: text("scan_log_id"),
+  /** Source traceability: which usage session produced this charge (nullable — populated by equipment-seen flow). */
+  usageSessionId: text("usage_session_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   externalId: text("external_id"),
   externalSource: text("external_source"),

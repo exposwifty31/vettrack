@@ -55,6 +55,20 @@ type LeakageReportItem = {
   severity: "HIGH" | "MEDIUM";
 };
 
+/** Equipment-scan leakage: checkout scan with no billing ledger entry in the subsequent 24 hours. */
+type EquipmentLeakageItem = {
+  clinicId: string;
+  scanLogId: string;
+  equipmentId: string;
+  equipmentName: string | null;
+  userId: string;
+  timestamp: string;
+  shift: "day" | "night";
+  estimatedPriceCents: number;
+  reason: "scan_without_billing";
+  severity: "HIGH" | "MEDIUM";
+};
+
 async function buildLeakageReport(
   clinicId: string,
   fromDate: Date,
@@ -151,6 +165,76 @@ async function buildLeakageReport(
     : 0;
 
   return { items, summary: { totalDispensedQty, totalBilledQty, totalGapQty, totalGapValueCents, overallLeakagePct } };
+}
+
+/**
+ * Equipment scan leakage: finds checkout scan_log events with no corresponding billing_ledger
+ * entry for that equipment within 24 hours of the scan (time-proximity anti-join).
+ *
+ * Direct FK join (billingLedger.scanLogId = scanLogs.id) is the preferred strategy once
+ * scanLogId is populated at write time. Until clients pass scanLogId to the /seen endpoint,
+ * the time-proximity join is the correct detection method.
+ */
+async function buildEquipmentScanLeakage(
+  clinicId: string,
+  fromDate: Date,
+  toDate: Date,
+  severityThresholdCents: number,
+): Promise<EquipmentLeakageItem[]> {
+  const result = await pool.query<{
+    scan_log_id: string;
+    equipment_id: string;
+    equipment_name: string | null;
+    user_id: string;
+    ts: Date;
+    estimated_price_cents: number;
+  }>(
+    `SELECT
+       sl.id                                          AS scan_log_id,
+       sl.equipment_id,
+       e.name                                         AS equipment_name,
+       sl.user_id,
+       sl.timestamp                                   AS ts,
+       COALESCE(bi.unit_price_cents, 0)::int          AS estimated_price_cents
+     FROM vt_scan_logs sl
+     LEFT JOIN vt_equipment e
+       ON e.id = sl.equipment_id AND e.clinic_id = sl.clinic_id
+     LEFT JOIN vt_billing_items bi
+       ON bi.id = e.billing_item_id AND bi.clinic_id = sl.clinic_id
+     LEFT JOIN vt_billing_ledger bl
+       ON  bl.clinic_id  = sl.clinic_id
+       AND bl.item_type  = 'EQUIPMENT'
+       AND bl.item_id    = sl.equipment_id
+       AND bl.status    != 'voided'
+       AND bl.created_at >= sl.timestamp
+       AND bl.created_at <= sl.timestamp + INTERVAL '24 hours'
+     WHERE sl.clinic_id     = $1
+       AND sl.timestamp    >= $2
+       AND sl.timestamp    <= $3
+       AND sl.equipment_id IS NOT NULL
+       AND sl.status       NOT IN ('blocked', 'issue')
+       AND bl.id           IS NULL
+     ORDER BY sl.timestamp DESC`,
+    [clinicId, fromDate, toDate],
+  );
+
+  return result.rows.map((r): EquipmentLeakageItem => {
+    const hour = new Date(r.ts).getUTCHours();
+    const shift: "day" | "night" = hour >= 7 && hour < 19 ? "day" : "night";
+    const severity: "HIGH" | "MEDIUM" = r.estimated_price_cents > severityThresholdCents ? "HIGH" : "MEDIUM";
+    return {
+      clinicId,
+      scanLogId: r.scan_log_id,
+      equipmentId: r.equipment_id,
+      equipmentName: r.equipment_name,
+      userId: r.user_id,
+      timestamp: new Date(r.ts).toISOString(),
+      shift,
+      estimatedPriceCents: r.estimated_price_cents,
+      reason: "scan_without_billing",
+      severity,
+    };
+  });
 }
 
 const createChargeSchema = z.object({
@@ -316,13 +400,23 @@ router.get("/leakage-report", requireAuth, requireEffectiveRole("vet"), async (r
 
     const thresholdParam = Number((req.query as Record<string, string>).thresholdCents ?? "5000");
     const severityThresholdCents = Number.isFinite(thresholdParam) && thresholdParam >= 0 ? Math.floor(thresholdParam) : 5000;
-    const { items, summary } = await buildLeakageReport(clinicId, fromDate, toDate, severityThresholdCents);
+    const [{ items, summary }, equipmentItems] = await Promise.all([
+      buildLeakageReport(clinicId, fromDate, toDate, severityThresholdCents),
+      buildEquipmentScanLeakage(clinicId, fromDate, toDate, severityThresholdCents),
+    ]);
+
+    const totalEquipmentLossCents = equipmentItems.reduce((s, i) => s + i.estimatedPriceCents, 0);
 
     res.json({
       from: fromDate.toISOString(),
       to: toDate.toISOString(),
-      summary,
+      summary: {
+        ...summary,
+        totalEquipmentUnbilledEvents: equipmentItems.length,
+        totalEquipmentLossCents,
+      },
       items,
+      equipmentItems,
     });
   } catch (err) {
     console.error(err);
@@ -396,14 +490,22 @@ router.get("/leakage-summary", requireAuth, requireEffectiveRole("vet"), async (
     const toDate = toParam ? new Date(toParam) : now;
     const thresholdParam = Number((req.query as Record<string, string>).thresholdCents ?? "5000");
     const severityThresholdCents = Number.isFinite(thresholdParam) && thresholdParam >= 0 ? Math.floor(thresholdParam) : 5000;
-    const { items, summary } = await buildLeakageReport(clinicId, fromDate, toDate, severityThresholdCents);
+    const [{ items, summary }, equipmentItems] = await Promise.all([
+      buildLeakageReport(clinicId, fromDate, toDate, severityThresholdCents),
+      buildEquipmentScanLeakage(clinicId, fromDate, toDate, severityThresholdCents),
+    ]);
     const days = Math.max(1, Math.ceil((toDate.getTime() - fromDate.getTime()) / (24 * 60 * 60 * 1000)));
     const top3 = items.slice(0, 3).map((i) => ({ containerId: i.containerId, containerName: i.containerName, gapValueCents: i.gapValueCents }));
+    const totalEquipmentLossCents = equipmentItems.reduce((s, i) => s + i.estimatedPriceCents, 0);
+    const totalUnbilledEvents = summary.totalGapQty + equipmentItems.length;
+    const totalEstimatedLoss = summary.totalGapValueCents + totalEquipmentLossCents;
     return res.json({
-      total_unbilled_events: summary.totalGapQty,
-      total_estimated_loss: summary.totalGapValueCents,
-      avg_loss_per_day: Math.round(summary.totalGapValueCents / days),
+      total_unbilled_events: totalUnbilledEvents,
+      total_estimated_loss: totalEstimatedLoss,
+      avg_loss_per_day: Math.round(totalEstimatedLoss / days),
       top_3_equipment_by_loss: top3,
+      equipment_scan_unbilled_events: equipmentItems.length,
+      equipment_scan_estimated_loss: totalEquipmentLossCents,
     });
   } catch (err) {
     console.error(err);
@@ -422,12 +524,19 @@ router.get("/leakage-report.csv", requireAuth, requireEffectiveRole("vet"), asyn
     const toDate = toParam ? new Date(toParam) : now;
     const thresholdParam = Number((req.query as Record<string, string>).thresholdCents ?? "5000");
     const severityThresholdCents = Number.isFinite(thresholdParam) && thresholdParam >= 0 ? Math.floor(thresholdParam) : 5000;
-    const { items } = await buildLeakageReport(clinicId, fromDate, toDate, severityThresholdCents);
-    const escape = (v: string) => `"${String(v).replace(/\"/g, "\"\"")}"`;
-    const header = ["container_id", "container_name", "user_id", "shift", "dispensed_qty", "billed_qty", "gap_qty", "gap_value_cents", "reason", "severity"].map(escape).join(",");
-    const rows = items.map((r) =>
-      [r.containerId, r.containerName, r.userId ?? "", r.shift, String(r.dispensedQty), String(r.billedQty), String(r.gapQty), String(r.gapValueCents), r.reason, r.severity].map(escape).join(","));
-    const csv = [header, ...rows].join("\r\n");
+    const [{ items }, equipmentItems] = await Promise.all([
+      buildLeakageReport(clinicId, fromDate, toDate, severityThresholdCents),
+      buildEquipmentScanLeakage(clinicId, fromDate, toDate, severityThresholdCents),
+    ]);
+    const escape = (v: string) => `"${String(v).replace(/"/g, '""')}"`;
+    const header = ["type", "event_id", "equipment_id", "equipment_name", "container_id", "container_name", "user_id", "shift", "timestamp", "dispensed_qty", "billed_qty", "gap_qty", "gap_value_cents", "estimated_price_cents", "reason", "severity"].map(escape).join(",");
+    const consumableRows = items.map((r) =>
+      ["consumable", "", "", "", r.containerId, r.containerName, r.userId ?? "", r.shift, "", String(r.dispensedQty), String(r.billedQty), String(r.gapQty), String(r.gapValueCents), String(r.unitPriceCents), r.reason, r.severity].map(escape).join(","),
+    );
+    const equipmentRows = equipmentItems.map((r) =>
+      ["equipment_scan", r.scanLogId, r.equipmentId, r.equipmentName ?? "", "", "", r.userId, r.shift, r.timestamp, "1", "0", "1", String(r.estimatedPriceCents), String(r.estimatedPriceCents), r.reason, r.severity].map(escape).join(","),
+    );
+    const csv = [header, ...consumableRows, ...equipmentRows].join("\r\n");
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", 'attachment; filename="leakage-report.csv"');
     return res.send(csv);
