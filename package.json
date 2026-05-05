@@ -27,7 +27,8 @@
     "migrate": "tsx scripts/run-migrations.ts",
     "db:push": "drizzle-kit push",
     "dev:db:push": "cross-env-shell \"drizzle-kit push\"",
-    "seed:dev": "tsx server/seed.ts"
+    "seed:dev": "tsx server/seed.ts",
+    "seed:dev:e2e": "tsx scripts/seed-dev.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1037.0",
