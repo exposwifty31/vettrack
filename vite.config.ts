@@ -76,6 +76,7 @@ export default defineConfig({
       // Live-server integration tests — require dev server running on :3001
       "tests/charge-alert-worker.test.js",
       "tests/code-blue-mode-equipment.test.js",
+      "tests/equipment-scan-e2e.test.js",
       "tests/expiry-api.test.js",
       "tests/expiry-check-worker.test.js",
       "tests/returns-api.test.js",

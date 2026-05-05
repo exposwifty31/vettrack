@@ -50,6 +50,11 @@ jobs:
         echo "API did not become ready at http://127.0.0.1:3001/api/healthz"
         tail -n 200 /tmp/vettrack-playwright.log || true
         exit 1
+    - name: Seed E2E fixtures
+      run: pnpm seed:dev:e2e
+      env:
+        DATABASE_URL: postgres://vettrack:vettrack@127.0.0.1:5432/vettrack_test
+        NODE_ENV: test
     - name: Run Playwright tests
       run: pnpm exec playwright test
     - uses: actions/upload-artifact@v4
