@@ -628,6 +628,13 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
 
   return (
     <div className="min-h-[100dvh] min-w-0 bg-ivory-bg">
+      {menuMounted && (
+        <div
+          className="fixed inset-0 z-[39]"
+          aria-hidden
+          onClick={() => setMenuOpen(false)}
+        />
+      )}
       <header
         className={cn(
           "sticky top-safe z-40 border-b bg-ivory-navy backdrop-blur supports-[backdrop-filter]:bg-ivory-navy/95",

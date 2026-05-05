@@ -55,5 +55,8 @@ export function usePaginatedEquipment(
     staleTime: 30_000,
     retry: false,
     refetchOnWindowFocus: false,
+    // Override global false: refetch on mount if data is stale so invalidateQueries
+    // from create/update mutations is picked up when the list remounts.
+    refetchOnMount: true,
   });
 }
