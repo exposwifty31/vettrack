@@ -1604,7 +1604,14 @@
     "delayed": "מאוחר",
     "tasks": "משימות",
     "createTask": "צור משימה",
-    "quickTask": "משימה מהירה"
+    "quickTask": "משימה מהירה",
+    "recommendationsLoadFailed": "טעינת המלצות נכשלה.",
+    "urgentLoadFailed": "טעינת משימות דחופות נכשלה.",
+    "todayLoadFailed": "לא ניתן לטעון משימות להיום.",
+    "myTasksLoadFailed": "לא ניתן לטעון משימות מוקצות.",
+    "dayViewLoadFailed": "לא ניתן לטעון תצוגת היום.",
+    "dayViewEmpty": "אין משימות מתוזמנות",
+    "dayViewEmptyHint": "לחץ על חריץ זמן או השתמש ב-Quick Task ליצירת משימה."
   },
   "cop": {
     "discrepancyTitle": "אי-התאמה בתרופות (Smart Cop)",

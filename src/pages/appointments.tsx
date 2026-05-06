@@ -8,7 +8,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import type { SidebarItem } from "@/components/layout/IconSidebar";
 import { MedicationCalculator } from "@/components/MedicationCalculator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { LoadingSection } from "@/components/ui/loading-section";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -707,14 +707,11 @@ export default function AppointmentsPage() {
           <CardContent>
             {recommendationsQuery.isError ? (
               <ErrorCard
-                message="טעינת המלצות נכשלה."
+                message={t.appointmentsPage.recommendationsLoadFailed}
                 onRetry={() => recommendationsQuery.refetch()}
               />
             ) : recommendationsQuery.isLoading && !recommendationsQuery.data ? (
-              <div className="space-y-3">
-                <Skeleton className="h-8 w-40" />
-                <Skeleton className="h-24 w-full" />
-              </div>
+              <LoadingSection rows={2} />
             ) : !recommendationsQuery.data?.nextBestTask ? (
               <EmptyState
                 icon={CheckCircle2}
@@ -831,14 +828,11 @@ export default function AppointmentsPage() {
           <CardContent className="space-y-3">
             {dashboardQuery.isError ? (
               <ErrorCard
-                message="טעינת משימות דחופות נכשלה."
+                message={t.appointmentsPage.urgentLoadFailed}
                 onRetry={() => dashboardQuery.refetch()}
               />
             ) : dashboardQuery.isLoading && !dashboardQuery.data ? (
-              <div className="space-y-2">
-                <Skeleton className="h-14 w-full" />
-                <Skeleton className="h-14 w-full" />
-              </div>
+              <LoadingSection rows={2} />
             ) : (
               <>
                 <ul className="space-y-2">
@@ -929,14 +923,11 @@ export default function AppointmentsPage() {
             <CardContent className="space-y-2 max-h-[min(320px,45vh)] overflow-y-auto">
               {dashboardQuery.isError ? (
                 <ErrorCard
-                  message="Unable to load today's tasks."
+                  message={t.appointmentsPage.todayLoadFailed}
                   onRetry={() => dashboardQuery.refetch()}
                 />
               ) : dashboardQuery.isLoading && !dashboardQuery.data ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-16 w-full" />
-                  <Skeleton className="h-16 w-full" />
-                </div>
+                <LoadingSection rows={2} />
               ) : (dashboardQuery.data?.today.length ?? 0) === 0 ? (
                 <EmptyState
                   icon={CheckCircle2}
@@ -1054,14 +1045,11 @@ export default function AppointmentsPage() {
             <CardContent className="space-y-2 max-h-[min(320px,45vh)] overflow-y-auto">
               {dashboardQuery.isError ? (
                 <ErrorCard
-                  message="Unable to load assigned tasks."
+                  message={t.appointmentsPage.myTasksLoadFailed}
                   onRetry={() => dashboardQuery.refetch()}
                 />
               ) : dashboardQuery.isLoading && !dashboardQuery.data ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-16 w-full" />
-                  <Skeleton className="h-16 w-full" />
-                </div>
+                <LoadingSection rows={2} />
               ) : (dashboardQuery.data?.myTasks.length ?? 0) === 0 ? (
                 <EmptyState
                   icon={CheckCircle2}
@@ -1171,7 +1159,9 @@ export default function AppointmentsPage() {
             <CardTitle className="text-sm font-semibold">Suggestions</CardTitle>
           </CardHeader>
           <CardContent>
-            {(recommendationsQuery.data?.suggestions.length ?? 0) === 0 ? (
+            {recommendationsQuery.isLoading && !recommendationsQuery.data ? (
+              <LoadingSection rows={2} />
+            ) : (recommendationsQuery.data?.suggestions.length ?? 0) === 0 ? (
               <EmptyState
                 icon={CheckCircle2}
                 message="אין הצעות"
@@ -1301,17 +1291,14 @@ export default function AppointmentsPage() {
             ) : null}
             {listQuery.isError ? (
               <ErrorCard
-                message="Unable to load the day view."
+                message={t.appointmentsPage.dayViewLoadFailed}
                 onRetry={() => {
                   void listQuery.refetch();
                   void metaQuery.refetch();
                 }}
               />
             ) : listQuery.isLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-8 w-48" />
-                <Skeleton className="h-64 w-full" />
-              </div>
+              <LoadingSection rows={3} />
             ) : (
               <div className="relative border rounded-xl overflow-hidden">
                 <div className="max-h-[70vh] overflow-auto">
@@ -1444,8 +1431,19 @@ export default function AppointmentsPage() {
                         <div className="w-full max-w-md">
                           <EmptyState
                             icon={CheckCircle2}
-                            message="אין משימות מתוזמנות"
-                            subMessage="הקש על חריץ זמן ליצירת משימה."
+                            message={t.appointmentsPage.dayViewEmpty}
+                            subMessage={t.appointmentsPage.dayViewEmptyHint}
+                            action={canCreateTask ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-3 text-xs"
+                                onClick={() => openQuickBooking(new Date())}
+                              >
+                                <Plus className="w-3.5 h-3.5 mr-1" />
+                                {t.appointmentsPage.createTask}
+                              </Button>
+                            ) : undefined}
                           />
                         </div>
                       </div>

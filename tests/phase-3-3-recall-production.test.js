@@ -105,7 +105,11 @@ describe("Phase 3.3 Daily Recall Engine (production checks)", () => {
   });
 
   it("Skeleton loader for dashboard", () => {
-    expect(appointmentsPage.includes("<Skeleton") || appointmentsPage.includes("Skeleton ")).toBe(true);
+    // Dashboard now uses the shared LoadingSection primitive (Epic 8 Slice 2)
+    expect(
+      appointmentsPage.includes("<LoadingSection") ||
+      appointmentsPage.includes("<Skeleton")
+    ).toBe(true);
   });
 
   it("sortRecallTasks: overdue rows sort before non-overdue", () => {

@@ -18,12 +18,13 @@ describe("Wave 6 state consistency checks (static)", () => {
     expect(
       appointments.includes("import { ErrorCard } from \"@/components/ui/error-card\";") &&
         appointments.includes("import { EmptyState } from \"@/components/ui/empty-state\";") &&
+        appointments.includes("import { LoadingSection } from \"@/components/ui/loading-section\";") &&
         appointments.includes("recommendationsQuery.isError") &&
         appointments.includes("dashboardQuery.isError") &&
         appointments.includes("listQuery.isError") &&
         appointments.includes("<EmptyState") &&
         appointments.includes("listQuery.isLoading ? (") &&
-        appointments.includes("<Skeleton className=\"h-64 w-full\" />"),
+        appointments.includes("<LoadingSection rows={3} />"),
     ).toBe(true);
   });
 
@@ -60,7 +61,7 @@ describe("Wave 6 state consistency checks (static)", () => {
 
   it("Priority pages use skeleton-based loading states", () => {
     expect(
-      appointments.includes("import { Skeleton } from \"@/components/ui/skeleton\";") &&
+      appointments.includes("import { LoadingSection } from \"@/components/ui/loading-section\";") &&
         settings.includes("import { Skeleton } from \"@/components/ui/skeleton\";") &&
         equipmentList.includes("EquipmentListSkeleton") &&
         alerts.includes("SkeletonAlertCard"),
