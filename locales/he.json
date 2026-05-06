@@ -1712,5 +1712,42 @@
       "reactFailed": "הוספת תגובה נכשלה.",
       "pinFailed": "הצמדת ההודעה נכשלה."
     }
+  },
+
+  "auditLog": {
+    "actions": {
+      "user_login": "כניסת משתמש",
+      "user_provisioned": "משתמש חדש נרשם",
+      "user_display_name_changed": "שם תצוגה שונה",
+      "user_role_changed": "תפקיד שונה",
+      "user_status_changed": "סטטוס שונה",
+      "equipment_created": "ציוד נוצר",
+      "equipment_updated": "ציוד עודכן",
+      "equipment_deleted": "ציוד נמחק",
+      "equipment_scanned": "ציוד נסרק",
+      "equipment_checked_out": "ציוד הוצא",
+      "equipment_returned": "ציוד הוחזר",
+      "equipment_reverted": "סריקה בוטלה",
+      "equipment_bulk_deleted": "מחיקה קבוצתית",
+      "equipment_bulk_moved": "העברה קבוצתית",
+      "equipment_imported": "ציוד יובא",
+      "folder_created": "תיקייה נוצרה",
+      "folder_updated": "תיקייה עודכנה",
+      "folder_deleted": "תיקייה נמחקה",
+      "alert_acknowledged": "התראה אושרה",
+      "alert_acknowledgment_removed": "אישור התראה הוסר",
+      "system.init": "אתחול מערכת",
+      "system.verified": "מערכת אומתה",
+      "rounds.started": "סבב התחיל",
+      "rounds.completed": "סבב הסתיים",
+      "equipment.scan": "סריקת ציוד",
+      "equipment.checkout": "הוצאת ציוד",
+      "equipment.transfer": "העברת ציוד",
+      "equipment.maintenance_review": "ביקורת תחזוקה",
+      "equipment.request": "בקשת ציוד",
+      "alert.received": "התראה התקבלה",
+      "audit_log.search": "חיפוש ביומן",
+      "report.viewed": "דוח נצפה"
+    }
   }
 }

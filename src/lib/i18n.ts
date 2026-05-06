@@ -554,6 +554,14 @@ const translations = {
 
   shiftChat: d.shiftChat,
 
+  auditLog: {
+    actions: d.auditLog.actions as Record<string, string>,
+    actionLabel: (actionType: string): string => {
+      const map = d.auditLog.actions as Record<string, string>;
+      return map[actionType] ?? actionType;
+    },
+  },
+
 } as const;
 
 return translations;

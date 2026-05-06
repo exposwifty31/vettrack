@@ -1711,5 +1711,42 @@
       "reactFailed": "Failed to add reaction.",
       "pinFailed": "Failed to pin message."
     }
+  },
+
+  "auditLog": {
+    "actions": {
+      "user_login": "User Login",
+      "user_provisioned": "User Provisioned",
+      "user_display_name_changed": "Display Name Changed",
+      "user_role_changed": "Role Changed",
+      "user_status_changed": "Status Changed",
+      "equipment_created": "Equipment Created",
+      "equipment_updated": "Equipment Updated",
+      "equipment_deleted": "Equipment Deleted",
+      "equipment_scanned": "Equipment Scanned",
+      "equipment_checked_out": "Checked Out",
+      "equipment_returned": "Returned",
+      "equipment_reverted": "Scan Reverted",
+      "equipment_bulk_deleted": "Bulk Deleted",
+      "equipment_bulk_moved": "Bulk Moved",
+      "equipment_imported": "Equipment Imported",
+      "folder_created": "Folder Created",
+      "folder_updated": "Folder Updated",
+      "folder_deleted": "Folder Deleted",
+      "alert_acknowledged": "Alert Acknowledged",
+      "alert_acknowledgment_removed": "Alert Ack Removed",
+      "system.init": "System Initialised",
+      "system.verified": "System Verified",
+      "rounds.started": "Rounds Started",
+      "rounds.completed": "Rounds Completed",
+      "equipment.scan": "Equipment Scanned",
+      "equipment.checkout": "Equipment Checked Out",
+      "equipment.transfer": "Equipment Transferred",
+      "equipment.maintenance_review": "Maintenance Review",
+      "equipment.request": "Equipment Requested",
+      "alert.received": "Alert Received",
+      "audit_log.search": "Audit Log Search",
+      "report.viewed": "Report Viewed"
+    }
   }
 }
