@@ -492,6 +492,15 @@ nav,
   [style*="accentGrow"] {
     animation: none !important;
   }
+
+  /*
+   * Mobile-menu nav items render with `opacity-0` + a `navItemFade` fade-in. When the
+   * media query above strips the animation, `opacity-0` would remain and items would
+   * silently stay invisible (only the category headings render). Force them visible.
+   */
+  [class*="navItemFade_"] {
+    opacity: 1 !important;
+  }
 }
 
 /* Bottom nav active-tab pill: instant jump when user prefers reduced motion */
