@@ -66,7 +66,7 @@ export default function SettingsPage() {
     update(effectivePatch);
     if (push.subscribed) {
       push.updateSettings(effectivePatch).catch(() => {
-        toast.error("Failed to sync notification settings");
+        toast.error("סנכרון הגדרות ההתראות נכשל");
       });
     }
   };
@@ -84,7 +84,7 @@ export default function SettingsPage() {
     update({ soundEnabled: v });
     if (push.subscribed) {
       push.updateSettings({ soundEnabled: v }).catch(() => {
-        toast.error("Failed to sync notification settings");
+        toast.error("סנכרון הגדרות ההתראות נכשל");
       });
     }
   };
@@ -100,7 +100,7 @@ export default function SettingsPage() {
     update({ criticalAlertsSound: v });
     if (push.subscribed) {
       push.updateSettings({ alertsEnabled: v }).catch(() => {
-        toast.error("Failed to sync notification settings");
+        toast.error("סנכרון הגדרות ההתראות נכשל");
       });
     }
   };
@@ -166,7 +166,7 @@ export default function SettingsPage() {
     const errorContent = (
       <div className="w-full max-w-full overflow-x-hidden space-y-3 pb-8">
         <ErrorCard
-          message="Unable to load settings for this session."
+          message="לא ניתן לטעון הגדרות עבור הפעלה זו."
           onRetry={() => safeReloadPage()}
         />
       </div>
@@ -209,12 +209,12 @@ export default function SettingsPage() {
             />
             <SettingsSelect
               icon={<AlignJustify className="w-5 h-5" />}
-              label="Language"
-              description="Choose app language and text direction"
+              label="שפה"
+              description="בחר שפת ממשק וכיוון טקסט"
               value={settings.locale}
               options={[
-                { value: "en", label: "English" },
-                { value: "he", label: "Hebrew" },
+                { value: "en", label: "אנגלית" },
+                { value: "he", label: "עברית" },
               ]}
               onValueChange={(v) => update({ locale: v as "en" | "he" })}
               data-testid="settings-locale"
@@ -291,7 +291,7 @@ export default function SettingsPage() {
                       else toast.error(push.error || t.settingsPage.testFailed);
                     }}
                   >
-                    Send Test
+                    שלח בדיקה
                   </Button>
                 </div>
               )}
@@ -403,8 +403,8 @@ export default function SettingsPage() {
               description={t.settingsPage.timeFormatDescription}
               value={settings.timeFormat}
               options={[
-                { value: "12h", label: "12-hour (AM/PM)" },
-                { value: "24h", label: "24-hour" },
+                { value: "12h", label: "12 שעות (AM/PM)" },
+                { value: "24h", label: "24 שעות" },
               ]}
               onValueChange={(v) => update({ timeFormat: v as "12h" | "24h" })}
               data-testid="settings-time-format"
@@ -444,7 +444,7 @@ export default function SettingsPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>{t.settingsPage.resetDialogTitle}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will restore all settings to their default values, including dark mode, sound, and display preferences. This action cannot be undone.
+                    {t.settingsPage.resetDescription}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -454,7 +454,7 @@ export default function SettingsPage() {
                     className="bg-destructive hover:bg-destructive/90"
                     data-testid="settings-reset-confirm"
                   >
-                    Reset
+                    {t.settingsPage.resetButton}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

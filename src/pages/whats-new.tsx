@@ -18,7 +18,7 @@ import {
   Clock,
   Smartphone,
   RefreshCw,
-  ArrowRight,
+  ArrowLeft,
 } from "lucide-react";
 
 interface ReleaseEntry {
@@ -35,66 +35,66 @@ interface ReleaseEntry {
 const releases: ReleaseEntry[] = [
   {
     version: "1.1.1",
-    date: "April 2026",
+    date: "אפריל 2026",
     highlights: [
       {
         icon: <Stethoscope className="w-5 h-5 text-primary" />,
-        title: "Active Patients",
+        title: "מטופלים פעילים",
         description:
-          "Admit patients directly from the app. Track hospitalization status (admitted, critical, observation, recovering), ward and bay location, admitting vet, and admission reason. The home screen KPI now shows real hospitalized patient count.",
-        badge: { label: "New", variant: "default" },
+          "קבלת מטופלים ישירות מהאפליקציה. מעקב אחר סטטוס אשפוז (קבלה, קריטי, תצפית, שיקום), מיקום מחלקה ומיטה, הווטרינר הקולט וסיבת האשפוז. מד ה-KPI במסך הבית מציג כעת ספירת מטופלים מאושפזים אמיתית.",
+        badge: { label: "חדש", variant: "default" },
       },
       {
         icon: <Siren className="w-5 h-5 text-red-500" />,
-        title: "Code Blue — Emergency Command Center",
+        title: "קוד כחול — מרכז פיקוד חירום",
         description:
-          "Redesigned Code Blue as a full emergency command center: resuscitation timer, CPR checklist with timestamps, quick action log for real-time event recording, and a full audit trail that persists after the event ends.",
-        badge: { label: "Redesigned", variant: "secondary" },
+          "עיצוב מחדש של קוד כחול כמרכז פיקוד חירום מלא: טיימר החייאה, רשימת משימות CPR עם חותמות זמן, יומן אירועים מהיר לתיעוד בזמן אמת, ונתיב ביקורת מלא שנשמר גם לאחר סיום האירוע.",
+        badge: { label: "עוצב מחדש", variant: "secondary" },
       },
     ],
   },
   {
     version: "1.1.0",
-    date: "April 2026",
+    date: "אפריל 2026",
     highlights: [
       {
         icon: <Bell className="w-5 h-5 text-primary" />,
-        title: "Smart Notifications",
+        title: "התראות חכמות",
         description:
-          "Push notifications for return reminders, team overdue alerts (senior technicians), and admin hourly summaries — all configurable per role in Settings.",
-        badge: { label: "New", variant: "default" },
+          "התראות Push לתזכורות החזרה, התראות על איחורים לצוות (טכנאים בכירים), וסיכומים שעתיים למנהלים — הכל ניתן להגדרה לפי תפקיד בהגדרות.",
+        badge: { label: "חדש", variant: "default" },
       },
       {
         icon: <Shield className="w-5 h-5 text-primary" />,
-        title: "Shift-Aware Roles",
+        title: "תפקידים מודעי-משמרת",
         description:
-          "Your effective role now follows your active shift. Permissions, notifications, and dashboard context all adapt automatically when you're on shift.",
-        badge: { label: "New", variant: "default" },
+          "התפקיד האפקטיבי שלך עוקב כעת אחרי המשמרת הפעילה. הרשאות, התראות והקשר לוח הבקרה מתעדכנים אוטומטית כשאתה במשמרת.",
+        badge: { label: "חדש", variant: "default" },
       },
       {
         icon: <Smartphone className="w-5 h-5 text-primary" />,
-        title: "Browser Push Notifications",
+        title: "התראות Push בדפדפן",
         description:
-          "Subscribe to push notifications directly from your browser. Granular toggles let you control which alerts you receive — return reminders, team updates, or admin digests.",
-        badge: { label: "New", variant: "default" },
+          "הרשם להתראות Push ישירות מהדפדפן. מתגים גרעיניים מאפשרים לך לשלוט אילו התראות לקבל — תזכורות החזרה, עדכוני צוות, או סיכומים מנהליים.",
+        badge: { label: "חדש", variant: "default" },
       },
       {
         icon: <Clock className="w-5 h-5 text-primary" />,
-        title: "Scheduled Return Reminders",
+        title: "תזכורות החזרה מתוזמנות",
         description:
-          "When equipment is checked out with a return time, the system automatically sends a push reminder when it's due. Reminders are cancelled if the item is returned early.",
+          "כשציוד יוצא לשימוש עם זמן החזרה, המערכת שולחת תזכורת Push אוטומטית כשמגיע המועד. התזכורות מבוטלות אם הפריט הוחזר מוקדם יותר.",
       },
       {
         icon: <Users className="w-5 h-5 text-primary" />,
-        title: "Admin User Management",
+        title: "ניהול משתמשים למנהלים",
         description:
-          "Paginated user list with filters for pending, active, and blocked users. Approve or reject sign-ups, change roles, and manage user status — all from the Admin panel.",
+          "רשימת משתמשים עם עמודים ומסננים לממתינים, פעילים וחסומים. אישור או דחיית הרשמות, שינוי תפקידים וניהול סטטוס משתמש — הכל מלוח הניהול.",
       },
       {
         icon: <RefreshCw className="w-5 h-5 text-primary" />,
-        title: "Auto-Update Banner",
+        title: "באנר עדכון אוטומטי",
         description:
-          "A banner appears when a new VetTrack version is deployed, linking straight to this page. Service worker updates prompt a one-click refresh.",
+          "באנר מופיע כשגרסת VetTrack חדשה מוצבת, עם קישור ישיר לדף זה. עדכוני Service Worker מציעים רענון בלחיצה אחת.",
       },
     ],
   },
@@ -104,14 +104,14 @@ export default function WhatsNewPage() {
   return (
     <Layout>
       <Helmet>
-        <title>What&apos;s New — VetTrack</title>
+        <title>מה חדש — VetTrack</title>
       </Helmet>
 
       <div className="max-w-2xl space-y-6 animate-fade-in">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold">What&apos;s New</h1>
+          <h1 className="text-2xl font-bold">מה חדש</h1>
           <p className="text-sm text-muted-foreground">
-            The latest VetTrack features and improvements.
+            הפיצ׳רים והשיפורים האחרונים של VetTrack.
           </p>
         </div>
 
@@ -164,8 +164,8 @@ export default function WhatsNewPage() {
             href="/settings"
             className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline underline-offset-2"
           >
-            Configure notifications in Settings
-            <ArrowRight className="w-3.5 h-3.5" />
+            הגדר התראות בהגדרות
+            <ArrowLeft className="w-3.5 h-3.5" />
           </Link>
         </div>
       </div>

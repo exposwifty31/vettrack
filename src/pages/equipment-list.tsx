@@ -163,7 +163,7 @@ function DesktopEquipmentView({
       />
 
       {isLoading ? (
-        <div className="text-[13px] text-ivory-text3 py-8 text-center">Loading…</div>
+        <div className="text-[13px] text-ivory-text3 py-8 text-center">טוען...</div>
       ) : (
         <EquipmentTable rows={rows} />
       )}
@@ -982,11 +982,11 @@ function EquipmentItem({
   });
 
   const quickAction = !isCheckedOut && eq.status === "ok"
-    ? { label: "In Use", icon: LogIn, action: () => checkoutMut.mutate(), pending: checkoutMut.isPending, className: "text-emerald-700 border-emerald-200 hover:bg-emerald-50" }
+    ? { label: "בשימוש", icon: LogIn, action: () => checkoutMut.mutate(), pending: checkoutMut.isPending, className: "text-emerald-700 border-emerald-200 hover:bg-emerald-50" }
     : (isCheckedOut && (checkedOutByMe || isAdmin)) && eq.status === "ok"
-    ? { label: "Return", icon: LogOut, action: () => setReturnDialogOpen(true), pending: returnMut.isPending, className: "text-primary border-primary/30 hover:bg-primary/10" }
+    ? { label: "החזר", icon: LogOut, action: () => setReturnDialogOpen(true), pending: returnMut.isPending, className: "text-primary border-primary/30 hover:bg-primary/10" }
     : eq.status === "issue"
-    ? { label: "View Issue", icon: AlertTriangle, action: null, href: `/equipment/${eq.id}`, pending: false, className: "text-red-600 border-red-200 hover:bg-red-50" }
+    ? { label: "צפה בבעיה", icon: AlertTriangle, action: null, href: `/equipment/${eq.id}`, pending: false, className: "text-red-600 border-red-200 hover:bg-red-50" }
     : null;
 
   return (

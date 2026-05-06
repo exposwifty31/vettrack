@@ -98,7 +98,7 @@ export default function AdminShiftsPage() {
               onChange={(event) => {
                 const file = event.target.files?.[0] ?? null;
                 if (file && !file.name.toLowerCase().endsWith(".csv")) {
-                  toast.error("Please choose a .csv file");
+                  toast.error("בחר קובץ CSV בלבד.");
                   setSelectedFile(null);
                   setPreview(null);
                   event.currentTarget.value = "";

@@ -16,12 +16,12 @@ export default function NotFoundPage() {
         <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center">
           <Frown className="w-10 h-10 text-muted-foreground" />
         </div>
-        <h1 className="text-2xl font-bold">Page Not Found</h1>
-        <p className="text-muted-foreground">The page you're looking for doesn't exist.</p>
+        <h1 className="text-2xl font-bold">הדף לא נמצא</h1>
+        <p className="text-muted-foreground">הדף שחיפשת אינו קיים.</p>
         <Link href="/home">
           <Button data-testid="btn-go-home">
-            <Home className="w-4 h-4 mr-2" />
-            Go Home
+            <Home className="w-4 h-4 ml-2" />
+            לדף הבית
           </Button>
         </Link>
       </div>

@@ -43,7 +43,7 @@ export default function ShiftLeaderboardPage() {
   if (!isAdmin) {
     return (
       <Layout>
-        <div className="p-8 text-center text-muted-foreground">Admin access required</div>
+        <div className="p-8 text-center text-muted-foreground">נדרשת גישת מנהל</div>
       </Layout>
     );
   }
@@ -60,34 +60,33 @@ export default function ShiftLeaderboardPage() {
   return (
     <Layout>
       <Helmet>
-        <title>Shift Scan Leaderboard — VetTrack</title>
+        <title>לוח מובילים — סריקות משמרת — VetTrack</title>
       </Helmet>
 
       <div className="w-full space-y-6 motion-safe:animate-page-enter">
-        {/* Header */}
+        {/* כותרת */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             <TrendingUp className="h-7 w-7 shrink-0 text-primary" aria-hidden />
-            <h1 className="truncate text-2xl font-bold tracking-tight">Shift Scan Leaderboard</h1>
+            <h1 className="truncate text-2xl font-bold tracking-tight">לוח מובילים — סריקות משמרת</h1>
           </div>
           <Link href="/analytics">
             <Button variant="outline" size="sm">
-              Back to Analytics
+              חזרה לניתוח נתונים
             </Button>
           </Link>
         </div>
 
         <p className="text-sm text-muted-foreground max-w-2xl">
-          Per-user scan counts and averages across shifts. Users with zero scans in any shift are
-          highlighted.
+          ספירת סריקות וממוצעים לפי משתמש על פני משמרות. משתמשים עם אפס סריקות בכל משמרת מסומנים.
         </p>
 
-        {/* Date range */}
+        {/* טווח תאריכים */}
         <div className="rounded-xl border bg-card p-4 shadow-sm">
           <div className="flex flex-wrap items-end gap-4">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-muted-foreground" htmlFor="sb-from">
-                From
+                מתאריך
               </label>
               <input
                 id="sb-from"
@@ -99,7 +98,7 @@ export default function ShiftLeaderboardPage() {
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-muted-foreground" htmlFor="sb-to">
-                To
+                עד תאריך
               </label>
               <input
                 id="sb-to"
@@ -113,12 +112,12 @@ export default function ShiftLeaderboardPage() {
               onClick={() => setQueryParams({ from: fromDate, to: toDate })}
               disabled={reportQ.isFetching}
             >
-              {reportQ.isFetching ? "Loading…" : "Run Report"}
+              {reportQ.isFetching ? "טוען..." : "הרץ דוח"}
             </Button>
           </div>
         </div>
 
-        {/* Results */}
+        {/* תוצאות */}
         {reportQ.isPending && (
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -128,14 +127,14 @@ export default function ShiftLeaderboardPage() {
         )}
 
         {reportQ.isError && (
-          <ErrorCard message="Failed to load shift completion data" />
+          <ErrorCard message="טעינת נתוני השלמת משמרת נכשלה" />
         )}
 
         {!reportQ.isPending && !reportQ.isError && users.length === 0 && (
           <EmptyState
             icon={Users}
-            message="No data"
-            subMessage="No users with shift activity in the selected period"
+            message="אין נתונים"
+            subMessage="אין משתמשים עם פעילות משמרת בתקופה שנבחרה"
           />
         )}
 
@@ -144,12 +143,12 @@ export default function ShiftLeaderboardPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wide border-b">
-                  <th className="px-4 py-2 text-left font-medium">#</th>
-                  <th className="px-4 py-2 text-left font-medium">User</th>
-                  <th className="px-4 py-2 text-right font-medium">Shifts</th>
-                  <th className="px-4 py-2 text-right font-medium">Total Scans</th>
-                  <th className="px-4 py-2 text-right font-medium">Avg / Shift</th>
-                  <th className="px-4 py-2 text-right font-medium">Zero-Capture</th>
+                  <th className="px-4 py-2 text-right font-medium">#</th>
+                  <th className="px-4 py-2 text-right font-medium">משתמש</th>
+                  <th className="px-4 py-2 text-right font-medium">משמרות</th>
+                  <th className="px-4 py-2 text-right font-medium">סריקות סה״כ</th>
+                  <th className="px-4 py-2 text-right font-medium">ממוצע / משמרת</th>
+                  <th className="px-4 py-2 text-right font-medium">ללא סריקה</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">

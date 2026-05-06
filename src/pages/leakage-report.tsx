@@ -74,17 +74,17 @@ export default function LeakageReportPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             <ShieldAlert className="h-7 w-7 shrink-0 text-destructive" aria-hidden />
-            <h1 className="truncate text-2xl font-bold tracking-tight">Leakage Audit Report</h1>
+            <h1 className="truncate text-2xl font-bold tracking-tight">דוח ביקורת דליפות</h1>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <Link href="/billing">
               <Button variant="outline" size="sm">
-                Back to Billing
+                חזרה לחיובים
               </Button>
             </Link>
             <Button variant="outline" size="sm" onClick={() => downloadLeakageCsv(items)} disabled={items.length === 0}>
               <Download className="h-4 w-4 mr-1" />
-              Export CSV
+              ייצא CSV
             </Button>
           </div>
         </div>
@@ -94,7 +94,7 @@ export default function LeakageReportPage() {
           <div className="flex flex-wrap items-end gap-4">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-muted-foreground" htmlFor="from-date">
-                From
+                מתאריך
               </label>
               <input
                 id="from-date"
@@ -106,7 +106,7 @@ export default function LeakageReportPage() {
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-muted-foreground" htmlFor="to-date">
-                To
+                עד תאריך
               </label>
               <input
                 id="to-date"
@@ -117,7 +117,7 @@ export default function LeakageReportPage() {
               />
             </div>
             <Button onClick={handleRunReport} disabled={reportQ.isFetching}>
-              {reportQ.isFetching ? "Running..." : "Run Report"}
+              {reportQ.isFetching ? "מריץ..." : "הרץ דוח"}
             </Button>
           </div>
         </div>
@@ -136,7 +136,7 @@ export default function LeakageReportPage() {
 
         {/* Error state */}
         {reportQ.isError && !reportQ.isPending && (
-          <ErrorCard message="Failed to load leakage report" onRetry={() => reportQ.refetch()} />
+          <ErrorCard message="טעינת דוח הדליפות נכשלה" onRetry={() => reportQ.refetch()} />
         )}
 
         {/* Results */}
@@ -195,8 +195,8 @@ export default function LeakageReportPage() {
             {items.length === 0 ? (
               <EmptyState
                 icon={ShieldAlert}
-                message="No leakage detected"
-                subMessage="All dispensed items appear to be billed within the selected date range."
+                message="לא זוהתה דליפה"
+                subMessage="כל הפריטים שחולקו נראים כמחויבים בטווח התאריכים שנבחר."
                 iconBg="bg-emerald-50 ring-1 ring-emerald-200/60"
                 iconColor="text-emerald-600"
               />

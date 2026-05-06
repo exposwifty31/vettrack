@@ -251,9 +251,9 @@ export default function BillingLedgerPage() {
   ];
 
   const BILLING_SIDEBAR: SidebarItem[] = [
-    { href: "/billing",                icon: ReceiptText,  label: "Billing Ledger" },
-    { href: "/billing/leakage",        icon: TrendingDown, label: "Leakage Report" },
-    { href: "/billing/inventory-jobs", icon: Boxes,        label: "Inventory Jobs" },
+    { href: "/billing",                icon: ReceiptText,  label: "לוח חיובים" },
+    { href: "/billing/leakage",        icon: TrendingDown, label: "דוח דליפות" },
+    { href: "/billing/inventory-jobs", icon: Boxes,        label: "עבודות מלאי" },
   ];
 
   const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
@@ -273,14 +273,14 @@ export default function BillingLedgerPage() {
             <Link href="/billing/leakage">
               <Button variant="outline" size="sm" className="gap-1.5 rounded-xl text-xs">
                 <TrendingDown className="h-3.5 w-3.5 text-destructive" />
-                Leakage Report
+                דוח דליפות
               </Button>
             </Link>
             {role === "admin" && (
               <Link href="/billing/inventory-jobs">
                 <Button variant="outline" size="sm" className="gap-1.5 rounded-xl text-xs">
                   <PackageX className="h-3.5 w-3.5 text-orange-500" />
-                  Inventory Jobs
+                  עבודות מלאי
                 </Button>
               </Link>
             )}
@@ -288,7 +288,7 @@ export default function BillingLedgerPage() {
               <Link href="/billing/code-blue-reconciliation">
                 <Button variant="outline" size="sm" className="gap-1.5 rounded-xl text-xs">
                   <Siren className="h-3.5 w-3.5 text-destructive" />
-                  Code Blue
+                  קוד כחול
                 </Button>
               </Link>
             )}
@@ -311,7 +311,7 @@ export default function BillingLedgerPage() {
             <Link href="/billing/leakage">
               <Button variant="outline" size="sm" className="min-h-[40px] shrink-0">
                 <ShieldAlert className="h-4 w-4 mr-1" />
-                Leakage Report
+                דוח דליפות
               </Button>
             </Link>
             {isAdmin && (
@@ -326,41 +326,41 @@ export default function BillingLedgerPage() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-xl border bg-card p-4 shadow-sm transition-shadow duration-200 hover:shadow-md motion-reduce:hover:shadow-sm">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-muted-foreground">Charges Today</p>
+              <p className="text-xs font-medium text-muted-foreground">חיובים היום</p>
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
             </div>
             <p className="mt-2 text-2xl font-semibold tracking-tight">{formatCents(chargesToday)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{nonVoidedEntries.length} active lines</p>
+            <p className="mt-1 text-xs text-muted-foreground">{nonVoidedEntries.length} שורות פעילות</p>
           </div>
           <div className="rounded-xl border bg-card p-4 shadow-sm transition-shadow duration-200 hover:shadow-md motion-reduce:hover:shadow-sm">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-muted-foreground">Charges This Week</p>
+              <p className="text-xs font-medium text-muted-foreground">חיובים השבוע</p>
               <Clock3 className="h-4 w-4 text-muted-foreground" />
             </div>
             <p className="mt-2 text-2xl font-semibold tracking-tight">{formatCents(chargesThisWeek)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">Rolling 7-day total</p>
+            <p className="mt-1 text-xs text-muted-foreground">סה״כ 7 ימים אחרונים</p>
           </div>
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm transition-shadow duration-200 hover:shadow-md motion-reduce:hover:shadow-sm">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-emerald-700">Auto-Synced</p>
+              <p className="text-xs font-medium text-emerald-700">מסונכרן אוטומטית</p>
               <Sparkles className="h-4 w-4 text-emerald-700" />
             </div>
             <p className="mt-2 text-2xl font-semibold tracking-tight text-emerald-800">
               {formatCents(autoCapturedTotal)}
             </p>
             <p className="mt-1 text-xs text-emerald-700">
-              {autoCapturedEntries.length} entries synced to external
+              {autoCapturedEntries.length} רשומות מסונכרנות לחיצוני
             </p>
           </div>
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm transition-shadow duration-200 hover:shadow-md motion-reduce:hover:shadow-sm">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-amber-700">Pending review</p>
+              <p className="text-xs font-medium text-amber-700">ממתין לסקירה</p>
               <AlertTriangle className="h-4 w-4 text-amber-700" />
             </div>
             <p className="mt-2 text-2xl font-semibold tracking-tight text-amber-800">
               {outstandingReviewEntries.length}
             </p>
-            <p className="mt-1 text-xs text-amber-700">{formatCents(outstandingReviewTotal)} pending review</p>
+            <p className="mt-1 text-xs text-amber-700">{formatCents(outstandingReviewTotal)} ממתין לסקירה</p>
           </div>
         </div>
 
@@ -410,7 +410,7 @@ export default function BillingLedgerPage() {
                 <Input
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
-                  placeholder="Search by animal ID, item ID, status, date, or type"
+                  placeholder="חיפוש לפי מזהה חיה, מזהה פריט, סטטוס, תאריך או סוג"
                   className="pl-9 pr-8"
                 />
                 {searchQuery ? (
@@ -418,7 +418,7 @@ export default function BillingLedgerPage() {
                     type="button"
                     onClick={() => setSearchQuery("")}
                     className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-muted"
-                    aria-label="Clear search"
+                    aria-label="נקה חיפוש"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -467,7 +467,7 @@ export default function BillingLedgerPage() {
           <EmptyState
             icon={Receipt}
             message={p.noEntries}
-            subMessage="Manual charges and synced captures will appear here once recorded."
+            subMessage="חיובים ידניים ורשומות מסונכרנות יופיעו כאן לאחר שיירשמו."
             iconBg="bg-muted/80 ring-1 ring-border/40"
             iconColor="text-muted-foreground"
           />

@@ -97,14 +97,14 @@ export default function AnalyticsPage() {
           <Link href="/analytics/shift-leaderboard">
             <span className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-3 py-1.5 text-xs font-medium shadow-sm hover:bg-muted/50 transition-colors cursor-pointer">
               <TrendingUp className="h-3.5 w-3.5 text-primary" />
-              Shift Scan Leaderboard
+              לוח מובילים — סריקות משמרת
             </span>
           </Link>
         </div>
 
         {isError && (
           <ErrorCard
-            message="Failed to load analytics. Please try again."
+            message="טעינת הנתונים נכשלה. נסה שוב."
             onRetry={() => refetch()}
           />
         )}

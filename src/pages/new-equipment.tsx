@@ -283,10 +283,10 @@ export default function NewEquipmentPage() {
       <Helmet>
         <title>
           {isEditing
-            ? `Edit ${existingEquipment?.name ?? "Equipment"} — VetTrack`
+            ? `עריכת ${existingEquipment?.name ?? "ציוד"} — VetTrack`
             : isCopy
-            ? `New Equipment (copied from ${prefill.copiedFrom}) — VetTrack`
-            : "Add Equipment — VetTrack"}
+            ? `ציוד חדש (העתק מ-${prefill.copiedFrom}) — VetTrack`
+            : "הוספת ציוד — VetTrack"}
         </title>
         <meta name="description" content="Register a new piece of veterinary equipment. Assign a name, serial number, location, folder, and maintenance schedule to begin QR tracking." />
         <link rel="canonical" href="https://vettrack.replit.app/equipment/new" />

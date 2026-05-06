@@ -381,7 +381,7 @@ export default function EquipmentDetailPage() {
             toast.success(t.equipmentDetail.toast.issueReported, {
               duration: 10000,
               action: isStudentEquipmentRole ? undefined : {
-                label: "Send WhatsApp",
+                label: "שלח WhatsApp",
                 onClick: () => window.open(waUrl, "_blank"),
               },
             });
@@ -662,8 +662,8 @@ export default function EquipmentDetailPage() {
       <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
         <AlertTriangle className="w-10 h-10 text-destructive opacity-60" />
         <div>
-          <p className="font-semibold text-foreground">Failed to load equipment</p>
-          <p className="text-sm text-muted-foreground mt-1">Check your connection and try again</p>
+          <p className="font-semibold text-foreground">טעינת הציוד נכשלה</p>
+          <p className="text-sm text-muted-foreground mt-1">בדוק את החיבור ונסה שוב</p>
         </div>
         <div className="flex gap-2">
           <Button
@@ -1101,7 +1101,7 @@ export default function EquipmentDetailPage() {
                         data-testid="btn-load-older-logs"
                       >
                         {isFetchingOlderLogs ? (
-                          <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Loading…</>
+                          <><Loader2 className="w-4 h-4 mr-1 animate-spin" />טוען...</>
                         ) : (
                           t.equipmentDetail.loadOlder
                         )}

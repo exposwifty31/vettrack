@@ -292,14 +292,14 @@ function completeButtonState(args: {
 }
 
 const STATUS_LABEL: Record<AppointmentStatus, string> = {
-  pending: "Pending",
-  assigned: "Assigned",
-  scheduled: "Scheduled",
-  arrived: "Arrived",
-  in_progress: "In progress",
-  completed: "Completed",
-  cancelled: "Cancelled",
-  no_show: "No show",
+  pending: "ממתין",
+  assigned: "הוקצה",
+  scheduled: "מתוזמן",
+  arrived: "הגיע",
+  in_progress: "בביצוע",
+  completed: "הושלם",
+  cancelled: "בוטל",
+  no_show: "לא הופיע",
 };
 
 function looksLikeUuid(s: string): boolean {
@@ -463,7 +463,7 @@ export default function AppointmentsPage() {
   const createMutation = useMutation({
     mutationFn: (payload: CreateAppointmentRequest) => api.appointments.create(payload),
     onSuccess: () => {
-      toast.success("Task created");
+      toast.success("משימה נוצרה");
       queryClient.invalidateQueries({ queryKey: ["/api/appointments", day], exact: true });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", meUserId ?? ""], exact: true });
       setBookingOpen(false);
@@ -509,7 +509,7 @@ export default function AppointmentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/appointments", day], exact: true });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", meUserId ?? ""], exact: true });
-      toast.success("Task started");
+      toast.success("משימה התחילה");
     },
     onError: (error: Error) => {
       toast.error(toErrorMessage(error));
@@ -521,7 +521,7 @@ export default function AppointmentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/appointments", day], exact: true });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", meUserId ?? ""], exact: true });
-      toast.success("Task completed");
+      toast.success("משימה הושלמה");
     },
     onError: (error: Error) => {
       toast.error(toErrorMessage(error));
@@ -533,7 +533,7 @@ export default function AppointmentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/appointments", day], exact: true });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", meUserId ?? ""], exact: true });
-      toast.success("Medication approved — technician notified");
+      toast.success("תרופה אושרה — טכנאי קיבל הודעה");
     },
     onError: (error: Error) => {
       toast.error(toErrorMessage(error));
@@ -555,7 +555,7 @@ export default function AppointmentsPage() {
       return;
     }
     if (event.type === "AUTOMATION_TRIGGERED") {
-      toast.info("Task auto-updated by automation rule");
+      toast.info("משימה עודכנה אוטומטית על ידי כלל אוטומציה");
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", meUserId ?? ""], exact: true });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/recommendations"], exact: true });
       return;
@@ -637,27 +637,27 @@ export default function AppointmentsPage() {
     }
 
     if (!formVetId.trim()) {
-      toast.error("Select a technician before creating a task.");
+      toast.error("בחר טכנאי לפני יצירת משימה.");
       return;
     }
     if (!formAnimalId.trim()) {
-      toast.error("Device / Asset is required.");
+      toast.error("נדרש לבחור מכשיר / נכס.");
       return;
     }
 
     const start = new Date(formStartLocal);
     const end = new Date(formEndLocal);
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      toast.error("Please enter valid start and end times.");
+      toast.error("הזן שעות התחלה וסיום תקינות.");
       return;
     }
     if (end.getTime() <= start.getTime()) {
-      toast.error("Expected end time must be after scheduled time.");
+      toast.error("שעת הסיום חייבת להיות אחרי שעת ההתחלה.");
       return;
     }
 
     if (isMedicationForm) {
-      toast.error("Medication tasks must be created using the medication calculator.");
+      toast.error("משימות תרופות חייבות להיווצר דרך מחשבון התרופות.");
       return;
     }
 
@@ -702,12 +702,12 @@ export default function AppointmentsPage() {
 
         <Card className="bg-card border-border/60 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">What should I do now?</CardTitle>
+            <CardTitle className="text-base font-semibold">מה לעשות עכשיו?</CardTitle>
           </CardHeader>
           <CardContent>
             {recommendationsQuery.isError ? (
               <ErrorCard
-                message="Unable to load recommendations."
+                message="טעינת המלצות נכשלה."
                 onRetry={() => recommendationsQuery.refetch()}
               />
             ) : recommendationsQuery.isLoading && !recommendationsQuery.data ? (
@@ -718,8 +718,8 @@ export default function AppointmentsPage() {
             ) : !recommendationsQuery.data?.nextBestTask ? (
               <EmptyState
                 icon={CheckCircle2}
-                message="You're all caught up"
-                subMessage="No next best task is pending right now."
+                message="הכל מעודכן"
+                subMessage="אין משימות ממתינות כרגע."
                 action={canCreateTask ? (
                   <Button
                     size="sm"
@@ -831,7 +831,7 @@ export default function AppointmentsPage() {
           <CardContent className="space-y-3">
             {dashboardQuery.isError ? (
               <ErrorCard
-                message="Unable to load urgent tasks."
+                message="טעינת משימות דחופות נכשלה."
                 onRetry={() => dashboardQuery.refetch()}
               />
             ) : dashboardQuery.isLoading && !dashboardQuery.data ? (
@@ -896,8 +896,8 @@ export default function AppointmentsPage() {
                 {(dashboardQuery.data?.overdue.length ?? 0) === 0 && (recommendationsQuery.data?.urgentTasks.length ?? 0) === 0 ? (
                   <EmptyState
                     icon={CheckCircle2}
-                    message="Nothing urgent right now"
-                    subMessage="Everything is currently on track."
+                    message="אין דחוף כרגע"
+                    subMessage="הכל במסלול תקין."
                   action={(
                     <Button
                       size="sm"
@@ -1065,8 +1065,8 @@ export default function AppointmentsPage() {
               ) : (dashboardQuery.data?.myTasks.length ?? 0) === 0 ? (
                 <EmptyState
                   icon={CheckCircle2}
-                  message="No tasks assigned"
-                  subMessage="Pick a task from the queue when ready."
+                  message="אין משימות מוקצות"
+                  subMessage="בחר משימה מהתור כשאתה מוכן."
                   action={(
                     <Button
                       size="sm"
@@ -1174,8 +1174,8 @@ export default function AppointmentsPage() {
             {(recommendationsQuery.data?.suggestions.length ?? 0) === 0 ? (
               <EmptyState
                 icon={CheckCircle2}
-                message="No suggestions"
-                subMessage="Everything looks good right now."
+                message="אין הצעות"
+                subMessage="הכל נראה תקין כרגע."
                 action={canCreateTask ? (
                   <Button
                     size="sm"
@@ -1198,12 +1198,12 @@ export default function AppointmentsPage() {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="font-medium">
                         {suggestion.type === "OVERDUE_WARNING"
-                          ? `${dashboardQuery.data?.counts.overdue ?? 0} overdue — review now`
+                          ? `${dashboardQuery.data?.counts.overdue ?? 0} באיחור — סקור עכשיו`
                           : suggestion.type === "START_NOW"
-                            ? "Next task is ready — start now"
+                            ? "המשימה הבאה מוכנה — התחל עכשיו"
                             : suggestion.type === "OVERLOADED"
-                              ? "High workload — review urgent tasks"
-                              : "Queue is open — pick a task"}
+                              ? "עומס גבוה — סקור משימות דחופות"
+                              : "התור פתוח — בחר משימה"}
                       </span>
                       <Button
                         size="sm"
@@ -1221,9 +1221,9 @@ export default function AppointmentsPage() {
                       >
                         {suggestion.type === "START_NOW"
                           ? t.appointmentsPage.startNow
-                          : suggestion.type === "PICK_FROM_QUEUE"
-                            ? "View queue"
-                            : "Review urgent"}
+                            : suggestion.type === "PICK_FROM_QUEUE"
+                            ? "צפה בתור"
+                              : "סקור דחופות"}
                       </Button>
                     </div>
                   </li>
@@ -1444,8 +1444,8 @@ export default function AppointmentsPage() {
                         <div className="w-full max-w-md">
                           <EmptyState
                             icon={CheckCircle2}
-                            message="No tasks scheduled"
-                            subMessage="Tap a slot to create one."
+                            message="אין משימות מתוזמנות"
+                            subMessage="הקש על חריץ זמן ליצירת משימה."
                           />
                         </div>
                       </div>
@@ -1468,7 +1468,7 @@ export default function AppointmentsPage() {
                   variant="ghost"
                   size="icon"
                   className="shrink-0 h-9 w-9"
-                  aria-label="Back to task type selection"
+                aria-label="חזרה לבחירת סוג משימה"
                   onClick={() => setFormTaskType("maintenance")}
                 >
                   <ChevronRight className="h-5 w-5" />
@@ -1517,7 +1517,7 @@ export default function AppointmentsPage() {
         animalId={formAnimalId.trim()}
         onCancel={() => setFormTaskType("maintenance")}
         onComplete={() => {
-          toast.success("Medication administered");
+          toast.success("תרופה ניתנה");
           queryClient.invalidateQueries({ queryKey: ["/api/appointments", day], exact: true });
           queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", meUserId ?? ""], exact: true });
           queryClient.invalidateQueries({ queryKey: ["/api/tasks/recommendations"], exact: true });
@@ -1683,7 +1683,7 @@ export default function AppointmentsPage() {
                   || !formEndLocal
                 }
               >
-                {createMutation.isPending ? "Saving..." : "Create Task"}
+                {createMutation.isPending ? "שומר..." : "צור משימה"}
               </Button>
             ) : null}
           </DialogFooter>

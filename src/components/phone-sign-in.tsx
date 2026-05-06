@@ -29,7 +29,7 @@ export function PhoneSignIn() {
       );
       if (!phoneFactor || !phoneFactor.phoneNumberId) {
         setErrorMsg(
-          "Phone sign-in is not available for this account. Please use another sign-in method, or contact support if you are signing in with an Israeli (+972) number and see a 'not supported' error — Israel must be enabled in the Clerk Dashboard (Configure → Phone numbers → SMS sending → Allowed countries)."
+          "התחברות עם טלפון אינה זמינה לחשבון זה. השתמש בשיטת התחברות אחרת, או פנה לתמיכה אם אתה מתחבר עם מספר ישראלי (+972) ומקבל שגיאה — יש לאפשר ישראל ב-Clerk Dashboard (Configure → Phone numbers → SMS sending → Allowed countries)."
         );
         return;
       }
@@ -43,7 +43,7 @@ export function PhoneSignIn() {
       const msg =
         clerkErr?.errors?.[0]?.longMessage ||
         clerkErr?.errors?.[0]?.message ||
-        "An error occurred. Please try again.";
+        "אירעה שגיאה. נסה שוב.";
       setErrorMsg(msg);
     } finally {
       setLoading(false);
@@ -63,14 +63,14 @@ export function PhoneSignIn() {
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
       } else {
-        setErrorMsg("Verification failed. Please try again.");
+        setErrorMsg("האימות נכשל. נסה שוב.");
       }
     } catch (err: unknown) {
       const clerkErr = err as { errors?: Array<{ message?: string; longMessage?: string }> };
       const msg =
         clerkErr?.errors?.[0]?.longMessage ||
         clerkErr?.errors?.[0]?.message ||
-        "Invalid code. Please try again.";
+        "קוד שגוי. נסה שוב.";
       setErrorMsg(msg);
     } finally {
       setLoading(false);
@@ -83,23 +83,23 @@ export function PhoneSignIn() {
   if (step === "phone") {
     return (
       <div className="bg-card border border-border rounded-2xl p-6 shadow-sm w-full">
-        <h2 className="text-base font-semibold text-foreground mb-1">Sign in with phone</h2>
+        <h2 className="text-base font-semibold text-foreground mb-1">התחברות עם טלפון</h2>
         <p className="text-xs text-muted-foreground mb-4">
-          Enter your phone number in international format (e.g.{" "}
-          <span className="font-mono">+972501234567</span>) or Israeli local format (e.g.{" "}
+          הזן מספר טלפון בפורמט בינלאומי (לדוגמה:{" "}
+          <span className="font-mono">+972501234567</span>) או בפורמט ישראלי מקומי (לדוגמה:{" "}
           <span className="font-mono">0501234567</span>).
         </p>
         <form onSubmit={handlePhoneSubmit} className="flex flex-col gap-3">
           <div>
             <label htmlFor="phone-sign-in-input" className="sr-only">
-              Phone number
+              מספר טלפון
             </label>
             <input
               id="phone-sign-in-input"
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="+972501234567 or 0501234567"
+              placeholder="+972501234567 או 0501234567"
               autoComplete="tel"
               required
               aria-required="true"
@@ -108,7 +108,7 @@ export function PhoneSignIn() {
             />
             {isILLocal && e164Preview && (
               <p className="text-xs text-primary mt-1">
-                Will be sent as <span className="font-mono">{e164Preview}</span>
+                יישלח בתור <span className="font-mono">{e164Preview}</span>
               </p>
             )}
           </div>
@@ -119,9 +119,9 @@ export function PhoneSignIn() {
               role="alert"
             >
               {errorMsg.toLowerCase().includes("not supported") || errorMsg.toLowerCase().includes("phone sign-in is not available")
-                ? "Phone sign-in is not available for this account. Try another sign-in method, or contact your administrator."
+                ? "התחברות עם טלפון אינה זמינה לחשבון זה. נסה שיטה אחרת, או פנה למנהל."
                 : errorMsg.toLowerCase().includes("clerk") || errorMsg.length > 120
-                ? "Something went wrong. Please try again or use another sign-in method."
+                ? "אירעה שגיאה. נסה שוב או השתמש בשיטת התחברות אחרת."
                 : errorMsg}
             </p>
           )}
@@ -130,7 +130,7 @@ export function PhoneSignIn() {
             disabled={loading || !phone.trim()}
             className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground font-semibold px-4 py-3 rounded-xl transition-colors text-sm"
           >
-            {loading ? "Sending code…" : "Send verification code"}
+            {loading ? "שולח קוד..." : "שלח קוד אימות"}
           </button>
         </form>
       </div>
@@ -139,13 +139,13 @@ export function PhoneSignIn() {
 
   return (
     <div className="bg-card border border-border rounded-2xl p-6 shadow-sm w-full">
-      <h2 className="text-base font-semibold text-foreground mb-1">Enter verification code</h2>
+      <h2 className="text-base font-semibold text-foreground mb-1">הזן קוד אימות</h2>
       <p className="text-xs text-muted-foreground mb-4">
-        A code was sent to <span className="font-mono font-medium">{normalizePhoneE164(phone)}</span>
+        נשלח קוד אל <span className="font-mono font-medium">{normalizePhoneE164(phone)}</span>
       </p>
       <form onSubmit={handleCodeSubmit} className="flex flex-col gap-3">
         <label htmlFor="verification-code-input" className="sr-only">
-          6-digit verification code
+          קוד אימות בן 6 ספרות
         </label>
         <input
           id="verification-code-input"
@@ -153,7 +153,7 @@ export function PhoneSignIn() {
           inputMode="numeric"
           value={code}
           onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-          placeholder="6-digit code"
+          placeholder="קוד בן 6 ספרות"
           maxLength={6}
           autoComplete="one-time-code"
           required
@@ -173,14 +173,14 @@ export function PhoneSignIn() {
           disabled={loading || code.length < 4}
           className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground font-semibold px-4 py-3 rounded-xl transition-colors text-sm"
         >
-          {loading ? "Verifying…" : "Verify"}
+          {loading ? "מאמת..." : "אמת"}
         </button>
         <button
           type="button"
           onClick={() => { setStep("phone"); setCode(""); setErrorMsg(null); }}
           className="text-xs text-muted-foreground hover:text-primary transition-colors underline"
         >
-          Change phone number
+          שנה מספר טלפון
         </button>
       </form>
     </div>

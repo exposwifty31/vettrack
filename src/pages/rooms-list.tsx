@@ -359,7 +359,7 @@ export default function RoomsListPage() {
             </div>
           </div>
         ) : isError ? (
-          <ErrorCard message="Failed to load rooms" />
+          <ErrorCard message="טעינת החדרים נכשלה" />
         ) : !rooms || rooms.length === 0 ? (
           <EmptyState
             icon={DoorOpen}

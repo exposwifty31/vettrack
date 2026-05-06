@@ -23,7 +23,7 @@ export function EquipmentFilters({ search, onSearchChange, onAdd }: EquipmentFil
           type="search"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search equipment…"
+          placeholder="חיפוש ציוד..."
           className={cn(
             "w-full ps-8 pe-3 py-[5px]",
             "rounded-[7px] border border-ivory-border bg-ivory-surface",
@@ -47,7 +47,7 @@ export function EquipmentFilters({ search, onSearchChange, onAdd }: EquipmentFil
           )}
         >
           <Plus size={13} strokeWidth={2.5} aria-hidden />
-          Add Equipment
+          הוסף ציוד
         </button>
       )}
     </div>

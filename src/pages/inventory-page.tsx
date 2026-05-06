@@ -420,7 +420,7 @@ export default function InventoryPage() {
   const trySelectContainer = (id: string) => {
     if (isRestocking && id !== selectedId) {
       haptics.error();
-      toast.warning("Finish restock before switching containers.");
+      toast.warning("סיים את המילוי מחדש לפני מעבר למכל אחר.");
       return;
     }
     setEditingCode(null);
@@ -446,7 +446,7 @@ export default function InventoryPage() {
     if (container) {
       if (isRestocking && container.id !== selectedId) {
         haptics.error();
-        toast.warning("Finish restock before switching containers.");
+        toast.warning("סיים את המילוי מחדש לפני מעבר למכל אחר.");
         return;
       }
       setSelectedId(container.id);
@@ -459,7 +459,7 @@ export default function InventoryPage() {
     }
     // Item tag → +1
     const sessionId = sessionIdRef.current;
-    if (!sessionId) { toast.error("Start a restock session first"); return; }
+    if (!sessionId) { toast.error("פתח סשן מילוי מחדש תחילה"); return; }
     dispatch({ type: "scan-request" });
     scanMut
       .mutateAsync({ sessionId, nfcTagId: tagId, delta: 1 })
@@ -485,10 +485,10 @@ export default function InventoryPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ndef.onreading = (event: any) => handleNFCTag(event.serialNumber as string);
       navigator.vibrate?.([20, 25, 20]);
-      toast.success("NFC ready — tap a tag", { duration: 3200 });
+      toast.success("NFC מוכן — גע בתווית", { duration: 3200 });
     } catch {
       navigator.vibrate?.(140);
-      toast.error("Failed to start NFC scanning");
+      toast.error("הפעלת סריקת NFC נכשלה");
     } finally {
       setIsNfcStarting(false);
     }
@@ -863,9 +863,9 @@ export default function InventoryPage() {
                     {finishMut.isPending ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
                     ) : missingCount === 0 ? (
-                      "Finish Restock"
+                      "סיים מילוי"
                     ) : (
-                      `Finish Restock (${missingCount} missing)`
+                      `סיים מילוי (${missingCount} חסרים)`
                     )}
                   </Button>
                 </div>

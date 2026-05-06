@@ -77,14 +77,14 @@ const BILLING_STATUS_CLASS: Record<BillingLedgerEntry["status"], string> = {
 };
 
 const APPOINTMENT_STATUS_LABEL: Record<Appointment["status"], string> = {
-  pending: "Pending",
-  assigned: "Assigned",
-  scheduled: "Scheduled",
-  arrived: "Arrived",
-  in_progress: "In progress",
-  completed: "Completed",
-  cancelled: "Cancelled",
-  no_show: "No show",
+  pending: "ממתין",
+  assigned: "הוקצה",
+  scheduled: "מתוזמן",
+  arrived: "הגיע",
+  in_progress: "בביצוע",
+  completed: "הושלם",
+  cancelled: "בוטל",
+  no_show: "לא הופיע",
 };
 
 function medDrugLabel(task: MedicationExecutionTask): string {

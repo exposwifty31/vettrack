@@ -11,10 +11,10 @@ import type { InventoryJob } from "@/types";
 type JobStatus = InventoryJob["status"];
 
 const STATUS_CONFIG: Record<JobStatus, { label: string; className: string; icon: React.ReactNode }> = {
-  pending:    { label: "Pending",    className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300", icon: <Clock className="h-3 w-3" /> },
-  processing: { label: "Processing", className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",       icon: <Loader2 className="h-3 w-3 animate-spin" /> },
-  resolved:   { label: "Resolved",   className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",   icon: <CheckCircle2 className="h-3 w-3" /> },
-  failed:     { label: "Failed",     className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",           icon: <AlertCircle className="h-3 w-3" /> },
+  pending:    { label: "ממתין",    className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300", icon: <Clock className="h-3 w-3" /> },
+  processing: { label: "בעיבוד",  className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",       icon: <Loader2 className="h-3 w-3 animate-spin" /> },
+  resolved:   { label: "טופל",    className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",   icon: <CheckCircle2 className="h-3 w-3" /> },
+  failed:     { label: "נכשל",    className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",           icon: <AlertCircle className="h-3 w-3" /> },
 };
 
 function StatusBadge({ status }: { status: JobStatus }) {
@@ -27,10 +27,10 @@ function StatusBadge({ status }: { status: JobStatus }) {
 }
 
 const FILTER_TABS: { key: string; label: string }[] = [
-  { key: "failed",     label: "Failed" },
-  { key: "pending",    label: "Pending" },
-  { key: "processing", label: "Processing" },
-  { key: "resolved",   label: "Resolved" },
+  { key: "failed",     label: "נכשל" },
+  { key: "pending",    label: "ממתין" },
+  { key: "processing", label: "בעיבוד" },
+  { key: "resolved",   label: "טופל" },
 ];
 
 export default function InventoryJobsPage() {
@@ -51,16 +51,17 @@ export default function InventoryJobsPage() {
   });
 
   const jobs: InventoryJob[] = jobsQ.data ?? [];
+  const currentLabel = FILTER_TABS.find((t) => t.key === statusFilter)?.label ?? statusFilter;
 
   return (
     <Layout>
-      <Helmet><title>Inventory Jobs — VetTrack</title></Helmet>
+      <Helmet><title>עבודות מלאי — VetTrack</title></Helmet>
       <div className="mx-auto max-w-5xl px-4 py-6">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold">Inventory Deduction Jobs</h1>
+            <h1 className="text-xl font-semibold">עבודות ניכוי מלאי</h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Medication inventory adjustments queued after task completion
+              התאמות מלאי תרופות בתור לאחר השלמת משימה
             </p>
           </div>
           <div className="flex gap-1.5">
@@ -89,14 +90,14 @@ export default function InventoryJobsPage() {
         {jobsQ.isError && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
             <AlertCircle className="mr-1.5 inline h-4 w-4" />
-            Failed to load inventory jobs: {(jobsQ.error as Error).message}
+            טעינת עבודות המלאי נכשלה: {(jobsQ.error as Error).message}
           </div>
         )}
 
         {!jobsQ.isLoading && !jobsQ.isError && jobs.length === 0 && (
           <div className="rounded-lg border p-12 text-center">
             <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
-            <p className="text-muted-foreground">No {statusFilter} jobs</p>
+            <p className="text-muted-foreground">אין עבודות {currentLabel}</p>
           </div>
         )}
 
@@ -105,13 +106,13 @@ export default function InventoryJobsPage() {
             <table className="w-full text-sm">
               <thead className="border-b bg-muted/40">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Task ID</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Container</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vol (mL)</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Retries</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Failure Reason</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Created</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">סטטוס</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">מזהה משימה</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">מכל</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">נפח (מ״ל)</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">ניסיונות</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">סיבת כשל</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">נוצר</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -131,7 +132,7 @@ export default function InventoryJobsPage() {
                       {job.failureReason ?? <span className="text-muted-foreground">—</span>}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                      {new Date(job.createdAt).toLocaleString()}
+                      {new Date(job.createdAt).toLocaleString("he-IL")}
                     </td>
                     <td className="px-4 py-3">
                       {job.status === "failed" && (
@@ -142,7 +143,7 @@ export default function InventoryJobsPage() {
                           onClick={() => retryMutation.mutate(job.id)}
                         >
                           <RefreshCw className="mr-1 h-3 w-3" />
-                          Retry
+                          נסה שוב
                         </Button>
                       )}
                     </td>
@@ -154,7 +155,7 @@ export default function InventoryJobsPage() {
         )}
 
         <p className="mt-3 text-xs text-muted-foreground">
-          Auto-refreshes every 30 s. The background recovery scheduler re-enqueues eligible failed jobs every 10 minutes.
+          מתרענן אוטומטית כל 30 שניות. מתזמן השחזור ברקע מעבד מחדש עבודות כושלות כשירות כל 10 דקות.
         </p>
       </div>
     </Layout>

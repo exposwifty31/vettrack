@@ -205,8 +205,8 @@ export default function QrPrintPage() {
           <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
             <AlertTriangle className="w-8 h-8 text-destructive opacity-60" />
             <div>
-              <p className="text-sm font-medium text-foreground">Failed to load equipment</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Check your connection and try again</p>
+              <p className="text-sm font-medium text-foreground">טעינת הציוד נכשלה</p>
+              <p className="text-xs text-muted-foreground mt-0.5">בדוק את החיבור ונסה שוב</p>
             </div>
             <Button
               variant="outline"

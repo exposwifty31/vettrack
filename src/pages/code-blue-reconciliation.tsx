@@ -43,10 +43,10 @@ function SessionRow({ session }: { session: CodeBlueReconciliationSession }) {
   const reconcileMut = useMutation({
     mutationFn: () => api.codeBlue.reconcile(session.sessionId),
     onSuccess: () => {
-      toast.success("Session marked as reconciled");
+      toast.success("ההפעלה סומנה כגושרת");
       qc.invalidateQueries({ queryKey: ["/api/code-blue/reconciliation"] });
     },
-    onError: () => toast.error("Failed to mark as reconciled"),
+    onError: () => toast.error("סימון כגשור נכשל"),
   });
 
   const unbilledCount = session.dispenseCount - session.billedCount;
@@ -67,34 +67,34 @@ function SessionRow({ session }: { session: CodeBlueReconciliationSession }) {
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-sm">
-              {session.patientName ?? "Unknown Patient"}
+              {session.patientName ?? "מטופל לא ידוע"}
             </span>
             {isReconciled ? (
               <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-200 text-xs">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
-                Reconciled
+                גושר
               </Badge>
             ) : unbilledCount > 0 ? (
               <Badge className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-200 text-xs">
                 <AlertCircle className="h-3 w-3 mr-1" />
-                {unbilledCount} unbilled
+                {unbilledCount} ללא חיוב
               </Badge>
             ) : (
               <Badge className="bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-950/50 dark:text-sky-200 text-xs">
-                Billed
+                חויב
               </Badge>
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
             {formatDateTime(session.startedAt)}
-            {session.endedAt ? ` – ${formatDateTime(session.endedAt)}` : " (no end time)"}
+            {session.endedAt ? ` – ${formatDateTime(session.endedAt)}` : " (ללא שעת סיום)"}
           </p>
         </div>
 
         <div className="text-right shrink-0">
           <p className="text-sm font-medium">{formatCents(session.totalBilledCents)}</p>
           <p className="text-xs text-muted-foreground">
-            {session.billedCount}/{session.dispenseCount} billed
+            {session.billedCount}/{session.dispenseCount} חויב
           </p>
         </div>
       </button>
@@ -109,17 +109,17 @@ function SessionRow({ session }: { session: CodeBlueReconciliationSession }) {
           )}
 
           {dispensesQ.isError && (
-            <p className="text-sm text-destructive">Failed to load dispenses</p>
+            <p className="text-sm text-destructive">טעינת החלוקות נכשלה</p>
           )}
 
           {dispensesQ.data && dispensesQ.data.length === 0 && (
-            <p className="text-sm text-muted-foreground">No dispenses recorded for this session</p>
+            <p className="text-sm text-muted-foreground">לא נרשמו חלוקות להפעלה זו</p>
           )}
 
           {dispensesQ.data && dispensesQ.data.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Dispenses
+                חלוקות
               </p>
               {dispensesQ.data.map((d: CodeBlueDispense) => (
                 <div
@@ -131,13 +131,13 @@ function SessionRow({ session }: { session: CodeBlueReconciliationSession }) {
                     <p className="text-xs text-muted-foreground">{formatDateTime(d.dispensedAt)}</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-xs">Qty: {Math.abs(d.quantityDispensed)}</p>
+                    <p className="text-xs">כמות: {Math.abs(d.quantityDispensed)}</p>
                     {d.billedCents != null ? (
                       <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
                         {formatCents(d.billedCents)}
                       </p>
                     ) : (
-                      <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">Unbilled</p>
+                      <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">ללא חיוב</p>
                     )}
                   </div>
                 </div>
@@ -154,13 +154,13 @@ function SessionRow({ session }: { session: CodeBlueReconciliationSession }) {
               disabled={reconcileMut.isPending}
             >
               <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              {reconcileMut.isPending ? "Marking…" : "Mark as Reconciled"}
+              {reconcileMut.isPending ? "מסמן..." : "סמן כגושר"}
             </Button>
           )}
 
           {isReconciled && session.reconciledAt && (
             <p className="text-xs text-muted-foreground">
-              Reconciled at {formatDateTime(session.reconciledAt)}
+              גושר ב-{formatDateTime(session.reconciledAt)}
             </p>
           )}
         </div>
@@ -184,7 +184,7 @@ export default function CodeBlueReconciliationPage() {
   if (!isAdmin) {
     return (
       <Layout>
-        <div className="p-8 text-center text-muted-foreground">Admin access required</div>
+        <div className="p-8 text-center text-muted-foreground">נדרשת גישת מנהל</div>
       </Layout>
     );
   }
@@ -196,27 +196,26 @@ export default function CodeBlueReconciliationPage() {
   return (
     <Layout>
       <Helmet>
-        <title>Code Blue Reconciliation — VetTrack</title>
+        <title>גישור קוד כחול — VetTrack</title>
       </Helmet>
 
       <div className="w-full space-y-6 motion-safe:animate-page-enter">
-        {/* Header */}
+        {/* כותרת */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             <ShieldAlert className="h-7 w-7 shrink-0 text-destructive" aria-hidden />
-            <h1 className="truncate text-2xl font-bold tracking-tight">Code Blue Reconciliation</h1>
+            <h1 className="truncate text-2xl font-bold tracking-tight">גישור קוד כחול</h1>
           </div>
           <Link href="/billing">
             <Button variant="outline" size="sm" className="gap-1.5">
               <Receipt className="h-4 w-4" />
-              Back to Billing
+              חזרה לחיובים
             </Button>
           </Link>
         </div>
 
         <p className="text-sm text-muted-foreground max-w-2xl">
-          Review dispenses recorded during emergency sessions and confirm billing is complete. Sessions
-          with unbilled items appear first.
+          סקור תרופות שחולקו בזמן מקרי חירום ואשר השלמת חיוב. הפעלות עם פריטים שלא חויבו מוצגות ראשונות.
         </p>
 
         {sessionsQ.isPending && (
@@ -228,21 +227,21 @@ export default function CodeBlueReconciliationPage() {
         )}
 
         {sessionsQ.isError && (
-          <ErrorCard message="Failed to load reconciliation sessions" />
+          <ErrorCard message="טעינת הפעלות הגישור נכשלה" />
         )}
 
         {!sessionsQ.isPending && !sessionsQ.isError && sessions.length === 0 && (
           <EmptyState
             icon={CheckCircle2}
-            message="All clear"
-            subMessage="No ended Code Blue sessions found"
+            message="הכל תקין"
+            subMessage="לא נמצאו הפעלות קוד כחול שהסתיימו"
           />
         )}
 
         {pending.length > 0 && (
           <section className="space-y-2">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Pending ({pending.length})
+              ממתין ({pending.length})
             </h2>
             {pending.map((s) => (
               <SessionRow key={s.sessionId} session={s} />
@@ -253,7 +252,7 @@ export default function CodeBlueReconciliationPage() {
         {done.length > 0 && (
           <section className="space-y-2">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Reconciled ({done.length})
+              גושר ({done.length})
             </h2>
             {done.map((s) => (
               <SessionRow key={s.sessionId} session={s} />

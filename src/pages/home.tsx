@@ -131,38 +131,38 @@ export default function HomePage() {
   }> = [
     {
       id: "active-patients",
-      title: "Active Patients",
+      title: "מטופלים פעילים",
       value: activePatientsCount,
-      subtitle: "In active care",
+      subtitle: "בטיפול פעיל",
       icon: Users,
       href: "/patients",
       loading: patientsLoading,
     },
     {
       id: "tasks-due",
-      title: "Tasks Due",
+      title: "משימות לביצוע",
       value: tasksDueCount,
-      subtitle: "Today + overdue",
+      subtitle: "היום + באיחור",
       icon: ListTodo,
       href: "/appointments",
       loading: tasksLoading,
     },
     {
       id: "inventory-alerts",
-      title: "Inventory Alerts",
+      title: "התראות מלאי",
       value: alertCount,
-      subtitle: alertCount > 0 ? "Needs review" : "All clear",
+      subtitle: alertCount > 0 ? "דורש בדיקה" : "הכל תקין",
       icon: ShieldAlert,
       href: "/alerts",
       loading: isLoading,
     },
     {
       id: "charges-today",
-      title: "Captured This Shift",
+      title: "נרשם במשמרת זו",
       value: shiftTotal?.shiftActive
         ? `₪${(shiftTotal.totalCents / 100).toLocaleString("he-IL", { maximumFractionDigits: 0 })}`
         : null,
-      subtitle: shiftTotal?.shiftActive ? "Billing entries this shift" : "No open shift",
+      subtitle: shiftTotal?.shiftActive ? "רשומות חיוב במשמרת" : "אין משמרת פתוחה",
       icon: DollarSign,
       href: "/billing",
       loading: shiftLoading,
@@ -179,29 +179,29 @@ export default function HomePage() {
   }> = [
     {
       id: "scan",
-      label: "Scan",
-      hint: "QR or NFC",
+      label: "סריקה",
+      hint: "QR או NFC",
       icon: Scan,
       onClick: () => setScannerOpen(true),
     },
     {
       id: "add-task",
-      label: "Add Task",
-      hint: "Create or assign",
+      label: "הוסף משימה",
+      hint: "צור או שייך",
       icon: FilePlus2,
       href: "/appointments",
     },
     {
       id: "inventory",
-      label: "Inventory",
-      hint: "Stock and assets",
+      label: "מלאי",
+      hint: "מלאי ונכסים",
       icon: Boxes,
       href: "/inventory",
     },
     {
       id: "billing",
-      label: "Billing",
-      hint: "Charges and ledger",
+      label: "חיובים",
+      hint: "חיובים ופנקס",
       icon: Receipt,
       href: "/billing",
     },
@@ -229,7 +229,7 @@ export default function HomePage() {
               <div className="min-w-0 flex-1 space-y-1.5">
                 <p className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background/80 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
                   <Sparkles className="h-3.5 w-3.5 text-primary" />
-                  Today
+                  היום
                 </p>
                 <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
                   {t.homePage.greeting(name?.split(" ")[0] || t.homePage.fallbackName)}
