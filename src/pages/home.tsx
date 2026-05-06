@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorCard } from "@/components/ui/error-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { LoadingSection } from "@/components/ui/loading-section";
 import { ShiftSummarySheet } from "@/components/shift-summary-sheet";
 import { computeAlerts } from "@/lib/utils";
 import {
@@ -78,7 +80,7 @@ export default function HomePage() {
     refetchOnWindowFocus: false,
   });
 
-  const { data: activityData } = useQuery({
+  const { data: activityData, isLoading: activityLoading } = useQuery({
     queryKey: ["/api/activity"],
     queryFn: () => api.activity.feed(),
     enabled: !!userId,
@@ -381,7 +383,9 @@ export default function HomePage() {
                     </Badge>
                   </div>
 
-                  {activityData?.items && activityData.items.length > 0 ? (
+                  {activityLoading ? (
+                    <LoadingSection rows={4} />
+                  ) : activityData?.items && activityData.items.length > 0 ? (
                     <div className="space-y-2">
                       {activityData.items.slice(0, 6).map((item) => {
                         const StatusIcon = STATUS_ICON_MAP[item.status ?? "ok"] ?? Activity;
@@ -418,15 +422,11 @@ export default function HomePage() {
                       })}
                     </div>
                   ) : (
-                    <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 px-4 py-8 text-center motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-300">
-                      <div className="mx-auto mb-2.5 flex h-11 w-11 items-center justify-center rounded-xl bg-background/80 shadow-inner ring-1 ring-border/50">
-                        <Activity className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <p className="text-sm font-medium text-foreground">No recent activity</p>
-                      <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
-                        Scans, status changes, and moves show up here as they happen.
-                      </p>
-                    </div>
+                    <EmptyState
+                      icon={Activity}
+                      message={t.homePage.activityFeedEmpty}
+                      subMessage={t.homePage.activityFeedEmptyHint}
+                    />
                   )}
                 </CardContent>
               </Card>
@@ -467,7 +467,9 @@ export default function HomePage() {
                     </Link>
                   </div>
 
-                  {alertCount > 0 ? (
+                  {isLoading ? (
+                    <LoadingSection rows={3} />
+                  ) : alertCount > 0 ? (
                     <div className="space-y-2">
                       {alerts.slice(0, 4).map((alert) => (
                         <Link key={`${alert.type}-${alert.equipmentId}`} href={`/equipment/${alert.equipmentId}`}>
@@ -497,15 +499,13 @@ export default function HomePage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 px-4 py-8 text-center motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-300">
-                      <div className="mx-auto mb-2.5 flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10 shadow-inner ring-1 ring-emerald-500/25">
-                        <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                      <p className="text-sm font-medium text-foreground">No inventory alerts</p>
-                      <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
-                        Sterilization, maintenance, and issues appear here when something needs attention.
-                      </p>
-                    </div>
+                    <EmptyState
+                      icon={CheckCircle2}
+                      message={t.homePage.alertsEmpty}
+                      subMessage={t.homePage.alertsEmptyHint}
+                      iconBg="bg-emerald-500/10 ring-1 ring-emerald-500/25"
+                      iconColor="text-emerald-600 dark:text-emerald-400"
+                    />
                   )}
                 </CardContent>
               </Card>

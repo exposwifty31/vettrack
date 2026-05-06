@@ -691,7 +691,11 @@
     "getStarted": "Get started",
     "total": "Total",
     "getStartedDescription": "Add your first equipment item to start tracking",
-    "appTourHint": "Training + video"
+    "appTourHint": "Training + video",
+    "activityFeedEmpty": "No recent activity",
+    "activityFeedEmptyHint": "Scans, status changes, and moves appear here as they happen.",
+    "alertsEmpty": "No inventory alerts",
+    "alertsEmptyHint": "Sterilization, maintenance, and issues appear here when something needs attention."
   },
   "landingPage": {
     "seoTitle": "VetTrack — Veterinary Equipment QR Tracking System",
@@ -1600,7 +1604,23 @@
     "delayed": "Delayed",
     "tasks": "Tasks",
     "createTask": "Create task",
-    "quickTask": "Quick task"
+    "quickTask": "Quick task",
+    "recommendationsLoadFailed": "Could not load task recommendations.",
+    "urgentLoadFailed": "Could not load urgent tasks.",
+    "todayLoadFailed": "Could not load today's tasks.",
+    "myTasksLoadFailed": "Could not load assigned tasks.",
+    "dayViewLoadFailed": "Could not load the day view.",
+    "dayViewEmpty": "No scheduled tasks",
+    "dayViewEmptyHint": "Tap a time slot or use Quick Task to schedule one.",
+    "suggestions": "Suggestions",
+    "taskControls": "Task Controls",
+    "dayLabel": "Day",
+    "technicianFilter": "Technician",
+    "allTechnicians": "All technicians",
+    "hours": "Hours",
+    "interval": "Interval",
+    "dayView": "Day View",
+    "scheduleTaskAt": "Schedule task at"
   },
   "cop": {
     "discrepancyTitle": "Medication discrepancy (Smart Cop)",

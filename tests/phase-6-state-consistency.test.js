@@ -10,18 +10,21 @@ const appointments = fs.readFileSync(path.join(repoRoot, "src", "pages", "appoin
 const settings = fs.readFileSync(path.join(repoRoot, "src", "pages", "settings.tsx"), "utf8");
 const equipmentList = fs.readFileSync(path.join(repoRoot, "src", "pages", "equipment-list.tsx"), "utf8");
 const alerts = fs.readFileSync(path.join(repoRoot, "src", "pages", "alerts.tsx"), "utf8");
+const home = fs.readFileSync(path.join(repoRoot, "src", "pages", "home.tsx"), "utf8");
+const loadingSection = fs.readFileSync(path.join(repoRoot, "src", "components", "ui", "loading-section.tsx"), "utf8");
 
 describe("Wave 6 state consistency checks (static)", () => {
   it("Appointments page uses explicit shared loading/error/empty states", () => {
     expect(
       appointments.includes("import { ErrorCard } from \"@/components/ui/error-card\";") &&
         appointments.includes("import { EmptyState } from \"@/components/ui/empty-state\";") &&
+        appointments.includes("import { LoadingSection } from \"@/components/ui/loading-section\";") &&
         appointments.includes("recommendationsQuery.isError") &&
         appointments.includes("dashboardQuery.isError") &&
         appointments.includes("listQuery.isError") &&
         appointments.includes("<EmptyState") &&
         appointments.includes("listQuery.isLoading ? (") &&
-        appointments.includes("<Skeleton className=\"h-64 w-full\" />"),
+        appointments.includes("<LoadingSection rows={3} />"),
     ).toBe(true);
   });
 
@@ -58,7 +61,7 @@ describe("Wave 6 state consistency checks (static)", () => {
 
   it("Priority pages use skeleton-based loading states", () => {
     expect(
-      appointments.includes("import { Skeleton } from \"@/components/ui/skeleton\";") &&
+      appointments.includes("import { LoadingSection } from \"@/components/ui/loading-section\";") &&
         settings.includes("import { Skeleton } from \"@/components/ui/skeleton\";") &&
         equipmentList.includes("EquipmentListSkeleton") &&
         alerts.includes("SkeletonAlertCard"),
@@ -95,6 +98,48 @@ describe("Wave 6 state consistency checks (static)", () => {
       alerts.includes("action={") &&
         alerts.includes("<Link href=\"/equipment\">") &&
         alerts.includes("t.alertsPage.browseEquipment"),
+    ).toBe(true);
+  });
+
+  // Epic 8 Slice 1 — Loading/Error/Empty primitives
+  it("LoadingSection component uses role=status and aria-busy for accessibility", () => {
+    expect(
+      loadingSection.includes('role="status"') &&
+        loadingSection.includes('aria-busy="true"') &&
+        loadingSection.includes("t.common.loading"),
+    ).toBe(true);
+  });
+
+  it("Equipment list desktop view uses skeleton loading instead of hardcoded text", () => {
+    expect(
+      equipmentList.includes("import { LoadingSection }") &&
+        equipmentList.includes("<LoadingSection rows={5} />") &&
+        !equipmentList.includes("טוען..."),
+    ).toBe(true);
+  });
+
+  it("Home page activity feed shows LoadingSection while loading, not blank", () => {
+    expect(
+      home.includes("isLoading: activityLoading") &&
+        home.includes("activityLoading ? (") &&
+        home.includes("<LoadingSection rows={4} />"),
+    ).toBe(true);
+  });
+
+  it("Home page alerts section shows LoadingSection while equipment loads, not blank", () => {
+    expect(
+      home.includes("isLoading ? (") &&
+        home.includes("<LoadingSection rows={3} />"),
+    ).toBe(true);
+  });
+
+  it("Home page uses shared EmptyState component for activity and alerts empty states", () => {
+    expect(
+      home.includes("import { EmptyState }") &&
+        home.includes("t.homePage.activityFeedEmpty") &&
+        home.includes("t.homePage.activityFeedEmptyHint") &&
+        home.includes("t.homePage.alertsEmpty") &&
+        home.includes("t.homePage.alertsEmptyHint"),
     ).toBe(true);
   });
 });

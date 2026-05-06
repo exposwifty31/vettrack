@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EquipmentListSkeleton } from "@/components/skeletons/equipment-list-skeleton";
 import { ErrorCard } from "@/components/ui/error-card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { LoadingSection } from "@/components/ui/loading-section";
 import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import {
   Select,
@@ -163,7 +164,7 @@ function DesktopEquipmentView({
       />
 
       {isLoading ? (
-        <div className="text-[13px] text-ivory-text3 py-8 text-center">טוען...</div>
+        <LoadingSection rows={5} />
       ) : (
         <EquipmentTable rows={rows} />
       )}
