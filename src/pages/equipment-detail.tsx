@@ -377,11 +377,11 @@ export default function EquipmentDetailPage() {
           if (isOffline) {
             toast.warning(t.equipmentDetail.toast.issueReportedOffline);
           } else {
-            const waUrl = buildWhatsAppUrl(undefined, updated.name, capturedStatus, scanLog?.note || "");
+            const waUrl = buildWhatsAppUrl(undefined, updated.name, capturedStatus, scanLog?.note || "", t.whatsAppMessage);
             toast.success(t.equipmentDetail.toast.issueReported, {
               duration: 10000,
               action: isStudentEquipmentRole ? undefined : {
-                label: "שלח WhatsApp",
+                label: t.equipmentDetail.sendWhatsApp,
                 onClick: () => window.open(waUrl, "_blank"),
               },
             });
@@ -559,11 +559,11 @@ export default function EquipmentDetailPage() {
         } else if (isStudentEquipmentRole) {
           toast.success(t.equipmentDetail.toast.issueReported);
         } else {
-          const waUrl = buildWhatsAppUrl(undefined, updated.name, "issue", scanLog?.note || capturedNote || "");
+          const waUrl = buildWhatsAppUrl(undefined, updated.name, "issue", scanLog?.note || capturedNote || "", t.whatsAppMessage);
           toast.success(t.equipmentDetail.toast.issueReported, {
             duration: 10000,
             action: {
-              label: "Send WhatsApp",
+              label: t.equipmentDetail.sendWhatsApp,
               onClick: () => window.open(waUrl, "_blank"),
             },
           });
@@ -675,7 +675,7 @@ export default function EquipmentDetailPage() {
             <Loader2 className={`w-4 h-4 ${isRefetching ? "animate-spin" : ""}`} />
             {isRefetching ? t.equipmentDetail.toast.trying : t.equipmentDetail.toast.tryAgain}
           </Button>
-          <Button variant="ghost" onClick={() => navigate("/equipment")}>Back to List</Button>
+          <Button variant="ghost" onClick={() => navigate("/equipment")}>{t.equipmentDetail.backToList}</Button>
         </div>
       </div>
     );
@@ -686,9 +686,9 @@ export default function EquipmentDetailPage() {
   if (!equipment) {
     const notFoundContent = (
       <div className="text-center py-20">
-        <p className="text-muted-foreground">Equipment not found</p>
+        <p className="text-muted-foreground">{t.equipmentDetail.notFound}</p>
         <Button variant="ghost" onClick={() => navigate("/equipment")} className="mt-2">
-          Back to list
+          {t.equipmentDetail.backToList}
         </Button>
       </div>
     );
@@ -903,7 +903,7 @@ export default function EquipmentDetailPage() {
               <div className="flex flex-col gap-1.5 items-end shrink-0">
                 <Button variant="outline" size="sm" onClick={handlePrintQr} data-testid="btn-print-qr" className="h-11">
                   <QrCode className="w-3.5 h-3.5 mr-1" />
-                  Print QR
+                  {t.equipmentDetail.printQrButton}
                 </Button>
                 {!isStudentEquipmentRole && (
                   <Button
@@ -914,7 +914,8 @@ export default function EquipmentDetailPage() {
                         undefined,
                         equipment.name,
                         equipment.status as EquipmentStatus,
-                        `Status report for ${equipment.name}`
+                        t.whatsAppMessage.statusReport(equipment.name),
+                        t.whatsAppMessage
                       );
                       window.open(waUrl, "_blank");
                     }}
