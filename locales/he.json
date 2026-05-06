@@ -691,7 +691,11 @@
     "getStarted": "התחל",
     "total": "סה״כ",
     "getStartedDescription": "הוסף את פריט הציוד הראשון כדי להתחיל במעקב",
-    "appTourHint": "הדרכה + סרטון"
+    "appTourHint": "הדרכה + סרטון",
+    "activityFeedEmpty": "אין פעילות אחרונה",
+    "activityFeedEmptyHint": "סריקות, שינויי סטטוס ומעברים מופיעים כאן בזמן אמת",
+    "alertsEmpty": "אין התראות מלאי",
+    "alertsEmptyHint": "הגדרות עיקור, תחזוקה ובעיות מופיעות כאן כאשר נדרשת התייחסות"
   },
   "landingPage": {
     "seoTitle": "VetTrack — מעקב אחר ציוד וטרינרי באמצעות QR",

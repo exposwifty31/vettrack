@@ -691,7 +691,11 @@
     "getStarted": "Get started",
     "total": "Total",
     "getStartedDescription": "Add your first equipment item to start tracking",
-    "appTourHint": "Training + video"
+    "appTourHint": "Training + video",
+    "activityFeedEmpty": "No recent activity",
+    "activityFeedEmptyHint": "Scans, status changes, and moves appear here as they happen.",
+    "alertsEmpty": "No inventory alerts",
+    "alertsEmptyHint": "Sterilization, maintenance, and issues appear here when something needs attention."
   },
   "landingPage": {
     "seoTitle": "VetTrack — Veterinary Equipment QR Tracking System",
