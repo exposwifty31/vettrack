@@ -1611,7 +1611,16 @@
     "myTasksLoadFailed": "לא ניתן לטעון משימות מוקצות.",
     "dayViewLoadFailed": "לא ניתן לטעון תצוגת היום.",
     "dayViewEmpty": "אין משימות מתוזמנות",
-    "dayViewEmptyHint": "לחץ על חריץ זמן או השתמש ב-Quick Task ליצירת משימה."
+    "dayViewEmptyHint": "לחץ על חריץ זמן או השתמש במשימה מהירה ליצירת משימה.",
+    "suggestions": "הצעות",
+    "taskControls": "בקרות משימות",
+    "dayLabel": "יום",
+    "technicianFilter": "טכנאי",
+    "allTechnicians": "כל הטכנאים",
+    "hours": "שעות",
+    "interval": "מרווח",
+    "dayView": "תצוגת יום",
+    "scheduleTaskAt": "תזמן משימה בשעה"
   },
   "cop": {
     "discrepancyTitle": "אי-התאמה בתרופות (Smart Cop)",

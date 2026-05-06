@@ -196,6 +196,12 @@ describe("Scheduling / Day View — time slot interactivity", () => {
     expect(appointments).toContain("cursor-not-allowed");
     expect(appointments).toContain("disabled={!available}");
   });
+
+  it("unavailable slots have pointer-events-none to remove touch affordances (Slice 4.2)", () => {
+    // pointer-events-none must appear alongside cursor-not-allowed for the unavailable branch
+    const unavailableIdx = appointments.indexOf("cursor-not-allowed pointer-events-none");
+    expect(unavailableIdx).toBeGreaterThan(-1);
+  });
 });
 
 // ── Locale keys ───────────────────────────────────────────────────────────────
@@ -235,5 +241,82 @@ describe("Locale keys — appointmentsPage additions", () => {
       expect(typeof val).toBe("string");
       expect(val.length).toBeGreaterThan(0);
     }
+  });
+
+  it("Slice 4.2 — locale keys for all 9 RTL-hardening additions exist in both locales", () => {
+    const SLICE_42_KEYS = [
+      "suggestions", "taskControls", "dayLabel", "technicianFilter",
+      "allTechnicians", "hours", "interval", "dayView", "scheduleTaskAt",
+    ];
+    for (const key of SLICE_42_KEYS) {
+      expect(enLocale.appointmentsPage).toHaveProperty(key);
+      expect(heLocale.appointmentsPage).toHaveProperty(key);
+      expect(typeof heLocale.appointmentsPage[key]).toBe("string");
+      expect(heLocale.appointmentsPage[key].length).toBeGreaterThan(0);
+    }
+  });
+
+  it("Slice 4.2 — he.json dayViewEmptyHint no longer contains raw English 'Quick Task'", () => {
+    expect(heLocale.appointmentsPage.dayViewEmptyHint).not.toContain("Quick Task");
+  });
+});
+
+// ── Slice 4.2 — RTL label hardening ──────────────────────────────────────────
+
+describe("Slice 4.2 — English labels replaced with i18n keys", () => {
+  it("Suggestions card title uses t.appointmentsPage.suggestions (not raw 'Suggestions')", () => {
+    expect(appointments).toContain("t.appointmentsPage.suggestions");
+    // raw literal must not appear as JSX text
+    expect(appointments).not.toContain(">Suggestions<");
+  });
+
+  it("Task Controls card title uses t.appointmentsPage.taskControls (not raw 'Task Controls')", () => {
+    expect(appointments).toContain("t.appointmentsPage.taskControls");
+    expect(appointments).not.toContain("Task Controls");
+  });
+
+  it("Day label uses t.appointmentsPage.dayLabel (not raw 'Day')", () => {
+    expect(appointments).toContain("t.appointmentsPage.dayLabel");
+    // Should not appear as a standalone JSX label text
+    expect(appointments).not.toMatch(/>Day<\/label>/);
+  });
+
+  it("All technicians option uses t.appointmentsPage.allTechnicians", () => {
+    expect(appointments).toContain("t.appointmentsPage.allTechnicians");
+    expect(appointments).not.toContain('"All technicians"');
+  });
+
+  it("Hours label uses t.appointmentsPage.hours", () => {
+    expect(appointments).toContain("t.appointmentsPage.hours");
+    expect(appointments).not.toMatch(/>Hours<\/label>/);
+  });
+
+  it("Interval label uses t.appointmentsPage.interval", () => {
+    expect(appointments).toContain("t.appointmentsPage.interval");
+    expect(appointments).not.toMatch(/>Interval<\/label>/);
+  });
+
+  it("Day View card title uses t.appointmentsPage.dayView", () => {
+    expect(appointments).toContain("t.appointmentsPage.dayView");
+    expect(appointments).not.toContain("Day View");
+  });
+});
+
+describe("Slice 4.2 — Mobile RTL overflow fix", () => {
+  it("Task Controls no longer uses overflow-prone md:grid-cols-5", () => {
+    // Fixed layout: flex-wrap instead of fixed 5-column grid at md breakpoint
+    expect(appointments).not.toContain("md:grid-cols-5");
+  });
+
+  it("Task Controls CardContent uses flex-wrap for safe mobile wrapping", () => {
+    expect(appointments).toContain("flex flex-wrap gap-3 items-end");
+  });
+
+  it("Date input wrapper uses min-w-40 to allow flex wrapping", () => {
+    expect(appointments).toContain("flex-1 min-w-40");
+  });
+
+  it("Date input has max-w-full to prevent overflow past card boundary", () => {
+    expect(appointments).toContain("max-w-full");
   });
 });

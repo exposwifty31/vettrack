@@ -1611,7 +1611,16 @@
     "myTasksLoadFailed": "Could not load assigned tasks.",
     "dayViewLoadFailed": "Could not load the day view.",
     "dayViewEmpty": "No scheduled tasks",
-    "dayViewEmptyHint": "Tap a time slot or use Quick Task to schedule one."
+    "dayViewEmptyHint": "Tap a time slot or use Quick Task to schedule one.",
+    "suggestions": "Suggestions",
+    "taskControls": "Task Controls",
+    "dayLabel": "Day",
+    "technicianFilter": "Technician",
+    "allTechnicians": "All technicians",
+    "hours": "Hours",
+    "interval": "Interval",
+    "dayView": "Day View",
+    "scheduleTaskAt": "Schedule task at"
   },
   "cop": {
     "discrepancyTitle": "Medication discrepancy (Smart Cop)",
