@@ -22,7 +22,6 @@
     "openNavigationMenu": "Open navigation menu",
     "quickSettings": "Quick settings"
   },
-
   "status": {
     "ok": "OK",
     "issue": "Issue",
@@ -30,7 +29,6 @@
     "sterilized": "Sterilized",
     "all": "All statuses"
   },
-
   "layout": {
     "nav": {
       "alerts": "Alerts",
@@ -58,7 +56,6 @@
       "pendingMessage": "{count} actions saved locally and waiting for server. Tap to sync now, or they will sync automatically when connected."
     }
   },
-
   "equipmentList": {
     "search": {
       "placeholder": "Search by name, serial number, model..."
@@ -96,7 +93,6 @@
     },
     "linkedInUse": "In use for: {name}"
   },
-
   "shiftHandoverPage": {
     "title": "Shift handover",
     "subtitle": "Financial and operational summary for the current period",
@@ -123,7 +119,6 @@
     "dischargeEmpty": "No open usage sessions",
     "dischargeClose": "Close"
   },
-
   "inventoryPage": {
     "title": "Inventory & consumables",
     "targetHeading": "Stock target",
@@ -147,7 +142,6 @@
     "decreaseAdded": "Decrease added quantity",
     "increaseAdded": "Increase added quantity"
   },
-
   "equipmentDetail": {
     "serialNumber": "Serial number",
     "model": "Model",
@@ -188,9 +182,12 @@
       "issueReported": "Issue reported",
       "issueWhatsAppOffline": "WhatsApp message will be sent when connected.",
       "reportFailedDefault": "Report failed"
-    }
+    },
+    "backToList": "Back to list",
+    "notFound": "Equipment not found",
+    "sendWhatsApp": "Send WhatsApp",
+    "printQrButton": "Print QR"
   },
-
   "newEquipment": {
     "heading": {
       "edit": "Edit equipment",
@@ -202,11 +199,22 @@
         "placeholder": "e.g. Autoclave Unit A",
         "error": "Name is required"
       },
-      "serialNumber": { "placeholder": "SN-12345" },
-      "model": { "placeholder": "Model name" },
-      "manufacturer": { "placeholder": "Manufacturer" },
-      "folder": { "placeholder": "Unfiled", "none": "Unfiled" },
-      "location": { "placeholder": "e.g. Surgery Room 1" },
+      "serialNumber": {
+        "placeholder": "SN-12345"
+      },
+      "model": {
+        "placeholder": "Model name"
+      },
+      "manufacturer": {
+        "placeholder": "Manufacturer"
+      },
+      "folder": {
+        "placeholder": "Unfiled",
+        "none": "Unfiled"
+      },
+      "location": {
+        "placeholder": "e.g. Surgery Room 1"
+      },
       "expectedReturnMinutes": {
         "label": "Expected return time (minutes)",
         "placeholder": "e.g. 45",
@@ -223,7 +231,6 @@
       "timeout": "Request timed out. Please check your connection and try again."
     }
   },
-
   "myEquipment": {
     "toast": {
       "returnSuccess": "Equipment available",
@@ -243,13 +250,24 @@
       "returnAll": "Return all"
     }
   },
-
   "alerts": {
     "types": {
-      "issue": { "label": "Active issue", "badgeLabel": "Critical" },
-      "overdue": { "label": "Overdue", "badgeLabel": "High" },
-      "sterilization_due": { "label": "Sterilization needed", "badgeLabel": "Medium" },
-      "inactive": { "label": "Inactive", "badgeLabel": "Low" }
+      "issue": {
+        "label": "Active issue",
+        "badgeLabel": "Critical"
+      },
+      "overdue": {
+        "label": "Overdue",
+        "badgeLabel": "High"
+      },
+      "sterilization_due": {
+        "label": "Sterilization needed",
+        "badgeLabel": "Medium"
+      },
+      "inactive": {
+        "label": "Inactive",
+        "badgeLabel": "Low"
+      }
     },
     "itemCount": "{count} {count, plural, one{item} other{items}}",
     "timeAgo": {
@@ -268,7 +286,6 @@
       "loadFailed": "Failed to load alerts. Try again."
     }
   },
-
   "shiftSummary": {
     "sections": {
       "checkedOut": "Currently in use:",
@@ -293,7 +310,6 @@
       "exportExcel": "Export to Excel"
     }
   },
-
   "auth": {
     "signIn": {
       "meta": {
@@ -328,7 +344,6 @@
       }
     }
   },
-
   "home": {
     "equipmentOverview": "Equipment overview",
     "shiftSummary": "Shift summary",
@@ -336,7 +351,6 @@
     "addEquipment": "Add equipment",
     "browseEquipment": "Browse equipment"
   },
-
   "equipment": {
     "title": "Equipment",
     "scanQr": "Scan QR",
@@ -345,7 +359,6 @@
     "importCsv": "Import CSV",
     "select": "Select"
   },
-
   "app": {
     "pendingApprovalTitle": "Account pending hospital management approval",
     "blockedAccessTitle": "Access blocked",
@@ -353,13 +366,11 @@
     "signOut": "Sign out",
     "loadingSystem": "Loading system..."
   },
-
   "api": {
     "sessionExpired": "Your session has expired. Please sign in again.",
     "serverError": "The server encountered an error. Please try again or refresh the page.",
     "networkUnavailable": "Cannot reach the server. You may be offline or the server is down."
   },
-
   "dispense": {
     "errors": {
       "ORPHAN_DISPENSE_BLOCKED": "No matching medication order found. Is this an emergency?",
@@ -380,13 +391,11 @@
       }
     }
   },
-
   "syncEngine": {
     "pausedTooManyErrors": "Sync paused — too many errors",
     "resumedTryingPending": "Sync resumed — retrying pending changes",
     "sessionExpiredSignInAgain": "Your session expired — please sign in again"
   },
-
   "errorCard": {
     "defaultMessage": "Failed to load data. Try again.",
     "persistentFailure": "Still failing. Check your connection or refresh the page.",
@@ -396,11 +405,9 @@
     "retrying": "Retrying...",
     "retry": "Retry"
   },
-
   "swUpdate": {
     "updateAvailable": "Update available — tap to refresh"
   },
-
   "reportIssueDialog": {
     "title": "Report an issue",
     "issueTitle": "Title",
@@ -440,7 +447,6 @@
       }
     }
   },
-
   "qrScanner": {
     "unknownQrFormat": "Unknown QR code format",
     "torchUnavailable": "Torch not available on this device",
@@ -455,7 +461,6 @@
     "search": "Search",
     "backToCamera": "Back to camera"
   },
-
   "onboarding": {
     "step1": {
       "tag": "Step 1 of 3",
@@ -490,14 +495,12 @@
     "gotIt": "Got it!",
     "next": "Next"
   },
-
   "moveRoomSheet": {
     "movedTo": "Moved to {roomName}",
     "movedToDefaultRoom": "Moved to room",
     "removedFromRoom": "Removed from room",
     "moveFailed": "Move failed"
   },
-
   "moveRoom": {
     "toast": {
       "movedTo": "Moved to {roomName}",
@@ -506,7 +509,6 @@
       "moveFailed": "Move failed"
     }
   },
-
   "syncQueueSheet": {
     "typeScan": "Scan",
     "typeSeen": "Patient link",
@@ -525,7 +527,6 @@
     "syncingNow": "Syncing...",
     "syncNow": "Sync now"
   },
-
   "settingsPage": {
     "title": "Settings",
     "subtitle": "Customize your VetTrack experience",
@@ -580,7 +581,6 @@
     "about": "About",
     "logout": "Sign out"
   },
-
   "adminShiftsPage": {
     "title": "Shift management",
     "subtitle": "Import shifts from EZShift and view import history",
@@ -614,7 +614,6 @@
     "employeeName": "Employee name",
     "role": "Role"
   },
-
   "alertsPage": {
     "oneMinuteAgo": "1 minute ago",
     "minutesAgo": "{minutes} minutes ago",
@@ -631,7 +630,6 @@
     "removeAckAria": "Remove acknowledgment status",
     "takeOwnership": "I'm handling this"
   },
-
   "analyticsPage": {
     "title": "Analytics",
     "maintenance": "Maintenance",
@@ -650,7 +648,6 @@
     "maintenanceLabel": "Maintenance",
     "itemsLabel": "items"
   },
-
   "outcomeKpiDashboard": {
     "title": "Outcome KPI & ROI",
     "metaDescription": "Hospital leadership view: time to triage, handoff integrity, and revenue recovery vs the 14-day pre-activation baseline.",
@@ -677,17 +674,14 @@
     "kpiRevenueRecoveryDesc": "Capture score: 100 minus consumable billing leakage (dispensed vs billed quantities). Higher means fewer missed charges.",
     "methodologyNote": "Deltas are oriented so positive percentages indicate improvement (faster triage, higher integrity, stronger revenue capture)."
   },
-
   "myEquipmentPage": {
     "scanQr": "Scan QR",
     "shiftSummary": "Shift summary",
     "browseEquipment": "Browse equipment"
   },
-
   "notFoundPage": {
     "title": "Page not found — VetTrack"
   },
-
   "homePage": {
     "greeting": "Hello, {name}",
     "fallbackName": "there",
@@ -699,7 +693,6 @@
     "getStartedDescription": "Add your first equipment item to start tracking",
     "appTourHint": "Training + video"
   },
-
   "landingPage": {
     "seoTitle": "VetTrack — Veterinary Equipment QR Tracking System",
     "seoDescription": "VetTrack — veterinary equipment QR tracking for vet hospitals and ER clinics. Real-time status, offline sync, alerts, and shift handoffs from any phone.",
@@ -787,7 +780,6 @@
     "footerEquipment": "Equipment",
     "footerNavAria": "Footer links"
   },
-
   "helpPage": {
     "dailyTasks": "Daily tasks",
     "equipmentStatus": "Equipment status",
@@ -831,7 +823,6 @@
     "pushAlertsTitle": "Push alerts",
     "pushAlertsDescription": "Enable push notifications in Settings -> Push Notifications to receive real-time alerts even when the app is in the background."
   },
-
   "roomRadarPage": {
     "roomVacant": "Room available",
     "patientActive": "Active patient",
@@ -850,7 +841,6 @@
     "allCheckedOutSubMessage": "All items in this room are currently checked out.",
     "verifyAllInRoom": "Verify all in {roomName}"
   },
-
   "roomsListPage": {
     "createRoomFailed": "Failed to create room",
     "title": "Asset radar",
@@ -861,7 +851,6 @@
     "roomFloorOptional": "Floor / area (optional)",
     "createRoom": "Create room"
   },
-
   "managementDashboardPage": {
     "title": "Dashboard",
     "refresh": "Refresh",
@@ -888,7 +877,6 @@
     "syncSuccess": "Sync successes",
     "syncFailures": "Sync failures"
   },
-
   "qrPrintPage": {
     "title": "Print QR",
     "selectHint": "Select equipment to print. You can print multiple QR codes together.",
@@ -899,7 +887,6 @@
     "trying": "Trying...",
     "retry": "Retry"
   },
-
   "stabilityPage": {
     "allChecksHealthy": "All checks healthy",
     "disabled": "Disabled",
@@ -922,7 +909,6 @@
     "internalLog": "Internal operations log",
     "noResultsHint": "No test results yet. Click 'Run all tests' to start."
   },
-
   "shiftSummaryPage": {
     "summaryTitle": "Shift summary",
     "loadFailed": "Failed to load shift data.",
@@ -944,7 +930,6 @@
     "checkedOutLineNoLoc": "• {name} since {since}",
     "todayUsageHeader": "Checkouts today ({count}):"
   },
-
   "adminPage": {
     "tabFolders": "Folders",
     "tabPending": "Pending",
@@ -1061,7 +1046,6 @@
     "formularyDeleteTitle": "Delete \"{name}\"?",
     "formularyDeleteBody": "This will remove the drug from your clinic's formulary. You can always re-add it later."
   },
-
   "layoutHebrew": {
     "home": "Home",
     "bottomHome": "Home",
@@ -1105,9 +1089,15 @@
     "quickSettings": "Quick settings",
     "allSettings": "All settings",
     "reportIssue": "Report issue",
-    "scanQrAria": "Scan QR code"
+    "scanQrAria": "Scan QR code",
+    "codeBlue": "Code Blue",
+    "crashCart": "Crash Cart",
+    "codeBlueHistory": "Code Blue History",
+    "tasks": "Tasks",
+    "activePatients": "Active Patients",
+    "wardDisplay": "Ward Display",
+    "medicationHub": "Medication Hub"
   },
-
   "conflictModal": {
     "title": "Sync Conflicts",
     "description": "These items were changed on another device while you were offline.",
@@ -1116,18 +1106,15 @@
     "keepMine": "Keep Mine",
     "useServerVersion": "Use Server Version"
   },
-
   "updateBanner": {
     "newVersion": "VetTrack v{version} is here — ",
     "seeWhatsNew": "see what's new",
     "dismissAria": "Dismiss update notification"
   },
-
   "pageErrorBoundary": {
     "defaultFallback": "This section failed to load",
     "tryAgain": "Try again"
   },
-
   "patientDetail": {
     "pageTitle": "Patient",
     "operatingCenter": "Operating center",
@@ -1180,7 +1167,6 @@
     "actionHandoverHint": "Discharge checklist",
     "loadError": "Could not load patient context"
   },
-
   "billingLedger": {
     "title": "Billing Dashboard",
     "addCharge": "Add charge",
@@ -1232,7 +1218,6 @@
     "saving": "Saving...",
     "cancel": "Cancel"
   },
-
   "inventoryItemsPage": {
     "title": "Inventory items",
     "newItem": "New item",
@@ -1268,7 +1253,6 @@
     "saving": "Saving...",
     "cancel": "Cancel"
   },
-
   "procurementPage": {
     "title": "Procurement",
     "newPo": "New order",
@@ -1315,7 +1299,6 @@
     "saving": "Saving...",
     "cancel": "Cancel"
   },
-
   "medsPage": {
     "title": "Medication Hub",
     "prescribeDesc": "Prescribe medication tasks for your technicians.",
@@ -1343,7 +1326,6 @@
     "startDisabledNoTech": "Task has no assigned technician.",
     "startDisabledOtherTech": "This task is assigned to another technician."
   },
-
   "pharmacyForecast": {
     "navLabel": "Pharmacy forecast",
     "title": "ICU pharmacy forecast",
@@ -1423,7 +1405,6 @@
       "noText": "Paste text to parse"
     }
   },
-
   "erImpact": {
     "title": "ER outcome KPIs",
     "subtitle": "Current reporting window compared to the latest pre-go-live baseline snapshot.",
@@ -1448,7 +1429,6 @@
       "high": "High confidence"
     }
   },
-
   "er": {
     "inAdmission": "In Admission",
     "admissionComplete": "✓ Admission Complete",
@@ -1474,7 +1454,6 @@
     "ownerLinked": "Owner name saved",
     "enrichFailed": "Could not save owner"
   },
-
   "erCommandCenter": {
     "title": "ER Command Center",
     "lanes": {
@@ -1596,7 +1575,6 @@
       "unitTemp": "°C"
     }
   },
-
   "erOperationalControl": {
     "sectionTitle": "Operational control",
     "currentMode": "Clinic ER mode",
@@ -1614,7 +1592,6 @@
     "toggleFailed": "Could not update ER mode",
     "ariaOperationalToggle": "Global ER mode control"
   },
-
   "appointmentsPage": {
     "administerMedication": "Administer Medication",
     "startNow": "Start now",
@@ -1625,7 +1602,6 @@
     "createTask": "Create task",
     "quickTask": "Quick task"
   },
-
   "cop": {
     "discrepancyTitle": "Medication discrepancy (Smart Cop)",
     "discrepancySubtitle": "Possible orphan drug use — patient charge does not match an active order or inpatient stay.",
@@ -1646,7 +1622,6 @@
     "reason_NO_ACTIVE_ORDER": "No matching active medication order for this cabinet line",
     "reason_QUANTITY_EXCEEDS_ORDER": "Quantity exceeds ordered amount"
   },
-
   "adminMedicationIntegrity": {
     "title": "Medication integrity",
     "accessDenied": "Administrator access required.",
@@ -1659,7 +1634,6 @@
     "colFlags": "Flags",
     "flagNoHosp": "No active hospitalization"
   },
-
   "adminOpsDashboard": {
     "title": "Operations dashboard",
     "subtitle": "Realtime and event pipeline health for this clinic.",
@@ -1682,7 +1656,6 @@
     "maxRetryHorizonHint": "Furthest backoff among pending retries.",
     "maxRetryHorizonEmpty": "—"
   },
-
   "errors": {
     "server": {
       "internalError": "Internal server error",
@@ -1702,7 +1675,6 @@
       "body": "{name} — expires {date}"
     }
   },
-
   "shiftChat": {
     "errors": {
       "noOpenShift": "No active shift. Start a shift before sending messages.",
@@ -1712,7 +1684,6 @@
       "pinFailed": "Failed to pin message."
     }
   },
-
   "auditLog": {
     "actions": {
       "user_login": "User Login",
@@ -1748,5 +1719,14 @@
       "audit_log.search": "Audit Log Search",
       "report.viewed": "Report Viewed"
     }
+  },
+  "whatsAppMessage": {
+    "alertTitle": "🚨 VetTrack Alert",
+    "equipmentLabel": "Equipment",
+    "statusLabel": "Status",
+    "timeLabel": "Time",
+    "noteLabel": "Note",
+    "actionRequired": "Please address this issue immediately.",
+    "statusReport": "Status report for {name}"
   }
 }

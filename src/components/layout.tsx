@@ -438,14 +438,14 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     ...(canAccessCodeBlue
       ? [{
           href: "/code-blue",
-          label: "Code Blue",
+          label: lh.codeBlue,
           icon: <Siren className="w-5 h-5 text-red-500" />,
         } satisfies NavItem]
       : []),
     ...(canAccessCodeBlue
       ? [{
           href: "/crash-cart",
-          label: "עגלת החייאה",
+          label: lh.crashCart,
           icon: <CheckCircle2 className="w-5 h-5" />,
         } satisfies NavItem]
       : []),
@@ -455,10 +455,10 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
       icon: <PackageOpen className="w-5 h-5" />,
       badgeCount: myCount,
     },
-    { href: "/appointments", label: "Tasks", icon: <CalendarDays className="w-5 h-5" />, menuOnly: true },
-    { href: "/patients", label: "Active Patients", icon: <Stethoscope className="w-5 h-5" />, menuOnly: true },
-    { href: "/display", label: "Ward Display", icon: <Monitor className="w-5 h-5" />, menuOnly: true },
-    { href: "/meds", label: "Medication Hub", icon: <Pill className="w-5 h-5" />, menuOnly: true },
+    { href: "/appointments", label: lh.tasks, icon: <CalendarDays className="w-5 h-5" />, menuOnly: true },
+    { href: "/patients", label: lh.activePatients, icon: <Stethoscope className="w-5 h-5" />, menuOnly: true },
+    { href: "/display", label: lh.wardDisplay, icon: <Monitor className="w-5 h-5" />, menuOnly: true },
+    { href: "/meds", label: lh.medicationHub, icon: <Pill className="w-5 h-5" />, menuOnly: true },
     ...(canAccessPharmacyForecastNav
       ? [{
           href: "/pharmacy-forecast",
@@ -512,7 +512,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
       adminOnly: true,
       menuOnly: true,
     },
-    { href: "/admin/code-blue-history", label: "היסטוריית CODE BLUE", icon: <Clock className="w-5 h-5" />, adminOnly: true, menuOnly: true },
+    { href: "/admin/code-blue-history", label: lh.codeBlueHistory, icon: <Clock className="w-5 h-5" />, adminOnly: true, menuOnly: true },
     { href: "/settings", label: lh.settings, icon: <Settings className="w-5 h-5" />, menuOnly: true },
     ];
   }, [

@@ -135,6 +135,10 @@ const translations = {
     updateStatusTitle: d.equipmentDetail.updateStatusTitle,
     statusLabel: d.equipmentDetail.statusLabel,
     reportIssueTitle: d.equipmentDetail.reportIssueTitle,
+    backToList: d.equipmentDetail.backToList,
+    notFound: d.equipmentDetail.notFound,
+    sendWhatsApp: d.equipmentDetail.sendWhatsApp,
+    printQrButton: d.equipmentDetail.printQrButton,
     toast: {
       undone: d.equipmentDetail.toast.undone,
       undoFailed: d.equipmentDetail.toast.undoFailed,
@@ -560,6 +564,16 @@ const translations = {
       const map = d.auditLog.actions as Record<string, string>;
       return map[actionType] ?? actionType;
     },
+  },
+
+  whatsAppMessage: {
+    alertTitle: d.whatsAppMessage.alertTitle,
+    equipmentLabel: d.whatsAppMessage.equipmentLabel,
+    statusLabel: d.whatsAppMessage.statusLabel,
+    timeLabel: d.whatsAppMessage.timeLabel,
+    noteLabel: d.whatsAppMessage.noteLabel,
+    actionRequired: d.whatsAppMessage.actionRequired,
+    statusReport: (name: string) => tr(d.whatsAppMessage.statusReport, { name }),
   },
 
 } as const;

@@ -156,18 +156,37 @@ export function normalizePhoneNumber(phone: string): string {
   return normalizePhoneE164(phone).replace(/^\+/, "");
 }
 
+export type WhatsAppMessageLabels = {
+  alertTitle: string;
+  equipmentLabel: string;
+  statusLabel: string;
+  timeLabel: string;
+  noteLabel: string;
+  actionRequired: string;
+};
+
+const DEFAULT_WA_LABELS: WhatsAppMessageLabels = {
+  alertTitle: "🚨 VetTrack Alert",
+  equipmentLabel: "Equipment",
+  statusLabel: "Status",
+  timeLabel: "Time",
+  noteLabel: "Note",
+  actionRequired: "Please address this issue immediately.",
+};
+
 export function buildWhatsAppUrl(
   phone: string | undefined,
   equipmentName: string,
   status: EquipmentStatus | string,
-  note?: string
+  note?: string,
+  labels: WhatsAppMessageLabels = DEFAULT_WA_LABELS
 ): string {
-  const timestamp = format(new Date(), "MMM d, yyyy 'at' h:mm a");
-  let message = `🚨 VetTrack Alert\n\nEquipment: *${equipmentName}*\nStatus: *${String(status).toUpperCase()}*\nTime: ${timestamp}`;
+  const timestamp = format(new Date(), "dd/MM/yyyy HH:mm");
+  let message = `${labels.alertTitle}\n\n${labels.equipmentLabel}: *${equipmentName}*\n${labels.statusLabel}: *${String(status).toUpperCase()}*\n${labels.timeLabel}: ${timestamp}`;
   if (note) {
-    message += `\nNote: ${note}`;
+    message += `\n${labels.noteLabel}: ${note}`;
   }
-  message += `\n\nPlease address this issue immediately.`;
+  message += `\n\n${labels.actionRequired}`;
   const encoded = encodeURIComponent(message);
   return phone
     ? `https://wa.me/${normalizePhoneNumber(phone)}?text=${encoded}`

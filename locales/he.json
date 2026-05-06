@@ -22,7 +22,6 @@
     "openNavigationMenu": "פתח תפריט ניווט",
     "quickSettings": "הגדרות מהירות"
   },
-
   "status": {
     "ok": "תקין",
     "issue": "תקלה",
@@ -30,7 +29,6 @@
     "sterilized": "עבר חיטוי",
     "all": "כל הסטטוסים"
   },
-
   "layout": {
     "nav": {
       "alerts": "התראות",
@@ -58,7 +56,6 @@
       "pendingMessage": "{count} פעולות נשמרו מקומית וממתינות לשרת. לחץ לסנכרון עכשיו, או שהן יסונכרנו אוטומטית כשתתחבר."
     }
   },
-
   "equipmentList": {
     "search": {
       "placeholder": "חיפוש לפי שם, מספר סידורי, דגם..."
@@ -96,7 +93,6 @@
     },
     "linkedInUse": "בשימוש אצל: {name}"
   },
-
   "shiftHandoverPage": {
     "title": "מסירת משמרת",
     "subtitle": "סיכום כספי ותפעולי לתקופה הנוכחית",
@@ -123,7 +119,6 @@
     "dischargeEmpty": "אין מחזורי שימוש פתוחים",
     "dischargeClose": "סגור"
   },
-
   "inventoryPage": {
     "title": "מלאי ומתכלים",
     "targetHeading": "יעד מלאי",
@@ -147,7 +142,6 @@
     "decreaseAdded": "הפחת כמות שנוספה",
     "increaseAdded": "הוסף כמות"
   },
-
   "equipmentDetail": {
     "serialNumber": "מספר סידורי",
     "model": "דגם",
@@ -186,12 +180,14 @@
       "deleteFailed": "המחיקה נכשלה",
       "issueReported": "תקלה דווחה",
       "issueWhatsAppOffline": "הודעת WhatsApp תישלח כשתתחבר.",
-      "reportFailedDefault": "הדיווח נכשל"
-      ,
+      "reportFailedDefault": "הדיווח נכשל",
       "chargeAlertScheduled": "התראה תישלח לאחר {minutes} דקות אם לא יחובר"
-    }
+    },
+    "backToList": "חזרה לרשימה",
+    "notFound": "הציוד לא נמצא",
+    "sendWhatsApp": "שלח WhatsApp",
+    "printQrButton": "הדפס QR"
   },
-
   "newEquipment": {
     "heading": {
       "edit": "עריכת ציוד",
@@ -203,11 +199,22 @@
         "placeholder": "לדוגמה: אוטוקלב יחידה א׳",
         "error": "שם הוא שדה חובה"
       },
-      "serialNumber": { "placeholder": "SN-12345" },
-      "model": { "placeholder": "שם דגם" },
-      "manufacturer": { "placeholder": "יצרן" },
-      "folder": { "placeholder": "ללא תיקייה", "none": "ללא תיקייה" },
-      "location": { "placeholder": "לדוגמה: חדר ניתוח 1" },
+      "serialNumber": {
+        "placeholder": "SN-12345"
+      },
+      "model": {
+        "placeholder": "שם דגם"
+      },
+      "manufacturer": {
+        "placeholder": "יצרן"
+      },
+      "folder": {
+        "placeholder": "ללא תיקייה",
+        "none": "ללא תיקייה"
+      },
+      "location": {
+        "placeholder": "לדוגמה: חדר ניתוח 1"
+      },
       "expectedReturnMinutes": {
         "label": "זמן שימוש צפוי (דקות)",
         "placeholder": "לדוגמה: 45",
@@ -224,7 +231,6 @@
       "timeout": "תוקף הבקשה פג. אנא בדוק את החיבור ונסה שוב."
     }
   },
-
   "myEquipment": {
     "toast": {
       "returnSuccess": "הציוד זמין",
@@ -244,13 +250,24 @@
       "returnAll": "החזר הכל"
     }
   },
-
   "alerts": {
     "types": {
-      "issue": { "label": "תקלה פעילה", "badgeLabel": "קריטי" },
-      "overdue": { "label": "באיחור", "badgeLabel": "גבוה" },
-      "sterilization_due": { "label": "נדרש חיטוי", "badgeLabel": "בינוני" },
-      "inactive": { "label": "לא פעיל", "badgeLabel": "נמוך" }
+      "issue": {
+        "label": "תקלה פעילה",
+        "badgeLabel": "קריטי"
+      },
+      "overdue": {
+        "label": "באיחור",
+        "badgeLabel": "גבוה"
+      },
+      "sterilization_due": {
+        "label": "נדרש חיטוי",
+        "badgeLabel": "בינוני"
+      },
+      "inactive": {
+        "label": "לא פעיל",
+        "badgeLabel": "נמוך"
+      }
     },
     "itemCount": "{count} {count, plural, one{פריט} other{פריטים}}",
     "timeAgo": {
@@ -269,7 +286,6 @@
       "loadFailed": "טעינת ההתראות נכשלה. נסה שוב."
     }
   },
-
   "shiftSummary": {
     "sections": {
       "checkedOut": "בשימוש כרגע:",
@@ -294,7 +310,6 @@
       "exportExcel": "ייצא לאקסל"
     }
   },
-
   "auth": {
     "signIn": {
       "meta": {
@@ -329,7 +344,6 @@
       }
     }
   },
-
   "home": {
     "equipmentOverview": "סקירת ציוד",
     "shiftSummary": "סיכום משמרת",
@@ -337,7 +351,6 @@
     "addEquipment": "הוסף ציוד",
     "browseEquipment": "עיין בציוד"
   },
-
   "equipment": {
     "title": "ציוד",
     "scanQr": "סרוק QR",
@@ -346,7 +359,6 @@
     "importCsv": "ייבוא CSV",
     "select": "בחירה"
   },
-
   "app": {
     "pendingApprovalTitle": "החשבון ממתין לאישור הנהלת ביה״ח",
     "blockedAccessTitle": "גישה חסומה",
@@ -354,13 +366,11 @@
     "signOut": "התנתק",
     "loadingSystem": "המערכת בטעינה..."
   },
-
   "api": {
     "sessionExpired": "הפעלתך פגה. נא להתחבר מחדש.",
     "serverError": "השרת נתקל בשגיאה. נא לנסות שוב או לרענן את העמוד.",
     "networkUnavailable": "לא ניתן לגשת לשרת. ייתכן שאתה לא מחובר או שהשרת נפל."
   },
-
   "dispense": {
     "errors": {
       "ORPHAN_DISPENSE_BLOCKED": "לא נמצאה פקודה רפואית תואמת. האם מדובר במקרה חירום?",
@@ -381,13 +391,11 @@
       }
     }
   },
-
   "syncEngine": {
     "pausedTooManyErrors": "הסנכרון הושהה — יותר מדי שגיאות",
     "resumedTryingPending": "הסנכרון חודש — מנסה שוב שינויים ממתינים",
     "sessionExpiredSignInAgain": "הפעלתך פגה — נא להתחבר מחדש"
   },
-
   "errorCard": {
     "defaultMessage": "טעינת הנתונים נכשלה. נסה שוב.",
     "persistentFailure": "עדיין יש תקלה. בדוק את החיבור או רענן את העמוד.",
@@ -397,11 +405,9 @@
     "retrying": "מנסה...",
     "retry": "נסה שוב"
   },
-
   "swUpdate": {
     "updateAvailable": "עדכון זמין – לחץ לרענון"
   },
-
   "reportIssueDialog": {
     "title": "דיווח על תקלה",
     "issueTitle": "כותרת",
@@ -441,7 +447,6 @@
       }
     }
   },
-
   "qrScanner": {
     "unknownQrFormat": "תבנית קוד QR לא מוכרת",
     "torchUnavailable": "פנס לא זמין במכשיר זה",
@@ -456,7 +461,6 @@
     "search": "חפש",
     "backToCamera": "חזור למצלמה"
   },
-
   "onboarding": {
     "step1": {
       "tag": "שלב 1 מתוך 3",
@@ -491,14 +495,12 @@
     "gotIt": "הבנתי!",
     "next": "הבא"
   },
-
   "moveRoomSheet": {
     "movedTo": "הועבר אל {roomName}",
     "movedToDefaultRoom": "הועבר אל חדר",
     "removedFromRoom": "הוסר מהחדר",
     "moveFailed": "ההעברה נכשלה"
   },
-
   "moveRoom": {
     "toast": {
       "movedTo": "הועבר אל {roomName}",
@@ -507,7 +509,6 @@
       "moveFailed": "ההעברה נכשלה"
     }
   },
-
   "syncQueueSheet": {
     "typeScan": "סריקה",
     "typeSeen": "זיהוי מטופל",
@@ -526,7 +527,6 @@
     "syncingNow": "מסנכרן...",
     "syncNow": "סנכרן עכשיו"
   },
-
   "settingsPage": {
     "title": "הגדרות",
     "subtitle": "התאם אישית את חווית השימוש ב-VetTrack",
@@ -581,7 +581,6 @@
     "about": "אודות",
     "logout": "התנתק"
   },
-
   "adminShiftsPage": {
     "title": "ניהול משמרות",
     "subtitle": "ייבוא משמרות מ-EZShift ותצוגת היסטוריית יבוא",
@@ -615,7 +614,6 @@
     "employeeName": "שם עובד",
     "role": "תפקיד"
   },
-
   "alertsPage": {
     "oneMinuteAgo": "לפני דקה",
     "minutesAgo": "לפני {minutes} דקות",
@@ -632,7 +630,6 @@
     "removeAckAria": "הסר סטטוס טיפול",
     "takeOwnership": "אני מטפל/ת בזה"
   },
-
   "analyticsPage": {
     "title": "ניתוח נתונים",
     "maintenance": "תחזוקה",
@@ -651,7 +648,6 @@
     "maintenanceLabel": "תחזוקה",
     "itemsLabel": "פריטים"
   },
-
   "outcomeKpiDashboard": {
     "title": "מדדי תוצאה ו־ROI",
     "metaDescription": "מבט הנהלה: זמן עד טריאז', שלמות מסירה, ושחזור הכנסות מול 14 הימים שלפני ההפעלה.",
@@ -678,17 +674,14 @@
     "kpiRevenueRecoveryDesc": "ציון לכידה: 100 פחות דליפת חיוב לצרכים (מול ביצע). ערך גבוה = פחות חיובים שחמקו.",
     "methodologyNote": "ההפרשים מכוונים כך שאחוז חיובי = שיפור (טריאז' מהיר יותר, שלמות גבוהה יותר, לכידה כספית חזקה יותר)."
   },
-
   "myEquipmentPage": {
     "scanQr": "סרוק QR",
     "shiftSummary": "סיכום משמרת",
     "browseEquipment": "דפדף בציוד"
   },
-
   "notFoundPage": {
     "title": "העמוד לא נמצא — VetTrack"
   },
-
   "homePage": {
     "greeting": "שלום, {name}",
     "fallbackName": "שם",
@@ -700,7 +693,6 @@
     "getStartedDescription": "הוסף את פריט הציוד הראשון כדי להתחיל במעקב",
     "appTourHint": "הדרכה + סרטון"
   },
-
   "landingPage": {
     "seoTitle": "VetTrack — מעקב אחר ציוד וטרינרי באמצעות QR",
     "seoDescription": "VetTrack — מעקב ציוד וטרינרי לבתי חולים וטרינריים ולחדרי מיון. סטטוס בזמן אמת, סנכרון אופליין, התראות ומסירת משמרות מהטלפון.",
@@ -788,7 +780,6 @@
     "footerEquipment": "ציוד",
     "footerNavAria": "קישורי כותרת תחתונה"
   },
-
   "helpPage": {
     "dailyTasks": "משימות יומיות",
     "equipmentStatus": "סטטוס ציוד",
@@ -832,7 +823,6 @@
     "pushAlertsTitle": "התראות Push",
     "pushAlertsDescription": "אפשר התראות Push בהגדרות → התראות Push לקבלת התראות בזמן אמת גם כשהאפליקציה ברקע."
   },
-
   "roomRadarPage": {
     "roomVacant": "חדר פנוי",
     "patientActive": "מטופל פעיל",
@@ -851,7 +841,6 @@
     "allCheckedOutSubMessage": "כל הפריטים בחדר זה מוצאים כרגע.",
     "verifyAllInRoom": "אמת הכל ב- {roomName}"
   },
-
   "roomsListPage": {
     "createRoomFailed": "יצירת החדר נכשלה",
     "title": "רדאר ציוד",
@@ -862,7 +851,6 @@
     "roomFloorOptional": "קומה / אזור (אופציונלי)",
     "createRoom": "יצירת חדר"
   },
-
   "managementDashboardPage": {
     "title": "לוח בקרה",
     "refresh": "רענן",
@@ -889,7 +877,6 @@
     "syncSuccess": "הצלחות סנכרון",
     "syncFailures": "שגיאות סנכרון"
   },
-
   "qrPrintPage": {
     "title": "הדפסת QR",
     "selectHint": "בחר ציוד להדפסה. ניתן להדפיס מספר קודי QR יחד.",
@@ -900,7 +887,6 @@
     "trying": "מנסה...",
     "retry": "נסה שוב"
   },
-
   "stabilityPage": {
     "allChecksHealthy": "כל הבדיקות תקינות",
     "disabled": "מושבת",
@@ -923,7 +909,6 @@
     "internalLog": "לוג פעולות פנימי",
     "noResultsHint": "אין תוצאות בדיקה. לחץ על ״הרץ את כל הבדיקות״ כדי להתחיל."
   },
-
   "shiftSummaryPage": {
     "summaryTitle": "סיכום משמרת",
     "loadFailed": "טעינת נתוני המשמרת נכשלה.",
@@ -945,7 +930,6 @@
     "checkedOutLineNoLoc": "• {name} מאז {since}",
     "todayUsageHeader": "שימושים היום ({count}):"
   },
-
   "adminPage": {
     "tabFolders": "תיקיות",
     "tabPending": "ממתינים",
@@ -1062,7 +1046,6 @@
     "formularyDeleteTitle": "מחיקת ״{name}״?",
     "formularyDeleteBody": "פעולה זו תסיר את התרופה מהרשימה של הקליניקה. תמיד ניתן להוסיף אותה מחדש."
   },
-
   "layoutHebrew": {
     "home": "ראשי",
     "bottomHome": "בית",
@@ -1106,9 +1089,15 @@
     "quickSettings": "הגדרות מהירות",
     "allSettings": "כל ההגדרות",
     "reportIssue": "דווח על בעיה",
-    "scanQrAria": "סרוק קוד QR"
+    "scanQrAria": "סרוק קוד QR",
+    "codeBlue": "Code Blue",
+    "crashCart": "עגלת החייאה",
+    "codeBlueHistory": "היסטוריית Code Blue",
+    "tasks": "משימות",
+    "activePatients": "מטופלים פעילים",
+    "wardDisplay": "תצוגת מחלקה",
+    "medicationHub": "מרכז תרופות"
   },
-
   "conflictModal": {
     "title": "התנגשויות סנכרון",
     "description": "פריטים אלה שונו במכשיר אחר בזמן שהיית במצב לא מקוון.",
@@ -1117,18 +1106,15 @@
     "keepMine": "שמור את שלי",
     "useServerVersion": "השתמש בגרסת השרת"
   },
-
   "updateBanner": {
     "newVersion": "VetTrack v{version} כאן — ",
     "seeWhatsNew": "ראה מה חדש",
     "dismissAria": "סגור הודעת עדכון"
   },
-
   "pageErrorBoundary": {
     "defaultFallback": "הקטע הזה נכשל בטעינה",
     "tryAgain": "נסה שוב"
   },
-
   "patientDetail": {
     "pageTitle": "מטופל",
     "operatingCenter": "מרכז פעילות",
@@ -1181,7 +1167,6 @@
     "actionHandoverHint": "רשימת שחרור",
     "loadError": "טעינת הקשר המטופל נכשלה"
   },
-
   "billingLedger": {
     "title": "לוח חיובים",
     "addCharge": "הוסף חיוב",
@@ -1233,7 +1218,6 @@
     "saving": "שומר...",
     "cancel": "ביטול"
   },
-
   "inventoryItemsPage": {
     "title": "פריטי מלאי",
     "newItem": "פריט חדש",
@@ -1269,7 +1253,6 @@
     "saving": "שומר...",
     "cancel": "ביטול"
   },
-
   "procurementPage": {
     "title": "רכש",
     "newPo": "הזמנה חדשה",
@@ -1316,7 +1299,6 @@
     "saving": "שומר...",
     "cancel": "ביטול"
   },
-
   "medsPage": {
     "title": "מרכז תרופות",
     "prescribeDesc": "הוסף משימות תרופתיות לטכנאים שלך.",
@@ -1344,7 +1326,6 @@
     "startDisabledNoTech": "אין טכנאי מוקצה למשימה.",
     "startDisabledOtherTech": "משימה זו מוקצית לטכנאי אחר."
   },
-
   "pharmacyForecast": {
     "navLabel": "תחזית בית מרקחת",
     "title": "תחזית בית מרקחת ICU",
@@ -1424,7 +1405,6 @@
       "noText": "נא להדביק טקסט לניתוח"
     }
   },
-
   "erImpact": {
     "title": "מדדי תוצאות חדר מיון",
     "subtitle": "חלון הדיווח הנוכחי מול צילום בסיס לפני עליה לאוויר (האחרון שנשמר).",
@@ -1449,7 +1429,6 @@
       "high": "ביטחון גבוה"
     }
   },
-
   "er": {
     "inAdmission": "בקבלה",
     "admissionComplete": "✓ קבלה הושלמה",
@@ -1475,7 +1454,6 @@
     "ownerLinked": "שם בעלים נשמר",
     "enrichFailed": "לא ניתן לשמור את שם הבעלים"
   },
-
   "erCommandCenter": {
     "title": "מרכז פיקוד חדר מיון",
     "lanes": {
@@ -1597,7 +1575,6 @@
       "unitTemp": "°C"
     }
   },
-
   "erOperationalControl": {
     "sectionTitle": "בקרה תפעולית",
     "currentMode": "מצב ER למרפאה",
@@ -1615,7 +1592,6 @@
     "toggleFailed": "לא ניתן לעדכן את מצב ה-ER",
     "ariaOperationalToggle": "בקרת מצב ER גלובלי"
   },
-
   "appointmentsPage": {
     "administerMedication": "מתן תרופה",
     "startNow": "התחל עכשיו",
@@ -1626,7 +1602,6 @@
     "createTask": "צור משימה",
     "quickTask": "משימה מהירה"
   },
-
   "cop": {
     "discrepancyTitle": "אי-התאמה בתרופות (Smart Cop)",
     "discrepancySubtitle": "חשד לשימוש „יתום” — חיוב מטופל ללא הזמנה פעילה או אשפוז מתאים.",
@@ -1647,7 +1622,6 @@
     "reason_NO_ACTIVE_ORDER": "אין הזמנת תרופה תואמת לשורת הארון",
     "reason_QUANTITY_EXCEEDS_ORDER": "הכמות חורגת מההזמנה"
   },
-
   "adminMedicationIntegrity": {
     "title": "תקינות תרופות",
     "accessDenied": "נדרשת הרשאת מנהל.",
@@ -1660,7 +1634,6 @@
     "colFlags": "סימונים",
     "flagNoHosp": "אין אשפוז פעיל"
   },
-
   "adminOpsDashboard": {
     "title": "לוח פעולות",
     "subtitle": "בריאות זמן אמת וצינור האירועים לקליניקה זו.",
@@ -1683,7 +1656,6 @@
     "maxRetryHorizonHint": "ההמתנה הארוכה ביותר בין הניסיונות הממתינים.",
     "maxRetryHorizonEmpty": "—"
   },
-
   "errors": {
     "server": {
       "internalError": "שגיאה פנימית בשרת",
@@ -1703,7 +1675,6 @@
       "body": "{name} — תוקף ב-{date}"
     }
   },
-
   "shiftChat": {
     "errors": {
       "noOpenShift": "אין משמרת פעילה. פתחו משמרת לפני שליחת הודעות.",
@@ -1713,7 +1684,6 @@
       "pinFailed": "הצמדת ההודעה נכשלה."
     }
   },
-
   "auditLog": {
     "actions": {
       "user_login": "כניסת משתמש",
@@ -1749,5 +1719,14 @@
       "audit_log.search": "חיפוש ביומן",
       "report.viewed": "דוח נצפה"
     }
+  },
+  "whatsAppMessage": {
+    "alertTitle": "🚨 התראת VetTrack",
+    "equipmentLabel": "ציוד",
+    "statusLabel": "סטטוס",
+    "timeLabel": "זמן",
+    "noteLabel": "הערה",
+    "actionRequired": "נא לטפל בכך בהקדם האפשרי.",
+    "statusReport": "דוח סטטוס עבור {name}"
   }
 }
