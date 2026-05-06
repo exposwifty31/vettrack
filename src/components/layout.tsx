@@ -279,7 +279,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     if (assetId.startsWith("inv-container:")) {
       const containerId = assetId.slice("inv-container:".length).trim();
       if (!containerId) {
-        toast.error("Invalid container NFC tag");
+        toast.error("תווית NFC לא חוקית עבור מכל");
         return;
       }
       const rawActive = safeStorageGetItem("vt_active_restock_session");
@@ -288,7 +288,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
           const parsed = JSON.parse(rawActive) as { containerId?: string };
           if (parsed.containerId && parsed.containerId !== containerId) {
             haptics.warning();
-            toast.warning("Finish restock before scanning another container.");
+            toast.warning("סיים את המילוי מחדש לפני סריקת מכל אחר.");
             return;
           }
         } catch {
@@ -304,18 +304,18 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     if (assetId.startsWith("inv-item:")) {
       const nfcTagId = assetId.slice("inv-item:".length).trim();
       if (!nfcTagId) {
-        toast.error("Invalid inventory item NFC tag");
+        toast.error("תווית NFC לא חוקית עבור פריט מלאי");
         return;
       }
       const raw = safeStorageGetItem("vt_active_restock_session");
       if (!raw) {
-        toast.error("Start a restock session before scanning item tags");
+        toast.error("פתח סשן מילוי מחדש לפני סריקת תוויות פריטים");
         return;
       }
       try {
         const parsed = JSON.parse(raw) as { sessionId?: string; containerId?: string };
         if (!parsed.sessionId) {
-          toast.error("No active restock session found");
+          toast.error("לא נמצא סשן מילוי מחדש פעיל");
           return;
         }
         await api.restock.scan(parsed.sessionId, { nfcTagId, delta: 1 });
@@ -327,7 +327,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
         return;
       } catch {
         haptics.error();
-        toast.error("Inventory scan failed");
+        toast.error("סריקת מלאי נכשלה");
         return;
       }
     }

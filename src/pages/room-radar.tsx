@@ -123,7 +123,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardP
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       toast.success(`Checked out — ${eq.name}`);
     },
-    onError: () => toast.error("Checkout failed"),
+    onError: () => toast.error("לקיחה נכשלה"),
     onSettled: () => { busyRef.current = false; },
   });
 
@@ -135,14 +135,14 @@ function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardP
       queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
       toast.success(`Returned — ${eq.name}`);
     },
-    onError: () => toast.error("Return failed"),
+    onError: () => toast.error("החזרה נכשלה"),
     onSettled: () => { busyRef.current = false; },
   });
 
   const quickAction = !isCheckedOut && eq.status === "ok"
-    ? { label: "Take", icon: LogIn, action: () => checkoutMut.mutate(), pending: checkoutMut.isPending, cls: "text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40" }
+    ? { label: "קח", icon: LogIn, action: () => checkoutMut.mutate(), pending: checkoutMut.isPending, cls: "text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40" }
     : isCheckedOut && (checkedOutByMe || isAdmin) && eq.status === "ok"
-    ? { label: "Return", icon: LogOut, action: () => setReturnDialogOpen(true), pending: returnMut.isPending, cls: "text-primary border-primary/30 hover:bg-primary/10 dark:hover:bg-primary/15" }
+    ? { label: "החזר", icon: LogOut, action: () => setReturnDialogOpen(true), pending: returnMut.isPending, cls: "text-primary border-primary/30 hover:bg-primary/10 dark:hover:bg-primary/15" }
     : null;
 
   const handleQuickAction = (e: React.MouseEvent) => {
@@ -152,7 +152,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardP
     busyRef.current = true;
     setTapped(true);
     tapTimerRef.current = setTimeout(() => setTapped(false), 300);
-    try { quickAction.action(); } catch { busyRef.current = false; toast.error("Action failed"); }
+    try { quickAction.action(); } catch { busyRef.current = false; toast.error("הפעולה נכשלה"); }
   };
 
   const verifierInitials = justVerified ? null : toInitials(eq.lastVerifiedByName);

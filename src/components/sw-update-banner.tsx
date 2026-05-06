@@ -19,7 +19,7 @@ export function SwUpdateBanner() {
       toast(t.swUpdate.updateAvailable, {
         duration: Infinity,
         action: {
-          label: "Refresh",
+          label: "רענן",
           onClick: () => {
             const worker = workerRef.current;
             if (worker) {

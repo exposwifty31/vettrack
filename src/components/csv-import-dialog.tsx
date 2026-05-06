@@ -158,7 +158,7 @@ export function CsvImportDialog({ open, onOpenChange }: Props) {
     e.target.value = "";
 
     if (!file.name.endsWith(".csv") && file.type !== "text/csv" && file.type !== "text/plain") {
-      toast.error("Please upload a CSV file");
+      toast.error("אנא העלה קובץ CSV");
       return;
     }
 

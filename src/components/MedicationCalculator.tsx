@@ -207,7 +207,7 @@ function FormularyManager({ onClose }: FormularyManagerProps) {
       ) : null}
 
       {isLoading ? (
-        <div className="text-xs text-muted-foreground">Loading...</div>
+        <div className="text-xs text-muted-foreground">טוען...</div>
       ) : (
         <div className="space-y-2">
           {rawList.map((entry) => (

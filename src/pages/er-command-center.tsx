@@ -308,14 +308,14 @@ export default function ErCommandCenterPage() {
         chiefComplaint: complaint.trim(),
       }),
     onSuccess: () => {
-      toast.success("Intake created");
+      toast.success("קבלה נוצרה");
       setIntakeOpen(false);
       setSpecies("");
       setComplaint("");
       setSeverity("medium");
       invalidateEr();
     },
-    onError: () => toast.error("Intake failed"),
+    onError: () => toast.error("יצירת קבלה נכשלה"),
   });
 
   const assignMut = useMutation({
@@ -323,10 +323,10 @@ export default function ErCommandCenterPage() {
     onMutate: ({ id }) => setAssigningId(id),
     onSettled: () => setAssigningId(null),
     onSuccess: () => {
-      toast.success("Assigned");
+      toast.success("הוקצה");
       invalidateEr();
     },
-    onError: () => toast.error("Assign failed"),
+    onError: () => toast.error("הקצאה נכשלה"),
   });
 
   const canDoctorAdmissionActions = ["admin", "vet"].includes(effectiveRole);
@@ -342,7 +342,7 @@ export default function ErCommandCenterPage() {
       invalidateEr();
       void qc.invalidateQueries({ queryKey: ["er", "admission-state"] });
     },
-    onError: () => toast.error("Accept failed"),
+    onError: () => toast.error("קבלת מטופל נכשלה"),
   });
 
   const enrichMut = useMutation({
@@ -361,7 +361,7 @@ export default function ErCommandCenterPage() {
       invalidateEr();
       void qc.invalidateQueries({ queryKey: ["er", "admission-state"] });
     },
-    onError: () => toast.error("Admission complete failed"),
+    onError: () => toast.error("השלמת קבלה נכשלה"),
   });
 
   const handoffMut = useMutation({
@@ -379,13 +379,13 @@ export default function ErCommandCenterPage() {
         })),
       }),
     onSuccess: () => {
-      toast.success("Structured Clinical Handoff created");
+      toast.success("מסירה קלינית מובנית נוצרה");
       setHandoffOpen(false);
       setHandoffHospId("");
       setHandoffItems([emptyHandoffRow()]);
       invalidateEr();
     },
-    onError: () => toast.error("Handoff failed"),
+    onError: () => toast.error("מסירה נכשלה"),
   });
 
   // Incoming Assignee Ack: direct acknowledgment by the designated incoming owner.
@@ -394,10 +394,10 @@ export default function ErCommandCenterPage() {
     onMutate: (id) => setAckingId(id),
     onSettled: () => setAckingId(null),
     onSuccess: () => {
-      toast.success("Acknowledged");
+      toast.success("אושר");
       invalidateEr();
     },
-    onError: () => toast.error("Ack failed"),
+    onError: () => toast.error("אישור נכשל"),
   });
 
   // Forced Ack Override: admin/vet acknowledges on behalf of the incoming owner.
@@ -407,12 +407,12 @@ export default function ErCommandCenterPage() {
     onMutate: ({ id }) => setAckingId(id),
     onSettled: () => setAckingId(null),
     onSuccess: () => {
-      toast.success("Forced Ack Override recorded");
+      toast.success("עקיפת אישור נרשמה");
       setOverrideTargetId(null);
       setOverrideReason("");
       invalidateEr();
     },
-    onError: () => toast.error("Override failed"),
+    onError: () => toast.error("עקיפה נכשלה"),
   });
 
   // Primary Lane Enforcement: deduplicateByPrimaryLane guarantees each patient card is placed

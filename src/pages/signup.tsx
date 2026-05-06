@@ -23,8 +23,8 @@ export default function SignUpPage() {
   return (
     <>
       <Helmet>
-        <title>Sign Up — VetTrack</title>
-        <meta name="description" content="Create a VetTrack account to manage veterinary equipment, scan QR codes, and track your clinic's fleet in real time." />
+        <title>הרשמה — VetTrack</title>
+        <meta name="description" content="צור חשבון VetTrack לניהול ציוד וטרינרי, סריקת QR ומעקב בזמן אמת." />
         <link rel="canonical" href="https://vettrack.replit.app/signup" />
         <meta name="robots" content="noindex" />
       </Helmet>
@@ -41,8 +41,8 @@ export default function SignUpPage() {
               </div>
               <span className="text-2xl font-bold text-foreground">VetTrack</span>
             </Link>
-            <h1 className="text-2xl font-bold text-foreground mb-2">Create your account</h1>
-            <p className="text-sm text-muted-foreground">Sign up to access your veterinary equipment dashboard</p>
+            <h1 className="text-2xl font-bold text-foreground mb-2">יצירת חשבון</h1>
+            <p className="text-sm text-muted-foreground">הירשם לניהול ציוד הוטרינרי שלך</p>
           </div>
 
           {CLERK_PUBLISHABLE_KEY ? (
@@ -54,7 +54,7 @@ export default function SignUpPage() {
               </ClerkLoading>
               <ClerkFailed>
                 <p className="text-sm text-center text-destructive px-2" role="alert">
-                  Sign-up could not load. Check your connection, then refresh. If this persists, confirm Clerk is configured for this domain and that the publishable key matches this deployment.
+                  דף ההרשמה לא נטען. בדוק את החיבור ורענן. אם הבעיה נמשכת, ודא ש-Clerk מוגדר לדומיין זה ושמפתח ה-Publishable Key תואם לסביבה.
                 </p>
               </ClerkFailed>
               <ClerkLoaded>
@@ -71,13 +71,13 @@ export default function SignUpPage() {
           ) : (
             <div className="bg-card border border-border rounded-2xl p-6 shadow-sm text-center">
               <p className="text-sm text-muted-foreground mb-4">
-                Authentication is running in development mode.
+                מצב פיתוח — אין צורך באימות.
               </p>
               <Link
                 href="/home"
                 className="inline-flex items-center justify-center gap-2 w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-3 rounded-xl transition-colors"
               >
-                Continue to Dashboard
+                כניסה ללוח הבקרה
               </Link>
             </div>
           )}
@@ -87,7 +87,7 @@ export default function SignUpPage() {
               href="/"
               className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              ← Learn more about VetTrack
+              → עוד על VetTrack
             </Link>
           </div>
         </div>

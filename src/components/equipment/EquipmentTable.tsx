@@ -20,7 +20,7 @@ export function EquipmentTable({ rows }: EquipmentTableProps) {
       <table className="w-full border-collapse">
         <thead>
           <tr className="border-b-2 border-ivory-borderMd">
-            {(["ID", "Name", "Location", "Last Scan", "Status"] as const).map((col) => (
+            {(["מזהה", "שם", "מיקום", "סריקה אחרונה", "סטטוס"] as const).map((col) => (
               <th
                 key={col}
                 className="px-[10px] py-[7px] text-start text-[10.5px] font-bold uppercase tracking-[0.08em] text-ivory-text"

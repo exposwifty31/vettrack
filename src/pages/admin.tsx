@@ -118,12 +118,12 @@ export default function AdminPage() {
         </Helmet>
         <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
           <Shield className="w-12 h-12 text-muted-foreground" />
-          <h1 className="text-2xl font-bold">Admin Only</h1>
+          <h1 className="text-2xl font-bold">גישת מנהל בלבד</h1>
           <p className="text-sm text-muted-foreground">
-            You need admin access to view this page.
+            נדרשת הרשאת מנהל לצפות בדף זה.
           </p>
           <Button variant="ghost" onClick={() => navigate("/home")}>
-            Go Home
+            לדף הבית
           </Button>
         </div>
       </>
@@ -776,9 +776,9 @@ function UsersSection() {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       setPendingSecondaryRole(undefined);
       setPendingSecondaryRoleUserId(null);
-      toast.success("Secondary role updated");
+      toast.success("תפקיד משני עודכן");
     },
-    onError: () => toast.error("Failed to update secondary role"),
+    onError: () => toast.error("עדכון תפקיד משני נכשל"),
   });
 
   const updateStatusMut = useMutation({
@@ -823,9 +823,9 @@ function UsersSection() {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users/deleted"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users/pending"] });
-      toast.success("User restored");
+      toast.success("משתמש שוחזר");
     },
-    onError: () => toast.error("Failed to restore user"),
+    onError: () => toast.error("שחזור משתמש נכשל"),
   });
 
   const filterButtons: { label: string; value: UserStatusFilter }[] = [
@@ -1108,7 +1108,7 @@ function UsersSection() {
                   data-testid="btn-load-more-users"
                 >
                   {isFetchingMoreUsers ? (
-                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Loading…</>
+                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" />טוען...</>
                   ) : (
                     t.adminPage.loadMore
                   )}
@@ -1787,7 +1787,7 @@ function FormularySection() {
       queryClient.invalidateQueries({ queryKey: ["/api/forecast/clinic/pharmacy-forecast-exclusions"] });
       setNewExclusion("");
       setNewExclusionNote("");
-      toast.success("Exclusion added");
+      toast.success("חריג נוסף");
     },
     onError: (e: Error) => toast.error(e.message || "Failed to add exclusion"),
   });
@@ -1796,9 +1796,9 @@ function FormularySection() {
     mutationFn: (id: string) => api.forecast.removeExclusion(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/forecast/clinic/pharmacy-forecast-exclusions"] });
-      toast.success("Exclusion removed");
+      toast.success("חריג הוסר");
     },
-    onError: () => toast.error("Failed to remove exclusion"),
+    onError: () => toast.error("הסרת חריג נכשלה"),
   });
 
   function openCreate() {
@@ -1830,7 +1830,7 @@ function FormularySection() {
     const conc = parseFloat(form.concentrationMgMl);
     const std = parseFloat(form.standardDose);
     if (!form.name.trim() || !form.genericName.trim() || !Number.isFinite(conc) || !Number.isFinite(std)) {
-      toast.error("Name, generic name, concentration, and standard dose are required");
+      toast.error("שם, שם גנרי, ריכוז ומינון סטנדרטי הם שדות חובה");
       return;
     }
     const min = form.minDose ? parseFloat(form.minDose) : null;
@@ -1890,7 +1890,7 @@ function FormularySection() {
           {isLoading ? (
             <Skeleton className="h-20 w-full" />
           ) : filtered.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No entries found.</p>
+            <p className="text-sm text-muted-foreground">לא נמצאו רשומות.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -2042,7 +2042,7 @@ function FormularySection() {
       <Dialog open={showCreate} onOpenChange={(o) => { if (!o) { setShowCreate(false); setEditEntry(null); } }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editEntry ? "Edit Drug" : "Add Drug"}</DialogTitle>
+            <DialogTitle>{editEntry ? "עריכת תרופה" : "הוספת תרופה"}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="col-span-2 flex flex-col gap-1">

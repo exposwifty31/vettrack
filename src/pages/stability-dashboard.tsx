@@ -134,9 +134,9 @@ function logLevelColor(level: LogEntry["level"]) {
 
 function suiteLabel(s: Suite) {
   return {
-    functional: { label: "Functional", className: "bg-primary/10 text-primary" },
-    stress: { label: "Stress", className: "bg-secondary text-secondary-foreground" },
-    edge: { label: "Edge Case", className: "bg-muted/80 text-foreground" },
+    functional: { label: "פונקציונלי", className: "bg-primary/10 text-primary" },
+    stress: { label: "עומס", className: "bg-secondary text-secondary-foreground" },
+    edge: { label: "מקרי קצה", className: "bg-muted/80 text-foreground" },
   }[s];
 }
 
@@ -145,7 +145,7 @@ function SystemStatusBadge({ status, running }: { status: TestReport | null; run
     return (
       <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold text-sm">
         <RefreshCw className="w-4 h-4 animate-spin" />
-        Testing in progress...
+        בדיקה בתהליך...
       </div>
     );
   }
@@ -153,7 +153,7 @@ function SystemStatusBadge({ status, running }: { status: TestReport | null; run
     return (
       <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted text-muted-foreground font-semibold text-sm">
         <Activity className="w-4 h-4" />
-        No tests run yet
+        טרם הורצו בדיקות
       </div>
     );
   }
@@ -163,7 +163,7 @@ function SystemStatusBadge({ status, running }: { status: TestReport | null; run
     return (
       <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-destructive/10 text-destructive font-semibold text-sm">
         <XCircle className="w-4 h-4" />
-        Issues Detected ({failed} failed)
+        בעיות זוהו ({failed} נכשלו)
       </div>
     );
   }
@@ -171,7 +171,7 @@ function SystemStatusBadge({ status, running }: { status: TestReport | null; run
     return (
       <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 text-amber-800 dark:text-amber-300 font-semibold text-sm">
         <AlertTriangle className="w-4 h-4" />
-        Warnings ({warned} warned)
+        אזהרות ({warned})
       </div>
     );
   }
@@ -199,9 +199,9 @@ function SuiteSection({ suite, results }: { suite: Suite; results: TestResult[] 
         <div className="flex items-center gap-3">
           <span className={cn("text-xs font-semibold px-2 py-0.5 rounded", sl.className)}>{sl.label}</span>
           <span className="font-medium text-sm">{results.length} tests</span>
-          <span className="text-xs text-green-600 dark:text-green-400">{passed} passed</span>
-          {failed > 0 && <span className="text-xs text-red-600 dark:text-red-400">{failed} failed</span>}
-          {warned > 0 && <span className="text-xs text-amber-600 dark:text-amber-400">{warned} warned</span>}
+          <span className="text-xs text-green-600 dark:text-green-400">{passed} עברו</span>
+          {failed > 0 && <span className="text-xs text-red-600 dark:text-red-400">{failed} נכשלו</span>}
+          {warned > 0 && <span className="text-xs text-amber-600 dark:text-amber-400">{warned} אזהרות</span>}
         </div>
         {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
       </button>
@@ -220,8 +220,8 @@ function SuiteSection({ suite, results }: { suite: Suite; results: TestResult[] 
               </div>
               {(r.expected || r.actual) && (
                 <div className="flex gap-4 text-xs text-muted-foreground font-mono">
-                  {r.expected && <span>expected: <span className="text-foreground">{r.expected}</span></span>}
-                  {r.actual && <span>actual: <span className={cn(r.status === "fail" ? "text-red-500" : "text-foreground")}>{r.actual}</span></span>}
+                  {r.expected && <span>צפוי: <span className="text-foreground">{r.expected}</span></span>}
+                  {r.actual && <span>בפועל: <span className={cn(r.status === "fail" ? "text-red-500" : "text-foreground")}>{r.actual}</span></span>}
                 </div>
               )}
               {r.detail && (
@@ -362,8 +362,8 @@ export default function StabilityDashboardPage() {
       <Layout>
         <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
           <ShieldCheck className="w-12 h-12 text-muted-foreground" />
-          <p className="text-muted-foreground">Admin access required</p>
-          <Button asChild variant="outline"><Link href="/home">Go Home</Link></Button>
+          <p className="text-muted-foreground">נדרשת גישת מנהל</p>
+          <Button asChild variant="outline"><Link href="/home">לדף הבית</Link></Button>
         </div>
       </Layout>
     );
@@ -404,21 +404,21 @@ export default function StabilityDashboardPage() {
           {/* Run button */}
           <Card>
             <CardContent className="p-4 flex flex-col gap-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Test Suite</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">חבילת בדיקות</p>
               <Button
                 onClick={() => runMutation.mutate()}
                 disabled={isRunning || runMutation.isPending}
                 className="gap-2 w-full"
               >
                 {isRunning ? (
-                  <><RefreshCw className="w-4 h-4 animate-spin" />Running...</>
+                  <><RefreshCw className="w-4 h-4 animate-spin" />מריץ...</>
                 ) : (
                   <><Play className="w-4 h-4" />{t.stabilityPage.runAllTests}</>
                 )}
               </Button>
               {report?.finishedAt && (
                 <p className="text-xs text-muted-foreground text-center">
-                  Last run: {format(new Date(report.finishedAt), "HH:mm:ss")}
+                  ריצה אחרונה: {format(new Date(report.finishedAt), "HH:mm:ss")}
                 </p>
               )}
             </CardContent>
@@ -427,7 +427,7 @@ export default function StabilityDashboardPage() {
           {/* Testing Mode */}
           <Card>
             <CardContent className="p-4 flex flex-col gap-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Testing Mode</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">מצב בדיקה</p>
               <button
                 onClick={() => testModeMutation.mutate(!(status?.testModeEnabled ?? false))}
                 disabled={testModeMutation.isPending}
@@ -442,7 +442,7 @@ export default function StabilityDashboardPage() {
                   {status?.testModeEnabled ? t.stabilityPage.enabled : t.stabilityPage.disabled}
                 </span>
               </button>
-              <p className="text-xs text-muted-foreground">Enable to run CRUD tests safely with isolated test data</p>
+              <p className="text-xs text-muted-foreground">הפעל להרצת בדיקות CRUD בבטחה עם נתוני בדיקה מבודדים</p>
             </CardContent>
           </Card>
 
@@ -450,7 +450,7 @@ export default function StabilityDashboardPage() {
           <Card>
             <CardContent className="p-4 flex flex-col gap-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                <CalendarClock className="w-3.5 h-3.5" />Auto Schedule
+                <CalendarClock className="w-3.5 h-3.5" />תזמון אוטומטי
               </p>
               <select
                 value={status?.scheduleHours ?? 0}
@@ -464,7 +464,7 @@ export default function StabilityDashboardPage() {
               </select>
               {(status?.scheduleHours ?? 0) > 0 && (
                 <p className="text-xs text-green-600 dark:text-green-400">
-                  Next run auto-scheduled every {status!.scheduleHours}h
+                  הריצה הבאה מתוזמנת אוטומטית כל {status!.scheduleHours} שעות
                 </p>
               )}
             </CardContent>
@@ -475,10 +475,10 @@ export default function StabilityDashboardPage() {
         {summary && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: "Passed", value: summary.passed, icon: <CheckCircle2 className="w-4 h-4" />, color: "text-green-600 dark:text-green-400" },
-              { label: "Failed", value: summary.failed, icon: <XCircle className="w-4 h-4" />, color: "text-red-600 dark:text-red-400" },
-              { label: "Avg Latency", value: `${summary.avgLatencyMs}ms`, icon: <Zap className="w-4 h-4" />, color: "text-primary" },
-              { label: "Max Latency", value: `${summary.maxLatencyMs}ms`, icon: <Activity className="w-4 h-4" />, color: summary.maxLatencyMs > 3000 ? "text-red-600" : "text-muted-foreground" },
+              { label: "עבר", value: summary.passed, icon: <CheckCircle2 className="w-4 h-4" />, color: "text-green-600 dark:text-green-400" },
+              { label: "נכשל", value: summary.failed, icon: <XCircle className="w-4 h-4" />, color: "text-red-600 dark:text-red-400" },
+              { label: "השהייה ממוצעת", value: `${summary.avgLatencyMs}ms`, icon: <Zap className="w-4 h-4" />, color: "text-primary" },
+              { label: "השהייה מקסימלית", value: `${summary.maxLatencyMs}ms`, icon: <Activity className="w-4 h-4" />, color: summary.maxLatencyMs > 3000 ? "text-red-600" : "text-muted-foreground" },
             ].map((stat) => (
               <Card key={stat.label}>
                 <CardContent className="p-4 flex flex-col gap-1">
@@ -509,7 +509,7 @@ export default function StabilityDashboardPage() {
                   onClick={() => exportStabilityPDF(report)}
                 >
                   <FileText className="w-3.5 h-3.5" />
-                  PDF REPORT
+                  דוח PDF
                 </Button>
                 <Badge variant="outline" className="ml-auto text-xs">
                   {format(new Date(report.finishedAt!), "dd MMM HH:mm:ss")}
@@ -550,7 +550,7 @@ export default function StabilityDashboardPage() {
             <CardTitle className="flex items-center gap-2 text-base">
               <Clock className="w-4 h-4" />
               {t.stabilityPage.internalLog}
-              <span className="ml-auto text-xs font-normal text-muted-foreground">{logs.length} entries</span>
+              <span className="ml-auto text-xs font-normal text-muted-foreground">{logs.length} רשומות</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
@@ -558,7 +558,7 @@ export default function StabilityDashboardPage() {
               <div className="relative flex-1">
                 <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search logs..."
+                  placeholder="חיפוש בלוגים..."
                   className="ps-9"
                   value={logSearch}
                   onChange={(e) => setLogSearch(e.target.value)}
@@ -569,7 +569,7 @@ export default function StabilityDashboardPage() {
                 size="icon"
                 onClick={() => clearLogsMutation.mutate()}
                 disabled={clearLogsMutation.isPending}
-                title="Clear all logs"
+                title="נקה את כל הלוגים"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -577,7 +577,7 @@ export default function StabilityDashboardPage() {
                 variant="outline"
                 size="icon"
                 onClick={() => qc.invalidateQueries({ queryKey: ["/api/stability/logs"] })}
-                title="Refresh logs"
+                title="רענן לוגים"
               >
                 <RefreshCw className="w-4 h-4" />
               </Button>
@@ -585,9 +585,9 @@ export default function StabilityDashboardPage() {
             <div className="rounded-lg border dark:border-gray-700 overflow-hidden">
               <div className="max-h-80 overflow-y-auto font-mono text-xs divide-y dark:divide-gray-700">
                 {logsLoading ? (
-                  <div className="p-4 text-muted-foreground">Loading logs...</div>
+                  <div className="p-4 text-muted-foreground">טוען לוגים...</div>
                 ) : logs.length === 0 ? (
-                  <div className="p-4 text-muted-foreground">No log entries{logSearch ? " matching search" : ""}.</div>
+                  <div className="p-4 text-muted-foreground">אין רשומות לוג{logSearch ? " התואמות לחיפוש" : ""}.</div>
                 ) : (
                   logs.map((entry) => (
                     <div key={entry.id} className="flex gap-2 px-3 py-1.5 hover:bg-muted/50 transition-colors">
@@ -613,7 +613,7 @@ export default function StabilityDashboardPage() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Logs auto-refresh every 5 seconds. Up to 1,000 entries stored in memory (resets on server restart).
+              הלוגים מתרעננים אוטומטית כל 5 שניות. עד 1,000 רשומות נשמרות בזיכרון (מתאפס עם הפעלת השרת מחדש).
             </p>
           </CardContent>
         </Card>
@@ -623,47 +623,47 @@ export default function StabilityDashboardPage() {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <ShieldCheck className="w-4 h-4" />
-              What Gets Tested
+              מה נבדק
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-3 pt-0">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <p className="font-semibold text-foreground mb-1 flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-primary inline-block" />Functional
+                  <span className="w-2 h-2 rounded-full bg-primary inline-block" />פונקציונלי
                 </p>
                 <ul className="space-y-0.5 text-xs list-disc list-inside">
-                  <li>Server health &amp; uptime</li>
-                  <li>Equipment list &amp; detail</li>
-                  <li>Analytics endpoint</li>
-                  <li>Activity feed &amp; users</li>
-                  <li>Equipment CRUD (test mode)</li>
-                  <li>QR scan workflow (test mode)</li>
+                  <li>בריאות שרת וזמן פעולה</li>
+                  <li>רשימת ציוד ופרטים</li>
+                  <li>נקודת קצה לניתוח</li>
+                  <li>פיד פעילות ומשתמשים</li>
+                  <li>CRUD ציוד (מצב בדיקה)</li>
+                  <li>זרימת סריקת QR (מצב בדיקה)</li>
                 </ul>
               </div>
               <div>
                 <p className="font-semibold text-foreground mb-1 flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-secondary-foreground/70 inline-block" />Stress
+                  <span className="w-2 h-2 rounded-full bg-secondary-foreground/70 inline-block" />עומס
                 </p>
                 <ul className="space-y-0.5 text-xs list-disc list-inside">
-                  <li>5 concurrent list requests</li>
-                  <li>10 rapid sequential requests</li>
-                  <li>3 concurrent analytics calls</li>
-                  <li>Latency spike detection</li>
-                  <li>Performance degradation check</li>
+                  <li>5 בקשות רשימה במקביל</li>
+                  <li>10 בקשות רצופות מהירות</li>
+                  <li>3 קריאות ניתוח במקביל</li>
+                  <li>זיהוי קפיצת השהייה</li>
+                  <li>בדיקת ירידת ביצועים</li>
                 </ul>
               </div>
               <div>
                 <p className="font-semibold text-foreground mb-1 flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-muted-foreground inline-block" />Edge Cases
+                  <span className="w-2 h-2 rounded-full bg-muted-foreground inline-block" />מקרי קצה
                 </p>
                 <ul className="space-y-0.5 text-xs list-disc list-inside">
-                  <li>Missing required fields → 400</li>
-                  <li>Nonexistent resource → 404</li>
-                  <li>Invalid scan status → 4xx</li>
-                  <li>Empty request body → 400</li>
-                  <li>5000-char field (XSS/overflow)</li>
-                  <li>Duplicate scan (test mode)</li>
+                  <li>שדות חובה חסרים → 400</li>
+                  <li>משאב לא קיים → 404</li>
+                  <li>סטטוס סריקה לא חוקי → 4xx</li>
+                  <li>גוף בקשה ריק → 400</li>
+                  <li>שדה 5000 תווים (XSS/overflow)</li>
+                  <li>סריקה כפולה (מצב בדיקה)</li>
                 </ul>
               </div>
             </div>
