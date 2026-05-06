@@ -35,45 +35,43 @@ import { t } from "@/lib/i18n";
 // Client-side rows per page — DOM never holds more than ROWS_PER_PAGE divs.
 const ROWS_PER_PAGE = 8;
 
-const ACTION_TYPE_LABELS: Record<string, string> = {
-  user_login: "User Login",
-  user_provisioned: "User Provisioned",
-  user_display_name_changed: "Display Name Changed",
-  user_role_changed: "Role Changed",
-  user_status_changed: "Status Changed",
-  equipment_created: "Equipment Created",
-  equipment_updated: "Equipment Updated",
-  equipment_deleted: "Equipment Deleted",
-  equipment_scanned: "Equipment Scanned",
-  equipment_checked_out: "Checked Out",
-  equipment_returned: "Returned",
-  equipment_reverted: "Scan Reverted",
-  equipment_bulk_deleted: "Bulk Deleted",
-  equipment_bulk_moved: "Bulk Moved",
-  equipment_imported: "Equipment Imported",
-  folder_created: "Folder Created",
-  folder_updated: "Folder Updated",
-  folder_deleted: "Folder Deleted",
-  alert_acknowledged: "Alert Acknowledged",
-  alert_acknowledgment_removed: "Alert Ack Removed",
-  "system.init": "System Initialised",
-  "system.verified": "System Verified",
-  "rounds.started": "Rounds Started",
-  "rounds.completed": "Rounds Completed",
-  "equipment.scan": "Equipment Scanned",
-  "equipment.checkout": "Equipment Checked Out",
-  "equipment.transfer": "Equipment Transferred",
-  "equipment.maintenance_review": "Maintenance Review",
-  "equipment.request": "Equipment Requested",
-  "alert.received": "Alert Received",
-  "audit_log.search": "Audit Log Search",
-  "report.viewed": "Report Viewed",
-};
+const ACTION_TYPE_KEYS = [
+  "user_login",
+  "user_provisioned",
+  "user_display_name_changed",
+  "user_role_changed",
+  "user_status_changed",
+  "equipment_created",
+  "equipment_updated",
+  "equipment_deleted",
+  "equipment_scanned",
+  "equipment_checked_out",
+  "equipment_returned",
+  "equipment_reverted",
+  "equipment_bulk_deleted",
+  "equipment_bulk_moved",
+  "equipment_imported",
+  "folder_created",
+  "folder_updated",
+  "folder_deleted",
+  "alert_acknowledged",
+  "alert_acknowledgment_removed",
+  "system.init",
+  "system.verified",
+  "rounds.started",
+  "rounds.completed",
+  "equipment.scan",
+  "equipment.checkout",
+  "equipment.transfer",
+  "equipment.maintenance_review",
+  "equipment.request",
+  "alert.received",
+  "audit_log.search",
+  "report.viewed",
+] as const;
 
-const ALL_ACTION_TYPES = Object.keys(ACTION_TYPE_LABELS);
-
-function actionLabel(actionType: string): string {
-  return ACTION_TYPE_LABELS[actionType] ?? actionType;
+function getActionTypeLabel(actionType: string): string {
+  return t.auditLog.actionLabel(actionType);
 }
 
 function actionBadgeClass(actionType: string): string {
@@ -127,7 +125,7 @@ function AuditLogRow({ log }: { log: AuditLog }) {
                 className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${actionBadgeClass(log.actionType)}`}
                 style={{ flexShrink: 0 }}
               >
-                {actionLabel(log.actionType)}
+                {getActionTypeLabel(log.actionType)}
               </span>
               {equipmentName && (
                 <span className="text-xs font-medium text-foreground truncate">
@@ -277,8 +275,8 @@ export function SharedAuditLogsPanel({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All actions</SelectItem>
-                    {ALL_ACTION_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>{ACTION_TYPE_LABELS[type]}</SelectItem>
+                    {ACTION_TYPE_KEYS.map((type) => (
+                      <SelectItem key={type} value={type}>{getActionTypeLabel(type)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
