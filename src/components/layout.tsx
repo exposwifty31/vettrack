@@ -240,6 +240,11 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     };
   }, [menuOpen]);
 
+  // Close the slide-in menu whenever the user navigates (bottom nav, back gesture, etc.)
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location]);
+
   useEffect(() => {
     if (quickSettingsOpen) {
       setQsMounted(true);

@@ -235,15 +235,16 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
   return (
     <>
       <div
-        className="fixed inset-0 bg-black/50 z-40"
+        className="fixed inset-0 bg-black/50 z-[65]"
         onClick={onClose}
         aria-hidden="true"
       />
       <div
         ref={sheetRef}
         role="dialog"
+        aria-modal="true"
         aria-label={t.shiftSummary.sections.checkedOut}
-        className="fixed inset-x-0 bottom-0 z-50 flex flex-col bg-white rounded-t-2xl shadow-2xl max-h-[88vh]"
+        className="fixed inset-x-0 bottom-0 z-[66] flex flex-col bg-white rounded-t-2xl shadow-2xl max-h-[88vh]"
       >
         {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-1">
@@ -426,7 +427,7 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t bg-white flex gap-2">
+        <div className="px-5 pt-4 pb-safe border-t bg-white flex gap-2">
           <Button
             className="flex-1 gap-2"
             variant="outline"

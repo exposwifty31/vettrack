@@ -232,20 +232,30 @@ export function SyncQueueSheet({ open, onClose }: SyncQueueSheetProps) {
     return () => window.removeEventListener("keydown", handleKey);
   }, [open, onClose]);
 
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   return (
     <>
       <div
-        className="fixed inset-0 bg-black/50 z-40"
+        className="fixed inset-0 bg-black/50 z-[65]"
         onClick={onClose}
         aria-hidden="true"
       />
       <div
         ref={sheetRef}
         role="dialog"
+        aria-modal="true"
         aria-label="Sync Queue"
-        className="fixed inset-x-0 bottom-0 z-50 flex flex-col bg-white dark:bg-background rounded-t-2xl shadow-2xl max-h-[80vh]"
+        className="fixed inset-x-0 bottom-0 z-[66] flex flex-col bg-white dark:bg-background rounded-t-2xl shadow-2xl max-h-[80vh]"
         data-testid="sync-queue-sheet"
       >
         <div className="flex justify-center pt-3 pb-1">
@@ -291,7 +301,7 @@ export function SyncQueueSheet({ open, onClose }: SyncQueueSheetProps) {
         </div>
         {isCircuitOpen && <CircuitBreakerBanner resetsAt={circuitResetsAt} />}
 
-        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3">
+        <div className="flex-1 overflow-y-auto px-5 pt-4 pb-safe flex flex-col gap-3">
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
               <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center">

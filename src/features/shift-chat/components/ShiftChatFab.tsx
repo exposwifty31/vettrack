@@ -23,7 +23,7 @@ export function ShiftChatFab() {
       <button
         onClick={() => setIsOpen(true)}
         className={cn(
-          "fixed bottom-[calc(68px+env(safe-area-inset-bottom)+8px)] right-5 z-[60]",
+          "fixed bottom-nav-float right-5 z-[60]",
           "w-12 h-12 rounded-full",
           "bg-gradient-to-br from-indigo-600 to-violet-700",
           "flex items-center justify-center text-xl shadow-lg shadow-indigo-500/40",

@@ -23,7 +23,7 @@ export function SyncStatusBanner() {
   return (
     <div
       className={[
-        "fixed bottom-20 left-0 right-0 z-50 mx-4 mb-safe flex items-center gap-3 rounded-xl border px-4 py-3 shadow-lg sm:mx-auto sm:max-w-md",
+        "fixed bottom-nav-float left-0 right-0 z-50 mx-4 flex items-center gap-3 rounded-xl border px-4 py-3 shadow-lg sm:mx-auto sm:max-w-md",
         isFailing
           ? "border-destructive/30 bg-destructive/10 text-destructive"
           : "border-amber-400/30 bg-amber-50/90 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300",

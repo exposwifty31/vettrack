@@ -745,7 +745,6 @@ export default function PharmacyForecastPage() {
     <Layout title={t.pharmacyForecast.title}>
       <div
         className="min-h-[100dvh] space-y-4 max-w-2xl mx-auto px-3 pb-nav-safe"
-        style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
       >
         <div className="space-y-1">
           <h1 className="text-2xl font-bold flex items-center gap-2">

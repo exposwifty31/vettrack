@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { Layout } from "@/components/layout";
-import { PageShell } from "@/components/layout/PageShell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,9 +20,7 @@ export default function AdminMedicationIntegrityPage() {
   if (!isAdmin) {
     return (
       <Layout title={t.adminMedicationIntegrity.title}>
-        <PageShell>
-          <p className="text-sm text-muted-foreground">{t.adminMedicationIntegrity.accessDenied}</p>
-        </PageShell>
+        <p className="text-sm text-muted-foreground">{t.adminMedicationIntegrity.accessDenied}</p>
       </Layout>
     );
   }
@@ -33,8 +30,7 @@ export default function AdminMedicationIntegrityPage() {
       <Helmet>
         <title>{t.adminMedicationIntegrity.title}</title>
       </Helmet>
-      <PageShell>
-        <div className="space-y-4">
+      <div className="space-y-4">
           <div>
             <h1 className="text-2xl font-bold">{t.adminMedicationIntegrity.title}</h1>
             <p className="text-sm text-muted-foreground">{t.adminMedicationIntegrity.subtitle}</p>
@@ -98,7 +94,6 @@ export default function AdminMedicationIntegrityPage() {
             </CardContent>
           </Card>
         </div>
-      </PageShell>
     </Layout>
   );
 }

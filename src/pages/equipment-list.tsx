@@ -150,7 +150,7 @@ function DesktopEquipmentView({
         Equipment Overview
       </h1>
 
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard title="Total"        value={String(total)}       sub="items tracked"   tone="info" />
         <StatCard title="Operational"  value={String(operational)} sub={`${total > 0 ? ((operational / total) * 100).toFixed(1) : 0}% uptime`} tone="ok" />
         <StatCard title="Maintenance"  value={String(maintenance)} sub="scheduled"       tone="warn" />
@@ -170,7 +170,7 @@ function DesktopEquipmentView({
       )}
 
       {alerts.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {alerts.map((a) => (
             <AlertCard key={a.title} icon={a.icon} title={a.title} tone={a.tone} />
           ))}
