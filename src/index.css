@@ -206,6 +206,27 @@
   }
 }
 
+/*
+ * ── Global z-index layer strategy ────────────────────────────────────────────
+ *
+ *   z-10        Decorative guides, badge counters (pointer-events-none)
+ *   z-20        In-page sticky bars (filter bars, inline toolbars)
+ *   z-[39]      Menu backdrop — below sticky header (z-40) so header stays on top
+ *   z-40        Sticky header / Topbar; Radix sheet backdrops
+ *   z-50        Fixed bottom nav; Radix Dialog/Sheet/AlertDialog; QR scanner; tooltips
+ *   z-[60]      Global FABs (ShiftChatFab) — float above nav + modals
+ *   z-[65/66]   Custom bottom sheets (ShiftSummarySheet, SyncQueueSheet)
+ *               backdrop z-[65] / content z-[66] — must cover nav (z-50) and FAB (z-[60])
+ *   z-[70]+     System-critical full-screen modals (OnboardingWalkthrough)
+ *
+ * Rules:
+ * - Custom sheets that don't use a Radix portal MUST use z-[65]/z-[66] so
+ *   they cover the bottom nav bar and FABs which render later in the DOM.
+ * - Radix Dialog/Sheet portals auto-stack correctly via DOM order (z-50 is fine).
+ * - Never add z-index values outside this table without updating it here.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
 @layer utilities {
   /* Sticky position anchored below the status bar */
   .top-safe {
