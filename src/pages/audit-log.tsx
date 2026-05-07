@@ -283,25 +283,25 @@ export function SharedAuditLogsPanel({
               </div>
 
               {/* Date range */}
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1.5 flex-1 min-w-[7rem]">
                 <Label className="text-xs">{t.adminPage.logFilterFrom}</Label>
                 <Input
                   type="date"
                   placeholder="מ-תאריך"
                   value={from}
                   onChange={(e) => setFrom(e.target.value)}
-                  className="h-8 text-sm w-36"
+                  className="h-8 text-sm w-full"
                 />
               </div>
 
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1.5 flex-1 min-w-[7rem]">
                 <Label className="text-xs">{t.adminPage.logFilterTo}</Label>
                 <Input
                   type="date"
                   placeholder="עד-תאריך"
                   value={to}
                   onChange={(e) => setTo(e.target.value)}
-                  className="h-8 text-sm w-36"
+                  className="h-8 text-sm w-full"
                 />
               </div>
 
