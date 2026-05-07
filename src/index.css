@@ -227,6 +227,11 @@
   .pb-nav-safe {
     padding-bottom: calc(6rem + env(safe-area-inset-bottom) + 0.375rem);
   }
+  /* For fixed/floating elements: positions above the full bottom nav bar + safe-area inset.
+     Nav bar is 68px; 0.5rem (8px) gap ensures the element clears the top edge. */
+  .bottom-nav-float {
+    bottom: calc(68px + env(safe-area-inset-bottom) + 0.5rem);
+  }
 }
 
 /* ── Compact density overrides ───────────────────────────────────────────── */

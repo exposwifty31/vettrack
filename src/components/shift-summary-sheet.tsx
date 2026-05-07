@@ -426,7 +426,7 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t bg-white flex gap-2">
+        <div className="px-5 pt-4 pb-safe border-t bg-white flex gap-2">
           <Button
             className="flex-1 gap-2"
             variant="outline"
