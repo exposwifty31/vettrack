@@ -186,7 +186,7 @@ export default function AdminPage() {
         </Card>
 
         {/* Tab bar */}
-        <div className="flex gap-2 border-b border-border pb-0 overflow-x-auto">
+        <div className="flex gap-2 border-b border-border pb-0 overflow-x-auto scrollbar-none">
           <button
             onClick={() => setActiveTab("folders")}
             data-testid="admin-tab-folders"

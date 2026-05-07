@@ -559,11 +559,11 @@ export default function WardDisplayPage() {
   return (
     <div className="min-h-screen bg-[#0d1117] text-gray-200 flex flex-col" dir="rtl">
       <AwarenessBar snapshot={snapshot} />
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-col sm:flex-row flex-1 min-h-0">
         <div className="flex-1 min-w-0 overflow-auto">
           <PatientGrid hospitalizations={snapshot.hospitalizations} />
         </div>
-        <div className="w-[420px] shrink-0 border-r border-[#1f2937] flex flex-col overflow-auto">
+        <div className="w-full sm:w-[420px] shrink-0 border-t sm:border-t-0 sm:border-r border-[#1f2937] flex flex-col overflow-auto">
           <EquipmentPane equipment={snapshot.equipment} />
           <UpcomingTasksPane tasks={snapshot.upcomingTasks} currentTime={snapshot.currentTime} />
         </div>

@@ -92,7 +92,7 @@ export default function LeakageReportPage() {
         {/* Date range picker */}
         <div className="rounded-xl border bg-card p-4 shadow-sm">
           <div className="flex flex-wrap items-end gap-4">
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 flex-1 min-w-[7rem]">
               <label className="text-xs font-medium text-muted-foreground" htmlFor="from-date">
                 מתאריך
               </label>
@@ -101,10 +101,10 @@ export default function LeakageReportPage() {
                 type="date"
                 value={fromDate}
                 onChange={(e) => setFromDate(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 flex-1 min-w-[7rem]">
               <label className="text-xs font-medium text-muted-foreground" htmlFor="to-date">
                 עד תאריך
               </label>
@@ -113,7 +113,7 @@ export default function LeakageReportPage() {
                 type="date"
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             <Button onClick={handleRunReport} disabled={reportQ.isFetching}>
