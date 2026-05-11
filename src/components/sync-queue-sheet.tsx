@@ -11,9 +11,11 @@ import {
   RotateCcw,
   CloudOff,
   ShieldAlert,
+  AlertTriangle,
 } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 import { t } from "@/lib/i18n";
+import { useConflicts, removeConflict } from "@/lib/conflict-store";
 
 interface SyncQueueSheetProps {
   open: boolean;
@@ -75,10 +77,12 @@ function DiscardConfirm({ onConfirm, onCancel }: { onConfirm: () => void; onCanc
 
 function SyncQueueItem({
   item,
+  isConflict,
   onRetry,
   onDiscard,
 }: {
   item: SyncQueueItemModel;
+  isConflict: boolean;
   onRetry: () => void;
   onDiscard: () => void;
 }) {
@@ -97,41 +101,55 @@ function SyncQueueItem({
   const isPending = item.status === "pending";
   const isFailed = item.status === "failed";
 
+  const statusLabel = isPending
+    ? t.syncQueueSheet.pending
+    : isConflict
+    ? t.syncQueueSheet.conflict
+    : t.syncQueueSheet.failed;
+
+  const statusColorClass = isPending
+    ? "bg-amber-100 text-amber-700"
+    : isConflict
+    ? "bg-orange-100 text-orange-700"
+    : "bg-red-100 text-red-700";
+
+  const cardColorClass = isPending
+    ? "bg-amber-50 border-amber-200"
+    : isConflict
+    ? "bg-orange-50 border-orange-200"
+    : "bg-red-50 border-red-200";
+
+  const iconNode = isPending ? (
+    <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin shrink-0" />
+  ) : isConflict ? (
+    <AlertTriangle className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+  ) : (
+    <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+  );
+
   return (
     <div
-      className={`rounded-xl border p-3 flex flex-col gap-1 ${
-        isFailed
-          ? "bg-red-50 border-red-200"
-          : "bg-amber-50 border-amber-200"
-      }`}
+      className={`rounded-xl border p-3 flex flex-col gap-1 ${cardColorClass}`}
       data-testid={`sync-item-${item.id}`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          {isPending ? (
-            <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin shrink-0" />
-          ) : (
-            <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
-          )}
+          {iconNode}
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <span
                 className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${
                   isPending
                     ? "bg-amber-200 text-amber-800"
+                    : isConflict
+                    ? "bg-orange-200 text-orange-800"
                     : "bg-red-200 text-red-800"
                 }`}
               >
                 {TYPE_LABELS[item.type] ?? item.type}
               </span>
-              <span
-                className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-                  isPending
-                    ? "bg-amber-100 text-amber-700"
-                    : "bg-red-100 text-red-700"
-                }`}
-              >
-                {isPending ? t.syncQueueSheet.pending : t.syncQueueSheet.failed}
+              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${statusColorClass}`}>
+                {statusLabel}
               </span>
             </div>
             <p className="text-sm font-medium text-foreground truncate mt-0.5">
@@ -148,7 +166,11 @@ function SyncQueueItem({
             <Button
               size="sm"
               variant="outline"
-              className="h-11 text-xs gap-1 border-amber-300 text-amber-700 hover:bg-amber-100"
+              className={`h-11 text-xs gap-1 ${
+                isConflict
+                  ? "border-orange-300 text-orange-700 hover:bg-orange-100"
+                  : "border-amber-300 text-amber-700 hover:bg-amber-100"
+              }`}
               onClick={handleRetry}
               disabled={retrying}
               data-testid={`btn-retry-${item.id}`}
@@ -175,7 +197,9 @@ function SyncQueueItem({
       </div>
 
       {isFailed && item.errorMessage && (
-        <p className="text-xs text-red-600 mt-0.5 pl-5">{item.errorMessage}</p>
+        <p className={`text-xs mt-0.5 pl-5 ${isConflict ? "text-orange-700" : "text-red-600"}`}>
+          {item.errorMessage}
+        </p>
       )}
 
       {confirmDiscard && (
@@ -219,6 +243,8 @@ function CircuitBreakerBanner({ resetsAt }: { resetsAt: number }) {
 export function SyncQueueSheet({ open, onClose }: SyncQueueSheetProps) {
   const { items, pendingCount, failedCount, retry, discard } = useSyncQueue();
   const { isSyncing, triggerSync, isCircuitOpen, circuitResetsAt, batchCurrent, batchTotal } = useSync();
+  const conflicts = useConflicts();
+  const conflictIds = new Set(conflicts.map((c) => c.id));
   const sheetRef = useRef<HTMLDivElement>(null);
 
   const totalCount = pendingCount + failedCount;
@@ -325,8 +351,12 @@ export function SyncQueueSheet({ open, onClose }: SyncQueueSheetProps) {
                 <SyncQueueItem
                   key={item.id}
                   item={item}
+                  isConflict={item.id !== undefined && conflictIds.has(item.id)}
                   onRetry={() => retry(item.id!)}
-                  onDiscard={() => discard(item.id!)}
+                  onDiscard={() => {
+                    if (item.id !== undefined) removeConflict(item.id);
+                    discard(item.id!);
+                  }}
                 />
               ))}
             </>

@@ -386,8 +386,8 @@ test.describe("PWA — Offline behaviour", () => {
     // insufficient because `clients.claim()` resolves asynchronously after
     // React has already mounted.
     await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
-    await waitForServiceWorkerReady(page);
-    await waitForServiceWorkerControlling(page);
+    await waitForServiceWorkerReady(page, 10_000);
+    await waitForServiceWorkerControlling(page, 10_000);
 
     await goOffline(context);
     try {

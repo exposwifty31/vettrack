@@ -113,9 +113,47 @@ export async function getCachedRoomById(id: string): Promise<Room | undefined> {
   return offlineDb.rooms.get(id);
 }
 
+// These mutation types are idempotent per endpoint — a second offline tap
+// should overwrite the first entry rather than queue a replay storm.
+const DEDUP_SYNC_TYPES: ReadonlySet<PendingSyncType> = new Set([
+  "checkout",
+  "return",
+  "scan",
+]);
+
 export async function addPendingSync(op: Omit<PendingSync, "id">): Promise<number | undefined> {
   const table = getPendingSyncTable();
   if (!table) return undefined;
+
+  if (DEDUP_SYNC_TYPES.has(op.type)) {
+    try {
+      const existing = await table
+        .where("status")
+        .equals("pending")
+        .and(
+          (item) =>
+            item.endpoint === op.endpoint &&
+            item.method === op.method &&
+            item.type === op.type,
+        )
+        .first();
+
+      if (existing?.id !== undefined) {
+        await table.update(existing.id, {
+          clientTimestamp: op.clientTimestamp,
+          createdAt: op.createdAt,
+          body: op.body,
+          optimisticData: op.optimisticData,
+          equipmentName: op.equipmentName,
+          retries: 0,
+        });
+        return existing.id;
+      }
+    } catch {
+      // Fall through to normal insert if dedup query fails
+    }
+  }
+
   return table.add(op) as Promise<number>;
 }
 

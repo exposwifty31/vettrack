@@ -131,12 +131,27 @@ describe("Equipment scan — return flow contract", () => {
     expect(routeSource).toContain("Quick scan — returned");
   });
 
-  it("return inserts an equipmentReturns row inside the transaction", () => {
+  it("quick-scan return inserts an equipmentReturns row inside the transaction", () => {
+    // The quick-scan route (POST /api/equipment/scan) inserts equipmentReturns
+    // as a lightweight record. POST /api/equipment/:id/return does NOT insert
+    // a duplicate — plug-in state is recorded via POST /api/returns instead.
     expect(routeSource).toContain("tx.insert(equipmentReturns)");
   });
 
-  it("return uses isPluggedIn=true as default", () => {
+  it("quick-scan return uses isPluggedIn=true as default", () => {
     expect(routeSource).toContain("isPluggedIn: true");
+  });
+
+  it("POST /:id/return does not insert a duplicate equipmentReturns row", () => {
+    // The /:id/return handler must return returnRecord: null to prevent
+    // duplicate records when the client also calls POST /api/returns.
+    const returnRouteStart = routeSource.indexOf("// POST /api/equipment/:id/return");
+    const returnRouteEnd = routeSource.indexOf("// POST /api/equipment/:id/seen");
+    expect(returnRouteStart).toBeGreaterThan(-1);
+    expect(returnRouteEnd).toBeGreaterThan(returnRouteStart);
+    const returnRouteBody = routeSource.slice(returnRouteStart, returnRouteEnd);
+    expect(returnRouteBody).not.toContain("tx.insert(equipmentReturns)");
+    expect(returnRouteBody).toContain("returnRecord: null");
   });
 
   it("return also creates an undoToken inside the transaction", () => {

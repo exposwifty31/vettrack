@@ -310,6 +310,8 @@ const translations = {
   roomRadarPage: {
     ...d.roomRadarPage,
     verifyAllInRoom: (roomName: string) => tr(d.roomRadarPage.verifyAllInRoom, { roomName }),
+    itemsVerified: (count: number) => tr(d.roomRadarPage.itemsVerified, { count }),
+    filterHint: (shown: number, total: number) => tr(d.roomRadarPage.filterHint, { shown, total }),
   },
 
   roomsListPage: d.roomsListPage,

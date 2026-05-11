@@ -1297,8 +1297,6 @@ router.post("/:id/return", requireAuth, checkoutLimiter, requireEffectiveRole("s
 
     let updated: EquipmentRow | null = null;
     let undoToken = "";
-    let returnRecordId: string | null = null;
-    let returnRecordDeadlineMinutes: number | null = null;
     let alreadyReturned = false;
 
     await db.transaction(async (tx) => {
@@ -1355,27 +1353,6 @@ router.post("/:id/return", requireAuth, checkoutLimiter, requireEffectiveRole("s
         scanLogId: returnLogId,
         previousState: snapshotState(existing),
       });
-
-      const [returnRecord] = await tx
-        .insert(equipmentReturns)
-        .values({
-          id: randomUUID(),
-          clinicId,
-          equipmentId: req.params.id,
-          returnedById: req.authUser!.id,
-          returnedByEmail: req.authUser!.email,
-          returnedAt: returnTime,
-          isPluggedIn: true,
-          plugInDeadlineMinutes: 30,
-          plugInAlertSentAt: null,
-          chargeAlertJobId: null,
-        })
-        .returning({
-          id: equipmentReturns.id,
-          plugInDeadlineMinutes: equipmentReturns.plugInDeadlineMinutes,
-        });
-      returnRecordId = returnRecord?.id ?? null;
-      returnRecordDeadlineMinutes = returnRecord?.plugInDeadlineMinutes ?? null;
     });
 
     if (!updated) {
@@ -1408,13 +1385,7 @@ router.post("/:id/return", requireAuth, checkoutLimiter, requireEffectiveRole("s
     res.json({
       equipment: updated,
       undoToken,
-      returnRecord: returnRecordId
-        ? {
-            id: returnRecordId,
-            isPluggedIn: true,
-            plugInDeadlineMinutes: returnRecordDeadlineMinutes ?? 30,
-          }
-        : null,
+      returnRecord: null,
     });
 
     await cancelSmartReturnReminder(clinicId, u.id, req.authUser!.id);

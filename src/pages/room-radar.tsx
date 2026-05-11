@@ -122,9 +122,9 @@ function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardP
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
-      toast.success(`Checked out — ${eq.name}`);
+      toast.success(`${t.roomRadarPage.checkoutSuccess} — ${eq.name}`);
     },
-    onError: () => toast.error("לקיחה נכשלה"),
+    onError: () => toast.error(t.roomRadarPage.checkoutError),
     onSettled: () => { busyRef.current = false; },
   });
 
@@ -135,16 +135,16 @@ function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardP
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
       queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
-      toast.success(`Returned — ${eq.name}`);
+      toast.success(`${t.roomRadarPage.returnSuccess} — ${eq.name}`);
     },
-    onError: () => toast.error("החזרה נכשלה"),
+    onError: () => toast.error(t.roomRadarPage.returnError),
     onSettled: () => { busyRef.current = false; },
   });
 
   const quickAction = !isCheckedOut && eq.status === "ok"
-    ? { label: "קח", icon: LogIn, action: () => checkoutMut.mutate(), pending: checkoutMut.isPending, cls: "text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40" }
+    ? { label: t.roomRadarPage.checkoutLabel, icon: LogIn, action: () => checkoutMut.mutate(), pending: checkoutMut.isPending, cls: "text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40" }
     : isCheckedOut && (checkedOutByMe || isAdmin) && eq.status === "ok"
-    ? { label: "החזר", icon: LogOut, action: () => setReturnDialogOpen(true), pending: returnMut.isPending, cls: "text-primary border-primary/30 hover:bg-primary/10 dark:hover:bg-primary/15" }
+    ? { label: t.roomRadarPage.returnLabel, icon: LogOut, action: () => setReturnDialogOpen(true), pending: returnMut.isPending, cls: "text-primary border-primary/30 hover:bg-primary/10 dark:hover:bg-primary/15" }
     : null;
 
   const handleQuickAction = (e: React.MouseEvent) => {
@@ -154,14 +154,14 @@ function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardP
     busyRef.current = true;
     setTapped(true);
     tapTimerRef.current = setTimeout(() => setTapped(false), 300);
-    try { quickAction.action(); } catch { busyRef.current = false; toast.error("הפעולה נכשלה"); }
+    try { quickAction.action(); } catch { busyRef.current = false; toast.error(t.roomRadarPage.actionFailed); }
   };
 
   const verifierInitials = justVerified ? null : toInitials(eq.lastVerifiedByName);
   const verifiedLabel = justVerified
     ? t.roomRadarPage.verifiedNow
     : eq.lastVerifiedAt
-    ? `Verified ${formatRelativeTime(eq.lastVerifiedAt)}${verifierInitials ? ` · ${verifierInitials}` : ""}`
+    ? `${t.roomRadarPage.verifiedPrefix} ${formatRelativeTime(eq.lastVerifiedAt)}${verifierInitials ? ` · ${verifierInitials}` : ""}`
     : null;
 
   const holderLabel = isCheckedOut
@@ -212,9 +212,9 @@ function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardP
                     {STATUS_LABELS[eq.status as keyof typeof STATUS_LABELS] ?? eq.status}
                   </Badge>
                   {isCheckedOut ? (
-                    <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300">In Use</span>
+                    <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300">{t.roomRadarPage.inUseCard}</span>
                   ) : (
-                    <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">Available</span>
+                    <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">{t.roomRadarPage.availableCard}</span>
                   )}
                 </div>
               </div>
@@ -243,7 +243,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardP
                   {verifiedLabel}
                 </span>
               ) : (
-                <span className="text-muted-foreground/60">Not verified</span>
+                <span className="text-muted-foreground/60">{t.roomRadarPage.notVerified}</span>
               )}
             </div>
 
@@ -270,10 +270,10 @@ function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardP
               <button
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMoveOpen(true); }}
                 className="flex items-center gap-1 px-3 py-2 rounded-xl border border-border text-[11px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors min-h-[44px]"
-                title={`Move ${eq.name}`}
+                title={`${t.roomRadarPage.moveButton} ${eq.name}`}
               >
                 <MoveRight className="w-3 h-3" />
-                Move
+                {t.roomRadarPage.moveButton}
               </button>
               <Link href={`/equipment/${eq.id}`} className="ml-auto">
                 <div className="p-2 rounded-lg hover:bg-muted transition-colors">
@@ -341,7 +341,7 @@ export default function RoomRadarPage() {
     refetchOnWindowFocus: false,
   });
 
-  const { data: room, isLoading: roomLoading } = useQuery({
+  const { data: room, isLoading: roomLoading, isError: roomError } = useQuery({
     queryKey: ["/api/rooms", id],
     queryFn: () => api.rooms.get(id!),
     enabled: !!userId && !!id,
@@ -423,7 +423,7 @@ export default function RoomRadarPage() {
               <div className="w-14 h-14 rounded-full bg-primary/15 border-2 border-primary/30 flex items-center justify-center mx-auto mb-3">
                 <Radar className="w-7 h-7 text-primary" />
               </div>
-              <p className="text-[10px] font-bold tracking-widest uppercase text-primary/70 mb-1">NFC Room Reset</p>
+              <p className="text-[10px] font-bold tracking-widest uppercase text-primary/70 mb-1">{t.roomRadarPage.nfcResetLabel}</p>
               <h2 className="text-lg font-bold text-foreground leading-snug">
                 {room?.name ?? t.roomRadarPage.loadingRoom}
               </h2>
@@ -444,7 +444,7 @@ export default function RoomRadarPage() {
               </p>
 
               <div className="flex items-center justify-between text-xs bg-muted/60 border border-border rounded-lg px-3 py-2 mt-1">
-                <span className="text-muted-foreground">Items in room</span>
+                <span className="text-muted-foreground">{t.roomRadarPage.nfcItemsInRoom}</span>
                 <span className="font-bold text-foreground">{roomEquipment.length}</span>
               </div>
 
@@ -463,14 +463,14 @@ export default function RoomRadarPage() {
                 {verifyState === "verifying" ? (
                   <><Loader2 className="w-4 h-4 animate-spin mr-2" />Verifying…</>
                 ) : (
-                  <><ShieldCheck className="w-4 h-4 mr-2" />Confirm Inventory</>
+                  <><ShieldCheck className="w-4 h-4 mr-2" />{t.roomRadarPage.nfcConfirmInventory}</>
                 )}
               </Button>
               <button
                 className="w-full text-sm text-muted-foreground hover:text-foreground py-2 transition-colors font-medium"
                 onClick={() => setNfcOverlayOpen(false)}
               >
-                Dismiss
+                {t.roomRadarPage.nfcDismiss}
               </button>
             </div>
           </div>
@@ -483,7 +483,7 @@ export default function RoomRadarPage() {
           <Link href="/rooms">
             <button className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3 -ml-1">
               <ArrowLeft className="w-4 h-4" />
-              All Rooms
+              {t.roomRadarPage.allRooms}
             </button>
           </Link>
 
@@ -496,6 +496,20 @@ export default function RoomRadarPage() {
               </p>
               <Skeleton className="h-7 w-40" />
               <Skeleton className="h-5 w-28" />
+            </div>
+          ) : roomError ? (
+            <div className="flex flex-col gap-3 py-4">
+              <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                <AlertTriangle className="w-5 h-5 shrink-0" />
+                <p className="font-semibold text-base">{t.roomRadarPage.roomLoadError}</p>
+              </div>
+              <p className="text-sm text-muted-foreground">{t.roomRadarPage.roomLoadErrorDesc}</p>
+              <Link href="/rooms">
+                <Button variant="outline" size="sm" className="gap-2 mt-1">
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  {t.roomRadarPage.backToRooms}
+                </Button>
+              </Link>
             </div>
           ) : room ? (
             <div className="flex items-start justify-between gap-3">
@@ -530,17 +544,17 @@ export default function RoomRadarPage() {
           <div className="flex gap-2 flex-wrap">
             <div className="flex items-center gap-1.5 text-xs font-semibold bg-primary/5 border border-primary/20 text-primary rounded-full px-3 py-1.5">
               <span className="font-bold">{availableCount}</span>
-              <span className="text-[11px]">Available</span>
+              <span className="text-[11px]">{t.roomRadarPage.availableStat}</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs font-semibold bg-muted border border-border text-muted-foreground rounded-full px-3 py-1.5">
               <span className="font-bold">{inUseCount}</span>
-              <span className="text-[11px]">In Use</span>
+              <span className="text-[11px]">{t.roomRadarPage.inUseStat}</span>
             </div>
             {issueCount > 0 && (
               <div className="flex items-center gap-1.5 text-xs font-semibold bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 rounded-full px-3 py-1.5">
                 <AlertTriangle className="w-3 h-3" />
                 <span className="font-bold">{issueCount}</span>
-                <span className="text-[11px]">Issue{issueCount !== 1 ? "s" : ""}</span>
+                <span className="text-[11px]">{issueCount !== 1 ? t.roomRadarPage.issuesStat : t.roomRadarPage.issueStat}</span>
               </div>
             )}
           </div>
@@ -560,7 +574,7 @@ export default function RoomRadarPage() {
               )}
             >
               {availableOnly ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-              Available Only
+              {t.roomRadarPage.availableOnly}
             </button>
 
             {/* Verify all button */}
@@ -577,12 +591,12 @@ export default function RoomRadarPage() {
               {verifyState === "verifying" ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Verifying…
+                  {t.roomRadarPage.verifying}
                 </>
               ) : verifyState === "done" ? (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  {verifiedCount} Item{verifiedCount !== 1 ? "s" : ""} Verified
+                  {t.roomRadarPage.itemsVerified(verifiedCount)}
                 </>
               ) : (
                 <>
@@ -612,16 +626,15 @@ export default function RoomRadarPage() {
               <Package className="w-8 h-8 text-muted-foreground/60" />
             </div>
             <div className="space-y-1">
-              <p className="font-semibold text-base text-foreground">Room is empty</p>
+              <p className="font-semibold text-base text-foreground">{t.roomRadarPage.roomEmptyTitle}</p>
               <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
-                No equipment is assigned here yet. Open any equipment item and tap{" "}
-                <span className="font-medium text-foreground">Move →</span> to relocate it to this room.
+                {t.roomRadarPage.roomEmptyDesc}
               </p>
             </div>
             <Link href="/equipment">
               <Button variant="outline" size="sm" className="gap-2">
                 <Package className="w-3.5 h-3.5" />
-                Browse Equipment
+                {t.roomRadarPage.browseEquipment}
               </Button>
             </Link>
           </div>
@@ -632,7 +645,7 @@ export default function RoomRadarPage() {
             subMessage={t.roomRadarPage.allCheckedOutSubMessage}
             action={
               <Button variant="outline" size="sm" onClick={() => setAvailableOnly(false)}>
-                Show All Items
+                {t.roomRadarPage.showAllItems}
               </Button>
             }
           />
@@ -651,9 +664,9 @@ export default function RoomRadarPage() {
         {/* Filter hint when active */}
         {availableOnly && roomEquipment.length > 0 && filtered.length < roomEquipment.length && (
           <p className="text-xs text-center text-muted-foreground">
-            Showing {filtered.length} of {roomEquipment.length} items ·{" "}
+            {t.roomRadarPage.filterHint(filtered.length, roomEquipment.length)} ·{" "}
             <button className="text-primary font-medium" onClick={() => setAvailableOnly(false)}>
-              Show all
+              {t.roomRadarPage.showAll}
             </button>
           </p>
         )}
@@ -667,9 +680,9 @@ export default function RoomRadarPage() {
             >
               <div className="flex items-center gap-2">
                 <Activity className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-semibold">Room Activity</span>
+                <span className="text-sm font-semibold">{t.roomRadarPage.roomActivity}</span>
                 <span className="text-[10px] font-medium text-muted-foreground bg-background border border-border rounded-full px-2 py-0.5">
-                  Last 5 scans
+                  {t.roomRadarPage.lastScans}
                 </span>
               </div>
               {activityOpen
@@ -691,8 +704,9 @@ export default function RoomRadarPage() {
                     ))}
                   </div>
                 ) : !activityEntries || activityEntries.length === 0 ? (
-                  <div className="px-4 py-6 text-center">
-                    <p className="text-sm text-muted-foreground">No scan activity for this room yet.</p>
+                  <div className="px-4 py-6 text-center flex flex-col gap-1">
+                    <p className="text-sm text-muted-foreground">{t.roomRadarPage.noActivityYet}</p>
+                    <p className="text-xs text-muted-foreground/70">{t.roomRadarPage.noActivityHint}</p>
                   </div>
                 ) : (
                   activityEntries.map((entry) => {
