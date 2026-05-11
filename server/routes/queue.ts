@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { getNotificationsDlq, getNotificationsQueue } from "../lib/queue.js";
+import { getNotificationsDlq, getNotificationsQueue, getQueueJobCounts, queueMetrics } from "../lib/queue.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import { safeRedisGet, getRedisUrl } from "../lib/redis.js";
 
 const router = Router();
 
@@ -28,6 +29,88 @@ function apiError(params: { code: string; reason: string; message: string; reque
     requestId: params.requestId,
   };
 }
+
+/**
+ * GET /api/queue/metrics
+ * Read-only BullMQ queue observability: live job counts, in-process counters,
+ * worker heartbeat, and degraded-state flag. Admin-only.
+ */
+router.get("/metrics", requireAuth, requireAdmin, async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  try {
+    // Live BullMQ counts from Redis (null when Redis is unavailable)
+    const liveCounts = await getQueueJobCounts();
+
+    // DLQ live counts
+    let dlqLiveCounts: Record<string, number> | null = null;
+    const dlq = await getNotificationsDlq();
+    if (dlq) {
+      try {
+        dlqLiveCounts = await dlq.getJobCounts("wait", "active", "completed", "failed", "delayed");
+      } catch {
+        dlqLiveCounts = null;
+      }
+    }
+
+    // Worker heartbeat: notification.worker.ts writes vettrack:worker:heartbeat every 30s (TTL 120s)
+    let workerHeartbeat: { status: "ok" | "stale" | "dead" | "no_redis"; ageMs: number | null } = {
+      status: "no_redis",
+      ageMs: null,
+    };
+    if (getRedisUrl()) {
+      const beat = await safeRedisGet("vettrack:worker:heartbeat");
+      if (beat) {
+        const ageMs = Date.now() - Number(beat);
+        workerHeartbeat = {
+          status: ageMs < 120_000 ? "ok" : "stale",
+          ageMs,
+        };
+      } else {
+        workerHeartbeat = { status: "dead", ageMs: null };
+      }
+    }
+
+    // Degraded state: any of: worker not alive, circuit broken, DLQ receiving jobs
+    const isDegraded =
+      workerHeartbeat.status === "dead" ||
+      workerHeartbeat.status === "stale" ||
+      queueMetrics.circuitQueueBroken > 0 ||
+      (dlqLiveCounts !== null && (dlqLiveCounts.wait ?? 0) + (dlqLiveCounts.active ?? 0) > 0);
+
+    res.json({
+      queue: {
+        name: "notifications",
+        live: liveCounts,
+        inProcess: {
+          enqueued: queueMetrics.enqueued,
+          completed: queueMetrics.completed,
+          failed: queueMetrics.failed,
+          droppedRateLimit: queueMetrics.droppedRateLimit,
+          droppedNoRedis: queueMetrics.droppedNoRedis,
+          circuitQueueBroken: queueMetrics.circuitQueueBroken,
+        },
+      },
+      dlq: {
+        name: "notifications_dlq",
+        live: dlqLiveCounts,
+      },
+      workerHeartbeat,
+      isDegraded,
+      redisAvailable: getRedisUrl() !== null,
+      requestId,
+    });
+  } catch (err) {
+    console.error("[queue-route] failed to fetch queue metrics", err);
+    res.status(500).json(
+      apiError({
+        code: "INTERNAL_ERROR",
+        reason: "QUEUE_METRICS_FETCH_FAILED",
+        message: "Failed to fetch queue metrics",
+        requestId,
+      }),
+    );
+  }
+});
 
 router.get("/dlq", requireAuth, requireAdmin, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);

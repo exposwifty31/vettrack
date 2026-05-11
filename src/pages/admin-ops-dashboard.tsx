@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { Layout } from "@/components/layout";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
@@ -17,9 +18,17 @@ export default function AdminOpsDashboardPage() {
   const { role } = useAuth();
   const isAdmin = role === "admin";
 
-  const q = useQuery({
+  const outboxQ = useQuery({
     queryKey: ["/api/admin/outbox-health"],
     queryFn: api.adminOutboxHealth.get,
+    enabled: isAdmin,
+    refetchInterval: POLL_MS,
+    refetchIntervalInBackground: true,
+  });
+
+  const queueQ = useQuery({
+    queryKey: ["/api/queue/metrics"],
+    queryFn: api.adminQueueMetrics.get,
     enabled: isAdmin,
     refetchInterval: POLL_MS,
     refetchIntervalInBackground: true,
@@ -33,25 +42,27 @@ export default function AdminOpsDashboardPage() {
     );
   }
 
-  const d = q.data;
+  const d = outboxQ.data;
+  const qd = queueQ.data;
 
   return (
     <Layout title={t.adminOpsDashboard.title}>
       <Helmet>
         <title>{t.adminOpsDashboard.title}</title>
       </Helmet>
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold">{t.adminOpsDashboard.title}</h1>
           <p className="text-sm text-muted-foreground">{t.adminOpsDashboard.subtitle}</p>
           <p className="mt-1 text-xs text-muted-foreground">{t.adminOpsDashboard.liveHint}</p>
         </div>
 
+        {/* Event outbox / realtime pipeline */}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <MetricCard
             title={t.adminOpsDashboard.publishLag}
-            loading={q.isLoading}
-            error={q.isError}
+            loading={outboxQ.isLoading}
+            error={outboxQ.isError}
             value={
               d?.publish_lag_ms == null ? (
                 <span className="text-muted-foreground">{t.adminOpsDashboard.publishLagEmpty}</span>
@@ -67,8 +78,8 @@ export default function AdminOpsDashboardPage() {
           />
           <MetricCard
             title={t.adminOpsDashboard.eventsPerSec}
-            loading={q.isLoading}
-            error={q.isError}
+            loading={outboxQ.isLoading}
+            error={outboxQ.isError}
             value={
               d ? (
                 d.events_per_sec.toLocaleString(undefined, {
@@ -80,47 +91,47 @@ export default function AdminOpsDashboardPage() {
           />
           <MetricCard
             title={t.adminOpsDashboard.deadLetterCount}
-            loading={q.isLoading}
-            error={q.isError}
+            loading={outboxQ.isLoading}
+            error={outboxQ.isError}
             highlightDestructive={(d?.dead_letter_count ?? 0) > 0}
             value={d != null ? d.dead_letter_count.toLocaleString() : null}
           />
           <MetricCard
             title={t.adminOpsDashboard.dlqPermanentCount}
-            loading={q.isLoading}
-            error={q.isError}
+            loading={outboxQ.isLoading}
+            error={outboxQ.isError}
             highlightDestructive={(d?.dlq_permanent_count ?? 0) > 0}
             value={d != null ? d.dlq_permanent_count.toLocaleString() : null}
           />
           <MetricCard
             title={t.adminOpsDashboard.dlqTransientCount}
-            loading={q.isLoading}
-            error={q.isError}
+            loading={outboxQ.isLoading}
+            error={outboxQ.isError}
             value={d != null ? d.dlq_transient_count.toLocaleString() : null}
           />
           <MetricCard
             title={t.adminOpsDashboard.dlqUnclassifiedCount}
-            loading={q.isLoading}
-            error={q.isError}
+            loading={outboxQ.isLoading}
+            error={outboxQ.isError}
             value={d != null ? d.dlq_unclassified_count.toLocaleString() : null}
           />
           <MetricCard
             title={t.adminOpsDashboard.gapResyncCount}
-            loading={q.isLoading}
-            error={q.isError}
+            loading={outboxQ.isLoading}
+            error={outboxQ.isError}
             value={d != null ? d.gap_resync_count.toLocaleString() : null}
           />
           <MetricCard
             title={t.adminOpsDashboard.duplicateDropsCount}
-            loading={q.isLoading}
-            error={q.isError}
+            loading={outboxQ.isLoading}
+            error={outboxQ.isError}
             value={d != null ? d.duplicate_drops_count.toLocaleString() : null}
           />
           <MetricCard
             title={t.adminOpsDashboard.nextRetryWave}
             description={t.adminOpsDashboard.nextRetryWaveHint}
-            loading={q.isLoading}
-            error={q.isError}
+            loading={outboxQ.isLoading}
+            error={outboxQ.isError}
             value={
               d?.next_retry_wave_in_ms == null ? (
                 <span className="text-muted-foreground">{t.adminOpsDashboard.nextRetryWaveEmpty}</span>
@@ -132,8 +143,8 @@ export default function AdminOpsDashboardPage() {
           <MetricCard
             title={t.adminOpsDashboard.maxRetryHorizon}
             description={t.adminOpsDashboard.maxRetryHorizonHint}
-            loading={q.isLoading}
-            error={q.isError}
+            loading={outboxQ.isLoading}
+            error={outboxQ.isError}
             value={
               d?.max_retry_horizon_ms == null ? (
                 <span className="text-muted-foreground">{t.adminOpsDashboard.maxRetryHorizonEmpty}</span>
@@ -144,8 +155,151 @@ export default function AdminOpsDashboardPage() {
           />
         </div>
 
-        {q.isError && (
-          <p className="text-sm text-destructive">{(q.error as Error)?.message ?? "Error"}</p>
+        {outboxQ.isError && (
+          <p className="text-sm text-destructive">{(outboxQ.error as Error)?.message ?? "Error"}</p>
+        )}
+
+        <div className="border-t" />
+
+        {/* BullMQ notification queue section */}
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-semibold">{t.adminOpsDashboard.notificationQueueTitle}</h2>
+            {queueQ.data != null && (
+              <Badge
+                variant={qd?.isDegraded ? "destructive" : "outline"}
+                className={cn(
+                  "text-xs",
+                  !qd?.isDegraded && "border-green-600 text-green-700 dark:text-green-400",
+                )}
+              >
+                {qd?.isDegraded
+                  ? t.adminOpsDashboard.queueDegraded
+                  : t.adminOpsDashboard.queueHealthy}
+              </Badge>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {t.adminOpsDashboard.notificationQueueSubtitle}
+          </p>
+
+          {!qd?.redisAvailable && qd != null && (
+            <p className="text-sm text-amber-600 dark:text-amber-400">
+              {t.adminOpsDashboard.queueRedisUnavailable}
+            </p>
+          )}
+
+          {qd?.isDegraded && (
+            <p className="text-sm text-destructive">{t.adminOpsDashboard.queueDegradedHint}</p>
+          )}
+
+          {/* Worker heartbeat */}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <MetricCard
+              title={t.adminOpsDashboard.workerHeartbeat}
+              loading={queueQ.isLoading}
+              error={queueQ.isError}
+              highlightDestructive={
+                qd?.workerHeartbeat.status === "dead" ||
+                qd?.workerHeartbeat.status === "stale"
+              }
+              value={
+                qd == null ? null : (
+                  <HeartbeatValue
+                    status={qd.workerHeartbeat.status}
+                    ageMs={qd.workerHeartbeat.ageMs}
+                  />
+                )
+              }
+            />
+
+            {/* Live BullMQ queue counts */}
+            <MetricCard
+              title={t.adminOpsDashboard.queueWaiting}
+              loading={queueQ.isLoading}
+              error={queueQ.isError}
+              value={qd?.queue.live != null ? (qd.queue.live.wait ?? 0).toLocaleString() : "—"}
+            />
+            <MetricCard
+              title={t.adminOpsDashboard.queueActive}
+              loading={queueQ.isLoading}
+              error={queueQ.isError}
+              value={qd?.queue.live != null ? (qd.queue.live.active ?? 0).toLocaleString() : "—"}
+            />
+            <MetricCard
+              title={t.adminOpsDashboard.queueFailed}
+              loading={queueQ.isLoading}
+              error={queueQ.isError}
+              highlightDestructive={(qd?.queue.live?.failed ?? 0) > 0}
+              value={qd?.queue.live != null ? (qd.queue.live.failed ?? 0).toLocaleString() : "—"}
+            />
+            <MetricCard
+              title={t.adminOpsDashboard.queueDelayed}
+              loading={queueQ.isLoading}
+              error={queueQ.isError}
+              value={qd?.queue.live != null ? (qd.queue.live.delayed ?? 0).toLocaleString() : "—"}
+            />
+            <MetricCard
+              title={t.adminOpsDashboard.queueCompleted}
+              loading={queueQ.isLoading}
+              error={queueQ.isError}
+              value={qd?.queue.live != null ? (qd.queue.live.completed ?? 0).toLocaleString() : "—"}
+            />
+
+            {/* DLQ counts */}
+            <MetricCard
+              title={t.adminOpsDashboard.queueDlqWaiting}
+              loading={queueQ.isLoading}
+              error={queueQ.isError}
+              highlightDestructive={(qd?.dlq.live?.wait ?? 0) > 0}
+              value={qd?.dlq.live != null ? (qd.dlq.live.wait ?? 0).toLocaleString() : "—"}
+            />
+            <MetricCard
+              title={t.adminOpsDashboard.queueDlqFailed}
+              loading={queueQ.isLoading}
+              error={queueQ.isError}
+              highlightDestructive={(qd?.dlq.live?.failed ?? 0) > 0}
+              value={qd?.dlq.live != null ? (qd.dlq.live.failed ?? 0).toLocaleString() : "—"}
+            />
+
+            {/* In-process counters */}
+            <MetricCard
+              title={t.adminOpsDashboard.queueEnqueued}
+              loading={queueQ.isLoading}
+              error={queueQ.isError}
+              value={qd?.queue.inProcess != null ? qd.queue.inProcess.enqueued.toLocaleString() : null}
+            />
+            <MetricCard
+              title={t.adminOpsDashboard.queueRetried}
+              loading={queueQ.isLoading}
+              error={queueQ.isError}
+              value={
+                qd?.queue.inProcess != null
+                  ? (qd.queue.inProcess.failed - (qd.queue.live?.failed ?? 0) > 0
+                      ? qd.queue.inProcess.failed.toLocaleString()
+                      : "0")
+                  : null
+              }
+            />
+            <MetricCard
+              title={t.adminOpsDashboard.queueDroppedRateLimit}
+              loading={queueQ.isLoading}
+              error={queueQ.isError}
+              highlightDestructive={(qd?.queue.inProcess.droppedRateLimit ?? 0) > 0}
+              value={qd?.queue.inProcess != null ? qd.queue.inProcess.droppedRateLimit.toLocaleString() : null}
+            />
+            <MetricCard
+              title={t.adminOpsDashboard.queueDroppedNoRedis}
+              loading={queueQ.isLoading}
+              error={queueQ.isError}
+              highlightDestructive={(qd?.queue.inProcess.droppedNoRedis ?? 0) > 0}
+              value={qd?.queue.inProcess != null ? qd.queue.inProcess.droppedNoRedis.toLocaleString() : null}
+            />
+          </div>
+        </div>
+
+        {queueQ.isError && (
+          <p className="text-sm text-destructive">{(queueQ.error as Error)?.message ?? "Error"}</p>
         )}
       </div>
     </Layout>
@@ -158,6 +312,30 @@ function formatRetryEta(ms: number): string {
   const target = new Date(Date.now() + ms);
   const locale = getCurrentLocale() === "he" ? heLocale : enUS;
   return formatDistanceToNow(target, { locale, addSuffix: true });
+}
+
+function HeartbeatValue(props: { status: "ok" | "stale" | "dead" | "no_redis"; ageMs: number | null }) {
+  const { status, ageMs } = props;
+  const labelMap: Record<typeof status, string> = {
+    ok: t.adminOpsDashboard.workerHeartbeatOk,
+    stale: t.adminOpsDashboard.workerHeartbeatStale,
+    dead: t.adminOpsDashboard.workerHeartbeatDead,
+    no_redis: t.adminOpsDashboard.workerHeartbeatNoRedis,
+  };
+  const label = labelMap[status];
+  const locale = getCurrentLocale() === "he" ? heLocale : enUS;
+  const ageLabel =
+    ageMs != null && Number.isFinite(ageMs)
+      ? formatDistanceToNow(new Date(Date.now() - ageMs), { locale, addSuffix: true })
+      : null;
+  return (
+    <span className="text-base font-semibold">
+      {label}
+      {ageLabel && (
+        <span className="block text-sm font-normal text-muted-foreground">{ageLabel}</span>
+      )}
+    </span>
+  );
 }
 
 function MetricCard(props: {

@@ -1277,6 +1277,34 @@ export const api = {
         requestId: string;
       }>("/api/admin/outbox-health"),
   },
+  adminQueueMetrics: {
+    get: () =>
+      request<{
+        queue: {
+          name: string;
+          live: Record<string, number> | null;
+          inProcess: {
+            enqueued: number;
+            completed: number;
+            failed: number;
+            droppedRateLimit: number;
+            droppedNoRedis: number;
+            circuitQueueBroken: number;
+          };
+        };
+        dlq: {
+          name: string;
+          live: Record<string, number> | null;
+        };
+        workerHeartbeat: {
+          status: "ok" | "stale" | "dead" | "no_redis";
+          ageMs: number | null;
+        };
+        isDegraded: boolean;
+        redisAvailable: boolean;
+        requestId: string;
+      }>("/api/queue/metrics"),
+  },
   restock: {
     start: (containerId: string) =>
       request<RestockSession>("/api/restock/start", {
