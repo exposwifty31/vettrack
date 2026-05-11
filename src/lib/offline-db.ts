@@ -118,6 +118,7 @@ export async function getCachedRoomById(id: string): Promise<Room | undefined> {
 const DEDUP_SYNC_TYPES: ReadonlySet<PendingSyncType> = new Set([
   "checkout",
   "return",
+  "return_with_charge",
   "scan",
 ]);
 

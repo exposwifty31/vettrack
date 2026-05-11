@@ -352,7 +352,10 @@ export function SyncQueueSheet({ open, onClose }: SyncQueueSheetProps) {
                   key={item.id}
                   item={item}
                   isConflict={item.id !== undefined && conflictIds.has(item.id)}
-                  onRetry={() => retry(item.id!)}
+                  onRetry={() => {
+                    if (item.id !== undefined) removeConflict(item.id);
+                    return retry(item.id!);
+                  }}
                   onDiscard={() => {
                     if (item.id !== undefined) removeConflict(item.id);
                     discard(item.id!);
