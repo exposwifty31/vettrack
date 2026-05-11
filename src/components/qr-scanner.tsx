@@ -504,10 +504,10 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
       await api.equipment.scan(scannedEquipment.id, { status: "ok" });
       void api.equipment.seen(scannedEquipment.id, { roomId: scannedEquipment.roomId }).catch(() => {});
       haptics.tap();
-      toast.success(`${scannedEquipment.name} marked as OK`);
+      toast.success(t.qrScanner.markedOk(scannedEquipment.name));
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Status update failed";
+      const msg = err instanceof Error ? err.message : t.qrScanner.statusUpdateFailed;
       toast.error(msg);
       setIsActing(false);
     }
@@ -526,7 +526,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
         <div className="flex flex-col">
           <span className="text-white font-semibold text-lg">{t.qrScanner.title}</span>
           <span className="text-[11px] uppercase tracking-[0.16em] text-white/70">
-            Equipment QR
+            {t.qrScanner.subtitleEquipmentQr}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -567,7 +567,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
           <div className="absolute inset-0 flex items-center justify-center bg-black/70">
             <div className="flex flex-col items-center gap-3 text-white">
               <Loader2 className="w-10 h-10 animate-spin" />
-              <p className="text-sm font-medium">Starting camera…</p>
+              <p className="text-sm font-medium">{t.qrScanner.startingCamera}</p>
             </div>
           </div>
         )}
@@ -580,8 +580,8 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                 <Loader2 className="w-10 h-10 animate-spin text-primary" />
                 <ScanSearch className="w-4 h-4 absolute -bottom-1 -right-1 text-white/90" />
               </div>
-              <p className="text-sm font-semibold">Looking up equipment…</p>
-              <p className="text-xs text-white/60">One moment</p>
+              <p className="text-sm font-semibold">{t.qrScanner.lookingUp}</p>
+              <p className="text-xs text-white/60">{t.qrScanner.oneMoment}</p>
             </div>
           </div>
         )}
@@ -613,9 +613,9 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
           <div className="absolute inset-0 flex items-center justify-center bg-black/90 p-6">
             <div className="flex flex-col items-center gap-4 text-center text-white max-w-xs">
               <AlertCircle className="w-14 h-14 text-white/60" />
-              <p className="font-bold text-lg">No Camera Found</p>
+              <p className="font-bold text-lg">{t.qrScanner.noCameraTitle}</p>
               <p className="text-sm text-white/70">
-                This device doesn't have a usable camera.
+                {t.qrScanner.noCameraDesc}
               </p>
               <Button
                 variant="outline"
@@ -624,7 +624,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                 data-testid="btn-manual-entry-no-camera"
               >
                 <Keyboard className="w-4 h-4" />
-                Enter Code Manually
+                {t.qrScanner.manualEnterButton}
               </Button>
             </div>
           </div>
@@ -635,9 +635,9 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
           <div className="absolute inset-0 flex items-center justify-center bg-black/90 p-6">
             <div className="flex flex-col items-center gap-4 text-center text-white max-w-xs">
               <AlertCircle className="w-14 h-14 text-red-400" />
-              <p className="font-bold text-lg">Camera Error</p>
+              <p className="font-bold text-lg">{t.qrScanner.cameraErrorTitle}</p>
               <p className="text-sm text-white/70">
-                Unable to start the camera. Try again or enter the code manually.
+                {t.qrScanner.cameraErrorDesc}
               </p>
               <div className="flex flex-col gap-2 w-full mt-2">
                 <Button
@@ -646,7 +646,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                     stopScanner().then(() => startScanner());
                   }}
                 >
-                  Try Again
+                  {t.qrScanner.tryAgain}
                 </Button>
                 <Button
                   variant="outline"
@@ -657,7 +657,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                   }}
                 >
                   <Keyboard className="w-4 h-4" />
-                  Enter Code Manually
+                  {t.qrScanner.manualEnterButton}
                 </Button>
               </div>
             </div>
@@ -669,9 +669,9 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
           <div className="absolute inset-0 flex items-center justify-center bg-black/90 p-6">
             <div className="flex flex-col items-center gap-4 text-center text-white max-w-xs">
               <Tag className="w-14 h-14 text-amber-400" />
-              <p className="font-bold text-lg">Unknown Tag</p>
+              <p className="font-bold text-lg">{t.qrScanner.unknownTagTitle}</p>
               <p className="text-sm text-white/70">
-                We read a code that is not linked to equipment yet.
+                {t.qrScanner.unknownTagDesc}
               </p>
               {notFoundId ? (
                 <p className="w-full max-w-full break-all rounded-lg bg-white/5 px-2 py-1.5 text-left font-mono text-[11px] text-white/90">
@@ -684,7 +684,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                   onClick={handleScanAgain}
                   data-testid="btn-scan-again"
                 >
-                  Scan Again
+                  {t.qrScanner.scanAgain}
                 </Button>
                 <Button
                   variant="outline"
@@ -695,7 +695,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                   }}
                 >
                   <Keyboard className="w-4 h-4" />
-                  Enter Code Manually
+                  {t.qrScanner.manualEnterButton}
                 </Button>
                 <Button
                   variant="secondary"
@@ -705,7 +705,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                     navigate(`/equipment/new?prefillId=${encodeURIComponent(notFoundId || "")}`);
                   }}
                 >
-                  Link this tag to equipment
+                  {t.qrScanner.linkToEquipment}
                 </Button>
               </div>
             </div>
@@ -745,7 +745,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
         <div className="bg-gradient-to-t from-black/95 to-black/70 px-4 pt-3 flex flex-col items-center gap-2 border-t border-white/10" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
           {showFallbackHint && (
             <p className="text-white/60 text-xs text-center animate-fade-in">
-              Having trouble? Try entering the ID manually.
+              {t.qrScanner.fallbackHint}
             </p>
           )}
           <Button
@@ -759,7 +759,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
             data-testid="btn-switch-manual"
           >
             <Keyboard className="w-4 h-4" />
-            Enter code manually
+            {t.qrScanner.manualEnterButton}
           </Button>
         </div>
       )}
@@ -773,7 +773,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
           </p>
           <Input
             className="w-full max-w-md min-w-0 bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-primary"
-            placeholder="Equipment ID or URL…"
+            placeholder={t.qrScanner.manualInputPlaceholder}
             value={manualCode}
             onChange={(e) => setManualCode(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleManualSubmit()}
@@ -818,14 +818,14 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                   <CheckCircle2 className="h-5 w-5" />
                   <Sparkles className="h-3.5 w-3.5 absolute -right-1 -top-1 text-emerald-500" />
                 </div>
-                <p className="text-sm font-semibold">Equipment matched</p>
+                <p className="text-sm font-semibold">{t.qrScanner.equipmentMatched}</p>
               </div>
             </div>
 
             {/* Equipment info */}
             <div className="flex items-start gap-3 mb-4">
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-lg leading-tight truncate" data-testid="scan-inline-equipment-name">
+                <p className="font-bold text-lg leading-tight truncate" dir="auto" data-testid="scan-inline-equipment-name">
                   {scannedEquipment.name}
                 </p>
                 {scannedEquipment.serialNumber && (
@@ -845,12 +845,12 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
               <div className="bg-primary/5 border border-primary/20 rounded-xl px-3 py-2.5 mb-4 text-sm">
                 <p className="font-medium text-foreground">
                   {checkedOutByMe
-                    ? "Checked out by you"
-                    : `In use by ${scannedEquipment.checkedOutByEmail || "another user"}`}
+                    ? t.qrScanner.checkedOutByYou
+                    : t.qrScanner.inUseBy(scannedEquipment.checkedOutByEmail || t.common.unknown)}
                 </p>
                 {scannedEquipment.checkedOutLocation && (
                   <p className="text-primary text-xs mt-0.5">
-                    Location: {scannedEquipment.checkedOutLocation}
+                    {t.qrScanner.locationLabel(scannedEquipment.checkedOutLocation)}
                   </p>
                 )}
               </div>
@@ -868,7 +868,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                   data-testid="btn-scan-inline-checkout"
                 >
                   {isActing ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5" />}
-                  Check Out
+                  {t.qrScanner.checkOut}
                 </Button>
               )}
 
@@ -882,13 +882,13 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                   data-testid="btn-scan-inline-return"
                 >
                   {isActing ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogOut className="w-5 h-5" />}
-                  Return
+                  {t.qrScanner.returnEquipment}
                 </Button>
               )}
 
               {isCheckedOut && !checkedOutByMe && !isAdmin && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-                  Only the teammate who checked this out—or an admin—can return it.
+                  {t.qrScanner.onlyOwnerCanReturn}
                 </div>
               )}
 
@@ -903,7 +903,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                   data-testid="btn-scan-inline-mark-ok"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  Mark OK
+                  {t.qrScanner.markOk}
                 </Button>
                 <Button
                   variant="outline"
@@ -914,7 +914,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                   data-testid="btn-scan-inline-mark-issue"
                 >
                   <Wrench className="w-4 h-4" />
-                  Report Issue
+                  {t.qrScanner.reportIssue}
                 </Button>
               </div>
 
@@ -924,7 +924,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                 onClick={() => navigateToEquipment(scannedEquipment.id)}
                 data-testid="btn-scan-inline-details"
               >
-                View Full Details
+                {t.qrScanner.viewFullDetails}
               </Button>
             </div>
           </div>

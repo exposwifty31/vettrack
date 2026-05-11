@@ -420,7 +420,7 @@ export default function InventoryPage() {
   const trySelectContainer = (id: string) => {
     if (isRestocking && id !== selectedId) {
       haptics.error();
-      toast.warning("סיים את המילוי מחדש לפני מעבר למכל אחר.");
+      toast.warning(p.finishRestockWarning);
       return;
     }
     setEditingCode(null);
@@ -446,7 +446,7 @@ export default function InventoryPage() {
     if (container) {
       if (isRestocking && container.id !== selectedId) {
         haptics.error();
-        toast.warning("סיים את המילוי מחדש לפני מעבר למכל אחר.");
+        toast.warning(p.finishRestockWarning);
         return;
       }
       setSelectedId(container.id);
@@ -459,7 +459,7 @@ export default function InventoryPage() {
     }
     // Item tag → +1
     const sessionId = sessionIdRef.current;
-    if (!sessionId) { toast.error("פתח סשן מילוי מחדש תחילה"); return; }
+    if (!sessionId) { toast.error(p.openSessionFirst); return; }
     dispatch({ type: "scan-request" });
     scanMut
       .mutateAsync({ sessionId, nfcTagId: tagId, delta: 1 })
@@ -469,7 +469,7 @@ export default function InventoryPage() {
         setScanGeneration((g) => g + 1);
       })
       .catch(() => {
-        showScanOverlay("Unknown NFC tag — assign this tag to an inventory item", null);
+        showScanOverlay(p.unknownNfcTag, null);
         haptics.error();
       });
   }, [containersQ.data, isRestocking, selectedId, startSessionMut, scanMut, showScanOverlay]);
@@ -485,10 +485,10 @@ export default function InventoryPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ndef.onreading = (event: any) => handleNFCTag(event.serialNumber as string);
       navigator.vibrate?.([20, 25, 20]);
-      toast.success("NFC מוכן — גע בתווית", { duration: 3200 });
+      toast.success(p.nfcReady, { duration: 3200 });
     } catch {
       navigator.vibrate?.(140);
-      toast.error("הפעלת סריקת NFC נכשלה");
+      toast.error(p.nfcStartFailed);
     } finally {
       setIsNfcStarting(false);
     }
@@ -497,7 +497,7 @@ export default function InventoryPage() {
   const handleOpenDispense = useCallback(() => {
     const containers = containersQ.data;
     if (!containers || containers.length === 0) {
-      toast.error("אין עגלות במערכת");
+      toast.error(p.noContainers);
       return;
     }
     setDispenseContainerId(containers[0].id);
@@ -535,7 +535,7 @@ export default function InventoryPage() {
               className="gap-1.5 shrink-0 min-h-[40px]"
             >
               {isNfcStarting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Nfc className="w-4 h-4" />}
-              {nfcActiveRef.current ? "NFC live" : isNfcStarting ? "Starting..." : "NFC"}
+              {nfcActiveRef.current ? p.nfcLive : isNfcStarting ? p.nfcStarting : p.nfcLabel}
             </Button>
           )}
         </div>
@@ -591,7 +591,7 @@ export default function InventoryPage() {
                   )}
                 >
                   <span className={cn("w-2 h-2 rounded-full shrink-0", containerDotClass(container))} />
-                  <span className="max-w-[96px] truncate">{container.name}</span>
+                  <span className="max-w-[96px] truncate" dir="auto">{container.name}</span>
                 </button>
               ))}
             </div>
@@ -613,7 +613,7 @@ export default function InventoryPage() {
                 )}
               >
                 <span className="min-w-0 flex-1 break-words">
-                  {isRestocking ? `Restocking · ${selected.name}` : selected.name}
+                  {isRestocking ? p.restockingLabel(selected.name) : selected.name}
                 </span>
                 {selected.department && (
                   <span className="text-xs font-normal opacity-60 shrink-0">{selected.department}</span>
@@ -641,7 +641,7 @@ export default function InventoryPage() {
               {/* All stocked banner */}
               {detailsQ.data && missingCount === 0 && totalItems > 0 && (
                 <div className="mx-4 mt-3 mb-1 rounded-lg border border-emerald-400/50 bg-emerald-50 px-3 py-2 text-center text-sm font-medium text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100 dark:border-emerald-700">
-                  ✓ All items stocked
+                  {p.allItemsStocked}
                 </div>
               )}
 
@@ -657,7 +657,7 @@ export default function InventoryPage() {
                 <div className="mx-4 mt-3 rounded-xl border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 shrink-0" />
-                    Another user is restocking this container.
+                    {p.otherUserRestocking}
                   </div>
                 </div>
               )}
@@ -727,22 +727,22 @@ export default function InventoryPage() {
                                       : "bg-amber-400",
                                 )}
                               />
-                              <p className="text-sm font-semibold min-w-0 truncate">{line.label}</p>
+                              <p className="text-sm font-semibold min-w-0 truncate" dir="auto">{line.label}</p>
                             </div>
                             <div className="mt-1 flex items-center gap-2 text-xs">
                               {isLowStock ? (
                                 <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-50 px-2 py-0.5 text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-300">
-                                  Short by {missing}
+                                  {p.shortBy(missing)}
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-50 px-2 py-0.5 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-300">
-                                  Stocked
+                                  {p.stocked}
                                 </span>
                               )}
                               {pendingOps > 0 && (
                                 <span className="inline-flex items-center gap-1 text-muted-foreground">
                                   <Loader2 className="w-3 h-3 animate-spin" />
-                                  Syncing...
+                                  {p.syncing}
                                 </span>
                               )}
                             </div>
@@ -834,19 +834,16 @@ export default function InventoryPage() {
                 <div className="mx-4 my-3 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm space-y-0.5">
                   <div className="flex items-center gap-2 font-semibold mb-1">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    Last session summary
+                    {p.lastSessionTitle}
                   </div>
                   <p className="text-muted-foreground">
-                    Added: <span className="text-foreground font-medium">{sessionState.lastSummary.totalAdded}</span>
+                    {p.lastSessionAdded(sessionState.lastSummary.totalAdded)}
                   </p>
                   <p className="text-muted-foreground">
-                    Removed: <span className="text-foreground font-medium">{sessionState.lastSummary.totalRemoved}</span>
+                    {p.lastSessionRemoved(sessionState.lastSummary.totalRemoved)}
                   </p>
-                  <p className="text-muted-foreground">
-                    Still missing:{" "}
-                    <span className={cn("font-medium", sessionState.lastSummary.itemsMissingCount > 0 ? "text-amber-600" : "text-emerald-600")}>
-                      {sessionState.lastSummary.itemsMissingCount}
-                    </span>
+                  <p className={cn("font-medium", sessionState.lastSummary.itemsMissingCount > 0 ? "text-amber-600" : "text-emerald-600")}>
+                    {p.lastSessionMissing(sessionState.lastSummary.itemsMissingCount)}
                   </p>
                 </div>
               )}
@@ -863,9 +860,9 @@ export default function InventoryPage() {
                     {finishMut.isPending ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
                     ) : missingCount === 0 ? (
-                      "סיים מילוי"
+                      p.finishRestock
                     ) : (
-                      `סיים מילוי (${missingCount} חסרים)`
+                      p.finishRestockWithMissing(missingCount)
                     )}
                   </Button>
                 </div>
@@ -909,7 +906,7 @@ export default function InventoryPage() {
           className="pointer-events-auto flex items-center gap-2 bg-primary text-primary-foreground font-bold rounded-full px-6 py-3 shadow-lg min-h-[52px] active:scale-95 transition-transform"
         >
           <span className="text-lg">📦</span>
-          לקיחת מתכלים
+          {p.takeConsumables}
         </button>
       </div>
 

@@ -349,20 +349,20 @@ export default function ShiftHandoverPage() {
           <div className="mt-4 space-y-3" dir="rtl">
             <h2 className="text-lg font-bold flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" aria-hidden />
-              צריכת מתכלים במשמרת
+              {p.consumablesTitle}
             </h2>
 
             {consumablesQ.data.pendingEmergencies > 0 && (
               <div className="flex items-center gap-3 rounded-xl border border-red-400 bg-red-50 dark:bg-red-950/25 p-3">
                 <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse shrink-0" />
                 <p className="text-sm font-bold text-red-800 dark:text-red-300 flex-1">
-                  {consumablesQ.data.pendingEmergencies} אירועי חירום ממתינים להשלמה
+                  {p.pendingEmergenciesAlert(consumablesQ.data.pendingEmergencies)}
                 </p>
                 <Link
                   href="/pending-emergencies"
                   className="shrink-0 text-sm font-bold text-red-700 dark:text-red-300 underline underline-offset-2 hover:text-red-900 dark:hover:text-red-100 whitespace-nowrap"
                 >
-                  יחס {consumablesQ.data.pendingEmergencies} פריטים ←
+                  {p.resolveItems(consumablesQ.data.pendingEmergencies)}
                 </Link>
               </div>
             )}
@@ -371,19 +371,19 @@ export default function ShiftHandoverPage() {
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
               <div className="rounded-xl border p-3 text-center">
                 <p className="text-2xl font-bold tabular-nums">{consumablesQ.data.totalEvents}</p>
-                <p className="text-xs text-muted-foreground mt-1">סה"כ לקיחות</p>
+                <p className="text-xs text-muted-foreground mt-1">{p.totalEvents}</p>
               </div>
               <div className={cn("rounded-xl border p-3 text-center", consumablesQ.data.unlinkedCount > 0 ? "border-amber-300 bg-amber-50 dark:bg-amber-950/25" : "")}>
                 <p className="text-2xl font-bold tabular-nums">{consumablesQ.data.unlinkedCount}</p>
-                <p className="text-xs text-muted-foreground mt-1">ללא שיוך</p>
+                <p className="text-xs text-muted-foreground mt-1">{p.unlinkedCount}</p>
               </div>
               <div className={cn("rounded-xl border p-3 text-center", consumablesQ.data.unlinkedPct > 20 ? "border-red-300 bg-red-50 dark:bg-red-950/25" : "")}>
                 <p className="text-2xl font-bold tabular-nums">{consumablesQ.data.unlinkedPct}%</p>
-                <p className="text-xs text-muted-foreground mt-1">% ללא שיוך</p>
+                <p className="text-xs text-muted-foreground mt-1">{p.unlinkedPct}</p>
               </div>
               <div className={cn("rounded-xl border p-3 text-center relative", consumablesQ.data.pendingEmergencies > 0 ? "border-red-400 bg-red-50 dark:bg-red-950/25" : "")}>
                 <p className="text-2xl font-bold tabular-nums">{consumablesQ.data.pendingEmergencies}</p>
-                <p className="text-xs text-muted-foreground mt-1">חירום ממתין</p>
+                <p className="text-xs text-muted-foreground mt-1">{p.pendingEmergencyCard}</p>
                 {consumablesQ.data.pendingEmergencies > 0 && (
                   <span className="absolute top-1 left-1 w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
                 )}
@@ -392,7 +392,7 @@ export default function ShiftHandoverPage() {
                 <p className={cn("text-2xl font-bold tabular-nums", consumablesQ.data.unBilledCount > 0 ? "text-red-700 dark:text-red-300" : "text-emerald-700 dark:text-emerald-300")}>
                   {consumablesQ.data.unBilledCount}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">ללא חיוב</p>
+                <p className="text-xs text-muted-foreground mt-1">{p.unbilledCount}</p>
                 {consumablesQ.data.unBilledCount > 0 && (
                   <span className="absolute top-1 left-1 w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
                 )}
@@ -402,14 +402,14 @@ export default function ShiftHandoverPage() {
             {/* Staff Activity */}
             {consumablesQ.data.userActivity.length > 0 && (
               <div className="overflow-x-auto rounded-xl border">
-                <h3 className="text-sm font-semibold px-3 py-2 border-b bg-muted/50">פעילות צוות</h3>
+                <h3 className="text-sm font-semibold px-3 py-2 border-b bg-muted/50">{p.staffActivity}</h3>
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/30">
-                      <th className="px-3 py-2 text-right font-medium">שם</th>
-                      <th className="px-3 py-2 text-right font-medium">לקיחות</th>
-                      <th className="px-3 py-2 text-right font-medium">חויב</th>
-                      <th className="px-3 py-2 text-right font-medium">שיעור לכידה</th>
+                      <th className="px-3 py-2 text-right font-medium">{p.colName}</th>
+                      <th className="px-3 py-2 text-right font-medium">{p.colEvents}</th>
+                      <th className="px-3 py-2 text-right font-medium">{p.colBilled}</th>
+                      <th className="px-3 py-2 text-right font-medium">{p.colCaptureRate}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -447,11 +447,11 @@ export default function ShiftHandoverPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/50">
-                      <th className="px-3 py-2 text-right font-medium">מתי</th>
-                      <th className="px-3 py-2 text-right font-medium">מי לקח</th>
-                      <th className="px-3 py-2 text-right font-medium">פריט</th>
-                      <th className="px-3 py-2 text-right font-medium">כמות</th>
-                      <th className="px-3 py-2 text-right font-medium">מטופל</th>
+                      <th className="px-3 py-2 text-right font-medium">{p.colWhen}</th>
+                      <th className="px-3 py-2 text-right font-medium">{p.colTakenBy}</th>
+                      <th className="px-3 py-2 text-right font-medium">{p.colItem}</th>
+                      <th className="px-3 py-2 text-right font-medium">{p.colQuantity}</th>
+                      <th className="px-3 py-2 text-right font-medium">{p.colPatient}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -466,14 +466,14 @@ export default function ShiftHandoverPage() {
                         <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
                           {formatTimeHHMM(ev.takenAt)}
                         </td>
-                        <td className="px-3 py-2 font-medium">{ev.takenByDisplayName}</td>
-                        <td className="px-3 py-2 break-words max-w-[120px]">{ev.itemLabel}</td>
+                        <td className="px-3 py-2 font-medium" dir="auto">{ev.takenByDisplayName}</td>
+                        <td className="px-3 py-2 break-words max-w-[120px]" dir="auto">{ev.itemLabel}</td>
                         <td className="px-3 py-2 tabular-nums">{ev.quantity}</td>
                         <td className="px-3 py-2">
                           {ev.pendingCompletion ? (
                             <div className="flex items-center gap-1 flex-wrap">
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-800 font-medium">
-                                חירום — ממתין לשיוך
+                                {p.emergencyPendingBadge}
                               </span>
                               <Button
                                 variant="default"
@@ -484,14 +484,14 @@ export default function ShiftHandoverPage() {
                                   setCompleteEmergencyContainerId(ev.containerId);
                                 }}
                               >
-                                השלם עכשיו
+                                {p.completeNow}
                               </Button>
                             </div>
                           ) : ev.animalName ? (
                             <span className="text-foreground">{ev.animalName}</span>
                           ) : (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground">
-                              ללא שיוך
+                              {p.unlinkedBadge}
                             </span>
                           )}
                         </td>
@@ -503,7 +503,7 @@ export default function ShiftHandoverPage() {
             )}
 
             {consumablesQ.data.events.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">אין לקיחות מתכלים במשמרת זו</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{p.noConsumablesInShift}</p>
             )}
           </div>
         )}

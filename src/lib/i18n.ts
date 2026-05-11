@@ -114,9 +114,21 @@ const translations = {
     },
   },
 
-  shiftHandoverPage: d.shiftHandoverPage,
+  shiftHandoverPage: {
+    ...d.shiftHandoverPage,
+    pendingEmergenciesAlert: (count: number) => tr(d.shiftHandoverPage.pendingEmergenciesAlert, { count }),
+    resolveItems: (count: number) => tr(d.shiftHandoverPage.resolveItems, { count }),
+  },
 
-  inventoryPage: d.inventoryPage,
+  inventoryPage: {
+    ...d.inventoryPage,
+    restockingLabel: (name: string) => tr(d.inventoryPage.restockingLabel, { name }),
+    shortBy: (count: number) => tr(d.inventoryPage.shortBy, { count }),
+    finishRestockWithMissing: (missing: number) => tr(d.inventoryPage.finishRestockWithMissing, { missing }),
+    lastSessionAdded: (count: number) => tr(d.inventoryPage.lastSessionAdded, { count }),
+    lastSessionRemoved: (count: number) => tr(d.inventoryPage.lastSessionRemoved, { count }),
+    lastSessionMissing: (count: number) => tr(d.inventoryPage.lastSessionMissing, { count }),
+  },
 
   equipmentDetail: {
     serialNumber: d.equipmentDetail.serialNumber,
@@ -228,7 +240,12 @@ const translations = {
 
   reportIssueDialog: d.reportIssueDialog,
 
-  qrScanner: d.qrScanner,
+  qrScanner: {
+    ...d.qrScanner,
+    markedOk: (name: string) => tr(d.qrScanner.markedOk, { name }),
+    inUseBy: (name: string) => tr(d.qrScanner.inUseBy, { name }),
+    locationLabel: (location: string) => tr(d.qrScanner.locationLabel, { location }),
+  },
 
   onboarding: {
     step1: d.onboarding.step1,
@@ -375,7 +392,18 @@ const translations = {
 
   procurementPage: d.procurementPage,
 
-  medsPage: d.medsPage,
+  medsPage: {
+    ...d.medsPage,
+    prescribed: (dose: string) => tr(d.medsPage.prescribed, { dose }),
+    concentration: (conc: string) => tr(d.medsPage.concentration, { conc }),
+    routeLabel: (route: string) => tr(d.medsPage.routeLabel, { route }),
+    concentrationLabel: (conc: string) => tr(d.medsPage.concentrationLabel, { conc }),
+    mgTotal: (mg: string) => tr(d.medsPage.mgTotal, { mg }),
+    assignMedicationWithVolume: (volume: string) => tr(d.medsPage.assignMedicationWithVolume, { volume }),
+    assignMedicationWithTab: (tab: string) => tr(d.medsPage.assignMedicationWithTab, { tab }),
+    deviationFromRecommended: (sign: string, pct: string) => tr(d.medsPage.deviationFromRecommended, { sign, pct }),
+    deviationBlocked: (sign: string, pct: string) => tr(d.medsPage.deviationBlocked, { sign, pct }),
+  },
 
   pharmacyForecast: {
     ...d.pharmacyForecast,

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, Pencil, Trash2, X } from "lucide-react";
+import { t } from "@/lib/i18n";
 import { useFormulary } from "@/hooks/useFormulary";
 import { useDrugFormulary } from "@/hooks/useDrugFormulary";
 import type { DrugFormularyPatch } from "@/hooks/useDrugFormulary";
@@ -124,7 +125,7 @@ function FormularyManager({ onClose }: FormularyManagerProps) {
     const conc = Number.parseFloat(editConc);
     const dose = Number.parseFloat(editDose);
     if (!Number.isFinite(conc) || conc <= 0 || !Number.isFinite(dose) || dose <= 0) {
-      setError("Enter valid positive numbers.");
+      setError(t.medsPage.formularyValidNumbers);
       return;
     }
     const minD = editMinDose ? Number.parseFloat(editMinDose) : null;
@@ -143,20 +144,20 @@ function FormularyManager({ onClose }: FormularyManagerProps) {
       await updateDrug(id, patch);
       setEditingId(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Update failed.");
+      setError(e instanceof Error ? e.message : t.medsPage.formularyUpdateFailed);
     } finally {
       setBusy(false);
     }
   }
 
   async function submitDelete(id: string) {
-    if (!confirm("Delete this drug from the formulary?")) return;
+    if (!confirm(t.medsPage.formularyDeleteConfirm)) return;
     setBusy(true);
     setError(null);
     try {
       await deleteDrug(id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Delete failed.");
+      setError(e instanceof Error ? e.message : t.medsPage.formularyDeleteFailed);
     } finally {
       setBusy(false);
     }
@@ -166,9 +167,9 @@ function FormularyManager({ onClose }: FormularyManagerProps) {
     const name = addName.trim();
     const conc = Number.parseFloat(addConc);
     const dose = Number.parseFloat(addDose);
-    if (!name) { setError("Drug name is required."); return; }
-    if (!Number.isFinite(conc) || conc <= 0) { setError("Enter valid concentration."); return; }
-    if (!Number.isFinite(dose) || dose <= 0) { setError("Enter valid standard dose."); return; }
+    if (!name) { setError(t.medsPage.formularyDrugRequired); return; }
+    if (!Number.isFinite(conc) || conc <= 0) { setError(t.medsPage.formularyValidConc); return; }
+    if (!Number.isFinite(dose) || dose <= 0) { setError(t.medsPage.formularyValidDose); return; }
     const minD = addMinDose ? Number.parseFloat(addMinDose) : null;
     const maxD = addMaxDose ? Number.parseFloat(addMaxDose) : null;
     setBusy(true);
@@ -187,7 +188,7 @@ function FormularyManager({ onClose }: FormularyManagerProps) {
       setAddName(""); setAddConc(""); setAddDose(""); setAddMinDose(""); setAddMaxDose(""); setAddUnit("mg_per_kg"); setAddRoute("");
       setAddOpen(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Add failed.");
+      setError(e instanceof Error ? e.message : t.medsPage.formularyAddFailed);
     } finally {
       setBusy(false);
     }
@@ -196,8 +197,8 @@ function FormularyManager({ onClose }: FormularyManagerProps) {
   return (
     <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold">Manage Formulary</span>
-        <button type="button" onClick={onClose} aria-label="Close formulary manager" className="text-muted-foreground hover:text-foreground">
+        <span className="text-sm font-semibold">{t.medsPage.formularyManageTitle}</span>
+        <button type="button" onClick={onClose} aria-label={t.medsPage.formularyManageTitle} className="text-muted-foreground hover:text-foreground">
           <X className="h-4 w-4" aria-hidden />
         </button>
       </div>
@@ -207,7 +208,7 @@ function FormularyManager({ onClose }: FormularyManagerProps) {
       ) : null}
 
       {isLoading ? (
-        <div className="text-xs text-muted-foreground">טוען...</div>
+        <div className="text-xs text-muted-foreground">{t.medsPage.formularyLoading}</div>
       ) : (
         <div className="space-y-2">
           {rawList.map((entry) => (
@@ -217,7 +218,7 @@ function FormularyManager({ onClose }: FormularyManagerProps) {
                   <div className="text-xs font-semibold text-foreground">{entry.name}</div>
                   <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <label className="text-[10px] text-muted-foreground">Conc (mg/mL)</label>
+                      <label className="text-[10px] text-muted-foreground">{t.medsPage.formularyFieldConc}</label>
                       <input
                         type="number" inputMode="decimal" min="0.001" step="0.001" value={editConc}
                         onChange={(e) => setEditConc(e.target.value)}
@@ -225,7 +226,7 @@ function FormularyManager({ onClose }: FormularyManagerProps) {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-muted-foreground">Std dose</label>
+                      <label className="text-[10px] text-muted-foreground">{t.medsPage.formularyFieldStdDose}</label>
                       <input
                         type="number" inputMode="decimal" min="0.001" step="0.001" value={editDose}
                         onChange={(e) => setEditDose(e.target.value)}
@@ -233,7 +234,7 @@ function FormularyManager({ onClose }: FormularyManagerProps) {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-muted-foreground">Unit</label>
+                      <label className="text-[10px] text-muted-foreground">{t.medsPage.formularyFieldUnit}</label>
                       <select
                         value={editUnit} onChange={(e) => setEditUnit(e.target.value as "mg_per_kg" | "mcg_per_kg" | "mEq_per_kg" | "tablet")}
                         className="w-full rounded border border-input px-2 py-1 text-xs"
@@ -247,24 +248,24 @@ function FormularyManager({ onClose }: FormularyManagerProps) {
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <label className="text-[10px] text-muted-foreground">Min dose</label>
+                      <label className="text-[10px] text-muted-foreground">{t.medsPage.formularyFieldMinDose}</label>
                       <input type="number" inputMode="decimal" min="0.001" step="0.001" value={editMinDose}
                         onChange={(e) => setEditMinDose(e.target.value)}
-                        placeholder="optional"
+                        placeholder={t.medsPage.formularyOptional}
                         className="w-full rounded border border-input px-2 py-1 text-xs" />
                     </div>
                     <div>
-                      <label className="text-[10px] text-muted-foreground">Max dose</label>
+                      <label className="text-[10px] text-muted-foreground">{t.medsPage.formularyFieldMaxDose}</label>
                       <input type="number" inputMode="decimal" min="0.001" step="0.001" value={editMaxDose}
                         onChange={(e) => setEditMaxDose(e.target.value)}
-                        placeholder="optional"
+                        placeholder={t.medsPage.formularyOptional}
                         className="w-full rounded border border-input px-2 py-1 text-xs" />
                     </div>
                     <div>
-                      <label className="text-[10px] text-muted-foreground">Route</label>
+                      <label className="text-[10px] text-muted-foreground">{t.medsPage.formularyFieldRoute}</label>
                       <input type="text" value={editRoute}
                         onChange={(e) => setEditRoute(e.target.value)}
-                        placeholder="e.g. IV/IM"
+                        placeholder={t.medsPage.formularyRoutePlaceholder}
                         className="w-full rounded border border-input px-2 py-1 text-xs" />
                     </div>
                   </div>
@@ -273,22 +274,21 @@ function FormularyManager({ onClose }: FormularyManagerProps) {
                       type="button" disabled={busy}
                       onClick={() => submitEdit(entry.id)}
                       className="rounded bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                      title={busy ? "Saving…" : undefined}
                     >
-                      Save
+                      {t.medsPage.formularySave}
                     </button>
                     <button
                       type="button" onClick={() => setEditingId(null)}
                       className="rounded border border-border px-3 py-1 text-xs"
                     >
-                      Cancel
+                      {t.medsPage.formularyCancel}
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="text-xs font-semibold">{entry.name}</div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold truncate" dir="auto">{entry.name}</div>
                     <div className="text-[10px] text-muted-foreground">
                       {entry.concentrationMgMl} {entry.doseUnit === "tablet" ? "mg/tab" : "mg/mL"} •{" "}
                       {entry.minDose != null && entry.maxDose != null
@@ -326,29 +326,29 @@ function FormularyManager({ onClose }: FormularyManagerProps) {
 
       {addOpen ? (
         <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
-          <div className="text-xs font-semibold text-foreground">New Drug</div>
+          <div className="text-xs font-semibold text-foreground">{t.medsPage.formularyNewDrug}</div>
           <input
-            type="text" placeholder="Drug name" value={addName}
+            type="text" placeholder={t.medsPage.formularyFieldDrugName} value={addName}
             onChange={(e) => setAddName(e.target.value)}
             className="w-full rounded border border-input px-2 py-1.5 text-xs"
           />
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="text-[10px] text-muted-foreground">Conc (mg/mL)</label>
+              <label className="text-[10px] text-muted-foreground">{t.medsPage.formularyFieldConc}</label>
               <input type="number" inputMode="decimal" min="0.001" step="0.001" value={addConc}
                 onChange={(e) => setAddConc(e.target.value)}
                 className="w-full rounded border border-input px-2 py-1 text-xs"
               />
             </div>
             <div>
-              <label className="text-[10px] text-muted-foreground">Std dose</label>
+              <label className="text-[10px] text-muted-foreground">{t.medsPage.formularyFieldStdDose}</label>
               <input type="number" inputMode="decimal" min="0.001" step="0.001" value={addDose}
                 onChange={(e) => setAddDose(e.target.value)}
                 className="w-full rounded border border-input px-2 py-1 text-xs"
               />
             </div>
             <div>
-              <label className="text-[10px] text-muted-foreground">Unit</label>
+              <label className="text-[10px] text-muted-foreground">{t.medsPage.formularyFieldUnit}</label>
               <select value={addUnit} onChange={(e) => setAddUnit(e.target.value as "mg_per_kg" | "mcg_per_kg" | "mEq_per_kg" | "tablet")}
                 className="w-full rounded border border-input px-2 py-1 text-xs"
               >
@@ -361,21 +361,21 @@ function FormularyManager({ onClose }: FormularyManagerProps) {
           </div>
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="text-[10px] text-muted-foreground">Min dose</label>
+              <label className="text-[10px] text-muted-foreground">{t.medsPage.formularyFieldMinDose}</label>
               <input type="number" inputMode="decimal" min="0.001" step="0.001" value={addMinDose}
-                onChange={(e) => setAddMinDose(e.target.value)} placeholder="optional"
+                onChange={(e) => setAddMinDose(e.target.value)} placeholder={t.medsPage.formularyOptional}
                 className="w-full rounded border border-input px-2 py-1 text-xs" />
             </div>
             <div>
-              <label className="text-[10px] text-muted-foreground">Max dose</label>
+              <label className="text-[10px] text-muted-foreground">{t.medsPage.formularyFieldMaxDose}</label>
               <input type="number" inputMode="decimal" min="0.001" step="0.001" value={addMaxDose}
-                onChange={(e) => setAddMaxDose(e.target.value)} placeholder="optional"
+                onChange={(e) => setAddMaxDose(e.target.value)} placeholder={t.medsPage.formularyOptional}
                 className="w-full rounded border border-input px-2 py-1 text-xs" />
             </div>
             <div>
-              <label className="text-[10px] text-muted-foreground">Route</label>
+              <label className="text-[10px] text-muted-foreground">{t.medsPage.formularyFieldRoute}</label>
               <input type="text" value={addRoute}
-                onChange={(e) => setAddRoute(e.target.value)} placeholder="e.g. IV/IM"
+                onChange={(e) => setAddRoute(e.target.value)} placeholder={t.medsPage.formularyRoutePlaceholder}
                 className="w-full rounded border border-input px-2 py-1 text-xs" />
             </div>
           </div>
@@ -383,15 +383,14 @@ function FormularyManager({ onClose }: FormularyManagerProps) {
             <button
               type="button" disabled={busy} onClick={submitAdd}
               className="rounded bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-              title={busy ? "Adding…" : undefined}
             >
-              Add
+              {t.medsPage.formularyAdd}
             </button>
             <button
               type="button" onClick={() => { setAddOpen(false); setError(null); }}
               className="rounded border border-border px-3 py-1 text-xs"
             >
-              Cancel
+              {t.medsPage.formularyCancel}
             </button>
           </div>
         </div>
@@ -400,7 +399,7 @@ function FormularyManager({ onClose }: FormularyManagerProps) {
           type="button" onClick={() => setAddOpen(true)}
           className="w-full rounded-lg border border-dashed border-primary/40 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/5"
         >
-          + Add drug
+          {t.medsPage.formularyAddDrug}
         </button>
       )}
     </div>
@@ -495,7 +494,7 @@ export function MedicationCalculator({
         eligible.some((u) => u.id === prev) ? prev : eligible[0].id,
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load technician list.";
+      const message = error instanceof Error ? error.message : t.medsPage.loadTechniciansFailed;
       setTechnicianLoadError(message);
       setTechnicians([]);
       setSelectedTechnicianId("");
@@ -625,14 +624,14 @@ export function MedicationCalculator({
     },
     onSuccess: (appointment) => {
       try { sessionStorage.removeItem(storageKeyRef.current); } catch { /* ignore */ }
-      setSuccessMessage(`Medication task created — ${calc.volumeMl.toFixed(2)} mL assigned to technician.`);
+      setSuccessMessage(t.medsPage.taskStarted);
       if (appointment) {
         onSuccess?.(appointment.id);
         onComplete?.(appointment);
       }
     },
     onError: (err: unknown) => {
-      setApiError(err instanceof Error ? err.message : "An unexpected error occurred.");
+      setApiError(err instanceof Error ? err.message : t.medsPage.taskStartFailed);
     },
     onSettled: () => {
       submittingRef.current = false;
@@ -642,20 +641,20 @@ export function MedicationCalculator({
 
   const handleGiveMedication = useCallback(() => {
     if (!rbac.permittedVetId) {
-      setApiError("No valid technician selected.");
+      setApiError(t.medsPage.noValidTechnician);
       return;
     }
     giveMedicationMutation.mutate();
   }, [giveMedicationMutation, rbac.permittedVetId]);
 
   if (formularyLoading) {
-    return <div className="flex items-center justify-center p-8 text-muted-foreground">Loading formulary...</div>;
+    return <div className="flex items-center justify-center p-8 text-muted-foreground">{t.medsPage.formularyLoading}</div>;
   }
 
   if (rbac.canExecute === "blocked") {
     return (
       <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-6 text-center text-red-800">
-        <p className="mb-1 text-lg font-semibold">Access Denied</p>
+        <p className="mb-1 text-lg font-semibold">{t.medsPage.accessDenied}</p>
         <p className="text-sm">{rbac.blockReason}</p>
       </div>
     );
@@ -687,25 +686,27 @@ export function MedicationCalculator({
         : "border-green-400 bg-green-100 text-green-800";
     return (
       <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm font-semibold ${color}`}>
-        {sign}{abs.toFixed(1)}% from recommended{abs > 50 ? " - BLOCKED" : ""}
+        {abs > 50
+          ? t.medsPage.deviationBlocked(sign, abs.toFixed(1))
+          : t.medsPage.deviationFromRecommended(sign, abs.toFixed(1))}
       </span>
     );
   })();
 
   return (
     <div className="mx-auto max-w-xl space-y-5 p-5">
-      <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Medication Calculator</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">Select a drug, enter the desired dose, then assign to a technician.</p>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-xl font-bold text-foreground">{t.medsPage.calculatorTitle}</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">{t.medsPage.calculatorDesc}</p>
         </div>
         {userCanManageFormulary ? (
           <button
             type="button"
             onClick={() => setShowFormularyManager((v) => !v)}
-            className="flex items-center gap-1 rounded-lg border border-input px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/50"
+            className="shrink-0 flex items-center gap-1 rounded-lg border border-input px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/50"
           >
-            Manage drugs
+            {t.medsPage.manageDrugs}
             {showFormularyManager ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           </button>
         ) : null}
@@ -716,9 +717,9 @@ export function MedicationCalculator({
       ) : null}
 
       {/* Technician */}
-      <section aria-label="Performing technician" className="space-y-2">
+      <section aria-label={t.medsPage.performingTechnician} className="space-y-2">
         <label htmlFor="med-performing-technician" className="mb-1 block text-sm font-medium text-foreground">
-          Performing Technician <span className="text-red-600">*</span>
+          {t.medsPage.performingTechnician} <span className="text-red-600">*</span>
         </label>
         <select
           id="med-performing-technician"
@@ -728,30 +729,30 @@ export function MedicationCalculator({
           className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
         >
           <option value="">
-            {isTechnicianLoading ? "Loading technicians..." : "Select technician..."}
+            {isTechnicianLoading ? t.medsPage.loadingTechnicians : t.medsPage.selectTechnician}
           </option>
           {technicians.map((u) => (
             <option key={u.id} value={u.id}>
-              {u.name}{u.id === userId ? " (you)" : ""}
+              {u.name}{u.id === userId ? t.medsPage.youSuffix : ""}
             </option>
           ))}
         </select>
         {technicianLoadError ? (
           <div role="alert" className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
             {technicianLoadError}
-            <button type="button" onClick={fetchTechnicians} className="ml-2 font-semibold underline">Retry</button>
+            <button type="button" onClick={fetchTechnicians} className="ms-2 font-semibold underline">{t.medsPage.retry}</button>
           </div>
         ) : null}
         {noTechniciansAvailable && !technicianLoadError ? (
           <div role="alert" className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
-            No eligible technicians found.
+            {t.medsPage.noEligibleTechnicians}
           </div>
         ) : null}
       </section>
 
       {/* Drug selection */}
-      <section aria-label="Drug selection">
-        <label htmlFor="drug-select" className="mb-1 block text-sm font-medium text-foreground">Drug</label>
+      <section aria-label={t.medsPage.drugLabel}>
+        <label htmlFor="drug-select" className="mb-1 block text-sm font-medium text-foreground">{t.medsPage.drugLabel}</label>
         <select
           id="drug-select"
           value={selectedDrugName}
@@ -759,7 +760,7 @@ export function MedicationCalculator({
           disabled={isSubmitting}
           className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
         >
-          <option value="">- Select a drug -</option>
+          <option value="">— {t.medsPage.selectDrug} —</option>
           {formularyList.map((entry) => (
             <option key={entry.id} value={entry.name}>
               {entry.name} ({concentrationDisplay(entry.name, entry.concentrationMgMl, entry.doseUnit)}{entry.defaultRoute ? ` · ${entry.defaultRoute}` : ""})
@@ -770,9 +771,9 @@ export function MedicationCalculator({
           const sel = formularyList.find((e) => e.name === selectedDrugName);
           return sel?.defaultRoute ? (
             <p className="mt-1 text-xs text-muted-foreground">
-              Route: <span className="font-semibold">{sel.defaultRoute}</span>
+              {t.medsPage.routeLabel(sel.defaultRoute)}
               <span className="mx-1">•</span>
-              Concentration: <span className="font-semibold">{concentrationDisplay(sel.name, sel.concentrationMgMl, sel.doseUnit)}</span>
+              {t.medsPage.concentrationLabel(concentrationDisplay(sel.name, sel.concentrationMgMl, sel.doseUnit))}
             </p>
           ) : null;
         })() : null}
@@ -782,22 +783,22 @@ export function MedicationCalculator({
         <>
           {/* Dosage range reference */}
           {doseRangeText ? (
-            <section aria-label="Dosage range">
-              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Standard Dosage Range</p>
+            <section aria-label={t.medsPage.standardDosageRange}>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{t.medsPage.standardDosageRange}</p>
               <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-medium text-foreground">
                 {doseRangeText}
               </div>
             </section>
           ) : (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-              No recommended dose in formulary. Enter dose manually.
+              {t.medsPage.noRecommendedDose}
             </div>
           )}
 
           {/* Patient weight (required) */}
-          <section aria-label="Patient weight">
+          <section aria-label={t.medsPage.patientWeight}>
             <label htmlFor="weight-input" className="mb-1 block text-sm font-medium text-foreground">
-              Patient Weight (kg) <span className="text-red-600">*</span>
+              {t.medsPage.patientWeight} <span className="text-red-600">*</span>
             </label>
             <input
               id="weight-input"
@@ -812,14 +813,14 @@ export function MedicationCalculator({
               }`}
             />
             {!weightIsValid && weightKgRaw === "" ? (
-              <p className="mt-1 text-xs text-red-600">Weight is required to create a medication task.</p>
+              <p className="mt-1 text-xs text-red-600">{t.medsPage.weightRequired}</p>
             ) : null}
           </section>
 
           {/* Desired dose in mg */}
-          <section aria-label="Desired dose">
+          <section aria-label={t.medsPage.desiredDose}>
             <label htmlFor="desired-mg-input" className="mb-1 block text-sm font-medium text-foreground">
-              Desired Dose (mg) <span className="text-red-600">*</span>
+              {t.medsPage.desiredDose} <span className="text-red-600">*</span>
             </label>
             <input
               id="desired-mg-input"
@@ -839,13 +840,13 @@ export function MedicationCalculator({
           {/* Volume result */}
           <section
             aria-live="polite"
-            aria-label="Calculated volume"
+            aria-label={t.medsPage.giveLabel}
             className={`rounded-2xl border-2 p-6 text-center transition-colors ${
               canExecute ? "border-primary/40 bg-primary/5" : "border-border bg-muted opacity-60"
             }`}
           >
-            <p className="mb-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">GIVE</p>
-            <p className={`text-5xl font-black tracking-tight ${canExecute ? "text-primary" : "text-muted-foreground"}`}>
+            <p className="mb-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">{t.medsPage.giveLabel}</p>
+            <p className={`text-5xl font-black tracking-tight tabular-nums ${canExecute ? "text-primary" : "text-muted-foreground"}`} dir="ltr">
               {calc.isBlocked || !Number.isFinite(calc.volumeMl)
                 ? "—"
                 : resolved?.doseUnit === "tablet"
@@ -853,7 +854,7 @@ export function MedicationCalculator({
                   : `${calc.volumeMl.toFixed(2)} mL`}
             </p>
             {!calc.isBlocked && Number.isFinite(calc.totalMg) && calc.totalMg > 0 ? (
-              <p className="mt-1 text-sm text-muted-foreground">= {calc.totalMg.toFixed(2)} mg total</p>
+              <p className="mt-1 text-sm text-muted-foreground">{t.medsPage.mgTotal(calc.totalMg.toFixed(2))}</p>
             ) : null}
           </section>
 
@@ -876,7 +877,7 @@ export function MedicationCalculator({
                 type="button" onClick={onCancel}
                 className="shrink-0 rounded-xl border border-input px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/50"
               >
-                Back
+                {t.medsPage.back}
               </button>
             ) : null}
             <button
@@ -893,18 +894,18 @@ export function MedicationCalculator({
               }`}
             >
               {isSubmitting
-                ? "Assigning..."
+                ? t.medsPage.assigning
                 : canExecute
                   ? resolved?.doseUnit === "tablet"
-                    ? `Assign Medication — ${formatTabletFraction(calc.volumeMl)} tab`
-                    : `Assign Medication — ${calc.volumeMl.toFixed(2)} mL`
-                  : "Assign Medication"}
+                    ? t.medsPage.assignMedicationWithTab(String(formatTabletFraction(calc.volumeMl)))
+                    : t.medsPage.assignMedicationWithVolume(calc.volumeMl.toFixed(2))
+                  : t.medsPage.assignMedication}
             </button>
           </div>
 
           {performerId ? (
             <p className="text-center text-xs text-muted-foreground">
-              Task will be assigned to the selected technician and requires vet approval before administration.
+              {t.medsPage.assignNote}
             </p>
           ) : null}
         </>
