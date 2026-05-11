@@ -31,14 +31,23 @@ jobs:
       run: npm install -g pnpm && pnpm install
     - name: Install Playwright Browsers
       run: pnpm exec playwright install --with-deps chromium
+    - name: Build frontend
+      run: |
+        export VITE_CLERK_PUBLISHABLE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-pk_test_ci_dummy_publishable_key}"
+        pnpm build
+      env:
+        VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+    - name: Database migrations
+      run: pnpm migrate
+      env:
+        DATABASE_URL: postgres://vettrack:vettrack@127.0.0.1:5432/vettrack_test
+        NODE_ENV: test
     - name: Start app for Playwright
-      run: pnpm dev:ci > /tmp/vettrack-playwright.log 2>&1 &
+      run: pnpm dev:api > /tmp/vettrack-playwright.log 2>&1 &
       env:
         DATABASE_URL: postgres://vettrack:vettrack@127.0.0.1:5432/vettrack_test
         SESSION_SECRET: ci-test-secret-that-is-long-enough-32chars
-        NODE_ENV: test
-        PORT: 3001
-        TEST_MODE: "true"
+        PLAYWRIGHT_E2E: "true"
     - name: Wait for API readiness
       run: |
         for i in {1..60}; do
@@ -57,6 +66,8 @@ jobs:
         NODE_ENV: test
     - name: Run Playwright tests
       run: pnpm exec playwright test --project=chromium
+      env:
+        TEST_BASE_URL: http://127.0.0.1:3001
     - uses: actions/upload-artifact@v4
       if: ${{ failure() }}
       with:

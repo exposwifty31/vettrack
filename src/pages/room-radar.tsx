@@ -121,6 +121,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardP
     mutationFn: () => api.equipment.checkout(eq.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
       toast.success(`Checked out — ${eq.name}`);
     },
     onError: () => toast.error("לקיחה נכשלה"),
@@ -133,6 +134,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardP
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
       toast.success(`Returned — ${eq.name}`);
     },
     onError: () => toast.error("החזרה נכשלה"),
@@ -375,6 +377,7 @@ export default function RoomRadarPage() {
       haptics.scanSuccess();
       queryClient.invalidateQueries({ queryKey: ["/api/rooms", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
       verifyTimerRef.current = setTimeout(() => {
         setVerifyState("idle");
       }, 4000);

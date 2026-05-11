@@ -22,12 +22,27 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
+  /* Per-test timeout — made explicit. Matches the previous implicit default. */
+  timeout: 30_000,
+  /* Suite-wide safety net so future regressions fail fast with a clean
+     GlobalTimeoutError instead of grinding against the GitHub Actions
+     `timeout-minutes: 60` job cap and looking like a hang. With workers:1
+     and 62 tests × 30s × 3 retries the worst-case is ~93 min, so a 12-min
+     ceiling is loose enough for healthy runs and aggressive enough to
+     surface real regressions quickly. */
+  globalTimeout: 12 * 60 * 1000,
+  /* Reporter — in CI we want streaming progress (the previous html-only
+     reporter buffered to disk, which is why the recent run looked frozen
+     in the Actions UI). Locally keep the rich html report. */
+  reporter: process.env.CI ? [['list'], ['html']] : 'html',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
-    /* Base URL to use in actions like `await page.goto('')`. */
-    // baseURL: 'http://localhost:3000',
+    /* Base URL used by relative `page.goto("/...")` and `request.get("/...")`.
+       CI exports TEST_BASE_URL=http://127.0.0.1:3001 (production-like build
+       served by Express); locally it falls back to the same value. Setting
+       baseURL globally is the canonical Playwright fix — individual specs
+       should NOT prepend BASE_URL themselves. */
+    baseURL: process.env.TEST_BASE_URL ?? 'http://127.0.0.1:3001',
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',

@@ -144,6 +144,8 @@ export default function ProcurementPage() {
     onSuccess: () => {
       toast.success(p.poReceived);
       qc.invalidateQueries({ queryKey: ["/api/procurement"] });
+      qc.invalidateQueries({ queryKey: ["/api/containers"] });
+      qc.invalidateQueries({ queryKey: ["/api/restock/container-items"] });
       setReceiveTarget(null);
     },
     onError: () => toast.error(p.poReceiveFailed),
@@ -328,7 +330,7 @@ export default function ProcurementPage() {
 
       {/* Create PO dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg w-full max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{p.newPo}</DialogTitle>
           </DialogHeader>
@@ -352,7 +354,7 @@ export default function ProcurementPage() {
                   className="h-6 text-xs"
                   onClick={() => setDraftLines((l) => [...l, { itemId: "", quantityOrdered: 1, unitPriceCents: 0 }])}
                 >
-                  <Plus className="h-3 w-3 mr-1" />
+                  <Plus className="h-3 w-3 me-1" />
                   {p.addLine}
                 </Button>
               </div>
@@ -363,14 +365,21 @@ export default function ProcurementPage() {
                     onValueChange={(v) =>
                       setDraftLines((ls) => ls.map((l, i) => i === idx ? { ...l, itemId: v } : l))
                     }
+                    disabled={itemsQ.isLoading}
                   >
                     <SelectTrigger className="flex-1 h-8 text-xs">
-                      <SelectValue placeholder={p.selectItem} />
+                      <SelectValue placeholder={itemsQ.isLoading ? p.loadingItems : p.selectItem} />
                     </SelectTrigger>
                     <SelectContent>
-                      {(itemsQ.data ?? []).map((item) => (
-                        <SelectItem key={item.id} value={item.id}>{item.label}</SelectItem>
-                      ))}
+                      {itemsQ.isLoading ? (
+                        <SelectItem value="__loading__" disabled>{p.loadingItems}</SelectItem>
+                      ) : (itemsQ.data ?? []).length === 0 ? (
+                        <SelectItem value="__empty__" disabled>{p.noItemsAvailable}</SelectItem>
+                      ) : (
+                        (itemsQ.data ?? []).map((item) => (
+                          <SelectItem key={item.id} value={item.id}>{item.label}</SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <Input
@@ -420,7 +429,7 @@ export default function ProcurementPage() {
 
       {/* Receive dialog */}
       <Dialog open={!!receiveTarget} onOpenChange={(o) => !o && setReceiveTarget(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg w-full max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{p.receiveTitle}</DialogTitle>
           </DialogHeader>
@@ -448,21 +457,28 @@ export default function ProcurementPage() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs">Container</Label>
+                      <Label className="text-xs">{p.containerLabel}</Label>
                       <Select
                         value={rl.containerId || "__none__"}
                         onValueChange={(v) =>
                           setReceiveLines((ls) => ls.map((l, i) => i === idx ? { ...l, containerId: v === "__none__" ? "" : v } : l))
                         }
+                        disabled={containersQ.isLoading}
                       >
                         <SelectTrigger className="h-8 text-sm">
-                          <SelectValue placeholder="Select container…" />
+                          <SelectValue placeholder={containersQ.isLoading ? p.loadingContainers : p.selectContainer} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__none__">— Select —</SelectItem>
-                          {(containersQ.data ?? []).map((c) => (
-                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                          ))}
+                          {containersQ.isLoading ? (
+                            <SelectItem value="__loading__" disabled>{p.loadingContainers}</SelectItem>
+                          ) : (
+                            <>
+                              <SelectItem value="__none__">{p.selectNone}</SelectItem>
+                              {(containersQ.data ?? []).map((c) => (
+                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                              ))}
+                            </>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>

@@ -90,6 +90,53 @@ async function waitForShellReady(page: Page, timeout = 10_000) {
   );
 }
 
+async function waitForServiceWorkerReady(page: Page, timeout = 15_000) {
+  await expect.poll(
+    () =>
+      page.evaluate(async () => {
+        if (!("serviceWorker" in navigator)) return true;
+        const ready = await navigator.serviceWorker.ready;
+        const reg = await navigator.serviceWorker.getRegistration("/");
+        const active = reg?.active ?? ready?.active ?? null;
+        return Boolean(active);
+      }),
+    { timeout }
+  ).toBe(true);
+}
+
+async function waitForPrecacheReady(page: Page, timeout = 15_000) {
+  await expect.poll(
+    () =>
+      page.evaluate(async () => {
+        const names = await caches.keys();
+        const cacheName = names.find((n: string) => n.startsWith("vettrack-"));
+        if (!cacheName) return false;
+        const cache = await caches.open(cacheName);
+        const keys = await cache.keys();
+        const urls = keys.map((r: Request) => new URL(r.url).pathname);
+        return urls.includes("/index.html") || urls.includes("/");
+      }),
+    { timeout }
+  ).toBe(true);
+}
+
+// In-page fetch() is only intercepted by the SW when the page is *controlled*
+// by it — i.e. `navigator.serviceWorker.controller` is non-null. On first
+// install, that only happens after `activate` runs `clients.claim()`, which
+// is asynchronous and happens after `serviceWorker.ready` resolves.
+// Tests that rely on SW interception of in-page fetches (e.g. the offline
+// API 503 stub) must wait for controller attachment, not just shell readiness
+// or active registration.
+async function waitForServiceWorkerControlling(page: Page, timeout = 20_000) {
+  await expect.poll(
+    () =>
+      page.evaluate(() =>
+        Boolean(navigator.serviceWorker && navigator.serviceWorker.controller),
+      ),
+    { timeout, intervals: [50, 100, 200, 500] },
+  ).toBe(true);
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 // P20: Server alive — run first so all other tests can assume the server is up
@@ -116,10 +163,29 @@ test.describe("PWA — App shell", () => {
     expect(viewport).toContain("viewport-fit=cover");
   });
 
-  test("P15: theme-color meta matches manifest theme_color (#2563eb)", async ({ page }) => {
+  test("P15: theme-color meta matches manifest theme_color", async ({ page, request }) => {
+    const manifestRes = await request.get(`${BASE_URL}/manifest.json`);
+    expect(manifestRes.status(), "manifest not served").toBe(200);
+
+    const manifest = await manifestRes.json() as Record<string, unknown>;
+
+    const expectedThemeColor =
+      String(manifest.theme_color ?? "").trim().toLowerCase();
+
+    expect(expectedThemeColor, "manifest.theme_color missing").toBeTruthy();
+
     await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
-    const themeColor = await page.locator('meta[name="theme-color"]').getAttribute("content");
-    expect(themeColor?.toLowerCase()).toBe("#2563eb");
+
+    const themeColor =
+      (
+        await page
+          .locator('meta[name="theme-color"]')
+          .getAttribute("content")
+      )?.trim().toLowerCase();
+
+    expect(themeColor, "theme-color meta missing").toBeTruthy();
+
+    expect(themeColor).toBe(expectedThemeColor);
   });
 });
 
@@ -144,27 +210,39 @@ test.describe("PWA — Manifest", () => {
       `manifest.display "${manifest.display}" is not installable`
     ).toBe(true);
 
-    // Icons must include 192 and 512 with explicit purpose (not combined "any maskable")
     const icons = manifest.icons as Array<{ src: string; sizes: string; purpose?: string }>;
     const has192 = icons.some((i) => i.sizes === "192x192");
     const has512 = icons.some((i) => i.sizes === "512x512");
     expect(has192, "manifest missing 192x192 icon").toBe(true);
     expect(has512, "manifest missing 512x512 icon").toBe(true);
 
-    // Purposes should be split — no single icon with "any maskable" combined
+    // Purpose validation: W3C spec allows space-separated tokens (e.g. "any maskable")
+    const allowedPurposeTokens = new Set(["any", "maskable", "monochrome"]);
+    let hasAnyToken = false;
+    let hasMaskableToken = false;
+
     for (const icon of icons) {
-      if (icon.purpose) {
-        const parts = icon.purpose.trim().split(/\s+/);
+      const normalizedPurpose =
+        (icon.purpose ?? "").trim().toLowerCase();
+
+      const purposeTokens =
+        normalizedPurpose.length === 0
+          ? ["any"]
+          : normalizedPurpose.split(/\s+/).filter(Boolean);
+
+      for (const token of purposeTokens) {
         expect(
-          parts.length,
-          `icon ${icon.src} has combined purpose "${icon.purpose}" — should be split into separate entries`
-        ).toBe(1);
+          allowedPurposeTokens.has(token),
+          `icon ${icon.src} has invalid purpose token "${token}"`,
+        ).toBe(true);
+
+        if (token === "any") hasAnyToken = true;
+        if (token === "maskable") hasMaskableToken = true;
       }
     }
 
-    // Has maskable icon
-    const hasMaskable = icons.some((i) => i.purpose === "maskable");
-    expect(hasMaskable, "no maskable icon in manifest").toBe(true);
+    expect(hasAnyToken, "no icon with 'any' purpose token").toBe(true);
+    expect(hasMaskableToken, "no icon with 'maskable' purpose token").toBe(true);
 
     // Background and theme colors
     expect(manifest.background_color, "manifest.background_color missing").toBeTruthy();
@@ -193,7 +271,8 @@ test.describe("PWA — Manifest", () => {
 
 test.describe("PWA — Service Worker", () => {
   test("P04: service worker registers and becomes active", async ({ page }) => {
-    await page.goto(BASE_URL, { waitUntil: "networkidle" });
+    await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await waitForServiceWorkerReady(page);
 
     const swState = await page.evaluate(async () => {
       if (!("serviceWorker" in navigator)) return { supported: false };
@@ -215,10 +294,9 @@ test.describe("PWA — Service Worker", () => {
   });
 
   test("P05: service worker has precached the app shell (/index.html or /)", async ({ page }) => {
-    await page.goto(BASE_URL, { waitUntil: "networkidle" });
-    // Give SW install + activate a moment to run (skipWaiting is synchronous but
-    // cache.add() is async; on first load it should be done by networkidle).
-    await page.waitForTimeout(1500);
+    await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    // Wait for the SW to install, activate, and populate the cache (replaces fixed timeout).
+    await waitForPrecacheReady(page);
 
     const cached = await page.evaluate(async () => {
       const cacheNames = await caches.keys();
@@ -243,7 +321,8 @@ test.describe("PWA — Service Worker", () => {
   });
 
   test("P19: SW_UPDATED message from SW dispatches sw-update-available on window", async ({ page }) => {
-    await page.goto(BASE_URL, { waitUntil: "networkidle" });
+    await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await waitForShellReady(page);
 
     const eventFired = await page.evaluate(() => {
       return new Promise<boolean>((resolve) => {
@@ -277,8 +356,8 @@ test.describe("PWA — Offline behaviour", () => {
     context,
   }) => {
     // First visit online to populate the cache
-    await page.goto(BASE_URL, { waitUntil: "networkidle" });
-    await page.waitForTimeout(1500); // let SW finish caching
+    await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await waitForPrecacheReady(page);
 
     // Go offline and try to navigate
     await goOffline(context);
@@ -299,9 +378,16 @@ test.describe("PWA — Offline behaviour", () => {
     page,
     context,
   }) => {
-    // Seed some API cache by loading the app
-    await page.goto(BASE_URL, { waitUntil: "networkidle" });
-    await page.waitForTimeout(1000);
+    // Load the app and wait for the SW to be active AND controlling this page.
+    // The SW's /api/* fetch handler only runs for controlled clients; without
+    // controller attachment, page-level fetch() bypasses the SW entirely and
+    // hits the network directly — which then throws when offline, not the
+    // structured 503 we contractually guarantee. Shell readiness alone is
+    // insufficient because `clients.claim()` resolves asynchronously after
+    // React has already mounted.
+    await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await waitForServiceWorkerReady(page);
+    await waitForServiceWorkerControlling(page);
 
     await goOffline(context);
     try {
@@ -330,7 +416,7 @@ test.describe("PWA — Offline behaviour", () => {
     page,
     context,
   }) => {
-    await page.goto(BASE_URL, { waitUntil: "networkidle" });
+    await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
     await waitForShellReady(page);
 
     // Drop connection, wait, restore

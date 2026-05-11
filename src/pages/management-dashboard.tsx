@@ -47,7 +47,7 @@ function formatUptime(seconds: number): string {
 export default function ManagementDashboardPage() {
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
   const [scannerOpen, setScannerOpen] = useState(false);
-  const { userId } = useAuth();
+  const { userId, isAdmin } = useAuth();
 
   const { data: equipment, isLoading, isError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["/api/equipment"],
@@ -62,7 +62,7 @@ export default function ManagementDashboardPage() {
   const { data: metrics, isLoading: metricsLoading } = useQuery({
     queryKey: ["/api/metrics"],
     queryFn: api.metrics.get,
-    enabled: !!userId,
+    enabled: isAdmin && !!userId,
     refetchInterval: leaderPoll(60_000),
     refetchIntervalInBackground: false,
     retry: false,
@@ -342,8 +342,8 @@ export default function ManagementDashboardPage() {
           </CardContent>
         </Card>
 
-        {/* System health */}
-        <Card className="bg-card border-border/60 shadow-sm" data-testid="section-system-health">
+        {/* System health — admin-only: non-admin users skip the 403 metrics request */}
+        {isAdmin && <Card className="bg-card border-border/60 shadow-sm" data-testid="section-system-health">
           <CardHeader className="pb-2 pt-4 px-4">
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Activity className="w-4 h-4 text-muted-foreground" />
@@ -413,7 +413,7 @@ export default function ManagementDashboardPage() {
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card>}
       </div>
 
       {scannerOpen && (

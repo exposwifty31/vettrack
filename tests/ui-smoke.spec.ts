@@ -22,6 +22,17 @@ const SCREENSHOTS_DIR = path.join(process.cwd(), "playwright-ui-screenshots");
 
 if (!fs.existsSync(SCREENSHOTS_DIR)) fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 
+// Detect the Playwright-CI / local-E2E runtime: PLAYWRIGHT_E2E is the explicit
+// server-side flag set by the workflow, and a localhost/127.0.0.1 TEST_BASE_URL
+// is the load-bearing signal that the bundle is being served by Express against
+// an origin Clerk's FAPI rejects. In either case, window.Clerk?.loaded will
+// never become true, so waiting for it is a 20s no-op that burns the per-test
+// budget. For real non-E2E runs (e.g. pointing at a deployed environment with
+// a valid Clerk origin), the wait remains in effect.
+const IS_E2E_RUNTIME =
+  process.env.PLAYWRIGHT_E2E === "true" ||
+  /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(process.env.TEST_BASE_URL ?? "");
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 const PUBLIC_ROUTES = [
@@ -93,42 +104,54 @@ async function visitPage(page: Page, route: { name: string; path: string }) {
   };
 
   page.on("console", onConsole);
-
-  await page.goto(route.path, { waitUntil: "domcontentloaded", timeout: 20_000 });
-
-  // Wait for Clerk to finish its FAPI round-trip and validate the stored session.
-  // This is async and often completes after domcontentloaded but before networkidle.
-  await page
-    .waitForFunction(
-      () => {
-        const w = window as unknown as { Clerk?: { loaded?: boolean } };
-        return w.Clerk?.loaded === true;
-      },
-      { timeout: 20_000 }
-    )
-    .catch(() => {
-      // Public pages (signin/signup embed Clerk differently; landing has no Clerk)
-    });
-
-  // If Clerk redirected us to /signin mid-load (session check failed transiently),
-  // give it a few extra seconds to recover and redirect back.
-  if (page.url().includes("/signin") && !route.path.endsWith("/signin")) {
-    await page
-      .waitForURL((url) => !url.href.includes("/signin"), { timeout: 8_000 })
-      .catch(() => {/* auth assertion below will surface the failure */});
-  }
+  const screenshotPath = path.join(SCREENSHOTS_DIR, `${route.name}.png`);
 
   try {
-    await page.waitForLoadState("networkidle", { timeout: 10_000 });
-  } catch {
-    // Non-fatal for pages with persistent polling
+    await page.goto(route.path, { waitUntil: "domcontentloaded", timeout: 20_000 });
+
+    // Wait for Clerk to finish its FAPI round-trip and validate the stored session.
+    // Skipped under PLAYWRIGHT_E2E / localhost runtime: Clerk's FAPI rejects
+    // 127.0.0.1 origins, so Clerk.loaded never becomes true and the wait would
+    // burn its full 20s budget on every test × every retry — which is what made
+    // the suite appear hung in CI. Real non-E2E runs (deployed environment with
+    // a valid Clerk origin) keep the original wait.
+    if (!IS_E2E_RUNTIME) {
+      await page
+        .waitForFunction(
+          () => {
+            const w = window as unknown as { Clerk?: { loaded?: boolean } };
+            return w.Clerk?.loaded === true;
+          },
+          { timeout: 20_000 }
+        )
+        .catch(() => {
+          // Public pages (signin/signup embed Clerk differently; landing has no Clerk)
+        });
+    }
+
+    // If Clerk redirected us to /signin mid-load (session check failed transiently),
+    // give it a few extra seconds to recover and redirect back.
+    if (page.url().includes("/signin") && !route.path.endsWith("/signin")) {
+      await page
+        .waitForURL((url) => !url.href.includes("/signin"), { timeout: 8_000 })
+        .catch(() => {/* auth assertion below will surface the failure */});
+    }
+
+    await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {
+      // Non-fatal for pages with persistent polling / Clerk FAPI in E2E mode
+    });
+    await page.waitForTimeout(250);
+
+    await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {
+      // Don't fail the route test just because the screenshot couldn't be written.
+    });
+  } finally {
+    // Always detach the console listener — leaving it attached leaks closures
+    // across retries and (more importantly) the previous structure could skip
+    // this on test timeout.
+    page.off("console", onConsole);
   }
-  await page.waitForTimeout(500);
 
-  const screenshotPath = path.join(SCREENSHOTS_DIR, `${route.name}.png`);
-  await page.screenshot({ path: screenshotPath, fullPage: true });
-
-  page.off("console", onConsole);
   return { errors, screenshotPath };
 }
 

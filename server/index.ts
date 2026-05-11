@@ -249,7 +249,7 @@ app.use("/api", erModeConcealmentMiddleware);
 
 registerApiRoutes(app);
 
-if (process.env.NODE_ENV === "production") {
+if (process.env.NODE_ENV === "production" || process.env.PLAYWRIGHT_E2E === "true") {
   // Vite content-hashed assets: safe to cache indefinitely (new content = new URL).
   app.use(
     "/assets",

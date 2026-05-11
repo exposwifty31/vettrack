@@ -935,6 +935,7 @@ function EquipmentItem({
     onSuccess: () => {
       haptics.tap();
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
       toast.success(`Checked out — ${eq.name}`);
     },
     onError: () => {
@@ -974,6 +975,7 @@ function EquipmentItem({
       haptics.tap();
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
       toast.success(`Returned — ${eq.name} is now available`);
     },
     onError: () => {

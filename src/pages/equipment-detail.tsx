@@ -315,6 +315,7 @@ export default function EquipmentDetailPage() {
     queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
     queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
     queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
   }
 
   const isOffline = !isOnline();

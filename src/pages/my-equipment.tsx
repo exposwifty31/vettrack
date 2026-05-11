@@ -65,6 +65,7 @@ export default function MyEquipmentPage() {
       haptics.tap();
       queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
       toast.success(t.myEquipment.toast.returnSuccess);
     },
     onError: () => toast.error(t.myEquipment.toast.returnError),
@@ -77,6 +78,7 @@ export default function MyEquipmentPage() {
       await Promise.all(items.map((item) => api.equipment.return(item.id, { isPluggedIn: false })));
       queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
       toast.success(`Returned ${items.length} item${items.length !== 1 ? "s" : ""} — all equipment now available`);
     } catch {
       toast.error(t.myEquipment.toast.returnAllPartialError);
