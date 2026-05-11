@@ -411,10 +411,11 @@ interface MutationResponse {
   equipment: Equipment;
   undoToken: string | undefined;
   pendingSyncId?: number;
+  returnRecord?: EquipmentReturn | null;
 }
 
 interface ReturnMutationResponse extends MutationResponse {
-  returnRecord?: EquipmentReturn;
+  returnRecord?: EquipmentReturn | null;
 }
 
 async function handleOptimisticMutation(opts: {
@@ -427,7 +428,7 @@ async function handleOptimisticMutation(opts: {
 }): Promise<MutationResponse> {
   const clientTimestamp = Date.now();
   try {
-    const result = await request<{ equipment: Equipment; undoToken: string }>(
+    const result = await request<{ equipment: Equipment; undoToken: string; returnRecord?: EquipmentReturn | null }>(
       opts.endpoint,
       {
         method: "POST",
@@ -714,11 +715,16 @@ export const api = {
     ): Promise<ReturnMutationResponse> => {
       const cached = await getCachedEquipmentById(id);
       const now = new Date().toISOString();
+      const isPluggedIn = options?.isPluggedIn ?? false;
+      const returnRequest = {
+        isPluggedIn,
+        ...(options?.plugInDeadlineMinutes !== undefined && { plugInDeadlineMinutes: options.plugInDeadlineMinutes }),
+      };
       const response = await handleOptimisticMutation({
         id,
         endpoint: `/api/equipment/${id}/return`,
-        syncType: "return",
-        requestBody: {},
+        syncType: "return_with_charge",
+        requestBody: returnRequest,
         optimisticEquipment: {
           checkedOutById: null,
           checkedOutByEmail: null,
@@ -734,7 +740,10 @@ export const api = {
         return response;
       }
 
-      const isPluggedIn = options?.isPluggedIn ?? false;
+      if (response.returnRecord) {
+        return response;
+      }
+
       const returnRecord = await createReturnRecordForEquipment({
         equipmentId: id,
         isPluggedIn,
