@@ -113,13 +113,15 @@ export async function getCachedRoomById(id: string): Promise<Room | undefined> {
   return offlineDb.rooms.get(id);
 }
 
-// These mutation types are idempotent per endpoint — a second offline tap
-// should overwrite the first entry rather than queue a replay storm.
+// checkout and return are idempotent per endpoint: a second offline tap on the
+// same item should overwrite the queued entry rather than replay it twice.
+// "scan" is intentionally excluded: each scan is a distinct audit event
+// (different status/note) and must be replayed individually to preserve the
+// full scanLogs history — collapsing them would silently drop intermediate entries.
 const DEDUP_SYNC_TYPES: ReadonlySet<PendingSyncType> = new Set([
   "checkout",
   "return",
   "return_with_charge",
-  "scan",
 ]);
 
 export async function addPendingSync(op: Omit<PendingSync, "id">): Promise<number | undefined> {
