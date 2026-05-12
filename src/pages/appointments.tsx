@@ -1332,7 +1332,7 @@ export default function AppointmentsPage() {
                               type="button"
                               disabled={!available}
                               onClick={() => openQuickBooking(slot)}
-                              className={`absolute left-0 right-0 text-left px-3 border-t min-h-[44px] ${
+                              className={`absolute left-0 right-0 text-left px-3 border-t ${
                                 available
                                   ? "hover:bg-emerald-50/60 focus:bg-emerald-50/80"
                                   : "bg-muted/40 cursor-not-allowed pointer-events-none"
