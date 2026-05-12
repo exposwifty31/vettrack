@@ -1899,8 +1899,11 @@
     "priorityNormal": "רגיל",
     "priorityHigh": "גבוה",
     "priorityCritical": "קריטי",
+    "saving": "שומר...",
     "shiftWindowsFor": "חלונות משמרת עבור {name}:",
-    "noShiftImported": "לא יובאה משמרת ליום זה"
+    "noShiftImported": "לא יובאה משמרת ליום זה",
+    "overrideApplied": "דריסה הוחלה",
+    "dayViewReadOnly": "תצוגה בלבד — יצירת משימות אינה זמינה לתפקידך"
   },
   "cop": {
     "discrepancyTitle": "אי-התאמה בתרופות (Smart Cop)",

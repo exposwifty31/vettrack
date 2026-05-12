@@ -376,7 +376,7 @@ export default function AppointmentsPage() {
   const { userId, role, effectiveRole, isLoaded } = useAuth();
   const dir = useDirection();
   const resolvedRole = String(effectiveRole ?? role ?? "").trim().toLowerCase();
-  const canCreateTask = resolvedRole !== "student";
+  const canCreateTask = isLoaded && resolvedRole !== "student";
   const queryClient = useQueryClient();
   const urgentRef = useRef<HTMLDivElement>(null);
   const myTasksRef = useRef<HTMLDivElement>(null);
@@ -1323,24 +1323,32 @@ export default function AppointmentsPage() {
                       );
                     })}
 
-                    {canCreateTask && slotAvailability.map(({ slot, available }) => {
-                      const top = minutesSinceDayStart(day, slot) * PIXELS_PER_MINUTE;
-                      return (
-                        <button
-                          key={slot.toISOString()}
-                          type="button"
-                          disabled={!available}
-                          onClick={() => openQuickBooking(slot)}
-                          className={`absolute left-0 right-0 text-left px-3 border-t ${
-                            available
-                              ? "hover:bg-emerald-50/60 focus:bg-emerald-50/80"
-                              : "bg-muted/40 cursor-not-allowed pointer-events-none"
-                          }`}
-                          style={{ top, height: SLOT_MINUTES * PIXELS_PER_MINUTE }}
-                          aria-label={`${t.appointmentsPage.scheduleTaskAt} ${formatTimeHHMM(slot)}`}
-                        />
-                      );
-                    })}
+                    {canCreateTask
+                      ? slotAvailability.map(({ slot, available }) => {
+                          const top = minutesSinceDayStart(day, slot) * PIXELS_PER_MINUTE;
+                          return (
+                            <button
+                              key={slot.toISOString()}
+                              type="button"
+                              disabled={!available}
+                              onClick={() => openQuickBooking(slot)}
+                              className={`absolute left-0 right-0 text-left px-3 border-t min-h-[44px] ${
+                                available
+                                  ? "hover:bg-emerald-50/60 focus:bg-emerald-50/80"
+                                  : "bg-muted/40 cursor-not-allowed pointer-events-none"
+                              }`}
+                              style={{ top, height: SLOT_MINUTES * PIXELS_PER_MINUTE }}
+                              aria-label={`${t.appointmentsPage.scheduleTaskAt} ${formatTimeHHMM(slot)}`}
+                            />
+                          );
+                        })
+                      : isLoaded && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <span className="text-xs text-muted-foreground bg-background/80 px-3 py-1 rounded-full">
+                              {t.appointmentsPage.dayViewReadOnly}
+                            </span>
+                          </div>
+                        )}
 
                     {appointmentBlocks.map(({ appointment, top, height, start, end }) => {
                       const completeState = completeButtonState({
@@ -1391,7 +1399,7 @@ export default function AppointmentsPage() {
                           </div>
                         ) : null}
                         {appointment.conflictOverride ? (
-                          <div className="text-[10px] mt-1 font-medium">Override applied</div>
+                          <div className="text-[10px] mt-1 font-medium">{t.appointmentsPage.overrideApplied}</div>
                         ) : null}
                         <div className="flex gap-1 mt-2 flex-wrap">
                           {canStartTask(appointment, meQuery.data?.id, role, effectiveRole) ? (
@@ -1676,7 +1684,7 @@ export default function AppointmentsPage() {
           </div>
           <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
             <Button variant="outline" onClick={() => setBookingOpen(false)}>
-              Cancel
+              {t.common.cancel}
             </Button>
             {!isMedicationForm ? (
               <Button
@@ -1689,7 +1697,7 @@ export default function AppointmentsPage() {
                   || !formEndLocal
                 }
               >
-                {createMutation.isPending ? "שומר..." : "צור משימה"}
+                {createMutation.isPending ? t.appointmentsPage.saving : t.appointmentsPage.createTask}
               </Button>
             ) : null}
           </DialogFooter>

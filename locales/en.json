@@ -1899,8 +1899,11 @@
     "priorityNormal": "Normal",
     "priorityHigh": "High",
     "priorityCritical": "Critical",
+    "saving": "Saving...",
     "shiftWindowsFor": "Shift windows for {name}:",
-    "noShiftImported": "No shift imported for this day"
+    "noShiftImported": "No shift imported for this day",
+    "overrideApplied": "Override applied",
+    "dayViewReadOnly": "View only — task creation is not available for your role"
   },
   "cop": {
     "discrepancyTitle": "Medication discrepancy (Smart Cop)",
