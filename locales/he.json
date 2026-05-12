@@ -1133,6 +1133,7 @@
     "logFilterTo": "עד תאריך",
     "logFilterAction": "סוג פעולה",
     "logFilterStaff": "איש צוות",
+    "logFilterStaffPlaceholder": "למשל: דנה, שגל…",
     "logFilterApply": "סנן",
     "logFilterReset": "אפס",
     "noTicketsYet": "אין פניות תמיכה עדיין",

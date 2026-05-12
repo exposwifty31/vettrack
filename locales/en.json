@@ -1133,6 +1133,7 @@
     "logFilterTo": "To date",
     "logFilterAction": "Action type",
     "logFilterStaff": "Staff member",
+    "logFilterStaffPlaceholder": "e.g. Dana, Sigal…",
     "logFilterApply": "Filter",
     "logFilterReset": "Reset",
     "noTicketsYet": "No support tickets yet",
