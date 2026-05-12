@@ -1324,24 +1324,44 @@ export default function AppointmentsPage() {
                     })}
 
                     {canCreateTask
-                      ? slotAvailability.map(({ slot, available }) => {
-                          const top = minutesSinceDayStart(day, slot) * PIXELS_PER_MINUTE;
-                          return (
-                            <button
-                              key={slot.toISOString()}
-                              type="button"
-                              disabled={!available}
-                              onClick={() => openQuickBooking(slot)}
-                              className={`absolute left-0 right-0 text-left px-3 border-t ${
-                                available
-                                  ? "hover:bg-emerald-50/60 focus:bg-emerald-50/80"
-                                  : "bg-muted/40 cursor-not-allowed pointer-events-none"
-                              }`}
-                              style={{ top, height: SLOT_MINUTES * PIXELS_PER_MINUTE }}
-                              aria-label={`${t.appointmentsPage.scheduleTaskAt} ${formatTimeHHMM(slot)}`}
-                            />
-                          );
-                        })
+                      ? (
+                        <>
+                          {slotAvailability.map(({ slot, available }) => {
+                            const top = minutesSinceDayStart(day, slot) * PIXELS_PER_MINUTE;
+                            return (
+                              <button
+                                key={slot.toISOString()}
+                                type="button"
+                                disabled={!available}
+                                onKeyDown={(e) => {
+                                  if ((e.key === "Enter" || e.key === " ") && available) {
+                                    e.preventDefault();
+                                    openQuickBooking(slot);
+                                  }
+                                }}
+                                className={`absolute left-0 right-0 border-t pointer-events-none ${
+                                  available ? "focus:bg-emerald-50/80" : "bg-muted/40"
+                                }`}
+                                style={{ top, height: SLOT_MINUTES * PIXELS_PER_MINUTE }}
+                                aria-label={`${t.appointmentsPage.scheduleTaskAt} ${formatTimeHHMM(slot)}`}
+                              />
+                            );
+                          })}
+                          {/* Single hit target: one DOM box covers the full grid so no slot
+                              buttons overlap. Click Y is divided back into slot index. */}
+                          <div
+                            aria-hidden="true"
+                            className="absolute inset-0 cursor-pointer"
+                            onClick={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const y = e.clientY - rect.top;
+                              const slotIndex = Math.floor(y / PIXELS_PER_MINUTE / SLOT_MINUTES);
+                              const entry = slotAvailability[slotIndex];
+                              if (entry?.available) openQuickBooking(entry.slot);
+                            }}
+                          />
+                        </>
+                      )
                       : isLoaded && (
                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                             <span className="text-xs text-muted-foreground bg-background/80 px-3 py-1 rounded-full">

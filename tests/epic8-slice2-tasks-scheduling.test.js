@@ -186,21 +186,29 @@ describe("Scheduling / Day View — empty state with CTA", () => {
 // ── Time slots interactivity ──────────────────────────────────────────────────
 
 describe("Scheduling / Day View — time slot interactivity", () => {
-  it("available slots are interactive (hover styles, onClick)", () => {
-    // Available slots SHOULD be interactive — confirming no regression
-    expect(appointments).toContain("hover:bg-emerald-50/60");
-    expect(appointments).toContain("onClick={() => openQuickBooking(slot)}");
+  it("available slots have keyboard focus ring and no overlapping pointer-events", () => {
+    // Slot buttons use pointer-events-none so they do NOT create overlapping hit
+    // areas. Keyboard users activate slots via onKeyDown (Enter/Space) and see a
+    // focus ring; pointer/touch users hit the single overlay div.
+    expect(appointments).toContain("focus:bg-emerald-50/80");
+    expect(appointments).toContain("onKeyDown=");
+    // All slot buttons carry pointer-events-none — no individual button expands its
+    // hit area beyond the slot height, which prevents later buttons from stealing taps.
+    expect(appointments).toContain("pointer-events-none");
   });
 
-  it("unavailable slots are visually non-interactive (cursor-not-allowed, disabled)", () => {
-    expect(appointments).toContain("cursor-not-allowed");
+  it("unavailable slots are visually non-interactive (bg-muted/40, disabled)", () => {
+    // Visual tint + disabled attribute guard both visual and keyboard paths
+    expect(appointments).toContain("bg-muted/40");
     expect(appointments).toContain("disabled={!available}");
   });
 
-  it("unavailable slots have pointer-events-none to remove touch affordances (Slice 4.2)", () => {
-    // pointer-events-none must appear alongside cursor-not-allowed for the unavailable branch
-    const unavailableIdx = appointments.indexOf("cursor-not-allowed pointer-events-none");
-    expect(unavailableIdx).toBeGreaterThan(-1);
+  it("a single hit-area overlay replaces per-slot pointer events (no overlapping DOM boxes)", () => {
+    // One absolute inset-0 div calculates which slot was tapped from the click's Y
+    // coordinate — this is the only pointer/touch target and cannot overlap itself.
+    expect(appointments).toContain("absolute inset-0");
+    // The overlay maps Y → slotIndex → slotAvailability entry and guards available
+    expect(appointments).toContain("openQuickBooking(entry.slot)");
   });
 });
 
