@@ -396,7 +396,7 @@
 /* ── QR scan-line animation ──────────────────────────────────────────────── */
 @keyframes qr-scan-line {
   0%   { transform: translateY(0px); }
-  50%  { transform: translateY(248px); }
+  50%  { transform: translateY(var(--qr-scan-distance, 248px)); }
   100% { transform: translateY(0px); }
 }
 

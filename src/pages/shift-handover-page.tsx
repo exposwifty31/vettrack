@@ -24,10 +24,10 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ClipboardList, Copy, Loader2, AlertTriangle, ReceiptText } from "lucide-react";
+import { ClipboardList, Copy, Loader2, AlertTriangle, ReceiptText, Users, Bell, Clock, History } from "lucide-react";
 import { toast } from "sonner";
 import { formatDateTimeByLocale } from "@/lib/i18n";
-import type { ShiftHandoverSummary } from "@/types";
+import type { ShiftHandoverSummary, ShiftHandoverPatientsResponse, ShiftHandoverSnapshotRecord, ShiftHandoverSummaryCounts } from "@/types";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { DispenseSheet } from "@/features/containers/components/DispenseSheet";
@@ -89,8 +89,8 @@ const SECTION_SHELL = {
 };
 
 export default function ShiftHandoverPage() {
-  const { userId, role } = useAuth();
-  const canBilling = role === "admin" || role === "vet";
+  const { userId, role, effectiveRole } = useAuth();
+  const canBilling = (effectiveRole ?? role) === "admin" || (effectiveRole ?? role) === "vet";
   const search = useSearch();
   const dischargeAnimalId = useMemo(() => new URLSearchParams(search).get("discharge"), [search]);
   const [dischargeOpen, setDischargeOpen] = useState(false);
@@ -130,6 +130,22 @@ export default function ShiftHandoverPage() {
     refetchOnWindowFocus: false,
   });
 
+  const patientsQ = useQuery({
+    queryKey: ["/api/shift-handover/patients"],
+    queryFn: () => api.shiftHandover.getPatients(),
+    enabled: !!userId,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const snapshotQ = useQuery({
+    queryKey: ["/api/shift-handover/snapshot/latest"],
+    queryFn: () => api.shiftHandover.getLatestSnapshot(),
+    enabled: !!userId,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
   const startMut = useMutation({
     mutationFn: () => api.shiftHandover.startSession(),
     onSuccess: () => {
@@ -154,7 +170,7 @@ export default function ShiftHandoverPage() {
     },
     onError: (err: unknown) => {
       const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("404")) {
+      if (msg.includes("NO_OPEN_SHIFT") || msg.includes("No open shift")) {
         toast.error(t.shiftHandoverPage.noOpenShift);
       } else {
         toast.error(t.shiftHandoverPage.loadError);
@@ -525,6 +541,12 @@ export default function ShiftHandoverPage() {
           </div>
         )}
 
+        {/* ── Patient Continuity Section ── */}
+        <PatientContinuitySection patientsQ={patientsQ} p={p} />
+
+        {/* ── Previous Snapshot Section ── */}
+        <PreviousSnapshotSection snapshotQ={snapshotQ} p={p} />
+
         {/* DispenseSheet for completing emergency events from shift report */}
         {completeEmergencyEventId && completeEmergencyContainerId && (
           <DispenseSheet
@@ -539,5 +561,279 @@ export default function ShiftHandoverPage() {
         )}
       </div>
     </Layout>
+  );
+}
+
+// ─── Patient Continuity Sub-component ────────────────────────────────────────
+
+function safeSummaryCounts(raw: unknown): ShiftHandoverSummaryCounts | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (
+    typeof r.patientCount !== "number" ||
+    typeof r.pendingTaskCount !== "number" ||
+    typeof r.overdueCount !== "number" ||
+    typeof r.unresolvedEmergencyCount !== "number"
+  ) return null;
+  return r as unknown as ShiftHandoverSummaryCounts;
+}
+
+type PatientsQueryResult = ReturnType<typeof useQuery<ShiftHandoverPatientsResponse>>;
+type SnapshotQueryResult = ReturnType<typeof useQuery<ShiftHandoverSnapshotRecord>>;
+
+function PatientContinuitySection({
+  patientsQ,
+  p,
+}: {
+  patientsQ: PatientsQueryResult;
+  p: typeof t.shiftHandoverPage;
+}) {
+  const data = patientsQ.data;
+  const counts = data?.summaryCounts;
+
+  return (
+    <div className="mt-6 space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <h2 className="text-lg font-bold flex items-center gap-2">
+          <Users className="w-5 h-5 text-primary shrink-0" aria-hidden />
+          {p.patientContinuityTitle}
+        </h2>
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">
+          {p.patientContinuityLiveBadge}
+        </span>
+      </div>
+      <p className="text-sm text-muted-foreground -mt-1">{p.patientContinuitySubtitle}</p>
+
+      {patientsQ.isLoading && (
+        <div className="space-y-2" role="status" aria-live="polite" aria-busy="true">
+          <span className="sr-only">{t.common.loading}</span>
+          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="h-16 w-full rounded-xl" />
+        </div>
+      )}
+
+      {patientsQ.isError && (
+        <Card className="border-destructive/50 rounded-xl">
+          <CardContent className="pt-4 pb-3 text-destructive text-sm">{p.patientContinuityError}</CardContent>
+        </Card>
+      )}
+
+      {!patientsQ.isError && data && (
+        <>
+          {/* Summary counts */}
+          {counts && (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="rounded-xl border p-3 text-center">
+                <p className="text-xl font-bold tabular-nums">{counts.patientCount}</p>
+                <p className="text-xs text-muted-foreground mt-1">{p.patientCountLabel}</p>
+              </div>
+              <div className={cn("rounded-xl border p-3 text-center", counts.pendingTaskCount > 0 ? "border-amber-300 bg-amber-50 dark:bg-amber-950/25" : "")}>
+                <p className="text-xl font-bold tabular-nums">{counts.pendingTaskCount}</p>
+                <p className="text-xs text-muted-foreground mt-1">{p.pendingTaskCountLabel}</p>
+              </div>
+              <div className={cn("rounded-xl border p-3 text-center", counts.overdueCount > 0 ? "border-red-300 bg-red-50 dark:bg-red-950/25" : "")}>
+                <p className={cn("text-xl font-bold tabular-nums", counts.overdueCount > 0 ? "text-red-700 dark:text-red-300" : "")}>{counts.overdueCount}</p>
+                <p className="text-xs text-muted-foreground mt-1">{p.overdueCountLabel}</p>
+              </div>
+              <div className={cn("rounded-xl border p-3 text-center relative", counts.unresolvedEmergencyCount > 0 ? "border-red-400 bg-red-50 dark:bg-red-950/25" : "")}>
+                <p className={cn("text-xl font-bold tabular-nums", counts.unresolvedEmergencyCount > 0 ? "text-red-700 dark:text-red-300" : "")}>{counts.unresolvedEmergencyCount}</p>
+                <p className="text-xs text-muted-foreground mt-1">{p.emergencyCountLabel}</p>
+                {counts.unresolvedEmergencyCount > 0 && (
+                  <span className="absolute top-1 left-1 w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Active alerts (clinic-wide) */}
+          {data.activeAlerts.length > 0 && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50/70 dark:bg-amber-950/20 p-3 space-y-1">
+              <p className="text-sm font-semibold flex items-center gap-2">
+                <Bell className="w-4 h-4 text-amber-600 shrink-0" aria-hidden />
+                {p.activeAlertsTitle}
+              </p>
+              <ul className="list-disc list-inside space-y-0.5 text-sm text-amber-900 dark:text-amber-200">
+                {data.activeAlerts.map((alert, i) => (
+                  <li key={i} dir="auto">{alert.alertType}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Patient list */}
+          {data.patients.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">{p.patientContinuityEmpty}</p>
+          ) : (
+            <Accordion type="multiple" className="w-full space-y-2">
+              {data.patients.map((patient) => {
+                const hasOverdue = patient.overdueMedicationCount > 0;
+                const hasEmergency = patient.unresolvedEmergencyDispenses.length > 0;
+                const hasTasks = patient.pendingMedicationTasks.length > 0;
+                return (
+                  <AccordionItem
+                    key={patient.hospitalizationId}
+                    value={patient.hospitalizationId}
+                    className={cn(
+                      "border-0 rounded-xl px-1 shadow-sm",
+                      hasOverdue || hasEmergency
+                        ? "border border-red-200/90 bg-red-50/60 dark:bg-red-950/15 dark:border-red-900/40"
+                        : hasTasks
+                          ? "border border-amber-200/90 bg-amber-50/60 dark:bg-amber-950/15 dark:border-amber-900/40"
+                          : "border border-border bg-muted/30",
+                    )}
+                  >
+                    <AccordionTrigger className="px-3 py-3 hover:no-underline min-h-[44px]">
+                      <div className="flex flex-wrap items-center gap-2 w-full text-start">
+                        <span className="font-semibold text-sm" dir="auto">{patient.animalName}</span>
+                        {patient.ward && (
+                          <span className="text-xs text-muted-foreground" dir="auto">
+                            {p.wardLabel}: {patient.ward}
+                            {patient.bay ? ` / ${p.bayLabel}: ${patient.bay}` : ""}
+                          </span>
+                        )}
+                        <div className="flex gap-1.5 flex-wrap ms-auto">
+                          {hasTasks && (
+                            <span className={cn(
+                              "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+                              hasOverdue
+                                ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200"
+                                : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200",
+                            )}>
+                              <Clock className="w-3 h-3 shrink-0" aria-hidden />
+                              {patient.pendingMedicationTasks.length}
+                              {hasOverdue ? ` (${patient.overdueMedicationCount} ${p.overdueLabel})` : ` ${p.pendingTasksLabel}`}
+                            </span>
+                          )}
+                          {hasEmergency && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200">
+                              <AlertTriangle className="w-3 h-3 shrink-0" aria-hidden />
+                              {patient.unresolvedEmergencyDispenses.length} {p.emergencyDispensesLabel}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-3 pb-3 space-y-2 text-sm">
+                      {patient.pendingMedicationTasks.length > 0 ? (
+                        <div>
+                          <p className="font-medium text-xs text-muted-foreground mb-1">{p.pendingTasksLabel}</p>
+                          <ul className="space-y-1">
+                            {patient.pendingMedicationTasks.map((task) => {
+                              const isOverdue = task.dueAt ? new Date(task.dueAt) < new Date() : false;
+                              return (
+                                <li key={task.id} className={cn("flex items-center gap-2 text-xs rounded px-2 py-1", isOverdue ? "bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-200" : "bg-muted/50 text-foreground")}>
+                                  <span className="font-mono" dir="auto">{task.drugId}</span>
+                                  <span className="text-muted-foreground">{task.status}</span>
+                                  {task.dueAt && (
+                                    <span className="ms-auto tabular-nums text-muted-foreground">{formatDateTimeByLocale(new Date(task.dueAt))}</span>
+                                  )}
+                                  {isOverdue && <AlertTriangle className="w-3 h-3 text-red-500 shrink-0" aria-hidden />}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">{p.noItems}</p>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Previous Snapshot Sub-component ─────────────────────────────────────────
+
+function PreviousSnapshotSection({
+  snapshotQ,
+  p,
+}: {
+  snapshotQ: SnapshotQueryResult;
+  p: typeof t.shiftHandoverPage;
+}) {
+  const snap = snapshotQ.data;
+  const is404 = snapshotQ.isError && snapshotQ.error instanceof Error && (snapshotQ.error.message.includes("NO_SNAPSHOT") || snapshotQ.error.message.includes("No handover snapshot"));
+
+  return (
+    <div className="mt-6 space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <h2 className="text-lg font-bold flex items-center gap-2">
+          <History className="w-5 h-5 text-muted-foreground shrink-0" aria-hidden />
+          {p.previousSnapshotTitle}
+        </h2>
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-muted text-muted-foreground">
+          {p.previousSnapshotHistoricalBadge}
+        </span>
+      </div>
+
+      {snapshotQ.isLoading && (
+        <div className="space-y-2" role="status" aria-live="polite" aria-busy="true">
+          <span className="sr-only">{t.common.loading}</span>
+          <Skeleton className="h-16 w-full rounded-xl" />
+        </div>
+      )}
+
+      {snapshotQ.isError && !is404 && (
+        <Card className="border-destructive/50 rounded-xl">
+          <CardContent className="pt-4 pb-3 text-destructive text-sm">{p.previousSnapshotError}</CardContent>
+        </Card>
+      )}
+
+      {(is404 || (!snapshotQ.isLoading && !snapshotQ.isError && !snap)) && (
+        <p className="text-sm text-muted-foreground py-2">{p.previousSnapshotEmpty}</p>
+      )}
+
+      {!snapshotQ.isError && snap && (
+        <Card className="rounded-xl border border-border bg-muted/20">
+          <CardContent className="pt-4 pb-4 space-y-3">
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Clock className="w-3 h-3 shrink-0" aria-hidden />
+              {p.snapshotGeneratedAt}: {formatDateTimeByLocale(new Date(snap.generatedAt))}
+            </p>
+            <SnapshotSummaryCounts raw={snap.summaryCounts} p={p} />
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function SnapshotSummaryCounts({
+  raw,
+  p,
+}: {
+  raw: unknown;
+  p: typeof t.shiftHandoverPage;
+}) {
+  const counts = safeSummaryCounts(raw);
+  if (!counts) return null;
+  return (
+    <div>
+      <p className="text-xs font-semibold text-muted-foreground mb-2">{p.summaryCountsTitle}</p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="rounded-lg border p-2 text-center">
+          <p className="text-lg font-bold tabular-nums">{counts.patientCount}</p>
+          <p className="text-xs text-muted-foreground">{p.patientCountLabel}</p>
+        </div>
+        <div className={cn("rounded-lg border p-2 text-center", counts.pendingTaskCount > 0 ? "border-amber-300 bg-amber-50/60 dark:bg-amber-950/20" : "")}>
+          <p className="text-lg font-bold tabular-nums">{counts.pendingTaskCount}</p>
+          <p className="text-xs text-muted-foreground">{p.pendingTaskCountLabel}</p>
+        </div>
+        <div className={cn("rounded-lg border p-2 text-center", counts.overdueCount > 0 ? "border-red-300 bg-red-50/60 dark:bg-red-950/20" : "")}>
+          <p className={cn("text-lg font-bold tabular-nums", counts.overdueCount > 0 ? "text-red-700 dark:text-red-300" : "")}>{counts.overdueCount}</p>
+          <p className="text-xs text-muted-foreground">{p.overdueCountLabel}</p>
+        </div>
+        <div className={cn("rounded-lg border p-2 text-center", counts.unresolvedEmergencyCount > 0 ? "border-red-400 bg-red-50/60 dark:bg-red-950/20" : "")}>
+          <p className={cn("text-lg font-bold tabular-nums", counts.unresolvedEmergencyCount > 0 ? "text-red-700 dark:text-red-300" : "")}>{counts.unresolvedEmergencyCount}</p>
+          <p className="text-xs text-muted-foreground">{p.emergencyCountLabel}</p>
+        </div>
+      </div>
+    </div>
   );
 }

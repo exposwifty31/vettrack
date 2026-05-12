@@ -722,7 +722,8 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                 height: 250,
                 boxShadow: "0 0 0 9999px rgba(0,0,0,0.58)",
                 borderRadius: "18px",
-              }}
+                "--qr-scan-distance": "248px",
+              } as React.CSSProperties}
             >
               {/* Corner brackets */}
               <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-xl" />

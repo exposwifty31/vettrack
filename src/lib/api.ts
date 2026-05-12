@@ -10,6 +10,8 @@ import type {
   EquipmentSeenResponse,
   ShiftHandoverSummary,
   ShiftHandoverSession,
+  ShiftHandoverPatientsResponse,
+  ShiftHandoverSnapshotRecord,
   InventoryContainer,
   InventoryContainerWithItems,
   ConsumablesReport,
@@ -1461,6 +1463,10 @@ export const api = {
         `/api/shift-handover/emergency/${encodeURIComponent(logId)}/reconcile`,
         { method: "PATCH", body: JSON.stringify(data) },
       ),
+    getPatients: () =>
+      request<ShiftHandoverPatientsResponse>("/api/shift-handover/patients"),
+    getLatestSnapshot: () =>
+      request<ShiftHandoverSnapshotRecord>("/api/shift-handover/snapshot/latest"),
   },
   forecast: {
     parseJson: (body: { text: string; windowHours?: 24 | 72; weekendMode?: boolean }) =>

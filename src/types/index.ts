@@ -667,6 +667,61 @@ export interface ShiftHandoverSession {
   note: string | null;
 }
 
+export interface ShiftHandoverSummaryCounts {
+  patientCount: number;
+  pendingTaskCount: number;
+  overdueCount: number;
+  unresolvedEmergencyCount: number;
+}
+
+export interface ShiftHandoverMedTask {
+  id: string;
+  status: string;
+  drugId: string;
+  dueAt: string | null;
+}
+
+export interface ShiftHandoverEmergencyDispense {
+  id: string;
+  createdAt: string;
+}
+
+export interface ShiftHandoverActiveAlert {
+  alertType: string;
+  ackStatus: string;
+}
+
+export interface ShiftHandoverPatient {
+  hospitalizationId: string;
+  animalId: string;
+  animalName: string;
+  status: string;
+  ward: string | null;
+  bay: string | null;
+  pendingMedicationTasks: ShiftHandoverMedTask[];
+  overdueMedicationCount: number;
+  unresolvedEmergencyDispenses: ShiftHandoverEmergencyDispense[];
+}
+
+export interface ShiftHandoverPatientsResponse {
+  patients: ShiftHandoverPatient[];
+  activeAlerts: ShiftHandoverActiveAlert[];
+  summaryCounts: ShiftHandoverSummaryCounts;
+  generatedAt: string;
+}
+
+/** Raw snapshot row returned by GET /api/shift-handover/snapshot/latest.
+ *  patientsPayload and summaryCounts are historical JSONB — treat as unknown. */
+export interface ShiftHandoverSnapshotRecord {
+  id: string;
+  clinicId: string;
+  shiftSessionId: string;
+  generatedAt: string;
+  patientsPayload: unknown;
+  summaryCounts: unknown;
+  createdBy: string;
+}
+
 export type EquipmentSeenResponse =
   | {
       linked: true;
