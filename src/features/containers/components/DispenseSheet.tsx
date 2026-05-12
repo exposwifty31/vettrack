@@ -139,13 +139,15 @@ export function DispenseSheet({
     queryKey: ["/api/containers/detail", containerId],
     queryFn: async (): Promise<InventoryContainerWithItems> => {
       const view = await api.restock.containerItems(containerId);
-      const itemsWithIds = view.lines.map((l) => ({
-        id: l.itemId ?? "",
-        itemId: l.itemId ?? "",
-        quantity: l.actual,
-        label: l.label,
-        code: l.code,
-      }));
+      const itemsWithIds = view.lines
+        .filter((l) => l.itemId && l.itemId.trim().length > 0)
+        .map((l) => ({
+          id: l.itemId!,
+          itemId: l.itemId!,
+          quantity: l.actual,
+          label: l.label,
+          code: l.code,
+        }));
       return {
         ...view.container,
         items: itemsWithIds,
@@ -231,7 +233,7 @@ export function DispenseSheet({
         crypto.randomUUID(),
       );
       if (!res.ok) {
-        toast.error(res.message?.trim() || t.dispense.errorMessage(res.error));
+        toast.error(t.dispense.errorMessage(res.error));
         return;
       }
       applyDispenseSuccess(res.data);
@@ -280,7 +282,7 @@ export function DispenseSheet({
           toast.error(t.dispense.errorMessage("INSUFFICIENT_STOCK"));
           return;
         }
-        toast.error(res.message?.trim() || t.dispense.errorMessage(res.error));
+        toast.error(t.dispense.errorMessage(res.error));
         return;
       }
       applyDispenseSuccess(res.data);

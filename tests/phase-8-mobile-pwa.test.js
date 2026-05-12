@@ -126,3 +126,27 @@ describe("layout.tsx navigation menu", () => {
     expect(menuSection).not.toMatch(/max-h-\[\d+vh\]/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 7. Dispense container-selection bug regression guards
+// ---------------------------------------------------------------------------
+describe("dispense container-selection fixes", () => {
+  const inventorySrc = read("src/pages/inventory-page.tsx");
+  const dispenseSheetSrc = read("src/features/containers/components/DispenseSheet.tsx");
+
+  it("handleOpenDispense uses selectedId, not containers[0].id", () => {
+    // The callback must reference selectedId, not the first element of the array
+    expect(inventorySrc).not.toMatch(/setDispenseContainerId\s*\(\s*containers\s*\[\s*0\s*\]\s*\.id\s*\)/);
+    expect(inventorySrc).toMatch(/setDispenseContainerId\s*\(\s*selectedId\s*\)/);
+  });
+
+  it("DispenseSheet does not pass empty string as itemId fallback", () => {
+    // itemId ?? "" would send an empty string that fails z.string().min(1) validation
+    expect(dispenseSheetSrc).not.toMatch(/itemId\s*\?\?\s*""/);
+  });
+
+  it("DispenseSheet toast uses localized errorMessage, not raw res.message", () => {
+    // Raw res.message surfaces English "Validation failed"; errorMessage() is always localized
+    expect(dispenseSheetSrc).not.toMatch(/res\.message\?\.trim\(\)\s*\|\|\s*t\.dispense\.errorMessage/);
+  });
+});

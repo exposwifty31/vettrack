@@ -495,14 +495,13 @@ export default function InventoryPage() {
   };
 
   const handleOpenDispense = useCallback(() => {
-    const containers = containersQ.data;
-    if (!containers || containers.length === 0) {
+    if (!selectedId) {
       toast.error(p.noContainers);
       return;
     }
-    setDispenseContainerId(containers[0].id);
+    setDispenseContainerId(selectedId);
     setDispenseOpen(true);
-  }, [containersQ.data]);
+  }, [selectedId]);
 
   const handleCloseDispense = useCallback(() => {
     setDispenseOpen(false);
