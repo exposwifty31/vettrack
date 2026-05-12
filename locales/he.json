@@ -1426,6 +1426,7 @@
     "emptyTitle": "אין משימות תרופתיות",
     "emptySubtitle": "משימות מוקצות, מתוזמנות, שהגיעו, ממתינות ובביצוע יופיעו כאן.",
     "taskStarted": "משימה תרופתית התחילה",
+    "medicationTaskCreated": "משימת תרופות נוצרה — {volume} הוקצו לטכנאי",
     "taskStartFailed": "הפעלת משימה תרופתית נכשלה",
     "taskCompleted": "משימה תרופתית הושלמה",
     "taskCompleteFailed": "השלמת משימה תרופתית נכשלה",

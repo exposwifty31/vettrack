@@ -624,7 +624,10 @@ export function MedicationCalculator({
     },
     onSuccess: (appointment) => {
       try { sessionStorage.removeItem(storageKeyRef.current); } catch { /* ignore */ }
-      setSuccessMessage(t.medsPage.taskStarted);
+      const volumeDisplay = resolved?.doseUnit === "tablet"
+        ? `${String(formatTabletFraction(calc.volumeMl))} tab`
+        : `${calc.volumeMl.toFixed(2)} mL`;
+      setSuccessMessage(t.medsPage.medicationTaskCreated(volumeDisplay));
       if (appointment) {
         onSuccess?.(appointment.id);
         onComplete?.(appointment);

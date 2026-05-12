@@ -403,6 +403,7 @@ const translations = {
     assignMedicationWithTab: (tab: string) => tr(d.medsPage.assignMedicationWithTab, { tab }),
     deviationFromRecommended: (sign: string, pct: string) => tr(d.medsPage.deviationFromRecommended, { sign, pct }),
     deviationBlocked: (sign: string, pct: string) => tr(d.medsPage.deviationBlocked, { sign, pct }),
+    medicationTaskCreated: (volume: string) => tr(d.medsPage.medicationTaskCreated, { volume }),
   },
 
   pharmacyForecast: {

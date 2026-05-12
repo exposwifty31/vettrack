@@ -1426,6 +1426,7 @@
     "emptyTitle": "No medication tasks ready",
     "emptySubtitle": "Assigned, scheduled, arrived, pending, and in-progress tasks appear here.",
     "taskStarted": "Medication task started",
+    "medicationTaskCreated": "Medication task created — {volume} assigned to technician",
     "taskStartFailed": "Failed to start medication task",
     "taskCompleted": "Medication task completed",
     "taskCompleteFailed": "Failed to complete medication task",
