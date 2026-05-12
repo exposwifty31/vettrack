@@ -143,7 +143,7 @@ function AuditLogRow({ log }: { log: AuditLog }) {
             </div>
             {actorRole ? (
               <p className="text-[10px] text-muted-foreground/90 mt-0.5 font-medium uppercase tracking-wide">
-                Role: {actorRole}
+                {t.adminPage.auditLogRoleLabel(actorRole)}
               </p>
             ) : null}
 
@@ -246,13 +246,13 @@ export function SharedAuditLogsPanel({
         <Card>
           {!compact && (
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Filters</CardTitle>
+              <CardTitle className="text-base">{t.adminPage.auditLogFilters}</CardTitle>
             </CardHeader>
           )}
           <CardContent className={compact ? "pt-4" : undefined}>
-            <div className="flex flex-wrap gap-4 items-end">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4 sm:items-end">
               {/* Staff name filter */}
-              <div className="flex flex-col gap-1.5 min-w-[160px]">
+              <div className="flex flex-col gap-1.5 sm:min-w-[160px]">
                 <Label className="text-xs">{t.adminPage.logFilterStaff}</Label>
                 <div className="relative">
                   <User className="absolute start-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
@@ -267,14 +267,14 @@ export function SharedAuditLogsPanel({
               </div>
 
               {/* Action type */}
-              <div className="flex flex-col gap-1.5 min-w-[180px]">
+              <div className="flex flex-col gap-1.5 sm:min-w-[180px]">
                 <Label className="text-xs">{t.adminPage.logFilterAction}</Label>
                 <Select value={actionType || "all"} onValueChange={(v) => setActionType(v === "all" ? "" : v)}>
                   <SelectTrigger className="h-8 text-sm">
-                    <SelectValue placeholder="All actions" />
+                    <SelectValue placeholder={t.adminPage.auditLogAllActions} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All actions</SelectItem>
+                    <SelectItem value="all">{t.adminPage.auditLogAllActions}</SelectItem>
                     {ACTION_TYPE_KEYS.map((type) => (
                       <SelectItem key={type} value={type}>{getActionTypeLabel(type)}</SelectItem>
                     ))}
@@ -283,32 +283,30 @@ export function SharedAuditLogsPanel({
               </div>
 
               {/* Date range */}
-              <div className="flex flex-col gap-1.5 flex-1 min-w-[7rem]">
+              <div className="flex flex-col gap-1.5 sm:flex-1 sm:min-w-[7rem]">
                 <Label className="text-xs">{t.adminPage.logFilterFrom}</Label>
                 <Input
                   type="date"
-                  placeholder="מ-תאריך"
                   value={from}
                   onChange={(e) => setFrom(e.target.value)}
                   className="h-8 text-sm w-full"
                 />
               </div>
 
-              <div className="flex flex-col gap-1.5 flex-1 min-w-[7rem]">
+              <div className="flex flex-col gap-1.5 sm:flex-1 sm:min-w-[7rem]">
                 <Label className="text-xs">{t.adminPage.logFilterTo}</Label>
                 <Input
                   type="date"
-                  placeholder="עד-תאריך"
                   value={to}
                   onChange={(e) => setTo(e.target.value)}
                   className="h-8 text-sm w-full"
                 />
               </div>
 
-              <div className="flex gap-2">
-                <Button size="sm" className="h-11 text-xs" onClick={handleFilter}>{t.adminPage.logFilterApply}</Button>
+              <div className="flex gap-2 sm:self-end">
+                <Button size="sm" className="h-9 text-xs flex-1 sm:flex-none" onClick={handleFilter}>{t.adminPage.logFilterApply}</Button>
                 {hasActiveFilter && (
-                  <Button size="sm" variant="outline" className="h-11 text-xs" onClick={handleReset}>{t.adminPage.logFilterReset}</Button>
+                  <Button size="sm" variant="outline" className="h-9 text-xs flex-1 sm:flex-none" onClick={handleReset}>{t.adminPage.logFilterReset}</Button>
                 )}
               </div>
             </div>
@@ -331,8 +329,8 @@ export function SharedAuditLogsPanel({
               <div className="flex flex-col items-center justify-center py-16 gap-3 text-center px-4">
                 <AlertTriangle className="w-8 h-8 text-destructive opacity-60" />
                 <div>
-                  <p className="text-sm font-medium text-foreground">Failed to load audit log</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Check your connection and try again</p>
+                  <p className="text-sm font-medium text-foreground">{t.adminPage.auditLogLoadFailed}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t.adminPage.auditLogLoadFailedHint}</p>
                 </div>
                 <Button
                   variant="outline"
@@ -342,18 +340,18 @@ export function SharedAuditLogsPanel({
                   className="gap-1.5 h-11 text-xs"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isRefetching ? "animate-spin" : ""}`} />
-                  {isRefetching ? "Trying…" : "Try Again"}
+                  {isRefetching ? t.adminPage.auditLogTrying : t.adminPage.auditLogTryAgain}
                 </Button>
               </div>
             ) : !allItems.length ? (
               <div className="py-4">
                 <EmptyState
                   icon={ClipboardList}
-                  message="No log entries found"
+                  message={t.adminPage.auditLogNoEntries}
                   subMessage={
                     hasActiveFilter
-                      ? "No entries match the current filters. Try adjusting the staff name, action type, or date range."
-                      : "Audit entries appear here as actions are performed in VetTrack."
+                      ? t.adminPage.auditLogNoEntriesFiltered
+                      : t.adminPage.auditLogNoEntriesEmpty
                   }
                   action={
                     hasActiveFilter ? (
@@ -361,7 +359,7 @@ export function SharedAuditLogsPanel({
                         onClick={handleReset}
                         className="text-sm text-primary hover:underline font-medium"
                       >
-                        Clear filters
+                        {t.adminPage.auditLogClearFilters}
                       </button>
                     ) : undefined
                   }
@@ -375,7 +373,7 @@ export function SharedAuditLogsPanel({
                     {t.adminPage.logEntries(allItems.length, Boolean(data?.hasMore))}
                     {" · "}
                     {t.adminPage.logClientPage(safeClientPage, clientTotalPages)}
-                    {hasActiveFilter && <span className="ml-1 text-primary font-medium">· Filtered</span>}
+                    {hasActiveFilter && <span className="ms-1 text-primary font-medium">· {t.adminPage.auditLogFiltered}</span>}
                   </span>
                   {isRefetching && (
                     <RefreshCw className="w-3 h-3 animate-spin text-muted-foreground" />
@@ -409,7 +407,7 @@ export function SharedAuditLogsPanel({
             data-testid="btn-prev-client-page"
           >
             <ChevronLeft className="w-4 h-4" />
-            Previous
+            {t.adminPage.auditLogPrevious}
           </Button>
           <span className="text-sm text-muted-foreground">
             {safeClientPage} / {clientTotalPages}
@@ -422,7 +420,7 @@ export function SharedAuditLogsPanel({
             className="gap-1 h-11 text-xs"
             data-testid="btn-next-client-page"
           >
-            Next
+            {t.adminPage.auditLogNext}
             <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
@@ -442,9 +440,9 @@ export function SharedAuditLogsPanel({
             className="gap-1 h-11 text-xs"
           >
             <ChevronLeft className="w-4 h-4" />
-            Load earlier
+            {t.adminPage.auditLogLoadEarlier}
           </Button>
-          <span className="text-xs text-muted-foreground">batch {serverPage}</span>
+          <span className="text-xs text-muted-foreground">{t.adminPage.auditLogBatch(serverPage)}</span>
           <Button
             variant="ghost"
             size="sm"
@@ -455,7 +453,7 @@ export function SharedAuditLogsPanel({
             }}
             className="gap-1 h-11 text-xs"
           >
-            Load more
+            {t.adminPage.auditLogLoadMore}
             <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
@@ -472,13 +470,13 @@ export default function AuditLogPage() {
     return (
       <Layout>
         <Helmet>
-          <title>Audit Log — VetTrack</title>
+          <title>{t.adminPage.auditLogTitle} — VetTrack</title>
         </Helmet>
         <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
           <Shield className="w-12 h-12 text-muted-foreground" />
-          <h1 className="text-2xl font-bold">Admin Only</h1>
-          <p className="text-sm text-muted-foreground">You need admin access to view this page.</p>
-          <Button variant="ghost" onClick={() => navigate("/home")}>Go Home</Button>
+          <h1 className="text-2xl font-bold">{t.adminPage.auditLogAdminOnly}</h1>
+          <p className="text-sm text-muted-foreground">{t.adminPage.auditLogAdminOnlyDesc}</p>
+          <Button variant="ghost" onClick={() => navigate("/home")}>{t.adminPage.auditLogGoHome}</Button>
         </div>
       </Layout>
     );
@@ -487,13 +485,13 @@ export default function AuditLogPage() {
   return (
     <Layout>
       <Helmet>
-        <title>Audit Log — VetTrack</title>
+        <title>{t.adminPage.auditLogTitle} — VetTrack</title>
         <meta name="description" content="Immutable audit log of all critical actions in VetTrack." />
       </Helmet>
       <div className="flex flex-col gap-6 pb-24 animate-fade-in">
         <h1 className="text-2xl font-bold leading-tight flex items-center gap-2">
           <ClipboardList className="w-6 h-6 text-primary" />
-          Audit Log
+          {t.adminPage.auditLogTitle}
         </h1>
         <SharedAuditLogsPanel />
       </div>

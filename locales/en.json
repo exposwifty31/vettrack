@@ -1162,7 +1162,28 @@
     "blockUserBody": "This will immediately revoke their access to VetTrack. They will not be able to log in until their status is changed back to Active.",
     "blockUserConfirm": "Yes, block",
     "formularyDeleteTitle": "Delete \"{name}\"?",
-    "formularyDeleteBody": "This will remove the drug from your clinic's formulary. You can always re-add it later."
+    "formularyDeleteBody": "This will remove the drug from your clinic's formulary. You can always re-add it later.",
+    "auditLogTitle": "Audit Log",
+    "auditLogAdminOnly": "Admin Only",
+    "auditLogAdminOnlyDesc": "You need admin access to view this page.",
+    "auditLogGoHome": "Go Home",
+    "auditLogFilters": "Filters",
+    "auditLogAllActions": "All actions",
+    "auditLogLoadFailed": "Failed to load audit log",
+    "auditLogLoadFailedHint": "Check your connection and try again",
+    "auditLogTrying": "Trying…",
+    "auditLogTryAgain": "Try Again",
+    "auditLogNoEntries": "No log entries found",
+    "auditLogNoEntriesFiltered": "No entries match the current filters. Try adjusting the staff name, action type, or date range.",
+    "auditLogNoEntriesEmpty": "Audit entries appear here as actions are performed in VetTrack.",
+    "auditLogClearFilters": "Clear filters",
+    "auditLogFiltered": "Filtered",
+    "auditLogPrevious": "Previous",
+    "auditLogNext": "Next",
+    "auditLogLoadEarlier": "Load earlier",
+    "auditLogBatch": "batch {page}",
+    "auditLogLoadMore": "Load more",
+    "auditLogRoleLabel": "Role: {role}"
   },
   "layoutHebrew": {
     "home": "Home",
@@ -1876,7 +1897,9 @@
     "viewMyTasks": "View my tasks",
     "priorityNormal": "Normal",
     "priorityHigh": "High",
-    "priorityCritical": "Critical"
+    "priorityCritical": "Critical",
+    "shiftWindowsFor": "Shift windows for {name}:",
+    "noShiftImported": "No shift imported for this day"
   },
   "cop": {
     "discrepancyTitle": "Medication discrepancy (Smart Cop)",

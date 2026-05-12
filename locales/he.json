@@ -1162,7 +1162,28 @@
     "blockUserBody": "פעולה זו תבטל מיידית את הגישה שלהם ל-VetTrack. הם לא יוכלו להתחבר עד שהסטטוס ישונה חזרה לפעיל.",
     "blockUserConfirm": "כן, חסום",
     "formularyDeleteTitle": "מחיקת ״{name}״?",
-    "formularyDeleteBody": "פעולה זו תסיר את התרופה מהרשימה של הקליניקה. תמיד ניתן להוסיף אותה מחדש."
+    "formularyDeleteBody": "פעולה זו תסיר את התרופה מהרשימה של הקליניקה. תמיד ניתן להוסיף אותה מחדש.",
+    "auditLogTitle": "יומן ביקורת",
+    "auditLogAdminOnly": "גישת מנהל בלבד",
+    "auditLogAdminOnlyDesc": "יש צורך בגישת מנהל כדי לצפות בדף זה.",
+    "auditLogGoHome": "עמוד הבית",
+    "auditLogFilters": "סינון",
+    "auditLogAllActions": "כל הפעולות",
+    "auditLogLoadFailed": "טעינת יומן הביקורת נכשלה",
+    "auditLogLoadFailedHint": "בדוק את החיבור ונסה שוב",
+    "auditLogTrying": "מנסה…",
+    "auditLogTryAgain": "נסה שוב",
+    "auditLogNoEntries": "לא נמצאו רשומות",
+    "auditLogNoEntriesFiltered": "אין רשומות התואמות את הפילטרים הנוכחיים. נסה לשנות את שם איש הצוות, סוג הפעולה, או טווח התאריכים.",
+    "auditLogNoEntriesEmpty": "רשומות ביקורת יופיעו כאן עם ביצוע פעולות ב-VetTrack.",
+    "auditLogClearFilters": "נקה פילטרים",
+    "auditLogFiltered": "מסונן",
+    "auditLogPrevious": "הקודם",
+    "auditLogNext": "הבא",
+    "auditLogLoadEarlier": "טען ישן יותר",
+    "auditLogBatch": "אצווה {page}",
+    "auditLogLoadMore": "טען עוד",
+    "auditLogRoleLabel": "תפקיד: {role}"
   },
   "layoutHebrew": {
     "home": "ראשי",
@@ -1876,7 +1897,9 @@
     "viewMyTasks": "הצג את המשימות שלי",
     "priorityNormal": "רגיל",
     "priorityHigh": "גבוה",
-    "priorityCritical": "קריטי"
+    "priorityCritical": "קריטי",
+    "shiftWindowsFor": "חלונות משמרת עבור {name}:",
+    "noShiftImported": "לא יובאה משמרת ליום זה"
   },
   "cop": {
     "discrepancyTitle": "אי-התאמה בתרופות (Smart Cop)",

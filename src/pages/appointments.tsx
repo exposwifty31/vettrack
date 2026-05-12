@@ -1291,10 +1291,10 @@ export default function AppointmentsPage() {
           <CardContent className="space-y-3">
             {selectedVetMeta ? (
               <div className="text-xs text-muted-foreground">
-                Shift windows for {selectedVetMeta.displayName || selectedVetMeta.name}:{" "}
+                {t.appointmentsPage.shiftWindowsFor(selectedVetMeta.displayName || selectedVetMeta.name)}{" "}
                 {selectedVetMeta.shifts.length > 0
                   ? selectedVetMeta.shifts.map((s) => `${s.startTime.slice(0, 5)}-${s.endTime.slice(0, 5)}`).join(", ")
-                  : "No shift imported for this day"}
+                  : t.appointmentsPage.noShiftImported}
               </div>
             ) : null}
             {listQuery.isError ? (

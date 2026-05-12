@@ -362,6 +362,8 @@ const translations = {
     deletedOn: (date: string) => tr(d.adminPage.deletedOn, { date }),
     blockUserTitle: (name: string) => tr(d.adminPage.blockUserTitle, { name }),
     formularyDeleteTitle: (name: string) => tr(d.adminPage.formularyDeleteTitle, { name }),
+    auditLogRoleLabel: (role: string) => tr(d.adminPage.auditLogRoleLabel, { role }),
+    auditLogBatch: (page: number) => tr(d.adminPage.auditLogBatch, { page }),
   },
 
   layoutHebrew: {
@@ -433,6 +435,7 @@ const translations = {
     ...d.appointmentsPage,
     scheduledAt: (time: string) => tr(d.appointmentsPage.scheduledAt, { time }),
     prescribedBy: (name: string) => tr(d.appointmentsPage.prescribedBy, { name }),
+    shiftWindowsFor: (name: string) => tr(d.appointmentsPage.shiftWindowsFor, { name }),
   },
 
   cop: {
