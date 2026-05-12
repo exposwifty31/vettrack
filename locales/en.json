@@ -1478,6 +1478,7 @@
     "loadTechniciansFailed": "Failed to load technician list.",
     "formularyLoading": "Loading formulary...",
     "formularyManageTitle": "Manage Formulary",
+    "formularyClose": "Close formulary manager",
     "formularyValidNumbers": "Enter valid positive numbers.",
     "formularyUpdateFailed": "Update failed.",
     "formularyDeleteFailed": "Delete failed.",

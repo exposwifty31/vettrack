@@ -198,7 +198,7 @@ function FormularyManager({ onClose }: FormularyManagerProps) {
     <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold">{t.medsPage.formularyManageTitle}</span>
-        <button type="button" onClick={onClose} aria-label={t.medsPage.formularyManageTitle} className="text-muted-foreground hover:text-foreground">
+        <button type="button" onClick={onClose} aria-label={t.medsPage.formularyClose} className="text-muted-foreground hover:text-foreground">
           <X className="h-4 w-4" aria-hidden />
         </button>
       </div>

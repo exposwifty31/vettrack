@@ -1478,6 +1478,7 @@
     "loadTechniciansFailed": "טעינת רשימת טכנאים נכשלה.",
     "formularyLoading": "טוען פורמולריום...",
     "formularyManageTitle": "ניהול פורמולריום",
+    "formularyClose": "סגור את מנהל הפורמולריום",
     "formularyValidNumbers": "נא להזין מספרים חיוביים תקינים.",
     "formularyUpdateFailed": "העדכון נכשל.",
     "formularyDeleteFailed": "המחיקה נכשלה.",
