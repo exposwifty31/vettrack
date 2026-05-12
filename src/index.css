@@ -395,13 +395,14 @@
 
 /* ── QR scan-line animation ──────────────────────────────────────────────── */
 @keyframes qr-scan-line {
-  0%   { top: 0%; }
-  50%  { top: calc(100% - 2px); }
-  100% { top: 0%; }
+  0%   { transform: translateY(0px); }
+  50%  { transform: translateY(248px); }
+  100% { transform: translateY(0px); }
 }
 
 .qr-scan-line {
   top: 0;
+  will-change: transform;
   animation: qr-scan-line 1.8s ease-in-out infinite;
 }
 
