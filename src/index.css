@@ -213,15 +213,19 @@
  *
  *   z-10        Decorative guides, badge counters (pointer-events-none)
  *   z-20        In-page sticky bars (filter bars, inline toolbars)
- *   z-[39]      Menu backdrop — below sticky header (z-40) so header stays on top
- *   z-40        Sticky header / Topbar; Radix sheet backdrops
+ *   z-40        Sticky header / Topbar (menu closed); Radix sheet backdrops
  *   z-50        Fixed bottom nav; Radix Dialog/Sheet/AlertDialog; QR scanner; tooltips
+ *   z-[54]      Menu backdrop (menuMounted) — above bottom nav so nav is not tappable
+ *   z-[55]      Sticky header (menuMounted) — above backdrop so menu panel is visible
  *   z-[60]      Global FABs (ShiftChatFab) — float above nav + modals
  *   z-[65/66]   Custom bottom sheets (ShiftSummarySheet, SyncQueueSheet)
  *               backdrop z-[65] / content z-[66] — must cover nav (z-50) and FAB (z-[60])
  *   z-[70]+     System-critical full-screen modals (OnboardingWalkthrough)
  *
  * Rules:
+ * - Both backdrop (z-[54]) and header (z-[55]) are gated on menuMounted, not menuOpen,
+ *   so the header stays above the backdrop for the full 220 ms exit animation — no
+ *   blocked-tap window between menu close and backdrop unmount.
  * - Custom sheets that don't use a Radix portal MUST use z-[65]/z-[66] so
  *   they cover the bottom nav bar and FABs which render later in the DOM.
  * - Radix Dialog/Sheet portals auto-stack correctly via DOM order (z-50 is fine).

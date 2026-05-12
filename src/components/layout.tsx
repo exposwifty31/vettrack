@@ -635,14 +635,15 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     <div className="min-h-[100dvh] min-w-0 bg-ivory-bg">
       {menuMounted && (
         <div
-          className="fixed inset-0 z-[39]"
+          className="fixed inset-0 z-[54]"
           aria-hidden
           onClick={() => setMenuOpen(false)}
         />
       )}
       <header
         className={cn(
-          "sticky top-safe z-40 border-b bg-ivory-navy backdrop-blur supports-[backdrop-filter]:bg-ivory-navy/95",
+          "sticky top-safe border-b bg-ivory-navy backdrop-blur supports-[backdrop-filter]:bg-ivory-navy/95",
+          menuMounted ? "z-[55]" : "z-40",
           navigationLocked ? "border-amber-400/60" : "border-[#0a1509]",
           "transition-colors duration-300"
         )}
@@ -920,6 +921,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                 ? "[animation:menuReveal_220ms_cubic-bezier(0.16,1,0.3,1)_forwards]"
                 : "opacity-0 pointer-events-none"
             )}
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}
           >
             <nav className="vt-header-menu flex flex-col gap-1">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-ivory-text3 px-3 pt-1 pb-0.5">Operations</p>
