@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
+import { t } from "@/lib/i18n";
 import { api } from "@/lib/api";
 import { Layout } from "@/components/layout";
 import type { LeakageReportItem } from "@/types";
@@ -206,13 +207,13 @@ export default function LeakageReportPage() {
                   <table className="w-full text-sm">
                     <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                       <tr>
-                        <th className="text-left px-4 py-3 font-semibold">Container</th>
-                        <th className="text-right px-4 py-3 font-semibold">Unit Price</th>
-                        <th className="text-right px-4 py-3 font-semibold">Dispensed</th>
-                        <th className="text-right px-4 py-3 font-semibold">Billed</th>
-                        <th className="text-right px-4 py-3 font-semibold">Gap Qty</th>
-                        <th className="text-right px-4 py-3 font-semibold">Gap Value</th>
-                        <th className="text-right px-4 py-3 font-semibold">Leakage %</th>
+                        <th className="text-start px-4 py-3 font-semibold">{t.leakageReport.tableContainer}</th>
+                        <th className="text-end px-4 py-3 font-semibold">{t.leakageReport.tableUnitPrice}</th>
+                        <th className="text-end px-4 py-3 font-semibold">{t.leakageReport.tableDispensed}</th>
+                        <th className="text-end px-4 py-3 font-semibold">{t.leakageReport.tableBilled}</th>
+                        <th className="text-end px-4 py-3 font-semibold">{t.leakageReport.tableGapQty}</th>
+                        <th className="text-end px-4 py-3 font-semibold">{t.leakageReport.tableGapValue}</th>
+                        <th className="text-end px-4 py-3 font-semibold">{t.leakageReport.tableLeakagePct}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
@@ -222,12 +223,12 @@ export default function LeakageReportPage() {
                           className={item.gapQty > 0 ? "bg-destructive/5" : ""}
                         >
                           <td className="px-4 py-3 font-medium">{item.containerName}</td>
-                          <td className="px-4 py-3 text-right text-muted-foreground">
+                          <td className="px-4 py-3 text-end text-muted-foreground">
                             {formatCents(item.unitPriceCents)}
                           </td>
-                          <td className="px-4 py-3 text-right">{item.dispensedQty}</td>
-                          <td className="px-4 py-3 text-right">{item.billedQty}</td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-end">{item.dispensedQty}</td>
+                          <td className="px-4 py-3 text-end">{item.billedQty}</td>
+                          <td className="px-4 py-3 text-end">
                             <span
                               className={
                                 item.gapQty > 0
@@ -238,7 +239,7 @@ export default function LeakageReportPage() {
                               {item.gapQty}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-end">
                             <span
                               className={
                                 item.gapValueCents > 0
@@ -249,7 +250,7 @@ export default function LeakageReportPage() {
                               {formatCents(item.gapValueCents)}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-end">
                             <span className={item.gapQty > 0 ? "font-semibold text-destructive" : "text-emerald-700"}>
                               {item.leakagePct}%
                             </span>

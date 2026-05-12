@@ -429,7 +429,11 @@ const translations = {
       tr(d.pharmacyForecast.quantityFrequencyBasis, { per24, inWindow, hours }),
   },
 
-  appointmentsPage: d.appointmentsPage,
+  appointmentsPage: {
+    ...d.appointmentsPage,
+    scheduledAt: (time: string) => tr(d.appointmentsPage.scheduledAt, { time }),
+    prescribedBy: (name: string) => tr(d.appointmentsPage.prescribedBy, { name }),
+  },
 
   cop: {
     ...d.cop,
@@ -606,6 +610,8 @@ const translations = {
     actionRequired: d.whatsAppMessage.actionRequired,
     statusReport: (name: string) => tr(d.whatsAppMessage.statusReport, { name }),
   },
+
+  leakageReport: d.leakageReport,
 
 } as const;
 

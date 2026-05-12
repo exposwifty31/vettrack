@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNod
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Redirect } from "wouter";
 import { t } from "@/lib/i18n";
+import { useDirection } from "@/hooks/useDirection";
 import { CalendarDays, CheckCircle2, ChevronRight, Clock3, Plus, User, Zap } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { PageShell } from "@/components/layout/PageShell";
@@ -31,18 +32,18 @@ const PIXELS_PER_MINUTE = 1.2;
 const HOUR_ROW_HEIGHT = 60;
 const DASHBOARD_REFETCH_MS = 45_000;
 
-const DURATION_PRESETS = [
-  { key: "quick-inspection", label: "Quick inspection (10m)", minutes: 10 },
-  { key: "urgent-response", label: "Urgent response (20m)", minutes: 20 },
-  { key: "preventive-maintenance", label: "Preventive maintenance (30m)", minutes: 30 },
-  { key: "repair-visit", label: "Repair visit (45m)", minutes: 45 },
-  { key: "calibration", label: "Calibration (60m)", minutes: 60 },
+const DURATION_PRESETS = () => [
+  { key: "quick-inspection", label: t.appointmentsPage.durationQuickInspection, minutes: 10 },
+  { key: "urgent-response", label: t.appointmentsPage.durationUrgentResponse, minutes: 20 },
+  { key: "preventive-maintenance", label: t.appointmentsPage.durationPreventive, minutes: 30 },
+  { key: "repair-visit", label: t.appointmentsPage.durationRepairVisit, minutes: 45 },
+  { key: "calibration", label: t.appointmentsPage.durationCalibration, minutes: 60 },
 ] as const;
 
-const ALLOWED_BOOKING_TASK_TYPES = [
-  { value: "maintenance", label: "Maintenance" },
-  { value: "repair", label: "Repair" },
-  { value: "inspection", label: "Inspection" },
+const ALLOWED_BOOKING_TASK_TYPES = () => [
+  { value: "maintenance", label: t.appointmentsPage.typeMaintenanceLabel },
+  { value: "repair", label: t.appointmentsPage.typeRepairLabel },
+  { value: "inspection", label: t.appointmentsPage.typeInspectionLabel },
 ] as const;
 
 const STATUS_COLORS: Record<AppointmentStatus, string> = {
@@ -61,6 +62,12 @@ const PRIORITY_BADGE: Record<string, string> = {
   high: "bg-accent text-accent-foreground border-transparent",
   normal: "bg-muted text-foreground border-border",
 };
+
+function priorityLabel(priority: string | null | undefined): string {
+  if (priority === "critical") return t.appointmentsPage.priorityCritical;
+  if (priority === "high") return t.appointmentsPage.priorityHigh;
+  return t.appointmentsPage.priorityNormal;
+}
 
 const SUGGESTION_SEVERITY_STYLES: Record<"high" | "medium" | "low", string> = {
   high: "border-red-300 bg-red-50 text-red-900",
@@ -183,15 +190,15 @@ function statusActions(status: AppointmentStatus): AppointmentStatus[] {
 }
 
 function toErrorMessage(err: Error): string {
-  if (err.message === "APPOINTMENT_CONFLICT") return "This technician already has an overlapping task.";
-  if (err.message === "OUTSIDE_SHIFT") return "Selected time is outside the technician shift.";
-  if (err.message === "OVERRIDE_REASON_REQUIRED") return "Conflict override requires a reason.";
-  if (err.message === "TIMEZONE_REQUIRED") return "Time input must include timezone information.";
-  if (err.message === "UNAUTHORIZED" || err.message === "Session expired") return "Your session expired. Please sign in again.";
-  if (err.message === "INSUFFICIENT_ROLE") return "You do not have permission to create or assign this task.";
-  if (err.message === "VALIDATION_FAILED") return "Please review required fields and time values.";
-  if (err.message === "TASK_NOT_OWNED_BY_TECH") return "Only the assigned technician can perform this action.";
-  if (err.message === "TASK_NOT_ASSIGNED") return "Assign a technician before starting.";
+  if (err.message === "APPOINTMENT_CONFLICT") return t.appointmentsPage.errorConflict;
+  if (err.message === "OUTSIDE_SHIFT") return t.appointmentsPage.errorOutsideShift;
+  if (err.message === "OVERRIDE_REASON_REQUIRED") return t.appointmentsPage.errorOverrideReason;
+  if (err.message === "TIMEZONE_REQUIRED") return t.appointmentsPage.errorTimezone;
+  if (err.message === "UNAUTHORIZED" || err.message === "Session expired") return t.appointmentsPage.errorSessionExpired;
+  if (err.message === "INSUFFICIENT_ROLE") return t.appointmentsPage.errorInsufficientRole;
+  if (err.message === "VALIDATION_FAILED") return t.appointmentsPage.errorValidationFailed;
+  if (err.message === "TASK_NOT_OWNED_BY_TECH") return t.appointmentsPage.errorTaskNotOwned;
+  if (err.message === "TASK_NOT_ASSIGNED") return t.appointmentsPage.errorTaskNotAssigned;
   return err.message;
 }
 
@@ -229,7 +236,7 @@ function isDelayedMedicationTask(appointment: Appointment): boolean {
 function formatScheduledLabel(appointment: Appointment): string | null {
   const scheduledIso = getScheduledIso(appointment);
   if (!scheduledIso) return null;
-  return `Scheduled ${formatTimeHHMM(new Date(scheduledIso))}`;
+  return t.appointmentsPage.scheduledAt(formatTimeHHMM(new Date(scheduledIso)));
 }
 
 function formatPrescribedByLabel(appointment: Appointment): string | null {
@@ -242,9 +249,9 @@ function formatPrescribedByLabel(appointment: Appointment): string | null {
       : null;
   const prescribedBy = prescribedByRaw && !looksLikeUuid(prescribedByRaw)
     ? prescribedByRaw
-    : "Staff member";
+    : t.appointmentsPage.staffMember;
   if (!prescribedBy) return null;
-  return `Prescribed by ${prescribedBy}`;
+  return t.appointmentsPage.prescribedBy(prescribedBy);
 }
 
 function completeButtonState(args: {
@@ -284,7 +291,7 @@ function completeButtonState(args: {
     return {
       visible: true,
       disabled: true,
-      tooltip: "Only the technician who acknowledged this task can complete it. Please contact the prescriber or admin for override.",
+      tooltip: t.appointmentsPage.acknowledgeTooltip,
     };
   }
 
@@ -292,14 +299,14 @@ function completeButtonState(args: {
 }
 
 const STATUS_LABEL: Record<AppointmentStatus, string> = {
-  pending: "ממתין",
-  assigned: "הוקצה",
-  scheduled: "מתוזמן",
-  arrived: "הגיע",
-  in_progress: "בביצוע",
-  completed: "הושלם",
-  cancelled: "בוטל",
-  no_show: "לא הופיע",
+  pending: t.appointmentsPage.statusPending,
+  assigned: t.appointmentsPage.statusAssigned,
+  scheduled: t.appointmentsPage.statusScheduled,
+  arrived: t.appointmentsPage.statusArrived,
+  in_progress: t.appointmentsPage.statusInProgress,
+  completed: t.appointmentsPage.statusCompleted,
+  cancelled: t.appointmentsPage.statusCancelled,
+  no_show: t.appointmentsPage.statusNoShow,
 };
 
 function looksLikeUuid(s: string): boolean {
@@ -307,8 +314,8 @@ function looksLikeUuid(s: string): boolean {
 }
 
 function formatDevice(animalId: string | null | undefined): string {
-  if (!animalId) return "Unassigned device";
-  if (looksLikeUuid(animalId)) return "Assigned device";
+  if (!animalId) return t.appointmentsPage.unassigned;
+  if (looksLikeUuid(animalId)) return t.appointmentsPage.unassigned;
   return animalId;
 }
 
@@ -326,7 +333,7 @@ function PatientChartLink({ animalId }: { animalId: string | null | undefined })
 
 function formatLocation(ownerId: string | null | undefined): string | null {
   if (!ownerId) return null;
-  if (looksLikeUuid(ownerId)) return "Assigned owner";
+  if (looksLikeUuid(ownerId)) return t.appointmentsPage.unassigned;
   return ownerId;
 }
 
@@ -342,11 +349,11 @@ function getTaskReasonBullets(scoreBreakdown: {
   inProgress: number;
 }): string[] {
   const bullets: string[] = [];
-  if (scoreBreakdown.overdue > 0) bullets.push("Overdue");
-  if (scoreBreakdown.critical > 0) bullets.push("Critical priority");
-  if (scoreBreakdown.startsSoon > 0) bullets.push("Starting soon");
-  if (scoreBreakdown.assigned > 0) bullets.push("Assigned to you");
-  if (scoreBreakdown.inProgress > 0) bullets.push("Already in progress");
+  if (scoreBreakdown.overdue > 0) bullets.push(t.appointmentsPage.scoreOverdue);
+  if (scoreBreakdown.critical > 0) bullets.push(t.appointmentsPage.scoreCritical);
+  if (scoreBreakdown.startsSoon > 0) bullets.push(t.appointmentsPage.scoreStartsSoon);
+  if (scoreBreakdown.assigned > 0) bullets.push(t.appointmentsPage.scoreAssigned);
+  if (scoreBreakdown.inProgress > 0) bullets.push(t.appointmentsPage.scoreInProgress);
   return bullets;
 }
 
@@ -367,6 +374,7 @@ const USER_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 export default function AppointmentsPage() {
   const { userId, role, effectiveRole, isLoaded } = useAuth();
+  const dir = useDirection();
   const resolvedRole = String(effectiveRole ?? role ?? "").trim().toLowerCase();
   const canCreateTask = resolvedRole !== "student";
   const queryClient = useQueryClient();
@@ -456,14 +464,14 @@ export default function AppointmentsPage() {
   }, [metaQuery.data?.vets]);
 
   function resolveVet(vetId: string | null | undefined): string {
-    if (!vetId) return "Unassigned";
-    return vetNameMap.get(vetId) ?? "Staff member";
+    if (!vetId) return t.appointmentsPage.unassigned;
+    return vetNameMap.get(vetId) ?? t.appointmentsPage.staffMember;
   }
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateAppointmentRequest) => api.appointments.create(payload),
     onSuccess: () => {
-      toast.success("משימה נוצרה");
+      toast.success(t.appointmentsPage.taskCreated);
       queryClient.invalidateQueries({ queryKey: ["/api/appointments", day], exact: true });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", meUserId ?? ""], exact: true });
       setBookingOpen(false);
@@ -683,26 +691,26 @@ export default function AppointmentsPage() {
   }
 
   const TASKS_SIDEBAR: SidebarItem[] = [
-    { href: "/appointments", icon: CalendarDays, label: "Tasks" },
+    { href: "/appointments", icon: CalendarDays, label: t.appointmentsPage.tasks },
   ];
 
   const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
   const pageContent = (
     <>
-      <div dir="rtl" className="flex flex-col gap-4 pb-24 text-right">
+      <div dir={dir} className="flex flex-col gap-4 pb-24 text-start">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <CalendarDays className="w-6 h-6" />
-            Tasks
+            {t.appointmentsPage.tasks}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Your tasks for today, prioritized by urgency and schedule.
+            {t.appointmentsPage.pageSubtitle}
           </p>
         </div>
 
         <Card className="bg-card border-border/60 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">מה לעשות עכשיו?</CardTitle>
+            <CardTitle className="text-base font-semibold">{t.appointmentsPage.nextTaskCardTitle}</CardTitle>
           </CardHeader>
           <CardContent>
             {recommendationsQuery.isError ? (
@@ -715,8 +723,8 @@ export default function AppointmentsPage() {
             ) : !recommendationsQuery.data?.nextBestTask ? (
               <EmptyState
                 icon={CheckCircle2}
-                message="הכל מעודכן"
-                subMessage="אין משימות ממתינות כרגע."
+                message={t.appointmentsPage.allCaughtUp}
+                subMessage={t.appointmentsPage.noPendingTasks}
                 action={canCreateTask ? (
                   <Button
                     size="sm"
@@ -760,7 +768,7 @@ export default function AppointmentsPage() {
                       variant="outline"
                       className={`text-[10px] ${PRIORITY_COLORS[nbt.priority ?? "normal"]}`}
                     >
-                      {nbt.priority ?? "normal"}
+                      {priorityLabel(nbt.priority)}
                     </Badge>
                   </div>
 
@@ -899,7 +907,7 @@ export default function AppointmentsPage() {
                       className="h-8 px-3 text-xs"
                       onClick={() => myTasksRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
                     >
-                      View my tasks
+                      {t.appointmentsPage.viewMyTasks}
                     </Button>
                   )}
                   />
@@ -931,8 +939,8 @@ export default function AppointmentsPage() {
               ) : (dashboardQuery.data?.today.length ?? 0) === 0 ? (
                 <EmptyState
                   icon={CheckCircle2}
-                  message="You're all caught up"
-                  subMessage="No tasks are due today."
+                  message={t.appointmentsPage.allCaughtUp}
+                  subMessage={t.appointmentsPage.noTasksToday}
                   action={canCreateTask ? (
                     <Button
                       size="sm"
@@ -972,7 +980,7 @@ export default function AppointmentsPage() {
                             variant="outline"
                             className={`text-[10px] ${PRIORITY_COLORS[todayTask.priority ?? "normal"]}`}
                           >
-                            {todayTask.priority ?? "normal"}
+                            {priorityLabel(todayTask.priority)}
                           </Badge>
                         </div>
                       </div>
@@ -1093,7 +1101,7 @@ export default function AppointmentsPage() {
                             variant="outline"
                             className={`text-[10px] ${PRIORITY_COLORS[myTask.priority ?? "normal"]}`}
                           >
-                            {myTask.priority ?? "normal"}
+                            {priorityLabel(myTask.priority)}
                           </Badge>
                         </div>
                       </div>
@@ -1247,7 +1255,7 @@ export default function AppointmentsPage() {
                 <option value="">{t.appointmentsPage.allTechnicians}</option>
                 {(metaQuery.data?.vets ?? []).map((vet) => (
                   <option key={vet.id} value={vet.id}>
-                    {vet.displayName || vet.name || "Unknown user"}
+                    {vet.displayName || vet.name || t.appointmentsPage.unknownUser}
                   </option>
                 ))}
               </select>
@@ -1366,7 +1374,7 @@ export default function AppointmentsPage() {
                               variant="outline"
                               className={`text-[10px] ${PRIORITY_BADGE[appointment.priority ?? "normal"] ?? PRIORITY_BADGE.normal}`}
                             >
-                              {appointment.priority ?? "normal"}
+                              {priorityLabel(appointment.priority)}
                             </Badge>
                           </div>
                         </div>
@@ -1457,7 +1465,7 @@ export default function AppointmentsPage() {
       </div>
 
       <Dialog open={bookingOpen} onOpenChange={setBookingOpen}>
-        <DialogContent dir="rtl" className="text-right max-h-[85dvh] flex flex-col overflow-hidden p-0">
+        <DialogContent dir={dir} className="text-start max-h-[85dvh] flex flex-col overflow-hidden p-0">
           <DialogHeader className="shrink-0 px-6 pt-6">
             <div className="flex items-start gap-2">
               {isMedicationForm ? (
@@ -1466,22 +1474,22 @@ export default function AppointmentsPage() {
                   variant="ghost"
                   size="icon"
                   className="shrink-0 h-9 w-9"
-                aria-label="חזרה לבחירת סוג משימה"
+                  aria-label={t.appointmentsPage.backToTaskType}
                   onClick={() => setFormTaskType("maintenance")}
                 >
                   <ChevronRight className="h-5 w-5" />
                 </Button>
               ) : null}
-              <div className="min-w-0 flex-1 space-y-1 text-right">
-                <DialogTitle>{isMedicationForm ? "Give Medication" : "New Task"}</DialogTitle>
+              <div className="min-w-0 flex-1 space-y-1 text-start">
+                <DialogTitle>{isMedicationForm ? t.appointmentsPage.giveMedication : t.appointmentsPage.newTask}</DialogTitle>
                 <DialogDescription>
                   {isMedicationForm ? (
-                    <>Confirm weight, dose, and volume in the calculator, then administer.</>
+                    <>{t.appointmentsPage.dialogDescMedication}</>
                   ) : (
                     <>
-                      Assign a device and technician.{" "}
-                      <span dir="ltr" className="inline-block text-left">
-                        Tap a slot to prefill the time.
+                      {t.appointmentsPage.dialogDescTask}{" "}
+                      <span dir="ltr" className="inline-block">
+                        {t.appointmentsPage.dialogDescTapSlot}
                       </span>
                     </>
                   )}
@@ -1493,13 +1501,13 @@ export default function AppointmentsPage() {
           {formTaskType === "medication" ? (
   <div className="flex flex-col gap-4">
     <div>
-      <label className="text-xs text-muted-foreground block text-right">Device / Asset (required)</label>
+      <label className="text-xs text-muted-foreground block text-start">{t.appointmentsPage.labelDeviceAsset} <span className="text-destructive" aria-hidden>*</span></label>
       <Input
         dir="ltr"
         className="text-left"
         value={formAnimalId}
         onChange={(e) => setFormAnimalId(e.target.value)}
-        placeholder="e.g. Ventilator, Autoclave"
+        placeholder={t.appointmentsPage.placeholderDevice}
       />
     </div>
 
@@ -1508,14 +1516,14 @@ export default function AppointmentsPage() {
         role="alert"
         className="text-sm text-destructive text-center rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2"
       >
-        Enter Device / Asset before giving medication.
+        {t.appointmentsPage.enterDeviceFirst}
       </p>
     ) : (
       <MedicationCalculator
         animalId={formAnimalId.trim()}
         onCancel={() => setFormTaskType("maintenance")}
         onComplete={() => {
-          toast.success("תרופה ניתנה");
+          toast.success(t.appointmentsPage.medicationGiven);
           queryClient.invalidateQueries({ queryKey: ["/api/appointments", day], exact: true });
           queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", meUserId ?? ""], exact: true });
           queryClient.invalidateQueries({ queryKey: ["/api/tasks/recommendations"], exact: true });
@@ -1532,8 +1540,8 @@ export default function AppointmentsPage() {
 ) : (
   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
     <div>
-      <label htmlFor={`${bookingFormId}-vet`} className="text-xs text-muted-foreground block text-right">
-        Technician <span className="text-destructive" aria-hidden>*</span>
+      <label htmlFor={`${bookingFormId}-vet`} className="text-xs text-muted-foreground block text-start">
+        {t.appointmentsPage.labelTechnician} <span className="text-destructive" aria-hidden>*</span>
       </label>
       <select
         id={`${bookingFormId}-vet`}
@@ -1542,20 +1550,20 @@ export default function AppointmentsPage() {
         onChange={(e) => setFormVetId(e.target.value)}
         required
         aria-required="true"
-        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-left"
+        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
       >
-        <option value="">Select technician</option>
+        <option value="">{t.appointmentsPage.placeholderSelectTechnician}</option>
         {(metaQuery.data?.vets ?? []).map((vet) => (
           <option key={vet.id} value={vet.id}>
-            {vet.displayName || vet.name || "Unknown user"}
+            {vet.displayName || vet.name || t.appointmentsPage.unknownUser}
           </option>
         ))}
       </select>
     </div>
 
     <div>
-      <label htmlFor={`${bookingFormId}-asset`} className="text-xs text-muted-foreground block text-right">
-        Device / Asset <span className="text-destructive" aria-hidden>*</span>
+      <label htmlFor={`${bookingFormId}-asset`} className="text-xs text-muted-foreground block text-start">
+        {t.appointmentsPage.labelDeviceAsset} <span className="text-destructive" aria-hidden>*</span>
       </label>
       <Input
         id={`${bookingFormId}-asset`}
@@ -1563,15 +1571,15 @@ export default function AppointmentsPage() {
         className="text-left"
         value={formAnimalId}
         onChange={(e) => setFormAnimalId(e.target.value)}
-        placeholder="e.g. Ventilator, Autoclave"
+        placeholder={t.appointmentsPage.placeholderDevice}
         required
         aria-required="true"
       />
     </div>
 
     <div>
-      <label htmlFor={`${bookingFormId}-location`} className="text-xs text-muted-foreground block text-right">
-        Location / Department
+      <label htmlFor={`${bookingFormId}-location`} className="text-xs text-muted-foreground block text-start">
+        {t.appointmentsPage.labelLocation}
       </label>
       <Input
         id={`${bookingFormId}-location`}
@@ -1579,12 +1587,12 @@ export default function AppointmentsPage() {
         className="text-left"
         value={formOwnerId}
         onChange={(e) => setFormOwnerId(e.target.value)}
-        placeholder="ICU / ER / Ward"
+        placeholder={t.appointmentsPage.placeholderLocation}
       />
     </div>
 
     <div>
-      <label htmlFor={`${bookingFormId}-tasktype`} className="text-xs text-muted-foreground block text-right">Task type</label>
+      <label htmlFor={`${bookingFormId}-tasktype`} className="text-xs text-muted-foreground block text-start">{t.appointmentsPage.labelTaskType}</label>
       <select
         id={`${bookingFormId}-tasktype`}
         dir="ltr"
@@ -1593,9 +1601,9 @@ export default function AppointmentsPage() {
           const nextType = (e.target.value || "maintenance") as Appointment["taskType"];
           setFormTaskType(nextType);
         }}
-        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-left"
+        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
       >
-        {ALLOWED_BOOKING_TASK_TYPES.map((taskType) => (
+        {ALLOWED_BOOKING_TASK_TYPES().map((taskType) => (
           <option key={taskType.value} value={taskType.value}>
             {taskType.label}
           </option>
@@ -1604,7 +1612,7 @@ export default function AppointmentsPage() {
     </div>
 
     <div>
-      <label htmlFor={`${bookingFormId}-duration`} className="text-xs text-muted-foreground block text-right">Duration preset</label>
+      <label htmlFor={`${bookingFormId}-duration`} className="text-xs text-muted-foreground block text-start">{t.appointmentsPage.taskDuration}</label>
       <select
         id={`${bookingFormId}-duration`}
         dir="ltr"
@@ -1613,9 +1621,9 @@ export default function AppointmentsPage() {
           setSelectedDuration(Number.parseInt(e.target.value, 10));
           setManualEndOverride(false);
         }}
-        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-left"
+        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
       >
-        {DURATION_PRESETS.map((preset) => (
+        {DURATION_PRESETS().map((preset) => (
           <option key={preset.key} value={preset.minutes}>
             {preset.label}
           </option>
@@ -1624,8 +1632,8 @@ export default function AppointmentsPage() {
     </div>
 
     <div>
-      <label htmlFor={`${bookingFormId}-start`} className="text-xs text-muted-foreground block text-right">
-        Scheduled time <span className="text-muted-foreground/70">({USER_TIMEZONE})</span>
+      <label htmlFor={`${bookingFormId}-start`} className="text-xs text-muted-foreground block text-start">
+        {t.appointmentsPage.labelScheduledTime} <span className="text-muted-foreground/70">({USER_TIMEZONE})</span>
       </label>
       <Input
         id={`${bookingFormId}-start`}
@@ -1638,7 +1646,7 @@ export default function AppointmentsPage() {
     </div>
 
     <div>
-      <label htmlFor={`${bookingFormId}-end`} className="text-xs text-muted-foreground block text-right">Expected end</label>
+      <label htmlFor={`${bookingFormId}-end`} className="text-xs text-muted-foreground block text-start">{t.appointmentsPage.labelExpectedEnd}</label>
       <Input
         id={`${bookingFormId}-end`}
         dir="ltr"
@@ -1653,7 +1661,7 @@ export default function AppointmentsPage() {
     </div>
 
     <div className="md:col-span-2">
-      <label htmlFor={`${bookingFormId}-notes`} className="text-xs text-muted-foreground block text-right">Notes</label>
+      <label htmlFor={`${bookingFormId}-notes`} className="text-xs text-muted-foreground block text-start">{t.appointmentsPage.labelNotes}</label>
       <Textarea
         id={`${bookingFormId}-notes`}
         dir="ltr"
@@ -1689,20 +1697,20 @@ export default function AppointmentsPage() {
       </Dialog>
 
       <Dialog open={conflictOpen} onOpenChange={setConflictOpen}>
-        <DialogContent dir="rtl" className="text-right max-h-[85dvh] flex flex-col overflow-hidden p-0">
+        <DialogContent dir={dir} className="text-start max-h-[85dvh] flex flex-col overflow-hidden p-0">
           <DialogHeader className="shrink-0 px-6 pt-6">
-            <DialogTitle>Scheduling conflict</DialogTitle>
+            <DialogTitle>{t.appointmentsPage.conflictTitle}</DialogTitle>
             <DialogDescription>
-              This time overlaps an existing task. Provide a reason to override.
+              {t.appointmentsPage.conflictBody}
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
-              <label className="text-xs text-muted-foreground block text-right">Reason for override</label>
-            <Textarea dir="ltr" className="text-left" value={conflictReason} onChange={(e) => setConflictReason(e.target.value)} rows={3} />
+            <label className="text-xs text-muted-foreground block text-start">{t.appointmentsPage.overrideReason}</label>
+            <Textarea dir="ltr" className="text-left" value={conflictReason} onChange={(e) => setConflictReason(e.target.value)} placeholder={t.appointmentsPage.overridePlaceholder} rows={3} />
           </div>
           <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
             <Button variant="outline" onClick={() => setConflictOpen(false)}>
-              Keep original
+              {t.common.cancel}
             </Button>
             <Button
               onClick={() => {
@@ -1716,7 +1724,7 @@ export default function AppointmentsPage() {
               }}
               disabled={!conflictReason.trim()}
             >
-              Confirm Override
+              {t.common.confirm}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1726,5 +1734,5 @@ export default function AppointmentsPage() {
   if (isDesktop) {
     return <PageShell sidebarItems={TASKS_SIDEBAR}>{pageContent}</PageShell>;
   }
-  return <Layout title="Tasks">{pageContent}</Layout>;
+  return <Layout title={t.appointmentsPage.tasks}>{pageContent}</Layout>;
 }

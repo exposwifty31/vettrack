@@ -1,13 +1,21 @@
 name: Playwright Tests
+
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
+    name: 🎭 Playwright E2E
     timeout-minutes: 60
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:16
@@ -22,61 +30,82 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://vettrack:vettrack@127.0.0.1:5432/vettrack_test
+      SESSION_SECRET: ci-test-secret-that-is-long-enough-32chars
+      PORT: 3001
+
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
-      with:
-        node-version: lts/*
-    - name: Install dependencies
-      run: npm install -g pnpm && pnpm install
-    - name: Install Playwright Browsers
-      run: pnpm exec playwright install --with-deps chromium
-    - name: Build frontend
-      run: |
-        export VITE_CLERK_PUBLISHABLE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-pk_test_ci_dummy_publishable_key}"
-        pnpm build
-      env:
-        VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
-    - name: Database migrations
-      run: pnpm migrate
-      env:
-        DATABASE_URL: postgres://vettrack:vettrack@127.0.0.1:5432/vettrack_test
-        NODE_ENV: test
-    - name: Start app for Playwright
-      run: pnpm dev:api > /tmp/vettrack-playwright.log 2>&1 &
-      env:
-        DATABASE_URL: postgres://vettrack:vettrack@127.0.0.1:5432/vettrack_test
-        SESSION_SECRET: ci-test-secret-that-is-long-enough-32chars
-        PLAYWRIGHT_E2E: "true"
-    - name: Wait for API readiness
-      run: |
-        for i in {1..60}; do
-          if curl -fsS http://127.0.0.1:3001/api/healthz > /dev/null; then
-            exit 0
-          fi
-          sleep 2
-        done
-        echo "API did not become ready at http://127.0.0.1:3001/api/healthz"
-        tail -n 200 /tmp/vettrack-playwright.log || true
-        exit 1
-    - name: Seed E2E fixtures
-      run: pnpm seed:dev:e2e
-      env:
-        DATABASE_URL: postgres://vettrack:vettrack@127.0.0.1:5432/vettrack_test
-        NODE_ENV: test
-    - name: Run Playwright tests
-      run: pnpm exec playwright test --project=chromium
-      env:
-        TEST_BASE_URL: http://127.0.0.1:3001
-    - uses: actions/upload-artifact@v4
-      if: ${{ failure() }}
-      with:
-        name: vettrack-playwright-dev-log
-        path: /tmp/vettrack-playwright.log
-        retention-days: 30
-    - uses: actions/upload-artifact@v4
-      if: ${{ !cancelled() }}
-      with:
-        name: playwright-report
-        path: playwright-report/
-        retention-days: 30
+      - name: ⬇️ Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: 🟢 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🌐 Install Playwright Browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: 🏗️ Build frontend
+        run: |
+          export VITE_CLERK_PUBLISHABLE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-pk_test_ci_dummy_publishable_key}"
+          pnpm build
+        env:
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+
+      - name: 🗄️ Database migrations
+        run: pnpm migrate
+
+      - name: 🚀 Start app for Playwright
+        run: pnpm dev:api > /tmp/vettrack-playwright.log 2>&1 &
+        env:
+          PLAYWRIGHT_E2E: "true"
+
+      - name: ⏳ Wait for API readiness
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:3001/api/healthz > /dev/null; then
+              echo "✅ API ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "❌ API did not become ready at http://127.0.0.1:3001/api/healthz"
+          tail -n 200 /tmp/vettrack-playwright.log || true
+          exit 1
+
+      - name: 🌱 Seed E2E fixtures
+        run: pnpm seed:dev:e2e
+
+      - name: 🎭 Run Playwright tests
+        run: pnpm exec playwright test --project=chromium
+        env:
+          TEST_BASE_URL: http://127.0.0.1:3001
+
+      - name: 📤 Upload dev log on failure
+        uses: actions/upload-artifact@v4
+        if: ${{ failure() }}
+        with:
+          name: vettrack-playwright-dev-log
+          path: /tmp/vettrack-playwright.log
+          retention-days: 30
+
+      - name: 📊 Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30

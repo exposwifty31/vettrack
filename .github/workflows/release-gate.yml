@@ -1,0 +1,372 @@
+name: Release Gate
+
+# Enforces pilot/demo release safety. Runs on merge to main and on manual dispatch.
+# Each gate is a named, independently observable check.
+# A single gate failure blocks the release with a clear, actionable error.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Reason for manual gate run"
+        required: false
+        default: "Manual pilot readiness check"
+
+concurrency:
+  group: release-gate
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Gate 1: Type safety ────────────────────────────────────────────────────
+  gate-typecheck:
+    name: 🔷 Gate — TypeScript
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: TypeScript — frontend
+        run: pnpm exec tsc --noEmit
+      - name: TypeScript — server
+        run: pnpm exec tsc --noEmit --project tsconfig.server-check.json
+
+  # ── Gate 2: Full test suite ────────────────────────────────────────────────
+  gate-tests:
+    name: 🧪 Gate — Unit & Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: vettrack
+          POSTGRES_PASSWORD: vettrack
+          POSTGRES_DB: vettrack_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://vettrack:vettrack@localhost:5432/vettrack_test
+      SESSION_SECRET: ci-release-gate-secret-32-chars-long
+      PORT: 3001
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm migrate
+      - name: Run full test suite
+        run: pnpm test -- --reporter=verbose
+
+  # ── Gate 3: Localization integrity ────────────────────────────────────────
+  gate-i18n:
+    name: 🌐 Gate — Localization Integrity
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+
+      - name: Verify locale key parity (en ↔ he)
+        run: |
+          python3 - << 'PYEOF'
+          import json, sys
+
+          def flatten(d, prefix=''):
+              keys = []
+              for k, v in d.items():
+                  full = prefix + '.' + k if prefix else k
+                  if isinstance(v, dict):
+                      keys.extend(flatten(v, full))
+                  else:
+                      keys.append(full)
+              return keys
+
+          with open('locales/en.json', encoding='utf-8') as f: en = json.load(f)
+          with open('locales/he.json', encoding='utf-8') as f: he = json.load(f)
+
+          en_keys = set(flatten(en))
+          he_keys = set(flatten(he))
+          only_en = sorted(en_keys - he_keys)
+          only_he = sorted(he_keys - en_keys)
+
+          ok = True
+          if only_en:
+              print(f"❌ Keys present in en.json but missing in he.json ({len(only_en)}):")
+              for k in only_en: print(f"  {k}")
+              ok = False
+          if only_he:
+              print(f"❌ Keys present in he.json but missing in en.json ({len(only_he)}):")
+              for k in only_he: print(f"  {k}")
+              ok = False
+
+          if ok:
+              print(f"✅ Locale parity: {len(en_keys)} keys in both en and he")
+          else:
+              sys.exit(1)
+          PYEOF
+
+      - name: Check for hardcoded UI strings
+        run: pnpm test -- tests/no-hardcoded-ui-strings.test.js
+
+      - name: Check i18n hardening
+        run: pnpm test -- tests/i18n-hardening.test.ts
+
+  # ── Gate 4: RTL & mobile foundation ───────────────────────────────────────
+  gate-rtl-mobile:
+    name: 📱 Gate — RTL & Mobile
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+
+      - name: RTL & i18n foundation tests
+        run: pnpm test -- tests/phase-4-i18n-rtl-foundation.test.js
+
+      - name: Mobile & PWA tests
+        run: pnpm test -- tests/phase-8-mobile-pwa.test.js
+
+      - name: Mobile nav menu tests
+        run: pnpm test -- tests/mobile-nav-menu.test.js
+
+      - name: Procurement mobile bug regression
+        run: pnpm test -- tests/procurement-mobile-bug.test.js
+
+      - name: UI token consistency
+        run: pnpm test -- tests/phase-3-ui-token-consistency.test.js
+
+  # ── Gate 5: Offline & sync ─────────────────────────────────────────────────
+  gate-offline-sync:
+    name: 📶 Gate — Offline & Sync
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+
+      - name: Offline behaviour tests
+        run: pnpm test -- tests/offline.test.js
+
+      - name: Sync queue sheet tests
+        run: pnpm test -- tests/sync-queue-sheet.test.js
+
+      - name: PWA system tests
+        run: pnpm test -- tests/pwa.system.test.js
+
+  # ── Gate 6: Critical workflow integrity ───────────────────────────────────
+  gate-workflows:
+    name: ⚕️ Gate — Critical Workflows
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: vettrack
+          POSTGRES_PASSWORD: vettrack
+          POSTGRES_DB: vettrack_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://vettrack:vettrack@localhost:5432/vettrack_test
+      SESSION_SECRET: ci-release-gate-secret-32-chars-long
+      PORT: 3001
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm migrate
+
+      - name: Medication calculation safety
+        run: pnpm test -- tests/medication-calculations.test.ts
+
+      - name: Equipment scan lifecycle
+        run: pnpm test -- tests/equipment-scan-lifecycle.test.ts
+
+      - name: Auth hardening
+        run: pnpm test -- tests/auth-hardening.test.ts
+
+      - name: Multi-tenancy hardening
+        run: pnpm test -- tests/multi-tenancy-hardening.test.js
+
+      - name: Data integrity
+        run: pnpm test -- tests/data-integrity-hardening.test.js
+
+      - name: Error contract compliance
+        run: pnpm test -- tests/phase-5-error-contract.test.js tests/phase-5-error-shape-guard.test.js
+
+      - name: State consistency
+        run: pnpm test -- tests/phase-6-state-consistency.test.js
+
+  # ── Gate 7: Accessibility & UX ────────────────────────────────────────────
+  gate-accessibility:
+    name: ♿ Gate — Accessibility & UX
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+
+      - name: Reduced motion hardening
+        run: pnpm test -- tests/ui-reduced-motion-hardening.test.js
+
+      - name: Route registration completeness
+        run: pnpm test -- tests/route-registration.test.js
+
+      - name: Frontend routing structure
+        run: pnpm test -- tests/frontend-routing-structure.test.js
+
+      - name: Server bootstrap structure
+        run: pnpm test -- tests/server-bootstrap-structure.test.js
+
+  # ── Release gate verdict ──────────────────────────────────────────────────
+  release-verdict:
+    name: 🏁 Release Gate — Verdict
+    runs-on: ubuntu-latest
+    needs:
+      - gate-typecheck
+      - gate-tests
+      - gate-i18n
+      - gate-rtl-mobile
+      - gate-offline-sync
+      - gate-workflows
+      - gate-accessibility
+    if: always()
+
+    steps:
+      - name: Evaluate all gate results
+        run: |
+          echo "## Release Gate Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Gate | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          gates=(
+            "gate-typecheck:TypeScript"
+            "gate-tests:Unit & Integration Tests"
+            "gate-i18n:Localization Integrity"
+            "gate-rtl-mobile:RTL & Mobile"
+            "gate-offline-sync:Offline & Sync"
+            "gate-workflows:Critical Workflows"
+            "gate-accessibility:Accessibility & UX"
+          )
+
+          failed=0
+          results='${{ toJSON(needs) }}'
+
+          for entry in "${gates[@]}"; do
+            key="${entry%%:*}"
+            name="${entry##*:}"
+            result=$(echo "$results" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('${key}', {}).get('result', 'unknown'))")
+            if [ "$result" = "success" ]; then
+              echo "| ${name} | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+            elif [ "$result" = "skipped" ]; then
+              echo "| ${name} | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| ${name} | ❌ FAILED |" >> $GITHUB_STEP_SUMMARY
+              failed=$((failed + 1))
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ $failed -eq 0 ]; then
+            echo "## ✅ PILOT RELEASE GATE PASSED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All gates passed. The build is safe to promote to pilot." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ PILOT RELEASE GATE FAILED — $failed gate(s) did not pass" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Do NOT promote this build to pilot until all gates pass.**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Each failing gate above has a detailed log. Fix the root cause, not the symptom." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Block release on gate failure
+        if: |
+          needs.gate-typecheck.result != 'success' ||
+          needs.gate-tests.result != 'success' ||
+          needs.gate-i18n.result != 'success' ||
+          needs.gate-rtl-mobile.result != 'success' ||
+          needs.gate-offline-sync.result != 'success' ||
+          needs.gate-workflows.result != 'success' ||
+          needs.gate-accessibility.result != 'success'
+        run: |
+          echo "❌ Release gate FAILED. One or more mandatory gates did not pass."
+          echo "Review the failing gate jobs above for specific failures."
+          exit 1
+
+      - name: Confirm pilot readiness
+        if: |
+          needs.gate-typecheck.result == 'success' &&
+          needs.gate-tests.result == 'success' &&
+          needs.gate-i18n.result == 'success' &&
+          needs.gate-rtl-mobile.result == 'success' &&
+          needs.gate-offline-sync.result == 'success' &&
+          needs.gate-workflows.result == 'success' &&
+          needs.gate-accessibility.result == 'success'
+        run: echo "✅ All release gates passed. Build is pilot-ready."

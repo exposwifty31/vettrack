@@ -157,7 +157,7 @@ describe("Appointments Scheduling", () => {
   it("UI includes conflict override confirmation flow", () => {
     expect(
       appointmentsPage.includes("conflictOpen") &&
-        appointmentsPage.includes("Confirm Override")
+        appointmentsPage.includes("conflictTitle")
     ).toBe(true);
   });
 

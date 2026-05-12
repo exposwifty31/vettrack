@@ -1,0 +1,142 @@
+name: Flake Detection
+
+# Runs on a nightly schedule AND can be triggered manually to surface flaky tests
+# before a pilot/demo release. Never runs on every PR (preserves fast PR lane).
+on:
+  schedule:
+    - cron: "0 3 * * *"  # 03:00 UTC daily
+  workflow_dispatch:
+    inputs:
+      repeat_count:
+        description: "Number of test suite repetitions (2–5)"
+        required: false
+        default: "3"
+
+concurrency:
+  group: flake-detection
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  detect-flakes:
+    name: 🔬 Flake Detection (${{ matrix.run }}/3)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        run: [1, 2, 3]
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: vettrack
+          POSTGRES_PASSWORD: vettrack
+          POSTGRES_DB: vettrack_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://vettrack:vettrack@localhost:5432/vettrack_test
+      SESSION_SECRET: ci-flake-secret-that-is-long-enough-32chars
+      PORT: 3001
+
+    steps:
+      - name: ⬇️ Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: 🟢 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🗄️ Database migrations
+        run: pnpm migrate
+
+      - name: 🧪 Run test suite (run ${{ matrix.run }})
+        id: test_run
+        run: pnpm test -- --reporter=verbose 2>&1 | tee /tmp/test-run-${{ matrix.run }}.log
+        continue-on-error: true
+
+      - name: 📊 Save test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: flake-test-results-run-${{ matrix.run }}
+          path: /tmp/test-run-${{ matrix.run }}.log
+          retention-days: 14
+
+      - name: ❌ Fail if tests failed
+        if: steps.test_run.outcome == 'failure'
+        run: |
+          echo "::error::Test suite failed on run ${{ matrix.run }} — check artifact flake-test-results-run-${{ matrix.run }} for details"
+          exit 1
+
+  flake-report:
+    name: 📋 Flake Report
+    runs-on: ubuntu-latest
+    needs: detect-flakes
+    if: always()
+
+    steps:
+      - name: 📥 Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: flake-test-results-run-*
+          merge-multiple: true
+          path: /tmp/flake-results/
+
+      - name: 🔍 Analyse cross-run consistency
+        run: |
+          echo "## Flake Detection Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Run | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+
+          all_passed=true
+          for run in 1 2 3; do
+            log="/tmp/flake-results/test-run-${run}.log"
+            if [ -f "$log" ]; then
+              if grep -q "Tests.*passed" "$log" && ! grep -q "failed" "$log"; then
+                echo "| Run ${run} | ✅ All passed |" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "| Run ${run} | ❌ Failures detected |" >> $GITHUB_STEP_SUMMARY
+                all_passed=false
+              fi
+            else
+              echo "| Run ${run} | ⚠️ No results found |" >> $GITHUB_STEP_SUMMARY
+              all_passed=false
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if $all_passed; then
+            echo "✅ **No flakiness detected across 3 runs.**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Inconsistent results detected — review failing runs for flaky tests.**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Flaky tests are tests that pass sometimes and fail other times without code changes." >> $GITHUB_STEP_SUMMARY
+            echo "Fix flaky tests before pilot release to prevent false CI signals." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 🚨 Fail job if any run failed
+        if: needs.detect-flakes.result == 'failure'
+        run: |
+          echo "One or more test runs failed — see flake-test-results artifacts for details."
+          exit 1

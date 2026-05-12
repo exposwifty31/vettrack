@@ -417,12 +417,12 @@ export default function PatientDetailPage() {
               recovering:  "bg-emerald-500",
             };
             const STATUS_LABELS: Record<string, string> = {
-              admitted:    "Admitted",
-              observation: "Observation",
-              critical:    "Critical",
-              recovering:  "Recovering",
-              discharged:  "Discharged",
-              deceased:    "Deceased",
+              admitted:    t.patientDetail.hospStatusAdmitted,
+              observation: t.patientDetail.hospStatusObservation,
+              critical:    t.patientDetail.hospStatusCritical,
+              recovering:  t.patientDetail.hospStatusRecovering,
+              discharged:  t.patientDetail.hospStatusDischarged,
+              deceased:    t.patientDetail.hospStatusDeceased,
             };
             const panelClass = STATUS_STYLES[hosp.status] ?? "border-border bg-muted/30";
             const dotClass = DOT_STYLES[hosp.status] ?? "bg-muted-foreground";

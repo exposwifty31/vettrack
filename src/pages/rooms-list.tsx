@@ -186,11 +186,11 @@ function RoomCardSkeleton() {
 type Zone = "all" | "icu" | "er" | "surgery" | "other";
 
 const ZONE_LABELS: Record<Zone, string> = {
-  all: "All",
-  icu: "ICU",
-  er: "ER",
-  surgery: "Surgery",
-  other: "Other",
+  all: t.roomsListPage.zoneAll,
+  icu: t.roomsListPage.zoneIcu,
+  er: t.roomsListPage.zoneEr,
+  surgery: t.roomsListPage.zoneSurgery,
+  other: t.roomsListPage.zoneOther,
 };
 
 function inferZone(room: Room): Zone {
