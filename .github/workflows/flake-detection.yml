@@ -71,7 +71,10 @@ jobs:
 
       - name: 🧪 Run test suite (run ${{ matrix.run }})
         id: test_run
-        run: pnpm test -- --reporter=verbose 2>&1 | tee /tmp/test-run-${{ matrix.run }}.log
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm test -- --reporter=verbose 2>&1 | tee /tmp/test-run-${{ matrix.run }}.log
         continue-on-error: true
 
       - name: 📊 Save test results
