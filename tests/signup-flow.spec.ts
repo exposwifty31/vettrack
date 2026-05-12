@@ -251,8 +251,8 @@ test("T4: new non-admin signup creates vt_users row with UUID id and status=pend
   const client = await pool!.connect();
   try {
     await client.query(
-      `INSERT INTO vt_users (id, clerk_id, email, name, role, status)
-       VALUES ($1, $2, $3, $4, 'technician', 'pending')`,
+      `INSERT INTO vt_users (id, clinic_id, clerk_id, email, name, role, status)
+       VALUES ($1, 'dev-clinic-default', $2, $3, $4, 'technician', 'pending')`,
       [newId, fakeClerkId, `pending-${Date.now()}@signup-e2e-test.example.com`, "Test Pending"]
     );
     const { rows } = await client.query<{ id: string; clerk_id: string; role: string; status: string }>(
@@ -483,8 +483,8 @@ test("T7: onConflictDoUpdate — re-signup does not create duplicate vt_users ro
   try {
     const id1 = randomUUID();
     const upsertSql = `
-      INSERT INTO vt_users (id, clerk_id, email, name, role, status)
-      VALUES ($1, $2, $3, $4, 'technician', 'pending')
+      INSERT INTO vt_users (id, clinic_id, clerk_id, email, name, role, status)
+      VALUES ($1, 'dev-clinic-default', $2, $3, $4, 'technician', 'pending')
       ON CONFLICT (clerk_id) DO UPDATE
         SET email = CASE WHEN EXCLUDED.email = '' THEN vt_users.email ELSE EXCLUDED.email END,
             name  = CASE WHEN EXCLUDED.name  = '' THEN vt_users.name  ELSE EXCLUDED.name  END
