@@ -139,7 +139,8 @@
     "emergencyPendingBadge": "Emergency — pending assignment",
     "completeNow": "Complete now",
     "unlinkedBadge": "Unlinked",
-    "noConsumablesInShift": "No consumables taken in this shift"
+    "noConsumablesInShift": "No consumables taken in this shift",
+    "viewBillingLedger": "Go to Billing Ledger"
   },
   "inventoryPage": {
     "title": "Inventory & consumables",
@@ -1363,7 +1364,8 @@
     "voidConfirm": "Void",
     "save": "Save",
     "saving": "Saving...",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "viewShiftEnd": "Go to Shift End"
   },
   "inventoryItemsPage": {
     "title": "Inventory items",

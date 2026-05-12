@@ -24,7 +24,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ClipboardList, Copy, Loader2, AlertTriangle } from "lucide-react";
+import { ClipboardList, Copy, Loader2, AlertTriangle, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
 import { formatDateTimeByLocale } from "@/lib/i18n";
 import type { ShiftHandoverSummary } from "@/types";
@@ -89,7 +89,8 @@ const SECTION_SHELL = {
 };
 
 export default function ShiftHandoverPage() {
-  const { userId } = useAuth();
+  const { userId, role } = useAuth();
+  const canBilling = role === "admin" || role === "vet";
   const search = useSearch();
   const dischargeAnimalId = useMemo(() => new URLSearchParams(search).get("discharge"), [search]);
   const [dischargeOpen, setDischargeOpen] = useState(false);
@@ -215,6 +216,15 @@ export default function ShiftHandoverPage() {
               {p.title}
             </h1>
             <p className="text-muted-foreground text-sm mt-1 leading-relaxed">{p.subtitle}</p>
+            {canBilling && (
+              <Link
+                href="/billing"
+                className="mt-1.5 inline-flex items-center gap-1.5 text-sm text-primary underline-offset-2 hover:underline min-h-[44px] sm:min-h-0"
+              >
+                <ReceiptText className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                {p.viewBillingLedger}
+              </Link>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button

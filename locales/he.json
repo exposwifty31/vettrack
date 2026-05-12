@@ -139,7 +139,8 @@
     "emergencyPendingBadge": "חירום — ממתין לשיוך",
     "completeNow": "השלם עכשיו",
     "unlinkedBadge": "ללא שיוך",
-    "noConsumablesInShift": "אין לקיחות מתכלים במשמרת זו"
+    "noConsumablesInShift": "אין לקיחות מתכלים במשמרת זו",
+    "viewBillingLedger": "עבור ללוח חיובים"
   },
   "inventoryPage": {
     "title": "מלאי ומתכלים",
@@ -1363,7 +1364,8 @@
     "voidConfirm": "בטל",
     "save": "שמור",
     "saving": "שומר...",
-    "cancel": "ביטול"
+    "cancel": "ביטול",
+    "viewShiftEnd": "עבור לסיום משמרת"
   },
   "inventoryItemsPage": {
     "title": "פריטי מלאי",

@@ -40,7 +40,7 @@ import { toast } from "sonner";
 import { useMemo, useState } from "react";
 import type { BillingLedgerEntry } from "@/types";
 import { useAuth } from "@/hooks/use-auth";
-import { Receipt, ReceiptText, Plus, Ban, Search, Sparkles, AlertTriangle, CalendarDays, Clock3, X, TrendingUp, Clock, CheckCircle2, XCircle, ShieldAlert, TrendingDown, PackageX, Siren, Boxes } from "lucide-react";
+import { Receipt, ReceiptText, Plus, Ban, Search, Sparkles, AlertTriangle, CalendarDays, Clock3, X, TrendingUp, Clock, CheckCircle2, XCircle, ShieldAlert, TrendingDown, PackageX, Siren, Boxes, ClipboardList } from "lucide-react";
 import { Link } from "wouter";
 import {
   BarChart,
@@ -270,6 +270,12 @@ export default function BillingLedgerPage() {
             <h1 className="truncate text-2xl font-bold tracking-tight">{p.title}</h1>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <Link href="/shift-handover">
+              <Button variant="outline" size="sm" className="gap-1.5 rounded-xl text-xs min-h-[44px] sm:min-h-0">
+                <ClipboardList className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                {p.viewShiftEnd}
+              </Button>
+            </Link>
             <Link href="/billing/leakage">
               <Button variant="outline" size="sm" className="gap-1.5 rounded-xl text-xs">
                 <TrendingDown className="h-3.5 w-3.5 text-destructive" />
