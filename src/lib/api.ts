@@ -73,6 +73,21 @@ import type {
   ShiftCompletionResult,
 } from "@/types";
 import type { OutcomeKpiRoiResponse } from "../../shared/er-types.js";
+import type {
+  HandoffEligiblePatientsResponse,
+  HandoffEligibleStaffResponse,
+  CreateHandoffResponse,
+  MyHandoffsResponse,
+  HandoffDetailResponse,
+  UpsertItemRequest,
+  UpsertItemResponse,
+  SubmitHandoffRequest,
+  SubmitHandoffResponse,
+  ReviewHandoffRequest,
+  ReviewHandoffResponse,
+  CancelHandoffRequest,
+  CancelHandoffResponse,
+} from "../../shared/patient-handoff-types.js";
 import { getStoredLocale, t } from "@/lib/i18n";
 import { toast } from "sonner";
 import type { PendingSyncType } from "./offline-db";
@@ -154,6 +169,32 @@ class OfflineResponseError extends Error {
   constructor() {
     super("Offline response received");
     this.name = "OfflineResponseError";
+  }
+}
+
+/**
+ * Error thrown by `request` / `requestWithOfflineFallback` for non-2xx responses.
+ * Preserves the server's error `code` and any structured fields (e.g.
+ * `invalidatedItems` from POST /patient-handoffs/:id/submit) so callers can
+ * branch on `e.code` and read extras without losing them in `new Error(message)`.
+ */
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  requestId?: string;
+  payload: ApiErrorPayload & Record<string, unknown>;
+  invalidatedItems?: Array<{ id: string; hospitalizationId: string; reason: string }>;
+  constructor(status: number, message: string, payload: ApiErrorPayload & Record<string, unknown>) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.payload = payload;
+    if (typeof payload.code === "string" && payload.code) this.code = payload.code;
+    else if (typeof payload.error === "string" && payload.error) this.code = payload.error;
+    if (typeof payload.requestId === "string") this.requestId = payload.requestId;
+    if (Array.isArray(payload.invalidatedItems)) {
+      this.invalidatedItems = payload.invalidatedItems as ApiError["invalidatedItems"];
+    }
   }
 }
 
@@ -334,11 +375,11 @@ export async function request<T>(
       if (!silent && res.status >= 500) {
         toast.error(t.api.serverError, { id: "server-error" });
       }
-      const error = await res.json().catch(() => ({ error: "Request failed" })) as ApiErrorPayload;
+      const error = (await res.json().catch(() => ({ error: "Request failed" }))) as ApiErrorPayload & Record<string, unknown>;
       if (isOfflineResponse(res.status, error)) {
         throw new OfflineResponseError();
       }
-      throw new Error(toApiErrorMessage(res.status, error));
+      throw new ApiError(res.status, toApiErrorMessage(res.status, error), error);
     }
     if (res.status === 204) return undefined as T;
     return res.json();
@@ -386,11 +427,11 @@ async function requestWithOfflineFallback<T>(
   try {
     const res = await fetchWithTimeout(url, { ...init, headers });
     if (!res.ok) {
-      const error = await res.json().catch(() => ({ error: "Request failed" })) as ApiErrorPayload;
+      const error = (await res.json().catch(() => ({ error: "Request failed" }))) as ApiErrorPayload & Record<string, unknown>;
       if (isOfflineResponse(res.status, error)) {
         throw new OfflineResponseError();
       }
-      throw new Error(toApiErrorMessage(res.status, error));
+      throw new ApiError(res.status, toApiErrorMessage(res.status, error), error);
     }
     return res.json();
   } catch (err) {
@@ -1463,6 +1504,41 @@ export const api = {
         `/api/shift-handover/emergency/${encodeURIComponent(logId)}/reconcile`,
         { method: "PATCH", body: JSON.stringify(data) },
       ),
+    patientHandoffs: {
+      eligiblePatients: () =>
+        request<HandoffEligiblePatientsResponse>("/api/shift-handover/patient-handoffs/eligible-patients"),
+      eligibleStaff: () =>
+        request<HandoffEligibleStaffResponse>("/api/shift-handover/patient-handoffs/eligible-staff"),
+      create: (data: { receivingUserId: string }) =>
+        request<CreateHandoffResponse>("/api/shift-handover/patient-handoffs", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      mine: () =>
+        request<MyHandoffsResponse>("/api/shift-handover/patient-handoffs/mine"),
+      get: (id: string) =>
+        request<HandoffDetailResponse>(`/api/shift-handover/patient-handoffs/${encodeURIComponent(id)}`),
+      upsertItem: (id: string, hospitalizationId: string, data: UpsertItemRequest) =>
+        request<UpsertItemResponse>(
+          `/api/shift-handover/patient-handoffs/${encodeURIComponent(id)}/items/${encodeURIComponent(hospitalizationId)}`,
+          { method: "PUT", body: JSON.stringify(data) },
+        ),
+      submit: (id: string, data: SubmitHandoffRequest) =>
+        request<SubmitHandoffResponse>(
+          `/api/shift-handover/patient-handoffs/${encodeURIComponent(id)}/submit`,
+          { method: "POST", body: JSON.stringify(data) },
+        ),
+      review: (id: string, data: ReviewHandoffRequest) =>
+        request<ReviewHandoffResponse>(
+          `/api/shift-handover/patient-handoffs/${encodeURIComponent(id)}/review`,
+          { method: "POST", body: JSON.stringify(data) },
+        ),
+      cancel: (id: string, data: CancelHandoffRequest) =>
+        request<CancelHandoffResponse>(
+          `/api/shift-handover/patient-handoffs/${encodeURIComponent(id)}/cancel`,
+          { method: "POST", body: JSON.stringify(data) },
+        ),
+    },
     getPatients: () =>
       request<ShiftHandoverPatientsResponse>("/api/shift-handover/patients"),
     getLatestSnapshot: () =>

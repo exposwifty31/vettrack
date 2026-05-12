@@ -1389,3 +1389,27 @@ export interface ShiftCompletionResult {
   users: ShiftCompletionUser[];
 }
 
+
+
+export type {
+  ShiftPatientHandoffStatus,
+  ShiftPatientHandoffItemStatus,
+  HandoffEligiblePatient,
+  HandoffEligiblePatientsResponse,
+  HandoffEligibleStaff,
+  HandoffEligibleStaffResponse,
+  CreateHandoffResponse,
+  HandoffItemDetail,
+  HandoffListItem,
+  MyHandoffsResponse,
+  HandoffDetailResponse,
+  UpsertItemRequest,
+  UpsertItemResponse,
+  SubmitHandoffRequest,
+  SubmitHandoffResponse,
+  ReviewHandoffRequest,
+  ReviewHandoffResponse,
+  CancelHandoffRequest,
+  CancelHandoffResponse,
+  HandoffItemsInvalidatedError,
+} from "../../shared/patient-handoff-types.js";

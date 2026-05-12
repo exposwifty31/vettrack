@@ -1680,6 +1680,71 @@ export const idempotencyKeys = pgTable(
   }),
 );
 
+// ─── Shift Patient Handoffs (Option B) ───────────────────────────────────────
+
+export const shiftPatientHandoffs = pgTable(
+  "vt_shift_patient_handoffs",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "restrict" }),
+    outgoingUserId: text("outgoing_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    receivingUserId: text("receiving_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    status: varchar("status", { length: 20 }).notNull().default("draft"),
+    version: integer("version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    clinicStatusIdx: index("idx_vt_sph_clinic_status").on(t.clinicId, t.status),
+    receivingIdx: index("idx_vt_sph_receiving").on(t.receivingUserId, t.status),
+    outgoingIdx: index("idx_vt_sph_outgoing").on(t.outgoingUserId, t.status),
+  }),
+);
+export type ShiftPatientHandoff = typeof shiftPatientHandoffs.$inferSelect;
+
+export const shiftPatientHandoffItems = pgTable(
+  "vt_shift_patient_handoff_items",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "restrict" }),
+    handoffId: text("handoff_id")
+      .notNull()
+      .references(() => shiftPatientHandoffs.id, { onDelete: "cascade" }),
+    hospitalizationId: text("hospitalization_id")
+      .notNull()
+      .references(() => hospitalizations.id, { onDelete: "restrict" }),
+    animalId: text("animal_id")
+      .notNull()
+      .references(() => animals.id, { onDelete: "restrict" }),
+    status: varchar("status", { length: 20 }).notNull().default("draft"),
+    skipReason: text("skip_reason"),
+    currentStability: text("current_stability").notNull().default(""),
+    pendingTasksNote: text("pending_tasks_note").notNull().default(""),
+    criticalWarnings: text("critical_warnings").notNull().default(""),
+    clinicalNote: text("clinical_note").notNull().default(""),
+    patientSnapshot: jsonb("patient_snapshot").notNull().default(sql`'{}'::jsonb`),
+    version: integer("version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    handoffIdx: index("idx_vt_sphi_handoff").on(t.handoffId),
+    handoffHospUq: uniqueIndex("uq_vt_sphi_handoff_hosp").on(t.handoffId, t.hospitalizationId),
+  }),
+);
+export type ShiftPatientHandoffItem = typeof shiftPatientHandoffItems.$inferSelect;
+
 export async function initDb() {
   // Schema initialization is now handled by the migration runner (server/migrate.ts).
   // This function is kept as a thin wrapper for backwards compatibility.

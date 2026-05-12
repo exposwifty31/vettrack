@@ -136,7 +136,10 @@ export type AuditActionType =
   | "alert_seen"
   | "alert_resolved"
   | "alert_reopened"
-  | "billing_reversed";
+  | "billing_reversed"
+  | "patient_handoff_submitted"
+  | "patient_handoff_reviewed"
+  | "patient_handoff_cancelled";
 
 export interface LogAuditParams {
   clinicId: string;
