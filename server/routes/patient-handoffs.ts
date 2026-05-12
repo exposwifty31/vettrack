@@ -111,11 +111,12 @@ router.get("/mine", requireAuth, requireEffectiveRole("technician"), async (req:
 
 router.get("/:id", requireAuth, requireEffectiveRole("technician"), async (req: Request, res: Response) => {
   try {
+    const callerRole = (req as any).effectiveRole ?? req.authUser!.role;
     const result = await getHandoffDetail(
       req.authUser!.clinicId,
       req.params.id,
       req.authUser!.id,
-      req.authUser!.role,
+      callerRole,
     );
     res.json(result);
   } catch (err) {

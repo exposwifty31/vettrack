@@ -441,6 +441,7 @@ function CreateHandoffSheet({
     queryFn: () => api.shiftHandover.patientHandoffs.eligibleStaff(),
     enabled: open,
     retry: false,
+    refetchOnMount: "always",
   });
 
   const patientsQ = useQuery({
@@ -448,6 +449,7 @@ function CreateHandoffSheet({
     queryFn: () => api.shiftHandover.patientHandoffs.eligiblePatients(),
     enabled: open,
     retry: false,
+    refetchOnMount: "always",
   });
 
   // Reset on close
@@ -648,12 +650,26 @@ function CreateHandoffSheet({
         for (const inv of e.invalidatedItems) {
           updateItem(inv.hospitalizationId, { itemStatus: "invalidated" });
         }
-      } else if (e.code === "CONFLICT_STALE_DRAFT") {
-        toast.error(p.staleVersionToast);
-        // Refresh handoff version
+        // Refetch handoff detail to reconcile item versions
         try {
           const detail = await api.shiftHandover.patientHandoffs.get(handoffId);
           setHandoffVersion(detail.version);
+          for (const serverItem of detail.items) {
+            updateItem(serverItem.hospitalizationId, { itemVersion: serverItem.version });
+          }
+        } catch {
+          // if refetch fails, use last-known versions; skip will catch stale if it conflicts
+        }
+      } else if (e.code === "CONFLICT_STALE_DRAFT") {
+        toast.error(p.staleVersionToast);
+        // Refresh handoff and all item versions
+        try {
+          const detail = await api.shiftHandover.patientHandoffs.get(handoffId);
+          setHandoffVersion(detail.version);
+          // Update all item versions to prevent stale conflicts on next attempt
+          for (const serverItem of detail.items) {
+            updateItem(serverItem.hospitalizationId, { itemVersion: serverItem.version });
+          }
         } catch {}
       } else {
         toast.error(e.message);

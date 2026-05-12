@@ -357,26 +357,35 @@ export async function upsertItem(
   const existing = existingRows[0];
 
   if (!existing) {
-    // First save — INSERT
+    // First save — INSERT with conflict handling
     const id = randomUUID();
     const newStatus = body.status ?? "draft";
 
-    await db.insert(shiftPatientHandoffItems).values({
-      id,
-      clinicId,
-      handoffId,
-      hospitalizationId,
-      animalId: hosp.animalId,
-      status: newStatus,
-      skipReason: body.skipReason ?? null,
-      currentStability: body.currentStability ?? "",
-      pendingTasksNote: body.pendingTasksNote ?? "",
-      criticalWarnings: body.criticalWarnings ?? "",
-      clinicalNote: body.clinicalNote ?? "",
-      version: 1,
-      createdAt: now,
-      updatedAt: now,
-    });
+    const inserted = await db
+      .insert(shiftPatientHandoffItems)
+      .values({
+        id,
+        clinicId,
+        handoffId,
+        hospitalizationId,
+        animalId: hosp.animalId,
+        status: newStatus,
+        skipReason: body.skipReason ?? null,
+        currentStability: body.currentStability ?? "",
+        pendingTasksNote: body.pendingTasksNote ?? "",
+        criticalWarnings: body.criticalWarnings ?? "",
+        clinicalNote: body.clinicalNote ?? "",
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoNothing()
+      .returning({ id: shiftPatientHandoffItems.id });
+
+    if (inserted.length === 0) {
+      // Another request already created this item
+      throw apiError("CONFLICT_STALE_DRAFT", 409, "Item was created by another request — please refresh");
+    }
 
     return { id, status: newStatus as UpsertItemResponse["status"], version: 1, updatedAt: now.toISOString() };
   }
@@ -517,13 +526,17 @@ export async function submitHandoff(
 
   if (invalidated.length > 0) {
     // Persist invalidated status so UI can show affected items
+    // version is intentionally NOT incremented; invalidation is a server-side preflight result
     await db
       .update(shiftPatientHandoffItems)
       .set({ status: "invalidated", updatedAt: new Date() })
       .where(
-        inArray(
-          shiftPatientHandoffItems.id,
-          invalidated.map((i) => i.id),
+        and(
+          eq(shiftPatientHandoffItems.clinicId, clinicId),
+          inArray(
+            shiftPatientHandoffItems.id,
+            invalidated.map((i) => i.id),
+          ),
         ),
       );
 
@@ -547,7 +560,8 @@ export async function submitHandoff(
         .where(eq(shiftPatientHandoffItems.id, itemId));
     }
 
-    await tx
+    // Guard by version + status to prevent concurrent submit races
+    const updated = await tx
       .update(shiftPatientHandoffs)
       .set({
         status: "submitted",
@@ -555,14 +569,27 @@ export async function submitHandoff(
         version: version + 1,
         updatedAt: now,
       })
-      .where(eq(shiftPatientHandoffs.id, handoffId));
-  });
+      .where(
+        and(
+          eq(shiftPatientHandoffs.id, handoffId),
+          eq(shiftPatientHandoffs.clinicId, clinicId),
+          eq(shiftPatientHandoffs.status, "draft"),
+          eq(shiftPatientHandoffs.version, version),
+        ),
+      )
+      .returning({ id: shiftPatientHandoffs.id });
 
-  await insertRealtimeDomainEvent(db, {
-    clinicId,
-    type: "PATIENT_HANDOFF_SUBMITTED",
-    payload: { handoffId, receivingUserId: header.receivingUserId, patientCount: activeItems.length },
-    category: "PATIENT",
+    if (updated.length === 0) {
+      throw apiError("CONFLICT_STALE_DRAFT", 409, "Handoff version changed — please refresh");
+    }
+
+    // Event insertion must be inside transaction for atomicity
+    await insertRealtimeDomainEvent(tx, {
+      clinicId,
+      type: "PATIENT_HANDOFF_SUBMITTED",
+      payload: { handoffId, receivingUserId: header.receivingUserId, patientCount: activeItems.length },
+      category: "PATIENT",
+    });
   });
 
   logAudit({
@@ -605,16 +632,33 @@ export async function reviewHandoff(
   if (header.version !== version) throw apiError("CONFLICT_STALE_DRAFT", 409, "Stale version — please refresh");
 
   const now = new Date();
-  await db
-    .update(shiftPatientHandoffs)
-    .set({ status: "reviewed", reviewedAt: now, version: version + 1, updatedAt: now })
-    .where(eq(shiftPatientHandoffs.id, handoffId));
 
-  await insertRealtimeDomainEvent(db, {
-    clinicId,
-    type: "PATIENT_HANDOFF_REVIEWED",
-    payload: { handoffId },
-    category: "PATIENT",
+  await db.transaction(async (tx) => {
+    // Guard by version + status to prevent concurrent review races
+    const updated = await tx
+      .update(shiftPatientHandoffs)
+      .set({ status: "reviewed", reviewedAt: now, version: version + 1, updatedAt: now })
+      .where(
+        and(
+          eq(shiftPatientHandoffs.id, handoffId),
+          eq(shiftPatientHandoffs.clinicId, clinicId),
+          eq(shiftPatientHandoffs.status, "submitted"),
+          eq(shiftPatientHandoffs.version, version),
+        ),
+      )
+      .returning({ id: shiftPatientHandoffs.id });
+
+    if (updated.length === 0) {
+      throw apiError("CONFLICT_STALE_DRAFT", 409, "Handoff version changed — please refresh");
+    }
+
+    // Event insertion must be inside transaction for atomicity
+    await insertRealtimeDomainEvent(tx, {
+      clinicId,
+      type: "PATIENT_HANDOFF_REVIEWED",
+      payload: { handoffId },
+      category: "PATIENT",
+    });
   });
 
   logAudit({
@@ -656,10 +700,26 @@ export async function cancelHandoff(
   if (header.version !== version) throw apiError("CONFLICT_STALE_DRAFT", 409, "Stale version — please refresh");
 
   const now = new Date();
-  await db
-    .update(shiftPatientHandoffs)
-    .set({ status: "cancelled", cancelledAt: now, version: version + 1, updatedAt: now })
-    .where(eq(shiftPatientHandoffs.id, handoffId));
+
+  await db.transaction(async (tx) => {
+    // Guard by version + status to prevent concurrent cancel races
+    const updated = await tx
+      .update(shiftPatientHandoffs)
+      .set({ status: "cancelled", cancelledAt: now, version: version + 1, updatedAt: now })
+      .where(
+        and(
+          eq(shiftPatientHandoffs.id, handoffId),
+          eq(shiftPatientHandoffs.clinicId, clinicId),
+          eq(shiftPatientHandoffs.status, "draft"),
+          eq(shiftPatientHandoffs.version, version),
+        ),
+      )
+      .returning({ id: shiftPatientHandoffs.id });
+
+    if (updated.length === 0) {
+      throw apiError("CONFLICT_STALE_DRAFT", 409, "Handoff version changed — please refresh");
+    }
+  });
 
   logAudit({
     clinicId,
