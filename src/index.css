@@ -401,6 +401,7 @@
 }
 
 .qr-scan-line {
+  top: 0;
   animation: qr-scan-line 1.8s ease-in-out infinite;
 }
 

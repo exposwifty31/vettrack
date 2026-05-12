@@ -751,7 +751,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
           <Button
             variant="ghost"
             size="sm"
-            className={`gap-2 ${showFallbackHint ? "text-white hover:text-white hover:bg-white/20" : "text-white/70 hover:text-white hover:bg-white/10"}`}
+            className="gap-2 text-white hover:text-white hover:bg-white/20"
             onClick={() => {
               stopScanner();
               setPhase("manual");
