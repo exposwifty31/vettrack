@@ -634,7 +634,7 @@ export function MedicationCalculator({
       }
     },
     onError: (err: unknown) => {
-      setApiError(err instanceof Error ? err.message : t.medsPage.taskStartFailed);
+      setApiError(err instanceof Error ? err.message : t.medsPage.unexpectedError);
     },
     onSettled: () => {
       submittingRef.current = false;

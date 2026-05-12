@@ -1428,6 +1428,7 @@
     "taskStarted": "משימה תרופתית התחילה",
     "medicationTaskCreated": "משימת תרופות נוצרה — {volume} הוקצו לטכנאי",
     "taskStartFailed": "הפעלת משימה תרופתית נכשלה",
+    "unexpectedError": "אירעה שגיאה בלתי צפויה",
     "taskCompleted": "משימה תרופתית הושלמה",
     "taskCompleteFailed": "השלמת משימה תרופתית נכשלה",
     "statusScheduled": "מתוזמן",
