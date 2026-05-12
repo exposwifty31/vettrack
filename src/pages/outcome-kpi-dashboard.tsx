@@ -141,7 +141,7 @@ function MetricBarPair(props: {
 }
 
 export default function OutcomeKpiDashboardPage() {
-  const { userId } = useAuth();
+  const { userId, isAdmin } = useAuth();
   const q = useQuery({
     queryKey: ["/api/analytics/outcome-kpi-roi"],
     queryFn: api.analytics.outcomeKpiRoi,
@@ -193,9 +193,16 @@ export default function OutcomeKpiDashboardPage() {
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
               <p>{t.outcomeKpiDashboard.noActivationBody}</p>
-              <code className="block rounded-lg bg-muted px-3 py-2 text-xs break-all">
-                {t.outcomeKpiDashboard.noActivationKeyHint}
-              </code>
+              {isAdmin && (
+                <details className="text-xs">
+                  <summary className="cursor-pointer select-none text-muted-foreground/70 hover:text-muted-foreground">
+                    {t.outcomeKpiDashboard.noActivationAdminSummary}
+                  </summary>
+                  <p className="mt-1 break-all rounded-lg bg-muted px-3 py-2">
+                    {t.outcomeKpiDashboard.noActivationAdminHint}
+                  </p>
+                </details>
+              )}
             </CardContent>
           </Card>
         )}
