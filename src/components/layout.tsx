@@ -417,7 +417,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   const canAccessCodeBlue = isAdmin || role === "vet" || role === "senior_technician" || role === "technician";
 
   const canAccessHandoverInventory =
-    role === "admin" || role === "vet" || role === "technician";
+    role === "admin" || role === "vet" || role === "senior_technician" || role === "technician";
 
   const navItems: NavItem[] = useMemo(() => {
     if (erConcealment) {

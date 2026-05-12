@@ -855,9 +855,10 @@ async function buildPatientHandoverPayload(clinicId: string): Promise<{
     bay: string | null;
     pendingMedicationTasks: Array<{ id: string; status: string; drugId: string; dueAt: string | null }>;
     overdueMedicationCount: number;
-    activeAlerts: Array<{ alertType: string; ackStatus: string }>;
     unresolvedEmergencyDispenses: Array<{ id: string; createdAt: string }>;
   }>;
+  /** Clinic-wide equipment alerts (SEEN, not yet RESOLVED). Not scoped per-patient. */
+  activeAlerts: Array<{ alertType: string; ackStatus: string }>;
   summaryCounts: {
     patientCount: number;
     pendingTaskCount: number;
@@ -901,18 +902,17 @@ async function buildPatientHandoverPayload(clinicId: string): Promise<{
         )
     : [];
 
-  // 3. Active alert acks (SEEN only — RESOLVED ones are closed)
-  const alertRows = animalIds.length
-    ? await db
-        .select({ equipmentId: alertAcks.equipmentId, alertType: alertAcks.alertType, ackStatus: alertAcks.ackStatus })
-        .from(alertAcks)
-        .where(
-          and(
-            eq(alertAcks.clinicId, clinicId),
-            eq(alertAcks.ackStatus, "SEEN"),
-          ),
-        )
-    : [];
+  // 3. Clinic-wide active alert acks (SEEN only — RESOLVED ones are closed).
+  //    These are equipment alerts, not scoped to individual patients.
+  const alertRows = await db
+    .select({ alertType: alertAcks.alertType, ackStatus: alertAcks.ackStatus })
+    .from(alertAcks)
+    .where(
+      and(
+        eq(alertAcks.clinicId, clinicId),
+        eq(alertAcks.ackStatus, "SEEN"),
+      ),
+    );
 
   // 4. Unresolved emergency dispenses per patient
   const emergencyRows = animalIds.length
@@ -966,7 +966,6 @@ async function buildPatientHandoverPayload(clinicId: string): Promise<{
         dueAt: t.dueAt?.toISOString() ?? null,
       })),
       overdueMedicationCount: overdueCount,
-      activeAlerts: alertRows.map((a) => ({ alertType: a.alertType, ackStatus: a.ackStatus })),
       unresolvedEmergencyDispenses: emergencies.map((e) => ({
         id: e.id,
         createdAt: e.createdAt.toISOString(),
@@ -981,7 +980,9 @@ async function buildPatientHandoverPayload(clinicId: string): Promise<{
     unresolvedEmergencyCount: patients.reduce((s, p) => s + p.unresolvedEmergencyDispenses.length, 0),
   };
 
-  return { patients, summaryCounts };
+  const activeAlerts = alertRows.map((a) => ({ alertType: a.alertType, ackStatus: a.ackStatus }));
+
+  return { patients, activeAlerts, summaryCounts };
 }
 
 // ─── Fix A: GET /api/shift-handover/patients ─────────────────────────────────
@@ -992,8 +993,8 @@ router.get("/patients", requireAuth, requireEffectiveRole("technician"), async (
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
-    const { patients, summaryCounts } = await buildPatientHandoverPayload(clinicId);
-    res.json({ patients, summaryCounts, generatedAt: new Date().toISOString() });
+    const { patients, activeAlerts, summaryCounts } = await buildPatientHandoverPayload(clinicId);
+    res.json({ patients, activeAlerts, summaryCounts, generatedAt: new Date().toISOString() });
   } catch (err) {
     console.error("[shift-handover] patients endpoint failed", err);
     res.status(500).json(
