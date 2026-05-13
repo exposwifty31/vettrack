@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Clock, ChevronDown, ChevronUp } from "lucide-react";
-import { authFetch } from "@/lib/auth-fetch";
+import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import type { CodeBlueSession } from "@/hooks/useCodeBlueSession";
 
@@ -27,11 +27,7 @@ export default function CodeBlueHistoryPage() {
 
   const historyQ = useQuery<CodeBlueSession[]>({
     queryKey: ["/api/code-blue/history"],
-    queryFn: async () => {
-      const res = await authFetch("/api/code-blue/history");
-      if (!res.ok) throw new Error("failed");
-      return res.json();
-    },
+    queryFn: () => api.codeBlue.history(),
     enabled: !!userId && (resolvedRole === "admin"),
   });
 

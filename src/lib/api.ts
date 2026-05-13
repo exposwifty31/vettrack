@@ -1654,6 +1654,8 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(data),
       }),
+    history: () =>
+      request<import("@/hooks/useCodeBlueSession").CodeBlueSession[]>("/api/code-blue/history"),
     reconciliationList: () =>
       request<{ sessions: CodeBlueReconciliationSession[] }>("/api/code-blue/reconciliation"),
     sessionDispenses: (sessionId: string) =>
