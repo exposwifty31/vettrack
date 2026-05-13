@@ -213,7 +213,7 @@ Code Blue specifically: every log entry is audited; elapsed time uses the earlie
 - **PDN-L1** Auto-reassignment policy on shift-end (overlaps with PDN-V11). Default V1: no auto-reassign; manager-check-out is blocked so the case is bounded.
 - **PDN-L2** Conflict resolution UX wording for equipment double-checkout.
 - **PDN-L3** Whether an un-submitted handoff draft survives indefinitely or auto-discards after N days.
-- **PDN-L4** Stale-authority cache window (proposal 60s; confirm in `offline-operational-architecture.md`).
+- **PDN-L4 — RESOLVED.** Stale-authority cache window = **60 seconds** (PDN-O1 approved). Server remains authoritative; first 401/403 invalidates cache immediately.
 - **PDN-L5** Inventory job retry permission (overlaps with PDN-4).
 
 ---

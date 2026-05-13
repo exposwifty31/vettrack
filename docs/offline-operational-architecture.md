@@ -24,7 +24,7 @@ Five principles. All other rules in this document derive from these.
 
 The FE caches authority state for UX gating only. The server NEVER trusts cached authority.
 
-- **Cache window:** **60 seconds** since last `/api/users/me` fetch (PDN-O1 — proposed default; confirm before Phase 2.5).
+- **Cache window:** **60 seconds** since last `/api/users/me` fetch. **APPROVED (PDN-O1 RESOLVED).** Server remains authoritative. First 401/403 response invalidates the cache immediately.
 - **Cached fields:** `systemRole`, `clinicalRole`, `activeShiftRole`, `operationalRole`, the user's `allowedOperationalRoles`, the clinic's effective `clinicPolicy`.
 - **NOT cached:** mid-session shift-end events from other tabs / browsers / devices. Detected only on reconnect.
 - **Invalidation:** any 401 / 403 response invalidates the cache immediately. Manual refresh button forces refetch.
@@ -69,7 +69,7 @@ The **inventory deduction job** is created server-side after complete reconciles
 | Sub-action | Offline | Notes |
 |---|---|---|
 | Trigger Code Blue | YES | Idempotent create; server creates session. |
-| Add log entry | YES | High-frequency during active session; queue batched. Idempotency key per entry. |
+| Add log entry | YES | High-frequency during active session; queue batched. Idempotency key per entry. **PDN-O4 RESOLVED — replay failures must NEVER be silently dropped; surface to incident review / unresolved sync queue.** |
 | Presence heartbeat | YES, best-effort | Lost heartbeats are accepted; server uses 30s stale window. |
 | Assign / reassign manager | **NO** | Live authority required. |
 | End Code Blue session | **NO — STRICT** | Live authority required. Fail closed. |
@@ -85,7 +85,7 @@ The **inventory deduction job** is created server-side after complete reconciles
 | Restock scan (`observedQuantity`) | YES | Queued; server computes delta. |
 | Restock finish | YES | Queued. |
 | Dispense (non-emergency) | **NO** | Medication safety; live authority required. |
-| Dispense (emergency) | YES | Clinical override; server reconciles after. |
+| Dispense (emergency) | YES | Clinical override; server reconciles after. **PDN-O3 RESOLVED — no post-reconnect attestation required in V1.** |
 | Blind audit | YES | Queued. |
 | Container CRUD | **NO** | Admin-only; live authority required. |
 
@@ -291,12 +291,18 @@ Explicit list of behaviours that are FORBIDDEN in V1:
 
 ## 14. Open product decisions
 
-- **PDN-O1** Authority cache TTL (proposal: 60 seconds; confirm before Phase 2.5 ships).
+**Resolved (architecture freeze sign-offs):**
+
+- **PDN-O1 — RESOLVED.** Authority cache TTL = **60 seconds**. Server remains authoritative. First 401/403 invalidates cache immediately.
+- **PDN-O3 — RESOLVED.** **No emergency-dispense attestation in V1.** Reconcile applies the queued dispense without a post-reconnect attestation step.
+- **PDN-O4 — RESOLVED.** **Code Blue replay failures must NEVER be silently dropped.** Failed replays surface to incident review / unresolved sync queue and remain user-visible until resolved or explicitly discarded.
+
+**Still open (deferrable, do not block Phase 1):**
+
 - **PDN-O2** Maximum queue depth before forcing reconnect (no V1 limit proposed; revisit if load testing reveals a problem).
-- **PDN-O3** Whether emergency dispense requires a post-reconnect attestation (medication safety review).
-- **PDN-O4** Whether Code Blue log entries that fail to replay (server rejects) should be retried indefinitely or surfaced for clinical incident review.
 - **PDN-O5** Equipment-checkout conflict UX wording.
 - **PDN-O6** Whether to expire offline-cached `eligible-assignees` aggressively (60s? per-session?) to avoid stale-list 403s.
+- **PDN-O7** Mid-session shift-end propagation across tabs (deferred to Phase 5; see §16).
 
 ---
 

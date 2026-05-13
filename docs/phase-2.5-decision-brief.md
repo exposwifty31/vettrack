@@ -244,41 +244,48 @@ V1 policy fields (founder's clinic):
 
 ---
 
-## Decision 7 — `allowedOperationalRoles` seed strategy (PDN-V2, PDN-V3)
+## Decision 7 — `allowedOperationalRoles` seed strategy (PDN-V2, PDN-V3) — **APPROVED (counter-proposal)**
 
-### Recommended decision
+### Recommended decision (revised after sign-off)
 
-**One-time manual seed migration for the founder's clinic + `['er_icu_vet']` default for newly-created Vet users.** Storage: `vt_users.allowed_operational_roles TEXT[]`.
+**No production default operational role.** Existing Vets MUST be explicitly seeded before Phase 2.5 rollout. New Vet users default to **no allowed operational roles** (empty array) until configured by an Admin. Development / test environments MAY use a guarded fallback constant for fixture data only. **Do not use `DEFAULT '{er_icu_vet}'` in production.**
 
-### Alternatives considered
+Storage: `vt_users.allowed_operational_roles TEXT[] NOT NULL DEFAULT '{}'`.
+
+### Rationale for the counter-proposal
+
+A non-empty production default would silently grant ER/ICU Vet authority to every newly-onboarded Vet. The risk is privilege escalation by inaction: a clinic admin who forgets to configure a new Vet has unintentionally granted them a clinically-meaningful operational role. The empty-array default forces an explicit administrative action; the cost is that admins must seed every Vet before the user can act clinically. For V1 with a small, known Vet roster this trade is acceptable and safer.
+
+### Alternatives considered (revised)
 
 | Option | Pros | Cons |
 |---|---|---|
-| A. Empty default for all (fail-closed) | Safest from a privilege standpoint | All existing Vets locked out on rollout; requires admin UI before rollout |
-| B. All five operational roles for everyone | No one locked out | Every Vet can declare themselves Senior Vet; defeats the gate |
-| C. Single-role default `[er_icu_vet]` | Conservative middle ground; one explicit operational role | Users with no historical role assignment land on ER/ICU; may not match all clinics |
-| D. Backfill from existing user metadata | Personalised | Heuristic; brittle; risk of wrong assignment |
-| **E. Manual one-time SQL seed + C default for new users (recommended)** | Founder-clinic accurate; safe default for future | Requires per-user mapping at seed time |
+| A. Empty default for all (fail-closed, **APPROVED**) | Safest; no silent privilege grant; forces explicit admin action | All Vets locked out until seeded; seed step is mandatory pre-rollout |
+| B. All five operational roles for everyone | No one locked out | Privilege blowout; rejected |
+| C. Single-role default `[er_icu_vet]` (previously recommended) | Conservative middle ground | **REJECTED**: silent privilege grant on every new user; admin omission becomes a vulnerability |
+| D. Backfill from existing user metadata | Personalised | Heuristic; rejected |
+| E. Manual seed + C default | Founder-clinic accurate; safe default | **C component rejected**; only the manual-seed component survives |
 
-E is correct for the founder's clinic: the existing Vet roster is small and known. C is the right default for new users post-rollout.
+A is correct. C-style defaults are silent privilege grants and the product owner has rejected them.
 
-Storage: column on `vt_users.allowed_operational_roles TEXT[]` (Postgres array). Simpler than a separate table; aligns with `clinicalRole` proximity. Future migration to a row-per-role table is non-breaking.
+### Risks (revised)
 
-### Risks
+- **Existing Vets locked out at rollout if seeding is incomplete.** Mitigation: pre-rollout seed migration is **mandatory** and gated by the Phase 2.5 feature flag flip; flip occurs only after seed is confirmed complete. This is now a hard rollout-blocker, not a soft one (see Decision 9).
+- **New Vet added post-rollout is locked out until Admin configures.** Mitigation: Admin tooling (Phase 5) must include a "configure operational roles" step in the user-onboarding flow. Until Phase 5, Admin sets `allowed_operational_roles` via a direct admin endpoint or SQL.
+- **Dev/test fixture data accidentally lands in production.** Mitigation: any guarded fallback constant lives in `shared/` behind an `env !== "production"` guard; CI enforces.
 
-- **Seed migration error.** Wrong roles assigned during rollout. Mitigation: review with clinic admin before running; backup `vt_users` before migration; rollback is restoring the column from backup.
-- **New Vet user with no admin attention.** Lands on `[er_icu_vet]` default; may need Senior Vet but admin hasn't updated. Mitigation: post-rollout, admin reviews new Vet users weekly. Phase 5 admin UI streamlines this.
-- **Storage shape locks the future.** If Phase 5+ needs richer per-role config (e.g., role + scope + expiry), a TEXT[] column doesn't scale. Mitigation: Phase 5 can migrate to a separate table when the time comes; the migration is additive and revertable.
+### Final V1 recommendation (revised)
 
-### Final V1 recommendation
-
-- Add `vt_users.allowed_operational_roles TEXT[] NOT NULL DEFAULT '{er_icu_vet}'` column (Postgres array; default single-element).
-- Per-user seed migration runs during Phase 2.5 rollout for the founder's clinic. Mapping is provided by the clinic admin via spreadsheet or direct input:
-  - Vets with Senior-Vet privileges: `['senior_vet', 'er_icu_vet', 'hospitalization_vet', 'receiving_vet']`.
-  - Vets with primary ER/ICU duty: `['er_icu_vet']` or `['er_icu_vet', 'receiving_vet']` etc.
-  - On-call-only Vets: `['on_call_vet']` (note: this confers no authority; PDN-V5 deferred).
-- Validation at check-in: backend rejects any `operationalRole` not in the user's `allowed_operational_roles`. 403 with structured reason.
-- No admin UI for editing in V1. Phase 5 ships `PATCH /api/users/:id/allowed-operational-roles` with audit.
+- Add `vt_users.allowed_operational_roles TEXT[] NOT NULL DEFAULT '{}'` column.
+- **Pre-rollout mandatory seed** for the founder's clinic: per-user mapping supplied by clinic admin via spreadsheet or direct input.
+  - Vets with Senior-Vet privileges: e.g., `['senior_vet', 'er_icu_vet', 'hospitalization_vet', 'receiving_vet']`.
+  - Vets with primary ER/ICU duty: e.g., `['er_icu_vet']` or `['er_icu_vet', 'receiving_vet']`.
+  - On-call-only Vets: `['on_call_vet']` (note: confers no authority by itself; PDN-V5 deferred).
+- **New Vet users (post-rollout) land with empty `allowed_operational_roles`.** They cannot check in until an Admin configures them.
+- **Validation at check-in:** backend rejects any `operationalRole` not in the user's `allowed_operational_roles`. 403 with structured reason. Empty array → cannot select any operational role → cannot check in.
+- **Dev/test fallback (guarded):** `shared/clinic-policy-v1.ts` MAY export a `DEV_ONLY_FALLBACK_ALLOWED_ROLES` constant used by test fixtures and dev-bypass auth. The constant MUST be wrapped in `if (process.env.NODE_ENV !== "production")` checks. CI lint or test rejects production use.
+- **No admin UI for editing in V1.** Phase 5 ships `PATCH /api/users/:id/allowed-operational-roles` with audit.
+- **Phase 2.5 PR 2.5.5 (seed + flag flip)** is GATED on confirmed completeness of the per-user seed. The flag is NOT flipped until the seed is verified.
 
 ---
 
@@ -386,7 +393,7 @@ D is the focused answer. The MVP unblocks Phase 4 without prematurely shipping P
 ### MVP scope
 
 1. **Schema** (3 columns, 1 table):
-   - `vt_users.allowed_operational_roles TEXT[] NOT NULL DEFAULT '{er_icu_vet}'`.
+   - `vt_users.allowed_operational_roles TEXT[] NOT NULL DEFAULT '{}'` (**empty array default per Decision 7 sign-off — no production default operational role**).
    - `vt_clinics.policy JSONB NOT NULL DEFAULT '{}'`.
    - `vt_clinics.phase_2_5_enabled BOOLEAN NOT NULL DEFAULT FALSE`.
    - `vt_clinical_shift_sessions` table: `id, clinicId, userId, kind ('vet'|'tech'), operationalRole NULLABLE, startedAt, endedAt NULLABLE, idempotencyKey UNIQUE, metadata JSONB`. Unique constraint on `(clinicId, userId)` where `endedAt IS NULL` to prevent double check-in.
@@ -470,7 +477,7 @@ Paste the following prompt into a new engineering task once Decisions 1–10 are
 > **PR sequence (do NOT collapse):**
 >
 > 1. **PR 2.5.1 — Schema.**
->    Add columns: `vt_users.allowed_operational_roles TEXT[] NOT NULL DEFAULT '{er_icu_vet}'`; `vt_clinics.policy JSONB NOT NULL DEFAULT '{}'`; `vt_clinics.phase_2_5_enabled BOOLEAN NOT NULL DEFAULT FALSE`. Add table `vt_clinical_shift_sessions` with columns per Decision 10 §1. Add the unique `(clinicId, userId)` constraint where `endedAt IS NULL`. Migration is additive; no data change. Test: flag-off behaviour identical to current.
+>    Add columns: `vt_users.allowed_operational_roles TEXT[] NOT NULL DEFAULT '{}'` (**empty array per Decision 7 sign-off — no production default**); `vt_clinics.policy JSONB NOT NULL DEFAULT '{}'`; `vt_clinics.phase_2_5_enabled BOOLEAN NOT NULL DEFAULT FALSE`. Add table `vt_clinical_shift_sessions` with columns per Decision 10 §1. Add the unique `(clinicId, userId)` constraint where `endedAt IS NULL`. Migration is additive; no data change. Test: flag-off behaviour identical to current.
 >
 > 2. **PR 2.5.2 — Resolver + decision helpers.**
 >    Extend `resolveAuthority(req)` to consult `vt_clinical_shift_sessions` when `vt_clinics.phase_2_5_enabled = true`. When flag is off, return identical legacy resolver output. Add `server/lib/authority/policy-helpers.ts` exporting `canManageCodeBlue`, `canToggleErMode`, `canCreateErIntake`, `canCreateMedicationTask`. Each helper consumes `(userAuthority, clinicPolicy)` and returns a boolean per Decision 6. V1 implementation merges defaults from `shared/clinic-policy-v1.ts`. Tests: helpers return correct V1 answers; resolver flag-off equivalence.
@@ -482,7 +489,7 @@ Paste the following prompt into a new engineering task once Decisions 1–10 are
 >    Implement modal per Decisions 1 (Tech), 2 (Senior Tech same as Tech with effective-role line), 3 (Vet picker with Senior Vet first, default-to-most-recent, on-call hidden). Persistent banner for dismissed-modal state. Header indicator with check-out button. All gated on `phase_2_5_enabled` (FE reads from `/api/users/me` payload). Tests: Playwright smoke through happy path; modal force-trigger on first clinical mutation; check-out warning UX.
 >
 > 5. **PR 2.5.5 — Seed + flag flip.**
->    SQL migration script seeding `vt_users.allowed_operational_roles` for founder's-clinic Vets per a manually-prepared mapping (see Decision 7). SQL seed of `vt_clinics.policy` to the founder's V1 policy JSON (see Decision 6). A separate post-deploy migration step flips `vt_clinics.phase_2_5_enabled` to `TRUE` for the founder's clinic only. Tests: smoke run in staging; rollback validated by flipping flag back to `FALSE`.
+>    SQL migration script seeding `vt_users.allowed_operational_roles` for **every founder's-clinic Vet user** per a manually-prepared mapping (see Decision 7). **Verify completeness before flag flip: any Vet with empty `allowed_operational_roles` will be unable to check in.** SQL seed of `vt_clinics.policy` to the founder's V1 policy JSON (see Decision 6). A separate post-deploy migration step flips `vt_clinics.phase_2_5_enabled` to `TRUE` for the founder's clinic only — **only after the seed completeness check passes**. Tests: smoke run in staging; assertion that no founder-clinic Vet has empty `allowed_operational_roles` before flip; rollback validated by flipping flag back to `FALSE`.
 >
 > **Per-PR checklist:**
 >
@@ -505,17 +512,29 @@ Paste the following prompt into a new engineering task once Decisions 1–10 are
 
 ---
 
-## Approval status
+## Approval status — FINAL
 
 | # | Decision | Status |
 |---|---|---|
-| 1 | Tech check-in UX | ☐ Approved · ☐ Counter-proposed · ☐ Pending |
-| 2 | Senior Tech check-in behaviour | ☐ Approved · ☐ Counter-proposed · ☐ Pending |
-| 3 | Vet check-in UX | ☐ Approved · ☐ Counter-proposed · ☐ Pending |
-| 4 | Check-out rules with in-flight responsibilities | ☐ Approved · ☐ Counter-proposed · ☐ Pending |
-| 5 | ER Mode dead-lock escape hatch | ☐ Approved · ☐ Counter-proposed · ☐ Pending |
-| 6 | `clinicPolicy` V1 storage | ☐ Approved · ☐ Counter-proposed · ☐ Pending |
-| 7 | `allowedOperationalRoles` seed strategy | ☐ Approved · ☐ Counter-proposed · ☐ Pending |
-| 8 | Audit requirements | ☐ Approved · ☐ Counter-proposed · ☐ Pending |
-| 9 | Rollout strategy / feature flag | ☐ Approved · ☐ Counter-proposed · ☐ Pending |
-| 10 | Minimum viable Phase 2.5 implementation | ☐ Approved · ☐ Counter-proposed · ☐ Pending |
+| 1 | Tech check-in UX | ✅ **Approved** |
+| 2 | Senior Tech check-in behaviour | ✅ **Approved** |
+| 3 | Vet check-in UX | ✅ **Approved** |
+| 4 | Check-out rules with in-flight responsibilities | ✅ **Approved** (Code Blue manager checkout block is interim until Phase 4 PR 4.6 reassignment UI ships) |
+| 5 | ER Mode dead-lock escape hatch | ✅ **Approved** (`systemRole = Admin` may disable unconditionally with audit + push fan-out; cannot enable) |
+| 6 | `clinicPolicy` V1 storage | ✅ **Approved** (`vt_clinics.policy JSONB` with default-merge) |
+| 7 | `allowedOperationalRoles` seed strategy | ✅ **Approved (counter-proposal)** — **no production default** (empty array); existing Vets MUST be seeded pre-rollout; new Vets land empty until Admin configures; dev/test guarded fallback only |
+| 8 | Audit requirements | ✅ **Approved** |
+| 9 | Rollout strategy / feature flag | ✅ **Approved** (per-clinic feature flag, default FALSE, flipped post-seed) |
+| 10 | Minimum viable Phase 2.5 implementation | ✅ **Approved** |
+
+**Cross-cutting sign-offs (recorded in `docs/architecture-review.md §F.9`):**
+
+| Sign-off | Resolution |
+|---|---|
+| **PDN-O1** authority cache TTL | ✅ **60 seconds.** Server remains authoritative. First 401/403 invalidates the cache immediately. |
+| **PDN-V2** default `allowedOperationalRoles` | ✅ **No production default.** Counter-proposal accepted (see Decision 7 above). |
+| **Code Blue manager checkout interim rule** | ✅ **Approved.** Manager cannot check out while managing an active Code Blue until Phase 4 PR 4.6 reassignment UI ships. |
+| **PDN-O3 emergency-dispense attestation** | ✅ **No attestation in V1.** Reconcile applies the queued dispense; no post-reconnect attestation required. |
+| **PDN-O4 Code Blue replay-rejection handling** | ✅ **Never silently dropped.** Replay failures surface to incident review / unresolved sync queue. |
+
+**Architecture freeze: APPROVED.** Implementation begins with **Phase 1 PR 1.1** (Code Blue history endpoint alignment per `docs/architecture-review.md §F.9` and Plan v2 Phase 1).

@@ -789,19 +789,34 @@ The Phase 2.5 decision brief's five-PR sequence (2.5.1 → 2.5.5) remains correc
 
 No new PRs. No re-sequencing.
 
-### F.9 Freeze recommendation
+### F.9 Architecture freeze — **APPROVED**
 
-**Architecture is recommended for freeze**, subject to product sign-off on the four small items below.
+**Architecture freeze status: APPROVED.** Implementation may begin immediately with Phase 1 PR 1.1.
 
-**Pre-freeze sign-off checklist (small, product-side):**
+#### Sign-offs recorded (product-side)
 
-- [ ] **PDN-O1** — authority cache TTL (recommend 60 seconds).
-- [ ] **PDN-V2** — `allowedOperationalRoles` default (recommend `['er_icu_vet']` for new Vet users + per-user seed for existing).
-- [ ] Confirm F.1.3 (Code Blue manager cannot cleanly end their shift until Phase 4 PR 4.6 ships) is acceptable interim state.
-- [ ] Confirm F.2.4 / F.2.5 V1 defaults (no emergency-dispense attestation; never silent-drop Code Blue log entries) are acceptable.
+- [x] **PDN-O1 — APPROVED.** Authority cache TTL = **60 seconds**. Server remains authoritative. First 401/403 invalidates the cache immediately. Documented in `docs/offline-operational-architecture.md §2`.
+- [x] **PDN-V2 — APPROVED (counter-proposal).** **No production default operational role.** New Vet users land with empty `allowed_operational_roles`; cannot check in until an Admin configures them. Existing Vets MUST be explicitly seeded before Phase 2.5 rollout (PR 2.5.5 gates the feature-flag flip on seed completeness). Dev/test environments MAY use a guarded fallback constant under `process.env.NODE_ENV !== "production"` for fixtures only. **`DEFAULT '{er_icu_vet}'` is NOT used in production.** Documented in `docs/phase-2.5-decision-brief.md` Decision 7.
+- [x] **F.1.3 / Code Blue manager checkout interim rule — APPROVED.** Until Phase 4 PR 4.6 reassignment UI ships, a Code Blue manager **cannot** check out while managing an active Code Blue. Documented in `docs/phase-2.5-decision-brief.md` Decision 4 and `docs/ownership-lifecycle.md §3.4`.
+- [x] **F.2.4 / PDN-O3 — APPROVED.** **No emergency-dispense attestation in V1.** Reconcile applies the queued emergency dispense without a post-reconnect attestation step. Phase 5 may revisit. Documented in `docs/offline-operational-architecture.md §3.4`.
+- [x] **F.2.5 / PDN-O4 — APPROVED.** **Code Blue replay failures must never be silently dropped.** Failed replays surface to incident review / unresolved sync queue and remain user-visible until resolved or explicitly discarded. Documented in `docs/offline-operational-architecture.md §3.3` and `§6` (reconcile categories).
 
-**Once the above four items are signed off, implementation may begin.** No further architecture work is required to start Phase 1.
+#### Implementation begins with
 
-The remaining open PDNs (V5, V6, V7, V8, V9, V11, V12, V13, V14, V15, V16, V17, L1–L5, O3, O4, O5, O6) are **deferrable** — they have documented V1 defaults or are out of scope until Phase 4 or Phase 5. Implementation can start in parallel with their resolution.
+**Phase 1 PR 1.1 — Code Blue History endpoint alignment.**
 
-**Architecture freeze status: READY (pending 4-item product sign-off).**
+Per Plan v2 Phase 1 and `docs/phase-2.5-decision-brief.md` implementation prompt context: either rename the FE call to `/api/code-blue/events` *or* add a `/history` alias on the backend. No business-logic change. Includes a regression test.
+
+The full Phase 1 sequence (PRs 1.1–1.7) is documented in Plan v2 §"Phase 1 — Surgical Production Fixes Only" and remains unchanged.
+
+#### Remaining open PDNs (all deferrable; do not block Phase 1)
+
+- **Phase 2.5 design details** (resolved by Phase 2.5 PR scoping): PDN-V3 storage shape, PDN-V13 Tech check-in UX, PDN-V14 granularity, PDN-V15 affordance, PDN-O5 conflict wording, PDN-O6 eligible-assignees TTL, PDN-L2 conflict UX, PDN-L4 cache TTL (resolved by PDN-O1).
+- **Phase 4 clinical decisions** (resolved before Phase 4 begins): PDN-V5 on-call transition, PDN-V6 Senior Vet override, PDN-V8 in-flight handoff details, PDN-V9 mid-shift swap, PDN-V11 manager auto-assignment, PDN-V12 in-flight Code Blue authority, PDN-CB1..CB3, PDN-ER1..ER2, PDN-A1..A9 (active-shift / EZShift series).
+- **Phase 5 operational decisions**: PDN-V7 multi-clinic, PDN-V16 policy storage admin shape, PDN-V17 policy edit authority, PDN-L1/L3/L5, PDN-O2/O7, PDN-10 escalation matrix per task type.
+
+None of these block the start of implementation.
+
+#### Architecture freeze is in effect
+
+No further architecture documents will be created before Phase 1 PR 1.1 lands. Subsequent architecture refinement (if any) is driven by implementation findings, not pre-emptive analysis. The `docs/` set as of this commit is the canonical reference for Phase 1 through Phase 4 implementation.
