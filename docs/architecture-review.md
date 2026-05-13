@@ -11,6 +11,8 @@
 4. The broadened **Phase 2.5 — Clinical Check-in & Active Authority Infrastructure** (renamed from "Vet Check-in & Operational-Role Infrastructure") between Phase 2A and Phase 4 (§3.11 of this review). Phase 2.5 now covers **both** Vet check-in (with operational-role selection) and Tech / Senior-Tech check-in confirmation (presence-only).
 5. The **schedule + check-in** composition for Tech / Senior-Tech active authority (`AM §3.2`): EZShift alone is now scheduled eligibility, not active authority. Tech check-in is the binding event.
 6. The **six-layer authority separation** (`AM §4.8`) that decouples clinical capability from organizational policy via named decision helpers (`canManageCodeBlue`, `canToggleErMode`, etc.). Endpoint code must never hardcode clinic-specific rules; helpers consume `(userAuthority, clinicPolicy)`.
+7. **Offline-safe operation as a core architectural requirement** (`AM §2 rule 7`, `docs/offline-operational-architecture.md`, `docs/ownership-lifecycle.md`). V1 is online-first, offline-tolerant, backend-authoritative on reconcile. No CRDTs, event sourcing, or distributed sync. Per-workflow offline behaviour is enumerated in `offline-operational-architecture.md §3`.
+8. **Ownership semantics formalised** in `docs/ownership-lifecycle.md`: four-concept separation (workflow ownership / authority to act / operational assignment / historical responsibility); per-workflow lifecycle for all nine V1 workflow types; disconnect / reconnect / shift-end behaviour codified.
 
 References use the shorthand:
 - `AM` = `authority-model.md`
@@ -708,3 +710,98 @@ These are well-formed in the current code and the Phase 0 docs do not propose to
 - "Critical blocker" means "Phase 1 cannot land safely without a written decision," not "the codebase is broken today."
 - Every "PDN" reference points to a tag already in the Phase 0 docs. This review does not invent new PDNs; it pulls them into a sequencing order tied to phase gates.
 - Where this review flags a workflow regression (e.g., off-shift Vet remote work), it does so to elicit product confirmation; the regression may be intentional under Plan v2's model.
+
+---
+
+## Final consistency review (freeze-readiness pass)
+
+This section is the **last** architecture review before implementation. Its purpose is freeze, not exploration. Each item is concise and execution-oriented.
+
+### F.1 Critical unresolved contradictions
+
+| # | Contradiction | Resolution before freeze |
+|---|---|---|
+| F.1.1 | Phase 1 PR 1.5 relies on `clinicalRole === "vet"` data, but `vt_users.role` is overloaded (§1.1). | Confirm in writing that today's `role = "vet"` is the predicate, and that PR 1.5 will be re-asserted after the Phase 2A column-shape decision. |
+| F.1.2 | Phase 2B.5 / 2B.6 ship coarse `clin(vet)` gates; Phase 4 PR 4.1 / 4.3 tighten via operational-role + helpers. **A small window exists where any Vet can toggle ER Mode.** | Acknowledge in PR descriptions; document in §3.11. Acceptable interim state. |
+| F.1.3 | Code Blue manager check-out is BLOCKED (Phase 2.5 Decision 4), but no reassignment UI exists until Phase 4 PR 4.6. **A Vet with an active manager assignment cannot end their shift cleanly until Phase 4 ships.** | V1 product accepts this; document in Phase 2.5 PR 2.5.3 and Phase 4 PR 4.6. |
+| F.1.4 | `secondaryRole` column remains writable during Phase 2A–2C with no semantic effect. | Phase 5 retires the endpoint; for Phase 2A–4, document as a no-op surface; admin tooling should hide it. |
+
+No other contradictions block freeze.
+
+### F.2 Offline-related authority risks
+
+| # | Risk | Mitigation |
+|---|---|---|
+| F.2.1 | Cached authority used after shift end (within 60s window). Tab A continues to show enabled buttons while server has revoked auth. | First mutation returns 401/403, cache invalidates, FE banner appears. Acceptable for V1. |
+| F.2.2 | Code Blue log entries queued offline for a manager whose shift ended mid-session. | Server validates session-active on replay; log entries STILL append (log entries don't require live manager authority — `OM §2.4`). End-session rejects → reassignment required. |
+| F.2.3 | Equipment double-checkout race when two users scan the same item offline. | First-to-reconcile wins; second user sees `CONFLICT` UX. **PDN-O5** locks the wording. |
+| F.2.4 | Emergency dispense reconciled without medication-safety attestation. | **PDN-O3** — product decision required: do we require a post-reconnect attestation? Defaults to "no" for V1; revisit in Phase 5. |
+| F.2.5 | Code Blue log entries that fail to replay (server rejects with `STATE_MISMATCH`) silently disappear from the clinical record. | **PDN-O4** — V1 default: surface to clinical incident review; never silent. Confirm. |
+
+### F.3 Ownership lifecycle gaps
+
+| # | Gap | Status |
+|---|---|---|
+| F.3.1 | Auto-reassignment of Code Blue manager when manager's shift ends without explicit handoff. | **PDN-V11** — not built in V1; Phase 2.5 Decision 4 mitigates by blocking voluntary check-out. Involuntary disconnect uses banner + reassign UI in Phase 4. |
+| F.3.2 | Handoff draft authoring while offline indefinitely. | **PDN-L3** — V1 default: no expiry; revisit in Phase 5. |
+| F.3.3 | Inventory job retry permission. | **PDN-4 / PDN-L5** — V1: Admin only. Future Senior Tech (PDN-7). |
+| F.3.4 | On-call Vet → full-authority transition mechanism. | **PDN-V5** — on-call hidden from V1 check-in picker (Phase 2.5 Decision 3); workflow deferred to Phase 4+. |
+
+### F.4 Migration-order blockers
+
+None new beyond what's already documented. The five Phase 2.5 PRs are sequenced in `phase-2.5-decision-brief.md`. Phase 4 depends on Phase 2.5 landing first.
+
+### F.5 Rollout blockers
+
+| # | Blocker | Status |
+|---|---|---|
+| F.5.1 | Per-clinic feature flag (`vt_clinics.phase_2_5_enabled`) must be wired through every authority-resolution path. | Phase 2.5 PR 2.5.2 owns this. |
+| F.5.2 | One-time seed migration for the founder's clinic `allowed_operational_roles`. | Phase 2.5 PR 2.5.5; mapping provided by clinic admin pre-deploy. |
+| F.5.3 | `vt_clinics.policy` seeded with V1 founder policy. | Phase 2.5 PR 2.5.5. |
+| F.5.4 | Backup of `vt_users` and `vt_clinics` before seed migrations. | Standard ops; checklist in the Phase 2.5 implementation prompt. |
+
+### F.6 Safety-critical unresolved decisions
+
+| PDN | Decision | Owner | Required before |
+|---|---|---|---|
+| PDN-O1 | Authority cache TTL (proposed 60s) | Product | Phase 2.5 PR 2.5.2 |
+| PDN-O3 | Emergency dispense post-reconnect attestation | Product + clinical | Phase 4 (deferrable; document V1 default explicitly) |
+| PDN-O4 | Code Blue replay-rejection handling | Product + clinical | Phase 4 (deferrable; document V1 default explicitly) |
+| PDN-V2 | `allowedOperationalRoles` default for unconfigured Vets | Product | Phase 2.5 PR 2.5.1 (migration schema choice) |
+| PDN-V10 | ER Mode dead-lock escape (Decision 5: Admin disable) | Locked in `phase-2.5-decision-brief.md` Decision 5 | Phase 4 PR 4.1 |
+| PDN-V11 | Code Blue manager auto-assignment when no Senior Vet | Product + clinical | Phase 4 PR 4.6 |
+
+PDNs not listed above are deferrable to Phase 4 or Phase 5 per the existing review.
+
+### F.7 Phase-plan changes required
+
+**None.** The five-phase + Phase 2.5 sequence holds. The two new docs (`ownership-lifecycle.md`, `offline-operational-architecture.md`) are **read-only architectural references**; they do not introduce new phases.
+
+The Phase 2.5 decision brief's five-PR sequence (2.5.1 → 2.5.5) remains correct. The offline behaviour and ownership semantics defined here are absorbed by existing Phase 2.5 / Phase 3 / Phase 4 PR scopes; no PR scope expands.
+
+### F.8 PR-sequencing changes required
+
+**None.** The Phase 2.5 PR scopes already include:
+
+- 2.5.2 — resolver + decision helpers (now also documents offline cache TTL handling).
+- 2.5.3 — check-in / check-out endpoints (now also documents check-in as offline-prohibited).
+- 2.5.4 — FE check-in flow (now also implements the per-action offline-disabled tooltip pattern from `offline-operational-architecture.md §11`).
+
+No new PRs. No re-sequencing.
+
+### F.9 Freeze recommendation
+
+**Architecture is recommended for freeze**, subject to product sign-off on the four small items below.
+
+**Pre-freeze sign-off checklist (small, product-side):**
+
+- [ ] **PDN-O1** — authority cache TTL (recommend 60 seconds).
+- [ ] **PDN-V2** — `allowedOperationalRoles` default (recommend `['er_icu_vet']` for new Vet users + per-user seed for existing).
+- [ ] Confirm F.1.3 (Code Blue manager cannot cleanly end their shift until Phase 4 PR 4.6 ships) is acceptable interim state.
+- [ ] Confirm F.2.4 / F.2.5 V1 defaults (no emergency-dispense attestation; never silent-drop Code Blue log entries) are acceptable.
+
+**Once the above four items are signed off, implementation may begin.** No further architecture work is required to start Phase 1.
+
+The remaining open PDNs (V5, V6, V7, V8, V9, V11, V12, V13, V14, V15, V16, V17, L1–L5, O3, O4, O5, O6) are **deferrable** — they have documented V1 defaults or are out of scope until Phase 4 or Phase 5. Implementation can start in parallel with their resolution.
+
+**Architecture freeze status: READY (pending 4-item product sign-off).**

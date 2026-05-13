@@ -40,6 +40,13 @@ If `shiftRole` is `null` (no active shift), `effectiveClinicalRole` is `null` an
    - **Students**: authority is via manual VetTrack configuration (PDN-A7). The activation mechanism for Students is undefined today.
 
    Without an active check-in confirming presence, **no user has clinical authority**, regardless of `clinicalRole`, schedule, or stored configuration. This is symmetric across all clinical roles.
+
+7. **Offline-tolerant, backend-authoritative.** V1 is **online-first, offline-tolerant**. The system continues operating during degraded connectivity, but **the backend is the authoritative source of truth on reconcile**. Specifics:
+   - The FE MAY cache authority for ≤60 seconds (PDN-O1) to govern button enable/disable; the server NEVER trusts cached authority.
+   - Safety-critical actions (ER Mode toggle, Code Blue end, medication-task create, check-in, non-emergency dispense) **fail closed** when authority cannot be live-validated.
+   - Safe actions (task complete, Code Blue log entry, equipment scan, restock scan, handoff create/ack) **may queue** for replay on reconnect via idempotency keys.
+   - On reconnect, the server re-validates each queued mutation against current authority and applies idempotency. Stale-authority queued mutations are **rejected with a structured reason**, never silently dropped.
+   - See `docs/offline-operational-architecture.md` for the per-workflow behaviour and `docs/ownership-lifecycle.md` for ownership semantics during disconnects.
 5. **Roles are always read from the database**, never from JWT claims.
 
 ---

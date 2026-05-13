@@ -32,6 +32,17 @@ Direct implications for the workflows in this document:
 
 A future phase MAY layer clock-in / attendance confirmation on top of check-in (the model in `AM §3.2.2` and §4.7 is a hook, not a guarantee). For the current scope, **schedule + check-in IS the authority source**. Risks created by this choice are catalogued in `docs/architecture-review.md`.
 
+### Offline behaviour summary for this document
+
+Per `docs/offline-operational-architecture.md §3`:
+
+- **ER Mode toggle (enable AND disable)** — **fail closed** when offline. Global flag; live authority is required for both Senior Vet and Admin escape-hatch paths.
+- **Code Blue trigger / log entries / presence** — offline-permitted; queued with idempotency keys.
+- **Code Blue manager assign / reassign / end** — **fail closed** when offline. Live Vet authority is strict.
+- **ER intake create / handoff / ack** — offline-permitted (queued) only if the user's authority was cached fresh; reconcile re-validates active-shift status.
+
+For ownership behaviour during disconnects (manager check-out blocking, ER intake transfer, handoff acknowledgement), see `docs/ownership-lifecycle.md §3`.
+
 ---
 
 ## 1. ER Mode
