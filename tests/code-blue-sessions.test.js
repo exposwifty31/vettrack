@@ -100,13 +100,44 @@ describe("Code Blue sessions — idempotency", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Equipment checkout
+// Equipment checkout — auto-mutation removed (PR 1.6)
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("Code Blue sessions — equipment checkout on log", () => {
-  it("equipment log entry updates equipment checkout state", () => {
-    // When category='equipment', the route updates the equipment record
-    expect(routes).toContain("checkedOutById");
+describe("Code Blue sessions — no auto-checkout on equipment log", () => {
+  it("equipment log entry does NOT update equipment checkout state", () => {
+    // PR 1.6: auto-checkout removed; equipment table must not be mutated via Code Blue log
+    const logBlock = routes.slice(routes.indexOf('router.post("/sessions/:id/logs"'));
+    const nextRoute = logBlock.indexOf("router.", 10);
+    const logHandler = nextRoute === -1 ? logBlock : logBlock.slice(0, nextRoute);
+    expect(logHandler).not.toContain("checkedOutById");
+    expect(logHandler).not.toContain(".update(equipment");
+  });
+
+  it("session end route does not perform equipment mutations", () => {
+    const endBlock = routes.slice(routes.indexOf('router.patch("/sessions/:id/end"'));
+    const nextRoute = endBlock.indexOf("router.", 10);
+    const endHandler = nextRoute === -1 ? endBlock : endBlock.slice(0, nextRoute);
+    expect(endHandler).not.toContain("checkedOutById");
+  });
+
+  it("session end route still closes the session", () => {
+    const endBlock = routes.slice(routes.indexOf('router.patch("/sessions/:id/end"'));
+    expect(endBlock).toContain('status: "ended"');
+    expect(endBlock).toContain("endedAt");
+  });
+
+  it("log entry history still persists via codeBlueLogEntries insert", () => {
+    const logBlock = routes.slice(routes.indexOf('router.post("/sessions/:id/logs"'));
+    const nextRoute = logBlock.indexOf("router.", 10);
+    const logHandler = nextRoute === -1 ? logBlock : logBlock.slice(0, nextRoute);
+    expect(logHandler).toContain("codeBlueLogEntries");
+    expect(logHandler).toContain("insert");
+  });
+
+  it("equipment import is no longer present in code-blue route", () => {
+    // Ensures the unused import was cleaned up
+    const importBlock = routes.slice(0, routes.indexOf("const router"));
+    expect(importBlock).not.toMatch(/\bequipment\b/);
   });
 });
 

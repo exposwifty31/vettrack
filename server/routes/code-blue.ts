@@ -10,7 +10,6 @@ import {
   codeBlueLogEntries,
   codeBluePresence,
   crashCartChecks,
-  equipment,
   animals,
   hospitalizations,
   users,
@@ -405,19 +404,6 @@ router.post("/sessions/:id/logs", requireAuth, validateUuid("id"), validateBody(
       loggedByUserId: req.authUser!.id,
       loggedByName: req.authUser!.name,
     });
-
-    // If equipment log: mark equipment as checked out to this patient
-    if (body.category === "equipment" && body.equipmentId && session.patientId) {
-      await db
-        .update(equipment)
-        .set({
-          checkedOutById: req.authUser!.id,
-          checkedOutByEmail: req.authUser!.email ?? "",
-          checkedOutAt: new Date(),
-          checkedOutLocation: `Code Blue — patient ${session.patientId}`,
-        })
-        .where(and(eq(equipment.id, body.equipmentId), eq(equipment.clinicId, clinicId)));
-    }
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
