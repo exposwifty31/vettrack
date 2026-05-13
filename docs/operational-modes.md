@@ -40,10 +40,13 @@ The state lives in the server config (`vt_server_config`) and is queryable via `
 
 ### 1.2 Toggle authority (target)
 
-- **Only an active-shift Vet** may toggle ER Mode.
+- **Only an active-shift Senior Vet** may enable or disable ER Mode. (Refined from earlier "active-shift Vet".)
+- "Active-shift Senior Vet" means a user with `clinicalRole = Vet` who has an active manual check-in (see `authority-model.md §4`) carrying `operationalRole = senior_vet`. The user must also have `senior_vet` in their `allowedOperationalRoles` to have been allowed to check in as Senior Vet in the first place.
 - Phase 1 does not introduce this gate; the toggle endpoint currently uses `canManageErModeForUser` which references a product-owner allowlist (not the shift-aware model).
-- Phase 2B PR 2B.6 introduces the active-shift Vet gate at the endpoint.
-- Phase 4 PR 4.1 finalises the gate, audit detail, and SSE broadcast.
+- Phase 2B PR 2B.6 introduces the active-shift Vet gate at the endpoint *(coarse — Vet only, not yet Senior Vet specifically; depends on Phase 2.5 to land first if Senior-Vet specificity is required at this point)*.
+- Phase 4 PR 4.1 finalises the gate as **active-shift Senior Vet only**, audit detail, and SSE broadcast. Requires the new Phase 2.5 (Vet check-in subsystem) to exist.
+
+**Dead-lock policy** when ER Mode is `enforced` and no Senior Vet is currently checked in: **PDN-V10**. Until resolved, the system relies on operational discipline (always have a Senior Vet checked in before enabling ER Mode). Phase 4 PR 4.1 should ship with a documented escape-hatch decision.
 
 ### 1.3 Backend enforcement (target)
 
@@ -136,13 +139,23 @@ Confirmed Product Logic states Code Blue must be associated with an existing pat
 
 ### 2.4 Event manager
 
-- Event manager must be an **active-shift Vet**.
-- A Code Blue **may start without a manager** if none is selected (or none is available).
+- Event manager must be an **active-shift Vet** (any operational role per `authority-model.md §4.2`).
+- **Senior Vet is preferred** but not strictly required. When a Senior Vet is checked in, the FE picker SHOULD surface them first; when none are checked in, any other active-shift operational Vet role (ER/ICU, Hospitalization, Receiving) may be assigned manager.
+- **On-call Vet alone is NOT sufficient** to be a manager. An on-call Vet must explicitly check in (transitioning to a non-on-call operational role) before they can be manager. See `authority-model.md §4.2` and **PDN-V5**.
+- A Code Blue **may start without a manager** if none is selected (or none is currently checked in).
 - If no manager is assigned, the UI **must show a persistent warning/banner**.
 - **Only the event manager may end the Code Blue.**
 - **End is blocked when no Vet manager exists.**
+- **Early closure** (before 15 minutes) requires the assigned Vet manager **plus** structured `earlyStopReason`. Any operational role qualifies — Senior Vet is **not** strictly required for early closure, contrary to a possible simpler-reading of the product brief. The early-closure path must NOT be a hard block on clinically necessary early termination.
 
-The manager picker UI consumes a server endpoint. Today `GET /api/users/managers` exists (users.ts line 923) and returns users; Phase 4 PR 4.6 normalises it to filter by active-shift Vet only (new name `GET /api/users/active-shift-vets`, with the legacy path optionally retained for compatibility).
+The manager picker UI consumes a server endpoint. Today `GET /api/users/managers` exists (users.ts line 923) and returns users; Phase 4 PR 4.6 normalises it to:
+
+- filter to active-shift Vets only (requires Phase 2.5 check-in subsystem);
+- annotate Senior Vets distinctly so the FE can surface them first;
+- proposed new name `GET /api/users/active-shift-vets`, with the legacy path optionally retained for compatibility.
+
+**Code Blue manager auto-assignment when no Senior Vet is checked in** — **PDN-V11**.
+**Senior Vet authority for in-flight Code Blues started before their check-in** — **PDN-V12**.
 
 > Note: The Phase 0–original audit reported that `/api/users/managers` was missing (404). It is in fact registered. Phase 4 work is **renaming + filtering**, not creation.
 
@@ -150,10 +163,24 @@ The manager picker UI consumes a server endpoint. Today `GET /api/users/managers
 
 - Server-side gate enforces `endedAt - startedAt >= 15 minutes` for ordinary closure.
 - Early closure remains possible if **and only if** all of the following hold:
-  - Caller is the assigned Vet event manager.
+  - Caller is the **assigned Vet event manager** (any operational role per `authority-model.md §4.2`).
   - Caller supplies a structured `earlyStopReason` payload.
+- Senior Vet is **not** strictly required for early closure — the assigned manager's operational role does not gate the early-closure path.
 - The early-closure path **must not be a hard block on clinically necessary early termination**. The product intent is to slow accidental early ends, not to prevent legitimate ones.
-- Phase 1 PR 1.5 introduces the server-side gate at the schema-validation layer, leveraging the existing `manager-only` end check already in `code-blue.ts:512`. Active-shift verification of the Vet manager is **Phase 4** work.
+- Phase 1 PR 1.5 introduces the server-side gate at the schema-validation layer, leveraging the existing `manager-only` end check already in `code-blue.ts:512`. The Phase 1 gate uses the existing `clinicalRole = vet` data only. **Active-shift verification of the Vet manager (Senior Vet preferred annotation, operational-role enforcement) is Phase 4 work and depends on Phase 2.5.**
+
+### 2.5.1 On-call Vet (`רופא כונן`) — escalation contact behaviour
+
+On-call Vet is the only operational role in `authority-model.md §4.2` that does **not** confer active clinical authority on its own. Specifically:
+
+- An on-call Vet **does not have authority** to enable/disable ER Mode, create medication tasks, create ER intake, be a Code Blue manager, or end a Code Blue, based on the on-call status alone.
+- An on-call Vet **does receive** escalation notifications (Code Blue start, escalated task, unresolved escalation per `task-product-model.md §5`).
+- To act with full clinical authority, the on-call Vet must transition to one of the four other operational roles (Senior / ER-ICU / Hospitalization / Receiving) via an explicit **check-in**, or be **explicitly assigned** per a workflow rule that is not yet defined.
+- Whether the on-call → checked-in transition is initiated by:
+  - the on-call Vet themselves (self-promote on response to an alert), or
+  - the system (auto-promote on accept-of-escalation), or
+  - a Senior Vet / Admin (manually assigned)
+  is **PDN-V5**. Phase 4 cannot ship the Code Blue manager-picker logic for on-call Vets without this resolved.
 
 ### 2.6 Notifications
 
@@ -228,14 +255,31 @@ Confirmed Product Logic states "Pending Patient becomes Active Patient after ass
 
 ### 4.2 Active-shift PDNs that block operational workflows
 
-These are owned by `docs/authority-model.md §7.2` but materially affect this document's flows. Listed here for cross-reference:
+These are owned by `docs/authority-model.md §8.2` (Active-Shift / EZShift series, applies to Techs) and `§8.3` (Vet operational-role series, applies to Vets); they materially affect this document's flows.
 
-- **PDN-A1** EZShift identity-matching strategy. Affects who is considered the assigned Vet manager, who receives Code Blue start notifications, who can toggle ER Mode.
-- **PDN-A2** Unrecognised EZShift label default behaviour. Affects whether a Vet with mistyped EZShift labels can act as Code Blue manager or toggle ER Mode.
-- **PDN-A3** Staleness handling. A stale schedule may show an off-shift Vet as active or hide an on-shift Vet.
-- **PDN-A4** Timezone + grace period. Affects boundary cases for Code Blue manager assignment and ER Mode toggle right at shift edges.
+**EZShift series (PDN-A) — applies to Tech / Senior Tech presence in workflows:**
 
-Until these resolve, the workflows in this document inherit the same ambiguity. Phase 4 PRs 4.1, 4.2, 4.6, and 4.7 all depend at least partially on the resolution.
+- **PDN-A1** EZShift identity-matching strategy. Affects which Tech / Senior Tech is treated as on-shift for Code Blue notifications and patient-handoff destinations.
+- **PDN-A2** Unrecognised EZShift label default behaviour.
+- **PDN-A3** Staleness handling.
+- **PDN-A4** Timezone + grace period.
+
+**Vet operational-role series (PDN-V) — applies to all Vet flows here:**
+
+- **PDN-V1** Vet check-in subsystem design (storage, endpoints, FE flow). Phase 2.5 cannot ship until resolved.
+- **PDN-V2** Default `allowedOperationalRoles` for users with no explicit configuration.
+- **PDN-V3** Storage shape for `allowedOperationalRoles`.
+- **PDN-V4** Audit policy for check-in / check-out and operational-role selection.
+- **PDN-V5** On-call Vet → full-authority transition mechanism (blocks Phase 4 PR 4.6 manager-picker handling for on-call Vets).
+- **PDN-V6** Senior Vet operational override of "❌ default" capabilities.
+- **PDN-V7** Multi-clinic Vet check-in.
+- **PDN-V8** Vet check-out with in-flight responsibilities (active Code Blue manager, in-progress tasks).
+- **PDN-V9** Mid-shift operational-role change.
+- **PDN-V10** ER Mode dead-lock: when ER Mode is `enforced` and no Senior Vet is checked in, who can disable it? Phase 4 PR 4.1 escape-hatch.
+- **PDN-V11** Code Blue manager auto-assignment policy when no Senior Vet is checked in.
+- **PDN-V12** Senior Vet authority over Code Blue sessions started before their check-in.
+
+Until these resolve, the workflows in this document inherit ambiguity. **Phase 4 PRs 4.1, 4.2, 4.6, 4.7, and 4.10 all depend at least partially on PDN-V resolution and on Phase 2.5 infrastructure existing.**
 
 ---
 

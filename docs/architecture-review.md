@@ -1,8 +1,14 @@
 # VetTrack Phase 0 — Architecture Review
 
-**Status:** Read-only analysis. No code, migrations, or document changes.
+**Status:** Read-only analysis. No code, migrations, or runtime changes.
 **Source documents reviewed:** `docs/authority-model.md`, `docs/task-product-model.md`, `docs/operational-modes.md`, `docs/endpoint-authority-matrix.md`.
 **Purpose:** Surface contradictions, ambiguities, hidden coupling, concurrency risks, workflow dead-ends, and rollout exposure **before Phase 1 implementation begins**.
+
+**This document has been updated to reflect:**
+1. The clarified Vet operational-role model (`AM §4` — manual check-in, V1 operational roles, `allowedOperationalRoles`).
+2. The confirmed EZShift mapping for Techs / Senior Techs (`AM §3.5`).
+3. The narrowed ER Mode toggle authority (active-shift Senior Vet only).
+4. The need for a **new Phase 2.5 — Vet Check-in & Operational-Role Infrastructure** between Phase 2A and Phase 4 (§3.11 of this review).
 
 References use the shorthand:
 - `AM` = `authority-model.md`
@@ -72,7 +78,31 @@ Therefore PR 1.5 has a *latent* dependency on the column-strategy decision. Ship
 - The response shape (field names, additional metadata) changes.
 - FE callers that currently rely on `/managers` are migrated in the same PR.
 
-Code Blue start flow depends on this endpoint; a wrong sequence is a clinical-flow regression.
+Code Blue start flow depends on this endpoint; a wrong sequence is a clinical-flow regression. **The picker must also annotate Senior Vets distinctly so the FE can surface them first per `OM §2.4`** — this requires Phase 2.5 (Vet check-in subsystem) to exist.
+
+### 1.8 NEW BLOCKER — Plan v2 has no phase for Vet check-in / operational-role infrastructure
+
+The Vet operational-role model (`AM §4`) requires:
+
+- a Vet check-in subsystem (storage, endpoints, FE flow);
+- an `allowedOperationalRoles` configuration per user;
+- a resolver extension that combines EZShift-derived `shiftRole` (Techs) and check-in-derived `operationalRole` (Vets) into a single authority decision;
+- audit of check-in / check-out events.
+
+**None of this is in Plan v2.** Phases 2A–2C migrate authority gates without it; Phase 3A enforces task creation without it; Phase 4 hardens ER/Code Blue with explicit operational-role dependencies. Every Phase 4 PR that mentions "active-shift Senior Vet" or "active-shift Receiving Vet" depends on a subsystem that does not exist in any current phase.
+
+**Recommendation:** insert a new **Phase 2.5 — Vet Check-in & Operational-Role Infrastructure** between Phase 2A (authority-model introduction) and Phase 4 (ER/Code Blue hardening). Phase 2.5 owns:
+
+- new schema for Vet check-in sessions (PDN-V1, PDN-V3);
+- new endpoints `POST /api/vet-shifts/check-in`, `POST /api/vet-shifts/check-out`, `GET /api/vet-shifts/me`;
+- `allowedOperationalRoles` configuration surface (admin UI is Phase 5);
+- resolver extension to consult check-in for `clinicalRole = Vet` users;
+- FE check-in flow on session start;
+- audit on every check-in / check-out (PDN-V4).
+
+Phase 2.5 must land **before** Phase 4. Phase 3A's clinical-typed task creation matrix (`TPM §2.2`) also depends on Phase 2.5; Phase 3A may need to ship in two parts — generic non-medication first (no Phase 2.5 dependency) and clinical-typed (after Phase 2.5).
+
+**Operational impact.** Without Phase 2.5, Phase 4 either ships with coarser `clin(vet)` gates (no Senior Vet specificity, no Receiving-Vet vs ER-ICU-Vet distinction) or does not ship at all. Coarser gates are recoverable but produce a *visible authority regression* relative to product intent and require a follow-up PR to tighten. **Migration impact:** adding Phase 2.5 is additive (new tables, new endpoints, no breaking change to existing flows); rollback is removing the registration. **Safety impact:** ER Mode toggle authority is the most safety-relevant gate; without Phase 2.5 it is enforced at the `clin(vet)` granularity in Phase 2B.6, which is coarser than product intent.
 
 ---
 
@@ -150,7 +180,39 @@ Today a Vet checking the app from home can approve medication tasks, end Code Bl
 
 ### 2.11 Cross-clinic users with overlapping shifts
 
-A user with active shifts in two clinics simultaneously. `req.clinicId` scopes the resolver. The model handles this per-request, but the doc does not enumerate the case and there is no test plan for it in Phase 2A.
+A user with active shifts in two clinics simultaneously. `req.clinicId` scopes the resolver. The model handles this per-request, but the doc does not enumerate the case and there is no test plan for it in Phase 2A. For Vets specifically, **multi-clinic check-in (PDN-V7)** adds another dimension: a Vet might be checked in at clinic A and need authority for an action at clinic B.
+
+### 2.12 Vet operational-role coverage gaps
+
+`AM §4.3` enumerates V1 operational-role capabilities, but several rows resolve to "❌ default" or "if assigned per workflow", and the override mechanism is **PDN-V6**. Concretely:
+
+- A Hospitalization Vet asked to start an ER intake mid-shift cannot do so under default rules. Either the patient is re-routed to a Receiving Vet, or a Senior Vet authorises an ad-hoc role override. The override mechanism is undefined.
+- An ER/ICU Vet wanting to write a hospitalization clinical task during transfer is in the same position.
+- A Receiving Vet who is the only Vet checked in when a Code Blue starts may be assigned manager (per `AM §4.3`) but the doc does not say whether they can perform high-level clinical overrides typically reserved for Senior Vet.
+
+Phase 4 PRs will surface these gaps as 403s on real workflows unless PDN-V6 resolves first.
+
+### 2.13 ER Mode dead-lock
+
+ER Mode is `enforced`. The Senior Vet who toggled it checks out (or their shift ends). No other Senior Vet is currently checked in. **No one can disable ER Mode** under the strict `clin(senior_vet)` gate. This is **PDN-V10**. Without an escape-hatch (e.g., `systemRole = Admin` override, or auto-disable on absence of Senior Vet for N minutes), the system can enter a state requiring out-of-band intervention.
+
+### 2.14 Code Blue manager auto-assignment when no Senior Vet is checked in
+
+`OM §2.4` says "Senior Vet preferred; any other operational Vet role may be the manager when no Senior Vet is available." The doc does not say:
+
+- Does the system auto-assign the next-eligible Vet?
+- Does the FE just show a banner "no Senior Vet — pick any operational Vet"?
+- Does the picker order Vets by some heuristic?
+
+This is **PDN-V11**.
+
+### 2.15 Senior Vet authority over Code Blue sessions started before their check-in
+
+A Code Blue is in progress with manager = ER/ICU Vet. Senior Vet walks in and checks in. Does the Senior Vet automatically gain manager authority? Can they end the session in place of the assigned manager? `AM §4.3` says Senior Vet can do high-level clinical overrides; `OM §2.4` says only the assigned manager may end. These are not strictly contradictory but the boundary is undefined. **PDN-V12.**
+
+### 2.16 Manager Vet checks out mid-Code Blue
+
+The assigned manager checks out before the session is ended. Under strict active-shift rules, they lose authority — and the session has no Vet manager. Per `OM §2.4`, **end is blocked when no Vet manager exists**, so the session becomes un-endable until another Vet checks in and is reassigned manager. The reassignment mechanism is not defined; **PDN-V8** scopes check-out with in-flight responsibilities.
 
 ---
 
@@ -205,6 +267,25 @@ PR 1.3 wires `recoverPendingInventoryJobs()` on a 10-minute interval. The existi
 
 `PATCH /api/users/:id/secondary-role` (users.ts:356) is not on any phase's removal list. During the transition, setting secondaryRole has no effect under the new model. This is a hidden surface for admin error and confusion.
 
+### 3.11 NEW — Phase 2.5 sequencing into Plan v2
+
+The newly-required **Phase 2.5 (Vet Check-in & Operational-Role Infrastructure)** is not yet in Plan v2. The recommended sequencing is:
+
+1. Phase 0 (docs, this work) — DONE.
+2. Phase 1 (surgical fixes) — proceeds with `clin(vet)` coarse semantics.
+3. Phase 2A (authority model alongside legacy) — no operational-role awareness yet. The resolver returns `null` for Vet `activeShiftRole` because check-in infra does not exist.
+4. Phase 2B (high-risk endpoint enforcement) — uses `clin(vet)` coarse gate for ER intake (PR 2B.5) and ER Mode toggle (PR 2B.6). Senior-Vet specificity is **explicitly deferred to Phase 4 + Phase 2.5 dependency**.
+5. Phase 2C (incremental migration) — same coarse `clin(vet)` semantics for Vet endpoints. Tech / Senior-Tech endpoints use EZShift-derived shiftRole normally.
+6. **Phase 2.5 (NEW)** — Vet check-in subsystem.
+7. Phase 3A (task creation matrix) — generic non-medication first, clinical-typed (ER intake / hospitalization / ER-ICU) **after Phase 2.5**.
+8. Phase 3B / 3C (escalation) — depends on PDN-10 (per-task-type escalation matrix), which now interacts with operational-role-based per-task-type recipient lists.
+9. Phase 4 (ER / Code Blue hardening) — uses operational-role gates from §4 of AM. Senior Vet enforcement on ER Mode (PR 4.1) lands here. Manager picker (PR 4.6) annotates Senior Vets distinctly.
+10. Phase 5 (cleanup, tests, i18n, monitoring) — adds operational-role to audit-coverage tests; admin tooling for `allowedOperationalRoles`.
+
+**Critical:** Phase 4 cannot ship if Phase 2.5 has not. Plan v2's Phase 4 PR 4.1 / 4.6 / 4.7 / 4.10 must explicitly declare "blocked by Phase 2.5" in their PR descriptions.
+
+**Migration impact:** Phase 2.5 is additive (new schema, new endpoints, no removal). Rollback is removing scheduler registration and the new endpoints. Phase 2.5 has its own internal PR sequence (schema → resolver extension → endpoints → FE) but is itself self-contained and revertable.
+
 ---
 
 ## 4. Authority-model edge cases
@@ -252,6 +333,30 @@ A handler performing a clinical mutation **and** a system-admin action needs bot
 ### 4.11 Forward-dated tasks (PDN-T4)
 
 If Phase 3A allows scheduling a task for a future shift, the assignee is off-shift at task creation time but on-shift at task start time. Eligible-assignees must handle "off-shift now, on-shift at task time." Schema today has no clean way to query "user with an upcoming shift covering datetime X."
+
+### 4.12 Vet without `allowedOperationalRoles`
+
+A Vet user whose `allowedOperationalRoles` is empty cannot check in at all. Under the new model they have no clinical authority, identical to off-shift. **PDN-V2** must define whether the default is empty (fail-closed; safe but breaks existing Vets until admin tooling lands) or non-empty (e.g., `[er_icu_vet]`; permissive default; risk that all Vets gain ER/ICU authority on rollout). Phase 2.5 needs this answer.
+
+### 4.13 Operational-role change mid-shift
+
+A Vet checked in as `receiving_vet`. Mid-shift, ICU is overwhelmed and they need to act as ER/ICU Vet. Today they would have to check out (losing in-flight responsibilities — PDN-V8) and check in again. **PDN-V9** asks whether a mid-shift operational-role swap is allowed without a full cycle.
+
+### 4.14 systemRole = Admin Vet check-in
+
+A user with `systemRole = Admin` AND `clinicalRole = Vet` and `allowedOperationalRoles = [senior_vet]`. They check in as Senior Vet. They now have both system-admin (any orthogonal action) AND active-shift Senior Vet authority. Two authorities are evaluated independently per `AM §6`. Edge case: if they check out, system-admin remains; clinical authority disappears. Documented but worth surfacing in tests.
+
+### 4.15 Multiple Senior Vets simultaneously checked in
+
+Two Senior Vets are checked in. Each can independently toggle ER Mode. Race between two toggles produces "enabled, then disabled, then enabled" interleavings. Audit log makes the sequence visible but the *current state* may surprise users.
+
+### 4.16 Vet check-out while assigned Code Blue manager
+
+`OM §2.4` says "end is blocked when no Vet manager exists." If the manager checks out, the session is in a "manager-absent" state. Phase 4 must either auto-pop a banner ("reassign manager") or prevent the check-out itself. **PDN-V8.**
+
+### 4.17 Vet check-in is itself an authority-granting event — needs audit
+
+Per `AM §4.4` and `OM §4.2 PDN-V4`, every check-in / check-out is a mutation that grants / revokes clinical authority. Audit policy for this is open. Without per-session audit, "who was Senior Vet at 03:14 last night" is unanswerable.
 
 ---
 
@@ -401,12 +506,33 @@ Sessions started without a manager **before** PR 1.5 land will become un-endable
 5. **PDN-A5** — Tie-break for multiple overlapping EZShift rows for the same user.
 6. **Decide the fate of `secondaryRole`** — drop, deprecate, remap. The EZShift model does not consult secondaryRole; explicit retirement is needed.
 7. **Map `lead_technician` and `vet_tech` to canonical roles** or declare them data errors to be cleaned up before Phase 2A.
-8. **Specify FE refresh behavior on shift transitions** — poll, SSE event, focus-refresh.
+8. **Specify FE refresh behavior on shift transitions** — poll, SSE event, focus-refresh. Applies symmetrically to Vet check-in / check-out events (Phase 2.5).
 9. **Specify idempotency behavior across shift transitions** — re-evaluate authority or return cached.
 10. **Carve out read-only ward TV / Display page** from the active-shift requirement (or confirm service accounts get an "always-active virtual shift").
 11. **Specify cross-clinic user behavior** — explicit per-request scoping (already implicit in code) and an acknowledged test case.
 12. **Decide whether off-shift Admin retains any clinical-override** for operational unstuck-task flows.
 13. **PDN-A7** — Student authority under the new model: Students are not in EZShift. Without resolution, the four `equipment.ts` endpoints currently gated `requireEffectiveRole("student")` will lose their Student callers when Phase 2C migrates them.
+
+### 8.3 Required before Phase 2.5 (NEW)
+
+These do not block Phase 2A but block the new Phase 2.5 (Vet check-in subsystem). Phase 4 transitively depends on these.
+
+1. **PDN-V1** — Vet check-in subsystem design. Storage table choice (`vt_vet_shift_sessions` new, or reuse / extend `vt_shift_sessions`); endpoint contracts; FE check-in flow.
+2. **PDN-V2** — Default `allowedOperationalRoles` for users with no explicit configuration. Fail-closed (empty) is safest but breaks all existing Vets until admin tooling lands. Confirm or counter.
+3. **PDN-V3** — Storage shape for `allowedOperationalRoles` (column-on-vt_users array vs separate row-per-role table).
+4. **PDN-V4** — Audit policy for check-in / check-out / operational-role change.
+5. **PDN-V5** — On-call Vet → full-authority transition mechanism. Cannot ship Phase 4 manager-picker handling without this.
+6. **PDN-V6** — Senior Vet operational override for "❌ default" capabilities (e.g., authorising a Hospitalization Vet to act as ER/ICU Vet ad-hoc). If yes: audit how, time-bounded how.
+7. **PDN-V7** — Multi-clinic Vet check-in.
+8. **PDN-V8** — Vet check-out with in-flight responsibilities (active Code Blue manager, in-progress tasks). Force handoff, auto-close, or block check-out?
+9. **PDN-V9** — Mid-shift operational-role change without full check-out / check-in cycle.
+
+### 8.4 Required before Phase 4 (over and above 8.2 / 8.3)
+
+1. **PDN-V10** — ER Mode dead-lock policy. When ER Mode is `enforced` and no Senior Vet is checked in, who can disable? Phase 4 PR 4.1 must ship with an escape-hatch.
+2. **PDN-V11** — Code Blue manager auto-assignment when no Senior Vet checked in. Phase 4 PR 4.6 manager picker.
+3. **PDN-V12** — Senior Vet authority over Code Blue sessions started before their check-in.
+4. **PDN-CB1, CB2, CB3** — Code Blue follow-ups already in `OM §4`.
 
 ---
 
@@ -473,6 +599,20 @@ These are well-formed in the current code and the Phase 0 docs do not propose to
 | PR 1.6 Code Blue equipment | `OM §2.7` | Phase 1 PR 1.6 | §3.6 (this review) |
 | PR 1.2 deploy ordering | (none) | Phase 1 PR 1.2 | §3.5 (this review) |
 | Audit gaps on patients / restock / crash cart | `EAM` | Phase 5 (PDN-5 dependent) | §5.7–§5.11 (this review) |
+| **NEW — Vet check-in subsystem (PDN-V1)** | `AM §4.1`, `OM §0` | **Phase 2.5 (new)** | §1.8 (this review) |
+| **NEW — Vet operational roles V1 (`AM §4.2`)** | `AM §4.2` | Phase 2.5 + Phase 4 | §1.8, §2.12 (this review) |
+| **NEW — `allowedOperationalRoles` config (PDN-V2/V3)** | `AM §4.4` | Phase 2.5 | §4.12 (this review) |
+| **NEW — Vet check-in audit (PDN-V4)** | `AM §8.3` | Phase 2.5 | §4.17 (this review) |
+| **NEW — On-call → full-authority transition (PDN-V5)** | `AM §4.2`, `OM §2.5.1` | Phase 4 | §2.12, §4.13 (this review) |
+| **NEW — Senior Vet override of role defaults (PDN-V6)** | `AM §4.3` notes | Phase 4 + Phase 2.5 | §2.12 (this review) |
+| **NEW — ER Mode = Senior Vet only** | `AM §5.3`, `OM §1.2` | Phase 4 PR 4.1 (after Phase 2.5) | §1.8 (this review) |
+| **NEW — ER Mode dead-lock (PDN-V10)** | `OM §1.2`, `AM §8.3` | Phase 4 PR 4.1 | §2.13 (this review) |
+| **NEW — Code Blue auto-assign manager (PDN-V11)** | `OM §2.4`, `AM §8.3` | Phase 4 PR 4.6 | §2.14 (this review) |
+| **NEW — Senior Vet authority over in-flight Code Blue (PDN-V12)** | `OM §2.4`, `AM §8.3` | Phase 4 PR 4.6/4.7 | §2.15 (this review) |
+| **NEW — Manager Vet checkout mid-Code Blue (PDN-V8)** | `OM §2.4`, `AM §8.3` | Phase 4 PR 4.7 | §2.16, §4.16 (this review) |
+| **NEW — Mid-shift role change (PDN-V9)** | `AM §8.3` | Phase 2.5 | §4.13 (this review) |
+| **NEW — ER intake = Receiving Vet target** | `AM §5.3`, `TPM §2.2` | Phase 4 PR 4.3 (after Phase 2.5); Phase 2B.5 ships coarser `clin(vet)` first | §3.11 (this review) |
+| **NEW — Medication-task creator = any Vet operational role except on-call** | `TPM §2.2` | Phase 3A (coarse) → tightened after Phase 2.5 | §3.11 (this review) |
 
 ---
 

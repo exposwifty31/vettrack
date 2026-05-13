@@ -25,19 +25,39 @@ A **task** has the following meaningful properties for authority decisions:
 
 The following is the **target** matrix. Phase 3A enforces it on the server. Phase 0 documents it only.
 
+**Important:** for Vets, the "effective clinical role" is the operational role selected at check-in (see `authority-model.md §4`), not generic `clinicalRole = Vet`. Without an active check-in a user with `clinicalRole = Vet` is treated identically to "off-shift Vet" below.
+
+### 2.1 Non-medication, non-clinical-typed task creation
+
 | Creator (effective clinical role) | Self-task | Task for Technician | Task for Senior Tech | Task for Vet | Task for Student | Medication task |
 |---|---|---|---|---|---|---|
 | **Student** | Self-reminder only (no clinical content) | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Technician** | ✅ self | ❌ (others) | ❌ | ❌ | ❌ | ❌ |
-| **Senior Technician** | ✅ self | ✅ | (not addressed by product — **assume ❌**) | ❌ explicitly forbidden | (not addressed — **PDN**) | ❌ |
-| **Vet** | ✅ self | ✅ | (not addressed — **assume ✅** pending product confirmation) | (not addressed — **PDN**) | (not addressed — **PDN**) | ✅ |
-| **Admin without active shift** | ❌ (no clinical authority) | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Off-shift Vet / Tech / Senior Tech** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Technician** (active shift) | ✅ self | ❌ (others) | ❌ | ❌ | ❌ | ❌ |
+| **Senior Technician** (active shift) | ✅ self | ✅ | assume ❌ — **PDN-T1** | ❌ explicitly forbidden | **PDN-T3** | ❌ |
+| **Senior Vet** (checked-in) | ✅ self | ✅ | assume ✅ — **PDN-T2** | assume ✅ — **PDN-T2** | **PDN-T3** | ✅ |
+| **ER / ICU Vet** (checked-in) | ✅ self | ✅ | **PDN-T2** | **PDN-T2** | **PDN-T3** | ✅ |
+| **Hospitalization Vet** (checked-in) | ✅ self | ✅ | **PDN-T2** | **PDN-T2** | **PDN-T3** | ✅ |
+| **Receiving Vet** (checked-in) | ✅ self | ✅ | **PDN-T2** | **PDN-T2** | **PDN-T3** | ✅ when clinically needed |
+| **On-call Vet** (no check-in) | ❌ default — **PDN-V5** | ❌ | ❌ | ❌ | ❌ | ❌ default — **PDN-V5** |
+| **Admin without active shift / check-in** | ❌ (no clinical authority) | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Off-shift / not checked-in clinical user** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+### 2.2 Clinical-typed task creation (new, follows Vet operational-role split)
+
+| Task type | Authority required |
+|---|---|
+| **ER intake** | active-shift Receiving Vet (primary); Senior Vet, ER/ICU Vet also permitted. See `operational-modes.md §3`. |
+| **ER / ICU clinical task** | active-shift ER/ICU Vet (primary); Senior Vet always permitted. |
+| **Hospitalization clinical task** | active-shift Hospitalization Vet (primary); Senior Vet always permitted. |
+| **Medication task** | active-shift Vet of any operational role (Senior, ER/ICU, Hospitalization, Receiving-when-clinically-needed). On-call Vet excluded by default (PDN-V5). |
+| **Generic clinical task** (no type specified) | matrix in §2.1; any active-shift Vet operational role + active-shift Senior Tech (for Tech-recipient creation). |
 
 Notes:
-- **Medication task creation requires active-shift Vet.** This is the strictest rule in the matrix and must remain a literal `Vet` string match (no hierarchy bypass).
+
+- **Medication task creation requires active-shift Vet (any operational role).** This is the strictest rule in the matrix and must remain a literal `Vet`-on-check-in match (no hierarchy bypass, no on-call Vet without check-in).
 - **Self-task creation requires active shift** for any clinical content. A Student's "self-reminder" is the only carve-out; its scope and audit treatment are tracked under PDN-12.
-- "Not addressed by product" rows above are flagged as **Product Decision Needed** (see §8).
+- "Not addressed" / "assume" rows above are flagged as **PDN-T1..T5**; see §8.
+- **PDN-V** series (Vet operational-role mechanics) blocks Phase 3A for clinical-typed tasks because the resolver must distinguish operational roles before this matrix can be enforced.
 
 ---
 
@@ -46,12 +66,13 @@ Notes:
 To populate task-creation UIs, a single-purpose endpoint `GET /api/tasks/eligible-assignees?taskType=…` will return the set of users the **current** caller is permitted to assign **this specific** taskType to. The endpoint is not a generic UserSelector backend.
 
 Inputs:
-- caller's `(systemRole, clinicalRole, activeShiftRole)`
+- caller's `(systemRole, clinicalRole, activeShiftRole)` — where `activeShiftRole` is EZShift-derived for Techs and check-in-derived `operationalRole` for Vets per `authority-model.md §4.6`.
 - `taskType` query param
 
 Output (Phase 3A target):
-- `assignees: { id, displayName, clinicalRole, activeShiftRole }[]` — filtered to the matrix row plus active-shift requirement on the assignee.
+- `assignees: { id, displayName, clinicalRole, activeShiftRole, operationalRole? }[]` — filtered to the matrix row plus active-shift requirement on the assignee. `operationalRole` is populated for Vet assignees once Phase 2.5 infrastructure exists; until then it is omitted and Vets appear under their generic `clinicalRole = vet`.
 - Empty list when no eligible assignees exist (UI shows actionable empty state).
+- **For clinical-typed tasks** (ER intake, ER/ICU, hospitalization), the assignee list is restricted by operational role per §2.2. Until Phase 2.5 lands, the endpoint MUST return an explicit "operational-role filter unavailable" signal rather than silently widening the result; the client SHOULD surface this as "Phase 2.5 infrastructure required" rather than show all Vets.
 
 Caller authority for the endpoint:
 - Anyone with an active shift, returning at minimum themselves if they may self-task that taskType.
@@ -100,10 +121,11 @@ In parallel, `escalationState` can move `none` → `escalated` (Phase 3B). Accep
 
 ### 4.3 Medication "report issue" path (Phase 4)
 
-- Available to the executing user (active-shift Tech / Senior Tech / Vet) while the task is `in_progress`.
+- Available to the executing user (active-shift Tech / Senior Tech / Vet of any operational role) while the task is `in_progress`.
 - Transitions task to `issue_raised`. No further execution is accepted.
-- Sends a push notification to the **creating Vet** (the prescriber).
-- Audit entry includes structured `issueReason`.
+- Sends a push notification to the **creating Vet** (the prescriber), identified by `userId` regardless of operational role. If the creating Vet is currently checked out, the notification fires but the Vet cannot act until they check in (or per **PDN-V5** for on-call escalation), creating a documented stall point — see `architecture-review.md`.
+- If the creating Vet has been off-shift / checked out for longer than a threshold (TBD by product), the task SHOULD escalate to the active-shift Senior Vet (**PDN-V5**); if no Senior Vet is checked in, **PDN-V10** applies.
+- Audit entry includes structured `issueReason`, the reporting user's `userId` and operational role at report time, and the creating Vet's `userId`.
 - **No dose change by Technician.** This path is the only avenue available to the executing Technician other than acknowledge / administer.
 
 ---

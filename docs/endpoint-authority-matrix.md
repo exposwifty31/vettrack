@@ -21,21 +21,31 @@ Mount prefixes are in `server/app/routes.ts`. Paths below are relative to those 
 
 ### Active-shift semantics applied to every `clin(role+)` row
 
-Wherever the **Target gate** column says `clin(role+) on active shift`, "active shift" carries the meaning defined in `docs/authority-model.md §3`:
+Wherever the **Target gate** column says `clin(role+) on active shift`, the **source of authority differs by clinicalRole**:
 
-- Source of truth is the **imported EZShift schedule**.
-- A user is active when their EZShift-derived `vt_shifts` row covers `NOW()` AND its labels map to the required `shiftRole` via the table in `authority-model.md §3.5`.
-- This is **scheduled** authority, not **attendance-confirmed** authority.
-- Backend re-resolves on every request; FE state is advisory.
+- **Technicians / Senior Technicians** — derived from the **imported EZShift schedule** per `authority-model.md §3`. A user is active when their EZShift-derived `vt_shifts` row covers `NOW()` AND its labels map to the required `shiftRole` per `authority-model.md §3.5`.
+- **Vets** — derived from **manual check-in** per `authority-model.md §4`. A user is active when they have an open Vet check-in session with a specific `operationalRole` (Senior Vet / ER/ICU Vet / Hospitalization Vet / Receiving Vet / On-call Vet). Vets are **NOT** in EZShift.
+- **Students** — derived from manual VetTrack configuration. Students are not in EZShift and do not check in like Vets. See **PDN-A7**.
 
-The matrix below does **not** repeat "EZShift-derived" per row. Treat every `clin(role+)` target as carrying this semantic.
+Both are **scheduled / explicit-check-in** authority, not **attendance-confirmed** authority. Backend re-resolves on every request; FE state is advisory.
+
+In target-gate notation:
+
+- `clin(tech+)` / `clin(senior_tech+)` — EZShift-derived (`authority-model.md §3`).
+- `clin(vet)` — any active Vet check-in (operational role unspecified).
+- `clin(senior_vet)` / `clin(er_icu_vet)` / `clin(hospitalization_vet)` / `clin(receiving_vet)` / `clin(on_call_vet)` — specific operational role on active check-in (`authority-model.md §4`).
+- `clin(any_vet_op_role except on_call)` — any active Vet check-in **except** on-call (since on-call alone does not confer full authority).
+- `sys-admin` — `systemRole = Admin`, orthogonal to clinical authority.
 
 Endpoint-level open questions tied to active-shift (cross-reference for individual rows):
 
-- **PDN-A1** Identity matching may alter which user a given EZShift name resolves to. Affects every `clin(role+)` row in this matrix.
-- **PDN-A2** Unrecognised EZShift labels default to `shiftRole = null`, which converts a `clin(role+)` row to 403.
-- **PDN-A4** Grace period at shift boundaries: a request right at start/end may pass or fail depending on policy.
-- **PDN-A7** Students are not represented in EZShift; how a `clin(student+)` target row applies is unresolved and is flagged on the specific rows below (e.g., equipment scan).
+- **PDN-A1** EZShift identity-matching. Affects every Tech/Senior-Tech `clin(...)` row.
+- **PDN-A2** Unrecognised EZShift labels default to `shiftRole = null`.
+- **PDN-A4** Grace period at shift boundaries.
+- **PDN-A7** Students manual-assignment semantics.
+- **PDN-V1** Vet check-in subsystem must exist before any `clin(senior_vet)` / operational-role-specific row can be enforced. Until Phase 2.5 lands, all rows referencing operational Vet roles use the coarser `clin(vet)` as a placeholder; the column **Target gate** explicitly says `(after Phase 2.5)` for operational-role-specific values.
+- **PDN-V5** On-call Vet authority transition. Affects whether `clin(on_call_vet)` can ever match a `clin(any_vet_op_role except on_call)` row through assignment.
+- **PDN-V10**, **PDN-V11**, **PDN-V12** — Vet operational-role corner cases; see `authority-model.md §8.3`.
 
 ---
 
@@ -143,7 +153,7 @@ Endpoint-level open questions tied to active-shift (cross-reference for individu
 | GET | `/sessions/active` | code-blue.ts:280 | auth | auth-only | n/a | n/a | IN-target | Polled every 2s. |
 | POST | `/sessions/:id/logs` | code-blue.ts:361 | auth | auth-only (PDN-CB1 for Student log entries) | yes | n/a | IN-target | Phase 1 PR 1.6 removes auto-checkout side-effect when category=equipment. |
 | PATCH | `/sessions/:id/presence` | code-blue.ts:443 | auth | auth-only | no | n/a | IN-target | Heartbeat; no audit by design. |
-| PATCH | `/sessions/:id/end` | code-blue.ts:492 | auth + manager-only inline check | clin(vet+) on active shift AND is assigned manager AND 15-min OR earlyStopReason | yes | n/a | IN-target | Phase 1 PR 1.5: server-side 15-min gate + require Vet manager assigned. Active-shift verification Phase 4. |
+| PATCH | `/sessions/:id/end` | code-blue.ts:492 | auth + manager-only inline check | Phase 1 PR 1.5: assigned `clinicalRole = vet` manager AND (15-min OR earlyStopReason). **Phase 4 PR 4.7 (after Phase 2.5):** assigned active-check-in Vet manager (any operational role per `authority-model.md §4.2`) AND (15-min OR earlyStopReason). Senior Vet is **not strictly required** for early closure. | yes | n/a | IN-target | Phase 1 PR 1.5: server-side 15-min gate + require `vet`-typed manager. Active-shift verification + operational-role enforcement are Phase 4 work and depend on Phase 2.5. |
 | GET | `/history` | code-blue.ts:594 | admin | sys-admin | n/a | n/a | OUT-admin-carveout | Endpoint exists (audit had reported 404 — incorrect). FE wiring to be verified. |
 | GET | `/reconciliation` | code-blue.ts:620 | admin | sys-admin | n/a | n/a | OUT-admin-carveout | |
 | GET | `/sessions/:id/dispenses` | code-blue.ts:667 | admin | sys-admin | n/a | n/a | OUT-admin-carveout | |
@@ -236,7 +246,7 @@ Endpoint-level open questions tied to active-shift (cross-reference for individu
 | PATCH | `/mode` | er.ts:242 | auth | clin(vet+) on active shift | yes | n/a | IN | Phase 4 PR 4.1. |
 | GET | `/board` | er.ts:288 | auth | clin(tech+ or vet+) — TBD | n/a | n/a | IN | |
 | GET | `/assignees` | er.ts:307 | auth | clin(tech+) | n/a | n/a | IN | |
-| POST | `/intake` | er.ts:326 | auth | **clin(vet+) on active shift** | yes | yes (er-audit-logger) | IN | **Phase 2B.5** — currently NO role gate. |
+| POST | `/intake` | er.ts:326 | auth | `clin(vet)` on active shift in Phase 2B.5; tighten to `clin(receiving_vet ∨ er_icu_vet ∨ senior_vet)` after Phase 2.5 | yes | yes (er-audit-logger) | IN | **Phase 2B.5** — currently NO role gate. Operational-role specificity per `task-product-model.md §2.2` and `authority-model.md §4.3`. |
 | PATCH | `/intake/:id/assign` | er.ts:360 | auth+requireAssignableRole | clin(per assign matrix) on active shift | yes | yes | IN | |
 | PATCH | `/intake/:id/accept` | er.ts:399 | auth | clin(vet+) — verify | yes | yes | IN | |
 | POST | `/admission-state` | er.ts:490 | auth+role(vet) | clin(vet+) on active shift | yes | yes | IN | |
@@ -256,7 +266,7 @@ Endpoint-level open questions tied to active-shift (cross-reference for individu
 
 | Method | Path | File:line | Current gate | Target gate | Audit (route) | Audit (service) | ER allowlist | Notes |
 |---|---|---|---|---|---|---|---|---|
-| POST | `/toggle-global-mode` | er-admin.ts:31 | auth + `canManageErModeForUser` check inside | clin(vet+) on active shift + audit | no | yes (`applyGlobalErModeToggle`) | IN | **Phase 2B.6** + **Phase 4 PR 4.1**. |
+| POST | `/toggle-global-mode` | er-admin.ts:31 | auth + `canManageErModeForUser` check inside | Phase 2B.6: `clin(vet)` on active shift. **Phase 4 PR 4.1 (after Phase 2.5): `clin(senior_vet)` only.** Audit on every toggle. | no | yes (`applyGlobalErModeToggle`) | IN | **Phase 2B.6** + **Phase 4 PR 4.1**. Dead-lock policy when no Senior Vet checked-in is **PDN-V10**. |
 | GET | `/toggle-global-mode` | er-admin.ts:76 | auth | clin(vet+) — verify need | n/a | n/a | IN | Probe / read of toggle status. |
 
 ---
@@ -354,7 +364,7 @@ All routes require `requireAdmin` (system-admin only).
 
 | Method | Path | File:line | Current gate | Target gate | Audit (route) | Audit (service) | ER allowlist | Notes |
 |---|---|---|---|---|---|---|---|---|
-| POST | `/` | medication-tasks.ts:180 | auth+role(technician)+ensureUserClinicMembership + idempotency | **clin(vet+) on active shift** (medication-create is Vet-only) | no | yes (medication-tasks.service.ts) | IN-target | Current gate is too permissive — Phase 3A locks down to Vet only. |
+| POST | `/` | medication-tasks.ts:180 | auth+role(technician)+ensureUserClinicMembership + idempotency | Phase 3A: `clin(vet)` on active shift (any active Vet check-in). **After Phase 2.5:** `clin(any_vet_op_role except on_call_vet)` per `task-product-model.md §2.2`. On-call Vet without check-in is excluded (**PDN-V5**). | no | yes (medication-tasks.service.ts) | IN-target | Current gate is too permissive — Phase 3A locks down. Operational-role specificity depends on Phase 2.5. |
 | POST | `/:id/take` | medication-tasks.ts:227 | (same router.use) + idempotency | clin(tech+) on active shift | no | yes | IN-target | |
 | POST | `/:id/complete` | medication-tasks.ts:244 | (same router.use) + idempotency | clin(tech+ or vet+) on active shift; Student forbidden | no | yes | IN-target | |
 | POST | `/:id/cancel` | medication-tasks.ts:276 | (same router.use) | clin(vet+) on active shift — verify | no | yes | IN-target | |
@@ -615,7 +625,7 @@ All routes require `requireAdmin` (system-admin only).
 | POST | `/sync` | users.ts:725 | auth+authSensitiveLimiter | auth-only | no | n/a | IN | Clerk sync. |
 | GET | `/purge-candidates` | users.ts:871 | admin+authSensitiveLimiter | sys-admin | n/a | n/a | OUT-admin-carveout | |
 | POST | `/purge-deleted` | users.ts:896 | admin+authSensitiveLimiter | sys-admin | yes | n/a | OUT-admin-carveout | |
-| GET | `/managers` | users.ts:923 | auth | auth-only (or clin(tech+) on active shift) | n/a | n/a | IN | **Endpoint EXISTS** — original audit's 404 finding was incorrect. Plan v2 Phase 4 PR 4.6 renames/filters to `/active-shift-vets`. |
+| GET | `/managers` | users.ts:923 | auth | auth-only today. **Phase 4 PR 4.6 (after Phase 2.5):** filter to active-shift Vets (any operational role), annotate Senior Vets distinctly so FE can surface them first. Proposed new name `/active-shift-vets`; legacy path may remain for compatibility. | n/a | n/a | IN | **Endpoint EXISTS** — original audit's 404 finding was incorrect. Manager-picker behaviour without a checked-in Senior Vet is **PDN-V11**. On-call Vet inclusion depends on **PDN-V5**. |
 | POST | `/backfill-clerk` | users.ts:953 | admin+authSensitiveLimiter | sys-admin | yes | n/a | OUT-admin-carveout | |
 
 ---
