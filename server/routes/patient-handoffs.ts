@@ -111,7 +111,12 @@ router.get("/mine", requireAuth, requireEffectiveRole("technician"), async (req:
 
 router.get("/:id", requireAuth, requireEffectiveRole("technician"), async (req: Request, res: Response) => {
   try {
-    const callerRole = (req as any).effectiveRole ?? req.authUser!.role;
+    // Permanent admins (base role or secondary role) must always resolve as
+    // "admin" so getHandoffDetail grants non-participant access.  effectiveRole
+    // may be a lower shift role when an admin is currently staffed as e.g.
+    // "technician", so we cannot rely on effectiveRole alone.
+    const isPermAdmin = req.authUser!.role === "admin" || req.authUser!.secondaryRole === "admin";
+    const callerRole = isPermAdmin ? "admin" : ((req as any).effectiveRole ?? req.authUser!.role);
     const result = await getHandoffDetail(
       req.authUser!.clinicId,
       req.params.id,
