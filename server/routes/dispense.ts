@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
+import { requireAuth, requireClinicalUser } from "../middleware/auth.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import {
@@ -12,6 +12,8 @@ import {
 } from "../services/dispense.service.js";
 
 const router = Router();
+
+router.use(requireAuth, requireClinicalUser);
 
 const itemSchema = z.object({
   itemId: z.string().min(1),
@@ -58,9 +60,8 @@ function sendError(res: { status: (n: number) => { json: (b: unknown) => void } 
   res.status(500).json(apiError({ code: "INTERNAL_ERROR", reason: "INTERNAL_ERROR", message: "Internal error", requestId }));
 }
 
-router.use(requireAuth, requireEffectiveRole("technician"));
-
 /** POST /api/dispense/draft — create a DRAFT (structure validation only, no stock mutation) */
+// TODO(Phase 2B): replace with requireClinicalAuthority(...)
 router.post("/draft", validateBody(draftSchema), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   const body = req.body as z.infer<typeof draftSchema>;
@@ -85,6 +86,7 @@ router.post("/draft", validateBody(draftSchema), async (req, res) => {
 });
 
 /** POST /api/dispense/:id/confirm — confirm a DRAFT; billing in TX; async inventory deduction after commit */
+// TODO(Phase 2B): replace with requireClinicalAuthority(...)
 router.post("/:id/confirm", validateUuid("id"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
@@ -93,6 +95,9 @@ router.post("/:id/confirm", validateUuid("id"), async (req, res) => {
       dispenseEventId: req.params.id,
       confirmedBy: req.authUser!.id,
       confirmedByEmail: req.authUser!.email,
+      // Phase 1: effectiveRole is not populated; no shift-aware role middleware in chain.
+      // resolveAuditActorRole falls back to authUser.role (static DB role).
+      // TODO(Phase 2B): restore shift-aware resolution once requireClinicalAuthority sets effectiveRole.
       actorRole: resolveAuditActorRole(req),
     });
     return res.json(event);
@@ -103,6 +108,7 @@ router.post("/:id/confirm", validateUuid("id"), async (req, res) => {
 });
 
 /** POST /api/dispense/emergency — EMERGENCY_PENDING (no stock mutation, minimal validation) */
+// TODO(Phase 2B): replace with requireClinicalAuthority(...)
 router.post("/emergency", validateBody(emergencySchema), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   const body = req.body as z.infer<typeof emergencySchema>;

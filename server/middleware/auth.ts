@@ -727,6 +727,26 @@ export function requireRole(minRole: UserRole) {
   };
 }
 
+const CLINICAL_ROLES = new Set(["admin", "vet", "senior_technician", "technician"]);
+
+export function requireClinicalUser(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  const requestId = resolveRequestId(req, res);
+  if (!req.authUser) {
+    res.status(401).json(buildApiErrorBody({ code: "UNAUTHORIZED", reason: "MISSING_AUTH_USER", message: "Unauthorized", requestId }));
+    return;
+  }
+  if (!CLINICAL_ROLES.has(req.authUser.role)) {
+    recordAccessDenied({ req, source: "requireClinicalUser", statusCode: 403, reason: "INSUFFICIENT_ROLE", message: "Clinical role required" });
+    res.status(403).json({ ...buildAccessDeniedBody("INSUFFICIENT_ROLE", "Clinical role required"), requestId });
+    return;
+  }
+  next();
+}
+
 export function requireEffectiveRole(minRole: UserRole) {
   return async function (req: Request, res: Response, next: NextFunction) {
     const requestId = resolveRequestId(req, res);
