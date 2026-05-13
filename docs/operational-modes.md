@@ -6,6 +6,26 @@
 
 ---
 
+## 0. Terminology used in this document — "active shift"
+
+Throughout this document, references to **"active-shift Vet"** / **"active-shift Tech"** / **"active-shift staff"** carry the precise meaning given in `docs/authority-model.md §3`:
+
+- The source of active-shift authority is the **imported EZShift schedule**.
+- A user is active when their EZShift-derived `vt_shifts` row covers `NOW()` AND its labels map to the required VetTrack `shiftRole` per the mapping table in `authority-model.md §3.5`.
+- This is **scheduled** authority, not **attendance-confirmed** authority. The system does not yet observe clock-in, physical presence, late arrival, early departure, absence, or ad-hoc substitution.
+- Backend re-resolves authority on every request. Frontend `useAuth()` exposure of `activeShiftRole` is advisory UX only; 403s are the source of truth.
+
+Direct implications for the workflows in this document:
+
+- **ER Mode toggle authority** depends on the EZShift schedule being current and the label mapping being correct. A Vet whose EZShift row is missing, mismatched by name, or carries unrecognised labels cannot toggle ER Mode even if physically present.
+- **Code Blue manager assignment** depends on the same source. If the schedule is stale or no eligible Vet is mapped active at `NOW()`, sessions may have to start without a manager (the banner state in §2.4).
+- **Code Blue start notifications** fan out to the EZShift-derived active-shift set, not to physically-present users.
+- **ER intake creation** is gated to EZShift-derived active-shift Vets.
+
+A future phase MAY layer clock-in / attendance confirmation on top of the schedule (the model in §0 of this document is a hook, not a guarantee). For the current scope, **the schedule IS the authority source**. Risks created by this choice are catalogued in `docs/architecture-review.md`.
+
+---
+
 ## 1. ER Mode
 
 ### 1.1 Definition
@@ -194,6 +214,8 @@ Confirmed Product Logic states "Pending Patient becomes Active Patient after ass
 
 ## 4. Open product decisions
 
+### 4.1 Operational-mode-specific PDNs
+
 - **PDN-1** Code Blue ↔ patient association mechanics.
 - **PDN-2** Pending Patient vs Pending Emergency relationship.
 - **PDN-5** Sensitive-reads audit policy (does viewing Code Blue history / audit log / patient records produce audit entries?).
@@ -203,6 +225,17 @@ Confirmed Product Logic states "Pending Patient becomes Active Patient after ass
 - **PDN-CB3** Whether the Code Blue 15-minute gate applies to `outcome = "ongoing"` (i.e., the session is closed-but-continuing, not truly ended).
 - **PDN-ER1** Whether ER intake support for "handoff from receiving Vet to Technician" requires a new endpoint or extends the existing assign/handoff flow.
 - **PDN-ER2** Whether the SSE catch-up on reload is sufficient to "restore all active ER events" or whether additional state replay is needed.
+
+### 4.2 Active-shift PDNs that block operational workflows
+
+These are owned by `docs/authority-model.md §7.2` but materially affect this document's flows. Listed here for cross-reference:
+
+- **PDN-A1** EZShift identity-matching strategy. Affects who is considered the assigned Vet manager, who receives Code Blue start notifications, who can toggle ER Mode.
+- **PDN-A2** Unrecognised EZShift label default behaviour. Affects whether a Vet with mistyped EZShift labels can act as Code Blue manager or toggle ER Mode.
+- **PDN-A3** Staleness handling. A stale schedule may show an off-shift Vet as active or hide an on-shift Vet.
+- **PDN-A4** Timezone + grace period. Affects boundary cases for Code Blue manager assignment and ER Mode toggle right at shift edges.
+
+Until these resolve, the workflows in this document inherit the same ambiguity. Phase 4 PRs 4.1, 4.2, 4.6, and 4.7 all depend at least partially on the resolution.
 
 ---
 

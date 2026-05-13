@@ -11,13 +11,31 @@ This document lists **every handler** registered in `server/routes/*.ts`. The "C
 | Column | Meaning |
 |---|---|
 | Current gate | Middleware applied. `auth` = `requireAuth`. `auth+role(min)` = `requireAuth + requireEffectiveRole(min)`. `admin` = `requireAuth + requireAdmin`. `none` = no auth middleware. Validation/idempotency middleware omitted unless relevant to authority. |
-| Target gate | Phase 2A → 2C target per authority model. `clin(role+)` = active-shift clinical role at minimum. `sys-admin` = `systemRole = Admin`. `clin(role+) ∨ sys-admin` = either. `auth-only` = no clinical role required. |
+| Target gate | Phase 2A → 2C target per authority model. `clin(role+)` = active-shift clinical role at minimum (see "Active-shift semantics" below). `sys-admin` = `systemRole = Admin`. `clin(role+) ∨ sys-admin` = either. `auth-only` = no clinical role required. |
 | Audit (route) | Does the route file call `logAudit`? |
 | Audit (service) | Does an obvious downstream service call `logAudit`? Best-effort grep. |
 | ER allowlist | Disposition when ER Mode is `enforced`: `IN` (already allowlisted in `shared/er-mode-access.ts`), `IN-target` (Plan v2 says should be allowlisted; not yet), `OUT` (intentionally blocked when enforced), `OUT-admin-carveout` (admin-page; reachable for `systemRole = Admin`), `PDN-8` (decision needed). |
 | Notes | Plan v2 PR references; PDN tags; known issues. |
 
 Mount prefixes are in `server/app/routes.ts`. Paths below are relative to those prefixes.
+
+### Active-shift semantics applied to every `clin(role+)` row
+
+Wherever the **Target gate** column says `clin(role+) on active shift`, "active shift" carries the meaning defined in `docs/authority-model.md §3`:
+
+- Source of truth is the **imported EZShift schedule**.
+- A user is active when their EZShift-derived `vt_shifts` row covers `NOW()` AND its labels map to the required `shiftRole` via the table in `authority-model.md §3.5`.
+- This is **scheduled** authority, not **attendance-confirmed** authority.
+- Backend re-resolves on every request; FE state is advisory.
+
+The matrix below does **not** repeat "EZShift-derived" per row. Treat every `clin(role+)` target as carrying this semantic.
+
+Endpoint-level open questions tied to active-shift (cross-reference for individual rows):
+
+- **PDN-A1** Identity matching may alter which user a given EZShift name resolves to. Affects every `clin(role+)` row in this matrix.
+- **PDN-A2** Unrecognised EZShift labels default to `shiftRole = null`, which converts a `clin(role+)` row to 403.
+- **PDN-A4** Grace period at shift boundaries: a request right at start/end may pass or fail depending on policy.
+- **PDN-A7** Students are not represented in EZShift; how a `clin(student+)` target row applies is unresolved and is flagged on the specific rows below (e.g., equipment scan).
 
 ---
 
@@ -192,11 +210,11 @@ Mount prefixes are in `server/app/routes.ts`. Paths below are relative to those 
 | PATCH | `/:id` | equipment.ts:734 | auth+writeLimiter+role(technician) | clin(tech+) on active shift | yes | n/a | IN-target | |
 | DELETE | `/:id` | equipment.ts:868 | admin+writeLimiter | sys-admin | yes | n/a | OUT-admin-carveout | |
 | POST | `/:id/restore` | equipment.ts:920 | admin | sys-admin | yes | n/a | OUT-admin-carveout | |
-| POST | `/scan` | equipment.ts:978 | auth+role(student)+checkoutLimiter | clin(student+) on active shift (Student scope decision = PDN) | yes | n/a | IN-target | Allows Student; product confirmation needed. |
-| POST | `/:id/checkout` | equipment.ts:1146 | auth+role(student)+checkoutLimiter | clin(tech+ or student?) on active shift — PDN | yes | n/a | IN-target | |
+| POST | `/scan` | equipment.ts:978 | auth+role(student)+checkoutLimiter | clin(student+) on active shift — **PDN-A7** (Students are not in EZShift; manual VetTrack assignment required) | yes | n/a | IN-target | Today allows Student via legacy hierarchy. Under new model, off-shift Students lose scan; on-shift Students need PDN-A7 resolution. |
+| POST | `/:id/checkout` | equipment.ts:1146 | auth+role(student)+checkoutLimiter | clin(tech+) on active shift — Student scope **PDN-A7** | yes | n/a | IN-target | |
 | POST | `/:id/return` | equipment.ts:1292 | auth+role(student)+checkoutLimiter | clin(tech+) on active shift AND `checkedOutById === actor.id` OR Senior Tech override | yes | n/a | IN-target | **Phase 2B.3** — add ownership check. |
 | POST | `/:id/seen` | equipment.ts:1416 | auth+writeLimiter | auth-only (acknowledgement) | yes | n/a | IN-target | |
-| POST | `/:id/scan` | equipment.ts:1475 | auth+role(student)+scanLimiter | clin(student+) on active shift | yes | n/a | IN-target | |
+| POST | `/:id/scan` | equipment.ts:1475 | auth+role(student)+scanLimiter | clin(student+) on active shift — Student scope **PDN-A7** | yes | n/a | IN-target | |
 | POST | `/:id/revert` | equipment.ts:1636 | auth+role(vet) | clin(vet+) on active shift | yes | n/a | IN-target | |
 | GET | `/:id/logs` | equipment.ts:1728 | auth | clin(tech+) | n/a | n/a | IN-target | |
 | GET | `/:id/transfers` | equipment.ts:1767 | auth | clin(tech+) | n/a | n/a | IN-target | |
@@ -501,10 +519,10 @@ All routes require `requireAdmin` (system-admin only).
 
 | Method | Path | File:line | Current gate | Target gate | Audit (route) | Audit (service) | ER allowlist | Notes |
 |---|---|---|---|---|---|---|---|---|
-| GET | `/imports` | shifts.ts:501 | admin | sys-admin | n/a | n/a | OUT-admin-carveout | |
-| POST | `/import/preview` | shifts.ts:535 | admin | sys-admin | no | n/a | OUT-admin-carveout | |
-| POST | `/import/confirm` | shifts.ts:574 | admin | sys-admin | yes | n/a | OUT-admin-carveout | |
-| POST | `/import` | shifts.ts:687 | admin | sys-admin | yes | n/a | OUT-admin-carveout | |
+| GET | `/imports` | shifts.ts:501 | admin | sys-admin | n/a | n/a | OUT-admin-carveout | EZShift import history. |
+| POST | `/import/preview` | shifts.ts:535 | admin | sys-admin | no | n/a | OUT-admin-carveout | EZShift import preview. Per-row audit policy = **PDN-A6**. |
+| POST | `/import/confirm` | shifts.ts:574 | admin | sys-admin | yes | n/a | OUT-admin-carveout | EZShift import commit; grants/revokes active-shift authority in bulk. Per-row diff audit = **PDN-A6**. |
+| POST | `/import` | shifts.ts:687 | admin | sys-admin | yes | n/a | OUT-admin-carveout | EZShift import (single-step). Per-row diff audit = **PDN-A6**. |
 | GET | `/` | shifts.ts:814 | admin | sys-admin | n/a | n/a | OUT-admin-carveout | |
 
 ---

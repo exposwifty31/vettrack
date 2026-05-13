@@ -47,14 +47,16 @@ Legacy `requireAdmin` matches `role === "admin"` (or hierarchy ≥ 40). New `req
 
 A product answer is required before Phase 4 PR 4.7. Phase 1 PR 1.5 inherits the same ambiguity (see 1.6).
 
-### 1.5 PDN-11 (null `vt_shifts.role`) blocks the Phase 2A resolver
+### 1.5 PDN-11 — RESOLVED / SUBSUMED by the EZShift mapping layer
 
-The resolver returns `activeShiftRole = vt_shifts.role`. If `vt_shifts.role` is null on an otherwise-matching row, the resolver must choose:
+PDN-11 originally asked: if a `vt_shifts` row exists with `role = null`, does the user have any clinical authority? **This is now resolved.** Per `docs/authority-model.md §3`, `vt_shifts` rows are populated by the EZShift import; the mapping table in §3.5 deterministically translates labels to `shiftRole`. Rows whose labels cannot be mapped produce `shiftRole = null` and (proposed default) confer **no** clinical authority.
 
-- Treat as no active shift → drops clinical authority entirely for that user.
-- Fall back to `clinicalRole` → violates the override rule.
+The narrower question — what is the default for an **unrecognised** EZShift label — is the active-shift-series successor **PDN-A2**. Phase 2A unblocks the original PDN-11; only PDN-A2 remains a precondition for the resolver.
 
-Phase 2A cannot ship without this answer. `AM §6` flags it as PDN-11 but does not propose a default. **The resolver's unit-test matrix in Phase 2A is undefined without it.**
+Two corollary resolutions follow:
+
+- The "fall back to `clinicalRole`" option is explicitly **rejected** by the override rule in `AM §2`. EZShift mapping is the source; no clinical authority is inferred from `clinicalRole` alone.
+- `vt_shift_sessions` is **not** consulted for authority resolution under the current model; `vt_shifts` (EZShift-populated) is canonical.
 
 ### 1.6 Phase 1 PR 1.5 uses `clinicalRole === "vet"` data that may not exist post-split
 
@@ -76,15 +78,28 @@ Code Blue start flow depends on this endpoint; a wrong sequence is a clinical-fl
 
 ## 2. High-risk ambiguities
 
-### 2.1 What counts as "active shift" is not defined
+### 2.1 What counts as "active shift" — PARTIALLY RESOLVED
 
-`AM` references active shift without committing to:
+`docs/authority-model.md §3` (new in the latest revision) defines active-shift authority as **derived from the imported EZShift schedule** ("scheduled active authority"). This resolves the previously-open questions:
 
-- **Timezone** — are `vt_shifts.startTime` and `endTime` clinic-local or UTC? `NOW()` evaluation differs by ~hours between clinics.
-- **Grace period** — is a shift "active" 5 min before its scheduled start or 5 min after its end? Clinical staff routinely arrive early / leave late.
-- **Source of truth** — `vt_shifts` (schedule) or `vt_shift_sessions` (login-bound). Schema has both; `role-resolution.ts` uses `vt_shifts`; product behavior may diverge.
-- **Multiple overlapping shifts** — tie-break is not specified.
-- **Identity match** — `role-resolution.ts:98-136` matches shifts by `employeeName` (display name). Names are mutable, non-unique, and not authoritative; collisions and renames are silent. Phase 2A inherits this bug unless explicitly redesigned.
+- **Source of truth** — RESOLVED: `vt_shifts`, populated by the EZShift import. `vt_shift_sessions` is not consulted.
+- **`vt_shifts.role` semantics** — RESOLVED: derived deterministically from the EZShift label via the mapping table in `AM §3.5`.
+- **EZShift label → role mapping** for `בכיר`, `טכנאי בכיר`, `טכנאי קבלה`, `טכנאי חירום`, `טכנאי אשפוז`, `טכנאי אסופיים`, `תמך בוקר`, `תמך ערב`, any `תמך …`, `התלמדות`, and standalone area labels — RESOLVED in `AM §3.5`.
+- **Schedule != physical attendance** — explicitly accepted. Clock-in / late-arrival / early-departure / absence / manual override / last-minute substitution are out of scope for the current phases.
+
+**Still open (the active-shift PDN-A series):**
+
+- **PDN-A1** Identity matching between EZShift name and VetTrack user record (current display-name match is fragile).
+- **PDN-A2** Unrecognised EZShift label default behaviour.
+- **PDN-A3** Schedule freshness / staleness handling.
+- **PDN-A4** Timezone normalisation + grace-period semantics.
+- **PDN-A5** Tie-break for multiple overlapping rows.
+- **PDN-A6** Audit policy on the import operation itself.
+- **PDN-A7** How Students (manually configured in VetTrack, not in EZShift) receive an active-shift role, if at all.
+- **PDN-A8** Whether Trainees (`התלמדות`) can be granted scoped clinical authority in a future phase.
+- **PDN-A9** Department/area metadata surface in API responses.
+
+PDN-A1, PDN-A2, PDN-A4, and PDN-A5 are precondition-grade for Phase 2A's resolver. PDN-A7 is precondition-grade for any endpoint that currently allows `requireEffectiveRole("student")` (equipment scan / checkout / return / per-equipment scan — see endpoint matrix).
 
 ### 2.2 FE freshness of `activeShiftRole`
 
@@ -298,13 +313,13 @@ All five handoff mutations in `patient-handoffs.ts` show `Audit (route) = no`. T
 
 Undocumented middleware. Phase 2C will need to migrate it without a clear target. (Already in §2.10.)
 
-### 6.2 `vt_shift_sessions` vs `vt_shifts`
+### 6.2 `vt_shift_sessions` vs `vt_shifts` — RESOLVED
 
-Schema has both. Which is the source of truth for "active shift"? Plan v2 implies `vt_shifts`. If production behavior leans on `vt_shift_sessions`, the resolver semantics will need to flip.
+`vt_shifts` is the source of truth for active-shift authority; `vt_shift_sessions` is not consulted by the resolver. Confirmed in `AM §3`. No remaining debt here.
 
-### 6.3 `role-resolution.ts` shift match by display name
+### 6.3 EZShift identity matching (was: "shift match by display name")
 
-Display names are mutable and non-unique. Today's match is fragile. Phase 2A inherits this unless explicitly redesigned. (Already in §2.1.)
+`role-resolution.ts` matches EZShift staff names against VetTrack user display names. Display names are mutable, non-unique, and prone to transliteration drift. The same physical staff member may be named differently in the EZShift export and the VetTrack user record. The match is silently fragile. Tracked as **PDN-A1**; needs resolution before Phase 2A's resolver hardens around it.
 
 ### 6.4 Legacy aliases `lead_technician`, `vet_tech`
 
@@ -370,21 +385,28 @@ Sessions started without a manager **before** PR 1.5 land will become un-endable
 
 ## 8. Recommended clarifications before Phase 2A
 
-1. **Resolve PDN-11** (null `vt_shifts.role`) — pick a default.
-2. **Resolve the `vt_users.role` column shape** (see §1.1, §1.2, §1.3). Commit to a migration plan or to keeping the column overloaded during Phase 2A and resolving in Phase 5.
-3. **Define "active shift" formally:**
-   - timezone of `vt_shifts.startTime/endTime`;
-   - grace period;
-   - source of truth (`vt_shifts` vs `vt_shift_sessions`);
-   - tie-break for multiple overlapping shifts;
-   - identity matching beyond `employeeName` if feasible.
-4. **Decide the fate of `secondaryRole`** — drop, deprecate, remap.
-5. **Map `lead_technician` and `vet_tech` to canonical roles** or declare them data errors to be cleaned up.
-6. **Specify FE refresh behavior on shift transitions** — poll, SSE event, or focus-refresh.
-7. **Specify idempotency behavior across shift transitions** — re-evaluate authority or return cached.
-8. **Carve out read-only ward TV / Display page** from the active-shift requirement (or confirm service accounts get an "always-active virtual shift").
-9. **Specify cross-clinic user behavior** — explicit per-request scoping (already implicit in code) and an acknowledged test case.
-10. **Decide whether off-shift Admin retains any clinical-override** for operational unstuck-task flows.
+### 8.1 Resolved by the EZShift mapping decision
+
+- **PDN-11** (null `vt_shifts.role`) — RESOLVED. Subsumed by `AM §3.5` and PDN-A2.
+- **Source of truth `vt_shifts` vs `vt_shift_sessions`** — RESOLVED. `vt_shifts` (EZShift-populated).
+- **EZShift label → role mapping for `בכיר`, `טכנאי …`, `תמך …`, `התלמדות`, standalone area labels** — RESOLVED in `AM §3.5`.
+- **Schedule != attendance** — explicit acceptance; clock-in / late-arrival / early-departure / absence / manual override / last-minute substitution are explicitly deferred.
+
+### 8.2 Still required before Phase 2A's resolver compiles
+
+1. **Resolve the `vt_users.role` column shape** (see §1.1, §1.2, §1.3). Commit to a migration plan or to keeping the column overloaded during Phase 2A and resolving in Phase 5.
+2. **PDN-A1** — EZShift identity-matching strategy. Display-name match is the current fragile default; commit to it explicitly, or design an employee-ID join or admin-curated mapping table before the resolver hardens.
+3. **PDN-A2** — Unrecognised EZShift label default. Proposed: `shiftRole = null` + admin alert. Confirm or counter.
+4. **PDN-A4** — Timezone normalisation of `vt_shifts.startTime/endTime` AND grace-period semantics. The current DB-session-timezone comparison may not match clinic-local time across deployments.
+5. **PDN-A5** — Tie-break for multiple overlapping EZShift rows for the same user.
+6. **Decide the fate of `secondaryRole`** — drop, deprecate, remap. The EZShift model does not consult secondaryRole; explicit retirement is needed.
+7. **Map `lead_technician` and `vet_tech` to canonical roles** or declare them data errors to be cleaned up before Phase 2A.
+8. **Specify FE refresh behavior on shift transitions** — poll, SSE event, focus-refresh.
+9. **Specify idempotency behavior across shift transitions** — re-evaluate authority or return cached.
+10. **Carve out read-only ward TV / Display page** from the active-shift requirement (or confirm service accounts get an "always-active virtual shift").
+11. **Specify cross-clinic user behavior** — explicit per-request scoping (already implicit in code) and an acknowledged test case.
+12. **Decide whether off-shift Admin retains any clinical-override** for operational unstuck-task flows.
+13. **PDN-A7** — Student authority under the new model: Students are not in EZShift. Without resolution, the four `equipment.ts` endpoints currently gated `requireEffectiveRole("student")` will lose their Student callers when Phase 2C migrates them.
 
 ---
 
@@ -427,13 +449,24 @@ These are well-formed in the current code and the Phase 0 docs do not propose to
 
 | Concern | Doc location | Plan v2 phase that lands behavior | Hard dependency |
 |---|---|---|---|
+| Concern | Doc location | Plan v2 phase | Hard dependency |
+|---|---|---|---|
 | Column strategy for `role` | `AM §1`, `EAM` summary | Phase 2A | §1.1 (this review) |
-| `requireAdmin` mapping | `AM §3.5` | Phase 2A → 2C sweep | §1.2 (this review) |
+| `requireAdmin` mapping | `AM §4.5` | Phase 2A → 2C sweep | §1.2 (this review) |
 | `secondaryRole` fate | `EAM` (legacy note) | Phase 2A or Phase 5 | §1.3 (this review) |
 | Code Blue mid-shift end | `OM §2.4`, `§2.8` | Phase 4 PR 4.7 | §1.4 (this review) |
-| PDN-11 (null shiftRole) | `AM §6` | Phase 2A | §1.5 (this review) |
-| Active shift definition | `AM §1`, implicit | Phase 2A | §2.1 (this review) |
-| FE freshness on shift transition | `AM §4` | Phase 2A | §2.2 (this review) |
+| PDN-11 (null shiftRole) | `AM §7.1` | RESOLVED — subsumed by `AM §3.5` + PDN-A2 | §1.5 (this review) |
+| Active shift definition | `AM §3` | partially resolved: EZShift; PDN-A series remain | §2.1 (this review) |
+| EZShift identity matching (PDN-A1) | `AM §3.6` | Phase 2A | §6.3 (this review) |
+| Unrecognised EZShift label default (PDN-A2) | `AM §3.5` | Phase 2A | §1.5 (this review) |
+| Schedule staleness (PDN-A3) | `AM §3.7` | Phase 2A or later | §2.1 (this review) |
+| Timezone + grace period (PDN-A4) | `AM §3.8` | Phase 2A | §2.1 (this review) |
+| Overlapping rows tie-break (PDN-A5) | `AM §3.9` | Phase 2A | §2.1 (this review) |
+| Import audit policy (PDN-A6) | `AM §3.4` | Phase 5 | §2.1 (this review) |
+| Student under new model (PDN-A7) | `AM §3.5` decomposition rules | Phase 2C (per-endpoint) | §2.1 (this review) |
+| Trainee future authority (PDN-A8) | `AM §3.5` | DEFERRED | §2.1 (this review) |
+| Department metadata surface (PDN-A9) | `AM §3.10` | Phase 3A / Phase 4 | §2.1 (this review) |
+| FE freshness on shift transition | `AM §3.3` | Phase 2A | §2.2 (this review) |
 | PDN-10 escalation matrix | `TPM §5.4` | Phase 3B/3C | §2.3 (this review) |
 | PDN-8 ER allowlist | `OM §1.4` | Phase 4 PR 4.2 | §2.4 (this review) |
 | Manager picker rename | `OM §2.4` | Phase 4 PR 4.6 | §1.7 (this review) |
