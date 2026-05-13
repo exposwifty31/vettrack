@@ -24,6 +24,7 @@ import { startAlertReminderScheduler } from "../lib/alert-reminder.js";
 import { scanUnresolvedEmergencyDispenses } from "../services/dispense.service.js";
 import { startOutboxDlqScanner } from "../lib/outbox-dlq-scanner.js";
 import { startCodeBlueReconciliationScanner } from "../lib/code-blue-reconciliation-scanner.js";
+import { recoverPendingInventoryJobs } from "../lib/inventory-job-recovery.js";
 
 export async function startBackgroundSchedulers() {
   if (process.env.NODE_ENV === "test") {
@@ -68,4 +69,24 @@ export async function startBackgroundSchedulers() {
 
   // Fix E (Code Blue): scanner for unreconciled sessions — alerts every 30 min per session.
   startCodeBlueReconciliationScanner();
+
+  // Re-enqueue stale/failed inventory deduction jobs every 10 minutes.
+  try {
+    const INVENTORY_RECOVERY_INTERVAL_MS = 10 * 60 * 1000;
+    recoverPendingInventoryJobs()
+      .then(({ enqueued, skipped }) => {
+        console.log("[inventory-job-recovery] startup recovery complete", { enqueued, skipped });
+      })
+      .catch((err) => {
+        console.error("[inventory-job-recovery] startup recovery failed", err);
+      });
+    setInterval(() => {
+      recoverPendingInventoryJobs().catch((err) => {
+        console.error("[inventory-job-recovery] interval recovery failed", err);
+      });
+    }, INVENTORY_RECOVERY_INTERVAL_MS);
+    console.log("[inventory-job-recovery] scheduler registered (interval=10m)");
+  } catch (err) {
+    console.error("[inventory-job-recovery] scheduler registration failed — recovery will not run", err);
+  }
 }
