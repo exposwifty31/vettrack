@@ -1,0 +1,73 @@
+/**
+ * Phase 2A: Shared authority types.
+ *
+ * Additive scaffolding only — no runtime enforcement in Phase 2A.
+ * The legacy authorization stack (requireEffectiveRole, requireRole,
+ * requireAdmin, ROLE_HIERARCHY, resolveCurrentRole) remains fully authoritative
+ * until Phase 2B enforcement migration.
+ *
+ * Keep this file free of server-only imports so it can be used by both
+ * frontend and backend without bundler conflicts.
+ */
+
+/** System-level role: whether a principal is a system administrator or a regular user. */
+export type SystemRole = "Admin" | "User";
+
+/**
+ * Clinical authority roles. Covers the full range of clinical identity a user
+ * may carry, including "student". Enforcement of clinical ceilings is Phase 2B.
+ */
+export type ClinicalRole =
+  | "vet"
+  | "senior_technician"
+  | "technician"
+  | "student";
+
+/**
+ * Roles that may appear as an active shift-assignable clinical authority.
+ * Intentionally excludes "admin" (system role, no clinical shift) and
+ * "student" (students are never elevated to shift authority).
+ */
+export type ActiveShiftRole =
+  | "vet"
+  | "senior_technician"
+  | "technician";
+
+/**
+ * Resolved effective clinical role after authority evaluation.
+ * Aliased to ActiveShiftRole so "student" can never appear here — the student
+ * never-elevated rule is enforced at the type level in Phase 2A.
+ */
+export type EffectiveClinicalRole = ActiveShiftRole;
+
+/**
+ * Operational role dimension.
+ * Phase 2A scaffolds this field as null only — no operational roles are
+ * implemented until Phase 2.5+.
+ */
+export type OperationalRole = null;
+
+/** How a user's authority was obtained. */
+export type AuthoritySource = "shift" | "no_active_shift";
+
+/** Categorical reason explaining how authority resolution arrived at its result. */
+export type AuthorityReason =
+  | "EZSHIFT_ACTIVE"
+  | "EZSHIFT_NONE"
+  | "SHIFT_ROLE_NOT_CLINICAL"
+  | "STUDENT_NEVER_ELEVATED"
+  | "LEGACY_ADMIN_NO_CLINICAL"
+  | "MISSING_USER_NAME"
+  | "RESOLUTION_ERROR";
+
+/** Point-in-time snapshot of a user's resolved authority state. */
+export interface AuthoritySnapshot {
+  systemRole: SystemRole;
+  clinicalRole: ClinicalRole | null;
+  activeShiftRole: ActiveShiftRole | null;
+  operationalRole: OperationalRole;
+  effectiveClinicalRole: EffectiveClinicalRole | null;
+  source: AuthoritySource;
+  reason: AuthorityReason;
+  resolvedAt: string;
+}
