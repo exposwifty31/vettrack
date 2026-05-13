@@ -1363,7 +1363,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ containerId }),
       }),
-    scan: (sessionId: string, params: { itemId?: string; nfcTagId?: string; delta: number }) =>
+    scan: (sessionId: string, params: { itemId?: string; nfcTagId?: string; observedQuantity: number }) =>
       request<{
         event: {
           id: string;
@@ -1374,7 +1374,7 @@ export const api = {
           delta: number;
           createdAt: string;
         };
-        quantity: number;
+        observedQuantity: number;
         item: { id: string; code: string; label: string; nfcTagId: string | null };
       }>("/api/restock/scan", {
         method: "POST",

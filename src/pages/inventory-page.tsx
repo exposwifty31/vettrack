@@ -144,9 +144,15 @@ export default function InventoryPage() {
   const startSessionPromiseRef = useRef<Promise<string | null> | null>(null);
   const overlayClearRef = useRef<number | undefined>(undefined);
   const nfcActiveRef = useRef(false);
+  const nfcItemCountsRef = useRef<Map<string, number>>(new Map());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleNFCTagRef = useRef<(tagId: string) => void>(() => {});
 
   useEffect(() => { sessionIdRef.current = sessionState.activeSessionId ?? null; }, [sessionState.activeSessionId]);
   useEffect(() => { activeContainerIdRef.current = sessionState.activeContainerId ?? null; }, [sessionState.activeContainerId]);
+  useEffect(() => {
+    if (!sessionState.activeSessionId) nfcItemCountsRef.current.clear();
+  }, [sessionState.activeSessionId]);
 
   // ── UI state ──────────────────────────────────────────────────────────────
 
@@ -210,11 +216,11 @@ export default function InventoryPage() {
   });
 
   const scanMut = useMutation({
-    mutationFn: (payload: { sessionId: string; itemId?: string; nfcTagId?: string; delta: number }) =>
+    mutationFn: (payload: { sessionId: string; itemId?: string; nfcTagId?: string; observedQuantity: number }) =>
       api.restock.scan(payload.sessionId, {
         itemId: payload.itemId,
         nfcTagId: payload.nfcTagId,
-        delta: payload.delta,
+        observedQuantity: payload.observedQuantity,
       }),
     onSuccess: () => {
       dispatch({ type: "scan-success" });
@@ -336,7 +342,7 @@ export default function InventoryPage() {
         const result = await scanMut.mutateAsync({
           sessionId,
           itemId: confirmedItemId,
-          delta,
+          observedQuantity: nextValue,
         });
 
         const name = result?.item?.label ?? label;
@@ -360,7 +366,7 @@ export default function InventoryPage() {
               ...old,
               lines: old.lines.map((l) =>
                 l.itemId === confirmedItemId
-                  ? { ...l, actual: nextValue }
+                  ? { ...l, actual: nextValue, sessionObservedQuantity: nextValue }
                   : l
               ),
             };
@@ -457,22 +463,39 @@ export default function InventoryPage() {
       }
       return;
     }
-    // Item tag → +1
+    // Item tag → +1 (route through scanLine when cached line is available)
     const sessionId = sessionIdRef.current;
     if (!sessionId) { toast.error(p.openSessionFirst); return; }
+    const cachedLine = detailsQ.data?.lines.find((l) => l.nfcTagId === tagId);
+    if (cachedLine?.itemId && cachedLine.code) {
+      scanLine(cachedLine.itemId, cachedLine.code, cachedLine.label, 1);
+      return;
+    }
+    // Fallback: item tag found but no itemId/code — use nfcTagId path
+    // Abort if detailsQ cache is cold (hasn't loaded yet) to avoid fabricating a count
+    if (!detailsQ.data) {
+      toast.error(p.openSessionFirst);
+      return;
+    }
+    const prevCount = nfcItemCountsRef.current.get(tagId) ?? (cachedLine?.sessionObservedQuantity ?? cachedLine?.actual ?? 0);
+    const nextCount = prevCount + 1;
+    nfcItemCountsRef.current.set(tagId, nextCount);
     dispatch({ type: "scan-request" });
     scanMut
-      .mutateAsync({ sessionId, nfcTagId: tagId, delta: 1 })
+      .mutateAsync({ sessionId, nfcTagId: tagId, observedQuantity: nextCount })
       .then((result) => {
         showScanOverlay(result.item.label, 1);
         haptics.tap();
         setScanGeneration((g) => g + 1);
       })
       .catch(() => {
+        nfcItemCountsRef.current.set(tagId, prevCount);
         showScanOverlay(p.unknownNfcTag, null);
         haptics.error();
       });
-  }, [containersQ.data, isRestocking, selectedId, startSessionMut, scanMut, showScanOverlay]);
+  }, [containersQ.data, detailsQ.data, isRestocking, selectedId, startSessionMut, scanMut, showScanOverlay]);
+
+  useEffect(() => { handleNFCTagRef.current = handleNFCTag; }, [handleNFCTag]);
 
   const startNFCScan = async () => {
     if (!nfcSupported || nfcActiveRef.current) return;
@@ -483,7 +506,7 @@ export default function InventoryPage() {
       await ndef.scan();
       nfcActiveRef.current = true;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ndef.onreading = (event: any) => handleNFCTag(event.serialNumber as string);
+      ndef.onreading = (event: any) => handleNFCTagRef.current(event.serialNumber as string);
       navigator.vibrate?.([20, 25, 20]);
       toast.success(p.nfcReady, { duration: 3200 });
     } catch {

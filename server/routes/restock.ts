@@ -19,13 +19,15 @@ const startSchema = z.object({
   containerId: z.string().uuid(),
 });
 
-const scanSchema = z.object({
-  sessionId: z.string().uuid(),
-  itemId: z.string().uuid().optional(),
-  nfcTagId: z.string().trim().min(1).max(200).optional(),
-  /** Absolute observed quantity (what the technician counted). */
-  observedQuantity: z.number().int().min(0),
-});
+const scanSchema = z
+  .object({
+    sessionId: z.string().uuid(),
+    itemId: z.string().uuid().optional(),
+    nfcTagId: z.string().trim().min(1).max(200).optional(),
+    /** Absolute observed quantity (what the technician counted). */
+    observedQuantity: z.number().int().min(0),
+  })
+  .strict();
 
 const finishSchema = z.object({
   sessionId: z.string().uuid(),

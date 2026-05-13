@@ -55,6 +55,7 @@ import {
 } from "lucide-react";
 import { OnboardingWalkthrough } from "@/components/onboarding-walkthrough";
 import { HelpTooltip } from "@/components/ui/help-tooltip";
+import type { RestockContainerView } from "@/types";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -323,7 +324,10 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
           toast.error("לא נמצא סשן מילוי מחדש פעיל");
           return;
         }
-        await api.restock.scan(parsed.sessionId, { nfcTagId, delta: 1 });
+        const cachedView = qc.getQueryData<RestockContainerView>(["/api/restock/container-items", parsed.containerId]);
+        const cachedLine = cachedView?.lines?.find((l) => l.nfcTagId === nfcTagId);
+        const currentActual = cachedLine?.sessionObservedQuantity ?? cachedLine?.actual ?? 0;
+        await api.restock.scan(parsed.sessionId, { nfcTagId, observedQuantity: currentActual + 1 });
         haptics.scanSuccess();
         if (parsed.containerId) {
           qc.invalidateQueries({ queryKey: ["/api/restock/container-items", parsed.containerId] });

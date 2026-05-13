@@ -575,6 +575,7 @@ export async function getContainerInventoryView(params: {
     itemId: string | null;
     code: string;
     label: string;
+    nfcTagId: string | null;
     expected: number;
     actual: number;
     missing: number;
@@ -588,7 +589,7 @@ export async function getContainerInventoryView(params: {
   if (template.supplyTargets.length > 0) {
     const codes = allTemplateCandidateCodes(template);
     const itemRows = await db
-      .select({ id: inventoryItems.id, code: inventoryItems.code, label: inventoryItems.label })
+      .select({ id: inventoryItems.id, code: inventoryItems.code, label: inventoryItems.label, nfcTagId: inventoryItems.nfcTagId })
       .from(inventoryItems)
       .where(and(eq(inventoryItems.clinicId, params.clinicId), inArray(inventoryItems.code, codes)));
     const itemByCode = new Map(itemRows.map((item) => [item.code, item]));
@@ -626,6 +627,7 @@ export async function getContainerInventoryView(params: {
         itemId: actionItem?.id ?? null,
         code: target.code,
         label: target.label,
+        nfcTagId: actionItem?.nfcTagId ?? null,
         expected: target.targetUnits,
         actual,
         missing: Math.max(0, target.targetUnits - actual),
@@ -640,6 +642,7 @@ export async function getContainerInventoryView(params: {
         id: inventoryItems.id,
         code: inventoryItems.code,
         label: inventoryItems.label,
+        nfcTagId: inventoryItems.nfcTagId,
         quantity: containerItems.quantity,
       })
       .from(containerItems)
@@ -659,6 +662,7 @@ export async function getContainerInventoryView(params: {
         itemId: row.id,
         code: row.code,
         label: row.label,
+        nfcTagId: row.nfcTagId,
         expected: 0,
         actual: Number(row.quantity),
         missing: 0,

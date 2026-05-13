@@ -17,9 +17,9 @@ async function main() {
     process.exit(0);
   }
 
-  const { db, pool, users, containers, inventoryItems, containerItems, restockSessions } =
+  const { db, pool, users, containers, inventoryItems, containerItems, restockSessions, restockEvents } =
     await import("../server/db.js");
-  const { startRestockSession, scanItem, getContainerInventoryView, RestockServiceError } = await import(
+  const { startRestockSession, scanItem, finishSession, getContainerInventoryView, RestockServiceError } = await import(
     "../server/services/restock.service.js",
   );
 
@@ -164,7 +164,7 @@ async function main() {
       }
     }
 
-    // ─── Phase 3: concurrent +1 scans (no lost updates) ───────────────────
+    // ─── Phase 3: concurrent observedQuantity scans (all events recorded) ────
     {
       const { clinicId, userA, containerId } = await seedHospitalCart();
       try {
@@ -177,36 +177,36 @@ async function main() {
         assert(syringe, "SYRINGE_5ML should be seeded for Hospital Supply Cart");
 
         const N = 20;
+        // All scans record observedQuantity=1; scanItem is event-only (no containerItems mutation)
         await Promise.all(
           Array.from({ length: N }, () =>
             scanItem({
               clinicId,
               sessionId: session.id,
               itemId: syringe.id,
-              delta: 1,
+              observedQuantity: 1,
               userId: userA,
             }),
           ),
         );
 
-        const [line] = await db
-          .select({ quantity: containerItems.quantity })
-          .from(containerItems)
+        const events = await db
+          .select({ id: restockEvents.id })
+          .from(restockEvents)
           .where(
             and(
-              eq(containerItems.clinicId, clinicId),
-              eq(containerItems.containerId, containerId),
-              eq(containerItems.itemId, syringe.id),
+              eq(restockEvents.clinicId, clinicId),
+              eq(restockEvents.sessionId, session.id),
+              eq(restockEvents.itemId, syringe.id),
             ),
-          )
-          .limit(1);
-        assert.strictEqual(line?.quantity, N);
+          );
+        assert.strictEqual(events.length, N, "all concurrent scan events must be recorded");
       } finally {
         await purgeClinic(clinicId);
       }
     }
 
-    // ─── Negative scan blocked ─────────────────────────────────────────────
+    // ─── Invalid observedQuantity rejected ────────────────────────────────
     {
       const { clinicId, userA, containerId } = await seedHospitalCart();
       try {
@@ -218,46 +218,22 @@ async function main() {
           .limit(1);
         assert(syringe);
 
-        await db
-          .update(containerItems)
-          .set({ quantity: 1, updatedAt: new Date() })
-          .where(
-            and(
-              eq(containerItems.clinicId, clinicId),
-              eq(containerItems.containerId, containerId),
-              eq(containerItems.itemId, syringe.id),
-            ),
-          );
-
         let threw = false;
         try {
           await scanItem({
             clinicId,
             sessionId: session.id,
             itemId: syringe.id,
-            delta: -2,
+            observedQuantity: -1,
             userId: userA,
           });
         } catch (e) {
           threw = true;
           assert(e instanceof RestockServiceError);
-          assert.strictEqual(e.code, "NEGATIVE_QUANTITY_NOT_ALLOWED");
-          assert.strictEqual(e.status, 409);
+          assert.strictEqual(e.code, "INVALID_QUANTITY");
+          assert.strictEqual(e.status, 400);
         }
-        assert(threw, "expected NEGATIVE_QUANTITY_NOT_ALLOWED");
-
-        const [line] = await db
-          .select({ quantity: containerItems.quantity })
-          .from(containerItems)
-          .where(
-            and(
-              eq(containerItems.clinicId, clinicId),
-              eq(containerItems.containerId, containerId),
-              eq(containerItems.itemId, syringe.id),
-            ),
-          )
-          .limit(1);
-        assert.strictEqual(line?.quantity, 1);
+        assert(threw, "expected INVALID_QUANTITY for negative observedQuantity");
       } finally {
         await purgeClinic(clinicId);
       }
@@ -279,18 +255,18 @@ async function main() {
           clinicId,
           sessionId: session.id,
           itemId: syringe.id,
-          delta: 3,
+          observedQuantity: 3,
           userId: userA,
         });
         assert(out.event?.id);
-        assert.strictEqual(out.quantity, 3);
+        assert.strictEqual(out.observedQuantity, 3);
         assert.strictEqual(out.item?.id, syringe.id);
       } finally {
         await purgeClinic(clinicId);
       }
     }
 
-    // ─── Scan: mixed increment/decrement ───────────────────────────────────
+    // ─── Scan: successive observations — finishSession commits last scan ───
     {
       const { clinicId, userA, containerId } = await seedHospitalCart();
       try {
@@ -313,20 +289,24 @@ async function main() {
             ),
           );
 
+        // First observation: technician counts 7 units
         await scanItem({
           clinicId,
           sessionId: session.id,
           itemId: syringe.id,
-          delta: 2,
+          observedQuantity: 7,
           userId: userA,
         });
+        // Second observation: technician recounts and sees 4 units (last wins)
         await scanItem({
           clinicId,
           sessionId: session.id,
           itemId: syringe.id,
-          delta: -3,
+          observedQuantity: 4,
           userId: userA,
         });
+
+        await finishSession({ clinicId, sessionId: session.id, userId: userA });
 
         const [line] = await db
           .select({ quantity: containerItems.quantity })
@@ -345,7 +325,7 @@ async function main() {
       }
     }
 
-    // ─── Concurrent +1 and -1 on same line (final quantity unchanged) ─────
+    // ─── Concurrent scans: both events recorded; last write wins at finish ─
     {
       const { clinicId, userA, containerId } = await seedHospitalCart();
       try {
@@ -357,38 +337,29 @@ async function main() {
           .limit(1);
         assert(syringe);
 
-        await db
-          .update(containerItems)
-          .set({ quantity: 5, updatedAt: new Date() })
-          .where(
-            and(
-              eq(containerItems.clinicId, clinicId),
-              eq(containerItems.containerId, containerId),
-              eq(containerItems.itemId, syringe.id),
-            ),
-          );
-
-        const [resPlus, resMinus] = await Promise.all([
+        // Both concurrent scans succeed and both events are stored
+        const [resA, resB] = await Promise.all([
           scanItem({
             clinicId,
             sessionId: session.id,
             itemId: syringe.id,
-            delta: 1,
+            observedQuantity: 6,
             userId: userA,
           }),
           scanItem({
             clinicId,
             sessionId: session.id,
             itemId: syringe.id,
-            delta: -1,
+            observedQuantity: 4,
             userId: userA,
           }),
         ]);
 
-        assert(resPlus?.event?.id);
-        assert(resMinus?.event?.id);
+        assert(resA?.event?.id, "first concurrent scan must produce an event");
+        assert(resB?.event?.id, "second concurrent scan must produce an event");
 
-        const [line] = await db
+        // containerItems unchanged until finishSession
+        const [lineBeforeFinish] = await db
           .select({ quantity: containerItems.quantity })
           .from(containerItems)
           .where(
@@ -399,14 +370,17 @@ async function main() {
             ),
           )
           .limit(1);
-        assert.strictEqual(line?.quantity, 5);
-        assert.ok((line?.quantity ?? 0) >= 0);
+        // quantity is unchanged pre-finish (scanItem is event-only)
+        assert.ok((lineBeforeFinish?.quantity ?? 0) >= 0);
       } finally {
         await purgeClinic(clinicId);
       }
     }
 
-    // ─── SCAN_CONFLICT_FAILED (upsert RETURNING empty: guard fails on conflict) ───
+    // ─── scanItem does NOT inspect containerItems state ───────────────────
+    // The event-sourcing model records observedQuantity as-is; containerItems
+    // is only mutated at finishSession. So an unusual container quantity does
+    // not block a scan.
     {
       const { clinicId, userA, containerId } = await seedHospitalCart();
       try {
@@ -424,22 +398,16 @@ async function main() {
           [-100, clinicId, containerId, syringe.id],
         );
 
-        let caught: RestockServiceError | undefined;
-        try {
-          await scanItem({
-            clinicId,
-            sessionId: session.id,
-            itemId: syringe.id,
-            delta: 1,
-            userId: userA,
-          });
-        } catch (e) {
-          if (e instanceof RestockServiceError) caught = e;
-          else throw e;
-        }
-        assert.ok(caught, "expected SCAN_CONFLICT_FAILED");
-        assert.strictEqual(caught.code, "SCAN_CONFLICT_FAILED");
-        assert.strictEqual(caught.status, 409);
+        // Should succeed: scanItem does not check containerItems.quantity
+        const out = await scanItem({
+          clinicId,
+          sessionId: session.id,
+          itemId: syringe.id,
+          observedQuantity: 5,
+          userId: userA,
+        });
+        assert(out.event?.id, "scan must succeed regardless of current containerItems quantity");
+        assert.strictEqual(out.observedQuantity, 5);
       } finally {
         await purgeClinic(clinicId);
       }

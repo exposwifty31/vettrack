@@ -548,9 +548,11 @@ export interface RestockContainerLine {
   itemId: string | null;
   code: string;
   label: string;
+  nfcTagId: string | null;
   expected: number;
   actual: number;
   missing: number;
+  sessionObservedQuantity: number | null;
 }
 
 export interface RestockContainerView {
