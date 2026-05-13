@@ -1637,6 +1637,11 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ dischargeNotes }),
       }),
+    update: (id: string, patch: import("@/types").UpdatePatientRequest) =>
+      request<{ patient: import("@/types").Hospitalization }>(`/api/patients/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      }),
   },
   codeBlue: {
     startEvent: (data: import("@/types").StartCodeBlueRequest) =>

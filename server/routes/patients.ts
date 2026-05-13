@@ -70,6 +70,22 @@ const dischargeSchema = z.object({
   overrideReason: z.string().min(1).max(500).optional(),
 });
 
+// Partial edit of an active hospitalization. Touches the animal record
+// (name/species/breed/sex/weightKg) and/or hospitalization fields
+// (ward/bay/admissionReason/status). All fields are optional; omitted fields
+// are left unchanged. Cannot be used to discharge — use /:id/discharge for that.
+const updateSchema = z.object({
+  animalName: z.string().min(1).max(120).optional(),
+  species: z.string().max(60).nullable().optional(),
+  breed: z.string().max(60).nullable().optional(),
+  sex: z.string().max(20).nullable().optional(),
+  weightKg: z.number().positive().nullable().optional(),
+  ward: z.string().max(80).nullable().optional(),
+  bay: z.string().max(40).nullable().optional(),
+  admissionReason: z.string().max(500).nullable().optional(),
+  status: z.enum(["admitted", "observation", "critical", "recovering", "discharged", "deceased"]).optional(),
+});
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function hospitalizationRow(h: typeof hospitalizations.$inferSelect, a: typeof animals.$inferSelect, o: typeof owners.$inferSelect | null, vetName: string | null) {
@@ -393,6 +409,150 @@ router.post("/", requireEffectiveRole("technician"), async (req, res) => {
   } catch (err) {
     console.error("[patients] admit failed", err);
     res.status(500).json(apiError({ code: "INTERNAL_ERROR", reason: "PATIENTS_ADMIT_FAILED", message: "Failed to admit patient", requestId }));
+  }
+});
+
+// ─── PATCH /api/patients/:id ────────────────────────────────────────────────
+// Edit an active hospitalization's animal data and/or hospitalization fields.
+// All body fields are optional; omitted keys are left unchanged. Cannot be
+// used to discharge (status="discharged" is rejected) — use /:id/discharge
+// for that, which runs pre-flight blocking-condition checks.
+
+router.patch("/:id", async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const parse = updateSchema.safeParse(req.body);
+  if (!parse.success) {
+    return res.status(400).json(apiError({
+      code: "VALIDATION_ERROR",
+      reason: "UPDATE_VALIDATION_FAILED",
+      message: parse.error.flatten().formErrors.join(", ") || "Invalid request",
+      requestId,
+    }));
+  }
+
+  const data = parse.data;
+  if (data.status === "discharged") {
+    return res.status(400).json(apiError({
+      code: "VALIDATION_ERROR",
+      reason: "USE_DISCHARGE_ENDPOINT",
+      message: "Use PATCH /:id/discharge to discharge a patient",
+      requestId,
+    }));
+  }
+
+  const clinicId = req.clinicId!;
+  const { id } = req.params;
+
+  try {
+    const [existing] = await db
+      .select({ id: hospitalizations.id, animalId: hospitalizations.animalId })
+      .from(hospitalizations)
+      .where(and(
+        eq(hospitalizations.id, id),
+        eq(hospitalizations.clinicId, clinicId),
+        isNull(hospitalizations.dischargedAt),
+      ))
+      .limit(1);
+
+    if (!existing) {
+      return res.status(404).json(apiError({
+        code: "NOT_FOUND",
+        reason: "HOSPITALIZATION_NOT_FOUND",
+        message: "Hospitalization not found or already discharged",
+        requestId,
+      }));
+    }
+
+    const animalUpdate: Record<string, unknown> = {};
+    if (data.animalName !== undefined) animalUpdate.name = data.animalName.trim();
+    if (data.species !== undefined) animalUpdate.species = data.species?.trim() || null;
+    if (data.breed !== undefined) animalUpdate.breed = data.breed?.trim() || null;
+    if (data.sex !== undefined) animalUpdate.sex = data.sex?.trim() || null;
+    if (data.weightKg !== undefined) animalUpdate.weightKg = data.weightKg != null ? String(data.weightKg) : null;
+
+    const hospUpdate: Record<string, unknown> = {};
+    if (data.ward !== undefined) hospUpdate.ward = data.ward?.trim() || null;
+    if (data.bay !== undefined) hospUpdate.bay = data.bay?.trim() || null;
+    if (data.admissionReason !== undefined) hospUpdate.admissionReason = data.admissionReason?.trim() || null;
+    if (data.status !== undefined) hospUpdate.status = data.status;
+
+    if (Object.keys(animalUpdate).length === 0 && Object.keys(hospUpdate).length === 0) {
+      return res.status(400).json(apiError({
+        code: "VALIDATION_ERROR",
+        reason: "NO_FIELDS_TO_UPDATE",
+        message: "At least one field is required",
+        requestId,
+      }));
+    }
+
+    await db.transaction(async (tx) => {
+      if (Object.keys(animalUpdate).length > 0) {
+        animalUpdate.updatedAt = new Date();
+        await tx.update(animals)
+          .set(animalUpdate)
+          .where(and(eq(animals.id, existing.animalId), eq(animals.clinicId, clinicId)));
+      }
+      if (Object.keys(hospUpdate).length > 0) {
+        hospUpdate.updatedAt = new Date();
+        await tx.update(hospitalizations)
+          .set(hospUpdate)
+          .where(and(eq(hospitalizations.id, id), eq(hospitalizations.clinicId, clinicId)));
+      }
+    });
+
+    const rows = await db
+      .select({ h: hospitalizations, a: animals, o: owners, vetName: users.name })
+      .from(hospitalizations)
+      .innerJoin(animals, eq(hospitalizations.animalId, animals.id))
+      .leftJoin(owners, eq(animals.ownerId, owners.id))
+      .leftJoin(users, eq(hospitalizations.admittingVetId, users.id))
+      .where(eq(hospitalizations.id, id))
+      .limit(1);
+
+    if (!rows.length) {
+      return res.status(404).json(apiError({
+        code: "NOT_FOUND",
+        reason: "HOSPITALIZATION_NOT_FOUND",
+        message: "Hospitalization not found after update",
+        requestId,
+      }));
+    }
+
+    const r = rows[0]!;
+
+    logAudit({
+      clinicId,
+      actionType: "patient_updated",
+      performedBy: req.authUser!.id,
+      performedByEmail: req.authUser!.email ?? "",
+      actorRole: resolveAuditActorRole(req),
+      targetId: id,
+      targetType: "hospitalization",
+      metadata: {
+        animalId: existing.animalId,
+        animalFields: Object.keys(animalUpdate).filter((k) => k !== "updatedAt"),
+        hospFields: Object.keys(hospUpdate).filter((k) => k !== "updatedAt"),
+      },
+    });
+
+    if (data.status && (data.status === "critical" || data.status === "deceased")) {
+      const eventType = data.status === "critical" ? "hosp_critical" : "hosp_deceased";
+      postSystemMessage(clinicId, eventType, {
+        hospitalizationId: id,
+        status: data.status,
+        updatedAt: new Date().toISOString(),
+      }).catch(() => {});
+    }
+
+    res.json({ patient: hospitalizationRow(r.h, r.a, r.o, r.vetName ?? null) });
+  } catch (err) {
+    console.error("[patients] update failed", err);
+    res.status(500).json(apiError({
+      code: "INTERNAL_ERROR",
+      reason: "PATIENTS_UPDATE_FAILED",
+      message: "Failed to update patient",
+      requestId,
+    }));
   }
 });
 

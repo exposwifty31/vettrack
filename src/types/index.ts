@@ -1212,6 +1212,18 @@ export interface AdmitPatientRequest {
   admittingVetId?: string;
 }
 
+export interface UpdatePatientRequest {
+  animalName?: string;
+  species?: string | null;
+  breed?: string | null;
+  sex?: string | null;
+  weightKg?: number | null;
+  ward?: string | null;
+  bay?: string | null;
+  admissionReason?: string | null;
+  status?: Exclude<HospitalizationStatus, "discharged">;
+}
+
 export interface AnimalSearchResult {
   id: string;
   name: string;

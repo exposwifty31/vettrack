@@ -61,6 +61,13 @@ describe("Active Patients — multi-tenancy isolation", () => {
     expect(patch).toContain("eq(hospitalizations.clinicId, clinicId)");
   });
 
+  it("PATCH /:id (edit) is clinic-scoped on both animal and hospitalization writes", () => {
+    expect(patientsRoute).toContain('router.patch("/:id"');
+    // Both update calls (animal + hospitalization) must restrict on clinicId
+    expect(patientsRoute).toMatch(/tx\.update\(animals\)[\s\S]*?eq\(animals\.clinicId, clinicId\)/);
+    expect(patientsRoute).toMatch(/tx\.update\(hospitalizations\)[\s\S]*?eq\(hospitalizations\.clinicId, clinicId\)/);
+  });
+
   it("Admit (POST) verifies animal belongs to clinic before admitting", () => {
     expect(patientsRoute).toContain("ANIMAL_NOT_IN_CLINIC");
   });
@@ -143,5 +150,35 @@ describe("Active Patients — API client", () => {
 
   it("api.patients.discharge is defined", () => {
     expect(apiClient).toContain("discharge");
+  });
+
+  it("api.patients.update is defined and PATCHes /api/patients/:id", () => {
+    expect(apiClient).toMatch(/update:\s*\(id:\s*string[\s\S]*?\/api\/patients\/\$\{encodeURIComponent\(id\)\}[\s\S]*?method:\s*"PATCH"/m);
+  });
+});
+
+describe("Active Patients — PATCH /:id edit endpoint", () => {
+  it("rejects status=discharged (must use /:id/discharge)", () => {
+    expect(patientsRoute).toContain("USE_DISCHARGE_ENDPOINT");
+  });
+
+  it("requires at least one editable field", () => {
+    expect(patientsRoute).toContain("NO_FIELDS_TO_UPDATE");
+  });
+
+  it("guards against already-discharged records", () => {
+    const start = patientsRoute.indexOf('router.patch("/:id"');
+    // Slice up to the next sibling route declaration to avoid pulling /:id/status
+    const end = patientsRoute.indexOf('router.patch("/:id/status"', start);
+    const block = start >= 0 && end > start ? patientsRoute.slice(start, end) : "";
+    expect(block).toContain("isNull(hospitalizations.dischargedAt)");
+  });
+
+  it("writes animal + hospitalization updates inside a transaction", () => {
+    expect(patientsRoute).toMatch(/db\.transaction\(async\s*\(tx\)\s*=>\s*\{[\s\S]*?tx\.update\(animals\)[\s\S]*?tx\.update\(hospitalizations\)/m);
+  });
+
+  it("emits patient_updated audit entry", () => {
+    expect(patientsRoute).toContain('actionType: "patient_updated"');
   });
 });

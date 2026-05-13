@@ -96,6 +96,7 @@ export type AuditActionType =
   | "formulary_entry_deleted"
   | "integration_mapping_review_updated"
   | "hospitalization_status_updated"
+  | "patient_updated"
   | "patient_discharged"
   | "push_subscription_created"
   | "push_subscription_updated"

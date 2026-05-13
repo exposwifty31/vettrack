@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, Redirect, useLocation, useParams } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   AlertTriangle,
@@ -12,6 +12,7 @@ import {
   LayoutGrid,
   MapPin,
   Package,
+  Pencil,
   Pill,
   Radar,
   Receipt,
@@ -20,6 +21,7 @@ import {
   Syringe,
   UserRound,
 } from "lucide-react";
+import { toast } from "sonner";
 import { t, getDirection } from "@/lib/i18n";
 import { api } from "@/lib/api";
 import { Layout } from "@/components/layout";
@@ -27,6 +29,11 @@ import { PageShell } from "@/components/layout/PageShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorCard } from "@/components/ui/error-card";
@@ -40,6 +47,8 @@ import type {
   BillingLedgerEntry,
   Equipment,
   Hospitalization,
+  HospitalizationStatus,
+  UpdatePatientRequest,
 } from "@/types";
 type MedicationExecutionTask = import("@/types").MedicationExecutionTask;
 
@@ -116,6 +125,233 @@ function SectionTitle({
   );
 }
 
+const EDITABLE_STATUSES: HospitalizationStatus[] = ["admitted", "observation", "critical", "recovering"];
+const SPECIES_OPTIONS = ["כלב", "חתול", "ציפור", "ארנב", "שאר"];
+const SEX_OPTIONS = ["זכר", "נקבה", "לא ידוע"];
+
+function normalize(v: string | null | undefined): string {
+  return (v ?? "").trim();
+}
+
+function EditPatientSheet({
+  open,
+  hospitalization,
+  onClose,
+}: {
+  open: boolean;
+  hospitalization: Hospitalization;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const p = t.patientDetail;
+
+  const initial = useMemo(
+    () => ({
+      animalName: hospitalization.animal.name ?? "",
+      species: hospitalization.animal.species ?? "",
+      breed: hospitalization.animal.breed ?? "",
+      sex: hospitalization.animal.sex ?? "",
+      ward: hospitalization.ward ?? "",
+      bay: hospitalization.bay ?? "",
+      admissionReason: hospitalization.admissionReason ?? "",
+      status: hospitalization.status,
+    }),
+    [hospitalization],
+  );
+
+  const [form, setForm] = useState(initial);
+
+  // Re-seed form whenever the sheet opens (so cancel-then-reopen resets cleanly).
+  useEffect(() => {
+    if (open) setForm(initial);
+  }, [open, initial]);
+
+  const updateMut = useMutation({
+    mutationFn: (patch: UpdatePatientRequest) => api.patients.update(hospitalization.id, patch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      toast.success(p.editSavedToast);
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message || p.editFailedToast),
+  });
+
+  function buildPatch(): UpdatePatientRequest {
+    const patch: UpdatePatientRequest = {};
+    if (normalize(form.animalName) && normalize(form.animalName) !== normalize(initial.animalName)) {
+      patch.animalName = normalize(form.animalName);
+    }
+    if (normalize(form.species) !== normalize(initial.species)) {
+      patch.species = normalize(form.species) || null;
+    }
+    if (normalize(form.breed) !== normalize(initial.breed)) {
+      patch.breed = normalize(form.breed) || null;
+    }
+    if (normalize(form.sex) !== normalize(initial.sex)) {
+      patch.sex = normalize(form.sex) || null;
+    }
+    if (normalize(form.ward) !== normalize(initial.ward)) {
+      patch.ward = normalize(form.ward) || null;
+    }
+    if (normalize(form.bay) !== normalize(initial.bay)) {
+      patch.bay = normalize(form.bay) || null;
+    }
+    if (normalize(form.admissionReason) !== normalize(initial.admissionReason)) {
+      patch.admissionReason = normalize(form.admissionReason) || null;
+    }
+    if (form.status !== initial.status && form.status !== "discharged" && form.status !== "deceased") {
+      patch.status = form.status as Exclude<HospitalizationStatus, "discharged">;
+    }
+    return patch;
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const patch = buildPatch();
+    if (Object.keys(patch).length === 0) {
+      toast.message(p.editNoChanges);
+      return;
+    }
+    updateMut.mutate(patch);
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(o) => !o && !updateMut.isPending && onClose()}>
+      <SheetContent side="bottom" className="max-h-[90dvh] overflow-y-auto rounded-t-2xl">
+        <SheetHeader className="mb-4">
+          <SheetTitle className="flex items-center gap-2 text-lg">
+            <Pencil className="h-5 w-5 text-primary" />
+            {p.editTitle}
+          </SheetTitle>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 pb-6">
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">{p.editFieldName}</Label>
+            <Input
+              value={form.animalName}
+              onChange={(e) => setForm((f) => ({ ...f, animalName: e.target.value }))}
+              data-testid="input-edit-patient-name"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{p.editFieldSpecies}</Label>
+              <Select
+                value={form.species || ""}
+                onValueChange={(v) => setForm((f) => ({ ...f, species: v }))}
+              >
+                <SelectTrigger data-testid="select-edit-patient-species">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SPECIES_OPTIONS.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{p.editFieldBreed}</Label>
+              <Input
+                value={form.breed}
+                onChange={(e) => setForm((f) => ({ ...f, breed: e.target.value }))}
+                data-testid="input-edit-patient-breed"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{p.editFieldSex}</Label>
+              <Select
+                value={form.sex || ""}
+                onValueChange={(v) => setForm((f) => ({ ...f, sex: v }))}
+              >
+                <SelectTrigger data-testid="select-edit-patient-sex">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SEX_OPTIONS.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{p.editFieldStatus}</Label>
+              <Select
+                value={form.status}
+                onValueChange={(v) => setForm((f) => ({ ...f, status: v as HospitalizationStatus }))}
+              >
+                <SelectTrigger data-testid="select-edit-patient-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {EDITABLE_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>{p[`hospStatus${s.charAt(0).toUpperCase()}${s.slice(1)}` as keyof typeof p] as string}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{p.editFieldWard}</Label>
+              <Input
+                value={form.ward}
+                onChange={(e) => setForm((f) => ({ ...f, ward: e.target.value }))}
+                data-testid="input-edit-patient-ward"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{p.editFieldBay}</Label>
+              <Input
+                value={form.bay}
+                onChange={(e) => setForm((f) => ({ ...f, bay: e.target.value }))}
+                data-testid="input-edit-patient-bay"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">{p.editFieldReason}</Label>
+            <Textarea
+              value={form.admissionReason}
+              onChange={(e) => setForm((f) => ({ ...f, admissionReason: e.target.value }))}
+              rows={2}
+              className="resize-none"
+              data-testid="input-edit-patient-reason"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={onClose}
+              disabled={updateMut.isPending}
+              data-testid="btn-edit-patient-cancel"
+            >
+              {p.editCancel}
+            </Button>
+            <Button
+              type="submit"
+              className="flex-1"
+              disabled={updateMut.isPending}
+              data-testid="btn-edit-patient-save"
+            >
+              {updateMut.isPending ? p.editSaving : p.editSave}
+            </Button>
+          </div>
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 export default function PatientDetailPage() {
   const { id: animalId } = useParams<{ id: string }>();
   const p = t.patientDetail;
@@ -126,6 +362,8 @@ export default function PatientDetailPage() {
   const resolvedRole = String(effectiveRole ?? role ?? "").trim().toLowerCase();
   const canTasks = roleLevel(resolvedRole) >= ROLE_LEVEL.technician;
   const canBilling = roleLevel(resolvedRole) >= ROLE_LEVEL.vet;
+  const canEdit = roleLevel(resolvedRole) >= ROLE_LEVEL.technician;
+  const [editOpen, setEditOpen] = useState(false);
 
   // Fetch active hospitalization for this animal (if any)
   const hospQ = useQuery({
@@ -391,15 +629,30 @@ export default function PatientDetailPage() {
                   )}
                 </div>
               </div>
-              <Badge
-                variant="outline"
-                className={cn(
-                  "w-full justify-center border px-3 py-1.5 text-xs font-semibold sm:w-auto sm:justify-start sm:shrink-0",
-                  statusBadge.className,
-                )}
-              >
-                {statusBadge.label}
-              </Badge>
+              <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center sm:shrink-0">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "justify-center border px-3 py-1.5 text-xs font-semibold sm:justify-start",
+                    statusBadge.className,
+                  )}
+                >
+                  {statusBadge.label}
+                </Badge>
+                {canEdit && hospQ.data ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 gap-1.5"
+                    onClick={() => setEditOpen(true)}
+                    data-testid="btn-open-edit-patient"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    {p.editButton}
+                  </Button>
+                ) : null}
+              </div>
             </div>
 
             <dl className="relative mt-5 grid grid-cols-1 gap-3 border-t border-border/50 pt-5 sm:grid-cols-3">
@@ -808,6 +1061,14 @@ export default function PatientDetailPage() {
           </section>
         </div>
       </div>
+
+      {hospQ.data ? (
+        <EditPatientSheet
+          open={editOpen}
+          hospitalization={hospQ.data}
+          onClose={() => setEditOpen(false)}
+        />
+      ) : null}
     </>
   );
   if (isDesktop) return <PageShell>{pageContent}</PageShell>;
