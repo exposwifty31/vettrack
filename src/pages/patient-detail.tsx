@@ -125,9 +125,19 @@ function SectionTitle({
   );
 }
 
+// Statuses an editor can pick from for an actively hospitalized patient.
+// Terminal statuses (deceased, discharged) are intentionally excluded — they
+// must never be entered or exited through this generic edit form. Discharge
+// has its own endpoint with pre-flight checks; deceased requires the
+// dedicated /:id/status endpoint and proper clinical handling.
 const EDITABLE_STATUSES: HospitalizationStatus[] = ["admitted", "observation", "critical", "recovering"];
+const TERMINAL_STATUSES: HospitalizationStatus[] = ["deceased", "discharged"];
 const SPECIES_OPTIONS = ["כלב", "חתול", "ציפור", "ארנב", "שאר"];
 const SEX_OPTIONS = ["זכר", "נקבה", "לא ידוע"];
+
+function isTerminal(status: HospitalizationStatus): boolean {
+  return TERMINAL_STATUSES.includes(status);
+}
 
 function normalize(v: string | null | undefined): string {
   return (v ?? "").trim();
@@ -199,7 +209,18 @@ function EditPatientSheet({
     if (normalize(form.admissionReason) !== normalize(initial.admissionReason)) {
       patch.admissionReason = normalize(form.admissionReason) || null;
     }
-    if (form.status !== initial.status && form.status !== "discharged" && form.status !== "deceased") {
+    // Status transitions are locked when the patient is already in a terminal
+    // state (deceased/discharged) — otherwise a user could pick any non-
+    // terminal value and silently "resurrect" the record. Transitions INTO a
+    // terminal state are also blocked here; "discharged" has its own endpoint
+    // with pre-flight checks, and "deceased" must be set via the dedicated
+    // status endpoint with the proper clinical workflow.
+    const initialTerminal = isTerminal(initial.status);
+    if (
+      !initialTerminal &&
+      form.status !== initial.status &&
+      !isTerminal(form.status)
+    ) {
       patch.status = form.status as Exclude<HospitalizationStatus, "discharged">;
     }
     return patch;
@@ -282,11 +303,23 @@ function EditPatientSheet({
               <Select
                 value={form.status}
                 onValueChange={(v) => setForm((f) => ({ ...f, status: v as HospitalizationStatus }))}
+                disabled={isTerminal(initial.status)}
               >
-                <SelectTrigger data-testid="select-edit-patient-status">
+                <SelectTrigger
+                  data-testid="select-edit-patient-status"
+                  title={isTerminal(initial.status) ? p.editStatusLocked : undefined}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  {/* Surface the terminal current value as a disabled item so the
+                      trigger renders the right label even though the field is
+                      locked. Without this, the Select would render blank. */}
+                  {isTerminal(initial.status) ? (
+                    <SelectItem key={initial.status} value={initial.status} disabled>
+                      {p[`hospStatus${initial.status.charAt(0).toUpperCase()}${initial.status.slice(1)}` as keyof typeof p] as string}
+                    </SelectItem>
+                  ) : null}
                   {EDITABLE_STATUSES.map((s) => (
                     <SelectItem key={s} value={s}>{p[`hospStatus${s.charAt(0).toUpperCase()}${s.slice(1)}` as keyof typeof p] as string}</SelectItem>
                   ))}

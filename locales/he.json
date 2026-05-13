@@ -1402,7 +1402,8 @@
     "editCancel": "ביטול",
     "editSavedToast": "המטופל עודכן",
     "editFailedToast": "עדכון המטופל נכשל",
-    "editNoChanges": "אין שינויים לשמירה"
+    "editNoChanges": "אין שינויים לשמירה",
+    "editStatusLocked": "סטטוס נעול עבור מטופלים שאינם פעילים"
   },
   "billingLedger": {
     "title": "לוח חיובים",

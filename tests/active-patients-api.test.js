@@ -10,6 +10,10 @@ const patientsRoute = fs.readFileSync(
   path.join(repoRoot, "server", "routes", "patients.ts"),
   "utf8",
 );
+const patientDetailSource = fs.readFileSync(
+  path.join(repoRoot, "src", "pages", "patient-detail.tsx"),
+  "utf8",
+);
 const routesMount = fs.readFileSync(
   path.join(repoRoot, "server", "app", "routes.ts"),
   "utf8",
@@ -214,5 +218,41 @@ describe("Active Patients — PATCH /:id edit endpoint", () => {
       const fieldLine = schema.split("\n").find((l) => l.includes(`${field}:`));
       expect(fieldLine ?? "", `${field} declaration`).toMatch(/\.optional\(\)/);
     }
+  });
+
+  it("server rejects status changes that would silently resurrect a deceased patient", () => {
+    const block = editBlock();
+    // The handler must select the current status, then reject if the current
+    // status is "deceased" AND the requested status differs.
+    expect(block).toMatch(/status:\s*hospitalizations\.status/);
+    expect(block).toContain("TERMINAL_STATUS_LOCKED");
+    expect(block).toContain("DECEASED_STATUS_IMMUTABLE");
+    expect(block).toMatch(/existing\.status\s*===\s*"deceased"/);
+  });
+});
+
+describe("Edit patient sheet — terminal-status lock (frontend)", () => {
+  it("declares EDITABLE_STATUSES without deceased/discharged", () => {
+    const decl = patientDetailSource.match(/const EDITABLE_STATUSES:\s*HospitalizationStatus\[\]\s*=\s*\[[^\]]*\]/);
+    expect(decl).not.toBeNull();
+    const list = decl[0];
+    expect(list).not.toMatch(/"deceased"/);
+    expect(list).not.toMatch(/"discharged"/);
+  });
+
+  it("disables the status Select when the initial status is terminal", () => {
+    expect(patientDetailSource).toMatch(/disabled=\{isTerminal\(initial\.status\)\}/);
+  });
+
+  it("renders the current terminal status as a disabled SelectItem so the trigger is not blank", () => {
+    expect(patientDetailSource).toMatch(/isTerminal\(initial\.status\)\s*\?\s*\(\s*<SelectItem[^>]*value=\{initial\.status\}\s+disabled/m);
+  });
+
+  it("buildPatch refuses to send a status change when the initial status is terminal", () => {
+    // The guard must check the INITIAL status, not just the form's new value,
+    // otherwise a user could pick any non-terminal option and silently exit
+    // the deceased/discharged state.
+    expect(patientDetailSource).toMatch(/initialTerminal\s*=\s*isTerminal\(initial\.status\)/);
+    expect(patientDetailSource).toMatch(/!initialTerminal\s*&&[\s\S]{0,100}form\.status\s*!==\s*initial\.status/m);
   });
 });

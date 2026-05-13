@@ -445,7 +445,11 @@ router.patch("/:id", async (req, res) => {
 
   try {
     const [existing] = await db
-      .select({ id: hospitalizations.id, animalId: hospitalizations.animalId })
+      .select({
+        id: hospitalizations.id,
+        animalId: hospitalizations.animalId,
+        status: hospitalizations.status,
+      })
       .from(hospitalizations)
       .where(and(
         eq(hospitalizations.id, id),
@@ -459,6 +463,22 @@ router.patch("/:id", async (req, res) => {
         code: "NOT_FOUND",
         reason: "HOSPITALIZATION_NOT_FOUND",
         message: "Hospitalization not found or already discharged",
+        requestId,
+      }));
+    }
+
+    // Defense-in-depth: a deceased patient cannot be silently "resurrected"
+    // through this generic edit endpoint. The frontend locks the status field
+    // for terminal records, but a direct API caller must be rejected here too.
+    if (
+      data.status !== undefined &&
+      existing.status === "deceased" &&
+      data.status !== "deceased"
+    ) {
+      return res.status(409).json(apiError({
+        code: "TERMINAL_STATUS_LOCKED",
+        reason: "DECEASED_STATUS_IMMUTABLE",
+        message: "Cannot change the status of a deceased patient",
         requestId,
       }));
     }

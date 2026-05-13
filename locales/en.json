@@ -1402,7 +1402,8 @@
     "editCancel": "Cancel",
     "editSavedToast": "Patient updated",
     "editFailedToast": "Patient update failed",
-    "editNoChanges": "Nothing changed"
+    "editNoChanges": "Nothing changed",
+    "editStatusLocked": "Status is locked for non-active patients"
   },
   "billingLedger": {
     "title": "Billing Dashboard",
