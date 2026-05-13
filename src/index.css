@@ -394,14 +394,20 @@
 }
 
 /* ── QR scan-line animation ──────────────────────────────────────────────── */
+/*
+ * The scan frame is a fixed 250×250 box. The line is 2px tall and starts at
+ * top: 0, so a 248px translateY sweeps it to the bottom edge. Keep the
+ * distance hardcoded — using var() inside @keyframes is unreliable on iOS
+ * WebView and was the source of the "frozen at the bottom" regression.
+ */
 @keyframes qr-scan-line {
-  0%   { transform: translateY(0px); }
-  50%  { transform: translateY(var(--qr-scan-distance, 248px)); }
-  100% { transform: translateY(0px); }
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50%      { transform: translate3d(0, 248px, 0); }
 }
 
 .qr-scan-line {
   top: 0;
+  transform: translate3d(0, 0, 0);
   will-change: transform;
   animation: qr-scan-line 1.8s ease-in-out infinite;
 }

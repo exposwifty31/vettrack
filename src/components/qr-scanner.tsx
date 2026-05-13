@@ -722,15 +722,16 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                 height: 250,
                 boxShadow: "0 0 0 9999px rgba(0,0,0,0.58)",
                 borderRadius: "18px",
-                "--qr-scan-distance": "248px",
-              } as React.CSSProperties}
+              }}
             >
               {/* Corner brackets */}
               <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-xl" />
               <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-xl" />
               <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-xl" />
               <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-xl" />
-              {/* Animated scan line */}
+              {/* Animated scan line — the surrounding `phase === "scanning"` gate
+                  unmounts/remounts this whole overlay each time scanning is
+                  re-entered, which restarts the CSS animation cleanly. */}
               <div className="qr-scan-line absolute left-0 right-0 h-0.5 bg-primary/80" />
               {/* Helper text below the frame */}
               <p className="absolute -bottom-10 left-0 right-0 px-2 text-center text-[11px] leading-snug text-white/80 sm:text-xs">

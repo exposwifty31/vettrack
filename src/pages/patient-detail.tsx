@@ -222,17 +222,34 @@ export default function PatientDetailPage() {
       if (row.equipmentId) patientEquipmentIds.add(row.equipmentId);
     }
 
+    // Prefer the hospitalization record (authoritative animal data + ward/bay)
+    // over equipment-link metadata, so a freshly admitted patient with no
+    // equipment linked still shows the values entered on admission.
+    const hosp = hospQ.data;
+
     let patientName = p.unknownName;
-    const fromEq = linkedEquipment.find((e) => e.linkedAnimalName?.trim());
-    if (fromEq?.linkedAnimalName?.trim()) patientName = fromEq.linkedAnimalName.trim();
+    if (hosp?.animal?.name?.trim()) {
+      patientName = hosp.animal.name.trim();
+    } else {
+      const fromEq = linkedEquipment.find((e) => e.linkedAnimalName?.trim());
+      if (fromEq?.linkedAnimalName?.trim()) patientName = fromEq.linkedAnimalName.trim();
+    }
 
     let species: string | null = null;
     let roomName: string | null = null;
     let roomId: string | null = null;
+
+    if (hosp?.animal?.species?.trim()) {
+      species = [hosp.animal.species, hosp.animal.breed].filter((s) => s && s.trim()).join(" · ").trim() || null;
+    }
+
+    const wardBay = hosp ? [hosp.ward, hosp.bay].filter((s) => s && s.trim()).join(" · ").trim() : "";
+    if (wardBay) roomName = wardBay;
+
     const firstRoomed = linkedEquipment.find((e) => e.roomId && e.roomName);
     if (firstRoomed) {
       roomId = firstRoomed.roomId ?? null;
-      roomName = firstRoomed.roomName ?? null;
+      if (!roomName) roomName = firstRoomed.roomName ?? null;
     }
 
     const dashboard = dashboardQ.data;
@@ -243,13 +260,15 @@ export default function PatientDetailPage() {
       .filter((a) => a.animalId === animalId && a.status !== "completed" && a.status !== "cancelled" && a.status !== "no_show")
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
-    for (const task of careTasks) {
-      if (!task.metadata || typeof task.metadata !== "object") continue;
-      const m = task.metadata as Record<string, unknown>;
-      const sp = metaString(m, ["species", "animalSpecies", "patientSpecies"]);
-      if (sp) {
-        species = sp;
-        break;
+    if (!species) {
+      for (const task of careTasks) {
+        if (!task.metadata || typeof task.metadata !== "object") continue;
+        const m = task.metadata as Record<string, unknown>;
+        const sp = metaString(m, ["species", "animalSpecies", "patientSpecies"]);
+        if (sp) {
+          species = sp;
+          break;
+        }
       }
     }
 
@@ -290,6 +309,7 @@ export default function PatientDetailPage() {
     };
   }, [
     animalId,
+    hospQ.data,
     equipmentQ.data,
     dashboardQ.data,
     medActiveQ.data,
@@ -303,7 +323,7 @@ export default function PatientDetailPage() {
     return <Redirect to="/" />;
   }
 
-  const loadingCore = equipmentQ.isLoading;
+  const loadingCore = equipmentQ.isLoading || hospQ.isLoading;
   const loadFailed = equipmentQ.isError;
 
   const statusBadge =
