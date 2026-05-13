@@ -43,8 +43,9 @@ const VALID_STATUSES: HospitalizationStatus[] = [
 const admitSchema = z.object({
   // Existing animal path
   animalId: z.string().optional(),
-  // New animal path
-  animalName: z.string().min(1).max(120).optional(),
+  // New animal path — trim() before min(1) so whitespace-only names are
+  // rejected instead of silently creating/storing an empty name.
+  animalName: z.string().trim().min(1).max(120).optional(),
   species: z.string().max(60).optional(),
   breed: z.string().max(60).optional(),
   sex: z.string().max(20).optional(),
@@ -75,7 +76,10 @@ const dischargeSchema = z.object({
 // (ward/bay/admissionReason/status). All fields are optional; omitted fields
 // are left unchanged. Cannot be used to discharge — use /:id/discharge for that.
 const updateSchema = z.object({
-  animalName: z.string().min(1).max(120).optional(),
+  // trim() before min(1) so whitespace-only input is rejected; otherwise
+  // a whitespace-only string would pass validation and the handler's
+  // subsequent .trim() would store "" — silently erasing the patient name.
+  animalName: z.string().trim().min(1).max(120).optional(),
   species: z.string().max(60).nullable().optional(),
   breed: z.string().max(60).nullable().optional(),
   sex: z.string().max(20).nullable().optional(),

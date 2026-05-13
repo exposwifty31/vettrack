@@ -256,3 +256,38 @@ describe("Edit patient sheet — terminal-status lock (frontend)", () => {
     expect(patientDetailSource).toMatch(/!initialTerminal\s*&&[\s\S]{0,100}form\.status\s*!==\s*initial\.status/m);
   });
 });
+
+describe("Active Patients — whitespace-name validation", () => {
+  // Both admit (create) and update (edit) schemas declare animalName with
+  // `.trim().min(1)` so a whitespace-only string is rejected at the schema
+  // level, preventing the handler's subsequent .trim() from silently storing
+  // an empty patient name.
+  it("admitSchema.animalName trims before min(1)", () => {
+    const start = patientsRoute.indexOf("const admitSchema");
+    const end = patientsRoute.indexOf("}).refine", start);
+    const block = start >= 0 && end > start ? patientsRoute.slice(start, end) : "";
+    expect(block).toMatch(/animalName:\s*z\.string\(\)\.trim\(\)\.min\(1\)/);
+  });
+
+  it("updateSchema.animalName trims before min(1)", () => {
+    const start = patientsRoute.indexOf("const updateSchema");
+    const end = patientsRoute.indexOf("});", start);
+    const block = start >= 0 && end > start ? patientsRoute.slice(start, end) : "";
+    expect(block).toMatch(/animalName:\s*z\.string\(\)\.trim\(\)\.min\(1\)/);
+  });
+});
+
+describe("Patient detail — error surface for hospitalization fetch", () => {
+  it("loadFailed includes hospQ.isError so a failed hosp fetch shows an ErrorCard", () => {
+    expect(patientDetailSource).toMatch(/loadFailed\s*=\s*equipmentQ\.isError\s*\|\|\s*hospQ\.isError/);
+  });
+
+  it("ErrorCard retry refetches both hospQ and equipmentQ when either errored", () => {
+    // The retry handler should call refetch on whichever query failed,
+    // not just equipmentQ.
+    const retryBlock = patientDetailSource.match(/loadFailed\s*\?\s*\(\s*<ErrorCard[\s\S]*?onRetry=\{[\s\S]*?\}\}/);
+    expect(retryBlock).not.toBeNull();
+    expect(retryBlock[0]).toContain("hospQ.refetch()");
+    expect(retryBlock[0]).toContain("equipmentQ.refetch()");
+  });
+});

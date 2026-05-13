@@ -595,7 +595,10 @@ export default function PatientDetailPage() {
   }
 
   const loadingCore = equipmentQ.isLoading || hospQ.isLoading;
-  const loadFailed = equipmentQ.isError;
+  // Either query failing breaks the hero card — hospQ provides the authoritative
+  // animal/ward data, equipmentQ provides the linked equipment fallback. Surface
+  // both so a hospQ failure can't silently render fallback defaults.
+  const loadFailed = equipmentQ.isError || hospQ.isError;
 
   const statusBadge =
     derived.statusKind === "in_progress"
@@ -630,7 +633,13 @@ export default function PatientDetailPage() {
           </header>
 
           {loadFailed ? (
-            <ErrorCard message={p.loadError} onRetry={() => equipmentQ.refetch()} />
+            <ErrorCard
+              message={p.loadError}
+              onRetry={() => {
+                if (equipmentQ.isError) equipmentQ.refetch();
+                if (hospQ.isError) hospQ.refetch();
+              }}
+            />
           ) : null}
 
           <section
