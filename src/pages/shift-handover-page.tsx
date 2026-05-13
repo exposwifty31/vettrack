@@ -452,6 +452,18 @@ function CreateHandoffSheet({
     refetchOnMount: "always",
   });
 
+  // `refetchOnMount` only fires on component mount, not when the controlled
+  // `open` prop toggles. Explicitly refetch both lists whenever the sheet
+  // reopens so discharged patients / deactivated staff don't persist.
+  useEffect(() => {
+    if (open) {
+      staffQ.refetch();
+      patientsQ.refetch();
+    }
+    // staffQ.refetch and patientsQ.refetch are stable React Query references
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   // Reset on close
   const handleOpenChange = (v: boolean) => {
     if (!v) {

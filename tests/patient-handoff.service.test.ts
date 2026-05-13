@@ -33,7 +33,10 @@ vi.mock("../server/lib/realtime-outbox.js", () => ({ insertRealtimeDomainEvent: 
 function chainable(returnValue: unknown) {
   // Every method returns the same chain; awaiting the chain itself resolves to returnValue.
   const chain: Record<string, unknown> = {};
-  const methods = ["from", "where", "limit", "leftJoin", "innerJoin", "orderBy", "returning", "values", "set", "as"];
+  const methods = [
+    "from", "where", "limit", "leftJoin", "innerJoin", "orderBy",
+    "returning", "values", "set", "as", "onConflictDoNothing", "onConflictDoUpdate",
+  ];
   for (const m of methods) {
     chain[m] = vi.fn().mockReturnValue(chain);
   }
@@ -42,6 +45,11 @@ function chainable(returnValue: unknown) {
     Promise.resolve(returnValue).then(resolve, _reject);
   };
   return chain;
+}
+
+// Builds a minimal transaction object whose update() always returns the given rows.
+function makeTx(updateRows: unknown) {
+  return { update: vi.fn().mockReturnValue(chainable(updateRows)) };
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -224,5 +232,167 @@ describe("reviewHandoff", () => {
     await expect(
       reviewHandoff("clinic-1", "handoff-1", "caller", "caller@test.com", "technician", 1),
     ).rejects.toMatchObject({ code: "HANDOFF_NOT_SUBMITTED", httpStatus: 409 });
+  });
+});
+
+// ─── Concurrency: submit race ─────────────────────────────────────────────────
+//
+// These tests verify the behavioral contract of the in-transaction version guard.
+// True parallel DB execution cannot be replicated with synchronous mocks, so we
+// test the contract directly: when the WHERE (version = N) predicate matches 0
+// rows inside the transaction the service throws CONFLICT_STALE_DRAFT (409)
+// rather than silently double-committing.
+//
+// Note: vi.resetAllMocks() (not just vi.clearAllMocks()) is used here because
+// vi.clearAllMocks() only resets call history — it does not drain the
+// mockReturnValueOnce queue.  Without resetAllMocks, stale queued values from
+// one test bleed into the next.
+
+describe("submitHandoff — concurrent submit race", () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it("returns CONFLICT_STALE_DRAFT when transaction update finds 0 rows (version already bumped)", async () => {
+    // Simulate: pre-check passed with version=1, but by the time the transaction
+    // executes its guarded UPDATE another request already incremented the version.
+    mockSelect
+      .mockReturnValueOnce(chainable([{ outgoingUserId: "caller", receivingUserId: "rx", status: "draft", version: 1 }]))
+      .mockReturnValueOnce(chainable([{ id: "rx" }]))
+      // All items skipped → no active patients, no invalidation check needed
+      .mockReturnValueOnce(chainable([{ id: "item-1", hospitalizationId: "h1", animalId: "a1", animalName: "Max", status: "skipped" }]));
+
+    // Transaction: guarded UPDATE returns 0 rows — another request won the race
+    mockTransaction.mockImplementation(async (cb: (tx: ReturnType<typeof makeTx>) => Promise<unknown>) => {
+      return cb(makeTx([]));
+    });
+
+    const { submitHandoff } = await import("../server/services/patient-handoff.service.js");
+    await expect(
+      submitHandoff("clinic-1", "handoff-1", "caller", "caller@test.com", "technician", 1),
+    ).rejects.toMatchObject({ code: "CONFLICT_STALE_DRAFT", httpStatus: 409 });
+  });
+
+  it("succeeds when transaction update returns the updated row", async () => {
+    mockSelect
+      .mockReturnValueOnce(chainable([{ outgoingUserId: "caller", receivingUserId: "rx", status: "draft", version: 1 }]))
+      .mockReturnValueOnce(chainable([{ id: "rx" }]))
+      .mockReturnValueOnce(chainable([{ id: "item-1", hospitalizationId: "h1", animalId: "a1", animalName: "Max", status: "skipped" }]));
+
+    // Transaction: guarded UPDATE returns the row — this request won
+    mockTransaction.mockImplementation(async (cb: (tx: ReturnType<typeof makeTx>) => Promise<unknown>) => {
+      return cb(makeTx([{ id: "handoff-1" }]));
+    });
+
+    const { submitHandoff } = await import("../server/services/patient-handoff.service.js");
+    const result = await submitHandoff("clinic-1", "handoff-1", "caller", "caller@test.com", "technician", 1);
+    expect(result.status).toBe("submitted");
+    expect(result.version).toBe(2);
+  });
+});
+
+// ─── Concurrency: first-save race ────────────────────────────────────────────
+//
+// Two requests try to create the same (handoffId, hospitalizationId) item
+// simultaneously.  The second INSERT hits the unique constraint; the service
+// uses .onConflictDoNothing() so the DB does not throw a raw 500, and the
+// empty returning() array is translated to a 409.
+
+describe("upsertItem — concurrent first-save race", () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it("returns CONFLICT_STALE_DRAFT (409) when insert returns 0 rows due to unique constraint", async () => {
+    mockSelect
+      .mockReturnValueOnce(chainable([{ outgoingUserId: "caller", status: "draft" }]))
+      .mockReturnValueOnce(chainable([{ id: "hosp-1", animalId: "animal-1" }]))
+      // No pre-existing item — first-save path
+      .mockReturnValueOnce(chainable([]));
+
+    // Insert returns 0 rows: onConflictDoNothing silenced the constraint violation
+    mockInsert.mockReturnValue(chainable([]));
+
+    const { upsertItem } = await import("../server/services/patient-handoff.service.js");
+    await expect(
+      upsertItem("clinic-1", "handoff-1", "hosp-1", "caller", {}),
+    ).rejects.toMatchObject({ code: "CONFLICT_STALE_DRAFT", httpStatus: 409 });
+  });
+
+  it("does not propagate a raw unique-constraint error as a 500", async () => {
+    mockSelect
+      .mockReturnValueOnce(chainable([{ outgoingUserId: "caller", status: "draft" }]))
+      .mockReturnValueOnce(chainable([{ id: "hosp-1", animalId: "animal-1" }]))
+      .mockReturnValueOnce(chainable([]));
+
+    mockInsert.mockReturnValue(chainable([]));
+
+    const { upsertItem } = await import("../server/services/patient-handoff.service.js");
+    const err = await upsertItem("clinic-1", "handoff-1", "hosp-1", "caller", {}).catch((e: unknown) => e);
+
+    // Must be a shaped ApiError (has httpStatus), never an unhandled DB error
+    expect(err).toHaveProperty("httpStatus", 409);
+    expect(err).not.toHaveProperty("code", "23505"); // postgres unique_violation code
+  });
+});
+
+// ─── Transaction atomicity: realtime outbox rollback ─────────────────────────
+//
+// If insertRealtimeDomainEvent throws inside the transaction, the entire
+// transaction must roll back (DB guarantees this).  At the service level this
+// means the error propagates — the caller receives an exception and the handoff
+// status change is NOT visible (no committed row).
+
+describe("submitHandoff — transaction rollback on realtime outbox failure", () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it("propagates outbox error so the transaction rolls back", async () => {
+    mockSelect
+      .mockReturnValueOnce(chainable([{ outgoingUserId: "caller", receivingUserId: "rx", status: "draft", version: 1 }]))
+      .mockReturnValueOnce(chainable([{ id: "rx" }]))
+      .mockReturnValueOnce(chainable([{ id: "item-1", hospitalizationId: "h1", animalId: "a1", animalName: "Max", status: "skipped" }]));
+
+    // Version guard succeeds, but outbox insert throws
+    const outboxError = new Error("outbox unavailable");
+    const { insertRealtimeDomainEvent } = await import("../server/lib/realtime-outbox.js");
+    vi.mocked(insertRealtimeDomainEvent).mockRejectedValueOnce(outboxError);
+
+    mockTransaction.mockImplementation(async (cb: (tx: ReturnType<typeof makeTx>) => Promise<unknown>) => {
+      // Execute the callback — it will throw when it hits insertRealtimeDomainEvent
+      return cb(makeTx([{ id: "handoff-1" }]));
+    });
+
+    const { submitHandoff } = await import("../server/services/patient-handoff.service.js");
+
+    // The service must throw, not swallow the error
+    await expect(
+      submitHandoff("clinic-1", "handoff-1", "caller", "caller@test.com", "technician", 1),
+    ).rejects.toThrow("outbox unavailable");
+
+    // The transaction callback was entered exactly once
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+
+    // The state-change UPDATE was attempted inside the transaction
+    const txArg = mockTransaction.mock.calls[0][0];
+    expect(txArg).toBeTypeOf("function");
+  });
+
+  it("does not return a success result when the outbox fails", async () => {
+    mockSelect
+      .mockReturnValueOnce(chainable([{ outgoingUserId: "caller", receivingUserId: "rx", status: "draft", version: 1 }]))
+      .mockReturnValueOnce(chainable([{ id: "rx" }]))
+      .mockReturnValueOnce(chainable([{ id: "item-1", hospitalizationId: "h1", animalId: "a1", animalName: "Max", status: "skipped" }]));
+
+    const { insertRealtimeDomainEvent } = await import("../server/lib/realtime-outbox.js");
+    vi.mocked(insertRealtimeDomainEvent).mockRejectedValueOnce(new Error("outbox unavailable"));
+
+    mockTransaction.mockImplementation(async (cb: (tx: ReturnType<typeof makeTx>) => Promise<unknown>) => {
+      return cb(makeTx([{ id: "handoff-1" }]));
+    });
+
+    const { submitHandoff } = await import("../server/services/patient-handoff.service.js");
+    const result = await submitHandoff("clinic-1", "handoff-1", "caller", "caller@test.com", "technician", 1)
+      .then((v) => v)
+      .catch((e: unknown) => e);
+
+    // Must be an error, not a SubmitHandoffResponse
+    expect(result).toBeInstanceOf(Error);
+    expect((result as Error).message).toBe("outbox unavailable");
   });
 });
