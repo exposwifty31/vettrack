@@ -205,14 +205,13 @@ function EditPatientSheet({
     return patch;
   }
 
+  const pendingPatch = buildPatch();
+  const hasChanges = Object.keys(pendingPatch).length > 0;
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const patch = buildPatch();
-    if (Object.keys(patch).length === 0) {
-      toast.message(p.editNoChanges);
-      return;
-    }
-    updateMut.mutate(patch);
+    if (!hasChanges) return;
+    updateMut.mutate(pendingPatch);
   }
 
   return (
@@ -340,8 +339,9 @@ function EditPatientSheet({
             <Button
               type="submit"
               className="flex-1"
-              disabled={updateMut.isPending}
+              disabled={updateMut.isPending || !hasChanges}
               data-testid="btn-edit-patient-save"
+              title={!hasChanges ? p.editNoChanges : undefined}
             >
               {updateMut.isPending ? p.editSaving : p.editSave}
             </Button>

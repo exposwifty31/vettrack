@@ -158,6 +158,12 @@ describe("Active Patients — API client", () => {
 });
 
 describe("Active Patients — PATCH /:id edit endpoint", () => {
+  function editBlock() {
+    const start = patientsRoute.indexOf('router.patch("/:id"');
+    const end = patientsRoute.indexOf('router.patch("/:id/status"', start);
+    return start >= 0 && end > start ? patientsRoute.slice(start, end) : "";
+  }
+
   it("rejects status=discharged (must use /:id/discharge)", () => {
     expect(patientsRoute).toContain("USE_DISCHARGE_ENDPOINT");
   });
@@ -167,11 +173,7 @@ describe("Active Patients — PATCH /:id edit endpoint", () => {
   });
 
   it("guards against already-discharged records", () => {
-    const start = patientsRoute.indexOf('router.patch("/:id"');
-    // Slice up to the next sibling route declaration to avoid pulling /:id/status
-    const end = patientsRoute.indexOf('router.patch("/:id/status"', start);
-    const block = start >= 0 && end > start ? patientsRoute.slice(start, end) : "";
-    expect(block).toContain("isNull(hospitalizations.dischargedAt)");
+    expect(editBlock()).toContain("isNull(hospitalizations.dischargedAt)");
   });
 
   it("writes animal + hospitalization updates inside a transaction", () => {
@@ -180,5 +182,37 @@ describe("Active Patients — PATCH /:id edit endpoint", () => {
 
   it("emits patient_updated audit entry", () => {
     expect(patientsRoute).toContain('actionType: "patient_updated"');
+  });
+
+  it("animal and hospitalization updates are independently conditional (omitted fields preserved)", () => {
+    // Both updates are wrapped in `if (Object.keys(...).length > 0)` so a
+    // request that only touches animal fields does not write the hospitalization,
+    // and vice versa.
+    const block = editBlock();
+    expect(block).toMatch(/if\s*\(Object\.keys\(animalUpdate\)\.length\s*>\s*0\)\s*\{[\s\S]*?tx\.update\(animals\)/m);
+    expect(block).toMatch(/if\s*\(Object\.keys\(hospUpdate\)\.length\s*>\s*0\)\s*\{[\s\S]*?tx\.update\(hospitalizations\)/m);
+  });
+
+  it("each editable field is gated on `!== undefined` so omitted keys are preserved", () => {
+    const block = editBlock();
+    // Animal-side fields
+    for (const field of ["animalName", "species", "breed", "sex", "weightKg"]) {
+      expect(block).toContain(`if (data.${field} !== undefined)`);
+    }
+    // Hospitalization-side fields
+    for (const field of ["ward", "bay", "admissionReason", "status"]) {
+      expect(block).toContain(`if (data.${field} !== undefined)`);
+    }
+  });
+
+  it("updateSchema marks every field as optional so partial PATCH is supported", () => {
+    const schemaStart = patientsRoute.indexOf("const updateSchema");
+    const schemaEnd = patientsRoute.indexOf("});", schemaStart);
+    const schema = schemaStart >= 0 && schemaEnd > schemaStart ? patientsRoute.slice(schemaStart, schemaEnd) : "";
+    for (const field of ["animalName", "species", "breed", "sex", "weightKg", "ward", "bay", "admissionReason", "status"]) {
+      // each must appear with .optional() somewhere in its declaration
+      const fieldLine = schema.split("\n").find((l) => l.includes(`${field}:`));
+      expect(fieldLine ?? "", `${field} declaration`).toMatch(/\.optional\(\)/);
+    }
   });
 });
