@@ -25,7 +25,10 @@ A **task** has the following meaningful properties for authority decisions:
 
 The following is the **target** matrix. Phase 3A enforces it on the server. Phase 0 documents it only.
 
-**Important:** for Vets, the "effective clinical role" is the operational role selected at check-in (see `authority-model.md §4`), not generic `clinicalRole = Vet`. Without an active check-in a user with `clinicalRole = Vet` is treated identically to "off-shift Vet" below.
+**Important — "active shift" requires check-in for ALL clinical roles.** Per `authority-model.md §2 rule 6` and `§3.2`:
+
+- For **Vets**, "active shift" = `allowedOperationalRoles`-eligible AND checked in (selecting an operational role). Without an active check-in, a user with `clinicalRole = Vet` is treated identically to "off-shift Vet" below.
+- For **Technicians / Senior Technicians**, "active shift" = EZShift-scheduled-eligible AND checked in. EZShift alone is no longer sufficient — Tech / Senior-Tech check-in is required to pass any `active-shift` gate in this matrix. Pre-Phase-2.5, the coarser "EZShift-eligible only" semantics apply (downstream PRs note the relaxation explicitly).
 
 ### 2.1 Non-medication, non-clinical-typed task creation
 

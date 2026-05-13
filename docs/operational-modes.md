@@ -8,21 +8,29 @@
 
 ## 0. Terminology used in this document — "active shift"
 
-Throughout this document, references to **"active-shift Vet"** / **"active-shift Tech"** / **"active-shift staff"** carry the precise meaning given in `docs/authority-model.md §3`:
+Throughout this document, references to **"active-shift Vet"** / **"active-shift Tech"** / **"active-shift staff"** carry the precise meaning given in `docs/authority-model.md §3` and `§4`. Active clinical authority is composed of **two states**, both required:
 
-- The source of active-shift authority is the **imported EZShift schedule**.
-- A user is active when their EZShift-derived `vt_shifts` row covers `NOW()` AND its labels map to the required VetTrack `shiftRole` per the mapping table in `authority-model.md §3.5`.
-- This is **scheduled** authority, not **attendance-confirmed** authority. The system does not yet observe clock-in, physical presence, late arrival, early departure, absence, or ad-hoc substitution.
+| Clinical role | Eligibility source | Activation mechanism |
+|---|---|---|
+| Technician / Senior Technician | EZShift schedule (`AM §3`) | Tech check-in (PDN-V13..V15) |
+| Vet | `allowedOperationalRoles` config (`AM §4.4`) | Vet check-in selecting operational role (`AM §4.1`) |
+| Student | manual VetTrack configuration (PDN-A7) | undefined today |
+
+Important properties:
+
+- Schedule alone (Techs) or config alone (Vets) is **scheduled / configured eligibility** — NOT active authority. **Check-in is the binding event** for all clinical roles.
+- This is **scheduled-plus-check-in** authority, not **attendance-confirmed** authority. The system does not yet observe clock-in via attendance device, physical presence, late arrival, early departure, absence, or ad-hoc substitution beyond what check-in covers.
 - Backend re-resolves authority on every request. Frontend `useAuth()` exposure of `activeShiftRole` is advisory UX only; 403s are the source of truth.
+- The check-in subsystem covering both Vets and Techs / Senior Techs ships in the **new Phase 2.5 — Clinical Check-in & Active Authority Infrastructure** (see `docs/architecture-review.md`).
 
 Direct implications for the workflows in this document:
 
-- **ER Mode toggle authority** depends on the EZShift schedule being current and the label mapping being correct. A Vet whose EZShift row is missing, mismatched by name, or carries unrecognised labels cannot toggle ER Mode even if physically present.
-- **Code Blue manager assignment** depends on the same source. If the schedule is stale or no eligible Vet is mapped active at `NOW()`, sessions may have to start without a manager (the banner state in §2.4).
-- **Code Blue start notifications** fan out to the EZShift-derived active-shift set, not to physically-present users.
-- **ER intake creation** is gated to EZShift-derived active-shift Vets.
+- **ER Mode toggle authority** depends on: (a) the Senior Vet user being scheduled/configured-eligible, AND (b) having actively checked in for the current shift selecting `operationalRole = senior_vet`. A Senior Vet whose check-in has not occurred (or has been ended via check-out) cannot toggle ER Mode even if physically present.
+- **Code Blue manager assignment** depends on the same source: active-shift Vet (any operational role per V1 clinic policy). If no eligible Vet is currently checked in, sessions may have to start without a manager (banner state, §2.4).
+- **Code Blue start notifications** fan out to the **checked-in** active-shift set, not to merely scheduled or merely configured users.
+- **ER intake creation** is gated to Vets who are checked in (active) — primary: Receiving Vet; permitted: Senior Vet and ER/ICU Vet.
 
-A future phase MAY layer clock-in / attendance confirmation on top of the schedule (the model in §0 of this document is a hook, not a guarantee). For the current scope, **the schedule IS the authority source**. Risks created by this choice are catalogued in `docs/architecture-review.md`.
+A future phase MAY layer clock-in / attendance confirmation on top of check-in (the model in `AM §3.2.2` and §4.7 is a hook, not a guarantee). For the current scope, **schedule + check-in IS the authority source**. Risks created by this choice are catalogued in `docs/architecture-review.md`.
 
 ---
 
@@ -47,6 +55,14 @@ The state lives in the server config (`vt_server_config`) and is queryable via `
 - Phase 4 PR 4.1 finalises the gate as **active-shift Senior Vet only**, audit detail, and SSE broadcast. Requires the new Phase 2.5 (Vet check-in subsystem) to exist.
 
 **Dead-lock policy** when ER Mode is `enforced` and no Senior Vet is currently checked in: **PDN-V10**. Until resolved, the system relies on operational discipline (always have a Senior Vet checked in before enabling ER Mode). Phase 4 PR 4.1 should ship with a documented escape-hatch decision.
+
+**Decision-helper boundary (same pattern as Code Blue manager — see §2.4):**
+
+```
+canToggleErMode(userAuthority, clinicPolicy) -> boolean
+```
+
+V1 founder's clinic policy: Senior Vet only. The helper hides this clinic-specific behaviour from endpoint code so future clinics may configure differently without re-coding the toggle endpoint. The helper boundary ships in Phase 2.5; Phase 4 PR 4.1 wires it into the toggle handler.
 
 ### 1.3 Backend enforcement (target)
 
@@ -139,23 +155,52 @@ Confirmed Product Logic states Code Blue must be associated with an existing pat
 
 ### 2.4 Event manager
 
+Event-manager eligibility flows through a **central decision helper** that separates clinical capability from clinic-specific policy. See `authority-model.md §4.8` for the layered-separation framework.
+
+**Helper boundary (architectural, not yet implemented):**
+
+```
+canManageCodeBlue(userAuthority, clinicPolicy) -> boolean
+```
+
+- `userAuthority` carries the user's `(systemRole, clinicalRole, activeShiftRole/operationalRole, checkedIn)`.
+- `clinicPolicy` carries the clinic's organizational policy. For V1 the only field is `allowAllActiveShiftVets: boolean`.
+
+**Layer 5 (clinical capability — product target):**
+
 - Event manager must be an **active-shift Vet** (any operational role per `authority-model.md §4.2`).
-- **Senior Vet is preferred** but not strictly required. When a Senior Vet is checked in, the FE picker SHOULD surface them first; when none are checked in, any other active-shift operational Vet role (ER/ICU, Hospitalization, Receiving) may be assigned manager.
 - **On-call Vet alone is NOT sufficient** to be a manager. An on-call Vet must explicitly check in (transitioning to a non-on-call operational role) before they can be manager. See `authority-model.md §4.2` and **PDN-V5**.
-- A Code Blue **may start without a manager** if none is selected (or none is currently checked in).
+
+**Layer 6 (organizational policy — founder's clinic V1):**
+
+- `allowAllActiveShiftVets = true` — any checked-in active-shift Vet of any operational role may manage Code Blue.
+- **Senior Vet is preferred UX**, NOT a hard gate. When a Senior Vet is checked in, the FE picker SHOULD surface them first; when none are checked in, any other active-shift operational Vet role (ER/ICU, Hospitalization, Receiving) may be assigned manager.
+- Other clinics MAY in the future configure a stricter policy (e.g., "Senior Vet only" or "Senior Vet preferred with explicit fallback"). The helper must accept these without endpoint code changes.
+
+**Hard rules across all clinics (cannot be relaxed by Layer 6):**
+
+- A Code Blue **may start without a manager** if none is selected or none is currently checked in.
 - If no manager is assigned, the UI **must show a persistent warning/banner**.
 - **Only the event manager may end the Code Blue.**
 - **End is blocked when no Vet manager exists.**
-- **Early closure** (before 15 minutes) requires the assigned Vet manager **plus** structured `earlyStopReason`. Any operational role qualifies — Senior Vet is **not** strictly required for early closure, contrary to a possible simpler-reading of the product brief. The early-closure path must NOT be a hard block on clinically necessary early termination.
+- **Early closure** (before 15 minutes) requires the assigned Vet manager **plus** structured `earlyStopReason`. Layer 5 permits any operational Vet role; Layer 6 may further restrict but MUST NOT remove the structured-reason requirement. The early-closure path must NOT be a hard block on clinically necessary early termination.
 
-The manager picker UI consumes a server endpoint. Today `GET /api/users/managers` exists (users.ts line 923) and returns users; Phase 4 PR 4.6 normalises it to:
+**Critical rule for endpoint code:**
 
-- filter to active-shift Vets only (requires Phase 2.5 check-in subsystem);
-- annotate Senior Vets distinctly so the FE can surface them first;
+> Do NOT hardcode "Senior Vet only" (or any other clinic-specific rule) into Code Blue manager endpoint logic. Always go through `canManageCodeBlue(userAuthority, clinicPolicy)`. For V1, the helper consults `clinicPolicy.allowAllActiveShiftVets` and returns `true` for any active-shift Vet (any operational role). The Senior-Vet preference is purely a FE picker affordance.
+
+**Manager picker UI** consumes a server endpoint. Today `GET /api/users/managers` exists (users.ts line 923) and returns users; Phase 4 PR 4.6 normalises it to:
+
+- filter to **checked-in active-shift Vets only** (requires Phase 2.5 check-in subsystem);
+- annotate Senior Vets distinctly so the FE can surface them first **without** the BE returning a different gate;
 - proposed new name `GET /api/users/active-shift-vets`, with the legacy path optionally retained for compatibility.
+
+The picker endpoint's response shape and the `canManageCodeBlue` helper are **two separate concerns**: the picker returns the candidate set; the helper validates the chosen candidate. Endpoint code must call the helper, not infer eligibility from picker order.
 
 **Code Blue manager auto-assignment when no Senior Vet is checked in** — **PDN-V11**.
 **Senior Vet authority for in-flight Code Blues started before their check-in** — **PDN-V12**.
+**Clinic-policy data shape** — **PDN-V16**.
+**Clinic-policy edit authority** — **PDN-V17**.
 
 > Note: The Phase 0–original audit reported that `/api/users/managers` was missing (404). It is in fact registered. Phase 4 work is **renaming + filtering**, not creation.
 

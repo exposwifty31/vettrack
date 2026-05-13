@@ -16,7 +16,7 @@ VetTrack authority is **not** a single hierarchy. It is a triple:
 |---|---|---|---|
 | `systemRole` | `Admin` \| `User` | DB column on `vt_users` (current `role` field semantically; final naming decided in Phase 2A) | Application/system management only. Does **not** grant clinical authority. |
 | `clinicalRole` | `Vet` \| `Senior Technician` \| `Technician` \| `Student` | DB column on `vt_users` | Professional identity. **Dormant by itself.** |
-| `shiftRole` | same enum as `clinicalRole`, plus the Vet **operational-role** set (§4), or `null` | **Source differs by clinicalRole.** Technicians / Senior Technicians: derived from imported EZShift schedule (§3); materialised in `vt_shifts`. **Vets: derived from manual check-in (§4) — Vets are NOT in EZShift.** Students: manually configured in VetTrack (no EZShift, no check-in). | The role the user is **actually operating as** during the current shift. For Techs the value is one of `vet`, `senior_technician`, `technician`, `student`, `null`. For Vets the value is one of the operational-role names in §4.2 (e.g., `senior_vet`, `er_icu_vet`). **Initial model is scheduled / explicit-check-in authority; physical attendance is not observed.** |
+| `shiftRole` | enum (Tech/Senior Tech values, Vet operational-role values §4.2), or `null` | **Composed differently by clinicalRole.** Technicians / Senior Technicians: **scheduled eligibility** from imported EZShift schedule (§3) **AND** a successful **check-in** confirming operational presence. Vets: **allowed-roles eligibility** from `allowedOperationalRoles` config **AND** a **check-in** that selects an operational role (§4); Vets are NOT in EZShift. Students: manually configured in VetTrack (PDN-A7); check-in shape for Students is undefined today. | The role the user is **actually operating as** during the current shift. Schedule alone (Techs) or `allowedOperationalRoles` alone (Vets) does **NOT** confer active authority. **Check-in is the binding event** for all clinical roles. Physical attendance beyond check-in (clock-in, presence beacons) is still not modelled and is explicitly out of scope. |
 
 The composed value used by clinical-action gates is the **effective clinical role**:
 
@@ -34,18 +34,23 @@ If `shiftRole` is `null` (no active shift), `effectiveClinicalRole` is `null` an
 2. **`shiftRole` overrides `clinicalRole`.** This is an override, **not** a max-of. A user whose `clinicalRole` is `Senior Technician` who is staffing a shift as `Technician` operates as `Technician` for the duration of that shift.
 3. **`systemRole` is orthogonal to clinical authority.** A user with `systemRole = Admin` can manage admin pages and admin-only operations (user management, integrations, audit log, billing void, etc.) but **cannot** perform a clinical action without an active clinical shift role.
 4. **`Student` is fixed.** A user whose `clinicalRole` is `Student` is never elevated by any shift assignment, never receives a secondary role, and never gains clinical authority above `Student`. The matrix in §5 lists everything Student can do. **Students are not represented in the EZShift import** (see §3.5); a user's Student role is configured manually in VetTrack.
-6. **`Vet` clinical authority requires explicit check-in.** A user whose `clinicalRole` is `Vet` has no active authority on the basis of `clinicalRole` alone. They must perform a manual check-in (§4), selecting an **operational role** for the shift from their configured `allowedOperationalRoles`. Without a current check-in, a Vet has no clinical authority — symmetric to the off-shift rule for Technicians.
+6. **Active clinical authority requires explicit check-in — for ALL clinical roles.** Neither `clinicalRole`, nor scheduled eligibility (EZShift), nor `allowedOperationalRoles` configuration grants active authority on its own. Check-in is the binding event that converts eligibility into active authority.
+   - **Technicians / Senior Technicians**: require an EZShift-scheduled assignment AND a check-in confirming operational presence (§3). EZShift alone is **scheduled eligibility**, not active authority.
+   - **Vets**: require a check-in that selects an operational role from the user's `allowedOperationalRoles` (§4). The configured `allowedOperationalRoles` alone is eligibility, not active authority.
+   - **Students**: authority is via manual VetTrack configuration (PDN-A7). The activation mechanism for Students is undefined today.
+
+   Without an active check-in confirming presence, **no user has clinical authority**, regardless of `clinicalRole`, schedule, or stored configuration. This is symmetric across all clinical roles.
 5. **Roles are always read from the database**, never from JWT claims.
 
 ---
 
-## 3. Active Shift Derivation — Technicians & Senior Technicians (EZShift)
+## 3. Active Shift Derivation — Technicians & Senior Technicians (EZShift schedule + check-in)
 
-> **Scope of this section.** Active-shift authority for **Technicians and Senior Technicians** is derived from the imported EZShift schedule. Vets are **NOT** in EZShift; their active-shift model is §4 (manual check-in). Students are not in EZShift either; see §3.5 decomposition rules and PDN-A7.
+> **Scope of this section.** Active clinical authority for **Technicians and Senior Technicians** is a **two-step composition**: EZShift-derived **scheduled eligibility** PLUS a successful **check-in confirmation**. Vets are **NOT** in EZShift; their model is §4 (`allowedOperationalRoles` + check-in). Students are not in EZShift either; see §3.5 decomposition rules and PDN-A7.
 
-### 3.1 Source of truth
+### 3.1 Source of scheduled eligibility (NOT active authority)
 
-For Technicians and Senior Technicians, the initial product model derives `activeShiftRole` from the **imported EZShift schedule file**. EZShift is the clinic's external scheduling system. Imports populate `vt_shifts` rows; each row corresponds to a scheduled shift block carrying:
+For Technicians and Senior Technicians, **scheduled eligibility** is derived from the **imported EZShift schedule file**. EZShift is the clinic's external scheduling system. Imports populate `vt_shifts` rows; each row corresponds to a scheduled shift block carrying:
 
 - staff name (Hebrew display name)
 - date
@@ -53,7 +58,7 @@ For Technicians and Senior Technicians, the initial product model derives `activ
 - department / area context
 - one or more operational labels (e.g., `בכיר`, `טכנאי קבלה`, `תמך בוקר`, `תמך ערב`, `חירום`, `אישפוז`, `אסופיים`, `התלמדות`)
 
-A user has **active clinical authority** if **all** of the following hold:
+A Tech / Senior Tech is **scheduled-eligible** if **all** of the following hold:
 
 1. they are matched to an imported EZShift assignment;
 2. the assignment's scheduled window covers `NOW()`;
@@ -61,28 +66,53 @@ A user has **active clinical authority** if **all** of the following hold:
 4. the assignment belongs to the relevant clinic / department context;
 5. the assignment was not manually disabled or overridden.
 
+**Scheduled eligibility is necessary but NOT sufficient for active clinical authority.** A scheduled-eligible user who has not checked in (§3.2) has no clinical authority — symmetric to the off-shift rule and to the rule for Vets in §4.
+
 Condition 5 is documented as a **future hook**. No manual-override mechanism exists today; the condition is named in the model so downstream consumers do not bake in "schedule is final, no exceptions" assumptions.
 
-### 3.2 Scheduled active authority — NOT attendance-confirmed
+### 3.2 Check-in confirmation converts eligibility into active authority
 
-This is **scheduled active authority**, not attendance-confirmed authority. The system does **not** observe whether the user:
+EZShift alone does not handle:
 
-- has physically arrived at the clinic;
-- has clocked in;
-- has logged into a clinic device.
+- no-shows;
+- sick staff who do not arrive;
+- late arrivals;
+- early departures;
+- emergency substitutions outside the imported schedule;
+- scheduled staff who are simply not physically present.
 
-Scheduled ≡ active for clinical-authority purposes. A scheduled user who is absent, late, sick, or substituted is still treated as authorised. Conversely, a user covering a shift not yet reflected in EZShift has no authority until the import catches up.
+For this reason, the V1 product target requires an explicit **check-in confirmation** for Techs / Senior Techs in addition to scheduled eligibility. Check-in:
 
-The following are **explicitly out of scope** of the Phase 0 model and any phase up to and including Phase 5:
+- is a per-shift event that confirms the user is operationally present;
+- is bounded by a paired **check-out** at the end of the shift;
+- produces an audit entry (PDN-V4 broadened — see §8.3);
+- is the **binding event** that converts "scheduled" into "active."
 
-- clock-in events;
-- presence / attendance confirmation;
-- manual override of the schedule (e.g., admin marks user "absent today");
-- late-arrival / early-departure handling;
-- last-minute substitutions outside EZShift;
-- absence handling.
+A user who has not checked in has **scheduled eligibility** but **no active clinical authority**. A user who has checked in but is not scheduled is **not active** either — both EZShift schedule and check-in are required.
 
-A future phase MAY layer some or all of the above on top of the schedule. Until then, the scheduled-active-authority model carries the entirety of "is this user authorised for clinical actions right now."
+The check-in subsystem for Techs / Senior Techs does **not exist in code today**. It is part of the **new Phase 2.5 — Clinical Check-in & Active Authority Infrastructure** (see `docs/architecture-review.md`). Until Phase 2.5 lands, downstream gates that depend on "active" Tech authority operate at the coarser scheduled-eligibility granularity, and target-gate documentation explicitly says `(after Phase 2.5)` for check-in-aware values.
+
+### 3.2.1 Four authority states for Techs / Senior Techs
+
+| State | Meaning | Confers clinical authority? |
+|---|---|---|
+| **scheduled** | EZShift row exists for this user at this time | no, until §3.2.2 conditions hold |
+| **eligible** | scheduled AND label maps to a recognised `shiftRole` AND not disabled | no, until checked in |
+| **checked-in** | eligible AND user has actively confirmed presence | yes — active clinical authority |
+| **off / inactive** | none of the above, or check-out has occurred | no |
+
+### 3.2.2 What is explicitly NOT modelled (deferred)
+
+The following are out of scope of Phase 0 → Phase 5 even after the schedule + check-in model:
+
+- clock-in via attendance device (separate from VetTrack check-in);
+- presence beacons / Bluetooth proximity;
+- manual admin override of the schedule;
+- automatic late-arrival / early-departure detection;
+- last-minute substitutions outside EZShift (a substitute Tech without an EZShift row cannot check in with authority);
+- absence-handling automation.
+
+A future phase MAY layer presence confirmation on top of check-in. Until then, check-in is the only attendance signal the system has.
 
 ### 3.3 Backend is authoritative; frontend visibility is advisory UX
 
@@ -196,7 +226,7 @@ The check-in produces a per-shift assignment with at least these conceptual fiel
 
 A Vet has active clinical authority when an active (non-ended) check-in exists for them in the current clinic. Without an active check-in, a user whose `clinicalRole` is `Vet` has **no clinical authority** — identical to the off-shift rule for Technicians in §3.
 
-**The Vet check-in subsystem does not exist in code today.** Storage, endpoints, and FE flow are out of scope for Phase 0–1. The earliest plausible landing is a new **Phase 2.5 (Vet Check-in & Operational-Role Infrastructure)** inserted between Phase 2A and Phase 4 — see `docs/architecture-review.md`. Documentation here defines the behavioural target only.
+**Neither the Vet check-in subsystem nor the Tech / Senior-Tech check-in subsystem exists in code today.** Storage, endpoints, and FE flow are out of scope for Phase 0–1. The earliest plausible landing is a new **Phase 2.5 — Clinical Check-in & Active Authority Infrastructure** inserted between Phase 2A and Phase 4 — see `docs/architecture-review.md`. Documentation here defines the behavioural target only. Phase 2.5 covers BOTH Vet check-in (with operational-role selection) and Tech / Senior-Tech check-in confirmation (presence-only; role already determined by EZShift).
 
 ### 4.2 Vet operational roles — V1 enumeration
 
@@ -249,31 +279,37 @@ To prevent any Vet from selecting "Senior Vet" or any other elevated role at wil
 
 Storage of `allowedOperationalRoles` is not designed today. The simplest option is a `vt_users` column carrying an array; the strictest is a separate row-per-role table. Either way, schema work is **PDN-V3** and out of scope of Phase 0.
 
-### 4.5 Vet check-in vs Technician active-shift — semantic differences
+### 4.5 Vet check-in vs Technician check-in — semantic differences
+
+Both Techs and Vets require check-in to gain active clinical authority. They differ in **eligibility source** and **role-selection mechanics**.
 
 | Aspect | Technician / Senior Tech | Vet |
 |---|---|---|
-| Source of authority | EZShift import (schedule) | manual check-in (per-shift action) |
-| Granularity | scheduled time window | session bounded by check-in / check-out |
-| Operational role selection | derived from EZShift label (§3.5) | selected at check-in from `allowedOperationalRoles` |
-| Default off-shift behaviour | no clinical authority | no clinical authority |
+| Source of eligibility | EZShift import (schedule) | `allowedOperationalRoles` config (per-user) |
+| Activation mechanism | **check-in confirmation** (paired with check-out) | **check-in** that **selects** an operational role |
+| Role determination | derived from EZShift label at scheduled-eligibility time (§3.5); not chosen at check-in | **chosen at check-in** from `allowedOperationalRoles` |
+| Default off-shift / pre-check-in behaviour | scheduled-eligible but no active authority | allowed-eligible but no active authority |
 | Override path | not yet defined | future: explicit assignment in lieu of check-in (PDN-V5, PDN-V6) |
-| Audit on grant / revoke | per-import (PDN-A6) | per check-in / check-out (PDN-V4) |
-| FE freshness | poll / SSE / focus-refresh | poll / SSE / focus-refresh |
-| Identity match | EZShift name → `vt_users.displayName` (PDN-A1) | direct: the checking-in user is the authenticated user |
+| Audit on grant / revoke | per-check-in / per-check-out (PDN-V4) plus per-import (PDN-A6) | per-check-in / per-check-out (PDN-V4) |
+| FE freshness | poll / SSE / focus-refresh on check-in/out + EZShift import events | poll / SSE / focus-refresh on check-in/out |
+| Identity match | EZShift name → `vt_users.displayName` (PDN-A1) for the eligibility join; check-in itself uses authenticated user | direct: the checking-in user is the authenticated user |
 
 ### 4.6 Composite "active clinical authority" definition
 
 Pulling together §3 (Techs / Senior Techs) and §4 (Vets):
 
 > A user has **active clinical authority** if **all** of the following hold:
-> 1. they have an active per-shift assignment for the current clinic;
->    - for **Technicians / Senior Technicians**, the assignment is an EZShift-derived `vt_shifts` row whose window covers `NOW()` and whose labels map to a recognised `shiftRole` (§3.5);
->    - for **Vets**, the assignment is an active Vet check-in carrying an `operationalRole` (§4.1);
->    - for **Students**, an active assignment exists only via manual VetTrack configuration (PDN-A7).
-> 2. the assignment maps to (or carries) a recognised authority value;
+> 1. **eligibility** exists for the current clinic / shift block:
+>    - for **Technicians / Senior Technicians**, an EZShift-derived `vt_shifts` row whose window covers `NOW()` and whose labels map to a recognised `shiftRole` (§3.5);
+>    - for **Vets**, the user's `allowedOperationalRoles` configuration is non-empty;
+>    - for **Students**, an explicit manual VetTrack configuration exists (PDN-A7).
+> 2. **check-in confirmation** is current:
+>    - for **Technicians / Senior Technicians**, the user has performed a Tech check-in for the eligible shift block (§3.2);
+>    - for **Vets**, the user has performed a Vet check-in selecting an `operationalRole` from the configuration (§4.1);
+>    - for **Students**, the activation mechanism is undefined (PDN-A7).
 > 3. the assignment is for the relevant clinic / department context;
-> 4. the assignment was not manually disabled or overridden.
+> 4. the assignment was not manually disabled or overridden;
+> 5. **organizational policy** for the clinic permits the user to perform the requested action (§5).
 
 §1's `effectiveClinicalRole(authority)` returns either:
 
@@ -285,11 +321,47 @@ For the §5 action authority matrix, a Vet's operational role is consulted on to
 
 ### 4.7 What this section explicitly does NOT change today
 
-- No schema change for Vet check-in is being made.
-- No endpoint for Vet check-in / check-out is being added.
+- No schema change for Vet check-in or Tech check-in is being made.
+- No endpoint for check-in / check-out is being added.
 - No `vt_users.allowedOperationalRoles` column or sibling table is being added.
-- The Phase 1 PR plan does not include Vet check-in or operational-role enforcement; gates that reference operational roles in §5 are **target gates** that depend on the new Phase 2.5 infrastructure (see `docs/architecture-review.md`).
-- The legacy `server/lib/role-resolution.ts` does not consult operational roles in Phase 0.
+- The Phase 1 PR plan does not include any check-in subsystem or operational-role enforcement; gates that reference operational roles in §5 are **target gates** that depend on the new Phase 2.5 infrastructure (see `docs/architecture-review.md`).
+- The legacy `server/lib/role-resolution.ts` does not consult operational roles or check-in state in Phase 0.
+
+---
+
+### 4.8 Authority model — six-layer separation
+
+To prevent endpoint code from hardcoding clinic-specific behaviour, the authority model is intentionally factored into six layers. Each layer can be reasoned about (and tested) independently. This is a documentation construct — no module structure is mandated today.
+
+| # | Layer | Question it answers | Source(s) today | Source(s) at target |
+|---|---|---|---|---|
+| 1 | **Identity** | Who is this user? | Clerk JWT + `vt_users` record | unchanged |
+| 2 | **Scheduled / configured eligibility** | Is this user permitted to act in some clinical role right now? | for Techs: EZShift import; for Vets: `allowedOperationalRoles` config (does not exist yet); for Students: manual VetTrack config (PDN-A7) | unchanged (PDN-A series, PDN-V2/V3) |
+| 3 | **Check-in-confirmed active authority** | Has this eligible user explicitly confirmed presence? | not modelled (legacy treats hierarchy + role string as active) | Phase 2.5: explicit check-in session |
+| 4 | **Operational role** | What clinical function is this user performing during this shift? | for Techs: derived from EZShift label; for Vets: not modelled | Phase 2.5: Tech derived from EZShift; Vet selected at check-in |
+| 5 | **Clinical capability** | Is this user permitted to perform this clinical action per the product model? | legacy hierarchy max-of (`requireEffectiveRole`) | Phase 2A: matrix-based; Phase 2C: per-endpoint migration |
+| 6 | **Organizational policy** | Does **this clinic** permit this user to perform this action? | not modelled (V1 reads as "yes, always") | Phase 4: decision helper at the boundary (e.g., `canManageCodeBlue(authority, clinicPolicy)`); V1 static config; future Phase 5+ clinic-editable |
+
+**Key separation principles:**
+
+- Layers 1–4 describe **who the user is** and **what they can do clinically**. They are platform-level constructs.
+- Layer 5 describes **what the product permits**. It is the canonical authority matrix (§5 of this document).
+- Layer 6 describes **what a specific clinic permits**. It can be **more restrictive** than Layer 5 but never **more permissive**.
+- Endpoints should not bake clinic-specific gates into request handlers. Decisions that may vary by clinic (e.g., "can this Vet manage Code Blue") flow through a named decision helper that consumes both the user's authority (layers 1–5) and the clinic's policy (layer 6).
+- For V1, layer 6 policy is **static / config-based**. There is no policy editor, no rule engine, no DSL.
+
+**V1 examples of layer-6 policy:**
+
+| Capability | Layer 5 (clinical) target | Layer 6 (V1 organizational policy) | Helper name (boundary) |
+|---|---|---|---|
+| Code Blue manager | any active-shift Vet of any operational role (Senior preferred UX) | `allowAllActiveShiftVets = true` (founder's clinic) | `canManageCodeBlue(authority, clinicPolicy)` |
+| ER Mode toggle | active-shift Senior Vet | V1 hard-coded to Senior Vet for the founder's clinic; clinic-policy hook documented but not invoked at V1 | `canToggleErMode(authority, clinicPolicy)` |
+| ER intake creation | active-shift Receiving Vet (primary) / Senior Vet / ER-ICU Vet | V1 hard-coded; clinic-policy hook reserved for future | `canCreateErIntake(authority, clinicPolicy)` |
+| Medication task creation | active-shift Vet of any operational role except on-call | V1 hard-coded; clinic-policy hook reserved | `canCreateMedicationTask(authority, clinicPolicy)` |
+
+**Phase 2.5 ships the layer-6 decision-helper boundary as a thin pass-through** (returns the layer-5 answer unmodified for V1). Phase 4 wires the helpers into endpoint handlers. Future phases may introduce clinic-specific policy data and an admin surface, but **no PR before Phase 5 builds a policy editor, rule engine, workflow DSL, or generic policy framework** — see `docs/architecture-review.md` for the explicit deferral.
+
+This separation is the central architectural principle for evolving VetTrack from a single-clinic application to a multi-clinic operational platform. It is **load-bearing**; future ambiguity should be resolved by asking "which layer does this concern belong to?"
 
 ---
 
@@ -349,11 +421,11 @@ This matrix lists the *categories* of actions and the minimum authority required
 | Trigger Code Blue | any authenticated user; Student is **trigger-only**. |
 | Add Code Blue log entry | any authenticated user (clinical-action verification = **PDN-CB1**). |
 | Code Blue presence heartbeat | any authenticated user. |
-| Be Code Blue event manager | active-shift Vet (any operational role per §4.2); **Senior Vet preferred**. UX MAY surface Senior Vets first. Backend gate: active-shift Vet. |
-| End Code Blue session | only the assigned manager (any active-shift Vet operational role). Blocked when no Vet manager assigned. 15-minute server gate with structured `earlyStopReason` override path. |
-| Code Blue early closure | the assigned Vet manager + structured `earlyStopReason`. Senior Vet **preferred but not strictly required** for early closure (any assigned manager qualifies). |
+| Be Code Blue event manager | **Layer 5 (clinical capability):** any active-shift Vet of any operational role per §4.2. **Layer 6 (organizational policy V1, founder's clinic):** `allowAllActiveShiftVets = true` — Senior Vet is **preferred UX** (picker surfaces first), **not** a hard gate. Endpoint logic must NOT hardcode "Senior Vet only" — eligibility flows through `canManageCodeBlue(authority, clinicPolicy)`. |
+| End Code Blue session | only the assigned manager (any active-shift Vet operational role per Layer 5). Blocked when no Vet manager assigned. 15-minute server gate with structured `earlyStopReason` override path. Layer 6 policy MAY further restrict (e.g., "only Senior Vet may end") in future clinics. |
+| Code Blue early closure | the assigned Vet manager + structured `earlyStopReason`. Senior Vet **preferred UX but not strictly required** — any assigned Vet manager qualifies (Layer 5). Layer 6 policy MAY restrict further. |
 | Code Blue history view | `systemRole = Admin`. |
-| **ER Mode enable / disable** | **active-shift Senior Vet only.** Narrower than legacy "active-shift Vet". Phase 4 PR 4.1 enforces this; depends on the Phase 2.5 check-in subsystem to exist. |
+| **ER Mode enable / disable** | **Layer 5: active-shift Senior Vet.** Layer 6 V1: founder's clinic enforces "Senior Vet only"; the helper `canToggleErMode(authority, clinicPolicy)` is reserved for clinic-policy override in future phases. Phase 4 PR 4.1 enforces this; depends on the Phase 2.5 check-in subsystem to exist. |
 | ER intake creation | active-shift Receiving Vet (primary), Senior Vet, or ER/ICU Vet per §4.3 (other operational Vet roles default-deny). |
 | ER intake assign | per current `requireAssignableRole` — to be normalised in Phase 4 against operational roles. |
 | ER handoff create | active-shift Receiving Vet (primary handoff source) — but ER/ICU Vet and Hospitalization Vet may also create handoffs per workflow rules (PDN-ER1). |
@@ -446,11 +518,11 @@ These derive directly from §3 and must be answered before Phase 2A's resolver s
 - **PDN-A8** Whether Trainees (`התלמדות` flag) can be granted scoped clinical authority in a future phase, and on what basis.
 - **PDN-A9** Where the `department` / area metadata surfaces in API responses (`/api/users/me`, `/api/tasks/eligible-assignees`, etc.).
 
-### 8.3 Still unresolved — Vet operational-role series (PDN-V, manual check-in)
+### 8.3 Still unresolved — Clinical check-in & operational-role series (PDN-V)
 
-These derive directly from §4 and must be answered before the Vet check-in subsystem (proposed new Phase 2.5) can land. None of them block Phase 1.
+These derive directly from §3.2 (Tech check-in) and §4 (Vet check-in), and must be answered before the new **Phase 2.5 — Clinical Check-in & Active Authority Infrastructure** can land. None of them block Phase 1.
 
-- **PDN-V1** Vet check-in subsystem design: storage (new `vt_vet_shift_sessions` vs reuse of `vt_shift_sessions` with an `operational_role` column), endpoints (`POST /api/vet-shifts/check-in`, `POST /api/vet-shifts/check-out`, `GET /api/vet-shifts/me`), and FE check-in flow.
+- **PDN-V1** Check-in subsystem design covering BOTH Vet operational-role check-in AND Tech / Senior-Tech presence check-in. Storage (new `vt_clinical_shift_sessions` vs reuse / extension of `vt_shift_sessions` with `operational_role` and `check_in_kind` columns), endpoints (`POST /api/shift-sessions/check-in`, `POST /api/shift-sessions/check-out`, `GET /api/shift-sessions/me`), and FE check-in flow. Vet check-in carries `operationalRole`; Tech check-in carries presence only (role already determined by EZShift).
 - **PDN-V2** Default `allowedOperationalRoles` behaviour for users with no explicit configuration — fail-closed (no operational role selectable) vs default `[er_icu_vet]` vs other.
 - **PDN-V3** Storage shape for `allowedOperationalRoles` — column on `vt_users` vs separate row-per-role table.
 - **PDN-V4** Audit policy for check-in / check-out and operational-role selection (per session start / end, per role change).
@@ -462,6 +534,11 @@ These derive directly from §4 and must be answered before the Vet check-in subs
 - **PDN-V10** ER Mode dead-lock policy: when ER Mode is `enforced` and no Senior Vet is currently checked in, who can disable it? Fail-safe escape hatch?
 - **PDN-V11** Code Blue manager auto-assignment policy when no Senior Vet is checked in. Does the system suggest the first checked-in Vet of any operational role? Notify all checked-in Vets?
 - **PDN-V12** Whether Senior Vet authority extends across Code Blue sessions started before their check-in (i.e., they walk in, an event is in progress — can they end it?).
+- **PDN-V13** Tech / Senior-Tech check-in UX flow — mobile-only? shared-device kiosk? badge swipe? Differs operationally from Vet check-in because Techs may not have a personal device on shift.
+- **PDN-V14** Tech check-in granularity — once per EZShift block? once per login? auto-extend on activity? auto-expire after N minutes idle?
+- **PDN-V15** UI affordance for **scheduled-but-not-checked-in** Tech: persistent banner "please check in"? Force-modal on first clinical action? Auto-check-in on first authenticated request (defeats the purpose)?
+- **PDN-V16** Clinic-policy data shape (layer 6, §4.8). Today's V1 needs only `allowAllActiveShiftVets = true` (founder's clinic). Future representation: JSON field on `vt_clinics`, separate `vt_clinic_policies` table, env-keyed config file. Decision needed by Phase 4 PR 4.6 (Code Blue manager picker).
+- **PDN-V17** Clinic-policy edit authority. Today static / engineer-edited. Future: which `systemRole` or clinic-scoped role may edit policy? When introduced, every policy edit MUST be audit-logged (PDN-V4 broadened).
 
 ### 8.4 Still unresolved — original PDN series
 
