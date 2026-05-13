@@ -71,7 +71,12 @@ describe("Code Blue sessions — manager enforcement", () => {
 
   it("end route manager check applies to ALL outcomes, not just 'died'", () => {
     // The 403 block must come BEFORE any outcome check — not inside a 'died' conditional
-    const endBlock = routes.slice(routes.indexOf("sessions/:id/end"));
+    const endHandlerStart = routes.indexOf("router.patch(\"/sessions/:id/end\"");
+    const endHandlerEnd = routes.indexOf("\nrouter.", endHandlerStart + 1);
+    const endBlock = routes.slice(
+      endHandlerStart,
+      endHandlerEnd > endHandlerStart ? endHandlerEnd : endHandlerStart + 2000,
+    );
     const manager403Pos = endBlock.indexOf("MANAGER_ONLY");
     const diedPos = endBlock.indexOf('"died"');
     // If no 'died' string, the check is outcome-agnostic — correct

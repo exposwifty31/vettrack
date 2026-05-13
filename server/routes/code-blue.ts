@@ -75,6 +75,7 @@ const logEntrySchema = z.object({
 
 const endSessionSchema = z.object({
   outcome: z.enum(["rosc", "died", "transferred", "ongoing"]),
+  earlyStopReason: z.string().min(1).max(500).optional(),
 });
 
 // POST /api/code-blue/events  — start a Code Blue event (fire-and-forget safe)
@@ -83,10 +84,9 @@ router.post("/events", requireAuth, validateBody(startSchema), async (req, res) 
   try {
     const clinicId = req.clinicId!;
     const userId = req.authUser!.id;
-    const { localStartedAt } = req.body as z.infer<typeof startSchema>;
 
     const id = randomUUID();
-    const startedAt = localStartedAt ? new Date(localStartedAt) : new Date();
+    const startedAt = new Date();
 
     await db.insert(codeBlueEvents).values({
       id,
@@ -209,7 +209,7 @@ router.post("/sessions", requireAuth, validateBody(startSessionSchema), async (r
     }
 
     const id = randomUUID();
-    const startedAt = body.localStartedAt ? new Date(body.localStartedAt) : new Date();
+    const startedAt = new Date();
 
     let codeBlueNotificationRequestOutboxId: number | undefined;
     await db.transaction(async (tx) => {
@@ -494,7 +494,13 @@ router.patch("/sessions/:id/end", requireAuth, validateUuid("id"), validateBody(
   try {
     const clinicId = req.clinicId!;
     const { id: sessionId } = req.params;
-    const { outcome } = req.body as z.infer<typeof endSessionSchema>;
+    const { outcome, earlyStopReason: rawEarlyStopReason } = req.body as z.infer<typeof endSessionSchema>;
+    const earlyStopReason = rawEarlyStopReason ? rawEarlyStopReason.trim() : undefined;
+    if (earlyStopReason !== undefined && earlyStopReason.length < 3) {
+      return res.status(400).json(
+        apiError({ code: "EARLY_STOP_REASON_REQUIRED", reason: "EARLY_STOP_REASON_REQUIRED", message: "earlyStopReason must be at least 3 characters", requestId }),
+      );
+    }
 
     const [session] = await db
       .select()
@@ -512,6 +518,35 @@ router.patch("/sessions/:id/end", requireAuth, validateUuid("id"), validateBody(
     if (session.managerUserId !== req.authUser!.id) {
       return res.status(403).json(
         apiError({ code: "MANAGER_ONLY", reason: "MANAGER_ONLY", message: "Only the resuscitation manager can end this session", requestId }),
+      );
+    }
+
+    // Verify manager still holds vet or admin role and is still active.
+    // TODO(Phase 4 + Phase 2.5): enforce active-shift operational-role manager authority
+    const [managerUser] = await db
+      .select({ id: users.id, role: users.role, status: users.status })
+      .from(users)
+      .where(and(eq(users.id, session.managerUserId), eq(users.clinicId, clinicId)))
+      .limit(1);
+
+    if (!managerUser || !["vet", "admin"].includes(managerUser.role)) {
+      return res.status(422).json(
+        apiError({ code: "NO_VET_MANAGER", reason: "NO_VET_MANAGER", message: "Assigned manager must be a vet or admin to end this session", requestId }),
+      );
+    }
+
+    if (managerUser.status !== "active") {
+      return res.status(403).json(
+        apiError({ code: "MANAGER_INACTIVE", reason: "MANAGER_INACTIVE", message: "Assigned manager account is no longer active", requestId }),
+      );
+    }
+
+    // 15-minute minimum gate — waivable only with an explicit earlyStopReason
+    const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
+    const durationMs = Date.now() - session.startedAt.getTime();
+    if (durationMs < FIFTEEN_MINUTES_MS && !earlyStopReason) {
+      return res.status(422).json(
+        apiError({ code: "TOO_EARLY", reason: "TOO_EARLY", message: "Session must run for at least 15 minutes, or supply an earlyStopReason", requestId }),
       );
     }
 
@@ -545,6 +580,7 @@ router.patch("/sessions/:id/end", requireAuth, validateUuid("id"), validateBody(
       participants,
       pre_check_passed: session.preCheckPassed ?? null,
       outcome,
+      ...(earlyStopReason ? { early_stop_reason: earlyStopReason } : {}),
     });
 
     // Update session
@@ -573,7 +609,7 @@ router.patch("/sessions/:id/end", requireAuth, validateUuid("id"), validateBody(
       performedByEmail: req.authUser!.email ?? "",
       targetId: sessionId,
       targetType: "code_blue_session",
-      metadata: { outcome, durationMinutes },
+      metadata: { outcome, durationMinutes, ...(earlyStopReason ? { earlyStopReason } : {}) },
     });
 
     postSystemMessage(clinicId, "code_blue_end", {
