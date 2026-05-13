@@ -441,7 +441,6 @@ function CreateHandoffSheet({
     queryFn: () => api.shiftHandover.patientHandoffs.eligibleStaff(),
     enabled: open,
     retry: false,
-    refetchOnMount: "always",
   });
 
   const patientsQ = useQuery({
@@ -449,7 +448,6 @@ function CreateHandoffSheet({
     queryFn: () => api.shiftHandover.patientHandoffs.eligiblePatients(),
     enabled: open,
     retry: false,
-    refetchOnMount: "always",
   });
 
   // `refetchOnMount` only fires on component mount, not when the controlled
