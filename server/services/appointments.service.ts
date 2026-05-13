@@ -1462,6 +1462,7 @@ export async function completeTask(
     }).onConflictDoNothing().returning({ id: inventoryJobs.id });
     inventoryJobInserted = Boolean(jobRow);
   }
+  let inventoryEnqueueFailed = false;
   if (
     inventoryJobInserted &&
     medicationBilling &&
@@ -1477,6 +1478,7 @@ export async function completeTask(
         animalId: updated.animalId,
       });
     } catch (error) {
+      inventoryEnqueueFailed = true;
       console.error("[completeTask] inventory deduction enqueue failed", {
         taskId,
         error: error instanceof Error ? error.message : String(error),
@@ -1502,7 +1504,7 @@ export async function completeTask(
   if (isMedicationTask) {
     await markIdempotentAsync(completionIdempotencyKey);
   }
-  return serialized;
+  return { task: serialized, inventoryEnqueueFailed };
 }
 
 /**

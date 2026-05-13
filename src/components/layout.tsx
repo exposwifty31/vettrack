@@ -327,7 +327,13 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
         const cachedView = qc.getQueryData<RestockContainerView>(["/api/restock/container-items", parsed.containerId]);
         const cachedLine = cachedView?.lines?.find((l) => l.nfcTagId === nfcTagId);
         const currentActual = cachedLine?.sessionObservedQuantity ?? cachedLine?.actual ?? 0;
-        await api.restock.scan(parsed.sessionId, { nfcTagId, observedQuantity: currentActual + 1 });
+        const result = await api.restock.scan(parsed.sessionId, { nfcTagId, observedQuantity: currentActual + 1 });
+        // Seed the inventory page's NFC counter so the next tap on this same tag
+        // sends the correct observedQuantity.
+        safeStorageSetItem(
+          "vt_nfc_scan_seed",
+          JSON.stringify({ tagId: nfcTagId, count: result.observedQuantity })
+        );
         haptics.scanSuccess();
         if (parsed.containerId) {
           qc.invalidateQueries({ queryKey: ["/api/restock/container-items", parsed.containerId] });

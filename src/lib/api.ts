@@ -1113,10 +1113,10 @@ export const api = {
     start: (id: string) =>
       request<{ task: Appointment }>(`/api/tasks/${id}/start`, { method: "POST" }).then((r) => r.task),
     complete: (id: string, payload?: { execution?: MedicationExecutionPayload }) =>
-      request<{ task: Appointment }>(
+      request<{ task: Appointment; inventoryWarning?: boolean }>(
         `/api/tasks/${id}/complete`,
         { method: "POST", body: JSON.stringify(payload ?? {}) },
-      ).then((r) => r.task),
+      ),
     vetApprove: (id: string) =>
       request<{ task: Appointment }>(`/api/tasks/${id}/vet-approve`, { method: "POST" }).then((r) => r.task),
   },
@@ -1375,6 +1375,8 @@ export const api = {
           createdAt: string;
         };
         observedQuantity: number;
+        targetPar: number;
+        delta: number;
         item: { id: string; code: string; label: string; nfcTagId: string | null };
       }>("/api/restock/scan", {
         method: "POST",

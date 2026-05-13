@@ -300,13 +300,13 @@ router.post(
     const executionPayload = normalizeMedicationExecutionPayload(
       (body.execution as unknown) ?? body,
     );
-    const task = await completeTask(req.clinicId!, req.params.id, {
+    const { task, inventoryEnqueueFailed } = await completeTask(req.clinicId!, req.params.id, {
       userId: req.authUser.id,
       clerkId: req.authUser.clerkId,
       email: req.authUser.email,
       role: resolveTaskAuthRole(req),
     }, executionPayload);
-    return res.json({ task });
+    return res.json({ task, inventoryWarning: inventoryEnqueueFailed });
   } catch (err) {
     if (sendServiceError(res, err, requestId)) return;
     console.error("tasks:complete", err);

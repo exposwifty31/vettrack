@@ -196,8 +196,11 @@ export default function MedicationHubPage() {
   const completeMutation = useMutation({
     mutationFn: ({ taskId, payload }: { taskId: string; payload: MedicationExecutionPayload }) =>
       api.tasks.complete(taskId, { execution: payload }),
-    onSuccess: () => {
+    onSuccess: (result) => {
       toast.success(t.medsPage.taskCompleted);
+      if (result.inventoryWarning) {
+        toast.warning(t.medsPage.inventoryDeductionWarning);
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/medication-active"], exact: true });
     },
     onError: (error: Error) => toast.error(error.message || t.medsPage.taskCompleteFailed),

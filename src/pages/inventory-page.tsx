@@ -30,7 +30,7 @@ import { useLocation } from "wouter";
 import { getCurrentUserId } from "@/lib/auth-store";
 import { useAuth } from "@/hooks/use-auth";
 import { haptics } from "@/lib/haptics";
-import { safeStorageRemoveItem, safeStorageSetItem } from "@/lib/safe-browser";
+import { safeStorageGetItem, safeStorageRemoveItem, safeStorageSetItem } from "@/lib/safe-browser";
 
 /** Main page column is under `data-restock-allow` so it stays tappable if `Layout navigationLocked` is enabled. */
 
@@ -144,14 +144,50 @@ export default function InventoryPage() {
   const startSessionPromiseRef = useRef<Promise<string | null> | null>(null);
   const overlayClearRef = useRef<number | undefined>(undefined);
   const nfcActiveRef = useRef(false);
-  const nfcItemCountsRef = useRef<Map<string, number>>(new Map());
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // Monotonically-increasing observed count per NFC tag for the current session.
+  // Using a ref so updates don't trigger re-renders. Cleared when session changes.
+  const nfcItemCountsRef = useRef<Map<string, number>>(new Map<string, number>());
+  // Stable ref to the latest handleNFCTag — avoids stale closure in ndef.onreading.
   const handleNFCTagRef = useRef<(tagId: string) => void>(() => {});
 
   useEffect(() => { sessionIdRef.current = sessionState.activeSessionId ?? null; }, [sessionState.activeSessionId]);
   useEffect(() => { activeContainerIdRef.current = sessionState.activeContainerId ?? null; }, [sessionState.activeContainerId]);
+  // Clear per-tag NFC counts whenever the session changes (start or finish).
+  // Persists counts to sessionStorage so they survive page reloads within the
+  // same browser tab. On session start, restores persisted counts first, then
+  // merges any layout.tsx seed (layout→inventory NFC transition).
   useEffect(() => {
-    if (!sessionState.activeSessionId) nfcItemCountsRef.current.clear();
+    nfcItemCountsRef.current.clear();
+    if (!sessionState.activeSessionId) {
+      safeStorageRemoveItem("vt_nfc_counts", "session");
+      return;
+    }
+    // Restore counts that survived a page reload for this session
+    const storedRaw = safeStorageGetItem("vt_nfc_counts", "session");
+    if (storedRaw) {
+      try {
+        const stored = JSON.parse(storedRaw) as { sessionId: string; counts: Record<string, number> };
+        if (stored.sessionId === sessionState.activeSessionId) {
+          for (const [k, v] of Object.entries(stored.counts)) {
+            nfcItemCountsRef.current.set(k, v);
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    // Also merge any layout.tsx seed (one-off NFC scan before navigating here)
+    const seedRaw = safeStorageGetItem("vt_nfc_scan_seed");
+    if (seedRaw) {
+      try {
+        const seed = JSON.parse(seedRaw) as { tagId: string; count: number };
+        if (seed.tagId && seed.count > 0) {
+          nfcItemCountsRef.current.set(seed.tagId, Math.max(
+            nfcItemCountsRef.current.get(seed.tagId) ?? 0,
+            seed.count
+          ));
+        }
+      } catch { /* ignore malformed seed */ }
+      safeStorageRemoveItem("vt_nfc_scan_seed");
+    }
   }, [sessionState.activeSessionId]);
 
   // ── UI state ──────────────────────────────────────────────────────────────
@@ -463,7 +499,7 @@ export default function InventoryPage() {
       }
       return;
     }
-    // Item tag → +1 (route through scanLine when cached line is available)
+    // Item tag → route through scanLine when cached line is available (avoids baseline mismatch)
     const sessionId = sessionIdRef.current;
     if (!sessionId) { toast.error(p.openSessionFirst); return; }
     const cachedLine = detailsQ.data?.lines.find((l) => l.nfcTagId === tagId);
@@ -471,19 +507,46 @@ export default function InventoryPage() {
       scanLine(cachedLine.itemId, cachedLine.code, cachedLine.label, 1);
       return;
     }
-    // Fallback: item tag found but no itemId/code — use nfcTagId path
-    // Abort if detailsQ cache is cold (hasn't loaded yet) to avoid fabricating a count
-    if (!detailsQ.data) {
-      toast.error(p.openSessionFirst);
-      return;
-    }
+    // Fallback: item tag found in NFC table but not yet resolved in cache — direct scan path.
+    // Abort if cache is cold to avoid sending observedQuantity from a zero baseline.
+    if (!detailsQ.data) { toast.error(p.openSessionFirst); return; }
     const prevCount = nfcItemCountsRef.current.get(tagId) ?? (cachedLine?.sessionObservedQuantity ?? cachedLine?.actual ?? 0);
-    const nextCount = prevCount + 1;
-    nfcItemCountsRef.current.set(tagId, nextCount);
+    const newCount = prevCount + 1;
+    nfcItemCountsRef.current.set(tagId, newCount);
     dispatch({ type: "scan-request" });
     scanMut
-      .mutateAsync({ sessionId, nfcTagId: tagId, observedQuantity: nextCount })
+      .mutateAsync({ sessionId, nfcTagId: tagId, observedQuantity: newCount })
       .then((result) => {
+        // Sync local NFC counter to server-confirmed value
+        nfcItemCountsRef.current.set(tagId, result.observedQuantity);
+        // Persist counts so they survive a page reload within the same session.
+        // sessionStorage is tab-scoped and is automatically cleared on tab close.
+        if (sessionIdRef.current) {
+          const countsObj: Record<string, number> = {};
+          nfcItemCountsRef.current.forEach((v, k) => { countsObj[k] = v; });
+          safeStorageSetItem(
+            "vt_nfc_counts",
+            JSON.stringify({ sessionId: sessionIdRef.current, counts: countsObj }),
+            "session"
+          );
+        }
+        // Sync manual-scan baseline so a subsequent scanLine tap uses the correct
+        // absolute count and doesn't regress the server value back toward 0.
+        setOptimisticActualByCode((prev) => ({ ...prev, [result.item.code]: result.observedQuantity }));
+        qc.setQueryData<ContainerItemsResponse>(
+          ["/api/restock/container-items", selectedId ?? ""],
+          (old) => {
+            if (!old) return old;
+            return {
+              ...old,
+              lines: old.lines.map((l) =>
+                l.itemId === result.item.id
+                  ? { ...l, actual: result.observedQuantity, sessionObservedQuantity: result.observedQuantity }
+                  : l
+              ),
+            };
+          }
+        );
         showScanOverlay(result.item.label, 1);
         haptics.tap();
         setScanGeneration((g) => g + 1);
@@ -493,9 +556,13 @@ export default function InventoryPage() {
         showScanOverlay(p.unknownNfcTag, null);
         haptics.error();
       });
-  }, [containersQ.data, detailsQ.data, isRestocking, selectedId, startSessionMut, scanMut, showScanOverlay]);
+  }, [containersQ.data, detailsQ.data, isRestocking, selectedId, startSessionMut, scanMut, showScanOverlay, scanLine]);
 
-  useEffect(() => { handleNFCTagRef.current = handleNFCTag; }, [handleNFCTag]);
+  // Keep ref pointing at the latest version — ndef.onreading uses the ref so it
+  // is never bound to a stale closure when handleNFCTag deps change.
+  useEffect(() => {
+    handleNFCTagRef.current = handleNFCTag;
+  }, [handleNFCTag]);
 
   const startNFCScan = async () => {
     if (!nfcSupported || nfcActiveRef.current) return;

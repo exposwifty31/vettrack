@@ -1557,6 +1557,7 @@
     "unexpectedError": "An unexpected error occurred",
     "taskCompleted": "Medication task completed",
     "taskCompleteFailed": "Failed to complete medication task",
+    "inventoryDeductionWarning": "Task completed, but inventory deduction could not be queued. It will be retried automatically.",
     "statusScheduled": "Scheduled",
     "statusAssigned": "Assigned",
     "statusArrived": "Arrived",

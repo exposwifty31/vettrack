@@ -1557,6 +1557,7 @@
     "unexpectedError": "אירעה שגיאה בלתי צפויה",
     "taskCompleted": "משימה תרופתית הושלמה",
     "taskCompleteFailed": "השלמת משימה תרופתית נכשלה",
+    "inventoryDeductionWarning": "המשימה הושלמה, אך לא ניתן היה להוסיף את ניכוי המלאי לתור. המערכת תנסה שוב אוטומטית.",
     "statusScheduled": "מתוזמן",
     "statusAssigned": "מוקצה",
     "statusArrived": "הגיע",
