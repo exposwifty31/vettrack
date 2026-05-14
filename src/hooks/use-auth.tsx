@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import type { Shift, ShiftRole, UserRole } from "@/types";
+import type { AuthoritySnapshot } from "../../shared/authority.js";
 import { setAuthState } from "@/lib/auth-store";
 import { isValidJwt, setClerkTokenGetter } from "@/lib/auth-fetch";
 import { useUser, useAuth as useClerkAuth } from "@clerk/clerk-react";
@@ -34,6 +35,8 @@ interface AuthState {
   isSignedIn: boolean; isAdmin: boolean; isOfflineSession: boolean;
   /** Server-derived — clinic-wide ER lock toggle (owner allowlist when configured). */
   canManageErMode: boolean;
+  /** Phase 2A: advisory-only authority snapshot from /api/users/me. Not enforced. */
+  authority?: AuthoritySnapshot;
 }
 
 interface AuthContextType extends AuthState {
@@ -53,6 +56,7 @@ interface SyncedUserResponse {
   resolvedAt?: string;
   status: UserStatus;
   canManageErMode?: boolean;
+  authority?: AuthoritySnapshot;
   error?: string;
   reason?: string;
   message?: string;
@@ -212,6 +216,7 @@ function DevAuthProviderInner({ children }: { children: ReactNode }) {
           isAdmin: role === "admin" || (data.secondaryRole ?? null) === "admin",
           isOfflineSession: false,
           canManageErMode: data.canManageErMode === true,
+          authority: data.authority,
         });
 
         processQueue().catch(() => {});
@@ -425,6 +430,7 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
             isAdmin: role === "admin" || (data.secondaryRole ?? null) === "admin",
             isOfflineSession: false,
             canManageErMode: data.canManageErMode === true,
+            authority: data.authority,
           });
 
           processQueue().catch(() => {});

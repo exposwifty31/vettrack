@@ -1,13 +1,13 @@
 /**
- * Phase 2A PR 2 guard: no server route may consume the new authority resolver.
+ * Phase 2A PR 2/3 guard: only the allowlisted route may consume resolveAuthority.
  *
- * resolveAuthority() is additive scaffolding only — Phase 2A must not wire it
- * into any route handler. Phase 2A PR 3 will relax this guard to allow exactly
- * server/routes/users.ts to import the resolver for the /api/users/me
- * passthrough exposure.
+ * resolveAuthority() is additive scaffolding. Phase 2A PR 3 relaxes this guard
+ * to allow exactly server/routes/users.ts to import the resolver for the
+ * /api/users/me passthrough exposure. No other route may import or reference
+ * the resolver in Phase 2A. Phase 2B will introduce broader enforcement.
  *
- * Failure of this test indicates accidental production consumption. Do not
- * relax the guard outside of Phase 2A PR 3.
+ * Failure of this test indicates accidental production consumption outside the
+ * allowlist. Do not extend the allowlist outside an approved phase plan.
  */
 
 import { describe, expect, it } from "vitest";
@@ -19,6 +19,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const routesDir = path.join(repoRoot, "server", "routes");
 
+/** Routes explicitly approved to consume resolveAuthority in Phase 2A. */
+const ALLOWED_ROUTE_FILES: ReadonlySet<string> = new Set([
+  path.join(routesDir, "users.ts"),
+]);
+
 function listRouteFiles(): string[] {
   return fs
     .readdirSync(routesDir)
@@ -26,14 +31,21 @@ function listRouteFiles(): string[] {
     .map((f) => path.join(routesDir, f));
 }
 
-describe("Phase 2A PR 2: no route consumes resolveAuthority", () => {
-  const routeFiles = listRouteFiles();
+const allRouteFiles = listRouteFiles();
+const guardedRouteFiles = allRouteFiles.filter((f) => !ALLOWED_ROUTE_FILES.has(f));
 
+describe("Phase 2A PR 2/3: only allowlisted routes consume resolveAuthority", () => {
   it("at least one route file exists (sanity)", () => {
-    expect(routeFiles.length).toBeGreaterThan(0);
+    expect(allRouteFiles.length).toBeGreaterThan(0);
   });
 
-  it.each(routeFiles)("%s does not import server/lib/authority", (file) => {
+  it("every allowlisted route exists on disk", () => {
+    for (const f of ALLOWED_ROUTE_FILES) {
+      expect(fs.existsSync(f), `allowlisted route missing: ${f}`).toBe(true);
+    }
+  });
+
+  it.each(guardedRouteFiles)("%s does not import server/lib/authority", (file) => {
     const src = fs.readFileSync(file, "utf8");
     // Match either ESM import or CommonJS-style require referencing the
     // authority module path (but not the existing authority-roles module).
@@ -49,7 +61,7 @@ describe("Phase 2A PR 2: no route consumes resolveAuthority", () => {
     );
   });
 
-  it.each(routeFiles)("%s does not reference resolveAuthority symbol", (file) => {
+  it.each(guardedRouteFiles)("%s does not reference resolveAuthority symbol", (file) => {
     const src = fs.readFileSync(file, "utf8");
     expect(
       src.includes("resolveAuthority"),

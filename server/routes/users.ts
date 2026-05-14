@@ -9,6 +9,7 @@ import { validateBody, validateUuid } from "../middleware/validate.js";
 import { authSensitiveLimiter } from "../middleware/rate-limiters.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { resolveCurrentRole } from "../lib/role-resolution.js";
+import { resolveAuthority } from "../lib/authority.js";
 import { ensureUserEmail } from "../services/user-sync.service.js";
 import { countPurgeCandidates, purgeDeletedUsers, PURGE_AFTER_DAYS } from "../lib/cleanup-scheduler.js";
 import { canManageErModeForUser } from "../lib/er-mode-permissions.js";
@@ -131,12 +132,29 @@ router.get("/me", requireAuth, async (req, res) => {
         }),
       );
     }
+    const now = new Date();
     const resolved = await resolveCurrentRole({
       clinicId: req.clinicId!,
       userId: req.authUser.id,
       userName: req.authUser.name,
       fallbackRole: req.authUser.role,
+      now,
     });
+
+    // Legacy effectiveRole remains authoritative in Phase 2A.
+    // Authority snapshot is advisory only.
+    // See docs/authority-model.md §1-§2.
+    let authority: Awaited<ReturnType<typeof resolveAuthority>> | undefined;
+    try {
+      authority = await resolveAuthority({
+        authUser: req.authUser,
+        clinicId: req.clinicId!,
+        now,
+      });
+    } catch (authorityErr) {
+      console.error("[users:me] resolveAuthority failed", authorityErr);
+    }
+
     res.json({
       ...req.authUser,
       effectiveRole: resolved.effectiveRole,
@@ -144,6 +162,7 @@ router.get("/me", requireAuth, async (req, res) => {
       activeShift: resolved.activeShift,
       resolvedAt: resolved.resolvedAt.toISOString(),
       canManageErMode: canManageErModeForUser(req.authUser),
+      ...(authority ? { authority } : {}),
     });
   } catch (err) {
     console.error("[users:me] resolveCurrentRole failed", err);

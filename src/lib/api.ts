@@ -73,6 +73,7 @@ import type {
   ShiftCompletionResult,
 } from "@/types";
 import type { OutcomeKpiRoiResponse } from "../../shared/er-types.js";
+import type { AuthoritySnapshot } from "../../shared/authority.js";
 import type {
   HandoffEligiblePatientsResponse,
   HandoffEligibleStaffResponse,
@@ -955,6 +956,7 @@ export const api = {
       roleSource?: "shift" | "permanent";
       activeShift?: Shift | null;
       resolvedAt?: string;
+      authority?: AuthoritySnapshot;
     }>("/api/users/me"),
   },
   storage: {

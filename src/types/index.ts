@@ -1,3 +1,5 @@
+import type { AuthoritySnapshot } from "../../shared/authority.js";
+
 export type EquipmentStatus =
   | "ok"
   | "issue"
@@ -38,6 +40,7 @@ export interface User {
   createdAt: string;
   deletedAt?: string | null;
   deletedBy?: string | null;
+  authority?: AuthoritySnapshot;
 }
 
 export interface DeletedEquipment {
