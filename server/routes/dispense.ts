@@ -112,6 +112,9 @@ router.post(
       actorRole:
         req.authoritySnapshot?.effectiveClinicalRole ??
         resolveAuditActorRole(req),
+      authoritySource: req.authoritySnapshot?.source ?? null,
+      authorityReason: req.authoritySnapshot?.reason ?? null,
+      authorityOperationalRole: req.authoritySnapshot?.operationalRole ?? null,
     });
     return res.json(event);
   } catch (err) {

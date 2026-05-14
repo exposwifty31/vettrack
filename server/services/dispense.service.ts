@@ -48,6 +48,9 @@ export interface ConfirmDispenseInput {
   confirmedBy: string;
   confirmedByEmail: string;
   actorRole?: string | null;
+  authoritySource?: string | null;
+  authorityReason?: string | null;
+  authorityOperationalRole?: string | null;
 }
 
 export interface CreateEmergencyDispenseInput {
@@ -133,7 +136,16 @@ export async function createDraftDispense(input: CreateDraftInput): Promise<Disp
  * Fix F (insufficientStock): soft pass — mark inventoryMismatch=true, do not block.
  */
 export async function confirmDispense(input: ConfirmDispenseInput): Promise<DispenseEvent> {
-  const { clinicId, dispenseEventId, confirmedBy, confirmedByEmail, actorRole } = input;
+  const {
+    clinicId,
+    dispenseEventId,
+    confirmedBy,
+    confirmedByEmail,
+    actorRole,
+    authoritySource,
+    authorityReason,
+    authorityOperationalRole,
+  } = input;
 
   const confirmed = await db.transaction(async (tx) => {
     const [event] = await tx
@@ -225,7 +237,13 @@ export async function confirmDispense(input: ConfirmDispenseInput): Promise<Disp
     actorRole,
     targetId: dispenseEventId,
     targetType: "dispense_event",
-    metadata: { status: confirmed.status, inventoryMismatch: confirmed.inventoryMismatch },
+    metadata: {
+      status: confirmed.status,
+      inventoryMismatch: confirmed.inventoryMismatch,
+      authoritySource: authoritySource ?? null,
+      authorityReason: authorityReason ?? null,
+      authorityOperationalRole: authorityOperationalRole ?? null,
+    },
   });
 
   // Enqueue async inventory deduction (post-TX, non-blocking)
