@@ -10,6 +10,7 @@ import { authSensitiveLimiter } from "../middleware/rate-limiters.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { resolveCurrentRole } from "../lib/role-resolution.js";
 import { resolveAuthority } from "../lib/authority.js";
+import { invalidateForUser } from "../lib/authority-cache.js";
 import { ensureUserEmail } from "../services/user-sync.service.js";
 import { countPurgeCandidates, purgeDeletedUsers, PURGE_AFTER_DAYS } from "../lib/cleanup-scheduler.js";
 import { canManageErModeForUser } from "../lib/er-mode-permissions.js";
@@ -343,6 +344,8 @@ router.patch("/:id/role", requireAuth, requireAdmin, validateUuid("id"), validat
       .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
       .returning();
 
+    invalidateForUser(clinicId, req.params.id);
+
     logAudit({
       actorRole: resolveAuditActorRole(req),
       clinicId,
@@ -530,6 +533,8 @@ router.patch("/:id/display_name", requireAuthAny, validateUuid("id"), validateBo
       .set({ displayName: display_name })
       .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id)))
       .returning();
+
+    invalidateForUser(clinicId, req.params.id);
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
@@ -777,6 +782,8 @@ router.post("/sync", requireAuth, authSensitiveLimiter, validateBody(syncUserSch
         .where(and(eq(users.clinicId, clinicId), eq(users.id, existing.id)))
         .returning();
 
+      invalidateForUser(clinicId, existing.id);
+
       logAudit({
         actorRole: String(existing.role ?? "").trim().toLowerCase() || null,
         clinicId,
@@ -826,6 +833,7 @@ router.post("/sync", requireAuth, authSensitiveLimiter, validateBody(syncUserSch
         })
         .returning();
       wasCreated = newUser.id === insertedId;
+      invalidateForUser(clinicId, newUser.id);
     } catch (insertErr: unknown) {
       const pgErr = insertErr as { code?: string };
       if (pgErr?.code === "23505") {

@@ -44,7 +44,21 @@ type MetricName =
   | "authority_oprole_shadow_match"
   | "authority_oprole_shadow_drift_revoked"
   | "authority_oprole_shadow_user_missing"
-  | "authority_oprole_shadow_runner_failed";
+  | "authority_oprole_shadow_runner_failed"
+  | "authority_cache_disabled"
+  | "authority_cache_checkin_hit"
+  | "authority_cache_checkin_miss"
+  | "authority_cache_shift_hit"
+  | "authority_cache_shift_miss"
+  | "authority_cache_inflight_hit"
+  | "authority_cache_invalidate_checkin"
+  | "authority_cache_invalidate_shift"
+  | "authority_cache_invalidate_clinic_shift"
+  | "authority_cache_evicted"
+  | "authority_cache_stale_write_dropped"
+  | "authority_cache_error_get"
+  | "authority_cache_error_set"
+  | "authority_cache_invalidate_error";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -117,6 +131,22 @@ export interface MetricsSnapshot {
       userMissing: number;
       runnerFailed: number;
     };
+    cache: {
+      disabled: number;
+      checkInHit: number;
+      checkInMiss: number;
+      shiftHit: number;
+      shiftMiss: number;
+      inflightHit: number;
+      invalidateCheckIn: number;
+      invalidateShift: number;
+      invalidateClinicShift: number;
+      evicted: number;
+      staleWriteDropped: number;
+      errorGet: number;
+      errorSet: number;
+      invalidateError: number;
+    };
   };
   timestamp: string;
 }
@@ -165,6 +195,20 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   authority_oprole_shadow_drift_revoked: 0,
   authority_oprole_shadow_user_missing: 0,
   authority_oprole_shadow_runner_failed: 0,
+  authority_cache_disabled: 0,
+  authority_cache_checkin_hit: 0,
+  authority_cache_checkin_miss: 0,
+  authority_cache_shift_hit: 0,
+  authority_cache_shift_miss: 0,
+  authority_cache_inflight_hit: 0,
+  authority_cache_invalidate_checkin: 0,
+  authority_cache_invalidate_shift: 0,
+  authority_cache_invalidate_clinic_shift: 0,
+  authority_cache_evicted: 0,
+  authority_cache_stale_write_dropped: 0,
+  authority_cache_error_get: 0,
+  authority_cache_error_set: 0,
+  authority_cache_invalidate_error: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -312,6 +356,22 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           userMissing: metrics.authority_oprole_shadow_user_missing,
           runnerFailed: metrics.authority_oprole_shadow_runner_failed,
         },
+        cache: {
+          disabled: metrics.authority_cache_disabled,
+          checkInHit: metrics.authority_cache_checkin_hit,
+          checkInMiss: metrics.authority_cache_checkin_miss,
+          shiftHit: metrics.authority_cache_shift_hit,
+          shiftMiss: metrics.authority_cache_shift_miss,
+          inflightHit: metrics.authority_cache_inflight_hit,
+          invalidateCheckIn: metrics.authority_cache_invalidate_checkin,
+          invalidateShift: metrics.authority_cache_invalidate_shift,
+          invalidateClinicShift: metrics.authority_cache_invalidate_clinic_shift,
+          evicted: metrics.authority_cache_evicted,
+          staleWriteDropped: metrics.authority_cache_stale_write_dropped,
+          errorGet: metrics.authority_cache_error_get,
+          errorSet: metrics.authority_cache_error_set,
+          invalidateError: metrics.authority_cache_invalidate_error,
+        },
       },
       timestamp: new Date().toISOString(),
     };
@@ -345,6 +405,22 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           driftRevoked: 0,
           userMissing: 0,
           runnerFailed: 0,
+        },
+        cache: {
+          disabled: 0,
+          checkInHit: 0,
+          checkInMiss: 0,
+          shiftHit: 0,
+          shiftMiss: 0,
+          inflightHit: 0,
+          invalidateCheckIn: 0,
+          invalidateShift: 0,
+          invalidateClinicShift: 0,
+          evicted: 0,
+          staleWriteDropped: 0,
+          errorGet: 0,
+          errorSet: 0,
+          invalidateError: 0,
         },
       },
       timestamp: new Date().toISOString(),

@@ -32,6 +32,7 @@ import { enqueueShiftReportEmailJob } from "../lib/queue.js";
 import { postSystemMessage } from "../lib/shift-chat-presence.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { autoCheckOutForSessionEnd } from "../services/clinical-check-in.js";
+import { invalidateClinicShift } from "../lib/authority-cache.js";
 
 const router = Router();
 
@@ -298,6 +299,7 @@ router.post(
         startedByUserId: req.authUser!.id,
         note: note?.trim() || null,
       });
+      invalidateClinicShift(clinicId);
       res.status(201).json({
         id,
         clinicId,
@@ -433,6 +435,8 @@ router.post(
         .update(shiftSessions)
         .set({ endedAt, note: mergedNote })
         .where(and(eq(shiftSessions.id, open.id), eq(shiftSessions.clinicId, clinicId)));
+
+      invalidateClinicShift(clinicId);
 
       // Non-fatal: shiftSessions.endedAt is already committed above. If this
       // throws, returning 500 SHIFT_END_FAILED would cause clients to retry

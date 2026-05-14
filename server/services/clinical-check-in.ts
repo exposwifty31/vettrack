@@ -7,6 +7,7 @@ import {
   type ClinicalCheckIn,
 } from "../db.js";
 import { logAudit } from "../lib/audit.js";
+import { invalidateForUser } from "../lib/authority-cache.js";
 
 export const OPERATIONAL_ROLES = [
   "admission",
@@ -207,6 +208,8 @@ export async function openCheckIn(input: CheckInInput): Promise<CheckInResult> {
       })
       .returning();
 
+    invalidateForUser(actor.clinicId, actor.userId);
+
     // Fire-and-forget; if a future refactor wraps this path in db.transaction(...),
     // thread the tx through to logAudit({ ..., tx }) so the audit row commits atomically.
     logAudit({
@@ -293,8 +296,11 @@ export async function closeCheckIn(args: {
         "User has no active clinical check-in",
       );
     }
+    invalidateForUser(actor.clinicId, actor.userId);
     return closed;
   }
+
+  invalidateForUser(actor.clinicId, actor.userId);
 
   // Fire-and-forget; if a future refactor wraps this path in db.transaction(...),
   // thread the tx through to logAudit({ ..., tx }) so the audit row commits atomically.
@@ -454,6 +460,7 @@ export async function autoCheckOutForSessionEnd(args: {
     .returning();
 
   for (const row of closed) {
+    invalidateForUser(clinicId, row.userId);
     // Fire-and-forget; if a future refactor wraps this path in db.transaction(...),
     // thread the tx through to logAudit({ ..., tx }) so the audit row commits atomically.
     logAudit({

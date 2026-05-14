@@ -41,12 +41,14 @@ import {
   mapLegacyRoleToSystemRole,
   normalizeShiftRoleToClinical,
 } from "./authority-roles.js";
-import { getOpenClinicalCheckIn } from "./check-in-resolution.js";
+import {
+  getOpenClinicalCheckInCached,
+  resolveCurrentRoleCached,
+} from "./authority-cache.js";
 import { createLogLimiter } from "./log-safety.js";
 import { incrementMetric } from "./metrics.js";
 import { scheduleOperationalRoleShadowValidation } from "./operational-role-shadow.js";
 import {
-  resolveCurrentRole,
   type PermanentVetTrackRole,
   type RoleResolutionResult,
 } from "./role-resolution.js";
@@ -149,9 +151,9 @@ export async function resolveAuthority(
   // continues through the legacy branches below, which emit MISSING_USER_NAME
   // exactly as before.
   if (isCheckInPathEnabled() && trimmedName) {
-    let checkIn: Awaited<ReturnType<typeof getOpenClinicalCheckIn>>;
+    let checkIn: Awaited<ReturnType<typeof getOpenClinicalCheckInCached>>;
     try {
-      checkIn = await getOpenClinicalCheckIn({
+      checkIn = await getOpenClinicalCheckInCached({
         clinicId: input.clinicId,
         userId: input.authUser.id,
       });
@@ -173,7 +175,7 @@ export async function resolveAuthority(
       //  - failure → emit structured warning, do NOT invalidate check-in
       let shiftResult: RoleResolutionResult | null = null;
       try {
-        shiftResult = await resolveCurrentRole({
+        shiftResult = await resolveCurrentRoleCached({
           clinicId: input.clinicId,
           userId: input.authUser.id,
           userName: trimmedName,
@@ -242,7 +244,7 @@ export async function resolveAuthority(
 
   let result: RoleResolutionResult;
   try {
-    result = await resolveCurrentRole({
+    result = await resolveCurrentRoleCached({
       clinicId: input.clinicId,
       userId: input.authUser.id,
       userName: trimmedName,
