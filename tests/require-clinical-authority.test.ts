@@ -443,6 +443,50 @@ describe("requireClinicalAuthority — dispense transitional fallback", () => {
     expect(res.statusCode).toBe(403);
   });
 
+  it("denies PR 7 CHECKED_IN_STALE even with transitional fallback ON (no resurrection)", async () => {
+    resolveAuthorityMock.mockResolvedValue(
+      makeSnapshot({
+        effectiveClinicalRole: null,
+        clinicalRole: "vet",
+        reason: "CHECKED_IN_STALE",
+      }),
+    );
+    const mw = requireClinicalAuthority({
+      allow: ["vet", "senior_technician", "technician"],
+      allowPermanentClinicalRoleFallbackForLegacyDispense: true,
+    });
+    const req = makeReq({
+      authUser: { ...(makeReq().authUser as object), role: "vet" },
+    });
+    const res = makeRes();
+    const next = vi.fn();
+    await mw(req as never, res as never, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("denies PR 7 CHECKED_IN_OPROLE_REVOKED even with transitional fallback ON (no resurrection)", async () => {
+    resolveAuthorityMock.mockResolvedValue(
+      makeSnapshot({
+        effectiveClinicalRole: null,
+        clinicalRole: "vet",
+        reason: "CHECKED_IN_OPROLE_REVOKED",
+      }),
+    );
+    const mw = requireClinicalAuthority({
+      allow: ["vet", "senior_technician", "technician"],
+      allowPermanentClinicalRoleFallbackForLegacyDispense: true,
+    });
+    const req = makeReq({
+      authUser: { ...(makeReq().authUser as object), role: "vet" },
+    });
+    const res = makeRes();
+    const next = vi.fn();
+    await mw(req as never, res as never, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(403);
+  });
+
   it("denies when transitional fallback OFF, effectiveClinicalRole=null, clinicalRole=vet, reason=EZSHIFT_NONE", async () => {
     resolveAuthorityMock.mockResolvedValue(
       makeSnapshot({

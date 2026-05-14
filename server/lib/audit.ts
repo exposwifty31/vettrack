@@ -148,7 +148,9 @@ export type AuditActionType =
   | "code_blue_replay_authority_denied"
   | "authority_denied"
   | "authority_resolution_failed"
-  | "dispense_legacy_role_fallback_used";
+  | "dispense_legacy_role_fallback_used"
+  | "authority_enforcement_denied_stale"
+  | "authority_enforcement_denied_oprole";
 
 export interface LogAuditParams {
   clinicId: string;

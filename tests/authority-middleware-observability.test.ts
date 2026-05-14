@@ -136,6 +136,47 @@ afterEach(() => {
   }
 });
 
+describe("requireClinicalAuthority observability — PR 7 surface invariant", () => {
+  it("PR 7 enforcement counters stay at 0 across PR 5 middleware operations (no PR-5 → PR-7 coupling)", async () => {
+    // The middleware never reads or increments PR 7 counters; PR 7 lives in
+    // the resolver. This test exercises a representative slice of PR 5
+    // middleware behavior and asserts the PR 7 counters remain zero, locking
+    // the architectural separation between PR 5 (middleware) and PR 7
+    // (resolver-side enforcement).
+    resolveAuthorityMock.mockResolvedValue(
+      makeSnapshot({
+        effectiveClinicalRole: "technician",
+        reason: "CHECKED_IN",
+        source: "check_in",
+      }),
+    );
+    await requireClinicalAuthority({ allow: ["technician"] })(
+      makeReq() as never,
+      makeRes() as never,
+      vi.fn(),
+    );
+    resolveAuthorityMock.mockResolvedValue(
+      makeSnapshot({
+        effectiveClinicalRole: null,
+        reason: "EZSHIFT_NONE",
+        source: "no_active_shift",
+        clinicalRole: "technician",
+      }),
+    );
+    await requireClinicalAuthority({ allow: ["technician"] })(
+      makeReq() as never,
+      makeRes() as never,
+      vi.fn(),
+    );
+
+    const auth = getMetricsSnapshot().authority;
+    expect(auth.staleEnforce.wouldHaveDenied).toBe(0);
+    expect(auth.staleEnforce.denied).toBe(0);
+    expect(auth.staleEnforce.skippedLegacyPath).toBe(0);
+    expect(auth.oproleEnforce.denied).toBe(0);
+  });
+});
+
 describe("requireClinicalAuthority observability — resolution source counters", () => {
   it("increments authority_resolution_source_check_in on a check-in snapshot", async () => {
     resolveAuthorityMock.mockResolvedValue(

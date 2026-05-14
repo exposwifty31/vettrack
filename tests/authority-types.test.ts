@@ -99,6 +99,26 @@ describe("AuthorityReason (Phase 2.5 additions)", () => {
       "CHECKED_IN_NO_OPROLE",
     ]);
   });
+
+  it("accepts the PR 7 enforcement denial codes", () => {
+    const stale: AuthorityReason = "CHECKED_IN_STALE";
+    const oproleRevoked: AuthorityReason = "CHECKED_IN_OPROLE_REVOKED";
+    assignable<AuthorityReason>(stale);
+    assignable<AuthorityReason>(oproleRevoked);
+    expect([stale, oproleRevoked]).toEqual([
+      "CHECKED_IN_STALE",
+      "CHECKED_IN_OPROLE_REVOKED",
+    ]);
+  });
+
+  it("does NOT accept CHECKED_IN_FORCE_CLOSED (auto-close is out of scope)", () => {
+    // Auto-close is explicitly forbidden by the PR 7 plan. If this line ever
+    // compiles, an auto-close path has snuck into AuthorityReason — investigate
+    // before removing the @ts-expect-error.
+    // @ts-expect-error — CHECKED_IN_FORCE_CLOSED is intentionally not a reason
+    const forbidden: AuthorityReason = "CHECKED_IN_FORCE_CLOSED";
+    expect(forbidden as unknown as string).toBe("CHECKED_IN_FORCE_CLOSED");
+  });
 });
 
 describe("AuthoritySource (Phase 2.5 additions)", () => {

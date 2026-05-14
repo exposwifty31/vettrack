@@ -56,14 +56,35 @@ import {
   type RoleResolutionResult,
 } from "./role-resolution.js";
 import { TtlCache } from "./analytics-cache.js";
+import { getAllowedOperationalRoles } from "../services/clinical-check-in.js";
+import type { OperationalRole } from "../../shared/authority.js";
 
 const CHECKIN_TTL_MS = 30_000;
 const SHIFT_TTL_MS = 60_000;
+// Phase 2.5 PR 7 — allowlist cache TTL bounds OPROLE revocation latency.
+// Must be ≤ 60s by §5.4 contract.
+const ALLOWLIST_TTL_MS = 60_000;
 const MAX_ENTRIES_PER_CACHE = 10_000;
 
 const NONE = "NONE" as const;
 type CheckInCached = OpenClinicalCheckInRow | typeof NONE;
 type ShiftCached = RoleResolutionResult | typeof NONE;
+
+// Phase 2.5 PR 7 — allowlist wrapper local types. The element type is the
+// non-null branch of OperationalRole (only emitted values; never "unknown",
+// never null).
+type NonNullOperationalRole = Exclude<OperationalRole, null>;
+type AllowlistCached = readonly NonNullOperationalRole[];
+
+/**
+ * Phase 2.5 PR 7 — discriminated result returned by
+ * getAllowedOperationalRolesCached. The wrapper owns hit/miss/error
+ * categorization internally; the OPROLE evaluator consumes this single shape
+ * and never re-implements the cache-state branching.
+ */
+export type AllowlistFetchResult =
+  | { kind: "ok"; allowlist: readonly NonNullOperationalRole[] }
+  | { kind: "error" };
 
 function isCacheEnabled(): boolean {
   return process.env.AUTHORITY_CACHE_V1 === "true";
@@ -104,6 +125,23 @@ const shiftCache = new TtlCache<ShiftCached>({
   },
 });
 
+// Phase 2.5 PR 7 — allowlist cache. Shares the existing TtlCache machinery and
+// the same eviction/error hooks. Inflight map prevents the dogpile.
+const allowlistInflight = new Map<string, Promise<AllowlistFetchResult>>();
+const allowlistCache = new TtlCache<AllowlistCached>({
+  ttlMs: ALLOWLIST_TTL_MS,
+  maxEntries: MAX_ENTRIES_PER_CACHE,
+  onEvict: (key) => {
+    allowlistInflight.delete(key);
+  },
+  onSetError: () => {
+    incrementMetric("authority_cache_error_set");
+  },
+  onEvicted: () => {
+    incrementMetric("authority_cache_evicted");
+  },
+});
+
 function checkInKey(clinicId: string, userId: string): string {
   return `${clinicId}:${userId}`;
 }
@@ -112,6 +150,15 @@ function shiftKey(input: RoleResolutionInput, now: Date): string {
   const userId = input.userId?.trim() ?? "";
   const dayBucket = toLocalDateString(now);
   return `${input.clinicId}:${userId}:${input.fallbackRole}:${dayBucket}`;
+}
+
+// Phase 2.5 PR 7 — allowlist key invariant (§5.4): exactly (clinicId, userId).
+// MUST NOT include operationalRole, route, snapshot fields, session ids, or
+// any request-scoped dimension. Same shape as checkInKey by design — same
+// (clinicId, userId) tuple, so the existing invalidateForUser hook clears
+// both caches with a single call.
+function allowlistKey(clinicId: string, userId: string): string {
+  return `${clinicId}:${userId}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -235,6 +282,90 @@ export async function resolveCurrentRoleCached(
   }
 }
 
+/**
+ * Phase 2.5 PR 7 — read-through wrapper for the (clinicId, userId) allowlist
+ * fetched by `getAllowedOperationalRoles`. Used by the OPROLE enforcement
+ * evaluator. Returns a discriminated result so the caller does not have to
+ * re-implement the hit/miss/error categorization.
+ *
+ * When AUTHORITY_CACHE_V1 is not "true", falls through to the underlying DB
+ * read with no Map touches (mirrors the other wrappers).
+ *
+ * Cache key (§5.4 invariant): exactly (clinicId, userId). NEVER includes
+ * operationalRole, route, snapshot fields, session ids, or any request-scoped
+ * dimension.
+ */
+export async function getAllowedOperationalRolesCached(
+  input: { clinicId: string; userId: string },
+): Promise<AllowlistFetchResult> {
+  if (!isCacheEnabled()) {
+    incrementMetric("authority_cache_disabled");
+    try {
+      const allowlist = await getAllowedOperationalRoles(
+        input.userId,
+        input.clinicId,
+      );
+      return {
+        kind: "ok",
+        allowlist: allowlist as readonly NonNullOperationalRole[],
+      };
+    } catch {
+      incrementMetric("authority_cache_allowlist_error");
+      return { kind: "error" };
+    }
+  }
+
+  const key = allowlistKey(input.clinicId, input.userId);
+
+  let cached: AllowlistCached | null = null;
+  try {
+    cached = allowlistCache.get(key);
+  } catch {
+    incrementMetric("authority_cache_error_get");
+    cached = null;
+  }
+  if (cached) {
+    incrementMetric("authority_cache_allowlist_hit");
+    return { kind: "ok", allowlist: cached };
+  }
+
+  const existing = allowlistInflight.get(key);
+  if (existing) {
+    incrementMetric("authority_cache_inflight_hit");
+    return existing;
+  }
+
+  incrementMetric("authority_cache_allowlist_miss");
+  const epochAtStart = allowlistCache.epochOf(key);
+
+  const p = (async (): Promise<AllowlistFetchResult> => {
+    try {
+      const allowlist = await getAllowedOperationalRoles(
+        input.userId,
+        input.clinicId,
+      );
+      const narrowed = allowlist as readonly NonNullOperationalRole[];
+      if (allowlistCache.epochOf(key) === epochAtStart) {
+        allowlistCache.set(key, narrowed);
+      } else {
+        incrementMetric("authority_cache_stale_write_dropped");
+      }
+      return { kind: "ok", allowlist: narrowed };
+    } catch {
+      // DB read failed. Do NOT cache; the next request retries.
+      incrementMetric("authority_cache_allowlist_error");
+      return { kind: "error" };
+    }
+  })();
+
+  allowlistInflight.set(key, p);
+  try {
+    return await p;
+  } finally {
+    allowlistInflight.delete(key);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Invalidation API. Writer-side hooks call these synchronously after their
 // DB write succeeds.
@@ -255,7 +386,15 @@ export function invalidateForUser(clinicId: string, userId: string): void {
       shiftInflight.delete(k);
     }
 
+    // Phase 2.5 PR 7 — extend invalidateForUser to cover the allowlist cache.
+    // Existing user-mutation call sites (server/routes/users.ts:347/537/785/836)
+    // pick this up automatically with zero edits there.
+    const alKey = allowlistKey(clinicId, userId);
+    allowlistCache.invalidate(alKey);
+    allowlistInflight.delete(alKey);
+
     incrementMetric("authority_cache_invalidate_checkin");
+    incrementMetric("authority_cache_invalidate_allowlist");
   } catch {
     incrementMetric("authority_cache_invalidate_error");
   }
@@ -280,13 +419,16 @@ export function invalidateClinicShift(clinicId: string): void {
 export function __resetAuthorityCacheForTests(): void {
   checkInCache.resetForTests();
   shiftCache.resetForTests();
+  allowlistCache.resetForTests();
   checkInInflight.clear();
   shiftInflight.clear();
+  allowlistInflight.clear();
 }
 
 export const __internals = {
   checkInCache,
   shiftCache,
+  allowlistCache,
   checkInInflight,
   shiftInflight,
   checkInKey,

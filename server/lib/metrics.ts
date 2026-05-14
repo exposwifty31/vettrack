@@ -58,7 +58,15 @@ type MetricName =
   | "authority_cache_stale_write_dropped"
   | "authority_cache_error_get"
   | "authority_cache_error_set"
-  | "authority_cache_invalidate_error";
+  | "authority_cache_invalidate_error"
+  | "authority_cache_allowlist_hit"
+  | "authority_cache_allowlist_miss"
+  | "authority_cache_allowlist_error"
+  | "authority_cache_invalidate_allowlist"
+  | "authority_stale_would_have_denied"
+  | "authority_stale_denied"
+  | "authority_stale_skipped_legacy_path"
+  | "authority_oprole_denied";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -146,6 +154,20 @@ export interface MetricsSnapshot {
       errorGet: number;
       errorSet: number;
       invalidateError: number;
+      allowlistHit: number;
+      allowlistMiss: number;
+      allowlistError: number;
+      invalidateAllowlist: number;
+    };
+    /** Phase 2.5 PR 7 — stale check-in enforcement (off | shadow | enforce). */
+    staleEnforce: {
+      wouldHaveDenied: number;
+      denied: number;
+      skippedLegacyPath: number;
+    };
+    /** Phase 2.5 PR 7 — operationalRole enforcement (off | enforce only). Shadow signal is owned by PR 5.3 oproleShadow. */
+    oproleEnforce: {
+      denied: number;
     };
   };
   timestamp: string;
@@ -209,6 +231,14 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   authority_cache_error_get: 0,
   authority_cache_error_set: 0,
   authority_cache_invalidate_error: 0,
+  authority_cache_allowlist_hit: 0,
+  authority_cache_allowlist_miss: 0,
+  authority_cache_allowlist_error: 0,
+  authority_cache_invalidate_allowlist: 0,
+  authority_stale_would_have_denied: 0,
+  authority_stale_denied: 0,
+  authority_stale_skipped_legacy_path: 0,
+  authority_oprole_denied: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -371,6 +401,18 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           errorGet: metrics.authority_cache_error_get,
           errorSet: metrics.authority_cache_error_set,
           invalidateError: metrics.authority_cache_invalidate_error,
+          allowlistHit: metrics.authority_cache_allowlist_hit,
+          allowlistMiss: metrics.authority_cache_allowlist_miss,
+          allowlistError: metrics.authority_cache_allowlist_error,
+          invalidateAllowlist: metrics.authority_cache_invalidate_allowlist,
+        },
+        staleEnforce: {
+          wouldHaveDenied: metrics.authority_stale_would_have_denied,
+          denied: metrics.authority_stale_denied,
+          skippedLegacyPath: metrics.authority_stale_skipped_legacy_path,
+        },
+        oproleEnforce: {
+          denied: metrics.authority_oprole_denied,
         },
       },
       timestamp: new Date().toISOString(),
@@ -421,7 +463,13 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           errorGet: 0,
           errorSet: 0,
           invalidateError: 0,
+          allowlistHit: 0,
+          allowlistMiss: 0,
+          allowlistError: 0,
+          invalidateAllowlist: 0,
         },
+        staleEnforce: { wouldHaveDenied: 0, denied: 0, skippedLegacyPath: 0 },
+        oproleEnforce: { denied: 0 },
       },
       timestamp: new Date().toISOString(),
     };

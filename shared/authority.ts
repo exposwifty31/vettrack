@@ -63,6 +63,12 @@ export type AuthoritySource = "shift" | "no_active_shift" | "check_in";
  * "CHECKED_IN", "CACHED", "NOT_CHECKED_IN", and "CHECKED_IN_NO_OPROLE" are
  * reserved for Phase 2.5 check-in resolution and cache plumbing; they are not
  * emitted by the resolver in PR 1.
+ *
+ * Phase 2.5 PR 7 enforcement denials (gated by env flags
+ * AUTHORITY_STALE_ENFORCE_V1 / AUTHORITY_OPROLE_ENFORCE_V1):
+ *   - "CHECKED_IN_STALE" — open check-in row exceeds the configured ceiling.
+ *   - "CHECKED_IN_OPROLE_REVOKED" — checkIn.operationalRole no longer in the
+ *     user's current allowedOperationalRoles allowlist.
  */
 export type AuthorityReason =
   | "EZSHIFT_ACTIVE"
@@ -75,7 +81,9 @@ export type AuthorityReason =
   | "CHECKED_IN"
   | "CACHED"
   | "NOT_CHECKED_IN"
-  | "CHECKED_IN_NO_OPROLE";
+  | "CHECKED_IN_NO_OPROLE"
+  | "CHECKED_IN_STALE"
+  | "CHECKED_IN_OPROLE_REVOKED";
 
 /** Point-in-time snapshot of a user's resolved authority state. */
 export interface AuthoritySnapshot {

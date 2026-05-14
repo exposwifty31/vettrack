@@ -48,6 +48,8 @@ import {
 import { createLogLimiter } from "./log-safety.js";
 import { incrementMetric } from "./metrics.js";
 import { scheduleOperationalRoleShadowValidation } from "./operational-role-shadow.js";
+import { evaluateStaleEnforcement } from "./authority/enforcement/stale.evaluator.js";
+import { evaluateOpRoleEnforcement } from "./authority/enforcement/oprole.evaluator.js";
 import {
   type PermanentVetTrackRole,
   type RoleResolutionResult,
@@ -227,6 +229,46 @@ export async function resolveAuthority(
         checkInId: checkIn.id,
         resolvedAt,
       });
+
+      // Phase 2.5 PR 7: enforcement evaluators. Stale runs first by load-bearing
+      // precedence (§3.4); either evaluator's deny short-circuits to a denial
+      // snapshot. Both run only inside this `if (checkIn)` branch — Strategy A
+      // (below) never sees them. Single-denial invariant (§3.5): exactly one
+      // reason literal per resolution; no composed reasons, no merged verdicts.
+      const enforcementCtx = {
+        clinicId: input.clinicId,
+        userId: input.authUser.id,
+        now,
+        checkIn,
+      };
+
+      const staleVerdict = await evaluateStaleEnforcement(enforcementCtx);
+      if (staleVerdict.action === "deny") {
+        return buildSnapshot({
+          systemRole,
+          clinicalRole,
+          activeShiftRole: observedShiftRole,
+          effectiveClinicalRole: null,
+          operationalRole: null,
+          source: "check_in",
+          reason: "CHECKED_IN_STALE",
+          resolvedAt,
+        });
+      }
+
+      const oproleVerdict = await evaluateOpRoleEnforcement(enforcementCtx);
+      if (oproleVerdict.action === "deny") {
+        return buildSnapshot({
+          systemRole,
+          clinicalRole,
+          activeShiftRole: observedShiftRole,
+          effectiveClinicalRole: null,
+          operationalRole: null,
+          source: "check_in",
+          reason: "CHECKED_IN_OPROLE_REVOKED",
+          resolvedAt,
+        });
+      }
 
       return buildSnapshot({
         systemRole,
