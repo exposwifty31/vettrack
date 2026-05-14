@@ -33,6 +33,7 @@ import forecastRoutes from "../routes/forecast.js";
 import animalsRoutes from "../routes/animals.js";
 import patientsRoutes from "../routes/patients.js";
 import uploadsRoutes from "../routes/uploads.js";
+import clinicalCheckInRoutes from "../routes/clinical-check-in.js";
 import codeBlueRoutes from "../routes/code-blue.js";
 import crashCartRoutes from "../routes/crash-cart.js";
 import integrationsRoutes from "../routes/integrations.js";
@@ -79,6 +80,7 @@ export function registerApiRoutes(app: express.Express) {
   app.use("/api/animals", animalsRoutes);
   app.use("/api/patients", patientsRoutes);
   app.use("/api/uploads", uploadsRoutes);
+  app.use("/api/clinical", clinicalCheckInRoutes);
   app.use("/api/code-blue", codeBlueRoutes);
   app.use("/api/crash-cart", crashCartRoutes);
   app.use("/api/integrations", integrationsRoutes);

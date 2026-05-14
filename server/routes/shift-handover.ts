@@ -31,6 +31,7 @@ import { validateBody } from "../middleware/validate.js";
 import { enqueueShiftReportEmailJob } from "../lib/queue.js";
 import { postSystemMessage } from "../lib/shift-chat-presence.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
+import { autoCheckOutForSessionEnd } from "../services/clinical-check-in.js";
 
 const router = Router();
 
@@ -432,6 +433,30 @@ router.post(
         .update(shiftSessions)
         .set({ endedAt, note: mergedNote })
         .where(and(eq(shiftSessions.id, open.id), eq(shiftSessions.clinicId, clinicId)));
+
+      // Non-fatal: shiftSessions.endedAt is already committed above. If this
+      // throws, returning 500 SHIFT_END_FAILED would cause clients to retry
+      // and hit "no open shift session" (404) while clinical check-ins remain
+      // dangling. Match the existing post-commit pattern in this handler
+      // (postSystemMessage / email enqueue are fire-and-forget for the same
+      // reason). Surviving dangling check-ins are observable via the audit
+      // log and can be reaped by ops.
+      try {
+        await autoCheckOutForSessionEnd({
+          clinicId,
+          endedAt,
+          performedBy: {
+            id: req.authUser!.id,
+            email: req.authUser!.email ?? "",
+            role: resolveAuditActorRole(req) ?? req.authUser!.role,
+          },
+        });
+      } catch (autoCheckoutErr) {
+        console.error(
+          "[shift-handover] auto-checkout failed (non-fatal):",
+          autoCheckoutErr,
+        );
+      }
 
       if (override && overrideReason?.trim()) {
         logAudit({
