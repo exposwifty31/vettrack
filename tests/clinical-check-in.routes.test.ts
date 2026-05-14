@@ -10,6 +10,7 @@ import type { NextFunction, Request, Response } from "express";
 
 const mockOpenCheckIn = vi.fn();
 const mockCloseCheckIn = vi.fn();
+const mockForceCloseCheckIn = vi.fn();
 const mockGetActiveCheckIn = vi.fn();
 const mockGetAllowedOperationalRoles = vi.fn();
 
@@ -28,6 +29,7 @@ vi.mock("../server/services/clinical-check-in.js", async () => {
   return {
     openCheckIn: mockOpenCheckIn,
     closeCheckIn: mockCloseCheckIn,
+    forceCloseCheckIn: mockForceCloseCheckIn,
     getActiveCheckIn: mockGetActiveCheckIn,
     getAllowedOperationalRoles: mockGetAllowedOperationalRoles,
     autoCheckOutForSessionEnd: vi.fn(),
@@ -78,6 +80,20 @@ vi.mock("../server/middleware/auth.js", () => ({
         error: "FORBIDDEN",
         reason: "INSUFFICIENT_ROLE",
         message: "Clinical role required",
+        requestId: "test-req",
+      });
+      return;
+    }
+    next();
+  },
+  requireAdmin: (req: Request, res: Response, next: NextFunction) => {
+    const user = (req as Request & { authUser?: { role?: string } }).authUser;
+    if (user?.role !== "admin") {
+      res.status(403).json({
+        code: "FORBIDDEN",
+        error: "FORBIDDEN",
+        reason: "INSUFFICIENT_ROLE",
+        message: "Admin role required",
         requestId: "test-req",
       });
       return;
@@ -439,5 +455,341 @@ describe("GET /me/operational-roles", () => {
     expect(captured.body).toEqual({
       allowedOperationalRoles: ["admission", "ward"],
     });
+  });
+});
+
+// ── POST /check-ins/:id/admin-force-close ─────────────────────────────────────
+
+const FORCE_CLOSE_UUID = "00000000-0000-4000-8000-000000000001";
+const ADMIN_USER = {
+  id: "user-admin",
+  email: "admin@clinic.test",
+  clinicId: "clinic-1",
+  role: "admin",
+};
+
+describe("POST /check-ins/:id/admin-force-close — auth gates", () => {
+  it("returns 401 when no auth user", async () => {
+    currentAuthUser = null;
+    const req = makeReq({
+      method: "POST",
+      url: `/check-ins/${FORCE_CLOSE_UUID}/admin-force-close`,
+      body: {},
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(401);
+    expect(mockForceCloseCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when caller is vet (non-admin)", async () => {
+    currentAuthUser = {
+      id: "u",
+      email: "v@test",
+      clinicId: "c",
+      role: "vet",
+    };
+    const req = makeReq({
+      method: "POST",
+      url: `/check-ins/${FORCE_CLOSE_UUID}/admin-force-close`,
+      body: {},
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(403);
+    expect(captured.body).toMatchObject({
+      reason: "INSUFFICIENT_ROLE",
+    });
+    expect(mockForceCloseCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when caller is senior_technician", async () => {
+    currentAuthUser = { id: "u", email: "s@t", clinicId: "c", role: "senior_technician" };
+    const req = makeReq({
+      method: "POST",
+      url: `/check-ins/${FORCE_CLOSE_UUID}/admin-force-close`,
+      body: {},
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(403);
+    expect(mockForceCloseCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when caller is technician", async () => {
+    currentAuthUser = { id: "u", email: "t@t", clinicId: "c", role: "technician" };
+    const req = makeReq({
+      method: "POST",
+      url: `/check-ins/${FORCE_CLOSE_UUID}/admin-force-close`,
+      body: {},
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(403);
+    expect(mockForceCloseCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when caller is student", async () => {
+    currentAuthUser = { id: "u", email: "s@t", clinicId: "c", role: "student" };
+    const req = makeReq({
+      method: "POST",
+      url: `/check-ins/${FORCE_CLOSE_UUID}/admin-force-close`,
+      body: {},
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(403);
+    expect(mockForceCloseCheckIn).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /check-ins/:id/admin-force-close — validation", () => {
+  beforeEach(() => {
+    currentAuthUser = { ...ADMIN_USER };
+  });
+
+  it("returns 400 when :id is not a UUID", async () => {
+    const req = makeReq({
+      method: "POST",
+      url: "/check-ins/not-a-uuid/admin-force-close",
+      body: {},
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(400);
+    expect(mockForceCloseCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 INVALID_BODY when body has unexpected keys", async () => {
+    const req = makeReq({
+      method: "POST",
+      url: `/check-ins/${FORCE_CLOSE_UUID}/admin-force-close`,
+      body: { foo: "bar" },
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(400);
+    expect(captured.body).toMatchObject({
+      code: "INVALID_BODY",
+      error: "INVALID_BODY",
+      reason: "INVALID_BODY",
+    });
+    expect((captured.body as Record<string, unknown>).requestId).toBeTruthy();
+    expect(mockForceCloseCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 INVALID_BODY when reason is empty string", async () => {
+    const req = makeReq({
+      method: "POST",
+      url: `/check-ins/${FORCE_CLOSE_UUID}/admin-force-close`,
+      body: { reason: "" },
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(400);
+    expect(captured.body).toMatchObject({ code: "INVALID_BODY" });
+    expect(mockForceCloseCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("accepts empty {} body (reason is optional)", async () => {
+    const closed = makeRow({
+      id: FORCE_CLOSE_UUID,
+      checkedOutAt: new Date(),
+      checkOutReason: "admin_force",
+    });
+    mockForceCloseCheckIn.mockResolvedValueOnce({
+      row: closed,
+      alreadyClosed: false,
+    });
+    const req = makeReq({
+      method: "POST",
+      url: `/check-ins/${FORCE_CLOSE_UUID}/admin-force-close`,
+      body: {},
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(200);
+    expect(mockForceCloseCheckIn).toHaveBeenCalledTimes(1);
+    expect(mockForceCloseCheckIn.mock.calls[0][0].reason).toBeNull();
+  });
+
+  it("accepts undefined body (POST without JSON payload)", async () => {
+    const closed = makeRow({
+      id: FORCE_CLOSE_UUID,
+      checkedOutAt: new Date(),
+      checkOutReason: "admin_force",
+    });
+    mockForceCloseCheckIn.mockResolvedValueOnce({
+      row: closed,
+      alreadyClosed: false,
+    });
+    const req = makeReq({
+      method: "POST",
+      url: `/check-ins/${FORCE_CLOSE_UUID}/admin-force-close`,
+    });
+    // makeReq defaults body to {} — overwrite to undefined to simulate a
+    // client that POSTs with no JSON body at all.
+    (req as Request & { body: unknown }).body = undefined;
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(200);
+    expect(mockForceCloseCheckIn).toHaveBeenCalledTimes(1);
+    expect(mockForceCloseCheckIn.mock.calls[0][0].reason).toBeNull();
+  });
+});
+
+describe("POST /check-ins/:id/admin-force-close — service contract", () => {
+  beforeEach(() => {
+    currentAuthUser = { ...ADMIN_USER };
+  });
+
+  it("returns 200 with serialized row + alreadyClosed=false on successful close", async () => {
+    const closed = makeRow({
+      id: FORCE_CLOSE_UUID,
+      checkedOutAt: new Date("2026-05-14T18:00:00Z"),
+      checkOutReason: "admin_force",
+    });
+    mockForceCloseCheckIn.mockResolvedValueOnce({
+      row: closed,
+      alreadyClosed: false,
+    });
+    const req = makeReq({
+      method: "POST",
+      url: `/check-ins/${FORCE_CLOSE_UUID}/admin-force-close`,
+      body: { reason: "stale device" },
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(200);
+    const body = captured.body as Record<string, unknown>;
+    expect(body.id).toBe(FORCE_CLOSE_UUID);
+    expect(body.checkOutReason).toBe("admin_force");
+    expect(body.checkedOutAt).toBe("2026-05-14T18:00:00.000Z");
+    expect(body.alreadyClosed).toBe(false);
+  });
+
+  it("returns 200 with alreadyClosed=true when service reports no-op", async () => {
+    const alreadyClosed = makeRow({
+      id: FORCE_CLOSE_UUID,
+      checkedOutAt: new Date("2026-05-14T15:00:00Z"),
+      checkOutReason: "self",
+    });
+    mockForceCloseCheckIn.mockResolvedValueOnce({
+      row: alreadyClosed,
+      alreadyClosed: true,
+    });
+    const req = makeReq({
+      method: "POST",
+      url: `/check-ins/${FORCE_CLOSE_UUID}/admin-force-close`,
+      body: {},
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(200);
+    expect((captured.body as Record<string, unknown>).alreadyClosed).toBe(true);
+    expect((captured.body as Record<string, unknown>).checkOutReason).toBe(
+      "self",
+    );
+  });
+
+  it("returns 404 CHECK_IN_NOT_FOUND when service throws NOT_FOUND", async () => {
+    const { ClinicalCheckInError } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    mockForceCloseCheckIn.mockRejectedValueOnce(
+      new ClinicalCheckInError(
+        404,
+        "NOT_FOUND",
+        "Clinical check-in not found in this clinic",
+        "CHECK_IN_NOT_FOUND",
+      ),
+    );
+    const req = makeReq({
+      method: "POST",
+      url: `/check-ins/${FORCE_CLOSE_UUID}/admin-force-close`,
+      body: {},
+    });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+    expect(captured.statusCode).toBe(404);
+    expect(captured.body).toMatchObject({
+      code: "NOT_FOUND",
+      reason: "CHECK_IN_NOT_FOUND",
+    });
+  });
+
+  it("forwards admin context and target id to the service", async () => {
+    const closed = makeRow({
+      id: FORCE_CLOSE_UUID,
+      checkedOutAt: new Date(),
+      checkOutReason: "admin_force",
+    });
+    mockForceCloseCheckIn.mockResolvedValueOnce({
+      row: closed,
+      alreadyClosed: false,
+    });
+    const req = makeReq({
+      method: "POST",
+      url: `/check-ins/${FORCE_CLOSE_UUID}/admin-force-close`,
+      body: { reason: "  manual recovery  " },
+    });
+    const { res } = makeRes();
+    await dispatch(req, res);
+    expect(mockForceCloseCheckIn).toHaveBeenCalledTimes(1);
+    const call = mockForceCloseCheckIn.mock.calls[0][0];
+    expect(call.admin).toEqual({
+      id: "user-admin",
+      email: "admin@clinic.test",
+      role: "admin",
+      clinicId: "clinic-1",
+    });
+    expect(call.targetCheckInId).toBe(FORCE_CLOSE_UUID);
+    // Zod's `.trim()` on the schema collapses surrounding whitespace before service call.
+    expect(call.reason).toBe("manual recovery");
+    expect(typeof call.requestId).toBe("string");
+    expect(call.requestId.length).toBeGreaterThan(0);
+  });
+
+  it("does NOT call closeCheckIn on the force-close path (regression guard)", async () => {
+    const closed = makeRow({
+      id: FORCE_CLOSE_UUID,
+      checkedOutAt: new Date(),
+      checkOutReason: "admin_force",
+    });
+    mockForceCloseCheckIn.mockResolvedValueOnce({
+      row: closed,
+      alreadyClosed: false,
+    });
+    const req = makeReq({
+      method: "POST",
+      url: `/check-ins/${FORCE_CLOSE_UUID}/admin-force-close`,
+      body: {},
+    });
+    const { res } = makeRes();
+    await dispatch(req, res);
+    expect(mockCloseCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("propagates incoming x-request-id header back via res.setHeader", async () => {
+    const closed = makeRow({
+      id: FORCE_CLOSE_UUID,
+      checkedOutAt: new Date(),
+      checkOutReason: "admin_force",
+    });
+    mockForceCloseCheckIn.mockResolvedValueOnce({
+      row: closed,
+      alreadyClosed: false,
+    });
+    const incoming = "req-12345";
+    const req = makeReq({
+      method: "POST",
+      url: `/check-ins/${FORCE_CLOSE_UUID}/admin-force-close`,
+      body: {},
+      headers: { "x-request-id": incoming },
+    });
+    const { res } = makeRes();
+    await dispatch(req, res);
+    expect(res.getHeader("x-request-id")).toBe(incoming);
+    expect(mockForceCloseCheckIn.mock.calls[0][0].requestId).toBe(incoming);
   });
 });

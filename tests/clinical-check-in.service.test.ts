@@ -456,6 +456,274 @@ describe("closeCheckIn", () => {
   });
 });
 
+describe("forceCloseCheckIn — successful force-close", () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  const ADMIN = {
+    id: "user-admin",
+    email: "admin@clinic.test",
+    role: "admin",
+    clinicId: "clinic-1",
+  };
+
+  it("closes an open row, emits success audit with source=admin_force", async () => {
+    const closed = makeRow({
+      checkedOutAt: new Date("2026-05-14T20:00:00Z"),
+      checkOutReason: "admin_force",
+    });
+    mockUpdate.mockReturnValue(chainable([closed]));
+
+    const { forceCloseCheckIn } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    const result = await forceCloseCheckIn({
+      admin: ADMIN,
+      targetCheckInId: "ci-1",
+      reason: "stale row",
+      requestId: "req-abc",
+    });
+
+    expect(result.alreadyClosed).toBe(false);
+    expect(result.row.checkOutReason).toBe("admin_force");
+    expect(mockLogAudit).toHaveBeenCalledTimes(1);
+    const audit = mockLogAudit.mock.calls[0][0];
+    expect(audit.actionType).toBe("clinical_check_out");
+    expect(audit.performedBy).toBe("user-admin");
+    expect(audit.performedByEmail).toBe("admin@clinic.test");
+    expect(audit.actorRole).toBe("admin");
+    expect(audit.targetType).toBe("clinical_check_in");
+    expect(audit.targetId).toBe(closed.id);
+    expect(audit.metadata.source).toBe("admin_force");
+    expect(audit.metadata.outcome).toBeUndefined();
+    expect(audit.metadata.userId).toBe("user-vet"); // target user, NOT admin
+    expect(audit.metadata.userId).not.toBe(ADMIN.id);
+    expect(audit.metadata.adminReason).toBe("stale row");
+    expect(audit.metadata.requestId).toBe("req-abc");
+  });
+
+  it("propagates trimmed adminReason; null when blank/missing", async () => {
+    const closed = makeRow({
+      checkedOutAt: new Date(),
+      checkOutReason: "admin_force",
+    });
+    mockUpdate.mockReturnValue(chainable([closed]));
+
+    const { forceCloseCheckIn } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    await forceCloseCheckIn({
+      admin: ADMIN,
+      targetCheckInId: "ci-1",
+      reason: "   ",
+      requestId: null,
+    });
+    expect(mockLogAudit.mock.calls[0][0].metadata.adminReason).toBeNull();
+    expect(mockLogAudit.mock.calls[0][0].metadata.requestId).toBeNull();
+
+    mockLogAudit.mockClear();
+    mockUpdate.mockReturnValue(chainable([closed]));
+    await forceCloseCheckIn({
+      admin: ADMIN,
+      targetCheckInId: "ci-1",
+      reason: "  spaced  ",
+    });
+    expect(mockLogAudit.mock.calls[0][0].metadata.adminReason).toBe("spaced");
+  });
+});
+
+describe("forceCloseCheckIn — idempotent already-closed", () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  const ADMIN = {
+    id: "user-admin",
+    email: "admin@clinic.test",
+    role: "admin",
+    clinicId: "clinic-1",
+  };
+
+  it("returns alreadyClosed=true and emits noop audit when row was previously closed with reason=self", async () => {
+    const alreadyClosed = makeRow({
+      checkedOutAt: new Date("2026-05-14T15:00:00Z"),
+      checkOutReason: "self",
+    });
+    // UPDATE no-ops because checked_out_at IS NULL predicate doesn't match.
+    mockUpdate.mockReturnValue(chainable([]));
+    mockSelectSequence([alreadyClosed]);
+
+    const { forceCloseCheckIn } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    const result = await forceCloseCheckIn({
+      admin: ADMIN,
+      targetCheckInId: "ci-1",
+    });
+
+    expect(result.alreadyClosed).toBe(true);
+    expect(result.row.checkOutReason).toBe("self");
+    expect(mockLogAudit).toHaveBeenCalledTimes(1);
+    const audit = mockLogAudit.mock.calls[0][0];
+    expect(audit.actionType).toBe("clinical_check_out");
+    expect(audit.metadata.source).toBe("admin_force");
+    expect(audit.metadata.outcome).toBe("noop_already_closed");
+    expect(audit.metadata.existingSource).toBe("self");
+    expect(audit.metadata.userId).toBe("user-vet");
+  });
+
+  it("captures existingSource=session_close when prior closer was session-end", async () => {
+    const alreadyClosed = makeRow({
+      checkedOutAt: new Date(),
+      checkOutReason: "session_close",
+    });
+    mockUpdate.mockReturnValue(chainable([]));
+    mockSelectSequence([alreadyClosed]);
+
+    const { forceCloseCheckIn } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    const result = await forceCloseCheckIn({
+      admin: ADMIN,
+      targetCheckInId: "ci-1",
+    });
+    expect(result.alreadyClosed).toBe(true);
+    expect(mockLogAudit.mock.calls[0][0].metadata.existingSource).toBe(
+      "session_close",
+    );
+  });
+
+  it("captures existingSource=admin_force when another admin already forced", async () => {
+    const alreadyClosed = makeRow({
+      checkedOutAt: new Date(),
+      checkOutReason: "admin_force",
+    });
+    mockUpdate.mockReturnValue(chainable([]));
+    mockSelectSequence([alreadyClosed]);
+
+    const { forceCloseCheckIn } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    const result = await forceCloseCheckIn({
+      admin: ADMIN,
+      targetCheckInId: "ci-1",
+    });
+    expect(result.alreadyClosed).toBe(true);
+    expect(mockLogAudit.mock.calls[0][0].metadata.existingSource).toBe(
+      "admin_force",
+    );
+    expect(mockLogAudit.mock.calls[0][0].metadata.outcome).toBe(
+      "noop_already_closed",
+    );
+  });
+});
+
+describe("forceCloseCheckIn — not found / tenant isolation", () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  const ADMIN = {
+    id: "user-admin",
+    email: "admin@clinic.test",
+    role: "admin",
+    clinicId: "clinic-1",
+  };
+
+  it("throws NOT_FOUND with reason=CHECK_IN_NOT_FOUND when row does not exist", async () => {
+    mockUpdate.mockReturnValue(chainable([]));
+    mockSelectSequence([]); // re-SELECT returns nothing
+
+    const { forceCloseCheckIn } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    await expect(
+      forceCloseCheckIn({ admin: ADMIN, targetCheckInId: "ci-missing" }),
+    ).rejects.toMatchObject({
+      status: 404,
+      code: "NOT_FOUND",
+      reason: "CHECK_IN_NOT_FOUND",
+    });
+    expect(mockLogAudit).not.toHaveBeenCalled();
+  });
+
+  it("treats cross-clinic row as 404 (re-SELECT also filters by admin.clinicId)", async () => {
+    // UPDATE no-ops (predicate clinic_id = admin.clinicId never matches).
+    mockUpdate.mockReturnValue(chainable([]));
+    // re-SELECT also filters by admin.clinicId — so it also returns nothing.
+    mockSelectSequence([]);
+
+    const { forceCloseCheckIn } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    await expect(
+      forceCloseCheckIn({ admin: ADMIN, targetCheckInId: "ci-other-clinic" }),
+    ).rejects.toMatchObject({
+      status: 404,
+      reason: "CHECK_IN_NOT_FOUND",
+    });
+    expect(mockLogAudit).not.toHaveBeenCalled();
+  });
+});
+
+describe("forceCloseCheckIn — DB mutation contract", () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  const ADMIN = {
+    id: "user-admin",
+    email: "admin@clinic.test",
+    role: "admin",
+    clinicId: "clinic-1",
+  };
+
+  it("issues a single UPDATE with set(checkedOutAt + checkOutReason='admin_force')", async () => {
+    const closed = makeRow({
+      checkedOutAt: new Date(),
+      checkOutReason: "admin_force",
+    });
+    const updChain = chainable([closed]);
+    mockUpdate.mockReturnValue(updChain);
+
+    const { forceCloseCheckIn } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    await forceCloseCheckIn({ admin: ADMIN, targetCheckInId: "ci-1" });
+
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    const setFn = updChain["set"] as ReturnType<typeof vi.fn>;
+    expect(setFn).toHaveBeenCalledTimes(1);
+    const setArg = setFn.mock.calls[0][0];
+    expect(setArg.checkOutReason).toBe("admin_force");
+    expect(setArg.checkedOutAt).toBeInstanceOf(Date);
+  });
+
+  it("does NOT perform a SELECT before the UPDATE on the success path", async () => {
+    const closed = makeRow({
+      checkedOutAt: new Date(),
+      checkOutReason: "admin_force",
+    });
+    mockUpdate.mockReturnValue(chainable([closed]));
+
+    const { forceCloseCheckIn } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    await forceCloseCheckIn({ admin: ADMIN, targetCheckInId: "ci-1" });
+
+    // Only the post-update path uses SELECT, and only on no-op. On success, no SELECT.
+    expect(mockSelect).not.toHaveBeenCalled();
+  });
+
+  it("performs exactly one re-SELECT on the no-op path", async () => {
+    const alreadyClosed = makeRow({
+      checkedOutAt: new Date(),
+      checkOutReason: "self",
+    });
+    mockUpdate.mockReturnValue(chainable([]));
+    mockSelectSequence([alreadyClosed]);
+
+    const { forceCloseCheckIn } = await import(
+      "../server/services/clinical-check-in.js"
+    );
+    await forceCloseCheckIn({ admin: ADMIN, targetCheckInId: "ci-1" });
+    expect(mockSelect).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("getAllowedOperationalRoles", () => {
   beforeEach(() => vi.resetAllMocks());
 

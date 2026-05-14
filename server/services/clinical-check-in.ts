@@ -317,6 +317,124 @@ export async function closeCheckIn(args: {
   return updated;
 }
 
+export type ForceCloseAdmin = {
+  id: string;
+  email: string;
+  role: string;
+  clinicId: string;
+};
+
+export type ForceCloseResult = {
+  row: ClinicalCheckIn;
+  alreadyClosed: boolean;
+};
+
+/**
+ * Admin-only recovery: force-close a specific stuck clinical check-in row.
+ *
+ * Tenant-scoped: row must belong to `admin.clinicId`. Cross-clinic IDs surface as 404.
+ * Race-safe: a single optimistic UPDATE ... WHERE checked_out_at IS NULL guards against
+ * concurrent closers (self / session_close / other admins). When the UPDATE no-ops,
+ * we re-SELECT to distinguish "not found" (→ 404) from "already closed" (→ idempotent
+ * 200 with alreadyClosed=true).
+ *
+ * Audits:
+ *  - successful close: actionType="clinical_check_out", metadata.source="admin_force"
+ *  - idempotent no-op: actionType="clinical_check_out", metadata.source="admin_force",
+ *                      metadata.outcome="noop_already_closed", metadata.existingSource=<prior>
+ *  - 404: no audit
+ */
+export async function forceCloseCheckIn(args: {
+  admin: ForceCloseAdmin;
+  targetCheckInId: string;
+  reason?: string | null;
+  requestId?: string | null;
+}): Promise<ForceCloseResult> {
+  const { admin, targetCheckInId, reason, requestId } = args;
+  const adminReason =
+    typeof reason === "string" && reason.trim().length > 0 ? reason.trim() : null;
+  const reqId = typeof requestId === "string" && requestId.length > 0 ? requestId : null;
+
+  const checkedOutAt = new Date();
+  const [updated] = await db
+    .update(clinicalCheckIns)
+    .set({ checkedOutAt, checkOutReason: "admin_force" })
+    .where(
+      and(
+        eq(clinicalCheckIns.id, targetCheckInId),
+        eq(clinicalCheckIns.clinicId, admin.clinicId),
+        isNull(clinicalCheckIns.checkedOutAt),
+      ),
+    )
+    .returning();
+
+  if (updated) {
+    // Fire-and-forget; mirrors closeCheckIn / autoCheckOutForSessionEnd.
+    logAudit({
+      clinicId: admin.clinicId,
+      actionType: "clinical_check_out",
+      performedBy: admin.id,
+      performedByEmail: admin.email,
+      actorRole: admin.role,
+      targetId: updated.id,
+      targetType: "clinical_check_in",
+      metadata: {
+        checkInId: updated.id,
+        clinicId: updated.clinicId,
+        userId: updated.userId,
+        operationalRole: updated.operationalRole,
+        source: "admin_force",
+        adminReason,
+        requestId: reqId,
+      },
+    });
+    return { row: updated, alreadyClosed: false };
+  }
+
+  const [existing] = await db
+    .select()
+    .from(clinicalCheckIns)
+    .where(
+      and(
+        eq(clinicalCheckIns.id, targetCheckInId),
+        eq(clinicalCheckIns.clinicId, admin.clinicId),
+      ),
+    )
+    .limit(1);
+
+  if (!existing) {
+    throw new ClinicalCheckInError(
+      404,
+      "NOT_FOUND",
+      "Clinical check-in not found in this clinic",
+      "CHECK_IN_NOT_FOUND",
+    );
+  }
+
+  logAudit({
+    clinicId: admin.clinicId,
+    actionType: "clinical_check_out",
+    performedBy: admin.id,
+    performedByEmail: admin.email,
+    actorRole: admin.role,
+    targetId: existing.id,
+    targetType: "clinical_check_in",
+    metadata: {
+      checkInId: existing.id,
+      clinicId: existing.clinicId,
+      userId: existing.userId,
+      operationalRole: existing.operationalRole,
+      source: "admin_force",
+      outcome: "noop_already_closed",
+      existingSource: existing.checkOutReason,
+      adminReason,
+      requestId: reqId,
+    },
+  });
+
+  return { row: existing, alreadyClosed: true };
+}
+
 export async function autoCheckOutForSessionEnd(args: {
   clinicId: string;
   endedAt: Date;

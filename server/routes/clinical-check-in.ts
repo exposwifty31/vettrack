@@ -2,13 +2,17 @@ import { Router, type Request, type Response } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import {
+  requireAdmin,
   requireAuth,
   requireClinicalUser,
   type AuthUser,
 } from "../middleware/auth.js";
+import { validateUuid } from "../middleware/validate.js";
+import { resolveAuditActorRole } from "../lib/audit.js";
 import {
   ClinicalCheckInError,
   closeCheckIn,
+  forceCloseCheckIn,
   getActiveCheckIn,
   getAllowedOperationalRoles,
   openCheckIn,
@@ -22,6 +26,12 @@ const router = Router();
 const checkInBodySchema = z
   .object({
     operationalRole: z.string().min(1).optional(),
+  })
+  .strict();
+
+const forceCloseBodySchema = z
+  .object({
+    reason: z.string().trim().min(1).max(500).optional(),
   })
   .strict();
 
@@ -194,6 +204,53 @@ router.get(
         req.authUser!.clinicId,
       );
       res.status(200).json({ allowedOperationalRoles: allowed });
+    } catch (err) {
+      handleServiceError(err, res, requestId);
+    }
+  },
+);
+
+router.post(
+  "/check-ins/:id/admin-force-close",
+  requireAuth,
+  requireAdmin,
+  validateUuid("id"),
+  async (req: Request, res: Response) => {
+    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    // Default missing/undefined body to {} — body is fully optional for this
+    // recovery endpoint, and clients commonly POST with no JSON payload.
+    const parsed = forceCloseBodySchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      const message = first
+        ? `${first.path.join(".") || "body"}: ${first.message}`
+        : "Invalid body";
+      res.status(400).json(
+        apiError({
+          code: "INVALID_BODY",
+          reason: "INVALID_BODY",
+          message,
+          requestId,
+        }),
+      );
+      return;
+    }
+    try {
+      const result = await forceCloseCheckIn({
+        admin: {
+          id: req.authUser!.id,
+          email: req.authUser!.email ?? "",
+          role: resolveAuditActorRole(req) ?? req.authUser!.role,
+          clinicId: req.authUser!.clinicId,
+        },
+        targetCheckInId: req.params.id,
+        reason: parsed.data.reason ?? null,
+        requestId,
+      });
+      res.status(200).json({
+        ...serializeCheckIn(result.row),
+        alreadyClosed: result.alreadyClosed,
+      });
     } catch (err) {
       handleServiceError(err, res, requestId);
     }
