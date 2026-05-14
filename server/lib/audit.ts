@@ -140,7 +140,12 @@ export type AuditActionType =
   | "billing_reversed"
   | "patient_handoff_submitted"
   | "patient_handoff_reviewed"
-  | "patient_handoff_cancelled";
+  | "patient_handoff_cancelled"
+  | "clinical_check_in"
+  | "clinical_check_out"
+  | "operational_roles_updated"
+  | "authority_cache_invalidated"
+  | "code_blue_replay_authority_denied";
 
 export interface LogAuditParams {
   clinicId: string;

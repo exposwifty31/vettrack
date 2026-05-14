@@ -50,6 +50,7 @@ export const users = pgTable("vt_users", {
   displayName: text("display_name").notNull().default(""),
   role: varchar("role", { length: 20 }).notNull().default("technician"),
   secondaryRole: varchar("secondary_role", { length: 20 }),
+  allowedOperationalRoles: jsonb("allowed_operational_roles").notNull().default(sql`'[]'::jsonb`),
   status: varchar("status", { length: 20 }).notNull().default("active"),
   preferredLocale: varchar("preferred_locale", { length: 10 }).notNull().default("he"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1744,6 +1745,38 @@ export const shiftPatientHandoffItems = pgTable(
   }),
 );
 export type ShiftPatientHandoffItem = typeof shiftPatientHandoffItems.$inferSelect;
+
+export const clinicalCheckIns = pgTable(
+  "vt_clinical_check_ins",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "restrict" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    checkedInAt: timestamp("checked_in_at", { withTimezone: true }).notNull().defaultNow(),
+    checkedOutAt: timestamp("checked_out_at", { withTimezone: true }),
+    operationalRole: varchar("operational_role", { length: 40 }),
+    clinicalRoleAtCheckIn: varchar("clinical_role_at_check_in", { length: 20 }).notNull(),
+    activeShiftId: text("active_shift_id"),
+    shiftSessionId: text("shift_session_id"),
+    checkOutReason: varchar("check_out_reason", { length: 40 }),
+    clientId: varchar("client_id", { length: 64 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    openPerUserUq: uniqueIndex("ux_vt_clinical_check_ins_open_per_user")
+      .on(t.clinicId, t.userId)
+      .where(sql`${t.checkedOutAt} IS NULL`),
+    clinicOpenIdx: index("idx_vt_clinical_check_ins_clinic_open")
+      .on(t.clinicId)
+      .where(sql`${t.checkedOutAt} IS NULL`),
+    userRecentIdx: index("idx_vt_clinical_check_ins_user_recent").on(t.userId, t.checkedInAt.desc()),
+  }),
+);
+export type ClinicalCheckIn = typeof clinicalCheckIns.$inferSelect;
 
 export async function initDb() {
   // Schema initialization is now handled by the migration runner (server/migrate.ts).

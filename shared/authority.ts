@@ -10,6 +10,8 @@
  * frontend and backend without bundler conflicts.
  */
 
+import type { DoctorOperationalShiftRole } from "./doctor-operational-shift.js";
+
 /** System-level role: whether a principal is a system administrator or a regular user. */
 export type SystemRole = "Admin" | "User";
 
@@ -42,15 +44,26 @@ export type EffectiveClinicalRole = ActiveShiftRole;
 
 /**
  * Operational role dimension.
- * Phase 2A scaffolds this field as null only — no operational roles are
- * implemented until Phase 2.5+.
+ * Phase 2.5 widens this from `null`-only to the doctor operational shift role
+ * domain (excluding the sentinel "unknown"), or null when no operational role
+ * is in effect. This is a pure type-level widening; resolver behavior and the
+ * set of values actually emitted at runtime are unchanged in PR 1.
  */
-export type OperationalRole = null;
+export type OperationalRole = Exclude<DoctorOperationalShiftRole, "unknown"> | null;
 
-/** How a user's authority was obtained. */
-export type AuthoritySource = "shift" | "no_active_shift";
+/**
+ * How a user's authority was obtained.
+ * "check_in" is reserved for Phase 2.5 clinical check-in resolution and is
+ * not emitted by the resolver in PR 1.
+ */
+export type AuthoritySource = "shift" | "no_active_shift" | "check_in";
 
-/** Categorical reason explaining how authority resolution arrived at its result. */
+/**
+ * Categorical reason explaining how authority resolution arrived at its result.
+ * "CHECKED_IN", "CACHED", "NOT_CHECKED_IN", and "CHECKED_IN_NO_OPROLE" are
+ * reserved for Phase 2.5 check-in resolution and cache plumbing; they are not
+ * emitted by the resolver in PR 1.
+ */
 export type AuthorityReason =
   | "EZSHIFT_ACTIVE"
   | "EZSHIFT_NONE"
@@ -58,7 +71,11 @@ export type AuthorityReason =
   | "STUDENT_NEVER_ELEVATED"
   | "LEGACY_ADMIN_NO_CLINICAL"
   | "MISSING_USER_NAME"
-  | "RESOLUTION_ERROR";
+  | "RESOLUTION_ERROR"
+  | "CHECKED_IN"
+  | "CACHED"
+  | "NOT_CHECKED_IN"
+  | "CHECKED_IN_NO_OPROLE";
 
 /** Point-in-time snapshot of a user's resolved authority state. */
 export interface AuthoritySnapshot {
