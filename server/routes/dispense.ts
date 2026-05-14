@@ -2,6 +2,7 @@ import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { requireAuth, requireClinicalUser } from "../middleware/auth.js";
+import { requireClinicalAuthority } from "../middleware/authority.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import {
@@ -61,8 +62,14 @@ function sendError(res: { status: (n: number) => { json: (b: unknown) => void } 
 }
 
 /** POST /api/dispense/draft — create a DRAFT (structure validation only, no stock mutation) */
-// TODO(Phase 2B): replace with requireClinicalAuthority(...)
-router.post("/draft", validateBody(draftSchema), async (req, res) => {
+router.post(
+  "/draft",
+  requireClinicalAuthority({
+    allow: ["vet", "senior_technician", "technician"],
+    allowPermanentClinicalRoleFallbackForLegacyDispense: true,
+  }),
+  validateBody(draftSchema),
+  async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   const body = req.body as z.infer<typeof draftSchema>;
   const idempotencyKey = (typeof req.headers["idempotency-key"] === "string"
@@ -83,11 +90,18 @@ router.post("/draft", validateBody(draftSchema), async (req, res) => {
     sendError(res, err, requestId);
     return;
   }
-});
+  },
+);
 
 /** POST /api/dispense/:id/confirm — confirm a DRAFT; billing in TX; async inventory deduction after commit */
-// TODO(Phase 2B): replace with requireClinicalAuthority(...)
-router.post("/:id/confirm", validateUuid("id"), async (req, res) => {
+router.post(
+  "/:id/confirm",
+  requireClinicalAuthority({
+    allow: ["vet", "senior_technician", "technician"],
+    allowPermanentClinicalRoleFallbackForLegacyDispense: true,
+  }),
+  validateUuid("id"),
+  async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const event = await confirmDispense({
@@ -95,21 +109,27 @@ router.post("/:id/confirm", validateUuid("id"), async (req, res) => {
       dispenseEventId: req.params.id,
       confirmedBy: req.authUser!.id,
       confirmedByEmail: req.authUser!.email,
-      // Phase 1: effectiveRole is not populated; no shift-aware role middleware in chain.
-      // resolveAuditActorRole falls back to authUser.role (static DB role).
-      // TODO(Phase 2B): restore shift-aware resolution once requireClinicalAuthority sets effectiveRole.
-      actorRole: resolveAuditActorRole(req),
+      actorRole:
+        req.authoritySnapshot?.effectiveClinicalRole ??
+        resolveAuditActorRole(req),
     });
     return res.json(event);
   } catch (err) {
     sendError(res, err, requestId);
     return;
   }
-});
+  },
+);
 
 /** POST /api/dispense/emergency — EMERGENCY_PENDING (no stock mutation, minimal validation) */
-// TODO(Phase 2B): replace with requireClinicalAuthority(...)
-router.post("/emergency", validateBody(emergencySchema), async (req, res) => {
+router.post(
+  "/emergency",
+  requireClinicalAuthority({
+    allow: ["vet", "senior_technician", "technician"],
+    allowPermanentClinicalRoleFallbackForLegacyDispense: true,
+  }),
+  validateBody(emergencySchema),
+  async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   const body = req.body as z.infer<typeof emergencySchema>;
   const idempotencyKey = (typeof req.headers["idempotency-key"] === "string"
@@ -131,6 +151,7 @@ router.post("/emergency", validateBody(emergencySchema), async (req, res) => {
     sendError(res, err, requestId);
     return;
   }
-});
+  },
+);
 
 export default router;

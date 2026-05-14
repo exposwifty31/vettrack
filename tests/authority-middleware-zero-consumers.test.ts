@@ -1,10 +1,11 @@
 /**
- * Phase 2B.1 guard: requireClinicalAuthority has ZERO route consumers.
+ * Phase 2B.2 guard: requireClinicalAuthority is consumed only by
+ * server/routes/dispense.ts.
  *
- * The Phase 2B.1 PR introduces server/middleware/authority.ts but is
- * intentionally infrastructure-only — no route may import, reference, or
- * register requireClinicalAuthority. This test enforces that scope via
- * grep-style assertions on the working tree.
+ * After Phase 2B.2 wires the middleware into the three dispense endpoints,
+ * dispense.ts is the only route file allowed to import or call
+ * requireClinicalAuthority. This test enforces that scope via grep-style
+ * assertions on the working tree.
  */
 
 import { describe, expect, it } from "vitest";
@@ -16,13 +17,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 
 const MIDDLEWARE_FILE = "server/middleware/authority.ts";
+const DISPENSE_ROUTE_FILE = "server/routes/dispense.ts";
 const MIDDLEWARE_TEST_FILE = "tests/require-clinical-authority.test.ts";
 const GUARD_TEST_FILE = "tests/authority-middleware-zero-consumers.test.ts";
+const ENFORCEMENT_TEST_FILE = "tests/dispense-authority-enforcement.test.ts";
 
 const ALLOWED_FILES: ReadonlySet<string> = new Set([
   MIDDLEWARE_FILE,
+  DISPENSE_ROUTE_FILE,
   MIDDLEWARE_TEST_FILE,
   GUARD_TEST_FILE,
+  ENFORCEMENT_TEST_FILE,
 ]);
 
 function gitGrepLines(args: string): string[] {
@@ -61,22 +66,29 @@ function withoutCommentMatches(lines: string[]): string[] {
   });
 }
 
-describe("Phase 2B.1: requireClinicalAuthority has zero route consumers", () => {
+describe("Phase 2B.2: requireClinicalAuthority is consumed only by dispense.ts", () => {
   it("middleware file exists at the expected path", () => {
     const lines = gitGrepLines(`-l "Phase 2B" -- ${MIDDLEWARE_FILE}`);
     expect(lines.length).toBeGreaterThan(0);
   });
 
-  it("no file outside server/middleware/authority.ts imports the middleware module", () => {
+  it("exactly one route imports ../middleware/authority.js and it is server/routes/dispense.ts", () => {
     const lines = gitGrepLines(
-      `-nE "from .*middleware/authority" -- server/ src/`,
+      `-lE "from .*middleware/authority" -- server/routes/`,
+    );
+    expect(lines).toEqual([DISPENSE_ROUTE_FILE]);
+  });
+
+  it("no non-route file outside server/middleware/authority.ts imports the middleware module", () => {
+    const lines = gitGrepLines(
+      `-nE "from .*middleware/authority" -- src/`,
     );
     expect(lines, lines.join("\n")).toEqual([]);
   });
 
   it("requireClinicalAuthority( call-site token appears as real code in exactly the allowed files", () => {
     // Use -nE to get line-level hits so we can filter out comment-only
-    // references (forward TODOs in legacy routes are not consumers).
+    // references.
     const hits = withoutCommentMatches(
       gitGrepLines(`-nE "requireClinicalAuthority\\(" -- server/ tests/`),
     );
@@ -84,19 +96,27 @@ describe("Phase 2B.1: requireClinicalAuthority has zero route consumers", () => 
     expect(files).toEqual(ALLOWED_FILES);
   });
 
-  it("no real (non-comment) requireClinicalAuthority( call-site under server/routes/", () => {
+  it("requireClinicalAuthority( appears exactly 3 times in server/routes/dispense.ts", () => {
+    const hits = withoutCommentMatches(
+      gitGrepLines(`-nE "requireClinicalAuthority\\(" -- ${DISPENSE_ROUTE_FILE}`),
+    );
+    expect(hits.length).toBe(3);
+  });
+
+  it("no other route file under server/routes/ contains requireClinicalAuthority(", () => {
     const hits = withoutCommentMatches(
       gitGrepLines(`-nE "requireClinicalAuthority\\(" -- server/routes/`),
     );
-    expect(hits, hits.join("\n")).toEqual([]);
+    const files = new Set(hits.map((h) => h.split(":")[0]!));
+    expect(files).toEqual(new Set([DISPENSE_ROUTE_FILE]));
   });
 
-  it("no real (non-comment) requireClinicalAuthority( call-site under server/ except authority.ts", () => {
+  it("no real (non-comment) requireClinicalAuthority( call-site under server/ except authority.ts and dispense.ts", () => {
     const hits = withoutCommentMatches(
       gitGrepLines(`-nE "requireClinicalAuthority\\(" -- server/`),
     );
     const files = new Set(hits.map((h) => h.split(":")[0]!));
-    expect(files).toEqual(new Set([MIDDLEWARE_FILE]));
+    expect(files).toEqual(new Set([MIDDLEWARE_FILE, DISPENSE_ROUTE_FILE]));
   });
 
   it("allowPermanentClinicalRoleFallbackForLegacyDispense appears only in allowed files", () => {
@@ -105,6 +125,13 @@ describe("Phase 2B.1: requireClinicalAuthority has zero route consumers", () => 
     );
     const files = new Set(lines);
     expect(files).toEqual(ALLOWED_FILES);
+  });
+
+  it("allowPermanentClinicalRoleFallbackForLegacyDispense appears exactly 3 times in server/routes/dispense.ts", () => {
+    const hits = gitGrepLines(
+      `-nE "allowPermanentClinicalRoleFallbackForLegacyDispense" -- ${DISPENSE_ROUTE_FILE}`,
+    );
+    expect(hits.length).toBe(3);
   });
 
   it("server/middleware/authority.ts never reads req.authUser.secondaryRole", () => {

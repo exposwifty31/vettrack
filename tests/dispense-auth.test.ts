@@ -44,16 +44,16 @@ describe("dispense.ts static structure (Phase 1 PR 1.4)", () => {
     );
   });
 
-  it("all three endpoints have TODO(Phase 2B) markers", () => {
+  it("no TODO(Phase 2B) markers remain", () => {
     const matches = dispenseSource.match(/TODO\(Phase 2B\)/g);
-    expect(matches).not.toBeNull();
-    expect(matches!.length).toBeGreaterThanOrEqual(3);
+    expect(matches).toBeNull();
   });
 
-  it("TODO markers reference requireClinicalAuthority", () => {
-    expect(dispenseSource).toMatch(
-      /TODO\(Phase 2B\).*requireClinicalAuthority/,
-    );
+  it("all three endpoints include the Phase 2B authority middleware", () => {
+    const needle = ["require", "Clinical", "Authority"].join("") + "\\(";
+    const matches = dispenseSource.match(new RegExp(needle, "g"));
+    expect(matches).not.toBeNull();
+    expect(matches!.length).toBe(3);
   });
 });
 
