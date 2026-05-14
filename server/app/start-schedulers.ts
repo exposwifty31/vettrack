@@ -7,6 +7,7 @@ import {
 import { startAccessDeniedMetricsWindowScheduler } from "../lib/access-denied.js";
 import { startSystemWatchdog } from "../lib/system-watchdog.js";
 import { startExpiryCheckWorker } from "../workers/expiryCheckWorker.js";
+import { startStaleCheckInSweepWorker } from "../workers/staleCheckInSweepWorker.js";
 import { startChargeAlertWorker } from "../workers/chargeAlertWorker.js";
 import { startInventoryDeductionWorker } from "../workers/inventory-deduction.worker.js";
 import { startAdmissionFanoutWorker } from "../workers/admission-fanout.worker.js";
@@ -43,6 +44,7 @@ export async function startBackgroundSchedulers() {
   startSmartRoleNotificationScheduler();
   startSystemWatchdog();
   await startExpiryCheckWorker();
+  await startStaleCheckInSweepWorker();
   await startChargeAlertWorker();
   await startInventoryDeductionWorker();
   await startAdmissionFanoutWorker();
