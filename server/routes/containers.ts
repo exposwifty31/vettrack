@@ -15,6 +15,7 @@ import {
   users,
 } from "../db.js";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
+import { requireClinicalAuthority } from "../middleware/authority.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { seedDefaultContainersIfEmpty } from "../lib/ensure-clinic-phase2-defaults.js";
 import { restockContainerInTx } from "../services/inventory.service.js";
@@ -277,7 +278,10 @@ const completeEmergencySchema = z.object({
 router.post(
   "/:id/dispense",
   requireAuth,
-  requireEffectiveRole("technician"),
+  requireClinicalAuthority({
+    allow: ["vet", "senior_technician", "technician"],
+    allowPermanentClinicalRoleFallbackForLegacyDispense: true,
+  }),
   validateUuid("id"),
   dispenseIdempotencyMiddleware,
   validateBody(dispenseSchema),
