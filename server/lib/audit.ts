@@ -145,7 +145,10 @@ export type AuditActionType =
   | "clinical_check_out"
   | "operational_roles_updated"
   | "authority_cache_invalidated"
-  | "code_blue_replay_authority_denied";
+  | "code_blue_replay_authority_denied"
+  | "authority_denied"
+  | "authority_resolution_failed"
+  | "dispense_legacy_role_fallback_used";
 
 export interface LogAuditParams {
   clinicId: string;

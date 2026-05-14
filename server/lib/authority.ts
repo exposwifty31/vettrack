@@ -43,6 +43,7 @@ import {
 } from "./authority-roles.js";
 import { getOpenClinicalCheckIn } from "./check-in-resolution.js";
 import { createLogLimiter } from "./log-safety.js";
+import { incrementMetric } from "./metrics.js";
 import {
   resolveCurrentRole,
   type PermanentVetTrackRole,
@@ -78,6 +79,15 @@ function emitAuthorityDrift(event: {
   shiftRole: string | null;
   timestamp: string;
 }): void {
+  // Counter is always-on and increments on every drift observation, even when
+  // the log limiter suppresses the warn line. Counter volume is the
+  // ground-truth signal for drift; the warn line is sampled context.
+  if (event.event === "checkin_shift_role_drift") {
+    incrementMetric("authority_drift_role");
+  } else {
+    incrementMetric("authority_drift_shift_lookup_failed");
+  }
+
   const key = `${event.event}:${event.clinicId}:${event.userId}`;
   if (!authorityDriftLogLimiter.shouldLog(key)) return;
   console.warn("[authority-drift]", JSON.stringify(event));

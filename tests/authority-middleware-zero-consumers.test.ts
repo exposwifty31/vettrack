@@ -26,6 +26,8 @@ const GUARD_TEST_FILE = "tests/authority-middleware-zero-consumers.test.ts";
 const ENFORCEMENT_TEST_FILE = "tests/dispense-authority-enforcement.test.ts";
 const CONTAINERS_AUTHORITY_TEST_FILE =
   "tests/containers-dispense-authority.test.ts";
+const OBSERVABILITY_TEST_FILE =
+  "tests/authority-middleware-observability.test.ts";
 
 const ALLOWED_FILES: ReadonlySet<string> = new Set([
   MIDDLEWARE_FILE,
@@ -35,6 +37,7 @@ const ALLOWED_FILES: ReadonlySet<string> = new Set([
   GUARD_TEST_FILE,
   ENFORCEMENT_TEST_FILE,
   CONTAINERS_AUTHORITY_TEST_FILE,
+  OBSERVABILITY_TEST_FILE,
 ]);
 
 const ALLOWED_ROUTE_FILES: ReadonlySet<string> = new Set([

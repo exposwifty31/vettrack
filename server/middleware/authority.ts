@@ -39,6 +39,12 @@ import type {
 
 import { recordAccessDenied } from "../lib/access-denied.js";
 import { resolveAuthority } from "../lib/authority.js";
+import {
+  emitAuthorityDeniedAudit,
+  emitAuthorityResolutionFailedAudit,
+  emitDispenseLegacyFallbackAudit,
+} from "../lib/authority-audit.js";
+import { incrementMetric } from "../lib/metrics.js";
 
 const VALID_ALLOW_ROLES: ReadonlySet<ActiveShiftRole> = new Set<ActiveShiftRole>([
   "vet",
@@ -111,19 +117,24 @@ export function requireClinicalAuthority(
   ): Promise<void> {
     const requestId = resolveRequestId(req, res);
 
-    try {
-      if (!req.authUser) {
-        res.status(401).json({
-          code: "UNAUTHORIZED",
-          error: "UNAUTHORIZED",
-          reason: "MISSING_AUTH_USER",
-          message: "Unauthorized",
-          requestId,
-        });
-        return;
-      }
+    if (!req.authUser) {
+      res.status(401).json({
+        code: "UNAUTHORIZED",
+        error: "UNAUTHORIZED",
+        reason: "MISSING_AUTH_USER",
+        message: "Unauthorized",
+        requestId,
+      });
+      return;
+    }
 
-      const snapshot = await resolveAuthority({
+    // Phase 2.5 PR 5: narrow catch scope to the resolveAuthority call only,
+    // so that a downstream error (audit emission, recordAccessDenied) can't
+    // re-enter the 500 path. Counter increment is always-on; durable audit
+    // and console.error are gated by AUTHORITY_OBS_V1 inside the audit module.
+    let snapshot: AuthoritySnapshot;
+    try {
+      snapshot = await resolveAuthority({
         authUser: {
           id: req.authUser.id,
           name: req.authUser.name,
@@ -136,52 +147,12 @@ export function requireClinicalAuthority(
         },
         clinicId: req.clinicId!,
       });
-
-      req.authoritySnapshot = snapshot;
-
-      if (opts.allowSystemAdmin === true && req.authUser.role === "admin") {
-        next();
-        return;
+    } catch (err) {
+      incrementMetric("authority_resolution_failed");
+      if (process.env.AUTHORITY_OBS_V1 === "true") {
+        console.error("[authority] resolution failed", err);
       }
-
-      if (
-        snapshot.effectiveClinicalRole !== null &&
-        opts.allow.includes(snapshot.effectiveClinicalRole)
-      ) {
-        next();
-        return;
-      }
-
-      if (opts.allowPermanentClinicalRoleFallbackForLegacyDispense === true) {
-        if (
-          snapshot.effectiveClinicalRole === null &&
-          snapshot.reason === "EZSHIFT_NONE" &&
-          snapshot.clinicalRole !== null &&
-          snapshot.clinicalRole !== "student" &&
-          opts.allow.includes(snapshot.clinicalRole as ActiveShiftRole)
-        ) {
-          next();
-          return;
-        }
-      }
-
-      recordAccessDenied({
-        req,
-        source: "requireClinicalAuthority",
-        statusCode: 403,
-        reason: "INSUFFICIENT_ROLE",
-        message: "Clinical authority required",
-      });
-
-      res.status(403).json({
-        code: "INSUFFICIENT_ROLE",
-        error: "INSUFFICIENT_ROLE",
-        reason: "INSUFFICIENT_CLINICAL_AUTHORITY",
-        message: "Clinical authority required",
-        requestId,
-      });
-      return;
-    } catch {
+      emitAuthorityResolutionFailedAudit({ req, error: err });
       res.status(500).json({
         code: "INTERNAL_ERROR",
         error: "INTERNAL_ERROR",
@@ -191,5 +162,91 @@ export function requireClinicalAuthority(
       });
       return;
     }
+
+    req.authoritySnapshot = snapshot;
+    incrementResolutionSourceMetric(snapshot);
+
+    if (opts.allowSystemAdmin === true && req.authUser.role === "admin") {
+      next();
+      return;
+    }
+
+    if (
+      snapshot.effectiveClinicalRole !== null &&
+      opts.allow.includes(snapshot.effectiveClinicalRole)
+    ) {
+      next();
+      return;
+    }
+
+    const fallbackOpted =
+      opts.allowPermanentClinicalRoleFallbackForLegacyDispense === true;
+
+    if (fallbackOpted) {
+      if (
+        snapshot.effectiveClinicalRole === null &&
+        snapshot.reason === "EZSHIFT_NONE" &&
+        snapshot.clinicalRole !== null &&
+        snapshot.clinicalRole !== "student" &&
+        opts.allow.includes(snapshot.clinicalRole as ActiveShiftRole)
+      ) {
+        incrementMetric("authority_legacy_fallback_used");
+        emitDispenseLegacyFallbackAudit({ req, snapshot });
+        next();
+        return;
+      }
+    }
+
+    // Phase 2.5 PR 5 follow-up: classify denial by branch OUTCOME, not by
+    // whether the route opted into the fallback. LEGACY_FALLBACK_NOT_MATCHED
+    // only fires when the fallback branch was actually attempted — i.e., the
+    // user had no effective shift authority AND was eligible (null effective
+    // role + EZSHIFT_NONE) — and the permanent-role test failed. A denial
+    // where effectiveClinicalRole is non-null (just not in allow) belongs in
+    // ROLE_NOT_IN_ALLOW even when fallback was opted, because the fallback
+    // branch was never reachable.
+    const fallbackAttempted =
+      fallbackOpted &&
+      snapshot.effectiveClinicalRole === null &&
+      snapshot.reason === "EZSHIFT_NONE";
+    const denialKind = fallbackAttempted
+      ? "LEGACY_FALLBACK_NOT_MATCHED"
+      : "ROLE_NOT_IN_ALLOW";
+    incrementMetric(
+      denialKind === "ROLE_NOT_IN_ALLOW"
+        ? "authority_denied_role_not_in_allow"
+        : "authority_denied_legacy_fallback_not_matched",
+    );
+    emitAuthorityDeniedAudit({ req, snapshot, denialKind });
+
+    recordAccessDenied({
+      req,
+      source: "requireClinicalAuthority",
+      statusCode: 403,
+      reason: "INSUFFICIENT_ROLE",
+      message: "Clinical authority required",
+    });
+
+    res.status(403).json({
+      code: "INSUFFICIENT_ROLE",
+      error: "INSUFFICIENT_ROLE",
+      reason: "INSUFFICIENT_CLINICAL_AUTHORITY",
+      message: "Clinical authority required",
+      requestId,
+    });
   };
+}
+
+function incrementResolutionSourceMetric(snapshot: AuthoritySnapshot): void {
+  switch (snapshot.source) {
+    case "check_in":
+      incrementMetric("authority_resolution_source_check_in");
+      return;
+    case "shift":
+      incrementMetric("authority_resolution_source_shift");
+      return;
+    case "no_active_shift":
+      incrementMetric("authority_resolution_source_no_active_shift");
+      return;
+  }
 }

@@ -27,7 +27,16 @@ type MetricName =
   | "recommendations_shown"
   | "suggestions_suppressed"
   | "scoring_runs"
-  | "er_mode_fail_open";
+  | "er_mode_fail_open"
+  | "authority_resolution_source_check_in"
+  | "authority_resolution_source_shift"
+  | "authority_resolution_source_no_active_shift"
+  | "authority_denied_role_not_in_allow"
+  | "authority_denied_legacy_fallback_not_matched"
+  | "authority_legacy_fallback_used"
+  | "authority_drift_role"
+  | "authority_drift_shift_lookup_failed"
+  | "authority_resolution_failed";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -74,6 +83,23 @@ export interface MetricsSnapshot {
     suggestionsSuppressed: number;
     scoringRuns: number;
   };
+  authority: {
+    resolutionSource: {
+      checkIn: number;
+      shift: number;
+      noActiveShift: number;
+    };
+    denied: {
+      roleNotInAllow: number;
+      legacyFallbackNotMatched: number;
+    };
+    legacyFallbackUsed: number;
+    drift: {
+      role: number;
+      shiftLookupFailed: number;
+    };
+    resolutionFailed: number;
+  };
   timestamp: string;
 }
 
@@ -104,6 +130,15 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   suggestions_suppressed: 0,
   scoring_runs: 0,
   er_mode_fail_open: 0,
+  authority_resolution_source_check_in: 0,
+  authority_resolution_source_shift: 0,
+  authority_resolution_source_no_active_shift: 0,
+  authority_denied_role_not_in_allow: 0,
+  authority_denied_legacy_fallback_not_matched: 0,
+  authority_legacy_fallback_used: 0,
+  authority_drift_role: 0,
+  authority_drift_shift_lookup_failed: 0,
+  authority_resolution_failed: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -225,6 +260,23 @@ export function getMetricsSnapshot(): MetricsSnapshot {
         suggestionsSuppressed: metrics.suggestions_suppressed,
         scoringRuns: metrics.scoring_runs,
       },
+      authority: {
+        resolutionSource: {
+          checkIn: metrics.authority_resolution_source_check_in,
+          shift: metrics.authority_resolution_source_shift,
+          noActiveShift: metrics.authority_resolution_source_no_active_shift,
+        },
+        denied: {
+          roleNotInAllow: metrics.authority_denied_role_not_in_allow,
+          legacyFallbackNotMatched: metrics.authority_denied_legacy_fallback_not_matched,
+        },
+        legacyFallbackUsed: metrics.authority_legacy_fallback_used,
+        drift: {
+          role: metrics.authority_drift_role,
+          shiftLookupFailed: metrics.authority_drift_shift_lookup_failed,
+        },
+        resolutionFailed: metrics.authority_resolution_failed,
+      },
       timestamp: new Date().toISOString(),
     };
   } catch {
@@ -241,6 +293,13 @@ export function getMetricsSnapshot(): MetricsSnapshot {
         recommendationsShown: 0,
         suggestionsSuppressed: 0,
         scoringRuns: 0,
+      },
+      authority: {
+        resolutionSource: { checkIn: 0, shift: 0, noActiveShift: 0 },
+        denied: { roleNotInAllow: 0, legacyFallbackNotMatched: 0 },
+        legacyFallbackUsed: 0,
+        drift: { role: 0, shiftLookupFailed: 0 },
+        resolutionFailed: 0,
       },
       timestamp: new Date().toISOString(),
     };
