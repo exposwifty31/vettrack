@@ -5,7 +5,7 @@
  * no network.
  */
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type {
   ActiveShiftSnapshot,
   RoleResolutionResult,
@@ -27,6 +27,15 @@ vi.mock("../server/db.js", () => ({
   db: {},
   shifts: {},
   users: {},
+}));
+
+// Phase 2.5 PR 5.3: stub the check-in lookup so we can exercise the check-in
+// branch of resolveAuthority deterministically.
+const getOpenClinicalCheckInMock = vi.fn<
+  (input: unknown) => Promise<unknown>
+>();
+vi.mock("../server/lib/check-in-resolution.js", () => ({
+  getOpenClinicalCheckIn: (input: unknown) => getOpenClinicalCheckInMock(input),
 }));
 
 import { resolveAuthority } from "../server/lib/authority.js";
@@ -73,6 +82,7 @@ const baseUser = {
 
 beforeEach(() => {
   resolveCurrentRoleMock.mockReset();
+  getOpenClinicalCheckInMock.mockReset();
 });
 
 // ---------------------------------------------------------------------------
@@ -502,5 +512,117 @@ describe("resolveAuthority — snapshot shape", () => {
     expect(snap).not.toHaveProperty("permanentRole");
     expect(snap).not.toHaveProperty("secondaryRole");
     expect(snap).not.toHaveProperty("activeShift");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 2.5 PR 5.3 — operationalRole shadow validation does not affect
+// resolver semantics. Additive tests only; existing tests above are untouched.
+// ---------------------------------------------------------------------------
+
+describe("resolveAuthority — PR 5.3 shadow validation invariants", () => {
+  const checkInRow = {
+    id: "ci-1",
+    clinicId: "c1",
+    userId: "user-1",
+    clinicalRoleAtCheckIn: "vet",
+    operationalRole: "admission",
+    checkedInAt: FIXED_NOW,
+  };
+
+  beforeEach(async () => {
+    process.env.AUTHORITY_USE_CHECKIN_PATH = "true";
+    const shadow = await import(
+      "../server/lib/operational-role-shadow.js"
+    );
+    shadow.__resetLimitersForTests();
+    shadow.__resetTokenBucketForTests();
+    shadow.__setAllowlistReaderForTests(null);
+    shadow.__setRunnerOverrideForTests(null);
+    const { resetMetrics } = await import("../server/lib/metrics.js");
+    resetMetrics();
+  });
+
+  afterEach(async () => {
+    delete process.env.AUTHORITY_USE_CHECKIN_PATH;
+    delete process.env.AUTHORITY_OPROLE_SHADOW;
+    const shadow = await import(
+      "../server/lib/operational-role-shadow.js"
+    );
+    shadow.__setAllowlistReaderForTests(null);
+    shadow.__setRunnerOverrideForTests(null);
+  });
+
+  it("snapshot is byte-identical with shadow flag off vs on (slow reader)", async () => {
+    // Set up shift mock so the check-in branch's advisory shift resolution
+    // succeeds and the snapshot's activeShiftRole is deterministic.
+    mockShiftResult("vet");
+    getOpenClinicalCheckInMock.mockResolvedValue(checkInRow);
+
+    // First: flag off.
+    delete process.env.AUTHORITY_OPROLE_SHADOW;
+    const snapOff = await resolveAuthority({
+      authUser: { ...baseUser, role: "vet" },
+      clinicId: "c1",
+      now: FIXED_NOW,
+    });
+
+    // Reset shift mock so the second resolve gets a fresh resolved value
+    // (mockResolvedValue persists across calls, so no reset needed, but reset
+    // the check-in mock state to be safe).
+    getOpenClinicalCheckInMock.mockResolvedValue(checkInRow);
+
+    // Second: flag on with a stubbed slow reader to prove fire-and-forget.
+    process.env.AUTHORITY_OPROLE_SHADOW = "true";
+    const shadow = await import(
+      "../server/lib/operational-role-shadow.js"
+    );
+    shadow.__setAllowlistReaderForTests(
+      () => new Promise((resolve) => setTimeout(() => resolve(["admission"]), 500)),
+    );
+
+    const start = Date.now();
+    const snapOn = await resolveAuthority({
+      authUser: { ...baseUser, role: "vet" },
+      clinicId: "c1",
+      now: FIXED_NOW,
+    });
+    const elapsed = Date.now() - start;
+
+    expect(snapOn).toEqual(snapOff);
+    expect(elapsed).toBeLessThan(50);
+    expect(snapOn.source).toBe("check_in");
+    expect(snapOn.operationalRole).toBe("admission");
+  });
+
+  it("a throwing shadow reader does not break the resolver", async () => {
+    mockShiftResult("vet");
+    getOpenClinicalCheckInMock.mockResolvedValue(checkInRow);
+    process.env.AUTHORITY_OPROLE_SHADOW = "true";
+
+    const shadow = await import(
+      "../server/lib/operational-role-shadow.js"
+    );
+    shadow.__setAllowlistReaderForTests(async () => {
+      throw new Error("simulated reader failure");
+    });
+
+    const snap = await resolveAuthority({
+      authUser: { ...baseUser, role: "vet" },
+      clinicId: "c1",
+      now: FIXED_NOW,
+    });
+
+    expect(snap.source).toBe("check_in");
+    expect(snap.operationalRole).toBe("admission");
+
+    // Yield twice so the detached runner Promise can settle and bump the
+    // _runner_failed counter via .catch.
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const { getMetricsSnapshot } = await import("../server/lib/metrics.js");
+    expect(getMetricsSnapshot().authority.oproleShadow.runnerFailed).toBeGreaterThanOrEqual(1);
   });
 });

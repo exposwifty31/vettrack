@@ -44,6 +44,7 @@ import {
 import { getOpenClinicalCheckIn } from "./check-in-resolution.js";
 import { createLogLimiter } from "./log-safety.js";
 import { incrementMetric } from "./metrics.js";
+import { scheduleOperationalRoleShadowValidation } from "./operational-role-shadow.js";
 import {
   resolveCurrentRole,
   type PermanentVetTrackRole,
@@ -213,6 +214,17 @@ export async function resolveAuthority(
         checkIn.clinicalRoleAtCheckIn as ActiveShiftRole;
       const operationalRole =
         (checkIn.operationalRole as OperationalRole | null) ?? null;
+
+      // Phase 2.5 PR 5.3: shadow-only operationalRole re-validation. Synchronous
+      // scheduler; runner is detached via `void` inside. Cannot influence the
+      // snapshot or the resolver return value.
+      scheduleOperationalRoleShadowValidation({
+        clinicId: input.clinicId,
+        userId: input.authUser.id,
+        observedOperationalRole: operationalRole,
+        checkInId: checkIn.id,
+        resolvedAt,
+      });
 
       return buildSnapshot({
         systemRole,

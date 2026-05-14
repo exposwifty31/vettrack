@@ -36,7 +36,15 @@ type MetricName =
   | "authority_legacy_fallback_used"
   | "authority_drift_role"
   | "authority_drift_shift_lookup_failed"
-  | "authority_resolution_failed";
+  | "authority_resolution_failed"
+  | "authority_oprole_shadow_scheduled"
+  | "authority_oprole_shadow_deduped"
+  | "authority_oprole_shadow_throttled"
+  | "authority_oprole_shadow_ran"
+  | "authority_oprole_shadow_match"
+  | "authority_oprole_shadow_drift_revoked"
+  | "authority_oprole_shadow_user_missing"
+  | "authority_oprole_shadow_runner_failed";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -99,6 +107,16 @@ export interface MetricsSnapshot {
       shiftLookupFailed: number;
     };
     resolutionFailed: number;
+    oproleShadow: {
+      scheduled: number;
+      deduped: number;
+      throttled: number;
+      ran: number;
+      match: number;
+      driftRevoked: number;
+      userMissing: number;
+      runnerFailed: number;
+    };
   };
   timestamp: string;
 }
@@ -139,6 +157,14 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   authority_drift_role: 0,
   authority_drift_shift_lookup_failed: 0,
   authority_resolution_failed: 0,
+  authority_oprole_shadow_scheduled: 0,
+  authority_oprole_shadow_deduped: 0,
+  authority_oprole_shadow_throttled: 0,
+  authority_oprole_shadow_ran: 0,
+  authority_oprole_shadow_match: 0,
+  authority_oprole_shadow_drift_revoked: 0,
+  authority_oprole_shadow_user_missing: 0,
+  authority_oprole_shadow_runner_failed: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -276,6 +302,16 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           shiftLookupFailed: metrics.authority_drift_shift_lookup_failed,
         },
         resolutionFailed: metrics.authority_resolution_failed,
+        oproleShadow: {
+          scheduled: metrics.authority_oprole_shadow_scheduled,
+          deduped: metrics.authority_oprole_shadow_deduped,
+          throttled: metrics.authority_oprole_shadow_throttled,
+          ran: metrics.authority_oprole_shadow_ran,
+          match: metrics.authority_oprole_shadow_match,
+          driftRevoked: metrics.authority_oprole_shadow_drift_revoked,
+          userMissing: metrics.authority_oprole_shadow_user_missing,
+          runnerFailed: metrics.authority_oprole_shadow_runner_failed,
+        },
       },
       timestamp: new Date().toISOString(),
     };
@@ -300,6 +336,16 @@ export function getMetricsSnapshot(): MetricsSnapshot {
         legacyFallbackUsed: 0,
         drift: { role: 0, shiftLookupFailed: 0 },
         resolutionFailed: 0,
+        oproleShadow: {
+          scheduled: 0,
+          deduped: 0,
+          throttled: 0,
+          ran: 0,
+          match: 0,
+          driftRevoked: 0,
+          userMissing: 0,
+          runnerFailed: 0,
+        },
       },
       timestamp: new Date().toISOString(),
     };
