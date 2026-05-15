@@ -168,7 +168,13 @@ export type AuditActionType =
   // Emitted from POST /api/code-blue/sessions/:id/logs when the persisted
   // manager's authority no longer satisfies the Code-Blue allowlist at
   // log-write time. Shadow-only; never blocks the log write.
-  | "code_blue_manager_midsession_authority_shadow_denied";
+  | "code_blue_manager_midsession_authority_shadow_denied"
+  // Phase 4 PR 4.4b — drug/shock actor oprole shadow detection.
+  // Emitted from POST /api/code-blue/sessions/:id/logs for category ∈
+  // {drug, shock} when the request actor's own snapshot fails the
+  // Code-Blue allowlist. Shadow-only; never blocks the log write in
+  // PR 4.4b. PR 4.5 wires enforce-mode 403 separately.
+  | "code_blue_log_drug_shock_authority_shadow_denied";
 
 export interface LogAuditParams {
   clinicId: string;

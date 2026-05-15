@@ -58,6 +58,11 @@ const staleTaskOwnershipCache = new Map<string, CacheEntry<StaleTaskOwnershipEnf
 // resolve independently per clinic. The cache TTL is shared with the other
 // families (10s), matching the rollback contract in master plan §11.
 const codeBlueManagerCache = new Map<string, CacheEntry<CodeBlueManagerEnforcementMode>>();
+// Phase 4 PR 4.4b — drug/shock actor authority enforcement flag.
+// Independent cache, single sub-key per clinic (no endpoint sub-key — this
+// is per-route, not per-endpoint).
+type CodeBlueLogDrugShockMode = "off" | "shadow" | "enforce";
+const codeBlueLogDrugShockCache = new Map<string, CacheEntry<CodeBlueLogDrugShockMode>>();
 
 function readCache<T>(map: Map<string, CacheEntry<T>>, key: string): T | null {
   const entry = map.get(key);
@@ -288,6 +293,57 @@ export async function resolveCodeBlueManagerEnforcementMode(
   return resolved;
 }
 
+/**
+ * Phase 4 PR 4.4b — Drug/shock actor authority enforcement mode resolver.
+ *
+ * Per-route flag (no endpoint sub-key — distinct from the manager family
+ * which has separate initiation/end sub-keys). Governs the actor-snapshot
+ * oprole shadow check on POST /api/code-blue/sessions/:id/logs for
+ * category ∈ {drug, shock}.
+ *
+ * Resolution chain (matches PR 4.1 manager pattern):
+ *   per-clinic vt_server_config (`code_blue.log_drug_shock_enforce.<clinicId>`)
+ *   → env default (`AUTHORITY_CODE_BLUE_LOG_DRUG_SHOCK_ENFORCE_V1`)
+ *   → `"off"`.
+ *
+ * Env defaults remain conservative (`off`) per master plan §11. PR 4.5
+ * enables enforcement clinic-by-clinic via vt_server_config; PR 4.5 does
+ * NOT flip the env default.
+ */
+function isCodeBlueLogDrugShockMode(
+  value: string | null | undefined,
+): value is CodeBlueLogDrugShockMode {
+  return value === "off" || value === "shadow" || value === "enforce";
+}
+
+export async function resolveCodeBlueLogDrugShockEnforcementMode(
+  clinicId: string,
+): Promise<CodeBlueLogDrugShockMode> {
+  const cached = readCache(codeBlueLogDrugShockCache, clinicId);
+  if (cached !== null) return cached;
+
+  let override: string | null = null;
+  try {
+    override = await getServerConfigValue(
+      clinicId,
+      `code_blue.log_drug_shock_enforce.${clinicId}`,
+    );
+  } catch {
+    override = null;
+  }
+  if (isCodeBlueLogDrugShockMode(override)) {
+    writeCache(codeBlueLogDrugShockCache, clinicId, override);
+    return override;
+  }
+
+  const envDefault = process.env.AUTHORITY_CODE_BLUE_LOG_DRUG_SHOCK_ENFORCE_V1;
+  const resolved: CodeBlueLogDrugShockMode = isCodeBlueLogDrugShockMode(envDefault)
+    ? envDefault
+    : "off";
+  writeCache(codeBlueLogDrugShockCache, clinicId, resolved);
+  return resolved;
+}
+
 export async function resolveOproleEnforcementMode(
   clinicId: string,
 ): Promise<OproleEnforcementMode> {
@@ -324,6 +380,7 @@ export function __resetEnforcementConfigCacheForTests(): void {
   taskAssignmentCache.clear();
   staleTaskOwnershipCache.clear();
   codeBlueManagerCache.clear();
+  codeBlueLogDrugShockCache.clear();
 }
 
 export const __testInternals = {

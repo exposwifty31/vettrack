@@ -138,7 +138,16 @@ type MetricName =
   // log-write time. Shadow-only; never blocks the log write. Reason
   // codes mirror the master plan's manager deny-reason union.
   | "code_blue_manager_midsession_shadow_denied_oprole_not_in_allowlist"
-  | "code_blue_manager_midsession_shadow_denied_no_open_check_in";
+  | "code_blue_manager_midsession_shadow_denied_no_open_check_in"
+  // Phase 4 PR 4.4b — drug/shock actor oprole shadow detection.
+  // Incremented from POST /api/code-blue/sessions/:id/logs for category ∈
+  // {drug, shock} based on the request actor's own snapshot. Shadow-only
+  // in PR 4.4b. The actor's snapshot is set by requireClinicalAuthority
+  // middleware (PR 4.4a) so no separate DB lookup is needed.
+  | "code_blue_log_drug_shock_actor_authority_allow"
+  | "code_blue_log_drug_shock_actor_authority_mode_inactive_strategy_a"
+  | "code_blue_log_drug_shock_actor_authority_shadow_denied_oprole_not_in_allowlist"
+  | "code_blue_log_drug_shock_actor_authority_shadow_denied_no_open_check_in";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -336,6 +345,22 @@ export interface MetricsSnapshot {
         noOpenCheckIn: number;
       };
     };
+    /**
+     * Phase 4 PR 4.4b — drug/shock actor oprole shadow detection.
+     * Incremented from POST /api/code-blue/sessions/:id/logs for
+     * category ∈ {drug, shock} based on the request actor's own snapshot.
+     * Distinct from the manager-family counters because this signal is
+     * about who is RECORDING the drug/shock event, not about the persisted
+     * resuscitation manager.
+     */
+    logDrugShockActor: {
+      allow: number;
+      modeInactiveStrategyA: number;
+      shadowWouldHaveDenied: {
+        oproleNotInAllowlist: number;
+        noOpenCheckIn: number;
+      };
+    };
   };
   timestamp: string;
 }
@@ -456,6 +481,11 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   // Phase 4 PR 4.4a — mid-session manager-downgrade shadow detection.
   code_blue_manager_midsession_shadow_denied_oprole_not_in_allowlist: 0,
   code_blue_manager_midsession_shadow_denied_no_open_check_in: 0,
+  // Phase 4 PR 4.4b — drug/shock actor oprole shadow detection.
+  code_blue_log_drug_shock_actor_authority_allow: 0,
+  code_blue_log_drug_shock_actor_authority_mode_inactive_strategy_a: 0,
+  code_blue_log_drug_shock_actor_authority_shadow_denied_oprole_not_in_allowlist: 0,
+  code_blue_log_drug_shock_actor_authority_shadow_denied_no_open_check_in: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -713,6 +743,17 @@ export function getMetricsSnapshot(): MetricsSnapshot {
               metrics.code_blue_manager_midsession_shadow_denied_no_open_check_in,
           },
         },
+        logDrugShockActor: {
+          allow: metrics.code_blue_log_drug_shock_actor_authority_allow,
+          modeInactiveStrategyA:
+            metrics.code_blue_log_drug_shock_actor_authority_mode_inactive_strategy_a,
+          shadowWouldHaveDenied: {
+            oproleNotInAllowlist:
+              metrics.code_blue_log_drug_shock_actor_authority_shadow_denied_oprole_not_in_allowlist,
+            noOpenCheckIn:
+              metrics.code_blue_log_drug_shock_actor_authority_shadow_denied_no_open_check_in,
+          },
+        },
       },
       timestamp: new Date().toISOString(),
     };
@@ -830,6 +871,14 @@ export function getMetricsSnapshot(): MetricsSnapshot {
             userMissing: 0,
           },
           midsessionShadowDenied: {
+            oproleNotInAllowlist: 0,
+            noOpenCheckIn: 0,
+          },
+        },
+        logDrugShockActor: {
+          allow: 0,
+          modeInactiveStrategyA: 0,
+          shadowWouldHaveDenied: {
             oproleNotInAllowlist: 0,
             noOpenCheckIn: 0,
           },

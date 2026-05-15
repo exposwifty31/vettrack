@@ -28,6 +28,7 @@ import { postSystemMessage } from "../lib/shift-chat-presence.js";
 import { evaluateCodeBlueManagerForRoute } from "../lib/authority/code-blue-manager.wiring.js";
 import { codeBlueManagerMetrics } from "../lib/authority/enforcement/code-blue-manager.metrics.js";
 import { detectMidsessionManagerDrift } from "../lib/authority/code-blue-manager-midsession.js";
+import { detectDrugShockActorDrift } from "../lib/authority/code-blue-log-drug-shock.js";
 
 const router = Router();
 
@@ -555,6 +556,31 @@ router.post(
         err,
       );
     });
+
+    // Phase 4 PR 4.4b — fire-and-forget drug/shock actor-snapshot oprole
+    // shadow detection. Only for category ∈ {drug, shock}; note/cpr/
+    // equipment entries do not run this check. Uses the actor's own
+    // req.authoritySnapshot (set by requireClinicalAuthority in PR 4.4a)
+    // — the one Phase 4 path where the actor's snapshot is the right input
+    // because drug/shock administration is the actor's clinical action.
+    // Shadow-only in PR 4.4b; never blocks. PR 4.5 wires enforce-mode 403
+    // separately.
+    if (body.category === "drug" || body.category === "shock") {
+      void detectDrugShockActorDrift({
+        clinicId,
+        sessionId,
+        snapshot: req.authoritySnapshot ?? null,
+        actorUserId: req.authUser!.id,
+        actorEmail: req.authUser!.email ?? "",
+        category: body.category,
+        now: new Date(),
+      }).catch((err) => {
+        console.error(
+          "[code-blue] drug/shock actor-drift detection failed (shadow); log write already persisted",
+          err,
+        );
+      });
+    }
 
     res.status(201).json({ id: entryId, duplicate: false });
   } catch (err) {
