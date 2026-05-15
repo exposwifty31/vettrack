@@ -306,6 +306,13 @@ export async function processStaleTaskOwnershipSweepJob(
                 previousStatus: row.status,
                 newStatus,
                 tx,
+                // §13.7 transactional-audit invariant: live revocation
+                // audit rows MUST be written. Bypass the AUTHORITY_OBS_V1
+                // observability gate AND the rate limiter so the audit
+                // is unconditional inside the transaction. Without this,
+                // an OBS-V1=off configuration would silently allow
+                // revocations to commit without an audit trail.
+                force: true,
               });
               if (auditPromise && typeof (auditPromise as Promise<unknown>).then === "function") {
                 await auditPromise;

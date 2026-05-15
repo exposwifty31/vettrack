@@ -120,16 +120,45 @@ export interface EmitStaleTaskOwnershipRevokedAuditInput {
    * don't supply tx because they don't mutate any DB state.
    */
   tx?: AuditDbExecutor;
+  /**
+   * PR 3.8.1 — bypass the `AUTHORITY_OBS_V1` flag AND the rate-limiter.
+   * Live revocations are NOT observability events — they are the audit
+   * trail for an authoritative DB mutation, and §13.7 requires them to
+   * be written transactionally with the UPDATE. Without `force`, both
+   * gates can independently silently drop the audit row, leaving an
+   * ownership revocation with no corresponding audit history.
+   *
+   * Caller contract: pass `force: true` for live-revocation audit
+   * emissions. Shadow-mode observations omit `force` to preserve the
+   * existing observability-gate semantics.
+   */
+  force?: boolean;
 }
 
 export function emitStaleTaskOwnershipRevokedAudit(
   args: EmitStaleTaskOwnershipRevokedAuditInput,
 ): void | Promise<void> {
-  if (!isAuthorityObsV1Enabled()) return;
-  if (!args.clinicId || !args.taskId) return;
-
-  const key = `stale_task_ownership_revoked:${args.clinicId}:${args.taskId}`;
-  if (!revokedLimiter.shouldLog(key)) return;
+  // Required-field check FIRST. For `force` callers, a missing
+  // clinicId or taskId is a programming error that must NOT silently
+  // skip — otherwise the caller's db.transaction would commit the
+  // ownership UPDATE without an audit row, violating §13.7. Throwing
+  // surfaces the misuse and rolls back the transaction.
+  if (!args.clinicId || !args.taskId) {
+    if (args.force) {
+      throw new Error(
+        "emitStaleTaskOwnershipRevokedAudit: clinicId and taskId are required when force=true",
+      );
+    }
+    return;
+  }
+  // The two observability gates are bypassed when `force: true` so the
+  // §13.7 transactional-audit invariant is unconditional for live
+  // revocations regardless of `AUTHORITY_OBS_V1` configuration.
+  if (!args.force) {
+    if (!isAuthorityObsV1Enabled()) return;
+    const key = `stale_task_ownership_revoked:${args.clinicId}:${args.taskId}`;
+    if (!revokedLimiter.shouldLog(key)) return;
+  }
 
   const params = {
     clinicId: args.clinicId,
@@ -151,15 +180,24 @@ export function emitStaleTaskOwnershipRevokedAudit(
     actorRole: null,
   };
 
+  if (args.tx) {
+    // Transactional variant — audit row is inserted in the same
+    // transaction as the caller's UPDATE. Returns a Promise the
+    // caller awaits to keep the transaction open until the audit
+    // INSERT completes. §13.7 atomic-audit invariant.
+    //
+    // No try/catch here. If logAudit rejects (either synchronously by
+    // throwing, or asynchronously via the returned Promise), the
+    // rejection MUST propagate so the caller's db.transaction rolls
+    // back — leaving the ownership UPDATE unwritten rather than
+    // committing it without the audit row.
+    return logAudit({ ...params, tx: args.tx });
+  }
+
+  // Non-transactional fire-and-forget (shadow / observation path). The
+  // try/catch is appropriate here because there's no transaction to
+  // protect; the audit row is best-effort observability.
   try {
-    if (args.tx) {
-      // Transactional variant — audit row is inserted in the same
-      // transaction as the caller's UPDATE. Returns a Promise the
-      // caller awaits to keep the transaction open until the audit
-      // INSERT completes. §13.7 atomic-audit invariant.
-      return logAudit({ ...params, tx: args.tx });
-    }
-    // Non-transactional fire-and-forget (shadow / observation path).
     logAudit(params);
   } catch (err) {
     console.error("[stale-task-ownership-audit] revoked emission failed", err);
