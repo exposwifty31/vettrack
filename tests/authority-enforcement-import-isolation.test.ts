@@ -30,34 +30,66 @@ function importedSpecifiers(source: string): string[] {
 }
 
 describe("authority enforcement import isolation", () => {
-  it("stale.evaluator.ts does NOT import oprole.evaluator", () => {
+  it("stale.evaluator.ts does NOT import oprole or task-assignment evaluators", () => {
     const specs = importedSpecifiers(read("stale.evaluator.ts"));
     for (const spec of specs) {
       expect(spec, `unexpected oprole import: ${spec}`).not.toMatch(/oprole/i);
+      expect(spec, `unexpected task-assignment import: ${spec}`).not.toMatch(/task-assignment/i);
     }
   });
 
-  it("oprole.evaluator.ts does NOT import stale.evaluator", () => {
+  it("oprole.evaluator.ts does NOT import stale or task-assignment evaluators", () => {
     const specs = importedSpecifiers(read("oprole.evaluator.ts"));
     for (const spec of specs) {
       expect(spec, `unexpected stale import: ${spec}`).not.toMatch(/stale/i);
+      expect(spec, `unexpected task-assignment import: ${spec}`).not.toMatch(/task-assignment/i);
     }
   });
 
-  it("evaluators only share result.ts and config.ts among siblings", () => {
-    // Sibling imports must be limited to result.ts, config.ts, metrics.ts, audit.ts.
-    // metrics.ts and audit.ts are independent helpers (no cross-evaluator state).
-    const allowedSiblings = ["./result.js", "./config.js", "./metrics.js", "./audit.js"];
+  it("task-assignment.evaluator.ts does NOT import stale or oprole evaluators", () => {
+    const specs = importedSpecifiers(read("task-assignment.evaluator.ts"));
+    for (const spec of specs) {
+      expect(spec, `unexpected stale import: ${spec}`).not.toMatch(/stale\.evaluator/i);
+      expect(spec, `unexpected oprole import: ${spec}`).not.toMatch(/oprole\.evaluator/i);
+    }
+  });
+
+  it("evaluators only share approved sibling files", () => {
+    // Sibling imports allowed for each evaluator. Stale/oprole share result.ts,
+    // config.ts, metrics.ts, audit.ts. Task-assignment has its OWN dedicated
+    // metrics and audit helpers (so its observability cannot starve or be
+    // starved by stale/oprole denials).
+    const allowedForLegacyEvaluators = [
+      "./result.js",
+      "./config.js",
+      "./metrics.js",
+      "./audit.js",
+    ];
+    const allowedForTaskAssignment = [
+      "./result.js",
+      "./config.js",
+      "./task-assignment.metrics.js",
+      "./task-assignment.audit.js",
+    ];
 
     for (const file of ["stale.evaluator.ts", "oprole.evaluator.ts"] as const) {
       const specs = importedSpecifiers(read(file));
       const siblingSpecs = specs.filter((s) => s.startsWith("./"));
       for (const spec of siblingSpecs) {
         expect(
-          allowedSiblings,
+          allowedForLegacyEvaluators,
           `${file} imports unexpected sibling ${spec}`,
         ).toContain(spec);
       }
+    }
+
+    const taSpecs = importedSpecifiers(read("task-assignment.evaluator.ts"));
+    const taSiblings = taSpecs.filter((s) => s.startsWith("./"));
+    for (const spec of taSiblings) {
+      expect(
+        allowedForTaskAssignment,
+        `task-assignment.evaluator.ts imports unexpected sibling ${spec}`,
+      ).toContain(spec);
     }
   });
 });

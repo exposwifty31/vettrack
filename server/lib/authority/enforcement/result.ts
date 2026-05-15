@@ -61,3 +61,80 @@ export type EnforcementVerdict = EnforcementAllow | EnforcementDeny;
  * Exclude.
  */
 export type NonNullOperationalRole = Exclude<OperationalRole, null>;
+
+// ---------------------------------------------------------------------------
+// Phase 3 PR 3.3 — Task-assignment evaluator types.
+//
+// Additive only. The existing stale / OPROLE types above are untouched.
+// The task-assignment evaluator has different inputs (a proposed transition
+// rather than a check-in row) and different verdict reasons, so it gets its
+// own context and verdict shapes rather than overloading the PR 7 ones.
+// ---------------------------------------------------------------------------
+
+export type TaskAssignmentEnforcementMode = "off" | "shadow" | "enforce";
+
+/** Which ownership-lifecycle transition is being evaluated. */
+export type TaskAssignmentTransition = "assign" | "reassign" | "acknowledge";
+
+/**
+ * Target user fields the evaluator needs to reason about. The route handler
+ * (PR 3.4) is responsible for hydrating these from vt_users — the evaluator
+ * never reads the database. Per PR 3.3 hard constraint: "no DB reads inside
+ * evaluator unless already explicitly provided via input."
+ */
+export interface TaskAssignmentTargetUser {
+  userId: string;
+  /** Raw `vt_users.role`. */
+  role: string;
+  /** Target user's clinic — used to enforce same-clinic invariant. */
+  clinicId: string;
+  /** Raw `vt_users.status` (e.g. "active", "blocked", "pending"). */
+  status: string;
+  /** `vt_users.deleted_at`; non-null means soft-deleted. */
+  deletedAt: Date | null;
+}
+
+/**
+ * Pure-data context passed to `evaluateTaskAssignment`. No Express request,
+ * no DB handle, no cache — the evaluator must remain side-effect-free aside
+ * from documented metrics + audit emissions.
+ */
+export interface TaskAssignmentContext {
+  clinicId: string;
+  now: Date;
+  transition: TaskAssignmentTransition;
+  actor: {
+    userId: string;
+    /** Raw `vt_users.role` of the actor performing the mutation. */
+    role: string;
+  };
+  target: TaskAssignmentTargetUser;
+  /** `null` for non-typed maintenance/inspection rows in the schema. */
+  taskType: "maintenance" | "repair" | "inspection" | "medication" | null;
+  currentOwnership: {
+    acknowledgedUserId: string | null;
+    /** Raw appointment.status. */
+    status: string;
+  };
+}
+
+/**
+ * Stable denial reasons. Each one maps 1:1 to a wouldHaveDenied / denied
+ * metric counter (see task-assignment.metrics.ts) and to the rate-limit
+ * bucket in the audit emitter.
+ */
+export type TaskAssignmentDenyReason =
+  | "ACTOR_ROLE_NOT_PERMITTED"
+  | "TARGET_CROSS_CLINIC"
+  | "TARGET_NOT_ACTIVE"
+  | "TARGET_ROLE_NOT_PERMITTED"
+  | "OWNERSHIP_EXCLUSIVITY_VIOLATED";
+
+export interface TaskAssignmentAllow {
+  action: "allow";
+}
+export interface TaskAssignmentDeny {
+  action: "deny";
+  reason: TaskAssignmentDenyReason;
+}
+export type TaskAssignmentVerdict = TaskAssignmentAllow | TaskAssignmentDeny;

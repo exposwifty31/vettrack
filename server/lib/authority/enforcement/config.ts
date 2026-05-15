@@ -23,6 +23,7 @@ import { getServerConfigValue } from "../../server-config.js";
 import type {
   OproleEnforcementMode,
   StaleEnforcementMode,
+  TaskAssignmentEnforcementMode,
 } from "./result.js";
 
 // ---------------------------------------------------------------------------
@@ -36,10 +37,13 @@ interface CacheEntry<T> {
   expiresAt: number;
 }
 
-// One Map per flag family so the two are observably independent. Failure to
-// read either does not affect the other.
+// One Map per flag family so the families are observably independent. Failure
+// to read any one does not affect the others.
 const staleCache = new Map<string, CacheEntry<StaleEnforcementMode>>();
 const oproleCache = new Map<string, CacheEntry<OproleEnforcementMode>>();
+// Phase 3 PR 3.3 — task-assignment evaluator flag. Independent cache so
+// stale/oprole resolution paths cannot affect this family and vice versa.
+const taskAssignmentCache = new Map<string, CacheEntry<TaskAssignmentEnforcementMode>>();
 
 function readCache<T>(map: Map<string, CacheEntry<T>>, key: string): T | null {
   const entry = map.get(key);
@@ -127,6 +131,50 @@ export async function resolveStaleEnforcementMode(
   return resolved;
 }
 
+/**
+ * Phase 3 PR 3.3 — Task-assignment evaluator mode resolver.
+ *
+ * Same resolution chain as stale/oprole: per-clinic vt_server_config override
+ * (`authority.task_assignment_enforce.<clinicId>`) → env default
+ * (`AUTHORITY_TASK_ASSIGNMENT_ENFORCE_V1`) → `"off"`.
+ *
+ * Accepts `off | shadow | enforce`. Anything else collapses to `off` so a
+ * typo cannot silently activate the evaluator.
+ */
+function isTaskAssignmentMode(
+  value: string | null | undefined,
+): value is TaskAssignmentEnforcementMode {
+  return value === "off" || value === "shadow" || value === "enforce";
+}
+
+export async function resolveTaskAssignmentEnforcementMode(
+  clinicId: string,
+): Promise<TaskAssignmentEnforcementMode> {
+  const cached = readCache(taskAssignmentCache, clinicId);
+  if (cached !== null) return cached;
+
+  let override: string | null = null;
+  try {
+    override = await getServerConfigValue(
+      clinicId,
+      `authority.task_assignment_enforce.${clinicId}`,
+    );
+  } catch {
+    override = null;
+  }
+  if (isTaskAssignmentMode(override)) {
+    writeCache(taskAssignmentCache, clinicId, override);
+    return override;
+  }
+
+  const envDefault = process.env.AUTHORITY_TASK_ASSIGNMENT_ENFORCE_V1;
+  const resolved: TaskAssignmentEnforcementMode = isTaskAssignmentMode(envDefault)
+    ? envDefault
+    : "off";
+  writeCache(taskAssignmentCache, clinicId, resolved);
+  return resolved;
+}
+
 export async function resolveOproleEnforcementMode(
   clinicId: string,
 ): Promise<OproleEnforcementMode> {
@@ -160,6 +208,7 @@ export async function resolveOproleEnforcementMode(
 export function __resetEnforcementConfigCacheForTests(): void {
   staleCache.clear();
   oproleCache.clear();
+  taskAssignmentCache.clear();
 }
 
 export const __testInternals = {

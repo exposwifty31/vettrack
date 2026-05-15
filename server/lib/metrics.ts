@@ -81,7 +81,22 @@ type MetricName =
   // Phase 3 PR 3.2 — ongoing read-path skeletons. INTENTIONALLY NOT INCREMENTED
   // by any PR 3.2 code path. A later PR will instrument the service path.
   | "task_ownership_typed"
-  | "task_ownership_string_only";
+  | "task_ownership_string_only"
+  // Phase 3 PR 3.3 — task-assignment evaluator counters. Shadow-mode "would
+  // have denied" buckets per reason, plus enforce-mode "denied" buckets per
+  // reason. Foundation-only: PR 3.3 wires the evaluator but no route binds
+  // it yet (that's PR 3.4). Counters move only when an explicit test or a
+  // future caller invokes the evaluator.
+  | "task_assignment_enforce_would_have_denied_actor_role"
+  | "task_assignment_enforce_would_have_denied_target_cross_clinic"
+  | "task_assignment_enforce_would_have_denied_target_not_active"
+  | "task_assignment_enforce_would_have_denied_target_role"
+  | "task_assignment_enforce_would_have_denied_exclusivity"
+  | "task_assignment_enforce_denied_actor_role"
+  | "task_assignment_enforce_denied_target_cross_clinic"
+  | "task_assignment_enforce_denied_target_not_active"
+  | "task_assignment_enforce_denied_target_role"
+  | "task_assignment_enforce_denied_exclusivity";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -205,6 +220,23 @@ export interface MetricsSnapshot {
       stringOnly: number;
     };
   };
+  /** Phase 3 PR 3.3 — task-assignment evaluator counters. */
+  taskAssignmentEnforce: {
+    wouldHaveDenied: {
+      actorRole: number;
+      targetCrossClinic: number;
+      targetNotActive: number;
+      targetRole: number;
+      exclusivity: number;
+    };
+    denied: {
+      actorRole: number;
+      targetCrossClinic: number;
+      targetNotActive: number;
+      targetRole: number;
+      exclusivity: number;
+    };
+  };
   timestamp: string;
 }
 
@@ -287,6 +319,17 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   // Skeleton — never incremented by PR 3.2. A later PR will instrument the service path.
   task_ownership_typed: 0,
   task_ownership_string_only: 0,
+  // Phase 3 PR 3.3 — task-assignment evaluator counters.
+  task_assignment_enforce_would_have_denied_actor_role: 0,
+  task_assignment_enforce_would_have_denied_target_cross_clinic: 0,
+  task_assignment_enforce_would_have_denied_target_not_active: 0,
+  task_assignment_enforce_would_have_denied_target_role: 0,
+  task_assignment_enforce_would_have_denied_exclusivity: 0,
+  task_assignment_enforce_denied_actor_role: 0,
+  task_assignment_enforce_denied_target_cross_clinic: 0,
+  task_assignment_enforce_denied_target_not_active: 0,
+  task_assignment_enforce_denied_target_role: 0,
+  task_assignment_enforce_denied_exclusivity: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -481,6 +524,22 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           stringOnly: metrics.task_ownership_string_only,
         },
       },
+      taskAssignmentEnforce: {
+        wouldHaveDenied: {
+          actorRole: metrics.task_assignment_enforce_would_have_denied_actor_role,
+          targetCrossClinic: metrics.task_assignment_enforce_would_have_denied_target_cross_clinic,
+          targetNotActive: metrics.task_assignment_enforce_would_have_denied_target_not_active,
+          targetRole: metrics.task_assignment_enforce_would_have_denied_target_role,
+          exclusivity: metrics.task_assignment_enforce_would_have_denied_exclusivity,
+        },
+        denied: {
+          actorRole: metrics.task_assignment_enforce_denied_actor_role,
+          targetCrossClinic: metrics.task_assignment_enforce_denied_target_cross_clinic,
+          targetNotActive: metrics.task_assignment_enforce_denied_target_not_active,
+          targetRole: metrics.task_assignment_enforce_denied_target_role,
+          exclusivity: metrics.task_assignment_enforce_denied_exclusivity,
+        },
+      },
       timestamp: new Date().toISOString(),
     };
   } catch {
@@ -551,6 +610,22 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           error: 0,
         },
         readPath: { typed: 0, stringOnly: 0 },
+      },
+      taskAssignmentEnforce: {
+        wouldHaveDenied: {
+          actorRole: 0,
+          targetCrossClinic: 0,
+          targetNotActive: 0,
+          targetRole: 0,
+          exclusivity: 0,
+        },
+        denied: {
+          actorRole: 0,
+          targetCrossClinic: 0,
+          targetNotActive: 0,
+          targetRole: 0,
+          exclusivity: 0,
+        },
       },
       timestamp: new Date().toISOString(),
     };

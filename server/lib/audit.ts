@@ -151,7 +151,8 @@ export type AuditActionType =
   | "dispense_legacy_role_fallback_used"
   | "authority_enforcement_denied_stale"
   | "authority_enforcement_denied_oprole"
-  | "MANUAL_OWNERSHIP_CONFIRMATION";
+  | "MANUAL_OWNERSHIP_CONFIRMATION"
+  | "task_assignment_enforcement_denied";
 
 export interface LogAuditParams {
   clinicId: string;
