@@ -117,12 +117,37 @@ describe("Code Blue 15-min gate — check ordering", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TODO marker present
+// TODO marker — Phase 4 PR 4.3 closed the manager-authority shadow wiring.
+// The old marker is replaced; the new marker tracks PR 4.5 enforce activation.
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("Code Blue 15-min gate — TODO marker", () => {
-  it("contains the Phase 4 + Phase 2.5 TODO marker", () => {
-    expect(routes).toContain("TODO(Phase 4 + Phase 2.5)");
+describe("Code Blue 15-min gate — TODO marker (post Phase 4 PR 4.3)", () => {
+  it("does NOT contain the legacy Phase 4 + Phase 2.5 TODO marker (closed by PR 4.3)", () => {
+    expect(routes).not.toContain("TODO(Phase 4 + Phase 2.5)");
+  });
+
+  it("contains the post-PR-4.3 enforce-activation TODO marker", () => {
+    expect(routes).toContain(
+      "TODO(Phase 4): activate enforce mode for end via per-clinic vt_server_config after shadow soak",
+    );
+  });
+
+  it("PATCH /sessions/:id/end invokes evaluateCodeBlueManagerForRoute with endpoint=\"end\"", () => {
+    // The end handler must call the Phase 4 manager evaluator wiring.
+    // The route declaration may span multiple lines (clinical middleware
+    // chain added in PR 4.3); the regex tolerates whitespace/newlines
+    // between `router.patch(` and `"/sessions/:id/end"`.
+    expect(routes).toContain("evaluateCodeBlueManagerForRoute");
+    const endHandlerStart = routes.search(
+      /router\.patch\(\s*["']\/sessions\/:id\/end["']/,
+    );
+    expect(endHandlerStart).toBeGreaterThanOrEqual(0);
+    const endHandlerEnd = routes.indexOf("\nrouter.", endHandlerStart + 1);
+    const endHandlerBlock = routes.slice(
+      endHandlerStart,
+      endHandlerEnd > endHandlerStart ? endHandlerEnd : endHandlerStart + 6000,
+    );
+    expect(endHandlerBlock).toMatch(/endpoint\s*:\s*["']end["']/);
   });
 });
 

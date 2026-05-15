@@ -50,7 +50,7 @@ describe("Code Blue sessions — server route structure", () => {
   });
 
   it("PATCH /sessions/:id/end route is defined", () => {
-    expect(routes).toMatch(/router\.patch\(["'"]\/sessions\/:id\/end["']/);
+    expect(routes).toMatch(/router\.patch\(\s*["'"]\/sessions\/:id\/end["']/);
   });
 
   it("GET /history route is defined", () => {
@@ -71,7 +71,9 @@ describe("Code Blue sessions — manager enforcement", () => {
 
   it("end route manager check applies to ALL outcomes, not just 'died'", () => {
     // The 403 block must come BEFORE any outcome check — not inside a 'died' conditional
-    const endHandlerStart = routes.indexOf("router.patch(\"/sessions/:id/end\"");
+    const endHandlerStart = routes.search(
+      /router\.patch\(\s*["']\/sessions\/:id\/end["']/,
+    );
     const endHandlerEnd = routes.indexOf("\nrouter.", endHandlerStart + 1);
     const endBlock = routes.slice(
       endHandlerStart,
@@ -114,14 +116,18 @@ describe("Code Blue sessions — no auto-checkout on equipment log", () => {
   });
 
   it("session end route does not perform equipment mutations", () => {
-    const endBlock = routes.slice(routes.indexOf('router.patch("/sessions/:id/end"'));
+    const endBlock = routes.slice(
+      routes.search(/router\.patch\(\s*["']\/sessions\/:id\/end["']/),
+    );
     const nextRoute = endBlock.indexOf("router.", 10);
     const endHandler = nextRoute === -1 ? endBlock : endBlock.slice(0, nextRoute);
     expect(endHandler).not.toContain("checkedOutById");
   });
 
   it("session end route still closes the session", () => {
-    const endBlock = routes.slice(routes.indexOf('router.patch("/sessions/:id/end"'));
+    const endBlock = routes.slice(
+      routes.search(/router\.patch\(\s*["']\/sessions\/:id\/end["']/),
+    );
     expect(endBlock).toContain('status: "ended"');
     expect(endBlock).toContain("endedAt");
   });

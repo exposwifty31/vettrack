@@ -42,12 +42,17 @@ const eventsPostBlock = routes.slice(
   eventsPostEnd > eventsPostStart ? eventsPostEnd : eventsPostStart + 1000,
 );
 
-// Extract only the PATCH /sessions/:id/end handler body
-const endHandlerStart = routes.indexOf("router.patch(\"/sessions/:id/end\"");
+// Extract only the PATCH /sessions/:id/end handler body.
+// Phase 4 PR 4.3 expanded this route declaration onto multiple lines to add
+// the requireClinicalAuthority middleware chain; the regex tolerates the
+// extra whitespace between `router.patch(` and `"/sessions/:id/end"`.
+const endHandlerStart = routes.search(
+  /router\.patch\(\s*["']\/sessions\/:id\/end["']/,
+);
 const endHandlerEnd = routes.indexOf("\nrouter.", endHandlerStart + 1);
 const endBlock = routes.slice(
   endHandlerStart,
-  endHandlerEnd > endHandlerStart ? endHandlerEnd : endHandlerStart + 3000,
+  endHandlerEnd > endHandlerStart ? endHandlerEnd : endHandlerStart + 6000,
 );
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -566,6 +566,26 @@ router.patch("/sessions/:id/presence", requireAuth, validateUuid("id"), async (r
 });
 
 // PATCH /api/code-blue/sessions/:id/end — close session (manager only for ALL outcomes)
+//
+// Phase 4 PR 4.3 architectural note: this route deliberately does NOT add the
+// `requireClinicalAuthority` middleware that initiation (POST /sessions) uses.
+// End is a *close-out* action authorized by the persisted manager identity
+// (`MANAGER_ONLY` check below), not by fresh clinical authority. Adding a
+// clinical-shift gate at the end would strand active sessions whenever the
+// persisted manager loses their clinical shift mid-session (e.g., shift
+// expires during a 30-minute resus, admin manager with no shift, vet who
+// checks out before closing out), which is a real production safety risk
+// flagged in PR 4.3 review (Codex P1 + Bugbot HIGH).
+//
+// The Phase 4 master plan §17 forbidden ("no system-admin bypass on Code
+// Blue clinical gates") still applies to the gates that EXIST: initiation
+// (PR 4.2) and the future log-write gates (PR 4.4a). End is fundamentally
+// different — once a session is created, the persisted manager identity is
+// the binding authorization for closing it.
+//
+// The PR 4.3 deliverable — the manager-authority evaluator at end-time and
+// the drift signal — is wired below inside the handler, AFTER session load
+// and identity validation. Shadow-only.
 router.patch("/sessions/:id/end", requireAuth, validateUuid("id"), validateBody(endSessionSchema), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
@@ -599,7 +619,7 @@ router.patch("/sessions/:id/end", requireAuth, validateUuid("id"), validateBody(
     }
 
     // Verify manager still holds vet or admin role and is still active.
-    // TODO(Phase 4 + Phase 2.5): enforce active-shift operational-role manager authority
+    // TODO(Phase 4): activate enforce mode for end via per-clinic vt_server_config after shadow soak
     const [managerUser] = await db
       .select({ id: users.id, role: users.role, status: users.status })
       .from(users)
@@ -616,6 +636,52 @@ router.patch("/sessions/:id/end", requireAuth, validateUuid("id"), validateBody(
       return res.status(403).json(
         apiError({ code: "MANAGER_INACTIVE", reason: "MANAGER_INACTIVE", message: "Assigned manager account is no longer active", requestId }),
       );
+    }
+
+    // Phase 4 PR 4.3 — Code Blue manager authority evaluator wiring at end.
+    // Runs AFTER the existing persisted-manager identity and state validation,
+    // BEFORE the 15-minute gate and any write/update flow. Shadow-only in
+    // PR 4.3: the evaluator may emit audit/metric internally but the verdict
+    // is NOT acted on by this PR. PR 4.5 introduces the enforce-mode response.
+    //
+    // The evaluator targets the persisted session.managerUserId (NOT the
+    // request actor's id — that may coincide here because the manager-only
+    // identity check above requires it, but the evaluator semantically
+    // resolves the manager's authority via the existing resolver framework
+    // applied to the persisted manager identity, and would behave identically
+    // if a non-manager actor invoked end through some future code path).
+    //
+    // Drift signal: when the end-side evaluator shadow-denies or denies, the
+    // manager is no longer Code-Blue-eligible at end time. The session was
+    // accepted at init time (otherwise it would not exist to end here), so
+    // this is the "init eligible but end ineligible" crossover — the headline
+    // Phase 4 signal per master plan §10.
+    if (session.managerUserId) {
+      // Defensive try/catch: the evaluator is designed to fail-open via its
+      // `resolver_fault` lookup kind, but a throw from audit emission, metric
+      // increment, or a future edge case must NEVER strand session end. The
+      // shadow-only / never-blocks invariant takes precedence over any
+      // observability signal. Errors are logged for diagnosis; the handler
+      // continues to the 15-min gate and write flow unchanged.
+      try {
+        const { verdict } = await evaluateCodeBlueManagerForRoute({
+          clinicId,
+          managerUserId: session.managerUserId,
+          endpoint: "end",
+          now: new Date(),
+        });
+        const endWouldDeny =
+          verdict.action === "deny" ||
+          verdict.protected === "SHADOW_WOULD_HAVE_DENIED";
+        if (endWouldDeny) {
+          codeBlueManagerMetrics.driftBetweenInitAndEnd();
+        }
+      } catch (evalErr) {
+        console.error(
+          "[code-blue] manager evaluator threw at end (shadow); session-end continues",
+          evalErr,
+        );
+      }
     }
 
     // 15-minute minimum gate — waivable only with an explicit earlyStopReason

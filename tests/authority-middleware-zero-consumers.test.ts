@@ -34,10 +34,12 @@ const OBSERVABILITY_TEST_FILE =
   "tests/authority-middleware-observability.test.ts";
 const CODE_BLUE_PR_4_2_ROUTE_WIRING_TEST_FILE =
   "tests/code-blue-pr-4-2-route-wiring.test.ts";
+const CODE_BLUE_PR_4_3_END_WIRING_TEST_FILE =
+  "tests/code-blue-pr-4-3-end-wiring.test.ts";
 
 // Files that may contain the literal `requireClinicalAuthority(` call-site
 // token. Test files appear here when they contain the literal substring
-// `requireClinicalAuthority(` (e.g., a Zod call argument or template string);
+// `requireClinicalAuthority(` (e.g., a `.not.toContain(...)` assertion);
 // test files that only mention the bare identifier `requireClinicalAuthority`
 // (no paren) are NOT included.
 const ALLOWED_FILES: ReadonlySet<string> = new Set([
@@ -50,6 +52,7 @@ const ALLOWED_FILES: ReadonlySet<string> = new Set([
   ENFORCEMENT_TEST_FILE,
   CONTAINERS_AUTHORITY_TEST_FILE,
   OBSERVABILITY_TEST_FILE,
+  CODE_BLUE_PR_4_3_END_WIRING_TEST_FILE,
 ]);
 
 // Files allowed to mention the transitional dispense-only flag. Code Blue
@@ -67,6 +70,7 @@ const ALLOWED_LEGACY_FALLBACK_FILES: ReadonlySet<string> = new Set([
   CONTAINERS_AUTHORITY_TEST_FILE,
   OBSERVABILITY_TEST_FILE,
   CODE_BLUE_PR_4_2_ROUTE_WIRING_TEST_FILE,
+  CODE_BLUE_PR_4_3_END_WIRING_TEST_FILE,
 ]);
 
 const ALLOWED_ROUTE_FILES: ReadonlySet<string> = new Set([
