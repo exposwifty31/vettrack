@@ -25,6 +25,7 @@ import type {
   StaleEnforcementMode,
   TaskAssignmentEnforcementMode,
 } from "./result.js";
+import type { StaleTaskOwnershipEnforcementMode } from "./stale-task-ownership.types.js";
 
 // ---------------------------------------------------------------------------
 // Per-clinic config TTL (rollback contract: flips visible within this window).
@@ -44,6 +45,10 @@ const oproleCache = new Map<string, CacheEntry<OproleEnforcementMode>>();
 // Phase 3 PR 3.3 — task-assignment evaluator flag. Independent cache so
 // stale/oprole resolution paths cannot affect this family and vice versa.
 const taskAssignmentCache = new Map<string, CacheEntry<TaskAssignmentEnforcementMode>>();
+// Phase 3 PR 3.6 — stale-task-ownership evaluator flag. Independent cache;
+// the family shares nothing observable with task-assignment, PR 7 stale,
+// or PR 7 oprole resolution paths.
+const staleTaskOwnershipCache = new Map<string, CacheEntry<StaleTaskOwnershipEnforcementMode>>();
 
 function readCache<T>(map: Map<string, CacheEntry<T>>, key: string): T | null {
   const entry = map.get(key);
@@ -175,6 +180,49 @@ export async function resolveTaskAssignmentEnforcementMode(
   return resolved;
 }
 
+/**
+ * Phase 3 PR 3.6 — Stale-task-ownership evaluator mode resolver.
+ *
+ * Same resolution chain as the task-assignment family: per-clinic
+ * vt_server_config override (`authority.stale_task_ownership_enforce.<clinicId>`)
+ * → env default (`AUTHORITY_STALE_TASK_OWNERSHIP_ENFORCE_V1`) → `"off"`.
+ *
+ * Accepts `off | shadow | enforce`. Anything else collapses to `off`.
+ */
+function isStaleTaskOwnershipMode(
+  value: string | null | undefined,
+): value is StaleTaskOwnershipEnforcementMode {
+  return value === "off" || value === "shadow" || value === "enforce";
+}
+
+export async function resolveStaleTaskOwnershipEnforcementMode(
+  clinicId: string,
+): Promise<StaleTaskOwnershipEnforcementMode> {
+  const cached = readCache(staleTaskOwnershipCache, clinicId);
+  if (cached !== null) return cached;
+
+  let override: string | null = null;
+  try {
+    override = await getServerConfigValue(
+      clinicId,
+      `authority.stale_task_ownership_enforce.${clinicId}`,
+    );
+  } catch {
+    override = null;
+  }
+  if (isStaleTaskOwnershipMode(override)) {
+    writeCache(staleTaskOwnershipCache, clinicId, override);
+    return override;
+  }
+
+  const envDefault = process.env.AUTHORITY_STALE_TASK_OWNERSHIP_ENFORCE_V1;
+  const resolved: StaleTaskOwnershipEnforcementMode = isStaleTaskOwnershipMode(envDefault)
+    ? envDefault
+    : "off";
+  writeCache(staleTaskOwnershipCache, clinicId, resolved);
+  return resolved;
+}
+
 export async function resolveOproleEnforcementMode(
   clinicId: string,
 ): Promise<OproleEnforcementMode> {
@@ -209,6 +257,7 @@ export function __resetEnforcementConfigCacheForTests(): void {
   staleCache.clear();
   oproleCache.clear();
   taskAssignmentCache.clear();
+  staleTaskOwnershipCache.clear();
 }
 
 export const __testInternals = {

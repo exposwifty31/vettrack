@@ -152,7 +152,10 @@ export type AuditActionType =
   | "authority_enforcement_denied_stale"
   | "authority_enforcement_denied_oprole"
   | "MANUAL_OWNERSHIP_CONFIRMATION"
-  | "task_assignment_enforcement_denied";
+  | "task_assignment_enforcement_denied"
+  | "stale_task_ownership_would_have_revoked"
+  | "stale_task_ownership_sweeper_started"
+  | "stale_task_ownership_sweeper_completed";
 
 export interface LogAuditParams {
   clinicId: string;

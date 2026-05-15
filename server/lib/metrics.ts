@@ -96,7 +96,22 @@ type MetricName =
   | "task_assignment_enforce_denied_target_cross_clinic"
   | "task_assignment_enforce_denied_target_not_active"
   | "task_assignment_enforce_denied_target_role"
-  | "task_assignment_enforce_denied_exclusivity";
+  | "task_assignment_enforce_denied_exclusivity"
+  // Phase 3 PR 3.6 — stale-task-ownership evaluator + sweeper counters.
+  // Foundation-only: PR 3.6 ships the evaluator and sweeper as fully inert
+  // (off-default). Counters move only when an explicit test invokes the
+  // evaluator, or when PR 3.7 wires it into shadow.
+  | "stale_task_ownership_scanned"
+  | "stale_task_ownership_would_have_revoked"
+  | "stale_task_ownership_active_treatment_protected"
+  | "stale_task_ownership_emergency_suspend_skip"
+  | "stale_task_ownership_degraded_mode_pause"
+  | "stale_task_ownership_lease_contention_retry"
+  // Tombstone counter (PR 3.6). Asserted to remain 0 in PR 3.6 tests. If
+  // it ever increments in production, an isolation invariant has been
+  // broken (PR 3.6 SHIPS the verdict-shape code for the enforce branch
+  // but ships NO consumer of it; live revocation is PR 3.8 scope).
+  | "stale_task_ownership_revoked";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -220,6 +235,17 @@ export interface MetricsSnapshot {
       stringOnly: number;
     };
   };
+  /** Phase 3 PR 3.6 — stale-task-ownership evaluator + sweeper counters. */
+  staleTaskOwnership: {
+    scanned: number;
+    wouldHaveRevoked: number;
+    activeTreatmentProtected: number;
+    emergencySuspendSkip: number;
+    degradedModePause: number;
+    leaseContentionRetry: number;
+    /** Tombstone — never incremented by PR 3.6. */
+    revoked: number;
+  };
   /** Phase 3 PR 3.3 — task-assignment evaluator counters. */
   taskAssignmentEnforce: {
     wouldHaveDenied: {
@@ -330,6 +356,14 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   task_assignment_enforce_denied_target_not_active: 0,
   task_assignment_enforce_denied_target_role: 0,
   task_assignment_enforce_denied_exclusivity: 0,
+  stale_task_ownership_scanned: 0,
+  stale_task_ownership_would_have_revoked: 0,
+  stale_task_ownership_active_treatment_protected: 0,
+  stale_task_ownership_emergency_suspend_skip: 0,
+  stale_task_ownership_degraded_mode_pause: 0,
+  stale_task_ownership_lease_contention_retry: 0,
+  // Tombstone — never incremented by PR 3.6. PR 3.8 scope.
+  stale_task_ownership_revoked: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -524,6 +558,15 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           stringOnly: metrics.task_ownership_string_only,
         },
       },
+      staleTaskOwnership: {
+        scanned: metrics.stale_task_ownership_scanned,
+        wouldHaveRevoked: metrics.stale_task_ownership_would_have_revoked,
+        activeTreatmentProtected: metrics.stale_task_ownership_active_treatment_protected,
+        emergencySuspendSkip: metrics.stale_task_ownership_emergency_suspend_skip,
+        degradedModePause: metrics.stale_task_ownership_degraded_mode_pause,
+        leaseContentionRetry: metrics.stale_task_ownership_lease_contention_retry,
+        revoked: metrics.stale_task_ownership_revoked,
+      },
       taskAssignmentEnforce: {
         wouldHaveDenied: {
           actorRole: metrics.task_assignment_enforce_would_have_denied_actor_role,
@@ -610,6 +653,15 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           error: 0,
         },
         readPath: { typed: 0, stringOnly: 0 },
+      },
+      staleTaskOwnership: {
+        scanned: 0,
+        wouldHaveRevoked: 0,
+        activeTreatmentProtected: 0,
+        emergencySuspendSkip: 0,
+        degradedModePause: 0,
+        leaseContentionRetry: 0,
+        revoked: 0,
       },
       taskAssignmentEnforce: {
         wouldHaveDenied: {
