@@ -520,25 +520,39 @@ export async function applyStaleTaskOwnershipObservation(args: {
     // If the check-in lookup fails, treat as degraded mode at the
     // evaluator boundary. The evaluator records degradedModePause and
     // returns allow.
-    await evaluateStaleTaskOwnership(
-      {
-        clinicId: args.clinicId,
-        now: new Date(),
-        graceWindowMs: STALE_TASK_OWNERSHIP_DEFAULT_GRACE_WINDOW_MS,
-        activityWindowMs: STALE_TASK_OWNERSHIP_DEFAULT_ACTIVITY_WINDOW_MS,
-        emergencySuspend: false,
-        resolverOperational: false,
-        task: {
-          id: args.taskId,
-          acknowledgedUserId: args.acknowledgedUserId,
-          acknowledgedAt: args.acknowledgedAt,
-          status: args.status,
-          updatedAt: args.updatedAt,
+    //
+    // PR 3.7.1: wrap the evaluator call in try/catch. The helper's
+    // observation-only contract (§12.4) requires that unexpected
+    // evaluator failures NEVER propagate into the caller's task-
+    // mutation flow. The intentional PR 3.8 STALE_OWNERSHIP_DENIED
+    // throw lives OUTSIDE this try block and propagates normally.
+    try {
+      await evaluateStaleTaskOwnership(
+        {
+          clinicId: args.clinicId,
+          now: new Date(),
+          graceWindowMs: STALE_TASK_OWNERSHIP_DEFAULT_GRACE_WINDOW_MS,
+          activityWindowMs: STALE_TASK_OWNERSHIP_DEFAULT_ACTIVITY_WINDOW_MS,
+          emergencySuspend: false,
+          resolverOperational: false,
+          task: {
+            id: args.taskId,
+            acknowledgedUserId: args.acknowledgedUserId,
+            acknowledgedAt: args.acknowledgedAt,
+            status: args.status,
+            updatedAt: args.updatedAt,
+          },
+          ownerCheckInEndedAt: null,
         },
-        ownerCheckInEndedAt: null,
-      },
-      { modeResolver: async () => mode },
-    );
+        { modeResolver: async () => mode },
+      );
+    } catch (err) {
+      console.warn("[stale-task-ownership-wiring] degraded-mode evaluator threw — observation suppressed", {
+        clinicId: args.clinicId,
+        taskId: args.taskId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
     return;
   }
 
@@ -549,25 +563,42 @@ export async function applyStaleTaskOwnershipObservation(args: {
   // treatment safety floor is structurally preserved because the
   // evaluator never produces `would_revoke` for active-treatment tasks
   // (it returns `allow + protected: ACTIVE_TREATMENT` instead).
-  const verdict = await evaluateStaleTaskOwnership(
-    {
-      clinicId: args.clinicId,
-      now: new Date(),
-      graceWindowMs: STALE_TASK_OWNERSHIP_DEFAULT_GRACE_WINDOW_MS,
-      activityWindowMs: STALE_TASK_OWNERSHIP_DEFAULT_ACTIVITY_WINDOW_MS,
-      emergencySuspend: false,
-      resolverOperational: true,
-      task: {
-        id: args.taskId,
-        acknowledgedUserId: args.acknowledgedUserId,
-        acknowledgedAt: args.acknowledgedAt,
-        status: args.status,
-        updatedAt: args.updatedAt,
+  //
+  // PR 3.7.1: wrap the evaluator call in try/catch. If the evaluator
+  // itself ever throws (defensive — its tests prove it shouldn't), the
+  // wiring degrades to allow rather than failing the user-facing
+  // mutation. The intentional STALE_OWNERSHIP_DENIED throw lives
+  // OUTSIDE this try block: it fires from inspecting the `verdict`
+  // value, not from inside `evaluateStaleTaskOwnership`.
+  let verdict;
+  try {
+    verdict = await evaluateStaleTaskOwnership(
+      {
+        clinicId: args.clinicId,
+        now: new Date(),
+        graceWindowMs: STALE_TASK_OWNERSHIP_DEFAULT_GRACE_WINDOW_MS,
+        activityWindowMs: STALE_TASK_OWNERSHIP_DEFAULT_ACTIVITY_WINDOW_MS,
+        emergencySuspend: false,
+        resolverOperational: true,
+        task: {
+          id: args.taskId,
+          acknowledgedUserId: args.acknowledgedUserId,
+          acknowledgedAt: args.acknowledgedAt,
+          status: args.status,
+          updatedAt: args.updatedAt,
+        },
+        ownerCheckInEndedAt,
       },
-      ownerCheckInEndedAt,
-    },
-    { modeResolver: async () => mode },
-  );
+      { modeResolver: async () => mode },
+    );
+  } catch (err) {
+    console.warn("[stale-task-ownership-wiring] evaluator threw — observation suppressed, degrading to allow", {
+      clinicId: args.clinicId,
+      taskId: args.taskId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return;
+  }
 
   // Phase 3 PR 3.8 — Enforce-branch deny activation (§13.3 / §13.16).
   // In shadow mode this branch is never reached (the evaluator returns
