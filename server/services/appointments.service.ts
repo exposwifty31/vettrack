@@ -5,7 +5,7 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, gt, gte, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import type { TaskPriority, TaskType } from "../domain/service-task.adapter.js";
-import { animals, appointments, billingItems, billingLedger, containers, db, inventoryJobs, owners, shifts, users } from "../db.js";
+import { animals, appointments, billingItems, billingLedger, clinicalCheckIns, containers, db, inventoryJobs, owners, shifts, users } from "../db.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { markIdempotentAsync } from "../lib/idempotency.js";
 import { validateJustificationText, MedJustificationError, resolvePresetLabel } from "../lib/med-justification.js";
@@ -14,8 +14,12 @@ import { broadcast } from "../lib/realtime.js";
 import { sendTaskNotification } from "../lib/task-notification.js";
 import { canPerformMedicationTaskAction } from "../lib/task-rbac.js";
 import { inventoryDeductionQueue } from "../queues/inventory-deduction.queue.js";
-import { resolveTaskAssignmentEnforcementMode } from "../lib/authority/enforcement/config.js";
+import {
+  resolveStaleTaskOwnershipEnforcementMode,
+  resolveTaskAssignmentEnforcementMode,
+} from "../lib/authority/enforcement/config.js";
 import { evaluateTaskAssignment } from "../lib/authority/enforcement/task-assignment.evaluator.js";
+import { evaluateStaleTaskOwnership } from "../lib/authority/enforcement/stale-task-ownership.evaluator.js";
 import type {
   TaskAssignmentTargetUser,
   TaskAssignmentTransition,
@@ -412,6 +416,154 @@ export async function applyTaskAssignmentEvaluator(args: {
       { reason: verdict.reason, transition: args.transition },
     );
   }
+}
+
+/**
+ * Phase 3 PR 3.7 — Stale-task-ownership wiring defaults.
+ *
+ * These are the same constants the PR 3.6 sweeper uses; centralising them
+ * here is intentional so the wiring and the sweeper agree on what "stale"
+ * means. A future PR may move these to enforcement/config.ts if other
+ * call sites need them.
+ */
+const STALE_TASK_OWNERSHIP_DEFAULT_GRACE_WINDOW_MS = 15 * 60 * 1000;
+const STALE_TASK_OWNERSHIP_DEFAULT_ACTIVITY_WINDOW_MS = 5 * 60 * 1000;
+
+/**
+ * Phase 3 PR 3.7 — Look up an owner's most recent check-in state.
+ *
+ * Returns null when the owner is currently checked in OR has no recorded
+ * check-in (both treated as "not stale" by the evaluator). Otherwise
+ * returns the most recent `checkedOutAt` timestamp.
+ *
+ * Called ONLY when the stale-task-ownership mode is not "off" so the
+ * off-mode invariant (no new DB queries) is preserved.
+ */
+async function loadOwnerCheckInEndedAtForStaleness(
+  userId: string,
+  clinicId: string,
+): Promise<Date | null> {
+  const open = await db
+    .select({ id: clinicalCheckIns.id })
+    .from(clinicalCheckIns)
+    .where(
+      and(
+        eq(clinicalCheckIns.clinicId, clinicId),
+        eq(clinicalCheckIns.userId, userId),
+        isNull(clinicalCheckIns.checkedOutAt),
+      ),
+    )
+    .limit(1);
+  if (open.length > 0) return null;
+
+  const closed = await db
+    .select({ checkedOutAt: clinicalCheckIns.checkedOutAt })
+    .from(clinicalCheckIns)
+    .where(
+      and(
+        eq(clinicalCheckIns.clinicId, clinicId),
+        eq(clinicalCheckIns.userId, userId),
+      ),
+    )
+    .orderBy(sql`${clinicalCheckIns.checkedOutAt} DESC NULLS LAST`)
+    .limit(1);
+  return closed[0]?.checkedOutAt ?? null;
+}
+
+/**
+ * Phase 3 PR 3.7 — Service-layer wiring for the PR 3.6 stale-task-ownership evaluator.
+ *
+ * Observation-only across ALL modes (off | shadow | enforce). Per the
+ * master plan §12.4: the wiring never denies, never revokes, never
+ * mutates ownership, never alters responses. PR 3.6 already established
+ * the same property for the sweeper. PR 3.8 will add the actual deny /
+ * revoke behavior within its tightly-bounded carve-out (§13.3 / §13.16).
+ *
+ * Off-mode invariant: mode is resolved FIRST. In `off`, no DB query
+ * happens and the evaluator is not invoked. The only allowed side effect
+ * is the per-clinic cached config probe (10s TTL, shared infrastructure).
+ *
+ * Strategy A safety net: any resolver-side failure degrades to off.
+ *
+ * The evaluator's verdict is INTENTIONALLY IGNORED here. Its side
+ * effects (metric increments, shadow-mode would-have-revoked audit) are
+ * the observability output. The function returns void regardless.
+ */
+export async function applyStaleTaskOwnershipObservation(args: {
+  clinicId: string;
+  taskId: string;
+  acknowledgedUserId: string | null;
+  acknowledgedAt: Date | null;
+  status: string;
+  updatedAt: Date;
+}): Promise<void> {
+  // No owner to evaluate — staleness is meaningless without an
+  // established owner. This is the common case for first-time
+  // startTask before any acknowledge has occurred.
+  if (!args.acknowledgedUserId) return;
+
+  let mode: Awaited<ReturnType<typeof resolveStaleTaskOwnershipEnforcementMode>>;
+  try {
+    mode = await resolveStaleTaskOwnershipEnforcementMode(args.clinicId);
+  } catch {
+    return;
+  }
+  if (mode === "off") return;
+
+  let ownerCheckInEndedAt: Date | null;
+  try {
+    ownerCheckInEndedAt = await loadOwnerCheckInEndedAtForStaleness(
+      args.acknowledgedUserId,
+      args.clinicId,
+    );
+  } catch {
+    // If the check-in lookup fails, treat as degraded mode at the
+    // evaluator boundary. The evaluator records degradedModePause and
+    // returns allow.
+    await evaluateStaleTaskOwnership(
+      {
+        clinicId: args.clinicId,
+        now: new Date(),
+        graceWindowMs: STALE_TASK_OWNERSHIP_DEFAULT_GRACE_WINDOW_MS,
+        activityWindowMs: STALE_TASK_OWNERSHIP_DEFAULT_ACTIVITY_WINDOW_MS,
+        emergencySuspend: false,
+        resolverOperational: false,
+        task: {
+          id: args.taskId,
+          acknowledgedUserId: args.acknowledgedUserId,
+          acknowledgedAt: args.acknowledgedAt,
+          status: args.status,
+          updatedAt: args.updatedAt,
+        },
+        ownerCheckInEndedAt: null,
+      },
+      { modeResolver: async () => mode },
+    );
+    return;
+  }
+
+  // Invoke the evaluator. PR 3.7 is observation-only: the verdict is
+  // discarded. The evaluator's internal side effects (counters + audit)
+  // are the entire output of this call.
+  await evaluateStaleTaskOwnership(
+    {
+      clinicId: args.clinicId,
+      now: new Date(),
+      graceWindowMs: STALE_TASK_OWNERSHIP_DEFAULT_GRACE_WINDOW_MS,
+      activityWindowMs: STALE_TASK_OWNERSHIP_DEFAULT_ACTIVITY_WINDOW_MS,
+      emergencySuspend: false,
+      resolverOperational: true,
+      task: {
+        id: args.taskId,
+        acknowledgedUserId: args.acknowledgedUserId,
+        acknowledgedAt: args.acknowledgedAt,
+        status: args.status,
+        updatedAt: args.updatedAt,
+      },
+      ownerCheckInEndedAt,
+    },
+    { modeResolver: async () => mode },
+  );
 }
 
 function computeDoseDeviation(meta: MedicationMetadata): number {
@@ -1459,6 +1611,24 @@ export async function startTask(clinicIdInput: string, taskId: string, actor: Ta
     }
   }
 
+  // Phase 3 PR 3.7 — stale-task-ownership observation wiring. Observation
+  // only: never throws, never alters response shape, even in enforce mode
+  // (per §12.4). Placed AFTER the status-transition validation so failed
+  // start attempts (e.g., retries on an already in_progress task) do NOT
+  // pollute the shadow observability signal. The wiring helper internally
+  // enforces the active-treatment safety floor by inspecting
+  // `existing.updatedAt`; per §12.6, startTask must bypass any
+  // stale-denial semantics during active-treatment windows — the
+  // evaluator handles this automatically.
+  await applyStaleTaskOwnershipObservation({
+    clinicId,
+    taskId: existing.id,
+    acknowledgedUserId: existing.acknowledgedUserId,
+    acknowledgedAt: existing.acknowledgedAt,
+    status: existing.status,
+    updatedAt: existing.updatedAt,
+  });
+
   await assertVetInClinic(clinicId, vetId);
 
   const now = new Date();
@@ -1553,6 +1723,21 @@ export async function completeTask(
       to: "completed",
     });
   }
+
+  // Phase 3 PR 3.7 — stale-task-ownership observation wiring. Observation
+  // only: never throws, never alters response shape (per §12.4). Placed
+  // AFTER the status-transition validation so retries against an
+  // already-completed (or otherwise invalid-state) task do NOT pollute
+  // the shadow observability signal. The active-treatment safety floor
+  // is enforced inside the evaluator.
+  await applyStaleTaskOwnershipObservation({
+    clinicId,
+    taskId: existing.id,
+    acknowledgedUserId: existing.acknowledgedUserId,
+    acknowledgedAt: existing.acknowledgedAt,
+    status: existing.status,
+    updatedAt: existing.updatedAt,
+  });
 
   await assertVetInClinic(clinicId, vetId);
 
