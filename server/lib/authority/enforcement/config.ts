@@ -26,6 +26,10 @@ import type {
   TaskAssignmentEnforcementMode,
 } from "./result.js";
 import type { StaleTaskOwnershipEnforcementMode } from "./stale-task-ownership.types.js";
+import type {
+  CodeBlueManagerEndpoint,
+  CodeBlueManagerEnforcementMode,
+} from "./code-blue-manager.types.js";
 
 // ---------------------------------------------------------------------------
 // Per-clinic config TTL (rollback contract: flips visible within this window).
@@ -49,6 +53,11 @@ const taskAssignmentCache = new Map<string, CacheEntry<TaskAssignmentEnforcement
 // the family shares nothing observable with task-assignment, PR 7 stale,
 // or PR 7 oprole resolution paths.
 const staleTaskOwnershipCache = new Map<string, CacheEntry<StaleTaskOwnershipEnforcementMode>>();
+// Phase 4 PR 4.1 — Code Blue manager authority enforcement flag. Independent
+// cache. Cache key includes the per-endpoint sub-key so `initiation` and `end`
+// resolve independently per clinic. The cache TTL is shared with the other
+// families (10s), matching the rollback contract in master plan §11.
+const codeBlueManagerCache = new Map<string, CacheEntry<CodeBlueManagerEnforcementMode>>();
 
 function readCache<T>(map: Map<string, CacheEntry<T>>, key: string): T | null {
   const entry = map.get(key);
@@ -223,6 +232,62 @@ export async function resolveStaleTaskOwnershipEnforcementMode(
   return resolved;
 }
 
+/**
+ * Phase 4 PR 4.1 — Code Blue manager authority enforcement mode resolver.
+ *
+ * Per-endpoint sub-key (`initiation` | `end`) — each Code Blue endpoint
+ * resolves independently per clinic so an operator can shadow `initiation`
+ * while keeping `end` at `off` (or any combination). The endpoint participates
+ * in the per-clinic vt_server_config key path AND the per-process cache key.
+ *
+ * Resolution chain (matches PR 7 / PR 3.3 / PR 3.6):
+ *   per-clinic vt_server_config (`code_blue.manager_enforce.<clinicId>.<endpoint>`)
+ *   → env default (`AUTHORITY_CODE_BLUE_MANAGER_ENFORCE_V1`)
+ *   → `"off"`.
+ *
+ * Accepts `off | shadow | enforce`. Anything else collapses to `off` so a
+ * typo cannot silently activate enforcement (typo-defensive).
+ *
+ * Env defaults remain conservative (`off`) per Phase 4 master plan §11.
+ * PR 4.5 enables enforcement clinic-by-clinic via vt_server_config; PR 4.5
+ * does NOT flip the env default.
+ */
+function isCodeBlueManagerMode(
+  value: string | null | undefined,
+): value is CodeBlueManagerEnforcementMode {
+  return value === "off" || value === "shadow" || value === "enforce";
+}
+
+export async function resolveCodeBlueManagerEnforcementMode(
+  clinicId: string,
+  endpoint: CodeBlueManagerEndpoint,
+): Promise<CodeBlueManagerEnforcementMode> {
+  const cacheKey = `${clinicId}:${endpoint}`;
+  const cached = readCache(codeBlueManagerCache, cacheKey);
+  if (cached !== null) return cached;
+
+  let override: string | null = null;
+  try {
+    override = await getServerConfigValue(
+      clinicId,
+      `code_blue.manager_enforce.${clinicId}.${endpoint}`,
+    );
+  } catch {
+    override = null;
+  }
+  if (isCodeBlueManagerMode(override)) {
+    writeCache(codeBlueManagerCache, cacheKey, override);
+    return override;
+  }
+
+  const envDefault = process.env.AUTHORITY_CODE_BLUE_MANAGER_ENFORCE_V1;
+  const resolved: CodeBlueManagerEnforcementMode = isCodeBlueManagerMode(envDefault)
+    ? envDefault
+    : "off";
+  writeCache(codeBlueManagerCache, cacheKey, resolved);
+  return resolved;
+}
+
 export async function resolveOproleEnforcementMode(
   clinicId: string,
 ): Promise<OproleEnforcementMode> {
@@ -258,6 +323,7 @@ export function __resetEnforcementConfigCacheForTests(): void {
   oproleCache.clear();
   taskAssignmentCache.clear();
   staleTaskOwnershipCache.clear();
+  codeBlueManagerCache.clear();
 }
 
 export const __testInternals = {

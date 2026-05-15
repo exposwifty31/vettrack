@@ -66,6 +66,16 @@ describe("authority enforcement import isolation", () => {
     }
   });
 
+  it("code-blue-manager.evaluator.ts does NOT import stale, oprole, task-assignment, or stale-task-ownership evaluators", () => {
+    const specs = importedSpecifiers(read("code-blue-manager.evaluator.ts"));
+    for (const spec of specs) {
+      expect(spec, `unexpected stale import: ${spec}`).not.toMatch(/^.\/stale\.evaluator/);
+      expect(spec, `unexpected oprole import: ${spec}`).not.toMatch(/^.\/oprole\.evaluator/);
+      expect(spec, `unexpected task-assignment import: ${spec}`).not.toMatch(/task-assignment\.evaluator/);
+      expect(spec, `unexpected stale-task-ownership import: ${spec}`).not.toMatch(/stale-task-ownership\.evaluator/);
+    }
+  });
+
   it("evaluators only share approved sibling files", () => {
     // Sibling imports allowed for each evaluator. Stale/oprole share result.ts,
     // config.ts, metrics.ts, audit.ts. Task-assignment and stale-task-ownership
@@ -88,6 +98,12 @@ describe("authority enforcement import isolation", () => {
       "./stale-task-ownership.types.js",
       "./stale-task-ownership.metrics.js",
       "./stale-task-ownership.audit.js",
+    ];
+    const allowedForCodeBlueManager = [
+      "./config.js",
+      "./code-blue-manager.types.js",
+      "./code-blue-manager.metrics.js",
+      "./code-blue-manager.audit.js",
     ];
 
     for (const file of ["stale.evaluator.ts", "oprole.evaluator.ts"] as const) {
@@ -116,6 +132,15 @@ describe("authority enforcement import isolation", () => {
       expect(
         allowedForStaleTaskOwnership,
         `stale-task-ownership.evaluator.ts imports unexpected sibling ${spec}`,
+      ).toContain(spec);
+    }
+
+    const cbmSpecs = importedSpecifiers(read("code-blue-manager.evaluator.ts"));
+    const cbmSiblings = cbmSpecs.filter((s) => s.startsWith("./"));
+    for (const spec of cbmSiblings) {
+      expect(
+        allowedForCodeBlueManager,
+        `code-blue-manager.evaluator.ts imports unexpected sibling ${spec}`,
       ).toContain(spec);
     }
   });

@@ -111,7 +111,27 @@ type MetricName =
   // it ever increments in production, an isolation invariant has been
   // broken (PR 3.6 SHIPS the verdict-shape code for the enforce branch
   // but ships NO consumer of it; live revocation is PR 3.8 scope).
-  | "stale_task_ownership_revoked";
+  | "stale_task_ownership_revoked"
+  // Phase 4 PR 4.1 — Code Blue manager authority enforcement counters.
+  // Foundation-only: PR 4.1 registers all counters; only the evaluator
+  // increments them in PR 4.1 (via explicit test invocations). Wiring lands
+  // in PR 4.2 (initiation), PR 4.3 (end), PR 4.5 (per-clinic enforce flip).
+  | "code_blue_initiator_authority_denied"
+  | "code_blue_manager_authority_allow"
+  | "code_blue_manager_authority_mode_inactive_strategy_a"
+  | "code_blue_manager_authority_fault_open"
+  | "code_blue_manager_authority_shadow_denied_oprole_not_in_allowlist"
+  | "code_blue_manager_authority_shadow_denied_no_open_check_in"
+  | "code_blue_manager_authority_shadow_denied_manager_cross_clinic"
+  | "code_blue_manager_authority_shadow_denied_user_missing"
+  | "code_blue_manager_authority_denied_oprole_not_in_allowlist"
+  | "code_blue_manager_authority_denied_no_open_check_in"
+  | "code_blue_manager_authority_denied_manager_cross_clinic"
+  | "code_blue_manager_authority_denied_user_missing"
+  // Tombstone (PR 4.1). PR 4.3 increments this when init→end manager
+  // eligibility crosses — the headline Phase 4 signal. Asserted 0 in
+  // PR 4.1 tests.
+  | "code_blue_manager_drift_between_init_and_end";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -263,6 +283,42 @@ export interface MetricsSnapshot {
       exclusivity: number;
     };
   };
+  /**
+   * Phase 4 PR 4.1 — Code Blue authority enforcement counters.
+   *
+   * `manager.driftBetweenInitAndEnd` is the headline Phase 4 signal —
+   * incremented (PR 4.3+) when initiation evaluator would have allowed but
+   * end evaluator would deny.
+   *
+   * `initiator.denied` is incremented by PR 4.2 wiring at the actor
+   * clinical-gate denial site. In PR 4.1 it is a tombstone.
+   *
+   * Drug/shock-family and mid-session counters are NOT in PR 4.1 scope;
+   * they will be added by PR 4.4a / PR 4.4b in their own additive PRs.
+   */
+  codeBlue: {
+    initiator: {
+      denied: number;
+    };
+    manager: {
+      allow: number;
+      modeInactiveStrategyA: number;
+      faultOpen: number;
+      driftBetweenInitAndEnd: number;
+      shadowWouldHaveDenied: {
+        oproleNotInAllowlist: number;
+        noOpenCheckIn: number;
+        managerCrossClinic: number;
+        userMissing: number;
+      };
+      denied: {
+        oproleNotInAllowlist: number;
+        noOpenCheckIn: number;
+        managerCrossClinic: number;
+        userMissing: number;
+      };
+    };
+  };
   timestamp: string;
 }
 
@@ -364,6 +420,21 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   stale_task_ownership_lease_contention_retry: 0,
   // Tombstone — never incremented by PR 3.6. PR 3.8 scope.
   stale_task_ownership_revoked: 0,
+  // Phase 4 PR 4.1 — Code Blue manager authority enforcement counters.
+  code_blue_initiator_authority_denied: 0,
+  code_blue_manager_authority_allow: 0,
+  code_blue_manager_authority_mode_inactive_strategy_a: 0,
+  code_blue_manager_authority_fault_open: 0,
+  code_blue_manager_authority_shadow_denied_oprole_not_in_allowlist: 0,
+  code_blue_manager_authority_shadow_denied_no_open_check_in: 0,
+  code_blue_manager_authority_shadow_denied_manager_cross_clinic: 0,
+  code_blue_manager_authority_shadow_denied_user_missing: 0,
+  code_blue_manager_authority_denied_oprole_not_in_allowlist: 0,
+  code_blue_manager_authority_denied_no_open_check_in: 0,
+  code_blue_manager_authority_denied_manager_cross_clinic: 0,
+  code_blue_manager_authority_denied_user_missing: 0,
+  // Tombstone — incremented by PR 4.3 wiring.
+  code_blue_manager_drift_between_init_and_end: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -583,6 +654,39 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           exclusivity: metrics.task_assignment_enforce_denied_exclusivity,
         },
       },
+      codeBlue: {
+        initiator: {
+          denied: metrics.code_blue_initiator_authority_denied,
+        },
+        manager: {
+          allow: metrics.code_blue_manager_authority_allow,
+          modeInactiveStrategyA:
+            metrics.code_blue_manager_authority_mode_inactive_strategy_a,
+          faultOpen: metrics.code_blue_manager_authority_fault_open,
+          driftBetweenInitAndEnd:
+            metrics.code_blue_manager_drift_between_init_and_end,
+          shadowWouldHaveDenied: {
+            oproleNotInAllowlist:
+              metrics.code_blue_manager_authority_shadow_denied_oprole_not_in_allowlist,
+            noOpenCheckIn:
+              metrics.code_blue_manager_authority_shadow_denied_no_open_check_in,
+            managerCrossClinic:
+              metrics.code_blue_manager_authority_shadow_denied_manager_cross_clinic,
+            userMissing:
+              metrics.code_blue_manager_authority_shadow_denied_user_missing,
+          },
+          denied: {
+            oproleNotInAllowlist:
+              metrics.code_blue_manager_authority_denied_oprole_not_in_allowlist,
+            noOpenCheckIn:
+              metrics.code_blue_manager_authority_denied_no_open_check_in,
+            managerCrossClinic:
+              metrics.code_blue_manager_authority_denied_manager_cross_clinic,
+            userMissing:
+              metrics.code_blue_manager_authority_denied_user_missing,
+          },
+        },
+      },
       timestamp: new Date().toISOString(),
     };
   } catch {
@@ -677,6 +781,27 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           targetNotActive: 0,
           targetRole: 0,
           exclusivity: 0,
+        },
+      },
+      codeBlue: {
+        initiator: { denied: 0 },
+        manager: {
+          allow: 0,
+          modeInactiveStrategyA: 0,
+          faultOpen: 0,
+          driftBetweenInitAndEnd: 0,
+          shadowWouldHaveDenied: {
+            oproleNotInAllowlist: 0,
+            noOpenCheckIn: 0,
+            managerCrossClinic: 0,
+            userMissing: 0,
+          },
+          denied: {
+            oproleNotInAllowlist: 0,
+            noOpenCheckIn: 0,
+            managerCrossClinic: 0,
+            userMissing: 0,
+          },
         },
       },
       timestamp: new Date().toISOString(),
