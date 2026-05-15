@@ -138,6 +138,14 @@ vi.mock("../server/db.js", () => ({
           dbCalls.push({ method: "tx.update", args });
           return txFluent;
         },
+        // PR 3.2.1: the confirm path now reads the appointment's metadata
+        // inside the transaction. The mock provides a select that goes
+        // through the same fluent chain; by default it resolves to []
+        // (no metadata found → falls back to acknowledgedAt = null).
+        select: (...args: unknown[]) => {
+          dbCalls.push({ method: "tx.select", args });
+          return txFluent;
+        },
       };
       transactionResult = await fn(tx);
       return transactionResult;

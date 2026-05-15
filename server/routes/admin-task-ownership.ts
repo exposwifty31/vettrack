@@ -294,9 +294,40 @@ async function resolveQueueRow(
     }
 
     if (outcome === "manual_confirmed" && confirmedUserId !== null) {
+      // PR 3.2.1: hydrate `acknowledgedAt` from the appointment's
+      // historical `metadata.acknowledged_at`, mirroring the worker
+      // auto-resolve path. Without this, manually-confirmed rows
+      // record the admin's confirmation time as the acknowledgment
+      // time, corrupting ownership-timeline reporting.
+      //
+      // Fallback when metadata is missing or unparseable: use `now`
+      // — matching the worker's `input.acknowledgedAtFromMetadata ??
+      // new Date()` pattern (see
+      // server/workers/taskOwnershipBackfill.worker.ts). This keeps
+      // the two resolution paths consistent: both use the historical
+      // timestamp when available and fall back to the current time
+      // when it isn't.
+      const [appointment] = await tx
+        .select({ metadata: appointments.metadata })
+        .from(appointments)
+        .where(
+          and(
+            eq(appointments.id, row.appointmentId),
+            eq(appointments.clinicId, clinicId),
+          ),
+        )
+        .limit(1);
+      const metadataRaw = appointment?.metadata as Record<string, unknown> | null | undefined;
+      const metadataAckRaw =
+        metadataRaw && typeof metadataRaw === "object" && !Array.isArray(metadataRaw)
+          ? metadataRaw.acknowledged_at
+          : null;
+      const parsedAck = typeof metadataAckRaw === "string" ? new Date(metadataAckRaw) : null;
+      const hydratedAcknowledgedAt =
+        parsedAck && Number.isFinite(parsedAck.getTime()) ? parsedAck : now;
       await tx
         .update(appointments)
-        .set({ acknowledgedUserId: confirmedUserId, acknowledgedAt: now })
+        .set({ acknowledgedUserId: confirmedUserId, acknowledgedAt: hydratedAcknowledgedAt })
         .where(
           and(
             eq(appointments.id, row.appointmentId),
