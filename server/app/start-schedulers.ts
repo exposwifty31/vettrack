@@ -12,6 +12,7 @@ import { startChargeAlertWorker } from "../workers/chargeAlertWorker.js";
 import { startInventoryDeductionWorker } from "../workers/inventory-deduction.worker.js";
 import { startAdmissionFanoutWorker } from "../workers/admission-fanout.worker.js";
 import { startIntegrationWorker } from "../workers/integration.worker.js";
+import { startTaskOwnershipBackfillWorker } from "../workers/taskOwnershipBackfill.worker.js";
 import { startIntegrationScheduleJobs } from "../integrations/jobs/integration-schedules.js";
 import { startIntegrationRetentionCron } from "../integrations/jobs/integration-retention.js";
 import { startErHandoffSlaScheduler } from "../services/er-handoff-sla.service.js";
@@ -49,6 +50,7 @@ export async function startBackgroundSchedulers() {
   await startInventoryDeductionWorker();
   await startAdmissionFanoutWorker();
   await startIntegrationWorker();
+  await startTaskOwnershipBackfillWorker();
   startIntegrationScheduleJobs();
   startIntegrationRetentionCron();
   startErKpiDailyRollupScheduler();

@@ -66,7 +66,22 @@ type MetricName =
   | "authority_stale_would_have_denied"
   | "authority_stale_denied"
   | "authority_stale_skipped_legacy_path"
-  | "authority_oprole_denied";
+  | "authority_oprole_denied"
+  // Phase 3 PR 3.2 — task-ownership backfill counters (incremented by the worker).
+  | "task_ownership_backfill_scanned"
+  | "task_ownership_backfill_auto_resolved_id"
+  | "task_ownership_backfill_auto_resolved_clerk_id"
+  | "task_ownership_backfill_queued_no_candidate"
+  | "task_ownership_backfill_queued_cross_clinic"
+  | "task_ownership_backfill_queued_blocked"
+  | "task_ownership_backfill_queued_deleted"
+  | "task_ownership_backfill_queued_ambiguous"
+  | "task_ownership_backfill_skipped"
+  | "task_ownership_backfill_error"
+  // Phase 3 PR 3.2 — ongoing read-path skeletons. INTENTIONALLY NOT INCREMENTED
+  // by any PR 3.2 code path. A later PR will instrument the service path.
+  | "task_ownership_typed"
+  | "task_ownership_string_only";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -170,6 +185,26 @@ export interface MetricsSnapshot {
       denied: number;
     };
   };
+  /** Phase 3 PR 3.2 — typed task-ownership backfill counters. */
+  taskOwnership: {
+    backfill: {
+      scanned: number;
+      autoResolvedById: number;
+      autoResolvedByClerkId: number;
+      queuedNoCandidate: number;
+      queuedCrossClinic: number;
+      queuedBlocked: number;
+      queuedDeleted: number;
+      queuedAmbiguous: number;
+      skipped: number;
+      error: number;
+    };
+    /** Skeleton counters — registered now, incremented only by a future PR that instruments the service read path. */
+    readPath: {
+      typed: number;
+      stringOnly: number;
+    };
+  };
   timestamp: string;
 }
 
@@ -239,6 +274,19 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   authority_stale_denied: 0,
   authority_stale_skipped_legacy_path: 0,
   authority_oprole_denied: 0,
+  task_ownership_backfill_scanned: 0,
+  task_ownership_backfill_auto_resolved_id: 0,
+  task_ownership_backfill_auto_resolved_clerk_id: 0,
+  task_ownership_backfill_queued_no_candidate: 0,
+  task_ownership_backfill_queued_cross_clinic: 0,
+  task_ownership_backfill_queued_blocked: 0,
+  task_ownership_backfill_queued_deleted: 0,
+  task_ownership_backfill_queued_ambiguous: 0,
+  task_ownership_backfill_skipped: 0,
+  task_ownership_backfill_error: 0,
+  // Skeleton — never incremented by PR 3.2. A later PR will instrument the service path.
+  task_ownership_typed: 0,
+  task_ownership_string_only: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -415,6 +463,24 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           denied: metrics.authority_oprole_denied,
         },
       },
+      taskOwnership: {
+        backfill: {
+          scanned: metrics.task_ownership_backfill_scanned,
+          autoResolvedById: metrics.task_ownership_backfill_auto_resolved_id,
+          autoResolvedByClerkId: metrics.task_ownership_backfill_auto_resolved_clerk_id,
+          queuedNoCandidate: metrics.task_ownership_backfill_queued_no_candidate,
+          queuedCrossClinic: metrics.task_ownership_backfill_queued_cross_clinic,
+          queuedBlocked: metrics.task_ownership_backfill_queued_blocked,
+          queuedDeleted: metrics.task_ownership_backfill_queued_deleted,
+          queuedAmbiguous: metrics.task_ownership_backfill_queued_ambiguous,
+          skipped: metrics.task_ownership_backfill_skipped,
+          error: metrics.task_ownership_backfill_error,
+        },
+        readPath: {
+          typed: metrics.task_ownership_typed,
+          stringOnly: metrics.task_ownership_string_only,
+        },
+      },
       timestamp: new Date().toISOString(),
     };
   } catch {
@@ -470,6 +536,21 @@ export function getMetricsSnapshot(): MetricsSnapshot {
         },
         staleEnforce: { wouldHaveDenied: 0, denied: 0, skippedLegacyPath: 0 },
         oproleEnforce: { denied: 0 },
+      },
+      taskOwnership: {
+        backfill: {
+          scanned: 0,
+          autoResolvedById: 0,
+          autoResolvedByClerkId: 0,
+          queuedNoCandidate: 0,
+          queuedCrossClinic: 0,
+          queuedBlocked: 0,
+          queuedDeleted: 0,
+          queuedAmbiguous: 0,
+          skipped: 0,
+          error: 0,
+        },
+        readPath: { typed: 0, stringOnly: 0 },
       },
       timestamp: new Date().toISOString(),
     };

@@ -1787,6 +1787,50 @@ export const clinicalCheckIns = pgTable(
 );
 export type ClinicalCheckIn = typeof clinicalCheckIns.$inferSelect;
 
+/**
+ * Phase 3 PR 3.2: manual-confirm queue for typed task-ownership backfill.
+ *
+ * Rows are enqueued by the backfill worker when the resolver cannot
+ * auto-resolve a historical `metadata.acknowledgedBy` value to an exact
+ * same-clinic active user via `vt_users.id` or `vt_users.clerk_id`. Auto
+ * resolutions do not appear in this table — only the residual cases that
+ * require admin attention or that the resolver intentionally refused to
+ * auto-apply (cross-clinic / blocked / deleted / ambiguous / no candidate).
+ *
+ * The (clinic_id, appointment_id, raw_acknowledged_by) uniqueness makes
+ * the queue idempotent: repeating the backfill never duplicates pending
+ * rows. The pending-by-clinic partial index powers the queue-depth gauge
+ * and the admin queue listing.
+ */
+export const taskOwnershipConfirmQueue = pgTable(
+  "vt_task_ownership_confirm_queue",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    appointmentId: text("appointment_id").notNull().references(() => appointments.id, { onDelete: "cascade" }),
+    rawAcknowledgedBy: text("raw_acknowledged_by").notNull(),
+    candidateUserIds: jsonb("candidate_user_ids").notNull().default(sql`'[]'::jsonb`),
+    resolutionReason: varchar("resolution_reason", { length: 40 }).notNull(),
+    matcherVersion: varchar("matcher_version", { length: 20 }).notNull(),
+    resolvedSource: varchar("resolved_source", { length: 30 }).notNull().default("pending"),
+    confirmedUserId: text("confirmed_user_id").references(() => users.id, { onDelete: "set null" }),
+    resolvedByUserId: text("resolved_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdByJobId: text("created_by_job_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    tripleUq: uniqueIndex("ux_vt_task_ownership_confirm_queue_triple")
+      .on(t.clinicId, t.appointmentId, t.rawAcknowledgedBy),
+    clinicPendingIdx: index("idx_vt_task_ownership_confirm_queue_clinic_pending")
+      .on(t.clinicId, t.createdAt)
+      .where(sql`${t.resolvedSource} = 'pending'`),
+    appointmentIdx: index("idx_vt_task_ownership_confirm_queue_appointment").on(t.appointmentId),
+  }),
+);
+export type TaskOwnershipConfirmQueueRow = typeof taskOwnershipConfirmQueue.$inferSelect;
+
 export async function initDb() {
   // Schema initialization is now handled by the migration runner (server/migrate.ts).
   // This function is kept as a thin wrapper for backwards compatibility.

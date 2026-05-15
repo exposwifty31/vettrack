@@ -43,6 +43,7 @@ import erRoutes from "../routes/er.js";
 import adminOutboxHealthRoutes from "../routes/admin-outbox-health.js";
 import adminOutboxDlqRoutes from "../routes/admin-outbox-dlq.js";
 import adminMedicationIntegrityRoutes from "../routes/admin-medication-integrity.js";
+import adminTaskOwnershipRoutes from "../routes/admin-task-ownership.js";
 import dispenseRoutes from "../routes/dispense.js";
 import patientHandoffsRoutes from "../routes/patient-handoffs.js";
 
@@ -90,6 +91,7 @@ export function registerApiRoutes(app: express.Express) {
   app.use("/api/admin", adminOutboxHealthRoutes);
   app.use("/api/admin", adminOutboxDlqRoutes);
   app.use("/api/admin", adminMedicationIntegrityRoutes);
+  app.use("/api/admin", adminTaskOwnershipRoutes);
   app.use("/api/dispense", dispenseRoutes);
   app.use("/api/test", testRoutes);
   app.use("/api/health", healthRoutes);
