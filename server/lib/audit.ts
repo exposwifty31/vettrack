@@ -174,7 +174,13 @@ export type AuditActionType =
   // {drug, shock} when the request actor's own snapshot fails the
   // Code-Blue allowlist. Shadow-only; never blocks the log write in
   // PR 4.4b. PR 4.5 wires enforce-mode 403 separately.
-  | "code_blue_log_drug_shock_authority_shadow_denied";
+  | "code_blue_log_drug_shock_authority_shadow_denied"
+  // Phase 4 PR 4.5 — drug/shock actor oprole enforce-mode deny.
+  // Emitted from POST /api/code-blue/sessions/:id/logs in enforce mode
+  // when the request actor's snapshot fails the Code-Blue allowlist.
+  // Distinct from the shadow kind so dashboards can separate observation
+  // from enforcement-driven denials.
+  | "code_blue_log_drug_shock_authority_denied";
 
 export interface LogAuditParams {
   clinicId: string;

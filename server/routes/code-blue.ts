@@ -28,7 +28,7 @@ import { postSystemMessage } from "../lib/shift-chat-presence.js";
 import { evaluateCodeBlueManagerForRoute } from "../lib/authority/code-blue-manager.wiring.js";
 import { codeBlueManagerMetrics } from "../lib/authority/enforcement/code-blue-manager.metrics.js";
 import { detectMidsessionManagerDrift } from "../lib/authority/code-blue-manager-midsession.js";
-import { detectDrugShockActorDrift } from "../lib/authority/code-blue-log-drug-shock.js";
+import { evaluateDrugShockActorForRoute } from "../lib/authority/code-blue-log-drug-shock.js";
 
 const router = Router();
 
@@ -264,22 +264,53 @@ router.post(
     const userId = req.authUser!.id;
     const body = req.body as z.infer<typeof startSessionSchema>;
 
-    // Phase 4 PR 4.2 — Code Blue manager authority evaluator wiring.
+    // Phase 4 PR 4.2 + PR 4.5 — Code Blue manager authority evaluator wiring.
     // Runs BEFORE existing manager validation + any side effects (DB insert,
-    // push fan-out, system message, "started" audit). Shadow-only in PR 4.2:
-    // the evaluator may emit audit/metric internally but the verdict is NOT
-    // acted on by this PR. PR 4.5 introduces the enforce-mode response.
+    // push fan-out, system message, "started" audit). The evaluator emits
+    // audit/metric internally based on the resolved mode.
+    //
+    // PR 4.5: in enforce mode the evaluator returns `action: "deny"`. The
+    // route translates that into a 403 with a stable reason code in the
+    // response body BEFORE any side effect commits. In shadow / off / mode-
+    // inactive / fault-open paths the verdict is `action: "allow"` and the
+    // route proceeds as before. Per-clinic vt_server_config
+    // `code_blue.manager_enforce.<clinicId>.initiation = "enforce"` activates
+    // the deny path; default (`off`) is unchanged.
     //
     // Evaluator targets the *named manager* via the existing resolver
     // framework. It MUST NOT read req.authoritySnapshot (which belongs to the
     // request actor, not the manager). The wiring helper loads vt_users by
     // id (clinic-scoped) and constructs a DB-only target user object.
-    await evaluateCodeBlueManagerForRoute({
+    const { verdict: initiationVerdict } = await evaluateCodeBlueManagerForRoute({
       clinicId,
       managerUserId: body.managerUserId,
       endpoint: "initiation",
       now: new Date(),
     });
+    if (initiationVerdict.action === "deny") {
+      // Codex P2 (PR 4.5 review): the evaluator can deny with USER_MISSING
+      // or MANAGER_CROSS_CLINIC, which are INPUT VALIDATION failures (the
+      // nominated managerUserId points to a non-existent or cross-clinic
+      // user), distinct from operational-role denials. Let those reasons
+      // fall through to the existing INVALID_MANAGER 400 response so the
+      // API contract for input validation is preserved. Only operational-
+      // role denials (OPROLE_NOT_IN_CB_ALLOWLIST, NO_OPEN_CHECK_IN) return
+      // the new 403 MANAGER_NOT_CODE_BLUE_ELIGIBLE response.
+      const reason = initiationVerdict.reason;
+      if (reason === "OPROLE_NOT_IN_CB_ALLOWLIST" || reason === "NO_OPEN_CHECK_IN") {
+        return res.status(403).json(
+          apiError({
+            code: "MANAGER_NOT_CODE_BLUE_ELIGIBLE",
+            reason,
+            message:
+              "Nominated manager is not currently Code-Blue-eligible (operational role check)",
+            requestId,
+          }),
+        );
+      }
+      // USER_MISSING / MANAGER_CROSS_CLINIC: continue to the existing
+      // managerUser DB lookup below, which returns 400 INVALID_MANAGER.
+    }
 
     // Validate that managerUserId is an active vet or admin in this clinic
     const [managerUser] = await db
@@ -515,6 +546,36 @@ router.post(
       return res.json({ id: existing.id, duplicate: true });
     }
 
+    // Phase 4 PR 4.5 — drug/shock actor authority enforcement gate.
+    // Runs BEFORE the insert so an enforce-mode deny returns 403 without
+    // persisting the log row. In shadow / off / mode-inactive / fault-open
+    // paths the verdict is `allow` and the route proceeds. The helper emits
+    // appropriate observability (audit + metric) based on the resolved mode.
+    // Only triggered for category ∈ {drug, shock}; note/cpr/equipment skip
+    // the check entirely.
+    if (body.category === "drug" || body.category === "shock") {
+      const drugShockVerdict = await evaluateDrugShockActorForRoute({
+        clinicId,
+        sessionId,
+        snapshot: req.authoritySnapshot ?? null,
+        actorUserId: req.authUser!.id,
+        actorEmail: req.authUser!.email ?? "",
+        category: body.category,
+        now: new Date(),
+      });
+      if (drugShockVerdict.action === "deny") {
+        return res.status(403).json(
+          apiError({
+            code: "DRUG_SHOCK_AUTHORITY_REQUIRED",
+            reason: drugShockVerdict.reason,
+            message:
+              "Recording drug/shock entries requires a Code-Blue-eligible operational role. Reconfigure the clinic to shadow / off to bypass.",
+            requestId,
+          }),
+        );
+      }
+    }
+
     const entryId = randomUUID();
     await db.insert(codeBlueLogEntries).values({
       id: entryId,
@@ -557,30 +618,13 @@ router.post(
       );
     });
 
-    // Phase 4 PR 4.4b — fire-and-forget drug/shock actor-snapshot oprole
-    // shadow detection. Only for category ∈ {drug, shock}; note/cpr/
-    // equipment entries do not run this check. Uses the actor's own
-    // req.authoritySnapshot (set by requireClinicalAuthority in PR 4.4a)
-    // — the one Phase 4 path where the actor's snapshot is the right input
-    // because drug/shock administration is the actor's clinical action.
-    // Shadow-only in PR 4.4b; never blocks. PR 4.5 wires enforce-mode 403
-    // separately.
-    if (body.category === "drug" || body.category === "shock") {
-      void detectDrugShockActorDrift({
-        clinicId,
-        sessionId,
-        snapshot: req.authoritySnapshot ?? null,
-        actorUserId: req.authUser!.id,
-        actorEmail: req.authUser!.email ?? "",
-        category: body.category,
-        now: new Date(),
-      }).catch((err) => {
-        console.error(
-          "[code-blue] drug/shock actor-drift detection failed (shadow); log write already persisted",
-          err,
-        );
-      });
-    }
+    // Note: Phase 4 PR 4.4b's post-insert fire-and-forget drug/shock shadow
+    // detection (`detectDrugShockActorDrift`) is superseded in PR 4.5 by the
+    // pre-insert sync `evaluateDrugShockActorForRoute` call above. The new
+    // call covers BOTH shadow-mode observability emission AND enforce-mode
+    // denial; running both would emit duplicate observability signals.
+    // The PR 4.4b helper remains exported for callers outside the route
+    // (it is not removed; it is no longer invoked from this handler).
 
     res.status(201).json({ id: entryId, duplicate: false });
   } catch (err) {
@@ -732,12 +776,24 @@ router.patch("/sessions/:id/end", requireAuth, validateUuid("id"), validateBody(
     // this is the "init eligible but end ineligible" crossover — the headline
     // Phase 4 signal per master plan §10.
     if (session.managerUserId) {
-      // Defensive try/catch: the evaluator is designed to fail-open via its
-      // `resolver_fault` lookup kind, but a throw from audit emission, metric
-      // increment, or a future edge case must NEVER strand session end. The
-      // shadow-only / never-blocks invariant takes precedence over any
-      // observability signal. Errors are logged for diagnosis; the handler
-      // continues to the 15-min gate and write flow unchanged.
+      // Defensive try/catch: a throw from audit emission, metric increment,
+      // or a future edge case must NEVER strand session end. The
+      // shadow-only / never-blocks contract for the EVALUATOR's internal
+      // emission is preserved; ENFORCE-mode 403 is opt-in via per-clinic
+      // vt_server_config and is acceptable to the operator who flipped it.
+      //
+      // PR 4.5: in enforce mode the evaluator returns `action: "deny"`. The
+      // route returns 403 with a stable reason code. Per-clinic config
+      // `code_blue.manager_enforce.<clinicId>.end = "enforce"` activates
+      // this path; default (`off`) is unchanged.
+      //
+      // The evaluator's `resolver_fault` lookup branch returns
+      // `protected: "FAULT_OPEN"` even in enforce mode (DECISION-2:
+      // fail-open in emergency context), so resolver/cache infrastructure
+      // failures cannot strand session end.
+      let endVerdict:
+        | Awaited<ReturnType<typeof evaluateCodeBlueManagerForRoute>>["verdict"]
+        | null = null;
       try {
         const { verdict } = await evaluateCodeBlueManagerForRoute({
           clinicId,
@@ -745,6 +801,7 @@ router.patch("/sessions/:id/end", requireAuth, validateUuid("id"), validateBody(
           endpoint: "end",
           now: new Date(),
         });
+        endVerdict = verdict;
         const endWouldDeny =
           verdict.action === "deny" ||
           verdict.protected === "SHADOW_WOULD_HAVE_DENIED";
@@ -753,9 +810,34 @@ router.patch("/sessions/:id/end", requireAuth, validateUuid("id"), validateBody(
         }
       } catch (evalErr) {
         console.error(
-          "[code-blue] manager evaluator threw at end (shadow); session-end continues",
+          "[code-blue] manager evaluator threw at end; session-end continues (fault-open)",
           evalErr,
         );
+      }
+      if (endVerdict?.action === "deny") {
+        // Codex P2 lesson (initiation review): USER_MISSING and
+        // MANAGER_CROSS_CLINIC are input/data-corruption signals, not
+        // operational-role denials. For end specifically, the existing
+        // MANAGER_INACTIVE / NO_VET_MANAGER checks already ran above and
+        // passed, so USER_MISSING here would only fire on a race with
+        // user deletion mid-request. Conservative posture: also confine
+        // the new 403 to operational-role reasons; other deny reasons
+        // fall through to the existing flow (15-min gate + write), which
+        // is the pre-PR-4.5 behavior for those scenarios.
+        const reason = endVerdict.reason;
+        if (reason === "OPROLE_NOT_IN_CB_ALLOWLIST" || reason === "NO_OPEN_CHECK_IN") {
+          return res.status(403).json(
+            apiError({
+              code: "MANAGER_NOT_CODE_BLUE_ELIGIBLE",
+              reason,
+              message:
+                "Persisted manager is not currently Code-Blue-eligible (operational role check). Reconfigure the clinic to shadow / off to bypass.",
+              requestId,
+            }),
+          );
+        }
+        // USER_MISSING / MANAGER_CROSS_CLINIC: continue with the existing
+        // flow (pre-PR-4.5 behavior preserved for these edge cases).
       }
     }
 

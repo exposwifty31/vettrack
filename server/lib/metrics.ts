@@ -147,7 +147,12 @@ type MetricName =
   | "code_blue_log_drug_shock_actor_authority_allow"
   | "code_blue_log_drug_shock_actor_authority_mode_inactive_strategy_a"
   | "code_blue_log_drug_shock_actor_authority_shadow_denied_oprole_not_in_allowlist"
-  | "code_blue_log_drug_shock_actor_authority_shadow_denied_no_open_check_in";
+  | "code_blue_log_drug_shock_actor_authority_shadow_denied_no_open_check_in"
+  // Phase 4 PR 4.5 — drug/shock actor oprole enforce-mode denied counters.
+  // Distinct from the shadow counters above so dashboards can separate
+  // observation from enforcement-driven denials.
+  | "code_blue_log_drug_shock_actor_authority_denied_oprole_not_in_allowlist"
+  | "code_blue_log_drug_shock_actor_authority_denied_no_open_check_in";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -360,6 +365,17 @@ export interface MetricsSnapshot {
         oproleNotInAllowlist: number;
         noOpenCheckIn: number;
       };
+      /**
+       * Phase 4 PR 4.5 — enforce-mode denied counters. Distinct from
+       * shadowWouldHaveDenied so dashboards can separate observation
+       * from enforcement-driven denials. Per-clinic vt_server_config
+       * key `code_blue.log_drug_shock_enforce.<clinicId>` = "enforce"
+       * activates this path.
+       */
+      denied: {
+        oproleNotInAllowlist: number;
+        noOpenCheckIn: number;
+      };
     };
   };
   timestamp: string;
@@ -486,6 +502,9 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   code_blue_log_drug_shock_actor_authority_mode_inactive_strategy_a: 0,
   code_blue_log_drug_shock_actor_authority_shadow_denied_oprole_not_in_allowlist: 0,
   code_blue_log_drug_shock_actor_authority_shadow_denied_no_open_check_in: 0,
+  // Phase 4 PR 4.5 — drug/shock actor oprole enforce-mode denied counters.
+  code_blue_log_drug_shock_actor_authority_denied_oprole_not_in_allowlist: 0,
+  code_blue_log_drug_shock_actor_authority_denied_no_open_check_in: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -753,6 +772,12 @@ export function getMetricsSnapshot(): MetricsSnapshot {
             noOpenCheckIn:
               metrics.code_blue_log_drug_shock_actor_authority_shadow_denied_no_open_check_in,
           },
+          denied: {
+            oproleNotInAllowlist:
+              metrics.code_blue_log_drug_shock_actor_authority_denied_oprole_not_in_allowlist,
+            noOpenCheckIn:
+              metrics.code_blue_log_drug_shock_actor_authority_denied_no_open_check_in,
+          },
         },
       },
       timestamp: new Date().toISOString(),
@@ -879,6 +904,10 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           allow: 0,
           modeInactiveStrategyA: 0,
           shadowWouldHaveDenied: {
+            oproleNotInAllowlist: 0,
+            noOpenCheckIn: 0,
+          },
+          denied: {
             oproleNotInAllowlist: 0,
             noOpenCheckIn: 0,
           },

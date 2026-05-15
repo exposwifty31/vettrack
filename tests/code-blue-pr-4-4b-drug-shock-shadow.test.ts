@@ -56,50 +56,23 @@ function extractLogsHandlerBlock(): string {
 
 const logsBlock = extractLogsHandlerBlock();
 
-describe("POST /sessions/:id/logs — drug/shock actor shadow wiring", () => {
-  it("invokes detectDrugShockActorDrift in the handler", () => {
-    expect(logsBlock).toContain("detectDrugShockActorDrift");
-  });
+describe("POST /sessions/:id/logs — drug/shock helper coexistence (post-PR 4.5)", () => {
+  // PR 4.4b originally wired `detectDrugShockActorDrift` as a post-insert
+  // fire-and-forget shadow observer. PR 4.5 superseded this call site with
+  // a pre-insert sync `evaluateDrugShockActorForRoute` that handles BOTH
+  // shadow-mode observability AND enforce-mode 403. The original
+  // `detectDrugShockActorDrift` export remains available for non-route
+  // callers; the route-wiring static assertions specific to PR 4.4b's
+  // fire-and-forget pattern have moved to `code-blue-pr-4-5-enforce.test.ts`
+  // (and now describe the pre-insert pattern). The runtime helper tests
+  // below continue to exercise `detectDrugShockActorDrift` in isolation.
 
-  it("guards the helper behind a category ∈ {drug, shock} check (not run for note/cpr/equipment)", () => {
-    const callIdx = logsBlock.indexOf("detectDrugShockActorDrift");
-    expect(callIdx).toBeGreaterThanOrEqual(0);
-    // Within ~250 chars before the call, the guard must reference both
-    // "drug" and "shock" category values.
-    const preCall = logsBlock.slice(Math.max(0, callIdx - 250), callIdx);
-    expect(preCall).toMatch(/body\.category\s*===\s*["']drug["']/);
-    expect(preCall).toMatch(/body\.category\s*===\s*["']shock["']/);
-  });
-
-  it("passes the actor's own snapshot (req.authoritySnapshot), not session.managerUserId", () => {
-    const callIdx = logsBlock.indexOf("detectDrugShockActorDrift");
-    const argBody = logsBlock.slice(callIdx, callIdx + 500);
-    expect(argBody).toMatch(/snapshot\s*:\s*req\.authoritySnapshot/);
-    expect(argBody).toMatch(/actorUserId\s*:\s*req\.authUser/);
-    // Must NOT pass session.managerUserId as the input — that would conflate
-    // with the mid-session helper's target.
-    expect(argBody).not.toMatch(/snapshot\s*:\s*session\.managerUserId/);
-  });
-
-  it("is fire-and-forget (void + .catch — never blocks the log write)", () => {
-    const callIdx = logsBlock.indexOf("detectDrugShockActorDrift");
-    const preCall = logsBlock.slice(Math.max(0, callIdx - 150), callIdx);
-    expect(preCall).toMatch(/\bvoid\b/);
-    const postCall = logsBlock.slice(callIdx);
-    expect(postCall.indexOf(".catch(")).toBeGreaterThanOrEqual(0);
-  });
-
-  it("runs AFTER the log insert (the response can already commit)", () => {
-    const insertIdx = logsBlock.indexOf("insert(codeBlueLogEntries)");
-    const detectIdx = logsBlock.indexOf("detectDrugShockActorDrift");
-    expect(insertIdx).toBeGreaterThanOrEqual(0);
-    expect(detectIdx).toBeGreaterThan(insertIdx);
-  });
-
-  it("does NOT touch the note/cpr/equipment paths", () => {
-    // Sanity: the helper is referenced exactly once in the route file.
-    const occurrences = logsBlock.match(/detectDrugShockActorDrift/g) ?? [];
-    expect(occurrences.length).toBe(1);
+  it("PR 4.4b helper export is preserved for non-route callers", () => {
+    // The export must remain so tests / future tooling can still call it.
+    // The route no longer invokes it (PR 4.5 supersession), but the helper
+    // is not removed. The runtime test suite below imports it via the
+    // top-level `await import(...)` and exercises it directly.
+    expect(typeof detectDrugShockActorDrift).toBe("function");
   });
 });
 
