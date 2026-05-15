@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import {
@@ -17,12 +18,15 @@ import {
 import { eq, and, desc, inArray, isNull } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { inventoryJobs } from "../db.js";
-import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import { requireAuth, requireAdmin, requireClinicalUser } from "../middleware/auth.js";
+import { requireClinicalAuthority } from "../middleware/authority.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
 import { enqueueNotificationJob } from "../lib/queue.js";
 import { postSystemMessage } from "../lib/shift-chat-presence.js";
+import { evaluateCodeBlueManagerForRoute } from "../lib/authority/code-blue-manager.wiring.js";
+import { codeBlueManagerMetrics } from "../lib/authority/enforcement/code-blue-manager.metrics.js";
 
 const router = Router();
 
@@ -180,13 +184,100 @@ router.get("/events", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+/**
+ * Phase 4 PR 4.2 — Initiator clinical-gate denial observer.
+ *
+ * Runs BEFORE the clinical-gate middleware chain on POST /api/code-blue/sessions.
+ * On response finish, if the gate denied (status 403) before the route handler
+ * could run, emits the Code-Blue-specific initiator denial counter + audit.
+ *
+ * This is a tiny observability shim that runs alongside the existing
+ * `requireClinicalAuthority` audit emission (`authority_denied`). It does NOT
+ * make any authority decision and does NOT modify the middleware framework —
+ * the gate's deny path is unchanged. The observer simply ALSO records the
+ * Code-Blue-flavored signal for dashboards keyed on Code Blue routes.
+ *
+ * `res.locals.__cbInitiatorGatePassed` is cleared by the post-gate marker
+ * (`__cbInitiatorGatePassed = true`) when the handler is reached. If it stays
+ * `false` at response-finish AND status is 403, the gate denied.
+ */
+function codeBlueInitiatorDenialObserver(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  res.locals.__cbInitiatorGatePassed = false;
+  res.on("finish", () => {
+    if (res.locals.__cbInitiatorGatePassed) return;
+    if (res.statusCode !== 403) return;
+    try {
+      codeBlueManagerMetrics.initiatorDenied();
+      logAudit({
+        clinicId: req.clinicId ?? "",
+        actionType: "code_blue_initiator_authority_denied",
+        performedBy: req.authUser?.id ?? "",
+        performedByEmail: req.authUser?.email ?? "",
+        targetType: "code_blue_session",
+        actorRole: resolveAuditActorRole(req),
+        metadata: {
+          endpoint: "POST /api/code-blue/sessions",
+          denialPath: "actor_clinical_gate",
+          resolvedAt: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      console.error("[code-blue] initiator-denial observer failed", err);
+    }
+  });
+  next();
+}
+
+function codeBlueInitiatorGatePassedMarker(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  res.locals.__cbInitiatorGatePassed = true;
+  next();
+}
+
 // POST /api/code-blue/sessions — start a new live session
-router.post("/sessions", requireAuth, validateBody(startSessionSchema), async (req, res) => {
+router.post(
+  "/sessions",
+  requireAuth,
+  codeBlueInitiatorDenialObserver,
+  requireClinicalUser,
+  requireClinicalAuthority({
+    allow: ["vet", "senior_technician", "technician"],
+    // Phase 4 master plan §5 invariant 8: system-admin identity is not an
+    // emergency clinical actor. Admins without a clinical check-in are denied.
+    allowSystemAdmin: false,
+  }),
+  codeBlueInitiatorGatePassedMarker,
+  validateBody(startSessionSchema),
+  async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
     const userId = req.authUser!.id;
     const body = req.body as z.infer<typeof startSessionSchema>;
+
+    // Phase 4 PR 4.2 — Code Blue manager authority evaluator wiring.
+    // Runs BEFORE existing manager validation + any side effects (DB insert,
+    // push fan-out, system message, "started" audit). Shadow-only in PR 4.2:
+    // the evaluator may emit audit/metric internally but the verdict is NOT
+    // acted on by this PR. PR 4.5 introduces the enforce-mode response.
+    //
+    // Evaluator targets the *named manager* via the existing resolver
+    // framework. It MUST NOT read req.authoritySnapshot (which belongs to the
+    // request actor, not the manager). The wiring helper loads vt_users by
+    // id (clinic-scoped) and constructs a DB-only target user object.
+    await evaluateCodeBlueManagerForRoute({
+      clinicId,
+      managerUserId: body.managerUserId,
+      endpoint: "initiation",
+      now: new Date(),
+    });
 
     // Validate that managerUserId is an active vet or admin in this clinic
     const [managerUser] = await db

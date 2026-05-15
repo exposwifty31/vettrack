@@ -1,15 +1,16 @@
 /**
- * Phase 4 PR 4.1 — Foundation-only invariants.
+ * Phase 4 PR 4.1 — Foundation invariants (post-PR-4.2 scope).
  *
- * Asserts that PR 4.1 introduces the Code Blue manager evaluator + config
- * resolver + metrics + audit kinds, but does NOT wire any route consumer.
- * Wiring lands in PR 4.2 (initiation), PR 4.3 (end), PR 4.4a (mid-session).
+ * PR 4.1 introduced the Code Blue manager evaluator + config resolver +
+ * metrics + audit kinds as foundation only. PR 4.2 introduced exactly one
+ * sanctioned consumer: `server/routes/code-blue.ts` (initiation). This test
+ * locks the allowlist: no other route file may consume the evaluator until
+ * its own designated wiring PR (PR 4.3 covers `code-blue.ts` for end —
+ * already allowed by this file; PR 4.4a covers it for log mid-session —
+ * already allowed).
  *
- * If this test fails, either:
- *   (a) a route file has accidentally consumed the evaluator before its
- *       designated PR — revert the wiring, or
- *   (b) the test allowlist needs updating because a wiring PR is being
- *       merged (which should not happen in PR 4.1).
+ * If this test fails for a route file OTHER than `code-blue.ts`, a wiring
+ * PR has expanded its scope outside the master plan boundaries.
  */
 
 import { describe, expect, it } from "vitest";
@@ -38,8 +39,9 @@ function listFiles(dir: string): string[] {
 const allRouteFiles = listFiles(routesDir);
 
 // Tokens that, if present in any route file, indicate the Code Blue manager
-// evaluator has been wired. PR 4.1 must NOT include any of these in any
-// server/routes/** file.
+// evaluator has been wired into that route. After PR 4.2, exactly one route
+// file is allowed to reference these symbols: `code-blue.ts`. Any other
+// route file referencing them is a scope violation.
 const FORBIDDEN_TOKENS_IN_ROUTES = [
   "evaluateCodeBlueManagerAuthority",
   "computeCodeBlueManagerSnapshotDeny",
@@ -48,25 +50,44 @@ const FORBIDDEN_TOKENS_IN_ROUTES = [
   "emitCodeBlueManagerDenied",
   "emitCodeBlueManagerFaultOpen",
   "codeBlueManagerMetrics",
+  "evaluateCodeBlueManagerForRoute",
+  "loadCodeBlueManagerLookup",
   "code-blue-manager.evaluator",
   "code-blue-manager.audit",
   "code-blue-manager.metrics",
   "code-blue-manager.types",
+  "code-blue-manager.wiring",
 ];
 
-describe("PR 4.1 foundation invariant — no route consumer", () => {
-  it.each(allRouteFiles)(
+// PR 4.2 sanctions `code-blue.ts` as the sole route consumer. Future Phase 4
+// PRs (4.3 end-wiring, 4.4a log-wiring) operate inside this same file.
+const ALLOWED_ROUTE_FILES: ReadonlySet<string> = new Set([
+  path.join(routesDir, "code-blue.ts"),
+]);
+
+const guardedRouteFiles = allRouteFiles.filter(
+  (f) => !ALLOWED_ROUTE_FILES.has(f),
+);
+
+describe("PR 4.1 foundation invariant — only allowlisted routes reference the evaluator", () => {
+  it.each(guardedRouteFiles)(
     "%s does not reference Code Blue manager evaluator symbols",
     (file) => {
       const src = fs.readFileSync(file, "utf8");
       for (const token of FORBIDDEN_TOKENS_IN_ROUTES) {
         expect(
           src.includes(token),
-          `Unexpected reference to '${token}' in ${file} — PR 4.1 is foundation-only`,
+          `Unexpected reference to '${token}' in ${file} — only code-blue.ts is sanctioned`,
         ).toBe(false);
       }
     },
   );
+
+  it("every allowlisted route exists on disk", () => {
+    for (const f of ALLOWED_ROUTE_FILES) {
+      expect(fs.existsSync(f), `allowlisted route missing: ${f}`).toBe(true);
+    }
+  });
 });
 
 describe("PR 4.1 foundation invariant — required files exist", () => {

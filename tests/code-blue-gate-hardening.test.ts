@@ -21,12 +21,17 @@ function read(rel: string) {
 
 const routes = read("server/routes/code-blue.ts");
 
-// Extract only the POST /sessions handler body to scope assertions
-const sessionsPostStart = routes.indexOf("router.post(\"/sessions\"");
+// Extract only the POST /sessions handler body to scope assertions.
+// Phase 4 PR 4.2 expanded this route declaration onto multiple lines to add
+// the requireClinicalAuthority middleware chain; the regex tolerates the
+// extra whitespace between `router.post(` and `"/sessions"`.
+const sessionsPostStart = routes.search(
+  /router\.post\(\s*["']\/sessions["']/,
+);
 const sessionsPostEnd = routes.indexOf("\nrouter.", sessionsPostStart + 1);
 const sessionsPostBlock = routes.slice(
   sessionsPostStart,
-  sessionsPostEnd > sessionsPostStart ? sessionsPostEnd : sessionsPostStart + 2000,
+  sessionsPostEnd > sessionsPostStart ? sessionsPostEnd : sessionsPostStart + 4000,
 );
 
 // Extract only the POST /events handler body

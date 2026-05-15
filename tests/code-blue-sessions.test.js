@@ -34,11 +34,11 @@ try { appRoutes = read("server/app/routes.ts"); } catch {}
 
 describe("Code Blue sessions — server route structure", () => {
   it("POST /sessions route is defined", () => {
-    expect(routes).toMatch(/router\.post\(["'"]\/sessions["']/);
+    expect(routes).toMatch(/router\.post\(\s*["'"]\/sessions["']/);
   });
 
   it("GET /sessions/active route is defined", () => {
-    expect(routes).toMatch(/router\.get\(["'"]\/sessions\/active["']/);
+    expect(routes).toMatch(/router\.get\(\s*["'"]\/sessions\/active["']/);
   });
 
   it("POST /sessions/:id/logs route is defined", () => {
