@@ -84,7 +84,27 @@ const endSessionSchema = z.object({
 });
 
 // POST /api/code-blue/events  — start a Code Blue event (fire-and-forget safe)
-router.post("/events", requireAuth, validateBody(startSchema), async (req, res) => {
+//
+// Phase 4 PR 4.6 — legacy archive clinical gate. Master plan §14 notes that
+// these /events routes are likely near-dead (no live HTTP callers identified;
+// the modern flow uses /sessions). The clinical gate prevents NEW non-clinical
+// callers from creating archive rows. A future cleanup phase may grep the
+// frontend and remove the legacy routes entirely.
+//
+// allowSystemAdmin:false per master plan §17 — Code Blue clinical gates do
+// not admit system-admin identity. Strand risk for shift-expired actors is
+// accepted given these are legacy archive writes, not real-time emergency
+// recording (modern flow → /sessions).
+router.post(
+  "/events",
+  requireAuth,
+  requireClinicalUser,
+  requireClinicalAuthority({
+    allow: ["vet", "senior_technician", "technician"],
+    allowSystemAdmin: false,
+  }),
+  validateBody(startSchema),
+  async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
@@ -121,7 +141,29 @@ router.post("/events", requireAuth, validateBody(startSchema), async (req, res) 
 });
 
 // PATCH /api/code-blue/events/:id  — close a Code Blue event with outcome + timeline
-router.patch("/events/:id", requireAuth, validateUuid("id"), validateBody(endSchema), async (req, res) => {
+//
+// Phase 4 PR 4.6 — legacy archive clinical gate. Same posture as the POST
+// route above. PATCH for the legacy /events archive is a one-shot close-out
+// (analogous to PATCH /sessions/:id/end, which was deliberately NOT gated in
+// PR 4.3 to avoid stranding active sessions). For /events specifically:
+//   - the route is legacy / likely dead (modern flow → /sessions),
+//   - the data being archived is the outcome of an already-completed event,
+//   - the realistic call-pattern is a clinical user closing an event they
+//     themselves opened, so the gate aligns with intended usage.
+// Strand risk (shift-expired actor cannot finalize the archive entry) is
+// accepted given these routes are scheduled for removal in a future
+// cleanup phase (master plan §14).
+router.patch(
+  "/events/:id",
+  requireAuth,
+  requireClinicalUser,
+  requireClinicalAuthority({
+    allow: ["vet", "senior_technician", "technician"],
+    allowSystemAdmin: false,
+  }),
+  validateUuid("id"),
+  validateBody(endSchema),
+  async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
