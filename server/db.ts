@@ -123,6 +123,15 @@ export const appointments = pgTable("vt_appointments", {
   overrideReason: text("override_reason"),
   notes: text("notes"),
   metadata: jsonb("metadata"),
+  /**
+   * Phase 3 PR 3.1: typed task-ownership FK. Foundation-only — no reads or
+   * writes in this PR. The existing free-form `metadata.acknowledgedBy`
+   * string remains the authoritative ownership marker until later PRs
+   * migrate readers/writers. Nullable during the compat window.
+   */
+  acknowledgedUserId: text("acknowledged_user_id").references(() => users.id, { onDelete: "set null" }),
+  /** Phase 3 PR 3.1: timestamp ownership was acquired. Foundation-only — no reads or writes in this PR. */
+  acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
   priority: varchar("priority", { length: 20 }).notNull().default("normal"),
   taskType: varchar("task_type", { length: 20 }),
   /** Medication: inventory container for billing + stock deduction (see also metadata.containerId legacy). */
