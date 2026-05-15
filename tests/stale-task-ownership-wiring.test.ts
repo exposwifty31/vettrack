@@ -187,43 +187,64 @@ describe("PR 3.7 wiring — shadow mode", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Enforce mode — wiring is STILL observation-only (PR 3.7 invariant)
+// Enforce mode — PR 3.8 activates deny at the wiring layer
 
-describe("PR 3.7 wiring — enforce mode (observation-only per §12.4)", () => {
-  it("enforce: wiring NEVER throws, even when evaluator would_revoke", async () => {
+describe("PR 3.7 wiring — enforce mode (PR 3.8 deny activation)", () => {
+  it("enforce + stale row → throws STALE_OWNERSHIP_DENIED 403", async () => {
     mockResolveStaleMode.mockResolvedValue("enforce");
     dbState.openCheckIn = [];
     dbState.closedCheckIns = [{ checkedOutAt: new Date(FIXED_NOW_REF.getTime() - 2 * ONE_HOUR) }];
-    await expect(
-      applyStaleTaskOwnershipObservation({
+    let thrown: unknown = null;
+    try {
+      await applyStaleTaskOwnershipObservation({
         clinicId: "clinic-1",
         taskId: "task-1",
         acknowledgedUserId: "tech-1",
         acknowledgedAt: new Date(FIXED_NOW_REF.getTime() - 3 * ONE_HOUR),
         status: "in_progress",
         updatedAt: new Date(FIXED_NOW_REF.getTime() - 3 * ONE_HOUR),
-      }),
-    ).resolves.toBeUndefined();
-    // Tombstone NEVER moves in PR 3.7 — observation-only.
-    expect(getMetricsSnapshot().staleTaskOwnership.revoked).toBe(0);
+      });
+    } catch (e) {
+      thrown = e;
+    }
+    expect((thrown as { name?: string })?.name).toBe("AppointmentServiceError");
+    expect((thrown as { code?: string })?.code).toBe("STALE_OWNERSHIP_DENIED");
+    expect((thrown as { status?: number })?.status).toBe(403);
+    expect((thrown as { details?: Record<string, unknown> })?.details).toEqual({
+      reason: "STALE_OWNERSHIP",
+      taskId: "task-1",
+    });
   });
 
-  it("enforce: 25 stale observations → 25 wouldHaveRevoked, 0 revoked", async () => {
+  it("enforce + non-stale row (owner checked in) → no throw", async () => {
+    mockResolveStaleMode.mockResolvedValue("enforce");
+    dbState.openCheckIn = [{ id: "ci-open" }];
+    await expect(
+      applyStaleTaskOwnershipObservation({
+        clinicId: "clinic-1",
+        taskId: "task-1",
+        acknowledgedUserId: "tech-1",
+        acknowledgedAt: new Date(FIXED_NOW_REF.getTime() - ONE_HOUR),
+        status: "in_progress",
+        updatedAt: new Date(FIXED_NOW_REF.getTime() - ONE_HOUR),
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("enforce + active-treatment task → no throw (HARD safety floor)", async () => {
     mockResolveStaleMode.mockResolvedValue("enforce");
     dbState.openCheckIn = [];
-    dbState.closedCheckIns = [{ checkedOutAt: new Date(FIXED_NOW_REF.getTime() - 2 * ONE_HOUR) }];
-    for (let i = 0; i < 25; i++) {
-      await applyStaleTaskOwnershipObservation({
+    dbState.closedCheckIns = [{ checkedOutAt: new Date(FIXED_NOW_REF.getTime() - 24 * ONE_HOUR) }];
+    await expect(
+      applyStaleTaskOwnershipObservation({
         clinicId: "clinic-1",
-        taskId: `task-${i}`,
+        taskId: "task-1",
         acknowledgedUserId: "tech-1",
-        acknowledgedAt: new Date(FIXED_NOW_REF.getTime() - 3 * ONE_HOUR),
+        acknowledgedAt: new Date(FIXED_NOW_REF.getTime() - 24 * ONE_HOUR),
         status: "in_progress",
-        updatedAt: new Date(FIXED_NOW_REF.getTime() - 3 * ONE_HOUR),
-      });
-    }
-    expect(getMetricsSnapshot().staleTaskOwnership.wouldHaveRevoked).toBe(25);
-    expect(getMetricsSnapshot().staleTaskOwnership.revoked).toBe(0);
+        updatedAt: new Date(Date.now() - 30_000), // active treatment
+      }),
+    ).resolves.toBeUndefined();
   });
 });
 

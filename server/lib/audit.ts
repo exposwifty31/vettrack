@@ -155,7 +155,8 @@ export type AuditActionType =
   | "task_assignment_enforcement_denied"
   | "stale_task_ownership_would_have_revoked"
   | "stale_task_ownership_sweeper_started"
-  | "stale_task_ownership_sweeper_completed";
+  | "stale_task_ownership_sweeper_completed"
+  | "stale_task_ownership_revoked";
 
 export interface LogAuditParams {
   clinicId: string;

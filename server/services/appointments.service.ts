@@ -542,10 +542,14 @@ export async function applyStaleTaskOwnershipObservation(args: {
     return;
   }
 
-  // Invoke the evaluator. PR 3.7 is observation-only: the verdict is
-  // discarded. The evaluator's internal side effects (counters + audit)
-  // are the entire output of this call.
-  await evaluateStaleTaskOwnership(
+  // Invoke the evaluator. In shadow mode the verdict is discarded — the
+  // evaluator's internal side effects (counters + audit) are the entire
+  // output. In enforce mode (PR 3.8 activation), a `would_revoke`
+  // verdict is mapped to a 403 AppointmentServiceError; the active-
+  // treatment safety floor is structurally preserved because the
+  // evaluator never produces `would_revoke` for active-treatment tasks
+  // (it returns `allow + protected: ACTIVE_TREATMENT` instead).
+  const verdict = await evaluateStaleTaskOwnership(
     {
       clinicId: args.clinicId,
       now: new Date(),
@@ -564,6 +568,21 @@ export async function applyStaleTaskOwnershipObservation(args: {
     },
     { modeResolver: async () => mode },
   );
+
+  // Phase 3 PR 3.8 — Enforce-branch deny activation (§13.3 / §13.16).
+  // In shadow mode this branch is never reached (the evaluator returns
+  // `allow` even for stale rows in shadow). The mode === "enforce"
+  // check is a defense-in-depth invariant: if the evaluator ever
+  // returned `would_revoke` outside enforce, we still want to allow
+  // (observation-only contract intact).
+  if (verdict.action === "would_revoke" && mode === "enforce") {
+    throw new AppointmentServiceError(
+      "STALE_OWNERSHIP_DENIED",
+      403,
+      "Task ownership is stale; the owner's check-in has ended past the grace window.",
+      { reason: verdict.reason, taskId: args.taskId },
+    );
+  }
 }
 
 function computeDoseDeviation(meta: MedicationMetadata): number {

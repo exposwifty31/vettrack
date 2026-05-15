@@ -33,6 +33,17 @@ const { dbState } = vi.hoisted(() => {
   return { dbState };
 });
 
+// PR 3.8: db.update is now exercised by the sweeper in enforce mode.
+// The mock tracks update calls and returns a fluent chain. By default
+// the UPDATE succeeds (returning one row); tests can override.
+const { dbUpdateState } = vi.hoisted(() => {
+  const dbUpdateState: { updateCalls: number; returnRows: { id: string }[] } = {
+    updateCalls: 0,
+    returnRows: [{ id: "updated-row" }],
+  };
+  return { dbUpdateState };
+});
+
 vi.mock("../server/db.js", () => {
   const db = {
     select: () => ({
@@ -51,6 +62,37 @@ vi.mock("../server/db.js", () => {
         }),
       }),
     }),
+    update: () => ({
+      set: () => ({
+        where: () => ({
+          returning: async () => {
+            dbUpdateState.updateCalls += 1;
+            return dbUpdateState.returnRows;
+          },
+        }),
+      }),
+    }),
+    // PR 3.8: db.transaction wraps the UPDATE + audit emission for
+    // atomic revocation. The mock provides a tx with the same update
+    // fluent shape; transaction returns the callback's resolved value.
+    transaction: async (fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        update: () => ({
+          set: () => ({
+            where: () => ({
+              returning: async () => {
+                dbUpdateState.updateCalls += 1;
+                return dbUpdateState.returnRows;
+              },
+            }),
+          }),
+        }),
+        insert: () => ({
+          values: async () => undefined,
+        }),
+      };
+      return fn(tx);
+    },
   };
   return {
     db,
@@ -94,6 +136,8 @@ function makeJob(clinicId: string): Job<{ clinicId: string; requestedByUserId: s
 beforeEach(() => {
   dbState.appointmentRows = [];
   dbState.queryCount = 0;
+  dbUpdateState.updateCalls = 0;
+  dbUpdateState.returnRows = [{ id: "updated-row" }];
   resetMetrics();
 });
 
@@ -216,8 +260,8 @@ describe("processStaleTaskOwnershipSweepJob — shadow mode", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Enforce mode (PR 3.6 ships the verdict shape but NO revocation in the sweeper)
 
-describe("processStaleTaskOwnershipSweepJob — enforce mode (tombstone never moves)", () => {
-  it("enforce: would-revoke verdict counted in stats, revoked tombstone stays 0", async () => {
+describe("processStaleTaskOwnershipSweepJob — enforce mode (PR 3.8 activation)", () => {
+  it("enforce + stale row → live revocation: UPDATE executed, revoked counter increments", async () => {
     dbState.appointmentRows = [
       {
         id: "task-stale",
@@ -232,13 +276,62 @@ describe("processStaleTaskOwnershipSweepJob — enforce mode (tombstone never mo
       fetchOwnerCheckInEndedAt: async () => new Date(FIXED_NOW.getTime() - ONE_HOUR),
       nowSupplier: () => FIXED_NOW,
     });
-    expect(stats.wouldHaveRevoked).toBe(1);
-    // PR 3.6 HARD invariant: the sweeper performs no revocation in ANY mode.
+    // PR 3.8: revoked now moves in enforce mode (was tombstone in PR 3.6).
+    expect(stats.revoked).toBe(1);
+    expect(dbUpdateState.updateCalls).toBe(1);
+    expect(getMetricsSnapshot().staleTaskOwnership.revoked).toBe(1);
+    // The evaluator still increments wouldHaveRevoked when it produces the
+    // would_revoke verdict — that's its observation contract. PR 3.8
+    // additionally increments revoked when the UPDATE succeeded.
+    expect(stats.wouldHaveRevoked).toBe(0); // sweeper-side counter; revoked-on-success path doesn't fall through to wouldHaveRevoked++
+  });
+
+  it("enforce + race-lost UPDATE → wouldHaveRevoked stat, no revoked increment", async () => {
+    // Simulate the race case where another writer changed the owner
+    // between our evaluator call and our UPDATE: the returning array is
+    // empty (0 rows updated).
+    dbState.appointmentRows = [
+      {
+        id: "task-stale",
+        acknowledgedUserId: "tech-stale",
+        acknowledgedAt: new Date(FIXED_NOW.getTime() - 2 * ONE_HOUR),
+        status: "in_progress",
+        updatedAt: new Date(FIXED_NOW.getTime() - 2 * ONE_HOUR),
+      },
+    ];
+    dbUpdateState.returnRows = []; // race: 0 rows updated
+    const stats = await processStaleTaskOwnershipSweepJob(makeJob("clinic-1"), {
+      modeResolver: async () => "enforce",
+      fetchOwnerCheckInEndedAt: async () => new Date(FIXED_NOW.getTime() - ONE_HOUR),
+      nowSupplier: () => FIXED_NOW,
+    });
     expect(stats.revoked).toBe(0);
+    expect(stats.wouldHaveRevoked).toBe(1); // race-lost falls through to wouldHaveRevoked
     expect(getMetricsSnapshot().staleTaskOwnership.revoked).toBe(0);
   });
 
-  it("enforce with active-treatment task: safety floor wins (HARD)", async () => {
+  it("shadow + stale row → NO revocation, wouldHaveRevoked counter increments", async () => {
+    dbState.appointmentRows = [
+      {
+        id: "task-stale",
+        acknowledgedUserId: "tech-stale",
+        acknowledgedAt: new Date(FIXED_NOW.getTime() - 2 * ONE_HOUR),
+        status: "in_progress",
+        updatedAt: new Date(FIXED_NOW.getTime() - 2 * ONE_HOUR),
+      },
+    ];
+    const stats = await processStaleTaskOwnershipSweepJob(makeJob("clinic-1"), {
+      modeResolver: async () => "shadow",
+      fetchOwnerCheckInEndedAt: async () => new Date(FIXED_NOW.getTime() - ONE_HOUR),
+      nowSupplier: () => FIXED_NOW,
+    });
+    expect(stats.wouldHaveRevoked).toBe(1);
+    expect(stats.revoked).toBe(0); // shadow never revokes
+    expect(dbUpdateState.updateCalls).toBe(0);
+    expect(getMetricsSnapshot().staleTaskOwnership.revoked).toBe(0);
+  });
+
+  it("enforce with active-treatment task: safety floor wins (HARD) — no UPDATE", async () => {
     dbState.appointmentRows = [
       {
         id: "task-active",
@@ -256,6 +349,9 @@ describe("processStaleTaskOwnershipSweepJob — enforce mode (tombstone never mo
     expect(stats.activeTreatmentProtected).toBe(1);
     expect(stats.wouldHaveRevoked).toBe(0);
     expect(stats.revoked).toBe(0);
+    // HARD INVARIANT: active treatment NEVER produces an UPDATE,
+    // even in enforce mode.
+    expect(dbUpdateState.updateCalls).toBe(0);
   });
 });
 

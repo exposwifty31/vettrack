@@ -30,7 +30,10 @@ import { createRedisConnection } from "../lib/redis.js";
 import { resolveStaleTaskOwnershipEnforcementMode } from "../lib/authority/enforcement/config.js";
 import { evaluateStaleTaskOwnership } from "../lib/authority/enforcement/stale-task-ownership.evaluator.js";
 import { staleTaskOwnershipMetrics } from "../lib/authority/enforcement/stale-task-ownership.metrics.js";
-import { emitStaleTaskOwnershipSweeperLifecycle } from "../lib/authority/enforcement/stale-task-ownership.audit.js";
+import {
+  emitStaleTaskOwnershipRevokedAudit,
+  emitStaleTaskOwnershipSweeperLifecycle,
+} from "../lib/authority/enforcement/stale-task-ownership.audit.js";
 import {
   STALE_TASK_OWNERSHIP_SWEEP_JOB_NAME,
   STALE_TASK_OWNERSHIP_SWEEP_QUEUE_NAME,
@@ -245,12 +248,87 @@ export async function processStaleTaskOwnershipSweepJob(
             stats.notStale += 1;
           }
         } else {
-          // verdict.action === "would_revoke". PR 3.6 EXPLICITLY DOES NOT
-          // PERFORM REVOCATION here. The would_revoke verdict is observed
-          // via the evaluator's wouldHaveRevoked counter (already
-          // incremented inside the evaluator); the sweeper does NOT
-          // touch the appointment row. Live revocation is PR 3.8 scope.
-          stats.wouldHaveRevoked += 1;
+          // verdict.action === "would_revoke".
+          //
+          // Phase 3 PR 3.8 — Live revocation activation (§13.3 / §13.16).
+          // PR 3.6 shipped this branch as a no-op (observation-only). PR 3.8
+          // adds the minimal code to perform the actual revocation IF mode
+          // is `enforce`. In shadow, the verdict is still observed only
+          // (counter increment happens inside the evaluator).
+          //
+          // Active-treatment safety floor: the evaluator already prevents
+          // `would_revoke` from being produced for active-treatment tasks
+          // (returns `allow + protected: ACTIVE_TREATMENT` instead). The
+          // safety floor is therefore preserved structurally; no
+          // additional guard is needed at this call site.
+          if (mode === "enforce") {
+            const ownerUserId = row.acknowledgedUserId;
+            // Reset status from in_progress → assigned per doctrine §3.4
+            // ("task remains in the queue, re-claimable"); other statuses
+            // are left untouched. Atomicity guard: only revoke if the
+            // owner is still the same person we evaluated (no race with a
+            // re-acknowledge in flight).
+            const newStatus = row.status === "in_progress" ? "assigned" : row.status;
+            // §13.7 transactional-audit invariant: the ownership UPDATE
+            // and the revocation audit row must be written in the SAME
+            // transaction. A process crash between them would leave the
+            // revocation without an audit trail, breaking the revocation
+            // history.
+            const revocationCommitted = await db.transaction(async (tx) => {
+              const updated = await tx
+                .update(appointments)
+                .set({
+                  acknowledgedUserId: null,
+                  acknowledgedAt: null,
+                  status: newStatus,
+                  updatedAt: nowSupplier(),
+                })
+                .where(
+                  and(
+                    eq(appointments.id, row.id),
+                    eq(appointments.clinicId, clinicId),
+                    eq(appointments.acknowledgedUserId, ownerUserId),
+                  ),
+                )
+                .returning({ id: appointments.id });
+              if (updated.length === 0) {
+                // Lost race; rollback by not committing the audit row.
+                return false;
+              }
+              const auditPromise = emitStaleTaskOwnershipRevokedAudit({
+                clinicId,
+                taskId: row.id,
+                ownerUserId,
+                ownerCheckInEndedAt,
+                taskUpdatedAt: row.updatedAt,
+                graceWindowMs,
+                activityWindowMs,
+                previousStatus: row.status,
+                newStatus,
+                tx,
+              });
+              if (auditPromise && typeof (auditPromise as Promise<unknown>).then === "function") {
+                await auditPromise;
+              }
+              return true;
+            });
+
+            if (revocationCommitted) {
+              stats.revoked += 1;
+              staleTaskOwnershipMetrics.revoked();
+            } else {
+              // Lost race: another writer (acknowledge / explicit
+              // reassign) changed the owner between our evaluator call
+              // and our UPDATE. Treat as a non-revocation; the next
+              // sweep will re-evaluate.
+              stats.wouldHaveRevoked += 1;
+            }
+          } else {
+            // mode === "shadow" — would-revoke counted in stats. The
+            // wouldHaveRevoked metric counter was already incremented
+            // by the evaluator. Sweeper does NOT touch the appointment.
+            stats.wouldHaveRevoked += 1;
+          }
         }
       } catch (err) {
         stats.error += 1;
