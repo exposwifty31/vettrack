@@ -42,7 +42,7 @@ describe("Code Blue sessions — server route structure", () => {
   });
 
   it("POST /sessions/:id/logs route is defined", () => {
-    expect(routes).toMatch(/router\.post\(["'"]\/sessions\/:id\/logs["']/);
+    expect(routes).toMatch(/router\.post\(\s*["'"]\/sessions\/:id\/logs["']/);
   });
 
   it("PATCH /sessions/:id/presence route is defined", () => {
@@ -108,7 +108,9 @@ describe("Code Blue sessions — idempotency", () => {
 describe("Code Blue sessions — no auto-checkout on equipment log", () => {
   it("equipment log entry does NOT update equipment checkout state", () => {
     // PR 1.6: auto-checkout removed; equipment table must not be mutated via Code Blue log
-    const logBlock = routes.slice(routes.indexOf('router.post("/sessions/:id/logs"'));
+    const logBlock = routes.slice(
+      routes.search(/router\.post\(\s*["']\/sessions\/:id\/logs["']/),
+    );
     const nextRoute = logBlock.indexOf("router.", 10);
     const logHandler = nextRoute === -1 ? logBlock : logBlock.slice(0, nextRoute);
     expect(logHandler).not.toContain("checkedOutById");
@@ -133,7 +135,9 @@ describe("Code Blue sessions — no auto-checkout on equipment log", () => {
   });
 
   it("log entry history still persists via codeBlueLogEntries insert", () => {
-    const logBlock = routes.slice(routes.indexOf('router.post("/sessions/:id/logs"'));
+    const logBlock = routes.slice(
+      routes.search(/router\.post\(\s*["']\/sessions\/:id\/logs["']/),
+    );
     const nextRoute = logBlock.indexOf("router.", 10);
     const logHandler = nextRoute === -1 ? logBlock : logBlock.slice(0, nextRoute);
     expect(logHandler).toContain("codeBlueLogEntries");

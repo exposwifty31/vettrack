@@ -158,12 +158,17 @@ export type AuditActionType =
   | "stale_task_ownership_sweeper_completed"
   | "stale_task_ownership_revoked"
   // Phase 4 PR 4.1 — Code Blue manager authority enforcement audit kinds.
-  // Registered in PR 4.1 foundation; wired by PR 4.2 (initiation),
-  // PR 4.3 (end), and PR 4.4a (mid-session shadow detection lands later).
+  // Registered in PR 4.1 foundation; wired by PR 4.2 (initiation) and
+  // PR 4.3 (end).
   | "code_blue_initiator_authority_denied"
   | "code_blue_manager_authority_shadow_denied"
   | "code_blue_manager_authority_denied"
-  | "code_blue_manager_authority_fault_open";
+  | "code_blue_manager_authority_fault_open"
+  // Phase 4 PR 4.4a — mid-session manager-downgrade shadow detection.
+  // Emitted from POST /api/code-blue/sessions/:id/logs when the persisted
+  // manager's authority no longer satisfies the Code-Blue allowlist at
+  // log-write time. Shadow-only; never blocks the log write.
+  | "code_blue_manager_midsession_authority_shadow_denied";
 
 export interface LogAuditParams {
   clinicId: string;

@@ -131,7 +131,14 @@ type MetricName =
   // Tombstone (PR 4.1). PR 4.3 increments this when init→end manager
   // eligibility crosses — the headline Phase 4 signal. Asserted 0 in
   // PR 4.1 tests.
-  | "code_blue_manager_drift_between_init_and_end";
+  | "code_blue_manager_drift_between_init_and_end"
+  // Phase 4 PR 4.4a — mid-session manager-downgrade shadow detection.
+  // Incremented from POST /api/code-blue/sessions/:id/logs when the
+  // persisted manager's authority is no longer Code-Blue-eligible at
+  // log-write time. Shadow-only; never blocks the log write. Reason
+  // codes mirror the master plan's manager deny-reason union.
+  | "code_blue_manager_midsession_shadow_denied_oprole_not_in_allowlist"
+  | "code_blue_manager_midsession_shadow_denied_no_open_check_in";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -317,6 +324,17 @@ export interface MetricsSnapshot {
         managerCrossClinic: number;
         userMissing: number;
       };
+      /**
+       * Phase 4 PR 4.4a — mid-session manager-downgrade shadow detection.
+       * Incremented from POST /api/code-blue/sessions/:id/logs. Shadow-only;
+       * never blocks. Distinct from the regular shadowWouldHaveDenied
+       * counters so dashboards can separate "init/end shadow" from
+       * "mid-session log-write shadow" signals.
+       */
+      midsessionShadowDenied: {
+        oproleNotInAllowlist: number;
+        noOpenCheckIn: number;
+      };
     };
   };
   timestamp: string;
@@ -435,6 +453,9 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   code_blue_manager_authority_denied_user_missing: 0,
   // Tombstone — incremented by PR 4.3 wiring.
   code_blue_manager_drift_between_init_and_end: 0,
+  // Phase 4 PR 4.4a — mid-session manager-downgrade shadow detection.
+  code_blue_manager_midsession_shadow_denied_oprole_not_in_allowlist: 0,
+  code_blue_manager_midsession_shadow_denied_no_open_check_in: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -685,6 +706,12 @@ export function getMetricsSnapshot(): MetricsSnapshot {
             userMissing:
               metrics.code_blue_manager_authority_denied_user_missing,
           },
+          midsessionShadowDenied: {
+            oproleNotInAllowlist:
+              metrics.code_blue_manager_midsession_shadow_denied_oprole_not_in_allowlist,
+            noOpenCheckIn:
+              metrics.code_blue_manager_midsession_shadow_denied_no_open_check_in,
+          },
         },
       },
       timestamp: new Date().toISOString(),
@@ -801,6 +828,10 @@ export function getMetricsSnapshot(): MetricsSnapshot {
             noOpenCheckIn: 0,
             managerCrossClinic: 0,
             userMissing: 0,
+          },
+          midsessionShadowDenied: {
+            oproleNotInAllowlist: 0,
+            noOpenCheckIn: 0,
           },
         },
       },

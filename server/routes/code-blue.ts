@@ -27,6 +27,7 @@ import { enqueueNotificationJob } from "../lib/queue.js";
 import { postSystemMessage } from "../lib/shift-chat-presence.js";
 import { evaluateCodeBlueManagerForRoute } from "../lib/authority/code-blue-manager.wiring.js";
 import { codeBlueManagerMetrics } from "../lib/authority/enforcement/code-blue-manager.metrics.js";
+import { detectMidsessionManagerDrift } from "../lib/authority/code-blue-manager-midsession.js";
 
 const router = Router();
 
@@ -448,16 +449,47 @@ router.get("/sessions/active", requireAuth, async (req, res) => {
 });
 
 // POST /api/code-blue/sessions/:id/logs — add a log entry
-router.post("/sessions/:id/logs", requireAuth, validateUuid("id"), validateBody(logEntrySchema), async (req, res) => {
+//
+// Phase 4 PR 4.4a — clinical gate. Anyone logging a Code Blue event must be
+// a clinical-shift actor (vet / senior_technician / technician). System-admin
+// identity is denied (allowSystemAdmin:false): an admin who lacks an active
+// clinical check-in cannot document clinical events. Master plan §8.
+//
+// Unlike PATCH /sessions/:id/end (close-out of a single persisted state),
+// log writes are per-event documentation by multiple actors. A vet without
+// an active shift being denied the ability to log is acceptable: other
+// clinical-shift actors in the room can still document. The session is not
+// stranded by a denial here.
+//
+// Mid-session manager-downgrade detection runs AFTER the log write
+// (fire-and-forget) and observes whether the PERSISTED manager has drifted
+// out of Code-Blue eligibility during the active session. Shadow-only;
+// never blocks the log write — the helper internally absorbs all errors.
+router.post(
+  "/sessions/:id/logs",
+  requireAuth,
+  requireClinicalUser,
+  requireClinicalAuthority({
+    allow: ["vet", "senior_technician", "technician"],
+    allowSystemAdmin: false,
+  }),
+  validateUuid("id"),
+  validateBody(logEntrySchema),
+  async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
     const { id: sessionId } = req.params;
     const body = req.body as z.infer<typeof logEntrySchema>;
 
-    // Verify session belongs to clinic
+    // Verify session belongs to clinic. Phase 4 PR 4.4a selects
+    // managerUserId so mid-session detection has the persisted manager.
     const [session] = await db
-      .select({ id: codeBlueSessions.id, patientId: codeBlueSessions.patientId })
+      .select({
+        id: codeBlueSessions.id,
+        patientId: codeBlueSessions.patientId,
+        managerUserId: codeBlueSessions.managerUserId,
+      })
       .from(codeBlueSessions)
       .where(and(eq(codeBlueSessions.id, sessionId), eq(codeBlueSessions.clinicId, clinicId)))
       .limit(1);
@@ -505,6 +537,23 @@ router.post("/sessions/:id/logs", requireAuth, validateUuid("id"), validateBody(
       targetId: sessionId,
       targetType: "code_blue_session",
       metadata: { entryId, category: body.category },
+    });
+
+    // Phase 4 PR 4.4a — fire-and-forget mid-session manager-drift detection.
+    // Shadow-only; never blocks. The helper internally try/catches all
+    // dependencies (DB, resolver, audit, metrics) and never throws. The
+    // additional .catch here is belt-and-suspenders defense for the
+    // never-block contract.
+    void detectMidsessionManagerDrift({
+      clinicId,
+      sessionId,
+      managerUserId: session.managerUserId ?? null,
+      now: new Date(),
+    }).catch((err) => {
+      console.error(
+        "[code-blue] midsession manager-drift detection failed (shadow); log write already persisted",
+        err,
+      );
     });
 
     res.status(201).json({ id: entryId, duplicate: false });
