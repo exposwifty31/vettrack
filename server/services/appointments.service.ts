@@ -14,6 +14,12 @@ import { broadcast } from "../lib/realtime.js";
 import { sendTaskNotification } from "../lib/task-notification.js";
 import { canPerformMedicationTaskAction } from "../lib/task-rbac.js";
 import { inventoryDeductionQueue } from "../queues/inventory-deduction.queue.js";
+import { resolveTaskAssignmentEnforcementMode } from "../lib/authority/enforcement/config.js";
+import { evaluateTaskAssignment } from "../lib/authority/enforcement/task-assignment.evaluator.js";
+import type {
+  TaskAssignmentTargetUser,
+  TaskAssignmentTransition,
+} from "../lib/authority/enforcement/result.js";
 import { doseDeviationRatio, justificationTier, requiresDoseJustification } from "../../shared/medication-justification.js";
 
 export type AppointmentStatus =
@@ -288,6 +294,124 @@ function matchesAcknowledgedActor(
   const actorUserId = actor.userId.trim();
   const actorClerkId = (actor.clerkId ?? "").trim();
   return ack === actorUserId || (actorClerkId.length > 0 && ack === actorClerkId);
+}
+
+/**
+ * Phase 3 PR 3.4 — Hydrate target user fields for the task-assignment evaluator.
+ *
+ * Called ONLY when the task-assignment enforcement mode is not 'off'. This
+ * preserves the byte-identical off-mode invariant: no new DB query fires
+ * when the evaluator family is disabled for the clinic.
+ *
+ * When `userId` does not exist in `vt_users`, returns a synthetic record
+ * with `status = "unknown"` so the evaluator's precedence (TARGET_NOT_ACTIVE
+ * after TARGET_CROSS_CLINIC) maps it to TARGET_NOT_ACTIVE in enforce mode.
+ * Per §9.11, expanding the evaluator's reason union with a dedicated
+ * TARGET_NOT_FOUND is out of PR 3.4 scope.
+ */
+async function loadTargetUserForAssignment(
+  userId: string,
+  clinicId: string,
+): Promise<TaskAssignmentTargetUser> {
+  const [row] = await db
+    .select({
+      id: users.id,
+      role: users.role,
+      clinicId: users.clinicId,
+      status: users.status,
+      deletedAt: users.deletedAt,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!row) {
+    // Synthetic record. clinicId matches the request so the cross-clinic
+    // check passes; status is non-"active" so the not-active check denies.
+    return {
+      userId,
+      role: "unknown",
+      clinicId,
+      status: "unknown",
+      deletedAt: null,
+    };
+  }
+  return {
+    userId: row.id,
+    role: row.role,
+    clinicId: row.clinicId,
+    status: row.status,
+    deletedAt: row.deletedAt,
+  };
+}
+
+/**
+ * Phase 3 PR 3.4 — Service-layer wiring for the PR 3.3 task-assignment evaluator.
+ *
+ * Off-mode byte-identical invariant: the mode is resolved FIRST. In `off`,
+ * no target user is hydrated and the evaluator is not invoked, so the only
+ * DB-visible side effect is the per-clinic cached config probe (10s TTL).
+ *
+ * In `shadow`: the evaluator emits counters; the verdict is `allow`; the
+ * service path proceeds unchanged.
+ *
+ * In `enforce`: a deny verdict throws AppointmentServiceError with code
+ * TASK_ASSIGNMENT_DENIED and the verdict reason in `details.reason`. The
+ * route's sendServiceError surfaces this as a 403 with the same shape.
+ *
+ * Strategy A: `resolveTaskAssignmentEnforcementMode` already catches
+ * getServerConfigValue throws and falls back to env / "off" (PR 3.3 §3
+ * config.ts). If `evaluateTaskAssignment` itself throws (defensive — its
+ * tests prove it doesn't), the throw propagates; this is consistent with
+ * other resolver-side throws in the service path.
+ */
+export async function applyTaskAssignmentEvaluator(args: {
+  clinicId: string;
+  actor: TaskAuditActor;
+  targetUserId: string;
+  transition: TaskAssignmentTransition;
+  taskType: TaskType | null | undefined;
+  currentAcknowledgedUserId: string | null;
+  currentStatus: string;
+}): Promise<void> {
+  // Strategy A safety net at the wiring layer: any resolver-side failure
+  // degrades to off without blocking the mutation. The mutation proceeds as
+  // if the family were disabled for the clinic. The resolver itself catches
+  // getServerConfigValue throws internally, so reaching this catch is
+  // defense-in-depth.
+  let mode: Awaited<ReturnType<typeof resolveTaskAssignmentEnforcementMode>>;
+  try {
+    mode = await resolveTaskAssignmentEnforcementMode(args.clinicId);
+  } catch {
+    return;
+  }
+  if (mode === "off") return;
+
+  const target = await loadTargetUserForAssignment(args.targetUserId, args.clinicId);
+
+  const verdict = await evaluateTaskAssignment(
+    {
+      clinicId: args.clinicId,
+      now: new Date(),
+      transition: args.transition,
+      actor: { userId: args.actor.userId, role: args.actor.role ?? "" },
+      target,
+      taskType: args.taskType ?? null,
+      currentOwnership: {
+        acknowledgedUserId: args.currentAcknowledgedUserId,
+        status: args.currentStatus,
+      },
+    },
+    { modeResolver: async () => mode },
+  );
+
+  if (verdict.action === "deny") {
+    throw new AppointmentServiceError(
+      "TASK_ASSIGNMENT_DENIED",
+      403,
+      "Task assignment denied by policy",
+      { reason: verdict.reason, transition: args.transition },
+    );
+  }
 }
 
 function computeDoseDeviation(meta: MedicationMetadata): number {
@@ -867,6 +991,22 @@ export async function createAppointment(clinicIdInput: string, payload: Appointm
       throw new AppointmentServiceError("ANIMAL_OWNER_MISMATCH", 400, "animalId does not belong to ownerId");
     }
   }
+
+  // Phase 3 PR 3.4 — task-assignment evaluator wiring (assign). No-op in `off` mode.
+  // Only fires when actor + vetId are both present (route-flow path). System
+  // callers without an actor (e.g., backfills) bypass policy gates by design.
+  if (actor && vetId) {
+    await applyTaskAssignmentEvaluator({
+      clinicId,
+      actor,
+      targetUserId: vetId,
+      transition: "assign",
+      taskType,
+      currentAcknowledgedUserId: null,
+      currentStatus: "pending",
+    });
+  }
+
   let finalConflictOverride = conflictOverride;
   let finalOverrideReason = overrideReason;
   let metadataRecord = asMetadataRecord(metadataInput);
@@ -1056,6 +1196,23 @@ export async function updateAppointment(
   if (nextVetId) {
     await assertVetInClinic(clinicId, nextVetId);
   }
+
+  // Phase 3 PR 3.4 — task-assignment evaluator wiring (assign / reassign). No-op
+  // in `off` mode. Fires only when nextVetId changes AND is non-null. Clearing
+  // assignment (nextVetId === null) is a release path, not an assignment
+  // transition, and is intentionally not wired.
+  if (actor && nextVetId !== null && nextVetId !== existing.vetId) {
+    await applyTaskAssignmentEvaluator({
+      clinicId,
+      actor,
+      targetUserId: nextVetId,
+      transition: existing.vetId === null ? "assign" : "reassign",
+      taskType: nextTaskType,
+      currentAcknowledgedUserId: existing.acknowledgedUserId,
+      currentStatus: existing.status,
+    });
+  }
+
   if (nextOwnerId) await assertOwnerInClinic(clinicId, nextOwnerId);
   if (nextAnimalId) {
     const animal = await assertAnimalInClinic(clinicId, nextAnimalId);
@@ -1254,6 +1411,32 @@ export async function startTask(clinicIdInput: string, taskId: string, actor: Ta
   const canBypassOwnership = actorRole === "admin" || actorRole === "vet" || actorRole === "senior_technician";
   if (vetId !== actor.userId && !canBypassOwnership) {
     throw new AppointmentServiceError("TASK_NOT_OWNED_BY_TECH", 403, "Only the assigned technician can start this task");
+  }
+
+  // Phase 3 PR 3.4 — task-assignment evaluator wiring (acknowledge). No-op in
+  // `off` mode. Self-acknowledge: target == actor. The current ownership row
+  // is the existing acknowledged_user_id (PR 3.1) — null on first start,
+  // non-null only if a prior acknowledge persisted.
+  //
+  // Supervisors (admin / vet / senior_technician) who bypass ownership at this
+  // service layer via canBypassOwnership are ALSO exempt from the evaluator's
+  // acknowledge-time check. They are not acquiring ownership of the task —
+  // they are overriding it (existing pre-PR-3.4 semantics). Subjecting them to
+  // the evaluator would regress non-medication startTask for vet and
+  // senior_technician, whose roles do not permit `task.start` per task-rbac.ts
+  // and would therefore fail the evaluator's TARGET_ROLE_NOT_PERMITTED check
+  // in enforce mode. Keeping the bypass exempt preserves byte-identical
+  // behavior for the existing supervisor-override path.
+  if (!canBypassOwnership) {
+    await applyTaskAssignmentEvaluator({
+      clinicId,
+      actor,
+      targetUserId: actor.userId,
+      transition: "acknowledge",
+      taskType: existing.taskType as TaskType | null,
+      currentAcknowledgedUserId: existing.acknowledgedUserId,
+      currentStatus: existing.status,
+    });
   }
 
   const from = existing.status as AppointmentStatus;
