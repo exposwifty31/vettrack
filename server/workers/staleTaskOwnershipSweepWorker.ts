@@ -23,7 +23,7 @@
  * NOT revoke in PR 3.6 — the revocation code path is intentionally absent
  * until PR 3.8 adds it within its tightly-bounded carve-out.
  */
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { Worker, type Job } from "bullmq";
 import { appointments, clinicalCheckIns, db } from "../db.js";
 import { createRedisConnection } from "../lib/redis.js";
@@ -84,9 +84,18 @@ async function loadBatch(
   cursor: string | null,
   batchSize: number,
 ): Promise<AppointmentSweepRow[]> {
+  // PR 3.6.1: include `acknowledged_user_id <> ''` in the SQL filter so
+  // empty-string values are excluded at the database layer. Without this
+  // the previous post-query `.filter()` could reduce the batch size below
+  // `batchSize`, which the pagination loop misinterprets as end-of-data
+  // and prematurely terminates — permanently skipping subsequent rows
+  // for the clinic. With the SQL-side check the JS filter becomes a
+  // pure type narrowing and the row count from the DB reliably reflects
+  // "more data available."
   const conditions = [
     eq(appointments.clinicId, clinicId),
     sql`${appointments.acknowledgedUserId} IS NOT NULL`,
+    ne(appointments.acknowledgedUserId, ""),
     inArray(appointments.status, ACTIVE_STATUSES),
   ];
   if (cursor !== null) {
@@ -104,12 +113,16 @@ async function loadBatch(
     .where(and(...conditions))
     .orderBy(appointments.id)
     .limit(batchSize);
-  // Drizzle types `acknowledgedUserId` as nullable; the SQL filter ensures
-  // non-null but the type system doesn't know that — narrow defensively.
-  return rows
-    .filter((r): r is AppointmentSweepRow =>
-      typeof r.acknowledgedUserId === "string" && r.acknowledgedUserId.length > 0,
-    );
+  // Type narrowing only: the SQL filter already guarantees these values
+  // are non-null non-empty strings. The previous filter could DROP rows
+  // and corrupt pagination; this version cannot.
+  return rows.map((r) => ({
+    id: r.id,
+    acknowledgedUserId: r.acknowledgedUserId as string,
+    acknowledgedAt: r.acknowledgedAt,
+    status: r.status,
+    updatedAt: r.updatedAt,
+  }));
 }
 
 /**
@@ -200,6 +213,38 @@ export async function processStaleTaskOwnershipSweepJob(
 
   const emergencySuspend = await isEmergencySuspended(clinicId);
   const resolverOperational = await isResolverOperational(clinicId);
+
+  // PR 3.6.1: job-level short-circuit when the clinic is in an incident
+  // state. The evaluator already short-circuits per-row, but per §11.5
+  // the sweeper itself must "pause during degraded mode" and "pause
+  // during emergency suspend" — meaning it should NOT scan or do any
+  // per-row check-in lookup. The previous version still ran full row
+  // scans and per-row check-in lookups even when these flags were set,
+  // which is the opposite of what they're meant to do during an
+  // incident. Now we skip the scan entirely and record exactly one
+  // counter increment per pause-condition for observability.
+  if (emergencySuspend) {
+    staleTaskOwnershipMetrics.emergencySuspendSkip();
+    stats.emergencySuspendSkip = 1;
+    emitStaleTaskOwnershipSweeperLifecycle({
+      clinicId,
+      event: "completed",
+      jobId,
+      metadata: { mode, stats, pausedReason: "EMERGENCY_SUSPEND" },
+    });
+    return stats;
+  }
+  if (!resolverOperational) {
+    staleTaskOwnershipMetrics.degradedModePause();
+    stats.degradedModePause = 1;
+    emitStaleTaskOwnershipSweeperLifecycle({
+      clinicId,
+      event: "completed",
+      jobId,
+      metadata: { mode, stats, pausedReason: "DEGRADED_MODE" },
+    });
+    return stats;
+  }
 
   const limit = job.data.limit ?? Number.POSITIVE_INFINITY;
   let cursor: string | null = null;
