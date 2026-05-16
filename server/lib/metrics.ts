@@ -152,7 +152,14 @@ type MetricName =
   // Distinct from the shadow counters above so dashboards can separate
   // observation from enforcement-driven denials.
   | "code_blue_log_drug_shock_actor_authority_denied_oprole_not_in_allowlist"
-  | "code_blue_log_drug_shock_actor_authority_denied_no_open_check_in";
+  | "code_blue_log_drug_shock_actor_authority_denied_no_open_check_in"
+  // Phase 5 PR 5.1 — clinical-invariant evaluator family resolved-mode
+  // counters. Foundation only: PR 5.1 adds the union literals + zero
+  // initializers; nothing increments them yet. PR 5.3 / 5.4 wiring is
+  // the first caller (off-mode increment on the request path).
+  | "clinical_invariant_resolved_off"
+  | "clinical_invariant_resolved_shadow"
+  | "clinical_invariant_resolved_enforce";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -378,6 +385,29 @@ export interface MetricsSnapshot {
       };
     };
   };
+  /**
+   * Phase 5 PR 5.1 — clinical-invariant evaluator family counters.
+   *
+   * Foundation only. PR 5.1 wires the resolver and ships the
+   * resolved-mode counters; no caller increments them yet. PR 5.3 /
+   * 5.4 (dispense-confirm / container-dispense wiring) are the first
+   * callers — they tick `resolved.off` on the request path with the
+   * env default `COP_CLINICAL_INVARIANT_ENFORCE_V1=off`.
+   *
+   * Per Phase 5 plan §13 narrow-scope rule, the clinical-invariant
+   * family is operationally co-located with the authority enforcement
+   * framework only — it is NOT an authority evaluator (CI-14). The
+   * snapshot keeps it in its own top-level section so dashboards can
+   * track it independently from `authority`, `staleTaskOwnership`,
+   * `taskAssignmentEnforce`, and `codeBlue`.
+   */
+  clinicalInvariant: {
+    resolved: {
+      off: number;
+      shadow: number;
+      enforce: number;
+    };
+  };
   timestamp: string;
 }
 
@@ -505,6 +535,10 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   // Phase 4 PR 4.5 — drug/shock actor oprole enforce-mode denied counters.
   code_blue_log_drug_shock_actor_authority_denied_oprole_not_in_allowlist: 0,
   code_blue_log_drug_shock_actor_authority_denied_no_open_check_in: 0,
+  // Phase 5 PR 5.1 — clinical-invariant resolved-mode counters.
+  clinical_invariant_resolved_off: 0,
+  clinical_invariant_resolved_shadow: 0,
+  clinical_invariant_resolved_enforce: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -780,6 +814,13 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           },
         },
       },
+      clinicalInvariant: {
+        resolved: {
+          off: metrics.clinical_invariant_resolved_off,
+          shadow: metrics.clinical_invariant_resolved_shadow,
+          enforce: metrics.clinical_invariant_resolved_enforce,
+        },
+      },
       timestamp: new Date().toISOString(),
     };
   } catch {
@@ -912,6 +953,9 @@ export function getMetricsSnapshot(): MetricsSnapshot {
             noOpenCheckIn: 0,
           },
         },
+      },
+      clinicalInvariant: {
+        resolved: { off: 0, shadow: 0, enforce: 0 },
       },
       timestamp: new Date().toISOString(),
     };

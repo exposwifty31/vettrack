@@ -76,6 +76,40 @@ describe("authority enforcement import isolation", () => {
     }
   });
 
+  // Phase 5 PR 5.1 — clinical-invariant family foundation files. The
+  // evaluator lands in PR 5.2; these checks lock the types + config
+  // files now so a future PR cannot silently cross the family boundary.
+  it("clinical-invariant.types.ts does NOT import any other evaluator family", () => {
+    const specs = importedSpecifiers(read("clinical-invariant.types.ts"));
+    for (const spec of specs) {
+      expect(spec, `unexpected stale evaluator import: ${spec}`).not.toMatch(/^.\/stale\.evaluator/);
+      expect(spec, `unexpected oprole evaluator import: ${spec}`).not.toMatch(/^.\/oprole\.evaluator/);
+      expect(spec, `unexpected task-assignment evaluator import: ${spec}`).not.toMatch(/task-assignment\.evaluator/);
+      expect(spec, `unexpected stale-task-ownership evaluator import: ${spec}`).not.toMatch(/stale-task-ownership\.evaluator/);
+      expect(spec, `unexpected code-blue-manager evaluator import: ${spec}`).not.toMatch(/code-blue-manager\.evaluator/);
+      // Phase 5 plan §19.16 — must NOT import the shared `config.ts` either.
+      expect(spec, `unexpected shared config import: ${spec}`).not.toMatch(/^.\/config(\.js)?$/);
+      // The shared `result.ts` is owned by stale / oprole / task-assignment.
+      // Phase 5 family declares its own result-equivalent shape inline.
+      expect(spec, `unexpected shared result import: ${spec}`).not.toMatch(/^.\/result(\.js)?$/);
+    }
+  });
+
+  it("clinical-invariant.config.ts does NOT import any evaluator file or shared config.ts", () => {
+    const specs = importedSpecifiers(read("clinical-invariant.config.ts"));
+    for (const spec of specs) {
+      expect(spec, `unexpected stale evaluator import: ${spec}`).not.toMatch(/^.\/stale\.evaluator/);
+      expect(spec, `unexpected oprole evaluator import: ${spec}`).not.toMatch(/^.\/oprole\.evaluator/);
+      expect(spec, `unexpected task-assignment evaluator import: ${spec}`).not.toMatch(/task-assignment\.evaluator/);
+      expect(spec, `unexpected stale-task-ownership evaluator import: ${spec}`).not.toMatch(/stale-task-ownership\.evaluator/);
+      expect(spec, `unexpected code-blue-manager evaluator import: ${spec}`).not.toMatch(/code-blue-manager\.evaluator/);
+      // Phase 5 plan §19.16 — resolver must live in its own file, not
+      // bleed into the shared `config.ts` resolver list.
+      expect(spec, `unexpected shared config import: ${spec}`).not.toMatch(/^.\/config(\.js)?$/);
+      expect(spec, `unexpected shared result import: ${spec}`).not.toMatch(/^.\/result(\.js)?$/);
+    }
+  });
+
   it("evaluators only share approved sibling files", () => {
     // Sibling imports allowed for each evaluator. Stale/oprole share result.ts,
     // config.ts, metrics.ts, audit.ts. Task-assignment and stale-task-ownership
@@ -105,6 +139,13 @@ describe("authority enforcement import isolation", () => {
       "./code-blue-manager.metrics.js",
       "./code-blue-manager.audit.js",
     ];
+    // Phase 5 PR 5.1 — clinical-invariant family. The evaluator lands
+    // in PR 5.2; PR 5.1 ships types + config only. The config file may
+    // only import its own types sibling (no shared `config.js` /
+    // `result.js`, no other family's siblings). The types file ships
+    // with zero local-sibling imports.
+    const allowedSiblingsForClinicalInvariantConfig = ["./clinical-invariant.types.js"];
+    const allowedSiblingsForClinicalInvariantTypes: string[] = [];
 
     for (const file of ["stale.evaluator.ts", "oprole.evaluator.ts"] as const) {
       const specs = importedSpecifiers(read(file));
@@ -141,6 +182,25 @@ describe("authority enforcement import isolation", () => {
       expect(
         allowedForCodeBlueManager,
         `code-blue-manager.evaluator.ts imports unexpected sibling ${spec}`,
+      ).toContain(spec);
+    }
+
+    // Phase 5 PR 5.1 — clinical-invariant family sibling allowlist.
+    const ciCfgSpecs = importedSpecifiers(read("clinical-invariant.config.ts"));
+    const ciCfgSiblings = ciCfgSpecs.filter((s) => s.startsWith("./"));
+    for (const spec of ciCfgSiblings) {
+      expect(
+        allowedSiblingsForClinicalInvariantConfig,
+        `clinical-invariant.config.ts imports unexpected sibling ${spec}`,
+      ).toContain(spec);
+    }
+
+    const ciTypesSpecs = importedSpecifiers(read("clinical-invariant.types.ts"));
+    const ciTypesSiblings = ciTypesSpecs.filter((s) => s.startsWith("./"));
+    for (const spec of ciTypesSiblings) {
+      expect(
+        allowedSiblingsForClinicalInvariantTypes,
+        `clinical-invariant.types.ts imports unexpected sibling ${spec}`,
       ).toContain(spec);
     }
   });
