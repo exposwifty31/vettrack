@@ -116,3 +116,46 @@ export function buildClinicalInvariantError(
     },
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 5 PR 5.7 post-merge fix (Cursor Bugbot Low) — shared deny error
+// class and fail-open env reader. Previously duplicated across
+// `server/services/dispense.service.ts` and `server/routes/containers.ts`;
+// consolidated here so the two wired call sites cannot diverge.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Phase 5 PR 5.7 — typed error carrying the §6.3 422 body.
+ *
+ * Thrown from inside each wired mutation transaction (dispense-confirm
+ * service + container-dispense route) so the tx rolls back and no
+ * inventory / billing artefact persists. The route layer's catch
+ * recognises this class and renders `body` as-is.
+ *
+ * Single source of truth for both call sites — any change here
+ * propagates atomically.
+ */
+export class ClinicalInvariantDenyError extends Error {
+  public readonly status = 422;
+  public readonly body: ClinicalInvariantErrorBody;
+  constructor(body: ClinicalInvariantErrorBody) {
+    super(body.message);
+    this.name = "ClinicalInvariantDenyError";
+    this.body = body;
+  }
+}
+
+/**
+ * Phase 5 PR 5.7 — `SMART_COP_VALIDATION_FAIL_OPEN` env reader.
+ *
+ * Process-wide and incident-only per Phase 5 plan §19.26. Default
+ * `false` (fail-closed). Enabling requires an incident declaration
+ * and time-bounded rollback per §8.2 — sustained fail-open is an
+ * operational risk requiring follow-up.
+ *
+ * Single source of truth — both wired call sites read through this
+ * helper so the env semantics cannot drift between them.
+ */
+export function isClinicalInvariantFailOpenActive(): boolean {
+  return process.env.SMART_COP_VALIDATION_FAIL_OPEN === "true";
+}

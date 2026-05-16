@@ -29,10 +29,24 @@ import {
 } from "../lib/dispense-order-validation.js";
 import { resolveClinicalInvariantEnforcementMode } from "../lib/authority/enforcement/clinical-invariant.config.js";
 import { evaluateClinicalInvariant } from "../lib/authority/enforcement/clinical-invariant.evaluator.js";
-import { emitClinicalInvariantShadowWouldHaveBlockedAudit } from "../lib/authority/enforcement/clinical-invariant.audit.js";
+import {
+  emitClinicalInvariantShadowWouldHaveBlockedAudit,
+  emitClinicalInvariantOrphanDispenseDeniedAuditInTx,
+  emitClinicalInvariantEmergencyBypassAudit,
+  emitClinicalInvariantFailOpenAudit,
+} from "../lib/authority/enforcement/clinical-invariant.audit.js";
+import { clinicalInvariantMetrics } from "../lib/authority/enforcement/clinical-invariant.metrics.js";
 import type { ClinicalInvariantEnforcementMode } from "../lib/authority/enforcement/clinical-invariant.types.js";
 import { incrementMetric } from "../lib/metrics.js";
-import type { OrphanLineDetail } from "../lib/dispense-order-validation.js";
+import type {
+  OrphanLineDetail,
+  OrphanReasonCode,
+} from "../lib/dispense-order-validation.js";
+import {
+  buildClinicalInvariantError,
+  ClinicalInvariantDenyError,
+  isClinicalInvariantFailOpenActive,
+} from "../lib/clinical-invariant-error.js";
 import { captureConsumableBillingForDispenseLine } from "../lib/container-consumable-billing.js";
 import {
   DISPENSE_IDEMPOTENCY_ENDPOINT,
@@ -78,6 +92,13 @@ function apiError(params: { code: string; reason: string; message: string; reque
     requestId: params.requestId,
   };
 }
+
+// Phase 5 PR 5.7 post-merge fix (Cursor Bugbot Low) — the local
+// `ClinicalInvariantDenyError` class and `isClinicalInvariantFailOpenActive`
+// helper that lived here AND in `dispense.service.ts` have been
+// consolidated into `server/lib/clinical-invariant-error.ts`. Both
+// wired call sites now import the same definitions, removing the
+// divergence risk Bugbot flagged.
 
 router.post("/bootstrap-defaults", requireAuth, requireEffectiveRole("technician"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -363,14 +384,35 @@ router.post(
         requestId: string;
         orphanLines: ReadonlyArray<OrphanLineDetail>;
       };
+      // PR 5.7 — post-commit emission slots (mirror dispense.service.ts).
+      type PendingEmergencyBypassAudit = {
+        userId: string;
+        containerId: string;
+        requestId: string;
+        bypassReason: string;
+      };
+      type PendingFailOpenAudit = {
+        route: string;
+        requestId: string;
+        errorType?: string;
+      };
 
       // Returning the audit payload via the callback's return value
       // (rather than closure-mutating an outer `let`) keeps
       // TypeScript's flow narrowing intact across the async tx
       // boundary — otherwise the variable narrows to `never` at the
       // post-commit emission site under the server-check tsconfig.
-      const { responsePayload, pendingShadowAudit } = await db.transaction(async (tx) => {
+      const {
+        responsePayload,
+        pendingShadowAudit,
+        pendingEmergencyBypassAudit,
+        pendingFailOpenAudit,
+        copDegraded,
+      } = await db.transaction(async (tx) => {
         let pendingShadowAudit: PendingShadowAudit | null = null;
+        let pendingEmergencyBypassAudit: PendingEmergencyBypassAudit | null = null;
+        let pendingFailOpenAudit: PendingFailOpenAudit | null = null;
+        let copDegraded = false;
         const [container] = await tx
           .select()
           .from(containers)
@@ -464,14 +506,63 @@ router.post(
               },
               { modeResolver: async () => clinicalInvariantMode },
             );
-            // PR 5.5 — capture the shadow-emission payload from the
-            // verdict so the sampled audit can fire AFTER the tx
-            // commits (post-commit; never inside the tx — Codex P2
-            // review on PR 5.5). The emitter computes unique
-            // reasonCodes + lineCount internally, so the two wiring
-            // sites stay symmetric. PR 5.4 still does NOT act on the
-            // verdict for request-flow purposes (no 422 path —
-            // that's PR 5.7).
+            // PR 5.7 — handle the enforce-mode deny verdict. The
+            // denial audit is attempted inside the tx via
+            // `AuditDbExecutor` so the audit-ordering contract
+            // (audit attempted BEFORE the 422 response is sent —
+            // §9.4 + the PR 5.7.1 regression test) is honored. Per
+            // CI-26 the row is best-effort and NOT durable: the
+            // throw rolls the tx back and the audit row goes with
+            // it. Durable observability for the denial is the
+            // metric counters + 422 response + server logs.
+            if (ciVerdict.action === "deny") {
+              clinicalInvariantMetrics.blockedTotal();
+              const seenReasons = new Set<OrphanReasonCode>();
+              for (const line of ciVerdict.orphanLines) {
+                for (const reason of line.reasons) {
+                  seenReasons.add(reason);
+                }
+              }
+              for (const reason of seenReasons) {
+                clinicalInvariantMetrics.blockedReason(reason);
+              }
+              // PR 5.7 post-merge review fix (Codex P1 + Cursor):
+              // emitter awaits its `logAudit({tx,…})` Promise so
+              // async rejections can't escape, and we await here so
+              // the INSERT attempt completes before the deny throw
+              // (§9.4 ordering contract).
+              await emitClinicalInvariantOrphanDispenseDeniedAuditInTx(tx, {
+                clinicId,
+                animalId: animalId ?? null,
+                containerId,
+                requestId,
+                orphanLines: ciVerdict.orphanLines,
+              });
+              const denyBody = buildClinicalInvariantError({
+                requestId,
+                orphanLines: ciVerdict.orphanLines,
+              });
+              throw new ClinicalInvariantDenyError(denyBody);
+            }
+
+            // PR 5.7 — emergency carve-out (CI-7). Tick the counter
+            // and capture the audit payload for post-commit emission.
+            if (
+              ciVerdict.action === "allow" &&
+              ciVerdict.disposition === "EMERGENCY_BYPASS"
+            ) {
+              clinicalInvariantMetrics.emergencyBypassTotal();
+              pendingEmergencyBypassAudit = {
+                userId: actorUserId,
+                containerId,
+                requestId,
+                bypassReason: body.bypassReason ?? "",
+              };
+            }
+
+            // PR 5.5 — shadow detection capture (unchanged). Sampled
+            // shadow audit fires AFTER the tx commits (post-commit;
+            // never inside the tx — Codex P2 review on PR 5.5).
             if (
               ciVerdict.action === "allow" &&
               ciVerdict.disposition === "WOULD_HAVE_BLOCKED_SHADOW" &&
@@ -484,10 +575,51 @@ router.post(
                 orphanLines: ciVerdict.orphanLines,
               };
             }
-          } catch {
-            // Wiring-layer Strategy A safety net (CI-16, CI-20): single
-            // catch, no retry. PR 5.7 will dispatch fail-open /
-            // fail-closed semantics here.
+          } catch (err) {
+            // Wiring-layer Strategy A safety net (CI-16, CI-20).
+            // Caught EXACTLY ONCE. No retry. No recursion.
+            //
+            // Enforce-mode deny surfaces here as
+            // `ClinicalInvariantDenyError` — re-throw so the route's
+            // catch renders the §6.3 422 envelope. The tx rolls back
+            // with the throw.
+            if (err instanceof ClinicalInvariantDenyError) {
+              throw err;
+            }
+            // Everything else is an evaluator-side throw. PR 5.7
+            // dispatches per plan §8.2:
+            //   - shadow: always allow + `evaluator_failure_total++`.
+            //     `SMART_COP_VALIDATION_FAIL_OPEN` is irrelevant in
+            //     shadow mode.
+            //   - enforce + fail-open env true: allow + degraded
+            //     header + fail-open audit.
+            //   - enforce + fail-open env false (default): throw
+            //     503 so the tx rolls back. No retry.
+            clinicalInvariantMetrics.evaluatorFailureTotal();
+            if (clinicalInvariantMode === "enforce") {
+              if (isClinicalInvariantFailOpenActive()) {
+                clinicalInvariantMetrics.failOpenTotal();
+                copDegraded = true;
+                const errorType =
+                  err instanceof Error && typeof err.name === "string" && err.name.length > 0
+                    ? err.name
+                    : undefined;
+                pendingFailOpenAudit = {
+                  route: "containers.dispense",
+                  requestId,
+                  errorType,
+                };
+              } else {
+                clinicalInvariantMetrics.failClosedTotal();
+                throw Object.assign(new Error("COP_VALIDATION_UNAVAILABLE"), {
+                  statusCode: 503,
+                  reason: "COP_VALIDATION_UNAVAILABLE",
+                  requestId,
+                });
+              }
+            }
+            // Shadow mode: tick the failure counter (above) and
+            // proceed. No header, no audit, no retry.
           }
         }
         // ─────────────────────────────────────────────────────────────────────
@@ -651,6 +783,15 @@ router.post(
           billingIds,
           autoBilledCents,
         };
+        // Phase 5 PR 5.7 post-merge fix (Codex P2): persist the
+        // degraded flag inside the idempotency-cached body so the
+        // `X-COP-Validation-Status: degraded` header can be re-emitted
+        // on idempotent replay (§6.2). The body field is additive
+        // and backend-operational only (CI-13 — no client consumer).
+        // The companion change lives in
+        // `server/middleware/container-dispense-idempotency.ts`
+        // (replay path re-emits the header when this flag is true).
+        if (copDegraded) payload.copValidationDegraded = true;
 
         await tx
           .insert(idempotencyKeys)
@@ -672,7 +813,13 @@ router.post(
             },
           });
 
-        return { responsePayload: payload, pendingShadowAudit };
+        return {
+          responsePayload: payload,
+          pendingShadowAudit,
+          pendingEmergencyBypassAudit,
+          pendingFailOpenAudit,
+          copDegraded,
+        };
       });
 
       // Phase 5 PR 5.5 — POST-COMMIT shadow audit emission. Fires
@@ -688,6 +835,32 @@ router.post(
           orphanLines: pendingShadowAudit.orphanLines,
         });
       }
+      // Phase 5 PR 5.7 — emergency-bypass audit (post-commit; the
+      // emergency mutation has committed at this point).
+      if (pendingEmergencyBypassAudit) {
+        emitClinicalInvariantEmergencyBypassAudit({
+          clinicId,
+          userId: pendingEmergencyBypassAudit.userId,
+          containerId: pendingEmergencyBypassAudit.containerId,
+          requestId: pendingEmergencyBypassAudit.requestId,
+          bypassReason: pendingEmergencyBypassAudit.bypassReason,
+        });
+      }
+      // Phase 5 PR 5.7 — fail-open audit (post-commit; the degraded
+      // allow path committed the mutation).
+      if (pendingFailOpenAudit) {
+        emitClinicalInvariantFailOpenAudit({
+          clinicId,
+          route: pendingFailOpenAudit.route,
+          requestId: pendingFailOpenAudit.requestId,
+          errorType: pendingFailOpenAudit.errorType,
+        });
+      }
+      // Phase 5 PR 5.7 — emit `X-COP-Validation-Status: degraded`
+      // ONLY on the enforce + fail-open allow path (§6.2 binding
+      // table). All other paths (off / shadow / enforce-pass /
+      // enforce-deny / fail-closed) MUST NOT set this header.
+      if (copDegraded) res.setHeader("X-COP-Validation-Status", "degraded");
 
       res.locals.dispenseIdempotencyPersistedInTransaction = true;
 
@@ -735,7 +908,26 @@ router.post(
 
       return res.json(responsePayload);
     } catch (err: unknown) {
+      // Phase 5 PR 5.7 — render the clinical-invariant §6.3 422
+      // envelope as-is. The body was built inside the tx; here we
+      // just serialize it. The throw rolled the tx back so no
+      // inventory / billing artefact persists.
+      if (err instanceof ClinicalInvariantDenyError) {
+        return res.status(err.status).json(err.body);
+      }
       const e = err as Record<string, unknown> & { statusCode?: number; reason?: string; orphanLines?: unknown; itemId?: string };
+      // Phase 5 PR 5.7 — fail-closed evaluator failure → 503
+      // (`COP_VALIDATION_UNAVAILABLE`). No mutation persisted.
+      if (e.reason === "COP_VALIDATION_UNAVAILABLE" || (err as Error).message === "COP_VALIDATION_UNAVAILABLE") {
+        return res.status(503).json(
+          apiError({
+            code: "COP_VALIDATION_UNAVAILABLE",
+            reason: "COP_VALIDATION_UNAVAILABLE",
+            message: "Clinical-invariant validation is unavailable; please retry.",
+            requestId,
+          }),
+        );
+      }
       if (e.code === "INSUFFICIENT_STOCK") {
         return res.status(409).json({
           code: "INSUFFICIENT_STOCK",

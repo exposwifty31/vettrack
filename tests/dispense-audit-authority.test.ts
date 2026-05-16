@@ -150,10 +150,14 @@ const shiftSnapshot: AuthoritySnapshot = {
 
 beforeEach(() => {
   confirmDispenseMock.mockReset();
+  // Phase 5 PR 5.7 — `confirmDispense` returns `{ event, copDegraded }`.
   confirmDispenseMock.mockResolvedValue({
-    id: "11111111-1111-1111-1111-111111111111",
-    status: "CONFIRMED",
-    inventoryMismatch: false,
+    event: {
+      id: "11111111-1111-1111-1111-111111111111",
+      status: "CONFIRMED",
+      inventoryMismatch: false,
+    },
+    copDegraded: false,
   });
 });
 

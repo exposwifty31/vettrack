@@ -184,10 +184,19 @@ export type AuditActionType =
   // Phase 5 PR 5.5 — clinical-invariant shadow-mode observability.
   // Fire-and-forget post-commit, sampled 1 per 5 min per
   // (clinicId, animalId), gated by `AUTHORITY_OBS_V1`. Best-effort
-  // per CI-25 — failure must never affect request outcome. The other
-  // three Phase 5 audit kinds (`_orphan_dispense_denied`,
-  // `_emergency_bypass`, `_fail_open`) land in PR 5.7.
-  | "clinical_invariant_shadow_would_have_blocked";
+  // per CI-25 — failure must never affect request outcome.
+  | "clinical_invariant_shadow_would_have_blocked"
+  // Phase 5 PR 5.7 — clinical-invariant enforce-mode audit kinds:
+  //   - `_orphan_dispense_denied`: in-tx attempt before the 422
+  //     response is sent (best-effort, non-durable per CI-26).
+  //   - `_emergency_bypass`: fire-and-forget post-commit when the
+  //     evaluator's emergency carve-out fires (CI-7).
+  //   - `_fail_open`: fire-and-forget post-commit when
+  //     `SMART_COP_VALIDATION_FAIL_OPEN=true` AND the evaluator
+  //     threw, and the wiring degraded to allow.
+  | "clinical_invariant_orphan_dispense_denied"
+  | "clinical_invariant_emergency_bypass"
+  | "clinical_invariant_fail_open";
 
 export interface LogAuditParams {
   clinicId: string;

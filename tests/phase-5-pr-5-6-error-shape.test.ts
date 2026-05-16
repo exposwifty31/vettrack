@@ -203,31 +203,26 @@ describe("Phase 5 PR 5.6 — source-level locks", () => {
     );
   });
 
-  it("helper is created but not yet imported by any route or service (PR 5.7 is the first caller)", async () => {
-    // Walk server/routes + server/services to confirm no caller yet.
+  it("helper is now imported by the two wired call sites (dispense-confirm service + containers dispense route) — PR 5.7", async () => {
+    // PR 5.6 originally asserted no caller existed yet. PR 5.7 wires
+    // the helper into the two production call sites — the assertion
+    // inverts here so the test continues to track the helper's
+    // expected consumers across phases.
     const fs2 = await import("node:fs");
-    const path2 = await import("node:path");
-    const checkDir = (dir: string) => {
-      const out: string[] = [];
-      for (const name of fs2.readdirSync(dir)) {
-        const full = path2.join(dir, name);
-        const stat = fs2.statSync(full);
-        if (stat.isDirectory()) out.push(...checkDir(full));
-        else if (full.endsWith(".ts")) out.push(full);
-      }
-      return out;
-    };
     const repoRoot = path.join(__dirname, "..");
-    const sourceFiles = [
-      ...checkDir(path.join(repoRoot, "server", "routes")),
-      ...checkDir(path.join(repoRoot, "server", "services")),
-    ];
-    for (const file of sourceFiles) {
-      const src = fs2.readFileSync(file, "utf8");
-      expect(
-        src,
-        `${file} unexpectedly imports buildClinicalInvariantError before PR 5.7`,
-      ).not.toMatch(/buildClinicalInvariantError|clinical-invariant-error/);
-    }
+    const dispenseService = fs2.readFileSync(
+      path.join(repoRoot, "server", "services", "dispense.service.ts"),
+      "utf8",
+    );
+    const containersRoute = fs2.readFileSync(
+      path.join(repoRoot, "server", "routes", "containers.ts"),
+      "utf8",
+    );
+    expect(dispenseService).toMatch(
+      /buildClinicalInvariantError|clinical-invariant-error/,
+    );
+    expect(containersRoute).toMatch(
+      /buildClinicalInvariantError|clinical-invariant-error/,
+    );
   });
 });

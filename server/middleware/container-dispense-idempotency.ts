@@ -64,6 +64,23 @@ export const dispenseIdempotencyMiddleware: RequestHandler = async (req, res, ne
         });
         return;
       }
+      // Phase 5 PR 5.7 post-merge fix (Codex P2): re-emit the
+      // `X-COP-Validation-Status: degraded` header on idempotent
+      // replay when the first write recorded a degraded validation.
+      // The flag is persisted as `copValidationDegraded: true` inside
+      // `responseBody` by the container-dispense route. Without this
+      // re-emit, a client retrying the same idempotency key after a
+      // fail-open success would never see that validation was
+      // degraded for the persisted mutation (CI-13 still holds — the
+      // header is backend operational only; no Phase 5 client
+      // consumes it).
+      if (
+        existing.responseBody &&
+        typeof existing.responseBody === "object" &&
+        (existing.responseBody as Record<string, unknown>).copValidationDegraded === true
+      ) {
+        res.setHeader("X-COP-Validation-Status", "degraded");
+      }
       res.status(existing.statusCode).json(existing.responseBody);
       return;
     }

@@ -165,13 +165,29 @@ type MetricName =
   // produces non-empty `orphanLines`. Per-reason counters tick once
   // per unique `OrphanReasonCode` observed in that request (not per
   // orphan line — matches the `(reason, mode)` cardinality contract).
-  // Enforce-mode counters (`_blocked_total`, `_orphan_reason_*`) land
-  // in PR 5.7 alongside their denial-audit emitter.
   | "clinical_invariant_would_have_blocked"
   | "clinical_invariant_would_have_blocked_no_patient_linked"
   | "clinical_invariant_would_have_blocked_no_active_hospitalization"
   | "clinical_invariant_would_have_blocked_no_active_order"
-  | "clinical_invariant_would_have_blocked_quantity_exceeds_order";
+  | "clinical_invariant_would_have_blocked_quantity_exceeds_order"
+  // Phase 5 PR 5.7 — clinical-invariant enforce-mode counters.
+  // `_blocked_total` ticks once per enforce-mode 422 deny. Per-reason
+  // `_orphan_reason_*` counters tick once per unique reason in the
+  // request (set semantics, matching the shadow counter contract).
+  // `_emergency_bypass_total` ticks when the carve-out fires.
+  // `_fail_open_total` / `_fail_closed_total` tick on the
+  // SMART_COP_VALIDATION_FAIL_OPEN dispatch paths.
+  // `_evaluator_failure_total` ticks once per evaluator-side throw
+  // (caught at the wiring's Strategy A safety net per CI-16).
+  | "clinical_invariant_blocked_total"
+  | "clinical_invariant_orphan_reason_no_patient_linked"
+  | "clinical_invariant_orphan_reason_no_active_hospitalization"
+  | "clinical_invariant_orphan_reason_no_active_order"
+  | "clinical_invariant_orphan_reason_quantity_exceeds_order"
+  | "clinical_invariant_emergency_bypass_total"
+  | "clinical_invariant_fail_open_total"
+  | "clinical_invariant_fail_closed_total"
+  | "clinical_invariant_evaluator_failure_total";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -423,8 +439,7 @@ export interface MetricsSnapshot {
      * Phase 5 PR 5.2 — shadow-observation counters. `total` ticks once
      * per shadow-mode request with non-empty `orphanLines`; per-reason
      * fields tick once per unique `OrphanReasonCode` observed in that
-     * request. Enforce-mode counters (`blockedTotal`, `orphanReason.*`)
-     * land in PR 5.7 alongside their denial-audit emitter.
+     * request.
      */
     shadowWouldHaveBlocked: {
       total: number;
@@ -433,6 +448,25 @@ export interface MetricsSnapshot {
       noActiveOrder: number;
       quantityExceedsOrder: number;
     };
+    /**
+     * Phase 5 PR 5.7 — enforce-mode counters. `blockedTotal` ticks
+     * once per 422 deny; `orphanReason.*` per unique reason in the
+     * request. `emergencyBypassTotal` ticks when the carve-out
+     * fires. `failOpenTotal` / `failClosedTotal` tick on the
+     * `SMART_COP_VALIDATION_FAIL_OPEN` dispatch. `evaluatorFailureTotal`
+     * ticks once per evaluator-side throw caught at the wiring layer.
+     */
+    blockedTotal: number;
+    orphanReason: {
+      noPatientLinked: number;
+      noActiveHospitalization: number;
+      noActiveOrder: number;
+      quantityExceedsOrder: number;
+    };
+    emergencyBypassTotal: number;
+    failOpenTotal: number;
+    failClosedTotal: number;
+    evaluatorFailureTotal: number;
   };
   timestamp: string;
 }
@@ -571,6 +605,16 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   clinical_invariant_would_have_blocked_no_active_hospitalization: 0,
   clinical_invariant_would_have_blocked_no_active_order: 0,
   clinical_invariant_would_have_blocked_quantity_exceeds_order: 0,
+  // Phase 5 PR 5.7 — clinical-invariant enforce-mode counters.
+  clinical_invariant_blocked_total: 0,
+  clinical_invariant_orphan_reason_no_patient_linked: 0,
+  clinical_invariant_orphan_reason_no_active_hospitalization: 0,
+  clinical_invariant_orphan_reason_no_active_order: 0,
+  clinical_invariant_orphan_reason_quantity_exceeds_order: 0,
+  clinical_invariant_emergency_bypass_total: 0,
+  clinical_invariant_fail_open_total: 0,
+  clinical_invariant_fail_closed_total: 0,
+  clinical_invariant_evaluator_failure_total: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -861,6 +905,19 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           quantityExceedsOrder:
             metrics.clinical_invariant_would_have_blocked_quantity_exceeds_order,
         },
+        blockedTotal: metrics.clinical_invariant_blocked_total,
+        orphanReason: {
+          noPatientLinked: metrics.clinical_invariant_orphan_reason_no_patient_linked,
+          noActiveHospitalization:
+            metrics.clinical_invariant_orphan_reason_no_active_hospitalization,
+          noActiveOrder: metrics.clinical_invariant_orphan_reason_no_active_order,
+          quantityExceedsOrder:
+            metrics.clinical_invariant_orphan_reason_quantity_exceeds_order,
+        },
+        emergencyBypassTotal: metrics.clinical_invariant_emergency_bypass_total,
+        failOpenTotal: metrics.clinical_invariant_fail_open_total,
+        failClosedTotal: metrics.clinical_invariant_fail_closed_total,
+        evaluatorFailureTotal: metrics.clinical_invariant_evaluator_failure_total,
       },
       timestamp: new Date().toISOString(),
     };
@@ -1004,6 +1061,17 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           noActiveOrder: 0,
           quantityExceedsOrder: 0,
         },
+        blockedTotal: 0,
+        orphanReason: {
+          noPatientLinked: 0,
+          noActiveHospitalization: 0,
+          noActiveOrder: 0,
+          quantityExceedsOrder: 0,
+        },
+        emergencyBypassTotal: 0,
+        failOpenTotal: 0,
+        failClosedTotal: 0,
+        evaluatorFailureTotal: 0,
       },
       timestamp: new Date().toISOString(),
     };

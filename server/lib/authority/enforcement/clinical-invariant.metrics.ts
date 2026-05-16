@@ -59,4 +59,51 @@ export const clinicalInvariantMetrics = {
         return;
     }
   },
+
+  // ── Phase 5 PR 5.7 — enforce-mode counters ─────────────────────────────
+
+  /** One tick per enforce-mode 422 deny. */
+  blockedTotal(): void {
+    incrementMetric("clinical_invariant_blocked_total");
+  },
+  /**
+   * Per-reason enforce counter. Set semantics — call once per unique
+   * `OrphanReasonCode` in the request (mirrors the shadow helper).
+   */
+  blockedReason(reason: OrphanReasonCode): void {
+    switch (reason) {
+      case "NO_PATIENT_LINKED":
+        incrementMetric("clinical_invariant_orphan_reason_no_patient_linked");
+        return;
+      case "NO_ACTIVE_HOSPITALIZATION":
+        incrementMetric("clinical_invariant_orphan_reason_no_active_hospitalization");
+        return;
+      case "NO_ACTIVE_ORDER":
+        incrementMetric("clinical_invariant_orphan_reason_no_active_order");
+        return;
+      case "QUANTITY_EXCEEDS_ORDER":
+        incrementMetric("clinical_invariant_orphan_reason_quantity_exceeds_order");
+        return;
+    }
+  },
+  /** One tick per emergency-bypass carve-out fire. */
+  emergencyBypassTotal(): void {
+    incrementMetric("clinical_invariant_emergency_bypass_total");
+  },
+  /** One tick per fail-open allow path. */
+  failOpenTotal(): void {
+    incrementMetric("clinical_invariant_fail_open_total");
+  },
+  /** One tick per fail-closed 503 path. */
+  failClosedTotal(): void {
+    incrementMetric("clinical_invariant_fail_closed_total");
+  },
+  /**
+   * One tick per evaluator-side throw caught at the wiring's
+   * Strategy A safety net (CI-16). Bumped before the fail-open /
+   * fail-closed dispatch in the wiring layer.
+   */
+  evaluatorFailureTotal(): void {
+    incrementMetric("clinical_invariant_evaluator_failure_total");
+  },
 };

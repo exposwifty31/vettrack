@@ -297,11 +297,13 @@ describe("PR 5.3 — confirmDispense / off-mode wiring", () => {
   it("off-mode response is byte-identical to the pre-wiring response shape", async () => {
     resolveClinicalInvariantEnforcementModeMock.mockResolvedValue("off");
     const result = await confirmDispense(defaultInput());
-    expect(result).toMatchObject({
+    expect(result.event).toMatchObject({
       id: "event-1",
       clinicId: "clinic-1",
       status: "CONFIRMED",
     });
+    // PR 5.7 — `copDegraded` is false on the off-mode happy path.
+    expect(result.copDegraded).toBe(false);
   });
 
   it("resolver throw degrades to off (evaluator still not invoked) — Strategy A", async () => {
@@ -371,7 +373,7 @@ describe("PR 5.3 — confirmDispense / shadow-forced wiring (CI-21, CI-16)", () 
     // Single attempt — no retry path.
     expect(evaluateClinicalInvariantMock).toHaveBeenCalledTimes(1);
     // Mutation proceeded despite evaluator throw.
-    expect(result).toMatchObject({ status: "CONFIRMED" });
+    expect(result.event).toMatchObject({ status: "CONFIRMED" });
   });
 
   it("shadow mode: ticks `clinical_invariant_resolved_shadow` exactly once", async () => {
@@ -465,7 +467,7 @@ describe("PR 5.3 — confirmDispense / shadow-forced wiring (CI-21, CI-16)", () 
 // ─── Enforce path (fixture-forced; PR 5.3 does NOT yet act on deny) ────────
 
 describe("PR 5.3 — confirmDispense / enforce-forced wiring", () => {
-  it("enforce mode: deny verdict is RECEIVED but NOT acted upon in PR 5.3 (422 path lands in PR 5.7)", async () => {
+  it("enforce mode: deny verdict now triggers a ClinicalInvariantDenyError throw (PR 5.7 422 path active)", async () => {
     resolveClinicalInvariantEnforcementModeMock.mockResolvedValue("enforce");
     evaluateClinicalInvariantMock.mockResolvedValue({
       action: "deny",
@@ -481,9 +483,12 @@ describe("PR 5.3 — confirmDispense / enforce-forced wiring", () => {
       ],
     });
 
-    // PR 5.3 must not throw on deny — the 422 path is PR 5.7 scope.
-    const result = await confirmDispense(defaultInput());
-    expect(result).toMatchObject({ status: "CONFIRMED" });
+    // PR 5.7 activates the 422 path — confirmDispense now throws
+    // a ClinicalInvariantDenyError carrying the §6.3 body.
+    await expect(confirmDispense(defaultInput())).rejects.toMatchObject({
+      name: "ClinicalInvariantDenyError",
+      status: 422,
+    });
     expect(evaluateClinicalInvariantMock).toHaveBeenCalledTimes(1);
   });
 
@@ -509,7 +514,7 @@ describe("PR 5.3 — confirmDispense / idempotency invariants", () => {
 
     const result = await confirmDispense(defaultInput());
 
-    expect(result).toMatchObject({ status: "CONFIRMED" });
+    expect(result.event).toMatchObject({ status: "CONFIRMED" });
     // Idempotent return path is BEFORE the wiring block — counters
     // stay at 0.
     expect(getMetricsSnapshot().clinicalInvariant.resolved.off).toBe(0);

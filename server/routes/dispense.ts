@@ -6,6 +6,7 @@ import { requireClinicalAuthority } from "../middleware/authority.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import {
+  ClinicalInvariantDenyError,
   confirmDispense,
   createDraftDispense,
   createEmergencyDispense,
@@ -50,6 +51,13 @@ function apiError(params: { code: string; reason: string; message: string; reque
 }
 
 function sendError(res: { status: (n: number) => { json: (b: unknown) => void } }, err: unknown, requestId: string): void {
+  // Phase 5 PR 5.7 — render the clinical-invariant §6.3 422
+  // envelope as-is. The body was built by `buildClinicalInvariantError`
+  // inside the service; the route just serializes it.
+  if (err instanceof ClinicalInvariantDenyError) {
+    res.status(err.status).json(err.body);
+    return;
+  }
   if (err instanceof DispenseError) {
     res.status(err.status).json({
       ...apiError({ code: err.code, reason: err.code, message: err.message, requestId }),
@@ -104,7 +112,7 @@ router.post(
   async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
-    const event = await confirmDispense({
+    const { event, copDegraded } = await confirmDispense({
       clinicId: req.clinicId!,
       dispenseEventId: req.params.id,
       confirmedBy: req.authUser!.id,
@@ -119,6 +127,11 @@ router.post(
       // wiring inside the confirm tx.
       requestId,
     });
+    // Phase 5 PR 5.7 — emit `X-COP-Validation-Status: degraded` ONLY on
+    // the enforce + fail-open allow path (§6.2 binding table). The
+    // service signals this via `copDegraded`; off / shadow / enforce-pass
+    // / enforce-deny / fail-closed must NOT set this header.
+    if (copDegraded) res.setHeader("X-COP-Validation-Status", "degraded");
     return res.json(event);
   } catch (err) {
     sendError(res, err, requestId);
