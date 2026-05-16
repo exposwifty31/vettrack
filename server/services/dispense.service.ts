@@ -12,9 +12,17 @@ import {
   operationalTasks,
   type DispenseEvent,
 } from "../db.js";
-import { logAudit } from "../lib/audit.js";
+import { logAudit, type AuditDbExecutor } from "../lib/audit.js";
 import { postSystemMessage } from "../lib/shift-chat-presence.js";
 import { captureConsumableBillingForDispenseLine } from "../lib/container-consumable-billing.js";
+import {
+  loadInventoryItemLabelCode,
+  type DispenseLineForValidation,
+} from "../lib/dispense-order-validation.js";
+import { resolveClinicalInvariantEnforcementMode } from "../lib/authority/enforcement/clinical-invariant.config.js";
+import { evaluateClinicalInvariant } from "../lib/authority/enforcement/clinical-invariant.evaluator.js";
+import type { ClinicalInvariantEnforcementMode } from "../lib/authority/enforcement/clinical-invariant.types.js";
+import { incrementMetric } from "../lib/metrics.js";
 
 export class DispenseError extends Error {
   constructor(
@@ -51,6 +59,46 @@ export interface ConfirmDispenseInput {
   authoritySource?: string | null;
   authorityReason?: string | null;
   authorityOperationalRole?: string | null;
+  /**
+   * Phase 5 PR 5.3 — threaded from the route layer; consumed by the
+   * clinical-invariant evaluator wiring inside the confirm tx. Required
+   * so the evaluator context can carry a stable correlation id for
+   * future audit emission (PR 5.7).
+   */
+  requestId: string;
+}
+
+/**
+ * Phase 5 PR 5.3 — private helper for the clinical-invariant wiring.
+ *
+ * Hydrates a `DispenseLineForValidation[]` array by joining the
+ * `DispenseItem[]` from the persisted dispense event with the
+ * `inventoryItems.label` / `inventoryItems.code` columns. Runs INSIDE
+ * the caller-provided `tx` — no new transaction is opened (CI-28).
+ *
+ * Missing inventory rows degrade gracefully to empty label/code
+ * rather than throwing — the wired confirm path already tolerates
+ * missing inventory rows by setting `inventoryMismatch=true` and
+ * proceeding. The evaluator's matching logic will simply skip the
+ * line if the label/code are empty (no orphan reason fired beyond
+ * what the animal/hospitalization checks already produce).
+ */
+async function loadDispenseValidationLines(
+  tx: AuditDbExecutor,
+  clinicId: string,
+  items: DispenseItem[],
+): Promise<DispenseLineForValidation[]> {
+  const lines: DispenseLineForValidation[] = [];
+  for (const item of items) {
+    const inv = await loadInventoryItemLabelCode(tx, clinicId, item.itemId);
+    lines.push({
+      itemId: item.itemId,
+      quantity: item.quantity,
+      label: inv?.label ?? "",
+      code: inv?.code ?? "",
+    });
+  }
+  return lines;
 }
 
 export interface CreateEmergencyDispenseInput {
@@ -145,6 +193,7 @@ export async function confirmDispense(input: ConfirmDispenseInput): Promise<Disp
     authoritySource,
     authorityReason,
     authorityOperationalRole,
+    requestId,
   } = input;
 
   const confirmed = await db.transaction(async (tx) => {
@@ -170,6 +219,95 @@ export async function confirmDispense(input: ConfirmDispenseInput): Promise<Disp
     if (!container) throw new DispenseError("CONTAINER_NOT_FOUND", 404, "Container not found.");
 
     const items = event.items as DispenseItem[];
+
+    // ── Phase 5 PR 5.3 — clinical-invariant evaluator wiring ───────────
+    // Wiring layer per Phase 5 plan §15 PR 5.3 + CI-21 + CI-22 + CI-23
+    // + CI-27 + CI-28. Mode is resolved exactly once per request and
+    // held request-local for the duration of this tx. The call site
+    // is the SOLE invocation point for the dispense-confirm path
+    // (no route-layer + service-layer double invocation).
+    //
+    // Off-mode does NOT invoke the evaluator on the request path
+    // (CI-22 + CI-27): it ticks the resolved counter and proceeds. The
+    // evaluator's own off-mode short-circuit is the unit-test path,
+    // not the request path.
+    //
+    // Shadow / enforce: the wiring layer invokes the evaluator
+    // exactly once (CI-21, CI-16). PR 5.3 does NOT act on the verdict
+    // (no 422 deny path yet — that lands in PR 5.7). Shadow counters
+    // tick from inside the evaluator.
+    //
+    // The wiring layer owns runtime control flow for evaluator
+    // failures (CI-20): any throw is caught here exactly once. No
+    // retry. No recursion. PR 5.7 will dispatch fail-open /
+    // fail-closed semantics here keyed on
+    // SMART_COP_VALIDATION_FAIL_OPEN.
+    //
+    // Mutation-order invariant (CI-23): this block runs BEFORE the
+    // billing loop, the inventory mismatch flag, the dispenseEvents
+    // UPDATE, the outbox enqueue (post-commit), and any event
+    // emission.
+    //
+    // Transaction-boundary invariant (CI-28): runs inside the
+    // existing `db.transaction` callback owned by `confirmDispense`.
+    // No nested tx, no savepoint, no tx orchestration change.
+    let clinicalInvariantMode: ClinicalInvariantEnforcementMode;
+    try {
+      clinicalInvariantMode = await resolveClinicalInvariantEnforcementMode(clinicId);
+    } catch {
+      // Strategy A safety net at the wiring layer: resolver throw
+      // degrades to off. Evaluator is not invoked.
+      clinicalInvariantMode = "off";
+    }
+
+    if (clinicalInvariantMode === "off") {
+      incrementMetric("clinical_invariant_resolved_off");
+    } else {
+      incrementMetric(
+        clinicalInvariantMode === "shadow"
+          ? "clinical_invariant_resolved_shadow"
+          : "clinical_invariant_resolved_enforce",
+      );
+      try {
+        const isEmergency = event.status === "EMERGENCY_PENDING";
+        const bypassReason = event.bypassReason ?? null;
+        // Skip the per-item label/code lookup when the evaluator's
+        // emergency carve-out will fire (CI-7) — it short-circuits
+        // before consuming `lines`.
+        const validationLines: DispenseLineForValidation[] =
+          isEmergency && typeof bypassReason === "string" && bypassReason.length > 0
+            ? []
+            : await loadDispenseValidationLines(tx, clinicId, items);
+        // CI-22 — mode is resolved EXACTLY ONCE per request at the
+        // wiring layer. Pin the already-resolved mode here so the
+        // evaluator does not re-resolve it via the cached config
+        // probe. This keeps the request-local mode value single-
+        // source — the evaluator and the `clinical_invariant_resolved_*`
+        // counters always agree.
+        await evaluateClinicalInvariant(
+          {
+            tx,
+            clinicId,
+            animalId: event.patientId ?? null,
+            containerId: event.containerId,
+            lines: validationLines,
+            isEmergency,
+            bypassReason,
+            requestId,
+          },
+          { modeResolver: async () => clinicalInvariantMode },
+        );
+        // PR 5.3 intentionally does NOT act on the verdict. PR 5.7
+        // will add the 422 deny path and the denial-audit attempt.
+      } catch {
+        // Wiring-layer Strategy A safety net (CI-16, CI-20): any
+        // throw inside the evaluator or label/code lookup is caught
+        // here exactly once. No retry. Mutation proceeds. PR 5.7
+        // will dispatch fail-open / fail-closed semantics here.
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
     let billingEventId: string | null = null;
     let anyInventoryMismatch = false;
 

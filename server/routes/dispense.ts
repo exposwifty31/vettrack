@@ -115,6 +115,9 @@ router.post(
       authoritySource: req.authoritySnapshot?.source ?? null,
       authorityReason: req.authoritySnapshot?.reason ?? null,
       authorityOperationalRole: req.authoritySnapshot?.operationalRole ?? null,
+      // Phase 5 PR 5.3 — threaded for the clinical-invariant evaluator
+      // wiring inside the confirm tx.
+      requestId,
     });
     return res.json(event);
   } catch (err) {
