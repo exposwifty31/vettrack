@@ -412,6 +412,28 @@
   animation: qr-scan-line 1.8s ease-in-out infinite;
 }
 
+/* ── QR scanner overlay root height — Phase 5 PR 5.0.1 ─────────────────── */
+/*
+ * Fix for the production regression where the green scanning frame sits
+ * too high on mobile Safari. The initial `100dvh` layout pass evaluated
+ * against the URL-bar-showing viewport and the engine did not consistently
+ * recompute when the URL bar collapsed, so the camera viewport — and
+ * therefore the frame's vertical center — stayed anchored to the smaller
+ * initial viewport.
+ *
+ * Layered cascade: the last supported value wins. On engines that support
+ * `lvh` (large viewport units, URL bar collapsed), the layout is sized to
+ * the largest stable viewport, so the frame centers within a stable
+ * max-height column regardless of URL bar state. Older engines degrade to
+ * `dvh` → `svh` → `vh`.
+ */
+.qr-scanner-overlay-root {
+  height: 100vh;
+  height: 100svh;
+  height: 100dvh;
+  height: 100lvh;
+}
+
 /* ── Native-feel PWA CSS ─────────────────────────────────────────────────── */
 
 /* Safe-area inset padding for the app shell */
