@@ -110,6 +110,23 @@ describe("authority enforcement import isolation", () => {
     }
   });
 
+  // Phase 5 PR 5.2 — evaluator file. Mirrors the per-family lock-down
+  // applied to every other evaluator at its introduction PR.
+  it("clinical-invariant.evaluator.ts does NOT import any other evaluator family", () => {
+    const specs = importedSpecifiers(read("clinical-invariant.evaluator.ts"));
+    for (const spec of specs) {
+      expect(spec, `unexpected stale evaluator import: ${spec}`).not.toMatch(/^.\/stale\.evaluator/);
+      expect(spec, `unexpected oprole evaluator import: ${spec}`).not.toMatch(/^.\/oprole\.evaluator/);
+      expect(spec, `unexpected task-assignment evaluator import: ${spec}`).not.toMatch(/task-assignment\.evaluator/);
+      expect(spec, `unexpected stale-task-ownership evaluator import: ${spec}`).not.toMatch(/stale-task-ownership\.evaluator/);
+      expect(spec, `unexpected code-blue-manager evaluator import: ${spec}`).not.toMatch(/code-blue-manager\.evaluator/);
+      // Phase 5 plan §19.16 — clinical-invariant family does NOT use
+      // the shared enforcement `config.ts` or `result.ts` siblings.
+      expect(spec, `unexpected shared config import: ${spec}`).not.toMatch(/^.\/config(\.js)?$/);
+      expect(spec, `unexpected shared result import: ${spec}`).not.toMatch(/^.\/result(\.js)?$/);
+    }
+  });
+
   it("evaluators only share approved sibling files", () => {
     // Sibling imports allowed for each evaluator. Stale/oprole share result.ts,
     // config.ts, metrics.ts, audit.ts. Task-assignment and stale-task-ownership
@@ -146,6 +163,19 @@ describe("authority enforcement import isolation", () => {
     // with zero local-sibling imports.
     const allowedSiblingsForClinicalInvariantConfig = ["./clinical-invariant.types.js"];
     const allowedSiblingsForClinicalInvariantTypes: string[] = [];
+    // Phase 5 PR 5.2 — clinical-invariant evaluator. Sibling imports
+    // are restricted to the family's own config + types + metrics
+    // files. Audit emitter is NOT a permitted sibling in PR 5.2 —
+    // `clinical-invariant.audit.ts` does not exist yet (it lands in
+    // PR 5.5 with the sampled shadow emitter only, then is extended
+    // in PR 5.7 with the enforce-denial / emergency-bypass /
+    // fail-open emitters). The evaluator file MUST NOT import a
+    // not-yet-existing audit sibling.
+    const allowedSiblingsForClinicalInvariantEvaluator = [
+      "./clinical-invariant.config.js",
+      "./clinical-invariant.types.js",
+      "./clinical-invariant.metrics.js",
+    ];
 
     for (const file of ["stale.evaluator.ts", "oprole.evaluator.ts"] as const) {
       const specs = importedSpecifiers(read(file));
@@ -201,6 +231,15 @@ describe("authority enforcement import isolation", () => {
       expect(
         allowedSiblingsForClinicalInvariantTypes,
         `clinical-invariant.types.ts imports unexpected sibling ${spec}`,
+      ).toContain(spec);
+    }
+
+    const ciEvalSpecs = importedSpecifiers(read("clinical-invariant.evaluator.ts"));
+    const ciEvalSiblings = ciEvalSpecs.filter((s) => s.startsWith("./"));
+    for (const spec of ciEvalSiblings) {
+      expect(
+        allowedSiblingsForClinicalInvariantEvaluator,
+        `clinical-invariant.evaluator.ts imports unexpected sibling ${spec}`,
       ).toContain(spec);
     }
   });

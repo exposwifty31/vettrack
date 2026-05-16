@@ -159,7 +159,19 @@ type MetricName =
   // the first caller (off-mode increment on the request path).
   | "clinical_invariant_resolved_off"
   | "clinical_invariant_resolved_shadow"
-  | "clinical_invariant_resolved_enforce";
+  | "clinical_invariant_resolved_enforce"
+  // Phase 5 PR 5.2 — clinical-invariant shadow-observation counters.
+  // `_would_have_blocked` ticks once per shadow-mode request that
+  // produces non-empty `orphanLines`. Per-reason counters tick once
+  // per unique `OrphanReasonCode` observed in that request (not per
+  // orphan line — matches the `(reason, mode)` cardinality contract).
+  // Enforce-mode counters (`_blocked_total`, `_orphan_reason_*`) land
+  // in PR 5.7 alongside their denial-audit emitter.
+  | "clinical_invariant_would_have_blocked"
+  | "clinical_invariant_would_have_blocked_no_patient_linked"
+  | "clinical_invariant_would_have_blocked_no_active_hospitalization"
+  | "clinical_invariant_would_have_blocked_no_active_order"
+  | "clinical_invariant_would_have_blocked_quantity_exceeds_order";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -407,6 +419,20 @@ export interface MetricsSnapshot {
       shadow: number;
       enforce: number;
     };
+    /**
+     * Phase 5 PR 5.2 — shadow-observation counters. `total` ticks once
+     * per shadow-mode request with non-empty `orphanLines`; per-reason
+     * fields tick once per unique `OrphanReasonCode` observed in that
+     * request. Enforce-mode counters (`blockedTotal`, `orphanReason.*`)
+     * land in PR 5.7 alongside their denial-audit emitter.
+     */
+    shadowWouldHaveBlocked: {
+      total: number;
+      noPatientLinked: number;
+      noActiveHospitalization: number;
+      noActiveOrder: number;
+      quantityExceedsOrder: number;
+    };
   };
   timestamp: string;
 }
@@ -539,6 +565,12 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   clinical_invariant_resolved_off: 0,
   clinical_invariant_resolved_shadow: 0,
   clinical_invariant_resolved_enforce: 0,
+  // Phase 5 PR 5.2 — clinical-invariant shadow-observation counters.
+  clinical_invariant_would_have_blocked: 0,
+  clinical_invariant_would_have_blocked_no_patient_linked: 0,
+  clinical_invariant_would_have_blocked_no_active_hospitalization: 0,
+  clinical_invariant_would_have_blocked_no_active_order: 0,
+  clinical_invariant_would_have_blocked_quantity_exceeds_order: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -820,6 +852,15 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           shadow: metrics.clinical_invariant_resolved_shadow,
           enforce: metrics.clinical_invariant_resolved_enforce,
         },
+        shadowWouldHaveBlocked: {
+          total: metrics.clinical_invariant_would_have_blocked,
+          noPatientLinked: metrics.clinical_invariant_would_have_blocked_no_patient_linked,
+          noActiveHospitalization:
+            metrics.clinical_invariant_would_have_blocked_no_active_hospitalization,
+          noActiveOrder: metrics.clinical_invariant_would_have_blocked_no_active_order,
+          quantityExceedsOrder:
+            metrics.clinical_invariant_would_have_blocked_quantity_exceeds_order,
+        },
       },
       timestamp: new Date().toISOString(),
     };
@@ -956,6 +997,13 @@ export function getMetricsSnapshot(): MetricsSnapshot {
       },
       clinicalInvariant: {
         resolved: { off: 0, shadow: 0, enforce: 0 },
+        shadowWouldHaveBlocked: {
+          total: 0,
+          noPatientLinked: 0,
+          noActiveHospitalization: 0,
+          noActiveOrder: 0,
+          quantityExceedsOrder: 0,
+        },
       },
       timestamp: new Date().toISOString(),
     };
