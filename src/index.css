@@ -412,26 +412,35 @@
   animation: qr-scan-line 1.8s ease-in-out infinite;
 }
 
-/* ── QR scanner overlay root height — Phase 5 PR 5.0.1 ─────────────────── */
+/* ── QR scanner overlay root height — Phase 5 PR 5.0.1 + PR 5.4 ───────── */
 /*
  * Fix for the production regression where the green scanning frame sits
- * too high on mobile Safari. The initial `100dvh` layout pass evaluated
- * against the URL-bar-showing viewport and the engine did not consistently
- * recompute when the URL bar collapsed, so the camera viewport — and
- * therefore the frame's vertical center — stayed anchored to the smaller
- * initial viewport.
+ * too high on mobile Safari AND the "enter code manually" footer is
+ * pushed below the visible viewport.
  *
- * Layered cascade: the last supported value wins. On engines that support
- * `lvh` (large viewport units, URL bar collapsed), the layout is sized to
- * the largest stable viewport, so the frame centers within a stable
- * max-height column regardless of URL bar state. Older engines degrade to
- * `dvh` → `svh` → `vh`.
+ * History:
+ *   - PR 5.0.1 used a `100vh → 100svh → 100dvh → 100lvh` cascade picking
+ *     `lvh` (largest stable viewport) as the winning value. This worked
+ *     when the URL bar was collapsed, but when the URL bar was showing
+ *     the overlay extended below the visible area — pushing the footer
+ *     (containing the manual-entry button) off-screen and making the
+ *     frame appear in the upper half of the visible area.
+ *   - PR 5.4 refines the cascade: `100svh` (smallest stable viewport)
+ *     is the LAST supported value, so on engines that support it the
+ *     overlay always fits within the always-visible area. The footer
+ *     stays on-screen and the frame centers within the actually-visible
+ *     camera viewport. Trade-off: when the URL bar collapses, there is
+ *     unused space below the overlay, but that beats hiding the
+ *     manual-entry affordance.
+ *
+ * Older engines degrade `dvh → vh`. The earlier `lvh` declaration is
+ * removed; explicitly preferring `lvh` here was the source of the
+ * footer-clipping regression.
  */
 .qr-scanner-overlay-root {
   height: 100vh;
-  height: 100svh;
   height: 100dvh;
-  height: 100lvh;
+  height: 100svh;
 }
 
 /* ── Native-feel PWA CSS ─────────────────────────────────────────────────── */

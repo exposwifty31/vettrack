@@ -262,6 +262,11 @@ export default function InventoryPage() {
       dispatch({ type: "scan-success" });
     },
     onError: (err) => {
+      // Phase 5 PR 5.4 — log the full error to the browser console for
+      // diagnostic visibility (the user-facing toast only carries the
+      // `message` + `requestId`; operators need the response payload
+      // including the new `errorType` field surfaced by the server).
+      console.error("[restock] scan failed", err);
       const message = err instanceof Error ? err.message : "Failed to apply scan";
       dispatch({ type: "failure", payload: { message } });
     },
@@ -283,6 +288,8 @@ export default function InventoryPage() {
       haptics.error();
     },
     onError: (err) => {
+      // Phase 5 PR 5.4 — diagnostic logging; see scanMut.onError above.
+      console.error("[restock] finish failed", err);
       const message = err instanceof Error ? err.message : "Failed to finish restock session";
       dispatch({ type: "failure", payload: { message } });
       toast.error(message);

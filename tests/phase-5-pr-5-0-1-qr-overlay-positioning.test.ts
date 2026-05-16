@@ -38,16 +38,28 @@ describe("Phase 5 PR 5.0.1 — QR scanner overlay positioning fix", () => {
       expect(cssSource).toMatch(/\.qr-scanner-overlay-root\s*\{/);
     });
 
-    it("layers 100vh / 100svh / 100dvh / 100lvh in cascade order", () => {
+    it("layers 100vh / 100dvh / 100svh in cascade order (PR 5.4 refinement)", () => {
       const match = cssSource.match(/\.qr-scanner-overlay-root\s*\{([^}]*)\}/);
       expect(match).not.toBeNull();
       const body = match![1];
-      // Order matters: last supported value wins, so `100lvh` must come last
-      // to be the preferred selection on supporting engines.
+      // PR 5.4 refinement: `100svh` (smallest stable viewport) is the
+      // LAST supported value, so on engines that support it the overlay
+      // always fits within the always-visible area — the footer
+      // (containing the manual-entry button) stays on-screen and the
+      // frame centers within the actually-visible viewport. Older
+      // engines degrade `dvh → vh`.
+      //
+      // The earlier PR 5.0.1 cascade ended at `100lvh` (largest stable
+      // viewport), which pushed the footer below the visible area when
+      // the URL bar was showing — that regression is what this PR fixes.
       const heights = [...body.matchAll(/height:\s*(100vh|100svh|100dvh|100lvh)\s*;/g)].map(
         (m) => m[1],
       );
-      expect(heights).toEqual(["100vh", "100svh", "100dvh", "100lvh"]);
+      expect(heights).toEqual(["100vh", "100dvh", "100svh"]);
+      // Defence-in-depth: the `100lvh` declaration must NOT be present —
+      // its inclusion is precisely what caused the footer-clipping
+      // regression PR 5.4 addresses.
+      expect(heights).not.toContain("100lvh");
     });
   });
 

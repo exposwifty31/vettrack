@@ -75,15 +75,56 @@ function mapErrorToHttp(err: unknown, requestId: string) {
       }),
     };
   }
+  // Phase 5 PR 5.4 — surface the underlying error class as a diagnostic
+  // hint for the 500 path so support can identify the failure type
+  // (e.g. `PostgresError`, `TimeoutError`) without needing server-log
+  // access. The user-facing `message` stays generic; `errorType` is an
+  // additive field consumed by operators / support only.
+  const errorType =
+    err instanceof Error && typeof err.name === "string" && err.name.length > 0
+      ? err.name
+      : "UnknownError";
   return {
     status: 500,
-    body: apiError({
-      code: "INTERNAL_ERROR",
-      reason: "RESTOCK_ROUTE_FAILED",
-      message: "Restock operation failed",
-      requestId,
-    }),
+    body: {
+      ...apiError({
+        code: "INTERNAL_ERROR",
+        reason: "RESTOCK_ROUTE_FAILED",
+        message: "Restock operation failed",
+        requestId,
+      }),
+      errorType,
+    },
   };
+}
+
+/**
+ * Phase 5 PR 5.4 — structured error log for restock route failures.
+ *
+ * The pre-existing `console.error(err)` calls log the bare error object,
+ * which often serialises to `{}` in production log aggregators. This
+ * helper emits a single line with a stable shape (`route`, `requestId`,
+ * `errorType`, `message`, `stackFirstLine`) so operators can correlate
+ * client-visible `requestId` toasts with server-side context.
+ */
+function logRestockError(route: string, requestId: string, err: unknown): void {
+  const errorType =
+    err instanceof Error && typeof err.name === "string" && err.name.length > 0
+      ? err.name
+      : "UnknownError";
+  const message =
+    err instanceof Error && typeof err.message === "string" ? err.message : String(err);
+  const stackFirstLine =
+    err instanceof Error && typeof err.stack === "string"
+      ? err.stack.split("\n")[1]?.trim() ?? null
+      : null;
+  console.error("[restock-route]", {
+    route,
+    requestId,
+    errorType,
+    message,
+    stackFirstLine,
+  });
 }
 
 router.post(
@@ -102,7 +143,7 @@ router.post(
       });
       res.status(201).json(session);
     } catch (err) {
-      console.error(err);
+      logRestockError(req.path, requestId, err);
       const mapped = mapErrorToHttp(err, requestId);
       res.status(mapped.status).json(mapped.body);
     }
@@ -146,7 +187,7 @@ router.post(
       });
       res.json(result);
     } catch (err) {
-      console.error(err);
+      logRestockError(req.path, requestId, err);
       const mapped = mapErrorToHttp(err, requestId);
       res.status(mapped.status).json(mapped.body);
     }
@@ -169,7 +210,7 @@ router.post(
       });
       res.json(result);
     } catch (err) {
-      console.error(err);
+      logRestockError(req.path, requestId, err);
       const mapped = mapErrorToHttp(err, requestId);
       res.status(mapped.status).json(mapped.body);
     }
@@ -192,7 +233,7 @@ router.post(
       });
       res.json(result);
     } catch (err) {
-      console.error(err);
+      logRestockError(req.path, requestId, err);
       const mapped = mapErrorToHttp(err, requestId);
       res.status(mapped.status).json(mapped.body);
     }
@@ -214,7 +255,7 @@ router.post(
       });
       res.json(result);
     } catch (err) {
-      console.error(err);
+      logRestockError(req.path, requestId, err);
       const mapped = mapErrorToHttp(err, requestId);
       res.status(mapped.status).json(mapped.body);
     }
