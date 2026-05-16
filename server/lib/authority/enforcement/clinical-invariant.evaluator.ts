@@ -145,11 +145,22 @@ export async function evaluateClinicalInvariant(
     for (const reason of seenReasons) {
       clinicalInvariantMetrics.wouldHaveBlockedReason(reason);
     }
-    // TODO(Phase 5 PR 5.5): emit sampled
-    // `clinical_invariant_shadow_would_have_blocked` audit row.
-    // The audit kind + emitter file land in PR 5.5; PR 5.2
-    // intentionally ships no audit emission.
-    return { action: "allow", disposition: "WOULD_HAVE_BLOCKED_SHADOW" };
+    // Phase 5 PR 5.5 — DO NOT emit the shadow audit from inside the
+    // evaluator. The evaluator runs inside the mutation transaction;
+    // emitting here would produce false-positive audit rows for
+    // requests that subsequently fail and roll back (Codex P2 review).
+    //
+    // Instead, the evaluator returns the orphan detail on the verdict
+    // so the wiring layer (PR 5.3 dispense.service + PR 5.4
+    // containers route) can call
+    // `emitClinicalInvariantShadowWouldHaveBlockedAudit` **after the
+    // mutation transaction commits** (best-effort post-commit per
+    // CI-25 + the post-commit observability contract).
+    return {
+      action: "allow",
+      disposition: "WOULD_HAVE_BLOCKED_SHADOW",
+      orphanLines,
+    };
   }
 
   // mode === "enforce" — return deny verdict.

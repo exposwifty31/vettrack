@@ -29,8 +29,10 @@ import {
 } from "../lib/dispense-order-validation.js";
 import { resolveClinicalInvariantEnforcementMode } from "../lib/authority/enforcement/clinical-invariant.config.js";
 import { evaluateClinicalInvariant } from "../lib/authority/enforcement/clinical-invariant.evaluator.js";
+import { emitClinicalInvariantShadowWouldHaveBlockedAudit } from "../lib/authority/enforcement/clinical-invariant.audit.js";
 import type { ClinicalInvariantEnforcementMode } from "../lib/authority/enforcement/clinical-invariant.types.js";
 import { incrementMetric } from "../lib/metrics.js";
+import type { OrphanLineDetail } from "../lib/dispense-order-validation.js";
 import { captureConsumableBillingForDispenseLine } from "../lib/container-consumable-billing.js";
 import {
   DISPENSE_IDEMPOTENCY_ENDPOINT,
@@ -355,7 +357,20 @@ router.post(
       const billingIds: string[] = [];
       let autoBilledCents = 0;
 
-      const responsePayload = await db.transaction(async (tx) => {
+      type PendingShadowAudit = {
+        animalId: string | null;
+        containerId: string;
+        requestId: string;
+        orphanLines: ReadonlyArray<OrphanLineDetail>;
+      };
+
+      // Returning the audit payload via the callback's return value
+      // (rather than closure-mutating an outer `let`) keeps
+      // TypeScript's flow narrowing intact across the async tx
+      // boundary — otherwise the variable narrows to `never` at the
+      // post-commit emission site under the server-check tsconfig.
+      const { responsePayload, pendingShadowAudit } = await db.transaction(async (tx) => {
+        let pendingShadowAudit: PendingShadowAudit | null = null;
         const [container] = await tx
           .select()
           .from(containers)
@@ -436,7 +451,7 @@ router.post(
             // evaluator never re-resolves. Single-source request-local
             // mode; the `clinical_invariant_resolved_*` counters and
             // the evaluator's mode dispatch cannot desync.
-            await evaluateClinicalInvariant(
+            const ciVerdict = await evaluateClinicalInvariant(
               {
                 tx,
                 clinicId,
@@ -449,8 +464,26 @@ router.post(
               },
               { modeResolver: async () => clinicalInvariantMode },
             );
-            // PR 5.4 intentionally does NOT act on the verdict — PR 5.7
-            // will add the 422 deny path and the denial-audit attempt.
+            // PR 5.5 — capture the shadow-emission payload from the
+            // verdict so the sampled audit can fire AFTER the tx
+            // commits (post-commit; never inside the tx — Codex P2
+            // review on PR 5.5). The emitter computes unique
+            // reasonCodes + lineCount internally, so the two wiring
+            // sites stay symmetric. PR 5.4 still does NOT act on the
+            // verdict for request-flow purposes (no 422 path —
+            // that's PR 5.7).
+            if (
+              ciVerdict.action === "allow" &&
+              ciVerdict.disposition === "WOULD_HAVE_BLOCKED_SHADOW" &&
+              ciVerdict.orphanLines
+            ) {
+              pendingShadowAudit = {
+                animalId: animalId ?? null,
+                containerId,
+                requestId,
+                orphanLines: ciVerdict.orphanLines,
+              };
+            }
           } catch {
             // Wiring-layer Strategy A safety net (CI-16, CI-20): single
             // catch, no retry. PR 5.7 will dispatch fail-open /
@@ -639,8 +672,22 @@ router.post(
             },
           });
 
-        return payload;
+        return { responsePayload: payload, pendingShadowAudit };
       });
+
+      // Phase 5 PR 5.5 — POST-COMMIT shadow audit emission. Fires
+      // only when (a) the tx above committed (a throw would have
+      // bypassed this), and (b) the evaluator returned
+      // `WOULD_HAVE_BLOCKED_SHADOW`. Best-effort per CI-25.
+      if (pendingShadowAudit) {
+        emitClinicalInvariantShadowWouldHaveBlockedAudit({
+          clinicId,
+          animalId: pendingShadowAudit.animalId,
+          containerId: pendingShadowAudit.containerId,
+          requestId: pendingShadowAudit.requestId,
+          orphanLines: pendingShadowAudit.orphanLines,
+        });
+      }
 
       res.locals.dispenseIdempotencyPersistedInTransaction = true;
 

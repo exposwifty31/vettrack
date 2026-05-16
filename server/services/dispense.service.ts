@@ -21,8 +21,10 @@ import {
 } from "../lib/dispense-order-validation.js";
 import { resolveClinicalInvariantEnforcementMode } from "../lib/authority/enforcement/clinical-invariant.config.js";
 import { evaluateClinicalInvariant } from "../lib/authority/enforcement/clinical-invariant.evaluator.js";
+import { emitClinicalInvariantShadowWouldHaveBlockedAudit } from "../lib/authority/enforcement/clinical-invariant.audit.js";
 import type { ClinicalInvariantEnforcementMode } from "../lib/authority/enforcement/clinical-invariant.types.js";
 import { incrementMetric } from "../lib/metrics.js";
+import type { OrphanLineDetail } from "../lib/dispense-order-validation.js";
 
 export class DispenseError extends Error {
   constructor(
@@ -196,7 +198,21 @@ export async function confirmDispense(input: ConfirmDispenseInput): Promise<Disp
     requestId,
   } = input;
 
-  const confirmed = await db.transaction(async (tx) => {
+  type PendingShadowAudit = {
+    animalId: string | null;
+    containerId: string;
+    requestId: string;
+    orphanLines: ReadonlyArray<OrphanLineDetail>;
+  };
+
+  // The tx callback returns the persisted event AND any pending
+  // shadow-audit payload. Returning via the callback (rather than
+  // closure-mutating an outer `let`) keeps TypeScript's flow
+  // narrowing intact across the async transaction boundary —
+  // otherwise the variable narrows to `never` at the post-commit
+  // emission site under the server-check tsconfig.
+  const { confirmed, pendingShadowAudit } = await db.transaction(async (tx) => {
+    let pendingShadowAudit: PendingShadowAudit | null = null;
     const [event] = await tx
       .select()
       .from(dispenseEvents)
@@ -205,7 +221,11 @@ export async function confirmDispense(input: ConfirmDispenseInput): Promise<Disp
 
     if (!event) throw new DispenseError("NOT_FOUND", 404, "Dispense event not found.");
     if (event.status === "CONFIRMED" || event.status === "COMPLETED") {
-      return event; // idempotent
+      // Idempotent — return early with no pending shadow audit. The
+      // wiring block below would have populated it; the early return
+      // skips that path because no clinical-invariant evaluation is
+      // needed for an already-confirmed event.
+      return { confirmed: event, pendingShadowAudit };
     }
     if (event.status !== "DRAFT" && event.status !== "EMERGENCY_PENDING") {
       throw new DispenseError("INVALID_STATE", 409, `Cannot confirm event with status '${event.status}'.`);
@@ -284,7 +304,7 @@ export async function confirmDispense(input: ConfirmDispenseInput): Promise<Disp
         // probe. This keeps the request-local mode value single-
         // source — the evaluator and the `clinical_invariant_resolved_*`
         // counters always agree.
-        await evaluateClinicalInvariant(
+        const ciVerdict = await evaluateClinicalInvariant(
           {
             tx,
             clinicId,
@@ -297,8 +317,26 @@ export async function confirmDispense(input: ConfirmDispenseInput): Promise<Disp
           },
           { modeResolver: async () => clinicalInvariantMode },
         );
-        // PR 5.3 intentionally does NOT act on the verdict. PR 5.7
-        // will add the 422 deny path and the denial-audit attempt.
+        // PR 5.5 — capture the shadow-emission payload from the
+        // verdict so the sampled audit can fire AFTER the tx
+        // commits (post-commit; never inside the tx). The emitter
+        // computes the unique reasonCodes + lineCount internally,
+        // so the two wiring sites stay symmetric and cannot diverge
+        // on cardinality semantics. PR 5.3 still does NOT act on
+        // the verdict for request-flow purposes (no 422 path —
+        // that lands in PR 5.7).
+        if (
+          ciVerdict.action === "allow" &&
+          ciVerdict.disposition === "WOULD_HAVE_BLOCKED_SHADOW" &&
+          ciVerdict.orphanLines
+        ) {
+          pendingShadowAudit = {
+            animalId: event.patientId ?? null,
+            containerId: event.containerId,
+            requestId,
+            orphanLines: ciVerdict.orphanLines,
+          };
+        }
       } catch {
         // Wiring-layer Strategy A safety net (CI-16, CI-20): any
         // throw inside the evaluator or label/code lookup is caught
@@ -364,8 +402,23 @@ export async function confirmDispense(input: ConfirmDispenseInput): Promise<Disp
       .where(and(eq(dispenseEvents.clinicId, clinicId), eq(dispenseEvents.id, dispenseEventId)))
       .returning();
 
-    return updated;
+    return { confirmed: updated, pendingShadowAudit };
   });
+
+  // Phase 5 PR 5.5 — POST-COMMIT shadow audit emission. Fires only if
+  // the evaluator returned `WOULD_HAVE_BLOCKED_SHADOW` AND the tx
+  // above committed successfully (`db.transaction` would have thrown
+  // and skipped this block on rollback). Best-effort per CI-25 — the
+  // emitter swallows internal errors; nothing affects request flow.
+  if (pendingShadowAudit) {
+    emitClinicalInvariantShadowWouldHaveBlockedAudit({
+      clinicId,
+      animalId: pendingShadowAudit.animalId,
+      containerId: pendingShadowAudit.containerId,
+      requestId: pendingShadowAudit.requestId,
+      orphanLines: pendingShadowAudit.orphanLines,
+    });
+  }
 
   logAudit({
     clinicId,

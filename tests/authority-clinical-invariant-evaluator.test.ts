@@ -237,7 +237,10 @@ describe("evaluateClinicalInvariant — shadow + orphans", () => {
     const verdict = await evaluateClinicalInvariant(baseContext(), {
       modeResolver: modeResolver("shadow"),
     });
-    expect(verdict).toEqual({ action: "allow", disposition: "WOULD_HAVE_BLOCKED_SHADOW" });
+    // PR 5.5 — the WOULD_HAVE_BLOCKED_SHADOW verdict additionally carries
+    // `orphanLines` so the wiring layer can emit the sampled audit
+    // post-commit. The shape match is asserted with `toMatchObject`.
+    expect(verdict).toMatchObject({ action: "allow", disposition: "WOULD_HAVE_BLOCKED_SHADOW" });
   });
 
   it("ticks `_would_have_blocked` total once per request regardless of line count", async () => {

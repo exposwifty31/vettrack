@@ -163,14 +163,20 @@ describe("authority enforcement import isolation", () => {
     // with zero local-sibling imports.
     const allowedSiblingsForClinicalInvariantConfig = ["./clinical-invariant.types.js"];
     const allowedSiblingsForClinicalInvariantTypes: string[] = [];
-    // Phase 5 PR 5.2 — clinical-invariant evaluator. Sibling imports
-    // are restricted to the family's own config + types + metrics
-    // files. Audit emitter is NOT a permitted sibling in PR 5.2 —
-    // `clinical-invariant.audit.ts` does not exist yet (it lands in
-    // PR 5.5 with the sampled shadow emitter only, then is extended
-    // in PR 5.7 with the enforce-denial / emergency-bypass /
-    // fail-open emitters). The evaluator file MUST NOT import a
-    // not-yet-existing audit sibling.
+    // Phase 5 PR 5.2 + PR 5.5 — clinical-invariant evaluator sibling
+    // allowlist. The evaluator imports ONLY its own config + types +
+    // metrics siblings. The audit sibling
+    // (`clinical-invariant.audit.ts`) lives at the family but is
+    // imported by the WIRING LAYER (dispense.service.ts +
+    // containers.ts), NOT the evaluator: PR 5.5 moved emission to
+    // post-commit at the wiring layer so a tx rollback can never
+    // persist a false-positive observability row (Codex P2 review).
+    //
+    // KEEPING the audit sibling out of this allowlist is intentional
+    // — it acts as a mechanical guard against a future PR
+    // re-introducing audit emission inside the evaluator (where
+    // it would run inside the tx and re-create the false-positive
+    // class of bugs PR 5.5 fixed).
     const allowedSiblingsForClinicalInvariantEvaluator = [
       "./clinical-invariant.config.js",
       "./clinical-invariant.types.js",

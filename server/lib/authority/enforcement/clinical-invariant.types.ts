@@ -78,6 +78,24 @@ export type ClinicalInvariantDisposition =
 export interface ClinicalInvariantAllow {
   action: "allow";
   disposition?: ClinicalInvariantDisposition;
+  /**
+   * Phase 5 PR 5.5 — populated when
+   * `disposition === "WOULD_HAVE_BLOCKED_SHADOW"`. Carries the orphan
+   * detail the evaluator observed, so the wiring layer can emit the
+   * sampled shadow audit **after the mutation transaction commits**.
+   *
+   * Emitting inside the tx would risk producing a false-positive
+   * audit row when the request subsequently fails and the tx rolls
+   * back (Codex P2 review on PR 5.5). Keeping the orphan detail on
+   * the verdict lets the wiring layer defer emission to post-commit
+   * without breaking the evaluator's read-only-inside-the-tx
+   * invariant (CI-24).
+   *
+   * Field is INTERNAL passport data — it carries the same
+   * `OrphanLineDetail[]` shape used by the `deny` arm of the union.
+   * Clients that only read `action` / `disposition` are unaffected.
+   */
+  orphanLines?: OrphanLineDetail[];
 }
 
 export interface ClinicalInvariantDeny {

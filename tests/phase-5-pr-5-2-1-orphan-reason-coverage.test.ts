@@ -163,7 +163,11 @@ describe("PR 5.2.1 — shadow / single-line / per-reason matrix", () => {
       const verdict = await evaluateClinicalInvariant(ctx(), {
         modeResolver: modeResolver("shadow"),
       });
-      expect(verdict).toEqual({ action: "allow", disposition: "WOULD_HAVE_BLOCKED_SHADOW" });
+      // PR 5.5 — the WOULD_HAVE_BLOCKED_SHADOW verdict additionally
+      // carries `orphanLines` so the wiring layer can emit the sampled
+      // audit post-commit. We only assert the action + disposition
+      // discriminator here; PR 5.5's tests cover the orphanLines shape.
+      expect(verdict).toMatchObject({ action: "allow", disposition: "WOULD_HAVE_BLOCKED_SHADOW" });
 
       const expected = zeroShadowSnapshot();
       expected.total = 1;

@@ -180,7 +180,14 @@ export type AuditActionType =
   // when the request actor's snapshot fails the Code-Blue allowlist.
   // Distinct from the shadow kind so dashboards can separate observation
   // from enforcement-driven denials.
-  | "code_blue_log_drug_shock_authority_denied";
+  | "code_blue_log_drug_shock_authority_denied"
+  // Phase 5 PR 5.5 — clinical-invariant shadow-mode observability.
+  // Fire-and-forget post-commit, sampled 1 per 5 min per
+  // (clinicId, animalId), gated by `AUTHORITY_OBS_V1`. Best-effort
+  // per CI-25 — failure must never affect request outcome. The other
+  // three Phase 5 audit kinds (`_orphan_dispense_denied`,
+  // `_emergency_bypass`, `_fail_open`) land in PR 5.7.
+  | "clinical_invariant_shadow_would_have_blocked";
 
 export interface LogAuditParams {
   clinicId: string;
