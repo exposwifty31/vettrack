@@ -24,12 +24,26 @@ export function interpolate(template: string, params: TranslationParams = {}): s
 
     if (type === "plural") {
       const num = typeof value === "number" ? value : Number(value);
+      let matched: string | undefined;
       for (const opt of options) {
-        if (opt.matcher.startsWith("=") && Number(opt.matcher.slice(1)) === num) return opt.value;
-        if (opt.matcher === "one" && num === 1) return opt.value;
+        if (opt.matcher.startsWith("=") && Number(opt.matcher.slice(1)) === num) {
+          matched = opt.value;
+          break;
+        }
+        if (opt.matcher === "one" && num === 1) {
+          matched = opt.value;
+          break;
+        }
       }
-      const other = options.find((o) => o.matcher === "other" || o.matcher === "*");
-      return other?.value ?? strVal;
+      if (matched === undefined) {
+        matched = options.find((o) => o.matcher === "other" || o.matcher === "*")?.value;
+      }
+      // ICU `#` token inside a plural branch: substitute with the
+      // numeric value of the plural variable. Without this the
+      // matched branch returns literally e.g. "# items pending sync"
+      // and end users see the `#` character (Cursor Bugbot finding
+      // on PR #338, applied to sync.status.{pending,failed}).
+      return matched !== undefined ? matched.replace(/#/g, String(num)) : strVal;
     }
 
     if (type === "select") {
@@ -54,6 +68,16 @@ export function resolve(dict: TranslationDictionary, keyPath: string): string | 
   return typeof current === "string" ? current : undefined;
 }
 
+const warnedMissingKeys = new Set<string>();
+
+function defaultMissingKeyWarn(keyPath: string, locale: string): void {
+  if (process.env.NODE_ENV !== "development") return;
+  const fingerprint = `${keyPath}|${locale}`;
+  if (warnedMissingKeys.has(fingerprint)) return;
+  warnedMissingKeys.add(fingerprint);
+  console.warn(`[i18n] Missing translation key "${keyPath}" for locale "${locale}"`);
+}
+
 export function translate(
   dict: TranslationDictionary,
   keyPath: string,
@@ -66,7 +90,12 @@ export function translate(
 ): string {
   const template = resolve(dict, keyPath) ?? resolve(options?.fallbackDict ?? {}, keyPath);
   if (!template) {
-    (options?.warn ?? console.warn)(`[i18n] Missing translation key "${keyPath}" for locale "${options?.locale ?? "unknown"}"`);
+    const locale = options?.locale ?? "unknown";
+    if (options?.warn) {
+      options.warn(`[i18n] Missing translation key "${keyPath}" for locale "${locale}"`);
+    } else {
+      defaultMissingKeyWarn(keyPath, locale);
+    }
     return keyPath;
   }
   return params ? interpolate(template, params) : template;

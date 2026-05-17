@@ -5,6 +5,7 @@ import { Shield, Wifi, WifiOff } from "lucide-react";
 import { authFetch } from "@/lib/auth-fetch";
 import { useAuth } from "@/hooks/use-auth";
 import type { SessionPollResult } from "@/hooks/useCodeBlueSession";
+import { t } from "@/lib/i18n";
 
 function formatElapsed(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
@@ -71,7 +72,7 @@ export default function CodeBlueDisplay() {
       </div>
       {pollQ.isError && (
         <div className="text-center text-red-400 text-sm py-1 bg-red-950/30">
-          חיבור אבד — מנסה שוב...
+          {t.codeBlue.display.connectionLost}
         </div>
       )}
 
@@ -79,8 +80,8 @@ export default function CodeBlueDisplay() {
         /* Standby */
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center text-zinc-600">
-            <div className="text-4xl font-black tracking-widest mb-4">ממתין לאירוע...</div>
-            <div className="text-lg">המסך יתעדכן אוטומטית בתוך 2 שניות מפתיחת CODE BLUE</div>
+            <div className="text-4xl font-black tracking-widest mb-4">{t.codeBlue.display.awaitingEvent}</div>
+            <div className="text-lg">{t.codeBlue.display.autoUpdateNote}</div>
           </div>
         </div>
       ) : (
@@ -91,7 +92,7 @@ export default function CodeBlueDisplay() {
               <div className="text-red-400 font-black tracking-widest text-2xl">⚠ CODE BLUE ACTIVE</div>
               {session.patientName && (
                 <div className="text-zinc-400 text-base mt-1">
-                  {session.patientName}{session.patientWeight ? ` — ${session.patientWeight} ק״ג` : ""}
+                  {session.patientName}{session.patientWeight ? ` — ${t.codeBlue.patientWeightSuffix(session.patientWeight)}` : ""}
                 </div>
               )}
             </div>
@@ -108,15 +109,15 @@ export default function CodeBlueDisplay() {
             </div>
             <div className="flex gap-6 justify-center items-center mt-4">
               <span className="bg-red-700 text-white text-base font-bold px-4 py-1 rounded-full">
-                מחזור #{cprCycle}
+                {t.codeBlue.display.cycle(cprCycle)}
               </span>
-              <span className="text-zinc-400 text-base">עוד {formatElapsed(msToNext)} לבדיקת קצב</span>
+              <span className="text-zinc-400 text-base">{t.codeBlue.display.nextCheck(formatElapsed(msToNext))}</span>
             </div>
           </div>
 
           {/* Timeline */}
           <div className="flex-1 px-8 py-6 overflow-y-auto">
-            <div className="text-sm text-zinc-500 tracking-widest uppercase mb-4">אירועים</div>
+            <div className="text-sm text-zinc-500 tracking-widest uppercase mb-4">{t.codeBlue.display.events}</div>
             <div className="flex flex-col gap-4">
               {recentEntries.map((entry) => (
                 <div key={entry.id} className="flex gap-6 items-baseline">
@@ -126,14 +127,14 @@ export default function CodeBlueDisplay() {
                 </div>
               ))}
               {logEntries.length === 0 && (
-                <p className="text-zinc-600 text-xl">אין אירועים עדיין</p>
+                <p className="text-zinc-600 text-xl">{t.codeBlue.display.noEvents}</p>
               )}
             </div>
           </div>
 
           {/* Presence */}
           <div className="px-8 py-4 border-t border-zinc-800 flex gap-3 items-center">
-            <span className="text-sm text-zinc-600">נוכחים:</span>
+            <span className="text-sm text-zinc-600">{t.codeBlue.display.present}</span>
             {presence.map((p) => (
               <span key={p.userId} className="bg-blue-900 text-blue-300 text-sm px-3 py-1 rounded-full">
                 {p.userName}

@@ -1,4 +1,5 @@
 import { interpolate } from "../../lib/i18n/index";
+import { isInternalKey } from "../../lib/i18n/internal-keys";
 import type { Locale as SharedLocale } from "../../lib/i18n/types";
 import enDict from "../../locales/en.json";
 import heDict from "../../locales/he.json";
@@ -12,6 +13,42 @@ const dictionaries: Record<Locale, typeof heDict> = {
   en: enDict,
   he: heDict,
 };
+
+/**
+ * Strip top-level internal keys (e.g. `_meta`) from the accessor tree.
+ *
+ * `_meta.*` is a reserved non-rendering metadata namespace included for
+ * parity but never exposed to UI. Delegates the "is internal" check to
+ * the shared `isInternalKey` predicate (Phase 6 §5 invariant 13 — the
+ * canonical predicate used by all four enforcement sites).
+ */
+export function stripInternalKeys<T extends Record<string, unknown>>(obj: T): T {
+  const copy = { ...obj };
+  for (const key of Object.keys(copy)) {
+    if (isInternalKey(key)) {
+      delete copy[key];
+    }
+  }
+  return copy;
+}
+
+const warnedMissingKeys = new Set<string>();
+
+/**
+ * Dev-only one-shot warning for a missing translation key. Deduped per
+ * `(key, locale)` via a module-level `Set`. No-op in production builds.
+ *
+ * Currently exported for use by future client-side resolvers; the existing
+ * `t` accessor tree resolves at build time via the hand-rolled
+ * `buildTranslations` literal and does not run through this path.
+ */
+export function warnMissingKeyOnce(key: string, locale: string): void {
+  if (typeof import.meta === "undefined" || !import.meta.env?.DEV) return;
+  const fingerprint = `${key}|${locale}`;
+  if (warnedMissingKeys.has(fingerprint)) return;
+  warnedMissingKeys.add(fingerprint);
+  console.warn(`[i18n] Missing translation key "${key}" for locale "${locale}"`);
+}
 
 export function isSupportedLocale(locale: string | null | undefined): locale is Locale {
   return locale === "en" || locale === "he";
@@ -234,6 +271,83 @@ const translations = {
 
   syncEngine: d.syncEngine,
 
+  sync: {
+    status: {
+      syncing: d.sync.status.syncing,
+      pending: (count: number) => tr(d.sync.status.pending, { count }),
+      failed: (count: number) => tr(d.sync.status.failed, { count }),
+    },
+    action: {
+      retry: d.sync.action.retry,
+    },
+  },
+
+  scanner: {
+    toast: {
+      checkedOut: (name: string) => tr(d.scanner.toast.checkedOut, { name }),
+      returned: (name: string) => tr(d.scanner.toast.returned, { name }),
+    },
+  },
+
+  codeBlue: {
+    ...d.codeBlue,
+    selectedManager: (name: string) => tr(d.codeBlue.selectedManager, { name }),
+    stopCprLocked: (countdown: string) => tr(d.codeBlue.stopCprLocked, { countdown }),
+    cprCycleLine: (n: number, time: string) => tr(d.codeBlue.cprCycleLine, { n, time }),
+    patientWeightSuffix: (weight: number | string) =>
+      tr(d.codeBlue.patientWeightSuffix, { weight: String(weight) }),
+    preCheck: {
+      ...d.codeBlue.preCheck,
+      cartCheckedBy: (name: string) => tr(d.codeBlue.preCheck.cartCheckedBy, { name }),
+    },
+    display: {
+      ...d.codeBlue.display,
+      cycle: (n: number) => tr(d.codeBlue.display.cycle, { n }),
+      nextCheck: (time: string) => tr(d.codeBlue.display.nextCheck, { time }),
+    },
+    history: {
+      ...d.codeBlue.history,
+      minutesShort: (n: number) => tr(d.codeBlue.history.minutesShort, { n }),
+      managerOpenedBy: (manager: string, opener: string) =>
+        tr(d.codeBlue.history.managerOpenedBy, { manager, opener }),
+    },
+    reconciliation: {
+      ...d.codeBlue.reconciliation,
+      unbilledCount: (count: number) => tr(d.codeBlue.reconciliation.unbilledCount, { count }),
+      billedRatio: (billed: number, total: number) =>
+        tr(d.codeBlue.reconciliation.billedRatio, { billed, total }),
+      quantityLabel: (n: number) => tr(d.codeBlue.reconciliation.quantityLabel, { n }),
+      reconciledAt: (time: string) => tr(d.codeBlue.reconciliation.reconciledAt, { time }),
+      pendingHeader: (count: number) => tr(d.codeBlue.reconciliation.pendingHeader, { count }),
+      reconciledHeader: (count: number) => tr(d.codeBlue.reconciliation.reconciledHeader, { count }),
+    },
+  },
+
+  nfc: {
+    error: {
+      invalidContainerTag: d.nfc.error.invalidContainerTag,
+      invalidInventoryItemTag: d.nfc.error.invalidInventoryItemTag,
+      restockSessionRequired: d.nfc.error.restockSessionRequired,
+      scanFailed: d.nfc.error.scanFailed,
+    },
+  },
+
+  admin: {
+    crashCart: {
+      ...d.admin.crashCart,
+      itemSubtitle: (key: string, qty: number) => tr(d.admin.crashCart.itemSubtitle, { key, qty }),
+      expiryWarnSuffix: (days: number) => tr(d.admin.crashCart.expiryWarnSuffix, { days }),
+      removeConfirmDesc: (label: string) => tr(d.admin.crashCart.removeConfirmDesc, { label }),
+    },
+    formulary: {
+      ...d.admin.formulary,
+      removeConfirmDesc: (name: string) => tr(d.admin.formulary.removeConfirmDesc, { name }),
+    },
+    csvImport: d.admin.csvImport,
+  },
+
+  errors: d.errors,
+
   errorCard: d.errorCard,
 
   swUpdate: d.swUpdate,
@@ -436,6 +550,10 @@ const translations = {
     scheduledAt: (time: string) => tr(d.appointmentsPage.scheduledAt, { time }),
     prescribedBy: (name: string) => tr(d.appointmentsPage.prescribedBy, { name }),
     shiftWindowsFor: (name: string) => tr(d.appointmentsPage.shiftWindowsFor, { name }),
+    statusHint: {
+      ...d.appointmentsPage.statusHint,
+      overdue: (count: number) => tr(d.appointmentsPage.statusHint.overdue, { count }),
+    },
   },
 
   cop: {
@@ -618,7 +736,7 @@ const translations = {
 
 } as const;
 
-return translations;
+return stripInternalKeys(translations) as typeof translations;
 }
 
 export let t = buildTranslations(dictionaries[getStoredLocale()]);

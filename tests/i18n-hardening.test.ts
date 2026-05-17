@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import type { Request } from "express";
 import {
   clearLocaleCache,
   getLocaleDictionaries,
@@ -6,6 +7,8 @@ import {
   loadLocale,
 } from "../lib/i18n/loader.js";
 import { interpolate, translate } from "../lib/i18n/index.js";
+import { resolveRequestLocale } from "../lib/i18n/middleware.js";
+import { DEFAULT_LOCALE, INITIAL_LOCALE } from "../lib/i18n/types.js";
 
 describe("Fallback + Missing Key Warning", () => {
   it("Falls back to English dictionary when key missing in locale", () => {
@@ -73,6 +76,22 @@ describe("Interpolation + Pluralization", () => {
     const many = interpolate(pluralTemplate, { count: 4 }).replace("#", "4");
     expect(many === "4 items").toBeTruthy();
   });
+
+  it("Pluralization substitutes the ICU `#` token with the count (no manual .replace needed)", () => {
+    // Regression guard for the Bugbot finding on PR #338: prior to the
+    // fix, `interpolate` returned the matched branch verbatim, leaving
+    // literal `#` in the output. The fix substitutes `#` with the
+    // numeric value before returning.
+    const pluralTemplate = "{count, plural, one {# item} other {# items}}";
+    expect(interpolate(pluralTemplate, { count: 1 })).toBe("1 item");
+    expect(interpolate(pluralTemplate, { count: 4 })).toBe("4 items");
+    expect(interpolate(pluralTemplate, { count: 0 })).toBe("0 items");
+  });
+
+  it("Pluralization substitutes ALL `#` occurrences within a branch", () => {
+    const pluralTemplate = "{n, plural, one {# of # found} other {# of # found}}";
+    expect(interpolate(pluralTemplate, { n: 3 })).toBe("3 of 3 found");
+  });
 });
 
 describe("Locale Switching + Loader Cache", () => {
@@ -102,5 +121,66 @@ describe("Locale Switching + Loader Cache", () => {
     const heBefore = getLocaleReadCount("he");
     loadLocale("he");
     expect(getLocaleReadCount("he") === heBefore).toBeTruthy();
+  });
+});
+
+function makeRequest(headers: Record<string, string | string[] | undefined> = {}): Request {
+  return { headers } as unknown as Request;
+}
+
+describe("INITIAL_LOCALE resolver default (Phase 6 PR 6.2)", () => {
+  it("DEFAULT_LOCALE stays anchored to English (dictionary-fallback role)", () => {
+    expect(DEFAULT_LOCALE).toBe("en");
+  });
+
+  it("INITIAL_LOCALE is Hebrew (resolver-default role)", () => {
+    expect(INITIAL_LOCALE).toBe("he");
+  });
+
+  it("resolveRequestLocale with no signals returns INITIAL_LOCALE (he)", () => {
+    const req = makeRequest({});
+    expect(resolveRequestLocale(req)).toBe("he");
+  });
+
+  it("resolveRequestLocale honors Accept-Language: en", () => {
+    const req = makeRequest({ "accept-language": "en-US,en;q=0.9" });
+    expect(resolveRequestLocale(req)).toBe("en");
+  });
+
+  it("resolveRequestLocale honors Accept-Language: he", () => {
+    const req = makeRequest({ "accept-language": "he-IL,he;q=0.9" });
+    expect(resolveRequestLocale(req)).toBe("he");
+  });
+
+  it("resolveRequestLocale honors x-locale override", () => {
+    const req = makeRequest({ "x-locale": "en" });
+    expect(resolveRequestLocale(req)).toBe("en");
+  });
+
+  it("resolveRequestLocale prefers explicit user pref over headers", () => {
+    const req = makeRequest({ "x-locale": "en", "accept-language": "en" });
+    expect(resolveRequestLocale(req, "he")).toBe("he");
+  });
+
+  it("resolveRequestLocale routes unrecognized Accept-Language values through the loader's invalid-string fallback (DEFAULT_LOCALE)", () => {
+    // Phase 6 intentionally keeps `normalizeLocale` returning DEFAULT_LOCALE
+    // for invalid strings — only the "no signal" path uses INITIAL_LOCALE.
+    const req = makeRequest({ "accept-language": "zz-ZZ" });
+    expect(resolveRequestLocale(req)).toBe("en");
+  });
+});
+
+describe("Loader fallback dictionary remains anchored to DEFAULT_LOCALE (en)", () => {
+  it("getLocaleDictionaries('he') returns English as the fallback dict", () => {
+    clearLocaleCache();
+    const bundle = getLocaleDictionaries("he");
+    const enBundle = getLocaleDictionaries("en");
+    expect(bundle.fallback).toBe(enBundle.primary);
+  });
+
+  it("getLocaleDictionaries('en') returns English as both primary and fallback", () => {
+    clearLocaleCache();
+    const bundle = getLocaleDictionaries("en");
+    expect(bundle.primary).toBe(bundle.fallback);
   });
 });

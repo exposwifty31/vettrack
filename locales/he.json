@@ -1,4 +1,7 @@
 {
+  "_meta": {
+    "appointmentsPageTerminology": "User-facing copy uses Tasks/משימות; the key namespace appointmentsPage is frozen for internal compatibility. The vt_appointments table, /appointments route, and appointmentsPage.* key paths are NOT renamed (Phase 6 §17 forbidden). _meta.* keys are non-rendering metadata (Phase 6 §5 invariant 13) — included in parity, never resolved by user-facing helpers, filtered out of the runtime accessor by stripInternalKeys."
+  },
   "common": {
     "appName": "VetTrack",
     "save": "שמור",
@@ -20,7 +23,11 @@
     "sterilization": "חיטוי",
     "closeNavigationMenu": "סגור תפריט ניווט",
     "openNavigationMenu": "פתח תפריט ניווט",
-    "quickSettings": "הגדרות מהירות"
+    "quickSettings": "הגדרות מהירות",
+    "toast": {
+      "savedSuccess": "נשמר",
+      "unexpectedError": "משהו השתבש."
+    }
   },
   "status": {
     "ok": "תקין",
@@ -1900,6 +1907,35 @@
     "ariaOperationalToggle": "בקרת מצב ER גלובלי"
   },
   "appointmentsPage": {
+    "toast": {
+      "taskStarted": "משימה התחילה",
+      "taskCompleted": "משימה הושלמה",
+      "medicationAcknowledged": "תרופה אושרה — טכנאי קיבל הודעה",
+      "autoUpdated": "משימה עודכנה אוטומטית על ידי כלל אוטומציה",
+      "errorPickTechnician": "בחר טכנאי לפני יצירת משימה.",
+      "errorPickDevice": "נדרש לבחור מכשיר / נכס.",
+      "errorValidStartEnd": "הזן שעות התחלה וסיום תקינות.",
+      "errorEndAfterStart": "שעת הסיום חייבת להיות אחרי שעת ההתחלה.",
+      "errorMedicationViaCalculator": "משימות תרופות חייבות להיווצר דרך מחשבון התרופות."
+    },
+    "empty": {
+      "urgentTitle": "אין דחוף כרגע",
+      "urgentHint": "הכל במסלול תקין.",
+      "myTitle": "אין משימות מוקצות",
+      "myHint": "בחר משימה מהתור כשאתה מוכן.",
+      "suggestionsTitle": "אין הצעות",
+      "suggestionsHint": "הכל נראה תקין כרגע."
+    },
+    "statusHint": {
+      "overdue": "{count} באיחור — סקור עכשיו",
+      "startNow": "המשימה הבאה מוכנה — התחל עכשיו",
+      "overloaded": "עומס גבוה — סקור משימות דחופות",
+      "pickFromQueue": "התור פתוח — בחר משימה"
+    },
+    "statusAction": {
+      "viewQueue": "צפה בתור",
+      "reviewUrgent": "סקור דחופות"
+    },
     "administerMedication": "מתן תרופה",
     "startNow": "התחל עכשיו",
     "markComplete": "סמן כהושלם",
@@ -2076,15 +2112,275 @@
     "queueDegradedHint": "ה-Worker אינו מגיב, המעגל מנותק, או שיש משימות ממתינות ב-DLQ.",
     "queueHealthy": "תור תקין"
   },
+  "sync": {
+    "status": {
+      "syncing": "מסנכרן…",
+      "pending": "{count, plural, one {# פריט בהמתנה לסנכרון} other {# פריטים בהמתנה לסנכרון}}",
+      "failed": "{count, plural, one {# פריט נכשל בסנכרון} other {# פריטים נכשלו בסנכרון}}"
+    },
+    "action": {
+      "retry": "נסה שוב"
+    }
+  },
+  "scanner": {
+    "toast": {
+      "checkedOut": "{name} נלקח",
+      "returned": "{name} הוחזר"
+    }
+  },
+  "codeBlue": {
+    "openTitle": "פתיחת CODE BLUE",
+    "openButton": "⚠ פתח CODE BLUE",
+    "proceedWithoutFullCheck": "המשך ללא בדיקה מלאה",
+    "managerLabel": "מנהל ההפצה",
+    "managerLabelShort": "מנהל הפצה:",
+    "managerInstruction": "חובה. מנהל ההפצה הוא הרופא האחראי. רק הוא יוכל לסגור את האירוע.",
+    "loadingManagers": "טוען רשימת רופאים…",
+    "noManagersAvailable": "אין רופאים זמינים. יש לוודא שרופא נמצא בשטח.",
+    "you": "(אתה)",
+    "selectedManager": "✓ נבחר: {name}",
+    "selectOutcome": "בחר תוצאה לסיום האירוע",
+    "selectEquipment": "בחר ציוד לתיעוד",
+    "noEquipmentAvailable": "אין ציוד זמין",
+    "noEventsYet": "אין אירועים עדיין",
+    "quickLog": "תיעוד מהיר",
+    "timeline": "ציר זמן",
+    "shock": "הלם חשמלי",
+    "compressorSwap": "החלפת מדחס",
+    "compressorSwapAction": "CPR — החלפת מדחס",
+    "linkedEquipment": "+ ציוד מחובר",
+    "linkedEquipmentHint": "מכשיר הנשמה, שאיבה…",
+    "stopCprChooseOutcome": "עצור CPR — בחר תוצאה",
+    "stopCprLocked": "🔒 עצור CPR — זמין בעוד {countdown}",
+    "managerOnlyHint": "זמין למנהל הפצה בלבד",
+    "cprCycleLine": "מחזור CPR #{n} — {time} לבדיקת קצב",
+    "patientWeightSuffix": "{weight} ק״ג",
+    "role": {
+      "admin": "מנהל",
+      "vet": "רופא"
+    },
+    "preCheck": {
+      "title": "בדיקה מהירה של עגלה",
+      "defib": "דפיברילטור טעון",
+      "o2": "חמצן פתוח",
+      "iv": "עירוי IV מוכן",
+      "drugs": "תרופות זמינות",
+      "ambu": "אמבו מוכן",
+      "cartCheckedBy": "✓ עגלה נבדקה ע״י {name}",
+      "cartNotChecked": "⚠ עגלה לא נבדקה היום"
+    },
+    "outcome": {
+      "rosc": "ROSC — חזרת פעילות לב",
+      "transferred": "הועבר לבית חולים",
+      "ongoing": "ממשיך — לא הסתיים",
+      "died": "הכרזת מוות"
+    },
+    "display": {
+      "connectionLost": "חיבור אבד — מנסה שוב…",
+      "awaitingEvent": "ממתין לאירוע…",
+      "autoUpdateNote": "המסך יתעדכן אוטומטית בתוך 2 שניות מפתיחת CODE BLUE",
+      "cycle": "מחזור #{n}",
+      "nextCheck": "עוד {time} לבדיקת קצב",
+      "events": "אירועים",
+      "noEvents": "אין אירועים עדיין",
+      "present": "נוכחים:"
+    },
+    "history": {
+      "adminOnly": "גישה לאדמין בלבד",
+      "title": "היסטוריית CODE BLUE",
+      "loading": "טוען…",
+      "loadFailed": "טעינת הנתונים נכשלה. נסה לרענן את הדף.",
+      "empty": "אין אירועים בהיסטוריה",
+      "minutesShort": "{n} דק׳",
+      "managerOpenedBy": "מנהל: {manager} · פתח: {opener}",
+      "eventStart": "תחילת אירוע",
+      "eventEnd": "סיום אירוע",
+      "cartCheck": "בדיקת עגלה",
+      "checkStatus": {
+        "passed": "עברה ✓",
+        "failed": "לא עברה ✗",
+        "notPerformed": "לא בוצעה"
+      },
+      "outcomeLabels": {
+        "died": "נפטר",
+        "transferred": "הועבר",
+        "ongoing": "ממשיך"
+      }
+    },
+    "reconciliation": {
+      "title": "גישור קוד כחול",
+      "documentTitle": "גישור קוד כחול — VetTrack",
+      "adminRequired": "נדרשת גישת מנהל",
+      "backToBilling": "חזרה לחיובים",
+      "pageDescription": "סקור תרופות שחולקו בזמן מקרי חירום ואשר השלמת חיוב. הפעלות עם פריטים שלא חויבו מוצגות ראשונות.",
+      "loadSessionsFailed": "טעינת הפעלות הגישור נכשלה",
+      "allClean": "הכל תקין",
+      "noEndedSessions": "לא נמצאו הפעלות קוד כחול שהסתיימו",
+      "pendingHeader": "ממתין ({count})",
+      "reconciledHeader": "גושר ({count})",
+      "unknownPatient": "מטופל לא ידוע",
+      "noEndTime": "(ללא שעת סיום)",
+      "badge": {
+        "reconciled": "גושר"
+      },
+      "unbilledCount": "{count} ללא חיוב",
+      "billed": "חויב",
+      "billedRatio": "{billed}/{total} חויב",
+      "loadDispensesFailed": "טעינת החלוקות נכשלה",
+      "noDispenses": "לא נרשמו חלוקות להפעלה זו",
+      "dispensesLabel": "חלוקות",
+      "quantityLabel": "כמות: {n}",
+      "unbilledLineLabel": "ללא חיוב",
+      "action": {
+        "marking": "מסמן…",
+        "mark": "סמן כגושר"
+      },
+      "reconciledAt": "גושר ב-{time}",
+      "toast": {
+        "reconciled": "ההפעלה סומנה כגושרת",
+        "reconcileFailed": "סימון כגשור נכשל"
+      }
+    }
+  },
+  "whatsapp": {
+    "status": {
+      "ok": "תקין",
+      "issue": "תקלה",
+      "maintenance": "תחזוקה",
+      "sterilized": "מחוטא",
+      "overdue": "באיחור",
+      "inactive": "לא פעיל"
+    },
+    "alertHeader": "🚨 התראת VetTrack",
+    "equipmentLine": "ציוד: {equipmentName}",
+    "statusLine": "סטטוס: {status}",
+    "timeLine": "זמן: {timestamp}",
+    "noteLine": "הערה: {note}",
+    "footer": "יש לטפל בנושא בהקדם."
+  },
+  "admin": {
+    "crashCart": {
+      "title": "הגדרת עגלת החייאה",
+      "loading": "טוען…",
+      "emptyMessage": "אין פריטים — הוסף ראשון",
+      "itemSubtitle": "{key} · כמות: {qty}",
+      "expiryWarnSuffix": " · אזהרת תוקף: {days}ד",
+      "addItem": "הוסף פריט",
+      "editTitle": "ערוך פריט",
+      "newTitle": "פריט חדש",
+      "fieldKey": "מפתח (אנגלית, ללא רווחים)",
+      "fieldLabel": "תווית",
+      "labelPlaceholder": "אפינפרין — זמין ולא פג תוקף",
+      "fieldQtyRequired": "כמות נדרשת",
+      "fieldExpiryWarn": "אזהרת תוקף (ימים, אופציונלי)",
+      "saving": "שומר…",
+      "save": "שמור",
+      "removeConfirmTitle": "הסר פריט?",
+      "removeConfirmDesc": "האם להסיר את {label} מרשימת הבדיקה?",
+      "removeAction": "הסר",
+      "toast": {
+        "added": "פריט נוסף",
+        "keyExists": "מפתח כבר קיים — בחר מפתח אחר",
+        "addFailed": "שגיאה בהוספת פריט",
+        "updated": "פריט עודכן",
+        "updateFailed": "שגיאה בעדכון פריט",
+        "removed": "פריט הוסר",
+        "removeFailed": "שגיאה בהסרת פריט"
+      }
+    },
+    "formulary": {
+      "title": "ניהול פורמולריום",
+      "addDrug": "הוסף תרופה",
+      "searchPlaceholder": "חפש שם תרופה…",
+      "loading": "טוען…",
+      "emptyMessage": "אין תרופות — הוסף ראשון",
+      "editTitle": "ערוך תרופה",
+      "newTitle": "תרופה חדשה",
+      "fieldName": "שם תרופה *",
+      "fieldGenericName": "שם גנרי *",
+      "fieldBrandNames": "שמות מסחריים (פסיק מפריד)",
+      "fieldSpecies": "מינים (פסיק מפריד)",
+      "fieldCategory": "קטגוריה",
+      "fieldRoute": "נתיב מתן",
+      "fieldConcentration": "ריכוז (mg/ml) *",
+      "fieldStandardDose": "מינון סטנדרטי *",
+      "fieldMinDose": "מינון מינימום",
+      "fieldMaxDose": "מינון מקסימום",
+      "fieldDoseUnit": "יחידת מינון",
+      "fieldUnitType": "סוג אריזה",
+      "noneOption": "— ללא —",
+      "fieldUnitVolume": "נפח יחידה (ml)",
+      "fieldDosageNotes": "הערות מינון",
+      "dosageNotesPlaceholder": "הוראות מינון מיוחדות…",
+      "saving": "שומר…",
+      "save": "שמור",
+      "removeConfirmTitle": "הסר תרופה?",
+      "removeConfirmDesc": "האם להסיר את {name} מהפורמולריום?",
+      "removeAction": "הסר",
+      "toast": {
+        "added": "תרופה נוספה",
+        "addFailed": "שגיאה בהוספת תרופה",
+        "updated": "תרופה עודכנה",
+        "updateFailed": "שגיאה בעדכון תרופה",
+        "removed": "תרופה הוסרה",
+        "removeFailed": "שגיאה בהסרת תרופה"
+      }
+    },
+    "csvImport": {
+      "toast": {
+        "pleaseUploadCsv": "אנא העלה קובץ CSV"
+      }
+    }
+  },
+  "nfc": {
+    "error": {
+      "invalidContainerTag": "תווית NFC לא חוקית עבור מכל",
+      "invalidInventoryItemTag": "תווית NFC לא חוקית עבור פריט מלאי",
+      "restockSessionRequired": "פתח סשן מילוי מחדש לפני סריקת תוויות פריטים",
+      "scanFailed": "סריקת מלאי נכשלה"
+    }
+  },
   "errors": {
     "server": {
       "internalError": "שגיאה פנימית בשרת",
       "failedToListEquipment": "טעינת רשימת הציוד נכשלה",
       "failedToGetAuditLogs": "טעינת לוג הביקורת נכשלה",
       "failedToSeedDemo": "יצירת נתוני דמו נכשלה"
+    },
+    "generic": "משהו השתבש. אנא נסו שוב.",
+    "validation": "אימות הבקשה נכשל.",
+    "notFound": "המשאב לא נמצא.",
+    "conflict": "מצב מתנגש. אנא רעננו ונסו שוב.",
+    "authority": {
+      "denied": "פעולה לא מותרת.",
+      "staleEnforce": "פעולה לא זמינה במצב לא מקוון ממושך.",
+      "oproleRevoked": "התפקיד התפעולי אינו בתוקף.",
+      "insufficientRole": "אין הרשאת תפקיד לפעולה זו.",
+      "checkInRequired": "נדרשת כניסה קלינית לפעולה זו."
+    },
+    "test": {
+      "notAvailableInProduction": "לא זמין בסביבת ייצור."
+    },
+    "dispense": {
+      "internalError": "שגיאה פנימית בעיבוד החלוקה."
+    },
+    "stability": {
+      "notAvailableInProduction": "לא זמין בסביבת ייצור."
+    },
+    "er": {
+      "notAuthenticated": "נדרשת הזדהות.",
+      "internalError": "שגיאה פנימית בפעולת ER מנהל."
+    },
+    "formulary": {
+      "notFound": "רשומת פורמולריום לא נמצאה.",
+      "internalError": "שגיאה פנימית בפעולת פורמולריום."
     }
   },
   "push": {
+    "role": {
+      "reminderForEquipment": "תזכורת: החזר {equipmentName} למקומו",
+      "adminSummaryCount": "{count} פריטים לא הוחזרו במשמרת הנוכחית"
+    },
     "overdue": {
       "title": "משימות באיחור",
       "body": "יש לך {count} משימה באיחור",

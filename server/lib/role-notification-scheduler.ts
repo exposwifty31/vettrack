@@ -6,6 +6,9 @@ import {
   getReturnReminderDelayMsPerUnit,
   getScheduledNotificationPollIntervalMs,
 } from "./test-mode.js";
+import { getLocaleDictionaries } from "../../lib/i18n/loader.js";
+import { translate } from "../../lib/i18n/index.js";
+import { INITIAL_LOCALE } from "../../lib/i18n/types.js";
 
 function requireClinicId(clinicId: string | null | undefined): string {
   const normalized = clinicId?.trim();
@@ -102,12 +105,44 @@ function getRowScheduledAtDate(row: typeof scheduledNotifications.$inferSelect):
   return null;
 }
 
-function buildReminderMessage(equipmentName: string): string {
-  return `תזכורת: החזר ${equipmentName} למקומו`;
+// Phase 6 PR 6.11 CORRECTION 3: recipient-aware locale lookup.
+// Mirrors the `getUserLocale` pattern in server/workers/notification.worker.ts —
+// queries `users.preferredLocale` and falls back to INITIAL_LOCALE when the
+// row is missing or the lookup fails (rather than "en", because INITIAL_LOCALE
+// is the Phase 6 broadcast default per §19 locked decision 1).
+async function getUserLocale(userId: string): Promise<string> {
+  try {
+    const [row] = await db
+      .select({ preferredLocale: users.preferredLocale })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    return row?.preferredLocale ?? INITIAL_LOCALE;
+  } catch (err) {
+    console.warn(
+      `[role-notif] getUserLocale failed, falling back to "${INITIAL_LOCALE}":`,
+      (err as Error).message,
+    );
+    return INITIAL_LOCALE;
+  }
 }
 
-function buildAdminSummaryMessage(count: number): string {
-  return `${count} פריטים לא הוחזרו במשמרת הנוכחית`;
+async function buildReminderMessage(userId: string, equipmentName: string): Promise<string> {
+  const locale = await getUserLocale(userId);
+  const { primary, fallback, locale: lc } = getLocaleDictionaries(locale);
+  return translate(primary, "push.role.reminderForEquipment", { equipmentName }, {
+    fallbackDict: fallback,
+    locale: lc,
+  });
+}
+
+async function buildAdminSummaryMessage(userId: string, count: number): Promise<string> {
+  const locale = await getUserLocale(userId);
+  const { primary, fallback, locale: lc } = getLocaleDictionaries(locale);
+  return translate(primary, "push.role.adminSummaryCount", { count }, {
+    fallbackDict: fallback,
+    locale: lc,
+  });
 }
 
 function buildSeniorTeamHourlyMessage(
@@ -142,7 +177,7 @@ async function sendScheduledCheckoutReturnReminder(
 ): Promise<void> {
   await sendPushToUser(requireClinicId(clinicId), userId, {
     title: "VetTrack",
-    body: buildReminderMessage(equipmentName),
+    body: await buildReminderMessage(userId, equipmentName),
     tag: `smart-reminder:${equipmentId}`,
     url: `/equipment/${equipmentId}`,
   });
@@ -525,7 +560,7 @@ async function runAdminHourlySummary(now: Date): Promise<void> {
       if (!enabled) continue;
       await sendPushToUser(clinicId, admin.id, {
         title: "VetTrack",
-        body: buildAdminSummaryMessage(overdueCount),
+        body: await buildAdminSummaryMessage(admin.id, overdueCount),
         tag: `smart-admin-summary:${getMinuteBucket(now)}`,
         url: "/my-equipment",
       });

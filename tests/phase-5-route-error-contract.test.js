@@ -181,19 +181,30 @@ describe("Phase 5 route error contract checks (static)", () => {
     ).toBe(true);
   });
 
-  it("Stability route emits standardized guard and validation errors", () => {
+  it("Stability route emits standardized guard and validation errors (post-PR-6.10 light adoption)", () => {
+    // Phase 6 PR 6.10 light adoption: the `requireNotProduction` 403
+    // branch was migrated from the legacy envelope (`reason:
+    // "NOT_AVAILABLE_IN_PRODUCTION"`) to the i18n-aware `apiError`.
+    // Remaining 4xx branches in stability.ts (`TEST_RUN_ALREADY_IN_PROGRESS`,
+    // `INVALID_TEST_MODE_ENABLED`) keep the legacy envelope until a
+    // future migration PR.
     expect(
       stability.includes("resolveRequestId") &&
-        stability.includes("reason: \"NOT_AVAILABLE_IN_PRODUCTION\"") &&
         stability.includes("reason: \"TEST_RUN_ALREADY_IN_PROGRESS\"") &&
         stability.includes("reason: \"INVALID_TEST_MODE_ENABLED\""),
     ).toBe(true);
   });
 
-  it("Test route emits standardized test-mode and scenario errors", () => {
+  it("Test route emits standardized scenario errors (post-PR-6.3 light adoption)", () => {
+    // Phase 6 PR 6.3 light-adoption migration: the `requireNotProduction`
+    // 403 (legacy `reason: "NOT_AVAILABLE_IN_PRODUCTION"`) and
+    // `requireTestMode` 404 (legacy `reason: "TEST_MODE_DISABLED"`) gate
+    // branches were migrated to the i18n-aware `apiError(req, res, key,
+    // params?, status?)` helper. Those two branches no longer carry the
+    // legacy `reason: "..."` envelope. The remaining route-level scenario
+    // errors keep the legacy envelope until a future migration PR.
     expect(
       testRoute.includes("resolveRequestId") &&
-        testRoute.includes("reason: \"TEST_MODE_DISABLED\"") &&
         testRoute.includes("reason: \"EQUIPMENT_NOT_CHECKED_OUT_BY_USER\""),
     ).toBe(true);
   });

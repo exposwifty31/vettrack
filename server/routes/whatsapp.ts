@@ -6,6 +6,36 @@ import { and, eq, isNull } from "drizzle-orm";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { format } from "date-fns";
+import { getLocaleDictionaries } from "../../lib/i18n/loader.js";
+import { translate, type TranslationParams } from "../../lib/i18n/index.js";
+import { INITIAL_LOCALE, type Locale } from "../../lib/i18n/types.js";
+import { isInternalKey } from "../../lib/i18n/internal-keys.js";
+
+/**
+ * Phase 6 PR 6.12 — file-local WhatsApp translation helper.
+ *
+ * Replaces the legacy `translateStatusToHebrew` map. Applies the shared
+ * `isInternalKey` guard before resolving (Phase 6 §5 invariant 13 point
+ * (d), §6) — internal keys throw in dev/test and fall back to
+ * `errors.generic` (rendered locale-aware) in production with a
+ * stderr log.
+ *
+ * Currently used with `INITIAL_LOCALE` because outbound WhatsApp messages
+ * are template-rendered at send time, not at recipient-side rendering. A
+ * future PR can thread the recipient's `preferred_locale` through.
+ */
+function tWhatsApp(locale: Locale, key: string, params?: TranslationParams): string {
+  if (isInternalKey(key)) {
+    if (process.env.NODE_ENV !== "production") {
+      throw new Error(`tWhatsApp: internal key "${key}" is not user-facing.`);
+    }
+    console.error(`[i18n] internal-key misuse: ${key}`);
+    const { primary, fallback, locale: lc } = getLocaleDictionaries(locale);
+    return translate(primary, "errors.generic", undefined, { fallbackDict: fallback, locale: lc });
+  }
+  const { primary, fallback, locale: lc } = getLocaleDictionaries(locale);
+  return translate(primary, key, params, { fallbackDict: fallback, locale: lc });
+}
 
 /**
  * Normalize to E.164 with leading '+' (for auth contexts).
@@ -68,24 +98,8 @@ const VALID_STATUSES = ["ok", "issue", "maintenance", "sterilized", "overdue", "
 
 const RTL = "\u202B";
 
-function translateStatusToHebrew(status: string): string {
-  switch (status) {
-    case "ok":
-      return "תקין";
-    case "issue":
-      return "תקלה";
-    case "maintenance":
-      return "תחזוקה";
-    case "sterilized":
-      return "מחוטא";
-    case "overdue":
-      return "באיחור";
-    case "inactive":
-      return "לא פעיל";
-    default:
-      return status;
-  }
-}
+// Phase 6 PR 6.12: `translateStatusToHebrew` removed — status labels
+// now come from the locale dict via `tWhatsApp(locale, "whatsapp.status.<status>")`.
 
 const whatsappAlertSchema = z.object({
   equipmentId: z.string().min(1, "equipmentId is required"),
@@ -123,13 +137,22 @@ router.post("/alert", requireAuth, requireEffectiveRole("technician"), validateB
     const equipmentName = item.name;
     const timestamp = format(new Date(), "dd/MM/yyyy HH:mm");
 
-    let message = `${RTL}🚨 התראת VetTrack
-
-ציוד: ${equipmentName}
-סטטוס: ${translateStatusToHebrew(status)}
-זמן: ${timestamp}`;
-    if (note) message += `\nהערה: ${note}`;
-    message += `\n\nיש לטפל בנושא בהקדם.`;
+    // Phase 6 PR 6.12: WhatsApp body sourced from locale dict via
+    // `tWhatsApp(locale, key, params?)`. Currently rendered in
+    // INITIAL_LOCALE because outbound WhatsApp messages are built at
+    // send time (no per-recipient locale lookup yet — deferred).
+    const locale = INITIAL_LOCALE;
+    const statusLabel = tWhatsApp(locale, `whatsapp.status.${status}`);
+    const lines: string[] = [
+      `${RTL}${tWhatsApp(locale, "whatsapp.alertHeader")}`,
+      "",
+      tWhatsApp(locale, "whatsapp.equipmentLine", { equipmentName }),
+      tWhatsApp(locale, "whatsapp.statusLine", { status: statusLabel }),
+      tWhatsApp(locale, "whatsapp.timeLine", { timestamp }),
+    ];
+    if (note) lines.push(tWhatsApp(locale, "whatsapp.noteLine", { note }));
+    lines.push("", tWhatsApp(locale, "whatsapp.footer"));
+    let message = lines.join("\n");
 
     const encoded = encodeURIComponent(message);
     const waUrl = phone

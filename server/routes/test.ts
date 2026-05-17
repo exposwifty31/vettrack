@@ -13,6 +13,7 @@ import {
 } from "../lib/role-notification-scheduler.js";
 import { runExpiryCheckWorker } from "../workers/expiryCheckWorker.js";
 import { runChargeAlertJobForReturn } from "../workers/chargeAlertWorker.js";
+import { apiError as i18nApiError } from "../lib/apiError.js";
 
 const router = Router();
 
@@ -30,6 +31,9 @@ function resolveRequestId(
   return requestId;
 }
 
+// Phase 5-style local envelope helper, retained for the remaining 4xx/5xx
+// branches in this file. Phase 6 PR 6.10 (and subsequent migration PRs)
+// will continue swapping individual sites over to `i18nApiError`.
 function apiError(params: { code: string; reason: string; message: string; requestId: string }) {
   return {
     code: params.code,
@@ -40,34 +44,23 @@ function apiError(params: { code: string; reason: string; message: string; reque
   };
 }
 
-function requireNotProduction(_req: Request, res: Response, next: NextFunction) {
+function requireNotProduction(req: Request, res: Response, next: NextFunction) {
   if (process.env.NODE_ENV === "production") {
-    const requestId = resolveRequestId(res, _req.headers["x-request-id"]);
-    return res.status(403).json(
-      apiError({
-        code: "FORBIDDEN",
-        reason: "NOT_AVAILABLE_IN_PRODUCTION",
-        message: "Not available in production",
-        requestId,
-      }),
-    );
+    // Phase 6 PR 6.3 light adoption (1 of 2): swap the local envelope for
+    // the i18n-aware helper. This branch is a deny gate with no
+    // production client consumer that depends on the legacy envelope
+    // shape; the i18n migration is safe.
+    return i18nApiError(req, res, "errors.test.notAvailableInProduction", undefined, 403);
   }
   next();
 }
 
 router.use(requireNotProduction);
 
-function requireTestMode(_req: Request, res: Response, next: NextFunction) {
+function requireTestMode(req: Request, res: Response, next: NextFunction) {
   if (!isTestMode()) {
-    const requestId = resolveRequestId(res, _req.headers["x-request-id"]);
-    return res.status(404).json(
-      apiError({
-        code: "NOT_FOUND",
-        reason: "TEST_MODE_DISABLED",
-        message: "Not found",
-        requestId,
-      }),
-    );
+    // Phase 6 PR 6.3 light adoption (2 of 2).
+    return i18nApiError(req, res, "errors.notFound", undefined, 404);
   }
   next();
 }

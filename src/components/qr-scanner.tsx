@@ -460,7 +460,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
     try {
       await api.equipment.checkout(scannedEquipment.id);
       haptics.tap();
-      toast.success(`${scannedEquipment.name} checked out`);
+      toast.success(t.scanner.toast.checkedOut(scannedEquipment.name));
       onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Checkout failed";
@@ -486,7 +486,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
         plugInDeadlineMinutes: payload.plugInDeadlineMinutes,
       });
       haptics.tap();
-      toast.success(`${scannedEquipment.name} returned`);
+      toast.success(t.scanner.toast.returned(scannedEquipment.name));
       setReturnDialogOpen(false);
       onClose();
     } catch (err: unknown) {

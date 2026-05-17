@@ -2,6 +2,7 @@ import { useSync } from "@/hooks/use-sync";
 import { AlertTriangle, CloudOff, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { t } from "@/lib/i18n";
 
 /**
  * Sticky banner shown when the offline sync queue has pending or failed items.
@@ -38,8 +39,8 @@ export function SyncStatusBanner() {
 
       <p className="flex-1 text-xs font-medium">
         {hasFailed
-          ? `${failedCount} item${failedCount !== 1 ? "s" : ""} failed to sync`
-          : `${pendingCount} item${pendingCount !== 1 ? "s" : ""} pending sync`}
+          ? t.sync.status.failed(failedCount)
+          : t.sync.status.pending(pendingCount)}
         {isCircuitOpen && " — sync paused, retrying soon"}
       </p>
 
@@ -52,7 +53,7 @@ export function SyncStatusBanner() {
           onClick={() => void triggerSync()}
         >
           <RefreshCw className={["h-3 w-3", isSyncing ? "animate-spin" : ""].join(" ")} />
-          <span className="ml-1">{isSyncing ? "Syncing" : "Retry"}</span>
+          <span className="ml-1">{isSyncing ? t.sync.status.syncing : t.sync.action.retry}</span>
         </Button>
       )}
 

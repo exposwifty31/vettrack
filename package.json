@@ -23,6 +23,8 @@
     "auth:user-status": "tsx scripts/dev-user-status.ts",
     "test": "vitest run",
     "test:signup": "playwright test tests/signup-flow.spec.ts --reporter=list",
+    "i18n:check": "tsx scripts/i18n/check-parity.ts",
+    "i18n:generate-types": "tsx scripts/i18n/generate-types.ts",
     "db:migrate": "tsx scripts/run-migrations.ts",
     "migrate": "tsx scripts/run-migrations.ts",
     "db:push": "drizzle-kit push",

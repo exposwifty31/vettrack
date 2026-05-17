@@ -6,6 +6,7 @@ import { db, drugFormulary } from "../db.js";
 import { normalizeJsonStringArray, syncFormularyFromSeed } from "../lib/formulary-seed-sync.js";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
+import { apiError as i18nApiError } from "../lib/apiError.js";
 
 const router = Router();
 
@@ -291,9 +292,12 @@ router.patch("/:id", requireAuth, requireEffectiveRole("vet"), async (req, res) 
       .limit(1);
 
     if (!existing) {
-      return res.status(404).json(
-        apiError({ code: "NOT_FOUND", reason: "FORMULARY_NOT_FOUND", message: "Formulary entry not found", requestId }),
-      );
+      // Phase 6 PR 6.10 light adoption (1 of 1 in formulary.ts): the
+      // update-not-found branch is the simplest representative site.
+      // The other 13 4xx branches in this file stay on the legacy
+      // envelope for a future migration PR; formulary.ts remains on
+      // the no-untranslated-api-error allowlist.
+      return i18nApiError(req, res, "errors.formulary.notFound", undefined, 404);
     }
 
     const now = new Date();

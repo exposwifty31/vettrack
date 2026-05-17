@@ -134,31 +134,31 @@ export function FormularyAdminSheet({ open, onOpenChange }: Props) {
   const createMut = useMutation({
     mutationFn: () => api.formulary.upsert(formToRequest(form)),
     onSuccess: () => {
-      toast.success("תרופה נוספה");
+      toast.success(t.admin.formulary.toast.added);
       qc.invalidateQueries({ queryKey: ["/api/formulary"] });
       setFormOpen(false);
     },
-    onError: () => toast.error("שגיאה בהוספת תרופה"),
+    onError: () => toast.error(t.admin.formulary.toast.addFailed),
   });
 
   const updateMut = useMutation({
     mutationFn: () => api.formulary.update(editTarget!.id, formToRequest(form)),
     onSuccess: () => {
-      toast.success("תרופה עודכנה");
+      toast.success(t.admin.formulary.toast.updated);
       qc.invalidateQueries({ queryKey: ["/api/formulary"] });
       setFormOpen(false);
     },
-    onError: () => toast.error("שגיאה בעדכון תרופה"),
+    onError: () => toast.error(t.admin.formulary.toast.updateFailed),
   });
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => api.formulary.remove(id),
     onSuccess: () => {
-      toast.success("תרופה הוסרה");
+      toast.success(t.admin.formulary.toast.removed);
       qc.invalidateQueries({ queryKey: ["/api/formulary"] });
       setDeleteTarget(null);
     },
-    onError: () => toast.error("שגיאה בהסרת תרופה"),
+    onError: () => toast.error(t.admin.formulary.toast.removeFailed),
   });
 
   function openCreate() {
@@ -196,16 +196,16 @@ export function FormularyAdminSheet({ open, onOpenChange }: Props) {
         <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col p-0">
           <SheetHeader className="px-4 pt-5 pb-3 border-b">
             <div className="flex items-center justify-between">
-              <SheetTitle>ניהול פורמולריום</SheetTitle>
+              <SheetTitle>{t.admin.formulary.title}</SheetTitle>
               <Button size="sm" onClick={openCreate}>
                 <Plus className="h-4 w-4 mr-1" />
-                הוסף תרופה
+                {t.admin.formulary.addDrug}
               </Button>
             </div>
             <div className="relative mt-2">
               <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="חפש שם תרופה..."
+                placeholder={t.admin.formulary.searchPlaceholder}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="ps-9"
@@ -215,9 +215,9 @@ export function FormularyAdminSheet({ open, onOpenChange }: Props) {
 
           <div className="flex-1 overflow-y-auto divide-y">
             {formularyQ.isPending ? (
-              <p className="text-sm text-muted-foreground p-4">טוען...</p>
+              <p className="text-sm text-muted-foreground p-4">{t.admin.formulary.loading}</p>
             ) : filtered.length === 0 ? (
-              <p className="text-sm text-muted-foreground p-4 text-center">אין תרופות — הוסף ראשון</p>
+              <p className="text-sm text-muted-foreground p-4 text-center">{t.admin.formulary.emptyMessage}</p>
             ) : (
               filtered.map((entry) => (
                 <div key={entry.id} className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-muted/30">
@@ -251,58 +251,58 @@ export function FormularyAdminSheet({ open, onOpenChange }: Props) {
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="max-h-[90dvh] overflow-y-auto max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editTarget ? "ערוך תרופה" : "תרופה חדשה"}</DialogTitle>
+            <DialogTitle>{editTarget ? t.admin.formulary.editTitle : t.admin.formulary.newTitle}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2 text-sm">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>שם תרופה *</Label>
+                <Label>{t.admin.formulary.fieldName}</Label>
                 <Input value={form.name} onChange={f("name")} placeholder="Propofol" />
               </div>
               <div className="space-y-1">
-                <Label>שם גנרי *</Label>
+                <Label>{t.admin.formulary.fieldGenericName}</Label>
                 <Input value={form.genericName} onChange={f("genericName")} placeholder="Propofol" />
               </div>
             </div>
             <div className="space-y-1">
-              <Label>שמות מסחריים (פסיק מפריד)</Label>
+              <Label>{t.admin.formulary.fieldBrandNames}</Label>
               <Input value={form.brandNames} onChange={f("brandNames")} placeholder="Diprivan, Fresofol" />
             </div>
             <div className="space-y-1">
-              <Label>מינים (פסיק מפריד)</Label>
+              <Label>{t.admin.formulary.fieldSpecies}</Label>
               <Input value={form.targetSpecies} onChange={f("targetSpecies")} placeholder="dog, cat" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>קטגוריה</Label>
+                <Label>{t.admin.formulary.fieldCategory}</Label>
                 <Input value={form.category} onChange={f("category")} placeholder="Anesthetic" />
               </div>
               <div className="space-y-1">
-                <Label>נתיב מתן</Label>
+                <Label>{t.admin.formulary.fieldRoute}</Label>
                 <Input value={form.defaultRoute} onChange={f("defaultRoute")} placeholder="IV" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>ריכוז (mg/ml) *</Label>
+                <Label>{t.admin.formulary.fieldConcentration}</Label>
                 <Input type="number" min={0.001} step="any" value={form.concentrationMgMl} onChange={f("concentrationMgMl")} placeholder="10" />
               </div>
               <div className="space-y-1">
-                <Label>מינון סטנדרטי *</Label>
+                <Label>{t.admin.formulary.fieldStandardDose}</Label>
                 <Input type="number" min={0.001} step="any" value={form.standardDose} onChange={f("standardDose")} placeholder="6" />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1">
-                <Label>מינון מינימום</Label>
+                <Label>{t.admin.formulary.fieldMinDose}</Label>
                 <Input type="number" min={0} step="any" value={form.minDose} onChange={f("minDose")} placeholder="4" />
               </div>
               <div className="space-y-1">
-                <Label>מינון מקסימום</Label>
+                <Label>{t.admin.formulary.fieldMaxDose}</Label>
                 <Input type="number" min={0} step="any" value={form.maxDose} onChange={f("maxDose")} placeholder="8" />
               </div>
               <div className="space-y-1">
-                <Label>יחידת מינון</Label>
+                <Label>{t.admin.formulary.fieldDoseUnit}</Label>
                 <Select
                   value={form.doseUnit}
                   onValueChange={(v) => setForm((prev) => ({ ...prev, doseUnit: v as DrugForm["doseUnit"] }))}
@@ -319,14 +319,14 @@ export function FormularyAdminSheet({ open, onOpenChange }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>סוג אריזה</Label>
+                <Label>{t.admin.formulary.fieldUnitType}</Label>
                 <Select
                   value={form.unitType || "__none__"}
                   onValueChange={(v) => setForm((prev) => ({ ...prev, unitType: v === "__none__" ? "" : v as DrugForm["unitType"] }))}
                 >
-                  <SelectTrigger><SelectValue placeholder="— ללא —" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t.admin.formulary.noneOption} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">— ללא —</SelectItem>
+                    <SelectItem value="__none__">{t.admin.formulary.noneOption}</SelectItem>
                     <SelectItem value="vial">Vial</SelectItem>
                     <SelectItem value="ampule">Ampule</SelectItem>
                     <SelectItem value="tablet">Tablet</SelectItem>
@@ -336,19 +336,19 @@ export function FormularyAdminSheet({ open, onOpenChange }: Props) {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label>נפח יחידה (ml)</Label>
+                <Label>{t.admin.formulary.fieldUnitVolume}</Label>
                 <Input type="number" min={0} step="any" value={form.unitVolumeMl} onChange={f("unitVolumeMl")} placeholder="20" />
               </div>
             </div>
             <div className="space-y-1">
-              <Label>הערות מינון</Label>
-              <Textarea value={form.dosageNotes} onChange={f("dosageNotes")} placeholder="הוראות מינון מיוחדות..." rows={2} />
+              <Label>{t.admin.formulary.fieldDosageNotes}</Label>
+              <Textarea value={form.dosageNotes} onChange={f("dosageNotes")} placeholder={t.admin.formulary.dosageNotesPlaceholder} rows={2} />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setFormOpen(false)}>{t.common.cancel}</Button>
             <Button onClick={handleSave} disabled={isPending || !isFormValid}>
-              {isPending ? "שומר..." : "שמור"}
+              {isPending ? t.admin.formulary.saving : t.admin.formulary.save}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -358,9 +358,9 @@ export function FormularyAdminSheet({ open, onOpenChange }: Props) {
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>הסר תרופה?</AlertDialogTitle>
+            <AlertDialogTitle>{t.admin.formulary.removeConfirmTitle}</AlertDialogTitle>
             <AlertDialogDescription>
-              האם להסיר את <strong>{deleteTarget?.name}</strong> מהפורמולריום?
+              {t.admin.formulary.removeConfirmDesc(deleteTarget?.name ?? "")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -369,7 +369,7 @@ export function FormularyAdminSheet({ open, onOpenChange }: Props) {
               onClick={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              הסר
+              {t.admin.formulary.removeAction}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

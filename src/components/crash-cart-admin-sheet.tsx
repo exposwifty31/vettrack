@@ -65,14 +65,14 @@ export function CrashCartAdminSheet({ open, onOpenChange }: Props) {
         expiryWarnDays: form.expiryWarnDays ? parseInt(form.expiryWarnDays) : null,
       }),
     onSuccess: () => {
-      toast.success("פריט נוסף");
+      toast.success(t.admin.crashCart.toast.added);
       qc.invalidateQueries({ queryKey: ["/api/crash-cart/items"] });
       setFormOpen(false);
     },
     onError: (err: unknown) => {
       const msg = String((err as { message?: string })?.message ?? "");
-      if (msg.includes("409") || msg.includes("KEY_EXISTS")) toast.error("מפתח כבר קיים — בחר מפתח אחר");
-      else toast.error("שגיאה בהוספת פריט");
+      if (msg.includes("409") || msg.includes("KEY_EXISTS")) toast.error(t.admin.crashCart.toast.keyExists);
+      else toast.error(t.admin.crashCart.toast.addFailed);
     },
   });
 
@@ -84,21 +84,21 @@ export function CrashCartAdminSheet({ open, onOpenChange }: Props) {
         expiryWarnDays: form.expiryWarnDays ? parseInt(form.expiryWarnDays) : null,
       }),
     onSuccess: () => {
-      toast.success("פריט עודכן");
+      toast.success(t.admin.crashCart.toast.updated);
       qc.invalidateQueries({ queryKey: ["/api/crash-cart/items"] });
       setFormOpen(false);
     },
-    onError: () => toast.error("שגיאה בעדכון פריט"),
+    onError: () => toast.error(t.admin.crashCart.toast.updateFailed),
   });
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => api.crashCartItems.remove(id),
     onSuccess: () => {
-      toast.success("פריט הוסר");
+      toast.success(t.admin.crashCart.toast.removed);
       qc.invalidateQueries({ queryKey: ["/api/crash-cart/items"] });
       setDeleteTarget(null);
     },
-    onError: () => toast.error("שגיאה בהסרת פריט"),
+    onError: () => toast.error(t.admin.crashCart.toast.removeFailed),
   });
 
   function openCreate() {
@@ -131,14 +131,14 @@ export function CrashCartAdminSheet({ open, onOpenChange }: Props) {
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent side="bottom" className="max-h-[80dvh] flex flex-col p-0" dir="rtl">
           <SheetHeader className="px-4 pt-5 pb-3 border-b">
-            <SheetTitle>הגדרת עגלת החייאה</SheetTitle>
+            <SheetTitle>{t.admin.crashCart.title}</SheetTitle>
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto">
             {itemsQ.isPending ? (
-              <p className="text-sm text-muted-foreground p-4">טוען...</p>
+              <p className="text-sm text-muted-foreground p-4">{t.admin.crashCart.loading}</p>
             ) : items.length === 0 ? (
-              <p className="text-sm text-muted-foreground p-4 text-center">אין פריטים — הוסף ראשון</p>
+              <p className="text-sm text-muted-foreground p-4 text-center">{t.admin.crashCart.emptyMessage}</p>
             ) : (
               <div className="divide-y">
                 {items.map((item) => (
@@ -147,8 +147,8 @@ export function CrashCartAdminSheet({ open, onOpenChange }: Props) {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{item.label}</p>
                       <p className="text-xs text-muted-foreground font-mono">
-                        {item.key} · כמות: {item.requiredQty}
-                        {item.expiryWarnDays ? ` · אזהרת תוקף: ${item.expiryWarnDays}ד` : ""}
+                        {t.admin.crashCart.itemSubtitle(item.key, item.requiredQty)}
+                        {item.expiryWarnDays ? t.admin.crashCart.expiryWarnSuffix(item.expiryWarnDays) : ""}
                       </p>
                     </div>
                     <div className="flex gap-1 shrink-0">
@@ -173,7 +173,7 @@ export function CrashCartAdminSheet({ open, onOpenChange }: Props) {
           <div className="p-4 border-t" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
             <Button onClick={openCreate} className="w-full" size="sm">
               <Plus className="h-4 w-4 ml-1" />
-              הוסף פריט
+              {t.admin.crashCart.addItem}
             </Button>
           </div>
         </SheetContent>
@@ -183,11 +183,11 @@ export function CrashCartAdminSheet({ open, onOpenChange }: Props) {
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent dir="rtl">
           <DialogHeader>
-            <DialogTitle>{editTarget ? "ערוך פריט" : "פריט חדש"}</DialogTitle>
+            <DialogTitle>{editTarget ? t.admin.crashCart.editTitle : t.admin.crashCart.newTitle}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1">
-              <Label>מפתח (אנגלית, ללא רווחים)</Label>
+              <Label>{t.admin.crashCart.fieldKey}</Label>
               <Input
                 value={form.key}
                 onChange={(e) => setForm((f) => ({ ...f, key: e.target.value.toLowerCase().replace(/\s+/g, "_") }))}
@@ -197,15 +197,15 @@ export function CrashCartAdminSheet({ open, onOpenChange }: Props) {
               />
             </div>
             <div className="space-y-1">
-              <Label>תווית</Label>
+              <Label>{t.admin.crashCart.fieldLabel}</Label>
               <Input
                 value={form.label}
                 onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
-                placeholder="אפינפרין — זמין ולא פג תוקף"
+                placeholder={t.admin.crashCart.labelPlaceholder}
               />
             </div>
             <div className="space-y-1">
-              <Label>כמות נדרשת</Label>
+              <Label>{t.admin.crashCart.fieldQtyRequired}</Label>
               <Input
                 type="number"
                 min={1}
@@ -215,7 +215,7 @@ export function CrashCartAdminSheet({ open, onOpenChange }: Props) {
               />
             </div>
             <div className="space-y-1">
-              <Label>אזהרת תוקף (ימים, אופציונלי)</Label>
+              <Label>{t.admin.crashCart.fieldExpiryWarn}</Label>
               <Input
                 type="number"
                 min={1}
@@ -229,7 +229,7 @@ export function CrashCartAdminSheet({ open, onOpenChange }: Props) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setFormOpen(false)}>{t.common.cancel}</Button>
             <Button onClick={handleSave} disabled={isPending || !form.label.trim() || !form.key.trim()}>
-              {isPending ? "שומר..." : "שמור"}
+              {isPending ? t.admin.crashCart.saving : t.admin.crashCart.save}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -239,9 +239,9 @@ export function CrashCartAdminSheet({ open, onOpenChange }: Props) {
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent dir="rtl">
           <AlertDialogHeader>
-            <AlertDialogTitle>הסר פריט?</AlertDialogTitle>
+            <AlertDialogTitle>{t.admin.crashCart.removeConfirmTitle}</AlertDialogTitle>
             <AlertDialogDescription>
-              האם להסיר את <strong>{deleteTarget?.label}</strong> מרשימת הבדיקה?
+              {t.admin.crashCart.removeConfirmDesc(deleteTarget?.label ?? "")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -250,7 +250,7 @@ export function CrashCartAdminSheet({ open, onOpenChange }: Props) {
               onClick={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              הסר
+              {t.admin.crashCart.removeAction}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

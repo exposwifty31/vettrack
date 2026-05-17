@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import type { Locale } from "./types.js";
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "./types.js";
+import { INITIAL_LOCALE, SUPPORTED_LOCALES } from "./types.js";
 import { normalizeLocale } from "./loader.js";
 
 declare global {
@@ -22,10 +22,13 @@ export function resolveRequestLocale(req: Request, userLocale?: string | null): 
   const requestOverride = Array.isArray(customHeaderValue) ? customHeaderValue[0] : customHeaderValue;
   const acceptLanguage = req.headers["accept-language"];
   const acceptLanguageValue = Array.isArray(acceptLanguage) ? acceptLanguage[0] : acceptLanguage;
-  const normalized = normalizeLocale(userPreferred ?? requestOverride ?? acceptLanguageValue ?? DEFAULT_LOCALE);
+  // Resolver fallback uses INITIAL_LOCALE (Phase 6 PR 6.2). The dictionary
+  // fallback chain in `loader.getLocaleDictionaries` continues to use
+  // DEFAULT_LOCALE (English) as the structural fallback dict.
+  const normalized = normalizeLocale(userPreferred ?? requestOverride ?? acceptLanguageValue ?? INITIAL_LOCALE);
   if (!SUPPORTED_LOCALES.includes(normalized)) {
-    console.warn(`[i18n] Resolved unsupported locale "${normalized}", defaulting to "${DEFAULT_LOCALE}"`);
-    return DEFAULT_LOCALE;
+    console.warn(`[i18n] Resolved unsupported locale "${normalized}", defaulting to "${INITIAL_LOCALE}"`);
+    return INITIAL_LOCALE;
   }
   return normalized;
 }

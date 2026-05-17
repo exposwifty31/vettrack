@@ -98,10 +98,17 @@ describe("Phase 5 PR 5.0.1 — QR scanner overlay positioning fix", () => {
   });
 
   describe("Behavioural regression bar — locked surfaces unchanged", () => {
-    it("scan-line keyframes block is intact", () => {
+    it("scan-line keyframes block is intact (animation shape may evolve)", () => {
+      // The keyframes name + the 248px sweep distance + the existence of a
+      // `.qr-scan-line` animation rule are the locked surface here. The
+      // duration / timing-function / fill-mode may evolve across phases
+      // (PR 6.1 pre-flight switched from `1.8s ease-in-out` ping-pong to
+      // `1.4s linear infinite alternate` to eliminate endpoint dwell on
+      // mobile Safari). See tests/qr-scan-line-animation.test.ts for the
+      // current canonical shape.
       expect(cssSource).toMatch(/@keyframes\s+qr-scan-line\s*\{/);
       expect(cssSource).toContain("translate3d(0, 248px, 0)");
-      expect(cssSource).toMatch(/\.qr-scan-line\s*\{[\s\S]*?animation:\s*qr-scan-line\s+1\.8s/);
+      expect(cssSource).toMatch(/\.qr-scan-line\s*\{[\s\S]*?animation:\s*qr-scan-line\s+/);
     });
 
     it("scan-line element still rendered inside the 250×250 frame", () => {

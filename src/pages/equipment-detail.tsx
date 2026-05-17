@@ -77,6 +77,7 @@ import {
 } from "@/lib/utils";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
 import { toast } from "sonner";
+import { toastSuccess } from "@/lib/ui-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useSyncQueue } from "@/hooks/use-sync";
 import { MoveRoomSheet } from "@/components/move-room-sheet";
@@ -189,7 +190,8 @@ export default function EquipmentDetailPage() {
       queryClient.setQueryData([`/api/equipment/${id}`], prev);
       invalidateAll();
       queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}/logs`] });
-      toast.success(t.equipmentDetail.toast.undone);
+      // Phase 6 PR 6.4 light adoption (1 of 2): canonical client toast wrapper.
+      toastSuccess(t.equipmentDetail.toast.undone);
       return;
     }
 

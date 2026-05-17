@@ -1,4 +1,7 @@
 {
+  "_meta": {
+    "appointmentsPageTerminology": "User-facing copy uses Tasks/משימות; the key namespace appointmentsPage is frozen for internal compatibility. The vt_appointments table, /appointments route, and appointmentsPage.* key paths are NOT renamed (Phase 6 §17 forbidden). _meta.* keys are non-rendering metadata (Phase 6 §5 invariant 13) — included in parity, never resolved by user-facing helpers, filtered out of the runtime accessor by stripInternalKeys."
+  },
   "common": {
     "appName": "VetTrack",
     "save": "Save",
@@ -20,7 +23,11 @@
     "sterilization": "Sterilization",
     "closeNavigationMenu": "Close navigation menu",
     "openNavigationMenu": "Open navigation menu",
-    "quickSettings": "Quick settings"
+    "quickSettings": "Quick settings",
+    "toast": {
+      "savedSuccess": "Saved",
+      "unexpectedError": "Something went wrong."
+    }
   },
   "status": {
     "ok": "OK",
@@ -1900,6 +1907,35 @@
     "ariaOperationalToggle": "Global ER mode control"
   },
   "appointmentsPage": {
+    "toast": {
+      "taskStarted": "Task started",
+      "taskCompleted": "Task completed",
+      "medicationAcknowledged": "Medication acknowledged — technician notified",
+      "autoUpdated": "Task auto-updated by automation rule",
+      "errorPickTechnician": "Pick a technician before creating a task.",
+      "errorPickDevice": "Select a device / asset.",
+      "errorValidStartEnd": "Enter valid start and end times.",
+      "errorEndAfterStart": "End time must be after start time.",
+      "errorMedicationViaCalculator": "Medication tasks must be created via the medication calculator."
+    },
+    "empty": {
+      "urgentTitle": "No urgent items",
+      "urgentHint": "Everything is on track.",
+      "myTitle": "No assigned tasks",
+      "myHint": "Pick a task from the queue when ready.",
+      "suggestionsTitle": "No suggestions",
+      "suggestionsHint": "Everything looks fine right now."
+    },
+    "statusHint": {
+      "overdue": "{count} overdue — review now",
+      "startNow": "Next task ready — start now",
+      "overloaded": "High load — review urgent tasks",
+      "pickFromQueue": "Queue open — pick a task"
+    },
+    "statusAction": {
+      "viewQueue": "View queue",
+      "reviewUrgent": "Review urgent"
+    },
     "administerMedication": "Administer Medication",
     "startNow": "Start now",
     "markComplete": "Mark complete",
@@ -2076,15 +2112,275 @@
     "queueDegradedHint": "Worker is not responding, circuit is broken, or DLQ has pending jobs.",
     "queueHealthy": "Queue healthy"
   },
+  "sync": {
+    "status": {
+      "syncing": "Syncing…",
+      "pending": "{count, plural, one {# item pending sync} other {# items pending sync}}",
+      "failed": "{count, plural, one {# item failed to sync} other {# items failed to sync}}"
+    },
+    "action": {
+      "retry": "Retry"
+    }
+  },
+  "scanner": {
+    "toast": {
+      "checkedOut": "{name} checked out",
+      "returned": "{name} returned"
+    }
+  },
+  "codeBlue": {
+    "openTitle": "OPEN CODE BLUE",
+    "openButton": "⚠ Open CODE BLUE",
+    "proceedWithoutFullCheck": "Continue without full check",
+    "managerLabel": "Distribution manager",
+    "managerLabelShort": "Distribution manager:",
+    "managerInstruction": "Required. The distribution manager is the responsible vet. Only they can close the event.",
+    "loadingManagers": "Loading manager list…",
+    "noManagersAvailable": "No managers available. Ensure a vet is on site.",
+    "you": "(you)",
+    "selectedManager": "✓ Selected: {name}",
+    "selectOutcome": "Select an outcome to close the event",
+    "selectEquipment": "Select equipment to log",
+    "noEquipmentAvailable": "No equipment available",
+    "noEventsYet": "No events yet",
+    "quickLog": "Quick log",
+    "timeline": "Timeline",
+    "shock": "Electric shock",
+    "compressorSwap": "Compressor swap",
+    "compressorSwapAction": "CPR — compressor swap",
+    "linkedEquipment": "+ Linked equipment",
+    "linkedEquipmentHint": "Ventilator, suction…",
+    "stopCprChooseOutcome": "Stop CPR — choose outcome",
+    "stopCprLocked": "🔒 Stop CPR — available in {countdown}",
+    "managerOnlyHint": "Available to the distribution manager only",
+    "cprCycleLine": "CPR cycle #{n} — {time} until rhythm check",
+    "patientWeightSuffix": "{weight} kg",
+    "role": {
+      "admin": "Admin",
+      "vet": "Vet"
+    },
+    "preCheck": {
+      "title": "Quick cart check",
+      "defib": "Defibrillator charged",
+      "o2": "O2 open",
+      "iv": "IV ready",
+      "drugs": "Drugs available",
+      "ambu": "Ambu bag ready",
+      "cartCheckedBy": "✓ Cart checked by {name}",
+      "cartNotChecked": "⚠ Cart not checked today"
+    },
+    "outcome": {
+      "rosc": "ROSC — return of cardiac activity",
+      "transferred": "Transferred to hospital",
+      "ongoing": "Ongoing — not finished",
+      "died": "Declared death"
+    },
+    "display": {
+      "connectionLost": "Connection lost — retrying…",
+      "awaitingEvent": "Awaiting event…",
+      "autoUpdateNote": "Screen will update automatically within 2 seconds of CODE BLUE opening",
+      "cycle": "Cycle #{n}",
+      "nextCheck": "{time} until rhythm check",
+      "events": "Events",
+      "noEvents": "No events yet",
+      "present": "Present:"
+    },
+    "history": {
+      "adminOnly": "Admin access only",
+      "title": "CODE BLUE History",
+      "loading": "Loading…",
+      "loadFailed": "Failed to load data. Try refreshing the page.",
+      "empty": "No events in history",
+      "minutesShort": "{n} min",
+      "managerOpenedBy": "Manager: {manager} · Opened by: {opener}",
+      "eventStart": "Event start",
+      "eventEnd": "Event end",
+      "cartCheck": "Cart check",
+      "checkStatus": {
+        "passed": "Passed ✓",
+        "failed": "Failed ✗",
+        "notPerformed": "Not performed"
+      },
+      "outcomeLabels": {
+        "died": "Deceased",
+        "transferred": "Transferred",
+        "ongoing": "Ongoing"
+      }
+    },
+    "reconciliation": {
+      "title": "Code Blue Reconciliation",
+      "documentTitle": "Code Blue Reconciliation — VetTrack",
+      "adminRequired": "Admin access required",
+      "backToBilling": "Back to billing",
+      "pageDescription": "Review medications dispensed during emergencies and complete billing. Sessions with unbilled items are shown first.",
+      "loadSessionsFailed": "Failed to load reconciliation sessions",
+      "allClean": "All clear",
+      "noEndedSessions": "No completed Code Blue sessions found",
+      "pendingHeader": "Pending ({count})",
+      "reconciledHeader": "Reconciled ({count})",
+      "unknownPatient": "Unknown patient",
+      "noEndTime": "(no end time)",
+      "badge": {
+        "reconciled": "Reconciled"
+      },
+      "unbilledCount": "{count} unbilled",
+      "billed": "Billed",
+      "billedRatio": "{billed}/{total} billed",
+      "loadDispensesFailed": "Failed to load dispenses",
+      "noDispenses": "No dispenses recorded for this event",
+      "dispensesLabel": "Dispenses",
+      "quantityLabel": "Quantity: {n}",
+      "unbilledLineLabel": "Unbilled",
+      "action": {
+        "marking": "Marking…",
+        "mark": "Mark as reconciled"
+      },
+      "reconciledAt": "Reconciled at {time}",
+      "toast": {
+        "reconciled": "Event marked as reconciled",
+        "reconcileFailed": "Failed to mark as reconciled"
+      }
+    }
+  },
+  "whatsapp": {
+    "status": {
+      "ok": "OK",
+      "issue": "Issue",
+      "maintenance": "Maintenance",
+      "sterilized": "Sterilized",
+      "overdue": "Overdue",
+      "inactive": "Inactive"
+    },
+    "alertHeader": "🚨 VetTrack alert",
+    "equipmentLine": "Equipment: {equipmentName}",
+    "statusLine": "Status: {status}",
+    "timeLine": "Time: {timestamp}",
+    "noteLine": "Note: {note}",
+    "footer": "Please address this promptly."
+  },
+  "admin": {
+    "crashCart": {
+      "title": "Configure crash cart",
+      "loading": "Loading…",
+      "emptyMessage": "No items — add the first one",
+      "itemSubtitle": "{key} · qty: {qty}",
+      "expiryWarnSuffix": " · expiry warning: {days}d",
+      "addItem": "Add item",
+      "editTitle": "Edit item",
+      "newTitle": "New item",
+      "fieldKey": "Key (English, no spaces)",
+      "fieldLabel": "Label",
+      "labelPlaceholder": "Epinephrine — available and not expired",
+      "fieldQtyRequired": "Required quantity",
+      "fieldExpiryWarn": "Expiry warning (days, optional)",
+      "saving": "Saving…",
+      "save": "Save",
+      "removeConfirmTitle": "Remove item?",
+      "removeConfirmDesc": "Remove {label} from the checklist?",
+      "removeAction": "Remove",
+      "toast": {
+        "added": "Item added",
+        "keyExists": "Key already exists — pick another",
+        "addFailed": "Failed to add item",
+        "updated": "Item updated",
+        "updateFailed": "Failed to update item",
+        "removed": "Item removed",
+        "removeFailed": "Failed to remove item"
+      }
+    },
+    "formulary": {
+      "title": "Formulary management",
+      "addDrug": "Add drug",
+      "searchPlaceholder": "Search drug name…",
+      "loading": "Loading…",
+      "emptyMessage": "No drugs — add the first",
+      "editTitle": "Edit drug",
+      "newTitle": "New drug",
+      "fieldName": "Drug name *",
+      "fieldGenericName": "Generic name *",
+      "fieldBrandNames": "Brand names (comma-separated)",
+      "fieldSpecies": "Species (comma-separated)",
+      "fieldCategory": "Category",
+      "fieldRoute": "Administration route",
+      "fieldConcentration": "Concentration (mg/ml) *",
+      "fieldStandardDose": "Standard dose *",
+      "fieldMinDose": "Minimum dose",
+      "fieldMaxDose": "Maximum dose",
+      "fieldDoseUnit": "Dose unit",
+      "fieldUnitType": "Package type",
+      "noneOption": "— none —",
+      "fieldUnitVolume": "Unit volume (ml)",
+      "fieldDosageNotes": "Dosage notes",
+      "dosageNotesPlaceholder": "Special dosing instructions…",
+      "saving": "Saving…",
+      "save": "Save",
+      "removeConfirmTitle": "Remove drug?",
+      "removeConfirmDesc": "Remove {name} from the formulary?",
+      "removeAction": "Remove",
+      "toast": {
+        "added": "Drug added",
+        "addFailed": "Failed to add drug",
+        "updated": "Drug updated",
+        "updateFailed": "Failed to update drug",
+        "removed": "Drug removed",
+        "removeFailed": "Failed to remove drug"
+      }
+    },
+    "csvImport": {
+      "toast": {
+        "pleaseUploadCsv": "Please upload a CSV file"
+      }
+    }
+  },
+  "nfc": {
+    "error": {
+      "invalidContainerTag": "Invalid NFC tag for container",
+      "invalidInventoryItemTag": "Invalid NFC tag for inventory item",
+      "restockSessionRequired": "Open a restock session before scanning item tags",
+      "scanFailed": "Inventory scan failed"
+    }
+  },
   "errors": {
     "server": {
       "internalError": "Internal server error",
       "failedToListEquipment": "Failed to list equipment",
       "failedToGetAuditLogs": "Failed to get audit logs",
       "failedToSeedDemo": "Failed to seed demo data"
+    },
+    "generic": "Something went wrong. Please try again.",
+    "validation": "Request validation failed.",
+    "notFound": "Resource not found.",
+    "conflict": "Conflicting state. Please refresh and try again.",
+    "authority": {
+      "denied": "Action not permitted.",
+      "staleEnforce": "Action unavailable while offline too long.",
+      "oproleRevoked": "Operational role no longer in effect.",
+      "insufficientRole": "Insufficient role for this action.",
+      "checkInRequired": "Clinical check-in required for this action."
+    },
+    "test": {
+      "notAvailableInProduction": "Not available in production."
+    },
+    "dispense": {
+      "internalError": "Internal error processing dispense."
+    },
+    "stability": {
+      "notAvailableInProduction": "Not available in production."
+    },
+    "er": {
+      "notAuthenticated": "Authentication required.",
+      "internalError": "Internal error in ER admin operation."
+    },
+    "formulary": {
+      "notFound": "Formulary entry not found.",
+      "internalError": "Internal error in formulary operation."
     }
   },
   "push": {
+    "role": {
+      "reminderForEquipment": "Reminder: return {equipmentName} to its place",
+      "adminSummaryCount": "{count} items not returned in the current shift"
+    },
     "overdue": {
       "title": "Overdue tasks",
       "body": "You have {count} overdue task",

@@ -60,10 +60,20 @@ function useCprCycleBeep(elapsedMs: number, active: boolean) {
 
 // ─── Drug dose calculator ─────────────────────────────────────────────────────
 
+// Drug catalog: clinical data, NOT localizable copy. Drug names
+// (English) match the formulary table's `name` field convention; units
+// (mg, units) are also data, not UI text. Per Phase 6 PR 6.7 follow-up
+// correction (CORRECTION 1): this catalog is owned by code-blue.tsx
+// inline rather than the locale dict, because clinical drug
+// identifiers belong with the data, not with i18n copy. The formulary
+// schema is the canonical source for these drugs' English names
+// (`shared/drug-formulary-seed.ts`); a future schema enhancement could
+// add localized name columns, at which point this array could be
+// replaced by a formulary query without further locale-dict changes.
 const DRUGS = [
-  { key: "epi",         label: "אפינפרין",   dosePerKg: 0.01, unit: "מ״ג", category: "drug" as const },
-  { key: "atropine",    label: "אטרופין",    dosePerKg: 0.04, unit: "מ״ג", category: "drug" as const },
-  { key: "vasopressin", label: "וזופרסין",   dosePerKg: 0.8,  unit: "יח׳", category: "drug" as const },
+  { key: "epi",         label: "Epinephrine", dosePerKg: 0.01, unit: "mg",    category: "drug" as const },
+  { key: "atropine",    label: "Atropine",    dosePerKg: 0.04, unit: "mg",    category: "drug" as const },
+  { key: "vasopressin", label: "Vasopressin", dosePerKg: 0.8,  unit: "units", category: "drug" as const },
 ];
 
 // ─── Manager picker (for non-eligible users) ─────────────────────────────────
@@ -83,7 +93,7 @@ function ManagerPicker({ onSelect }: { onSelect: (id: string, name: string) => v
 
   return (
     <div className="flex flex-col gap-2">
-      {managersQ.isPending && <p className="text-xs text-zinc-500">טוען רשימת רופאים...</p>}
+      {managersQ.isPending && <p className="text-xs text-zinc-500">{t.codeBlue.loadingManagers}</p>}
       {managersQ.data?.map((m) => (
         <button
           key={m.id}
@@ -91,11 +101,11 @@ function ManagerPicker({ onSelect }: { onSelect: (id: string, name: string) => v
           onClick={() => onSelect(m.id, m.name)}
           className="p-2 rounded border border-zinc-700 bg-zinc-800 text-sm text-zinc-200 text-right hover:bg-zinc-700"
         >
-          {m.name} ({m.role === "admin" ? "מנהל" : "רופא"})
+          {m.name} ({m.role === "admin" ? t.codeBlue.role.admin : t.codeBlue.role.vet})
         </button>
       ))}
       {managersQ.data?.length === 0 && (
-        <p className="text-xs text-red-400">אין רופאים זמינים. יש לוודא שרופא נמצא בשטח.</p>
+        <p className="text-xs text-red-400">{t.codeBlue.noManagersAvailable}</p>
       )}
     </div>
   );
@@ -103,17 +113,20 @@ function ManagerPicker({ onSelect }: { onSelect: (id: string, name: string) => v
 
 // ─── Pre-check gate ──────────────────────────────────────────────────────────
 
-const QUICK_CHECK_ITEMS = [
-  { key: "defib",  label: "דפיברילטור טעון" },
-  { key: "o2",     label: "חמצן פתוח" },
-  { key: "iv",     label: "עירוי IV מוכן" },
-  { key: "drugs",  label: "תרופות זמינות" },
-  { key: "ambu",   label: "אמבו מוכן" },
-];
-
 function PreCheckGate({ onStart }: { onStart: (passed: boolean, manager: { id: string; name: string }) => void }) {
   const { userId, role, name } = useAuth();
   const isEligibleManager = role === "vet" || role === "admin";
+  // Built per-render so a runtime locale switch
+  // (`setStoredLocale` → `refreshTranslations`) reflows the labels.
+  // Module-level capture froze the labels at first import (Codex P2
+  // finding on PR #338).
+  const QUICK_CHECK_ITEMS = [
+    { key: "defib",  label: t.codeBlue.preCheck.defib },
+    { key: "o2",     label: t.codeBlue.preCheck.o2 },
+    { key: "iv",     label: t.codeBlue.preCheck.iv },
+    { key: "drugs",  label: t.codeBlue.preCheck.drugs },
+    { key: "ambu",   label: t.codeBlue.preCheck.ambu },
+  ];
   const [checked, setChecked] = useState<Record<string, boolean>>(
     Object.fromEntries(QUICK_CHECK_ITEMS.map((i) => [i.key, false])),
   );
@@ -134,26 +147,26 @@ function PreCheckGate({ onStart }: { onStart: (passed: boolean, manager: { id: s
     <div className="min-h-screen bg-zinc-950 p-4 max-w-md mx-auto" dir="rtl">
       <div className="flex items-center gap-2 mb-6 text-red-400">
         <AlertTriangle className="h-6 w-6" />
-        <h1 className="text-xl font-bold">פתיחת CODE BLUE</h1>
+        <h1 className="text-xl font-bold">{t.codeBlue.openTitle}</h1>
       </div>
 
       {/* Manager designation */}
       <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-4 mb-4">
         <h2 className="text-sm font-semibold text-zinc-400 mb-3 flex items-center gap-2">
-          <Shield className="h-4 w-4" /> מנהל ההפצה
+          <Shield className="h-4 w-4" /> {t.codeBlue.managerLabel}
         </h2>
         <p className="text-xs text-zinc-500 mb-3">
-          חובה. מנהל ההפצה הוא הרופא האחראי. רק הוא יוכל לסגור את האירוע.
+          {t.codeBlue.managerInstruction}
         </p>
         {isEligibleManager ? (
           <div className="rounded border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-zinc-200">
-            {name} (אתה)
+            {name} {t.codeBlue.you}
           </div>
         ) : (
           <>
             <ManagerPicker onSelect={(id, n) => { setManagerId(id); setManagerName(n); }} />
             {managerId && (
-              <div className="mt-2 text-xs text-green-400">✓ נבחר: {managerName}</div>
+              <div className="mt-2 text-xs text-green-400">{t.codeBlue.selectedManager(managerName)}</div>
             )}
           </>
         )}
@@ -161,7 +174,7 @@ function PreCheckGate({ onStart }: { onStart: (passed: boolean, manager: { id: s
 
       {/* Quick pre-check */}
       <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-4 mb-4">
-        <h2 className="text-sm font-semibold text-zinc-400 mb-3">בדיקה מהירה של עגלה</h2>
+        <h2 className="text-sm font-semibold text-zinc-400 mb-3">{t.codeBlue.preCheck.title}</h2>
         <div className="flex flex-col gap-2">
           {QUICK_CHECK_ITEMS.map((item) => (
             <button
@@ -187,7 +200,7 @@ function PreCheckGate({ onStart }: { onStart: (passed: boolean, manager: { id: s
         disabled={!managerId}
         onClick={() => handleStart(allChecked)}
       >
-        ⚠ פתח CODE BLUE
+        {t.codeBlue.openButton}
       </Button>
       {!allChecked && (
         <button
@@ -195,7 +208,7 @@ function PreCheckGate({ onStart }: { onStart: (passed: boolean, manager: { id: s
           className="w-full mt-2 text-xs text-zinc-500 hover:text-zinc-400"
           onClick={() => handleStart(false)}
         >
-          המשך ללא בדיקה מלאה
+          {t.codeBlue.proceedWithoutFullCheck}
         </button>
       )}
     </div>
@@ -204,18 +217,20 @@ function PreCheckGate({ onStart }: { onStart: (passed: boolean, manager: { id: s
 
 // ─── Outcome modal ───────────────────────────────────────────────────────────
 
-const OUTCOMES = [
-  { value: "rosc",        label: "ROSC — חזרת פעילות לב" },
-  { value: "transferred", label: "הועבר לבית חולים" },
-  { value: "ongoing",     label: "ממשיך — לא הסתיים" },
-  { value: "died",        label: "הכרזת מוות" },
-];
-
 function OutcomeModal({ onClose }: { onClose: (outcome: string) => void }) {
+  // Built per-render so a runtime locale switch reflows the labels.
+  // Module-level capture froze the labels at first import (Codex P2
+  // finding on PR #338).
+  const OUTCOMES = [
+    { value: "rosc",        label: t.codeBlue.outcome.rosc },
+    { value: "transferred", label: t.codeBlue.outcome.transferred },
+    { value: "ongoing",     label: t.codeBlue.outcome.ongoing },
+    { value: "died",        label: t.codeBlue.outcome.died },
+  ];
   return (
     <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 p-4" dir="rtl">
       <div className="w-full max-w-md bg-zinc-900 rounded-t-2xl border border-zinc-700 p-4">
-        <h2 className="text-base font-bold text-white mb-4 text-center">בחר תוצאה לסיום האירוע</h2>
+        <h2 className="text-base font-bold text-white mb-4 text-center">{t.codeBlue.selectOutcome}</h2>
         <div className="flex flex-col gap-2">
           {OUTCOMES.map((o) => (
             <button
@@ -258,7 +273,7 @@ function EquipmentPicker({ onSelect, onClose }: { onSelect: (item: EquipmentItem
   return (
     <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 p-4" dir="rtl">
       <div className="w-full max-w-md bg-zinc-900 rounded-t-2xl border border-zinc-700 p-4">
-        <h2 className="text-base font-bold text-white mb-4">בחר ציוד לתיעוד</h2>
+        <h2 className="text-base font-bold text-white mb-4">{t.codeBlue.selectEquipment}</h2>
         <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
           {equipQ.data?.map((item) => (
             <button
@@ -270,7 +285,7 @@ function EquipmentPicker({ onSelect, onClose }: { onSelect: (item: EquipmentItem
               {item.name}
             </button>
           ))}
-          {equipQ.data?.length === 0 && <p className="text-zinc-500 text-sm">אין ציוד זמין</p>}
+          {equipQ.data?.length === 0 && <p className="text-zinc-500 text-sm">{t.codeBlue.noEquipmentAvailable}</p>}
         </div>
         <button type="button" className="w-full mt-3 text-xs text-zinc-500" onClick={onClose}>{t.common.cancel}</button>
       </div>
@@ -344,25 +359,25 @@ function ActiveSession() {
             : "bg-amber-500/10 border-amber-500/20 text-amber-400",
         )}>
           {cartStatus.allPassed
-            ? `✓ עגלה נבדקה ע״י ${cartStatus.performedByName}`
-            : "⚠ עגלה לא נבדקה היום"}
+            ? t.codeBlue.preCheck.cartCheckedBy(cartStatus.performedByName)
+            : t.codeBlue.preCheck.cartNotChecked}
         </div>
       ) : (
         <div className="px-4 py-1.5 text-xs bg-amber-500/10 border-b border-amber-500/20 text-amber-400">
-          ⚠ עגלה לא נבדקה היום
+          {t.codeBlue.preCheck.cartNotChecked}
         </div>
       )}
 
       {/* Manager badge */}
       <div className="px-4 py-2 bg-zinc-900/50 border-b border-zinc-800 text-xs text-zinc-400 flex items-center gap-2">
         <Shield className="h-3.5 w-3.5 text-blue-400" />
-        מנהל הפצה: <span className="text-blue-300 font-semibold">{session.managerUserName}</span>
+        {t.codeBlue.managerLabelShort} <span className="text-blue-300 font-semibold">{session.managerUserName}</span>
       </div>
 
       {/* Patient banner */}
       {session.patientName && (
         <div className="px-4 py-2 bg-zinc-900/30 border-b border-zinc-800 text-xs text-amber-300">
-          🐕 {session.patientName}{session.patientWeight ? ` — ${session.patientWeight} ק״ג` : ""}
+          🐕 {session.patientName}{session.patientWeight ? ` — ${t.codeBlue.patientWeightSuffix(session.patientWeight)}` : ""}
         </div>
       )}
 
@@ -372,13 +387,13 @@ function ActiveSession() {
           {formatElapsed(elapsed)}
         </div>
         <div className="text-xs text-zinc-500 mt-2">
-          מחזור CPR #{cprCycle} — {formatElapsed(msToNext)} לבדיקת קצב
+          {t.codeBlue.cprCycleLine(cprCycle, formatElapsed(msToNext))}
         </div>
       </div>
 
       {/* Quick log grid */}
       <div className="p-4 border-b border-zinc-800">
-        <div className="text-xs text-zinc-500 tracking-widest uppercase mb-3">תיעוד מהיר</div>
+        <div className="text-xs text-zinc-500 tracking-widest uppercase mb-3">{t.codeBlue.quickLog}</div>
         <div className="grid grid-cols-2 gap-2">
           {DRUGS.map((drug) => {
             const dose = session.patientWeight
@@ -398,26 +413,26 @@ function ActiveSession() {
           })}
           <button
             type="button"
-            onClick={() => logEntry({ label: "הלם חשמלי", category: "shock" })}
+            onClick={() => logEntry({ label: t.codeBlue.shock, category: "shock" })}
             className="bg-yellow-900/60 hover:bg-yellow-800/60 border border-yellow-800/50 rounded-lg p-3 text-center"
           >
             <Zap className="h-5 w-5 text-yellow-300 mx-auto mb-1" />
-            <div className="text-white font-bold text-sm">הלם חשמלי</div>
+            <div className="text-white font-bold text-sm">{t.codeBlue.shock}</div>
           </button>
           <button
             type="button"
-            onClick={() => logEntry({ label: "CPR — החלפת מדחס", category: "cpr" })}
+            onClick={() => logEntry({ label: t.codeBlue.compressorSwapAction, category: "cpr" })}
             className="bg-blue-900/60 hover:bg-blue-800/60 border border-blue-800/50 rounded-lg p-3 text-center"
           >
-            <div className="text-white font-bold text-sm">החלפת מדחס</div>
+            <div className="text-white font-bold text-sm">{t.codeBlue.compressorSwap}</div>
           </button>
           <button
             type="button"
             onClick={() => setShowEquipPicker(true)}
             className="col-span-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg p-3 text-center"
           >
-            <div className="text-zinc-200 font-bold text-sm">+ ציוד מחובר</div>
-            <div className="text-zinc-500 text-xs mt-0.5">מכשיר הנשמה, שאיבה...</div>
+            <div className="text-zinc-200 font-bold text-sm">{t.codeBlue.linkedEquipment}</div>
+            <div className="text-zinc-500 text-xs mt-0.5">{t.codeBlue.linkedEquipmentHint}</div>
           </button>
         </div>
       </div>
@@ -431,7 +446,7 @@ function ActiveSession() {
 
       {/* Timeline */}
       <div className="p-4 border-b border-zinc-800">
-        <div className="text-xs text-zinc-500 tracking-widest uppercase mb-3">ציר זמן</div>
+        <div className="text-xs text-zinc-500 tracking-widest uppercase mb-3">{t.codeBlue.timeline}</div>
         <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
           {[...logEntries].reverse().map((entry) => (
             <div key={entry.id} className="flex gap-3 text-xs items-baseline">
@@ -441,7 +456,7 @@ function ActiveSession() {
             </div>
           ))}
           {logEntries.length === 0 && (
-            <p className="text-xs text-zinc-600">אין אירועים עדיין</p>
+            <p className="text-xs text-zinc-600">{t.codeBlue.noEventsYet}</p>
           )}
         </div>
       </div>
@@ -454,16 +469,16 @@ function ActiveSession() {
               className="w-full bg-zinc-700 hover:bg-zinc-600 text-white font-bold py-4"
               onClick={() => setShowOutcomeModal(true)}
             >
-              עצור CPR — בחר תוצאה
+              {t.codeBlue.stopCprChooseOutcome}
             </Button>
           ) : (
             <div className="rounded-lg bg-zinc-900 border border-zinc-700 p-4 text-center text-zinc-500 text-sm">
-              🔒 עצור CPR — זמין בעוד {gateCountdown}
+              {t.codeBlue.stopCprLocked(gateCountdown)}
             </div>
           )
         ) : (
           <div className="rounded-lg bg-zinc-900 border border-zinc-700 p-4 text-center text-zinc-600 text-xs">
-            זמין למנהל הפצה בלבד
+            {t.codeBlue.managerOnlyHint}
           </div>
         )}
       </div>

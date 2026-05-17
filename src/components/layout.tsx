@@ -285,7 +285,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     if (assetId.startsWith("inv-container:")) {
       const containerId = assetId.slice("inv-container:".length).trim();
       if (!containerId) {
-        toast.error("תווית NFC לא חוקית עבור מכל");
+        toast.error(t.nfc.error.invalidContainerTag);
         return;
       }
       const rawActive = safeStorageGetItem("vt_active_restock_session");
@@ -310,12 +310,12 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     if (assetId.startsWith("inv-item:")) {
       const nfcTagId = assetId.slice("inv-item:".length).trim();
       if (!nfcTagId) {
-        toast.error("תווית NFC לא חוקית עבור פריט מלאי");
+        toast.error(t.nfc.error.invalidInventoryItemTag);
         return;
       }
       const raw = safeStorageGetItem("vt_active_restock_session");
       if (!raw) {
-        toast.error("פתח סשן מילוי מחדש לפני סריקת תוויות פריטים");
+        toast.error(t.nfc.error.restockSessionRequired);
         return;
       }
       try {
@@ -342,7 +342,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
         return;
       } catch {
         haptics.error();
-        toast.error("סריקת מלאי נכשלה");
+        toast.error(t.nfc.error.scanFailed);
         return;
       }
     }

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { Upload, Download, AlertTriangle, CheckCircle2, Loader2, X } from "lucide-react";
+import { t } from "@/lib/i18n";
 
 const CSV_TEMPLATE =
   "name,serial,status,location,folder,maintenanceIntervalDays,notes\n" +
@@ -158,7 +159,7 @@ export function CsvImportDialog({ open, onOpenChange }: Props) {
     e.target.value = "";
 
     if (!file.name.endsWith(".csv") && file.type !== "text/csv" && file.type !== "text/plain") {
-      toast.error("אנא העלה קובץ CSV");
+      toast.error(t.admin.csvImport.toast.pleaseUploadCsv);
       return;
     }
 

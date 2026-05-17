@@ -399,17 +399,24 @@
  * top: 0, so a 248px translateY sweeps it to the bottom edge. Keep the
  * distance hardcoded — using var() inside @keyframes is unreliable on iOS
  * WebView and was the source of the "frozen at the bottom" regression.
+ *
+ * The keyframes are one-way (from→to) and the animation uses `alternate` so
+ * the line sweeps top→bottom then bottom→top continuously. Combined with
+ * `linear` timing this removes the endpoint dwell that an ease-in-out
+ * ping-pong produces — the prior shape (`0%,100% { 0 } 50% { 248px }` +
+ * `ease-in-out`) spent enough time near the endpoints on mobile Safari that
+ * the line read as "pinned near the top".
  */
 @keyframes qr-scan-line {
-  0%, 100% { transform: translate3d(0, 0, 0); }
-  50%      { transform: translate3d(0, 248px, 0); }
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(0, 248px, 0); }
 }
 
 .qr-scan-line {
   top: 0;
   transform: translate3d(0, 0, 0);
   will-change: transform;
-  animation: qr-scan-line 1.8s ease-in-out infinite;
+  animation: qr-scan-line 1.4s linear infinite alternate;
 }
 
 /* ── QR scanner overlay root height — Phase 5 PR 5.0.1 + PR 5.4 ───────── */

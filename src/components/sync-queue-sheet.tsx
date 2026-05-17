@@ -180,7 +180,7 @@ function SyncQueueItem({
               ) : (
                 <RotateCcw className="w-3 h-3" />
               )}
-              Retry
+              {t.sync.action.retry}
             </Button>
             <Button
               size="sm"

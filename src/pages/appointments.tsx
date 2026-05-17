@@ -24,6 +24,7 @@ import { useTaskRecommendations } from "@/hooks/useTaskRecommendations";
 import { useAuth } from "@/hooks/use-auth";
 import type { Appointment, AppointmentStatus, CreateAppointmentRequest, TaskPriority } from "@/types";
 import { toast } from "sonner";
+import { toastSuccess } from "@/lib/ui-toast";
 
 const DAY_START_HOUR = 8;
 const DAY_END_HOUR = 20;
@@ -517,7 +518,10 @@ export default function AppointmentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/appointments", day], exact: true });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", meUserId ?? ""], exact: true });
-      toast.success("משימה התחילה");
+      // Phase 6 PR 6.4 light adoption (2 of 2): canonical client toast wrapper +
+      // extract the Hebrew literal to locale dict. Full appointments.tsx
+      // migration lands in PR 6.8.
+      toastSuccess(t.appointmentsPage.toast.taskStarted);
     },
     onError: (error: Error) => {
       toast.error(toErrorMessage(error));
@@ -529,7 +533,7 @@ export default function AppointmentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/appointments", day], exact: true });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", meUserId ?? ""], exact: true });
-      toast.success("משימה הושלמה");
+      toast.success(t.appointmentsPage.toast.taskCompleted);
     },
     onError: (error: Error) => {
       toast.error(toErrorMessage(error));
@@ -541,7 +545,7 @@ export default function AppointmentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/appointments", day], exact: true });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", meUserId ?? ""], exact: true });
-      toast.success("תרופה אושרה — טכנאי קיבל הודעה");
+      toast.success(t.appointmentsPage.toast.medicationAcknowledged);
     },
     onError: (error: Error) => {
       toast.error(toErrorMessage(error));
@@ -563,7 +567,7 @@ export default function AppointmentsPage() {
       return;
     }
     if (event.type === "AUTOMATION_TRIGGERED") {
-      toast.info("משימה עודכנה אוטומטית על ידי כלל אוטומציה");
+      toast.info(t.appointmentsPage.toast.autoUpdated);
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", meUserId ?? ""], exact: true });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/recommendations"], exact: true });
       return;
@@ -645,27 +649,27 @@ export default function AppointmentsPage() {
     }
 
     if (!formVetId.trim()) {
-      toast.error("בחר טכנאי לפני יצירת משימה.");
+      toast.error(t.appointmentsPage.toast.errorPickTechnician);
       return;
     }
     if (!formAnimalId.trim()) {
-      toast.error("נדרש לבחור מכשיר / נכס.");
+      toast.error(t.appointmentsPage.toast.errorPickDevice);
       return;
     }
 
     const start = new Date(formStartLocal);
     const end = new Date(formEndLocal);
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      toast.error("הזן שעות התחלה וסיום תקינות.");
+      toast.error(t.appointmentsPage.toast.errorValidStartEnd);
       return;
     }
     if (end.getTime() <= start.getTime()) {
-      toast.error("שעת הסיום חייבת להיות אחרי שעת ההתחלה.");
+      toast.error(t.appointmentsPage.toast.errorEndAfterStart);
       return;
     }
 
     if (isMedicationForm) {
-      toast.error("משימות תרופות חייבות להיווצר דרך מחשבון התרופות.");
+      toast.error(t.appointmentsPage.toast.errorMedicationViaCalculator);
       return;
     }
 
@@ -898,8 +902,8 @@ export default function AppointmentsPage() {
                 {(dashboardQuery.data?.overdue.length ?? 0) === 0 && (recommendationsQuery.data?.urgentTasks.length ?? 0) === 0 ? (
                   <EmptyState
                     icon={CheckCircle2}
-                    message="אין דחוף כרגע"
-                    subMessage="הכל במסלול תקין."
+                    message={t.appointmentsPage.empty.urgentTitle}
+                    subMessage={t.appointmentsPage.empty.urgentHint}
                   action={(
                     <Button
                       size="sm"
@@ -1061,8 +1065,8 @@ export default function AppointmentsPage() {
               ) : (dashboardQuery.data?.myTasks.length ?? 0) === 0 ? (
                 <EmptyState
                   icon={CheckCircle2}
-                  message="אין משימות מוקצות"
-                  subMessage="בחר משימה מהתור כשאתה מוכן."
+                  message={t.appointmentsPage.empty.myTitle}
+                  subMessage={t.appointmentsPage.empty.myHint}
                   action={(
                     <Button
                       size="sm"
@@ -1172,8 +1176,8 @@ export default function AppointmentsPage() {
             ) : (recommendationsQuery.data?.suggestions.length ?? 0) === 0 ? (
               <EmptyState
                 icon={CheckCircle2}
-                message="אין הצעות"
-                subMessage="הכל נראה תקין כרגע."
+                message={t.appointmentsPage.empty.suggestionsTitle}
+                subMessage={t.appointmentsPage.empty.suggestionsHint}
                 action={canCreateTask ? (
                   <Button
                     size="sm"
@@ -1196,12 +1200,12 @@ export default function AppointmentsPage() {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="font-medium">
                         {suggestion.type === "OVERDUE_WARNING"
-                          ? `${dashboardQuery.data?.counts.overdue ?? 0} באיחור — סקור עכשיו`
+                          ? t.appointmentsPage.statusHint.overdue(dashboardQuery.data?.counts.overdue ?? 0)
                           : suggestion.type === "START_NOW"
-                            ? "המשימה הבאה מוכנה — התחל עכשיו"
+                            ? t.appointmentsPage.statusHint.startNow
                             : suggestion.type === "OVERLOADED"
-                              ? "עומס גבוה — סקור משימות דחופות"
-                              : "התור פתוח — בחר משימה"}
+                              ? t.appointmentsPage.statusHint.overloaded
+                              : t.appointmentsPage.statusHint.pickFromQueue}
                       </span>
                       <Button
                         size="sm"
@@ -1220,8 +1224,8 @@ export default function AppointmentsPage() {
                         {suggestion.type === "START_NOW"
                           ? t.appointmentsPage.startNow
                             : suggestion.type === "PICK_FROM_QUEUE"
-                            ? "צפה בתור"
-                              : "סקור דחופות"}
+                            ? t.appointmentsPage.statusAction.viewQueue
+                              : t.appointmentsPage.statusAction.reviewUrgent}
                       </Button>
                     </div>
                   </li>

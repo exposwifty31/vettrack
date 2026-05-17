@@ -11,6 +11,7 @@ import {
   testModeEnabled,
 } from "../lib/test-runner.js";
 import { getActionLogs, clearActionLogs, logAction } from "../lib/stability-log.js";
+import { apiError as i18nApiError } from "../lib/apiError.js";
 
 const router = Router();
 
@@ -38,17 +39,15 @@ function apiError(params: { code: string; reason: string; message: string; reque
   };
 }
 
-function requireNotProduction(_req: Request, res: Response, next: NextFunction) {
+function requireNotProduction(req: Request, res: Response, next: NextFunction) {
   if (process.env.NODE_ENV === "production") {
-    const requestId = resolveRequestId(res, _req.headers["x-request-id"]);
-    return res.status(403).json(
-      apiError({
-        code: "FORBIDDEN",
-        reason: "NOT_AVAILABLE_IN_PRODUCTION",
-        message: "Not available in production",
-        requestId,
-      }),
-    );
+    // Phase 6 PR 6.10 light adoption (1 of 1 in stability.ts): swap the
+    // local envelope for the i18n-aware `apiError`. Remaining 4xx
+    // branches in this file (test-mode required, schedule update, etc.)
+    // stay on the legacy local helper for a future migration PR — the
+    // file remains on the no-untranslated-api-error allowlist until
+    // full migration.
+    return i18nApiError(req, res, "errors.stability.notAvailableInProduction", undefined, 403);
   }
   next();
 }

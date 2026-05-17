@@ -125,7 +125,10 @@ describe("Code Blue display page", () => {
   });
 
   it.skipIf(display === null)("display page shows standby message when no session", () => {
-    expect(display).toContain("ממתין");
+    // Phase 6 PR 6.7 migrated the literal "ממתין לאירוע..." to
+    // t.codeBlue.display.awaitingEvent. Assert the accessor + locale
+    // dict are wired up.
+    expect(display).toContain("t.codeBlue.display.awaitingEvent");
   });
 });
 

@@ -7,6 +7,7 @@ import { resolveAuditActorRole } from "../lib/audit.js";
 import { applyGlobalErModeToggle } from "../lib/er-mode-toggle.js";
 import { canManageErModeForUser } from "../lib/er-mode-permissions.js";
 import { getClinicErModeState } from "../lib/er-mode.js";
+import { apiError as i18nApiError } from "../lib/apiError.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -33,7 +34,8 @@ router.post("/toggle-global-mode", async (req: Request, res: Response) => {
 
   const user = req.authUser;
   if (!user) {
-    res.status(401).json(apiError({ code: "UNAUTHORIZED", reason: "NOT_AUTHENTICATED", message: "Authentication required", requestId }));
+    // Phase 6 PR 6.10 light adoption (1 of 1 in er-admin.ts).
+    i18nApiError(req, res, "errors.er.notAuthenticated", undefined, 401);
     return;
   }
 

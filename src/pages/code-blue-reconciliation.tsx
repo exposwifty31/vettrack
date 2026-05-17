@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { ShieldAlert, ChevronDown, ChevronRight, CheckCircle2, AlertCircle, Receipt } from "lucide-react";
 import { Link } from "wouter";
 import type { CodeBlueReconciliationSession, CodeBlueDispense } from "@/types";
+import { t } from "@/lib/i18n";
 
 function formatCents(cents: number): string {
   return `₪${(cents / 100).toFixed(2)}`;
@@ -43,10 +44,10 @@ function SessionRow({ session }: { session: CodeBlueReconciliationSession }) {
   const reconcileMut = useMutation({
     mutationFn: () => api.codeBlue.reconcile(session.sessionId),
     onSuccess: () => {
-      toast.success("ההפעלה סומנה כגושרת");
+      toast.success(t.codeBlue.reconciliation.toast.reconciled);
       qc.invalidateQueries({ queryKey: ["/api/code-blue/reconciliation"] });
     },
-    onError: () => toast.error("סימון כגשור נכשל"),
+    onError: () => toast.error(t.codeBlue.reconciliation.toast.reconcileFailed),
   });
 
   const unbilledCount = session.dispenseCount - session.billedCount;
@@ -67,34 +68,34 @@ function SessionRow({ session }: { session: CodeBlueReconciliationSession }) {
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-sm">
-              {session.patientName ?? "מטופל לא ידוע"}
+              {session.patientName ?? t.codeBlue.reconciliation.unknownPatient}
             </span>
             {isReconciled ? (
               <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-200 text-xs">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
-                גושר
+                {t.codeBlue.reconciliation.badge.reconciled}
               </Badge>
             ) : unbilledCount > 0 ? (
               <Badge className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-200 text-xs">
                 <AlertCircle className="h-3 w-3 mr-1" />
-                {unbilledCount} ללא חיוב
+                {t.codeBlue.reconciliation.unbilledCount(unbilledCount)}
               </Badge>
             ) : (
               <Badge className="bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-950/50 dark:text-sky-200 text-xs">
-                חויב
+                {t.codeBlue.reconciliation.billed}
               </Badge>
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
             {formatDateTime(session.startedAt)}
-            {session.endedAt ? ` – ${formatDateTime(session.endedAt)}` : " (ללא שעת סיום)"}
+            {session.endedAt ? ` – ${formatDateTime(session.endedAt)}` : ` ${t.codeBlue.reconciliation.noEndTime}`}
           </p>
         </div>
 
         <div className="text-right shrink-0">
           <p className="text-sm font-medium">{formatCents(session.totalBilledCents)}</p>
           <p className="text-xs text-muted-foreground">
-            {session.billedCount}/{session.dispenseCount} חויב
+            {t.codeBlue.reconciliation.billedRatio(session.billedCount, session.dispenseCount)}
           </p>
         </div>
       </button>
@@ -109,17 +110,17 @@ function SessionRow({ session }: { session: CodeBlueReconciliationSession }) {
           )}
 
           {dispensesQ.isError && (
-            <p className="text-sm text-destructive">טעינת החלוקות נכשלה</p>
+            <p className="text-sm text-destructive">{t.codeBlue.reconciliation.loadDispensesFailed}</p>
           )}
 
           {dispensesQ.data && dispensesQ.data.length === 0 && (
-            <p className="text-sm text-muted-foreground">לא נרשמו חלוקות להפעלה זו</p>
+            <p className="text-sm text-muted-foreground">{t.codeBlue.reconciliation.noDispenses}</p>
           )}
 
           {dispensesQ.data && dispensesQ.data.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                חלוקות
+                {t.codeBlue.reconciliation.dispensesLabel}
               </p>
               {dispensesQ.data.map((d: CodeBlueDispense) => (
                 <div
@@ -131,13 +132,13 @@ function SessionRow({ session }: { session: CodeBlueReconciliationSession }) {
                     <p className="text-xs text-muted-foreground">{formatDateTime(d.dispensedAt)}</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-xs">כמות: {Math.abs(d.quantityDispensed)}</p>
+                    <p className="text-xs">{t.codeBlue.reconciliation.quantityLabel(Math.abs(d.quantityDispensed))}</p>
                     {d.billedCents != null ? (
                       <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
                         {formatCents(d.billedCents)}
                       </p>
                     ) : (
-                      <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">ללא חיוב</p>
+                      <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">{t.codeBlue.reconciliation.unbilledLineLabel}</p>
                     )}
                   </div>
                 </div>
@@ -154,13 +155,13 @@ function SessionRow({ session }: { session: CodeBlueReconciliationSession }) {
               disabled={reconcileMut.isPending}
             >
               <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              {reconcileMut.isPending ? "מסמן..." : "סמן כגושר"}
+              {reconcileMut.isPending ? t.codeBlue.reconciliation.action.marking : t.codeBlue.reconciliation.action.mark}
             </Button>
           )}
 
           {isReconciled && session.reconciledAt && (
             <p className="text-xs text-muted-foreground">
-              גושר ב-{formatDateTime(session.reconciledAt)}
+              {t.codeBlue.reconciliation.reconciledAt(formatDateTime(session.reconciledAt))}
             </p>
           )}
         </div>
@@ -184,7 +185,7 @@ export default function CodeBlueReconciliationPage() {
   if (!isAdmin) {
     return (
       <Layout>
-        <div className="p-8 text-center text-muted-foreground">נדרשת גישת מנהל</div>
+        <div className="p-8 text-center text-muted-foreground">{t.codeBlue.reconciliation.adminRequired}</div>
       </Layout>
     );
   }
@@ -196,26 +197,25 @@ export default function CodeBlueReconciliationPage() {
   return (
     <Layout>
       <Helmet>
-        <title>גישור קוד כחול — VetTrack</title>
+        <title>{t.codeBlue.reconciliation.documentTitle}</title>
       </Helmet>
 
       <div className="w-full space-y-6 motion-safe:animate-page-enter">
-        {/* כותרת */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             <ShieldAlert className="h-7 w-7 shrink-0 text-destructive" aria-hidden />
-            <h1 className="truncate text-2xl font-bold tracking-tight">גישור קוד כחול</h1>
+            <h1 className="truncate text-2xl font-bold tracking-tight">{t.codeBlue.reconciliation.title}</h1>
           </div>
           <Link href="/billing">
             <Button variant="outline" size="sm" className="gap-1.5">
               <Receipt className="h-4 w-4" />
-              חזרה לחיובים
+              {t.codeBlue.reconciliation.backToBilling}
             </Button>
           </Link>
         </div>
 
         <p className="text-sm text-muted-foreground max-w-2xl">
-          סקור תרופות שחולקו בזמן מקרי חירום ואשר השלמת חיוב. הפעלות עם פריטים שלא חויבו מוצגות ראשונות.
+          {t.codeBlue.reconciliation.pageDescription}
         </p>
 
         {sessionsQ.isPending && (
@@ -227,21 +227,21 @@ export default function CodeBlueReconciliationPage() {
         )}
 
         {sessionsQ.isError && (
-          <ErrorCard message="טעינת הפעלות הגישור נכשלה" />
+          <ErrorCard message={t.codeBlue.reconciliation.loadSessionsFailed} />
         )}
 
         {!sessionsQ.isPending && !sessionsQ.isError && sessions.length === 0 && (
           <EmptyState
             icon={CheckCircle2}
-            message="הכל תקין"
-            subMessage="לא נמצאו הפעלות קוד כחול שהסתיימו"
+            message={t.codeBlue.reconciliation.allClean}
+            subMessage={t.codeBlue.reconciliation.noEndedSessions}
           />
         )}
 
         {pending.length > 0 && (
           <section className="space-y-2">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              ממתין ({pending.length})
+              {t.codeBlue.reconciliation.pendingHeader(pending.length)}
             </h2>
             {pending.map((s) => (
               <SessionRow key={s.sessionId} session={s} />
@@ -252,7 +252,7 @@ export default function CodeBlueReconciliationPage() {
         {done.length > 0 && (
           <section className="space-y-2">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              גושר ({done.length})
+              {t.codeBlue.reconciliation.reconciledHeader(done.length)}
             </h2>
             {done.map((s) => (
               <SessionRow key={s.sessionId} session={s} />
