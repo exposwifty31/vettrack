@@ -66,6 +66,16 @@ Items tracked here are known limitations, deferred work, or architectural compro
 
 ---
 
+### MEDIUM — SW activate wipes the entire previous cache generation
+
+**What:** `public/sw.js` activate handler deletes every `vettrack-*` cache whose name differs from the new `CACHE_NAME`. With the Phase 9 per-build cache naming (`vettrack-${version}-${ts}`), every deploy invalidates 100% of the prior generation's cached chunks, including assets the previous SW just lazily cached during the same load. A stale-shell race against this wholesale wipe is the underlying condition the Phase 10 `index.html` recovery script papers over.
+
+**Impact:** Mostly hidden by the new recovery script (one reload on the affected session). Increases first-load latency after every deploy because nothing carries over. Adds reload pressure on installed PWAs.
+
+**Resolution path:** Investigate a generation-aware retention strategy — e.g. keep the most recent N cache buckets, or migrate compatible entries from the previous bucket into the new one on activate. **Out of scope for Phase 10** (no SW lifecycle / fetch / install semantics changes). Re-evaluate when the recovery script's reload-count telemetry signals a high enough recovery rate to justify the work.
+
+---
+
 ## Resolved Items
 
 | Item | Resolved In |

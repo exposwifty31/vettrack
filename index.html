@@ -2,6 +2,160 @@
 <html lang="he" dir="rtl">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Installed-PWA blank-screen recovery. If a built /assets/* script
+      // fails to load — typically when the SW serves a stale index.html
+      // whose hashed bundle URL no longer exists on the server, or when
+      // the chunk was evicted by an activate-time cache wipe — React
+      // never mounts and the user sees a blank window with no reload
+      // affordance. Recover once by unregistering all service workers,
+      // deleting every vettrack-* cache, and reloading.
+      //
+      // Loop guard: a sessionStorage flag (auto-clears on PWA window
+      // close) blocks reload loops. When sessionStorage is unavailable
+      // (private browsing, restricted WebViews, storage-full conditions),
+      // we fall back to a one-shot URL query parameter that survives the
+      // reload. If both guards are unavailable we refuse to reload at all
+      // rather than risk a loop in a standalone PWA window with no
+      // address bar / stop button.
+      (function () {
+        var STORAGE_GUARD_KEY = "vt_blank_recovery_inflight";
+        var URL_GUARD_PARAM = "_vt_recovered";
+
+        function isBuiltAssetScript(target) {
+          return (
+            target &&
+            target.tagName === "SCRIPT" &&
+            typeof target.src === "string" &&
+            target.src.indexOf("/assets/") !== -1
+          );
+        }
+
+        function readUrlGuard() {
+          try {
+            return (
+              new URL(window.location.href).searchParams.get(URL_GUARD_PARAM) ===
+              "1"
+            );
+          } catch (e) {
+            return false;
+          }
+        }
+
+        function stripUrlGuard() {
+          try {
+            var url = new URL(window.location.href);
+            if (!url.searchParams.has(URL_GUARD_PARAM)) return;
+            url.searchParams.delete(URL_GUARD_PARAM);
+            var qs = url.searchParams.toString();
+            var path =
+              url.pathname + (qs ? "?" + qs : "") + (url.hash || "");
+            window.history.replaceState(null, "", path);
+          } catch (e) {}
+        }
+
+        // Snapshot the URL guard before stripping; this is the in-memory
+        // signal that we just completed a recovery on this navigation.
+        var alreadyRecoveredThisNavigation = readUrlGuard();
+        if (alreadyRecoveredThisNavigation) stripUrlGuard();
+
+        function readStorageGuard() {
+          try {
+            return sessionStorage.getItem(STORAGE_GUARD_KEY) === "1";
+          } catch (e) {
+            return false;
+          }
+        }
+
+        function writeStorageGuard() {
+          try {
+            sessionStorage.setItem(STORAGE_GUARD_KEY, "1");
+            return true;
+          } catch (e) {
+            return false;
+          }
+        }
+
+        function reload(useUrlFallback) {
+          if (useUrlFallback) {
+            try {
+              var url = new URL(window.location.href);
+              url.searchParams.set(URL_GUARD_PARAM, "1");
+              window.location.replace(url.toString());
+              return;
+            } catch (e) {
+              // URL construction / navigation API threw — refuse to reload
+              // rather than risk a loop with no guard in place.
+              return;
+            }
+          }
+          try {
+            window.location.reload();
+          } catch (e) {}
+        }
+
+        function recover(useUrlFallback) {
+          var pending = [];
+          try {
+            if ("serviceWorker" in navigator) {
+              pending.push(
+                navigator.serviceWorker
+                  .getRegistrations()
+                  .then(function (regs) {
+                    return Promise.all(
+                      regs.map(function (r) {
+                        return r.unregister().catch(function () {});
+                      })
+                    );
+                  })
+                  .catch(function () {})
+              );
+            }
+            if (typeof caches !== "undefined" && caches.keys) {
+              pending.push(
+                caches
+                  .keys()
+                  .then(function (keys) {
+                    return Promise.all(
+                      keys
+                        .filter(function (k) {
+                          return k.indexOf("vettrack-") === 0;
+                        })
+                        .map(function (k) {
+                          return caches.delete(k).catch(function () {});
+                        })
+                    );
+                  })
+                  .catch(function () {})
+              );
+            }
+          } catch (e) {}
+          var done = function () {
+            reload(useUrlFallback);
+          };
+          if (pending.length === 0) return done();
+          Promise.all(pending).then(done, done);
+        }
+
+        window.addEventListener(
+          "error",
+          function (event) {
+            if (!isBuiltAssetScript(event.target)) return;
+            // Already recovered on this navigation (URL marker present on
+            // load) or earlier in this session (sessionStorage marker set).
+            if (alreadyRecoveredThisNavigation) return;
+            if (readStorageGuard()) return;
+            // Try to persist a guard. If sessionStorage works we'll loop-guard
+            // via storage on the next load; otherwise we'll loop-guard via
+            // the URL parameter set by reload(true). If neither can be set,
+            // reload(true) will refuse to reload at all.
+            var persisted = writeStorageGuard();
+            recover(!persisted);
+          },
+          true
+        );
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
