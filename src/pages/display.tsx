@@ -1,8 +1,18 @@
 // src/pages/display.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { connectRealtime, disconnectRealtime, EventIngestor } from "@/lib/realtime";
+import {
+  connectRealtime,
+  disconnectRealtime,
+  EventIngestor,
+  publishBuildTagGossip,
+  publishCodeBlueSeenGossip,
+} from "@/lib/realtime";
 import { useDisplaySnapshot } from "@/hooks/useDisplaySnapshot";
+import { useKioskWakeLock } from "@/hooks/useKioskWakeLock";
+import { useDisplayHeartbeat } from "@/hooks/useDisplayHeartbeat";
+import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
+import { useCodeBlueKeepaliveReconciliation } from "@/hooks/useCodeBlueKeepaliveReconciliation";
 import type {
   DisplaySnapshot,
   DisplaySnapshotHospitalization,
@@ -518,6 +528,26 @@ export default function WardDisplayPage() {
   const qc = useQueryClient();
   const realtimeIngestor = useMemo(() => new EventIngestor(qc), [qc]);
 
+  // Phase 9 PR 9.2 — kiosk-only wake-lock + operational heartbeat.
+  // `?kiosk=1` opts a Department Display surface into TV-grade behavior:
+  // screen wake-lock with bounded reacquire discipline. Non-kiosk views of
+  // /display (e.g. an operator's tab) do not request the wake-lock.
+  const kioskMode = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return new URL(window.location.href).searchParams.get("kiosk") === "1";
+    } catch {
+      return false;
+    }
+  }, []);
+
+  useKioskWakeLock(kioskMode);
+
+  // Phase 9 PR 9.3 — visibility / pageshow / online / resume reconciliation.
+  // Centralized so display, ER, and other realtime-consuming pages share one
+  // implementation and never drift apart.
+  useRealtimeReconciliation({ queryClient: qc, ingestor: realtimeIngestor });
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -538,6 +568,50 @@ export default function WardDisplayPage() {
   }, [qc, realtimeIngestor]);
 
   const snapshot = useDisplaySnapshot();
+
+  // Phase 9 PR 9.2 — heartbeat (operational-only). Always runs while the
+  // display surface is mounted; never gates rendering or any clinical path.
+  useDisplayHeartbeat({ kioskMode });
+
+  // Phase 9 PR 9.4 — Code Blue keepalive reconciliation. Compares the local
+  // snapshot's active session id against the server's keepalive. After a
+  // 5 s grace window on persistent disagreement, forces a snapshot refetch.
+  // The overlay is never cleared locally — server snapshots drive overlay
+  // visibility.
+  useCodeBlueKeepaliveReconciliation({
+    queryClient: qc,
+    getLocalActiveSessionId: () => snapshot?.codeBlueSession?.id ?? null,
+  });
+
+  // Phase 9 PR 9.6 — BroadcastChannel split-version gossip.
+  // On focus, gossip this tab's build tag so other tabs detect divergence
+  // and surface the existing update banner once. Best-effort, no leader
+  // election, no consensus.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    function onFocus(): void {
+      publishBuildTagGossip();
+    }
+    window.addEventListener("focus", onFocus);
+    publishBuildTagGossip();
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+
+  // Phase 9 PR 9.6 — Code Blue split-brain gossip. When the active CB
+  // session id this tab is rendering changes, gossip it so peer tabs can
+  // re-establish baseline if they disagree.
+  //
+  // Skip the publish while `snapshot` is still loading on first mount:
+  // the initial render produces `localCbId = null` before this tab
+  // actually knows the server's CB state. Publishing a premature `null`
+  // would wake peer tabs during an active emergency and have them all
+  // re-fetch baseline based on this tab's not-yet-loaded view.
+  const snapshotLoaded = snapshot !== undefined;
+  const localCbId = snapshot?.codeBlueSession?.id ?? null;
+  useEffect(() => {
+    if (!snapshotLoaded) return;
+    publishCodeBlueSeenGossip(localCbId);
+  }, [snapshotLoaded, localCbId]);
 
   if (!snapshot) {
     return (

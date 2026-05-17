@@ -7,6 +7,7 @@ import { db, eventOutbox } from "../db.js";
 import { outboxEmitter, type PublishedOutboxRow } from "../lib/event-publisher.js";
 import { incrementMetric } from "../lib/metrics.js";
 import { subscribe, unsubscribe } from "../lib/realtime.js";
+import { recordStreamConnect, startKeepalive } from "../lib/code-blue-keepalive.js";
 
 const MAX_OUTBOX_REPLAY = 1000;
 
@@ -267,17 +268,163 @@ router.get("/outbox-head", requireAuth, async (req, res) => {
   }
 });
 
+// Phase 9 PR 9.4 — code blue propagation latency buckets accepted via the
+// existing telemetry endpoint. The set of allowed values is a closed enum;
+// anything else is silently rejected (no new metric series).
+const ALLOWED_CB_PROPAGATION_BUCKETS = ["lt_1s", "lt_3s", "lt_15s", "gte_15s"] as const;
+type CbPropagationBucket = (typeof ALLOWED_CB_PROPAGATION_BUCKETS)[number];
+
+function isAllowedPropagationBucket(value: unknown): value is CbPropagationBucket {
+  return typeof value === "string" && (ALLOWED_CB_PROPAGATION_BUCKETS as readonly string[]).includes(value);
+}
+
+// Phase 9 PR 9.5 — offline emergency mutation blocking. Bounded enum; the
+// sessionStorage buffer itself is never posted, only the endpoint class.
+const ALLOWED_EMERGENCY_BLOCKED_CLASSES = ["start", "log", "end", "presence"] as const;
+type EmergencyBlockedClass = (typeof ALLOWED_EMERGENCY_BLOCKED_CLASSES)[number];
+
+function isAllowedEmergencyBlockedClass(value: unknown): value is EmergencyBlockedClass {
+  return typeof value === "string" && (ALLOWED_EMERGENCY_BLOCKED_CLASSES as readonly string[]).includes(value);
+}
+
+// Phase 9 PR 9.7 — bounded enums for the remaining §3.9 telemetry surfaces.
+const ALLOWED_FORCED_RESYNC_TRIGGERS = [
+  "visibility",
+  "pageshow",
+  "online",
+  "version_mismatch",
+  "gap",
+  "peer_ahead",
+  "emergency_uncertain",
+] as const;
+type ForcedResyncTrigger = (typeof ALLOWED_FORCED_RESYNC_TRIGGERS)[number];
+function isAllowedForcedResyncTrigger(value: unknown): value is ForcedResyncTrigger {
+  return (
+    typeof value === "string" &&
+    (ALLOWED_FORCED_RESYNC_TRIGGERS as readonly string[]).includes(value)
+  );
+}
+
+const ALLOWED_SW_RELOAD_SURFACES = ["active", "idle", "kiosk"] as const;
+type SwReloadSurface = (typeof ALLOWED_SW_RELOAD_SURFACES)[number];
+function isAllowedSwReloadSurface(value: unknown): value is SwReloadSurface {
+  return (
+    typeof value === "string" &&
+    (ALLOWED_SW_RELOAD_SURFACES as readonly string[]).includes(value)
+  );
+}
+
 /** Best-effort client telemetry for duplicate sequence drops and gap-driven resyncs (see admin outbox-health). */
 router.post("/telemetry", requireAuth, (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
-    const body = req.body as { duplicateDrop?: unknown; gapResync?: unknown };
+    // Phase 9 PR 9.7 — basic shape validation. The body must be a JSON
+    // object; anything else (null, array, primitive) is silently rejected
+    // and recorded in the bounded shape-rejection counter.
+    if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+      incrementMetric("telemetry_payload_rejected_shape");
+      return res.status(200).json({ ok: true, requestId });
+    }
+    // All recognized fields are declared in a single type assertion so we
+    // never re-cast `body` to read additional fields. Each field is
+    // narrowed against its own bounded enum (or boolean) below; unknown
+    // values are dropped silently into the bounded
+    // `telemetry_payload_rejected_*` counters.
+    const body = req.body as {
+      duplicateDrop?: unknown;
+      gapResync?: unknown;
+      codeBluePropagationBucket?: unknown;
+      codeBlueWakeRecovery?: unknown;
+      codeBlueSnapshotFallback?: unknown;
+      emergencyDegradedEntered?: unknown;
+      emergencyDegradedRecovered?: unknown;
+      offlineEmergencyMutationBlocked?: unknown;
+      displayForcedResyncTrigger?: unknown;
+      splitVersionClientDetected?: unknown;
+      swUpdateConflict?: unknown;
+      swForcedReloadSurface?: unknown;
+      swForcedReloadLoopSuppressed?: unknown;
+      displayWakeLockReacquireExhausted?: unknown;
+    };
     if (body?.duplicateDrop === true) {
       incrementMetric("realtime_duplicate_drops");
     }
     if (body?.gapResync === true) {
       incrementMetric("realtime_gap_resync");
     }
+    // Phase 9 PR 9.4 — bounded enum validation. Invalid bucket values are
+    // dropped without creating new metric series; the mismatch is recorded
+    // in the bounded `telemetry_payload_rejected_enum_mismatch` counter so
+    // there's an observability signal (matches the contract of every other
+    // bounded-enum field in this handler).
+    if (body?.codeBluePropagationBucket !== undefined) {
+      if (isAllowedPropagationBucket(body.codeBluePropagationBucket)) {
+        const bucket = body.codeBluePropagationBucket;
+        if (bucket === "lt_1s") incrementMetric("code_blue_propagation_observed_lt_1s");
+        else if (bucket === "lt_3s") incrementMetric("code_blue_propagation_observed_lt_3s");
+        else if (bucket === "lt_15s") incrementMetric("code_blue_propagation_observed_lt_15s");
+        else if (bucket === "gte_15s") incrementMetric("code_blue_propagation_observed_gte_15s");
+      } else {
+        incrementMetric("telemetry_payload_rejected_enum_mismatch");
+      }
+    }
+    if (body?.codeBlueWakeRecovery === true) incrementMetric("code_blue_wake_recovery");
+    if (body?.codeBlueSnapshotFallback === true) incrementMetric("code_blue_snapshot_fallback");
+    if (body?.emergencyDegradedEntered === true) incrementMetric("realtime_emergency_degraded");
+    if (body?.emergencyDegradedRecovered === true) incrementMetric("realtime_emergency_degraded_recovered");
+    // Phase 9 PR 9.5 — bounded enum validation. Invalid endpoint_class values
+    // are dropped silently without creating new metric series.
+    if (body?.offlineEmergencyMutationBlocked !== undefined) {
+      if (isAllowedEmergencyBlockedClass(body.offlineEmergencyMutationBlocked)) {
+        const blockedClass = body.offlineEmergencyMutationBlocked;
+        if (blockedClass === "start") incrementMetric("offline_emergency_mutation_blocked_start");
+        else if (blockedClass === "log") incrementMetric("offline_emergency_mutation_blocked_log");
+        else if (blockedClass === "end") incrementMetric("offline_emergency_mutation_blocked_end");
+        else if (blockedClass === "presence") incrementMetric("offline_emergency_mutation_blocked_presence");
+      } else {
+        incrementMetric("telemetry_payload_rejected_enum_mismatch");
+      }
+    }
+
+    // Phase 9 PR 9.7 — display forced-resync triggers (bounded enum).
+    if (body?.displayForcedResyncTrigger !== undefined) {
+      if (isAllowedForcedResyncTrigger(body.displayForcedResyncTrigger)) {
+        const trigger = body.displayForcedResyncTrigger;
+        if (trigger === "visibility") incrementMetric("display_forced_resync_visibility");
+        else if (trigger === "pageshow") incrementMetric("display_forced_resync_pageshow");
+        else if (trigger === "online") incrementMetric("display_forced_resync_online");
+        else if (trigger === "version_mismatch") incrementMetric("display_forced_resync_version_mismatch");
+        else if (trigger === "gap") incrementMetric("display_forced_resync_gap");
+        else if (trigger === "peer_ahead") incrementMetric("display_forced_resync_peer_ahead");
+        else if (trigger === "emergency_uncertain") incrementMetric("display_forced_resync_emergency_uncertain");
+      } else {
+        incrementMetric("telemetry_payload_rejected_enum_mismatch");
+      }
+    }
+
+    if (body?.splitVersionClientDetected === true) {
+      incrementMetric("split_version_client_detected");
+    }
+    if (body?.swUpdateConflict === true) {
+      incrementMetric("sw_update_conflict");
+    }
+    if (body?.swForcedReloadLoopSuppressed === true) {
+      incrementMetric("sw_forced_reload_loop_suppressed");
+    }
+    if (body?.displayWakeLockReacquireExhausted === true) {
+      incrementMetric("display_wake_lock_reacquire_exhausted");
+    }
+    const swReloadSurface = body?.swForcedReloadSurface;
+    if (swReloadSurface !== undefined) {
+      if (isAllowedSwReloadSurface(swReloadSurface)) {
+        if (swReloadSurface === "active") incrementMetric("sw_forced_reload_active");
+        else if (swReloadSurface === "idle") incrementMetric("sw_forced_reload_idle");
+        else if (swReloadSurface === "kiosk") incrementMetric("sw_forced_reload_kiosk");
+      } else {
+        incrementMetric("telemetry_payload_rejected_enum_mismatch");
+      }
+    }
+
     res.status(200).json({ ok: true, requestId });
   } catch (err) {
     console.error("[realtime-route] telemetry failed", err);
@@ -342,9 +489,18 @@ router.get("/stream", requireAuth, async (req, res) => {
       else incrementMetric("realtime_events_sent");
     };
 
+    // Phase 9 PR 9.4 — record this connect for reconnect-storm detection and
+    // start the structured KEEPALIVE emitter for this connection. The
+    // keepalive carries `activeCodeBlueSessionId` so the client can detect
+    // missed CODE_BLUE_STARTED / CODE_BLUE_ENDED events and force a snapshot
+    // refetch when its local view disagrees with the server.
+    recordStreamConnect(clinicId);
+    const stopKeepalive = startKeepalive(res, clinicId);
+
     finalize = () => {
       if (cleaned) return;
       cleaned = true;
+      stopKeepalive();
       outboxEmitter.off(`clinic:${clinicId}`, onOutbox);
       unsubscribe(res);
       try {

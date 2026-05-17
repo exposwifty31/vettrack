@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingSection } from "@/components/ui/loading-section";
 import { ShiftSummarySheet } from "@/components/shift-summary-sheet";
 import { computeAlerts } from "@/lib/utils";
+import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -64,6 +65,11 @@ export default function HomePage() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [shiftSummaryOpen, setShiftSummaryOpen] = useState(false);
   const searchStr = useSearch();
+
+  // Phase 9 PR 9.3 — visibility / pageshow / online / resume reconciliation.
+  // Home is a top-level operational dashboard; ensure it converges after
+  // suspend/resume cycles even without a per-page EventIngestor.
+  useRealtimeReconciliation({ queryClient });
 
   useEffect(() => {
     const params = new URLSearchParams(searchStr);

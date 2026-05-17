@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { getAliveCount as getDisplayHeartbeatsAlive } from "./display-heartbeat-store.js";
 
 type MetricName =
   | "tasks_created"
@@ -187,7 +188,60 @@ type MetricName =
   | "clinical_invariant_emergency_bypass_total"
   | "clinical_invariant_fail_open_total"
   | "clinical_invariant_fail_closed_total"
-  | "clinical_invariant_evaluator_failure_total";
+  | "clinical_invariant_evaluator_failure_total"
+  // Phase 9 PR 9.2 — Department Display heartbeat + kiosk wake-lock.
+  // Bounded enum labels are encoded as separate counter names (the existing
+  // pattern). The kiosk_mode label of `display_heartbeats_received_total`
+  // from §3.9 is fanned out into _kiosk and _non_kiosk counters.
+  | "display_heartbeats_received_kiosk"
+  | "display_heartbeats_received_non_kiosk"
+  | "display_wake_lock_reacquire_exhausted"
+  // Phase 9 PR 9.4 — Code Blue runtime reliability.
+  // Bounded enum labels from §3.9 are fanned out into individual counter
+  // names. No PII / userId / clinicId / requestId labels.
+  | "realtime_reconnect_storm_detected"
+  | "realtime_emergency_degraded"
+  | "realtime_emergency_degraded_recovered"
+  | "code_blue_wake_recovery"
+  | "code_blue_snapshot_fallback"
+  | "code_blue_propagation_observed_lt_1s"
+  | "code_blue_propagation_observed_lt_3s"
+  | "code_blue_propagation_observed_lt_15s"
+  | "code_blue_propagation_observed_gte_15s"
+  // Phase 9 PR 9.5 — offline emergency mutation blocking.
+  // Bounded endpoint_class enum fanned out into individual counters.
+  | "offline_emergency_mutation_blocked_start"
+  | "offline_emergency_mutation_blocked_log"
+  | "offline_emergency_mutation_blocked_end"
+  | "offline_emergency_mutation_blocked_presence"
+  // Phase 9 PR 9.7 — observability fan-out for the remaining §3.9 counters.
+  // All labels are encoded as separate counter names (no Prometheus labels).
+  | "display_forced_resync_visibility"
+  | "display_forced_resync_pageshow"
+  | "display_forced_resync_online"
+  | "display_forced_resync_version_mismatch"
+  | "display_forced_resync_gap"
+  | "display_forced_resync_peer_ahead"
+  | "display_forced_resync_emergency_uncertain"
+  | "split_version_client_detected"
+  | "sw_update_conflict"
+  | "sw_forced_reload_active"
+  | "sw_forced_reload_idle"
+  | "sw_forced_reload_kiosk"
+  | "sw_forced_reload_loop_suppressed"
+  | "telemetry_payload_rejected_enum_mismatch"
+  | "telemetry_payload_rejected_shape"
+  // Tombstone — declared per plan §3.9 bounded enum
+  // `telemetry_payload_rejected_total{reason="enum_mismatch|shape|rate_limit"}`
+  // but never incremented by Phase 9. The telemetry endpoint relies on
+  // the global per-IP API limiter for rate enforcement; that path returns
+  // 429 before reaching the handler and is not counted here. A future PR
+  // that adds endpoint-local rate limiting (e.g. per-displaySessionId
+  // throttling that returns 200 + drops to this counter) will wire the
+  // increment. Until then dashboards must treat this value as
+  // "rate-limit drops counted at the handler" — not "no rate limiting
+  // active". Documented here so operators don't misread a 0.
+  | "telemetry_payload_rejected_rate_limit";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -468,6 +522,70 @@ export interface MetricsSnapshot {
     failClosedTotal: number;
     evaluatorFailureTotal: number;
   };
+  /** Phase 9 PR 9.2 — Department Display heartbeat + kiosk wake-lock. */
+  display: {
+    heartbeats: {
+      received: {
+        kiosk: number;
+        nonKiosk: number;
+      };
+      /** Gauge: distinct sessions with an accepted heartbeat in the last 60s. */
+      alive: number;
+    };
+    wakeLock: {
+      reacquireExhausted: number;
+    };
+  };
+  /** Phase 9 PR 9.4 — Code Blue runtime reliability. */
+  phase9Realtime: {
+    reconnectStormDetected: number;
+    emergencyDegraded: number;
+    emergencyDegradedRecovered: number;
+  };
+  phase9CodeBlue: {
+    wakeRecovery: number;
+    snapshotFallback: number;
+    propagationObserved: {
+      lt_1s: number;
+      lt_3s: number;
+      lt_15s: number;
+      gte_15s: number;
+    };
+  };
+  /** Phase 9 PR 9.5 — offline emergency mutation blocking. */
+  phase9OfflineEmergency: {
+    blocked: {
+      start: number;
+      log: number;
+      end: number;
+      presence: number;
+    };
+  };
+  /** Phase 9 PR 9.7 — observability fan-out. */
+  phase9Observability: {
+    displayForcedResync: {
+      visibility: number;
+      pageshow: number;
+      online: number;
+      versionMismatch: number;
+      gap: number;
+      peerAhead: number;
+      emergencyUncertain: number;
+    };
+    splitVersionClientDetected: number;
+    swUpdateConflict: number;
+    swForcedReload: {
+      active: number;
+      idle: number;
+      kiosk: number;
+    };
+    swForcedReloadLoopSuppressed: number;
+    telemetryPayloadRejected: {
+      enumMismatch: number;
+      shape: number;
+      rateLimit: number;
+    };
+  };
   timestamp: string;
 }
 
@@ -615,6 +733,42 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   clinical_invariant_fail_open_total: 0,
   clinical_invariant_fail_closed_total: 0,
   clinical_invariant_evaluator_failure_total: 0,
+  // Phase 9 PR 9.2 — Department Display heartbeat + kiosk wake-lock.
+  display_heartbeats_received_kiosk: 0,
+  display_heartbeats_received_non_kiosk: 0,
+  display_wake_lock_reacquire_exhausted: 0,
+  // Phase 9 PR 9.4 — Code Blue runtime reliability.
+  realtime_reconnect_storm_detected: 0,
+  realtime_emergency_degraded: 0,
+  realtime_emergency_degraded_recovered: 0,
+  code_blue_wake_recovery: 0,
+  code_blue_snapshot_fallback: 0,
+  code_blue_propagation_observed_lt_1s: 0,
+  code_blue_propagation_observed_lt_3s: 0,
+  code_blue_propagation_observed_lt_15s: 0,
+  code_blue_propagation_observed_gte_15s: 0,
+  // Phase 9 PR 9.5 — offline emergency mutation blocking.
+  offline_emergency_mutation_blocked_start: 0,
+  offline_emergency_mutation_blocked_log: 0,
+  offline_emergency_mutation_blocked_end: 0,
+  offline_emergency_mutation_blocked_presence: 0,
+  // Phase 9 PR 9.7 — observability fan-out for the remaining §3.9 counters.
+  display_forced_resync_visibility: 0,
+  display_forced_resync_pageshow: 0,
+  display_forced_resync_online: 0,
+  display_forced_resync_version_mismatch: 0,
+  display_forced_resync_gap: 0,
+  display_forced_resync_peer_ahead: 0,
+  display_forced_resync_emergency_uncertain: 0,
+  split_version_client_detected: 0,
+  sw_update_conflict: 0,
+  sw_forced_reload_active: 0,
+  sw_forced_reload_idle: 0,
+  sw_forced_reload_kiosk: 0,
+  sw_forced_reload_loop_suppressed: 0,
+  telemetry_payload_rejected_enum_mismatch: 0,
+  telemetry_payload_rejected_shape: 0,
+  telemetry_payload_rejected_rate_limit: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -690,6 +844,14 @@ export function incrementMetric(name: string, value: number = 1): void {
     }
   } catch {
     // Metrics are best-effort and must never impact request or worker paths.
+  }
+}
+
+function safeGetDisplayHeartbeatsAlive(): number {
+  try {
+    return getDisplayHeartbeatsAlive();
+  } catch {
+    return 0;
   }
 }
 
@@ -919,6 +1081,65 @@ export function getMetricsSnapshot(): MetricsSnapshot {
         failClosedTotal: metrics.clinical_invariant_fail_closed_total,
         evaluatorFailureTotal: metrics.clinical_invariant_evaluator_failure_total,
       },
+      display: {
+        heartbeats: {
+          received: {
+            kiosk: metrics.display_heartbeats_received_kiosk,
+            nonKiosk: metrics.display_heartbeats_received_non_kiosk,
+          },
+          alive: safeGetDisplayHeartbeatsAlive(),
+        },
+        wakeLock: {
+          reacquireExhausted: metrics.display_wake_lock_reacquire_exhausted,
+        },
+      },
+      phase9Realtime: {
+        reconnectStormDetected: metrics.realtime_reconnect_storm_detected,
+        emergencyDegraded: metrics.realtime_emergency_degraded,
+        emergencyDegradedRecovered: metrics.realtime_emergency_degraded_recovered,
+      },
+      phase9CodeBlue: {
+        wakeRecovery: metrics.code_blue_wake_recovery,
+        snapshotFallback: metrics.code_blue_snapshot_fallback,
+        propagationObserved: {
+          lt_1s: metrics.code_blue_propagation_observed_lt_1s,
+          lt_3s: metrics.code_blue_propagation_observed_lt_3s,
+          lt_15s: metrics.code_blue_propagation_observed_lt_15s,
+          gte_15s: metrics.code_blue_propagation_observed_gte_15s,
+        },
+      },
+      phase9OfflineEmergency: {
+        blocked: {
+          start: metrics.offline_emergency_mutation_blocked_start,
+          log: metrics.offline_emergency_mutation_blocked_log,
+          end: metrics.offline_emergency_mutation_blocked_end,
+          presence: metrics.offline_emergency_mutation_blocked_presence,
+        },
+      },
+      phase9Observability: {
+        displayForcedResync: {
+          visibility: metrics.display_forced_resync_visibility,
+          pageshow: metrics.display_forced_resync_pageshow,
+          online: metrics.display_forced_resync_online,
+          versionMismatch: metrics.display_forced_resync_version_mismatch,
+          gap: metrics.display_forced_resync_gap,
+          peerAhead: metrics.display_forced_resync_peer_ahead,
+          emergencyUncertain: metrics.display_forced_resync_emergency_uncertain,
+        },
+        splitVersionClientDetected: metrics.split_version_client_detected,
+        swUpdateConflict: metrics.sw_update_conflict,
+        swForcedReload: {
+          active: metrics.sw_forced_reload_active,
+          idle: metrics.sw_forced_reload_idle,
+          kiosk: metrics.sw_forced_reload_kiosk,
+        },
+        swForcedReloadLoopSuppressed: metrics.sw_forced_reload_loop_suppressed,
+        telemetryPayloadRejected: {
+          enumMismatch: metrics.telemetry_payload_rejected_enum_mismatch,
+          shape: metrics.telemetry_payload_rejected_shape,
+          rateLimit: metrics.telemetry_payload_rejected_rate_limit,
+        },
+      },
       timestamp: new Date().toISOString(),
     };
   } catch {
@@ -1072,6 +1293,42 @@ export function getMetricsSnapshot(): MetricsSnapshot {
         failOpenTotal: 0,
         failClosedTotal: 0,
         evaluatorFailureTotal: 0,
+      },
+      display: {
+        heartbeats: {
+          received: { kiosk: 0, nonKiosk: 0 },
+          alive: 0,
+        },
+        wakeLock: { reacquireExhausted: 0 },
+      },
+      phase9Realtime: {
+        reconnectStormDetected: 0,
+        emergencyDegraded: 0,
+        emergencyDegradedRecovered: 0,
+      },
+      phase9CodeBlue: {
+        wakeRecovery: 0,
+        snapshotFallback: 0,
+        propagationObserved: { lt_1s: 0, lt_3s: 0, lt_15s: 0, gte_15s: 0 },
+      },
+      phase9OfflineEmergency: {
+        blocked: { start: 0, log: 0, end: 0, presence: 0 },
+      },
+      phase9Observability: {
+        displayForcedResync: {
+          visibility: 0,
+          pageshow: 0,
+          online: 0,
+          versionMismatch: 0,
+          gap: 0,
+          peerAhead: 0,
+          emergencyUncertain: 0,
+        },
+        splitVersionClientDetected: 0,
+        swUpdateConflict: 0,
+        swForcedReload: { active: 0, idle: 0, kiosk: 0 },
+        swForcedReloadLoopSuppressed: 0,
+        telemetryPayloadRejected: { enumMismatch: 0, shape: 0, rateLimit: 0 },
       },
       timestamp: new Date().toISOString(),
     };

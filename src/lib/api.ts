@@ -93,6 +93,10 @@ import { getStoredLocale, t } from "@/lib/i18n";
 import { toast } from "sonner";
 import type { PendingSyncType } from "./offline-db";
 import {
+  classifyEmergencyEndpoint,
+  recordEmergencyBlockLocally,
+} from "@/lib/offline-emergency-block";
+import {
   addPendingSync,
   getCachedEquipment,
   getCachedEquipmentById,
@@ -197,6 +201,64 @@ export class ApiError extends Error {
       this.invalidatedItems = payload.invalidatedItems as ApiError["invalidatedItems"];
     }
   }
+}
+
+// Phase 9 PR 9.5 — offline emergency mutation blocking.
+//
+// Thrown when a Code Blue mutation endpoint is attempted while offline.
+// The error is intentionally loud: callers must surface failure and must
+// NOT silently treat it as a queued success. The doctrine forbids
+// queueing emergency mutations for later replay.
+export class OfflineEmergencyMutationBlockedError extends Error {
+  endpointClass: "start" | "log" | "end" | "presence";
+  constructor(endpointClass: "start" | "log" | "end" | "presence") {
+    super(`Offline emergency mutation blocked (${endpointClass})`);
+    this.name = "OfflineEmergencyMutationBlockedError";
+    this.endpointClass = endpointClass;
+  }
+}
+
+/**
+ * Phase 9 PR 9.5 — best-effort fire-and-forget telemetry post that records
+ * an offline emergency-block event server-side. Lives inline in api.ts (not
+ * in offline-emergency-block.ts) to avoid a circular dependency. The
+ * `silent: true` flag suppresses the inner request's network-error toast
+ * so the caller's own emergency-block-specific toast is the single
+ * user-visible signal. Shared between `request()` and
+ * `handleOptimisticMutation()` so the two call sites cannot diverge.
+ *
+ * Doctrine (plan §3.8): only the bounded enum endpointClass crosses the
+ * wire; the sessionStorage buffer contents are never posted.
+ *
+ * Counter coverage limitation (acknowledged):
+ *   This helper is only called from inside network-error handlers — i.e.
+ *   when the outer request just failed. There are two cases:
+ *     1. Transient network error while the page is online (timeout, 5xx,
+ *        DNS hiccup, CDN blip): the navigator.onLine check below passes
+ *        and the POST may succeed → server-side counter ticks.
+ *     2. Page is fully offline (`navigator.onLine === false`): we skip
+ *        the futile fetch entirely. The local sessionStorage buffer
+ *        (`recordEmergencyBlockLocally`) remains the authoritative local
+ *        record for these blocks per plan §3.8. The server-side counter
+ *        will undercount pure-offline blocks — by doctrine, the buffer
+ *        is the only durable evidence; deferred-telemetry shipping the
+ *        buffer to the server is explicitly out of scope (future phase).
+ */
+function reportEmergencyBlockedSilently(
+  endpointClass: "start" | "log" | "end" | "presence",
+): void {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return;
+  }
+  void request<{ ok: boolean }>(
+    "/api/realtime/telemetry",
+    {
+      method: "POST",
+      body: JSON.stringify({ offlineEmergencyMutationBlocked: endpointClass }),
+    },
+    undefined,
+    true,
+  ).catch(() => {});
 }
 
 function isOfflineResponse(status: number, payload: unknown): boolean {
@@ -385,8 +447,25 @@ export async function request<T>(
     if (res.status === 204) return undefined as T;
     return res.json();
   } catch (err) {
-    if (!silent && isNetworkError(err)) {
-      toast.error(t.api.networkUnavailable, { id: "network-error" });
+    if (isNetworkError(err)) {
+      // Phase 9 PR 9.5 — Code Blue mutations are NEVER queued offline. The
+      // emergency check must run on ANY network error path, not just when an
+      // `offline` options object is present. Code Blue helpers in api.ts
+      // (e.g. session start/end) call `request()` without an `offline`
+      // object, so gating this on `offline` would silently let an emergency
+      // mutation hit a network error without recording the block.
+      const emergencyClass = classifyEmergencyEndpoint(url, (init.method as string) || "GET");
+      if (emergencyClass) {
+        recordEmergencyBlockLocally(emergencyClass);
+        reportEmergencyBlockedSilently(emergencyClass);
+        if (!silent) {
+          toast.error(t.api.networkUnavailable, { id: `emergency-blocked-${emergencyClass}` });
+        }
+        throw new OfflineEmergencyMutationBlockedError(emergencyClass);
+      }
+      if (!silent) {
+        toast.error(t.api.networkUnavailable, { id: "network-error" });
+      }
     }
     if (isNetworkError(err) && offline) {
       const clientTimestamp = Date.now();
@@ -484,6 +563,17 @@ async function handleOptimisticMutation(opts: {
     return { ...result, pendingSyncId: undefined };
   } catch (err) {
     if (isNetworkError(err)) {
+      // Phase 9 PR 9.5 — refuse to queue Code Blue mutations even via the
+      // optimistic-mutation path. Equipment endpoints will not match the
+      // classifier; this is a safety net. The inline telemetry POST avoids
+      // a circular import (offline-emergency-block → api.ts → ...).
+      const emergencyClass = classifyEmergencyEndpoint(opts.endpoint, "POST");
+      if (emergencyClass) {
+        recordEmergencyBlockLocally(emergencyClass);
+        reportEmergencyBlockedSilently(emergencyClass);
+        toast.error(t.api.networkUnavailable, { id: `emergency-blocked-${emergencyClass}` });
+        throw new OfflineEmergencyMutationBlockedError(emergencyClass);
+      }
       const pendingSyncId = await addPendingSync({
         type: opts.syncType,
         endpoint: opts.endpoint,
@@ -1675,6 +1765,22 @@ export const api = {
   display: {
     snapshot: (): Promise<DisplaySnapshot> =>
       request<DisplaySnapshot>("/api/display/snapshot"),
+    // Phase 9 PR 9.2 — operational liveness heartbeat. Never used as input to
+    // any clinical, authority, audit, billing, or enforcement decision.
+    //
+    // Payload is intentionally minimal — only fields the server actually
+    // reads. The handler reads `displaySessionId` (rate-limit/coalescing
+    // key) and `kioskMode` (bounded-enum counter routing); transmitting
+    // anything else would waste bytes on a 30-s polling path with no
+    // server-side consumer.
+    heartbeat: (body: {
+      displaySessionId: string;
+      kioskMode: boolean;
+    }): Promise<{ ok: boolean }> =>
+      request<{ ok: boolean }>("/api/display/heartbeat", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
   },
   realtime: {
     outboxHead: () => request<{ maxPublishedId: number }>("/api/realtime/outbox-head"),
@@ -1691,7 +1797,37 @@ export const api = {
         }>;
         hasMore: boolean;
       }>(`/api/realtime/replay?from_id=${encodeURIComponent(String(fromId))}`),
-    telemetry: (body: { duplicateDrop?: boolean; gapResync?: boolean }) =>
+    telemetry: (body: {
+      duplicateDrop?: boolean;
+      gapResync?: boolean;
+      // Phase 9 PR 9.4 — bounded enum buckets only.
+      codeBluePropagationBucket?: "lt_1s" | "lt_3s" | "lt_15s" | "gte_15s";
+      codeBlueWakeRecovery?: boolean;
+      codeBlueSnapshotFallback?: boolean;
+      emergencyDegradedEntered?: boolean;
+      emergencyDegradedRecovered?: boolean;
+      // Phase 9 PR 9.5 — bounded enum: which Code Blue endpoint class was
+      // blocked offline. The sessionStorage buffer itself is NEVER posted.
+      offlineEmergencyMutationBlocked?: "start" | "log" | "end" | "presence";
+      // Phase 9 PR 9.7 — bounded enum telemetry fields.
+      displayForcedResyncTrigger?:
+        | "visibility"
+        | "pageshow"
+        | "online"
+        | "version_mismatch"
+        | "gap"
+        | "peer_ahead"
+        | "emergency_uncertain";
+      splitVersionClientDetected?: boolean;
+      swUpdateConflict?: boolean;
+      swForcedReloadSurface?: "active" | "idle" | "kiosk";
+      swForcedReloadLoopSuppressed?: boolean;
+      // Phase 9 PR 9.2 — wake-lock reacquire budget exhaustion. Bounded
+      // boolean; bumps `display_wake_lock_reacquire_exhausted` once per
+      // exhaustion event (the hook itself enforces one-shot semantics via
+      // the `exhaustedLogged` flag).
+      displayWakeLockReacquireExhausted?: boolean;
+    }) =>
       request<{ ok: boolean }>("/api/realtime/telemetry", {
         method: "POST",
         body: JSON.stringify(body),

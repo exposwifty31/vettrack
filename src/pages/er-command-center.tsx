@@ -16,6 +16,7 @@ import {
   getErEligibleHospitalizations,
 } from "@/lib/er-api";
 import { connectRealtime, disconnectRealtime, EventIngestor } from "@/lib/realtime";
+import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
 import type { ErBoardItem, ErBoardResponse, ErLane, ErSeverity } from "../../shared/er-types";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -299,6 +300,9 @@ export default function ErCommandCenterPage() {
       realtimeIngestor.dispose();
     };
   }, [qc, realtimeIngestor]);
+
+  // Phase 9 PR 9.3 — visibility / pageshow / online / resume reconciliation.
+  useRealtimeReconciliation({ queryClient: qc, ingestor: realtimeIngestor, extraRefetch: invalidateEr });
 
   const createMut = useMutation({
     mutationFn: () =>

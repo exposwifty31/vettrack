@@ -119,6 +119,31 @@ export async function applyEvent(client: QueryClient, event: RealtimeEvent): Pro
 
 
 
+    // Phase 9 PR 9.3 — task lifecycle events also alter what the Department
+    // Display renders (overdue meds, upcoming tasks). Invalidate the
+    // snapshot so the next render reads from the server. We invalidate
+    // rather than refetch-merge because the snapshot endpoint is server-side
+    // aggregated and cheap to re-fetch.
+    case "TASK_CREATED":
+
+    case "TASK_STARTED":
+
+    case "TASK_COMPLETED":
+
+    case "TASK_APPROVED":
+
+    case "TASK_UPDATED":
+
+    case "TASK_CANCELLED": {
+
+      await client.invalidateQueries({ queryKey: DISPLAY_SNAPSHOT_QUERY_KEY });
+
+      return;
+
+    }
+
+
+
     case "INVENTORY_ALERT": {
 
       await client.invalidateQueries({ queryKey: ["/api/containers"] });

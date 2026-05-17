@@ -16,6 +16,8 @@ import {
   users,
 } from "../db.js";
 import { requireAuth } from "../middleware/auth.js";
+import { recordHeartbeat } from "../lib/display-heartbeat-store.js";
+import { incrementMetric } from "../lib/metrics.js";
 
 const router = Router();
 
@@ -315,6 +317,61 @@ router.get("/snapshot", requireAuth, async (req, res) => {
         requestId,
       }),
     );
+  }
+});
+
+// Phase 9 PR 9.2 — Department Display heartbeat (operational liveness only).
+//
+// Contract (plan §3.2):
+//   - operational liveness only; never an input to clinical/authority/audit/
+//     billing/enforcement.
+//   - reuse existing app session/auth context (no new auth system).
+//   - coalesce by displaySessionId at ≤ 1 per 10 s per session.
+//   - Redis-with-TTL primary, bounded in-process Map fallback. No DB writes.
+//   - bounded enum labels only. No PII / userId / clinicId / requestId / IP /
+//     UA / device ID / tab ID labels.
+//   - heartbeat post failure never affects display rendering or any clinical
+//     workflow. Counters are best-effort.
+router.post("/heartbeat", requireAuth, async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  try {
+    const body: unknown = req.body ?? {};
+    const sessionId =
+      typeof (body as { displaySessionId?: unknown }).displaySessionId === "string"
+        ? (body as { displaySessionId: string }).displaySessionId
+        : null;
+    const kioskMode = (body as { kioskMode?: unknown }).kioskMode === true;
+
+    if (!sessionId) {
+      return res.status(400).json(
+        apiError({
+          code: "INVALID_INPUT",
+          reason: "MISSING_DISPLAY_SESSION_ID",
+          message: "displaySessionId is required",
+          requestId,
+        }),
+      );
+    }
+
+    const result = await recordHeartbeat({ rawSessionId: sessionId, kioskMode });
+
+    if (result.accepted) {
+      incrementMetric(
+        result.kioskMode
+          ? "display_heartbeats_received_kiosk"
+          : "display_heartbeats_received_non_kiosk",
+        1,
+      );
+    }
+
+    // Always 2xx — coalesced and invalid-after-sanitize are treated as silent
+    // no-ops at the wire level (per plan §3.2 "drops silently, 2xx no-op").
+    res.json({ ok: true });
+  } catch (err) {
+    // Heartbeat failure must never propagate as a hard error in any way that
+    // could affect clinical workflows. Log and return 2xx.
+    console.warn("[display:heartbeat]", (err as Error).message);
+    res.json({ ok: true });
   }
 });
 

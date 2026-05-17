@@ -20,6 +20,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { api } from "@/lib/api";
 import { leaderPoll } from "@/lib/leader";
 import { useRealtime } from "@/hooks/useRealtime";
+import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
 import { useTaskRecommendations } from "@/hooks/useTaskRecommendations";
 import { useAuth } from "@/hooks/use-auth";
 import type { Appointment, AppointmentStatus, CreateAppointmentRequest, TaskPriority } from "@/types";
@@ -576,6 +577,11 @@ export default function AppointmentsPage() {
   }, [day, meUserId, queryClient]);
 
   useRealtime(handleRealtimeEvent);
+
+  // Phase 9 PR 9.3 — visibility / pageshow / online / resume reconciliation.
+  // Refetches ward/ER caches and lets `useRealtime` continue handling the
+  // appointment-specific event flow.
+  useRealtimeReconciliation({ queryClient });
 
   const filteredAppointments = useMemo(() => {
     const all = [...(listQuery.data ?? [])].sort((a, b) => {

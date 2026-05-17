@@ -54,11 +54,12 @@ function AppBootstrap() {
       });
       return;
     }
-    // Cache-busting version param + updateViaCache:'none' so browsers NEVER
-    // serve a stale /sw.js from HTTP cache.
-    // Bump SW_VERSION whenever sw.js changes in a breaking way.
-    const SW_VERSION = "20260425a";
-    registerServiceWorkerSafe(`/sw.js?v=${SW_VERSION}`, { updateViaCache: "none" })
+    // Phase 9 PR 9.1 — single source-of-truth build tag.
+    // The same value is injected into the SW at build time by the
+    // swBuildTagTemplate Vite plugin, so SW_UPDATED can carry buildTag and
+    // the client can compare against the bundle's own tag.
+    const BUILD_TAG = __VT_BUILD_TAG__;
+    registerServiceWorkerSafe(`/sw.js?v=${encodeURIComponent(BUILD_TAG)}`, { updateViaCache: "none" })
       .then((registration) => {
         if (!registration) {
           console.warn("VetTrack: service worker registration unavailable.");
@@ -66,15 +67,18 @@ function AppBootstrap() {
         }
 
         // Wire SW_UPDATED messages from the service worker to the window event
-        // that SwUpdateBanner listens for.
+        // that SwUpdateBanner listens for. Only surface the banner when the
+        // SW's build tag differs from the loaded bundle's build tag — repeated
+        // SW_UPDATED for the same tag is a no-op (anti-toast-spam).
         navigator.serviceWorker.addEventListener("message", (event) => {
-          if (event.data?.type === "SW_UPDATED") {
-            window.dispatchEvent(
-              new CustomEvent("sw-update-available", {
-                detail: { worker: registration.active },
-              })
-            );
-          }
+          if (event.data?.type !== "SW_UPDATED") return;
+          const swBuildTag = typeof event.data.buildTag === "string" ? event.data.buildTag : null;
+          if (swBuildTag && swBuildTag === BUILD_TAG) return;
+          window.dispatchEvent(
+            new CustomEvent("sw-update-available", {
+              detail: { worker: registration.active, buildTag: swBuildTag },
+            })
+          );
         });
 
         // Also handle the waiting worker case: if a new SW is already waiting

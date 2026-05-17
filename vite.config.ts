@@ -1,12 +1,37 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const { version } = JSON.parse(readFileSync("./package.json", "utf-8")) as { version: string };
+
+// Phase 9 PR 9.1 — single source-of-truth build tag.
+// One value flows into the client bundle (via `define`) and into public/sw.js
+// (via the swBuildTagTemplate plugin below), so the SW and the loaded bundle
+// can compare tags deterministically.
+const VT_BUILD_TAG = `${version}-${Date.now().toString(36)}`;
+
+function swBuildTagTemplate(buildTag: string): Plugin {
+  const PLACEHOLDER = "__VT_BUILD_TAG__";
+  let outDir = "dist/public";
+  return {
+    name: "vt-sw-build-tag-template",
+    apply: "build",
+    configResolved(config) {
+      outDir = config.build.outDir;
+    },
+    closeBundle() {
+      const swPath = path.resolve(outDir, "sw.js");
+      if (!existsSync(swPath)) return;
+      const original = readFileSync(swPath, "utf8");
+      if (!original.includes(PLACEHOLDER)) return;
+      writeFileSync(swPath, original.split(PLACEHOLDER).join(buildTag), "utf8");
+    },
+  };
+}
 
 const sentryPlugin =
   process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT
@@ -20,7 +45,7 @@ const sentryPlugin =
     : [];
 
 export default defineConfig({
-  plugins: [react(), ...sentryPlugin],
+  plugins: [react(), swBuildTagTemplate(VT_BUILD_TAG), ...sentryPlugin],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -42,6 +67,7 @@ export default defineConfig({
   },
   define: {
     __APP_VERSION__: JSON.stringify(version),
+    __VT_BUILD_TAG__: JSON.stringify(VT_BUILD_TAG),
   },
   optimizeDeps: {
     include: ["recharts"],

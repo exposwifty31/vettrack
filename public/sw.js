@@ -6,10 +6,13 @@
 //   API mutate  →  pass-through (handled by the app layer / pending-sync)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Bump this version whenever you need to invalidate ALL existing caches
-// across ALL user devices.
-const CACHE_VERSION = "v8";
-const CACHE_NAME = `vettrack-${CACHE_VERSION}`;
+// Phase 9 PR 9.1 — single source-of-truth build tag.
+// At build time the swBuildTagTemplate Vite plugin replaces __VT_BUILD_TAG__
+// with the same value injected into the client bundle via `define`.
+// In dev the SW is not registered (see src/main.tsx), so the placeholder is
+// inert there.
+const BUILD_TAG = "__VT_BUILD_TAG__";
+const CACHE_NAME = `vettrack-${BUILD_TAG}`;
 
 // Shell URLs that are precached during install so the app works offline
 // immediately — even before the user visits a route for the first time.
@@ -27,6 +30,20 @@ const STATIC_EXTENSIONS = [
   ".woff2", ".woff", ".ttf", ".ico", ".svg", ".json",
 ];
 
+// Phase 9 PR 9.1 — emergency endpoint denylist.
+// These endpoints carry live/emergency state. They MUST NEVER be read from or
+// written to Cache Storage. The bypass is unconditional and applies whether or
+// not a Code Blue session is active. Failed responses are never cached. On SW
+// activate, any pre-existing cached entries matching this list are purged.
+const EMERGENCY_BYPASS_PATHS = [
+  "/api/display/snapshot",
+  "/api/code-blue/sessions/active",
+  "/api/realtime/stream",
+  "/api/realtime/replay",
+  "/api/realtime/outbox-head",
+  "/api/realtime/telemetry",
+];
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function isStaticAsset(url) {
@@ -39,6 +56,30 @@ function isApiRequest(url) {
 
 function isMutatingRequest(method) {
   return ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+}
+
+function isEmergencyBypass(url) {
+  return EMERGENCY_BYPASS_PATHS.some((p) => url.pathname === p || url.pathname.startsWith(p + "/"));
+}
+
+async function purgeEmergencyCacheEntries() {
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    const keys = await cache.keys();
+    await Promise.all(
+      keys.map((req) => {
+        try {
+          const u = new URL(req.url);
+          if (isEmergencyBypass(u)) return cache.delete(req);
+        } catch {
+          // ignore malformed cached request URLs
+        }
+        return Promise.resolve();
+      })
+    );
+  } catch {
+    // best-effort: never block activate on cache purge errors
+  }
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
@@ -79,17 +120,36 @@ self.addEventListener("activate", (event) => {
           .filter((key) => key.startsWith("vettrack-") && key !== CACHE_NAME)
           .map((key) => caches.delete(key))
       );
+      // Phase 9 PR 9.1 — defensive purge of any emergency-endpoint entries
+      // in the current cache bucket.
+      //
+      // Under the current build-tag naming scheme this is effectively a
+      // no-op on a clean upgrade path: the current bucket was just created
+      // during `install` with only shell URLs, and older buckets are
+      // already deleted wholesale by the version-cleanup loop above.
+      // We retain the purge as belt-and-braces — it costs O(small) on
+      // activate and protects against:
+      //   - a future change that reuses CACHE_NAME across deploys (e.g.
+      //     a regression in the build-tag plumbing);
+      //   - a future code path that writes to the live cache bucket
+      //     bypassing the fetch handler (out-of-band `cache.put()` from
+      //     the page, scripts, or a misconfigured SW message handler);
+      //   - drift introduced by future refactors that loosen the
+      //     no-write invariant in the fetch handler.
+      // The fetch-time bypass guard (isEmergencyBypass) is what actually
+      // enforces the no-read / no-write doctrine for the steady state.
+      await purgeEmergencyCacheEntries();
       await self.clients.claim();
 
-      // Notify all controlled clients that a new SW version is active.
-      // The app's SwUpdateBanner listens for "sw-update-available" on window,
-      // but since we skipWaiting immediately the toast is informational only.
+      // Notify all controlled clients that a new SW version is active. The
+      // payload carries the build tag so the client can compare it against
+      // the build tag baked into the loaded bundle (__VT_BUILD_TAG__).
       const allClients = await self.clients.matchAll({
         type: "window",
         includeUncontrolled: true,
       });
       for (const client of allClients) {
-        client.postMessage({ type: "SW_UPDATED", version: CACHE_VERSION });
+        client.postMessage({ type: "SW_UPDATED", buildTag: BUILD_TAG });
       }
     })()
   );
@@ -111,6 +171,19 @@ self.addEventListener("fetch", (event) => {
   // Never intercept cross-origin requests or mutating requests.
   if (url.origin !== self.location.origin) return;
   if (isMutatingRequest(event.request.method)) return;
+
+  // Phase 9 PR 9.1 — emergency endpoint cache bypass.
+  // For denylisted live/emergency endpoints we go straight to the network,
+  // never read from cache, and never write to cache (even on success or
+  // failure). The native error/timeout surfaces to the app layer so it can
+  // decide what to render. The bypass is unconditional — this check MUST
+  // run before any other path-based filter (including the Vite dev
+  // internals filter below) so a request that happens to carry ?v= or
+  // ?t= cannot accidentally skip the bypass enforcement.
+  if (isEmergencyBypass(url)) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
   // Never cache Vite dev-server internals (HMR, module transforms, etc.).
   // These URLs only exist in development and must never be served stale.

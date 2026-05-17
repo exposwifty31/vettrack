@@ -25,6 +25,7 @@ import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
 import { enqueueNotificationJob } from "../lib/queue.js";
 import { postSystemMessage } from "../lib/shift-chat-presence.js";
+import { invalidateActiveCodeBlueCache } from "../lib/code-blue-keepalive.js";
 import { evaluateCodeBlueManagerForRoute } from "../lib/authority/code-blue-manager.wiring.js";
 import { codeBlueManagerMetrics } from "../lib/authority/enforcement/code-blue-manager.metrics.js";
 import { detectMidsessionManagerDrift } from "../lib/authority/code-blue-manager-midsession.js";
@@ -431,6 +432,10 @@ router.post(
     }).catch(() => {
       /* non-critical */
     });
+
+    // Phase 9 PR 9.4 — invalidate the keepalive's active-session cache so
+    // the next SSE KEEPALIVE event reflects this start within ≤ 5 s.
+    invalidateActiveCodeBlueCache(clinicId);
 
     res.status(201).json({ id, startedAt: startedAt.toISOString() });
   } catch (err) {
@@ -953,6 +958,10 @@ router.patch("/sessions/:id/end", requireAuth, validateUuid("id"), validateBody(
       targetType: "code_blue_session",
       metadata: { outcome, durationMinutes, ...(earlyStopReason ? { earlyStopReason } : {}) },
     });
+
+    // Phase 9 PR 9.4 — invalidate the keepalive's active-session cache so
+    // the next SSE KEEPALIVE event reflects the end within ≤ 5 s.
+    invalidateActiveCodeBlueCache(clinicId);
 
     postSystemMessage(clinicId, "code_blue_end", {
       outcome: outcome ?? "unknown",

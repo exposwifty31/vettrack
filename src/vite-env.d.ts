@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 declare const __APP_VERSION__: string;
+declare const __VT_BUILD_TAG__: string;
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
