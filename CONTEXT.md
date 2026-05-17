@@ -203,6 +203,10 @@ _Avoid_: Applying day-shift routing rules without a time window_
 6. **Hard-stop vs surfacing**: A **Dose Hard-Stop** or policy-backed **orphan block** must **reject the mutation on the server** with a clear reason code; reliance on banners or realtime alone for unstoppable actions is insufficient where policy requires a stop.
 7. **Auditability**: Sensitive actions (dispensing, permission changes, integration credential use) must remain **auditable** (e.g. `logAudit()` patterns per project rules).
 8. **Async clinical–financial paths**: Where billing and inventory follow async workers, document and preserve **idempotent, clinic-scoped** processing—no double charges or silent drops on retry.
+9. **Code Blue mutations are online-only**: Session start, log entries, end, and presence heartbeats never queue for offline replay. The offline emergency-block layer fails loud and increments a bounded counter. Session end is server-confirmed; the UI never optimistically marks a session ended.
+10. **Realtime transport is frozen**: SSE via `/api/realtime/stream`, outbox-backed ordering on `vt_event_outbox`, replay + snapshot reconciliation on reconnect. No WebSockets, no polling-based recovery for emergency state, no parallel realtime path.
+11. **Enforcement envelope is `off | shadow | enforce`**: Every evaluator family in `server/lib/authority/enforcement/*` follows the same per-clinic mode resolver. `off` short-circuits the wiring; `shadow` runs without denying and emits bounded counters/audit; `enforce` may deny with a stable reason code. The wiring-layer Strategy A safety net degrades resolver throws to `off`.
+12. **Terminology**: User-facing copy uses **Tasks / משימות** for the unified task model. The `vt_appointments` table, `/api/appointments` route, and `appointmentsPage.*` i18n key namespace are intentionally not renamed.
 
 ---
 

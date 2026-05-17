@@ -1,5 +1,7 @@
 # Ward Display Implementation Plan
 
+> **Historical snapshot — 2026-04-28.** This plan predates the Phase 9 Department Display upgrade. The merged surface uses SSE + outbox replay (not 5 s/2 s polling), reconciliation via `useRealtimeReconciliation` (visibility, pageshow/BFCache, online, freeze/resume), heartbeat liveness via `useDisplayHeartbeat`, optional kiosk wake-lock, and emergency endpoint cache bypass. For the current architecture see `README.md` → "Realtime, Code Blue, and PWA architecture".
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build `/display` — a read-only, large-screen ward dashboard with real-time patient status, equipment, staff, upcoming procedures, and instant full-screen Code Blue takeover.

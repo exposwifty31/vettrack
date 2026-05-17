@@ -9,7 +9,7 @@ Use `docs/cloud-agent-starter-skill.md` as the default quickstart runbook for en
 Persistent guidance for Cursor (and compatible agents) lives under `.cursor/rules/*.mdc`. The umbrella rule **`engineering-and-agent-principles.mdc`** is always applied and stacks with focused rules such as `typescript-standards.mdc`, `express-server.mdc`, and `vettrack-stabilization-plan.mdc`. For rationale, impact, and how to maintain these rules over time, see `docs/engineering-rules-rollout.md`.
 
 ### Architecture
-VetTrack is a single full-stack app: React 18 + Vite frontend (port 5000) and Express + TypeScript backend (port 3001), backed by PostgreSQL. See `replit.md` for full architecture details.
+VetTrack is a single full-stack app: React 18 + Vite frontend (port 5000) and Express + TypeScript backend (port 3001), backed by PostgreSQL. **Canonical architecture references:** `README.md` (overview, frozen architecture topics) and `CLAUDE.md` (engineering rules, post-Phase-9 doctrine). `CONTEXT.md` holds the clinical glossary. `replit.md` is a historical snapshot.
 
 ### Prerequisites
 - **Node.js >=22.12.0** (`.nvmrc` specifies 22.14.0)
@@ -60,7 +60,7 @@ The repo's Clerk keys are **production keys** (`pk_live_*` / `sk_live_*`) bound 
 
 The Clerk instance supports **password**, **email OTP** (6-digit code), **email link**, and **Google OAuth**. However, the production Clerk instance has **client trust / bot protection** enabled (`needs_client_trust` status), which blocks automated/programmatic sign-in — including Puppeteer, `page.evaluate`, and direct Clerk JS SDK calls. To complete the full authenticated UI flow, **a human must sign in interactively via the Desktop pane**. A dedicated test account exists in the Clerk dashboard (credentials stored in your password manager, not in this file).
 
-Only 4 route modules are mounted in `server/index.ts`: equipment, analytics, activity, users (rooms and other routes referenced in the codebase are not yet registered).
+All API route modules are registered via `server/app/routes.ts` (~49 routers under `/api/*`). Background workers and schedulers are wired in `server/app/start-schedulers.ts`. The single source of truth for what is registered is those two files — do not rely on older summaries.
 
 ### Commands
 | Action | Command |
@@ -75,5 +75,6 @@ Only 4 route modules are mounted in `server/index.ts`: equipment, analytics, act
 ### Gotchas
 - The `predev` script runs `kill-port 3001 5000` to clear stale processes silently before starting.
 - No ESLint config exists in this repo.
-- Migrations **are** auto-run on server start (`runMigrations()` is called in `server/index.ts`). You can also run them manually with `pnpm db:migrate`.
+- The runtime applies pending migrations on startup via `runMigrations()` in `server/index.ts`. `pnpm db:migrate` runs the same path on demand. After editing `server/db.ts`, generate the next migration with `npx drizzle-kit generate` and commit it.
 - The `server/migrate.ts` file only exports `runMigrations()` — it has no self-executing code.
+- Realtime, Code Blue, and PWA surfaces are **frozen** post-Phase-9. See `CLAUDE.md` → "Frozen architecture surfaces" and "Operational doctrine" before editing them.

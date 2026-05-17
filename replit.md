@@ -1,5 +1,7 @@
 # VetTrack — Veterinary Equipment QR Tracking System
 
+> **Historical snapshot.** This file documents the original Replit-era equipment-tracking surface and does not reflect the current post-Phase-9 architecture (SSE realtime, Code Blue runtime, Department Display, authority/enforcement, i18n governance). For the current architecture see `README.md` and `CLAUDE.md`; for the clinical glossary see `CONTEXT.md`. Sections below are preserved for context but may reference workflows, tables, and rules that have since evolved.
+
 ## Overview
 VetTrack is a mobile-first progressive web app (PWA) for tracking veterinary equipment using QR codes and NFC tags. Built with React + Vite frontend and Express backend, backed by PostgreSQL, with full offline-first capability via Dexie.js and a hardened Service Worker.
 

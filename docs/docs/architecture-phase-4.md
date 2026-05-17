@@ -1,5 +1,7 @@
 # Phase 4 Architecture Snapshot
 
+> **Historical snapshot.** This document captures the Phase 4 architecture at the time it was written. Post-Phase-9 the realtime, Code Blue, and PWA surfaces have additional guarantees (SSE keepalive + reconcile, build-tag SW versioning, emergency endpoint cache bypass, offline emergency-mutation blocking) and the enforcement framework is wired with the `off | shadow | enforce` envelope. See `README.md` and `CLAUDE.md` for the current architecture.
+
 ## Core systems
 - Task Engine
 - Notification Engine

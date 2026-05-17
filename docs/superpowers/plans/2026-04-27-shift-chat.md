@@ -1,5 +1,7 @@
 # Shift Chat Implementation Plan
 
+> **Historical snapshot — 2026-04-27.** This plan describes the original shift-chat polling architecture (3-second polling REST). VetTrack's current realtime transport is SSE-based; new realtime work should integrate with the outbox + reconciliation path documented in `CLAUDE.md` → "Realtime (Phase 9)".
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a shift-scoped group chat channel accessible via a floating FAB on every screen, with broadcast commands, 12 enrichment features, and system auto-posts from existing app events.

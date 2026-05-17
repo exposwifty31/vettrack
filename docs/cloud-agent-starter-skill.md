@@ -138,9 +138,20 @@ This codebase has few classic feature flags; use these practical toggles:
    ```bash
    pnpm test
    ```
-   (includes offline/conflict/PWA system tests)
+   (includes offline/conflict/PWA system tests + Phase 9 deterministic drills)
 2. In browser DevTools, toggle offline and verify app shell still loads.
 3. Trigger an action offline (for example, equipment status change), then reconnect and confirm sync completion.
+4. **Do not** add Code Blue mutation endpoints (`POST /code-blue/sessions`, `POST /code-blue/sessions/:id/logs`, `PATCH /code-blue/sessions/:id/end`, `PATCH /code-blue/sessions/:id/presence`) to the offline queue. The classifier in `src/lib/offline-emergency-block.ts` fails them loud and increments a bounded counter — this is required behavior.
+5. **Do not** add emergency endpoints (`/api/display/snapshot`, `/api/code-blue/sessions/active`, `/api/realtime/*`) to any Cache Storage path in `public/sw.js`. They are on an unconditional bypass denylist.
+
+### Area: Realtime / Code Blue (`server/routes/realtime.ts`, `src/lib/realtime.ts`, `public/sw.js`)
+
+Transport is SSE — `/api/realtime/stream`, outbox-backed ordering on `vt_event_outbox`. Reconnect uses `Last-Event-ID` replay; pruned cursors trigger a snapshot resync. `KEEPALIVE` events carry `{ activeCodeBlueSessionId, stormHint }` and never invalidate caches. Cross-tab uses `BroadcastChannel("vt_realtime_outbox_cursor")` with a versioned envelope (`cursor`, `build_tag`, `code_blue_seen`).
+
+When verifying realtime/PWA changes:
+- Unit-level: `tests/phase-9-deterministic-drills.test.ts` (bounded-counter contracts).
+- Browser-level: `tests/phase-9-drills.spec.ts` (8 Playwright drills covering replay-gap, stale SW, BFCache, storm, split-version, degraded mode, stale emergency cache, offline emergency block).
+- Telemetry surfaces are bounded enums in `server/routes/realtime.ts` — adding a new metric series requires extending the enum + the closed `incrementMetric()` union.
 
 ---
 

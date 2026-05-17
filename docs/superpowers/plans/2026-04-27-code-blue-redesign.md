@@ -1,5 +1,7 @@
 # Code Blue Redesign — Implementation Plan
 
+> **Historical snapshot — 2026-04-27.** This plan captured the original Code Blue redesign as proposed before Phase 9. The merged architecture differs materially: realtime is SSE-driven (not 2 s polling), offline mutation queueing is **forbidden** for Code Blue endpoints, session end is server-confirmed (no optimistic local termination), and reconnect recovery uses outbox replay + snapshot reconciliation. For the current Code Blue runtime guarantees see `README.md` → "Code Blue runtime guarantees" and `CLAUDE.md` → "Code Blue runtime guarantees (Phase 9)".
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Transform Code Blue from a localStorage-only single-device screen into a multi-device emergency command center with server-side sync, resuscitation manager role, crash cart daily checks, equipment tracking, and room display mode.
