@@ -269,6 +269,9 @@ export interface TStructure {
     nfcReady: string;
     nfcStartFailed: string;
     noContainers: string;
+    startSessionFailed: string;
+    finishSessionFailed: string;
+    errorWithRequestId: string;
   };
   equipmentDetail: {
     serialNumber: string;

@@ -265,7 +265,10 @@
     "unknownNfcTag": "Unknown NFC tag — assign this tag to an inventory item",
     "nfcReady": "NFC ready — tap a tag",
     "nfcStartFailed": "Failed to start NFC scan",
-    "noContainers": "No containers in the system"
+    "noContainers": "No containers in the system",
+    "startSessionFailed": "Could not start the restock session — please try again",
+    "finishSessionFailed": "Could not finish the restock — please try again",
+    "errorWithRequestId": "{message} (ref: {requestId})"
   },
   "equipmentDetail": {
     "serialNumber": "Serial number",

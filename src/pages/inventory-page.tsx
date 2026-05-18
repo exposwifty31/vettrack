@@ -21,6 +21,7 @@ import {
   useState,
 } from "react";
 import type { InventoryContainer, RestockContainerLine } from "@/types";
+import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
   initialRestockSessionState,
@@ -245,9 +246,11 @@ export default function InventoryPage() {
       haptics.scanSuccess();
     },
     onError: (err) => {
-      const message = err instanceof Error ? err.message : "Failed to start restock session";
-      dispatch({ type: "failure", payload: { message } });
-      toast.error(message);
+      const fallback = p.startSessionFailed;
+      const requestId = err instanceof ApiError ? err.requestId : undefined;
+      const display = requestId ? p.errorWithRequestId(fallback, requestId) : fallback;
+      dispatch({ type: "failure", payload: { message: display } });
+      toast.error(display);
     },
   });
 
@@ -290,9 +293,11 @@ export default function InventoryPage() {
     onError: (err) => {
       // Phase 5 PR 5.4 — diagnostic logging; see scanMut.onError above.
       console.error("[restock] finish failed", err);
-      const message = err instanceof Error ? err.message : "Failed to finish restock session";
-      dispatch({ type: "failure", payload: { message } });
-      toast.error(message);
+      const fallback = p.finishSessionFailed;
+      const requestId = err instanceof ApiError ? err.requestId : undefined;
+      const display = requestId ? p.errorWithRequestId(fallback, requestId) : fallback;
+      dispatch({ type: "failure", payload: { message: display } });
+      toast.error(display);
     },
   });
 

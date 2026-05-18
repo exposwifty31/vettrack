@@ -265,7 +265,10 @@
     "unknownNfcTag": "תווית NFC לא מזוהה — שייך תווית זו לפריט מלאי",
     "nfcReady": "NFC מוכן — גע בתווית",
     "nfcStartFailed": "הפעלת סריקת NFC נכשלה",
-    "noContainers": "אין עגלות במערכת"
+    "noContainers": "אין עגלות במערכת",
+    "startSessionFailed": "לא ניתן להתחיל סשן מילוי — נסה שוב",
+    "finishSessionFailed": "לא ניתן לסיים את המילוי — נסה שוב",
+    "errorWithRequestId": "{message} (קוד תמיכה: {requestId})"
   },
   "equipmentDetail": {
     "serialNumber": "מספר סידורי",

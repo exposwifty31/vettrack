@@ -165,6 +165,8 @@ const translations = {
     lastSessionAdded: (count: number) => tr(d.inventoryPage.lastSessionAdded, { count }),
     lastSessionRemoved: (count: number) => tr(d.inventoryPage.lastSessionRemoved, { count }),
     lastSessionMissing: (count: number) => tr(d.inventoryPage.lastSessionMissing, { count }),
+    errorWithRequestId: (message: string, requestId: string) =>
+      tr(d.inventoryPage.errorWithRequestId, { message, requestId }),
   },
 
   equipmentDetail: {

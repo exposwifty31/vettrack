@@ -403,25 +403,32 @@ export async function finishSession(params: {
         }).onConflictDoNothing();
       }
 
-      // Write inventory_log for audit trail (Fix G)
-      await tx.insert(inventoryLogs).values({
-        id: randomUUID(),
-        clinicId: params.clinicId,
-        containerId: session.containerId,
-        taskId: session.id,
-        logType: "restock",
-        quantityBefore: currentQuantity,
-        quantityAdded: adjustment,
-        quantityAfter: newQuantity,
-        note: `Restock session commit`,
-        metadata: {
-          sessionId: session.id,
-          observedQuantity,
-          targetPar: event.targetPar,
-          scannedByUserId: event.scannedByUserId,
-        },
-        createdByUserId: params.userId,
-      });
+      // Write inventory_log for audit trail (Fix G).
+      // taskId is the per-item restock event id so the unique index
+      // `inventory_logs_task_clinic_type_idx` (task_id, clinic_id, log_type)
+      // does not collide across items committed in the same session.
+      // sessionId remains queryable via metadata.
+      await tx
+        .insert(inventoryLogs)
+        .values({
+          id: randomUUID(),
+          clinicId: params.clinicId,
+          containerId: session.containerId,
+          taskId: event.id,
+          logType: "restock",
+          quantityBefore: currentQuantity,
+          quantityAdded: adjustment,
+          quantityAfter: newQuantity,
+          note: `Restock session commit`,
+          metadata: {
+            sessionId: session.id,
+            observedQuantity,
+            targetPar: event.targetPar,
+            scannedByUserId: event.scannedByUserId,
+          },
+          createdByUserId: params.userId,
+        })
+        .onConflictDoNothing();
 
       committedItems.push({ itemId, observedQuantity, previousQuantity: currentQuantity, newQuantity, adjustment });
     }

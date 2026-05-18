@@ -63,6 +63,21 @@ function apiError(params: { code: string; reason: string; message: string; reque
   };
 }
 
+function extractPgErrorCode(err: unknown): string | undefined {
+  let current: unknown = err;
+  const seen = new Set<unknown>();
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current);
+    if ("code" in current && typeof (current as { code: unknown }).code === "string") {
+      const code = (current as { code: string }).code;
+      if (/^\d{5}$/.test(code) || /^[0-9A-Z]{5}$/.test(code)) return code;
+    }
+    if (!("cause" in current)) break;
+    current = (current as { cause: unknown }).cause;
+  }
+  return undefined;
+}
+
 function mapErrorToHttp(err: unknown, requestId: string) {
   if (err instanceof RestockServiceError) {
     return {
@@ -84,6 +99,7 @@ function mapErrorToHttp(err: unknown, requestId: string) {
     err instanceof Error && typeof err.name === "string" && err.name.length > 0
       ? err.name
       : "UnknownError";
+  const pgErrorCode = extractPgErrorCode(err);
   return {
     status: 500,
     body: {
@@ -94,6 +110,7 @@ function mapErrorToHttp(err: unknown, requestId: string) {
         requestId,
       }),
       errorType,
+      ...(pgErrorCode ? { pgErrorCode } : {}),
     },
   };
 }
@@ -118,10 +135,12 @@ function logRestockError(route: string, requestId: string, err: unknown): void {
     err instanceof Error && typeof err.stack === "string"
       ? err.stack.split("\n")[1]?.trim() ?? null
       : null;
+  const pgErrorCode = extractPgErrorCode(err);
   console.error("[restock-route]", {
     route,
     requestId,
     errorType,
+    ...(pgErrorCode ? { pgErrorCode } : {}),
     message,
     stackFirstLine,
   });

@@ -17,18 +17,20 @@ async function main() {
     process.exit(0);
   }
 
-  const { db, pool, users, containers, inventoryItems, containerItems, restockSessions, restockEvents } =
+  const { db, pool, clinics, users, containers, inventoryItems, containerItems, restockSessions, restockEvents, inventoryLogs } =
     await import("../server/db.js");
   const { startRestockSession, scanItem, finishSession, getContainerInventoryView, RestockServiceError } = await import(
     "../server/services/restock.service.js",
   );
 
   async function purgeClinic(clinicId: string) {
+    await db.delete(inventoryLogs).where(eq(inventoryLogs.clinicId, clinicId));
     await db.delete(restockSessions).where(eq(restockSessions.clinicId, clinicId));
     await db.delete(containerItems).where(eq(containerItems.clinicId, clinicId));
     await db.delete(containers).where(eq(containers.clinicId, clinicId));
     await db.delete(inventoryItems).where(eq(inventoryItems.clinicId, clinicId));
     await db.delete(users).where(eq(users.clinicId, clinicId));
+    await db.delete(clinics).where(eq(clinics.id, clinicId));
   }
 
   async function seedHospitalCart() {
@@ -36,6 +38,7 @@ async function main() {
     const userA = randomUUID();
     const userB = randomUUID();
     const containerId = randomUUID();
+    await db.insert(clinics).values({ id: clinicId });
     await db.insert(users).values([
       {
         id: userA,
@@ -82,6 +85,7 @@ async function main() {
       const legacySyringeId = randomUUID();
       const legacyIvId = randomUUID();
       try {
+        await db.insert(clinics).values({ id: clinicId });
         await db.insert(users).values({
           id: userId,
           clinicId,
@@ -408,6 +412,53 @@ async function main() {
         });
         assert(out.event?.id, "scan must succeed regardless of current containerItems quantity");
         assert.strictEqual(out.observedQuantity, 5);
+      } finally {
+        await purgeClinic(clinicId);
+      }
+    }
+
+    // ─── Regression: finishSession commits 2+ items without colliding on
+    //     the `inventory_logs_task_clinic_type_idx` unique index
+    //     (task_id, clinic_id, log_type). Previously, finishSession reused
+    //     session.id as task_id for every committed row, so the second item
+    //     threw a 23505 and the route returned a generic 500
+    //     "Restock operation failed" toast.
+    {
+      const { clinicId, userA, containerId } = await seedHospitalCart();
+      try {
+        const session = await startRestockSession({ clinicId, containerId, userId: userA });
+        const seeded = await db
+          .select({ id: inventoryItems.id, code: inventoryItems.code })
+          .from(inventoryItems)
+          .where(eq(inventoryItems.clinicId, clinicId));
+        assert(seeded.length >= 2, "blueprint should seed multiple items for Hospital Supply Cart");
+
+        await scanItem({
+          clinicId,
+          sessionId: session.id,
+          itemId: seeded[0].id,
+          observedQuantity: 4,
+          userId: userA,
+        });
+        await scanItem({
+          clinicId,
+          sessionId: session.id,
+          itemId: seeded[1].id,
+          observedQuantity: 6,
+          userId: userA,
+        });
+
+        const summary = await finishSession({ clinicId, sessionId: session.id, userId: userA });
+        assert.strictEqual(summary.scannedItemCount, 2, "both items must commit");
+        assert.strictEqual(summary.committedItems.length, 2, "both committedItems entries returned");
+
+        const logs = await db
+          .select({ id: inventoryLogs.id, taskId: inventoryLogs.taskId })
+          .from(inventoryLogs)
+          .where(eq(inventoryLogs.clinicId, clinicId));
+        assert.strictEqual(logs.length, 2, "one inventory_log row per scanned item");
+        const taskIds = new Set(logs.map((l) => l.taskId));
+        assert.strictEqual(taskIds.size, 2, "each restock log row carries a distinct task_id");
       } finally {
         await purgeClinic(clinicId);
       }
