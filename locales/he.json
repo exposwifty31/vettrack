@@ -1961,6 +1961,7 @@
     "allTechnicians": "כל הטכנאים",
     "hours": "שעות",
     "interval": "מרווח",
+    "minutesShort": "{n} דק׳",
     "dayView": "תצוגת יום",
     "scheduleTaskAt": "תזמן משימה בשעה",
     "pageSubtitle": "המשימות שלך להיום, ממוינות לפי דחיפות ולוח זמנים.",

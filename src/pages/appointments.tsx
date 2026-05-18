@@ -1248,13 +1248,13 @@ export default function AppointmentsPage() {
               {t.appointmentsPage.taskControls}
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-3 items-end">
+          <CardContent className="flex flex-wrap gap-x-6 gap-y-3 items-end">
             <div className="flex-1 min-w-40">
-              <label htmlFor={`${bookingFormId}-filter-day`} className="text-xs text-muted-foreground block text-right">{t.appointmentsPage.dayLabel}</label>
+              <label htmlFor={`${bookingFormId}-filter-day`} className="text-xs text-muted-foreground block text-right mb-1 truncate">{t.appointmentsPage.dayLabel}</label>
               <Input id={`${bookingFormId}-filter-day`} dir="ltr" className="text-left w-full max-w-full" type="date" value={day} onChange={(e) => setDay(e.target.value)} />
             </div>
             <div className="flex-1 min-w-40">
-              <label htmlFor={`${bookingFormId}-filter-tech`} className="text-xs text-muted-foreground block text-right">{t.appointmentsPage.technicianFilter}</label>
+              <label htmlFor={`${bookingFormId}-filter-tech`} className="text-xs text-muted-foreground block text-right mb-1 truncate">{t.appointmentsPage.technicianFilter}</label>
               <select
                 id={`${bookingFormId}-filter-tech`}
                 dir="ltr"
@@ -1271,14 +1271,14 @@ export default function AppointmentsPage() {
               </select>
             </div>
             <div className="flex-1 min-w-28">
-              <label className="text-xs text-muted-foreground block text-right">{t.appointmentsPage.hours}</label>
-              <div className="h-10 px-3 rounded-md border flex items-center text-sm">
-                {DAY_START_HOUR}:00 - {DAY_END_HOUR}:00
+              <label className="text-xs text-muted-foreground block text-right mb-1 truncate">{t.appointmentsPage.hours}</label>
+              <div dir="ltr" className="h-10 px-3 rounded-md border flex items-center text-sm text-left">
+                {String(DAY_START_HOUR).padStart(2, "0")}:00 – {String(DAY_END_HOUR).padStart(2, "0")}:00
               </div>
             </div>
             <div className="flex-1 min-w-28">
-              <label className="text-xs text-muted-foreground block text-right">{t.appointmentsPage.interval}</label>
-              <div className="h-10 px-3 rounded-md border flex items-center text-sm">{SLOT_MINUTES} min</div>
+              <label className="text-xs text-muted-foreground block text-right mb-1 truncate">{t.appointmentsPage.interval}</label>
+              <div dir="ltr" className="h-10 px-3 rounded-md border flex items-center text-sm text-left">{t.appointmentsPage.minutesShort(SLOT_MINUTES)}</div>
             </div>
             {canCreateTask && (
               <div className="flex-1 min-w-28">

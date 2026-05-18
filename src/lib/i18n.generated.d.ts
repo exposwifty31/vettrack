@@ -1964,6 +1964,7 @@ export interface TStructure {
     allTechnicians: string;
     hours: string;
     interval: string;
+    minutesShort: string;
     dayView: string;
     scheduleTaskAt: string;
     pageSubtitle: string;

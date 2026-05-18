@@ -1961,6 +1961,7 @@
     "allTechnicians": "All technicians",
     "hours": "Hours",
     "interval": "Interval",
+    "minutesShort": "{n} min",
     "dayView": "Day View",
     "scheduleTaskAt": "Schedule task at",
     "pageSubtitle": "Your tasks for today, prioritized by urgency and schedule.",

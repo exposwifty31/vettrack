@@ -317,7 +317,7 @@ describe("Slice 4.2 — Mobile RTL overflow fix", () => {
   });
 
   it("Task Controls CardContent uses flex-wrap for safe mobile wrapping", () => {
-    expect(appointments).toContain("flex flex-wrap gap-3 items-end");
+    expect(appointments).toContain("flex flex-wrap gap-x-6 gap-y-3 items-end");
   });
 
   it("Date input wrapper uses min-w-40 to allow flex wrapping", () => {

@@ -552,6 +552,7 @@ const translations = {
     scheduledAt: (time: string) => tr(d.appointmentsPage.scheduledAt, { time }),
     prescribedBy: (name: string) => tr(d.appointmentsPage.prescribedBy, { name }),
     shiftWindowsFor: (name: string) => tr(d.appointmentsPage.shiftWindowsFor, { name }),
+    minutesShort: (n: number) => tr(d.appointmentsPage.minutesShort, { n }),
     statusHint: {
       ...d.appointmentsPage.statusHint,
       overdue: (count: number) => tr(d.appointmentsPage.statusHint.overdue, { count }),
