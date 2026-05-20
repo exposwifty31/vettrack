@@ -6,6 +6,7 @@ import {
   getPendingSync,
   updatePendingSync,
   removePendingSync,
+  runStartupCleanup,
   type PendingSync,
 } from "./offline-db";
 import { getAuthHeaders } from "./auth-store";
@@ -366,6 +367,8 @@ async function attemptSync(item: PendingSync): Promise<ItemResult> {
 
 export function initSyncEngine(queryClient?: QueryClient) {
   queryClientRef = queryClient;
+
+  runStartupCleanup(queryClient).catch(() => {});
 
   const handleOnline = () => {
     processQueue();

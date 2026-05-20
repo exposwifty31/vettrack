@@ -1258,6 +1258,7 @@ export type CodeBlueLogCategory = "drug" | "shock" | "cpr" | "note" | "equipment
 
 export interface DisplaySnapshotHospitalization {
   id: string;
+  animalId: string;
   status: HospitalizationStatus;
   ward: string | null;
   bay: string | null;

@@ -258,6 +258,7 @@ router.get("/snapshot", requireAuth, async (req, res) => {
       }
       return {
         id: hosp.id,
+        animalId: hosp.animalId,
         status: hosp.status,
         ward: hosp.ward,
         bay: hosp.bay,

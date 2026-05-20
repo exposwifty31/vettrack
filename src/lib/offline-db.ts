@@ -130,30 +130,35 @@ export async function addPendingSync(op: Omit<PendingSync, "id">): Promise<numbe
 
   if (DEDUP_SYNC_TYPES.has(op.type)) {
     try {
-      const existing = await table
-        .where("status")
-        .equals("pending")
-        .and(
-          (item) =>
-            item.endpoint === op.endpoint &&
-            item.method === op.method &&
-            item.type === op.type,
-        )
-        .first();
+      const result = await offlineDb.transaction("rw", table, async () => {
+        const existing = await table
+          .where("status")
+          .equals("pending")
+          .and(
+            (item) =>
+              item.endpoint === op.endpoint &&
+              item.method === op.method &&
+              item.type === op.type,
+          )
+          .first();
 
-      if (existing?.id !== undefined) {
-        await table.update(existing.id, {
-          clientTimestamp: op.clientTimestamp,
-          createdAt: op.createdAt,
-          body: op.body,
-          optimisticData: op.optimisticData,
-          equipmentName: op.equipmentName,
-          retries: 0,
-        });
-        return existing.id;
-      }
+        if (existing?.id !== undefined) {
+          await table.update(existing.id, {
+            clientTimestamp: op.clientTimestamp,
+            createdAt: op.createdAt,
+            body: op.body,
+            optimisticData: op.optimisticData,
+            equipmentName: op.equipmentName,
+            retries: 0,
+          });
+          return existing.id;
+        }
+
+        return (await table.add(op)) as number;
+      });
+      return result;
     } catch {
-      // Fall through to normal insert if dedup query fails
+      // Fall through to non-transactional insert if tx fails
     }
   }
 

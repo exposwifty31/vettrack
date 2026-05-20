@@ -83,15 +83,21 @@ function AppBootstrap() {
 
         // Also handle the waiting worker case: if a new SW is already waiting
         // when the page loads (e.g. the user had an old tab open), surface the
-        // update banner immediately.
+        // update banner immediately — but only when the waiting SW's build tag
+        // differs from the loaded bundle (same guard as SW_UPDATED above).
         function notifyIfWaiting(reg: ServiceWorkerRegistration) {
-          if (reg.waiting) {
-            window.dispatchEvent(
-              new CustomEvent("sw-update-available", {
-                detail: { worker: reg.waiting },
-              })
-            );
+          if (!reg.waiting) return;
+          try {
+            const waitingTag = new URL(reg.waiting.scriptURL).searchParams.get("v");
+            if (waitingTag && waitingTag === BUILD_TAG) return;
+          } catch {
+            // scriptURL parse failure — fall through and show banner
           }
+          window.dispatchEvent(
+            new CustomEvent("sw-update-available", {
+              detail: { worker: reg.waiting, buildTag: null },
+            })
+          );
         }
 
         notifyIfWaiting(registration);

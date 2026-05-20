@@ -378,7 +378,7 @@ function CodeBlueOverlay({
   const displayedLogs = session.logEntries.slice(-15);
 
   const remaining = hospitalizations.filter(
-    (h) => !session.patientId || h.id !== session.patientId,
+    (h) => !session.patientId || h.animalId !== session.patientId,
   );
 
   return (
@@ -456,12 +456,12 @@ function CodeBlueOverlay({
             יומן אירוע
           </div>
           <div className="space-y-2">
-            {displayedLogs.map((entry) => {
+            {displayedLogs.map((entry, idx) => {
               const em = Math.floor(entry.elapsedMs / 60_000);
               const es = Math.floor((entry.elapsedMs % 60_000) / 1_000);
               const entryTime = `${String(em).padStart(2, "0")}:${String(es).padStart(2, "0")}`;
               return (
-                <div key={`${entry.elapsedMs}-${entry.label}`} className="flex gap-2 text-[12px]">
+                <div key={`${entry.elapsedMs}-${entry.label}-${idx}`} className="flex gap-2 text-[12px]">
                   <span className="text-red-500 tabular-nums min-w-[42px] text-[11px] shrink-0">
                     {entryTime}
                   </span>
