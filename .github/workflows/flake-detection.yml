@@ -116,7 +116,8 @@ jobs:
     name: 📋 Flake Report
     runs-on: ubuntu-latest
     needs: [prepare, detect-flakes]
-    if: always()
+    # Skip when prepare failed — outputs are unset and seq would error obscurely.
+    if: always() && needs.prepare.result == 'success'
 
     steps:
       - name: 📥 Download all test results
@@ -130,6 +131,10 @@ jobs:
         env:
           REPEAT_COUNT: ${{ needs.prepare.outputs.repeat_count }}
         run: |
+          if [ -z "$REPEAT_COUNT" ] || ! [[ "$REPEAT_COUNT" =~ ^[0-9]+$ ]]; then
+            echo "::error::repeat_count output missing or invalid (got: '$REPEAT_COUNT')"
+            exit 1
+          fi
           echo "## Flake Detection Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Run | Result |" >> $GITHUB_STEP_SUMMARY
