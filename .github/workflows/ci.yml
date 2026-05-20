@@ -90,6 +90,7 @@ jobs:
       CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
       VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
       ALLOWED_ORIGIN: ${{ secrets.ALLOWED_ORIGIN }}
+      DB_CONFIG_ENCRYPTION_KEY: ${{ secrets.DB_CONFIG_ENCRYPTION_KEY }}
       PORT: 3001
 
     steps:
@@ -97,7 +98,7 @@ jobs:
         id: preflight_guard
         run: |
           missing=0
-          for var in DATABASE_URL REDIS_URL SESSION_SECRET CLERK_SECRET_KEY VITE_CLERK_PUBLISHABLE_KEY ALLOWED_ORIGIN; do
+          for var in DATABASE_URL REDIS_URL SESSION_SECRET CLERK_SECRET_KEY VITE_CLERK_PUBLISHABLE_KEY ALLOWED_ORIGIN DB_CONFIG_ENCRYPTION_KEY; do
             if [ -z "${!var}" ]; then
               echo "Missing $var for deploy pre-flight."
               missing=1
@@ -152,6 +153,7 @@ jobs:
       CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
       VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
       ALLOWED_ORIGIN: ${{ secrets.ALLOWED_ORIGIN }}
+      DB_CONFIG_ENCRYPTION_KEY: ${{ secrets.DB_CONFIG_ENCRYPTION_KEY }}
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE }}
       RAILWAY_USE_CLI_DEPLOY: ${{ secrets.RAILWAY_USE_CLI_DEPLOY }}

@@ -326,7 +326,7 @@
 
 ### Should Phase 10 exist?
 
-**Yes.** Two P0 clinical correctness issues (Code Blue offline queue bypass + unguarded session-end navigation) require immediate attention. The eight P1 issues cover real correctness, data integrity, and propagation gaps that would cause confusion in production Code Blue and ward display scenarios.
+**Yes.** Two P0 clinical correctness issues (Code Blue offline queue bypass + unguarded session-end navigation) require immediate attention. The ten P1 issues cover real correctness, data integrity, and propagation gaps that would cause confusion in production Code Blue and ward display scenarios.
 
 ### Approximate scope
 

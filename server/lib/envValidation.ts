@@ -10,11 +10,18 @@ const REQUIRED_IN_PRODUCTION: string[] = [
   "CLERK_SECRET_KEY",
   "VITE_CLERK_PUBLISHABLE_KEY",
   "ALLOWED_ORIGIN",
+  // Credential encryption — required to decrypt existing vt_server_config rows.
+  // Missing in production means integration credentials silently return null
+  // (decryptConfigValue throws → getCredentials swallows the error), which
+  // looks healthy but breaks every integration sync/validation path.
+  // See: server/lib/config-crypto.ts, server/integrations/credential-manager.ts
+  "DB_CONFIG_ENCRYPTION_KEY",
 ];
 
 const RECOMMENDED_IN_PRODUCTION: string[] = [
+  // Clerk webhook handler returns 501 if unset (server/routes/webhooks.ts L65),
+  // so user-lifecycle sync is degraded but the rest of the app keeps running.
   "CLERK_WEBHOOK_SECRET",
-  "DB_CONFIG_ENCRYPTION_KEY",
 ];
 
 function validateClerkKeyPair(): void {

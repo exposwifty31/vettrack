@@ -26,7 +26,7 @@ done
 echo "Running deployment pre-flight checks..."
 
 # Check required environment variables
-required_vars=("DATABASE_URL" "REDIS_URL" "SESSION_SECRET" "CLERK_SECRET_KEY" "VITE_CLERK_PUBLISHABLE_KEY" "ALLOWED_ORIGIN")
+required_vars=("DATABASE_URL" "REDIS_URL" "SESSION_SECRET" "CLERK_SECRET_KEY" "VITE_CLERK_PUBLISHABLE_KEY" "ALLOWED_ORIGIN" "DB_CONFIG_ENCRYPTION_KEY")
 
 for var in "${required_vars[@]}"; do
   if [ -z "${!var}" ]; then
@@ -38,7 +38,7 @@ done
 echo "✅ Required pre-flight checks passed"
 
 # Check recommended environment variables (warn, don't block)
-recommended_vars=("CLERK_WEBHOOK_SECRET" "DB_CONFIG_ENCRYPTION_KEY")
+recommended_vars=("CLERK_WEBHOOK_SECRET")
 
 for var in "${recommended_vars[@]}"; do
   if [ -z "${!var}" ]; then
