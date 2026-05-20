@@ -601,6 +601,8 @@ export default function AppointmentsPage() {
     });
   }, [filteredAppointments, day]);
 
+  const appointmentStatusLabels = statusLabel();
+
   const totalGridMinutes = (DAY_END_HOUR - DAY_START_HOUR) * 60;
   const totalGridHeight = totalGridMinutes * PIXELS_PER_MINUTE;
 
@@ -1406,7 +1408,7 @@ export default function AppointmentsPage() {
                               </Badge>
                             ) : null}
                             <Badge variant="secondary" className="text-[10px]">
-                              {statusLabel()[appointment.status]}
+                              {appointmentStatusLabels[appointment.status]}
                             </Badge>
                             <Badge
                               variant="outline"
@@ -1465,7 +1467,7 @@ export default function AppointmentsPage() {
                               onClick={() => updateStatusMutation.mutate({ id: appointment.id, status: nextStatus })}
                               disabled={updateStatusMutation.isPending}
                             >
-                              {statusLabel()[nextStatus]}
+                              {appointmentStatusLabels[nextStatus]}
                             </Button>
                           ))}
                         </div>

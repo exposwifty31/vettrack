@@ -326,7 +326,7 @@ export default function RoomsListPage() {
                     : "bg-card text-foreground border-border hover:bg-muted"
                 )}
               >
-                {zoneLabels()[zone]}
+                {roomZoneLabels[zone]}
                 <span className={cn(
                   "text-[10px] font-bold rounded-full px-1.5 py-px",
                   activeZone === zone ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
