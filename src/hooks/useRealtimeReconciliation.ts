@@ -64,20 +64,23 @@ export function useRealtimeReconciliation(args: ReconcileArgs): void {
     let scheduled = false;
     let cancelled = false;
     let pendingTrigger: ResyncTrigger | null = null;
+    let runInFlight: Promise<void> | null = null;
 
     function schedule(trigger: ResyncTrigger): void {
-      // If a different trigger arrives while one is pending, keep the
-      // earliest non-null trigger — it represents the original cause.
       if (!pendingTrigger) pendingTrigger = trigger;
       if (scheduled) return;
       scheduled = true;
       window.setTimeout(() => {
         scheduled = false;
         if (cancelled) return;
+        if (runInFlight) return;
         const fired = pendingTrigger;
         pendingTrigger = null;
         if (fired) reportForcedResync(fired);
-        void run();
+        runInFlight = run().finally(() => {
+          runInFlight = null;
+          if (pendingTrigger && !cancelled) schedule(pendingTrigger);
+        });
       }, RECONCILE_DEBOUNCE_MS);
     }
 

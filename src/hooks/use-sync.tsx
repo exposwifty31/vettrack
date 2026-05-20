@@ -6,7 +6,7 @@ import {
   removePendingSync,
   type PendingSync,
 } from "@/lib/offline-db";
-import { processQueue, onSyncStateChange, getSyncProgress } from "@/lib/sync-engine";
+import { processQueue, onSyncStateChange, getSyncProgress, initSyncEngine } from "@/lib/sync-engine";
 
 interface SyncState {
   pendingCount: number;
@@ -104,6 +104,11 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       setBatchTotal(progress.batchTotal);
     });
     return () => { unsub(); };
+  }, []);
+
+  useEffect(() => {
+    const cleanup = initSyncEngine();
+    return cleanup;
   }, []);
 
   const triggerSync = useCallback(async () => {

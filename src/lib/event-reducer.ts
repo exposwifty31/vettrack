@@ -107,7 +107,8 @@ export async function applyEvent(client: QueryClient, event: RealtimeEvent): Pro
 
 
 
-    case "PATIENT_STATUS_UPDATED": {
+    case "PATIENT_STATUS_UPDATED":
+    case "CODE_BLUE_STATUS_CHANGED": {
 
       const snapshot = await api.display.snapshot();
 

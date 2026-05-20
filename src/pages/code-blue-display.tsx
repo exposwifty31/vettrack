@@ -47,7 +47,11 @@ export default function CodeBlueDisplay() {
   const presence = pollQ.data?.presence ?? [];
 
   const startedAtRef = useRef<string | null>(null);
-  if (session?.startedAt) startedAtRef.current = session.startedAt;
+  if (session?.startedAt) {
+    startedAtRef.current = session.startedAt;
+  } else {
+    startedAtRef.current = null;
+  }
   const elapsed = useElapsed(startedAtRef.current);
   const recentEntries = useMemo(
     () => [...logEntries].reverse().slice(0, 8),

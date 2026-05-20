@@ -378,7 +378,29 @@ router.post(
     const startedAt = new Date();
 
     let codeBlueNotificationRequestOutboxId: number | undefined;
+    let activeSessionExists = false;
     await db.transaction(async (tx) => {
+      await tx.execute(sql`
+        SELECT pg_advisory_xact_lock(hashtextextended(${`code-blue-active-session:${clinicId}`}, 0))
+      `);
+
+      // P1-4: serialize the guard with the insert so concurrent starts cannot
+      // both observe "no active session" before either writes.
+      const [existingActive] = await tx
+        .select({ id: codeBlueSessions.id })
+        .from(codeBlueSessions)
+        .where(
+          and(
+            eq(codeBlueSessions.clinicId, clinicId),
+            eq(codeBlueSessions.status, "active"),
+          ),
+        )
+        .limit(1);
+      if (existingActive) {
+        activeSessionExists = true;
+        return;
+      }
+
       await tx.insert(codeBlueSessions).values({
         id,
         clinicId,
@@ -402,7 +424,24 @@ router.post(
         },
         occurredAt: startedAt,
       });
+      await insertRealtimeDomainEvent(tx, {
+        clinicId,
+        type: "CODE_BLUE_STATUS_CHANGED",
+        payload: { sessionId: id, status: "active" },
+        occurredAt: startedAt,
+      });
     });
+
+    if (activeSessionExists) {
+      return res.status(409).json(
+        apiError({
+          code: "ACTIVE_SESSION_EXISTS",
+          reason: "ACTIVE_SESSION_EXISTS",
+          message: "An active Code Blue session already exists for this clinic",
+          requestId,
+        }),
+      );
+    }
 
     postSystemMessage(clinicId, "code_blue_start", {
       startedBy: req.authUser!.name ?? req.authUser!.id,
@@ -452,11 +491,12 @@ router.get("/sessions/active", requireAuth, async (req, res) => {
   try {
     const clinicId = req.clinicId!;
 
-    // Active session
+    // Active session — order by startedAt desc so the most recent is returned
     const [session] = await db
       .select()
       .from(codeBlueSessions)
       .where(and(eq(codeBlueSessions.clinicId, clinicId), eq(codeBlueSessions.status, "active")))
+      .orderBy(desc(codeBlueSessions.startedAt))
       .limit(1);
 
     // Latest crash cart check (last 24h)
@@ -930,11 +970,19 @@ router.patch("/sessions/:id/end", requireAuth, validateUuid("id"), validateBody(
       ...(earlyStopReason ? { early_stop_reason: earlyStopReason } : {}),
     });
 
-    // Update session
-    await db
-      .update(codeBlueSessions)
-      .set({ status: "ended", outcome, endedAt })
-      .where(and(eq(codeBlueSessions.id, sessionId), eq(codeBlueSessions.clinicId, clinicId)));
+    // Update session + emit outbox event in same TX for display propagation
+    await db.transaction(async (tx) => {
+      await tx
+        .update(codeBlueSessions)
+        .set({ status: "ended", outcome, endedAt })
+        .where(and(eq(codeBlueSessions.id, sessionId), eq(codeBlueSessions.clinicId, clinicId)));
+      await insertRealtimeDomainEvent(tx, {
+        clinicId,
+        type: "CODE_BLUE_STATUS_CHANGED",
+        payload: { sessionId, status: "ended", outcome },
+        occurredAt: endedAt,
+      });
+    });
 
     // Archive to vt_code_blue_events (backward compat)
     await db.insert(codeBlueEvents).values({

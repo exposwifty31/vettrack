@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCodeBlueSession } from "@/hooks/useCodeBlueSession";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
+import { toast } from "sonner";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -320,12 +321,22 @@ function ActiveSession() {
   const handleEndSession = async (outcome: string) => {
     if (!outcome || !session) return;
     setShowOutcomeModal(false);
-    await authFetch(`/api/code-blue/sessions/${session.id}/end`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ outcome }),
-    });
-    navigate("/home");
+    try {
+      const res = await authFetch(`/api/code-blue/sessions/${session.id}/end`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ outcome }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "Unknown error" }));
+        const msg = typeof body?.message === "string" ? body.message : t.codeBlue.endSessionFailed;
+        toast.error(msg, { id: "cb-end-failed" });
+        return;
+      }
+      navigate("/home");
+    } catch {
+      toast.error(t.api.networkUnavailable, { id: "cb-end-failed" });
+    }
   };
 
   // Each quick-log action uses crypto.randomUUID() as idempotencyKey (via logEntry in the hook)
@@ -504,7 +515,7 @@ export default function CodeBluePage() {
   const handleStart = async (preCheckPassed: boolean, manager: { id: string; name: string }) => {
     setStarting(true);
     try {
-      await authFetch("/api/code-blue/sessions", {
+      const res = await authFetch("/api/code-blue/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -516,6 +527,11 @@ export default function CodeBluePage() {
           patientId: initPatientId,
         }),
       });
+      if (!res.ok) {
+        toast.error(res.status === 409 ? t.codeBlue.activeSessionExists : t.codeBlue.startSessionFailed);
+      }
+    } catch {
+      toast.error(t.api.networkUnavailable);
     } finally {
       setStarting(false);
     }

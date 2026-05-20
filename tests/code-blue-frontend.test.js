@@ -46,9 +46,10 @@ describe("useCodeBlueSession hook", () => {
     expect(hook).not.toMatch(/Date\.now\(\)\s*-\s*Date\.now/);
   });
 
-  it.skipIf(hook === null)("queues log entries to localStorage when fetch fails", () => {
-    expect(hook).toContain("localStorage");
-    expect(hook).toContain("queue");
+  it.skipIf(hook === null)("fails loud on CB log network error (Phase 9 doctrine — no offline queue)", () => {
+    expect(hook).toContain("classifyEmergencyEndpoint");
+    expect(hook).toContain("recordEmergencyBlockLocally");
+    expect(hook).not.toContain("vt_cb_queue");
   });
 
   it.skipIf(hook === null)("sends presence heartbeat every 10 seconds", () => {

@@ -13,6 +13,8 @@ interface State {
   errorMessage: string;
 }
 
+const RELOAD_GUARD_KEY = "vt_peb_reload_guard";
+
 /**
  * Lightweight per-section error boundary.
  * Wraps a page section so a single component crash cannot take down the
@@ -33,16 +35,48 @@ export class PageErrorBoundary extends Component<Props, State> {
     console.error("[PageErrorBoundary]", error, info.componentStack);
   }
 
+  componentDidMount() {
+    this.clearReloadGuardIfRecovered();
+  }
+
+  componentDidUpdate() {
+    this.clearReloadGuardIfRecovered();
+  }
+
+  clearReloadGuardIfRecovered = () => {
+    if (this.state.hasError) return;
+    try {
+      sessionStorage.removeItem(RELOAD_GUARD_KEY);
+    } catch {
+      // Storage can be unavailable in restricted browser modes.
+    }
+  };
+
   reset = () => {
-    // React.lazy() caches a rejected promise, so remounting throws the same
-    // error immediately. Module evaluation failures (broken optimized dep,
-    // missing export) are only recoverable with a full page reload.
     const isModuleError =
       this.state.errorMessage.includes("Importing binding") ||
       this.state.errorMessage.includes("does not provide an export") ||
       this.state.errorMessage.includes("Failed to fetch dynamically imported");
     if (isModuleError) {
-      window.location.reload();
+      try {
+        if (sessionStorage.getItem(RELOAD_GUARD_KEY) === "1") {
+          sessionStorage.removeItem(RELOAD_GUARD_KEY);
+          this.setState({ hasError: false, errorMessage: "" });
+          return;
+        }
+        sessionStorage.setItem(RELOAD_GUARD_KEY, "1");
+      } catch {
+        return;
+      }
+      if (typeof caches !== "undefined") {
+        void caches.keys().then((keys) =>
+          Promise.all(
+            keys.filter((k) => k.startsWith("vettrack-")).map((k) => caches.delete(k)),
+          ),
+        ).finally(() => window.location.reload());
+      } else {
+        window.location.reload();
+      }
       return;
     }
     this.setState({ hasError: false, errorMessage: "" });

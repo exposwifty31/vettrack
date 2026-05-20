@@ -16,9 +16,8 @@ export function useDisplaySnapshot(): DisplaySnapshot | undefined {
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: false,
     staleTime: 0,
-    // On error: keep showing last-known state (read-only display, no queue needed)
     placeholderData: (previous) => previous,
-    retry: false,
+    retry: 2,
   });
   return data;
 }

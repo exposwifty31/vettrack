@@ -3,6 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useCallback, useRef } from "react";
 import { authFetch } from "@/lib/auth-fetch";
 import { useAuth } from "@/hooks/use-auth";
+import { classifyEmergencyEndpoint, recordEmergencyBlockLocally } from "@/lib/offline-emergency-block";
+import { toast } from "sonner";
+import { t } from "@/lib/i18n";
 
 export interface CodeBlueLogEntry {
   id: string;
@@ -47,25 +50,7 @@ export interface SessionPollResult {
   cartStatus: CartStatus | null;
 }
 
-const QUEUE_KEY = "vt_cb_queue";
 const SESSION_CACHE_KEY = "vt_cb_cache";
-let _flushInProgress = false;
-
-function loadQueue(): Array<{ sessionId: string; entry: object }> {
-  try {
-    return JSON.parse(localStorage.getItem(QUEUE_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveQueue(q: Array<{ sessionId: string; entry: object }>) {
-  try {
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
-  } catch {
-    // ignore quota
-  }
-}
 
 function cacheSession(data: SessionPollResult) {
   try {
@@ -107,11 +92,16 @@ export function useCodeBlueSession() {
 
   const sessionId = query.data?.session?.id ?? null;
 
-  // Presence heartbeat
   const sendPresence = useCallback(async () => {
     if (!sessionId) return;
+    const url = `/api/code-blue/sessions/${sessionId}/presence`;
+    const emergencyClass = classifyEmergencyEndpoint(url, "PATCH");
+    if (emergencyClass && !navigator.onLine) {
+      recordEmergencyBlockLocally(emergencyClass);
+      return;
+    }
     try {
-      await authFetch(`/api/code-blue/sessions/${sessionId}/presence`, { method: "PATCH" });
+      await authFetch(url, { method: "PATCH" });
     } catch {
       // non-critical
     }
@@ -125,39 +115,6 @@ export function useCodeBlueSession() {
       if (presenceTimerRef.current) clearInterval(presenceTimerRef.current);
     };
   }, [sessionId, sendPresence]);
-
-  // Flush offline queue when we have a valid session and connection
-  useEffect(() => {
-    if (!sessionId || query.isError) return;
-    const queue = loadQueue();
-    if (queue.length === 0) return;
-    if (_flushInProgress) return;
-    _flushInProgress = true;
-    (async () => {
-      const remaining: typeof queue = [];
-      for (const item of queue) {
-        if (item.sessionId !== sessionId) {
-          remaining.push(item);
-          continue;
-        }
-        try {
-          await authFetch(`/api/code-blue/sessions/${sessionId}/logs`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(item.entry),
-          });
-        } catch {
-          remaining.push(item);
-        }
-      }
-      saveQueue(remaining);
-      if (remaining.length < queue.length) {
-        queryClient.invalidateQueries({ queryKey: ["/api/code-blue/sessions/active"] });
-      }
-    })().finally(() => {
-      _flushInProgress = false;
-    });
-  }, [sessionId, query.isError, queryClient]);
 
   const logEntry = useCallback(
     async (entry: {
@@ -175,6 +132,13 @@ export function useCodeBlueSession() {
         elapsedMs,
         ...entry,
       };
+      const url = `/api/code-blue/sessions/${sessionId}/logs`;
+      const emergencyClass = classifyEmergencyEndpoint(url, "POST");
+      if (emergencyClass && !navigator.onLine) {
+        recordEmergencyBlockLocally(emergencyClass);
+        toast.error(t.api.networkUnavailable, { id: `emergency-blocked-${emergencyClass}` });
+        return;
+      }
 
       // Optimistic update
       queryClient.setQueryData<SessionPollResult>(["/api/code-blue/sessions/active"], (prev) => {
@@ -199,15 +163,13 @@ export function useCodeBlueSession() {
       });
 
       try {
-        await authFetch(`/api/code-blue/sessions/${sessionId}/logs`, {
+        await authFetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
       } catch {
-        // Queue for later
-        const q = loadQueue();
-        saveQueue([...q, { sessionId, entry: payload }]);
+        toast.error(t.api.networkUnavailable, { id: "cb-log-failed" });
       }
 
       queryClient.invalidateQueries({ queryKey: ["/api/code-blue/sessions/active"] });

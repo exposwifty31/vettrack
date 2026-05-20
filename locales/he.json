@@ -2157,6 +2157,9 @@
     "stopCprChooseOutcome": "עצור CPR — בחר תוצאה",
     "stopCprLocked": "🔒 עצור CPR — זמין בעוד {countdown}",
     "managerOnlyHint": "זמין למנהל הפצה בלבד",
+    "activeSessionExists": "כבר פתוח מפגש Code Blue פעיל.",
+    "startSessionFailed": "פתיחת מפגש Code Blue נכשלה",
+    "endSessionFailed": "סיום מפגש Code Blue נכשל",
     "cprCycleLine": "מחזור CPR #{n} — {time} לבדיקת קצב",
     "patientWeightSuffix": "{weight} ק״ג",
     "role": {

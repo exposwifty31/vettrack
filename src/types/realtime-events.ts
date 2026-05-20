@@ -22,6 +22,8 @@ export type RealtimeEventType =
   | "ER_HANDOFF_SLA_BREACHED"
   /** Ward / hospitalization → ward display snapshot refresh (outbox); “WARD_*” naming maps here. */
   | "PATIENT_STATUS_UPDATED"
+  /** Code Blue session started or ended — triggers display snapshot refresh. */
+  | "CODE_BLUE_STATUS_CHANGED"
   /** Container dispense / emergency reconciliation — inventory + billing committed with this outbox row. */
   | "INVENTORY_ALERT"
   /** Medication charged without matching active order / admission (Smart Cop). */

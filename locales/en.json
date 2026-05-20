@@ -2157,6 +2157,9 @@
     "stopCprChooseOutcome": "Stop CPR — choose outcome",
     "stopCprLocked": "🔒 Stop CPR — available in {countdown}",
     "managerOnlyHint": "Available to the distribution manager only",
+    "activeSessionExists": "An active Code Blue session is already open.",
+    "startSessionFailed": "Failed to start Code Blue session",
+    "endSessionFailed": "Failed to end Code Blue session",
     "cprCycleLine": "CPR cycle #{n} — {time} until rhythm check",
     "patientWeightSuffix": "{weight} kg",
     "role": {

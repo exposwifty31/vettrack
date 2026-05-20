@@ -304,29 +304,25 @@ self.addEventListener("fetch", (event) => {
 
   // ── 3. API GET requests ───────────────────────────────────────────────────
   //
-  // Strategy: network-first, fall back to cached JSON, then a 503 stub so
-  // the app can detect offline state and switch to Dexie.
+  // Strategy: network-first, offline → structured 503 stub so the app
+  // can detect offline state and switch to Dexie.
+  //
+  // Phase 10 P1-9: API responses carry tenant-scoped data and are keyed
+  // by URL alone (no Vary/auth isolation). On shared clinic tablets a
+  // user sign-out/sign-in cycle could serve the previous user's cached
+  // JSON. Fixed by NOT writing API responses to Cache Storage — the app
+  // layer uses Dexie for offline data via the sync engine.
 
   if (isApiRequest(url)) {
     event.respondWith(
-      caches.open(CACHE_NAME).then((cache) =>
-        fetch(event.request)
-          .then((response) => {
-            if (response.ok) cache.put(event.request, response.clone());
-            return response;
-          })
-          .catch(() =>
-            cache.match(event.request).then(
-              (cached) =>
-                cached ??
-                new Response(
-                  JSON.stringify({ offline: true, error: "Network unavailable" }),
-                  {
-                    status: 503,
-                    headers: { "Content-Type": "application/json" },
-                  }
-                )
-            )
+      fetch(event.request).catch(
+        () =>
+          new Response(
+            JSON.stringify({ offline: true, error: "Network unavailable" }),
+            {
+              status: 503,
+              headers: { "Content-Type": "application/json" },
+            }
           )
       )
     );

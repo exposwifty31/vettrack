@@ -561,7 +561,7 @@ export class EventIngestor {
     if (this.lastAppliedEventId !== null && peerCursor <= this.lastAppliedEventId) return;
     if (this.peerRecoveryInFlight) {
       await this.peerRecoveryInFlight;
-      return;
+      if (this.lastAppliedEventId !== null && peerCursor <= this.lastAppliedEventId) return;
     }
 
     this.peerRecoveryInFlight = (async () => {
