@@ -208,6 +208,7 @@ export default function RoomsListPage() {
   const [roomName, setRoomName] = useState("");
   const [roomFloor, setRoomFloor] = useState("");
   const [activeZone, setActiveZone] = useState<Zone>("all");
+  const roomZoneLabels = zoneLabels();
 
   const { data: rooms, isLoading, isError } = useQuery({
     queryKey: ["/api/rooms"],
@@ -387,7 +388,7 @@ export default function RoomsListPage() {
         ) : (
           <div className="flex flex-col items-center py-10 gap-2 text-center">
             <DoorOpen className="w-8 h-8 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">No rooms in {zoneLabels()[activeZone]}</p>
+            <p className="text-sm text-muted-foreground">No rooms in {roomZoneLabels[activeZone]}</p>
             <button className="text-xs text-primary font-medium" onClick={() => setActiveZone("all")}>
               Show all rooms
             </button>
