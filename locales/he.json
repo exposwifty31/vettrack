@@ -1971,6 +1971,8 @@
     "noTasksToday": "אין משימות להיום.",
     "staffMember": "איש צוות",
     "unassigned": "לא מוקצה",
+    "linkedDevice": "מכשיר משויך",
+    "linkedOwner": "בעלים משויך",
     "unknownUser": "משתמש לא ידוע",
     "scheduledAt": "מתוזמן ל-{time}",
     "prescribedBy": "נרשם על ידי {name}",

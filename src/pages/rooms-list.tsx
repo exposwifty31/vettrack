@@ -185,13 +185,13 @@ function RoomCardSkeleton() {
 
 type Zone = "all" | "icu" | "er" | "surgery" | "other";
 
-const ZONE_LABELS: Record<Zone, string> = {
+const zoneLabels = (): Record<Zone, string> => ({
   all: t.roomsListPage.zoneAll,
   icu: t.roomsListPage.zoneIcu,
   er: t.roomsListPage.zoneEr,
   surgery: t.roomsListPage.zoneSurgery,
   other: t.roomsListPage.zoneOther,
-};
+});
 
 function inferZone(room: Room): Zone {
   const n = (room.name + " " + (room.floor ?? "")).toLowerCase();
@@ -326,7 +326,7 @@ export default function RoomsListPage() {
                     : "bg-card text-foreground border-border hover:bg-muted"
                 )}
               >
-                {ZONE_LABELS[zone]}
+                {zoneLabels()[zone]}
                 <span className={cn(
                   "text-[10px] font-bold rounded-full px-1.5 py-px",
                   activeZone === zone ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
@@ -387,7 +387,7 @@ export default function RoomsListPage() {
         ) : (
           <div className="flex flex-col items-center py-10 gap-2 text-center">
             <DoorOpen className="w-8 h-8 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">No rooms in {ZONE_LABELS[activeZone]}</p>
+            <p className="text-sm text-muted-foreground">No rooms in {zoneLabels()[activeZone]}</p>
             <button className="text-xs text-primary font-medium" onClick={() => setActiveZone("all")}>
               Show all rooms
             </button>

@@ -32,24 +32,6 @@ export function stripInternalKeys<T extends Record<string, unknown>>(obj: T): T 
   return copy;
 }
 
-const warnedMissingKeys = new Set<string>();
-
-/**
- * Dev-only one-shot warning for a missing translation key. Deduped per
- * `(key, locale)` via a module-level `Set`. No-op in production builds.
- *
- * Currently exported for use by future client-side resolvers; the existing
- * `t` accessor tree resolves at build time via the hand-rolled
- * `buildTranslations` literal and does not run through this path.
- */
-export function warnMissingKeyOnce(key: string, locale: string): void {
-  if (typeof import.meta === "undefined" || !import.meta.env?.DEV) return;
-  const fingerprint = `${key}|${locale}`;
-  if (warnedMissingKeys.has(fingerprint)) return;
-  warnedMissingKeys.add(fingerprint);
-  console.warn(`[i18n] Missing translation key "${key}" for locale "${locale}"`);
-}
-
 export function isSupportedLocale(locale: string | null | undefined): locale is Locale {
   return locale === "en" || locale === "he";
 }
@@ -315,6 +297,9 @@ const translations = {
     },
     reconciliation: {
       ...d.codeBlue.reconciliation,
+      toast: { ...d.codeBlue.reconciliation.toast },
+      action: { ...d.codeBlue.reconciliation.action },
+      badge: { ...d.codeBlue.reconciliation.badge },
       unbilledCount: (count: number) => tr(d.codeBlue.reconciliation.unbilledCount, { count }),
       billedRatio: (billed: number, total: number) =>
         tr(d.codeBlue.reconciliation.billedRatio, { billed, total }),

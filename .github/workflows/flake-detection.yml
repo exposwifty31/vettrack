@@ -20,13 +20,34 @@ permissions:
   contents: read
 
 jobs:
-  detect-flakes:
-    name: 🔬 Flake Detection (${{ matrix.run }}/3)
+  prepare:
+    name: Prepare matrix
     runs-on: ubuntu-latest
+    outputs:
+      repeat_count: ${{ steps.matrix.outputs.repeat_count }}
+      runs_json: ${{ steps.matrix.outputs.runs_json }}
+    steps:
+      - id: matrix
+        shell: bash
+        run: |
+          raw="${{ github.event.inputs.repeat_count }}"
+          if [ -z "$raw" ]; then raw="3"; fi
+          if ! [[ "$raw" =~ ^[0-9]+$ ]] || [ "$raw" -lt 2 ] || [ "$raw" -gt 5 ]; then
+            echo "::error::repeat_count must be an integer between 2 and 5 (got: $raw)"
+            exit 1
+          fi
+          runs_json=$(seq 1 "$raw" | jq -R 'tonumber' | jq -s -c .)
+          echo "repeat_count=$raw" >> "$GITHUB_OUTPUT"
+          echo "runs_json=$runs_json" >> "$GITHUB_OUTPUT"
+
+  detect-flakes:
+    name: 🔬 Flake Detection (${{ matrix.run }}/${{ needs.prepare.outputs.repeat_count }})
+    runs-on: ubuntu-latest
+    needs: prepare
     strategy:
       fail-fast: false
       matrix:
-        run: [1, 2, 3]
+        run: ${{ fromJSON(needs.prepare.outputs.runs_json) }}
 
     services:
       postgres:
@@ -94,7 +115,7 @@ jobs:
   flake-report:
     name: 📋 Flake Report
     runs-on: ubuntu-latest
-    needs: detect-flakes
+    needs: [prepare, detect-flakes]
     if: always()
 
     steps:
@@ -106,6 +127,8 @@ jobs:
           path: /tmp/flake-results/
 
       - name: 🔍 Analyse cross-run consistency
+        env:
+          REPEAT_COUNT: ${{ needs.prepare.outputs.repeat_count }}
         run: |
           echo "## Flake Detection Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -113,7 +136,7 @@ jobs:
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
 
           all_passed=true
-          for run in 1 2 3; do
+          for run in $(seq 1 "$REPEAT_COUNT"); do
             log="/tmp/flake-results/test-run-${run}.log"
             if [ -f "$log" ]; then
               if grep -q "Tests.*passed" "$log" && ! grep -q "failed" "$log"; then
@@ -130,7 +153,7 @@ jobs:
 
           echo "" >> $GITHUB_STEP_SUMMARY
           if $all_passed; then
-            echo "✅ **No flakiness detected across 3 runs.**" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **No flakiness detected across ${REPEAT_COUNT} runs.**" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ **Inconsistent results detected — review failing runs for flaky tests.**" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY

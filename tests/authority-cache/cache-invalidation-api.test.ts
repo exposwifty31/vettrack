@@ -117,6 +117,7 @@ describe("invalidateForUser", () => {
 
     invalidateForUser("clinic-a", "user-1");
     expect(__internals.shiftCache.size()).toBe(0);
+    expect(getMetricsSnapshot().authority.cache.invalidateShift).toBe(1);
   });
 
   it("does not affect other users in same clinic", async () => {
