@@ -35,7 +35,16 @@ for var in "${required_vars[@]}"; do
   fi
 done
 
-echo "✅ All pre-flight checks passed"
+echo "✅ Required pre-flight checks passed"
+
+# Check recommended environment variables (warn, don't block)
+recommended_vars=("CLERK_WEBHOOK_SECRET" "DB_CONFIG_ENCRYPTION_KEY")
+
+for var in "${recommended_vars[@]}"; do
+  if [ -z "${!var}" ]; then
+    echo "⚠️  Recommended variable missing: $var (startup will warn)"
+  fi
+done
 
 if [ "$CHECK_MODE" = false ]; then
   if [ -z "$RAILWAY_TOKEN" ]; then

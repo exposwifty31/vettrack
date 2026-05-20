@@ -10,9 +10,10 @@ const REQUIRED_IN_PRODUCTION: string[] = [
   "CLERK_SECRET_KEY",
   "VITE_CLERK_PUBLISHABLE_KEY",
   "ALLOWED_ORIGIN",
-  // Webhook signature verification — required for Clerk user lifecycle sync
+];
+
+const RECOMMENDED_IN_PRODUCTION: string[] = [
   "CLERK_WEBHOOK_SECRET",
-  // Credential encryption — required to protect external integration API keys at rest
   "DB_CONFIG_ENCRYPTION_KEY",
 ];
 
@@ -67,6 +68,13 @@ export function validateEnv(): void {
       errors.push(
         `  - ${varName} is set to a known insecure fallback value ("${value}"). Use a strong, random secret in production.`
       );
+    }
+  }
+
+  for (const varName of RECOMMENDED_IN_PRODUCTION) {
+    const value = process.env[varName];
+    if (!value || value.trim() === "") {
+      console.warn(`⚠️  ${varName} is recommended in production but is missing or empty`);
     }
   }
 
