@@ -300,7 +300,7 @@ function completeButtonState(args: {
   return { visible: true, disabled: false, tooltip: "" };
 }
 
-const STATUS_LABEL: Record<AppointmentStatus, string> = {
+const statusLabel = (): Record<AppointmentStatus, string> => ({
   pending: t.appointmentsPage.statusPending,
   assigned: t.appointmentsPage.statusAssigned,
   scheduled: t.appointmentsPage.statusScheduled,
@@ -309,7 +309,7 @@ const STATUS_LABEL: Record<AppointmentStatus, string> = {
   completed: t.appointmentsPage.statusCompleted,
   cancelled: t.appointmentsPage.statusCancelled,
   no_show: t.appointmentsPage.statusNoShow,
-};
+});
 
 function looksLikeUuid(s: string): boolean {
   return s.includes("-") && s.length > 20;
@@ -317,7 +317,7 @@ function looksLikeUuid(s: string): boolean {
 
 function formatDevice(animalId: string | null | undefined): string {
   if (!animalId) return t.appointmentsPage.unassigned;
-  if (looksLikeUuid(animalId)) return t.appointmentsPage.unassigned;
+  if (looksLikeUuid(animalId)) return t.appointmentsPage.linkedDevice;
   return animalId;
 }
 
@@ -335,7 +335,7 @@ function PatientChartLink({ animalId }: { animalId: string | null | undefined })
 
 function formatLocation(ownerId: string | null | undefined): string | null {
   if (!ownerId) return null;
-  if (looksLikeUuid(ownerId)) return t.appointmentsPage.unassigned;
+  if (looksLikeUuid(ownerId)) return t.appointmentsPage.linkedOwner;
   return ownerId;
 }
 
@@ -600,6 +600,8 @@ export default function AppointmentsPage() {
       return { appointment, top, height, start, end };
     });
   }, [filteredAppointments, day]);
+
+  const appointmentStatusLabels = statusLabel();
 
   const totalGridMinutes = (DAY_END_HOUR - DAY_START_HOUR) * 60;
   const totalGridHeight = totalGridMinutes * PIXELS_PER_MINUTE;
@@ -1406,7 +1408,7 @@ export default function AppointmentsPage() {
                               </Badge>
                             ) : null}
                             <Badge variant="secondary" className="text-[10px]">
-                              {STATUS_LABEL[appointment.status]}
+                              {appointmentStatusLabels[appointment.status]}
                             </Badge>
                             <Badge
                               variant="outline"
@@ -1465,7 +1467,7 @@ export default function AppointmentsPage() {
                               onClick={() => updateStatusMutation.mutate({ id: appointment.id, status: nextStatus })}
                               disabled={updateStatusMutation.isPending}
                             >
-                              {STATUS_LABEL[nextStatus]}
+                              {appointmentStatusLabels[nextStatus]}
                             </Button>
                           ))}
                         </div>

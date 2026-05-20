@@ -1971,6 +1971,8 @@
     "noTasksToday": "No tasks are due today.",
     "staffMember": "Staff member",
     "unassigned": "Unassigned",
+    "linkedDevice": "Assigned device",
+    "linkedOwner": "Assigned owner",
     "unknownUser": "Unknown user",
     "scheduledAt": "Scheduled {time}",
     "prescribedBy": "Prescribed by {name}",

@@ -385,6 +385,9 @@ export function invalidateForUser(clinicId: string, userId: string): void {
     for (const k of matched) {
       shiftInflight.delete(k);
     }
+    if (matched.length > 0) {
+      incrementMetric("authority_cache_invalidate_shift");
+    }
 
     // Phase 2.5 PR 7 — extend invalidateForUser to cover the allowlist cache.
     // Existing user-mutation call sites (server/routes/users.ts:347/537/785/836)

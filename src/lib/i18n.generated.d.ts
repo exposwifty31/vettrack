@@ -1974,6 +1974,8 @@ export interface TStructure {
     noTasksToday: string;
     staffMember: string;
     unassigned: string;
+    linkedDevice: string;
+    linkedOwner: string;
     unknownUser: string;
     scheduledAt: string;
     prescribedBy: string;
@@ -2160,6 +2162,9 @@ export interface TStructure {
     stopCprChooseOutcome: string;
     stopCprLocked: string;
     managerOnlyHint: string;
+    activeSessionExists: string;
+    startSessionFailed: string;
+    endSessionFailed: string;
     cprCycleLine: string;
     patientWeightSuffix: string;
     role: {
