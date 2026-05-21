@@ -1,11 +1,14 @@
 name: Release Gate
 
-# Enforces pilot/demo release safety. Runs on merge to main and on manual dispatch.
-# Each gate is a named, independently observable check.
-# A single gate failure blocks the release with a clear, actionable error.
+# Enforces pilot/demo release safety as a manual, on-demand release-readiness
+# check. Each gate is a named, independently observable check; a single gate
+# failure blocks the release with a clear, actionable error.
+#
+# This workflow is dispatch-only by design: the automatic typecheck + full
+# vitest suite on push to main is owned by `ci.yml`. Running both on every
+# main push duplicated the entire test run, so the release gate is now a
+# thin, deliberately-invoked check (see DP-04).
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       reason:

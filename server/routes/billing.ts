@@ -237,7 +237,7 @@ async function buildEquipmentScanLeakage(
   });
 }
 
-const createChargeSchema = z.object({
+export const createChargeSchema = z.object({
   animalId: z.string().min(1).optional(),
   itemType: z.enum(["EQUIPMENT", "CONSUMABLE"]),
   itemId: z.string().min(1),
@@ -246,13 +246,13 @@ const createChargeSchema = z.object({
   note: z.string().max(500).optional(),
   /** Optional: Idempotency-Key header value used to build deterministic key. */
   idempotencyKeyHint: z.string().max(200).optional(),
-});
+}).strict();
 
-const reverseChargeSchema = z.object({
+export const reverseChargeSchema = z.object({
   reversalReason: z.string().min(1).max(500),
-});
+}).strict();
 
-const leakageOnePagerSchema = z.object({
+export const leakageOnePagerSchema = z.object({
   summary: z.object({
     totalGapValueCents: z.number().int().nonnegative(),
     totalGapQty: z.number().int().nonnegative(),
@@ -265,7 +265,7 @@ const leakageOnePagerSchema = z.object({
   shift: z.string().min(1).max(120).optional(),
   primaryEquipment: z.string().min(1).max(200).optional(),
   topContributor: z.string().min(1).max(200).optional(),
-});
+}).strict();
 
 function formatUsdFromCents(cents: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -890,9 +890,9 @@ router.patch(
   }
 });
 
-const bulkSyncSchema = z.object({
+export const bulkSyncSchema = z.object({
   ids: z.array(z.string()).min(1),
-});
+}).strict();
 
 // PATCH /api/billing/bulk-sync — mark billing entries as synced
 router.patch(

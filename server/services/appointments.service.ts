@@ -9,6 +9,11 @@ import { animals, appointments, billingItems, billingLedger, clinicalCheckIns, c
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { markIdempotentAsync } from "../lib/idempotency.js";
 import { validateJustificationText, MedJustificationError, resolvePresetLabel } from "../lib/med-justification.js";
+import {
+  clinicTodayIsoDate,
+  getClinicDayUtcRange,
+  getClinicTimezone,
+} from "../lib/clinic-timezone.js";
 import { incrementMetric } from "../lib/metrics.js";
 import { broadcast } from "../lib/realtime.js";
 import { sendTaskNotification } from "../lib/task-notification.js";
@@ -818,7 +823,9 @@ function assertClinicId(clinicId: string): string {
   return normalized;
 }
 
-function toUtcDate(value: string | Date, field: string): Date {
+// Exported for the datetime ISO-contract test (PR-17). The UI must send
+// timezone-qualified ISO strings (offset or `Z`); offset-less input is rejected.
+export function toUtcDate(value: string | Date, field: string): Date {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) {
       throw new AppointmentServiceError("INVALID_TIME", 400, `${field} must be a valid UTC timestamp`);
@@ -2016,15 +2023,14 @@ export async function getTasksForTechnician(clinicIdInput: string, technicianId:
   return serializeAppointmentRowsSkippingMalformed(rows, "getTasksForTechnician");
 }
 
-/** Today's tasks (UTC day) for a technician — used by GET /api/tasks/me. */
+/** Today's tasks (clinic-local calendar day) for a technician — used by GET /api/tasks/me. */
 export async function getTasksForTechnicianToday(clinicIdInput: string, technicianId: string) {
-  const day = new Date().toISOString().slice(0, 10);
   const clinicId = assertClinicId(clinicIdInput);
   await assertVetInClinic(clinicId, technicianId);
 
-  const dayStart = new Date(`${day}T00:00:00.000Z`);
-  const dayEnd = new Date(dayStart);
-  dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+  const timeZone = await getClinicTimezone(clinicId);
+  const day = clinicTodayIsoDate(timeZone);
+  const { dayStart, dayEnd } = await getClinicDayUtcRange(clinicId, day);
 
   const rows = await db
     .select()
@@ -2104,7 +2110,9 @@ export async function getActiveMedicationTasks(clinicIdInput: string): Promise<M
 }
 
 export async function getTodayTasks(clinicIdInput: string) {
-  const day = new Date().toISOString().slice(0, 10);
+  const clinicId = assertClinicId(clinicIdInput);
+  const timeZone = await getClinicTimezone(clinicId);
+  const day = clinicTodayIsoDate(timeZone);
   return getAppointmentsByDay(clinicIdInput, day);
 }
 
@@ -2114,9 +2122,7 @@ export async function getAppointmentsByDay(clinicIdInput: string, dayIsoDate: st
     throw new AppointmentServiceError("INVALID_DAY", 400, "day must be YYYY-MM-DD");
   }
 
-  const dayStart = new Date(`${dayIsoDate}T00:00:00.000Z`);
-  const dayEnd = new Date(dayStart);
-  dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+  const { dayStart, dayEnd } = await getClinicDayUtcRange(clinicId, dayIsoDate);
 
   const rows = await db
     .select()

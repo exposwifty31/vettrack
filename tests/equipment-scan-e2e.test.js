@@ -60,6 +60,8 @@ async function del(path, headers = {}) {
  * User IDs recognised by auth.ts DEV_USER_PRESETS:
  *   "dev-user-alpha" → alpha@vettrack.dev
  *   "dev-user-beta"  → beta@vettrack.dev
+ *   "dev-pending-user-001" → pending@vettrack.dev (status=pending)
+ *   "dev-blocked-user-001" → blocked@vettrack.dev (status=blocked)
  * Default (no override) → dev-admin-001 / admin@vettrack.dev
  */
 function devHeaders({ userId, clinicId, role = "admin" } = {}) {

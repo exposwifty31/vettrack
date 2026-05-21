@@ -21,9 +21,9 @@ jobs:
           exit 1
 
   staging-e2e:
-    name: Staging E2E — seed / Playwright / cleanup
+    name: Staging E2E — seed / Playwright / walkthrough / cleanup
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     needs: [refuse-wrong-branch]
     if: always() && needs.refuse-wrong-branch.result == 'skipped' && github.ref == 'refs/heads/staging'
 
@@ -62,6 +62,9 @@ jobs:
 
       - name: 🎭 Run staging Playwright E2E
         run: pnpm test:staging:e2e
+
+      - name: 🚶 Run staging UI walkthrough
+        run: pnpm test:staging:walkthrough
 
       - name: 🧹 Cleanup staging E2E fixtures
         if: always()

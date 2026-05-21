@@ -11,6 +11,10 @@ import {
 } from "../db.js";
 import type { InventoryBlueprintEntry } from "../config/inventoryBlueprint.js";
 import { resolveBlueprintEntryForContainerName } from "../config/inventoryBlueprint.js";
+import {
+  isCheckViolation,
+  toInventoryConstraintError,
+} from "../lib/db-constraint-errors.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DbTx = any;
@@ -105,16 +109,23 @@ async function ensureTemplateItemsSeededInTx(
     .where(and(eq(inventoryItems.clinicId, clinicId), inArray(inventoryItems.code, codes)));
 
   for (const item of seededItems) {
-    await tx
-      .insert(containerItems)
-      .values({
-        id: randomUUID(),
-        clinicId,
-        containerId,
-        itemId: item.id,
-        quantity: 0,
-      })
-      .onConflictDoNothing();
+    try {
+      await tx
+        .insert(containerItems)
+        .values({
+          id: randomUUID(),
+          clinicId,
+          containerId,
+          itemId: item.id,
+          quantity: 0,
+        })
+        .onConflictDoNothing();
+    } catch (err) {
+      if (isCheckViolation(err)) {
+        throw toInventoryConstraintError(err);
+      }
+      throw err;
+    }
   }
 
   return entry;
@@ -382,25 +393,39 @@ export async function finishSession(params: {
       const newQuantity = Math.max(0, currentQuantity + adjustment);
 
       if (ci) {
-        await tx
-          .update(containerItems)
-          .set({ quantity: newQuantity, updatedAt: new Date() })
-          .where(
-            and(
-              eq(containerItems.clinicId, params.clinicId),
-              eq(containerItems.containerId, session.containerId),
-              eq(containerItems.itemId, itemId),
-            ),
-          );
+        try {
+          await tx
+            .update(containerItems)
+            .set({ quantity: newQuantity, updatedAt: new Date() })
+            .where(
+              and(
+                eq(containerItems.clinicId, params.clinicId),
+                eq(containerItems.containerId, session.containerId),
+                eq(containerItems.itemId, itemId),
+              ),
+            );
+        } catch (err) {
+          if (isCheckViolation(err)) {
+            throw toInventoryConstraintError(err);
+          }
+          throw err;
+        }
       } else {
-        await tx.insert(containerItems).values({
-          id: randomUUID(),
-          clinicId: params.clinicId,
-          containerId: session.containerId,
-          itemId,
-          quantity: newQuantity,
-          updatedAt: new Date(),
-        }).onConflictDoNothing();
+        try {
+          await tx.insert(containerItems).values({
+            id: randomUUID(),
+            clinicId: params.clinicId,
+            containerId: session.containerId,
+            itemId,
+            quantity: newQuantity,
+            updatedAt: new Date(),
+          }).onConflictDoNothing();
+        } catch (err) {
+          if (isCheckViolation(err)) {
+            throw toInventoryConstraintError(err);
+          }
+          throw err;
+        }
       }
 
       // Write inventory_log for audit trail (Fix G).

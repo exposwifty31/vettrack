@@ -794,7 +794,7 @@ router.post("/handoffs", requireAssignableRole, async (req: Request, res: Respon
   }
 });
 
-router.post("/handoffs/:id/ack", async (req: Request, res: Response) => {
+router.post("/handoffs/:id/ack", requireAssignableRole, async (req: Request, res: Response) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   const parsed = ackHandoffSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
@@ -840,6 +840,9 @@ router.post("/handoffs/:id/ack", async (req: Request, res: Response) => {
   }
 });
 
+// Not built — responds 501 COMING_SOON. Deliberately excluded from
+// ER_API_IMPLEMENTED_ROUTES in src/lib/er-api.ts so diagnostics/admin
+// tooling does not advertise it as implemented.
 router.get("/queue", async (req: Request, res: Response) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   return notImplemented(res, requestId);

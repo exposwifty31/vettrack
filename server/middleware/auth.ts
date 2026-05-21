@@ -81,6 +81,22 @@ const DEV_USER: AuthUser = {
 const DEV_USER_PRESETS: Record<string, Partial<AuthUser>> = {
   "dev-user-alpha": { id: "dev-user-alpha", clerkId: "dev-user-alpha", email: "alpha@vettrack.dev", name: "Dev Alpha" },
   "dev-user-beta":  { id: "dev-user-beta",  clerkId: "dev-user-beta",  email: "beta@vettrack.dev",  name: "Dev Beta"  },
+  "dev-pending-user-001": {
+    id: "dev-pending-user-001",
+    clerkId: "dev-pending-user-001",
+    email: "pending@vettrack.dev",
+    name: "Dev Pending",
+    role: "technician",
+    status: "pending",
+  },
+  "dev-blocked-user-001": {
+    id: "dev-blocked-user-001",
+    clerkId: "dev-blocked-user-001",
+    email: "blocked@vettrack.dev",
+    name: "Dev Blocked",
+    role: "technician",
+    status: "blocked",
+  },
 };
 
 const isProduction = process.env.NODE_ENV === "production";

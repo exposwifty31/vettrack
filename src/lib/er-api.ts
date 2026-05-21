@@ -48,7 +48,8 @@ export const ER_API_IMPLEMENTED_ROUTES = [
   "POST /api/er/handoffs",
   "POST /api/er/handoffs/:id/ack",
   "GET /api/er/impact",
-  "GET /api/er/queue",
+  // GET /api/er/queue is intentionally omitted — the route exists but
+  // responds 501 COMING_SOON (queue feature not built). See server/routes/er.ts.
 ] as const;
 
 type RequestFn = typeof import("./api").request;

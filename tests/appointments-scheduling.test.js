@@ -205,4 +205,31 @@ describe("Appointments Scheduling", () => {
     };
     expect(transitions.completed.includes("scheduled")).toBe(false);
   });
+
+  it("Clinic timezone column exists on vt_clinics", () => {
+    const dbFile = fs.readFileSync(path.join(repoRoot, "server", "db.ts"), "utf8");
+    expect(dbFile.includes('timezone: text("timezone")')).toBe(true);
+  });
+
+  it('Today task queries use clinic timezone helpers (not UTC "T00:00:00.000Z" day start)', () => {
+    expect(serviceFile.includes("getClinicDayUtcRange")).toBe(true);
+    expect(serviceFile.includes("clinicTodayIsoDate")).toBe(true);
+    expect(serviceFile.includes('`${day}T00:00:00.000Z`')).toBe(false);
+  });
+});
+
+describe("Clinic timezone boundaries (PR-23)", () => {
+  it("Jerusalem day start is not naive UTC midnight on the same calendar date", async () => {
+    const { clinicDayUtcRange } = await import("../server/lib/clinic-timezone.ts");
+    const { dayStart } = clinicDayUtcRange("2026-01-15", "Asia/Jerusalem");
+    expect(dayStart.toISOString()).not.toBe("2026-01-15T00:00:00.000Z");
+    expect(dayStart.toISOString()).toBe("2026-01-14T22:00:00.000Z");
+  });
+
+  it("Standard winter day in Asia/Jerusalem has 24-hour local span", async () => {
+    const { clinicDayUtcRange } = await import("../server/lib/clinic-timezone.ts");
+    const { dayStart, dayEnd } = clinicDayUtcRange("2026-01-15", "Asia/Jerusalem");
+    const hours = (dayEnd.getTime() - dayStart.getTime()) / 3_600_000;
+    expect(hours).toBe(24);
+  });
 });

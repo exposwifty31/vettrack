@@ -20,6 +20,7 @@ import {
   primaryKey,
   doublePrecision,
   bigserial,
+  check,
 } from "drizzle-orm/pg-core";
 
 // Managed Postgres providers (Neon, Supabase, Heroku, Railway public proxy, …)
@@ -70,6 +71,8 @@ export const owners = pgTable("vt_owners", {
 
 export const clinics = pgTable("vt_clinics", {
   id: text("id").primaryKey(),
+  /** IANA timezone for clinic-local day boundaries (tasks, scheduling). */
+  timezone: text("timezone").notNull().default("Asia/Jerusalem"),
   pharmacyEmail: text("pharmacy_email"),
   forecastPdfSourceFormat: varchar("forecast_pdf_source_format", { length: 20 }).notNull().default("smartflow"),
   erModeState: varchar("er_mode_state", { length: 20 }).notNull().default("disabled"),
@@ -468,7 +471,14 @@ export const containers = pgTable("vt_containers", {
   roomId: text("room_id").references(() => rooms.id, { onDelete: "set null" }),
   billingItemId: text("billing_item_id").references(() => billingItems.id, { onDelete: "set null" }),
   nfcTagId: text("nfc_tag_id").unique(),
-});
+}, (table) => ({
+  // On-hand stock can never be negative — DB-level safety net behind the
+  // service-layer flooring (see migration 125).
+  currentQuantityNonNegative: check(
+    "vt_containers_current_quantity_non_negative",
+    sql`${table.currentQuantity} >= 0`,
+  ),
+}));
 
 export const inventoryItems = pgTable(
   "vt_items",
@@ -554,6 +564,9 @@ export const containerItems = pgTable(
   (table) => ({
     containerItemUnique: uniqueIndex("vt_container_items_container_item_unique").on(table.containerId, table.itemId),
     clinicIdx: index("idx_container_items_clinic").on(table.clinicId),
+    // On-hand stock can never be negative — DB-level safety net behind the
+    // service-layer flooring (see migration 125).
+    quantityNonNegative: check("vt_container_items_quantity_non_negative", sql`${table.quantity} >= 0`),
   }),
 );
 

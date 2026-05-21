@@ -28,6 +28,10 @@ import {
   emitClinicalInvariantFailOpenAudit,
 } from "../lib/authority/enforcement/clinical-invariant.audit.js";
 import { clinicalInvariantMetrics } from "../lib/authority/enforcement/clinical-invariant.metrics.js";
+import {
+  isCheckViolation,
+  toInventoryConstraintError,
+} from "../lib/db-constraint-errors.js";
 import type { ClinicalInvariantEnforcementMode } from "../lib/authority/enforcement/clinical-invariant.types.js";
 import { incrementMetric } from "../lib/metrics.js";
 import type {
@@ -635,6 +639,10 @@ export async function confirmDispense(input: ConfirmDispenseInput): Promise<Conf
   try {
     await enqueueDispenseInventoryDeduction(clinicId, confirmed);
   } catch (err) {
+    // NOTE: deduction failures (including InventoryConstraintError from
+    // migration-125 CHECK) are recorded as inventoryStatus: "FAILED" and
+    // do NOT propagate to sendError. The sendError inventory branch
+    // exists for safety if this swallow is ever removed.
     console.error("[confirmDispense] inventory deduction enqueue failed", {
       dispenseEventId,
       err: err instanceof Error ? err.message : String(err),
@@ -676,23 +684,33 @@ async function enqueueDispenseInventoryDeduction(clinicId: string, event: Dispen
       const currentQty = ci?.quantity ?? 0;
       const requestedQty = lineItem.quantity;
       const actualDeduct = Math.min(currentQty, requestedQty);
-      const newQty = currentQty - actualDeduct;
+      // actualDeduct <= currentQty, so this is already >= 0; the explicit
+      // clamp documents and guarantees the non-negative invariant now
+      // enforced by the DB CHECK constraint (migration 125).
+      const newQty = Math.max(0, currentQty - actualDeduct);
 
       if (actualDeduct < requestedQty) {
         anyMismatch = true;
       }
 
       if (ci) {
-        await tx
-          .update(containerItems)
-          .set({ quantity: newQty, updatedAt: new Date() })
-          .where(
-            and(
-              eq(containerItems.clinicId, clinicId),
-              eq(containerItems.containerId, event.containerId),
-              eq(containerItems.itemId, lineItem.itemId),
-            ),
-          );
+        try {
+          await tx
+            .update(containerItems)
+            .set({ quantity: newQty, updatedAt: new Date() })
+            .where(
+              and(
+                eq(containerItems.clinicId, clinicId),
+                eq(containerItems.containerId, event.containerId),
+                eq(containerItems.itemId, lineItem.itemId),
+              ),
+            );
+        } catch (err) {
+          if (isCheckViolation(err)) {
+            throw toInventoryConstraintError(err);
+          }
+          throw err;
+        }
       }
 
       await tx.insert(inventoryLogs).values({

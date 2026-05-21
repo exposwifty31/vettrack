@@ -163,6 +163,14 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   const quickSettingsToggleRef = useRef<HTMLButtonElement>(null);
   const qc = useQueryClient();
 
+  // Permanent sync-failure toasts (sync-engine) dispatch this event so
+  // their "view queue" action can open the sync sheet from outside React.
+  useEffect(() => {
+    const openSyncQueue = () => setSyncQueueOpen(true);
+    window.addEventListener("vettrack:open-sync-queue", openSyncQueue);
+    return () => window.removeEventListener("vettrack:open-sync-queue", openSyncQueue);
+  }, []);
+
   useEffect(() => {
     if (!navigationLocked) return;
     // Restock UIs: put `data-restock-allow` on a wrapper around controls that must stay clickable

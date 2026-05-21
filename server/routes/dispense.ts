@@ -14,6 +14,11 @@ import {
   DispenseError,
 } from "../services/dispense.service.js";
 import { apiError as i18nApiError } from "../lib/apiError.js";
+import {
+  handleCheckViolation,
+  isCheckViolation,
+  isInventoryConstraintError,
+} from "../lib/db-constraint-errors.js";
 
 const router = Router();
 
@@ -24,20 +29,20 @@ const itemSchema = z.object({
   quantity: z.number().int().min(1),
 });
 
-const draftSchema = z.object({
+export const draftSchema = z.object({
   containerId: z.string().uuid(),
   patientId: z.string().uuid().optional().nullable(),
   items: z.array(itemSchema).min(1),
-});
+}).strict();
 
-const confirmSchema = z.object({});
+export const confirmSchema = z.object({}).strict();
 
-const emergencySchema = z.object({
+export const emergencySchema = z.object({
   containerId: z.string().uuid(),
   patientId: z.string().uuid().optional().nullable(),
   items: z.array(itemSchema),
   bypassReason: z.enum(["EMERGENCY_CPR", "PROTOCOL_OVERRIDE", "TECH_ERROR"]),
-});
+}).strict();
 
 function resolveRequestId(res: { getHeader: (n: string) => unknown; setHeader?: (n: string, v: string) => void }, incoming: unknown): string {
   const incomingStr = typeof incoming === "string" ? incoming.trim() : "";
@@ -65,6 +70,17 @@ function sendError(req: Request, res: Response, err: unknown, requestId: string)
       ...apiError({ code: err.code, reason: err.code, message: err.message, requestId }),
       details: err.details ?? null,
     });
+    return;
+  }
+  if (isInventoryConstraintError(err)) {
+    res.status(err.status).json({
+      code: err.code,
+      message: err.message,
+      constraint: err.constraint,
+    });
+    return;
+  }
+  if (isCheckViolation(err) && handleCheckViolation(err, res)) {
     return;
   }
   console.error("[dispense] unexpected error", err);

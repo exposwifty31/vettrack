@@ -7,6 +7,8 @@ import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/a
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 
+// TODO(constraint-handler): unify with db-constraint-errors.ts when adding inventory_items mappings (post-PR #366)
+
 const router = Router();
 
 function resolveRequestId(
@@ -31,7 +33,7 @@ function apiError(params: { code: string; reason: string; message: string; reque
   };
 }
 
-const createItemSchema = z.object({
+export const createItemSchema = z.object({
   code: z.string().min(1).max(100).regex(/^[A-Z0-9_\-]+$/i, "Code must be alphanumeric with underscores/hyphens"),
   label: z.string().min(1).max(200),
   itemType: z.enum(["DRUG", "CONSUMABLE", "EQUIPMENT"]).default("CONSUMABLE"),
@@ -40,9 +42,9 @@ const createItemSchema = z.object({
   nfcTagId: z.string().max(200).optional().nullable(),
   /** Required when itemType = 'DRUG'. Must reference an active formulary entry. */
   formularyId: z.string().uuid().optional().nullable(),
-});
+}).strict();
 
-const updateItemSchema = z.object({
+export const updateItemSchema = z.object({
   label: z.string().min(1).max(200).optional(),
   itemType: z.enum(["DRUG", "CONSUMABLE", "EQUIPMENT"]).optional(),
   unit: z.string().min(1).max(30).optional().nullable(),
@@ -51,15 +53,15 @@ const updateItemSchema = z.object({
   isBillable: z.boolean().optional(),
   minimumDispenseToCapture: z.number().int().min(1).optional(),
   formularyId: z.string().uuid().optional().nullable(),
-});
+}).strict();
 
-const addPriceSchema = z.object({
+export const addPriceSchema = z.object({
   contextType: z.enum(["CONTAINER", "USAGE", "GLOBAL"]),
   contextId: z.string().max(200).optional().nullable(),
   priceCents: z.number().int().min(0),
   currency: z.string().length(3).default("ILS"),
   effectiveFrom: z.string().datetime({ offset: true }).optional(),
-});
+}).strict();
 
 /** Enforce DRUG ↔ formulary coupling at service level. */
 async function resolveFormularyVersion(

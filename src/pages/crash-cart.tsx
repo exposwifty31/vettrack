@@ -7,6 +7,7 @@ import { ErrorCard } from "@/components/ui/error-card";
 import { authFetch } from "@/lib/auth-fetch";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/lib/api";
+import { t, formatDateByLocale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { CrashCartAdminSheet } from "@/components/crash-cart-admin-sheet";
@@ -30,8 +31,8 @@ function formatRelativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const h = Math.floor(diff / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
-  if (h > 0) return `${h}שע׳ ${m}ד׳`;
-  return `${m}ד׳`;
+  if (h > 0) return t.crashCart.relativeHoursMinutes(h, m);
+  return t.crashCart.relativeMinutes(m);
 }
 
 export default function CrashCartCheckPage() {
@@ -80,7 +81,7 @@ export default function CrashCartCheckPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/crash-cart/checks/latest"] });
     },
     onError: () => {
-      toast.error("שגיאה בשמירת הבדיקה — נסה שנית");
+      toast.error(t.crashCart.saveError);
     },
   });
 
@@ -92,7 +93,7 @@ export default function CrashCartCheckPage() {
   if (latestQ.isError) {
     return (
       <div className="min-h-screen bg-background p-4 max-w-2xl mx-auto" dir="rtl">
-        <ErrorCard message="שגיאה בטעינת נתוני עגלת ההחייאה" onRetry={() => latestQ.refetch()} />
+        <ErrorCard message={t.crashCart.loadError} onRetry={() => latestQ.refetch()} />
       </div>
     );
   }
@@ -101,14 +102,14 @@ export default function CrashCartCheckPage() {
     <div className="min-h-screen bg-background p-4 max-w-2xl mx-auto" dir="rtl">
       <div className="flex items-center gap-2 mb-6">
         <CheckCircle2 className="h-6 w-6 text-green-500" />
-        <h1 className="text-xl font-bold flex-1">בדיקת עגלת החייאה יומית</h1>
+        <h1 className="text-xl font-bold flex-1">{t.crashCart.title}</h1>
         {isAdmin && (
           <Button
             variant="ghost"
             size="sm"
             className="h-8 px-2"
             onClick={() => setAdminSheetOpen(true)}
-            aria-label="הגדרות עגלה"
+            aria-label={t.crashCart.settingsAria}
           >
             <Settings className="h-4 w-4" />
           </Button>
@@ -124,9 +125,14 @@ export default function CrashCartCheckPage() {
             : "border-amber-500/30 bg-amber-500/10 text-amber-400",
         )}>
           {latestQ.data.checkedToday && latestQ.data.latest ? (
-            <span>✓ נבדקה לפני {formatRelativeTime(latestQ.data.latest.performedAt)} ע״י {latestQ.data.latest.performedByName}</span>
+            <span>
+              {t.crashCart.checkedAgo(
+                formatRelativeTime(latestQ.data.latest.performedAt),
+                latestQ.data.latest.performedByName,
+              )}
+            </span>
           ) : (
-            <span>⚠ העגלה לא נבדקה היום</span>
+            <span>{t.crashCart.notCheckedToday}</span>
           )}
         </div>
       )}
@@ -136,13 +142,13 @@ export default function CrashCartCheckPage() {
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 mb-4">
           <div className="flex items-center gap-2 mb-2 text-red-400 text-sm font-semibold">
             <AlertTriangle className="h-4 w-4" />
-            מטופלים בסיכון גבוה — {criticalPatients.length}
+            {t.crashCart.highRiskPatients(criticalPatients.length)}
           </div>
           <div className="flex flex-col gap-1">
             {criticalPatients.map((p) => (
               <div key={p.hospitalizationId} className="text-xs text-zinc-300 flex gap-2">
                 <span className="font-medium">{p.animalName}</span>
-                <span className="text-zinc-500">{p.species}{p.weightKg ? ` · ${p.weightKg} ק״ג` : ""}</span>
+                <span className="text-zinc-500">{p.species}{p.weightKg ? ` · ${t.crashCart.weightKg(p.weightKg)}` : ""}</span>
                 {(p.ward || p.bay) && <span className="text-zinc-500">· {[p.ward, p.bay].filter(Boolean).join(" / ")}</span>}
               </div>
             ))}
@@ -153,11 +159,11 @@ export default function CrashCartCheckPage() {
       {/* Checklist */}
       {itemsQ.isPending ? (
         <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 mb-4">
-          <p className="text-sm text-zinc-500">טוען פריטים...</p>
+          <p className="text-sm text-zinc-500">{t.crashCart.loadingItems}</p>
         </div>
       ) : !submitted ? (
         <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 mb-4">
-          <h2 className="text-sm font-semibold text-zinc-400 mb-3">פריטים לבדיקה</h2>
+          <h2 className="text-sm font-semibold text-zinc-400 mb-3">{t.crashCart.itemsToCheck}</h2>
           <div className="flex flex-col gap-3">
             {cartItems.map((item) => (
               <button
@@ -184,7 +190,7 @@ export default function CrashCartCheckPage() {
           {!allChecked && (
             <textarea
               className="mt-3 w-full rounded border border-zinc-700 bg-zinc-800 p-2 text-sm text-zinc-200 placeholder-zinc-500"
-              placeholder="הערות על פריטים חסרים..."
+              placeholder={t.crashCart.missingItemsNotesPlaceholder}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
@@ -197,13 +203,13 @@ export default function CrashCartCheckPage() {
             onClick={() => submit.mutate()}
             disabled={submit.isPending || cartItems.length === 0}
           >
-            {allChecked ? "✓ כל הפריטים תקינים — שמור" : "שמור (עם פריטים חסרים)"}
+            {allChecked ? t.crashCart.saveAllOk : t.crashCart.saveWithMissing}
           </Button>
         </div>
       ) : (
         <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4 mb-4 text-center text-green-400">
           <CheckCircle2 className="h-8 w-8 mx-auto mb-2" />
-          <p className="font-semibold">הבדיקה נשמרה</p>
+          <p className="font-semibold">{t.crashCart.checkSaved}</p>
         </div>
       )}
 
@@ -211,15 +217,15 @@ export default function CrashCartCheckPage() {
       {recentChecks.length > 0 && (
         <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
           <h2 className="text-sm font-semibold text-zinc-400 mb-3 flex items-center gap-2">
-            <Clock className="h-4 w-4" /> היסטוריית בדיקות
+            <Clock className="h-4 w-4" /> {t.crashCart.historyTitle}
           </h2>
           <div className="flex flex-col gap-2">
             {recentChecks.map((check) => (
               <div key={check.id} className="flex justify-between items-center text-xs text-zinc-400">
-                <span>{new Date(check.performedAt).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                <span>{formatDateByLocale(check.performedAt, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
                 <span className="text-zinc-500">{check.performedByName}</span>
                 <span className={check.allPassed ? "text-green-400" : "text-red-400"}>
-                  {check.allPassed ? "✓ תקין" : "⚠ חסר"}
+                  {check.allPassed ? t.crashCart.statusOk : t.crashCart.statusMissing}
                 </span>
               </div>
             ))}

@@ -620,6 +620,7 @@ router.post("/approve", requireAuth, ensureUserClinicMembership, requireEffectiv
     const { subject, html, text } = buildPharmacyOrderEmail({
       result: mergedResult,
       technicianName: authUser.name || authUser.email,
+      locale: req.locale,
       auditOrOrderHint: orderId,
       auditTrace: parsed.data.auditTrace,
       patientWeightOverrides: parsed.data.patientWeightOverrides,

@@ -203,15 +203,31 @@ router.get("/data-integrity", async (req, res) => {
     ? req.headers["x-health-token"].trim()
     : "";
 
-  if (process.env.NODE_ENV === "production" && expectedToken && providedToken !== expectedToken) {
-    return res.status(401).json(
-      apiError({
-        code: "UNAUTHORIZED",
-        reason: "INVALID_HEALTH_TOKEN",
-        message: "Unauthorized",
-        requestId,
-      }),
-    );
+  // Fail closed in production: this probe exposes tenant-isolation counts
+  // (null clinicId rows, cross-tenant mismatches, orphan relations) and must
+  // never be reachable unauthenticated. A missing DATA_INTEGRITY_HEALTH_TOKEN
+  // is a misconfiguration, not an open door — reject rather than serve.
+  if (process.env.NODE_ENV === "production") {
+    if (!expectedToken) {
+      return res.status(503).json(
+        apiError({
+          code: "SERVICE_UNAVAILABLE",
+          reason: "HEALTH_TOKEN_NOT_CONFIGURED",
+          message: "Data-integrity health check is not configured",
+          requestId,
+        }),
+      );
+    }
+    if (providedToken !== expectedToken) {
+      return res.status(401).json(
+        apiError({
+          code: "UNAUTHORIZED",
+          reason: "INVALID_HEALTH_TOKEN",
+          message: "Unauthorized",
+          requestId,
+        }),
+      );
+    }
   }
 
   try {

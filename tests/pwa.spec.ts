@@ -33,7 +33,9 @@ import { test, expect, type Page, type BrowserContext } from "@playwright/test";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const BASE_URL = process.env.TEST_BASE_URL ?? "http://localhost:5000";
+// Default must match playwright.shared.ts DEFAULT_BASE_URL — the API origin
+// the Playwright config and CI workflow actually serve (PLAYWRIGHT_E2E).
+const BASE_URL = process.env.TEST_BASE_URL ?? "http://127.0.0.1:3001";
 
 const CRITICAL_ERROR_PATTERNS = [
   /Uncaught (TypeError|ReferenceError|SyntaxError)/,

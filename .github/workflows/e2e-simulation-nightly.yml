@@ -1,0 +1,127 @@
+# Nightly e2e/simulation run against a freshly built + seeded local app.
+#
+# The simulation suite (`tests/e2e/simulation/**`, PW_SUITE=workday) is
+# deliberately excluded from the PR-gating Playwright workflow because it is
+# long-running and not deterministic enough for per-PR feedback. It still
+# needs regular signal, so it runs here on a nightly schedule.
+#
+# Unlike `workday-simulation-nightly.yml` (which exercises the *deployed*
+# staging server and skips when staging secrets are absent), this workflow
+# builds, migrates and seeds the app locally on 127.0.0.1:3001 — so it always
+# runs and validates the simulation against the code as built.
+name: E2E simulation (nightly)
+
+on:
+  schedule:
+    - cron: "0 5 * * *" # 05:00 UTC — after workday-simulation-nightly (04:00)
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-simulation-nightly-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  simulation:
+    name: 🎭 e2e/simulation (local build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Non-blocking: the simulation is observational, never a merge gate.
+    continue-on-error: true
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: vettrack
+          POSTGRES_PASSWORD: vettrack
+          POSTGRES_DB: vettrack_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U vettrack -d vettrack_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://vettrack:vettrack@127.0.0.1:5432/vettrack_test
+      SESSION_SECRET: ci-test-secret-that-is-long-enough-32chars
+      PORT: 3001
+
+    steps:
+      - name: ⬇️ Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: 🟢 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🌐 Install Playwright Browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: 🏗️ Build frontend
+        run: |
+          export VITE_CLERK_PUBLISHABLE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-pk_test_ci_dummy_publishable_key}"
+          pnpm build
+        env:
+          NODE_ENV: production
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+
+      - name: 🗄️ Database migrations
+        run: pnpm migrate
+
+      - name: 🚀 Start app for Playwright
+        run: pnpm dev:api > /tmp/vettrack-simulation.log 2>&1 &
+        env:
+          PLAYWRIGHT_E2E: "true"
+
+      - name: ⏳ Wait for API readiness
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:3001/api/healthz > /dev/null; then
+              echo "✅ API ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "❌ API did not become ready at http://127.0.0.1:3001/api/healthz"
+          tail -n 200 /tmp/vettrack-simulation.log || true
+          exit 1
+
+      - name: 🌱 Seed E2E fixtures
+        run: pnpm seed:dev:e2e
+
+      - name: 🎭 Run e2e/simulation suite
+        run: pnpm test:playwright:workday --reporter=list
+        env:
+          TEST_BASE_URL: http://127.0.0.1:3001
+
+      - name: 📤 Upload dev log on failure
+        uses: actions/upload-artifact@v4
+        if: ${{ failure() }}
+        with:
+          name: vettrack-simulation-dev-log
+          path: /tmp/vettrack-simulation.log
+          retention-days: 30
+
+      - name: 📊 Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: simulation-playwright-report
+          path: playwright-report/
+          retention-days: 30

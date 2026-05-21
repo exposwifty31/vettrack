@@ -137,6 +137,38 @@ function mergeRequestHeaders(init: RequestInit): Record<string, string> {
   return merged;
 }
 
+const AUTH_BOOTSTRAP_TIMEOUT_MS = 10_000;
+
+/**
+ * Auth bootstrap helpers — return raw `Response` so `use-auth` can branch on
+ * 401/404 before session is established without triggering mutation 401 redirects.
+ */
+export async function authFetchUsersMe(init: RequestInit = {}): Promise<Response> {
+  return fetchWithTimeout(
+    "/api/users/me",
+    { credentials: "include", ...init, headers: mergeRequestHeaders(init) },
+    AUTH_BOOTSTRAP_TIMEOUT_MS,
+  );
+}
+
+export async function authPostUsersSync(
+  body: { clerkId: string; email: string; name: string },
+  init: RequestInit = {},
+): Promise<Response> {
+  const payload = JSON.stringify(body);
+  return fetchWithTimeout(
+    "/api/users/sync",
+    {
+      credentials: "include",
+      method: "POST",
+      ...init,
+      headers: mergeRequestHeaders({ ...init, body: payload }),
+      body: payload,
+    },
+    AUTH_BOOTSTRAP_TIMEOUT_MS,
+  );
+}
+
 interface OfflineOptions {
   offlineType: PendingSyncType;
   offlineEquipmentId?: string;
@@ -733,6 +765,11 @@ export const api = {
       const cached = await getCachedEquipmentById(id);
       const now = new Date().toISOString();
       const clientTimestamp = Date.now();
+      const scanBody: { status: ScanEquipmentRequest["status"]; note?: string; photoUrl?: string } = {
+        status: data.status,
+        ...(data.note !== undefined && data.note !== "" ? { note: data.note } : {}),
+        ...(data.photoUrl ? { photoUrl: data.photoUrl } : {}),
+      };
 
       const optimisticEquipment: Partial<Equipment> = {
         status: data.status,
@@ -745,8 +782,8 @@ export const api = {
       const optimisticScanLog: ScanLog = {
         id: `pending-${clientTimestamp}`,
         equipmentId: id,
-        userId: data.userId || getCurrentUserId(),
-        userEmail: data.userEmail || getCurrentUserEmail(),
+        userId: getCurrentUserId(),
+        userEmail: getCurrentUserEmail(),
         status: data.status,
         note: data.note || null,
         photoUrl: data.photoUrl || null,
@@ -765,7 +802,7 @@ export const api = {
           `/api/equipment/${id}/scan`,
           {
             method: "POST",
-            body: JSON.stringify(data),
+            body: JSON.stringify(scanBody),
             headers: { "X-Client-Timestamp": String(clientTimestamp) },
           }
         );
@@ -778,7 +815,7 @@ export const api = {
             type: "scan",
             endpoint: `/api/equipment/${id}/scan`,
             method: "POST",
-            body: JSON.stringify(data),
+            body: JSON.stringify(scanBody),
             createdAt: new Date(),
             retries: 0,
             status: "pending",
@@ -1735,6 +1772,12 @@ export const api = {
       request<{ patient: import("@/types").Hospitalization }>(`/api/patients/${encodeURIComponent(id)}`, {
         method: "PATCH",
         body: JSON.stringify(patch),
+      }),
+    listPending: () =>
+      request<{ patients: import("@/types").Hospitalization[] }>("/api/patients/pending"),
+    assign: (id: string) =>
+      request<{ id: string; assigned: boolean }>(`/api/patients/${id}/assign`, {
+        method: "PATCH",
       }),
   },
   codeBlue: {

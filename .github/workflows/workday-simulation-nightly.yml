@@ -1,0 +1,67 @@
+# Nightly staging workday simulation — non-blocking, never production.
+name: Workday simulation (staging nightly)
+
+on:
+  schedule:
+    - cron: "0 4 * * *"  # 04:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: workday-simulation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  workday:
+    name: Staging workday (non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Never block merges; skip if secrets missing
+    continue-on-error: true
+    # Scheduled runs fire on the default branch, so `github.ref` is never
+    # `refs/heads/staging` for a cron trigger — gate by event name instead.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    env:
+      STAGING_E2E_CONFIRM: "yes"
+      TEST_BASE_URL: ${{ secrets.TEST_BASE_URL_STAGING }}
+      STAGING_E2E_PASSWORD: ${{ secrets.STAGING_E2E_PASSWORD_STAGING }}
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
+      VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_STAGING }}
+
+    steps:
+      - name: Skip without staging secrets
+        if: env.TEST_BASE_URL == ''
+        run: |
+          echo "TEST_BASE_URL_STAGING not configured — skipping workday simulation"
+          exit 0
+
+      - uses: actions/checkout@v4
+        with:
+          # The simulation exercises the deployed staging server; check out
+          # the staging ref so the Playwright runner code matches it.
+          ref: staging
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run workday simulation
+        run: pnpm test:playwright:workday --reporter=list
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workday-simulation-artifacts
+          path: artifacts/
+          retention-days: 14

@@ -20,7 +20,7 @@ import { resolveAuditActorRole } from "../lib/audit.js";
 
 const router = Router();
 
-const createTaskSchema = z.object({
+export const createTaskSchema = z.object({
   animalId: z.string().trim().min(1),
   drugId: z.string().trim().min(1),
   route: z.string().trim().min(1).max(80),
@@ -33,16 +33,16 @@ const createTaskSchema = z.object({
   overrideReason: z.string().trim().max(1000).optional().nullable(),
   reasonType: z.enum(["NEW", "REPEAT", "CORRECTION"]).optional().nullable(),
   dueAt: z.string().datetime({ offset: true }).optional().nullable(),
-});
+}).strict();
 
-const completeTaskSchema = z.object({
+export const completeTaskSchema = z.object({
   actualVolume: z.number().finite().positive(),
   administeredAt: z.string().datetime({ offset: true }).optional().nullable(),
-});
+}).strict();
 
-const cancelTaskSchema = z.object({
+export const cancelTaskSchema = z.object({
   reason: z.string().trim().max(500).optional().nullable(),
-});
+}).strict();
 
 function resolveRequestId(res: Response, incomingHeader: unknown): string {
   const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";

@@ -39,7 +39,9 @@ describe("buildPharmacyOrderEmail", () => {
 
   it("shows audit trace when provided", () => {
     const { html } = buildPharmacyOrderEmail({
-      result, technicianName: "שרה",
+      result,
+      technicianName: "שרה",
+      locale: "he",
       auditTrace: { "361848__famotidine": { forecastedQty: 4, onHandQty: 1 } },
     });
     expect(html).toContain("חזוי: 4");
@@ -65,7 +67,11 @@ describe("buildPharmacyOrderEmail", () => {
       ...result,
       parseFailures: [{ fileName: "ward-a.pdf", message: "פענוח PDF נכשל" }],
     };
-    const { html, text } = buildPharmacyOrderEmail({ result: withFailures, technicianName: "שרה" });
+    const { html, text } = buildPharmacyOrderEmail({
+      result: withFailures,
+      technicianName: "שרה",
+      locale: "he",
+    });
     expect(html).toContain("קבצים שלא פוענחו");
     expect(html).toContain("ward-a.pdf");
     expect(text).toContain("קבצים שלא פוענחו");

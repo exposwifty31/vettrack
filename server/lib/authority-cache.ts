@@ -36,11 +36,10 @@
  * Epoch-map boundedness: epoch counters are co-evicted with their cache
  * entries via the TtlCache onEvict hook, bounding memory by maxEntries.
  *
- * Timezone semantics: dayBucket is derived from toLocalDateString(now), the
- * exact same helper used by the shift query at server/lib/role-resolution.ts.
- * The helper is server-local; clinics in different timezones from the server
- * share the same potential calendar-day misalignment as the shift query
- * already has. This PR neither introduces nor fixes that.
+ * Timezone semantics: shift cache dayBucket uses clinicTodayIsoDate with the
+ * clinic IANA timezone from `vt_clinics.timezone` (see clinic-timezone.ts).
+ * Aligns cache keys with clinic-local "today" used by appointment task queries.
+ * Role-resolution shift DB matching still uses server-local toLocalDateString.
  */
 
 import {
@@ -48,16 +47,41 @@ import {
   type GetOpenClinicalCheckInInput,
   type OpenClinicalCheckInRow,
 } from "./check-in-resolution.js";
+import { clinicTodayIsoDate, getClinicTimezone } from "./clinic-timezone.js";
 import { incrementMetric } from "./metrics.js";
 import {
   resolveCurrentRole,
-  toLocalDateString,
   type RoleResolutionInput,
   type RoleResolutionResult,
 } from "./role-resolution.js";
 import { TtlCache } from "./analytics-cache.js";
 import { getAllowedOperationalRoles } from "../services/clinical-check-in.js";
 import type { OperationalRole } from "../../shared/authority.js";
+
+// In-memory clinic-timezone cache to avoid DB hit on every cache key lookup.
+// TTL: 5 minutes. Invalidated lazily on lookup miss.
+interface TzCacheEntry {
+  timezone: string;
+  expiresAt: number;
+}
+const TZ_CACHE_TTL_MS = 5 * 60 * 1000;
+const tzCache = new Map<string, TzCacheEntry>();
+
+async function resolveClinicTimezone(clinicId: string): Promise<string> {
+  const now = Date.now();
+  const cached = tzCache.get(clinicId);
+  if (cached && cached.expiresAt > now) {
+    return cached.timezone;
+  }
+  const timezone = await getClinicTimezone(clinicId);
+  tzCache.set(clinicId, { timezone, expiresAt: now + TZ_CACHE_TTL_MS });
+  return timezone;
+}
+
+/** Test-only: clear the timezone cache. */
+export function __resetAuthorityCacheTzForTests(): void {
+  tzCache.clear();
+}
 
 const CHECKIN_TTL_MS = 30_000;
 const SHIFT_TTL_MS = 60_000;
@@ -146,9 +170,10 @@ function checkInKey(clinicId: string, userId: string): string {
   return `${clinicId}:${userId}`;
 }
 
-function shiftKey(input: RoleResolutionInput, now: Date): string {
+async function shiftKey(input: RoleResolutionInput, now: Date): Promise<string> {
   const userId = input.userId?.trim() ?? "";
-  const dayBucket = toLocalDateString(now);
+  const timezone = await resolveClinicTimezone(input.clinicId);
+  const dayBucket = clinicTodayIsoDate(timezone, now);
   return `${input.clinicId}:${userId}:${input.fallbackRole}:${dayBucket}`;
 }
 
@@ -235,7 +260,7 @@ export async function resolveCurrentRoleCached(
     return resolveCurrentRole(input);
   }
 
-  const key = shiftKey(input, now);
+  const key = await shiftKey(input, now);
 
   let cached: ShiftCached | null = null;
   try {
@@ -426,6 +451,7 @@ export function __resetAuthorityCacheForTests(): void {
   checkInInflight.clear();
   shiftInflight.clear();
   allowlistInflight.clear();
+  __resetAuthorityCacheTzForTests();
 }
 
 export const __internals = {

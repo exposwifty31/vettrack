@@ -6,6 +6,7 @@ import { isValidJwt, setClerkTokenGetter } from "@/lib/auth-fetch";
 import { useUser, useAuth as useClerkAuth } from "@clerk/clerk-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { restoreOfflineSession, saveOfflineSession, clearOfflineSession } from "@/lib/offline-session";
+import { authFetchUsersMe, authPostUsersSync } from "@/lib/api";
 import { setAuthStateRef, clearHaltQueue, processQueue } from "@/lib/sync-engine";
 import { isOnline, safeReloadPage } from "@/lib/safe-browser";
 
@@ -164,10 +165,7 @@ function DevAuthProviderInner({ children }: { children: ReactNode }) {
 
     async function syncDevSession() {
       try {
-        const res = await fetch("/api/users/me", {
-          credentials: "include",
-          signal: controller.signal,
-        });
+        const res = await authFetchUsersMe({ signal: controller.signal });
         const data = await res.json().catch(() => ({} as Partial<SyncedUserResponse>));
         if (!res.ok) {
           throw new Error(`DEV_AUTH_SYNC_FAILED_${res.status}`);
@@ -367,22 +365,15 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
 
       try {
         // 1. Try fetching the existing user
-        let res = await fetch("/api/users/me", {
-          headers,
-          signal: controller.signal,
-          credentials: "include",
-        });
+        let res = await authFetchUsersMe({ headers, signal: controller.signal });
 
         // 2. Sync/provision only when user is missing/unauthorized.
         // Avoid calling /sync on transient failures such as 429.
         if (!res.ok && (res.status === 401 || res.status === 404)) {
-          res = await fetch("/api/users/sync", {
-            method: "POST",
-            headers,
-            body: JSON.stringify({ clerkId, email, name }),
-            signal: controller.signal,
-            credentials: "include",
-          });
+          res = await authPostUsersSync(
+            { clerkId, email, name },
+            { headers, signal: controller.signal },
+          );
         }
 
         const data = await res.json().catch(() => ({} as Partial<SyncedUserResponse>));

@@ -49,40 +49,42 @@ function apiError(p: { code: string; reason: string; message: string; requestId:
   return { code: p.code, error: p.code, reason: p.reason, message: p.message, requestId: p.requestId };
 }
 
-const startSchema = z.object({
+export const startSchema = z.object({
   localStartedAt: z.string().datetime().optional(),
-});
+}).strict();
 
-const endSchema = z.object({
+export const endSchema = z.object({
   outcome: z.enum(["rosc", "died", "transferred", "ongoing"]).optional(),
   notes: z.string().max(2000).optional(),
   timeline: z
     .array(z.object({ elapsed: z.number(), label: z.string().max(200) }))
     .max(500)
     .optional(),
-});
+}).strict();
 
-const startSessionSchema = z.object({
+export const startSessionSchema = z.object({
   managerUserId: z.string().min(1),
   managerUserName: z.string().min(1),
   patientId: z.string().optional(),
   hospitalizationId: z.string().optional(),
   preCheckPassed: z.boolean().optional(),
   localStartedAt: z.string().datetime().optional(),
-});
+  /** Accepted for client idempotency hygiene; not persisted on session start. */
+  idempotencyKey: z.string().min(1).max(128).optional(),
+}).strict();
 
-const logEntrySchema = z.object({
+export const logEntrySchema = z.object({
   idempotencyKey: z.string().uuid(),
   elapsedMs: z.number().int().min(0),
   label: z.string().min(1).max(200),
   category: z.enum(["drug", "shock", "cpr", "note", "equipment"]),
   equipmentId: z.string().optional(),
-});
+}).strict();
 
-const endSessionSchema = z.object({
+export const endSessionSchema = z.object({
   outcome: z.enum(["rosc", "died", "transferred", "ongoing"]),
   earlyStopReason: z.string().min(1).max(500).optional(),
-});
+}).strict();
 
 // POST /api/code-blue/events  — start a Code Blue event (fire-and-forget safe)
 //
@@ -1148,9 +1150,9 @@ router.get("/sessions/:id/dispenses", requireAuth, requireAdmin, async (req, res
  * Fix D: Validates billing completeness + no failed inventory jobs before marking reconciled.
  * Pass ?force=true + body.forceReason to override gaps. Admin only.
  */
-const reconcileSchema = z.object({
+export const reconcileSchema = z.object({
   forceReason: z.string().min(1).max(500).optional(),
-});
+}).strict();
 
 router.patch("/sessions/:id/reconcile", requireAuth, requireAdmin, validateBody(reconcileSchema), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -1253,7 +1255,7 @@ router.patch("/sessions/:id/reconcile", requireAuth, requireAdmin, validateBody(
  * POST /api/code-blue/sessions/:id/manual-billing
  * Creates a manual billing entry for an unbilled dispense. Admin only.
  */
-const manualBillingSchema = z.object({
+export const manualBillingSchema = z.object({
   inventoryLogId: z.string().min(1),
   itemId: z.string().min(1),
   quantity: z.number().int().min(1),
@@ -1261,7 +1263,7 @@ const manualBillingSchema = z.object({
   animalId: z.string().nullable().optional(),
   /** When set, clears matching `PROBABLE_ORPHAN_USAGE` Smart Cop alert after billing linkage. */
   resolveTaskId: z.string().uuid().optional(),
-});
+}).strict();
 
 router.post("/sessions/:id/manual-billing", requireAuth, requireAdmin, validateBody(manualBillingSchema), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);

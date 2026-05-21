@@ -333,8 +333,6 @@ export default function EquipmentDetailPage() {
         status: capturedStatus,
         note: capturedNote,
         photoUrl: capturedPhoto || undefined,
-        userEmail: email || "",
-        userId: userId || "",
       });
       return { result, prev, capturedStatus, wasOffline: result.pendingSyncId !== undefined };
     },
@@ -514,8 +512,6 @@ export default function EquipmentDetailPage() {
         status: "issue",
         note: capturedNote,
         photoUrl: capturedPhoto || undefined,
-        userEmail: email || "",
-        userId: userId || "",
       });
       return { result, prev, capturedNote };
     },

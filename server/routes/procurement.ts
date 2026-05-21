@@ -6,6 +6,12 @@ import { purchaseOrders, poLines, containerItems, inventoryLogs, inventoryItems,
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
+import {
+  handleCheckViolation,
+  isCheckViolation,
+  isInventoryConstraintError,
+  toInventoryConstraintError,
+} from "../lib/db-constraint-errors.js";
 
 const router = Router();
 
@@ -31,7 +37,7 @@ function apiError(params: { code: string; reason: string; message: string; reque
   };
 }
 
-const createPoSchema = z.object({
+export const createPoSchema = z.object({
   supplierName: z.string().min(1).max(200),
   lines: z
     .array(
@@ -43,9 +49,9 @@ const createPoSchema = z.object({
     )
     .min(1),
   notes: z.string().max(1000).optional(),
-});
+}).strict();
 
-const receivePoSchema = z.object({
+export const receivePoSchema = z.object({
   lines: z.array(
     z.object({
       lineId: z.string().min(1),
@@ -53,7 +59,7 @@ const receivePoSchema = z.object({
       containerId: z.string().min(1),
     }),
   ),
-});
+}).strict();
 
 // GET /api/procurement — list POs for the clinic
 router.get("/", requireAuth, requireEffectiveRole("technician"), async (req, res) => {
@@ -302,10 +308,17 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
           .limit(1);
 
         if (existingCi) {
-          await tx
-            .update(containerItems)
-            .set({ quantity: existingCi.quantity + incoming.quantityReceived, updatedAt: new Date() })
-            .where(eq(containerItems.id, existingCi.id));
+          try {
+            await tx
+              .update(containerItems)
+              .set({ quantity: existingCi.quantity + incoming.quantityReceived, updatedAt: new Date() })
+              .where(eq(containerItems.id, existingCi.id));
+          } catch (ciErr) {
+            if (isCheckViolation(ciErr)) {
+              throw toInventoryConstraintError(ciErr);
+            }
+            throw ciErr;
+          }
 
           await tx.insert(inventoryLogs).values({
             id: randomUUID(),
@@ -319,13 +332,20 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
             createdByUserId: userId,
           });
         } else {
-          await tx.insert(containerItems).values({
-            id: randomUUID(),
-            clinicId,
-            containerId: incoming.containerId,
-            itemId: line.itemId,
-            quantity: incoming.quantityReceived,
-          });
+          try {
+            await tx.insert(containerItems).values({
+              id: randomUUID(),
+              clinicId,
+              containerId: incoming.containerId,
+              itemId: line.itemId,
+              quantity: incoming.quantityReceived,
+            });
+          } catch (ciErr) {
+            if (isCheckViolation(ciErr)) {
+              throw toInventoryConstraintError(ciErr);
+            }
+            throw ciErr;
+          }
 
           await tx.insert(inventoryLogs).values({
             id: randomUUID(),
@@ -387,6 +407,16 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
     });
     res.json({ ...updated, lines: updatedLines });
   } catch (err) {
+    if (isInventoryConstraintError(err)) {
+      return res.status(err.status).json({
+        code: err.code,
+        message: err.message,
+        constraint: err.constraint,
+      });
+    }
+    if (isCheckViolation(err) && handleCheckViolation(err, res)) {
+      return;
+    }
     console.error(err);
     res.status(500).json(apiError({ code: "INTERNAL_ERROR", reason: "PO_RECEIVE_FAILED", message: "Failed to receive purchase order", requestId }));
   }

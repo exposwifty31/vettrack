@@ -62,3 +62,6 @@ desktop/cleaner/dist/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Staging E2E (Clerk user ids — never commit)
+.staging-e2e-manifest.json

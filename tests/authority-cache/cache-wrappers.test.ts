@@ -6,7 +6,7 @@
  *
  * No DB. The underlying `getOpenClinicalCheckIn` and `resolveCurrentRole`
  * are mocked via `vi.mock` with `importOriginal` to preserve
- * `toLocalDateString` (used by the cache wrapper for dayBucket derivation).
+ * `clinicTodayIsoDate` (used by the cache wrapper for dayBucket derivation).
  */
 
 import {
@@ -53,6 +53,16 @@ vi.mock("../../server/db.js", () => ({
   users: {},
   clinicalCheckIns: {},
 }));
+
+vi.mock("../../server/lib/clinic-timezone.js", async (importOriginal) => {
+  const original = await importOriginal<
+    typeof import("../../server/lib/clinic-timezone.js")
+  >();
+  return {
+    ...original,
+    getClinicTimezone: vi.fn().mockResolvedValue("Asia/Jerusalem"),
+  };
+});
 
 // Imported AFTER vi.mock so the module receives mocked dependencies.
 const {
@@ -274,36 +284,17 @@ describe("day-bucket boundary (test #13)", () => {
     process.env.AUTHORITY_CACHE_V1 = "true";
   });
 
-  it("two requests across local midnight produce distinct cache entries", async () => {
+  it("two requests across clinic-local midnight produce distinct cache entries", async () => {
     resolveCurrentRoleMock.mockResolvedValue(makeResult());
 
-    // Both timestamps below straddle the local-midnight boundary as
-    // observed by `toLocalDateString` (process-local). Using the same
-    // helper that the cache uses keeps the test resilient to the host TZ.
-    const { toLocalDateString } = await import(
-      "../../server/lib/role-resolution.js"
-    );
+    const { clinicTodayIsoDate } = await import("../../server/lib/clinic-timezone.js");
+    const tz = "Asia/Jerusalem";
+    const before = new Date("2026-01-15T21:59:00.000Z");
+    const after = new Date("2026-01-15T22:01:00.000Z");
+    expect(clinicTodayIsoDate(tz, before)).not.toBe(clinicTodayIsoDate(tz, after));
 
-    // Find a moment near local midnight by iterating across a 26-hour
-    // window. We pick "before midnight" and "after midnight" by detecting
-    // a change in toLocalDateString output.
-    const start = new Date("2026-05-14T00:00:00.000Z");
-    let before: Date | null = null;
-    let after: Date | null = null;
-    for (let i = 0; i < 26 * 60; i++) {
-      const probe = new Date(start.getTime() + i * 60 * 1000);
-      const next = new Date(probe.getTime() + 60 * 1000);
-      if (toLocalDateString(probe) !== toLocalDateString(next)) {
-        before = probe;
-        after = next;
-        break;
-      }
-    }
-    expect(before).not.toBeNull();
-    expect(after).not.toBeNull();
-
-    await resolveCurrentRoleCached({ ...baseShiftInput, now: before! });
-    await resolveCurrentRoleCached({ ...baseShiftInput, now: after! });
+    await resolveCurrentRoleCached({ ...baseShiftInput, now: before });
+    await resolveCurrentRoleCached({ ...baseShiftInput, now: after });
     // Two distinct day buckets → two underlying calls.
     expect(resolveCurrentRoleMock).toHaveBeenCalledTimes(2);
   });
@@ -336,8 +327,8 @@ describe("fallbackRole key isolation (test #25)", () => {
     expect(resolveCurrentRoleMock).toHaveBeenCalledTimes(2);
 
     // Verify the keys are distinct via the internals helper.
-    const keyTech = __internals.shiftKey(techInput, techInput.now!);
-    const keyVet = __internals.shiftKey(vetInput, vetInput.now!);
+    const keyTech = await __internals.shiftKey(techInput, techInput.now!);
+    const keyVet = await __internals.shiftKey(vetInput, vetInput.now!);
     expect(keyTech).not.toBe(keyVet);
 
     // Repeat identical calls — both hit cache independently.

@@ -224,6 +224,9 @@ export default function NewEquipmentPage() {
       maintenanceIntervalDays: data.maintenanceIntervalDays ?? null,
       ...(showExpectedReturnField && { expectedReturnMinutes: data.expectedReturnMinutes ?? null }),
       imageUrl: normalizeOptionalString(data.imageUrl) ?? null,
+      // Optimistic concurrency: echo back the version we loaded so the
+      // server can 409 if someone else edited the row meanwhile.
+      ...(existingEquipment?.version !== undefined && { version: existingEquipment.version }),
     };
   }
 

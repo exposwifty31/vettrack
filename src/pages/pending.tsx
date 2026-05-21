@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import type { Hospitalization } from "@/types";
+
+type PendingHospitalization = Hospitalization & { waitingMinutes?: number };
 
 export default function PendingPage() {
-  const [patients, setPatients] = useState<any[]>([]);
+  const [patients, setPatients] = useState<PendingHospitalization[]>([]);
 
   const load = async () => {
-    const res = await fetch("/api/patients/pending");
-    const data = await res.json();
+    const data = await api.patients.listPending();
     setPatients(data.patients || []);
   };
 
@@ -14,9 +17,7 @@ export default function PendingPage() {
   }, []);
 
   const takePatient = async (id: string) => {
-    await fetch(`/api/patients/${id}/assign`, {
-      method: "PATCH",
-    });
+    await api.patients.assign(id);
 
     setPatients((prev) => prev.filter((p) => p.id !== id));
   };
@@ -34,7 +35,7 @@ export default function PendingPage() {
       {patients.map((p) => (
         <div
           key={p.id}
-          className={`p-4 mb-2 rounded ${color(p.waitingMinutes)}`}
+          className={`p-4 mb-2 rounded ${color(p.waitingMinutes ?? 0)}`}
         >
           <div>{p.animal.name}</div>
           <div>{new Date(p.admittedAt).toLocaleTimeString()}</div>

@@ -42,6 +42,16 @@ vi.mock("../../server/db.js", () => ({
   clinicalCheckIns: {},
 }));
 
+vi.mock("../../server/lib/clinic-timezone.js", async (importOriginal) => {
+  const original = await importOriginal<
+    typeof import("../../server/lib/clinic-timezone.js")
+  >();
+  return {
+    ...original,
+    getClinicTimezone: vi.fn().mockResolvedValue("Asia/Jerusalem"),
+  };
+});
+
 const { resolveAuthority } = await import("../../server/lib/authority.js");
 const { __resetAuthorityCacheForTests } = await import(
   "../../server/lib/authority-cache.js"

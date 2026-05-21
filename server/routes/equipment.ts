@@ -65,21 +65,24 @@ const patchEquipmentSchema = z.object({
   expectedReturnMinutes: z.number().int().positive().optional().nullable(),
   imageUrl: z.string().max(500).optional().nullable(),
   status: z.enum(EQUIPMENT_STATUS_VALUES).optional(),
+  /** Optimistic concurrency: the row `version` the client last loaded.
+   *  When supplied, the PATCH is rejected 409 if the row moved on. */
+  version: z.number().int().nonnegative().optional(),
 });
 
 const bulkVerifyRoomSchema = z.object({
   roomId: z.string().min(1, "roomId is required"),
 });
 
-const checkoutSchema = z.object({
+export const checkoutSchema = z.object({
   location: z.string().max(500).optional(),
-});
+}).strict();
 
-const scanSchema = z.object({
+export const scanSchema = z.object({
   status: z.enum(EQUIPMENT_STATUS_VALUES),
   note: z.string().trim().max(500).optional(),
   photoUrl: z.string().max(500).optional(),
-});
+}).strict();
 
 const revertSchema = z.object({
   undoToken: z.string().min(1, "undoToken is required"),
@@ -750,6 +753,7 @@ try {
       expectedReturnMinutes,
       imageUrl,
       status,
+      version: expectedVersion,
     } = req.body as z.infer<typeof patchEquipmentSchema>;
 
     if (expectedReturnMinutes !== undefined && req.authUser?.role !== "admin") {
@@ -764,6 +768,7 @@ try {
     }
 
     let result: EquipmentRow | null = null;
+    let versionConflict = false;
 
     await db.transaction(async (tx) => {
       const [oldItem] = await tx
@@ -771,6 +776,16 @@ try {
         .from(equipment)
         .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id), isNull(equipment.deletedAt)))
         .limit(1);
+
+      // Not found — leave result null so the handler returns 404.
+      if (!oldItem) return;
+
+      // Optimistic concurrency: if the client declared the version it
+      // loaded and the row has since moved on, reject before writing.
+      if (expectedVersion !== undefined && oldItem.version !== expectedVersion) {
+        versionConflict = true;
+        return;
+      }
 
       const [item] = await tx
         .update(equipment)
@@ -789,11 +804,23 @@ try {
           ...(expectedReturnMinutes !== undefined && { expectedReturnMinutes }),
           ...(imageUrl !== undefined && { imageUrl }),
           ...(status !== undefined && { status }),
+          // Always bump the row version so concurrent loaders can detect drift.
+          version: sql`${equipment.version} + 1`,
         })
-        .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id), isNull(equipment.deletedAt)))
+        .where(and(
+          eq(equipment.clinicId, clinicId),
+          eq(equipment.id, req.params.id),
+          isNull(equipment.deletedAt),
+          ...(expectedVersion !== undefined ? [eq(equipment.version, expectedVersion)] : []),
+        ))
         .returning();
 
-      if (!item) return;
+      // No row updated despite oldItem existing — a concurrent writer won
+      // the version race between the SELECT and the UPDATE.
+      if (!item) {
+        versionConflict = expectedVersion !== undefined;
+        return;
+      }
       result = item;
 
       if (folderId !== undefined && oldItem && oldItem.folderId !== (folderId ?? null)) {
@@ -827,6 +854,17 @@ try {
         }
       }
     });
+
+    if (versionConflict) {
+      return res.status(409).json(
+        apiError({
+          code: "CONFLICT",
+          reason: "EQUIPMENT_VERSION_CONFLICT",
+          message: "Equipment was modified by someone else — reload and retry",
+          requestId,
+        }),
+      );
+    }
 
     if (!result) {
       return res.status(404).json(
@@ -1170,29 +1208,72 @@ router.post(
 
       if (!existing) return;
 
-      if (existing.checkedOutById) {
+      const checkoutTime = clientTimestamp ? new Date(clientTimestamp) : new Date();
+      reminderBaseTime = checkoutTime;
+
+      const checkoutSet = {
+        checkedOutById: req.authUser!.id,
+        checkedOutByEmail: req.authUser!.email,
+        checkedOutAt: checkoutTime,
+        checkedOutLocation: location ?? null,
+        lastSeen: checkoutTime,
+        lastStatus: existing.status,
+      };
+
+      let updatedRow: EquipmentRow | undefined;
+
+      if (!existing.checkedOutById) {
+        [updatedRow] = await tx
+          .update(equipment)
+          .set(checkoutSet)
+          .where(
+            and(
+              eq(equipment.clinicId, clinicId),
+              eq(equipment.id, req.params.id),
+              isNull(equipment.checkedOutById),
+            ),
+          )
+          .returning();
+
+        if (!updatedRow) {
+          const [winner] = await tx
+            .select()
+            .from(equipment)
+            .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id)))
+            .limit(1);
+          throw new CheckoutConflictError(winner?.checkedOutByEmail ?? "unknown");
+        }
+      } else {
         const existingTimestamp = existing.checkedOutAt
           ? new Date(existing.checkedOutAt).getTime()
           : 0;
         if (!clientTimestamp || clientTimestamp <= existingTimestamp) {
           throw new CheckoutConflictError(existing.checkedOutByEmail ?? "unknown");
         }
-      }
 
-      const checkoutTime = clientTimestamp ? new Date(clientTimestamp) : new Date();
-      reminderBaseTime = checkoutTime;
-      const [updatedRow] = await tx
-        .update(equipment)
-        .set({
-          checkedOutById: req.authUser!.id,
-          checkedOutByEmail: req.authUser!.email,
-          checkedOutAt: checkoutTime,
-          checkedOutLocation: location ?? null,
-          lastSeen: checkoutTime,
-          lastStatus: existing.status,
-        })
-        .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id)))
-        .returning();
+        const overrideWhere =
+          existing.checkedOutAt == null
+            ? and(
+                eq(equipment.clinicId, clinicId),
+                eq(equipment.id, req.params.id),
+                isNull(equipment.checkedOutAt),
+              )
+            : and(
+                eq(equipment.clinicId, clinicId),
+                eq(equipment.id, req.params.id),
+                eq(equipment.checkedOutAt, existing.checkedOutAt),
+              );
+
+        [updatedRow] = await tx
+          .update(equipment)
+          .set(checkoutSet)
+          .where(overrideWhere)
+          .returning();
+
+        if (!updatedRow) {
+          throw new CheckoutConflictError(existing.checkedOutByEmail ?? "unknown");
+        }
+      }
 
       updated = updatedRow;
       const checkoutLogId = randomUUID();

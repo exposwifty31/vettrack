@@ -90,7 +90,11 @@ type Role = "admin" | "vet" | "technician" | "student";
 
 // DevUserId: named test user identities for multi-user tests.
 // Matches DEV_USER_PRESETS in server/middleware/auth.ts.
-type DevUserId = "dev-user-alpha" | "dev-user-beta";
+type DevUserId =
+  | "dev-user-alpha"
+  | "dev-user-beta"
+  | "dev-pending-user-001"
+  | "dev-blocked-user-001";
 
 function authHeaders(role?: Role, userId?: DevUserId): Record<string, string> {
   const h: Record<string, string> = { "Content-Type": "application/json" };

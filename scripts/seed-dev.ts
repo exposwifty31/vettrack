@@ -20,6 +20,8 @@ import { db, pool, clinics, users, equipment } from "../server/db.js";
 
 const CLINIC_ID = process.env.DEV_DEFAULT_CLINIC_ID?.trim() || "dev-clinic-default";
 const USER_ID = "dev-admin-001";
+const PENDING_USER_ID = "dev-pending-user-001";
+const BLOCKED_USER_ID = "dev-blocked-user-001";
 const EQUIPMENT_E2E_ID = "eq1";
 
 async function main(): Promise<void> {
@@ -52,6 +54,35 @@ async function main(): Promise<void> {
     })
     .onConflictDoNothing();
 
+  // 2b. Account-gate personas (AUTH-03/04 E2E)
+  await db
+    .insert(users)
+    .values({
+      id: PENDING_USER_ID,
+      clinicId: CLINIC_ID,
+      clerkId: PENDING_USER_ID,
+      email: "pending@vettrack.dev",
+      name: "Dev Pending",
+      displayName: "Dev Pending",
+      role: "technician",
+      status: "pending",
+    })
+    .onConflictDoNothing();
+
+  await db
+    .insert(users)
+    .values({
+      id: BLOCKED_USER_ID,
+      clinicId: CLINIC_ID,
+      clerkId: BLOCKED_USER_ID,
+      email: "blocked@vettrack.dev",
+      name: "Dev Blocked",
+      displayName: "Dev Blocked",
+      role: "technician",
+      status: "blocked",
+    })
+    .onConflictDoNothing();
+
   // 3. Equipment "eq1" — fixed ID for E2E / manual verification
   //    status="ok", no checkout fields set → starts available
   await db
@@ -71,6 +102,8 @@ async function main(): Promise<void> {
   console.info("[seed-dev] Done.");
   console.info(`  clinic    : ${CLINIC_ID}`);
   console.info(`  user      : ${USER_ID} (admin@vettrack.dev)`);
+  console.info(`  user      : ${PENDING_USER_ID} (pending@vettrack.dev, status=pending)`);
+  console.info(`  user      : ${BLOCKED_USER_ID} (blocked@vettrack.dev, status=blocked)`);
   console.info(`  equipment : ${EQUIPMENT_E2E_ID} (E2E Test Equipment, available)`);
 }
 

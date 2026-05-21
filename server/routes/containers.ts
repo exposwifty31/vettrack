@@ -53,6 +53,12 @@ import {
   dispenseIdempotencyMiddleware,
 } from "../middleware/container-dispense-idempotency.js";
 import { hashDispenseRequestBody } from "../lib/dispense-idempotency-hash.js";
+import {
+  handleCheckViolation,
+  isCheckViolation,
+  isInventoryConstraintError,
+  toInventoryConstraintError,
+} from "../lib/db-constraint-errors.js";
 
 const router = Router();
 
@@ -206,19 +212,36 @@ router.post(
       const b = req.body as z.infer<typeof createContainerSchema>;
       const id = randomUUID();
       const current = b.currentQuantity ?? b.targetQuantity;
-      await db.insert(containers).values({
-        id,
-        clinicId,
-        name: b.name.trim(),
-        department: b.department?.trim() ?? "",
-        targetQuantity: b.targetQuantity,
-        currentQuantity: current,
-        roomId: b.roomId ?? null,
-        nfcTagId: b.nfcTagId?.trim() || null,
-      });
+      try {
+        await db.insert(containers).values({
+          id,
+          clinicId,
+          name: b.name.trim(),
+          department: b.department?.trim() ?? "",
+          targetQuantity: b.targetQuantity,
+          currentQuantity: current,
+          roomId: b.roomId ?? null,
+          nfcTagId: b.nfcTagId?.trim() || null,
+        });
+      } catch (insertErr) {
+        if (isCheckViolation(insertErr)) {
+          throw toInventoryConstraintError(insertErr);
+        }
+        throw insertErr;
+      }
       const [row] = await db.select().from(containers).where(eq(containers.id, id)).limit(1);
       res.status(201).json(row);
     } catch (err) {
+      if (isInventoryConstraintError(err)) {
+        return res.status(err.status).json({
+          code: err.code,
+          message: err.message,
+          constraint: err.constraint,
+        });
+      }
+      if (isCheckViolation(err) && handleCheckViolation(err, res)) {
+        return;
+      }
       console.error(err);
       res.status(500).json(
         apiError({
@@ -656,8 +679,12 @@ router.post(
         }
 
         for (const lineItem of body.items) {
+          let ci: (typeof containerItems.$inferSelect) | undefined;
+          let item: { label: string } | undefined;
+          let newQty = 0;
+          try {
           // Verify container item exists and has sufficient quantity
-          const [ci] = await tx
+          const [ciRow] = await tx
             .select()
             .from(containerItems)
             .where(
@@ -668,6 +695,7 @@ router.post(
               ),
             )
             .limit(1);
+          ci = ciRow;
 
           if (!ci) {
             throw Object.assign(new Error("ITEM_NOT_IN_CONTAINER"), {
@@ -690,13 +718,14 @@ router.post(
           }
 
           // Get item label
-          const [item] = await tx
+          const [itemRow] = await tx
             .select({ label: inventoryItems.label })
             .from(inventoryItems)
             .where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, lineItem.itemId)))
             .limit(1);
+          item = itemRow;
 
-          const newQty = ci.quantity - lineItem.quantity;
+          newQty = ci.quantity - lineItem.quantity;
 
           // Decrement container item quantity
           await tx
@@ -709,6 +738,12 @@ router.post(
                 eq(containerItems.itemId, lineItem.itemId),
               ),
             );
+          } catch (lineErr) {
+            if (isCheckViolation(lineErr)) {
+              throw toInventoryConstraintError(lineErr);
+            }
+            throw lineErr;
+          }
 
           // Insert inventory log
           const inventoryLogId = randomUUID();
@@ -915,6 +950,16 @@ router.post(
       if (err instanceof ClinicalInvariantDenyError) {
         return res.status(err.status).json(err.body);
       }
+      if (isInventoryConstraintError(err)) {
+        return res.status(err.status).json({
+          code: err.code,
+          message: err.message,
+          constraint: err.constraint,
+        });
+      }
+      if (isCheckViolation(err) && handleCheckViolation(err, res)) {
+        return;
+      }
       const e = err as Record<string, unknown> & { statusCode?: number; reason?: string; orphanLines?: unknown; itemId?: string };
       // Phase 5 PR 5.7 — fail-closed evaluator failure → 503
       // (`COP_VALIDATION_UNAVAILABLE`). No mutation persisted.
@@ -1016,7 +1061,11 @@ router.patch(
         if (!container) throw Object.assign(new Error("NOT_FOUND"), { statusCode: 404 });
 
         for (const lineItem of body.items) {
-          const [ci] = await tx
+          let ci: (typeof containerItems.$inferSelect) | undefined;
+          let item: { label: string } | undefined;
+          let newQty = 0;
+          try {
+          const [ciRow] = await tx
             .select()
             .from(containerItems)
             .where(
@@ -1027,6 +1076,7 @@ router.patch(
               ),
             )
             .limit(1);
+          ci = ciRow;
 
           if (!ci || ci.quantity < lineItem.quantity) {
             throw Object.assign(new Error("INSUFFICIENT_STOCK"), {
@@ -1038,13 +1088,14 @@ router.patch(
             });
           }
 
-          const [item] = await tx
+          const [itemRow] = await tx
             .select({ label: inventoryItems.label })
             .from(inventoryItems)
             .where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, lineItem.itemId)))
             .limit(1);
+          item = itemRow;
 
-          const newQty = ci.quantity - lineItem.quantity;
+          newQty = ci.quantity - lineItem.quantity;
 
           await tx
             .update(containerItems)
@@ -1056,6 +1107,12 @@ router.patch(
                 eq(containerItems.itemId, lineItem.itemId),
               ),
             );
+          } catch (lineErr) {
+            if (isCheckViolation(lineErr)) {
+              throw toInventoryConstraintError(lineErr);
+            }
+            throw lineErr;
+          }
 
           const inventoryLogId = randomUUID();
           await tx.insert(inventoryLogs).values({
@@ -1185,6 +1242,16 @@ router.patch(
         billingIds,
       });
     } catch (err: unknown) {
+      if (isInventoryConstraintError(err)) {
+        return res.status(err.status).json({
+          code: err.code,
+          message: err.message,
+          constraint: err.constraint,
+        });
+      }
+      if (isCheckViolation(err) && handleCheckViolation(err, res)) {
+        return;
+      }
       const e = err as Record<string, unknown>;
       if (e.code === "INSUFFICIENT_STOCK") {
         return res.status(409).json({

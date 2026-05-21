@@ -242,6 +242,19 @@ async function processSingleItemWithRetry(item: PendingSync): Promise<ItemResult
           errorMessage: `Failed after ${MAX_RETRIES} attempts`,
         },
       });
+      // Surface the permanent failure to the operator — previously only
+      // Sentry + the Dexie `failed` status recorded it, so a user with no
+      // open sync sheet got no feedback that an action was dropped.
+      toast.error(t.layout.sync.failedMessage, {
+        action: {
+          label: t.layout.sync.viewQueue,
+          onClick: () => {
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("vettrack:open-sync-queue"));
+            }
+          },
+        },
+      });
       return "transient_failure";
     }
 
@@ -271,6 +284,8 @@ async function attemptSync(item: PendingSync): Promise<ItemResult> {
     const timeout = setTimeout(() => controller.abort(), ITEM_TIMEOUT_MS);
     let res: Response;
     try {
+      // Intentional raw fetch: replays the exact queued endpoint/method. Routing
+      // through `request()` would re-enter the offline queue and 401 redirect paths.
       res = await fetch(item.endpoint, {
         method: item.method,
         headers,

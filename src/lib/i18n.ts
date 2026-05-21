@@ -722,6 +722,34 @@ const translations = {
 
   leakageReport: d.leakageReport,
 
+  inventoryJobsPage: {
+    ...d.inventoryJobsPage,
+    loadError: (params: { message: string }) => tr(d.inventoryJobsPage.loadError, params),
+    empty: (params: { status: string }) => tr(d.inventoryJobsPage.empty, params),
+  },
+
+  crashCart: {
+    title: d.crashCart.title,
+    settingsAria: d.crashCart.settingsAria,
+    loadError: d.crashCart.loadError,
+    saveError: d.crashCart.saveError,
+    checkedAgo: (time: string, name: string) => tr(d.crashCart.checkedAgo, { time, name }),
+    notCheckedToday: d.crashCart.notCheckedToday,
+    highRiskPatients: (count: number) => tr(d.crashCart.highRiskPatients, { count }),
+    weightKg: (weight: number) => tr(d.crashCart.weightKg, { weight }),
+    loadingItems: d.crashCart.loadingItems,
+    itemsToCheck: d.crashCart.itemsToCheck,
+    missingItemsNotesPlaceholder: d.crashCart.missingItemsNotesPlaceholder,
+    saveAllOk: d.crashCart.saveAllOk,
+    saveWithMissing: d.crashCart.saveWithMissing,
+    checkSaved: d.crashCart.checkSaved,
+    historyTitle: d.crashCart.historyTitle,
+    statusOk: d.crashCart.statusOk,
+    statusMissing: d.crashCart.statusMissing,
+    relativeHoursMinutes: (h: number, m: number) => tr(d.crashCart.relativeHoursMinutes, { h, m }),
+    relativeMinutes: (m: number) => tr(d.crashCart.relativeMinutes, { m }),
+  },
+
 } as const;
 
 return stripInternalKeys(translations) as typeof translations;

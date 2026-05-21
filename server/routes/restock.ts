@@ -12,6 +12,11 @@ import {
   scanItem,
   startRestockSession,
 } from "../services/restock.service.js";
+import {
+  handleCheckViolation,
+  isCheckViolation,
+  isInventoryConstraintError,
+} from "../lib/db-constraint-errors.js";
 
 const router = Router();
 
@@ -78,6 +83,29 @@ function extractPgErrorCode(err: unknown): string | undefined {
   return undefined;
 }
 
+function respondRestockRouteError(
+  route: string,
+  requestId: string,
+  err: unknown,
+  res: { status: (n: number) => { json: (b: unknown) => void } },
+): void {
+  if (isInventoryConstraintError(err)) {
+    res.status(err.status).json({
+      code: err.code,
+      message: err.message,
+      constraint: err.constraint,
+      requestId,
+    });
+    return;
+  }
+  if (isCheckViolation(err) && handleCheckViolation(err, res as Parameters<typeof handleCheckViolation>[1])) {
+    return;
+  }
+  logRestockError(route, requestId, err);
+  const mapped = mapErrorToHttp(err, requestId);
+  res.status(mapped.status).json(mapped.body);
+}
+
 function mapErrorToHttp(err: unknown, requestId: string) {
   if (err instanceof RestockServiceError) {
     return {
@@ -88,6 +116,17 @@ function mapErrorToHttp(err: unknown, requestId: string) {
         message: err.message,
         requestId,
       }),
+    };
+  }
+  if (isInventoryConstraintError(err)) {
+    return {
+      status: err.status,
+      body: {
+        code: err.code,
+        message: err.message,
+        constraint: err.constraint,
+        requestId,
+      },
     };
   }
   // Phase 5 PR 5.4 — surface the underlying error class as a diagnostic
@@ -162,9 +201,7 @@ router.post(
       });
       res.status(201).json(session);
     } catch (err) {
-      logRestockError(req.path, requestId, err);
-      const mapped = mapErrorToHttp(err, requestId);
-      res.status(mapped.status).json(mapped.body);
+      respondRestockRouteError(req.path, requestId, err, res);
     }
   },
 );
@@ -206,9 +243,7 @@ router.post(
       });
       res.json(result);
     } catch (err) {
-      logRestockError(req.path, requestId, err);
-      const mapped = mapErrorToHttp(err, requestId);
-      res.status(mapped.status).json(mapped.body);
+      respondRestockRouteError(req.path, requestId, err, res);
     }
   },
 );
@@ -229,9 +264,7 @@ router.post(
       });
       res.json(result);
     } catch (err) {
-      logRestockError(req.path, requestId, err);
-      const mapped = mapErrorToHttp(err, requestId);
-      res.status(mapped.status).json(mapped.body);
+      respondRestockRouteError(req.path, requestId, err, res);
     }
   },
 );
@@ -252,9 +285,7 @@ router.post(
       });
       res.json(result);
     } catch (err) {
-      logRestockError(req.path, requestId, err);
-      const mapped = mapErrorToHttp(err, requestId);
-      res.status(mapped.status).json(mapped.body);
+      respondRestockRouteError(req.path, requestId, err, res);
     }
   },
 );
@@ -274,9 +305,7 @@ router.post(
       });
       res.json(result);
     } catch (err) {
-      logRestockError(req.path, requestId, err);
-      const mapped = mapErrorToHttp(err, requestId);
-      res.status(mapped.status).json(mapped.body);
+      respondRestockRouteError(req.path, requestId, err, res);
     }
   },
 );

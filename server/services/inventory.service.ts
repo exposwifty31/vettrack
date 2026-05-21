@@ -10,6 +10,10 @@ import {
 } from "../config/inventoryBlueprint.js";
 import { findActiveAnimalInRoom, resolveBillingItemForContainer, restockLedgerIdempotencyKey } from "../lib/container-billing.js";
 import { RestockServiceError } from "./restock.service.js";
+import {
+  isCheckViolation,
+  toInventoryConstraintError,
+} from "../lib/db-constraint-errors.js";
 
 /**
  * Aligns persisted `vt_containers.target_quantity` with the current blueprint for that
@@ -46,16 +50,23 @@ export async function seedContainersFromBlueprint(clinicId: string): Promise<num
     .where(eq(containers.clinicId, clinicId));
   if (n > 0) return 0;
 
-  await db.insert(containers).values(
-    INVENTORY_BLUEPRINT.map((entry) => ({
-      id: randomUUID(),
-      clinicId,
-      name: entry.name,
-      department: entry.department,
-      targetQuantity: targetQuantityFromSupplies(entry.supplyTargets),
-      currentQuantity: targetQuantityFromSupplies(entry.supplyTargets),
-    })),
-  );
+  try {
+    await db.insert(containers).values(
+      INVENTORY_BLUEPRINT.map((entry) => ({
+        id: randomUUID(),
+        clinicId,
+        name: entry.name,
+        department: entry.department,
+        targetQuantity: targetQuantityFromSupplies(entry.supplyTargets),
+        currentQuantity: targetQuantityFromSupplies(entry.supplyTargets),
+      })),
+    );
+  } catch (err) {
+    if (isCheckViolation(err)) {
+      throw toInventoryConstraintError(err);
+    }
+    throw err;
+  }
   return INVENTORY_BLUEPRINT.length;
 }
 
@@ -138,12 +149,19 @@ export async function deductMedicationInventoryInTx(
     return { alreadyApplied: true as const, containerId: c.id };
   }
 
-  await tx
-    .update(containers)
-    .set({
-      currentQuantity: sql`GREATEST(0, ${containers.currentQuantity} - ${unitsToDeduct})`,
-    })
-    .where(and(eq(containers.clinicId, params.clinicId), eq(containers.id, c.id)));
+  try {
+    await tx
+      .update(containers)
+      .set({
+        currentQuantity: sql`GREATEST(0, ${containers.currentQuantity} - ${unitsToDeduct})`,
+      })
+      .where(and(eq(containers.clinicId, params.clinicId), eq(containers.id, c.id)));
+  } catch (err) {
+    if (isCheckViolation(err)) {
+      throw toInventoryConstraintError(err);
+    }
+    throw err;
+  }
 
   return { ok: true as const, containerId: c.id, quantityBefore, quantityAfter };
 }
@@ -169,10 +187,17 @@ export async function restockContainerInTx(
   const consumed = consumedFromBlueprint(c.targetQuantity, quantityBefore);
   const quantityAfter = Math.min(c.targetQuantity, quantityBefore + params.addedQuantity);
 
-  await tx
-    .update(containers)
-    .set({ currentQuantity: quantityAfter })
-    .where(and(eq(containers.clinicId, params.clinicId), eq(containers.id, c.id)));
+  try {
+    await tx
+      .update(containers)
+      .set({ currentQuantity: quantityAfter })
+      .where(and(eq(containers.clinicId, params.clinicId), eq(containers.id, c.id)));
+  } catch (err) {
+    if (isCheckViolation(err)) {
+      throw toInventoryConstraintError(err);
+    }
+    throw err;
+  }
 
   const animal = await findActiveAnimalInRoom(tx, params.clinicId, c.roomId);
   let ledgerId: string | null = null;
