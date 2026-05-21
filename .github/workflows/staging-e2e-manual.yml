@@ -1,0 +1,68 @@
+# Manual staging E2E only — never triggered on push/PR.
+# Requires GitHub Actions secrets: *_STAGING (see docs/staging-e2e-runbook.md).
+name: Staging E2E (manual)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: staging-e2e-manual-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  refuse-wrong-branch:
+    name: Branch guard
+    runs-on: ubuntu-latest
+    if: github.ref != 'refs/heads/staging'
+    steps:
+      - name: Require staging branch
+        run: |
+          echo "::error::Staging E2E must be run via workflow_dispatch on branch 'staging' (current ref: ${{ github.ref }})."
+          exit 1
+
+  staging-e2e:
+    name: Staging E2E — seed / Playwright / cleanup
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [refuse-wrong-branch]
+    if: always() && needs.refuse-wrong-branch.result == 'skipped' && github.ref == 'refs/heads/staging'
+
+    env:
+      STAGING_E2E_CONFIRM: "yes"
+      NODE_ENV: test
+      DATABASE_URL: ${{ secrets.DATABASE_URL_STAGING }}
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
+      VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_STAGING }}
+      STAGING_E2E_PASSWORD: ${{ secrets.STAGING_E2E_PASSWORD_STAGING }}
+      TEST_BASE_URL: ${{ secrets.TEST_BASE_URL_STAGING }}
+
+    steps:
+      - name: ⬇️ Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: 🟢 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🌐 Install Playwright (Chromium)
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: 🌱 Seed staging personas
+        run: pnpm staging:seed
+
+      - name: 🎭 Run staging Playwright E2E
+        run: pnpm test:staging:e2e
+
+      - name: 🧹 Cleanup staging E2E fixtures
+        if: always()
+        run: pnpm staging:cleanup
