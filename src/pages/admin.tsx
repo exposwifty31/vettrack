@@ -105,7 +105,7 @@ export default function AdminPage() {
     retry: false,
   });
 
-  const { data: equipmentList = [] } = useQuery({
+  const { data: equipmentList } = useQuery({
     queryKey: ["/api/equipment"],
     queryFn: api.equipment.list,
     enabled: isPilotMode && isAdmin && !!userId,
@@ -115,7 +115,7 @@ export default function AdminPage() {
   });
 
   const pilotCounts = useMemo(() => {
-    if (!isPilotMode) return null;
+    if (!isPilotMode || !equipmentList) return null;
     const now = Date.now();
     const oneDayMs = 24 * 60 * 60 * 1000;
     return {
