@@ -89,6 +89,11 @@ export function registerApiRoutes(app: express.Express) {
   app.use("/api/admin", adminTaskOwnershipRoutes);
   app.use("/api/stability", stabilityRoutes);
 
+  // Admin-only APIs: kept outside the pilot guard because /admin is always
+  // accessible and its Formulary/Settings sections call these endpoints.
+  app.use("/api/formulary", formularyRoutes);
+  app.use("/api/forecast", forecastRoutes);
+
   // --- Full-platform routes (disabled in pilot mode) ---
   if (!isPilotMode) {
     app.use("/api/analytics", analyticsRoutes);
@@ -99,12 +104,10 @@ export function registerApiRoutes(app: express.Express) {
     app.use("/api/shift-handover/patient-handoffs", patientHandoffsRoutes);
     app.use("/api/containers", containersRoutes);
     app.use("/api/restock", restockRoutes);
-    app.use("/api/formulary", formularyRoutes);
     app.use("/api/medication-tasks", medicationTasksRoutes);
     app.use("/api/billing", billingRoutes);
     app.use("/api/inventory-items", inventoryItemsRoutes);
     app.use("/api/procurement", procurementRoutes);
-    app.use("/api/forecast", forecastRoutes);
     app.use("/api/animals", animalsRoutes);
     app.use("/api/patients", patientsRoutes);
     app.use("/api/clinical", clinicalCheckInRoutes);

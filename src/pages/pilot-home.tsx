@@ -12,7 +12,6 @@ import type { Equipment } from "@/types";
 import { Search, Scan, MapPin, ChevronRight, CheckCircle2, Loader2 } from "lucide-react";
 
 const STALE_MS = 4 * 60 * 60 * 1000;
-const RECENT_KEY = "vt_pilot_recent";
 const MAX_RECENT = 5;
 
 interface RecentItem {
@@ -22,17 +21,21 @@ interface RecentItem {
   accessedAt: number;
 }
 
-function getRecent(): RecentItem[] {
+function recentKey(userId: string | null) {
+  return `vt_pilot_recent_${userId ?? "anon"}`;
+}
+
+function getRecent(userId: string | null): RecentItem[] {
   try {
-    return JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
+    return JSON.parse(localStorage.getItem(recentKey(userId)) ?? "[]");
   } catch {
     return [];
   }
 }
 
-function trackRecent(item: RecentItem) {
-  const prev = getRecent().filter((r) => r.id !== item.id);
-  localStorage.setItem(RECENT_KEY, JSON.stringify([item, ...prev].slice(0, MAX_RECENT)));
+function trackRecent(item: RecentItem, userId: string | null) {
+  const prev = getRecent(userId).filter((r) => r.id !== item.id);
+  localStorage.setItem(recentKey(userId), JSON.stringify([item, ...prev].slice(0, MAX_RECENT)));
 }
 
 function relativeTime(ms: number): string {
@@ -83,8 +86,8 @@ export default function PilotHomePage() {
   const [confirmedId, setConfirmedId] = useState<string | null>(null);
 
   useEffect(() => {
-    setRecent(getRecent());
-  }, []);
+    setRecent(getRecent(userId));
+  }, [userId]);
 
   const { data: equipment = [] } = useQuery({
     queryKey: ["/api/equipment"],
@@ -132,8 +135,8 @@ export default function PilotHomePage() {
   const isSearching = query.trim().length > 0;
 
   const handleSelect = (e: Equipment) => {
-    trackRecent({ id: e.id, name: e.name, location: e.location ?? null, accessedAt: Date.now() });
-    setRecent(getRecent());
+    trackRecent({ id: e.id, name: e.name, location: e.location ?? null, accessedAt: Date.now() }, userId);
+    setRecent(getRecent(userId));
   };
 
   const confirmMut = useMutation({
@@ -145,8 +148,8 @@ export default function PilotHomePage() {
     setConfirmingId(e.id);
     try {
       await confirmMut.mutateAsync(e.id);
-      trackRecent({ id: e.id, name: e.name, location: e.location ?? null, accessedAt: Date.now() });
-      setRecent(getRecent());
+      trackRecent({ id: e.id, name: e.name, location: e.location ?? null, accessedAt: Date.now() }, userId);
+      setRecent(getRecent(userId));
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       setConfirmedId(e.id);
       setTimeout(() => setConfirmedId((prev) => (prev === e.id ? null : prev)), 1500);
