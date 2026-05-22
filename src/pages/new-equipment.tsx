@@ -61,6 +61,8 @@ const schema = z.object({
   ),
   imageUrl: z.string().optional(),
   usuallyFoundHere: z.string().max(200).optional().nullable(),
+  searchAlias: z.string().max(200).optional().nullable(),
+  staffNote: z.string().max(500).optional().nullable(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -155,6 +157,8 @@ export default function NewEquipmentPage() {
         expectedReturnMinutes: existingEquipment.expectedReturnMinutes ?? undefined,
         imageUrl: existingEquipment.imageUrl ?? undefined,
         usuallyFoundHere: existingEquipment.usuallyFoundHere ?? undefined,
+        searchAlias: existingEquipment.searchAlias ?? undefined,
+        staffNote: existingEquipment.staffNote ?? undefined,
       });
     }
   }, [isEditing, existingEquipment, reset]);
@@ -212,6 +216,8 @@ export default function NewEquipmentPage() {
       ...(showExpectedReturnField && { expectedReturnMinutes: data.expectedReturnMinutes }),
       imageUrl: normalizeOptionalString(data.imageUrl),
       usuallyFoundHere: normalizeOptionalString(data.usuallyFoundHere ?? undefined) ?? null,
+      searchAlias: normalizeOptionalString(data.searchAlias ?? undefined) ?? null,
+      staffNote: normalizeOptionalString(data.staffNote ?? undefined) ?? null,
     };
   }
 
@@ -229,6 +235,8 @@ export default function NewEquipmentPage() {
       ...(showExpectedReturnField && { expectedReturnMinutes: data.expectedReturnMinutes ?? null }),
       imageUrl: normalizeOptionalString(data.imageUrl) ?? null,
       usuallyFoundHere: normalizeOptionalString(data.usuallyFoundHere ?? undefined) ?? null,
+      searchAlias: normalizeOptionalString(data.searchAlias ?? undefined) ?? null,
+      staffNote: normalizeOptionalString(data.staffNote ?? undefined) ?? null,
       // Optimistic concurrency: echo back the version we loaded so the
       // server can 409 if someone else edited the row meanwhile.
       ...(existingEquipment?.version !== undefined && { version: existingEquipment.version }),
@@ -428,6 +436,34 @@ export default function NewEquipmentPage() {
                 />
                 <p className="text-xs text-muted-foreground">
                   Where staff actually find this. Shown during equipment lookup.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="searchAlias" className="text-sm font-medium">Also known as</Label>
+                <Input
+                  id="searchAlias"
+                  placeholder="e.g. good FAST, parvo pump, doppler probe"
+                  className="h-12 rounded-xl border-border/60 bg-background text-base"
+                  maxLength={200}
+                  {...register("searchAlias")}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Alternate names staff use when searching. Not displayed — only affects search results.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="staffNote" className="text-sm font-medium">Staff note</Label>
+                <Textarea
+                  id="staffNote"
+                  placeholder="e.g. Probe loses contact on right side"
+                  className="min-h-[72px] rounded-xl border-border/60 bg-background text-base resize-none"
+                  maxLength={500}
+                  {...register("staffNote")}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Floor memory — shown faintly during search. Anonymous, no names.
                 </p>
               </div>
 

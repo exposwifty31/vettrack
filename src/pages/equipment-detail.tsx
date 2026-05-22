@@ -968,6 +968,15 @@ export default function EquipmentDetailPage() {
           </div>
         )}
 
+        {/* Staff note */}
+        {equipment.staffNote && (
+          <div className="rounded-xl border border-border/40 bg-muted/30 px-3.5 py-3">
+            <p className="text-xs leading-relaxed text-muted-foreground/70 italic">
+              {equipment.staffNote}
+            </p>
+          </div>
+        )}
+
         {/* Info tabs */}
         <Tabs defaultValue="details">
           <TabsList className="w-full">

@@ -1,5 +1,5 @@
 /**
- * Pilot equipment seed — expanded list (~60 items).
+ * Pilot equipment seed — 64 items + 5 rooms.
  *
  * All usuallyFoundHere values are placeholders based on operational research.
  * Replace with actual locations after the physical seeding walk.
@@ -12,11 +12,31 @@
  *   tsx scripts/seed-pilot.ts
  */
 import "dotenv/config";
-import { db, pool, clinics, equipment } from "../server/db.js";
+import { db, pool, clinics, equipment, rooms } from "../server/db.js";
 
-const CLINIC_ID = process.env.DEV_DEFAULT_CLINIC_ID?.trim() || "dev-clinic-default";
+const CLINIC_ID =
+  process.env.CLINIC_ID?.trim() ||
+  process.env.DEV_DEFAULT_CLINIC_ID?.trim() ||
+  "dev-clinic-default";
 
-const PILOT_EQUIPMENT = [
+const PILOT_ROOMS = [
+  { id: "pilot-room-icu",               name: "ICU" },
+  { id: "pilot-room-internal-medicine", name: "Internal Medicine" },
+  { id: "pilot-room-treatment",         name: "Treatment Room" },
+  { id: "pilot-room-procedure",         name: "Procedure Room" },
+  { id: "pilot-room-recovery",          name: "Recovery" },
+];
+
+type PilotItem = {
+  id: string;
+  name: string;
+  searchAlias: string;
+  usuallyFoundHere: string;
+  staffNote: string | null;
+  roomId?: string | null;
+};
+
+const PILOT_EQUIPMENT: PilotItem[] = [
   // ── FAST Ultrasound ───────────────────────────────────────────────────────
   {
     id: "pilot-fast-a",
@@ -464,7 +484,25 @@ const PILOT_EQUIPMENT = [
     usuallyFoundHere: "Update after walk — should be a fixed anchor location",
     staffNote: null,
   },
-] as const;
+
+  // ── Glucometers (one per ward) ────────────────────────────────────────────
+  {
+    id: "pilot-glucometer-icu",
+    name: "Glucometer — ICU",
+    searchAlias: "glucometer glucose blood sugar gluco",
+    usuallyFoundHere: "ICU — stays in the ward",
+    staffNote: null,
+    roomId: "pilot-room-icu",
+  },
+  {
+    id: "pilot-glucometer-internal-medicine",
+    name: "Glucometer — Internal Medicine",
+    searchAlias: "glucometer glucose blood sugar gluco",
+    usuallyFoundHere: "Internal Medicine ward — stays in the ward",
+    staffNote: null,
+    roomId: "pilot-room-internal-medicine",
+  },
+];
 
 async function main(): Promise<void> {
   const dbUrl = (process.env.DATABASE_URL || process.env.POSTGRES_URL || "").trim();
@@ -473,9 +511,17 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  console.info(`[seed-pilot] Seeding pilot equipment (clinicId=${CLINIC_ID})…`);
+  console.info(`[seed-pilot] Seeding pilot rooms + equipment (clinicId=${CLINIC_ID})…`);
 
   await db.insert(clinics).values({ id: CLINIC_ID }).onConflictDoNothing();
+
+  for (const room of PILOT_ROOMS) {
+    await db
+      .insert(rooms)
+      .values({ id: room.id, clinicId: CLINIC_ID, name: room.name })
+      .onConflictDoNothing();
+    console.info(`  [room] ${room.name}`);
+  }
 
   for (const item of PILOT_EQUIPMENT) {
     await db
@@ -487,6 +533,7 @@ async function main(): Promise<void> {
         searchAlias: item.searchAlias,
         usuallyFoundHere: item.usuallyFoundHere,
         staffNote: item.staffNote ?? null,
+        roomId: item.roomId ?? null,
         status: "ok",
       })
       .onConflictDoNothing();
@@ -494,7 +541,7 @@ async function main(): Promise<void> {
     console.info(`  [ok] ${item.name}`);
   }
 
-  console.info(`[seed-pilot] Done — ${PILOT_EQUIPMENT.length} items seeded.`);
+  console.info(`[seed-pilot] Done — ${PILOT_ROOMS.length} rooms, ${PILOT_EQUIPMENT.length} items seeded.`);
   console.info("");
   console.info("Next step: perform the physical walk and update usuallyFoundHere");
   console.info("values with operational truth from the seeding tech.");
