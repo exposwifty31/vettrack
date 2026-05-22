@@ -1299,7 +1299,11 @@
     "auditLogLoadEarlier": "טען ישן יותר",
     "auditLogBatch": "אצווה {page}",
     "auditLogLoadMore": "טען עוד",
-    "auditLogRoleLabel": "תפקיד: {role}"
+    "auditLogRoleLabel": "תפקיד: {role}",
+    "pilotPulseItems": "פריטים",
+    "pilotPulseEverConfirmed": "אושרו אי פעם",
+    "pilotPulseConfirmedToday": "היום",
+    "pilotPulseNeverConfirmed": "לא אושרו מעולם"
   },
   "layoutHebrew": {
     "home": "ראשי",

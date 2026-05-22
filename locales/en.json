@@ -1299,7 +1299,11 @@
     "auditLogLoadEarlier": "Load earlier",
     "auditLogBatch": "batch {page}",
     "auditLogLoadMore": "Load more",
-    "auditLogRoleLabel": "Role: {role}"
+    "auditLogRoleLabel": "Role: {role}",
+    "pilotPulseItems": "items",
+    "pilotPulseEverConfirmed": "ever confirmed",
+    "pilotPulseConfirmedToday": "today",
+    "pilotPulseNeverConfirmed": "never confirmed"
   },
   "layoutHebrew": {
     "home": "Home",

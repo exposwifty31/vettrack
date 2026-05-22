@@ -1303,6 +1303,10 @@ export interface TStructure {
     auditLogBatch: string;
     auditLogLoadMore: string;
     auditLogRoleLabel: string;
+    pilotPulseItems: string;
+    pilotPulseEverConfirmed: string;
+    pilotPulseConfirmedToday: string;
+    pilotPulseNeverConfirmed: string;
   };
   layoutHebrew: {
     home: string;

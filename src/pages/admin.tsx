@@ -67,6 +67,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { isPilotMode } from "@/lib/pilot-mode";
 import type {
   SupportTicket,
   SupportTicketStatus,
@@ -103,6 +104,29 @@ export default function AdminPage() {
     refetchOnWindowFocus: false,
     retry: false,
   });
+
+  const { data: equipmentList = [] } = useQuery({
+    queryKey: ["/api/equipment"],
+    queryFn: api.equipment.list,
+    enabled: isPilotMode && isAdmin && !!userId,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+
+  const pilotCounts = useMemo(() => {
+    if (!isPilotMode) return null;
+    const now = Date.now();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    return {
+      total: equipmentList.length,
+      everConfirmed: equipmentList.filter((e) => e.lastSeen != null).length,
+      confirmedToday: equipmentList.filter(
+        (e) => e.lastSeen != null && now - new Date(e.lastSeen).getTime() <= oneDayMs,
+      ).length,
+      neverConfirmed: equipmentList.filter((e) => e.lastSeen == null).length,
+    };
+  }, [equipmentList]);
 
   const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
 
@@ -184,6 +208,22 @@ export default function AdminPage() {
             </Button>
           </CardContent>
         </Card>
+
+        {isPilotMode && pilotCounts && (
+          <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-muted/50 border border-border/60 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">{pilotCounts.total}</span>
+            <span>{t.adminPage.pilotPulseItems}</span>
+            <span className="text-border/80">·</span>
+            <span className="font-medium text-foreground">{pilotCounts.everConfirmed}</span>
+            <span>{t.adminPage.pilotPulseEverConfirmed}</span>
+            <span className="text-border/80">·</span>
+            <span className="font-medium text-foreground">{pilotCounts.confirmedToday}</span>
+            <span>{t.adminPage.pilotPulseConfirmedToday}</span>
+            <span className="text-border/80">·</span>
+            <span className="font-medium text-foreground">{pilotCounts.neverConfirmed}</span>
+            <span>{t.adminPage.pilotPulseNeverConfirmed}</span>
+          </div>
+        )}
 
         {/* Tab bar */}
         <div className="flex gap-2 border-b border-border pb-0 overflow-x-auto scrollbar-none">
