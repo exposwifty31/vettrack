@@ -48,6 +48,7 @@ const createEquipmentSchema = z.object({
   maintenanceIntervalDays: z.number().int().positive().optional().nullable(),
   expectedReturnMinutes: z.number().int().positive().optional().nullable(),
   imageUrl: z.string().max(500).optional().nullable(),
+  usuallyFoundHere: z.string().max(200).optional().nullable(),
 });
 
 const patchEquipmentSchema = z.object({
@@ -64,6 +65,7 @@ const patchEquipmentSchema = z.object({
   maintenanceIntervalDays: z.number().int().positive().optional().nullable(),
   expectedReturnMinutes: z.number().int().positive().optional().nullable(),
   imageUrl: z.string().max(500).optional().nullable(),
+  usuallyFoundHere: z.string().max(200).optional().nullable(),
   status: z.enum(EQUIPMENT_STATUS_VALUES).optional(),
   /** Optimistic concurrency: the row `version` the client last loaded.
    *  When supplied, the PATCH is rejected 409 if the row moved on. */
@@ -308,6 +310,7 @@ router.get("/my", requireAuth, async (req, res) => {
         checkedOutLocation: equipment.checkedOutLocation,
         expectedReturnMinutes: equipment.expectedReturnMinutes,
         createdAt: equipment.createdAt,
+        usuallyFoundHere: equipment.usuallyFoundHere,
         linkedAnimalId: sql<string | null>`(
           SELECT a.id
           FROM vt_patient_room_assignments pra
@@ -437,6 +440,7 @@ router.get("/", requireAuth, async (req, res) => {
         checkedOutLocation: equipment.checkedOutLocation,
         expectedReturnMinutes: equipment.expectedReturnMinutes,
         createdAt: equipment.createdAt,
+        usuallyFoundHere: equipment.usuallyFoundHere,
         linkedAnimalId: sql<string | null>`(
           SELECT a.id
           FROM vt_patient_room_assignments pra
@@ -602,6 +606,7 @@ router.get("/:id", requireAuth, async (req, res) => {
         checkedOutLocation: equipment.checkedOutLocation,
         expectedReturnMinutes: equipment.expectedReturnMinutes,
         createdAt: equipment.createdAt,
+        usuallyFoundHere: equipment.usuallyFoundHere,
         linkedAnimalId: sql<string | null>`(
           SELECT a.id
           FROM vt_patient_room_assignments pra
@@ -671,6 +676,7 @@ router.post("/", requireAuth, writeLimiter, requireEffectiveRole("technician"), 
       maintenanceIntervalDays,
       expectedReturnMinutes,
       imageUrl,
+      usuallyFoundHere,
     } = req.body as z.infer<typeof createEquipmentSchema>;
 
     if (expectedReturnMinutes !== undefined && req.authUser?.role !== "admin") {
@@ -703,6 +709,7 @@ router.post("/", requireAuth, writeLimiter, requireEffectiveRole("technician"), 
         maintenanceIntervalDays: maintenanceIntervalDays ?? null,
         expectedReturnMinutes: expectedReturnMinutes ?? null,
         imageUrl: imageUrl ?? null,
+        usuallyFoundHere: usuallyFoundHere ?? null,
         status: "ok",
       })
       .returning();
@@ -752,6 +759,7 @@ try {
       maintenanceIntervalDays,
       expectedReturnMinutes,
       imageUrl,
+      usuallyFoundHere,
       status,
       version: expectedVersion,
     } = req.body as z.infer<typeof patchEquipmentSchema>;
@@ -803,6 +811,7 @@ try {
           ...(maintenanceIntervalDays !== undefined && { maintenanceIntervalDays }),
           ...(expectedReturnMinutes !== undefined && { expectedReturnMinutes }),
           ...(imageUrl !== undefined && { imageUrl }),
+          ...(usuallyFoundHere !== undefined && { usuallyFoundHere }),
           ...(status !== undefined && { status }),
           // Always bump the row version so concurrent loaders can detect drift.
           version: sql`${equipment.version} + 1`,

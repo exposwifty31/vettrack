@@ -385,6 +385,7 @@ export const equipment = pgTable("vt_equipment", {
   version: integer("version").notNull().default(1),
   deletedAt: timestamp("deleted_at"),
   deletedBy: text("deleted_by"),
+  usuallyFoundHere: text("usually_found_here"),
 });
 
 export const patientRoomAssignments = pgTable("vt_patient_room_assignments", {

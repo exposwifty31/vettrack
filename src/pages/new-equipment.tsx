@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -59,6 +60,7 @@ const schema = z.object({
     z.number().int().positive().optional()
   ),
   imageUrl: z.string().optional(),
+  usuallyFoundHere: z.string().max(200).optional().nullable(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -152,6 +154,7 @@ export default function NewEquipmentPage() {
         maintenanceIntervalDays: existingEquipment.maintenanceIntervalDays ?? undefined,
         expectedReturnMinutes: existingEquipment.expectedReturnMinutes ?? undefined,
         imageUrl: existingEquipment.imageUrl ?? undefined,
+        usuallyFoundHere: existingEquipment.usuallyFoundHere ?? undefined,
       });
     }
   }, [isEditing, existingEquipment, reset]);
@@ -208,6 +211,7 @@ export default function NewEquipmentPage() {
       maintenanceIntervalDays: data.maintenanceIntervalDays,
       ...(showExpectedReturnField && { expectedReturnMinutes: data.expectedReturnMinutes }),
       imageUrl: normalizeOptionalString(data.imageUrl),
+      usuallyFoundHere: normalizeOptionalString(data.usuallyFoundHere ?? undefined) ?? null,
     };
   }
 
@@ -224,6 +228,7 @@ export default function NewEquipmentPage() {
       maintenanceIntervalDays: data.maintenanceIntervalDays ?? null,
       ...(showExpectedReturnField && { expectedReturnMinutes: data.expectedReturnMinutes ?? null }),
       imageUrl: normalizeOptionalString(data.imageUrl) ?? null,
+      usuallyFoundHere: normalizeOptionalString(data.usuallyFoundHere ?? undefined) ?? null,
       // Optimistic concurrency: echo back the version we loaded so the
       // server can 409 if someone else edited the row meanwhile.
       ...(existingEquipment?.version !== undefined && { version: existingEquipment.version }),
@@ -410,6 +415,20 @@ export default function NewEquipmentPage() {
                   {...register("location")}
                   data-testid="input-location"
                 />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="usuallyFoundHere" className="text-sm font-medium">Floor note</Label>
+                <Textarea
+                  id="usuallyFoundHere"
+                  placeholder="e.g. Usually near ICU prep alcove beside oxygen tanks"
+                  className="min-h-[72px] rounded-xl border-border/60 bg-background text-base resize-none"
+                  maxLength={200}
+                  {...register("usuallyFoundHere")}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Where staff actually find this. Shown during equipment lookup.
+                </p>
               </div>
 
               <div className="flex flex-col gap-2">

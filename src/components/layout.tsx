@@ -78,6 +78,7 @@ import {
 } from "@/lib/safe-browser";
 import { DispenseSheet } from "@/features/containers/components/DispenseSheet";
 import { ErModeToggle } from "@/features/er-admin/ErModeToggle";
+import { isPilotMode } from "@/lib/pilot-mode";
 
 interface NavItem {
   href: string;
@@ -449,7 +450,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
         },
       ];
     }
-    return [
+    const allItems: NavItem[] = [
     { href: "/", label: lh.home, icon: <Home className="w-5 h-5" /> },
     { href: "/equipment", label: t.equipment.title, icon: <Package className="w-5 h-5" /> },
     {
@@ -538,6 +539,16 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     { href: "/admin/code-blue-history", label: lh.codeBlueHistory, icon: <Clock className="w-5 h-5" />, adminOnly: true, menuOnly: true },
     { href: "/settings", label: lh.settings, icon: <Settings className="w-5 h-5" />, menuOnly: true },
     ];
+    if (isPilotMode) {
+      const pilotHrefs = new Set([
+        "/", "/equipment", "/alerts", "/code-blue", "/crash-cart",
+        "/my-equipment", "/rooms", "/display",
+        "/admin", "/admin/code-blue-history", "/print",
+        "/help", "/settings",
+      ]);
+      return allItems.filter((item) => pilotHrefs.has(item.href));
+    }
+    return allItems;
   }, [
     erConcealment,
     alertCount,
@@ -548,6 +559,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     myCount,
     lh,
     t,
+    isPilotMode,
   ]);
 
   const visibleItems = navItems.filter(

@@ -48,55 +48,68 @@ import dispenseRoutes from "../routes/dispense.js";
 import patientHandoffsRoutes from "../routes/patient-handoffs.js";
 import homeDashboardRoutes from "../routes/home-dashboard.js";
 
+const isPilotMode = process.env.PILOT_MODE === "true";
+
 export function registerApiRoutes(app: express.Express) {
+  // --- Infrastructure (always registered) ---
   app.use("/api/users", userRoutes);
-  app.use("/api/equipment", equipmentRoutes);
-  app.use("/api/analytics", analyticsRoutes);
-  app.use("/api/activity", activityRoutes);
-  app.use("/api/home", homeDashboardRoutes);
-  app.use("/api/metrics", metricsRoutes);
   app.use("/api/realtime", realtimeRoutes);
   app.use("/api/queue", queueRoutes);
-  app.use("/api/folders", foldersRoutes);
-  app.use("/api/stability", stabilityRoutes);
-  app.use("/api/alert-acks", alertAcksRoutes);
-  app.use("/api/rooms", roomsRoutes);
-  app.use("/api/support", supportRoutes);
-  app.use("/api/push", pushRoutes);
-  app.use("/api/whatsapp", whatsappRoutes);
-  app.use("/api/audit-logs", auditLogsRoutes);
+  app.use("/api/metrics", metricsRoutes);
   app.use("/api/storage", storageRoutes);
-  app.use("/api/shifts", shiftsRoutes);
-  app.use("/api/appointments", appointmentsRoutes);
-  app.use("/api/tasks", tasksRoutes);
-  app.use("/api/returns", returnsRoutes);
-  app.use("/api/shift-handover", shiftHandoverRoutes);
-  app.use("/api/shift-handover/patient-handoffs", patientHandoffsRoutes);
-  app.use("/api/containers", containersRoutes);
-  app.use("/api/restock", restockRoutes);
-  app.use("/api/formulary", formularyRoutes);
-  app.use("/api/medication-tasks", medicationTasksRoutes);
-  app.use("/api/billing", billingRoutes);
-  app.use("/api/inventory-items", inventoryItemsRoutes);
-  app.use("/api/procurement", procurementRoutes);
-  app.use("/api/forecast", forecastRoutes);
-  app.use("/api/animals", animalsRoutes);
-  app.use("/api/patients", patientsRoutes);
   app.use("/api/uploads", uploadsRoutes);
-  app.use("/api/clinical", clinicalCheckInRoutes);
-  app.use("/api/code-blue", codeBlueRoutes);
-  app.use("/api/crash-cart", crashCartRoutes);
+  app.use("/api/push", pushRoutes);
+  app.use("/api/support", supportRoutes);
+  app.use("/api/audit-logs", auditLogsRoutes);
   app.use("/api/integrations", integrationsRoutes);
-  app.use("/api/shift-chat", shiftChatRoutes);
-  app.use("/api/display", displayRoutes);
-  app.use("/api/er", erRoutes);
-  app.use("/api/admin", adminOutboxHealthRoutes);
-  app.use("/api/admin", adminOutboxDlqRoutes);
-  app.use("/api/admin", adminMedicationIntegrityRoutes);
-  app.use("/api/admin", adminTaskOwnershipRoutes);
-  app.use("/api/dispense", dispenseRoutes);
   app.use("/api/test", testRoutes);
   app.use("/api/health", healthRoutes);
   app.use("/api/health/ready", healthRoutes);
   app.use("/health", healthRoutes);
+
+  // --- Equipment core (always registered) ---
+  app.use("/api/equipment", equipmentRoutes);
+  app.use("/api/rooms", roomsRoutes);
+  app.use("/api/folders", foldersRoutes);
+  app.use("/api/returns", returnsRoutes);
+  app.use("/api/alert-acks", alertAcksRoutes);
+  app.use("/api/activity", activityRoutes);
+  app.use("/api/home", homeDashboardRoutes);
+  app.use("/api/display", displayRoutes);
+
+  // --- Safety surfaces (always registered) ---
+  app.use("/api/code-blue", codeBlueRoutes);
+  app.use("/api/crash-cart", crashCartRoutes);
+  app.use("/api/er", erRoutes);
+
+  // --- Admin (always registered — data management during pilot) ---
+  app.use("/api/admin", adminOutboxHealthRoutes);
+  app.use("/api/admin", adminOutboxDlqRoutes);
+  app.use("/api/admin", adminMedicationIntegrityRoutes);
+  app.use("/api/admin", adminTaskOwnershipRoutes);
+  app.use("/api/stability", stabilityRoutes);
+
+  // --- Full-platform routes (disabled in pilot mode) ---
+  if (!isPilotMode) {
+    app.use("/api/analytics", analyticsRoutes);
+    app.use("/api/shifts", shiftsRoutes);
+    app.use("/api/appointments", appointmentsRoutes);
+    app.use("/api/tasks", tasksRoutes);
+    app.use("/api/shift-handover", shiftHandoverRoutes);
+    app.use("/api/shift-handover/patient-handoffs", patientHandoffsRoutes);
+    app.use("/api/containers", containersRoutes);
+    app.use("/api/restock", restockRoutes);
+    app.use("/api/formulary", formularyRoutes);
+    app.use("/api/medication-tasks", medicationTasksRoutes);
+    app.use("/api/billing", billingRoutes);
+    app.use("/api/inventory-items", inventoryItemsRoutes);
+    app.use("/api/procurement", procurementRoutes);
+    app.use("/api/forecast", forecastRoutes);
+    app.use("/api/animals", animalsRoutes);
+    app.use("/api/patients", patientsRoutes);
+    app.use("/api/clinical", clinicalCheckInRoutes);
+    app.use("/api/dispense", dispenseRoutes);
+    app.use("/api/shift-chat", shiftChatRoutes);
+    app.use("/api/whatsapp", whatsappRoutes);
+  }
 }

@@ -154,6 +154,7 @@ export interface Equipment {
   linkedAnimalName?: string | null;
   /** Optimistic-concurrency row version; pass back on PATCH to detect conflicts. */
   version?: number;
+  usuallyFoundHere?: string | null;
 }
 
 export type CodeBlueStatus = "critical" | "needs_attention";
@@ -210,6 +211,7 @@ export interface CreateEquipmentRequest {
   maintenanceIntervalDays?: number;
   expectedReturnMinutes?: number | null;
   imageUrl?: string;
+  usuallyFoundHere?: string | null;
 }
 
 export interface UpdateEquipmentRequest {
@@ -229,6 +231,7 @@ export interface UpdateEquipmentRequest {
   plugInDeadlineMinutes?: number | null;
   imageUrl?: string | null;
   status?: EquipmentStatus;
+  usuallyFoundHere?: string | null;
   /** Optimistic-concurrency token: the `version` last loaded. When set,
    *  the server rejects the PATCH with 409 if the row has since changed. */
   version?: number;

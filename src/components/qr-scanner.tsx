@@ -836,6 +836,9 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                 {scannedEquipment.location && (
                   <p className="text-xs text-muted-foreground">{scannedEquipment.location}</p>
                 )}
+                {scannedEquipment.usuallyFoundHere && (
+                  <p className="mt-0.5 text-xs italic text-muted-foreground/70">{scannedEquipment.usuallyFoundHere}</p>
+                )}
               </div>
               <Badge variant={statusToBadgeVariant(scannedEquipment.status)} className="shrink-0" data-testid="scan-inline-status-badge">
                 {STATUS_LABELS[scannedEquipment.status] || scannedEquipment.status}
@@ -901,7 +904,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                   size="default"
                   className="min-h-11 flex-1 gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-800 dark:text-emerald-200 dark:hover:bg-emerald-950/50"
                   onClick={handleMarkOk}
-                  disabled={isActing || scannedEquipment.status === "ok"}
+                  disabled={isActing}
                   data-testid="btn-scan-inline-mark-ok"
                 >
                   <CheckCircle2 className="w-4 h-4" />

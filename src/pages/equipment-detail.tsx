@@ -958,6 +958,16 @@ export default function EquipmentDetailPage() {
           </CardContent>
         </Card>
 
+        {/* Floor note */}
+        {equipment.usuallyFoundHere && (
+          <div className="flex items-start gap-2.5 rounded-xl border border-amber-200/60 bg-amber-50/60 dark:border-amber-800/30 dark:bg-amber-950/20 px-3.5 py-3">
+            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+            <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-300">
+              {equipment.usuallyFoundHere}
+            </p>
+          </div>
+        )}
+
         {/* Info tabs */}
         <Tabs defaultValue="details">
           <TabsList className="w-full">

@@ -92,13 +92,19 @@ import { EquipmentTable } from "@/components/equipment/EquipmentTable";
 import { EquipmentFilters } from "@/components/equipment/EquipmentFilters";
 import { AlertCard } from "@/components/alerts/AlertCard";
 import type { SidebarItem } from "@/components/layout/IconSidebar";
+import { isPilotMode } from "@/lib/pilot-mode";
 
-const EQUIPMENT_SIDEBAR: SidebarItem[] = [
-  { href: "/equipment",             icon: LayoutGrid, label: "All Equipment" },
-  { href: "/rooms",                 icon: Home,       label: "Rooms" },
-  { href: "/equipment/scan",        icon: ScanLine,   label: "Scan Log" },
-  { href: "/equipment/maintenance", icon: Wrench,     label: "Maintenance", alertDot: false },
-];
+const EQUIPMENT_SIDEBAR: SidebarItem[] = isPilotMode
+  ? [
+      { href: "/equipment", icon: LayoutGrid, label: "All Equipment" },
+      { href: "/rooms",     icon: Home,       label: "Rooms" },
+    ]
+  : [
+      { href: "/equipment",             icon: LayoutGrid, label: "All Equipment" },
+      { href: "/rooms",                 icon: Home,       label: "Rooms" },
+      { href: "/equipment/scan",        icon: ScanLine,   label: "Scan Log" },
+      { href: "/equipment/maintenance", icon: Wrench,     label: "Maintenance", alertDot: false },
+    ];
 
 function DesktopEquipmentView({
   equipment,

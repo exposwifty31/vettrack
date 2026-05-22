@@ -3,19 +3,21 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useDirection } from "@/hooks/useDirection";
+import { isPilotMode } from "@/lib/pilot-mode";
 
 export interface TopbarSection {
   href: string;
   label: string;
   adminOnly?: boolean;
+  pilotHidden?: boolean;
 }
 
 const SECTIONS: TopbarSection[] = [
   { href: "/home",         label: "Home" },
-  { href: "/patients",     label: "Patients" },
-  { href: "/equipment",   label: "Equipment" },
-  { href: "/meds",        label: "Pharmacy" },
-  { href: "/appointments", label: "Shifts" },
+  { href: "/patients",     label: "Patients",  pilotHidden: true },
+  { href: "/equipment",    label: "Equipment" },
+  { href: "/meds",         label: "Pharmacy",  pilotHidden: true },
+  { href: "/appointments", label: "Shifts",    pilotHidden: true },
   { href: "/display",      label: "Ward" },
   { href: "/admin",        label: "Admin", adminOnly: true },
 ];
@@ -26,7 +28,7 @@ export function Topbar() {
   const dir = useDirection();
 
   const visibleSections = SECTIONS.filter((s) =>
-    s.adminOnly ? isAdmin : true
+    (!s.adminOnly || isAdmin) && (!isPilotMode || !s.pilotHidden)
   );
 
   // Match the most specific prefix
