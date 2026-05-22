@@ -141,14 +141,58 @@ function mergeRequestHeaders(init: RequestInit): Record<string, string> {
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 10_000;
 
 /**
+ * Raw fetch with timeout — bypasses authFetch intentionally.
+ *
+ * Auth bootstrap calls (/api/users/me, /api/users/sync) must NOT go through
+ * authFetch because:
+ *   1. authFetch gates on `getCurrentUserId()` being non-empty, but userId is
+ *      always "" in authStore at the time the first bootstrap call fires (before
+ *      the server response populates it). This throws AUTH_INVALID and puts the
+ *      client into the catch-branch, which shows the "pending" screen as a false
+ *      positive even when the DB user is fully active.
+ *   2. authFetch throws on 401 responses, but the bootstrap flow needs raw 401
+ *      so it can fall through to POST /api/users/sync to provision new users.
+ *
+ * The caller (use-auth.tsx syncSession) already constructs the correct
+ * Authorization header before calling these functions, so no auth logic is lost.
+ */
+function bootstrapFetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const outer = init.signal as AbortSignal | undefined | null;
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, AUTH_BOOTSTRAP_TIMEOUT_MS);
+
+  if (outer) {
+    const onAbort = () => controller.abort();
+    outer.addEventListener("abort", onAbort, { once: true });
+    controller.signal.addEventListener("abort", () => outer.removeEventListener("abort", onAbort), { once: true });
+  }
+
+  return fetch(url, { ...init, signal: controller.signal })
+    .finally(() => clearTimeout(timer))
+    .catch((err) => {
+      if (timedOut && err instanceof DOMException && err.name === "AbortError") {
+        throw new TimeoutError(AUTH_BOOTSTRAP_TIMEOUT_MS);
+      }
+      throw err;
+    });
+}
+
+/**
  * Auth bootstrap helpers — return raw `Response` so `use-auth` can branch on
  * 401/404 before session is established without triggering mutation 401 redirects.
+ *
+ * Uses bootstrapFetchWithTimeout (raw fetch) instead of the authenticated
+ * fetchWithTimeout to avoid the authFetch userId guard that fires before the
+ * server response has populated authStore.userId.
  */
 export async function authFetchUsersMe(init: RequestInit = {}): Promise<Response> {
-  return fetchWithTimeout(
+  return bootstrapFetchWithTimeout(
     "/api/users/me",
     { credentials: "include", ...init, headers: mergeRequestHeaders(init) },
-    AUTH_BOOTSTRAP_TIMEOUT_MS,
   );
 }
 
@@ -157,7 +201,7 @@ export async function authPostUsersSync(
   init: RequestInit = {},
 ): Promise<Response> {
   const payload = JSON.stringify(body);
-  return fetchWithTimeout(
+  return bootstrapFetchWithTimeout(
     "/api/users/sync",
     {
       credentials: "include",
@@ -166,7 +210,6 @@ export async function authPostUsersSync(
       headers: mergeRequestHeaders({ ...init, body: payload }),
       body: payload,
     },
-    AUTH_BOOTSTRAP_TIMEOUT_MS,
   );
 }
 
