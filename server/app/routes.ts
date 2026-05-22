@@ -46,12 +46,14 @@ import adminMedicationIntegrityRoutes from "../routes/admin-medication-integrity
 import adminTaskOwnershipRoutes from "../routes/admin-task-ownership.js";
 import dispenseRoutes from "../routes/dispense.js";
 import patientHandoffsRoutes from "../routes/patient-handoffs.js";
+import homeDashboardRoutes from "../routes/home-dashboard.js";
 
 export function registerApiRoutes(app: express.Express) {
   app.use("/api/users", userRoutes);
   app.use("/api/equipment", equipmentRoutes);
   app.use("/api/analytics", analyticsRoutes);
   app.use("/api/activity", activityRoutes);
+  app.use("/api/home", homeDashboardRoutes);
   app.use("/api/metrics", metricsRoutes);
   app.use("/api/realtime", realtimeRoutes);
   app.use("/api/queue", queueRoutes);

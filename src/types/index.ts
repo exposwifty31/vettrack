@@ -426,6 +426,18 @@ export interface TaskDashboard {
   };
 }
 
+/** GET /api/home/dashboard — aggregate "pulse" for the magnetic home dashboard. */
+export interface HomeDashboardPulse {
+  /** Open clinic shift session, if one is running. */
+  shift: { startedAt: string } | null;
+  /** Consecutive most-recent days with zero overdue tasks. */
+  streak: number;
+  /** Tasks marked completed today. */
+  tasksCompletedToday: number;
+  /** Scans logged by the current user today. */
+  scansToday: number;
+}
+
 export type RecommendationSuggestionType = "OVERDUE_WARNING" | "START_NOW" | "OVERLOADED" | "PICK_FROM_QUEUE";
 
 export interface RecommendationSuggestion {

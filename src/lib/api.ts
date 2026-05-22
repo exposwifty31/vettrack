@@ -24,6 +24,7 @@ import type {
   UpdateRoomRequest,
   BulkVerifyRoomResult,
   ActivityFeedItem,
+  HomeDashboardPulse,
   AnalyticsSummary,
   BulkDeleteRequest,
   BulkMoveRequest,
@@ -1029,6 +1030,9 @@ export const api = {
       ),
     myScanCount: () =>
       request<{ count: number }>("/api/activity/my-scan-count", {}, undefined, true),
+  },
+  home: {
+    dashboard: () => request<HomeDashboardPulse>("/api/home/dashboard"),
   },
   analytics: {
     summary: () => request<AnalyticsSummary>("/api/analytics"),

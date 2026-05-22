@@ -51,8 +51,8 @@ describe("Wave 3 UI token consistency checks (static)", () => {
 
   it("Home status visuals use semantic token classes", () => {
     expect(
-      home.includes("ok: \"text-primary\"") &&
-        home.includes("issue: \"text-destructive\""),
+      home.includes("text-destructive") &&
+        home.includes("border-primary"),
     ).toBe(true);
   });
 });

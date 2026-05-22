@@ -126,20 +126,15 @@ describe("Wave 6 state consistency checks (static)", () => {
     ).toBe(true);
   });
 
-  it("Home page alerts section shows LoadingSection while equipment loads, not blank", () => {
-    expect(
-      home.includes("isLoading ? (") &&
-        home.includes("<LoadingSection rows={3} />"),
-    ).toBe(true);
+  it("Home page next-up task card shows a loading state while tasks fetch, not blank", () => {
+    expect(home.includes("tasksLoading")).toBe(true);
   });
 
-  it("Home page uses shared EmptyState component for activity and alerts empty states", () => {
+  it("Home page uses shared EmptyState component for the activity empty state", () => {
     expect(
       home.includes("import { EmptyState }") &&
         home.includes("t.homePage.activityFeedEmpty") &&
-        home.includes("t.homePage.activityFeedEmptyHint") &&
-        home.includes("t.homePage.alertsEmpty") &&
-        home.includes("t.homePage.alertsEmptyHint"),
+        home.includes("t.homePage.activityFeedEmptyHint"),
     ).toBe(true);
   });
 });

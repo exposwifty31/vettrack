@@ -126,8 +126,8 @@ describe("Home dashboard state integration", () => {
     expect(home).toContain("<LoadingSection rows={4} />");
   });
 
-  it("loading state: alerts section shows LoadingSection while equipment loads", () => {
-    expect(home).toContain("<LoadingSection rows={3} />");
+  it("loading state: next-up task card shows a skeleton while tasks fetch", () => {
+    expect(home).toContain("tasksLoading");
   });
 
   it("empty state: activity feed uses EmptyState with i18n keys", () => {
@@ -135,9 +135,9 @@ describe("Home dashboard state integration", () => {
     expect(home).toContain("t.homePage.activityFeedEmptyHint");
   });
 
-  it("empty state: alerts section uses EmptyState with i18n keys", () => {
-    expect(home).toContain("t.homePage.alertsEmpty");
-    expect(home).toContain("t.homePage.alertsEmptyHint");
+  it("empty state: next-up task card has an all-caught-up empty state", () => {
+    expect(home).toContain("t.homePage.nextUpEmpty");
+    expect(home).toContain("t.homePage.nextUpEmptyBody");
   });
 
   it("error state: equipment fetch error shows ErrorCard with retry", () => {

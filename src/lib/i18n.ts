@@ -416,6 +416,15 @@ const translations = {
   homePage: {
     ...d.homePage,
     greeting: (name: string) => tr(d.homePage.greeting, { name }),
+    hello: (name: string) => tr(d.homePage.hello, { name }),
+    shiftLine: (time: string) => tr(d.homePage.shiftLine, { time }),
+    progressComplete: (pct: number) => tr(d.homePage.progressComplete, { pct }),
+    streakLabel: (count: number) => tr(d.homePage.streakLabel, { count }),
+    nextUpDueIn: (time: string) => tr(d.homePage.nextUpDueIn, { time }),
+    nextUpOverdueBy: (time: string) => tr(d.homePage.nextUpOverdueBy, { time }),
+    etaMinutes: (count: number) => tr(d.homePage.etaMinutes, { count }),
+    etaHours: (count: number) => tr(d.homePage.etaHours, { count }),
+    triageAlertsHint: (count: number) => tr(d.homePage.triageAlertsHint, { count }),
   },
 
   landingPage: {
