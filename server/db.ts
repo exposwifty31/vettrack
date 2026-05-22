@@ -386,6 +386,8 @@ export const equipment = pgTable("vt_equipment", {
   deletedAt: timestamp("deleted_at"),
   deletedBy: text("deleted_by"),
   usuallyFoundHere: text("usually_found_here"),
+  searchAlias: text("search_alias"),
+  staffNote: text("staff_note"),
 });
 
 export const patientRoomAssignments = pgTable("vt_patient_room_assignments", {

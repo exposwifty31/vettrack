@@ -39,6 +39,7 @@
     "dev:db:push": "cross-env-shell \"drizzle-kit push\"",
     "seed:dev": "tsx server/seed.ts",
     "seed:dev:e2e": "tsx scripts/seed-dev.ts",
+    "seed:pilot": "tsx scripts/seed-pilot.ts",
     "staging:seed": "tsx scripts/staging/seed.ts",
     "staging:cleanup": "tsx scripts/staging/cleanup.ts",
     "test:staging:e2e": "playwright test --config=playwright.staging.config.ts tests/staging-auth-smoke.spec.ts tests/staging-code-blue-gating.spec.ts --reporter=list",

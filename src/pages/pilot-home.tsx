@@ -106,7 +106,8 @@ export default function PilotHomePage() {
           e.name.toLowerCase().includes(q) ||
           (e.location ?? "").toLowerCase().includes(q) ||
           (e.model ?? "").toLowerCase().includes(q) ||
-          (e.usuallyFoundHere ?? "").toLowerCase().includes(q),
+          (e.usuallyFoundHere ?? "").toLowerCase().includes(q) ||
+          (e.searchAlias ?? "").toLowerCase().includes(q),
       )
       .slice(0, 8);
   }, [query, equipment]);
@@ -221,6 +222,11 @@ export default function PilotHomePage() {
                             {e.usuallyFoundHere}
                           </p>
                         )}
+                        {e.staffNote && (
+                          <p className="mt-0.5 truncate text-[10px] text-ivory-text3/50 italic">
+                            {e.staffNote}
+                          </p>
+                        )}
                       </div>
                     </Link>
                     <button
@@ -315,6 +321,11 @@ export default function PilotHomePage() {
                           {e.usuallyFoundHere && (
                             <p className="mt-0.5 truncate text-[10.5px] text-ivory-text3/70 italic">
                               {e.usuallyFoundHere}
+                            </p>
+                          )}
+                          {e.staffNote && (
+                            <p className="mt-0.5 truncate text-[10px] text-ivory-text3/50 italic">
+                              {e.staffNote}
                             </p>
                           )}
                         </div>

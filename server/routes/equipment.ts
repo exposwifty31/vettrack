@@ -49,6 +49,8 @@ const createEquipmentSchema = z.object({
   expectedReturnMinutes: z.number().int().positive().optional().nullable(),
   imageUrl: z.string().max(500).optional().nullable(),
   usuallyFoundHere: z.string().max(200).optional().nullable(),
+  searchAlias: z.string().max(200).optional().nullable(),
+  staffNote: z.string().max(500).optional().nullable(),
 });
 
 const patchEquipmentSchema = z.object({
@@ -66,6 +68,8 @@ const patchEquipmentSchema = z.object({
   expectedReturnMinutes: z.number().int().positive().optional().nullable(),
   imageUrl: z.string().max(500).optional().nullable(),
   usuallyFoundHere: z.string().max(200).optional().nullable(),
+  searchAlias: z.string().max(200).optional().nullable(),
+  staffNote: z.string().max(500).optional().nullable(),
   status: z.enum(EQUIPMENT_STATUS_VALUES).optional(),
   /** Optimistic concurrency: the row `version` the client last loaded.
    *  When supplied, the PATCH is rejected 409 if the row moved on. */
@@ -311,6 +315,8 @@ router.get("/my", requireAuth, async (req, res) => {
         expectedReturnMinutes: equipment.expectedReturnMinutes,
         createdAt: equipment.createdAt,
         usuallyFoundHere: equipment.usuallyFoundHere,
+        searchAlias: equipment.searchAlias,
+        staffNote: equipment.staffNote,
         linkedAnimalId: sql<string | null>`(
           SELECT a.id
           FROM vt_patient_room_assignments pra
@@ -381,7 +387,9 @@ router.get("/", requireAuth, async (req, res) => {
         ilike(equipment.serialNumber, pattern),
         ilike(equipment.model, pattern),
         ilike(equipment.manufacturer, pattern),
-        ilike(equipment.location, pattern)
+        ilike(equipment.location, pattern),
+        ilike(equipment.usuallyFoundHere, pattern),
+        ilike(equipment.searchAlias, pattern)
       );
       if (searchCondition) whereClauses.push(searchCondition);
     }
@@ -441,6 +449,8 @@ router.get("/", requireAuth, async (req, res) => {
         expectedReturnMinutes: equipment.expectedReturnMinutes,
         createdAt: equipment.createdAt,
         usuallyFoundHere: equipment.usuallyFoundHere,
+        searchAlias: equipment.searchAlias,
+        staffNote: equipment.staffNote,
         linkedAnimalId: sql<string | null>`(
           SELECT a.id
           FROM vt_patient_room_assignments pra
@@ -607,6 +617,8 @@ router.get("/:id", requireAuth, async (req, res) => {
         expectedReturnMinutes: equipment.expectedReturnMinutes,
         createdAt: equipment.createdAt,
         usuallyFoundHere: equipment.usuallyFoundHere,
+        searchAlias: equipment.searchAlias,
+        staffNote: equipment.staffNote,
         linkedAnimalId: sql<string | null>`(
           SELECT a.id
           FROM vt_patient_room_assignments pra
@@ -677,6 +689,8 @@ router.post("/", requireAuth, writeLimiter, requireEffectiveRole("technician"), 
       expectedReturnMinutes,
       imageUrl,
       usuallyFoundHere,
+      searchAlias,
+      staffNote,
     } = req.body as z.infer<typeof createEquipmentSchema>;
 
     if (expectedReturnMinutes !== undefined && req.authUser?.role !== "admin") {
@@ -710,6 +724,8 @@ router.post("/", requireAuth, writeLimiter, requireEffectiveRole("technician"), 
         expectedReturnMinutes: expectedReturnMinutes ?? null,
         imageUrl: imageUrl ?? null,
         usuallyFoundHere: usuallyFoundHere ?? null,
+        searchAlias: searchAlias ?? null,
+        staffNote: staffNote ?? null,
         status: "ok",
       })
       .returning();
@@ -760,6 +776,8 @@ try {
       expectedReturnMinutes,
       imageUrl,
       usuallyFoundHere,
+      searchAlias,
+      staffNote,
       status,
       version: expectedVersion,
     } = req.body as z.infer<typeof patchEquipmentSchema>;
@@ -812,6 +830,8 @@ try {
           ...(expectedReturnMinutes !== undefined && { expectedReturnMinutes }),
           ...(imageUrl !== undefined && { imageUrl }),
           ...(usuallyFoundHere !== undefined && { usuallyFoundHere }),
+          ...(searchAlias !== undefined && { searchAlias }),
+          ...(staffNote !== undefined && { staffNote }),
           ...(status !== undefined && { status }),
           // Always bump the row version so concurrent loaders can detect drift.
           version: sql`${equipment.version} + 1`,
