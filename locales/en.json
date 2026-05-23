@@ -1094,7 +1094,13 @@
     "nfcResetLabel": "NFC Room Reset",
     "nfcItemsInRoom": "Items in room",
     "nfcConfirmInventory": "Confirm Inventory",
-    "nfcDismiss": "Dismiss"
+    "nfcDismiss": "Dismiss",
+    "pilotConfirmHere": "Confirm here",
+    "pilotConfirmedHere": "Confirmed!",
+    "pilotConfirmError": "Couldn't confirm",
+    "pilotNeverSeen": "Never",
+    "pilotStale": "Stale",
+    "pilotRecent": "Recent"
   },
   "roomsListPage": {
     "createRoomFailed": "Failed to create room",

@@ -44,6 +44,7 @@ import { useAuth } from "@/hooks/use-auth";
 import type { Equipment, Room, RoomActivityEntry, EquipmentStatus } from "@/types";
 import { ReturnPlugDialog } from "@/components/return-plug-dialog";
 import { haptics } from "@/lib/haptics";
+import { isPilotMode } from "@/lib/pilot-mode";
 
 function toInitials(name: string | null | undefined): string {
   if (!name?.trim()) return "?";
@@ -101,10 +102,13 @@ interface RadarEquipmentCardProps {
   justVerified?: boolean;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardProps) {
   const [moveOpen, setMoveOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [tapped, setTapped] = useState(false);
+  const [justConfirmed, setJustConfirmed] = useState(false);
   const busyRef = useRef(false);
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queryClient = useQueryClient();
@@ -112,6 +116,17 @@ function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardP
   const isCheckedOut = !!eq.checkedOutById;
   const checkedOutByMe = eq.checkedOutById === userId;
   const statusVariant = statusToBadgeVariant(eq.status);
+
+  const confirmMut = useMutation({
+    mutationFn: () => api.equipment.scan(eq.id, { status: "ok" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      setJustConfirmed(true);
+      haptics.scanSuccess();
+      setTimeout(() => setJustConfirmed(false), 1500);
+    },
+    onError: () => toast.error(t.roomRadarPage.pilotConfirmError),
+  });
 
   useEffect(() => {
     return () => { if (tapTimerRef.current) clearTimeout(tapTimerRef.current); };
@@ -147,15 +162,27 @@ function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardP
     ? { label: t.roomRadarPage.returnLabel, icon: LogOut, action: () => setReturnDialogOpen(true), pending: returnMut.isPending, cls: "text-primary border-primary/30 hover:bg-primary/10 dark:hover:bg-primary/15" }
     : null;
 
-  const handleQuickAction = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!quickAction || quickAction.pending || busyRef.current) return;
-    busyRef.current = true;
-    setTapped(true);
-    tapTimerRef.current = setTimeout(() => setTapped(false), 300);
-    try { quickAction.action(); } catch { busyRef.current = false; toast.error(t.roomRadarPage.actionFailed); }
-  };
+  const pilotAction = isPilotMode
+    ? {
+        label: justConfirmed ? t.roomRadarPage.pilotConfirmedHere : t.roomRadarPage.pilotConfirmHere,
+        icon: justConfirmed ? CheckCircle2 : ShieldCheck,
+        action: () => { if (!confirmMut.isPending) confirmMut.mutate(); },
+        pending: confirmMut.isPending,
+        cls: justConfirmed
+          ? "text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/20"
+          : "text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40",
+      }
+    : null;
+
+  const activeQuickAction = isPilotMode ? pilotAction : quickAction;
+
+  const pilotStaleness = isPilotMode
+    ? !eq.lastSeen
+      ? "never"
+      : Date.now() - new Date(eq.lastSeen).getTime() <= DAY_MS
+      ? "recent"
+      : "stale"
+    : null;
 
   const verifierInitials = justVerified ? null : toInitials(eq.lastVerifiedByName);
   const verifiedLabel = justVerified
@@ -220,7 +247,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardP
               </div>
             </div>
 
-            {/* Row 2: holder + location + verified */}
+            {/* Row 2: holder + location + verified + pilot staleness */}
             <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
               {holderLabel && (
                 <span className="flex items-center gap-1 truncate">
@@ -234,7 +261,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardP
                   {locationLabel}
                 </span>
               )}
-              {verifiedLabel ? (
+              {!isPilotMode && (verifiedLabel ? (
                 <span className={cn(
                   "flex items-center gap-1",
                   justVerified ? "text-emerald-600 dark:text-emerald-400 font-semibold" : ""
@@ -244,27 +271,54 @@ function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardP
                 </span>
               ) : (
                 <span className="text-muted-foreground/60">{t.roomRadarPage.notVerified}</span>
+              ))}
+              {pilotStaleness === "never" && (
+                <span className="text-red-500 font-semibold">{t.roomRadarPage.pilotNeverSeen}</span>
+              )}
+              {pilotStaleness === "stale" && (
+                <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                  {t.roomRadarPage.pilotStale}
+                  {eq.lastSeen ? ` · ${formatRelativeTime(eq.lastSeen)}` : ""}
+                </span>
+              )}
+              {(pilotStaleness === "recent" || justConfirmed) && (
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                  {justConfirmed && <CheckCircle2 className="w-2.5 h-2.5" />}
+                  {justConfirmed ? t.roomRadarPage.pilotConfirmedHere : t.roomRadarPage.pilotRecent}
+                  {!justConfirmed && eq.lastSeen ? ` · ${formatRelativeTime(eq.lastSeen)}` : ""}
+                </span>
               )}
             </div>
 
             {/* Row 3: actions */}
             <div className="flex items-center gap-2 mt-2.5">
-              {quickAction && (
+              {activeQuickAction && (
                 <button
-                  onClick={handleQuickAction}
-                  disabled={quickAction.pending}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!activeQuickAction.pending && !busyRef.current) {
+                      if (!isPilotMode) {
+                        busyRef.current = true;
+                        setTapped(true);
+                        tapTimerRef.current = setTimeout(() => setTapped(false), 300);
+                      }
+                      try { activeQuickAction.action(); } catch { busyRef.current = false; toast.error(t.roomRadarPage.actionFailed); }
+                    }
+                  }}
+                  disabled={activeQuickAction.pending}
                   className={cn(
                     "flex items-center gap-1.5 px-4 py-2 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-[0.97]",
-                    quickAction.cls
+                    activeQuickAction.cls
                   )}
                   data-testid={`quick-action-${eq.id}`}
                 >
-                  {quickAction.pending ? (
+                  {activeQuickAction.pending ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
-                    <quickAction.icon className="w-3.5 h-3.5" />
+                    <activeQuickAction.icon className="w-3.5 h-3.5" />
                   )}
-                  {quickAction.label}
+                  {activeQuickAction.label}
                 </button>
               )}
               <button

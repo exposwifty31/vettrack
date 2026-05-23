@@ -1094,7 +1094,13 @@
     "nfcResetLabel": "איפוס NFC לחדר",
     "nfcItemsInRoom": "פריטים בחדר",
     "nfcConfirmInventory": "אשר מלאי",
-    "nfcDismiss": "סגור"
+    "nfcDismiss": "סגור",
+    "pilotConfirmHere": "אשר כאן",
+    "pilotConfirmedHere": "אושר!",
+    "pilotConfirmError": "לא ניתן לאשר",
+    "pilotNeverSeen": "אף פעם",
+    "pilotStale": "ישן",
+    "pilotRecent": "עדכני"
   },
   "roomsListPage": {
     "createRoomFailed": "יצירת החדר נכשלה",

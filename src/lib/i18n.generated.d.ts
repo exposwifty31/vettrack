@@ -1098,6 +1098,12 @@ export interface TStructure {
     nfcItemsInRoom: string;
     nfcConfirmInventory: string;
     nfcDismiss: string;
+    pilotConfirmHere: string;
+    pilotConfirmedHere: string;
+    pilotConfirmError: string;
+    pilotNeverSeen: string;
+    pilotStale: string;
+    pilotRecent: string;
   };
   roomsListPage: {
     createRoomFailed: string;
