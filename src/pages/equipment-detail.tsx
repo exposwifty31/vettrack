@@ -145,6 +145,9 @@ export default function EquipmentDetailPage() {
   const [undoCountdown, setUndoCountdown] = useState(0);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const [editingFloorNote, setEditingFloorNote] = useState(false);
+  const [floorNoteText, setFloorNoteText] = useState("");
+
   const [moveRoomOpen, setMoveRoomOpen] = useState(false);
   const [reportIssueOpen, setReportIssueOpen] = useState(false);
   const [reportIssueNote, setReportIssueNote] = useState("");
@@ -321,6 +324,18 @@ export default function EquipmentDetailPage() {
   }
 
   const isOffline = !isOnline();
+
+  const floorNoteMut = useMutation({
+    mutationFn: (note: string | null) =>
+      api.equipment.update(id!, { usuallyFoundHere: note }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData([`/api/equipment/${id}`], updated);
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      setEditingFloorNote(false);
+      toast.success(t.equipmentDetail.floorNoteSaved);
+    },
+    onError: () => toast.error(t.equipmentDetail.floorNoteSaveFailed),
+  });
 
   const scanMut = useMutation({
     mutationFn: async () => {
@@ -958,14 +973,72 @@ export default function EquipmentDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Floor note */}
-        {equipment.usuallyFoundHere && (
+        {/* Floor note — inline editable for technician+ */}
+        {editingFloorNote ? (
+          <div className="flex flex-col gap-2 rounded-xl border border-amber-200/60 bg-amber-50/60 dark:border-amber-800/30 dark:bg-amber-950/20 px-3.5 py-3">
+            <Textarea
+              autoFocus
+              value={floorNoteText}
+              onChange={(e) => setFloorNoteText(e.target.value.slice(0, 200))}
+              placeholder={t.equipmentDetail.floorNotePlaceholder}
+              className="min-h-[72px] resize-none text-xs bg-white/70 dark:bg-black/20 border-amber-200/60"
+              maxLength={200}
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-amber-700/60 dark:text-amber-400/60">
+                {floorNoteText.length}/200
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 text-xs"
+                  onClick={() => setEditingFloorNote(false)}
+                  disabled={floorNoteMut.isPending}
+                >
+                  {t.equipmentDetail.floorNoteCancel}
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => floorNoteMut.mutate(floorNoteText.trim() || null)}
+                  disabled={floorNoteMut.isPending}
+                >
+                  {floorNoteMut.isPending ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    t.equipmentDetail.floorNoteSave
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : equipment.usuallyFoundHere ? (
           <div className="flex items-start gap-2.5 rounded-xl border border-amber-200/60 bg-amber-50/60 dark:border-amber-800/30 dark:bg-amber-950/20 px-3.5 py-3">
             <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
-            <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-300">
+            <p className="flex-1 text-xs leading-relaxed text-amber-800 dark:text-amber-300">
               {equipment.usuallyFoundHere}
             </p>
+            {!isStudentEquipmentRole && (
+              <button
+                onClick={() => { setFloorNoteText(equipment.usuallyFoundHere ?? ""); setEditingFloorNote(true); }}
+                className="shrink-0 text-amber-500 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-200"
+                aria-label="Edit floor note"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
+        ) : (
+          !isStudentEquipmentRole && (
+            <button
+              onClick={() => { setFloorNoteText(""); setEditingFloorNote(true); }}
+              className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 px-1 py-0.5"
+            >
+              <Pencil className="h-3 w-3" />
+              {t.equipmentDetail.floorNoteAdd}
+            </button>
+          )
         )}
 
         {/* Staff note */}

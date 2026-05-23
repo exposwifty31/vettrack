@@ -314,7 +314,13 @@
     "backToList": "Back to list",
     "notFound": "Equipment not found",
     "sendWhatsApp": "Send WhatsApp",
-    "printQrButton": "Print QR"
+    "printQrButton": "Print QR",
+    "floorNoteAdd": "Add floor note",
+    "floorNotePlaceholder": "Where is this usually found?",
+    "floorNoteSave": "Save",
+    "floorNoteCancel": "Cancel",
+    "floorNoteSaved": "Floor note saved",
+    "floorNoteSaveFailed": "Failed to save floor note"
   },
   "newEquipment": {
     "heading": {

@@ -314,7 +314,13 @@
     "backToList": "חזרה לרשימה",
     "notFound": "הציוד לא נמצא",
     "sendWhatsApp": "שלח WhatsApp",
-    "printQrButton": "הדפס QR"
+    "printQrButton": "הדפס QR",
+    "floorNoteAdd": "הוסף הערת מיקום",
+    "floorNotePlaceholder": "היכן הציוד נמצא בדרך כלל?",
+    "floorNoteSave": "שמור",
+    "floorNoteCancel": "ביטול",
+    "floorNoteSaved": "הערת המיקום נשמרה",
+    "floorNoteSaveFailed": "שמירת הערת המיקום נכשלה"
   },
   "newEquipment": {
     "heading": {

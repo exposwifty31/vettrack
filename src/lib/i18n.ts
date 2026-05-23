@@ -172,6 +172,12 @@ const translations = {
     notFound: d.equipmentDetail.notFound,
     sendWhatsApp: d.equipmentDetail.sendWhatsApp,
     printQrButton: d.equipmentDetail.printQrButton,
+    floorNoteAdd: d.equipmentDetail.floorNoteAdd,
+    floorNotePlaceholder: d.equipmentDetail.floorNotePlaceholder,
+    floorNoteSave: d.equipmentDetail.floorNoteSave,
+    floorNoteCancel: d.equipmentDetail.floorNoteCancel,
+    floorNoteSaved: d.equipmentDetail.floorNoteSaved,
+    floorNoteSaveFailed: d.equipmentDetail.floorNoteSaveFailed,
     toast: {
       undone: d.equipmentDetail.toast.undone,
       undoFailed: d.equipmentDetail.toast.undoFailed,

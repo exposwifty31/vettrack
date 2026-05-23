@@ -318,6 +318,12 @@ export interface TStructure {
     notFound: string;
     sendWhatsApp: string;
     printQrButton: string;
+    floorNoteAdd: string;
+    floorNotePlaceholder: string;
+    floorNoteSave: string;
+    floorNoteCancel: string;
+    floorNoteSaved: string;
+    floorNoteSaveFailed: string;
   };
   newEquipment: {
     heading: {
