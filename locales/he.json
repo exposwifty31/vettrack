@@ -1151,7 +1151,9 @@
     "selectAll": "בחר הכל",
     "titleFull": "הדפסת QR — VetTrack",
     "trying": "מנסה...",
-    "retry": "נסה שוב"
+    "retry": "נסה שוב",
+    "selectUnconfirmed": "בחר לא מאושרים",
+    "pilotNeverBadge": "אף פעם"
   },
   "stabilityPage": {
     "allChecksHealthy": "כל הבדיקות תקינות",

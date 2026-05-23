@@ -122,6 +122,7 @@ export function AppRoutes() {
         <Route path="/er"><AuthGuard><ErCommandCenterPage /></AuthGuard></Route>
 
         {/* Admin + settings — always available */}
+        {isPilotMode && <Route path="/admin/equipment/print-qr"><AuthGuard><QrPrintPage /></AuthGuard></Route>}
         {isPilotMode && <Route path="/admin/pilot-coverage"><AuthGuard><AdminPilotCoveragePage /></AuthGuard></Route>}
         <Route path="/admin"><AuthGuard><AdminPage /></AuthGuard></Route>
         <Route path="/settings"><AuthGuard><SettingsPage /></AuthGuard></Route>

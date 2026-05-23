@@ -1151,7 +1151,9 @@
     "selectAll": "Select all",
     "titleFull": "Print QR — VetTrack",
     "trying": "Trying...",
-    "retry": "Retry"
+    "retry": "Retry",
+    "selectUnconfirmed": "Select unconfirmed",
+    "pilotNeverBadge": "Never"
   },
   "stabilityPage": {
     "allChecksHealthy": "All checks healthy",

@@ -1155,6 +1155,8 @@ export interface TStructure {
     titleFull: string;
     trying: string;
     retry: string;
+    selectUnconfirmed: string;
+    pilotNeverBadge: string;
   };
   stabilityPage: {
     allChecksHealthy: string;

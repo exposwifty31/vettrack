@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import type { Equipment } from "@/types";
 import { useAuth } from "@/hooks/use-auth";
+import { isPilotMode } from "@/lib/pilot-mode";
 
 export default function QrPrintPage() {
   const { userId } = useAuth();
@@ -38,12 +39,25 @@ export default function QrPrintPage() {
     refetchOnWindowFocus: false,
   });
 
-  const filtered = equipment?.filter(
+  const baseFiltered = equipment?.filter(
     (eq) =>
       !search ||
       eq.name.toLowerCase().includes(search.toLowerCase()) ||
       eq.serialNumber?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const filtered = isPilotMode && baseFiltered
+    ? [...baseFiltered].sort((a, b) => {
+        const aNever = a.lastSeen == null ? 0 : 1;
+        const bNever = b.lastSeen == null ? 0 : 1;
+        return aNever - bNever;
+      })
+    : baseFiltered;
+
+  const selectUnconfirmed = () => {
+    const unconfirmed = equipment?.filter((e) => e.lastSeen == null) ?? [];
+    setSelected(new Set(unconfirmed.map((e) => e.id)));
+  };
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -170,23 +184,36 @@ export default function QrPrintPage() {
         </div>
 
         {/* Select all / count */}
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleAll}
-            className="text-xs gap-1 h-11"
-            data-testid="btn-select-all"
-          >
-            {selected.size === (filtered?.length ?? 0) && filtered?.length! > 0 ? (
-              <CheckSquare className="w-4 h-4" />
-            ) : (
-              <Square className="w-4 h-4" />
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleAll}
+              className="text-xs gap-1 h-11"
+              data-testid="btn-select-all"
+            >
+              {selected.size === (filtered?.length ?? 0) && filtered?.length! > 0 ? (
+                <CheckSquare className="w-4 h-4" />
+              ) : (
+                <Square className="w-4 h-4" />
+              )}
+              {selected.size === (filtered?.length ?? 0) && filtered?.length! > 0
+                ? t.qrPrintPage.unselectAll
+                : t.qrPrintPage.selectAll}
+            </Button>
+            {isPilotMode && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={selectUnconfirmed}
+                className="text-xs gap-1 h-11 text-red-600 hover:text-red-700 hover:bg-red-50"
+                data-testid="btn-select-unconfirmed"
+              >
+                {t.qrPrintPage.selectUnconfirmed}
+              </Button>
             )}
-            {selected.size === (filtered?.length ?? 0) && filtered?.length! > 0
-              ? t.qrPrintPage.unselectAll
-              : t.qrPrintPage.selectAll}
-          </Button>
+          </div>
           {selected.size > 0 && (
             <span className="text-xs text-muted-foreground">
               {selected.size} selected
@@ -245,7 +272,14 @@ export default function QrPrintPage() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm">{eq.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-sm truncate">{eq.name}</p>
+                      {isPilotMode && eq.lastSeen == null && (
+                        <Badge variant="issue" className="text-[9px] py-0 px-1.5 h-4 shrink-0">
+                          {t.qrPrintPage.pilotNeverBadge}
+                        </Badge>
+                      )}
+                    </div>
                     {eq.serialNumber && (
                       <p className="text-xs text-muted-foreground">#{eq.serialNumber}</p>
                     )}

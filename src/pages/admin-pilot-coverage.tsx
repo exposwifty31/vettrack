@@ -10,7 +10,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { t } from "@/lib/i18n";
 import { formatRelativeTime } from "@/lib/utils";
-import { ArrowLeft, MapPin } from "lucide-react";
+import { ArrowLeft, MapPin, Printer } from "lucide-react";
 import type { PilotCoverageItem } from "@/types";
 import { isPilotMode } from "@/lib/pilot-mode";
 
@@ -61,7 +61,16 @@ export default function AdminPilotCoveragePage() {
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <h1 className="text-xl font-semibold">{t.adminPilotCoverage.title}</h1>
+          <h1 className="text-xl font-semibold flex-1">{t.adminPilotCoverage.title}</h1>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 shrink-0"
+            onClick={() => navigate("/admin/equipment/print-qr")}
+          >
+            <Printer className="w-4 h-4" />
+            {t.qrPrintPage.title}
+          </Button>
         </div>
 
         {/* Summary strip */}
