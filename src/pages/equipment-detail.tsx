@@ -329,7 +329,9 @@ export default function EquipmentDetailPage() {
     mutationFn: (note: string | null) =>
       api.equipment.update(id!, { usuallyFoundHere: note }),
     onSuccess: (updated) => {
-      queryClient.setQueryData([`/api/equipment/${id}`], updated);
+      queryClient.setQueryData<Equipment>([`/api/equipment/${id}`], (prev) =>
+        prev ? { ...prev, ...updated } : prev
+      );
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       setEditingFloorNote(false);
       toast.success(t.equipmentDetail.floorNoteSaved);
