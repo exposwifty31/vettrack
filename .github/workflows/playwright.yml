@@ -84,11 +84,6 @@ jobs:
         run: pnpm dev:api > /tmp/vettrack-playwright.log 2>&1 &
         env:
           PLAYWRIGHT_E2E: "true"
-          # The e2e/flows specs pre-date the V1 operational state layer and test
-          # the legacy checkout/return paths directly. Disable V1 so those tests
-          # continue to exercise the original behaviour without requiring a full
-          # dock-return setup cycle.
-          DISABLE_EQUIPMENT_OPERATIONAL_STATE_V1: "true"
 
       - name: ⏳ Wait for API readiness
         run: |

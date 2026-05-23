@@ -2629,7 +2629,6 @@
     "autoRefreshHint": "Auto-refreshes every 30 seconds. The background recovery scheduler re-processes failed jobs when the worker is running."
   },
   "operationalState": {
-    "featureDisabled": "Operational readiness feature is disabled.",
     "invalidCustodyForDockReturn": "Dock return requires custody state: returned or docked.",
     "noAssetTypeDefined": "Equipment has no asset type assigned.",
     "crossClinicAssociation": "Resource belongs to a different clinic.",

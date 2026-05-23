@@ -4,15 +4,12 @@ import { logAudit } from "../lib/audit.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
 import {
   computeBundleReadinessGate,
-  isOperationalStateFeatureEnabled,
 } from "../services/equipment-operational-state.service.js";
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
 
 const STALENESS_SWEEP_INTERVAL_MS = 15 * 60 * 1000;
 
 export async function runEquipmentConditionStalenessSweep(now: Date = new Date()): Promise<{ scanned: number; markedNotReady: number }> {
-  if (!isOperationalStateFeatureEnabled()) return { scanned: 0, markedNotReady: 0 };
-
   // Scan only docked+ready equipment that has an asset type
   const candidates = await db
     .select()
@@ -96,8 +93,6 @@ let _intervalId: ReturnType<typeof setInterval> | null = null;
 
 export function startEquipmentConditionStalenessWorker(): void {
   if (_intervalId !== null) return;
-  if (!isOperationalStateFeatureEnabled()) return;
-
   _intervalId = setInterval(() => {
     runEquipmentConditionStalenessSweep().catch((err) => {
       console.error("[staleness-worker] sweep failed:", err);

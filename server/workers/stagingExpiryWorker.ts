@@ -2,14 +2,11 @@ import { and, eq, isNotNull, lt, sql } from "drizzle-orm";
 import { db, equipment, stagingQueue } from "../db.js";
 import { logAudit } from "../lib/audit.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
-import { isOperationalStateFeatureEnabled } from "../services/equipment-operational-state.service.js";
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
 
 const EXPIRY_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
 export async function runStagingExpirySweep(now: Date = new Date()): Promise<{ expiredClaims: number; releasedEquipment: number }> {
-  if (!isOperationalStateFeatureEnabled()) return { expiredClaims: 0, releasedEquipment: 0 };
-
   // Expire all active claims whose expires_at < now.
   // RETURNING avoids a separate SELECT and prevents race where a claim is fulfilled mid-sweep.
   const expiredRows = await db
@@ -123,8 +120,6 @@ let _intervalId: ReturnType<typeof setInterval> | null = null;
 
 export function startStagingExpiryWorker(): void {
   if (_intervalId !== null) return;
-  if (!isOperationalStateFeatureEnabled()) return;
-
   _intervalId = setInterval(() => {
     runStagingExpirySweep().catch((err) => {
       console.error("[staging-expiry-worker] sweep failed:", err);

@@ -14,7 +14,7 @@ import { trackSyncSuccess, trackSyncFail } from "../lib/sync-metrics.js";
 import { scheduleSmartReturnReminder, cancelSmartReturnReminder } from "../lib/role-notification-scheduler.js";
 import { recordEquipmentSeen } from "../lib/equipment-seen.js";
 import { getPilotStaleMs } from "../lib/pilot-config.js";
-import { isOperationalStateFeatureEnabled, computeBundleReadinessGate } from "../services/equipment-operational-state.service.js";
+import { computeBundleReadinessGate } from "../services/equipment-operational-state.service.js";
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
 
@@ -1289,145 +1289,144 @@ router.post(
     let v1StageClaimId: string | null = null;
     let v1NewUsageState: "in_use" | "emergency_use" = "in_use";
 
-    if (isOperationalStateFeatureEnabled()) {
-      const [snap] = await db
-        .select()
-        .from(equipment)
-        .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id), isNull(equipment.deletedAt)))
-        .limit(1);
+    const [snap] = await db
+      .select()
+      .from(equipment)
+      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id), isNull(equipment.deletedAt)))
+      .limit(1);
 
-      if (snap) {
-        // A. untracked → 422 (NFC scan not possible — also blocks emergency)
-        if (snap.custodyState === "untracked") {
-          void recordOperationalMetric({ clinicId, equipmentId: snap.id, userId: req.authUser!.id, eventType: "custody_chain_broken" });
-          return res.status(422).json({ code: "CUSTODY_CHAIN_BROKEN", error: "Equipment custody chain is broken" });
+    if (snap) {
+      // A. untracked → 422 (NFC scan not possible — also blocks emergency)
+      if (snap.custodyState === "untracked") {
+        void recordOperationalMetric({ clinicId, equipmentId: snap.id, userId: req.authUser!.id, eventType: "custody_chain_broken" });
+        return res.status(422).json({ code: "CUSTODY_CHAIN_BROKEN", error: "Equipment custody chain is broken" });
+      }
+
+      // B. checked_out → 422 (no double-checkout — also blocks emergency)
+      if (snap.custodyState === "checked_out") {
+        return res.status(409).json({ code: "ALREADY_CHECKED_OUT", error: "Equipment is already checked out" });
+      }
+
+      // C. Emergency — must be before usageState checks to bypass staged
+      if (isEmergency) {
+        if (!emergencyReason) {
+          return res.status(422).json({ code: "EMERGENCY_REASON_REQUIRED", error: "emergencyReason is required for emergency checkout" });
         }
+        const capturedVersion = snap.version;
+        const now = new Date();
+        try {
+          await db.transaction(async (tx) => {
+            // Cancel all active staging claims
+            await tx.update(stagingQueue)
+              .set({ status: "cancelled", updatedAt: now })
+              .where(and(eq(stagingQueue.equipmentId, snap.id), eq(stagingQueue.status, "active")));
 
-        // B. checked_out → 422 (no double-checkout — also blocks emergency)
-        if (snap.custodyState === "checked_out") {
-          return res.status(409).json({ code: "ALREADY_CHECKED_OUT", error: "Equipment is already checked out" });
-        }
+            // Set emergency state
+            const emergencyUpdate = await tx
+              .update(equipment)
+              .set({
+                custodyState: "checked_out",
+                custodyStateSince: now,
+                readinessState: "unknown",
+                readinessStateSince: now,
+                usageState: "emergency_use",
+                usageStateSince: now,
+                emergencyOverrideAt: now,
+                emergencyOverrideById: req.authUser!.id,
+                checkedOutById: req.authUser!.id,
+                checkedOutByEmail: req.authUser!.email,
+                checkedOutAt: now,
+                checkedOutLocation: location ?? null,
+                lastSeen: now,
+                lastStatus: snap.status,
+                version: sql`${equipment.version} + 1`,
+              })
+              .where(and(
+                eq(equipment.clinicId, clinicId),
+                eq(equipment.id, snap.id),
+                inArray(equipment.custodyState, ["docked", "returned"]),
+                eq(equipment.version, capturedVersion),
+              ));
 
-        // C. Emergency — must be before usageState checks to bypass staged
-        if (isEmergency) {
-          if (!emergencyReason) {
-            return res.status(422).json({ code: "EMERGENCY_REASON_REQUIRED", error: "emergencyReason is required for emergency checkout" });
-          }
-          const capturedVersion = snap.version;
-          const now = new Date();
-          try {
-            await db.transaction(async (tx) => {
-              // Cancel all active staging claims
-              await tx.update(stagingQueue)
-                .set({ status: "cancelled", updatedAt: now })
-                .where(and(eq(stagingQueue.equipmentId, snap.id), eq(stagingQueue.status, "active")));
-
-              // Set emergency state
-              const emergencyUpdate = await tx
-                .update(equipment)
-                .set({
-                  custodyState: "checked_out",
-                  custodyStateSince: now,
-                  readinessState: "unknown",
-                  readinessStateSince: now,
-                  usageState: "emergency_use",
-                  usageStateSince: now,
-                  emergencyOverrideAt: now,
-                  emergencyOverrideById: req.authUser!.id,
-                  checkedOutById: req.authUser!.id,
-                  checkedOutByEmail: req.authUser!.email,
-                  checkedOutAt: now,
-                  checkedOutLocation: location ?? null,
-                  lastSeen: now,
-                  lastStatus: snap.status,
-                  version: sql`${equipment.version} + 1`,
-                })
-                .where(and(
-                  eq(equipment.clinicId, clinicId),
-                  eq(equipment.id, snap.id),
-                  inArray(equipment.custodyState, ["docked", "returned"]),
-                  eq(equipment.version, capturedVersion),
-                ));
-
-              if ((emergencyUpdate as unknown as { rowCount?: number }).rowCount === 0) {
-                throw new Error("VERSION_CONFLICT");
-              }
-
-              await insertRealtimeDomainEvent(tx, {
-                clinicId,
-                type: "EQUIPMENT_EMERGENCY_CHECKOUT",
-                payload: { equipmentId: snap.id, emergencyReason },
-              });
-            });
-          } catch (err) {
-            if (err instanceof Error && err.message === "VERSION_CONFLICT") {
-              return res.status(409).json({ code: "VERSION_CONFLICT", error: "Version conflict, please retry" });
+            if ((emergencyUpdate as unknown as { rowCount?: number }).rowCount === 0) {
+              throw new Error("VERSION_CONFLICT");
             }
-            throw err;
-          }
 
-          logAudit({
-            clinicId,
-            actionType: "equipment_emergency_checkout",
-            performedBy: req.authUser!.id,
-            performedByEmail: req.authUser!.email,
-            targetId: snap.id,
-            metadata: { emergencyReason },
+            await insertRealtimeDomainEvent(tx, {
+              clinicId,
+              type: "EQUIPMENT_EMERGENCY_CHECKOUT",
+              payload: { equipmentId: snap.id, emergencyReason },
+            });
           });
-          void recordOperationalMetric({ clinicId, equipmentId: snap.id, userId: req.authUser!.id, eventType: "emergency_override", metadata: { emergencyReason } });
-
-          const [freshEq] = await db.select().from(equipment).where(eq(equipment.id, snap.id));
-          return res.json({ equipment: freshEq, undoToken: "" });
+        } catch (err) {
+          if (err instanceof Error && err.message === "VERSION_CONFLICT") {
+            return res.status(409).json({ code: "VERSION_CONFLICT", error: "Version conflict, please retry" });
+          }
+          throw err;
         }
 
-        // D. staged + top-claim-holder
-        if (snap.usageState === "staged") {
-          const claims = await db
-            .select()
-            .from(stagingQueue)
-            .where(and(eq(stagingQueue.equipmentId, snap.id), eq(stagingQueue.clinicId, clinicId), eq(stagingQueue.status, "active")))
-            .orderBy(
-              sql`CASE ${stagingQueue.clinicalPriority} WHEN 'emergency' THEN 3 WHEN 'urgent' THEN 2 WHEN 'routine' THEN 1 ELSE 0 END DESC`,
-              stagingQueue.stagedAt,
-            );
+        logAudit({
+          clinicId,
+          actionType: "equipment_emergency_checkout",
+          performedBy: req.authUser!.id,
+          performedByEmail: req.authUser!.email,
+          targetId: snap.id,
+          metadata: { emergencyReason },
+        });
+        void recordOperationalMetric({ clinicId, equipmentId: snap.id, userId: req.authUser!.id, eventType: "emergency_override", metadata: { emergencyReason } });
 
-          const topClaim = claims[0];
-          if (!topClaim || topClaim.requestedById !== req.authUser!.id) {
-            return res.status(409).json({ code: "STAGING_CONFLICT", error: "You are not the top priority claim holder", queue: claims });
-          }
+        const [freshEq] = await db.select().from(equipment).where(eq(equipment.id, snap.id));
+        return res.json({ equipment: freshEq, undoToken: "" });
+      }
 
-          const allConditions = snap.assetTypeId
-            ? await db.select().from(assetTypeConditions).where(eq(assetTypeConditions.assetTypeId, snap.assetTypeId))
-            : [];
-          const condStates = snap.assetTypeId
-            ? await db.select().from(unitConditionStates).where(eq(unitConditionStates.equipmentId, snap.id))
-            : [];
-          const gateResult = computeBundleReadinessGate(snap, condStates, allConditions, new Date(), true);
-          if (!("skipped" in gateResult) && !gateResult.ok) {
-            void recordOperationalMetric({ clinicId, equipmentId: snap.id, userId: req.authUser!.id, eventType: "bundle_failed", metadata: { reason: gateResult.reason, failedConditions: gateResult.failedConditions, staleConditions: gateResult.staleConditions, unknownConditions: gateResult.unknownConditions } });
-            return res.status(422).json({ code: "BUNDLE_INCOMPLETE", ...gateResult });
-          }
+      // D. staged + top-claim-holder
+      if (snap.usageState === "staged") {
+        const claims = await db
+          .select()
+          .from(stagingQueue)
+          .where(and(eq(stagingQueue.equipmentId, snap.id), eq(stagingQueue.clinicId, clinicId), eq(stagingQueue.status, "active")))
+          .orderBy(
+            sql`CASE ${stagingQueue.clinicalPriority} WHEN 'emergency' THEN 3 WHEN 'urgent' THEN 2 WHEN 'routine' THEN 1 ELSE 0 END DESC`,
+            stagingQueue.stagedAt,
+          );
 
-          v1StageClaimId = topClaim.id;
-        } else if (snap.usageState === "available") {
-          // E. available — check bundle gate
-          const allConditions = snap.assetTypeId
-            ? await db.select().from(assetTypeConditions).where(eq(assetTypeConditions.assetTypeId, snap.assetTypeId))
-            : [];
-          const condStates = snap.assetTypeId
-            ? await db.select().from(unitConditionStates).where(eq(unitConditionStates.equipmentId, snap.id))
-            : [];
-          const gateResult = computeBundleReadinessGate(snap, condStates, allConditions, new Date(), true);
-          if (!("skipped" in gateResult) && !gateResult.ok) {
-            void recordOperationalMetric({ clinicId, equipmentId: snap.id, userId: req.authUser!.id, eventType: "bundle_failed", metadata: { reason: gateResult.reason, failedConditions: gateResult.failedConditions, staleConditions: gateResult.staleConditions, unknownConditions: gateResult.unknownConditions } });
-            return res.status(422).json({ code: "BUNDLE_INCOMPLETE", ...gateResult });
-          }
-        } else {
-          // F. any other usageState
-          return res.status(422).json({ code: "EQUIPMENT_UNAVAILABLE", error: `Equipment usage state ${snap.usageState} blocks checkout` });
+        const topClaim = claims[0];
+        if (!topClaim || topClaim.requestedById !== req.authUser!.id) {
+          return res.status(409).json({ code: "STAGING_CONFLICT", error: "You are not the top priority claim holder", queue: claims });
         }
+
+        const allConditions = snap.assetTypeId
+          ? await db.select().from(assetTypeConditions).where(eq(assetTypeConditions.assetTypeId, snap.assetTypeId))
+          : [];
+        const condStates = snap.assetTypeId
+          ? await db.select().from(unitConditionStates).where(eq(unitConditionStates.equipmentId, snap.id))
+          : [];
+        const gateResult = computeBundleReadinessGate(snap, condStates, allConditions, new Date(), true);
+        if (!("skipped" in gateResult) && !gateResult.ok) {
+          void recordOperationalMetric({ clinicId, equipmentId: snap.id, userId: req.authUser!.id, eventType: "bundle_failed", metadata: { reason: gateResult.reason, failedConditions: gateResult.failedConditions, staleConditions: gateResult.staleConditions, unknownConditions: gateResult.unknownConditions } });
+          return res.status(422).json({ code: "BUNDLE_INCOMPLETE", ...gateResult });
+        }
+
+        v1StageClaimId = topClaim.id;
+      } else if (snap.usageState === "available") {
+        // E. available — check bundle gate
+        const allConditions = snap.assetTypeId
+          ? await db.select().from(assetTypeConditions).where(eq(assetTypeConditions.assetTypeId, snap.assetTypeId))
+          : [];
+        const condStates = snap.assetTypeId
+          ? await db.select().from(unitConditionStates).where(eq(unitConditionStates.equipmentId, snap.id))
+          : [];
+        const gateResult = computeBundleReadinessGate(snap, condStates, allConditions, new Date(), true);
+        if (!("skipped" in gateResult) && !gateResult.ok) {
+          void recordOperationalMetric({ clinicId, equipmentId: snap.id, userId: req.authUser!.id, eventType: "bundle_failed", metadata: { reason: gateResult.reason, failedConditions: gateResult.failedConditions, staleConditions: gateResult.staleConditions, unknownConditions: gateResult.unknownConditions } });
+          return res.status(422).json({ code: "BUNDLE_INCOMPLETE", ...gateResult });
+        }
+      } else {
+        // F. any other usageState
+        return res.status(422).json({ code: "EQUIPMENT_UNAVAILABLE", error: `Equipment usage state ${snap.usageState} blocks checkout` });
       }
     }
+
     // ─────────────────────────────────────────────────────────────────
 
     await db.transaction(async (tx) => {
@@ -1450,15 +1449,11 @@ router.post(
         lastSeen: checkoutTime,
         lastStatus: existing.status,
         // V1 operational state additions
-        ...(isOperationalStateFeatureEnabled()
-          ? {
-              custodyState: "checked_out" as const,
-              custodyStateSince: checkoutTime,
-              usageState: v1NewUsageState,
-              usageStateSince: checkoutTime,
-              version: sql`${equipment.version} + 1`,
-            }
-          : {}),
+        custodyState: "checked_out" as const,
+        custodyStateSince: checkoutTime,
+        usageState: v1NewUsageState,
+        usageStateSince: checkoutTime,
+        version: sql`${equipment.version} + 1`,
       };
 
       let updatedRow: EquipmentRow | undefined;
@@ -1547,13 +1542,11 @@ router.post(
       }
 
       // V1: realtime event
-      if (isOperationalStateFeatureEnabled()) {
-        await insertRealtimeDomainEvent(tx, {
+      await insertRealtimeDomainEvent(tx, {
           clinicId,
           type: "EQUIPMENT_CUSTODY_STATE_CHANGED",
           payload: { equipmentId: req.params.id, custodyState: "checked_out", usageState: v1NewUsageState },
         });
-      }
     });
 
     if (!updated) {
@@ -1694,41 +1687,39 @@ router.post("/:id/return", requireAuth, checkoutLimiter, requireEffectiveRole("s
       });
 
       // Operational state V1: update custody/readiness/usage state
-      if (isOperationalStateFeatureEnabled()) {
-        const [activeClaims] = await tx
-          .select({ count: sql<number>`count(*)` })
-          .from(stagingQueue)
-          .where(and(
-            eq(stagingQueue.equipmentId, req.params.id),
-            eq(stagingQueue.clinicId, clinicId),
-            eq(stagingQueue.status, "active"),
-          ));
+      const [activeClaims] = await tx
+        .select({ count: sql<number>`count(*)` })
+        .from(stagingQueue)
+        .where(and(
+          eq(stagingQueue.equipmentId, req.params.id),
+          eq(stagingQueue.clinicId, clinicId),
+          eq(stagingQueue.status, "active"),
+        ));
         const hasActiveClaims = Number(activeClaims?.count ?? 0) > 0;
 
         await tx
-          .update(equipment)
-          .set({
-            custodyState: "returned",
-            custodyStateSince: returnTime,
-            readinessState: "unknown",
-            readinessStateSince: returnTime,
-            usageState: hasActiveClaims ? "staged" : "available",
-            usageStateSince: returnTime,
-            version: sql`${equipment.version} + 1`,
-          })
-          .where(and(
-            eq(equipment.clinicId, clinicId),
-            eq(equipment.id, req.params.id),
-            eq(equipment.custodyState, "checked_out"),
-            eq(equipment.version, existing.version),
-          ));
+        .update(equipment)
+        .set({
+          custodyState: "returned",
+          custodyStateSince: returnTime,
+          readinessState: "unknown",
+          readinessStateSince: returnTime,
+          usageState: hasActiveClaims ? "staged" : "available",
+          usageStateSince: returnTime,
+          version: sql`${equipment.version} + 1`,
+        })
+        .where(and(
+          eq(equipment.clinicId, clinicId),
+          eq(equipment.id, req.params.id),
+          eq(equipment.custodyState, "checked_out"),
+          eq(equipment.version, existing.version),
+        ));
 
         await insertRealtimeDomainEvent(tx, {
-          clinicId,
-          type: "EQUIPMENT_CUSTODY_STATE_CHANGED",
-          payload: { equipmentId: req.params.id, custodyState: "returned", hasActiveClaims },
+        clinicId,
+        type: "EQUIPMENT_CUSTODY_STATE_CHANGED",
+        payload: { equipmentId: req.params.id, custodyState: "returned", hasActiveClaims },
         });
-      }
     });
 
     if (!updated) {

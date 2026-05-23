@@ -242,5 +242,4 @@ dock confirmation UX.
 - Open questions Q1–Q3 resolved
 - Pilot hospital has identified the physical FAST dock location
 - vt_docks and vt_equipment_staging_queue migration files generated and reviewed
-- Kill switch in Railway: DISABLE_EQUIPMENT_STATE_V1 to revert to
-  scan-only model if V1 causes operational disruption
+- Rollback plan documented if V1 causes operational disruption (deploy revert)

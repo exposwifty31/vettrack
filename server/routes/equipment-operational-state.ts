@@ -19,16 +19,12 @@ import {
   computeBundleReadinessGate,
   computeStagingExpiry,
   isEquipmentFullyDeployable,
-  isOperationalStateFeatureEnabled,
 } from "../services/equipment-operational-state.service.js";
 import { apiError } from "../lib/apiError.js";
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
 
 const router = Router();
 
-function featureDisabledResponse(req: import("express").Request, res: import("express").Response) {
-  return apiError(req, res, "operationalState.featureDisabled", undefined, 501);
-}
 
 // ─── Docks ──────────────────────────────────────────────────────────────────
 
@@ -39,7 +35,6 @@ const createDockSchema = z.object({
 });
 
 router.post("/docks", requireAuth, requireAdmin, validateBody(createDockSchema), async (req, res) => {
-  if (!isOperationalStateFeatureEnabled()) return featureDisabledResponse(req, res);
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
   const { name, description, roomId } = req.body as z.infer<typeof createDockSchema>;
@@ -53,7 +48,6 @@ router.post("/docks", requireAuth, requireAdmin, validateBody(createDockSchema),
 });
 
 router.get("/docks", requireAuth, async (req, res) => {
-  if (!isOperationalStateFeatureEnabled()) return featureDisabledResponse(req, res);
   const clinicId = req.clinicId!;
 
   const rows = await db.select().from(docks).where(eq(docks.clinicId, clinicId));
@@ -67,7 +61,6 @@ const createAssetTypeSchema = z.object({
 });
 
 router.post("/asset-types", requireAuth, requireAdmin, validateBody(createAssetTypeSchema), async (req, res) => {
-  if (!isOperationalStateFeatureEnabled()) return featureDisabledResponse(req, res);
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
   const { name } = req.body as z.infer<typeof createAssetTypeSchema>;
@@ -88,7 +81,6 @@ const createConditionSchema = z.object({
 });
 
 router.post("/asset-types/:assetTypeId/conditions", requireAuth, requireAdmin, validateBody(createConditionSchema), async (req, res) => {
-  if (!isOperationalStateFeatureEnabled()) return featureDisabledResponse(req, res);
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
   const { assetTypeId } = req.params;
@@ -112,7 +104,6 @@ router.post("/asset-types/:assetTypeId/conditions", requireAuth, requireAdmin, v
 });
 
 router.get("/asset-types/:assetTypeId/conditions", requireAuth, async (req, res) => {
-  if (!isOperationalStateFeatureEnabled()) return featureDisabledResponse(req, res);
   const clinicId = req.clinicId!;
   const { assetTypeId } = req.params;
 
@@ -131,7 +122,6 @@ router.get("/asset-types/:assetTypeId/conditions", requireAuth, async (req, res)
 // ─── Equipment: Deployability ─────────────────────────────────────────────────
 
 router.get("/equipment/:equipmentId/deployability", requireAuth, async (req, res) => {
-  if (!isOperationalStateFeatureEnabled()) return featureDisabledResponse(req, res);
   const clinicId = req.clinicId!;
   const { equipmentId } = req.params;
 
@@ -173,7 +163,6 @@ const dockReturnSchema = z.object({
 });
 
 router.post("/equipment/:equipmentId/dock-return", requireAuth, validateBody(dockReturnSchema), async (req, res) => {
-  if (!isOperationalStateFeatureEnabled()) return featureDisabledResponse(req, res);
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
   const { equipmentId } = req.params;
@@ -323,7 +312,6 @@ const stageSchema = z.object({
 });
 
 router.post("/equipment/:equipmentId/stage", requireAuth, validateBody(stageSchema), async (req, res) => {
-  if (!isOperationalStateFeatureEnabled()) return featureDisabledResponse(req, res);
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
   const { equipmentId } = req.params;
@@ -428,7 +416,6 @@ router.post("/equipment/:equipmentId/stage", requireAuth, validateBody(stageSche
 });
 
 router.delete("/equipment/:equipmentId/stage/:claimId", requireAuth, async (req, res) => {
-  if (!isOperationalStateFeatureEnabled()) return featureDisabledResponse(req, res);
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
   const { equipmentId, claimId } = req.params;
@@ -498,7 +485,6 @@ router.delete("/equipment/:equipmentId/stage/:claimId", requireAuth, async (req,
 });
 
 router.get("/equipment/:equipmentId/staging-queue", requireAuth, async (req, res) => {
-  if (!isOperationalStateFeatureEnabled()) return featureDisabledResponse(req, res);
   const clinicId = req.clinicId!;
   const { equipmentId } = req.params;
 
