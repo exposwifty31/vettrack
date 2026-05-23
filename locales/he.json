@@ -320,7 +320,11 @@
     "floorNoteSave": "שמור",
     "floorNoteCancel": "ביטול",
     "floorNoteSaved": "הערת המיקום נשמרה",
-    "floorNoteSaveFailed": "שמירת הערת המיקום נכשלה"
+    "floorNoteSaveFailed": "שמירת הערת המיקום נכשלה",
+    "confirmHere": "אשר כאן",
+    "confirmedHere": "אושר!",
+    "scanCount": "אושר {count} פעמים",
+    "scanCountOnce": "אושר פעם אחת"
   },
   "newEquipment": {
     "heading": {

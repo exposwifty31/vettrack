@@ -178,6 +178,11 @@ const translations = {
     floorNoteCancel: d.equipmentDetail.floorNoteCancel,
     floorNoteSaved: d.equipmentDetail.floorNoteSaved,
     floorNoteSaveFailed: d.equipmentDetail.floorNoteSaveFailed,
+    confirmHere: d.equipmentDetail.confirmHere,
+    confirmedHere: d.equipmentDetail.confirmedHere,
+    scanCount: (count: number) => count === 1
+      ? d.equipmentDetail.scanCountOnce
+      : tr(d.equipmentDetail.scanCount, { count }),
     toast: {
       undone: d.equipmentDetail.toast.undone,
       undoFailed: d.equipmentDetail.toast.undoFailed,

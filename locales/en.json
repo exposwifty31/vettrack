@@ -320,7 +320,11 @@
     "floorNoteSave": "Save",
     "floorNoteCancel": "Cancel",
     "floorNoteSaved": "Floor note saved",
-    "floorNoteSaveFailed": "Failed to save floor note"
+    "floorNoteSaveFailed": "Failed to save floor note",
+    "confirmHere": "Confirm here",
+    "confirmedHere": "Confirmed!",
+    "scanCount": "Confirmed {count} times",
+    "scanCountOnce": "Confirmed once"
   },
   "newEquipment": {
     "heading": {

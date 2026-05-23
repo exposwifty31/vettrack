@@ -87,6 +87,7 @@ import { playCriticalAlertTone } from "@/lib/sounds";
 import { haptics } from "@/lib/haptics";
 import { safeStorageSetItem } from "@/lib/safe-browser";
 import { isOnline } from "@/lib/safe-browser";
+import { isPilotMode } from "@/lib/pilot-mode";
 
 const STATUS_CONFIG = {
   ok: { icon: CheckCircle2, color: "text-emerald-600", iconBg: "bg-emerald-50" },
@@ -147,6 +148,8 @@ export default function EquipmentDetailPage() {
 
   const [editingFloorNote, setEditingFloorNote] = useState(false);
   const [floorNoteText, setFloorNoteText] = useState("");
+  const [confirmingHere, setConfirmingHere] = useState(false);
+  const [justConfirmed, setJustConfirmed] = useState(false);
 
   const [moveRoomOpen, setMoveRoomOpen] = useState(false);
   const [reportIssueOpen, setReportIssueOpen] = useState(false);
@@ -321,6 +324,23 @@ export default function EquipmentDetailPage() {
     queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
     queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
     queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
+  }
+
+  async function handleConfirmHere() {
+    if (confirmingHere || !id) return;
+    setConfirmingHere(true);
+    try {
+      await api.equipment.scan(id, { status: "ok" });
+      queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}/logs`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      setJustConfirmed(true);
+      setTimeout(() => setJustConfirmed(false), 1500);
+    } catch {
+      toast.error("Couldn't confirm — check connection");
+    } finally {
+      setConfirmingHere(false);
+    }
   }
 
   const isOffline = !isOnline();
@@ -810,8 +830,28 @@ export default function EquipmentDetailPage() {
 
         {/* Quick Action Bar — ICU-moment: 1–2 large, instantly tappable actions */}
         <div className="flex flex-col gap-2" data-testid="quick-action-bar">
-          {/* Primary action based on checkout state */}
-          {!isCheckedOut ? (
+          {/* Pilot mode: Confirm here replaces checkout/return */}
+          {isPilotMode ? (
+            <Button
+              className={cn(
+                "w-full h-12 gap-2 text-sm font-semibold rounded-2xl active:scale-[0.98] transition-all",
+                justConfirmed
+                  ? "bg-emerald-600 hover:bg-emerald-600 text-white border-emerald-600"
+                  : "border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/50",
+              )}
+              variant="outline"
+              onClick={handleConfirmHere}
+              disabled={confirmingHere}
+              data-testid="btn-confirm-here"
+            >
+              {confirmingHere ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
+              {justConfirmed ? t.equipmentDetail.confirmedHere : t.equipmentDetail.confirmHere}
+            </Button>
+          ) : !isCheckedOut ? (
             <Button
               variant="outline"
               className="w-full h-12 gap-2 text-sm font-semibold rounded-2xl active:scale-[0.98] transition-all border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -881,8 +921,8 @@ export default function EquipmentDetailPage() {
             )}
           </div>
 
-          {/* In-use context indicator */}
-          {isCheckedOut && (
+          {/* In-use context indicator — full-platform only */}
+          {!isPilotMode && isCheckedOut && (
             <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border/60 bg-muted/50 text-sm">
               <User className="w-4 h-4 shrink-0" />
               <div className="min-w-0">
@@ -974,6 +1014,14 @@ export default function EquipmentDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Pilot: scan count — no names, aggregate only */}
+        {isPilotMode && scanLogsPages && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+            <span>{t.equipmentDetail.scanCount(scanLogsPages.pages[0]?.total ?? 0)}</span>
+          </div>
+        )}
 
         {/* Floor note — inline editable for technician+ */}
         {editingFloorNote ? (

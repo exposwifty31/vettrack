@@ -324,6 +324,10 @@ export interface TStructure {
     floorNoteCancel: string;
     floorNoteSaved: string;
     floorNoteSaveFailed: string;
+    confirmHere: string;
+    confirmedHere: string;
+    scanCount: string;
+    scanCountOnce: string;
   };
   newEquipment: {
     heading: {
