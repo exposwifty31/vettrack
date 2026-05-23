@@ -1915,7 +1915,9 @@ router.get("/:id/logs", requireAuth, async (req, res) => {
       .from(scanLogs)
       .where(baseWhere);
 
-    const items = await db
+    const isAdmin = req.authUser?.role === "admin";
+
+    const rows = await db
       .select({
         id: scanLogs.id,
         clinicId: scanLogs.clinicId,
@@ -1935,6 +1937,11 @@ router.get("/:id/logs", requireAuth, async (req, res) => {
       .orderBy(desc(scanLogs.timestamp))
       .limit(limit)
       .offset(offset);
+
+    // Attribution boundary: staff name/role only on admin (audit) surfaces.
+    const items = isAdmin
+      ? rows
+      : rows.map(({ staffName: _sn, staffRole: _sr, ...rest }) => rest);
 
     res.json({ items, total, page, pageSize: limit, hasMore: offset + items.length < total });
   } catch (err) {

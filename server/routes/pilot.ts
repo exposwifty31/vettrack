@@ -18,7 +18,7 @@ const patchConfigSchema = z.object({
     .max(MAX_STALE_MS, "Maximum 7 days"),
 });
 
-router.get("/config", requireAuth, requireAdmin, async (req, res) => {
+router.get("/config", requireAuth, async (req, res) => {
   const staleMs = await getPilotStaleMs();
   res.json({ staleMs, default: PILOT_STALE_MS_DEFAULT });
 });

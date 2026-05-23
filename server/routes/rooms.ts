@@ -231,8 +231,10 @@ router.get("/:id/activity", requireAuth, async (req, res) => {
       .orderBy(desc(scanLogs.timestamp))
       .limit(5);
 
+    const isAdmin = req.authUser?.role === "admin";
     res.json(
-      entries.map((e) => ({
+      entries.map(({ userName, ...e }) => ({
+        ...(isAdmin ? { userName } : {}),
         ...e,
         timestamp: new Date(e.timestamp).toISOString(),
       }))
