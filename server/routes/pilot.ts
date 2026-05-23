@@ -10,7 +10,7 @@ const router = Router();
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const MAX_STALE_MS = 7 * 24 * ONE_HOUR_MS; // 7 days
 
-const patchConfigSchema = z.object({
+export const patchConfigSchema = z.object({
   staleMs: z
     .number()
     .int()
