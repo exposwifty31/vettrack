@@ -1019,6 +1019,16 @@ export const api = {
         throw err;
       }
     },
+    logsAdmin: async (
+      id: string,
+      since?: string
+    ): Promise<{ items: ScanLog[]; total: number; page: number; pageSize: number; hasMore: boolean }> => {
+      const params = new URLSearchParams({ limit: "200" });
+      if (since) params.set("since", since);
+      return request<{ items: ScanLog[]; total: number; page: number; pageSize: number; hasMore: boolean }>(
+        `/api/equipment/${id}/logs?${params}`
+      );
+    },
     transfers: (id: string) =>
       requestWithOfflineFallback<TransferLog[]>(
         `/api/equipment/${id}/transfers`,

@@ -328,6 +328,11 @@ export interface TStructure {
     confirmedHere: string;
     scanCount: string;
     scanCountOnce: string;
+    scanLogTab: string;
+    scanLogToday: string;
+    scanLogWeek: string;
+    scanLogAll: string;
+    scanLogEmpty: string;
   };
   newEquipment: {
     heading: {

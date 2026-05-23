@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import multer from "multer";
 import { z } from "zod";
 import { db, equipment, equipmentReturns, folders, rooms, scanLogs, transferLogs, undoTokens, users } from "../db.js";
-import { eq, inArray, desc, and, or, ilike, lt, sql, isNull, isNotNull } from "drizzle-orm";
+import { eq, inArray, desc, and, or, ilike, lt, gte, sql, isNull, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { scanLimiter, checkoutLimiter, writeLimiter } from "../middleware/rate-limiters.js";
@@ -1847,15 +1847,40 @@ router.get("/:id/logs", requireAuth, async (req, res) => {
     const page = (!isNaN(rawPage) && rawPage > 1) ? rawPage : 1;
     const offset = (page - 1) * limit;
 
+    const rawSince = req.query.since as string | undefined;
+    const sinceDate = rawSince ? new Date(rawSince) : null;
+    const sinceFilter = sinceDate && !isNaN(sinceDate.getTime())
+      ? gte(scanLogs.timestamp, sinceDate)
+      : undefined;
+
+    const baseWhere = and(
+      eq(scanLogs.clinicId, clinicId),
+      eq(scanLogs.equipmentId, req.params.id),
+      sinceFilter,
+    );
+
     const [{ total }] = await db
       .select({ total: sql<number>`count(*)::int` })
       .from(scanLogs)
-      .where(and(eq(scanLogs.clinicId, clinicId), eq(scanLogs.equipmentId, req.params.id)));
+      .where(baseWhere);
 
     const items = await db
-      .select()
+      .select({
+        id: scanLogs.id,
+        clinicId: scanLogs.clinicId,
+        equipmentId: scanLogs.equipmentId,
+        userId: scanLogs.userId,
+        userEmail: scanLogs.userEmail,
+        status: scanLogs.status,
+        note: scanLogs.note,
+        photoUrl: scanLogs.photoUrl,
+        timestamp: scanLogs.timestamp,
+        staffName: users.name,
+        staffRole: users.role,
+      })
       .from(scanLogs)
-      .where(and(eq(scanLogs.clinicId, clinicId), eq(scanLogs.equipmentId, req.params.id)))
+      .leftJoin(users, and(eq(scanLogs.userId, users.id), eq(users.clinicId, clinicId)))
+      .where(baseWhere)
       .orderBy(desc(scanLogs.timestamp))
       .limit(limit)
       .offset(offset);

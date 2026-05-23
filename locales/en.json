@@ -324,7 +324,12 @@
     "confirmHere": "Confirm here",
     "confirmedHere": "Confirmed!",
     "scanCount": "Confirmed {count} times",
-    "scanCountOnce": "Confirmed once"
+    "scanCountOnce": "Confirmed once",
+    "scanLogTab": "Scan Log",
+    "scanLogToday": "Today",
+    "scanLogWeek": "Last 7 days",
+    "scanLogAll": "All",
+    "scanLogEmpty": "No scan activity in this period"
   },
   "newEquipment": {
     "heading": {

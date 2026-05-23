@@ -1,5 +1,5 @@
 import { t } from "@/lib/i18n";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useParams, useLocation, useSearch } from "wouter";
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
@@ -150,6 +150,7 @@ export default function EquipmentDetailPage() {
   const [floorNoteText, setFloorNoteText] = useState("");
   const [confirmingHere, setConfirmingHere] = useState(false);
   const [justConfirmed, setJustConfirmed] = useState(false);
+  const [scanHistoryRange, setScanHistoryRange] = useState<"today" | "7d" | "all">("today");
 
   const [moveRoomOpen, setMoveRoomOpen] = useState(false);
   const [reportIssueOpen, setReportIssueOpen] = useState(false);
@@ -310,6 +311,27 @@ export default function EquipmentDetailPage() {
   });
 
   const scanLogs = scanLogsPages?.pages.flatMap((p) => p.items);
+
+  const scanHistorySince = useMemo(() => {
+    if (scanHistoryRange === "today") {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      return d.toISOString();
+    }
+    if (scanHistoryRange === "7d") {
+      return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    }
+    return undefined;
+  }, [scanHistoryRange]);
+
+  const { data: adminScanLogs, isLoading: adminLogsLoading } = useQuery({
+    queryKey: [`/api/equipment/${id}/logs`, "admin", scanHistoryRange],
+    queryFn: () => api.equipment.logsAdmin(id!, scanHistorySince),
+    enabled: isAdmin && isPilotMode && !!id && queryEnabled,
+    staleTime: 30_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
   const { data: transfers, isLoading: transfersLoading } = useQuery({
     queryKey: [`/api/equipment/${id}/transfers`],
@@ -1110,6 +1132,11 @@ export default function EquipmentDetailPage() {
             <TabsTrigger value="transfers" className="flex-1">
               Transfers ({transfers?.length ?? 0})
             </TabsTrigger>
+            {isAdmin && isPilotMode && (
+              <TabsTrigger value="scanlog" className="flex-1">
+                {t.equipmentDetail.scanLogTab}
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="details">
@@ -1292,6 +1319,73 @@ export default function EquipmentDetailPage() {
               )}
             </div>
           </TabsContent>
+
+          {isAdmin && isPilotMode && (
+            <TabsContent value="scanlog">
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-2">
+                  {(["today", "7d", "all"] as const).map((range) => (
+                    <Button
+                      key={range}
+                      variant={scanHistoryRange === range ? "default" : "outline"}
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => setScanHistoryRange(range)}
+                    >
+                      {range === "today"
+                        ? t.equipmentDetail.scanLogToday
+                        : range === "7d"
+                        ? t.equipmentDetail.scanLogWeek
+                        : t.equipmentDetail.scanLogAll}
+                    </Button>
+                  ))}
+                </div>
+                {adminLogsLoading ? (
+                  <>
+                    <Skeleton className="h-16 w-full rounded-xl" />
+                    <Skeleton className="h-16 w-full rounded-xl" />
+                    <Skeleton className="h-16 w-full rounded-xl" />
+                  </>
+                ) : !adminScanLogs?.items.length ? (
+                  <Card className="bg-card border-border/60 shadow-sm">
+                    <CardContent className="p-8 text-center">
+                      <p className="text-muted-foreground text-sm">{t.equipmentDetail.scanLogEmpty}</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  adminScanLogs.items.map((log) => (
+                    <Card key={log.id} className="bg-card border-border/60 shadow-sm">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex flex-col gap-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge variant={statusToBadgeVariant(log.status)}>
+                                {STATUS_LABELS[log.status as keyof typeof STATUS_LABELS] || log.status}
+                              </Badge>
+                              <span className="text-xs font-medium truncate">
+                                {log.staffName || log.userEmail}
+                              </span>
+                              {log.staffRole && (
+                                <span className="text-xs text-muted-foreground capitalize">
+                                  {log.staffRole.replace(/_/g, " ")}
+                                </span>
+                              )}
+                            </div>
+                            {log.note && (
+                              <p className="text-xs text-muted-foreground">{log.note}</p>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground shrink-0">
+                            {formatRelativeTime(log.timestamp.toString())}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 

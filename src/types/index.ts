@@ -784,6 +784,8 @@ export interface ScanLog {
   note?: string | null;
   photoUrl?: string | null;
   timestamp: string;
+  staffName?: string | null;
+  staffRole?: string | null;
 }
 
 export interface TransferLog {

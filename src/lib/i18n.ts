@@ -183,6 +183,11 @@ const translations = {
     scanCount: (count: number) => count === 1
       ? d.equipmentDetail.scanCountOnce
       : tr(d.equipmentDetail.scanCount, { count }),
+    scanLogTab: d.equipmentDetail.scanLogTab,
+    scanLogToday: d.equipmentDetail.scanLogToday,
+    scanLogWeek: d.equipmentDetail.scanLogWeek,
+    scanLogAll: d.equipmentDetail.scanLogAll,
+    scanLogEmpty: d.equipmentDetail.scanLogEmpty,
     toast: {
       undone: d.equipmentDetail.toast.undone,
       undoFailed: d.equipmentDetail.toast.undoFailed,

@@ -324,7 +324,12 @@
     "confirmHere": "אשר כאן",
     "confirmedHere": "אושר!",
     "scanCount": "אושר {count} פעמים",
-    "scanCountOnce": "אושר פעם אחת"
+    "scanCountOnce": "אושר פעם אחת",
+    "scanLogTab": "יומן סריקה",
+    "scanLogToday": "היום",
+    "scanLogWeek": "7 ימים אחרונים",
+    "scanLogAll": "הכל",
+    "scanLogEmpty": "אין פעילות סריקה בתקופה זו"
   },
   "newEquipment": {
     "heading": {
