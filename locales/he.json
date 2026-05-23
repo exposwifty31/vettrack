@@ -2627,5 +2627,18 @@
     "failedBannerTitle": "עבודות שנכשלו דורשות טיפול",
     "failedBannerBody": "לחץ «נסה שוב» בשורה כדי להחזיר את הניכוי לתור. מתזמן השחזור ברקע מנסה שוב עבודות ישנות כל 10 דקות כש-Redis פעיל.",
     "autoRefreshHint": "מתרענן אוטומטית כל 30 שניות. מתזמן השחזור ברקע מעבד מחדש עבודות כושלות כשה-worker פועל."
+  },
+  "operationalState": {
+    "featureDisabled": "מאפיין מוכנות תפעולית מושבת.",
+    "invalidCustodyForDockReturn": "חזרה לעגינה דורשת מצב שמירה: הוחזר או עגון.",
+    "noAssetTypeDefined": "לציוד אין סוג נכס מוגדר.",
+    "crossClinicAssociation": "המשאב שייך למרפאה אחרת.",
+    "conditionNotFound": "תנאי לא נמצא.",
+    "conditionWrongAssetType": "התנאי שייך לסוג נכס אחר.",
+    "versionConflict": "התנגשות גרסאות, נא לרענן ולנסות שוב.",
+    "invalidCustodyForStaging": "העיבוד דורש ציוד עגון.",
+    "equipmentNotReady": "הציוד אינו מוכן לשימוש.",
+    "equipmentUnavailable": "הציוד אינו זמין לתור.",
+    "claimNotActive": "הבקשה אינה פעילה עוד."
   }
 }

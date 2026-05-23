@@ -2627,5 +2627,18 @@
     "failedBannerTitle": "Failed jobs need attention",
     "failedBannerBody": "Use Retry on each row to re-queue deduction. The background recovery scheduler also retries stale jobs every 10 minutes when Redis is available.",
     "autoRefreshHint": "Auto-refreshes every 30 seconds. The background recovery scheduler re-processes failed jobs when the worker is running."
+  },
+  "operationalState": {
+    "featureDisabled": "Operational readiness feature is disabled.",
+    "invalidCustodyForDockReturn": "Dock return requires custody state: returned or docked.",
+    "noAssetTypeDefined": "Equipment has no asset type assigned.",
+    "crossClinicAssociation": "Resource belongs to a different clinic.",
+    "conditionNotFound": "Condition not found.",
+    "conditionWrongAssetType": "Condition belongs to a different asset type.",
+    "versionConflict": "Version conflict, please refresh and retry.",
+    "invalidCustodyForStaging": "Staging requires docked equipment.",
+    "equipmentNotReady": "Equipment readiness is not ready.",
+    "equipmentUnavailable": "Equipment is not available for staging.",
+    "claimNotActive": "Claim is no longer active."
   }
 }

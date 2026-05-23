@@ -20,6 +20,7 @@ import {
   primaryKey,
   doublePrecision,
   bigserial,
+  bigint,
   check,
 } from "drizzle-orm/pg-core";
 
@@ -388,6 +389,24 @@ export const equipment = pgTable("vt_equipment", {
   usuallyFoundHere: text("usually_found_here"),
   searchAlias: text("search_alias"),
   staffNote: text("staff_note"),
+  // Operational state — V1
+  assetTypeId: text("asset_type_id").references(() => assetTypes.id, { onDelete: "set null" }),
+  dockId: text("dock_id").references(() => docks.id, { onDelete: "set null" }),
+  dockConfirmedReadyAt: timestamp("dock_confirmed_ready_at"),
+  dockConfirmedById: text("dock_confirmed_by_id").references(() => users.id, { onDelete: "set null" }),
+  custodyState: text("custody_state").notNull().default("untracked"),
+  custodyStateSince: timestamp("custody_state_since"),
+  untrackedDepartureAt: timestamp("untracked_departure_at"),
+  emergencyOverrideAt: timestamp("emergency_override_at"),
+  emergencyOverrideById: text("emergency_override_by_id").references(() => users.id, { onDelete: "set null" }),
+  readinessState: text("readiness_state").notNull().default("unknown"),
+  readinessStateSince: timestamp("readiness_state_since"),
+  usageState: text("usage_state").notNull().default("available"),
+  usageStateSince: timestamp("usage_state_since"),
+  procedureBoundHospitalizationId: text("procedure_bound_hospitalization_id").references(
+    () => hospitalizations.id,
+    { onDelete: "set null" },
+  ),
 });
 
 export const patientRoomAssignments = pgTable("vt_patient_room_assignments", {
@@ -1846,6 +1865,147 @@ export const taskOwnershipConfirmQueue = pgTable(
   }),
 );
 export type TaskOwnershipConfirmQueueRow = typeof taskOwnershipConfirmQueue.$inferSelect;
+
+// ─── Equipment Operational State V1 ────────────────────────────────────────
+
+export const docks = pgTable(
+  "vt_docks",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    roomId: text("room_id").references(() => rooms.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    clinicNameUnique: uniqueIndex("vt_docks_clinic_name_unique").on(t.clinicId, t.name),
+  }),
+);
+export type Dock = typeof docks.$inferSelect;
+export type NewDock = typeof docks.$inferInsert;
+
+export const assetTypes = pgTable(
+  "vt_asset_types",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    clinicNameUnique: uniqueIndex("vt_asset_types_clinic_name_unique").on(t.clinicId, t.name),
+  }),
+);
+export type AssetType = typeof assetTypes.$inferSelect;
+export type NewAssetType = typeof assetTypes.$inferInsert;
+
+export const assetTypeConditions = pgTable(
+  "vt_asset_type_conditions",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    assetTypeId: text("asset_type_id").notNull().references(() => assetTypes.id, { onDelete: "cascade" }),
+    conditionName: text("condition_name").notNull(),
+    verificationMethod: text("verification_method").notNull(),
+    staleAfterMinutes: integer("stale_after_minutes").notNull(),
+    displayOrder: integer("display_order").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    assetTypeConditionUnique: uniqueIndex("vt_asset_type_conditions_unique").on(
+      t.assetTypeId,
+      t.conditionName,
+    ),
+  }),
+);
+export type AssetTypeCondition = typeof assetTypeConditions.$inferSelect;
+export type NewAssetTypeCondition = typeof assetTypeConditions.$inferInsert;
+
+export const unitConditionStates = pgTable(
+  "vt_unit_condition_states",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    equipmentId: text("equipment_id").notNull().references(() => equipment.id, { onDelete: "cascade" }),
+    conditionId: text("condition_id").notNull().references(() => assetTypeConditions.id, { onDelete: "cascade" }),
+    verified: boolean("verified").notNull().default(false),
+    verifiedAt: timestamp("verified_at"),
+    verifiedById: text("verified_by_id").references(() => users.id, { onDelete: "set null" }),
+    notes: text("notes"),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    equipmentConditionUnique: uniqueIndex("vt_unit_condition_states_unique").on(
+      t.equipmentId,
+      t.conditionId,
+    ),
+    clinicEquipmentIdx: index("vt_unit_condition_states_clinic_equipment").on(
+      t.clinicId,
+      t.equipmentId,
+    ),
+  }),
+);
+export type UnitConditionState = typeof unitConditionStates.$inferSelect;
+export type NewUnitConditionState = typeof unitConditionStates.$inferInsert;
+
+export const stagingQueue = pgTable(
+  "vt_staging_queue",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    equipmentId: text("equipment_id").notNull().references(() => equipment.id, { onDelete: "cascade" }),
+    requestedById: text("requested_by_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    taskId: text("task_id").references(() => appointments.id, { onDelete: "set null" }),
+    clinicalPriority: text("clinical_priority").notNull().default("routine"),
+    stagedAt: timestamp("staged_at").defaultNow().notNull(),
+    expiresAt: timestamp("expires_at"),
+    status: text("status").notNull().default("active"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    clinicEquipmentIdx: index("vt_staging_queue_clinic_equipment").on(
+      t.clinicId,
+      t.equipmentId,
+      t.status,
+    ),
+    expiryIdx: index("vt_staging_queue_expiry")
+      .on(t.expiresAt)
+      .where(sql`${t.status} = 'active' AND ${t.expiresAt} IS NOT NULL`),
+  }),
+);
+export type StagingQueueRow = typeof stagingQueue.$inferSelect;
+export type NewStagingQueueRow = typeof stagingQueue.$inferInsert;
+
+// ─── End Equipment Operational State V1 ────────────────────────────────────
+
+// ─── Operational Metrics (V1.1) ─────────────────────────────────────────────
+
+export const operationalMetrics = pgTable(
+  "vt_operational_metrics",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    equipmentId: text("equipment_id").references(() => equipment.id, { onDelete: "set null" }),
+    roomId: text("room_id").references(() => rooms.id, { onDelete: "set null" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    eventType: text("event_type").notNull(),
+    durationMs: bigint("duration_ms", { mode: "number" }),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    eventIdx: index("vt_operational_metrics_event_idx").on(t.clinicId, t.eventType, t.createdAt),
+    equipmentIdx: index("vt_operational_metrics_equipment_idx").on(t.equipmentId, t.createdAt),
+    roomIdx: index("vt_operational_metrics_room_idx").on(t.roomId, t.createdAt),
+  }),
+);
+export type OperationalMetric = typeof operationalMetrics.$inferSelect;
+export type NewOperationalMetric = typeof operationalMetrics.$inferInsert;
+
+// ─── End Operational Metrics ────────────────────────────────────────────────
 
 export async function initDb() {
   // Schema initialization is now handled by the migration runner (server/migrate.ts).

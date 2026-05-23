@@ -48,6 +48,8 @@ import dispenseRoutes from "../routes/dispense.js";
 import patientHandoffsRoutes from "../routes/patient-handoffs.js";
 import homeDashboardRoutes from "../routes/home-dashboard.js";
 import pilotRoutes from "../routes/pilot.js";
+import equipmentOperationalStateRoutes from "../routes/equipment-operational-state.js";
+import operationalMetricsRoutes from "../routes/operational-metrics.js";
 
 const isPilotMode = process.env.PILOT_MODE === "true";
 
@@ -70,6 +72,8 @@ export function registerApiRoutes(app: express.Express) {
 
   // --- Equipment core (always registered) ---
   app.use("/api/equipment", equipmentRoutes);
+  app.use("/api", equipmentOperationalStateRoutes);
+  app.use("/api", operationalMetricsRoutes);
   app.use("/api/rooms", roomsRoutes);
   app.use("/api/folders", foldersRoutes);
   app.use("/api/returns", returnsRoutes);

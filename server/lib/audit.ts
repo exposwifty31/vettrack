@@ -197,7 +197,19 @@ export type AuditActionType =
   | "clinical_invariant_orphan_dispense_denied"
   | "clinical_invariant_emergency_bypass"
   | "clinical_invariant_fail_open"
-  | "pilot_config_updated";
+  | "pilot_config_updated"
+  // Equipment Operational State V1
+  | "equipment_dock_return"
+  | "equipment_condition_verified"
+  | "equipment_custody_state_changed"
+  | "equipment_readiness_state_changed"
+  | "equipment_usage_state_changed"
+  | "equipment_emergency_checkout"
+  | "equipment_custody_chain_broken"
+  | "equipment_staged"
+  | "equipment_stage_cancelled"
+  | "equipment_stage_fulfilled"
+  | "equipment_stage_expired";
 
 export interface LogAuditParams {
   clinicId: string;
