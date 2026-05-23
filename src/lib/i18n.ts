@@ -213,6 +213,19 @@ const translations = {
     },
   },
 
+  adminPilotCoverage: {
+    title: d.adminPilotCoverage.title,
+    total: d.adminPilotCoverage.total,
+    everConfirmed: d.adminPilotCoverage.everConfirmed,
+    confirmedToday: d.adminPilotCoverage.confirmedToday,
+    neverConfirmed: d.adminPilotCoverage.neverConfirmed,
+    noItems: d.adminPilotCoverage.noItems,
+    statusNever: d.adminPilotCoverage.statusNever,
+    statusStale: d.adminPilotCoverage.statusStale,
+    statusRecent: d.adminPilotCoverage.statusRecent,
+    confirmCount: (count: number) => tr(d.adminPilotCoverage.confirmCount, { count }),
+  },
+
   newEquipment: {
     heading: d.newEquipment.heading,
     fields: d.newEquipment.fields,

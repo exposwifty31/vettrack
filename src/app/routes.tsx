@@ -42,6 +42,7 @@ const ManagementDashboardPage = lazy(() => import("@/pages/management-dashboard"
 const AdminShiftsPage = lazy(() => import("@/pages/admin-shifts"));
 const AdminMedicationIntegrityPage = lazy(() => import("@/pages/admin-medication-integrity"));
 const AdminOpsDashboardPage = lazy(() => import("@/pages/admin-ops-dashboard"));
+const AdminPilotCoveragePage = lazy(() => import("@/pages/admin-pilot-coverage"));
 const AppointmentsPage = lazy(() => import("@/pages/appointments"));
 const MedicationHubPage = lazy(() => import("@/pages/meds"));
 const PharmacyForecastPage = lazy(() => import("@/pages/pharmacy-forecast"));
@@ -121,6 +122,7 @@ export function AppRoutes() {
         <Route path="/er"><AuthGuard><ErCommandCenterPage /></AuthGuard></Route>
 
         {/* Admin + settings — always available */}
+        {isPilotMode && <Route path="/admin/pilot-coverage"><AuthGuard><AdminPilotCoveragePage /></AuthGuard></Route>}
         <Route path="/admin"><AuthGuard><AdminPage /></AuthGuard></Route>
         <Route path="/settings"><AuthGuard><SettingsPage /></AuthGuard></Route>
         <Route path="/help"><AuthGuard><HelpPage /></AuthGuard></Route>

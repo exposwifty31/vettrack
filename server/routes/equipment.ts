@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import multer from "multer";
 import { z } from "zod";
 import { db, equipment, equipmentReturns, folders, rooms, scanLogs, transferLogs, undoTokens, users } from "../db.js";
-import { eq, inArray, desc, and, or, ilike, lt, gte, sql, isNull, isNotNull } from "drizzle-orm";
+import { eq, inArray, desc, asc, and, or, ilike, lt, gte, sql, isNull, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { scanLimiter, checkoutLimiter, writeLimiter } from "../middleware/rate-limiters.js";
@@ -574,6 +574,56 @@ router.get("/critical", requireAuth, async (req, res) => {
         code: "INTERNAL_ERROR",
         reason: "CRITICAL_EQUIPMENT_FETCH_FAILED",
         message: "Failed to fetch critical equipment",
+        requestId,
+      }),
+    );
+  }
+});
+
+router.get("/pilot-coverage", requireAuth, requireAdmin, async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  try {
+    const clinicId = req.clinicId!;
+
+    const rows = await db
+      .select({
+        id: equipment.id,
+        name: equipment.name,
+        location: equipment.location,
+        usuallyFoundHere: equipment.usuallyFoundHere,
+        folderName: folders.name,
+        lastSeen: equipment.lastSeen,
+        confirmCount: sql<number>`count(${scanLogs.id})::int`,
+      })
+      .from(equipment)
+      .leftJoin(folders, eq(equipment.folderId, folders.id))
+      .leftJoin(
+        scanLogs,
+        and(eq(scanLogs.equipmentId, equipment.id), eq(scanLogs.clinicId, clinicId)),
+      )
+      .where(and(eq(equipment.clinicId, clinicId), isNull(equipment.deletedAt)))
+      .groupBy(equipment.id, folders.name)
+      .orderBy(sql`${equipment.lastSeen} ASC NULLS FIRST`, asc(equipment.name));
+
+    const now = Date.now();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const summary = {
+      total: rows.length,
+      everConfirmed: rows.filter((r) => r.lastSeen != null).length,
+      confirmedToday: rows.filter(
+        (r) => r.lastSeen != null && now - new Date(r.lastSeen as Date).getTime() <= dayMs,
+      ).length,
+      neverConfirmed: rows.filter((r) => r.lastSeen == null).length,
+    };
+
+    res.json({ summary, items: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json(
+      apiError({
+        code: "INTERNAL_ERROR",
+        reason: "PILOT_COVERAGE_FETCH_FAILED",
+        message: "Failed to fetch pilot coverage",
         requestId,
       }),
     );

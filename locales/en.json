@@ -331,6 +331,18 @@
     "scanLogAll": "All",
     "scanLogEmpty": "No scan activity in this period"
   },
+  "adminPilotCoverage": {
+    "title": "Pilot Coverage",
+    "total": "Total",
+    "everConfirmed": "Ever Confirmed",
+    "confirmedToday": "Confirmed Today",
+    "neverConfirmed": "Never Confirmed",
+    "noItems": "No equipment found",
+    "statusNever": "Never",
+    "statusStale": "Stale",
+    "statusRecent": "Recent",
+    "confirmCount": "{count} confirms"
+  },
   "newEquipment": {
     "heading": {
       "edit": "Edit equipment",

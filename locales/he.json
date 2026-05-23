@@ -331,6 +331,18 @@
     "scanLogAll": "הכל",
     "scanLogEmpty": "אין פעילות סריקה בתקופה זו"
   },
+  "adminPilotCoverage": {
+    "title": "כיסוי פיילוט",
+    "total": "סה״כ",
+    "everConfirmed": "אושר פעם",
+    "confirmedToday": "אושר היום",
+    "neverConfirmed": "לא אושר מעולם",
+    "noItems": "לא נמצא ציוד",
+    "statusNever": "אף פעם",
+    "statusStale": "ישן",
+    "statusRecent": "עדכני",
+    "confirmCount": "{count} אישורים"
+  },
   "newEquipment": {
     "heading": {
       "edit": "עריכת ציוד",

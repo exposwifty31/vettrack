@@ -788,6 +788,26 @@ export interface ScanLog {
   staffRole?: string | null;
 }
 
+export interface PilotCoverageItem {
+  id: string;
+  name: string;
+  location?: string | null;
+  usuallyFoundHere?: string | null;
+  folderName?: string | null;
+  lastSeen?: string | null;
+  confirmCount: number;
+}
+
+export interface PilotCoverageResponse {
+  summary: {
+    total: number;
+    everConfirmed: number;
+    confirmedToday: number;
+    neverConfirmed: number;
+  };
+  items: PilotCoverageItem[];
+}
+
 export interface TransferLog {
   id: string;
   equipmentId: string;

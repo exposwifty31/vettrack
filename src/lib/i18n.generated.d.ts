@@ -334,6 +334,18 @@ export interface TStructure {
     scanLogAll: string;
     scanLogEmpty: string;
   };
+  adminPilotCoverage: {
+    title: string;
+    total: string;
+    everConfirmed: string;
+    confirmedToday: string;
+    neverConfirmed: string;
+    noItems: string;
+    statusNever: string;
+    statusStale: string;
+    statusRecent: string;
+    confirmCount: string;
+  };
   newEquipment: {
     heading: {
       edit: string;
