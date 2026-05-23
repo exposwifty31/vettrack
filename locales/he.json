@@ -1338,7 +1338,12 @@
     "pilotPulseItems": "פריטים",
     "pilotPulseEverConfirmed": "אושרו אי פעם",
     "pilotPulseConfirmedToday": "היום",
-    "pilotPulseNeverConfirmed": "לא אושרו מעולם"
+    "pilotPulseNeverConfirmed": "לא אושרו מעולם",
+    "pilotSettings": "הגדרות פיילוט",
+    "pilotStaleThresholdLabel": "סף ישנות",
+    "pilotStaleThresholdHint": "פריטים שלא אושרו בתוך חלון זה מסומנים כישנים.",
+    "pilotStaleThresholdSaved": "הסף עודכן",
+    "pilotStaleThresholdError": "עדכון הסף נכשל"
   },
   "layoutHebrew": {
     "home": "ראשי",

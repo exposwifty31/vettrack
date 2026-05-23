@@ -13,6 +13,7 @@ import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { trackSyncSuccess, trackSyncFail } from "../lib/sync-metrics.js";
 import { scheduleSmartReturnReminder, cancelSmartReturnReminder } from "../lib/role-notification-scheduler.js";
 import { recordEquipmentSeen } from "../lib/equipment-seen.js";
+import { getPilotStaleMs } from "../lib/pilot-config.js";
 
 const EQUIPMENT_STATUS_VALUES = [
   "ok",
@@ -606,12 +607,12 @@ router.get("/pilot-coverage", requireAuth, requireAdmin, async (req, res) => {
       .orderBy(sql`${equipment.lastSeen} ASC NULLS FIRST`, asc(equipment.name));
 
     const now = Date.now();
-    const dayMs = 24 * 60 * 60 * 1000;
+    const staleMs = await getPilotStaleMs();
     const summary = {
       total: rows.length,
       everConfirmed: rows.filter((r) => r.lastSeen != null).length,
       confirmedToday: rows.filter(
-        (r) => r.lastSeen != null && now - new Date(r.lastSeen as Date).getTime() <= dayMs,
+        (r) => r.lastSeen != null && now - new Date(r.lastSeen as Date).getTime() <= staleMs,
       ).length,
       neverConfirmed: rows.filter((r) => r.lastSeen == null).length,
     };

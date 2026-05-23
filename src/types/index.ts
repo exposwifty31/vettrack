@@ -788,6 +788,11 @@ export interface ScanLog {
   staffRole?: string | null;
 }
 
+export interface PilotConfig {
+  staleMs: number;
+  default: number;
+}
+
 export interface PilotCoverageItem {
   id: string;
   name: string;

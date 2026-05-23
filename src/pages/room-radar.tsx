@@ -45,6 +45,7 @@ import type { Equipment, Room, RoomActivityEntry, EquipmentStatus } from "@/type
 import { ReturnPlugDialog } from "@/components/return-plug-dialog";
 import { haptics } from "@/lib/haptics";
 import { isPilotMode } from "@/lib/pilot-mode";
+import { usePilotStaleMs } from "@/hooks/use-pilot-config";
 
 function toInitials(name: string | null | undefined): string {
   if (!name?.trim()) return "?";
@@ -100,11 +101,10 @@ const STATUS_BAR_COLORS: Record<EquipmentStatus, string> = {
 interface RadarEquipmentCardProps {
   equipment: Equipment;
   justVerified?: boolean;
+  staleMs: number;
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardProps) {
+function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquipmentCardProps) {
   const [moveOpen, setMoveOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [tapped, setTapped] = useState(false);
@@ -179,7 +179,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardP
   const pilotStaleness = isPilotMode
     ? !eq.lastSeen
       ? "never"
-      : Date.now() - new Date(eq.lastSeen).getTime() <= DAY_MS
+      : Date.now() - new Date(eq.lastSeen).getTime() <= staleMs
       ? "recent"
       : "stale"
     : null;
@@ -365,6 +365,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified }: RadarEquipmentCardP
 export default function RoomRadarPage() {
   const { id } = useParams<{ id: string }>();
   const { userId } = useAuth();
+  const staleMs = usePilotStaleMs();
   const searchStr = useSearch();
   const nfcParam = new URLSearchParams(searchStr).get("verify");
   const queryClient = useQueryClient();
@@ -710,6 +711,7 @@ export default function RoomRadarPage() {
                 key={eq.id}
                 equipment={eq}
                 justVerified={verifyState === "done"}
+                staleMs={staleMs}
               />
             ))}
           </div>

@@ -68,6 +68,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { isPilotMode } from "@/lib/pilot-mode";
+import { usePilotStaleMs } from "@/hooks/use-pilot-config";
 import type {
   SupportTicket,
   SupportTicketStatus,
@@ -81,6 +82,7 @@ import { haptics } from "@/lib/haptics";
 export default function AdminPage() {
   const { isAdmin, userId } = useAuth();
   const [, navigate] = useLocation();
+  const staleMs = usePilotStaleMs();
   const [activeTab, setActiveTab] = useState<
     "folders" | "users" | "pending" | "support" | "audit-logs" | "deleted" | "settings" | "formulary"
   >("folders");
@@ -117,16 +119,35 @@ export default function AdminPage() {
   const pilotCounts = useMemo(() => {
     if (!isPilotMode || !equipmentList) return null;
     const now = Date.now();
-    const oneDayMs = 24 * 60 * 60 * 1000;
     return {
       total: equipmentList.length,
       everConfirmed: equipmentList.filter((e) => e.lastSeen != null).length,
       confirmedToday: equipmentList.filter(
-        (e) => e.lastSeen != null && now - new Date(e.lastSeen).getTime() <= oneDayMs,
+        (e) => e.lastSeen != null && now - new Date(e.lastSeen).getTime() <= staleMs,
       ).length,
       neverConfirmed: equipmentList.filter((e) => e.lastSeen == null).length,
     };
-  }, [equipmentList]);
+  }, [equipmentList, staleMs]);
+
+  const queryClient = useQueryClient();
+  const [editingStaleMs, setEditingStaleMs] = useState(false);
+  const [staleMsInput, setStaleMsInput] = useState("");
+
+  const staleMsMut = useMutation({
+    mutationFn: (ms: number) => api.pilot.setConfig(ms),
+    onSuccess: (result) => {
+      queryClient.setQueryData(["/api/pilot/config"], result);
+      setEditingStaleMs(false);
+      toast.success(t.adminPage.pilotStaleThresholdSaved);
+    },
+    onError: () => toast.error(t.adminPage.pilotStaleThresholdError),
+  });
+
+  const handleSaveStaleMs = () => {
+    const hours = parseFloat(staleMsInput);
+    if (isNaN(hours) || hours < 1 || hours > 168) return;
+    staleMsMut.mutate(Math.round(hours * 60 * 60 * 1000));
+  };
 
   const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
 
@@ -223,6 +244,68 @@ export default function AdminPage() {
             <span className="font-medium text-foreground">{pilotCounts.neverConfirmed}</span>
             <span>{t.adminPage.pilotPulseNeverConfirmed}</span>
           </div>
+        )}
+
+        {isPilotMode && (
+          <Card className="bg-card border-border/60 shadow-sm">
+            <CardContent className="p-4 flex flex-col gap-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                {t.adminPage.pilotSettings}
+              </p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-sm text-muted-foreground">{t.adminPage.pilotStaleThresholdLabel}:</span>
+                {editingStaleMs ? (
+                  <>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={168}
+                      step={1}
+                      className="h-8 w-24 text-sm"
+                      value={staleMsInput}
+                      onChange={(e) => setStaleMsInput(e.target.value)}
+                      placeholder="24"
+                    />
+                    <span className="text-sm text-muted-foreground">h</span>
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs"
+                      disabled={staleMsMut.isPending}
+                      onClick={handleSaveStaleMs}
+                    >
+                      {t.common.save}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 text-xs"
+                      onClick={() => setEditingStaleMs(false)}
+                    >
+                      {t.common.cancel}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-sm font-medium">
+                      {Math.round(staleMs / (60 * 60 * 1000))}h
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        setStaleMsInput(String(Math.round(staleMs / (60 * 60 * 1000))));
+                        setEditingStaleMs(true);
+                      }}
+                    >
+                      {t.common.edit}
+                    </Button>
+                  </>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">{t.adminPage.pilotStaleThresholdHint}</p>
+            </CardContent>
+          </Card>
         )}
 
         {/* Tab bar */}

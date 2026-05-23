@@ -196,7 +196,8 @@ export type AuditActionType =
   //     threw, and the wiring degraded to allow.
   | "clinical_invariant_orphan_dispense_denied"
   | "clinical_invariant_emergency_bypass"
-  | "clinical_invariant_fail_open";
+  | "clinical_invariant_fail_open"
+  | "pilot_config_updated";
 
 export interface LogAuditParams {
   clinicId: string;

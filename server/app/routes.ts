@@ -47,6 +47,7 @@ import adminTaskOwnershipRoutes from "../routes/admin-task-ownership.js";
 import dispenseRoutes from "../routes/dispense.js";
 import patientHandoffsRoutes from "../routes/patient-handoffs.js";
 import homeDashboardRoutes from "../routes/home-dashboard.js";
+import pilotRoutes from "../routes/pilot.js";
 
 const isPilotMode = process.env.PILOT_MODE === "true";
 
@@ -81,6 +82,9 @@ export function registerApiRoutes(app: express.Express) {
   app.use("/api/code-blue", codeBlueRoutes);
   app.use("/api/crash-cart", crashCartRoutes);
   app.use("/api/er", erRoutes);
+
+  // --- Pilot config (always registered — admin-gated, read/write pilot_stale_ms) ---
+  app.use("/api/pilot", pilotRoutes);
 
   // --- Admin (always registered — data management during pilot) ---
   app.use("/api/admin", adminOutboxHealthRoutes);

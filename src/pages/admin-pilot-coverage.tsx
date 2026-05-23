@@ -13,17 +13,18 @@ import { formatRelativeTime } from "@/lib/utils";
 import { ArrowLeft, MapPin, Printer } from "lucide-react";
 import type { PilotCoverageItem } from "@/types";
 import { isPilotMode } from "@/lib/pilot-mode";
+import { usePilotStaleMs } from "@/hooks/use-pilot-config";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-function itemStaleness(item: PilotCoverageItem): "never" | "stale" | "recent" {
+function itemStaleness(item: PilotCoverageItem, staleMs: number): "never" | "stale" | "recent" {
   if (!item.lastSeen) return "never";
-  return Date.now() - new Date(item.lastSeen).getTime() <= DAY_MS ? "recent" : "stale";
+  return Date.now() - new Date(item.lastSeen).getTime() <= staleMs ? "recent" : "stale";
 }
 
 export default function AdminPilotCoveragePage() {
   const { isAdmin } = useAuth();
   const [, navigate] = useLocation();
+
+  const staleMs = usePilotStaleMs();
 
   const { data, isLoading } = useQuery({
     queryKey: ["/api/equipment/pilot-coverage"],
@@ -105,7 +106,7 @@ export default function AdminPilotCoveragePage() {
         ) : (
           <div className="flex flex-col gap-2">
             {items.map((item) => {
-              const staleness = itemStaleness(item);
+              const staleness = itemStaleness(item, staleMs);
               return (
                 <Card
                   key={item.id}

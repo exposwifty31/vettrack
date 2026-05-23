@@ -1338,7 +1338,12 @@
     "pilotPulseItems": "items",
     "pilotPulseEverConfirmed": "ever confirmed",
     "pilotPulseConfirmedToday": "today",
-    "pilotPulseNeverConfirmed": "never confirmed"
+    "pilotPulseNeverConfirmed": "never confirmed",
+    "pilotSettings": "Pilot Settings",
+    "pilotStaleThresholdLabel": "Stale threshold",
+    "pilotStaleThresholdHint": "Items not confirmed within this window are marked stale.",
+    "pilotStaleThresholdSaved": "Threshold updated",
+    "pilotStaleThresholdError": "Failed to update threshold"
   },
   "layoutHebrew": {
     "home": "Home",

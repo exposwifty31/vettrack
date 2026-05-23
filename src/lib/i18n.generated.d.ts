@@ -1342,6 +1342,11 @@ export interface TStructure {
     pilotPulseEverConfirmed: string;
     pilotPulseConfirmedToday: string;
     pilotPulseNeverConfirmed: string;
+    pilotSettings: string;
+    pilotStaleThresholdLabel: string;
+    pilotStaleThresholdHint: string;
+    pilotStaleThresholdSaved: string;
+    pilotStaleThresholdError: string;
   };
   layoutHebrew: {
     home: string;
