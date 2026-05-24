@@ -16,7 +16,7 @@ if (existsSync(envPath)) {
 }
 
 export default {
-  schema: "./server/db.ts",
+  schema: "./server/schema/index.ts",
   out: "./migrations",
   dialect: "postgresql",
   dbCredentials: {

@@ -207,7 +207,7 @@ describe("Appointments Scheduling", () => {
   });
 
   it("Clinic timezone column exists on vt_clinics", () => {
-    const dbFile = fs.readFileSync(path.join(repoRoot, "server", "db.ts"), "utf8");
+    const dbFile = fs.readFileSync(path.join(repoRoot, "server", "schema", "core.ts"), "utf8");
     expect(dbFile.includes('timezone: text("timezone")')).toBe(true);
   });
 

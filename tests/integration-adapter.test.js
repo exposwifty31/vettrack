@@ -233,55 +233,59 @@ describe("integrations/index.ts", () => {
 // 6. DB schema — new tables and sync columns
 // ---------------------------------------------------------------------------
 describe("server/db.ts — integration tables and sync columns", () => {
-  const src = read("server/db.ts");
+  const integrationsSrc = read("server/schema/integrations.ts");
+  const coreSrc = read("server/schema/core.ts");
+  const tasksSrc = read("server/schema/tasks.ts");
+  const billingSrc = read("server/schema/billing.ts");
+  const inventorySrc = read("server/schema/inventory.ts");
 
   it("defines integrationConfigs table", () => {
-    expect(src).toContain('export const integrationConfigs = pgTable("vt_integration_configs"');
+    expect(integrationsSrc).toContain('export const integrationConfigs = vtTable("vt_integration_configs"');
   });
   it("integrationConfigs has adapterId and enabled fields", () => {
-    const start = src.indexOf('export const integrationConfigs = pgTable');
-    const body = src.slice(start, start + 800);
+    const start = integrationsSrc.indexOf('export const integrationConfigs = vtTable');
+    const body = integrationsSrc.slice(start, start + 800);
     expect(body).toContain("adapterId");
     expect(body).toContain("enabled");
   });
   it("defines integrationSyncLog table", () => {
-    expect(src).toContain('export const integrationSyncLog = pgTable("vt_integration_sync_log"');
+    expect(integrationsSrc).toContain('export const integrationSyncLog = vtTable("vt_integration_sync_log"');
   });
   it("integrationSyncLog has syncType, direction, status fields", () => {
-    const start = src.indexOf('export const integrationSyncLog = pgTable');
-    const body = src.slice(start, start + 600);
+    const start = integrationsSrc.indexOf('export const integrationSyncLog = vtTable');
+    const body = integrationsSrc.slice(start, start + 600);
     expect(body).toContain("syncType");
     expect(body).toContain("direction");
     expect(body).toContain("status");
   });
   it("defines integrationWebhookEvents table", () => {
-    expect(src).toContain('export const integrationWebhookEvents = pgTable("vt_integration_webhook_events"');
-    expect(src).toContain("signatureValid");
+    expect(integrationsSrc).toContain('export const integrationWebhookEvents = vtTable("vt_integration_webhook_events"');
+    expect(integrationsSrc).toContain("signatureValid");
   });
   it("animals table has externalId, externalSource, externalSyncedAt", () => {
-    const start = src.indexOf('export const animals = pgTable("vt_animals"');
-    const body = src.slice(start, start + 1000);
+    const start = coreSrc.indexOf('export const animals = vtTable("vt_animals"');
+    const body = coreSrc.slice(start, start + 1000);
     expect(body).toContain("externalId");
     expect(body).toContain("externalSource");
     expect(body).toContain("externalSyncedAt");
   });
   it("appointments table has external sync columns", () => {
-    const start = src.indexOf('export const appointments = pgTable("vt_appointments"');
-    const body = src.slice(start, start + 4000);
+    const start = tasksSrc.indexOf('export const appointments = vtTable("vt_appointments"');
+    const body = tasksSrc.slice(start, start + 4000);
     expect(body).toContain("externalId");
     expect(body).toContain("externalSource");
     expect(body).toContain("externalSyncedAt");
   });
   it("billingLedger table has external sync columns", () => {
-    const start = src.indexOf('export const billingLedger = pgTable("vt_billing_ledger"');
-    const body = src.slice(start, start + 3000);
+    const start = billingSrc.indexOf('export const billingLedger = vtTable("vt_billing_ledger"');
+    const body = billingSrc.slice(start, start + 3000);
     expect(body).toContain("externalId");
     expect(body).toContain("externalSource");
     expect(body).toContain("externalSyncedAt");
   });
   it("inventoryItems table has external sync columns", () => {
-    const start = src.indexOf('export const inventoryItems = pgTable(');
-    const body = src.slice(start, start + 1500);
+    const start = inventorySrc.indexOf('export const inventoryItems = vtTable(');
+    const body = inventorySrc.slice(start, start + 1500);
     expect(body).toContain("externalId");
     expect(body).toContain("externalSource");
     expect(body).toContain("externalSyncedAt");

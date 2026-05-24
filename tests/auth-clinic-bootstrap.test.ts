@@ -81,9 +81,9 @@ describe("resolveAuthUser — clinic-before-user call order", () => {
 // ---------------------------------------------------------------------------
 describe("FK constraint preservation", () => {
   it("vt_users.clinic_id FK is still declared in db.ts", () => {
-    const dbSrc = fs.readFileSync(path.join(ROOT, "server/db.ts"), "utf8");
+    const dbSrc = fs.readFileSync(path.join(ROOT, "server/schema/core.ts"), "utf8");
     // The users table clinic_id column must still reference clinics.id
-    const usersTableStart = dbSrc.indexOf('export const users = pgTable("vt_users"');
+    const usersTableStart = dbSrc.indexOf('export const users = vtTable("vt_users"');
     const usersTableEnd = dbSrc.indexOf("\n});", usersTableStart);
     const usersBody = dbSrc.slice(usersTableStart, usersTableEnd);
     expect(usersBody).toContain("clinicId");

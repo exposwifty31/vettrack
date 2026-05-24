@@ -18,7 +18,7 @@ const routesMount = fs.readFileSync(
   path.join(repoRoot, "server", "app", "routes.ts"),
   "utf8",
 );
-const dbSchema = fs.readFileSync(path.join(repoRoot, "server", "db.ts"), "utf8");
+const dbSchema = fs.readFileSync(path.join(repoRoot, "server", "schema", "core.ts"), "utf8");
 const apiClient = fs.readFileSync(path.join(repoRoot, "src", "lib", "api.ts"), "utf8");
 const appRoutes = fs.readFileSync(path.join(repoRoot, "src", "app", "routes.tsx"), "utf8");
 

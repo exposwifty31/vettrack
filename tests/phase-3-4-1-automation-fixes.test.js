@@ -9,7 +9,7 @@ const repoRoot = path.resolve(__dirname, "..");
 const automation = fs.readFileSync(path.join(repoRoot, "server", "services", "task-automation.service.ts"), "utf8");
 const queue = fs.readFileSync(path.join(repoRoot, "server", "lib", "queue.ts"), "utf8");
 const migration = fs.readFileSync(path.join(repoRoot, "migrations", "032_automation_escalation_columns.sql"), "utf8");
-const db = fs.readFileSync(path.join(repoRoot, "server", "db.ts"), "utf8");
+const db = fs.readFileSync(path.join(repoRoot, "server", "schema", "tasks.ts"), "utf8");
 
 describe("Phase 3.4.1 Automation safety (static checks)", () => {
   it("Escalation sets escalatedTo/escalatedAt only; vet_id preserved; empty returning skips", () => {
