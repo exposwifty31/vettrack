@@ -31,7 +31,7 @@ const checkItemSchema = z.object({
 });
 
 const submitCheckSchema = z.object({
-  items: z.array(checkItemSchema).min(1).max(20),
+  items: z.array(checkItemSchema).min(1).max(50),
   notes: z.string().max(500).optional(),
 });
 

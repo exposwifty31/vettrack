@@ -104,8 +104,8 @@ const EQUIPMENT_SIDEBAR: SidebarItem[] = isPilotMode
   : [
       { href: "/equipment",             icon: LayoutGrid, label: "All Equipment" },
       { href: "/rooms",                 icon: Home,       label: "Rooms" },
-      { href: "/equipment/scan",        icon: ScanLine,   label: "Scan Log" },
-      { href: "/equipment/maintenance", icon: Wrench,     label: "Maintenance", alertDot: false },
+      { href: "/equipment",                    icon: ScanLine, label: "Scan Log" },
+      { href: "/equipment?status=maintenance", icon: Wrench, label: "Maintenance", alertDot: false },
     ];
 
 function DesktopEquipmentView({

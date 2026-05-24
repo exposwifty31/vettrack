@@ -104,6 +104,8 @@ export function AppRoutes() {
         {/* Equipment — always available */}
         <Route path="/equipment"><AuthGuard><EquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/new"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
+        <Route path="/equipment/scan"><Redirect to="/equipment" /></Route>
+        <Route path="/equipment/maintenance"><Redirect to="/equipment?status=maintenance" /></Route>
         <Route path="/equipment/:id/edit"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/:id/qr"><AuthGuard><EquipmentQrPrintPage /></AuthGuard></Route>
         <Route path="/equipment/:id"><AuthGuard><EquipmentDetailPage /></AuthGuard></Route>
@@ -149,7 +151,7 @@ export function AppRoutes() {
         {!isPilotMode && <Route path="/pharmacy-forecast"><AuthGuard><PharmacyForecastPage /></AuthGuard></Route>}
         {!isPilotMode && <Route path="/stability"><AuthGuard><StabilityDashboardPage /></AuthGuard></Route>}
         {!isPilotMode && <Route path="/audit-log"><AuthGuard><AuditLogPage /></AuthGuard></Route>}
-        {!isPilotMode && <Route path="/whats-new"><AuthGuard><WhatsNewPage /></AuthGuard></Route>}
+        <Route path="/whats-new"><AuthGuard><WhatsNewPage /></AuthGuard></Route>
         {!isPilotMode && <Route path="/billing/leakage"><AuthGuard><LeakageReportPage /></AuthGuard></Route>}
         {!isPilotMode && <Route path="/billing/inventory-jobs"><AuthGuard><InventoryJobsPage /></AuthGuard></Route>}
         {!isPilotMode && <Route path="/billing/code-blue-reconciliation"><AuthGuard><CodeBlueReconciliationPage /></AuthGuard></Route>}

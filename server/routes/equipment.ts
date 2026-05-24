@@ -1995,6 +1995,10 @@ router.post("/:id/scan", requireAuth, scanLimiter, requireEffectiveRole("student
           lastStatus: status,
           status,
         };
+        if (status === "ok") {
+          updates.lastVerifiedAt = scanTime;
+          updates.lastVerifiedById = req.authUser!.id;
+        }
         if (status === "maintenance") updates.lastMaintenanceDate = scanTime;
         if (status === "sterilized") updates.lastSterilizationDate = scanTime;
 

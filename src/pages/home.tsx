@@ -28,6 +28,7 @@ import {
   Scan,
   ShieldAlert,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 /** Deep forest used for accent bars, primary CTAs, and the solid quick action. */
 const FOREST = "#1a3d28";
@@ -264,6 +265,7 @@ export default function HomePage() {
   const todayItems = activityItems.slice(1, 6);
 
   const sectionFade = reduced ? "" : "motion-safe:animate-page-enter";
+  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
 
   const pageContent = (
     <>
@@ -454,27 +456,31 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Quick actions */}
+        {/* Quick actions — mobile relies on bottom-nav scan; desktop shows scan + alerts */}
         <section>
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-ivory-text3">
-            {t.homePage.orLabel}
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setScannerOpen(true)}
-              data-testid="quick-action-scan"
-              className="flex min-h-[76px] items-center justify-between gap-2.5 rounded-2xl p-3.5 text-start text-white transition-transform motion-safe:active:scale-[0.98]"
-              style={{ background: FOREST, boxShadow: "0 10px 22px -12px rgba(26,61,40,0.45)" }}
-            >
-              <span className="min-w-0">
-                <span className="block text-[13.5px] font-bold">{t.homePage.scanEquipment}</span>
-                <span className="mt-0.5 block text-[11px] text-white/65">{t.homePage.scanEquipmentHint}</span>
-              </span>
-              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15">
-                <Scan className="h-[17px] w-[17px]" aria-hidden />
-              </span>
-            </button>
+          {isDesktop && (
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-ivory-text3">
+              {t.homePage.orLabel}
+            </p>
+          )}
+          <div className={cn("grid gap-2", isDesktop ? "grid-cols-2" : "grid-cols-1")}>
+            {isDesktop && (
+              <button
+                type="button"
+                onClick={() => setScannerOpen(true)}
+                data-testid="quick-action-scan"
+                className="flex min-h-[76px] items-center justify-between gap-2.5 rounded-2xl p-3.5 text-start text-white transition-transform motion-safe:active:scale-[0.98]"
+                style={{ background: FOREST, boxShadow: "0 10px 22px -12px rgba(26,61,40,0.45)" }}
+              >
+                <span className="min-w-0">
+                  <span className="block text-[13.5px] font-bold">{t.homePage.scanEquipment}</span>
+                  <span className="mt-0.5 block text-[11px] text-white/65">{t.homePage.scanEquipmentHint}</span>
+                </span>
+                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15">
+                  <Scan className="h-[17px] w-[17px]" aria-hidden />
+                </span>
+              </button>
+            )}
 
             <Link
               href="/alerts"
@@ -583,10 +589,10 @@ export default function HomePage() {
     </>
   );
 
-  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
   if (isDesktop) {
     return <PageShell>{pageContent}</PageShell>;
   }
+
   return (
     <Layout
       onScan={() => setScannerOpen(true)}

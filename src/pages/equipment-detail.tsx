@@ -405,8 +405,9 @@ export default function EquipmentDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       setJustConfirmed(true);
       setTimeout(() => setJustConfirmed(false), 1500);
-    } catch {
-      toast.error("Couldn't confirm — check connection");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      toast.error(msg || t.roomRadarPage.pilotConfirmError);
     } finally {
       setConfirmingHere(false);
     }

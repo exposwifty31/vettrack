@@ -10,6 +10,7 @@ import { QrScanner } from "@/components/qr-scanner";
 import { getCurrentUserId } from "@/lib/auth-store";
 import type { Equipment } from "@/types";
 import { Search, Scan, MapPin, ChevronRight, CheckCircle2, Loader2 } from "lucide-react";
+import { t } from "@/lib/i18n";
 
 const STALE_MS = 4 * 60 * 60 * 1000;
 const MAX_RECENT = 5;
@@ -154,12 +155,15 @@ export default function PilotHomePage() {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       setConfirmedId(e.id);
       setTimeout(() => setConfirmedId((prev) => (prev === e.id ? null : prev)), 1500);
-    } catch {
-      toast.error("Couldn't confirm — check connection");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      toast.error(msg || t.roomRadarPage.pilotConfirmError);
     } finally {
       setConfirmingId(null);
     }
   }
+
+  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
 
   const content = (
     <>
@@ -168,7 +172,7 @@ export default function PilotHomePage() {
       </Helmet>
 
       <div className="mx-auto flex w-full max-w-[680px] flex-col gap-4 px-3 pb-nav-safe pt-4 sm:px-5">
-        {/* Search + Scan */}
+        {/* Search + Scan (desktop only; mobile uses bottom-nav scan) */}
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search
@@ -184,14 +188,16 @@ export default function PilotHomePage() {
               className="h-11 w-full rounded-xl border border-ivory-border bg-ivory-surface ps-9 pe-3 text-sm text-ivory-text placeholder:text-ivory-text3 focus:border-primary/40 focus:outline-none focus:ring-0"
             />
           </div>
-          <button
-            type="button"
-            onClick={() => setScannerOpen(true)}
-            aria-label="Scan QR code"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#1a3d28] text-white transition-opacity active:opacity-80"
-          >
-            <Scan className="h-[18px] w-[18px]" aria-hidden />
-          </button>
+          {isDesktop && (
+            <button
+              type="button"
+              onClick={() => setScannerOpen(true)}
+              aria-label="Scan QR code"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#1a3d28] text-white transition-opacity active:opacity-80"
+            >
+              <Scan className="h-[18px] w-[18px]" aria-hidden />
+            </button>
+          )}
         </div>
 
         {/* Search results */}
@@ -382,7 +388,6 @@ export default function PilotHomePage() {
     </>
   );
 
-  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
   if (isDesktop) return <PageShell>{content}</PageShell>;
   return (
     <Layout

@@ -1,7 +1,8 @@
 // src/pages/crash-cart.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Circle, AlertTriangle, Clock, Settings } from "lucide-react";
+import { CheckCircle2, Circle, AlertTriangle, Clock, Settings, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorCard } from "@/components/ui/error-card";
 import { authFetch } from "@/lib/auth-fetch";
@@ -38,10 +39,18 @@ function formatRelativeTime(iso: string): string {
 export default function CrashCartCheckPage() {
   const { userId, isAdmin } = useAuth();
   const queryClient = useQueryClient();
+  const searchStr = useSearch();
+  const configureFromUrl = new URLSearchParams(searchStr).get("configure") === "1";
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [notes, setNotes] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [adminSheetOpen, setAdminSheetOpen] = useState(false);
+
+  useEffect(() => {
+    if (configureFromUrl && isAdmin) {
+      setAdminSheetOpen(true);
+    }
+  }, [configureFromUrl, isAdmin]);
 
   const itemsQ = useQuery({
     queryKey: ["/api/crash-cart/items"],
@@ -155,6 +164,32 @@ export default function CrashCartCheckPage() {
           </div>
         </div>
       )}
+
+      {/* Clinic-specific checklist (admin configures; staff sees hint) */}
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900/80 p-4 mb-4">
+        <div className="flex items-start gap-3">
+          <ListChecks className="h-5 w-5 text-primary shrink-0 mt-0.5" aria-hidden />
+          <div className="flex-1 min-w-0 space-y-2">
+            <p className="text-sm font-semibold text-zinc-200">{t.crashCart.customizeTitle}</p>
+            <p className="text-xs text-zinc-500 leading-relaxed">{t.crashCart.customizeDescription}</p>
+            {isAdmin ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="mt-1"
+                onClick={() => setAdminSheetOpen(true)}
+                data-testid="crash-cart-customize"
+              >
+                <Settings className="h-4 w-4 ml-1" aria-hidden />
+                {t.crashCart.customizeButton}
+              </Button>
+            ) : (
+              <p className="text-xs text-amber-600/90 dark:text-amber-400">{t.crashCart.nonAdminHint}</p>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Checklist */}
       {itemsQ.isPending ? (

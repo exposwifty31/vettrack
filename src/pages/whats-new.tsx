@@ -19,6 +19,10 @@ import {
   Smartphone,
   RefreshCw,
   ArrowLeft,
+  Scan,
+  MapPin,
+  ShieldCheck,
+  HeartPulse,
 } from "lucide-react";
 
 interface ReleaseEntry {
@@ -33,6 +37,46 @@ interface ReleaseEntry {
 }
 
 const releases: ReleaseEntry[] = [
+  {
+    version: "1.1.2",
+    date: "מאי 2026",
+    highlights: [
+      {
+        icon: <RefreshCw className="w-5 h-5 text-primary" />,
+        title: "מה חדש וניווט ציוד",
+        description:
+          "קישור «ראה מה חדש» מהגדרות, מבאנר העדכון ומהתפריט עובד גם במצב פיילוט. נתיבים שגויים כמו /equipment/scan מפנים כעת לרשימת הציוד במקום מסך «הדף לא נמצא».",
+        badge: { label: "תיקון", variant: "outline" },
+      },
+      {
+        icon: <Scan className="w-5 h-5 text-primary" />,
+        title: "סריקה ברורה במובייל",
+        description:
+          "במסך הבית ובפיילוט הוסר כפתור סריקה כפול — במובייל נשאר רק כפתור הסריקה המרכזי בתחתית. בדסקטופ עדיין זמין קיצור דרך לסריקה.",
+        badge: { label: "תיקון", variant: "outline" },
+      },
+      {
+        icon: <ShieldCheck className="w-5 h-5 text-primary" />,
+        title: "אישור ציוד ברדאר חדרים",
+        description:
+          "לחיצה על «אשר כאן» מעדכנת כעת את מצב האימות (lastVerified) ומציגה הודעת שגיאה מדויקת מהשרת במקום «לא ניתן לאשר» גנרי. ספירת פריטים בחדר (למשל ICU) תואמת לנתוני השרת.",
+        badge: { label: "תיקון", variant: "outline" },
+      },
+      {
+        icon: <MapPin className="w-5 h-5 text-primary" />,
+        title: "רדאר חדרים ותחזוקה",
+        description:
+          "קישור «תחזוקה» בסרגל הציוד בדסקטופ מסנן את הרשימה לפריטים בתחזוקה. ניווט מחדר לפריט ציוד נפתח תמיד לעמוד הפרטים הנכון.",
+      },
+      {
+        icon: <HeartPulse className="w-5 h-5 text-primary" />,
+        title: "רשימת עגלת החייאה לפי בית החולים",
+        description:
+          "מנהל יכול להתאים את פריטי הבדיקה היומית לעגלה במחלקה: הוספה, עריכה והסרה ממסך בדיקת העגלה או מהגדרות. הרשימה נשמרת לכל המשמרות באותו בית חולים.",
+        badge: { label: "חדש", variant: "default" },
+      },
+    ],
+  },
   {
     version: "1.1.1",
     date: "אפריל 2026",

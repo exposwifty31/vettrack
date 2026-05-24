@@ -86,10 +86,17 @@ function AwarenessBar({ snapshot }: { snapshot: DisplaySnapshot }) {
   });
 
   const cart = snapshot.crashCartStatus;
-  const cartAgeHours = cart
-    ? Math.round((now.getTime() - new Date(cart.lastCheckedAt).getTime()) / 3_600_000)
+  const cartCheckedAgoMs = cart
+    ? now.getTime() - new Date(cart.lastCheckedAt).getTime()
     : null;
-  const cartOk = cart !== null && cartAgeHours !== null && cartAgeHours < 24;
+  const cartOk =
+    cart !== null && cartCheckedAgoMs !== null && cartCheckedAgoMs < 24 * 3_600_000;
+  const cartAgeLabel =
+    cartCheckedAgoMs !== null
+      ? cartCheckedAgoMs < 3_600_000
+        ? `${Math.max(1, Math.round(cartCheckedAgoMs / 60_000))} דק׳`
+        : `${Math.round(cartCheckedAgoMs / 3_600_000)} שע׳`
+      : null;
 
   const firstOverdue = snapshot.hospitalizations.find((h) => h.overdueTaskCount > 0);
   const extraOverdue = snapshot.totalOverdueCount > 1 ? snapshot.totalOverdueCount - 1 : 0;
@@ -119,7 +126,7 @@ function AwarenessBar({ snapshot }: { snapshot: DisplaySnapshot }) {
 
       {cartOk ? (
         <span className="flex items-center gap-1 bg-green-900/30 border border-green-700/40 text-green-300 rounded px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap">
-          ✓ עגלה נבדקה · {cartAgeHours} שע׳
+          ✓ עגלה נבדקה · {cartAgeLabel}
         </span>
       ) : (
         <span className="flex items-center gap-1 bg-amber-900/20 border border-amber-700/40 text-yellow-300 rounded px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap">

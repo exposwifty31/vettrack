@@ -32,7 +32,9 @@ import {
   Sun,
   AlignJustify,
   Send,
+  ListChecks,
 } from "lucide-react";
+import { Link } from "wouter";
 import { playFeedbackTone, playMuteTone } from "@/lib/sounds";
 import { toast } from "sonner";
 import { t } from "@/lib/i18n";
@@ -483,6 +485,21 @@ export default function SettingsPage() {
             </Button>
           </div>
         </section>
+
+        {isAdminContext && (
+          <section className="space-y-2">
+            <SettingsSectionHeader label={t.settingsPage.crashCartChecklist} />
+            <div className="rounded-xl bg-card border border-border/60 px-4 py-4 space-y-3">
+              <p className="text-sm text-muted-foreground">{t.settingsPage.crashCartChecklistDescription}</p>
+              <Link href="/crash-cart?configure=1">
+                <Button variant="outline" size="sm" className="gap-2" data-testid="settings-crash-cart-checklist">
+                  <ListChecks className="w-4 h-4" aria-hidden />
+                  {t.settingsPage.crashCartChecklistManage}
+                </Button>
+              </Link>
+            </div>
+          </section>
+        )}
 
         {/* About */}
         <section className="space-y-2">

@@ -764,6 +764,9 @@ export interface TStructure {
     resetButton: string;
     resetDialogTitle: string;
     account: string;
+    crashCartChecklist: string;
+    crashCartChecklistDescription: string;
+    crashCartChecklistManage: string;
     about: string;
     logout: string;
   };
@@ -2551,6 +2554,10 @@ export interface TStructure {
     weightKg: string;
     loadingItems: string;
     itemsToCheck: string;
+    customizeTitle: string;
+    customizeDescription: string;
+    customizeButton: string;
+    nonAdminHint: string;
     missingItemsNotesPlaceholder: string;
     saveAllOk: string;
     saveWithMissing: string;

@@ -544,7 +544,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
         "/", "/equipment", "/alerts", "/code-blue", "/crash-cart",
         "/my-equipment", "/rooms", "/display",
         "/admin", "/admin/code-blue-history", "/print",
-        "/help", "/settings",
+        "/help", "/settings", "/whats-new",
       ]);
       return allItems.filter((item) => pilotHrefs.has(item.href));
     }

@@ -1,6 +1,7 @@
 import { t } from "@/lib/i18n";
 import { useState, useEffect, useRef } from "react";
 import { useParams, useSearch } from "wouter";
+import { ApiError } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
@@ -105,6 +106,7 @@ interface RadarEquipmentCardProps {
 }
 
 function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquipmentCardProps) {
+  const { id: roomId } = useParams<{ id: string }>();
   const [moveOpen, setMoveOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [tapped, setTapped] = useState(false);
@@ -121,11 +123,22 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
     mutationFn: () => api.equipment.scan(eq.id, { status: "ok" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      if (roomId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/rooms", roomId] });
+      }
       setJustConfirmed(true);
       haptics.scanSuccess();
       setTimeout(() => setJustConfirmed(false), 1500);
     },
-    onError: () => toast.error(t.roomRadarPage.pilotConfirmError),
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "";
+      toast.error(msg || t.roomRadarPage.pilotConfirmError);
+    },
   });
 
   useEffect(() => {
@@ -420,9 +433,11 @@ export default function RoomRadarPage() {
     ? roomEquipment.filter((e) => !e.checkedOutById)
     : roomEquipment;
 
-  const availableCount = roomEquipment.filter((e) => !e.checkedOutById).length;
-  const inUseCount = roomEquipment.filter((e) => !!e.checkedOutById).length;
-  const issueCount = roomEquipment.filter((e) => e.status === "issue" || e.status === "maintenance").length;
+  const derivedAvailable = roomEquipment.filter((e) => !e.checkedOutById).length;
+  const derivedInUse = roomEquipment.filter((e) => !!e.checkedOutById).length;
+  const availableCount = room?.availableCount ?? derivedAvailable;
+  const inUseCount = room?.inUseCount ?? derivedInUse;
+  const issueCount = room?.issueCount ?? roomEquipment.filter((e) => e.status === "issue" || e.status === "maintenance").length;
 
   const verifyMut = useMutation({
     mutationFn: () => api.rooms.bulkVerify(id!),
