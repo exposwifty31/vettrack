@@ -2669,6 +2669,8 @@ export interface TStructure {
     notDeployable: string;
     setupRequired: string;
     procedureBindNotReadyWarning: string;
+    procedureBound: string;
+    procedureReleased: string;
   };
   dockReturn: {
     title: string;
@@ -2708,6 +2710,14 @@ export interface TStructure {
     requestStage: string;
     conflict: string;
     youAreFirst: string;
+    promotedTitle: string;
+    promotedBody: string;
+    readinessTab: string;
+    bindToHospitalization: string;
+    selectHospitalization: string;
+    releaseFromProcedure: string;
+    confirmRelease: string;
+    confirmReleaseDescription: string;
   };
   operationalMetrics: {
     title: string;

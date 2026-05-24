@@ -826,6 +826,8 @@ const translations = {
     notDeployable: d.operationalState.notDeployable,
     setupRequired: d.operationalState.setupRequired,
     procedureBindNotReadyWarning: d.operationalState.procedureBindNotReadyWarning,
+    procedureBound: d.operationalState.procedureBound,
+    procedureReleased: d.operationalState.procedureReleased,
   },
 
   dockReturn: {
@@ -868,6 +870,14 @@ const translations = {
     requestStage: d.stagingQueue.requestStage,
     conflict: d.stagingQueue.conflict,
     youAreFirst: d.stagingQueue.youAreFirst,
+    promotedTitle: d.stagingQueue.promotedTitle,
+    promotedBody: d.stagingQueue.promotedBody,
+    readinessTab: d.stagingQueue.readinessTab,
+    bindToHospitalization: d.stagingQueue.bindToHospitalization,
+    selectHospitalization: d.stagingQueue.selectHospitalization,
+    releaseFromProcedure: d.stagingQueue.releaseFromProcedure,
+    confirmRelease: d.stagingQueue.confirmRelease,
+    confirmReleaseDescription: d.stagingQueue.confirmReleaseDescription,
   },
 
   operationalMetrics: {

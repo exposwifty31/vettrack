@@ -18,6 +18,7 @@ import { computeBundleReadinessGate } from "../services/equipment-operational-st
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
 import { enqueueChargeAlertJob } from "../workers/chargeAlertWorker.js";
+import { promoteStagingQueueNext } from "../lib/staging-promotion.js";
 
 const EQUIPMENT_STATUS_VALUES = [
   "ok",
@@ -1584,6 +1585,10 @@ router.post(
           payload: { equipmentId: req.params.id, custodyState: "checked_out", usageState: v1NewUsageState },
         });
     });
+
+    if (v1StageClaimId) {
+      void promoteStagingQueueNext(req.params.id, clinicId);
+    }
 
     if (!updated) {
       return res.status(404).json(

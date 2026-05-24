@@ -2665,7 +2665,9 @@
     "fullDeployable": "מוכן לפריסה",
     "notDeployable": "לא פריס",
     "setupRequired": "נדרשת הגדרת asset type",
-    "procedureBindNotReadyWarning": "ציוד זה אינו מוכן לפריסה — האם להמשיך?"
+    "procedureBindNotReadyWarning": "ציוד זה אינו מוכן לפריסה — האם להמשיך?",
+    "procedureBound": "הציוד קושר לאשפוז",
+    "procedureReleased": "הציוד שוחרר מהפרוצדורה"
   },
   "dockReturn": {
     "title": "החזרת ציוד לעגינה",
@@ -2704,7 +2706,15 @@
     "cancelClaim": "בטל הזמנה",
     "requestStage": "הזמן ציוד",
     "conflict": "ציוד תפוס בתור",
-    "youAreFirst": "אתה ראשון — ניתן לcheckout"
+    "youAreFirst": "אתה ראשון — ניתן לcheckout",
+    "promotedTitle": "אתה ראשון בתור",
+    "promotedBody": "ניתן לבצע checkout של {name}",
+    "readinessTab": "מוכנות",
+    "bindToHospitalization": "קשר לאשפוז",
+    "selectHospitalization": "בחר אשפוז",
+    "releaseFromProcedure": "שחרר מפרוצדורה",
+    "confirmRelease": "לשחרר את הציוד מהפרוצדורה?",
+    "confirmReleaseDescription": "הציוד יחזור למצב זמין ויסומן כלא ידוע — נדרש dock-return לפני פריסה."
   },
   "operationalMetrics": {
     "title": "מדדים תפעוליים",

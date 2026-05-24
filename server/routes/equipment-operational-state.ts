@@ -25,6 +25,7 @@ import {
 } from "../services/equipment-operational-state.service.js";
 import { apiError } from "../lib/apiError.js";
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
+import { promoteStagingQueueNext } from "../lib/staging-promotion.js";
 
 const router = Router();
 
@@ -489,6 +490,7 @@ router.delete("/equipment/:equipmentId/stage/:claimId", requireAuth, async (req,
     throw err;
   }
 
+  void promoteStagingQueueNext(equipmentId, clinicId);
   logAudit({ clinicId, actionType: "equipment_stage_cancelled", performedBy: userId, performedByEmail: email, targetId: equipmentId, metadata: { claimId } });
   res.status(204).send();
 });

@@ -2665,7 +2665,9 @@
     "fullDeployable": "Deployable",
     "notDeployable": "Not Deployable",
     "setupRequired": "Asset type setup required",
-    "procedureBindNotReadyWarning": "This equipment is not ready for deployment — continue anyway?"
+    "procedureBindNotReadyWarning": "This equipment is not ready for deployment — continue anyway?",
+    "procedureBound": "Equipment bound to hospitalization",
+    "procedureReleased": "Equipment released from procedure"
   },
   "dockReturn": {
     "title": "Return to Dock",
@@ -2704,7 +2706,15 @@
     "cancelClaim": "Cancel claim",
     "requestStage": "Request equipment",
     "conflict": "Equipment is queued",
-    "youAreFirst": "You're first — checkout available"
+    "youAreFirst": "You're first — checkout available",
+    "promotedTitle": "You are now #1 in queue",
+    "promotedBody": "Checkout available for {name}",
+    "readinessTab": "Readiness",
+    "bindToHospitalization": "Bind to hospitalization",
+    "selectHospitalization": "Select hospitalization",
+    "releaseFromProcedure": "Release from procedure",
+    "confirmRelease": "Release this equipment from the procedure?",
+    "confirmReleaseDescription": "Equipment will return to available and be marked unknown — dock-return required before deployment."
   },
   "operationalMetrics": {
     "title": "Operational metrics",

@@ -75,12 +75,12 @@ function AdminDocksContent() {
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}
               />
-              <Select value={newRoomId} onValueChange={setNewRoomId}>
+              <Select value={newRoomId || "__none__"} onValueChange={(v) => setNewRoomId(v === "__none__" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Room (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No room</SelectItem>
+                  <SelectItem value="__none__">No room</SelectItem>
                   {(roomsQ.data ?? []).map((room: Room) => (
                     <SelectItem key={room.id} value={room.id}>
                       {room.name}

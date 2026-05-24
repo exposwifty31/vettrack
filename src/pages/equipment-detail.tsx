@@ -91,6 +91,7 @@ import { haptics } from "@/lib/haptics";
 import { safeStorageSetItem } from "@/lib/safe-browser";
 import { isOnline } from "@/lib/safe-browser";
 import { isPilotMode } from "@/lib/pilot-mode";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const STATUS_CONFIG = {
   ok: { icon: CheckCircle2, color: "text-emerald-600", iconBg: "bg-emerald-50" },
@@ -129,6 +130,8 @@ export default function EquipmentDetailPage() {
   /** Baseline DB/shift role is student — not elevated technician/vet for this session. */
   const isStudentEquipmentRole = resolvedEquipmentRole === "student";
   const canDuplicate = (ROLE_LEVEL[resolvedEquipmentRole] ?? 0) >= 20;
+  // Pattern from shift-chat-panel.tsx — effectiveRole may differ from role during shift
+  const hasVetAccess = isAdmin || effectiveRole === "vet" || role === "vet";
   const { settings } = useSettings();
   const { discard } = useSyncQueue();
   const queryClient = useQueryClient();
@@ -161,6 +164,9 @@ export default function EquipmentDetailPage() {
   const [reportIssueNote, setReportIssueNote] = useState("");
   const [reportIssuePhoto, setReportIssuePhoto] = useState<string | null>(null);
   const [reportIssueNoteError, setReportIssueNoteError] = useState("");
+  const [bindOpen, setBindOpen] = useState(false);
+  const [releaseConfirmOpen, setReleaseConfirmOpen] = useState(false);
+  const [selectedHospId, setSelectedHospId] = useState<string>("");
 
   useEffect(() => {
     const params = new URLSearchParams(searchStr);
@@ -343,6 +349,43 @@ export default function EquipmentDetailPage() {
     enabled: !!id && queryEnabled,
     retry: false,
     refetchOnWindowFocus: false,
+  });
+
+  const deployabilityQ = useQuery({
+    queryKey: ["deployability", id],
+    queryFn: () => api.operationalState.deployability(id!),
+    enabled: !!id && equipment?.custodyState != null,
+    refetchInterval: 30_000,
+  });
+
+  const hospitalizationsQ = useQuery({
+    queryKey: ["/api/patients", "active"],
+    queryFn: () => api.patients.listActive(),
+    enabled: bindOpen,
+  });
+
+  const procedureBindMut = useMutation({
+    mutationFn: (hospitalizationId: string) =>
+      api.operationalState.procedureBind(id!, { hospitalizationId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ["deployability", id] });
+      queryClient.invalidateQueries({ queryKey: ["staging-queue", id] });
+      setBindOpen(false);
+      setSelectedHospId("");
+      toast.success(t.operationalState.procedureBound);
+    },
+  });
+
+  const procedureUnbindMut = useMutation({
+    mutationFn: () => api.operationalState.procedureUnbind(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ["deployability", id] });
+      queryClient.invalidateQueries({ queryKey: ["staging-queue", id] });
+      setReleaseConfirmOpen(false);
+      toast.success(t.operationalState.procedureReleased);
+    },
   });
 
   function invalidateAll() {
@@ -1158,17 +1201,17 @@ export default function EquipmentDetailPage() {
         <Tabs defaultValue="details">
           <TabsList className="w-full">
             <TabsTrigger value="details" className="flex-1">Details</TabsTrigger>
-            {showOperationalState && (
-              <TabsTrigger value="readiness" className="flex-1" data-testid="tab-readiness">
-                {t.dockReturn.conditions}
-              </TabsTrigger>
-            )}
             <TabsTrigger value="history" className="flex-1">
               History ({scanLogs?.length ?? 0})
             </TabsTrigger>
             <TabsTrigger value="transfers" className="flex-1">
               Transfers ({transfers?.length ?? 0})
             </TabsTrigger>
+            {equipment?.custodyState != null && (
+              <TabsTrigger value="readiness" className="flex-1" data-testid="tab-readiness">
+                {t.stagingQueue.readinessTab}
+              </TabsTrigger>
+            )}
             {isAdmin && isPilotMode && (
               <TabsTrigger value="scanlog" className="flex-1">
                 {t.equipmentDetail.scanLogTab}
@@ -1243,24 +1286,6 @@ export default function EquipmentDetailPage() {
               </CardContent>
             </Card>
           </TabsContent>
-
-          {showOperationalState && (
-            <TabsContent value="readiness">
-              <Card className="bg-card border-border/60 shadow-sm">
-                <CardContent className="p-4 flex flex-col gap-4">
-                  <DeployabilityBadge
-                    custodyState={equipment.custodyState}
-                    readinessState={equipment.readinessState}
-                    usageState={equipment.usageState}
-                    fullDeployable={fullDeployable}
-                  />
-                  {userId && (
-                    <StagingQueuePanel equipment={equipment} currentUserId={userId} />
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
 
           <TabsContent value="history">
             <div className="flex flex-col gap-2">
@@ -1375,6 +1400,127 @@ export default function EquipmentDetailPage() {
             </div>
           </TabsContent>
 
+          {equipment?.custodyState != null && (
+            <TabsContent value="readiness" className="space-y-4 p-4">
+              {deployabilityQ.data && (
+                <div className="flex flex-col gap-1">
+                  <DeployabilityBadge
+                    custodyState={deployabilityQ.data.custodyState}
+                    readinessState={deployabilityQ.data.readinessState}
+                    usageState={deployabilityQ.data.usageState}
+                    fullDeployable={deployabilityQ.data.fullDeployable}
+                  />
+                  {!deployabilityQ.data.bundleGate.ok &&
+                    !deployabilityQ.data.bundleGate.skipped &&
+                    deployabilityQ.data.bundleGate.reason && (
+                    <p className="text-xs text-muted-foreground">
+                      {deployabilityQ.data.bundleGate.reason}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {userId && (
+                <StagingQueuePanel equipment={equipment} currentUserId={userId} />
+              )}
+
+              <div className="flex flex-col gap-2">
+                {equipment.custodyState === "returned" && (
+                  <Button variant="outline" onClick={() => setDockReturnOpen(true)}>
+                    {t.dockReturn.title}
+                  </Button>
+                )}
+                {equipment.custodyState === "docked" &&
+                  equipment.usageState === "available" &&
+                  hasVetAccess && (
+                  <Button variant="outline" onClick={() => setBindOpen(true)}>
+                    {t.stagingQueue.bindToHospitalization}
+                  </Button>
+                )}
+                {equipment.usageState === "procedure_bound" && hasVetAccess && (
+                  <Button
+                    variant="destructive"
+                    onClick={() => setReleaseConfirmOpen(true)}
+                    disabled={procedureUnbindMut.isPending}
+                  >
+                    {t.stagingQueue.releaseFromProcedure}
+                  </Button>
+                )}
+              </div>
+
+              <DockReturnFlow
+                equipment={equipment}
+                open={dockReturnOpen}
+                onClose={() => setDockReturnOpen(false)}
+                onSuccess={() => {
+                  queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
+                  queryClient.invalidateQueries({ queryKey: ["deployability", id] });
+                  queryClient.invalidateQueries({ queryKey: ["condition-states", id] });
+                  queryClient.invalidateQueries({ queryKey: ["staging-queue", id] });
+                  setDockReturnOpen(false);
+                }}
+              />
+
+              <Dialog open={bindOpen} onOpenChange={setBindOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{t.stagingQueue.bindToHospitalization}</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-3">
+                    {equipment.readinessState !== "ready" && (
+                      <p className="text-sm text-amber-600 bg-amber-50 rounded p-2">
+                        {t.operationalState.procedureBindNotReadyWarning}
+                      </p>
+                    )}
+                    <Select value={selectedHospId} onValueChange={setSelectedHospId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={t.stagingQueue.selectHospitalization} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(hospitalizationsQ.data?.patients ?? []).map((h) => (
+                          <SelectItem key={h.id} value={h.id}>
+                            {h.animal?.name ?? h.id} — {h.status}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setBindOpen(false)}>
+                      {t.common.cancel}
+                    </Button>
+                    <Button
+                      onClick={() => procedureBindMut.mutate(selectedHospId)}
+                      disabled={!selectedHospId || procedureBindMut.isPending}
+                    >
+                      {t.stagingQueue.bindToHospitalization}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              <AlertDialog open={releaseConfirmOpen} onOpenChange={setReleaseConfirmOpen}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{t.stagingQueue.confirmRelease}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t.stagingQueue.confirmReleaseDescription}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => procedureUnbindMut.mutate()}
+                      disabled={procedureUnbindMut.isPending}
+                    >
+                      {t.stagingQueue.releaseFromProcedure}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </TabsContent>
+          )}
+
           {isAdmin && isPilotMode && (
             <TabsContent value="scanlog">
               <div className="flex flex-col gap-3">
@@ -1454,16 +1600,6 @@ export default function EquipmentDetailPage() {
             isPluggedIn: nextPluggedIn,
             plugInDeadlineMinutes: nextDeadline ?? 30,
           });
-        }}
-      />
-
-      <DockReturnFlow
-        equipment={equipment}
-        open={dockReturnOpen}
-        onClose={() => setDockReturnOpen(false)}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
-          queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
         }}
       />
 

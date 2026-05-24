@@ -3,6 +3,7 @@ import { db, equipment, stagingQueue } from "../db.js";
 import { logAudit } from "../lib/audit.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
+import { promoteStagingQueueNext } from "../lib/staging-promotion.js";
 
 const EXPIRY_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -58,7 +59,10 @@ export async function runStagingExpirySweep(now: Date = new Date()): Promise<{ e
         ),
       );
 
-    if (remaining.length > 0) continue;
+    if (remaining.length > 0) {
+      void promoteStagingQueueNext(equipmentId, clinicId);
+      continue;
+    }
 
     // Fetch current equipment row for version guard — scoped to this clinic
     const rows = await db

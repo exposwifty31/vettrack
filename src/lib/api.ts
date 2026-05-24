@@ -1848,6 +1848,8 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(patch),
       }),
+    listActive: () =>
+      request<{ patients: import("@/types").Hospitalization[] }>("/api/patients"),
     listPending: () =>
       request<{ patients: import("@/types").Hospitalization[] }>("/api/patients/pending"),
     assign: (id: string) =>

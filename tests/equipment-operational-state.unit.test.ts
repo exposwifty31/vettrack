@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   computeBundleReadinessGate,
 } from "../server/services/equipment-operational-state.service.js";
@@ -199,5 +199,110 @@ describe("computeBundleReadinessGate", () => {
       true,
     );
     expect(result).toEqual({ ok: true });
+  });
+});
+
+// ─── promoteStagingQueueNext ────────────────────────────────────────────────
+//
+// Tests operate on stagingPromotionDeps directly — no Drizzle chain to mock.
+
+import {
+  promoteStagingQueueNext,
+  stagingPromotionDeps,
+} from "../server/lib/staging-promotion.js";
+
+describe("promoteStagingQueueNext", () => {
+  const origDeps = { ...stagingPromotionDeps };
+
+  beforeEach(() => {
+    stagingPromotionDeps.findNextClaim = vi.fn();
+    stagingPromotionDeps.getEquipmentName = vi.fn();
+    stagingPromotionDeps.enqueueNotificationJob = vi.fn();
+  });
+
+  afterEach(() => {
+    Object.assign(stagingPromotionDeps, origDeps);
+  });
+
+  it("does not enqueue when no active claim exists", async () => {
+    vi.mocked(stagingPromotionDeps.findNextClaim).mockResolvedValue(null);
+    await promoteStagingQueueNext("eq-1", "clinic-1");
+    expect(stagingPromotionDeps.enqueueNotificationJob).not.toHaveBeenCalled();
+  });
+
+  it("enqueues NORMAL priority for routine claim", async () => {
+    vi.mocked(stagingPromotionDeps.findNextClaim).mockResolvedValue({
+      id: "claim-1",
+      requestedById: "user-1",
+      clinicalPriority: "routine",
+    });
+    vi.mocked(stagingPromotionDeps.getEquipmentName).mockResolvedValue("Ventilator A");
+    await promoteStagingQueueNext("eq-1", "clinic-1");
+    expect(stagingPromotionDeps.enqueueNotificationJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        priority: "NORMAL",
+        tag: "staging-promoted:eq-1",
+        userId: "user-1",
+      }),
+    );
+  });
+
+  it("enqueues HIGH priority for urgent claim", async () => {
+    vi.mocked(stagingPromotionDeps.findNextClaim).mockResolvedValue({
+      id: "claim-2",
+      requestedById: "user-2",
+      clinicalPriority: "urgent",
+    });
+    vi.mocked(stagingPromotionDeps.getEquipmentName).mockResolvedValue("Defibrillator");
+    await promoteStagingQueueNext("eq-1", "clinic-1");
+    expect(stagingPromotionDeps.enqueueNotificationJob).toHaveBeenCalledWith(
+      expect.objectContaining({ priority: "HIGH" }),
+    );
+  });
+
+  it("enqueues CRITICAL priority for emergency claim", async () => {
+    vi.mocked(stagingPromotionDeps.findNextClaim).mockResolvedValue({
+      id: "claim-3",
+      requestedById: "user-3",
+      clinicalPriority: "emergency",
+    });
+    vi.mocked(stagingPromotionDeps.getEquipmentName).mockResolvedValue("Crash Cart");
+    await promoteStagingQueueNext("eq-1", "clinic-1");
+    expect(stagingPromotionDeps.enqueueNotificationJob).toHaveBeenCalledWith(
+      expect.objectContaining({ priority: "CRITICAL" }),
+    );
+  });
+
+  it("uses claim id (not time-based) for idempotencyKey", async () => {
+    vi.mocked(stagingPromotionDeps.findNextClaim).mockResolvedValue({
+      id: "claim-abc",
+      requestedById: "user-4",
+      clinicalPriority: "routine",
+    });
+    vi.mocked(stagingPromotionDeps.getEquipmentName).mockResolvedValue("Pump");
+    await promoteStagingQueueNext("eq-2", "clinic-1");
+    expect(stagingPromotionDeps.enqueueNotificationJob).toHaveBeenCalledWith(
+      expect.objectContaining({ idempotencyKey: "staging-promoted:claim-abc" }),
+    );
+  });
+
+  it("does not throw when enqueueNotificationJob throws", async () => {
+    vi.mocked(stagingPromotionDeps.findNextClaim).mockResolvedValue({
+      id: "claim-x",
+      requestedById: "user-5",
+      clinicalPriority: "routine",
+    });
+    vi.mocked(stagingPromotionDeps.getEquipmentName).mockResolvedValue("Device");
+    vi.mocked(stagingPromotionDeps.enqueueNotificationJob).mockRejectedValue(
+      new Error("Redis down"),
+    );
+    await expect(promoteStagingQueueNext("eq-1", "clinic-1")).resolves.toBeUndefined();
+  });
+
+  it("does not throw when findNextClaim throws", async () => {
+    vi.mocked(stagingPromotionDeps.findNextClaim).mockRejectedValue(
+      new Error("DB error"),
+    );
+    await expect(promoteStagingQueueNext("eq-1", "clinic-1")).resolves.toBeUndefined();
   });
 });
