@@ -1,44 +1,44 @@
 /**
- * Phase 10 P1-10 regression: PageErrorBoundary.reset() must guard
+ * Phase 10 P1-10 regression: chunk-load recovery must guard
  * against reload loops using sessionStorage (matching index.html pattern).
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { PageErrorBoundary } from "../src/components/ui/page-error-boundary";
+import * as chunkRecovery from "../src/lib/chunk-load-recovery";
 
 describe("P1-10: PageErrorBoundary reload loop guard", () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
-  it("uses sessionStorage guard before reload", async () => {
+  it("delegates chunk recovery to chunk-load-recovery module", async () => {
     const fs = await import("fs");
-    const source = fs.readFileSync("src/components/ui/page-error-boundary.tsx", "utf8");
-    expect(source).toContain("vt_peb_reload_guard");
-    expect(source).toContain("sessionStorage");
-    expect(source).not.toMatch(/window\.location\.reload\(\);\s*\n\s*return;\s*\n\s*\}/);
+    const boundarySource = fs.readFileSync(
+      "src/components/ui/page-error-boundary.tsx",
+      "utf8",
+    );
+    const recoverySource = fs.readFileSync(
+      "src/lib/chunk-load-recovery.ts",
+      "utf8",
+    );
+    expect(boundarySource).toContain("recoverFromChunkLoadFailure");
+    expect(boundarySource).not.toContain("removeItem(CHUNK_RECOVERY_GUARD_KEY)");
+    expect(recoverySource).toContain("vt_chunk_recovery_guard");
+    expect(recoverySource).toContain("sessionStorage");
+    expect(recoverySource).toContain('k.startsWith("vettrack-")');
+    expect(recoverySource).toContain("caches.delete");
   });
 
-  it("clears vettrack-* caches before reload", async () => {
-    const fs = await import("fs");
-    const source = fs.readFileSync("src/components/ui/page-error-boundary.tsx", "utf8");
-    expect(source).toContain('k.startsWith("vettrack-")');
-    expect(source).toContain("caches.delete");
-  });
-
-  it("does not leave Try Again as a no-op after a guarded reload fails", () => {
-    const storage = new Map([["vt_peb_reload_guard", "1"]]);
+  it("does not leave Try Again as a no-op after a guarded reload fails", async () => {
     const reload = vi.fn();
-    vi.stubGlobal("sessionStorage", {
-      getItem: (key: string) => storage.get(key) ?? null,
-      setItem: (key: string, value: string) => storage.set(key, value),
-      removeItem: (key: string) => storage.delete(key),
-    });
     vi.stubGlobal("window", { location: { reload } });
+    vi.spyOn(chunkRecovery, "recoverFromChunkLoadFailure").mockResolvedValue(false);
 
     const boundary = new PageErrorBoundary({ children: null });
     boundary.state = {
       hasError: true,
-      errorMessage: "Failed to fetch dynamically imported module",
+      errorMessage: "Importing a module script failed",
     };
     const setState = vi.fn((state: typeof boundary.state) => {
       boundary.state = state;
@@ -46,8 +46,9 @@ describe("P1-10: PageErrorBoundary reload loop guard", () => {
     boundary.setState = setState as typeof boundary.setState;
 
     boundary.reset();
+    await Promise.resolve();
 
-    expect(storage.has("vt_peb_reload_guard")).toBe(false);
+    expect(chunkRecovery.recoverFromChunkLoadFailure).toHaveBeenCalled();
     expect(setState).toHaveBeenCalledWith({ hasError: false, errorMessage: "" });
     expect(reload).not.toHaveBeenCalled();
   });

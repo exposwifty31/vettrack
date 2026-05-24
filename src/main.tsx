@@ -17,6 +17,10 @@ import { SyncStatusBanner } from "@/components/sync-status-banner";
 import { SwUpdateBanner } from "@/components/sw-update-banner";
 import { ShiftChatFab } from "@/features/shift-chat/components/ShiftChatFab";
 import {
+  chunkLoadErrorFromReason,
+  recoverFromChunkLoadFailure,
+} from "@/lib/chunk-load-recovery";
+import {
   getServiceWorkerRegistrationsSafe,
   isServiceWorkerSupported,
   registerServiceWorkerSafe,
@@ -43,6 +47,30 @@ const rootEl = document.getElementById("root");
 
 function AppBootstrap() {
   const [localeVersion, setLocaleVersion] = useState(0);
+  useEffect(() => {
+    if (import.meta.env.PROD) {
+      const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+        const msg = chunkLoadErrorFromReason(event.reason);
+        if (!msg) return;
+        event.preventDefault();
+        void recoverFromChunkLoadFailure({ unregisterServiceWorkers: true });
+      };
+      const onWindowError = (event: ErrorEvent) => {
+        if (!event.message) return;
+        const msg = chunkLoadErrorFromReason(event.message);
+        if (!msg) return;
+        void recoverFromChunkLoadFailure({ unregisterServiceWorkers: true });
+      };
+      window.addEventListener("unhandledrejection", onUnhandledRejection);
+      window.addEventListener("error", onWindowError);
+      return () => {
+        window.removeEventListener("unhandledrejection", onUnhandledRejection);
+        window.removeEventListener("error", onWindowError);
+      };
+    }
+    return undefined;
+  }, []);
+
   useEffect(() => {
     if (!isServiceWorkerSupported()) return;
     if (import.meta.env.DEV) {

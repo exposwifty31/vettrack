@@ -2,6 +2,7 @@ import { Component, type ReactNode } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { t } from "@/lib/i18n";
+import { isChunkLoadError, recoverFromChunkLoadFailure } from "@/lib/chunk-load-recovery";
 
 interface Props {
   children: ReactNode;
@@ -12,8 +13,6 @@ interface State {
   hasError: boolean;
   errorMessage: string;
 }
-
-const RELOAD_GUARD_KEY = "vt_peb_reload_guard";
 
 /**
  * Lightweight per-section error boundary.
@@ -35,48 +34,13 @@ export class PageErrorBoundary extends Component<Props, State> {
     console.error("[PageErrorBoundary]", error, info.componentStack);
   }
 
-  componentDidMount() {
-    this.clearReloadGuardIfRecovered();
-  }
-
-  componentDidUpdate() {
-    this.clearReloadGuardIfRecovered();
-  }
-
-  clearReloadGuardIfRecovered = () => {
-    if (this.state.hasError) return;
-    try {
-      sessionStorage.removeItem(RELOAD_GUARD_KEY);
-    } catch {
-      // Storage can be unavailable in restricted browser modes.
-    }
-  };
-
   reset = () => {
-    const isModuleError =
-      this.state.errorMessage.includes("Importing binding") ||
-      this.state.errorMessage.includes("does not provide an export") ||
-      this.state.errorMessage.includes("Failed to fetch dynamically imported");
-    if (isModuleError) {
-      try {
-        if (sessionStorage.getItem(RELOAD_GUARD_KEY) === "1") {
-          sessionStorage.removeItem(RELOAD_GUARD_KEY);
+    if (isChunkLoadError(this.state.errorMessage)) {
+      void recoverFromChunkLoadFailure().then((reloaded) => {
+        if (!reloaded) {
           this.setState({ hasError: false, errorMessage: "" });
-          return;
         }
-        sessionStorage.setItem(RELOAD_GUARD_KEY, "1");
-      } catch {
-        return;
-      }
-      if (typeof caches !== "undefined") {
-        void caches.keys().then((keys) =>
-          Promise.all(
-            keys.filter((k) => k.startsWith("vettrack-")).map((k) => caches.delete(k)),
-          ),
-        ).finally(() => window.location.reload());
-      } else {
-        window.location.reload();
-      }
+      });
       return;
     }
     this.setState({ hasError: false, errorMessage: "" });

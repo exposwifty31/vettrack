@@ -50,6 +50,11 @@ function isStaticAsset(url) {
   return STATIC_EXTENSIONS.some((ext) => url.pathname.endsWith(ext));
 }
 
+/** Vite content-hashed bundles — must be network-first to avoid post-deploy chunk skew. */
+function isHashedBuildAsset(url) {
+  return url.pathname.startsWith("/assets/");
+}
+
 function isApiRequest(url) {
   return url.pathname.startsWith("/api/");
 }
@@ -269,7 +274,36 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // ── 2. Static assets (.js, .css, images, fonts) ──────────────────────────
+  // ── 2a. Content-hashed build assets (/assets/*) ─────────────────────────
+  //
+  // Strategy: network-first.
+  // Stale-while-revalidate here caused "Importing a module script failed" after
+  // deploy: cached entry chunks referenced chunk hashes deleted on the server.
+
+  if (isHashedBuildAsset(url)) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then(async (cache) => {
+        try {
+          const fresh = await fetch(event.request);
+          if (fresh.ok) {
+            cache.put(event.request, fresh.clone());
+            return fresh;
+          }
+          const cached = await cache.match(event.request);
+          return cached ?? fresh;
+        } catch {
+          const cached = await cache.match(event.request);
+          return (
+            cached ??
+            new Response("Offline asset unavailable", { status: 503 })
+          );
+        }
+      })
+    );
+    return;
+  }
+
+  // ── 2b. Other static assets (.js, .css, images, fonts) ─────────────────
   //
   // Strategy: stale-while-revalidate.
   // Serve from cache immediately for speed; update the cache in the background
