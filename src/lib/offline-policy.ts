@@ -42,10 +42,11 @@ export function assertPendingSyncEnqueueAllowed(op: PendingSyncEnqueueOp): void 
     return;
   }
 
-  console.warn("[offline-policy] unregistered_pending_sync_enqueue", {
+  const payload = {
     code: OFFLINE_SYNC_UNREGISTERED_CODE,
-    type: op.type,
+    pendingType: op.type,
     endpoint: op.endpoint,
     method,
-  });
+  } as const;
+  console.warn("[offline-policy] unregistered_pending_sync_enqueue", payload);
 }

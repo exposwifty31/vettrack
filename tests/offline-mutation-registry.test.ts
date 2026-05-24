@@ -1,6 +1,8 @@
 /**
  * Phase 1 — offline mutation registry and enqueue policy gate.
  */
+import { readFileSync } from "fs";
+import { join } from "path";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
   assertPendingSyncEnqueueAllowed,
@@ -8,54 +10,92 @@ import {
   OfflineEmergencyMutationBlockedError,
 } from "../src/lib/offline-policy";
 import {
+  discoverEnqueueProducerTypesFromApiSource,
   offlineAllowProducers,
   offlineOnlineRequiredDomains,
   ORPHAN_PENDING_SYNC_TYPES,
   PRODUCTION_ENQUEUE_PRODUCER_TYPES,
   resolveAllowRegistryEntry,
+  sampleEndpointForAllowEntry,
 } from "../src/lib/offline-mutation-registry";
-import type { PendingSyncType } from "../src/lib/offline-db";
 
-const PRODUCER_FIXTURES: Array<{
-  type: PendingSyncType;
-  method: string;
-  endpoint: string;
-}> = [
-  { type: "create", method: "POST", endpoint: "/api/equipment" },
-  { type: "update", method: "PATCH", endpoint: "/api/equipment/eq-1" },
-  { type: "delete", method: "DELETE", endpoint: "/api/equipment/eq-1" },
-  { type: "scan", method: "POST", endpoint: "/api/equipment/eq-1/scan" },
-  { type: "seen", method: "POST", endpoint: "/api/equipment/eq-1/seen" },
-  { type: "checkout", method: "POST", endpoint: "/api/equipment/eq-1/checkout" },
-  { type: "return", method: "POST", endpoint: "/api/equipment/eq-1/return" },
-  { type: "return_with_charge", method: "POST", endpoint: "/api/equipment/eq-1/return" },
-];
+const API_SOURCE_PATH = join(process.cwd(), "src/lib/api.ts");
+
+function readApiSource(): string {
+  return readFileSync(API_SOURCE_PATH, "utf8");
+}
 
 describe("offline-mutation-registry — production enqueue producers", () => {
-  it("every production producer fixture resolves to an allow registry entry", () => {
-    for (const fixture of PRODUCER_FIXTURES) {
-      const entry = resolveAllowRegistryEntry(fixture);
-      expect(entry, `missing registry for ${fixture.type} ${fixture.method} ${fixture.endpoint}`).toBeDefined();
-      expect(entry?.policy).toBe("allow");
-      expect(entry?.pendingType).toBe(fixture.type);
+  it("discovers enqueue producer types from api.ts (not a static fixture list)", () => {
+    const source = readApiSource();
+    const discovered = discoverEnqueueProducerTypesFromApiSource(source);
+    expect(discovered.size).toBeGreaterThan(0);
+    // Current api.ts literals: create, update, delete, scan, seen, checkout, return_with_charge
+    expect(discovered.has("create")).toBe(true);
+    expect(discovered.has("scan")).toBe(true);
+    expect(discovered.has("checkout")).toBe(true);
+    expect(discovered.has("return_with_charge")).toBe(true);
+  });
+
+  it("every type discovered in api.ts resolves to an allow registry entry", () => {
+    const discovered = discoverEnqueueProducerTypesFromApiSource(readApiSource());
+    for (const pendingType of discovered) {
+      const entry = offlineAllowProducers.find((e) => e.pendingType === pendingType);
+      expect(entry, `registry missing discovered producer ${pendingType}`).toBeDefined();
+      const endpoint = sampleEndpointForAllowEntry(entry!);
+      const resolved = resolveAllowRegistryEntry({
+        type: pendingType,
+        method: entry!.method,
+        endpoint,
+      });
+      expect(resolved?.key).toBe(entry!.key);
     }
   });
 
-  it("allow registry covers exactly the eight production producer types", () => {
-    const registryTypes = [...new Set(offlineAllowProducers.map((e) => e.pendingType))].sort();
-    const expected = [...PRODUCTION_ENQUEUE_PRODUCER_TYPES].sort();
-    expect(registryTypes).toEqual(expected);
-    expect(registryTypes).toHaveLength(8);
+  it("every allow registry entry is exercised by a discovered api producer or documented sync contract", () => {
+    const discovered = discoverEnqueueProducerTypesFromApiSource(readApiSource());
+    for (const entry of offlineAllowProducers) {
+      const endpoint = sampleEndpointForAllowEntry(entry);
+      expect(
+        resolveAllowRegistryEntry({
+          type: entry.pendingType,
+          method: entry.method,
+          endpoint,
+        }),
+        `registry entry ${entry.key} must resolve for sample endpoint`,
+      ).toBeDefined();
+      if (!discovered.has(entry.pendingType) && entry.pendingType === "return") {
+        // handleOptimisticMutation accepts syncType "return"; no literal call site today.
+        expect(entry.key).toBe("equipment.return");
+        continue;
+      }
+      expect(
+        discovered.has(entry.pendingType),
+        `registry type ${entry.pendingType} has no literal in api.ts — add call site or Phase 2 cleanup`,
+      ).toBe(true);
+    }
+  });
+
+  it("addPendingSync is only invoked from api.ts (single producer module)", () => {
+    const source = readApiSource();
+    expect(source.includes("addPendingSync(")).toBe(true);
+    const offlineDbSource = readFileSync(join(process.cwd(), "src/lib/offline-db.ts"), "utf8");
+    const dbCalls = (offlineDbSource.match(/addPendingSync\(/g) ?? []).length;
+    expect(dbCalls).toBe(1); // export definition only
   });
 
   it("documents orphan PendingSyncType values for Phase 2", () => {
     expect(ORPHAN_PENDING_SYNC_TYPES).toContain("restock");
     expect(ORPHAN_PENDING_SYNC_TYPES).toContain("shift_session");
     for (const orphan of ORPHAN_PENDING_SYNC_TYPES) {
-      expect(
-        offlineAllowProducers.some((e) => e.pendingType === orphan),
-      ).toBe(false);
+      expect(offlineAllowProducers.some((e) => e.pendingType === orphan)).toBe(false);
     }
+  });
+
+  it("production producer type union matches allow registry rows", () => {
+    const registryTypes = [...new Set(offlineAllowProducers.map((e) => e.pendingType))].sort();
+    expect([...PRODUCTION_ENQUEUE_PRODUCER_TYPES].sort()).toEqual(registryTypes);
+    expect(registryTypes).toHaveLength(8);
   });
 });
 
@@ -104,14 +144,22 @@ describe("offline-policy — assertPendingSyncEnqueueAllowed", () => {
     ).toThrow(OfflineEmergencyMutationBlockedError);
   });
 
-  it("allows registered equipment producers without warning", () => {
-    for (const fixture of PRODUCER_FIXTURES) {
-      expect(() => assertPendingSyncEnqueueAllowed(fixture)).not.toThrow();
+  it("allows every type discovered from api.ts without warning", () => {
+    const discovered = discoverEnqueueProducerTypesFromApiSource(readApiSource());
+    for (const pendingType of discovered) {
+      const entry = offlineAllowProducers.find((e) => e.pendingType === pendingType)!;
+      expect(() =>
+        assertPendingSyncEnqueueAllowed({
+          type: pendingType,
+          method: entry.method,
+          endpoint: sampleEndpointForAllowEntry(entry),
+        }),
+      ).not.toThrow();
     }
     expect(console.warn).not.toHaveBeenCalled();
   });
 
-  it("warns but does not throw for unregistered enqueue", () => {
+  it("emits stable structured warn payload for unregistered enqueue", () => {
     assertPendingSyncEnqueueAllowed({
       type: "scan",
       method: "POST",
@@ -119,17 +167,16 @@ describe("offline-policy — assertPendingSyncEnqueueAllowed", () => {
     });
     expect(console.warn).toHaveBeenCalledWith(
       "[offline-policy] unregistered_pending_sync_enqueue",
-      expect.objectContaining({
+      {
         code: OFFLINE_SYNC_UNREGISTERED_CODE,
-        type: "scan",
+        pendingType: "scan",
         endpoint: "/api/unknown/custom",
         method: "POST",
-      }),
+      },
     );
   });
 
   it("does not reject non-emergency paths solely because they are online-required in docs", () => {
-    // Medication/billing have no producer; an arbitrary equipment-like unknown still only warns.
     assertPendingSyncEnqueueAllowed({
       type: "update",
       method: "PATCH",

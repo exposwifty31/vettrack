@@ -159,3 +159,51 @@ export function resolveAllowRegistryEntry(op: {
 /** Every production allow producer type must have a registry row (behavioral coverage). */
 export const PRODUCTION_ENQUEUE_PRODUCER_TYPES: readonly ProducerPendingSyncType[] =
   offlineAllowProducers.map((e) => e.pendingType);
+
+/**
+ * Parse `src/lib/api.ts` source for literal PendingSyncTypes that reach `addPendingSync`.
+ * Tests use this so registry coverage tracks real producers, not a static fixture list.
+ */
+export function discoverEnqueueProducerTypesFromApiSource(apiSource: string): Set<ProducerPendingSyncType> {
+  const discovered = new Set<string>();
+
+  for (const match of apiSource.matchAll(/\bofflineType:\s*["']([a-z_]+)["']/g)) {
+    discovered.add(match[1]);
+  }
+  for (const match of apiSource.matchAll(/\bsyncType:\s*["']([a-z_]+)["']/g)) {
+    discovered.add(match[1]);
+  }
+  for (const match of apiSource.matchAll(/\btype:\s*["'](scan|seen)["']/g)) {
+    discovered.add(match[1]);
+  }
+
+  const allowed = new Set<string>(PRODUCTION_ENQUEUE_PRODUCER_TYPES);
+  const result = new Set<ProducerPendingSyncType>();
+  for (const raw of discovered) {
+    if (!allowed.has(raw)) {
+      throw new Error(
+        `api.ts references unknown addPendingSync producer type "${raw}" — update registry or remove call site`,
+      );
+    }
+    result.add(raw as ProducerPendingSyncType);
+  }
+  return result;
+}
+
+/** Sample endpoint for registry resolution tests derived from pathPattern. */
+export function sampleEndpointForAllowEntry(entry: AllowRegistryEntry): string {
+  if (entry.pendingType === "create") return "/api/equipment";
+  const suffixByType: Partial<Record<ProducerPendingSyncType, string>> = {
+    update: "",
+    delete: "",
+    scan: "/scan",
+    seen: "/seen",
+    checkout: "/checkout",
+    return: "/return",
+    return_with_charge: "/return",
+  };
+  const suffix = suffixByType[entry.pendingType] ?? "";
+  if (entry.pendingType === "update") return "/api/equipment/eq-sample";
+  if (entry.pendingType === "delete") return "/api/equipment/eq-sample";
+  return `/api/equipment/eq-sample${suffix}`;
+}

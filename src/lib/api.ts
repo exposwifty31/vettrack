@@ -288,9 +288,8 @@ export class ApiError extends Error {
   }
 }
 
-// Phase 9 PR 9.5 — shared with offline-policy enqueue choke point.
+// Phase 9 PR 9.5 — shared error class with offline-policy enqueue gate (single definition).
 import { OfflineEmergencyMutationBlockedError } from "@/lib/offline-policy";
-export { OfflineEmergencyMutationBlockedError };
 
 /**
  * Phase 9 PR 9.5 — best-effort fire-and-forget telemetry post that records
