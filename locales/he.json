@@ -2629,6 +2629,7 @@
     "autoRefreshHint": "מתרענן אוטומטית כל 30 שניות. מתזמן השחזור ברקע מעבד מחדש עבודות כושלות כשה-worker פועל."
   },
   "operationalState": {
+    "featureDisabled": "תכונה לא פעילה",
     "invalidCustodyForDockReturn": "חזרה לעגינה דורשת מצב שמירה: הוחזר או עגון.",
     "noAssetTypeDefined": "לציוד אין סוג נכס מוגדר.",
     "crossClinicAssociation": "המשאב שייך למרפאה אחרת.",
@@ -2638,6 +2639,83 @@
     "invalidCustodyForStaging": "העיבוד דורש ציוד עגון.",
     "equipmentNotReady": "הציוד אינו מוכן לשימוש.",
     "equipmentUnavailable": "הציוד אינו זמין לתור.",
-    "claimNotActive": "הבקשה אינה פעילה עוד."
+    "claimNotActive": "הבקשה אינה פעילה עוד.",
+    "hospitalizationDischarged": "האשפוז כבר שוחרר.",
+    "invalidCustody": "הציוד חייב להיות עגון.",
+    "equipmentNotBound": "הציוד אינו קשור לפרוצדורה.",
+    "duplicateClaim": "כבר יש לך בקשה פעילה עבור ציוד זה.",
+    "custodyState": {
+      "docked": "עגון",
+      "checked_out": "מוחזק",
+      "untracked": "לא מעוקב",
+      "returned": "הוחזר"
+    },
+    "readinessState": {
+      "ready": "מוכן",
+      "not_ready": "לא מוכן",
+      "unknown": "לא ידוע"
+    },
+    "usageState": {
+      "available": "זמין",
+      "staged": "בתור",
+      "in_use": "בשימוש",
+      "emergency_use": "חירום",
+      "procedure_bound": "נעול לפרוצדורה"
+    },
+    "fullDeployable": "מוכן לפריסה",
+    "notDeployable": "לא פריס",
+    "setupRequired": "נדרשת הגדרת asset type",
+    "procedureBindNotReadyWarning": "ציוד זה אינו מוכן לפריסה — האם להמשיך?"
+  },
+  "dockReturn": {
+    "title": "החזרת ציוד לעגינה",
+    "selectDock": "בחר עגינה",
+    "conditions": "תנאי מוכנות",
+    "submit": "אשר החזרה",
+    "success": "ציוד הוחזר בהצלחה",
+    "readyAfterReturn": "מוכן לפריסה",
+    "notReadyAfterReturn": "הוחזר — לא עמד בתנאים",
+    "noAssetTypeBlocked": "ציוד זה אינו מוגדר עם asset type — לא ניתן לבצע dock-return",
+    "goToSetup": "הגדר asset type",
+    "noConditionsWarning": "אין תנאים מוגדרים — ציוד יסומן כלא מוכן"
+  },
+  "bundleConditions": {
+    "verified": "אומת",
+    "notVerified": "לא אומת",
+    "stale": "פג תוקף",
+    "unknown": "לא ידוע",
+    "verificationMethod": {
+      "visual": "ויזואלי",
+      "electronic": "אלקטרוני",
+      "manual": "ידני"
+    },
+    "verifiedAt": "אומת ב",
+    "verifiedBy": "ע״י"
+  },
+  "stagingQueue": {
+    "title": "תור ציוד",
+    "priority": {
+      "routine": "רגיל",
+      "urgent": "דחוף",
+      "emergency": "חירום"
+    },
+    "expiresAt": "פג בעוד",
+    "myPosition": "מיקומי בתור",
+    "cancelClaim": "בטל הזמנה",
+    "requestStage": "הזמן ציוד",
+    "conflict": "ציוד תפוס בתור",
+    "youAreFirst": "אתה ראשון — ניתן לcheckout"
+  },
+  "operationalMetrics": {
+    "title": "מדדים תפעוליים",
+    "emergencyOverrides": "עקיפות חירום",
+    "bundleFailures": "כשלי מוכנות",
+    "staleConditions": "תנאים שפגו",
+    "procedureBounds": "פעולות פרוצדורה",
+    "averageCheckoutTime": "זמן checkout ממוצע",
+    "averageDockReturnTime": "זמן dock-return ממוצע",
+    "deployableSuccessRate": "שיעור הצלחת פריסה",
+    "noData": "אין נתונים לתקופה זו",
+    "metricsDisabled": "מדידת מדדים לא פעילה (ENABLE_OPERATIONAL_METRICS)"
   }
 }

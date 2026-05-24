@@ -13,7 +13,8 @@ export type OperationalMetricEvent =
   | "custody_chain_broken"
   | "equipment_not_ready"
   | "workflow_abandoned"
-  | "deployable_success";
+  | "deployable_success"
+  | "procedure_bound";
 
 // Validated at insert to prevent analytics pollution from typos
 const VALID_METRIC_EVENTS = new Set<OperationalMetricEvent>([
@@ -29,6 +30,7 @@ const VALID_METRIC_EVENTS = new Set<OperationalMetricEvent>([
   "equipment_not_ready",
   "workflow_abandoned",
   "deployable_success",
+  "procedure_bound",
 ]);
 
 export interface MetricInput {
@@ -41,7 +43,7 @@ export interface MetricInput {
   metadata?: Record<string, unknown>;
 }
 
-function isMetricsEnabled(): boolean {
+export function isMetricsEnabled(): boolean {
   const val = process.env.ENABLE_OPERATIONAL_METRICS;
   if (!val) return false;
   const n = val.trim().toLowerCase();

@@ -2631,4 +2631,94 @@ export interface TStructure {
     failedBannerBody: string;
     autoRefreshHint: string;
   };
+  operationalState: {
+    featureDisabled: string;
+    invalidCustodyForDockReturn: string;
+    noAssetTypeDefined: string;
+    crossClinicAssociation: string;
+    conditionNotFound: string;
+    conditionWrongAssetType: string;
+    versionConflict: string;
+    invalidCustodyForStaging: string;
+    equipmentNotReady: string;
+    equipmentUnavailable: string;
+    claimNotActive: string;
+    hospitalizationDischarged: string;
+    invalidCustody: string;
+    equipmentNotBound: string;
+    duplicateClaim: string;
+    custodyState: {
+      docked: string;
+      checked_out: string;
+      untracked: string;
+      returned: string;
+    };
+    readinessState: {
+      ready: string;
+      not_ready: string;
+      unknown: string;
+    };
+    usageState: {
+      available: string;
+      staged: string;
+      in_use: string;
+      emergency_use: string;
+      procedure_bound: string;
+    };
+    fullDeployable: string;
+    notDeployable: string;
+    setupRequired: string;
+    procedureBindNotReadyWarning: string;
+  };
+  dockReturn: {
+    title: string;
+    selectDock: string;
+    conditions: string;
+    submit: string;
+    success: string;
+    readyAfterReturn: string;
+    notReadyAfterReturn: string;
+    noAssetTypeBlocked: string;
+    goToSetup: string;
+    noConditionsWarning: string;
+  };
+  bundleConditions: {
+    verified: string;
+    notVerified: string;
+    stale: string;
+    unknown: string;
+    verificationMethod: {
+      visual: string;
+      electronic: string;
+      manual: string;
+    };
+    verifiedAt: string;
+    verifiedBy: string;
+  };
+  stagingQueue: {
+    title: string;
+    priority: {
+      routine: string;
+      urgent: string;
+      emergency: string;
+    };
+    expiresAt: string;
+    myPosition: string;
+    cancelClaim: string;
+    requestStage: string;
+    conflict: string;
+    youAreFirst: string;
+  };
+  operationalMetrics: {
+    title: string;
+    emergencyOverrides: string;
+    bundleFailures: string;
+    staleConditions: string;
+    procedureBounds: string;
+    averageCheckoutTime: string;
+    averageDockReturnTime: string;
+    deployableSuccessRate: string;
+    noData: string;
+    metricsDisabled: string;
+  };
 }

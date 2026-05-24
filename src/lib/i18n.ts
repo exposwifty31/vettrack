@@ -788,6 +788,101 @@ const translations = {
     relativeMinutes: (m: number) => tr(d.crashCart.relativeMinutes, { m }),
   },
 
+  operationalState: {
+    featureDisabled: d.operationalState.featureDisabled,
+    invalidCustodyForDockReturn: d.operationalState.invalidCustodyForDockReturn,
+    noAssetTypeDefined: d.operationalState.noAssetTypeDefined,
+    crossClinicAssociation: d.operationalState.crossClinicAssociation,
+    conditionNotFound: d.operationalState.conditionNotFound,
+    conditionWrongAssetType: d.operationalState.conditionWrongAssetType,
+    versionConflict: d.operationalState.versionConflict,
+    invalidCustodyForStaging: d.operationalState.invalidCustodyForStaging,
+    equipmentNotReady: d.operationalState.equipmentNotReady,
+    equipmentUnavailable: d.operationalState.equipmentUnavailable,
+    claimNotActive: d.operationalState.claimNotActive,
+    hospitalizationDischarged: d.operationalState.hospitalizationDischarged,
+    invalidCustody: d.operationalState.invalidCustody,
+    equipmentNotBound: d.operationalState.equipmentNotBound,
+    duplicateClaim: d.operationalState.duplicateClaim,
+    custodyState: {
+      docked: d.operationalState.custodyState.docked,
+      checked_out: d.operationalState.custodyState.checked_out,
+      untracked: d.operationalState.custodyState.untracked,
+      returned: d.operationalState.custodyState.returned,
+    },
+    readinessState: {
+      ready: d.operationalState.readinessState.ready,
+      not_ready: d.operationalState.readinessState.not_ready,
+      unknown: d.operationalState.readinessState.unknown,
+    },
+    usageState: {
+      available: d.operationalState.usageState.available,
+      staged: d.operationalState.usageState.staged,
+      in_use: d.operationalState.usageState.in_use,
+      emergency_use: d.operationalState.usageState.emergency_use,
+      procedure_bound: d.operationalState.usageState.procedure_bound,
+    },
+    fullDeployable: d.operationalState.fullDeployable,
+    notDeployable: d.operationalState.notDeployable,
+    setupRequired: d.operationalState.setupRequired,
+    procedureBindNotReadyWarning: d.operationalState.procedureBindNotReadyWarning,
+  },
+
+  dockReturn: {
+    title: d.dockReturn.title,
+    selectDock: d.dockReturn.selectDock,
+    conditions: d.dockReturn.conditions,
+    submit: d.dockReturn.submit,
+    success: d.dockReturn.success,
+    readyAfterReturn: d.dockReturn.readyAfterReturn,
+    notReadyAfterReturn: d.dockReturn.notReadyAfterReturn,
+    noAssetTypeBlocked: d.dockReturn.noAssetTypeBlocked,
+    goToSetup: d.dockReturn.goToSetup,
+    noConditionsWarning: d.dockReturn.noConditionsWarning,
+  },
+
+  bundleConditions: {
+    verified: d.bundleConditions.verified,
+    notVerified: d.bundleConditions.notVerified,
+    stale: d.bundleConditions.stale,
+    unknown: d.bundleConditions.unknown,
+    verificationMethod: {
+      visual: d.bundleConditions.verificationMethod.visual,
+      electronic: d.bundleConditions.verificationMethod.electronic,
+      manual: d.bundleConditions.verificationMethod.manual,
+    },
+    verifiedAt: d.bundleConditions.verifiedAt,
+    verifiedBy: d.bundleConditions.verifiedBy,
+  },
+
+  stagingQueue: {
+    title: d.stagingQueue.title,
+    priority: {
+      routine: d.stagingQueue.priority.routine,
+      urgent: d.stagingQueue.priority.urgent,
+      emergency: d.stagingQueue.priority.emergency,
+    },
+    expiresAt: d.stagingQueue.expiresAt,
+    myPosition: d.stagingQueue.myPosition,
+    cancelClaim: d.stagingQueue.cancelClaim,
+    requestStage: d.stagingQueue.requestStage,
+    conflict: d.stagingQueue.conflict,
+    youAreFirst: d.stagingQueue.youAreFirst,
+  },
+
+  operationalMetrics: {
+    title: d.operationalMetrics.title,
+    emergencyOverrides: d.operationalMetrics.emergencyOverrides,
+    bundleFailures: d.operationalMetrics.bundleFailures,
+    staleConditions: d.operationalMetrics.staleConditions,
+    procedureBounds: d.operationalMetrics.procedureBounds,
+    averageCheckoutTime: d.operationalMetrics.averageCheckoutTime,
+    averageDockReturnTime: d.operationalMetrics.averageDockReturnTime,
+    deployableSuccessRate: d.operationalMetrics.deployableSuccessRate,
+    noData: d.operationalMetrics.noData,
+    metricsDisabled: d.operationalMetrics.metricsDisabled,
+  },
+
 } as const;
 
 return stripInternalKeys(translations) as typeof translations;

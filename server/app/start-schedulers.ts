@@ -30,6 +30,7 @@ import { startCodeBlueReconciliationScanner } from "../lib/code-blue-reconciliat
 import { recoverPendingInventoryJobs } from "../lib/inventory-job-recovery.js";
 import { startEquipmentConditionStalenessWorker } from "../workers/equipmentConditionStalenessWorker.js";
 import { startStagingExpiryWorker } from "../workers/stagingExpiryWorker.js";
+import { startProcedureBoundReleaseWorker } from "../workers/procedureBoundReleaseWorker.js";
 
 export async function startBackgroundSchedulers() {
   if (process.env.NODE_ENV === "test") {
@@ -78,9 +79,10 @@ export async function startBackgroundSchedulers() {
   // Fix E (Code Blue): scanner for unreconciled sessions — alerts every 30 min per session.
   startCodeBlueReconciliationScanner();
 
-  // Equipment Operational State V1 workers
+  // Equipment Operational State V1/V2 workers (no-op when feature flag is disabled)
   startEquipmentConditionStalenessWorker();
   startStagingExpiryWorker();
+  startProcedureBoundReleaseWorker();
 
   // Re-enqueue stale/failed inventory deduction jobs every 10 minutes.
   try {

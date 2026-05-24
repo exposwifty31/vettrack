@@ -99,6 +99,8 @@ export default defineConfig({
       "tests/restock.service.test.ts",
       "tests/migrations/**",
       "tests/phase-2-3-medication-package-integration.test.ts",
+      // DB integration tests — require DATABASE_URL + applied migrations + isolated test clinic
+      "tests/equipment-operational-state.integration.test.ts",
       // Live-server integration tests — require dev server running on :3001
       "tests/charge-alert-worker.test.js",
       "tests/code-blue-mode-equipment.test.js",

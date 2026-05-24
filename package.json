@@ -22,6 +22,7 @@
     "auth:preflight": "tsx scripts/auth-preflight.ts",
     "auth:user-status": "tsx scripts/dev-user-status.ts",
     "test": "vitest run",
+    "test:integration:ops": "vitest run tests/equipment-operational-state.integration.test.ts",
     "test:playwright": "pnpm test:playwright:ci",
     "test:playwright:ci": "cross-env PW_SUITE=ci playwright test --config=playwright.config.ts --project=chromium",
     "test:playwright:chromium": "pnpm test:playwright:ci",

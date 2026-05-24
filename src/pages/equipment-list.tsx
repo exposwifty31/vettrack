@@ -35,6 +35,8 @@ import {
 import { STATUS_LABELS } from "@/types";
 import type { Equipment } from "@/types";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
+import { DeployabilityBadge } from "@/components/equipment/DeployabilityBadge";
+import { DockReturnFlow } from "@/components/equipment/DockReturnFlow";
 import {
   Plus,
   Search,
@@ -906,6 +908,7 @@ function EquipmentItem({
   const { userId, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [dockReturnOpen, setDockReturnOpen] = useState(false);
   const statusVariant = statusToBadgeVariant(eq.status);
   const listCardContentPad = settings.density === "compact" ? "p-3" : "p-4";
   const isCheckedOut = !!eq.checkedOutById;
@@ -990,7 +993,9 @@ function EquipmentItem({
     },
   });
 
-  const quickAction = !isCheckedOut && eq.status === "ok"
+  const quickAction = eq.custodyState === "returned" && eq.status === "ok"
+    ? { label: t.dockReturn.submit, icon: LogIn, action: () => setDockReturnOpen(true), pending: false, className: "text-blue-700 border-blue-200 hover:bg-blue-50" }
+    : !isCheckedOut && eq.status === "ok"
     ? { label: "בשימוש", icon: LogIn, action: () => checkoutMut.mutate(), pending: checkoutMut.isPending, className: "text-emerald-700 border-emerald-200 hover:bg-emerald-50" }
     : (isCheckedOut && (checkedOutByMe || isAdmin)) && eq.status === "ok"
     ? { label: "החזר", icon: LogOut, action: () => setReturnDialogOpen(true), pending: returnMut.isPending, className: "text-primary border-primary/30 hover:bg-primary/10" }
@@ -1095,6 +1100,15 @@ function EquipmentItem({
                       בתוקף
                     </Badge>
                   )}
+                  {eq.custodyState != null && (
+                    <DeployabilityBadge
+                      custodyState={eq.custodyState}
+                      readinessState={eq.readinessState}
+                      usageState={eq.usageState}
+                      fullDeployable={eq.custodyState === "docked" && eq.readinessState === "ready" && eq.usageState === "available"}
+                      compact
+                    />
+                  )}
                 </div>
               </div>
               {/* Trailing: compact in-card quick action or status badge + chevron.
@@ -1160,6 +1174,14 @@ function EquipmentItem({
           onSettled: () => setReturnDialogOpen(false),
         })
       }
+    />
+    <DockReturnFlow
+      equipment={eq}
+      open={dockReturnOpen}
+      onClose={() => setDockReturnOpen(false)}
+      onSuccess={() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      }}
     />
     </>
   );

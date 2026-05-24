@@ -4,6 +4,7 @@ import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { db, operationalMetrics } from "../db.js";
 import { requireAuth } from "../middleware/auth.js";
 import { apiError } from "../lib/apiError.js";
+import { isMetricsEnabled } from "../services/operational-metrics.service.js";
 
 const router = Router();
 
@@ -53,9 +54,11 @@ router.get("/operational-metrics/summary", requireAuth, async (req, res) => {
     emergencyOverrides: byType["emergency_override"]?.count ?? 0,
     bundleFailures: byType["bundle_failed"]?.count ?? 0,
     staleConditions: byType["condition_stale"]?.count ?? 0,
+    procedureBounds: byType["procedure_bound"]?.count ?? 0,
     averageCheckoutMs: byType["checkout_duration"]?.avgMs ?? null,
     averageDockReturnMs: byType["dock_return_duration"]?.avgMs ?? null,
     deployableSuccessRate,
+    metricsEnabled: isMetricsEnabled(),
     from: fromDate.toISOString(),
     to: toDate.toISOString(),
   });

@@ -9,9 +9,11 @@ import {
   assetTypeConditions,
   unitConditionStates,
   stagingQueue,
+  users,
+  hospitalizations,
 } from "../db.js";
-import { eq, and, inArray, sql } from "drizzle-orm";
-import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import { eq, and, inArray, sql, asc } from "drizzle-orm";
+import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { logAudit } from "../lib/audit.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
@@ -19,12 +21,16 @@ import {
   computeBundleReadinessGate,
   computeStagingExpiry,
   isEquipmentFullyDeployable,
+  isOperationalStateFeatureEnabled,
 } from "../services/equipment-operational-state.service.js";
 import { apiError } from "../lib/apiError.js";
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
 
 const router = Router();
 
+function featureDisabledResponse(req: import("express").Request, res: import("express").Response) {
+  return res.status(501).json({ code: "FEATURE_DISABLED", error: "Equipment operational state feature is not enabled" });
+}
 
 // ─── Docks ──────────────────────────────────────────────────────────────────
 
@@ -407,6 +413,9 @@ router.post("/equipment/:equipmentId/stage", requireAuth, validateBody(stageSche
       if (err.message === "CUSTODY_CHAIN_BROKEN") return apiError(req, res, "operationalState.invalidCustodyForStaging", undefined, 422);
       if (err.message === "EQUIPMENT_NOT_READY") return apiError(req, res, "operationalState.equipmentNotReady", undefined, 422);
     }
+    if ((err as { code?: string }).code === "23505") {
+      return res.status(409).json({ code: "DUPLICATE_CLAIM", error: "You already have an active claim for this equipment" });
+    }
     throw err;
   }
 
@@ -501,6 +510,249 @@ router.get("/equipment/:equipmentId/staging-queue", requireAuth, async (req, res
     );
 
   res.json(claims);
+});
+
+// ─── Asset Types: list ────────────────────────────────────────────────────────
+
+router.get("/asset-types", requireAuth, async (req, res) => {
+  if (!isOperationalStateFeatureEnabled()) return featureDisabledResponse(req, res);
+  const clinicId = req.clinicId!;
+  const rows = await db.select().from(assetTypes).where(eq(assetTypes.clinicId, clinicId));
+  res.json(rows);
+});
+
+// ─── Equipment: Condition States ──────────────────────────────────────────────
+
+router.get("/equipment/:equipmentId/condition-states", requireAuth, async (req, res) => {
+  if (!isOperationalStateFeatureEnabled()) return featureDisabledResponse(req, res);
+  const clinicId = req.clinicId!;
+  const { equipmentId } = req.params;
+
+  const [eq_row] = await db
+    .select({ id: equipment.id, assetTypeId: equipment.assetTypeId })
+    .from(equipment)
+    .where(and(eq(equipment.id, equipmentId), eq(equipment.clinicId, clinicId)))
+    .limit(1);
+
+  if (!eq_row) return res.status(404).json({ code: "NOT_FOUND", error: "Equipment not found" });
+  if (!eq_row.assetTypeId) return res.json([]);
+
+  const states = await db
+    .select({
+      id: unitConditionStates.id,
+      equipmentId: unitConditionStates.equipmentId,
+      conditionId: unitConditionStates.conditionId,
+      verified: unitConditionStates.verified,
+      verifiedAt: unitConditionStates.verifiedAt,
+      verifiedByName: users.name,
+      notes: unitConditionStates.notes,
+      updatedAt: unitConditionStates.updatedAt,
+    })
+    .from(unitConditionStates)
+    .innerJoin(assetTypeConditions, and(
+      eq(assetTypeConditions.id, unitConditionStates.conditionId),
+      eq(assetTypeConditions.assetTypeId, eq_row.assetTypeId),
+    ))
+    .leftJoin(users, eq(users.id, unitConditionStates.verifiedById))
+    .where(and(
+      eq(unitConditionStates.equipmentId, equipmentId),
+      eq(unitConditionStates.clinicId, clinicId),
+    ))
+    .orderBy(asc(assetTypeConditions.displayOrder), asc(assetTypeConditions.conditionName));
+
+  res.json(states);
+});
+
+// ─── Equipment: Procedure Bind / Unbind ────────────────────────────────────────
+
+const procedureBindSchema = z.object({
+  hospitalizationId: z.string().min(1),
+});
+
+router.post(
+  "/equipment/:equipmentId/procedure-bind",
+  requireAuth,
+  requireEffectiveRole("vet"),
+  validateBody(procedureBindSchema),
+  async (req, res) => {
+    if (!isOperationalStateFeatureEnabled()) return featureDisabledResponse(req, res);
+    const clinicId = req.clinicId!;
+    const { id: userId, email } = req.authUser!;
+    const { equipmentId } = req.params;
+    const { hospitalizationId } = req.body as z.infer<typeof procedureBindSchema>;
+
+    const [hosp] = await db
+      .select()
+      .from(hospitalizations)
+      .where(and(eq(hospitalizations.id, hospitalizationId), eq(hospitalizations.clinicId, clinicId)))
+      .limit(1);
+    if (!hosp) return res.status(404).json({ code: "NOT_FOUND", error: "Hospitalization not found" });
+    if (hosp.status === "discharged") {
+      return res.status(422).json({ code: "HOSPITALIZATION_DISCHARGED", error: "Hospitalization is already discharged" });
+    }
+
+    const [eq_row] = await db
+      .select()
+      .from(equipment)
+      .where(and(eq(equipment.id, equipmentId), eq(equipment.clinicId, clinicId)))
+      .limit(1);
+    if (!eq_row) return res.status(404).json({ code: "NOT_FOUND", error: "Equipment not found" });
+    if (eq_row.custodyState !== "docked") {
+      return res.status(422).json({ code: "INVALID_CUSTODY", error: "Equipment must be docked to bind to a procedure" });
+    }
+    if (eq_row.usageState !== "available") {
+      return res.status(422).json({ code: "EQUIPMENT_UNAVAILABLE", error: `Equipment usage state ${eq_row.usageState} blocks procedure bind` });
+    }
+
+    let updated: { id: string; usageState: string | null; readinessState: string | null; version: number } | undefined;
+    try {
+      await db.transaction(async (tx) => {
+        const [row] = await tx
+          .update(equipment)
+          .set({
+            usageState: "procedure_bound",
+            usageStateSince: new Date(),
+            procedureBoundHospitalizationId: hospitalizationId,
+            version: sql`${equipment.version} + 1`,
+          })
+          .where(and(
+            eq(equipment.id, equipmentId),
+            eq(equipment.clinicId, clinicId),
+            eq(equipment.custodyState, "docked"),
+            eq(equipment.usageState, "available"),
+            eq(equipment.version, eq_row.version),
+          ))
+          .returning({
+            id: equipment.id,
+            usageState: equipment.usageState,
+            readinessState: equipment.readinessState,
+            version: equipment.version,
+          });
+
+        if (!row) throw new Error("VERSION_CONFLICT");
+        updated = row;
+
+        await insertRealtimeDomainEvent(tx, {
+          clinicId,
+          type: "EQUIPMENT_USAGE_STATE_CHANGED",
+          payload: { equipmentId, usageState: "procedure_bound", hospitalizationId },
+        });
+      });
+    } catch (err) {
+      if (err instanceof Error && err.message === "VERSION_CONFLICT") {
+        return res.status(409).json({ code: "VERSION_CONFLICT", error: "Version conflict, please retry" });
+      }
+      throw err;
+    }
+
+    logAudit({
+      clinicId,
+      actionType: "equipment_usage_state_changed",
+      performedBy: userId,
+      performedByEmail: email,
+      targetId: equipmentId,
+      metadata: { usageState: "procedure_bound", hospitalizationId, action: "bind", readinessState: eq_row.readinessState },
+    });
+    void recordOperationalMetric({
+      clinicId,
+      equipmentId,
+      eventType: "procedure_bound",
+      metadata: { hospitalizationId, action: "bind" },
+    });
+
+    res.json({ ok: true, equipment: updated });
+  },
+);
+
+router.delete("/equipment/:equipmentId/procedure-bind", requireAuth, requireEffectiveRole("vet"), async (req, res) => {
+  if (!isOperationalStateFeatureEnabled()) return featureDisabledResponse(req, res);
+  const clinicId = req.clinicId!;
+  const { id: userId, email } = req.authUser!;
+  const { equipmentId } = req.params;
+
+  const [eq_row] = await db
+    .select()
+    .from(equipment)
+    .where(and(eq(equipment.id, equipmentId), eq(equipment.clinicId, clinicId)))
+    .limit(1);
+  if (!eq_row) return res.status(404).json({ code: "NOT_FOUND", error: "Equipment not found" });
+  if (eq_row.usageState !== "procedure_bound") {
+    return res.status(422).json({ code: "EQUIPMENT_NOT_BOUND", error: "Equipment is not procedure-bound" });
+  }
+
+  const now = new Date();
+  const prevHospitalizationId = eq_row.procedureBoundHospitalizationId;
+  let updated: { id: string; usageState: string | null; readinessState: string | null; version: number } | undefined;
+  let cancelledClaimIds: string[] = [];
+
+  try {
+    await db.transaction(async (tx) => {
+      const cancelled = await tx
+        .update(stagingQueue)
+        .set({ status: "cancelled", updatedAt: now })
+        .where(and(
+          eq(stagingQueue.equipmentId, equipmentId),
+          eq(stagingQueue.clinicId, clinicId),
+          eq(stagingQueue.status, "active"),
+        ))
+        .returning({ id: stagingQueue.id });
+      cancelledClaimIds = cancelled.map((r) => r.id);
+
+      const [row] = await tx
+        .update(equipment)
+        .set({
+          usageState: "available",
+          usageStateSince: now,
+          readinessState: "unknown",
+          readinessStateSince: now,
+          procedureBoundHospitalizationId: null,
+          version: sql`${equipment.version} + 1`,
+        })
+        .where(and(
+          eq(equipment.id, equipmentId),
+          eq(equipment.clinicId, clinicId),
+          eq(equipment.usageState, "procedure_bound"),
+          eq(equipment.version, eq_row.version),
+        ))
+        .returning({
+          id: equipment.id,
+          usageState: equipment.usageState,
+          readinessState: equipment.readinessState,
+          version: equipment.version,
+        });
+
+      if (!row) throw new Error("VERSION_CONFLICT");
+      updated = row;
+
+      await insertRealtimeDomainEvent(tx, {
+        clinicId,
+        type: "EQUIPMENT_USAGE_STATE_CHANGED",
+        payload: { equipmentId, usageState: "available", reason: "manual_unbind" },
+      });
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message === "VERSION_CONFLICT") {
+      return res.status(409).json({ code: "VERSION_CONFLICT", error: "Version conflict, please retry" });
+    }
+    throw err;
+  }
+
+  logAudit({
+    clinicId,
+    actionType: "equipment_usage_state_changed",
+    performedBy: userId,
+    performedByEmail: email,
+    targetId: equipmentId,
+    metadata: { usageState: "available", reason: "manual_unbind", prevHospitalizationId },
+  });
+  void recordOperationalMetric({
+    clinicId,
+    equipmentId,
+    eventType: "procedure_bound",
+    metadata: { hospitalizationId: prevHospitalizationId, action: "unbind" },
+  });
+
+  res.json({ ok: true, equipment: updated });
 });
 
 export default router;

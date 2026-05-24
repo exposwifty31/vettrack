@@ -43,6 +43,9 @@ const AdminShiftsPage = lazy(() => import("@/pages/admin-shifts"));
 const AdminMedicationIntegrityPage = lazy(() => import("@/pages/admin-medication-integrity"));
 const AdminOpsDashboardPage = lazy(() => import("@/pages/admin-ops-dashboard"));
 const AdminPilotCoveragePage = lazy(() => import("@/pages/admin-pilot-coverage"));
+const AdminAssetTypesPage = lazy(() => import("@/pages/AdminAssetTypesPage"));
+const AdminDocksPage = lazy(() => import("@/pages/AdminDocksPage"));
+const OperationalMetricsDashboardPage = lazy(() => import("@/pages/OperationalMetricsDashboardPage"));
 const AppointmentsPage = lazy(() => import("@/pages/appointments"));
 const MedicationHubPage = lazy(() => import("@/pages/meds"));
 const PharmacyForecastPage = lazy(() => import("@/pages/pharmacy-forecast"));
@@ -138,6 +141,9 @@ export function AppRoutes() {
         {!isPilotMode && <Route path="/admin/shifts"><AuthGuard><AdminShiftsPage /></AuthGuard></Route>}
         {!isPilotMode && <Route path="/admin/medication-integrity"><AuthGuard><AdminMedicationIntegrityPage /></AuthGuard></Route>}
         {!isPilotMode && <Route path="/admin/ops-dashboard"><AuthGuard><AdminOpsDashboardPage /></AuthGuard></Route>}
+        {!isPilotMode && <Route path="/admin/asset-types"><AuthGuard><AdminAssetTypesPage /></AuthGuard></Route>}
+        {!isPilotMode && <Route path="/admin/docks"><AuthGuard><AdminDocksPage /></AuthGuard></Route>}
+        {!isPilotMode && <Route path="/admin/metrics"><AuthGuard><OperationalMetricsDashboardPage /></AuthGuard></Route>}
         {!isPilotMode && <Route path="/appointments"><AuthGuard><AppointmentsPage /></AuthGuard></Route>}
         {!isPilotMode && <Route path="/meds"><AuthGuard><MedicationHubPage /></AuthGuard></Route>}
         {!isPilotMode && <Route path="/pharmacy-forecast"><AuthGuard><PharmacyForecastPage /></AuthGuard></Route>}

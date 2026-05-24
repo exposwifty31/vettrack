@@ -1,4 +1,9 @@
+import { and, eq, sql } from "drizzle-orm";
 import type { AssetTypeCondition, UnitConditionState } from "../db.js";
+import { db, equipment } from "../db.js";
+import { logAudit } from "../lib/audit.js";
+import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
+import { recordOperationalMetric } from "./operational-metrics.service.js";
 
 export type BundleReadinessResult =
   | { ok: true }
@@ -124,3 +129,83 @@ export function computeStagingExpiry(
   return null; // emergency: no expiry
 }
 
+export function isOperationalStateFeatureEnabled(): boolean {
+  const val = process.env.DISABLE_EQUIPMENT_OPERATIONAL_STATE_V1;
+  if (!val) return true;
+  const normalized = val.trim().toLowerCase();
+  return !(normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on");
+}
+
+export async function releaseProcedureBoundEquipment(
+  clinicId: string,
+  hospitalizationId: string,
+  now: Date = new Date(),
+): Promise<{ released: number }> {
+  try {
+    const candidates = await db
+      .select()
+      .from(equipment)
+      .where(
+        and(
+          eq(equipment.clinicId, clinicId),
+          eq(equipment.procedureBoundHospitalizationId, hospitalizationId),
+          eq(equipment.usageState, "procedure_bound"),
+        ),
+      );
+
+    let released = 0;
+    for (const row of candidates) {
+      const result = await db
+        .update(equipment)
+        .set({
+          usageState: "available",
+          usageStateSince: now,
+          readinessState: "unknown",
+          readinessStateSince: now,
+          procedureBoundHospitalizationId: null,
+          version: sql`${equipment.version} + 1`,
+        })
+        .where(
+          and(
+            eq(equipment.id, row.id),
+            eq(equipment.clinicId, clinicId),
+            eq(equipment.usageState, "procedure_bound"),
+            eq(equipment.version, row.version),
+          ),
+        );
+
+      if ((result as unknown as { rowCount?: number }).rowCount === 0) continue;
+      released++;
+
+      logAudit({
+        clinicId,
+        actionType: "equipment_usage_state_changed",
+        performedBy: "system",
+        performedByEmail: "system",
+        targetId: row.id,
+        metadata: { usageState: "available", reason: "procedure_discharged", readinessState: row.readinessState },
+      });
+
+      void db
+        .transaction((tx) =>
+          insertRealtimeDomainEvent(tx, {
+            clinicId,
+            type: "EQUIPMENT_USAGE_STATE_CHANGED",
+            payload: { equipmentId: row.id, usageState: "available", reason: "procedure_discharged" },
+          }),
+        )
+        .catch((err) => console.error("[procedure-release] realtime failed:", err));
+
+      void recordOperationalMetric({
+        clinicId,
+        equipmentId: row.id,
+        eventType: "procedure_bound",
+        metadata: { hospitalizationId, action: "release" },
+      });
+    }
+    return { released };
+  } catch (err) {
+    console.error("[procedure-release] failed:", err);
+    return { released: 0 };
+  }
+}

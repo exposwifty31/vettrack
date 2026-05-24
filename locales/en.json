@@ -2629,6 +2629,7 @@
     "autoRefreshHint": "Auto-refreshes every 30 seconds. The background recovery scheduler re-processes failed jobs when the worker is running."
   },
   "operationalState": {
+    "featureDisabled": "Feature disabled",
     "invalidCustodyForDockReturn": "Dock return requires custody state: returned or docked.",
     "noAssetTypeDefined": "Equipment has no asset type assigned.",
     "crossClinicAssociation": "Resource belongs to a different clinic.",
@@ -2638,6 +2639,83 @@
     "invalidCustodyForStaging": "Staging requires docked equipment.",
     "equipmentNotReady": "Equipment readiness is not ready.",
     "equipmentUnavailable": "Equipment is not available for staging.",
-    "claimNotActive": "Claim is no longer active."
+    "claimNotActive": "Claim is no longer active.",
+    "hospitalizationDischarged": "Hospitalization is already discharged.",
+    "invalidCustody": "Equipment must be docked.",
+    "equipmentNotBound": "Equipment is not bound to a procedure.",
+    "duplicateClaim": "You already have an active claim for this equipment.",
+    "custodyState": {
+      "docked": "Docked",
+      "checked_out": "Checked Out",
+      "untracked": "Untracked",
+      "returned": "Returned"
+    },
+    "readinessState": {
+      "ready": "Ready",
+      "not_ready": "Not Ready",
+      "unknown": "Unknown"
+    },
+    "usageState": {
+      "available": "Available",
+      "staged": "Staged",
+      "in_use": "In Use",
+      "emergency_use": "Emergency Use",
+      "procedure_bound": "Procedure Bound"
+    },
+    "fullDeployable": "Deployable",
+    "notDeployable": "Not Deployable",
+    "setupRequired": "Asset type setup required",
+    "procedureBindNotReadyWarning": "This equipment is not ready for deployment — continue anyway?"
+  },
+  "dockReturn": {
+    "title": "Return to Dock",
+    "selectDock": "Select dock",
+    "conditions": "Readiness conditions",
+    "submit": "Confirm return",
+    "success": "Equipment returned successfully",
+    "readyAfterReturn": "Ready for deployment",
+    "notReadyAfterReturn": "Returned — conditions not met",
+    "noAssetTypeBlocked": "This equipment has no asset type — dock-return is unavailable",
+    "goToSetup": "Configure asset type",
+    "noConditionsWarning": "No conditions defined — equipment will be marked not ready"
+  },
+  "bundleConditions": {
+    "verified": "Verified",
+    "notVerified": "Not verified",
+    "stale": "Stale",
+    "unknown": "Unknown",
+    "verificationMethod": {
+      "visual": "Visual",
+      "electronic": "Electronic",
+      "manual": "Manual"
+    },
+    "verifiedAt": "Verified at",
+    "verifiedBy": "by"
+  },
+  "stagingQueue": {
+    "title": "Equipment queue",
+    "priority": {
+      "routine": "Routine",
+      "urgent": "Urgent",
+      "emergency": "Emergency"
+    },
+    "expiresAt": "Expires in",
+    "myPosition": "My position",
+    "cancelClaim": "Cancel claim",
+    "requestStage": "Request equipment",
+    "conflict": "Equipment is queued",
+    "youAreFirst": "You're first — checkout available"
+  },
+  "operationalMetrics": {
+    "title": "Operational metrics",
+    "emergencyOverrides": "Emergency overrides",
+    "bundleFailures": "Bundle failures",
+    "staleConditions": "Stale conditions",
+    "procedureBounds": "Procedure actions",
+    "averageCheckoutTime": "Avg checkout time",
+    "averageDockReturnTime": "Avg dock-return time",
+    "deployableSuccessRate": "Deployable success rate",
+    "noData": "No data for this period",
+    "metricsDisabled": "Metrics tracking disabled (ENABLE_OPERATIONAL_METRICS)"
   }
 }

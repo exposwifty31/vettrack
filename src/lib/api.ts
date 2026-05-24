@@ -74,6 +74,13 @@ import type {
   CodeBlueDispense,
   ManualBillingRequest,
   ShiftCompletionResult,
+  AssetType,
+  AssetTypeCondition,
+  UnitConditionState,
+  StagingClaim,
+  DeployabilityResponse,
+  Dock,
+  OperationalMetricsSummary,
 } from "@/types";
 import type { OutcomeKpiRoiResponse } from "../../shared/er-types.js";
 import type { AuthoritySnapshot } from "../../shared/authority.js";
@@ -1943,6 +1950,64 @@ export const api = {
         method: "POST",
         body: JSON.stringify(body),
       }),
+  },
+  operationalState: {
+    listAssetTypes: () =>
+      request<AssetType[]>("/api/asset-types"),
+    createAssetType: (data: { name: string }) =>
+      request<AssetType>("/api/asset-types", { method: "POST", body: JSON.stringify(data) }),
+    listConditions: (assetTypeId: string) =>
+      request<AssetTypeCondition[]>(`/api/asset-types/${assetTypeId}/conditions`),
+    createCondition: (
+      assetTypeId: string,
+      data: { conditionName: string; verificationMethod: string; staleAfterMinutes: number; displayOrder?: number },
+    ) =>
+      request<AssetTypeCondition>(`/api/asset-types/${assetTypeId}/conditions`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    listDocks: () =>
+      request<Dock[]>("/api/docks"),
+    createDock: (data: { name: string; description?: string; roomId?: string }) =>
+      request<Dock>("/api/docks", { method: "POST", body: JSON.stringify(data) }),
+    deployability: (id: string) =>
+      request<DeployabilityResponse>(`/api/equipment/${id}/deployability`),
+    conditionStates: (id: string) =>
+      request<UnitConditionState[]>(`/api/equipment/${id}/condition-states`),
+    dockReturn: (
+      id: string,
+      data: { dockId: string; conditionVerifications: { conditionId: string; verified: boolean; notes?: string }[] },
+    ) =>
+      request<{ ok: boolean; readinessState: string }>(`/api/equipment/${id}/dock-return`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    stage: (
+      id: string,
+      data: { clinicalPriority: "routine" | "urgent" | "emergency"; notes?: string; emergencyStage?: boolean },
+    ) =>
+      request<StagingClaim>(`/api/equipment/${id}/stage`, { method: "POST", body: JSON.stringify(data) }),
+    cancelStage: (id: string, claimId: string) =>
+      request<void>(`/api/equipment/${id}/stage/${claimId}`, { method: "DELETE" }),
+    stagingQueue: (id: string) =>
+      request<StagingClaim[]>(`/api/equipment/${id}/staging-queue`),
+    procedureBind: (id: string, data: { hospitalizationId: string }) =>
+      request<{ ok: boolean; equipment: { id: string; usageState: string; readinessState: string; version: number } }>(
+        `/api/equipment/${id}/procedure-bind`,
+        { method: "POST", body: JSON.stringify(data) },
+      ),
+    procedureUnbind: (id: string) =>
+      request<{ ok: boolean; equipment: { id: string; usageState: string; readinessState: string; version: number } }>(
+        `/api/equipment/${id}/procedure-bind`,
+        { method: "DELETE" },
+      ),
+    metricsSummary: (params?: { from?: string; to?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.from) qs.set("from", params.from);
+      if (params?.to) qs.set("to", params.to);
+      const query = qs.toString() ? `?${qs.toString()}` : "";
+      return request<OperationalMetricsSummary>(`/api/operational-metrics/summary${query}`);
+    },
   },
 };
 

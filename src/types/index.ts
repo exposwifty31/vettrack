@@ -157,6 +157,18 @@ export interface Equipment {
   usuallyFoundHere?: string | null;
   searchAlias?: string | null;
   staffNote?: string | null;
+  // Operational State V1 fields
+  custodyState?: "docked" | "checked_out" | "untracked" | "returned" | null;
+  custodyStateSince?: string | null;
+  readinessState?: "ready" | "not_ready" | "unknown" | null;
+  readinessStateSince?: string | null;
+  usageState?: "available" | "staged" | "in_use" | "emergency_use" | "procedure_bound" | null;
+  usageStateSince?: string | null;
+  assetTypeId?: string | null;
+  dockId?: string | null;
+  dockConfirmedReadyAt?: string | null;
+  emergencyOverrideAt?: string | null;
+  procedureBoundHospitalizationId?: string | null;
 }
 
 export type CodeBlueStatus = "critical" | "needs_attention";
@@ -1482,3 +1494,88 @@ export type {
   CancelHandoffResponse,
   HandoffItemsInvalidatedError,
 } from "../../shared/patient-handoff-types.js";
+
+// ─── Equipment Operational State V1/V2 types ─────────────────────────────────
+
+export type CustodyState = "docked" | "checked_out" | "untracked" | "returned";
+export type ReadinessState = "ready" | "not_ready" | "unknown";
+export type UsageState = "available" | "staged" | "in_use" | "emergency_use" | "procedure_bound";
+
+export interface AssetType {
+  id: string;
+  clinicId: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface AssetTypeCondition {
+  id: string;
+  assetTypeId: string;
+  conditionName: string;
+  verificationMethod: "visual" | "electronic" | "manual";
+  staleAfterMinutes: number;
+  displayOrder: number;
+}
+
+export interface UnitConditionState {
+  id: string;
+  equipmentId: string;
+  conditionId: string;
+  verified: boolean;
+  verifiedAt?: string | null;
+  verifiedByName?: string | null;
+  notes?: string | null;
+  updatedAt: string;
+}
+
+export interface StagingClaim {
+  id: string;
+  equipmentId: string;
+  requestedById: string;
+  requestedByName?: string | null;
+  clinicalPriority: "routine" | "urgent" | "emergency";
+  stagedAt: string;
+  expiresAt?: string | null;
+  status: "active" | "expired" | "cancelled" | "fulfilled";
+  notes?: string | null;
+}
+
+export interface DeployabilityResponse {
+  equipmentId: string;
+  custodyState: CustodyState;
+  readinessState: ReadinessState;
+  usageState: UsageState;
+  fullDeployable: boolean;
+  bundleGate: {
+    ok: boolean;
+    reason?: string;
+    skipped?: boolean;
+    failedConditions?: string[];
+    staleConditions?: string[];
+    unknownConditions?: string[];
+  };
+  asOfMs: number;
+}
+
+export interface Dock {
+  id: string;
+  clinicId: string;
+  name: string;
+  description?: string | null;
+  roomId?: string | null;
+  roomName?: string | null;
+  createdAt: string;
+}
+
+export interface OperationalMetricsSummary {
+  emergencyOverrides: number;
+  bundleFailures: number;
+  staleConditions: number;
+  procedureBounds: number;
+  averageCheckoutMs: number | null;
+  averageDockReturnMs: number | null;
+  deployableSuccessRate: number | null;
+  metricsEnabled: boolean;
+  from: string;
+  to: string;
+}

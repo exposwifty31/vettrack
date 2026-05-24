@@ -6,6 +6,10 @@ import { animals, appointments, db, dispenseEvents, hospitalizations, inventoryJ
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { postSystemMessage } from "../lib/shift-chat-presence.js";
+import {
+  isOperationalStateFeatureEnabled,
+  releaseProcedureBoundEquipment,
+} from "../services/equipment-operational-state.service.js";
 
 const router = Router();
 router.use(requireAuth, requireEffectiveRole("technician"));
@@ -612,6 +616,11 @@ router.patch("/:id/status", async (req, res) => {
       }).catch(() => {});
     }
 
+    // WHERE clause already filters dischargedAt IS NULL — any successful update here transitions to discharged for the first time
+    if (newStatus === "discharged" && isOperationalStateFeatureEnabled()) {
+      void releaseProcedureBoundEquipment(clinicId, id);
+    }
+
     res.json({ id: updated[0]!.id, status: parse.data.status });
   } catch (err) {
     console.error("[patients] status update failed", err);
@@ -730,6 +739,10 @@ router.patch("/:id/discharge", async (req, res) => {
       .returning({ id: hospitalizations.id, dischargedAt: hospitalizations.dischargedAt });
 
     if (!updated.length) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "HOSPITALIZATION_NOT_FOUND", message: "Hospitalization not found or already discharged", requestId }));
+
+    if (isOperationalStateFeatureEnabled()) {
+      void releaseProcedureBoundEquipment(clinicId, id);
+    }
 
     logAudit({
       clinicId,
