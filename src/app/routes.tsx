@@ -104,8 +104,8 @@ export function AppRoutes() {
         {/* Equipment — always available */}
         <Route path="/equipment"><AuthGuard><EquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/new"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
-        <Route path="/equipment/scan"><Redirect to="/equipment" /></Route>
-        <Route path="/equipment/maintenance"><Redirect to="/equipment?status=maintenance" /></Route>
+        <Route path="/equipment/scan"><Redirect to="/equipment" replace /></Route>
+        <Route path="/equipment/maintenance"><Redirect to="/equipment?status=maintenance" replace /></Route>
         <Route path="/equipment/:id/edit"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/:id/qr"><AuthGuard><EquipmentQrPrintPage /></AuthGuard></Route>
         <Route path="/equipment/:id"><AuthGuard><EquipmentDetailPage /></AuthGuard></Route>
