@@ -1,17 +1,12 @@
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db, equipment, hospitalizations } from "../db.js";
-import {
-  isOperationalStateFeatureEnabled,
-  releaseProcedureBoundEquipment,
-} from "../services/equipment-operational-state.service.js";
+import { releaseProcedureBoundEquipment } from "../services/equipment-operational-state.service.js";
 
 const RELEASE_SWEEP_INTERVAL_MS = 30 * 60 * 1000;
 
 export async function runProcedureBoundReleaseSweep(
   now: Date = new Date(),
 ): Promise<{ scanned: number; released: number }> {
-  if (!isOperationalStateFeatureEnabled()) return { scanned: 0, released: 0 };
-
   // DISTINCT (clinicId, hospitalizationId) pairs via INNER JOIN to avoid N+1.
   // INNER JOIN vt_hospitalizations ensures we only touch discharged ones.
   const groups = await db
@@ -53,7 +48,6 @@ let _intervalId: ReturnType<typeof setInterval> | null = null;
 
 export function startProcedureBoundReleaseWorker(): void {
   if (_intervalId !== null) return;
-  if (!isOperationalStateFeatureEnabled()) return;
 
   _intervalId = setInterval(() => {
     runProcedureBoundReleaseSweep().catch((err) => {

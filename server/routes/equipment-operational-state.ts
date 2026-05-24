@@ -21,17 +21,12 @@ import {
   computeBundleReadinessGate,
   computeStagingExpiry,
   isEquipmentFullyDeployable,
-  isOperationalStateFeatureEnabled,
 } from "../services/equipment-operational-state.service.js";
 import { apiError } from "../lib/apiError.js";
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
 import { promoteStagingQueueNext } from "../lib/staging-promotion.js";
 
 const router = Router();
-
-function featureDisabledResponse(req: import("express").Request, res: import("express").Response) {
-  return res.status(501).json({ code: "FEATURE_DISABLED", error: "Equipment operational state feature is not enabled" });
-}
 
 // ─── Docks ──────────────────────────────────────────────────────────────────
 
@@ -517,7 +512,6 @@ router.get("/equipment/:equipmentId/staging-queue", requireAuth, async (req, res
 // ─── Asset Types: list ────────────────────────────────────────────────────────
 
 router.get("/asset-types", requireAuth, async (req, res) => {
-  if (!isOperationalStateFeatureEnabled()) return featureDisabledResponse(req, res);
   const clinicId = req.clinicId!;
   const rows = await db.select().from(assetTypes).where(eq(assetTypes.clinicId, clinicId));
   res.json(rows);
@@ -526,7 +520,6 @@ router.get("/asset-types", requireAuth, async (req, res) => {
 // ─── Equipment: Condition States ──────────────────────────────────────────────
 
 router.get("/equipment/:equipmentId/condition-states", requireAuth, async (req, res) => {
-  if (!isOperationalStateFeatureEnabled()) return featureDisabledResponse(req, res);
   const clinicId = req.clinicId!;
   const { equipmentId } = req.params;
 
@@ -577,7 +570,6 @@ router.post(
   requireEffectiveRole("vet"),
   validateBody(procedureBindSchema),
   async (req, res) => {
-    if (!isOperationalStateFeatureEnabled()) return featureDisabledResponse(req, res);
     const clinicId = req.clinicId!;
     const { id: userId, email } = req.authUser!;
     const { equipmentId } = req.params;
@@ -667,7 +659,6 @@ router.post(
 );
 
 router.delete("/equipment/:equipmentId/procedure-bind", requireAuth, requireEffectiveRole("vet"), async (req, res) => {
-  if (!isOperationalStateFeatureEnabled()) return featureDisabledResponse(req, res);
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
   const { equipmentId } = req.params;

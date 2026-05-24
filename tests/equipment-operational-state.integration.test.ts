@@ -285,7 +285,6 @@ let ctx: TestFixture;
 describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
   beforeAll(async () => {
     if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL required for integration tests");
-    process.env.DISABLE_EQUIPMENT_OPERATIONAL_STATE_V1 = "";
     process.env.ENABLE_OPERATIONAL_METRICS = "true";
 
     const app = buildApp();
@@ -305,7 +304,6 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
 
   beforeEach(async () => {
     currentUserRole = "vet";
-    process.env.DISABLE_EQUIPMENT_OPERATIONAL_STATE_V1 = "";
 
     ctx = {
       clinicId: randomUUID(),
@@ -327,7 +325,6 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
   });
 
   afterEach(async () => {
-    process.env.DISABLE_EQUIPMENT_OPERATIONAL_STATE_V1 = "";
     await purgeClinic(ctx.clinicId);
   });
 
@@ -374,16 +371,6 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
   // ─── Group 2: Checkout paths ───────────────────────────────────────────────
 
   describe("checkout paths", () => {
-    it("flag disabled → 200 (legacy checkout, no V1 checks)", async () => {
-      process.env.DISABLE_EQUIPMENT_OPERATIONAL_STATE_V1 = "true";
-      await seedEquipment(ctx.eqId, ctx.clinicId, {
-        asset_type_id: ctx.assetTypeId,
-        custody_state: "untracked", // would 422 if V1 enabled
-      });
-      const res = await api(`/api/equipment/${ctx.eqId}/checkout`, "POST", {});
-      expect(res.status).toBe(200);
-    });
-
     it("untracked → 422 CUSTODY_CHAIN_BROKEN", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, { custody_state: "untracked" });
       const res = await api(`/api/equipment/${ctx.eqId}/checkout`, "POST", {});

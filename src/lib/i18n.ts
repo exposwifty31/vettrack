@@ -793,7 +793,6 @@ const translations = {
   },
 
   operationalState: {
-    featureDisabled: d.operationalState.featureDisabled,
     invalidCustodyForDockReturn: d.operationalState.invalidCustodyForDockReturn,
     noAssetTypeDefined: d.operationalState.noAssetTypeDefined,
     crossClinicAssociation: d.operationalState.crossClinicAssociation,

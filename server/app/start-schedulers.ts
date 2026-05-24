@@ -79,7 +79,7 @@ export async function startBackgroundSchedulers() {
   // Fix E (Code Blue): scanner for unreconciled sessions — alerts every 30 min per session.
   startCodeBlueReconciliationScanner();
 
-  // Equipment Operational State V1/V2 workers (no-op when feature flag is disabled)
+  // Equipment Operational State V1/V2 workers
   startEquipmentConditionStalenessWorker();
   startStagingExpiryWorker();
   startProcedureBoundReleaseWorker();

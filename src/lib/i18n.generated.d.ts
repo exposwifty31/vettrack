@@ -2639,7 +2639,6 @@ export interface TStructure {
     autoRefreshHint: string;
   };
   operationalState: {
-    featureDisabled: string;
     invalidCustodyForDockReturn: string;
     noAssetTypeDefined: string;
     crossClinicAssociation: string;

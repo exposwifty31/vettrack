@@ -129,13 +129,6 @@ export function computeStagingExpiry(
   return null; // emergency: no expiry
 }
 
-export function isOperationalStateFeatureEnabled(): boolean {
-  const val = process.env.DISABLE_EQUIPMENT_OPERATIONAL_STATE_V1;
-  if (!val) return true;
-  const normalized = val.trim().toLowerCase();
-  return !(normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on");
-}
-
 export async function releaseProcedureBoundEquipment(
   clinicId: string,
   hospitalizationId: string,
