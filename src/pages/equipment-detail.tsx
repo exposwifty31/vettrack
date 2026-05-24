@@ -82,6 +82,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { useSyncQueue } from "@/hooks/use-sync";
 import { MoveRoomSheet } from "@/components/move-room-sheet";
 import { ReturnPlugDialog } from "@/components/return-plug-dialog";
+import { DeployabilityBadge } from "@/components/equipment/DeployabilityBadge";
+import { DockReturnFlow } from "@/components/equipment/DockReturnFlow";
+import { StagingQueuePanel } from "@/components/equipment/StagingQueuePanel";
 import { useSettings } from "@/hooks/use-settings";
 import { playCriticalAlertTone } from "@/lib/sounds";
 import { haptics } from "@/lib/haptics";
@@ -138,6 +141,7 @@ export default function EquipmentDetailPage() {
   const [noteError, setNoteError] = useState("");
   const [checkoutLocation, setCheckoutLocation] = useState("");
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [dockReturnOpen, setDockReturnOpen] = useState(false);
   const [isPluggedIn, setIsPluggedIn] = useState<boolean>(false);
   const [plugInDeadlineMinutes, setPlugInDeadlineMinutes] = useState<number>(30);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -760,6 +764,14 @@ export default function EquipmentDetailPage() {
   const sterilizationDue = isSterilizationDue(equipment);
   const isCheckedOut = !!equipment.checkedOutById;
   const checkedOutByMe = equipment.checkedOutById === userId;
+  const showOperationalState =
+    equipment.custodyState != null &&
+    equipment.readinessState != null &&
+    equipment.usageState != null;
+  const fullDeployable =
+    equipment.custodyState === "docked" &&
+    equipment.readinessState === "ready" &&
+    equipment.usageState === "available";
 
   const pageContent = (
     <>
@@ -873,6 +885,16 @@ export default function EquipmentDetailPage() {
               )}
               {justConfirmed ? t.equipmentDetail.confirmedHere : t.equipmentDetail.confirmHere}
             </Button>
+          ) : equipment.custodyState === "returned" && equipment.status === "ok" ? (
+            <Button
+              variant="outline"
+              className="w-full h-12 gap-2 text-sm font-semibold rounded-2xl active:scale-[0.98] transition-all text-blue-700 border-blue-200 hover:bg-blue-50"
+              onClick={() => setDockReturnOpen(true)}
+              data-testid="btn-dock-return"
+            >
+              <LogIn className="w-4 h-4" />
+              {t.dockReturn.submit}
+            </Button>
           ) : !isCheckedOut ? (
             <Button
               variant="outline"
@@ -976,6 +998,16 @@ export default function EquipmentDetailPage() {
                   <p className="text-xs text-muted-foreground">
                     Last scan: {formatRelativeTime(equipment.lastSeen?.toString())}
                   </p>
+                  {showOperationalState && (
+                    <div className="mt-1.5">
+                      <DeployabilityBadge
+                        custodyState={equipment.custodyState}
+                        readinessState={equipment.readinessState}
+                        usageState={equipment.usageState}
+                        fullDeployable={fullDeployable}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex flex-col gap-1.5 items-end shrink-0">
@@ -1126,6 +1158,11 @@ export default function EquipmentDetailPage() {
         <Tabs defaultValue="details">
           <TabsList className="w-full">
             <TabsTrigger value="details" className="flex-1">Details</TabsTrigger>
+            {showOperationalState && (
+              <TabsTrigger value="readiness" className="flex-1" data-testid="tab-readiness">
+                {t.dockReturn.conditions}
+              </TabsTrigger>
+            )}
             <TabsTrigger value="history" className="flex-1">
               History ({scanLogs?.length ?? 0})
             </TabsTrigger>
@@ -1206,6 +1243,24 @@ export default function EquipmentDetailPage() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {showOperationalState && (
+            <TabsContent value="readiness">
+              <Card className="bg-card border-border/60 shadow-sm">
+                <CardContent className="p-4 flex flex-col gap-4">
+                  <DeployabilityBadge
+                    custodyState={equipment.custodyState}
+                    readinessState={equipment.readinessState}
+                    usageState={equipment.usageState}
+                    fullDeployable={fullDeployable}
+                  />
+                  {userId && (
+                    <StagingQueuePanel equipment={equipment} currentUserId={userId} />
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
 
           <TabsContent value="history">
             <div className="flex flex-col gap-2">
@@ -1399,6 +1454,16 @@ export default function EquipmentDetailPage() {
             isPluggedIn: nextPluggedIn,
             plugInDeadlineMinutes: nextDeadline ?? 30,
           });
+        }}
+      />
+
+      <DockReturnFlow
+        equipment={equipment}
+        open={dockReturnOpen}
+        onClose={() => setDockReturnOpen(false)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
+          queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
         }}
       />
 

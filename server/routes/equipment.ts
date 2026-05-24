@@ -292,6 +292,15 @@ class CheckoutConflictError extends Error {
   }
 }
 
+/** V1 operational state columns returned on list/detail reads for deployability UI. */
+const equipmentOperationalStateSelect = {
+  custodyState: equipment.custodyState,
+  readinessState: equipment.readinessState,
+  usageState: equipment.usageState,
+  assetTypeId: equipment.assetTypeId,
+  dockId: equipment.dockId,
+} as const;
+
 // GET /api/equipment/my
 router.get("/my", requireAuth, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -352,6 +361,7 @@ router.get("/my", requireAuth, async (req, res) => {
             AND a.clinic_id = ${clinicId}
           LIMIT 1
         )`.as("linkedAnimalName"),
+        ...equipmentOperationalStateSelect,
       })
       .from(equipment)
       .leftJoin(folders, and(eq(equipment.folderId, folders.id), eq(folders.clinicId, clinicId), isNull(folders.deletedAt)))
@@ -486,6 +496,7 @@ router.get("/", requireAuth, async (req, res) => {
             AND a.clinic_id = ${clinicId}
           LIMIT 1
         )`.as("linkedAnimalName"),
+        ...equipmentOperationalStateSelect,
       })
       .from(equipment)
       .leftJoin(folders, and(eq(equipment.folderId, folders.id), eq(folders.clinicId, clinicId), isNull(folders.deletedAt)))
@@ -704,6 +715,7 @@ router.get("/:id", requireAuth, async (req, res) => {
             AND a.clinic_id = ${clinicId}
           LIMIT 1
         )`.as("linkedAnimalName"),
+        ...equipmentOperationalStateSelect,
       })
       .from(equipment)
       .leftJoin(folders, and(eq(equipment.folderId, folders.id), eq(folders.clinicId, clinicId), isNull(folders.deletedAt)))

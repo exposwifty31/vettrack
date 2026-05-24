@@ -3,6 +3,7 @@
  *
  * Requires DATABASE_URL and migrations 130–136 applied.
  * Run: pnpm test:integration:ops
+ * Default CI also guards serialization via equipment-operational-state-serialization.contract.test.ts
  *
  * Groups:
  *   2. checkout paths (12)
@@ -328,6 +329,46 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
   afterEach(async () => {
     process.env.DISABLE_EQUIPMENT_OPERATIONAL_STATE_V1 = "";
     await purgeClinic(ctx.clinicId);
+  });
+
+  // ─── Equipment list/detail serialization ───────────────────────────────────
+
+  describe("equipment list serialization", () => {
+    it("GET /api/equipment includes V1 operational state fields", async () => {
+      await seedEquipment(ctx.eqId, ctx.clinicId, {
+        asset_type_id: ctx.assetTypeId,
+        dock_id: ctx.dockId,
+        custody_state: "docked",
+        readiness_state: "ready",
+        usage_state: "available",
+      });
+
+      const res = await api("/api/equipment");
+      expect(res.status).toBe(200);
+      const items = res.json.items as Array<Record<string, unknown>>;
+      expect(Array.isArray(items)).toBe(true);
+      const row = items.find((i) => i.id === ctx.eqId);
+      expect(row).toBeDefined();
+      expect(row!.custodyState).toBe("docked");
+      expect(row!.readinessState).toBe("ready");
+      expect(row!.usageState).toBe("available");
+      expect(row!.assetTypeId).toBe(ctx.assetTypeId);
+      expect(row!.dockId).toBe(ctx.dockId);
+    });
+
+    it("GET /api/equipment/:id includes V1 operational state fields", async () => {
+      await seedEquipment(ctx.eqId, ctx.clinicId, {
+        custody_state: "returned",
+        readiness_state: "unknown",
+        usage_state: "available",
+      });
+
+      const res = await api(`/api/equipment/${ctx.eqId}`);
+      expect(res.status).toBe(200);
+      expect(res.json.custodyState).toBe("returned");
+      expect(res.json.readinessState).toBe("unknown");
+      expect(res.json.usageState).toBe("available");
+    });
   });
 
   // ─── Group 2: Checkout paths ───────────────────────────────────────────────
