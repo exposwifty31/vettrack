@@ -85,6 +85,7 @@ async function main(): Promise<void> {
 
   // 3. Equipment "eq1" — fixed ID for E2E / manual verification
   //    status="ok", no checkout fields set → starts available
+  const seedNow = new Date();
   await db
     .insert(equipment)
     .values({
@@ -92,6 +93,10 @@ async function main(): Promise<void> {
       clinicId: CLINIC_ID,
       name: "E2E Test Equipment",
       status: "ok",
+      custodyState: "returned",
+      custodyStateSince: seedNow,
+      readinessState: "unknown",
+      readinessStateSince: seedNow,
       checkedOutById: null,
       checkedOutByEmail: null,
       checkedOutAt: null,

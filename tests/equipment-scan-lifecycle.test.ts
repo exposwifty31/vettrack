@@ -142,16 +142,25 @@ describe("Equipment scan — return flow contract", () => {
     expect(routeSource).toContain("isPluggedIn: true");
   });
 
-  it("POST /:id/return does not insert a duplicate equipmentReturns row", () => {
-    // The /:id/return handler must return returnRecord: null to prevent
-    // duplicate records when the client also calls POST /api/returns.
+  it("POST /:id/return creates equipmentReturns only when isPluggedIn is false", () => {
     const returnRouteStart = routeSource.indexOf("// POST /api/equipment/:id/return");
     const returnRouteEnd = routeSource.indexOf("// POST /api/equipment/:id/seen");
     expect(returnRouteStart).toBeGreaterThan(-1);
     expect(returnRouteEnd).toBeGreaterThan(returnRouteStart);
     const returnRouteBody = routeSource.slice(returnRouteStart, returnRouteEnd);
-    expect(returnRouteBody).not.toContain("tx.insert(equipmentReturns)");
-    expect(returnRouteBody).toContain("returnRecord: null");
+    expect(returnRouteBody).toContain("isPluggedIn === false");
+    expect(returnRouteBody).toContain("insert(equipmentReturns)");
+    expect(returnRouteBody).toContain("returnRecord");
+  });
+
+  it("POST /:id/return applies custody transition in a single atomic update", () => {
+    const returnRouteStart = routeSource.indexOf("// POST /api/equipment/:id/return");
+    const returnRouteEnd = routeSource.indexOf("// POST /api/equipment/:id/seen");
+    const returnRouteBody = routeSource.slice(returnRouteStart, returnRouteEnd);
+    expect(returnRouteBody).toContain("transitionCustody");
+    expect(returnRouteBody).toContain("CUSTODY_RETURN_VERSION_CONFLICT");
+    const custodyUpdateCount = (returnRouteBody.match(/\.update\(equipment\)/g) ?? []).length;
+    expect(custodyUpdateCount).toBe(1);
   });
 
   it("return also creates an undoToken inside the transaction", () => {

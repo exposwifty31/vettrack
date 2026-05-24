@@ -17,6 +17,7 @@ import { getPilotStaleMs } from "../lib/pilot-config.js";
 import { computeBundleReadinessGate } from "../services/equipment-operational-state.service.js";
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
+import { enqueueChargeAlertJob } from "../workers/chargeAlertWorker.js";
 
 const EQUIPMENT_STATUS_VALUES = [
   "ok",
@@ -93,6 +94,15 @@ export const scanSchema = z.object({
   status: z.enum(EQUIPMENT_STATUS_VALUES),
   note: z.string().trim().max(500).optional(),
   photoUrl: z.string().max(500).optional(),
+}).strict();
+
+const PLUG_IN_DEADLINE_MAX_MINUTES = 1440;
+const PLUG_IN_DEADLINE_DEFAULT_MINUTES = 30;
+
+/** Optional body for POST /:id/return — enables offline replay of plug-in charge tracking. */
+export const equipmentReturnBodySchema = z.object({
+  isPluggedIn: z.boolean().optional(),
+  plugInDeadlineMinutes: z.number().int().min(1).max(PLUG_IN_DEADLINE_MAX_MINUTES).optional(),
 }).strict();
 
 const revertSchema = z.object({
@@ -759,6 +769,7 @@ router.post("/", requireAuth, writeLimiter, requireEffectiveRole("technician"), 
       );
     }
 
+    const createdAt = new Date();
     const [item] = await db
       .insert(equipment)
       .values({
@@ -782,6 +793,10 @@ router.post("/", requireAuth, writeLimiter, requireEffectiveRole("technician"), 
         searchAlias: searchAlias ?? null,
         staffNote: staffNote ?? null,
         status: "ok",
+        custodyState: "returned",
+        custodyStateSince: createdAt,
+        readinessState: "unknown",
+        readinessStateSince: createdAt,
       })
       .returning();
 
@@ -1409,17 +1424,26 @@ router.post(
 
         v1StageClaimId = topClaim.id;
       } else if (snap.usageState === "available") {
-        // E. available — check bundle gate
-        const allConditions = snap.assetTypeId
-          ? await db.select().from(assetTypeConditions).where(eq(assetTypeConditions.assetTypeId, snap.assetTypeId))
-          : [];
-        const condStates = snap.assetTypeId
-          ? await db.select().from(unitConditionStates).where(eq(unitConditionStates.equipmentId, snap.id))
-          : [];
-        const gateResult = computeBundleReadinessGate(snap, condStates, allConditions, new Date(), true);
-        if (!("skipped" in gateResult) && !gateResult.ok) {
-          void recordOperationalMetric({ clinicId, equipmentId: snap.id, userId: req.authUser!.id, eventType: "bundle_failed", metadata: { reason: gateResult.reason, failedConditions: gateResult.failedConditions, staleConditions: gateResult.staleConditions, unknownConditions: gateResult.unknownConditions } });
-          return res.status(422).json({ code: "BUNDLE_INCOMPLETE", ...gateResult });
+        // E. available — bundle gate only when asset type defines conditions
+        if (snap.assetTypeId) {
+          const allConditions = await db
+            .select()
+            .from(assetTypeConditions)
+            .where(eq(assetTypeConditions.assetTypeId, snap.assetTypeId));
+          const condStates = await db
+            .select()
+            .from(unitConditionStates)
+            .where(eq(unitConditionStates.equipmentId, snap.id));
+          const gateResult = computeBundleReadinessGate(snap, condStates, allConditions, new Date(), true);
+          if (!("skipped" in gateResult) && !gateResult.ok) {
+            void recordOperationalMetric({ clinicId, equipmentId: snap.id, userId: req.authUser!.id, eventType: "bundle_failed", metadata: { reason: gateResult.reason, failedConditions: gateResult.failedConditions, staleConditions: gateResult.staleConditions, unknownConditions: gateResult.unknownConditions } });
+            return res.status(422).json({ code: "BUNDLE_INCOMPLETE", ...gateResult });
+          }
+        } else if (!["returned", "docked"].includes(snap.custodyState)) {
+          return res.status(422).json({
+            code: "EQUIPMENT_UNAVAILABLE",
+            error: `Equipment custody state ${snap.custodyState} blocks checkout`,
+          });
         }
       } else {
         // F. any other usageState
@@ -1621,11 +1645,19 @@ router.post(
 });
 
 // POST /api/equipment/:id/return
-router.post("/:id/return", requireAuth, checkoutLimiter, requireEffectiveRole("student"), validateUuid("id"), async (req, res) => {
+router.post(
+  "/:id/return",
+  requireAuth,
+  checkoutLimiter,
+  requireEffectiveRole("student"),
+  validateUuid("id"),
+  validateBody(equipmentReturnBodySchema),
+  async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
     const clientTimestamp = parseInt(req.headers["x-client-timestamp"] as string || "0", 10);
+    const { isPluggedIn, plugInDeadlineMinutes } = req.body as z.infer<typeof equipmentReturnBodySchema>;
 
     let updated: EquipmentRow | null = null;
     let undoToken = "";
@@ -1650,19 +1682,63 @@ router.post("/:id/return", requireAuth, checkoutLimiter, requireEffectiveRole("s
       }
 
       const returnTime = clientTimestamp ? new Date(clientTimestamp) : new Date();
+      const transitionCustody = existing.custodyState === "checked_out";
+
+      let hasActiveClaims = false;
+      if (transitionCustody) {
+        const [activeClaims] = await tx
+          .select({ count: sql<number>`count(*)` })
+          .from(stagingQueue)
+          .where(and(
+            eq(stagingQueue.equipmentId, req.params.id),
+            eq(stagingQueue.clinicId, clinicId),
+            eq(stagingQueue.status, "active"),
+          ));
+        hasActiveClaims = Number(activeClaims?.count ?? 0) > 0;
+      }
+
+      const returnSet = {
+        checkedOutById: null,
+        checkedOutByEmail: null,
+        checkedOutAt: null,
+        checkedOutLocation: null,
+        status: "ok" as const,
+        lastSeen: returnTime,
+        lastStatus: "ok" as const,
+        ...(transitionCustody
+          ? {
+              custodyState: "returned" as const,
+              custodyStateSince: returnTime,
+              readinessState: "unknown" as const,
+              readinessStateSince: returnTime,
+              usageState: hasActiveClaims ? ("staged" as const) : ("available" as const),
+              usageStateSince: returnTime,
+              version: sql`${equipment.version} + 1`,
+            }
+          : {}),
+      };
+
+      const returnWhere = transitionCustody
+        ? and(
+            eq(equipment.clinicId, clinicId),
+            eq(equipment.id, req.params.id),
+            eq(equipment.custodyState, "checked_out"),
+            eq(equipment.version, existing.version),
+          )
+        : and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id));
+
       const [updatedRow] = await tx
         .update(equipment)
-        .set({
-          checkedOutById: null,
-          checkedOutByEmail: null,
-          checkedOutAt: null,
-          checkedOutLocation: null,
-          status: "ok",
-          lastSeen: returnTime,
-          lastStatus: "ok",
-        })
-        .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id)))
+        .set(returnSet)
+        .where(returnWhere)
         .returning();
+
+      if (!updatedRow) {
+        if (transitionCustody) {
+          throw new Error("CUSTODY_RETURN_VERSION_CONFLICT");
+        }
+        throw new Error("EQUIPMENT_RETURN_UPDATE_FAILED");
+      }
 
       updated = updatedRow;
       const returnLogId = randomUUID();
@@ -1686,40 +1762,13 @@ router.post("/:id/return", requireAuth, checkoutLimiter, requireEffectiveRole("s
         previousState: snapshotState(existing),
       });
 
-      // Operational state V1: update custody/readiness/usage state
-      const [activeClaims] = await tx
-        .select({ count: sql<number>`count(*)` })
-        .from(stagingQueue)
-        .where(and(
-          eq(stagingQueue.equipmentId, req.params.id),
-          eq(stagingQueue.clinicId, clinicId),
-          eq(stagingQueue.status, "active"),
-        ));
-        const hasActiveClaims = Number(activeClaims?.count ?? 0) > 0;
-
-        await tx
-        .update(equipment)
-        .set({
-          custodyState: "returned",
-          custodyStateSince: returnTime,
-          readinessState: "unknown",
-          readinessStateSince: returnTime,
-          usageState: hasActiveClaims ? "staged" : "available",
-          usageStateSince: returnTime,
-          version: sql`${equipment.version} + 1`,
-        })
-        .where(and(
-          eq(equipment.clinicId, clinicId),
-          eq(equipment.id, req.params.id),
-          eq(equipment.custodyState, "checked_out"),
-          eq(equipment.version, existing.version),
-        ));
-
+      if (transitionCustody) {
         await insertRealtimeDomainEvent(tx, {
-        clinicId,
-        type: "EQUIPMENT_CUSTODY_STATE_CHANGED",
-        payload: { equipmentId: req.params.id, custodyState: "returned", hasActiveClaims },
+          clinicId,
+          type: "EQUIPMENT_CUSTODY_STATE_CHANGED",
+          payload: { equipmentId: req.params.id, custodyState: "returned", hasActiveClaims },
         });
+      }
     });
 
     if (!updated) {
@@ -1736,6 +1785,34 @@ router.post("/:id/return", requireAuth, checkoutLimiter, requireEffectiveRole("s
 
     const u = updated as EquipmentRow;
 
+    let returnRecord: (typeof equipmentReturns.$inferSelect) | null = null;
+    if (isPluggedIn === false) {
+      const deadlineMinutes = plugInDeadlineMinutes ?? PLUG_IN_DEADLINE_DEFAULT_MINUTES;
+      const returnId = randomUUID();
+      const chargeAlertJobId = await enqueueChargeAlertJob({
+        returnId,
+        clinicId,
+        equipmentId: req.params.id,
+        plugInDeadlineMinutes: deadlineMinutes,
+      });
+      const [created] = await db
+        .insert(equipmentReturns)
+        .values({
+          id: returnId,
+          clinicId,
+          equipmentId: req.params.id,
+          returnedById: req.authUser!.id,
+          returnedByEmail: req.authUser!.email,
+          returnedAt: new Date(),
+          isPluggedIn: false,
+          plugInDeadlineMinutes: deadlineMinutes,
+          plugInAlertSentAt: null,
+          chargeAlertJobId,
+        })
+        .returning();
+      returnRecord = created ?? null;
+    }
+
     logAudit({
       actorRole: resolveAuditActorRole(req),
       clinicId,
@@ -1744,7 +1821,16 @@ router.post("/:id/return", requireAuth, checkoutLimiter, requireEffectiveRole("s
       performedByEmail: req.authUser!.email,
       targetId: req.params.id,
       targetType: "equipment",
-      metadata: { name: u.name },
+      metadata: {
+        name: u.name,
+        ...(returnRecord
+          ? {
+              returnId: returnRecord.id,
+              isPluggedIn: returnRecord.isPluggedIn,
+              plugInDeadlineMinutes: returnRecord.plugInDeadlineMinutes,
+            }
+          : {}),
+      },
     });
 
     invalidateAnalyticsCache(clinicId);
@@ -1752,7 +1838,7 @@ router.post("/:id/return", requireAuth, checkoutLimiter, requireEffectiveRole("s
     res.json({
       equipment: updated,
       undoToken,
-      returnRecord: null,
+      returnRecord,
     });
 
     await cancelSmartReturnReminder(clinicId, u.id, req.authUser!.id);
@@ -1766,6 +1852,17 @@ router.post("/:id/return", requireAuth, checkoutLimiter, requireEffectiveRole("s
       });
     }
   } catch (err) {
+    if (err instanceof Error && err.message === "CUSTODY_RETURN_VERSION_CONFLICT") {
+      trackSyncFail();
+      return res.status(409).json(
+        apiError({
+          code: "CONFLICT",
+          reason: "VERSION_CONFLICT",
+          message: "Equipment was updated concurrently; please retry the return",
+          requestId,
+        }),
+      );
+    }
     console.error(err);
     trackSyncFail();
     res.status(500).json(
@@ -1777,7 +1874,8 @@ router.post("/:id/return", requireAuth, checkoutLimiter, requireEffectiveRole("s
       }),
     );
   }
-});
+},
+);
 
 // POST /api/equipment/:id/seen — idempotent billing + usage session (Phase 2)
 router.post(
