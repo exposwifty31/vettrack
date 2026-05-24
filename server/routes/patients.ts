@@ -64,7 +64,8 @@ const admitSchema = z.object({
 );
 
 const statusSchema = z.object({
-  status: z.enum(["admitted", "observation", "critical", "recovering", "discharged", "deceased"]),
+  // Discharge must use PATCH /:id/discharge (sets dischargedAt + pre-flight checks).
+  status: z.enum(["admitted", "observation", "critical", "recovering", "deceased"]),
 });
 
 const dischargeSchema = z.object({
@@ -601,21 +602,13 @@ router.patch("/:id/status", async (req, res) => {
     if (!updated.length) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "HOSPITALIZATION_NOT_FOUND", message: "Hospitalization not found or already discharged", requestId }));
 
     const newStatus = parse.data.status;
-    if (newStatus === "critical" || newStatus === "discharged" || newStatus === "deceased") {
-      const eventType =
-        newStatus === "critical"  ? "hosp_critical"  :
-        newStatus === "deceased"  ? "hosp_deceased"  :
-        "hosp_discharged";
+    if (newStatus === "critical" || newStatus === "deceased") {
+      const eventType = newStatus === "critical" ? "hosp_critical" : "hosp_deceased";
       postSystemMessage(clinicId, eventType, {
         hospitalizationId: id,
         status: newStatus,
         updatedAt: new Date().toISOString(),
       }).catch(() => {});
-    }
-
-    // WHERE clause already filters dischargedAt IS NULL — any successful update here transitions to discharged for the first time
-    if (newStatus === "discharged") {
-      void releaseProcedureBoundEquipment(clinicId, id);
     }
 
     res.json({ id: updated[0]!.id, status: parse.data.status });

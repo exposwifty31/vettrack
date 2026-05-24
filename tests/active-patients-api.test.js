@@ -139,6 +139,17 @@ describe("Active Patients — schema & discharge safety", () => {
     expect(statusBlock).toContain("isNull(hospitalizations.dischargedAt)");
     expect(dischargeBlock).toContain("isNull(hospitalizations.dischargedAt)");
   });
+
+  it("status patch cannot discharge (procedure-bound release only on /:id/discharge)", () => {
+    const statusStart = patientsRoute.indexOf('router.patch("/:id/status"');
+    const statusBlock = statusStart >= 0 ? patientsRoute.slice(statusStart, statusStart + 2500) : "";
+    const statusSchemaStart = patientsRoute.indexOf("const statusSchema");
+    const statusSchemaBlock =
+      statusSchemaStart >= 0 ? patientsRoute.slice(statusSchemaStart, statusSchemaStart + 400) : "";
+    expect(statusBlock).not.toContain("releaseProcedureBoundEquipment");
+    expect(statusSchemaBlock).not.toMatch(/"discharged"/);
+    expect(patientsRoute).toContain("releaseProcedureBoundEquipment(clinicId, id)");
+  });
 });
 
 describe("Active Patients — API client", () => {
