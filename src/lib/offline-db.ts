@@ -1,6 +1,7 @@
 import Dexie, { type Table } from "dexie";
 import type { QueryClient } from "@tanstack/react-query";
 import type { Equipment, ScanLog, Folder, Room } from "@/types";
+import { assertPendingSyncEnqueueAllowed } from "@/lib/offline-policy";
 
 export type PendingSyncStatus = "pending" | "synced" | "failed";
 export type PendingSyncType =
@@ -125,6 +126,12 @@ const DEDUP_SYNC_TYPES: ReadonlySet<PendingSyncType> = new Set([
 ]);
 
 export async function addPendingSync(op: Omit<PendingSync, "id">): Promise<number | undefined> {
+  assertPendingSyncEnqueueAllowed({
+    type: op.type,
+    endpoint: op.endpoint,
+    method: op.method,
+  });
+
   const table = getPendingSyncTable();
   if (!table) return undefined;
 

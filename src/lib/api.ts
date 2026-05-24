@@ -288,20 +288,8 @@ export class ApiError extends Error {
   }
 }
 
-// Phase 9 PR 9.5 — offline emergency mutation blocking.
-//
-// Thrown when a Code Blue mutation endpoint is attempted while offline.
-// The error is intentionally loud: callers must surface failure and must
-// NOT silently treat it as a queued success. The doctrine forbids
-// queueing emergency mutations for later replay.
-export class OfflineEmergencyMutationBlockedError extends Error {
-  endpointClass: "start" | "log" | "end" | "presence";
-  constructor(endpointClass: "start" | "log" | "end" | "presence") {
-    super(`Offline emergency mutation blocked (${endpointClass})`);
-    this.name = "OfflineEmergencyMutationBlockedError";
-    this.endpointClass = endpointClass;
-  }
-}
+// Phase 9 PR 9.5 — shared error class with offline-policy enqueue gate (single definition).
+import { OfflineEmergencyMutationBlockedError } from "@/lib/offline-policy";
 
 /**
  * Phase 9 PR 9.5 — best-effort fire-and-forget telemetry post that records
