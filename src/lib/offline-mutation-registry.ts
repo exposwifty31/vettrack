@@ -1,6 +1,6 @@
 /**
- * Phase 1 — offline mutation registry (audit + enqueue policy resolution).
- * `online-required` entries are documentation-only in Phase 1 (no enqueue reject).
+ * Offline mutation registry (enqueue policy resolution).
+ * `online-required` entries are documentation-only (no enqueue reject via registry).
  */
 
 export type ProducerPendingSyncType =
@@ -12,9 +12,6 @@ export type ProducerPendingSyncType =
   | "checkout"
   | "return"
   | "return_with_charge";
-
-/** PendingSyncType values with no producer today — resolve in Phase 2. */
-export const ORPHAN_PENDING_SYNC_TYPES = ["restock", "shift_session"] as const;
 
 export type AllowRegistryEntry = {
   readonly key: string;

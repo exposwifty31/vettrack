@@ -1,23 +1,24 @@
 /**
- * Phase 1 — offline mutation registry and enqueue policy gate.
+ * Phase 1–2 — offline mutation registry and enqueue policy gate.
  */
 import { readFileSync } from "fs";
 import { join } from "path";
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   assertPendingSyncEnqueueAllowed,
   OFFLINE_SYNC_UNREGISTERED_CODE,
   OfflineEmergencyMutationBlockedError,
+  UnknownOfflineMutationError,
 } from "../src/lib/offline-policy";
 import {
   discoverEnqueueProducerTypesFromApiSource,
   offlineAllowProducers,
   offlineOnlineRequiredDomains,
-  ORPHAN_PENDING_SYNC_TYPES,
   PRODUCTION_ENQUEUE_PRODUCER_TYPES,
   resolveAllowRegistryEntry,
   sampleEndpointForAllowEntry,
 } from "../src/lib/offline-mutation-registry";
+import type { PendingSyncType } from "../src/lib/offline-db";
 
 const API_SOURCE_PATH = join(process.cwd(), "src/lib/api.ts");
 
@@ -27,10 +28,8 @@ function readApiSource(): string {
 
 describe("offline-mutation-registry — production enqueue producers", () => {
   it("discovers enqueue producer types from api.ts (not a static fixture list)", () => {
-    const source = readApiSource();
-    const discovered = discoverEnqueueProducerTypesFromApiSource(source);
+    const discovered = discoverEnqueueProducerTypesFromApiSource(readApiSource());
     expect(discovered.size).toBeGreaterThan(0);
-    // Current api.ts literals: create, update, delete, scan, seen, checkout, return_with_charge
     expect(discovered.has("create")).toBe(true);
     expect(discovered.has("scan")).toBe(true);
     expect(discovered.has("checkout")).toBe(true);
@@ -65,13 +64,12 @@ describe("offline-mutation-registry — production enqueue producers", () => {
         `registry entry ${entry.key} must resolve for sample endpoint`,
       ).toBeDefined();
       if (!discovered.has(entry.pendingType) && entry.pendingType === "return") {
-        // handleOptimisticMutation accepts syncType "return"; no literal call site today.
         expect(entry.key).toBe("equipment.return");
         continue;
       }
       expect(
         discovered.has(entry.pendingType),
-        `registry type ${entry.pendingType} has no literal in api.ts — add call site or Phase 2 cleanup`,
+        `registry type ${entry.pendingType} has no literal in api.ts`,
       ).toBe(true);
     }
   });
@@ -81,18 +79,13 @@ describe("offline-mutation-registry — production enqueue producers", () => {
     expect(source.includes("addPendingSync(")).toBe(true);
     const offlineDbSource = readFileSync(join(process.cwd(), "src/lib/offline-db.ts"), "utf8");
     const dbCalls = (offlineDbSource.match(/addPendingSync\(/g) ?? []).length;
-    expect(dbCalls).toBe(1); // export definition only
+    expect(dbCalls).toBe(1);
   });
 
-  it("documents orphan PendingSyncType values for Phase 2", () => {
-    expect(ORPHAN_PENDING_SYNC_TYPES).toContain("restock");
-    expect(ORPHAN_PENDING_SYNC_TYPES).toContain("shift_session");
-    for (const orphan of ORPHAN_PENDING_SYNC_TYPES) {
-      expect(offlineAllowProducers.some((e) => e.pendingType === orphan)).toBe(false);
-    }
-  });
-
-  it("production producer type union matches allow registry rows", () => {
+  it("PendingSyncType union matches registry producer types (no orphans)", () => {
+    const pendingSyncSource = readFileSync(join(process.cwd(), "src/lib/offline-db.ts"), "utf8");
+    expect(pendingSyncSource).not.toMatch(/["']restock["']/);
+    expect(pendingSyncSource).not.toMatch(/["']shift_session["']/);
     const registryTypes = [...new Set(offlineAllowProducers.map((e) => e.pendingType))].sort();
     expect([...PRODUCTION_ENQUEUE_PRODUCER_TYPES].sort()).toEqual(registryTypes);
     expect(registryTypes).toHaveLength(8);
@@ -118,14 +111,6 @@ describe("offline-mutation-registry — online-required documentation", () => {
 });
 
 describe("offline-policy — assertPendingSyncEnqueueAllowed", () => {
-  beforeEach(() => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it("rejects Code Blue emergency endpoints via classifyEmergencyEndpoint", () => {
     expect(() =>
       assertPendingSyncEnqueueAllowed({
@@ -144,7 +129,7 @@ describe("offline-policy — assertPendingSyncEnqueueAllowed", () => {
     ).toThrow(OfflineEmergencyMutationBlockedError);
   });
 
-  it("allows every type discovered from api.ts without warning", () => {
+  it("allows every type discovered from api.ts", () => {
     const discovered = discoverEnqueueProducerTypesFromApiSource(readApiSource());
     for (const pendingType of discovered) {
       const entry = offlineAllowProducers.find((e) => e.pendingType === pendingType)!;
@@ -156,32 +141,67 @@ describe("offline-policy — assertPendingSyncEnqueueAllowed", () => {
         }),
       ).not.toThrow();
     }
-    expect(console.warn).not.toHaveBeenCalled();
   });
 
-  it("emits stable structured warn payload for unregistered enqueue", () => {
-    assertPendingSyncEnqueueAllowed({
-      type: "scan",
-      method: "POST",
-      endpoint: "/api/unknown/custom",
-    });
-    expect(console.warn).toHaveBeenCalledWith(
-      "[offline-policy] unregistered_pending_sync_enqueue",
-      {
+  it("throws UnknownOfflineMutationError with structured payload for unregistered enqueue", () => {
+    expect(() =>
+      assertPendingSyncEnqueueAllowed({
+        type: "scan",
+        method: "POST",
+        endpoint: "/api/unknown/custom",
+      }),
+    ).toThrow(UnknownOfflineMutationError);
+
+    try {
+      assertPendingSyncEnqueueAllowed({
+        type: "scan",
+        method: "POST",
+        endpoint: "/api/unknown/custom",
+      });
+    } catch (err) {
+      expect(err).toBeInstanceOf(UnknownOfflineMutationError);
+      const error = err as UnknownOfflineMutationError;
+      expect(error.payload).toEqual({
         code: OFFLINE_SYNC_UNREGISTERED_CODE,
         pendingType: "scan",
         endpoint: "/api/unknown/custom",
         method: "POST",
-      },
-    );
+      });
+    }
   });
 
   it("does not reject non-emergency paths solely because they are online-required in docs", () => {
-    assertPendingSyncEnqueueAllowed({
-      type: "update",
-      method: "PATCH",
-      endpoint: "/api/medication-tasks/task-1/complete",
-    });
-    expect(console.warn).toHaveBeenCalled();
+    expect(() =>
+      assertPendingSyncEnqueueAllowed({
+        type: "update",
+        method: "PATCH",
+        endpoint: "/api/medication-tasks/task-1/complete",
+      }),
+    ).toThrow(UnknownOfflineMutationError);
+  });
+});
+
+describe("offline-policy — registered producer types", () => {
+  const registeredTypes: PendingSyncType[] = [
+    "checkout",
+    "return",
+    "return_with_charge",
+    "scan",
+    "seen",
+    "create",
+    "update",
+    "delete",
+  ];
+
+  it.each(registeredTypes)("allows registered producer %s", (pendingType) => {
+    const entry = offlineAllowProducers.find((e) => e.pendingType === pendingType);
+    expect(entry).toBeDefined();
+    expect(() =>
+      assertPendingSyncEnqueueAllowed({
+        type: pendingType,
+        method: entry!.method,
+        endpoint: sampleEndpointForAllowEntry(entry!),
+      }),
+    ).not.toThrow();
   });
 });

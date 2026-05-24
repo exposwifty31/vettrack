@@ -1,8 +1,9 @@
 /**
- * Phase 1 — verify policy gate before dedup does not change checkout/return dedup or scan append-only behavior.
+ * Phase 1–2 — policy gate before dedup; unknown enqueue rejected without queue mutation.
  */
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
+import { UnknownOfflineMutationError } from "../src/lib/offline-policy";
 import {
   addPendingSync,
   getPendingSync,
@@ -26,6 +27,21 @@ describe("addPendingSync dedup after policy gate", () => {
   beforeEach(async () => {
     await offlineDb.delete();
     await offlineDb.open();
+  });
+
+  it("rejects unknown enqueue without mutating the queue", async () => {
+    await expect(
+      addPendingSync(
+        baseOp({
+          type: "scan",
+          endpoint: "/api/unknown/custom",
+          method: "POST",
+        }),
+      ),
+    ).rejects.toBeInstanceOf(UnknownOfflineMutationError);
+
+    const pending = await getPendingSync();
+    expect(pending).toHaveLength(0);
   });
 
   it("collapses duplicate checkout enqueue to one pending row", async () => {

@@ -21,15 +21,46 @@ export class OfflineEmergencyMutationBlockedError extends Error {
 
 export const OFFLINE_SYNC_UNREGISTERED_CODE = "OFFLINE_SYNC_UNREGISTERED" as const;
 
+export type OfflineSyncUnregisteredPayload = {
+  code: typeof OFFLINE_SYNC_UNREGISTERED_CODE;
+  pendingType: string;
+  endpoint: string;
+  method: string;
+};
+
 export type PendingSyncEnqueueOp = {
   type: string;
   endpoint: string;
   method: string;
 };
 
+/** Thrown when an enqueue is not registered in the offline mutation registry (Phase 2). */
+export class UnknownOfflineMutationError extends Error {
+  readonly payload: OfflineSyncUnregisteredPayload;
+
+  constructor(payload: OfflineSyncUnregisteredPayload) {
+    super(
+      `Unregistered offline mutation (${payload.method} ${payload.pendingType} ${payload.endpoint})`,
+    );
+    this.name = "UnknownOfflineMutationError";
+    this.payload = payload;
+  }
+}
+
+export function buildOfflineSyncUnregisteredPayload(
+  op: PendingSyncEnqueueOp,
+): OfflineSyncUnregisteredPayload {
+  return {
+    code: OFFLINE_SYNC_UNREGISTERED_CODE,
+    pendingType: op.type,
+    endpoint: op.endpoint,
+    method: op.method.toUpperCase(),
+  };
+}
+
 /**
- * Phase 1 — single choke-point policy gate for `addPendingSync`.
- * Emergency reject via existing classifier; allow passes through; unknown warns only.
+ * Single choke-point policy gate for `addPendingSync`.
+ * Emergency reject via existing classifier; allow passes through; unknown throws.
  */
 export function assertPendingSyncEnqueueAllowed(op: PendingSyncEnqueueOp): void {
   const method = op.method.toUpperCase();
@@ -42,11 +73,5 @@ export function assertPendingSyncEnqueueAllowed(op: PendingSyncEnqueueOp): void 
     return;
   }
 
-  const payload = {
-    code: OFFLINE_SYNC_UNREGISTERED_CODE,
-    pendingType: op.type,
-    endpoint: op.endpoint,
-    method,
-  } as const;
-  console.warn("[offline-policy] unregistered_pending_sync_enqueue", payload);
+  throw new UnknownOfflineMutationError(buildOfflineSyncUnregisteredPayload(op));
 }

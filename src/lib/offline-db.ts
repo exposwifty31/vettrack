@@ -12,9 +12,7 @@ export type PendingSyncType =
   | "delete"
   | "checkout"
   | "return"
-  | "return_with_charge"
-  | "restock"
-  | "shift_session";
+  | "return_with_charge";
 
 export interface PendingSync {
   id?: number;
