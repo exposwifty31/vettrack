@@ -48,4 +48,25 @@ describe("equipment return custody + charge tracking contracts", () => {
     expect(apiSource).toContain("requestBody: returnRequest");
     expect(apiSource).toContain("if (response.returnRecord)");
   });
+
+  it("stale client-timestamp idempotent return uses the same JSON envelope as a normal return", () => {
+    const returnRouteStart = routeSource.indexOf("// POST /api/equipment/:id/return");
+    const returnRouteEnd = routeSource.indexOf("// POST /api/equipment/:id/seen");
+    const returnRouteBody = routeSource.slice(returnRouteStart, returnRouteEnd);
+    expect(returnRouteBody).toContain("alreadyReturned = true");
+
+    const branchStart = returnRouteBody.indexOf("if (alreadyReturned)");
+    expect(branchStart).toBeGreaterThan(-1);
+    const afterBranch = returnRouteBody.slice(branchStart);
+    const branchEnd = afterBranch.indexOf("const u = updated");
+    expect(branchEnd).toBeGreaterThan(-1);
+    const alreadyReturnedBranch = afterBranch.slice(0, branchEnd);
+
+    expect(alreadyReturnedBranch).toMatch(
+      /return res\.json\(\s*\{[\s\S]*equipment:\s*updated/,
+    );
+    expect(alreadyReturnedBranch).toContain('undoToken: ""');
+    expect(alreadyReturnedBranch).toContain("returnRecord: null");
+    expect(alreadyReturnedBranch).not.toMatch(/res\.json\(\s*updated\s*\)/);
+  });
 });

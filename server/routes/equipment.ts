@@ -1824,7 +1824,13 @@ router.post(
         }),
       );
     }
-    if (alreadyReturned) return res.json(updated);
+    if (alreadyReturned) {
+      return res.json({
+        equipment: updated,
+        undoToken: "",
+        returnRecord: null,
+      });
+    }
 
     const u = updated as EquipmentRow;
 
