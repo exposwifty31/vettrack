@@ -33,7 +33,11 @@ import {
   CHARGE_ALERT_JOB_NAME,
   CHARGE_ALERT_QUEUE_NAME,
 } from "../../workers/chargeAlertWorker.js";
-import type { JobDefinition, JobKind, StaticJobKind } from "../registry.js";
+import {
+  resolveBullmqJobName,
+  type JobDefinition,
+  type StaticJobKind,
+} from "../registry.js";
 
 export const EXPIRY_CHECK_QUEUE_NAME = "expiry-check";
 export const EXPIRY_CHECK_JOB_NAME = "check-expiry";
@@ -204,6 +208,29 @@ export const definitionByKind = new Map<StaticJobKind, JobDefinition>(
 );
 
 export const definitionsByQueue = buildDefinitionsByQueue(staticJobDefinitions);
+
+/** Phase 1b pilot queues — one worker per queue in {@link startJobRuntime}. */
+export const PILOT_QUEUE_NAMES = [
+  INVENTORY_DEDUCTION_QUEUE_NAME,
+  CHARGE_ALERT_QUEUE_NAME,
+] as const;
+
+export type PilotQueueName = (typeof PILOT_QUEUE_NAMES)[number];
+
+export function isPilotQueueName(queueName: string): queueName is PilotQueueName {
+  return (PILOT_QUEUE_NAMES as readonly string[]).includes(queueName);
+}
+
+export function resolveDefinitionForJobName(
+  queueName: string,
+  jobName: string,
+): JobDefinition | undefined {
+  const defs = definitionsByQueue.get(queueName);
+  if (!defs) return undefined;
+  return defs.find((def) => resolveBullmqJobName(def) === jobName);
+}
+
+export { resolveBullmqJobName };
 
 export function getStaticJobDefinition(kind: StaticJobKind): JobDefinition {
   const definition = definitionByKind.get(kind);
