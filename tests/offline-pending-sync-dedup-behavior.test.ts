@@ -8,10 +8,12 @@ import {
   addPendingSync,
   getPendingSync,
   offlineDb,
-  type PendingSync,
+  type PendingSyncCreateInput,
 } from "../src/lib/offline-db";
 
-function baseOp(overrides: Partial<PendingSync> & Pick<PendingSync, "type" | "endpoint">): Omit<PendingSync, "id"> {
+function baseOp(
+  overrides: Partial<PendingSyncCreateInput> & Pick<PendingSyncCreateInput, "type" | "endpoint">,
+): PendingSyncCreateInput {
   return {
     method: "POST",
     body: "{}",
@@ -53,6 +55,17 @@ describe("addPendingSync dedup after policy gate", () => {
     expect(pending).toHaveLength(1);
     expect(pending[0]?.endpoint).toBe(endpoint);
     expect(pending[0]?.clientTimestamp).toBe(2001);
+  });
+
+  it("preserves clientMutationId and idempotencyKey when dedup overwrites a row", async () => {
+    const endpoint = "/api/equipment/eq-dedup/checkout";
+    const op = baseOp({ type: "checkout", endpoint, clientTimestamp: 1000 });
+    await addPendingSync(op);
+    const first = (await getPendingSync())[0]!;
+    await addPendingSync({ ...op, clientTimestamp: 2001, body: "{}" });
+    const second = (await getPendingSync())[0]!;
+    expect(second.clientMutationId).toBe(first.clientMutationId);
+    expect(second.idempotencyKey).toBe(first.idempotencyKey);
   });
 
   it("collapses duplicate return enqueue to one pending row", async () => {

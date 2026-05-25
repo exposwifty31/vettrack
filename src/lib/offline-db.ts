@@ -2,6 +2,7 @@ import Dexie, { type Table } from "dexie";
 import type { QueryClient } from "@tanstack/react-query";
 import type { Equipment, ScanLog, Folder, Room } from "@/types";
 import { assertPendingSyncEnqueueAllowed } from "@/lib/offline-policy";
+import { getCurrentUserId } from "@/lib/auth-store";
 
 export type PendingSyncStatus = "pending" | "synced" | "failed";
 export type PendingSyncType =
@@ -14,6 +15,20 @@ export type PendingSyncType =
   | "return"
   | "return_with_charge";
 
+/** Current Dexie pendingSync row schema version (queue evolution). */
+export const PENDING_SYNC_SCHEMA_VERSION = 1;
+
+export type PendingSyncStructuredErrorDetails = Record<
+  string,
+  string | number | boolean | null
+>;
+
+export interface PendingSyncStructuredError {
+  code: string;
+  message?: string;
+  details?: PendingSyncStructuredErrorDetails;
+}
+
 export interface PendingSync {
   id?: number;
   type: PendingSyncType;
@@ -24,9 +39,97 @@ export interface PendingSync {
   retries: number;
   status: PendingSyncStatus;
   clientTimestamp: number;
+  clientMutationId: string;
+  idempotencyKey: string;
+  schemaVersion: number;
+  updatedAt: Date;
+  structuredError: PendingSyncStructuredError | null;
+  clinicId?: string;
+  userId?: string;
   optimisticData?: string;
   errorMessage?: string;
   equipmentName?: string;
+}
+
+/** Fields auto-filled at enqueue; callers omit these unless overriding clinicId/userId. */
+export type PendingSyncCreateInput = Omit<
+  PendingSync,
+  | "id"
+  | "clientMutationId"
+  | "idempotencyKey"
+  | "schemaVersion"
+  | "updatedAt"
+  | "structuredError"
+  | "clinicId"
+  | "userId"
+> & {
+  clinicId?: string;
+  userId?: string;
+};
+
+const PENDING_SYNC_STORES =
+  "++id, type, createdAt, status, clientTimestamp" as const;
+
+function newQueueUuid(): string {
+  return crypto.randomUUID();
+}
+
+function coerceDate(value: Date | string | number | undefined): Date {
+  if (value instanceof Date) return value;
+  if (value !== undefined) return new Date(value);
+  return new Date();
+}
+
+/**
+ * Backfill Phase 3 fields on an existing row (migration-safe, idempotent).
+ */
+export function applyPendingSyncSchemaDefaults(row: PendingSync): void {
+  if (!row.clientMutationId) {
+    row.clientMutationId = newQueueUuid();
+  }
+  if (!row.idempotencyKey) {
+    row.idempotencyKey = newQueueUuid();
+  }
+  if (row.schemaVersion == null) {
+    row.schemaVersion = PENDING_SYNC_SCHEMA_VERSION;
+  }
+  if (!row.updatedAt) {
+    row.updatedAt = coerceDate(row.createdAt);
+  }
+  if (row.structuredError === undefined) {
+    row.structuredError = null;
+  }
+}
+
+export async function upgradePendingSyncTable(
+  table: Table<PendingSync, number>,
+): Promise<void> {
+  await table.toCollection().modify((row) => {
+    applyPendingSyncSchemaDefaults(row);
+  });
+}
+
+function getPendingSyncEnqueueContext(): { clinicId?: string; userId?: string } {
+  const userId = getCurrentUserId()?.trim();
+  return {
+    userId: userId || undefined,
+    clinicId: undefined,
+  };
+}
+
+function materializePendingSyncRow(op: PendingSyncCreateInput): Omit<PendingSync, "id"> {
+  const ctx = getPendingSyncEnqueueContext();
+  const now = new Date();
+  return {
+    ...op,
+    clinicId: op.clinicId ?? ctx.clinicId,
+    userId: op.userId ?? ctx.userId,
+    clientMutationId: newQueueUuid(),
+    idempotencyKey: newQueueUuid(),
+    schemaVersion: PENDING_SYNC_SCHEMA_VERSION,
+    updatedAt: now,
+    structuredError: null,
+  };
 }
 
 class VetTrackDB extends Dexie {
@@ -42,14 +145,23 @@ class VetTrackDB extends Dexie {
       equipment: "id, name, status, folderId, lastSeen, createdAt",
       scanLogs: "id, equipmentId, timestamp",
       folders: "id, name, type",
-      pendingSync: "++id, type, createdAt, status, clientTimestamp",
+      pendingSync: PENDING_SYNC_STORES,
     });
     this.version(4).stores({
       equipment: "id, name, status, folderId, roomId, location, lastSeen, createdAt",
       scanLogs: "id, equipmentId, timestamp",
       folders: "id, name, type",
       rooms: "id, name, syncStatus",
-      pendingSync: "++id, type, createdAt, status, clientTimestamp",
+      pendingSync: PENDING_SYNC_STORES,
+    });
+    this.version(5).stores({
+      equipment: "id, name, status, folderId, roomId, location, lastSeen, createdAt",
+      scanLogs: "id, equipmentId, timestamp",
+      folders: "id, name, type",
+      rooms: "id, name, syncStatus",
+      pendingSync: PENDING_SYNC_STORES,
+    }).upgrade(async (tx) => {
+      await upgradePendingSyncTable(tx.table("pendingSync"));
     });
   }
 }
@@ -123,7 +235,7 @@ const DEDUP_SYNC_TYPES: ReadonlySet<PendingSyncType> = new Set([
   "return_with_charge",
 ]);
 
-export async function addPendingSync(op: Omit<PendingSync, "id">): Promise<number | undefined> {
+export async function addPendingSync(op: PendingSyncCreateInput): Promise<number | undefined> {
   assertPendingSyncEnqueueAllowed({
     type: op.type,
     endpoint: op.endpoint,
@@ -132,6 +244,8 @@ export async function addPendingSync(op: Omit<PendingSync, "id">): Promise<numbe
 
   const table = getPendingSyncTable();
   if (!table) return undefined;
+
+  const row = materializePendingSyncRow(op);
 
   if (DEDUP_SYNC_TYPES.has(op.type)) {
     try {
@@ -155,11 +269,12 @@ export async function addPendingSync(op: Omit<PendingSync, "id">): Promise<numbe
             optimisticData: op.optimisticData,
             equipmentName: op.equipmentName,
             retries: 0,
+            updatedAt: new Date(),
           });
           return existing.id;
         }
 
-        return (await table.add(op)) as number;
+        return (await table.add(row)) as number;
       });
       return result;
     } catch {
@@ -167,7 +282,7 @@ export async function addPendingSync(op: Omit<PendingSync, "id">): Promise<numbe
     }
   }
 
-  return table.add(op) as Promise<number>;
+  return table.add(row) as Promise<number>;
 }
 
 export async function getPendingSync(): Promise<PendingSync[]> {
@@ -182,7 +297,7 @@ export async function getAllPendingSync(): Promise<PendingSync[]> {
 }
 
 export async function updatePendingSync(id: number, updates: Partial<PendingSync>) {
-  return offlineDb.pendingSync.update(id, updates);
+  return offlineDb.pendingSync.update(id, { ...updates, updatedAt: new Date() });
 }
 
 export async function removePendingSync(id: number) {

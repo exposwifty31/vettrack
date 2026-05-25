@@ -32,7 +32,7 @@ describe("P2-5: addPendingSync dedup race", () => {
     // After the try/catch around the transaction, there must be a fallback
     // table.add(op) call for resilience
     const txBlock = source.indexOf('offlineDb.transaction("rw"');
-    const fallbackAdd = source.indexOf("table.add(op)", txBlock);
+    const fallbackAdd = source.indexOf("table.add(row)", txBlock);
     expect(txBlock).toBeGreaterThan(-1);
     expect(fallbackAdd).toBeGreaterThan(txBlock);
   });
