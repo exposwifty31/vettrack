@@ -1,6 +1,6 @@
 import { t } from "@/lib/i18n";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
 import { leaderPoll } from "@/lib/leader";
@@ -11,8 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ErrorCard } from "@/components/ui/error-card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { computeDashboardData } from "@/lib/dashboard-utils";
+import { computeDashboardData, type CriticalItem } from "@/lib/dashboard-utils";
 import { generateMonthlyReport } from "@/lib/generate-report";
+import { isEquipmentRecoveryUiEnabled } from "@/lib/equipment-recovery-ui-flag";
+import {
+  buildManagementRecoveryCriticalRows,
+  isManagementRecoveryCriticalRow,
+  type ManagementRecoveryCriticalRow,
+} from "@/lib/management-dashboard-recovery";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -71,7 +77,15 @@ export default function ManagementDashboardPage() {
 
   const dashData = equipment ? computeDashboardData(equipment) : null;
   const counts = dashData?.counts ?? { available: 0, inUse: 0, issues: 0, missing: 0 };
-  const criticalItems = dashData?.criticalItems ?? [];
+  const legacyCritical = dashData?.criticalItems ?? [];
+  const displayCriticalItems = useMemo((): Array<
+    CriticalItem | ManagementRecoveryCriticalRow
+  > => {
+    if (!isEquipmentRecoveryUiEnabled || !equipment) return legacyCritical;
+    const issueRows = legacyCritical.filter((i) => i.status === "issue");
+    const recoveryRows = buildManagementRecoveryCriticalRows(equipment);
+    return [...issueRows, ...recoveryRows];
+  }, [equipment, legacyCritical]);
   const userGroups = dashData?.userGroups ?? [];
   const locationGroups = dashData?.locationGroups ?? [];
 
@@ -175,12 +189,17 @@ export default function ManagementDashboardPage() {
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-muted-foreground" />
               {t.managementDashboardPage.criticalAlerts}
-              {criticalItems.length > 0 && (
+              {displayCriticalItems.length > 0 && (
                 <span className="ms-auto text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-0.5 rounded-full">
-                  {criticalItems.length}
+                  {displayCriticalItems.length}
                 </span>
               )}
             </CardTitle>
+            {isEquipmentRecoveryUiEnabled && (
+              <p className="text-xs text-muted-foreground px-4 -mt-1 pb-1">
+                {t.managementDashboardPage.recoveryAlertsHint}
+              </p>
+            )}
           </CardHeader>
           <CardContent className="px-4 pb-4">
             {isLoading ? (
@@ -188,7 +207,7 @@ export default function ManagementDashboardPage() {
                 <Skeleton className="h-10 w-full rounded-xl" />
                 <Skeleton className="h-10 w-full rounded-xl" />
               </div>
-            ) : criticalItems.length === 0 ? (
+            ) : displayCriticalItems.length === 0 ? (
               <div className="flex flex-col items-center py-5 gap-2 text-center">
                 <CheckCircle2 className="w-7 h-7 text-emerald-400" />
                 <p className="text-sm font-medium text-foreground">{t.managementDashboardPage.allGood}</p>
@@ -196,24 +215,40 @@ export default function ManagementDashboardPage() {
               </div>
             ) : (
               <div className="flex flex-col gap-2">
-                {criticalItems.map((item) => (
+                {displayCriticalItems.map((item) => {
+                  const isRecovery = isManagementRecoveryCriticalRow(item);
+                  const reasonText = isRecovery
+                    ? t.managementDashboardPage[item.reasonKey]
+                    : item.reason;
+                  return (
                   <Link key={item.id} href={`/equipment/${item.id}`}>
                     <div className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border/60 bg-background hover:bg-muted/50 transition-colors cursor-pointer">
                       <div className="min-w-0">
                         <p className="font-semibold text-sm truncate">{item.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {item.reason}{item.location ? ` · ${item.location}` : ""}
+                          {reasonText}{item.location ? ` · ${item.location}` : ""}
                         </p>
                       </div>
                       <Badge
-                        variant={item.status === "issue" ? "issue" : "maintenance"}
+                        variant={
+                          isRecovery
+                            ? "outline"
+                            : item.status === "issue"
+                              ? "issue"
+                              : "maintenance"
+                        }
                         className="shrink-0 text-[10px] px-2 py-0.5"
                       >
-                        {item.status === "issue" ? t.managementDashboardPage.issue : t.managementDashboardPage.missing}
+                        {isRecovery
+                          ? t.managementDashboardPage[item.reasonKey]
+                          : item.status === "issue"
+                            ? t.managementDashboardPage.issue
+                            : t.managementDashboardPage.missing}
                       </Badge>
                     </div>
                   </Link>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

@@ -1150,6 +1150,10 @@ export interface TStructure {
     allGood: string;
     allInPlace: string;
     issue: string;
+    recoveryReasonStale: string;
+    recoveryReasonVeryStale: string;
+    recoveryReasonCheckedOutLong: string;
+    recoveryAlertsHint: string;
     whoHasWhat: string;
     allReturned: string;
     noneInUse: string;
