@@ -39,6 +39,11 @@ function buildJobContext(job: Job): JobContext {
 async function runPilotJob(queueName: string, job: Job): Promise<void> {
   const definition = resolveDefinitionForJobName(queueName, job.name);
   if (!definition) {
+    console.warn("[job-runtime] job_runtime_unknown_job_name", {
+      event: "job_runtime_unknown_job_name",
+      queueName,
+      jobName: job.name,
+    });
     throw new Error(
       `No JobDefinition for queue=${queueName} job.name=${job.name}`,
     );

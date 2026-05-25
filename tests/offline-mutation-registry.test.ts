@@ -3,7 +3,7 @@
  */
 import { readFileSync } from "fs";
 import { join } from "path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   assertPendingSyncEnqueueAllowed,
   OFFLINE_SYNC_UNREGISTERED_CODE,
@@ -111,6 +111,10 @@ describe("offline-mutation-registry — online-required documentation", () => {
 });
 
 describe("offline-policy — assertPendingSyncEnqueueAllowed", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("rejects Code Blue emergency endpoints via classifyEmergencyEndpoint", () => {
     expect(() =>
       assertPendingSyncEnqueueAllowed({
@@ -168,6 +172,35 @@ describe("offline-policy — assertPendingSyncEnqueueAllowed", () => {
         method: "POST",
       });
     }
+  });
+
+  it("warns with stable fields then throws UnknownOfflineMutationError (no body logged)", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    expect(() =>
+      assertPendingSyncEnqueueAllowed({
+        type: "scan",
+        method: "POST",
+        endpoint: "/api/unknown/custom",
+      }),
+    ).toThrow(UnknownOfflineMutationError);
+
+    expect(warnSpy).toHaveBeenCalledOnce();
+    const [tag, fields] = warnSpy.mock.calls[0] as [string, Record<string, unknown>];
+    expect(tag).toBe("[offline-policy] offline_sync_unknown_mutation");
+    expect(fields).toEqual({
+      event: "offline_sync_unknown_mutation",
+      pendingType: "scan",
+      method: "POST",
+      endpoint: "/api/unknown/custom",
+    });
+    expect(fields).not.toHaveProperty("body");
+    expect(fields).not.toHaveProperty("payload");
+    expect(Object.keys(fields).sort()).toEqual(
+      ["endpoint", "event", "method", "pendingType"].sort(),
+    );
+
+    warnSpy.mockRestore();
   });
 
   it("does not reject non-emergency paths solely because they are online-required in docs", () => {
