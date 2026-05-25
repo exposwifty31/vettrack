@@ -14,6 +14,19 @@ import { deductMedicationInventoryInTx } from "../services/inventory.service.js"
 
 let inventoryDeductionWorker: Worker<InventoryDeductionJobData> | null = null;
 let inventoryDeductionWorkerInitialized = false;
+let legacyWorkerStarterWarned = false;
+
+const logger = {
+  warn(message: string, meta: { name: string }): void {
+    console.warn(message, meta);
+  },
+};
+
+function warnLegacyWorkerStarterOnce(name: string): void {
+  if (legacyWorkerStarterWarned) return;
+  legacyWorkerStarterWarned = true;
+  logger.warn("legacy_worker_starter_used", { name });
+}
 
 async function markResolved(claimedId: string, clinicId: string): Promise<void> {
   await db
@@ -191,7 +204,11 @@ export async function processInventoryDeductionJob(
   }
 }
 
+/**
+ * @deprecated Use Job Runtime registry execution instead.
+ */
 export async function startInventoryDeductionWorker(): Promise<void> {
+  warnLegacyWorkerStarterOnce("startInventoryDeductionWorker");
   if (inventoryDeductionWorkerInitialized) return;
   const workerConnection = await createRedisConnection();
   if (!workerConnection) {
