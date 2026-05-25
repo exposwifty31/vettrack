@@ -19,6 +19,19 @@ type ChargeAlertJobPayload = {
 let chargeAlertQueue: Queue | null = null;
 let chargeAlertWorker: Worker | null = null;
 let chargeAlertQueueInitialized = false;
+let legacyWorkerStarterWarned = false;
+
+const logger = {
+  warn(message: string, meta: { name: string }): void {
+    console.warn(message, meta);
+  },
+};
+
+function warnLegacyWorkerStarterOnce(name: string): void {
+  if (legacyWorkerStarterWarned) return;
+  legacyWorkerStarterWarned = true;
+  logger.warn("legacy_worker_starter_used", { name });
+}
 
 /** Binds the producer queue used by {@link enqueueChargeAlertJob} (e.g. job runtime startup). */
 export function bindChargeAlertProducerQueue(queue: Queue): void {
@@ -186,7 +199,11 @@ export async function runChargeAlertJobForReturn(
   return { notified: outcome === "alerted" };
 }
 
+/**
+ * @deprecated Use Job Runtime registry execution instead.
+ */
 export async function startChargeAlertWorker(): Promise<void> {
+  warnLegacyWorkerStarterOnce("startChargeAlertWorker");
   if (chargeAlertQueueInitialized) return;
   const queueConnection = await createRedisConnection();
   const workerConnection = await createRedisConnection();
