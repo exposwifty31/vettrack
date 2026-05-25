@@ -5,6 +5,7 @@ import {
   buildEquipmentReplayStorageKey,
   hashEquipmentReplayRequest,
 } from "../lib/equipment-replay-idempotency.js";
+import { incrementMetric } from "../lib/metrics.js";
 
 /** Structured equipment replay idempotency events (telemetry only). */
 export const logger = {
@@ -121,6 +122,7 @@ export function equipmentReplayIdempotency(endpoint: string): RequestHandler {
             route: endpoint,
             outcome: "IDEMPOTENCY_KEY_BODY_MISMATCH",
           });
+          incrementMetric("replay_idempotency_collision");
           res.status(409).json({
             code: "IDEMPOTENCY_CONFLICT",
             error: "IDEMPOTENCY_CONFLICT",

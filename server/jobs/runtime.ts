@@ -1,5 +1,6 @@
 import { Worker, type Job } from "bullmq";
 import type { Redis } from "ioredis";
+import { incrementMetric } from "../lib/metrics.js";
 import { createRedisConnection } from "../lib/redis.js";
 import { processChargeAlertJob, bindChargeAlertProducerQueue } from "../workers/chargeAlertWorker.js";
 import { processInventoryDeductionJob } from "../workers/inventory-deduction.worker.js";
@@ -39,6 +40,7 @@ function buildJobContext(job: Job): JobContext {
 async function runPilotJob(queueName: string, job: Job): Promise<void> {
   const definition = resolveDefinitionForJobName(queueName, job.name);
   if (!definition) {
+    incrementMetric("job_runtime_unknown_job_name");
     console.warn("[job-runtime] job_runtime_unknown_job_name", {
       event: "job_runtime_unknown_job_name",
       queueName,
@@ -87,12 +89,14 @@ async function startPilotWorker(
   const defs = definitionsByQueue.get(queueName);
   if (!defs || defs.length === 0) {
     console.warn("[job-runtime] no definitions for queue", { queueName });
+    incrementMetric("job_runtime_worker_unavailable");
     return { name: queueName, ok: false };
   }
 
   const connection = await createRedisConnection();
   if (!connection) {
     console.warn(`[job-runtime] ${queueName} worker disabled (Redis unavailable)`);
+    incrementMetric("job_runtime_worker_unavailable");
     return { name: queueName, ok: false };
   }
 

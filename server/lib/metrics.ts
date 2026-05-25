@@ -241,7 +241,12 @@ type MetricName =
   // increment. Until then dashboards must treat this value as
   // "rate-limit drops counted at the handler" — not "no rate limiting
   // active". Documented here so operators don't misread a 0.
-  | "telemetry_payload_rejected_rate_limit";
+  | "telemetry_payload_rejected_rate_limit"
+  // F1b-1 — job registry / idempotency bounded server counters (no labels).
+  | "replay_idempotency_collision"
+  | "job_runtime_unknown_job_name"
+  | "legacy_worker_starter_used"
+  | "job_runtime_worker_unavailable";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -586,6 +591,13 @@ export interface MetricsSnapshot {
       rateLimit: number;
     };
   };
+  /** F1b-1 — job registry / equipment replay idempotency (bounded names only). */
+  jobRegistry: {
+    replayIdempotencyCollision: number;
+    jobRuntimeUnknownJobName: number;
+    legacyWorkerStarterUsed: number;
+    jobRuntimeWorkerUnavailable: number;
+  };
   timestamp: string;
 }
 
@@ -769,6 +781,10 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   telemetry_payload_rejected_enum_mismatch: 0,
   telemetry_payload_rejected_shape: 0,
   telemetry_payload_rejected_rate_limit: 0,
+  replay_idempotency_collision: 0,
+  job_runtime_unknown_job_name: 0,
+  legacy_worker_starter_used: 0,
+  job_runtime_worker_unavailable: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -1140,6 +1156,12 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           rateLimit: metrics.telemetry_payload_rejected_rate_limit,
         },
       },
+      jobRegistry: {
+        replayIdempotencyCollision: metrics.replay_idempotency_collision,
+        jobRuntimeUnknownJobName: metrics.job_runtime_unknown_job_name,
+        legacyWorkerStarterUsed: metrics.legacy_worker_starter_used,
+        jobRuntimeWorkerUnavailable: metrics.job_runtime_worker_unavailable,
+      },
       timestamp: new Date().toISOString(),
     };
   } catch {
@@ -1329,6 +1351,12 @@ export function getMetricsSnapshot(): MetricsSnapshot {
         swForcedReload: { active: 0, idle: 0, kiosk: 0 },
         swForcedReloadLoopSuppressed: 0,
         telemetryPayloadRejected: { enumMismatch: 0, shape: 0, rateLimit: 0 },
+      },
+      jobRegistry: {
+        replayIdempotencyCollision: 0,
+        jobRuntimeUnknownJobName: 0,
+        legacyWorkerStarterUsed: 0,
+        jobRuntimeWorkerUnavailable: 0,
       },
       timestamp: new Date().toISOString(),
     };

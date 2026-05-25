@@ -2,6 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { Worker } from "bullmq";
 import { appointments, db, inventoryJobs } from "../db.js";
 import { MAX_INVENTORY_JOB_RETRIES } from "../lib/inventory-constants.js";
+import { incrementMetric } from "../lib/metrics.js";
 import { createRedisConnection } from "../lib/redis.js";
 import { postSystemMessage } from "../lib/shift-chat-presence.js";
 import { deductMedicationInventoryInTx } from "../services/inventory.service.js";
@@ -24,6 +25,7 @@ const logger = {
 function warnLegacyWorkerStarterOnce(name: string): void {
   if (legacyWorkerStarterWarned) return;
   legacyWorkerStarterWarned = true;
+  incrementMetric("legacy_worker_starter_used");
   logger.warn("legacy_worker_starter_used", { name });
 }
 

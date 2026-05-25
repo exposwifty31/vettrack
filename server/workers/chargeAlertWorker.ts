@@ -2,6 +2,7 @@ import { Queue, Worker } from "bullmq";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, equipment, equipmentReturns } from "../db.js";
 import { sendPushToAll } from "../lib/push.js";
+import { incrementMetric } from "../lib/metrics.js";
 import { createRedisConnection } from "../lib/redis.js";
 
 export const CHARGE_ALERT_QUEUE_NAME = "charge-alert";
@@ -30,6 +31,7 @@ const logger = {
 function warnLegacyWorkerStarterOnce(name: string): void {
   if (legacyWorkerStarterWarned) return;
   legacyWorkerStarterWarned = true;
+  incrementMetric("legacy_worker_starter_used");
   logger.warn("legacy_worker_starter_used", { name });
 }
 
