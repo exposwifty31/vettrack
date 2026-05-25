@@ -35,7 +35,7 @@ function buildAddOptions(
 
 /**
  * Enqueue a static BullMQ job by {@link StaticJobKind} (matches existing `job.name`).
- * Not yet wired into production call sites — Phase 1a skeleton only.
+ * Production: {@link enqueueChargeAlertJob} delegates `check-plug` here (Job Registry 1c-1).
  */
 export async function enqueueJob<K extends StaticJobKind>(
   kind: K,

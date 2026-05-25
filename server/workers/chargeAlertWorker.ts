@@ -157,18 +157,22 @@ export async function enqueueChargeAlertJob(params: {
   if (!chargeAlertQueue) {
     return jobId;
   }
-  await chargeAlertQueue.add(
-    CHARGE_ALERT_JOB_NAME,
+  const delayMs = normalizePlugInDeadlineMinutes(params.plugInDeadlineMinutes) * 60 * 1000;
+  const { enqueueJob } = await import("../jobs/enqueue.js");
+  await enqueueJob(
+    "check-plug",
     {
       returnId: params.returnId,
       equipmentId: params.equipmentId,
       clinicId: params.clinicId,
     } satisfies ChargeAlertJobPayload,
     {
-      delay: normalizePlugInDeadlineMinutes(params.plugInDeadlineMinutes) * 60 * 1000,
       jobId,
-      removeOnComplete: 50,
-      removeOnFail: 100,
+      delayMs,
+      bullmq: {
+        removeOnComplete: 50,
+        removeOnFail: 100,
+      },
     },
   );
   return jobId;
