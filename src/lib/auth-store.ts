@@ -3,6 +3,7 @@ interface AuthState {
   email: string;
   name: string;
   bearerToken: string | null;
+  clinicId?: string;
 }
 
 let authState: AuthState = {
@@ -34,6 +35,18 @@ export function getAuthHeaders(): Record<string, string> {
 
 export function getCurrentUserId(): string {
   return authState.userId;
+}
+
+export function setCurrentClinicId(clinicId?: string): void {
+  const normalized = typeof clinicId === "string" ? clinicId.trim() : "";
+  authState = {
+    ...authState,
+    clinicId: normalized || undefined,
+  };
+}
+
+export function getCurrentClinicId(): string {
+  return authState.clinicId?.trim() ?? "";
 }
 
 export function getCurrentUserEmail(): string {

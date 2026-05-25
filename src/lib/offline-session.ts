@@ -9,6 +9,7 @@ export interface OfflineSessionSnapshot {
   token: string;
   tokenExp: number;
   lastActiveAt: number;
+  clinicId?: string;
 }
 
 const SESSION_KEY = "vt_session";
@@ -36,9 +37,14 @@ export function saveOfflineSession(data: {
   status: string;
   token: string;
   tokenExp?: number;
+  clinicId?: string;
 }): void {
   try {
     const tokenExp = data.tokenExp ?? extractTokenExp(data.token);
+    const clinicId =
+      typeof data.clinicId === "string" && data.clinicId.trim() !== ""
+        ? data.clinicId.trim()
+        : undefined;
     const snapshot: OfflineSessionSnapshot = {
       userId: data.userId,
       email: data.email,
@@ -48,6 +54,7 @@ export function saveOfflineSession(data: {
       token: data.token,
       tokenExp,
       lastActiveAt: Date.now(),
+      ...(clinicId ? { clinicId } : {}),
     };
     safeStorageSetItem(SESSION_KEY, JSON.stringify(snapshot));
   } catch {

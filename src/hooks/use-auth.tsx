@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import type { Shift, ShiftRole, UserRole } from "@/types";
 import type { AuthoritySnapshot } from "../../shared/authority.js";
-import { setAuthState } from "@/lib/auth-store";
+import { setAuthState, setCurrentClinicId } from "@/lib/auth-store";
 import { isValidJwt, setClerkTokenGetter } from "@/lib/auth-fetch";
 import { useUser, useAuth as useClerkAuth } from "@clerk/clerk-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -47,6 +47,7 @@ interface AuthContextType extends AuthState {
 
 interface SyncedUserResponse {
   id: string;
+  clinicId?: string;
   email: string;
   name: string;
   role: UserRole;
@@ -87,6 +88,7 @@ function DevAuthProviderInner({ children }: { children: ReactNode }) {
         name: offlineSnapshot.name,
         bearerToken: offlineSnapshot.token,
       });
+      setCurrentClinicId(offlineSnapshot.clinicId);
 
       return {
         userId: offlineSnapshot.userId,
@@ -135,6 +137,7 @@ function DevAuthProviderInner({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     clearOfflineSession();
     clearHaltQueue();
+    setCurrentClinicId();
     setAuthState({ userId: "", email: "", name: "", bearerToken: null });
     queryClient.clear();
     setState({
@@ -186,6 +189,9 @@ function DevAuthProviderInner({ children }: { children: ReactNode }) {
           name: resolvedName,
           bearerToken: null,
         });
+        setCurrentClinicId(
+          typeof data.clinicId === "string" ? data.clinicId : undefined,
+        );
 
         clearHaltQueue();
         saveOfflineSession({
@@ -195,6 +201,7 @@ function DevAuthProviderInner({ children }: { children: ReactNode }) {
           role,
           status: status ?? "active",
           token: "",
+          clinicId: typeof data.clinicId === "string" ? data.clinicId : undefined,
         });
 
         setState({
@@ -222,6 +229,7 @@ function DevAuthProviderInner({ children }: { children: ReactNode }) {
         if (controller.signal.aborted) return;
         console.error("Dev auth sync failed:", err);
         clearHaltQueue();
+        setCurrentClinicId();
         setAuthState({ userId: "", email: "", name: "", bearerToken: null });
         setState({
           userId: null, email: null, name: null, role: "technician", secondaryRole: null,
@@ -257,6 +265,7 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
         name: offlineSnapshot.name,
         bearerToken: offlineSnapshot.token,
       });
+      setCurrentClinicId(offlineSnapshot.clinicId);
 
       return {
         userId: offlineSnapshot.userId,
@@ -319,6 +328,7 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     clearOfflineSession();
     clearHaltQueue();
+    setCurrentClinicId();
     setAuthState({ userId: "", email: "", name: "", bearerToken: null });
     queryClient.clear();
     await clerkSignOut({ redirectUrl: "/" });
@@ -333,6 +343,7 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
     if (!isLoaded) return;
     if (!isSignedIn || !user) {
       clearHaltQueue();
+      setCurrentClinicId();
       setAuthState({ userId: "", email: "", name: "", bearerToken: null });
       setState({
         userId: null, email: null, name: null, role: "technician", secondaryRole: null,
@@ -394,6 +405,9 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
             name: resolvedName,
             bearerToken: token || null,
           });
+          setCurrentClinicId(
+            typeof data.clinicId === "string" ? data.clinicId : undefined,
+          );
 
           clearHaltQueue();
           saveOfflineSession({
@@ -402,7 +416,8 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
             name: resolvedName,
             role,
             status: status ?? "active",
-            token: token || ""
+            token: token || "",
+            clinicId: typeof data.clinicId === "string" ? data.clinicId : undefined,
           });
 
           setState({
@@ -449,6 +464,7 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
           // of leaving protected pages mounted in a bad auth loop.
           console.error("Auth sync unauthorized:", data);
           clearHaltQueue();
+          setCurrentClinicId();
           setAuthState({ userId: "", email: "", name: "", bearerToken: null });
           setState({
             userId: null, email: null, name: null, role: "technician", secondaryRole: null,
