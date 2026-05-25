@@ -10,6 +10,7 @@ import {
   OfflineEmergencyMutationBlockedError,
   UnknownOfflineMutationError,
 } from "../src/lib/offline-policy";
+import { classifyEmergencyEndpoint } from "../src/lib/offline-emergency-block";
 import {
   discoverEnqueueProducerTypesFromApiSource,
   offlineAllowProducers,
@@ -19,6 +20,34 @@ import {
   sampleEndpointForAllowEntry,
 } from "../src/lib/offline-mutation-registry";
 import type { PendingSyncType } from "../src/lib/offline-db";
+
+/** Code Blue emergency mutations — owned by classifyEmergencyEndpoint, not the allow registry. */
+const CODE_BLUE_EMERGENCY_MUTATIONS = [
+  {
+    label: "POST /sessions (start)",
+    url: "/api/code-blue/sessions",
+    method: "POST",
+    expected: "start" as const,
+  },
+  {
+    label: "POST /sessions/:id/logs (log)",
+    url: "/api/code-blue/sessions/sess-1/logs",
+    method: "POST",
+    expected: "log" as const,
+  },
+  {
+    label: "PATCH /sessions/:id/end (end)",
+    url: "/api/code-blue/sessions/sess-1/end",
+    method: "PATCH",
+    expected: "end" as const,
+  },
+  {
+    label: "PATCH /sessions/:id/presence (presence)",
+    url: "/api/code-blue/sessions/sess-1/presence",
+    method: "PATCH",
+    expected: "presence" as const,
+  },
+];
 
 const API_SOURCE_PATH = join(process.cwd(), "src/lib/api.ts");
 
@@ -89,6 +118,46 @@ describe("offline-mutation-registry — production enqueue producers", () => {
     const registryTypes = [...new Set(offlineAllowProducers.map((e) => e.pendingType))].sort();
     expect([...PRODUCTION_ENQUEUE_PRODUCER_TYPES].sort()).toEqual(registryTypes);
     expect(registryTypes).toHaveLength(8);
+  });
+});
+
+describe("offline-mutation-registry — emergency classification boundary (B1)", () => {
+  it.each(CODE_BLUE_EMERGENCY_MUTATIONS)(
+    "classifyEmergencyEndpoint owns emergency classification for $label",
+    ({ url, method, expected }) => {
+      expect(classifyEmergencyEndpoint(url, method)).toBe(expected);
+    },
+  );
+
+  it.each(CODE_BLUE_EMERGENCY_MUTATIONS)(
+    "emergency path $label is not registered as an offline-allowed producer",
+    ({ url, method }) => {
+      const pathname = new URL(url, "http://localhost").pathname;
+      const upperMethod = method.toUpperCase();
+
+      for (const entry of offlineAllowProducers) {
+        const matches =
+          entry.method.toUpperCase() === upperMethod && entry.pathPattern.test(pathname);
+        expect(
+          matches,
+          `allow producer ${entry.key} must not match Code Blue emergency ${method} ${url}`,
+        ).toBe(false);
+      }
+
+      for (const pendingType of PRODUCTION_ENQUEUE_PRODUCER_TYPES) {
+        expect(
+          resolveAllowRegistryEntry({ type: pendingType, method, endpoint: url }),
+          `no allow-registry match for emergency ${method} ${url} as ${pendingType}`,
+        ).toBeUndefined();
+      }
+    },
+  );
+
+  it("documents Code Blue mutations as online-required, not allow producers", () => {
+    expect(offlineAllowProducers.map((e) => e.key)).not.toContain("code_blue.mutations");
+    const codeBlueDoc = offlineOnlineRequiredDomains.find((e) => e.key === "code_blue.mutations");
+    expect(codeBlueDoc?.policy).toBe("online-required");
+    expect(codeBlueDoc?.hasEnqueueProducer).toBe(false);
   });
 });
 
