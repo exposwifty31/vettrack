@@ -25,6 +25,7 @@ type RuntimeWorkerEntry = {
 
 let runtimeStarted = false;
 const runtimeWorkers: RuntimeWorkerEntry[] = [];
+let workerStartupResults: Array<{ name: string; ok: boolean }> = [];
 
 function buildJobContext(job: Job): JobContext {
   const data = job.data as { clinicId?: string } | undefined;
@@ -75,17 +76,19 @@ async function ensureChargeAlertProducerQueue(): Promise<void> {
   bindChargeAlertProducerQueue(queue);
 }
 
-async function startPilotWorker(queueName: string): Promise<void> {
+async function startPilotWorker(
+  queueName: string,
+): Promise<{ name: string; ok: boolean }> {
   const defs = definitionsByQueue.get(queueName);
   if (!defs || defs.length === 0) {
     console.warn("[job-runtime] no definitions for queue", { queueName });
-    return;
+    return { name: queueName, ok: false };
   }
 
   const connection = await createRedisConnection();
   if (!connection) {
     console.warn(`[job-runtime] ${queueName} worker disabled (Redis unavailable)`);
-    return;
+    return { name: queueName, ok: false };
   }
 
   const concurrency = defs[0]?.workerConcurrency ?? 1;
@@ -119,6 +122,8 @@ async function startPilotWorker(queueName: string): Promise<void> {
     concurrency,
     jobKinds: defs.map((d) => d.kind),
   });
+
+  return { name: queueName, ok: true };
 }
 
 /**
@@ -136,12 +141,14 @@ export async function startJobRuntime(): Promise<void> {
     });
   }
 
+  const results: Array<{ name: string; ok: boolean }> = [];
   for (const queueName of PILOT_QUEUE_NAMES) {
     if (!isPilotQueueName(queueName)) continue;
-    await startPilotWorker(queueName);
+    results.push(await startPilotWorker(queueName));
   }
 
-  runtimeStarted = true;
+  workerStartupResults = results;
+  runtimeStarted = results.every((r) => r.ok);
   console.log("[job-runtime] pilot runtime active", {
     queues: PILOT_QUEUE_NAMES,
     workers: runtimeWorkers.map((e) => e.queueName),
@@ -166,14 +173,26 @@ export async function closeJobRuntime(): Promise<void> {
   }
   runtimeWorkers.length = 0;
   runtimeStarted = false;
+  workerStartupResults = [];
 }
 
 export function isJobRuntimeStarted(): boolean {
   return runtimeStarted;
 }
 
+export function getRuntimeReadiness(): {
+  started: boolean;
+  workers: Array<{ name: string; ok: boolean }>;
+} {
+  return {
+    started: runtimeStarted,
+    workers: workerStartupResults.map((r) => ({ name: r.name, ok: r.ok })),
+  };
+}
+
 /** Test-only: reset runtime singleton state without closing Redis. */
 export function resetJobRuntimeStateForTests(): void {
   runtimeWorkers.length = 0;
   runtimeStarted = false;
+  workerStartupResults = [];
 }
