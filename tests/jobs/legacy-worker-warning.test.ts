@@ -28,8 +28,15 @@ vi.mock("bullmq", () => {
   return { Worker: WorkerMock, Queue: QueueMock };
 });
 
-function legacyStarterWarnCalls(mock: ReturnType<typeof vi.spyOn>) {
-  return mock.mock.calls.filter((call) => call[0] === "legacy_worker_starter_used");
+function legacyStarterWarnFields(
+  mock: ReturnType<typeof vi.spyOn>,
+): Record<string, unknown>[] {
+  return mock.mock.calls
+    .map((call) => call[1] as Record<string, unknown> | undefined)
+    .filter(
+      (fields): fields is Record<string, unknown> =>
+        fields?.event === "legacy_worker_starter_used",
+    );
 }
 
 describe("B2b — legacy pilot worker starter warnings", () => {
@@ -74,8 +81,8 @@ describe("B2b — legacy pilot worker starter warnings", () => {
       await startChargeAlertWorker();
 
       const warnSpy = vi.mocked(console.warn);
-      expect(legacyStarterWarnCalls(warnSpy)).toEqual([
-        ["legacy_worker_starter_used", { name: "startChargeAlertWorker" }],
+      expect(legacyStarterWarnFields(warnSpy)).toEqual([
+        { event: "legacy_worker_starter_used", starterName: "startChargeAlertWorker" },
       ]);
     });
 
@@ -91,7 +98,7 @@ describe("B2b — legacy pilot worker starter warnings", () => {
       await startChargeAlertWorker();
       await startChargeAlertWorker();
 
-      expect(legacyStarterWarnCalls(vi.mocked(console.warn))).toHaveLength(1);
+      expect(legacyStarterWarnFields(vi.mocked(console.warn))).toHaveLength(1);
     });
 
     it("preserves starter behavior when Redis is available", async () => {
@@ -123,8 +130,11 @@ describe("B2b — legacy pilot worker starter warnings", () => {
       await startInventoryDeductionWorker();
 
       const warnSpy = vi.mocked(console.warn);
-      expect(legacyStarterWarnCalls(warnSpy)).toEqual([
-        ["legacy_worker_starter_used", { name: "startInventoryDeductionWorker" }],
+      expect(legacyStarterWarnFields(warnSpy)).toEqual([
+        {
+          event: "legacy_worker_starter_used",
+          starterName: "startInventoryDeductionWorker",
+        },
       ]);
     });
 
@@ -140,7 +150,7 @@ describe("B2b — legacy pilot worker starter warnings", () => {
       await startInventoryDeductionWorker();
       await startInventoryDeductionWorker();
 
-      expect(legacyStarterWarnCalls(vi.mocked(console.warn))).toHaveLength(1);
+      expect(legacyStarterWarnFields(vi.mocked(console.warn))).toHaveLength(1);
     });
 
     it("preserves starter behavior when Redis is available", async () => {

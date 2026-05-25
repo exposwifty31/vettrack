@@ -23,16 +23,16 @@ let chargeAlertQueueInitialized = false;
 let legacyWorkerStarterWarned = false;
 
 const logger = {
-  warn(message: string, meta: { name: string }): void {
-    console.warn(message, meta);
+  warn(fields: { event: "legacy_worker_starter_used"; starterName: string }): void {
+    console.warn("[legacy-worker-starter]", fields);
   },
 };
 
-function warnLegacyWorkerStarterOnce(name: string): void {
+function warnLegacyWorkerStarterOnce(starterName: string): void {
   if (legacyWorkerStarterWarned) return;
   legacyWorkerStarterWarned = true;
   incrementMetric("legacy_worker_starter_used");
-  logger.warn("legacy_worker_starter_used", { name });
+  logger.warn({ event: "legacy_worker_starter_used", starterName });
 }
 
 /** Binds the producer queue used by {@link enqueueChargeAlertJob} (e.g. job runtime startup). */

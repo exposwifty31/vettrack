@@ -9,8 +9,12 @@ import { incrementMetric } from "../lib/metrics.js";
 
 /** Structured equipment replay idempotency events (telemetry only). */
 export const logger = {
-  info(event: string, fields: { route: string; outcome: string }): void {
-    console.info(event, fields);
+  info(fields: {
+    event: "replay_idempotency_collision";
+    route: string;
+    outcome: string;
+  }): void {
+    console.info("[equipment-replay-idempotency]", fields);
   },
 };
 
@@ -118,7 +122,8 @@ export function equipmentReplayIdempotency(endpoint: string): RequestHandler {
 
       if (existing) {
         if (existing.requestHash !== requestHash) {
-          logger.info("replay_idempotency_collision", {
+          logger.info({
+            event: "replay_idempotency_collision",
             route: endpoint,
             outcome: "IDEMPOTENCY_KEY_BODY_MISMATCH",
           });

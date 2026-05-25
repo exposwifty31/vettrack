@@ -41,7 +41,7 @@ async function runPilotJob(queueName: string, job: Job): Promise<void> {
   const definition = resolveDefinitionForJobName(queueName, job.name);
   if (!definition) {
     incrementMetric("job_runtime_unknown_job_name");
-    console.warn("[job-runtime] job_runtime_unknown_job_name", {
+    console.warn("[job-runtime]", {
       event: "job_runtime_unknown_job_name",
       queueName,
       jobName: job.name,
@@ -88,14 +88,22 @@ async function startPilotWorker(
 ): Promise<{ name: string; ok: boolean }> {
   const defs = definitionsByQueue.get(queueName);
   if (!defs || defs.length === 0) {
-    console.warn("[job-runtime] no definitions for queue", { queueName });
+    console.warn("[job-runtime]", {
+      event: "job_runtime_worker_unavailable",
+      queueName,
+      reason: "NO_DEFINITIONS",
+    });
     incrementMetric("job_runtime_worker_unavailable");
     return { name: queueName, ok: false };
   }
 
   const connection = await createRedisConnection();
   if (!connection) {
-    console.warn(`[job-runtime] ${queueName} worker disabled (Redis unavailable)`);
+    console.warn("[job-runtime]", {
+      event: "job_runtime_worker_unavailable",
+      queueName,
+      reason: "REDIS_UNAVAILABLE",
+    });
     incrementMetric("job_runtime_worker_unavailable");
     return { name: queueName, ok: false };
   }

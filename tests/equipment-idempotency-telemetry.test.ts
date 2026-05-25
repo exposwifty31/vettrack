@@ -124,7 +124,8 @@ describe("equipment idempotency collision telemetry", () => {
     expect(next).not.toHaveBeenCalled();
     expect(recorded.statusCode).toBe(409);
     expect(logger.info).toHaveBeenCalledOnce();
-    expect(logger.info).toHaveBeenCalledWith("replay_idempotency_collision", {
+    expect(logger.info).toHaveBeenCalledWith({
+      event: "replay_idempotency_collision",
       route: ROUTE,
       outcome: "IDEMPOTENCY_KEY_BODY_MISMATCH",
     });

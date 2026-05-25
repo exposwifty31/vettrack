@@ -78,9 +78,39 @@ describe("startJobRuntime", () => {
   });
 
   it("does not throw when Redis is unavailable", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
     vi.mocked(createRedisConnection).mockResolvedValue(null);
     await expect(startJobRuntime()).resolves.toBeUndefined();
     expect(mockWorkerCtor).not.toHaveBeenCalled();
+
+    const unavailableWarns = warnSpy.mock.calls
+      .map((call) => call[1] as Record<string, unknown> | undefined)
+      .filter((fields) => fields?.event === "job_runtime_worker_unavailable");
+
+    expect(unavailableWarns).toHaveLength(2);
+    expect(unavailableWarns).toEqual(
+      expect.arrayContaining([
+        {
+          event: "job_runtime_worker_unavailable",
+          queueName: INVENTORY_DEDUCTION_QUEUE_NAME,
+          reason: "REDIS_UNAVAILABLE",
+        },
+        {
+          event: "job_runtime_worker_unavailable",
+          queueName: "charge-alert",
+          reason: "REDIS_UNAVAILABLE",
+        },
+      ]),
+    );
+    for (const fields of unavailableWarns) {
+      expect(fields).not.toHaveProperty("body");
+      expect(fields).not.toHaveProperty("payload");
+      expect(fields).not.toHaveProperty("data");
+      expect(fields).not.toHaveProperty("clinicId");
+    }
+
+    warnSpy.mockRestore();
   });
 
   it("starts one worker per pilot queue with dedicated connections", async () => {
