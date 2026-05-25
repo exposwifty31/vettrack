@@ -6,6 +6,13 @@ import {
   hashEquipmentReplayRequest,
 } from "../lib/equipment-replay-idempotency.js";
 
+/** Structured equipment replay idempotency events (telemetry only). */
+export const logger = {
+  info(event: string, fields: { route: string; outcome: string }): void {
+    console.info(event, fields);
+  },
+};
+
 /** Plain JSON snapshot suitable for jsonb replay (dates → ISO strings, etc.). */
 function snapshotResponseBody(body: unknown): Record<string, unknown> | null {
   if (typeof body !== "object" || body === null) {
@@ -110,6 +117,10 @@ export function equipmentReplayIdempotency(endpoint: string): RequestHandler {
 
       if (existing) {
         if (existing.requestHash !== requestHash) {
+          logger.info("replay_idempotency_collision", {
+            route: endpoint,
+            outcome: "IDEMPOTENCY_KEY_BODY_MISMATCH",
+          });
           res.status(409).json({
             code: "IDEMPOTENCY_CONFLICT",
             error: "IDEMPOTENCY_CONFLICT",
