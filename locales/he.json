@@ -864,7 +864,11 @@
   "myEquipmentPage": {
     "scanQr": "סרוק QR",
     "shiftSummary": "סיכום משמרת",
-    "browseEquipment": "דפדף בציוד"
+    "browseEquipment": "דפדף בציוד",
+    "recoveryBadgeStale": "דורש אימות",
+    "recoveryBadgeVeryStale": "מיושן מאוד",
+    "recoveryBadgeCheckedOutLong": "מושאל זמן רב",
+    "recoveryAttentionSummary": "{count} פריטים דורשים תשומת לב"
   },
   "notFoundPage": {
     "title": "העמוד לא נמצא — VetTrack"

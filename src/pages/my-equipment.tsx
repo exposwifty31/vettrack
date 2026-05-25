@@ -1,5 +1,5 @@
 import { t } from "@/lib/i18n";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
@@ -41,6 +41,13 @@ import { QrScanner } from "@/components/qr-scanner";
 import { ReturnPlugDialog } from "@/components/return-plug-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { haptics } from "@/lib/haptics";
+import { isEquipmentRecoveryUiEnabled } from "@/lib/equipment-recovery-ui-flag";
+import {
+  compareRecoveryAttention,
+  deriveEquipmentRecoverySnapshotFromSource,
+  filterEquipmentNeedingAttention,
+} from "@/lib/equipment-recovery-adapter";
+import { resolveMyEquipmentRecoveryBadgeKey } from "./my-equipment-recovery-labels";
 
 export default function MyEquipmentPage() {
   const { userId } = useAuth();
@@ -57,6 +64,24 @@ export default function MyEquipmentPage() {
     retry: false,
     refetchOnWindowFocus: false,
   });
+
+  const displayItems = useMemo(() => {
+    if (!items) return items;
+    if (!isEquipmentRecoveryUiEnabled) return items;
+    return [...items].sort((a, b) =>
+      compareRecoveryAttention(
+        deriveEquipmentRecoverySnapshotFromSource(a),
+        deriveEquipmentRecoverySnapshotFromSource(b),
+      ),
+    );
+  }, [items]);
+
+  const recoveryAttentionCount = useMemo(() => {
+    if (!isEquipmentRecoveryUiEnabled || !items?.length) return 0;
+    return filterEquipmentNeedingAttention(items).length;
+  }, [items]);
+
+  const listItems = isEquipmentRecoveryUiEnabled ? displayItems : items;
 
   const returnMut = useMutation({
     mutationFn: ({ id, isPluggedIn, plugInDeadlineMinutes }: { id: string; isPluggedIn: boolean; plugInDeadlineMinutes?: number }) =>
@@ -191,16 +216,38 @@ export default function MyEquipmentPage() {
           />
         ) : (
           <div className="flex flex-col gap-2">
-            {items.map((item) => (
+            {isEquipmentRecoveryUiEnabled && recoveryAttentionCount > 0 && (
+              <p className="text-sm text-muted-foreground">
+                {t.myEquipmentPage.recoveryAttentionSummary.replace(
+                  "{count}",
+                  String(recoveryAttentionCount),
+                )}
+              </p>
+            )}
+            {(listItems ?? []).map((item) => {
+              const recoveryBadgeKey = isEquipmentRecoveryUiEnabled
+                ? resolveMyEquipmentRecoveryBadgeKey(
+                    deriveEquipmentRecoverySnapshotFromSource(item),
+                  )
+                : null;
+              return (
               <Card key={item.id} className="bg-card border-border/60 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1.5">
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                         <p className="font-semibold text-sm truncate">{item.name}</p>
                         <Badge variant={statusToBadgeVariant(item.status)} className="shrink-0 text-[10px] px-2 py-0.5">
                           {STATUS_LABELS[item.status] || item.status}
                         </Badge>
+                        {recoveryBadgeKey && (
+                          <Badge
+                            variant="outline"
+                            className="shrink-0 text-[10px] px-2 py-0.5"
+                          >
+                            {t.myEquipmentPage[recoveryBadgeKey]}
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span>Since {formatRelativeTime(item.checkedOutAt)}</span>
@@ -239,7 +286,8 @@ export default function MyEquipmentPage() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+            );
+            })}
           </div>
         )}
       </div>
