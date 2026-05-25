@@ -100,6 +100,8 @@ describe("startJobRuntime", () => {
   });
 
   it("throws on unknown job.name for pilot inventory queue", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
     vi.mocked(createRedisConnection).mockImplementation(async () =>
       mockRedisConnection() as never,
     );
@@ -121,6 +123,23 @@ describe("startJobRuntime", () => {
     ).rejects.toThrow(/No JobDefinition for queue=inventory-deduction/);
 
     expect(mockProcessInventory).not.toHaveBeenCalled();
+
+    const unknownJobWarn = warnSpy.mock.calls.find(
+      (call) => call[1] && (call[1] as Record<string, unknown>).event === "job_runtime_unknown_job_name",
+    );
+    expect(unknownJobWarn).toBeDefined();
+    const [, fields] = unknownJobWarn as [string, Record<string, unknown>];
+    expect(fields).toEqual({
+      event: "job_runtime_unknown_job_name",
+      queueName: INVENTORY_DEDUCTION_QUEUE_NAME,
+      jobName: "unknown-job",
+    });
+    expect(fields).not.toHaveProperty("body");
+    expect(fields).not.toHaveProperty("payload");
+    expect(fields).not.toHaveProperty("data");
+    expect(JSON.stringify(unknownJobWarn)).not.toContain("taskId");
+
+    warnSpy.mockRestore();
   });
 
   it("dispatches known inventory-deduction jobs to processInventoryDeductionJob", async () => {

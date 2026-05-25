@@ -73,5 +73,12 @@ export function assertPendingSyncEnqueueAllowed(op: PendingSyncEnqueueOp): void 
     return;
   }
 
-  throw new UnknownOfflineMutationError(buildOfflineSyncUnregisteredPayload(op));
+  const payload = buildOfflineSyncUnregisteredPayload(op);
+  console.warn("[offline-policy] offline_sync_unknown_mutation", {
+    event: "offline_sync_unknown_mutation",
+    pendingType: payload.pendingType,
+    method: payload.method,
+    endpoint: payload.endpoint,
+  });
+  throw new UnknownOfflineMutationError(payload);
 }
