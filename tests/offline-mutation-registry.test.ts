@@ -1,5 +1,6 @@
 /**
  * Phase 1–2 — offline mutation registry and enqueue policy gate.
+ * E1 — producer/registry parity lock (api.ts call sites ↔ allow registry).
  */
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -54,6 +55,128 @@ const API_SOURCE_PATH = join(process.cwd(), "src/lib/api.ts");
 function readApiSource(): string {
   return readFileSync(API_SOURCE_PATH, "utf8");
 }
+
+/** Representative endpoint/method per production producer (parity resolution). */
+const REPRESENTATIVE_PRODUCER_OPS: ReadonlyArray<{
+  pendingType: PendingSyncType;
+  method: string;
+  endpoint: string;
+}> = [
+  { pendingType: "create", method: "POST", endpoint: "/api/equipment" },
+  { pendingType: "update", method: "PATCH", endpoint: "/api/equipment/eq-e1" },
+  { pendingType: "delete", method: "DELETE", endpoint: "/api/equipment/eq-e1" },
+  { pendingType: "scan", method: "POST", endpoint: "/api/equipment/eq-e1/scan" },
+  { pendingType: "seen", method: "POST", endpoint: "/api/equipment/eq-e1/seen" },
+  { pendingType: "checkout", method: "POST", endpoint: "/api/equipment/eq-e1/checkout" },
+  { pendingType: "return", method: "POST", endpoint: "/api/equipment/eq-e1/return" },
+  {
+    pendingType: "return_with_charge",
+    method: "POST",
+    endpoint: "/api/equipment/eq-e1/return",
+  },
+];
+
+/**
+ * Count direct production enqueue call sites in api.ts (must stay the sole producer module).
+ */
+function countAddPendingSyncCallSites(apiSource: string): number {
+  return (apiSource.match(/await\s+addPendingSync\s*\(/g) ?? []).length;
+}
+
+/** Literal offlineType / syncType / inline type values wired to addPendingSync in api.ts. */
+function discoverProducerTypeLiteralsInApi(apiSource: string): Set<string> {
+  const literals = new Set<string>();
+  for (const match of apiSource.matchAll(/\bofflineType:\s*["']([a-z_]+)["']/g)) {
+    literals.add(match[1]);
+  }
+  for (const match of apiSource.matchAll(/\bsyncType:\s*["']([a-z_]+)["']/g)) {
+    literals.add(match[1]);
+  }
+  for (const match of apiSource.matchAll(
+    /\btype:\s*["'](scan|seen|create|update|delete|checkout|return|return_with_charge)["']/g,
+  )) {
+    literals.add(match[1]);
+  }
+  return literals;
+}
+
+describe("offline-mutation-registry — E1 producer/registry parity", () => {
+  const apiSource = readApiSource();
+
+  it("discovers every production addPendingSync call site only in api.ts", () => {
+    const callSites = countAddPendingSyncCallSites(apiSource);
+    expect(callSites).toBeGreaterThan(0);
+    expect(
+      callSites,
+      "update count when adding a new addPendingSync producer in api.ts",
+    ).toBe(4);
+    const offlineDbSource = readFileSync(join(process.cwd(), "src/lib/offline-db.ts"), "utf8");
+    expect((offlineDbSource.match(/addPendingSync\(/g) ?? []).length).toBe(1);
+  });
+
+  it("api.ts producer type literals exactly match discoverEnqueueProducerTypesFromApiSource", () => {
+    const literals = discoverProducerTypeLiteralsInApi(apiSource);
+    const discovered = discoverEnqueueProducerTypesFromApiSource(apiSource);
+    expect(literals).toEqual(discovered);
+  });
+
+  it("every type discovered in api.ts is in allow registry; return is the only registry-only producer", () => {
+    const discovered = discoverEnqueueProducerTypesFromApiSource(apiSource);
+    for (const pendingType of discovered) {
+      expect(PRODUCTION_ENQUEUE_PRODUCER_TYPES).toContain(pendingType);
+    }
+    const registryOnly = PRODUCTION_ENQUEUE_PRODUCER_TYPES.filter(
+      (t) => !discovered.has(t),
+    );
+    expect(registryOnly).toEqual(["return"]);
+  });
+
+  it("every production producer type resolves to an allow registry entry at a representative endpoint", () => {
+    const discovered = discoverEnqueueProducerTypesFromApiSource(apiSource);
+    for (const pendingType of discovered) {
+      const op = REPRESENTATIVE_PRODUCER_OPS.find((r) => r.pendingType === pendingType);
+      expect(
+        op,
+        `add representative endpoint for new producer type "${pendingType}" in E1 test`,
+      ).toBeDefined();
+      const resolved = resolveAllowRegistryEntry({
+        type: op!.pendingType,
+        method: op!.method,
+        endpoint: op!.endpoint,
+      });
+      expect(
+        resolved,
+        `registry must allow ${op!.method} ${op!.endpoint} as ${pendingType}`,
+      ).toBeDefined();
+      expect(resolved!.pendingType).toBe(pendingType);
+    }
+  });
+
+  it("fails discovery when api.ts introduces an unknown addPendingSync producer type", () => {
+    const poisoned = `${apiSource}\n// test-only\nofflineType: "not_a_real_producer"`;
+    expect(() => discoverEnqueueProducerTypesFromApiSource(poisoned)).toThrow(
+      /unknown addPendingSync producer type/,
+    );
+  });
+
+  it("online-required domains never declare enqueue producers (explicit allow list empty)", () => {
+    const explicitOnlineRequiredWithProducers: string[] = [];
+    for (const entry of offlineOnlineRequiredDomains) {
+      expect(entry.hasEnqueueProducer).toBe(false);
+      if (entry.hasEnqueueProducer) {
+        explicitOnlineRequiredWithProducers.push(entry.key);
+      }
+    }
+    expect(explicitOnlineRequiredWithProducers).toEqual([]);
+    for (const doc of offlineOnlineRequiredDomains) {
+      const allowCollision = offlineAllowProducers.find((a) => a.key === doc.key);
+      expect(
+        allowCollision,
+        `online-required ${doc.key} must not duplicate an allow producer key`,
+      ).toBeUndefined();
+    }
+  });
+});
 
 describe("offline-mutation-registry — production enqueue producers", () => {
   it("discovers enqueue producer types from api.ts (not a static fixture list)", () => {
