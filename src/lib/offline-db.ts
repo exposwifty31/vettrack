@@ -2,7 +2,7 @@ import Dexie, { type Table } from "dexie";
 import type { QueryClient } from "@tanstack/react-query";
 import type { Equipment, ScanLog, Folder, Room } from "@/types";
 import { assertPendingSyncEnqueueAllowed } from "@/lib/offline-policy";
-import { getCurrentUserId } from "@/lib/auth-store";
+import { getCurrentClinicId, getCurrentUserId } from "@/lib/auth-store";
 
 export type PendingSyncStatus = "pending" | "synced" | "failed";
 export type PendingSyncType =
@@ -111,9 +111,10 @@ export async function upgradePendingSyncTable(
 
 function getPendingSyncEnqueueContext(): { clinicId?: string; userId?: string } {
   const userId = getCurrentUserId()?.trim();
+  const clinicId = getCurrentClinicId()?.trim();
   return {
     userId: userId || undefined,
-    clinicId: undefined,
+    clinicId: clinicId || undefined,
   };
 }
 

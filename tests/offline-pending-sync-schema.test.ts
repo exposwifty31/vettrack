@@ -6,7 +6,7 @@ import Dexie from "dexie";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { setAuthState } from "../src/lib/auth-store";
+import { setAuthState, setCurrentClinicId } from "../src/lib/auth-store";
 import {
   addPendingSync,
   applyPendingSyncSchemaDefaults,
@@ -217,6 +217,7 @@ describe("offline-pending-sync-schema — new enqueue rows", () => {
       name: "Phase 3",
       bearerToken: null,
     });
+    setCurrentClinicId();
   });
 
   it("new rows contain Phase 3 metadata fields", async () => {
@@ -230,6 +231,43 @@ describe("offline-pending-sync-schema — new enqueue rows", () => {
     expect(row?.updatedAt).toBeInstanceOf(Date);
     expect(row?.structuredError).toBeNull();
     expect(row?.userId).toBe("user-phase3-test");
+    expect(row?.clinicId).toBeUndefined();
+  });
+
+  it("populates clinicId from getCurrentClinicId when set", async () => {
+    setCurrentClinicId("clinic-phase3-test");
+    await addPendingSync(
+      enqueueInput("scan", "/api/equipment/eq-clinic/scan"),
+    );
+    const [row] = await getPendingSync();
+    expect(row?.clinicId).toBe("clinic-phase3-test");
+    expect(row?.userId).toBe("user-phase3-test");
+  });
+
+  it("empty clinicId becomes undefined on enqueue", async () => {
+    setCurrentClinicId("   ");
+    await addPendingSync(
+      enqueueInput("seen", "/api/equipment/eq-no-clinic/seen"),
+    );
+    const [row] = await getPendingSync();
+    expect(row?.clinicId).toBeUndefined();
+    expect(row?.userId).toBe("user-phase3-test");
+  });
+
+  it("clinicId survives dedup updates", async () => {
+    setCurrentClinicId("clinic-dedup-test");
+    const endpoint = "/api/equipment/eq-dedup-clinic/checkout";
+    const op = enqueueInput("checkout", endpoint);
+    await addPendingSync({ ...op, clientTimestamp: 1000 });
+    const first = (await getPendingSync())[0]!;
+    expect(first.clinicId).toBe("clinic-dedup-test");
+
+    setCurrentClinicId("clinic-other-should-not-replace");
+    await addPendingSync({ ...op, clientTimestamp: 2001, body: '{"location":"B"}' });
+    const second = (await getPendingSync())[0]!;
+    expect(second.clientTimestamp).toBe(2001);
+    expect(second.clinicId).toBe("clinic-dedup-test");
+    expect(second.userId).toBe("user-phase3-test");
   });
 
   const producerTypes: PendingSyncType[] = [
