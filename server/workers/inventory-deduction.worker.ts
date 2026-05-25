@@ -1,16 +1,29 @@
 import { and, eq, sql } from "drizzle-orm";
-import { Worker } from "bullmq";
+import { Worker, type Job, type JobsOptions } from "bullmq";
 import { appointments, db, inventoryJobs } from "../db.js";
 import { MAX_INVENTORY_JOB_RETRIES } from "../lib/inventory-constants.js";
 import { createRedisConnection } from "../lib/redis.js";
 import { postSystemMessage } from "../lib/shift-chat-presence.js";
+import { deductMedicationInventoryInTx } from "../services/inventory.service.js";
 import {
   INVENTORY_DEDUCTION_JOB_NAME,
   INVENTORY_DEDUCTION_QUEUE_NAME,
   type InventoryDeductionJobData,
 } from "../queues/inventory-deduction.queue.js";
-import { resolveMedicationTaskContainerId } from "../services/appointments.service.js";
-import { deductMedicationInventoryInTx } from "../services/inventory.service.js";
+
+export const inventoryDeductionQueue = {
+  async add(
+    data: InventoryDeductionJobData,
+    options?: JobsOptions,
+  ): Promise<Job<InventoryDeductionJobData>> {
+    const { enqueueJob } = await import("../jobs/enqueue.js");
+    return enqueueJob(
+      "inventory-deduction",
+      data,
+      options ? { bullmq: options } : undefined,
+    );
+  },
+};
 
 let inventoryDeductionWorker: Worker<InventoryDeductionJobData> | null = null;
 let inventoryDeductionWorkerInitialized = false;
@@ -101,6 +114,9 @@ export async function processInventoryDeductionJob(
     return;
   }
 
+  const { resolveMedicationTaskContainerId } = await import(
+    "../services/appointments.service.js"
+  );
   const resolvedContainerId = resolveMedicationTaskContainerId(appointmentRow);
   if (!resolvedContainerId) {
     const failureReason = "CONTAINER_NOT_FOUND";
