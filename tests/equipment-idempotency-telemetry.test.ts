@@ -6,6 +6,7 @@ import {
 } from "../server/lib/equipment-replay-idempotency.js";
 
 const selectLimitMock = vi.fn();
+const onConflictDoUpdateMock = vi.fn();
 
 vi.mock("../server/db.js", () => ({
   db: {
@@ -14,6 +15,11 @@ vi.mock("../server/db.js", () => ({
         where: vi.fn(() => ({
           limit: selectLimitMock,
         })),
+      })),
+    })),
+    insert: vi.fn(() => ({
+      values: vi.fn(() => ({
+        onConflictDoUpdate: onConflictDoUpdateMock,
       })),
     })),
   },
@@ -69,9 +75,16 @@ function makeReq(body: unknown, idempotencyKey = "key-1"): Request {
   } as unknown as Request;
 }
 
+async function flushMicrotasks(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setImmediate(resolve);
+  });
+}
+
 describe("equipment idempotency collision telemetry", () => {
   beforeEach(() => {
     selectLimitMock.mockReset();
+    onConflictDoUpdateMock.mockReset();
     vi.restoreAllMocks();
     vi.spyOn(logger, "info").mockImplementation(() => {});
   });
@@ -138,5 +151,80 @@ describe("equipment idempotency collision telemetry", () => {
     expect(next).not.toHaveBeenCalled();
     expect(recorded.statusCode).toBe(200);
     expect(logger.info).not.toHaveBeenCalled();
+  });
+});
+
+describe("equipment replay idempotency persist-before-send (#326cc38b)", () => {
+  beforeEach(() => {
+    selectLimitMock.mockReset();
+    onConflictDoUpdateMock.mockReset();
+    vi.restoreAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it("defers successful JSON until idempotency row is persisted", async () => {
+    selectLimitMock.mockResolvedValue([]);
+
+    let resolveInsert!: () => void;
+    const insertDeferred = new Promise<void>((resolve) => {
+      resolveInsert = resolve;
+    });
+    onConflictDoUpdateMock.mockReturnValue(insertDeferred);
+
+    const recorded = makeRes();
+    const routeHandler = vi.fn(() => {
+      recorded.res.status(200).json({ equipment: { id: "eq-1" } });
+    });
+
+    const handler = equipmentReplayIdempotency(ROUTE);
+    await handler(makeReq({ status: "ok" }), recorded.res, routeHandler);
+
+    expect(routeHandler).toHaveBeenCalledOnce();
+    expect(onConflictDoUpdateMock).toHaveBeenCalledOnce();
+    expect(recorded.body).toBeUndefined();
+
+    resolveInsert();
+    await flushMicrotasks();
+
+    expect(recorded.statusCode).toBe(200);
+    expect(recorded.body).toEqual({ equipment: { id: "eq-1" } });
+  });
+
+  it("still sends JSON when persist fails (fail-open)", async () => {
+    selectLimitMock.mockResolvedValue([]);
+    onConflictDoUpdateMock.mockRejectedValue(new Error("db unavailable"));
+
+    const recorded = makeRes();
+    const routeHandler = vi.fn(() => {
+      recorded.res.status(200).json({ equipment: { id: "eq-1" } });
+    });
+
+    const handler = equipmentReplayIdempotency(ROUTE);
+    await handler(makeReq({ status: "ok" }), recorded.res, routeHandler);
+    await flushMicrotasks();
+
+    expect(recorded.statusCode).toBe(200);
+    expect(recorded.body).toEqual({ equipment: { id: "eq-1" } });
+    expect(console.error).toHaveBeenCalledWith(
+      "[equipment-replay-idempotency] persist failed",
+      expect.any(Error),
+    );
+  });
+
+  it("does not persist non-2xx JSON responses", async () => {
+    selectLimitMock.mockResolvedValue([]);
+
+    const recorded = makeRes();
+    const routeHandler = vi.fn(() => {
+      recorded.res.status(422).json({ code: "VALIDATION_FAILED" });
+    });
+
+    const handler = equipmentReplayIdempotency(ROUTE);
+    await handler(makeReq({ status: "ok" }), recorded.res, routeHandler);
+    await flushMicrotasks();
+
+    expect(onConflictDoUpdateMock).not.toHaveBeenCalled();
+    expect(recorded.statusCode).toBe(422);
+    expect(recorded.body).toEqual({ code: "VALIDATION_FAILED" });
   });
 });

@@ -24,4 +24,20 @@ describe("P1-9: SW API cache isolation", () => {
     expect(source).toContain("/api/realtime/stream");
     expect(source).toContain("EMERGENCY_BYPASS_PATHS");
   });
+
+  it("sw.js serves /assets/* with network-first to prevent post-deploy chunk skew (#413)", async () => {
+    const fs = await import("fs");
+    const source = fs.readFileSync("public/sw.js", "utf8");
+  const hashedSection = source.slice(
+    source.indexOf("2a. Content-hashed build assets"),
+    source.indexOf("2b. Other static assets"),
+  );
+    expect(source).toContain("function isHashedBuildAsset(url)");
+    expect(hashedSection).toContain("Strategy: network-first");
+    expect(hashedSection).toContain("isHashedBuildAsset(url)");
+    expect(hashedSection).toContain("await fetch(event.request)");
+    expect(hashedSection.indexOf("await fetch")).toBeLessThan(
+      hashedSection.indexOf("cache.match"),
+    );
+  });
 });
