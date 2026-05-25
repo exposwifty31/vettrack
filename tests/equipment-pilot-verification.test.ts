@@ -94,7 +94,7 @@ describe("buildStatusScanUpdates (POST /:id/scan)", () => {
 });
 
 function extractStatusScanRouteBody(): string {
-  const scanRouteStart = routeSource.indexOf('router.post("/:id/scan"');
+  const scanRouteStart = routeSource.indexOf('"/:id/scan"');
   if (scanRouteStart < 0) throw new Error("POST /:id/scan route not found");
   const scanRouteEnd = routeSource.indexOf('router.post("/:id/quick', scanRouteStart + 1);
   return routeSource.slice(
