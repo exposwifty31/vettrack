@@ -1,4 +1,4 @@
-import type { RequestHandler } from "express";
+import type { RequestHandler, Response } from "express";
 import { and, eq } from "drizzle-orm";
 import { db, idempotencyKeys } from "../db.js";
 import {
@@ -43,21 +43,30 @@ async function persistEquipmentReplayResponse(params: {
     });
 }
 
-function persistThenSend<T>(
+/**
+ * Await idempotency persist, then invoke the real sender. Returns `res` immediately so
+ * Express's synchronous Send/json typings are satisfied; the HTTP body is still emitted
+ * only after persist completes (or fail-open on persist error).
+ */
+function schedulePersistThenSend(
+  res: Response,
   persisted: { value: boolean },
   persist: () => Promise<void>,
-  send: () => T,
-): T | Promise<T> {
+  send: () => Response,
+): Response {
   if (persisted.value) {
     return send();
   }
   persisted.value = true;
-  return persist()
-    .then(() => send())
+  void persist()
+    .then(() => {
+      send();
+    })
     .catch((err: unknown) => {
       console.error("[equipment-replay-idempotency] persist failed", err);
-      return send();
+      send();
     });
+  return res;
 }
 
 /**
@@ -138,46 +147,61 @@ export function equipmentReplayIdempotency(endpoint: string): RequestHandler {
       requestHash,
     };
 
-    res.json = (body: unknown) => {
+    const jsonWithReplay: Response["json"] = function jsonWithReplay(body?: unknown) {
       const statusCode = res.statusCode;
       if (statusCode < 200 || statusCode >= 300) {
         return origJson(body);
       }
       if (statusCode === 204) {
-        return persistThenSend(persisted, () =>
-          persistEquipmentReplayResponse({
-            ...persistContext,
-            statusCode: 204,
-            responseBody: {},
-          }),
-        () => origJson(body));
+        return schedulePersistThenSend(
+          res,
+          persisted,
+          () =>
+            persistEquipmentReplayResponse({
+              ...persistContext,
+              statusCode: 204,
+              responseBody: {},
+            }),
+          () => origJson(body),
+        );
       }
       const responseBody = snapshotResponseBody(body);
       if (responseBody === null) {
         return origJson(body);
       }
-      return persistThenSend(persisted, () =>
-        persistEquipmentReplayResponse({
-          ...persistContext,
-          statusCode,
-          responseBody,
-        }),
-      () => origJson(body));
+      return schedulePersistThenSend(
+        res,
+        persisted,
+        () =>
+          persistEquipmentReplayResponse({
+            ...persistContext,
+            statusCode,
+            responseBody,
+          }),
+        () => origJson(body),
+      );
     };
 
-    res.send = (body?: unknown) => {
+    const sendWithReplay: Response["send"] = function sendWithReplay(body) {
       const statusCode = res.statusCode;
       if (statusCode !== 204 || persisted.value) {
         return origSend(body);
       }
-      return persistThenSend(persisted, () =>
-        persistEquipmentReplayResponse({
-          ...persistContext,
-          statusCode: 204,
-          responseBody: {},
-        }),
-      () => origSend(body));
+      return schedulePersistThenSend(
+        res,
+        persisted,
+        () =>
+          persistEquipmentReplayResponse({
+            ...persistContext,
+            statusCode: 204,
+            responseBody: {},
+          }),
+        () => origSend(body),
+      );
     };
+
+    res.json = jsonWithReplay;
+    res.send = sendWithReplay;
 
     next();
   };
