@@ -329,7 +329,13 @@
     "scanLogToday": "Today",
     "scanLogWeek": "Last 7 days",
     "scanLogAll": "All",
-    "scanLogEmpty": "No scan activity in this period"
+    "scanLogEmpty": "No scan activity in this period",
+    "recoveryBadgeStale": "Needs confirm",
+    "recoveryBadgeVeryStale": "Very stale",
+    "recoveryBadgeCheckedOutLong": "Checked out long",
+    "recoveryAttentionCalloutStale": "Confirm this asset is still here and in good condition.",
+    "recoveryAttentionCalloutVeryStale": "This asset has not been confirmed in a long time — verify location and status.",
+    "recoveryAttentionCalloutCheckedOutLong": "Checked out for an extended period — confirm custody or return when done."
   },
   "adminPilotCoverage": {
     "title": "Pilot Coverage",

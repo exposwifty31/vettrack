@@ -92,6 +92,12 @@ import { safeStorageSetItem } from "@/lib/safe-browser";
 import { isOnline } from "@/lib/safe-browser";
 import { isPilotMode } from "@/lib/pilot-mode";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { isEquipmentRecoveryUiEnabled } from "@/lib/equipment-recovery-ui-flag";
+import { deriveEquipmentRecoverySnapshotFromSource } from "@/lib/equipment-recovery-adapter";
+import {
+  resolveEquipmentDetailRecoveryBadgeKey,
+  resolveEquipmentDetailRecoveryCalloutKey,
+} from "@/lib/equipment-detail-recovery-labels";
 
 const STATUS_CONFIG = {
   ok: { icon: CheckCircle2, color: "text-emerald-600", iconBg: "bg-emerald-50" },
@@ -817,6 +823,16 @@ export default function EquipmentDetailPage() {
     equipment.readinessState === "ready" &&
     equipment.usageState === "available";
 
+  const recoverySnapshot = isEquipmentRecoveryUiEnabled
+    ? deriveEquipmentRecoverySnapshotFromSource(equipment)
+    : null;
+  const recoveryBadgeKey = recoverySnapshot
+    ? resolveEquipmentDetailRecoveryBadgeKey(recoverySnapshot)
+    : null;
+  const recoveryCalloutKey = recoverySnapshot
+    ? resolveEquipmentDetailRecoveryCalloutKey(recoverySnapshot)
+    : null;
+
   const pageContent = (
     <>
       <Helmet>
@@ -1029,6 +1045,15 @@ export default function EquipmentDetailPage() {
         {/* Status card */}
         <Card className="bg-card border-border/60 shadow-sm">
           <CardContent className="p-4">
+            {recoveryCalloutKey && (
+              <div
+                className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-sm text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-100"
+                data-testid="equipment-detail-recovery-callout"
+              >
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <p>{t.equipmentDetail[recoveryCalloutKey]}</p>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${statusConf?.iconBg || "bg-muted"}`}>
@@ -1036,9 +1061,20 @@ export default function EquipmentDetailPage() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Current Status</p>
-                  <p className="text-lg font-bold">
-                    {STATUS_LABELS[equipment.status as keyof typeof STATUS_LABELS] || equipment.status}
-                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-lg font-bold">
+                      {STATUS_LABELS[equipment.status as keyof typeof STATUS_LABELS] || equipment.status}
+                    </p>
+                    {recoveryBadgeKey && (
+                      <Badge
+                        variant="outline"
+                        className="shrink-0 text-xs"
+                        data-testid="equipment-detail-recovery-badge"
+                      >
+                        {t.equipmentDetail[recoveryBadgeKey]}
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     Last scan: {formatRelativeTime(equipment.lastSeen?.toString())}
                   </p>

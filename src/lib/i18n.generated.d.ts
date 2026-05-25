@@ -333,6 +333,12 @@ export interface TStructure {
     scanLogWeek: string;
     scanLogAll: string;
     scanLogEmpty: string;
+    recoveryBadgeStale: string;
+    recoveryBadgeVeryStale: string;
+    recoveryBadgeCheckedOutLong: string;
+    recoveryAttentionCalloutStale: string;
+    recoveryAttentionCalloutVeryStale: string;
+    recoveryAttentionCalloutCheckedOutLong: string;
   };
   adminPilotCoverage: {
     title: string;

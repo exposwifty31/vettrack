@@ -188,6 +188,12 @@ const translations = {
     scanLogWeek: d.equipmentDetail.scanLogWeek,
     scanLogAll: d.equipmentDetail.scanLogAll,
     scanLogEmpty: d.equipmentDetail.scanLogEmpty,
+    recoveryBadgeStale: d.equipmentDetail.recoveryBadgeStale,
+    recoveryBadgeVeryStale: d.equipmentDetail.recoveryBadgeVeryStale,
+    recoveryBadgeCheckedOutLong: d.equipmentDetail.recoveryBadgeCheckedOutLong,
+    recoveryAttentionCalloutStale: d.equipmentDetail.recoveryAttentionCalloutStale,
+    recoveryAttentionCalloutVeryStale: d.equipmentDetail.recoveryAttentionCalloutVeryStale,
+    recoveryAttentionCalloutCheckedOutLong: d.equipmentDetail.recoveryAttentionCalloutCheckedOutLong,
     toast: {
       undone: d.equipmentDetail.toast.undone,
       undoFailed: d.equipmentDetail.toast.undoFailed,

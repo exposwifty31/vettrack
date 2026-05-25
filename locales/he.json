@@ -329,7 +329,13 @@
     "scanLogToday": "היום",
     "scanLogWeek": "7 ימים אחרונים",
     "scanLogAll": "הכל",
-    "scanLogEmpty": "אין פעילות סריקה בתקופה זו"
+    "scanLogEmpty": "אין פעילות סריקה בתקופה זו",
+    "recoveryBadgeStale": "דורש אימות",
+    "recoveryBadgeVeryStale": "מיושן מאוד",
+    "recoveryBadgeCheckedOutLong": "מושאל זמן רב",
+    "recoveryAttentionCalloutStale": "אשר שהציוד עדיין כאן ובמצב תקין.",
+    "recoveryAttentionCalloutVeryStale": "הציוד לא אומת זמן רב — בדוק מיקום וסטטוס.",
+    "recoveryAttentionCalloutCheckedOutLong": "מושאל זמן רב — אשר אחריות או החזר כשסיימת."
   },
   "adminPilotCoverage": {
     "title": "כיסוי פיילוט",
