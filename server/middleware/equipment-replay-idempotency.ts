@@ -6,6 +6,60 @@ import {
   hashEquipmentReplayRequest,
 } from "../lib/equipment-replay-idempotency.js";
 
+/** Plain JSON snapshot suitable for jsonb replay (dates → ISO strings, etc.). */
+function snapshotResponseBody(body: unknown): Record<string, unknown> | null {
+  if (typeof body !== "object" || body === null) {
+    return null;
+  }
+  return JSON.parse(JSON.stringify(body)) as Record<string, unknown>;
+}
+
+async function persistEquipmentReplayResponse(params: {
+  clinicId: string;
+  storageKey: string;
+  endpoint: string;
+  requestHash: string;
+  statusCode: number;
+  responseBody: Record<string, unknown>;
+}): Promise<void> {
+  await db
+    .insert(idempotencyKeys)
+    .values({
+      clinicId: params.clinicId,
+      key: params.storageKey,
+      endpoint: params.endpoint,
+      requestHash: params.requestHash,
+      statusCode: params.statusCode,
+      responseBody: params.responseBody,
+    })
+    .onConflictDoUpdate({
+      target: [idempotencyKeys.clinicId, idempotencyKeys.key],
+      set: {
+        endpoint: params.endpoint,
+        requestHash: params.requestHash,
+        statusCode: params.statusCode,
+        responseBody: params.responseBody,
+      },
+    });
+}
+
+function persistThenSend<T>(
+  persisted: { value: boolean },
+  persist: () => Promise<void>,
+  send: () => T,
+): T | Promise<T> {
+  if (persisted.value) {
+    return send();
+  }
+  persisted.value = true;
+  return persist()
+    .then(() => send())
+    .catch((err: unknown) => {
+      console.error("[equipment-replay-idempotency] persist failed", err);
+      return send();
+    });
+}
+
 /**
  * Optional offline replay idempotency for equipment mutations.
  * When `Idempotency-Key` is absent, the request proceeds unchanged (online callers).
@@ -75,54 +129,55 @@ export function equipmentReplayIdempotency(endpoint: string): RequestHandler {
 
     const origJson = res.json.bind(res);
     const origSend = res.send.bind(res);
-    let captured: unknown;
-    let persisted = false;
+    const persisted = { value: false };
+
+    const persistContext = {
+      clinicId,
+      storageKey,
+      endpoint,
+      requestHash,
+    };
 
     res.json = (body: unknown) => {
-      captured = body;
-      return origJson(body);
+      const statusCode = res.statusCode;
+      if (statusCode < 200 || statusCode >= 300) {
+        return origJson(body);
+      }
+      if (statusCode === 204) {
+        return persistThenSend(persisted, () =>
+          persistEquipmentReplayResponse({
+            ...persistContext,
+            statusCode: 204,
+            responseBody: {},
+          }),
+        () => origJson(body));
+      }
+      const responseBody = snapshotResponseBody(body);
+      if (responseBody === null) {
+        return origJson(body);
+      }
+      return persistThenSend(persisted, () =>
+        persistEquipmentReplayResponse({
+          ...persistContext,
+          statusCode,
+          responseBody,
+        }),
+      () => origJson(body));
     };
 
     res.send = (body?: unknown) => {
-      if (body !== undefined) captured = body;
-      return origSend(body);
+      const statusCode = res.statusCode;
+      if (statusCode !== 204 || persisted.value) {
+        return origSend(body);
+      }
+      return persistThenSend(persisted, () =>
+        persistEquipmentReplayResponse({
+          ...persistContext,
+          statusCode: 204,
+          responseBody: {},
+        }),
+      () => origSend(body));
     };
-
-    res.once("finish", () => {
-      if (persisted) return;
-      if (res.statusCode < 200 || res.statusCode >= 300) return;
-
-      const responseBody: Record<string, unknown> =
-        res.statusCode === 204
-          ? {}
-          : (typeof captured === "object" && captured !== null
-              ? (captured as Record<string, unknown>)
-              : {});
-
-      persisted = true;
-      void db
-        .insert(idempotencyKeys)
-        .values({
-          clinicId,
-          key: storageKey,
-          endpoint,
-          requestHash,
-          statusCode: res.statusCode,
-          responseBody,
-        })
-        .onConflictDoUpdate({
-          target: [idempotencyKeys.clinicId, idempotencyKeys.key],
-          set: {
-            endpoint,
-            requestHash,
-            statusCode: res.statusCode,
-            responseBody,
-          },
-        })
-        .catch((err: unknown) => {
-          console.error("[equipment-replay-idempotency] persist failed", err);
-        });
-    });
 
     next();
   };
