@@ -104,7 +104,7 @@ describe("GET /api/metrics — jobRegistry (F1d-1)", () => {
     resetMetrics();
   });
 
-  it("includes jobRegistry with all four F1b-1 counters at zero by default", async () => {
+  it("includes jobRegistry with all F1b/F2c counters at zero by default", async () => {
     const { statusCode, body } = await getMetricsViaRoute();
 
     expect(statusCode).toBe(200);
@@ -113,6 +113,7 @@ describe("GET /api/metrics — jobRegistry (F1d-1)", () => {
       jobRuntimeUnknownJobName: 0,
       legacyWorkerStarterUsed: 0,
       jobRuntimeWorkerUnavailable: 0,
+      jobEnqueueQueueUnavailable: 0,
     });
   });
 
@@ -121,6 +122,7 @@ describe("GET /api/metrics — jobRegistry (F1d-1)", () => {
     incrementMetric("job_runtime_unknown_job_name");
     incrementMetric("legacy_worker_starter_used");
     incrementMetric("job_runtime_worker_unavailable");
+    incrementMetric("job_enqueue_queue_unavailable");
 
     const { statusCode, body } = await getMetricsViaRoute();
 
@@ -130,6 +132,7 @@ describe("GET /api/metrics — jobRegistry (F1d-1)", () => {
       jobRuntimeUnknownJobName: 1,
       legacyWorkerStarterUsed: 1,
       jobRuntimeWorkerUnavailable: 1,
+      jobEnqueueQueueUnavailable: 1,
     });
     expect(body.jobRegistry).toEqual(getMetricsSnapshot().jobRegistry);
   });
@@ -142,5 +145,6 @@ describe("GET /api/metrics — jobRegistry (F1d-1)", () => {
     expect(registry).not.toHaveProperty("job_runtime_unknown_job_name");
     expect(registry).not.toHaveProperty("legacy_worker_starter_used");
     expect(registry).not.toHaveProperty("job_runtime_worker_unavailable");
+    expect(registry).not.toHaveProperty("job_enqueue_queue_unavailable");
   });
 });

@@ -246,7 +246,8 @@ type MetricName =
   | "replay_idempotency_collision"
   | "job_runtime_unknown_job_name"
   | "legacy_worker_starter_used"
-  | "job_runtime_worker_unavailable";
+  | "job_runtime_worker_unavailable"
+  | "job_enqueue_queue_unavailable";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -597,6 +598,7 @@ export interface MetricsSnapshot {
     jobRuntimeUnknownJobName: number;
     legacyWorkerStarterUsed: number;
     jobRuntimeWorkerUnavailable: number;
+    jobEnqueueQueueUnavailable: number;
   };
   timestamp: string;
 }
@@ -785,6 +787,7 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   job_runtime_unknown_job_name: 0,
   legacy_worker_starter_used: 0,
   job_runtime_worker_unavailable: 0,
+  job_enqueue_queue_unavailable: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -1161,6 +1164,7 @@ export function getMetricsSnapshot(): MetricsSnapshot {
         jobRuntimeUnknownJobName: metrics.job_runtime_unknown_job_name,
         legacyWorkerStarterUsed: metrics.legacy_worker_starter_used,
         jobRuntimeWorkerUnavailable: metrics.job_runtime_worker_unavailable,
+        jobEnqueueQueueUnavailable: metrics.job_enqueue_queue_unavailable,
       },
       timestamp: new Date().toISOString(),
     };
@@ -1357,6 +1361,7 @@ export function getMetricsSnapshot(): MetricsSnapshot {
         jobRuntimeUnknownJobName: 0,
         legacyWorkerStarterUsed: 0,
         jobRuntimeWorkerUnavailable: 0,
+        jobEnqueueQueueUnavailable: 0,
       },
       timestamp: new Date().toISOString(),
     };

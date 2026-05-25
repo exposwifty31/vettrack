@@ -1,4 +1,5 @@
 import type { Job, JobsOptions } from "bullmq";
+import { incrementMetric } from "../lib/metrics.js";
 import {
   buildStaleTaskOwnershipSweepJobId,
   defaultIntegrationJobId,
@@ -18,6 +19,69 @@ export type EnqueueJobOptions = {
   /** Merged after definition defaults (same precedence as existing queue wrappers). */
   bullmq?: JobsOptions;
 };
+
+type EnqueueQueueUnavailableReason =
+  | "REDIS_URL_MISSING"
+  | "REDIS_CONNECTION_FAILED"
+  | "QUEUE_INIT_FAILED";
+
+const INTEGRATION_SYNC_ENQUEUE_KIND = "integration-sync-enqueue" as const;
+
+function isEnqueueQueueUnavailableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("queue disabled") ||
+    message.includes("queue unavailable") ||
+    message.includes("REDIS_URL missing") ||
+    message.includes("Redis connection failed")
+  );
+}
+
+function deriveEnqueueQueueUnavailableReason(
+  error: unknown,
+): EnqueueQueueUnavailableReason {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("REDIS_URL missing")) {
+    return "REDIS_URL_MISSING";
+  }
+  if (message.includes("Redis connection failed")) {
+    return "REDIS_CONNECTION_FAILED";
+  }
+  return "QUEUE_INIT_FAILED";
+}
+
+function observeEnqueueQueueUnavailable(params: {
+  kind: StaticJobKind | typeof INTEGRATION_SYNC_ENQUEUE_KIND;
+  queueName: string;
+  reason: EnqueueQueueUnavailableReason;
+}): void {
+  incrementMetric("job_enqueue_queue_unavailable");
+  console.warn("[job-enqueue]", {
+    event: "job_enqueue_queue_unavailable",
+    kind: params.kind,
+    queueName: params.queueName,
+    reason: params.reason,
+  });
+}
+
+async function withEnqueueQueueObservability<T>(
+  kind: StaticJobKind | typeof INTEGRATION_SYNC_ENQUEUE_KIND,
+  queueName: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (isEnqueueQueueUnavailableError(error)) {
+      observeEnqueueQueueUnavailable({
+        kind,
+        queueName,
+        reason: deriveEnqueueQueueUnavailableReason(error),
+      });
+    }
+    throw error;
+  }
+}
 
 function buildAddOptions(
   definition: ReturnType<typeof getStaticJobDefinition>,
@@ -45,28 +109,30 @@ export async function enqueueJob<K extends StaticJobKind>(
   options?: EnqueueJobOptions,
 ): Promise<Job<PayloadForStaticKind[K]>> {
   const definition = getStaticJobDefinition(kind);
-  const queue = await getOrCreateQueue<PayloadForStaticKind[K]>({
-    queueName: definition.queue,
-    defaultJobOptions: mergeEnqueueJobOptions(definition),
-    logLabel: `${definition.queue}-queue`,
+  return withEnqueueQueueObservability(kind, definition.queue, async () => {
+    const queue = await getOrCreateQueue<PayloadForStaticKind[K]>({
+      queueName: definition.queue,
+      defaultJobOptions: mergeEnqueueJobOptions(definition),
+      logLabel: `${definition.queue}-queue`,
+    });
+
+    let addOptions = buildAddOptions(definition, options);
+
+    if (kind === "stale-task-ownership-sweep") {
+      const sweepPayload = payload as PayloadForStaticKind["stale-task-ownership-sweep"];
+      addOptions = {
+        ...addOptions,
+        jobId:
+          options?.jobId ?? buildStaleTaskOwnershipSweepJobId(sweepPayload.clinicId),
+      };
+    }
+
+    const jobName = definition.bullmqJobName ?? definition.kind;
+    // BullMQ name/data generics are narrower than our StaticJobKind union under server-check tsconfig.
+    return queue.add(jobName as never, payload as never, addOptions) as Promise<
+      Job<PayloadForStaticKind[K]>
+    >;
   });
-
-  let addOptions = buildAddOptions(definition, options);
-
-  if (kind === "stale-task-ownership-sweep") {
-    const sweepPayload = payload as PayloadForStaticKind["stale-task-ownership-sweep"];
-    addOptions = {
-      ...addOptions,
-      jobId:
-        options?.jobId ?? buildStaleTaskOwnershipSweepJobId(sweepPayload.clinicId),
-    };
-  }
-
-  const jobName = definition.bullmqJobName ?? definition.kind;
-  // BullMQ name/data generics are narrower than our StaticJobKind union under server-check tsconfig.
-  return queue.add(jobName as never, payload as never, addOptions) as Promise<
-    Job<PayloadForStaticKind[K]>
-  >;
 }
 
 /**
@@ -77,25 +143,31 @@ export async function enqueueIntegrationSyncJob(
   options?: JobsOptions,
 ): Promise<Job<IntegrationSyncJobData>> {
   const queueName = integrationQueueForPayload(data);
-  const meta = integrationSyncEnqueueDefinition;
-  const queue = await getOrCreateQueue<IntegrationSyncJobData>({
+  return withEnqueueQueueObservability(
+    INTEGRATION_SYNC_ENQUEUE_KIND,
     queueName,
-    defaultJobOptions: {
-      attempts: meta.attempts,
-      backoff: meta.backoff,
-      removeOnComplete: meta.removeOnComplete,
-      removeOnFail: meta.removeOnFail,
-    },
-    logLabel: "integration-queue",
-  });
+    async () => {
+      const meta = integrationSyncEnqueueDefinition;
+      const queue = await getOrCreateQueue<IntegrationSyncJobData>({
+        queueName,
+        defaultJobOptions: {
+          attempts: meta.attempts,
+          backoff: meta.backoff,
+          removeOnComplete: meta.removeOnComplete,
+          removeOnFail: meta.removeOnFail,
+        },
+        logLabel: "integration-queue",
+      });
 
-  const jobName = integrationBullmqJobName(data);
-  return queue.add(jobName, data, {
-    attempts: meta.attempts,
-    backoff: meta.backoff,
-    removeOnComplete: meta.removeOnComplete,
-    removeOnFail: meta.removeOnFail,
-    ...(options ?? {}),
-    jobId: options?.jobId ?? defaultIntegrationJobId(data),
-  });
+      const jobName = integrationBullmqJobName(data);
+      return queue.add(jobName, data, {
+        attempts: meta.attempts,
+        backoff: meta.backoff,
+        removeOnComplete: meta.removeOnComplete,
+        removeOnFail: meta.removeOnFail,
+        ...(options ?? {}),
+        jobId: options?.jobId ?? defaultIntegrationJobId(data),
+      });
+    },
+  );
 }
