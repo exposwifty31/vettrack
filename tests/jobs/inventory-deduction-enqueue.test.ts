@@ -23,6 +23,16 @@ const BASE_PAYLOAD: InventoryDeductionJobData = {
   animalId: "animal-1",
 };
 
+describe("inventory-deduction.queue module", () => {
+  it("exposes queue constants from the queue module path (no worker re-export)", async () => {
+    vi.resetModules();
+    const queueMod = await import("../../server/queues/inventory-deduction.queue.js");
+    expect(queueMod.INVENTORY_DEDUCTION_QUEUE_NAME).toBe("inventory-deduction");
+    expect(queueMod.INVENTORY_DEDUCTION_JOB_NAME).toBe("inventory-deduction");
+    expect(typeof queueMod.inventoryDeductionQueue.add).toBe("function");
+  });
+});
+
 describe("inventoryDeductionQueue.add — enqueueJob delegation (1c-2)", () => {
   beforeEach(() => {
     mockEnqueueJob.mockClear();

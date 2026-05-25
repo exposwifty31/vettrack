@@ -1,5 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
-import { Worker, type Job, type JobsOptions } from "bullmq";
+import { Worker } from "bullmq";
 import { appointments, db, inventoryJobs } from "../db.js";
 import { MAX_INVENTORY_JOB_RETRIES } from "../lib/inventory-constants.js";
 import { createRedisConnection } from "../lib/redis.js";
@@ -10,20 +10,6 @@ import {
   INVENTORY_DEDUCTION_QUEUE_NAME,
   type InventoryDeductionJobData,
 } from "../queues/inventory-deduction.queue.js";
-
-export const inventoryDeductionQueue = {
-  async add(
-    data: InventoryDeductionJobData,
-    options?: JobsOptions,
-  ): Promise<Job<InventoryDeductionJobData>> {
-    const { enqueueJob } = await import("../jobs/enqueue.js");
-    return enqueueJob(
-      "inventory-deduction",
-      data,
-      options ? { bullmq: options } : undefined,
-    );
-  },
-};
 
 let inventoryDeductionWorker: Worker<InventoryDeductionJobData> | null = null;
 let inventoryDeductionWorkerInitialized = false;
