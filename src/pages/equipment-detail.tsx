@@ -1412,7 +1412,6 @@ export default function EquipmentDetailPage() {
                     fullDeployable={deployabilityQ.data.fullDeployable}
                   />
                   {!deployabilityQ.data.bundleGate.ok &&
-                    !deployabilityQ.data.bundleGate.skipped &&
                     deployabilityQ.data.bundleGate.reason && (
                     <p className="text-xs text-muted-foreground">
                       {deployabilityQ.data.bundleGate.reason}

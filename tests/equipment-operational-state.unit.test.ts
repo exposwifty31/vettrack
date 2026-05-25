@@ -36,17 +36,6 @@ function makeState(overrides: Partial<UnitConditionState> = {}): UnitConditionSt
 }
 
 describe("computeBundleReadinessGate", () => {
-  it("returns skipped when feature is disabled", () => {
-    const result = computeBundleReadinessGate(
-      { custodyState: "docked", assetTypeId: "at-1" },
-      [],
-      [],
-      NOW,
-      false,
-    );
-    expect(result).toEqual({ skipped: true, reason: "FEATURE_DISABLED" });
-  });
-
   it("returns CUSTODY_CHAIN_BROKEN with unknownConditions for untracked", () => {
     const cond = makeCondition();
     const result = computeBundleReadinessGate(
@@ -54,7 +43,6 @@ describe("computeBundleReadinessGate", () => {
       [],
       [cond],
       NOW,
-      true,
     );
     expect(result).toMatchObject({
       ok: false,
@@ -72,7 +60,6 @@ describe("computeBundleReadinessGate", () => {
       [],
       [cond],
       NOW,
-      true,
     );
     expect(result).toMatchObject({
       ok: false,
@@ -88,7 +75,6 @@ describe("computeBundleReadinessGate", () => {
       [],
       [cond],
       NOW,
-      true,
     );
     expect(result).toMatchObject({
       ok: false,
@@ -103,7 +89,6 @@ describe("computeBundleReadinessGate", () => {
       [],
       [],
       NOW,
-      true,
     );
     expect(result).toEqual({
       ok: false,
@@ -120,7 +105,6 @@ describe("computeBundleReadinessGate", () => {
       [],
       [],
       NOW,
-      true,
     );
     expect(result).toEqual({
       ok: false,
@@ -138,7 +122,6 @@ describe("computeBundleReadinessGate", () => {
       [], // no states
       [cond],
       NOW,
-      true,
     );
     expect(result).toMatchObject({
       ok: false,
@@ -157,7 +140,6 @@ describe("computeBundleReadinessGate", () => {
       [state],
       [cond],
       NOW,
-      true,
     );
     expect(result).toMatchObject({
       ok: false,
@@ -177,7 +159,6 @@ describe("computeBundleReadinessGate", () => {
       [state],
       [cond],
       NOW,
-      true,
     );
     expect(result).toMatchObject({
       ok: false,
@@ -196,7 +177,6 @@ describe("computeBundleReadinessGate", () => {
       [state],
       [cond],
       NOW,
-      true,
     );
     expect(result).toEqual({ ok: true });
   });

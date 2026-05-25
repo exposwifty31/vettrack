@@ -36,9 +36,9 @@ export async function runEquipmentConditionStalenessSweep(now: Date = new Date()
       .from(unitConditionStates)
       .where(eq(unitConditionStates.equipmentId, eq_row.id));
 
-    const result = computeBundleReadinessGate(eq_row, condStates, conditions, now, true);
+    const result = computeBundleReadinessGate(eq_row, condStates, conditions, now);
 
-    if (!("skipped" in result) && !result.ok) {
+    if (!result.ok) {
       // Version-guarded UPDATE — guard on custody_state prevents overwriting equipment checked out between scan and update
       const updateResult = await db
         .update(equipment)

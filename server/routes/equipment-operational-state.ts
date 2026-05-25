@@ -139,7 +139,7 @@ router.get("/equipment/:equipmentId/deployability", requireAuth, async (req, res
     }
   }
 
-  const bundleGate = computeBundleReadinessGate(eq_row, conditionStates, conditions, new Date(), true);
+  const bundleGate = computeBundleReadinessGate(eq_row, conditionStates, conditions, new Date());
   const fullDeployable = isEquipmentFullyDeployable(eq_row.custodyState, eq_row.readinessState, eq_row.usageState);
 
   res.json({
@@ -243,10 +243,9 @@ router.post("/equipment/:equipmentId/dock-return", requireAuth, validateBody(doc
         freshStates,
         allConditions,
         now,
-        true,
       );
 
-      const readinessOk = !("skipped" in readinessResult) && readinessResult.ok;
+      const readinessOk = readinessResult.ok;
       const newReadiness = readinessOk ? "ready" : "not_ready";
 
       // 4. Update equipment with version guard

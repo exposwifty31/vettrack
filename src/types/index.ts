@@ -1549,7 +1549,6 @@ export interface DeployabilityResponse {
   bundleGate: {
     ok: boolean;
     reason?: string;
-    skipped?: boolean;
     failedConditions?: string[];
     staleConditions?: string[];
     unknownConditions?: string[];

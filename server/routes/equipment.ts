@@ -1454,8 +1454,8 @@ router.post(
         const condStates = snap.assetTypeId
           ? await db.select().from(unitConditionStates).where(eq(unitConditionStates.equipmentId, snap.id))
           : [];
-        const gateResult = computeBundleReadinessGate(snap, condStates, allConditions, new Date(), true);
-        if (!("skipped" in gateResult) && !gateResult.ok) {
+        const gateResult = computeBundleReadinessGate(snap, condStates, allConditions, new Date());
+        if (!gateResult.ok) {
           void recordOperationalMetric({ clinicId, equipmentId: snap.id, userId: req.authUser!.id, eventType: "bundle_failed", metadata: { reason: gateResult.reason, failedConditions: gateResult.failedConditions, staleConditions: gateResult.staleConditions, unknownConditions: gateResult.unknownConditions } });
           return res.status(422).json({ code: "BUNDLE_INCOMPLETE", ...gateResult });
         }
@@ -1472,8 +1472,8 @@ router.post(
             .select()
             .from(unitConditionStates)
             .where(eq(unitConditionStates.equipmentId, snap.id));
-          const gateResult = computeBundleReadinessGate(snap, condStates, allConditions, new Date(), true);
-          if (!("skipped" in gateResult) && !gateResult.ok) {
+          const gateResult = computeBundleReadinessGate(snap, condStates, allConditions, new Date());
+          if (!gateResult.ok) {
             void recordOperationalMetric({ clinicId, equipmentId: snap.id, userId: req.authUser!.id, eventType: "bundle_failed", metadata: { reason: gateResult.reason, failedConditions: gateResult.failedConditions, staleConditions: gateResult.staleConditions, unknownConditions: gateResult.unknownConditions } });
             return res.status(422).json({ code: "BUNDLE_INCOMPLETE", ...gateResult });
           }

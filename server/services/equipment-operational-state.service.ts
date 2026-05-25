@@ -7,7 +7,6 @@ import { recordOperationalMetric } from "./operational-metrics.service.js";
 
 export type BundleReadinessResult =
   | { ok: true }
-  | { skipped: true; reason: "FEATURE_DISABLED" }
   | {
       ok: false;
       reason:
@@ -39,10 +38,7 @@ export function computeBundleReadinessGate(
   unitConditionStates: UnitConditionState[],
   assetTypeConditions: AssetTypeCondition[],
   now: Date,
-  featureEnabled: boolean,
 ): BundleReadinessResult {
-  if (!featureEnabled) return { skipped: true, reason: "FEATURE_DISABLED" };
-
   if (equipment.custodyState !== "docked") {
     return {
       ok: false,
