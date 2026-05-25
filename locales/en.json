@@ -864,7 +864,11 @@
   "myEquipmentPage": {
     "scanQr": "Scan QR",
     "shiftSummary": "Shift summary",
-    "browseEquipment": "Browse equipment"
+    "browseEquipment": "Browse equipment",
+    "recoveryBadgeStale": "Needs confirm",
+    "recoveryBadgeVeryStale": "Very stale",
+    "recoveryBadgeCheckedOutLong": "Checked out long",
+    "recoveryAttentionSummary": "{count} item(s) need attention"
   },
   "notFoundPage": {
     "title": "Page not found — VetTrack"

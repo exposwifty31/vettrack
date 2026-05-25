@@ -868,6 +868,10 @@ export interface TStructure {
     scanQr: string;
     shiftSummary: string;
     browseEquipment: string;
+    recoveryBadgeStale: string;
+    recoveryBadgeVeryStale: string;
+    recoveryBadgeCheckedOutLong: string;
+    recoveryAttentionSummary: string;
   };
   notFoundPage: {
     title: string;
