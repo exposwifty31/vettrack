@@ -20,6 +20,16 @@ let chargeAlertQueue: Queue | null = null;
 let chargeAlertWorker: Worker | null = null;
 let chargeAlertQueueInitialized = false;
 
+/** Binds the producer queue used by {@link enqueueChargeAlertJob} (e.g. job runtime startup). */
+export function bindChargeAlertProducerQueue(queue: Queue): void {
+  chargeAlertQueue = queue;
+  chargeAlertQueueInitialized = true;
+}
+
+export function isChargeAlertProducerQueueReady(): boolean {
+  return chargeAlertQueue !== null;
+}
+
 export function buildChargeAlertJobId(returnId: string): string {
   return `${CHARGE_ALERT_JOB_PREFIX}${returnId}`;
 }
@@ -185,7 +195,7 @@ export async function startChargeAlertWorker(): Promise<void> {
     return;
   }
 
-  chargeAlertQueue = new Queue(CHARGE_ALERT_QUEUE_NAME, { connection: queueConnection });
+  bindChargeAlertProducerQueue(new Queue(CHARGE_ALERT_QUEUE_NAME, { connection: queueConnection }));
   chargeAlertWorker = new Worker(
     CHARGE_ALERT_QUEUE_NAME,
     async (job) => {
@@ -203,7 +213,6 @@ export async function startChargeAlertWorker(): Promise<void> {
     });
   });
 
-  chargeAlertQueueInitialized = true;
   console.log("[charge-alert-worker] started", {
     queueName: CHARGE_ALERT_QUEUE_NAME,
     jobName: CHARGE_ALERT_JOB_NAME,
