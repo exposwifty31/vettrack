@@ -35,6 +35,7 @@ import {
 } from "../../workers/chargeAlertWorker.js";
 import {
   resolveBullmqJobName,
+  type AnyJobDefinition,
   type JobDefinition,
   type StaticJobKind,
 } from "../registry.js";
@@ -189,9 +190,9 @@ export function buildStaleTaskOwnershipSweepJobId(
 }
 
 function buildDefinitionsByQueue(
-  definitions: readonly JobDefinition[],
-): Map<string, JobDefinition[]> {
-  const byQueue = new Map<string, JobDefinition[]>();
+  definitions: readonly AnyJobDefinition[],
+): Map<string, AnyJobDefinition[]> {
+  const byQueue = new Map<string, AnyJobDefinition[]>();
   for (const definition of definitions) {
     const list = byQueue.get(definition.queue) ?? [];
     list.push(definition);
@@ -200,14 +201,16 @@ function buildDefinitionsByQueue(
   return byQueue;
 }
 
-export const definitionByKind = new Map<StaticJobKind, JobDefinition>(
+export const definitionByKind = new Map<StaticJobKind, AnyJobDefinition>(
   staticJobDefinitions.map((definition) => [
     definition.kind as StaticJobKind,
-    definition,
+    definition as AnyJobDefinition,
   ]),
 );
 
-export const definitionsByQueue = buildDefinitionsByQueue(staticJobDefinitions);
+export const definitionsByQueue = buildDefinitionsByQueue(
+  staticJobDefinitions as readonly AnyJobDefinition[],
+);
 
 /** Phase 1b pilot queues — one worker per queue in {@link startJobRuntime}. */
 export const PILOT_QUEUE_NAMES = [
@@ -224,7 +227,7 @@ export function isPilotQueueName(queueName: string): queueName is PilotQueueName
 export function resolveDefinitionForJobName(
   queueName: string,
   jobName: string,
-): JobDefinition | undefined {
+): AnyJobDefinition | undefined {
   const defs = definitionsByQueue.get(queueName);
   if (!defs) return undefined;
   return defs.find((def) => resolveBullmqJobName(def) === jobName);
@@ -232,7 +235,7 @@ export function resolveDefinitionForJobName(
 
 export { resolveBullmqJobName };
 
-export function getStaticJobDefinition(kind: StaticJobKind): JobDefinition {
+export function getStaticJobDefinition(kind: StaticJobKind): AnyJobDefinition {
   const definition = definitionByKind.get(kind);
   if (!definition) {
     throw new Error(`Unknown static JobKind: ${kind}`);

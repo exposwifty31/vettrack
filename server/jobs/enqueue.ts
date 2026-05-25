@@ -61,7 +61,10 @@ export async function enqueueJob<K extends StaticJobKind>(
   }
 
   const jobName = definition.bullmqJobName ?? definition.kind;
-  return queue.add(jobName, payload, addOptions);
+  // BullMQ name/data generics are narrower than our StaticJobKind union under server-check tsconfig.
+  return queue.add(jobName as never, payload as never, addOptions) as Promise<
+    Job<PayloadForStaticKind[K]>
+  >;
 }
 
 /**

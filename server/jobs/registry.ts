@@ -50,6 +50,9 @@ export type JobDefinition<TPayload = unknown> = {
   handler?: JobHandler<TPayload>;
 };
 
+/** Erased definition type for maps and runtime lookup (avoids invariant handler generics). */
+export type AnyJobDefinition = JobDefinition<unknown>;
+
 export type BackoffConfig = Exclude<JobsOptions["backoff"], undefined>;
 
 export function resolveBullmqJobName(definition: JobDefinition): string {
@@ -57,7 +60,7 @@ export function resolveBullmqJobName(definition: JobDefinition): string {
 }
 
 export function mergeEnqueueJobOptions(
-  definition: JobDefinition,
+  definition: AnyJobDefinition,
   overrides?: JobsOptions,
 ): JobsOptions {
   return {
