@@ -95,6 +95,15 @@ import { EquipmentFilters } from "@/components/equipment/EquipmentFilters";
 import { AlertCard } from "@/components/alerts/AlertCard";
 import type { SidebarItem } from "@/components/layout/IconSidebar";
 import { isPilotMode } from "@/lib/pilot-mode";
+import { isEquipmentRecoveryUiEnabled } from "@/lib/equipment-recovery-ui-flag";
+import {
+  deriveEquipmentRecoverySnapshotFromSource,
+  filterEquipmentNeedingAttention,
+} from "@/lib/equipment-recovery-adapter";
+import {
+  buildEquipmentListForDisplay,
+  resolveEquipmentListRecoveryBadgeKey,
+} from "@/lib/equipment-list-recovery-labels";
 
 const EQUIPMENT_SIDEBAR: SidebarItem[] = isPilotMode
   ? [
@@ -216,6 +225,7 @@ export default function EquipmentListPage() {
   const [folderSheetOpen, setFolderSheetOpen] = useState(false);
   const [folderSearch, setFolderSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [recoveryAttentionFilterActive, setRecoveryAttentionFilterActive] = useState(false);
 
   const params = useMemo(() => new URLSearchParams(searchStr), [searchStr]);
   const search = params.get("q") ?? "";
@@ -394,19 +404,35 @@ export default function EquipmentListPage() {
     });
   }, [equipment, search, statusFilter, folderFilter, locationFilter]);
 
+  const listForDisplay = useMemo(
+    () =>
+      buildEquipmentListForDisplay(filtered, {
+        flag: isEquipmentRecoveryUiEnabled,
+        attentionOnly: recoveryAttentionFilterActive,
+      }),
+    [filtered, recoveryAttentionFilterActive],
+  );
+
+  const recoveryAttentionCount = useMemo(() => {
+    if (!isEquipmentRecoveryUiEnabled || filtered.length === 0) return 0;
+    return filterEquipmentNeedingAttention(filtered).length;
+  }, [filtered]);
+
+  const displayList = isEquipmentRecoveryUiEnabled ? listForDisplay : filtered;
+
   // Virtualization is active when filtered results exceed threshold and select mode is off.
-  const isVirtualized = filtered.length > VIRTUALIZATION_THRESHOLD && !selectMode;
+  const isVirtualized = displayList.length > VIRTUALIZATION_THRESHOLD && !selectMode;
   /** Matches compact vs comfortable list card padding (8px less vertical when compact). */
   const virtualizedItemHeight = settings.density === "compact" ? 104 : 112;
 
   // Stable pagination guards — out-of-bound pages are impossible.
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(displayList.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
 
   // Exactly PAGE_SIZE nodes rendered — DOM size is bounded regardless of dataset.
   const pageItems = useMemo(
-    () => filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
-    [filtered, safePage],
+    () => displayList.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [displayList, safePage],
   );
 
   // Reset to page 1 when totalPages changes (filter changed to fewer results).
@@ -424,10 +450,10 @@ export default function EquipmentListPage() {
   };
 
   const toggleAll = () => {
-    if (selected.size === filtered.length) {
+    if (selected.size === displayList.length) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(filtered.map((e) => e.id)));
+      setSelected(new Set(displayList.map((e) => e.id)));
     }
   };
 
@@ -539,6 +565,23 @@ export default function EquipmentListPage() {
                 {opt.label}
               </button>
             ))}
+            {isEquipmentRecoveryUiEnabled && (
+              <button
+                type="button"
+                onClick={() => {
+                  setRecoveryAttentionFilterActive((prev) => !prev);
+                  setPage(1);
+                }}
+                className={`shrink-0 flex items-center px-3 min-h-[44px] rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${
+                  recoveryAttentionFilterActive
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
+                }`}
+                data-testid="recovery-attention-filter"
+              >
+                {t.equipmentList.recoveryAttentionFilter}
+              </button>
+            )}
           </div>
           {/* Folder filter trigger */}
           <button
@@ -694,7 +737,7 @@ export default function EquipmentListPage() {
                 onClick={toggleAll}
                 className="text-xs h-11"
               >
-                {selected.size === filtered.length ? "Deselect all" : "Select all"}
+                {selected.size === displayList.length ? "Deselect all" : "Select all"}
               </Button>
               <span className="text-xs text-muted-foreground">
                 {selected.size} selected
@@ -769,9 +812,18 @@ export default function EquipmentListPage() {
           )}
         </div>
 
+        {isEquipmentRecoveryUiEnabled && recoveryAttentionCount > 0 && (
+          <p className="text-sm text-muted-foreground -mt-1">
+            {t.equipmentList.recoveryAttentionSummary.replace(
+              "{count}",
+              String(recoveryAttentionCount),
+            )}
+          </p>
+        )}
+
         {/* Count + page info */}
         <p className="text-xs text-muted-foreground -mt-2">
-          {filtered.length} of {totalCount || equipment.length} items
+          {displayList.length} of {totalCount || equipment.length} items
           {!isLoading && !isVirtualized && totalPages > 1 && (
             <span className="ml-1">· page {safePage} of {totalPages}</span>
           )}
@@ -792,17 +844,25 @@ export default function EquipmentListPage() {
         <PageErrorBoundary fallbackLabel={t.equipmentList.errors.renderFailed}>
           {isLoading ? (
             <EquipmentListSkeleton count={PAGE_SIZE} />
-          ) : !isError && filtered.length === 0 ? (
+          ) : !isError && displayList.length === 0 ? (
             <EmptyState
               icon={Package}
               message={t.equipmentList.empty.message}
               subMessage={
-                search || statusFilter !== "all" || folderFilter !== "all" || locationFilter !== "all"
+                search ||
+                statusFilter !== "all" ||
+                folderFilter !== "all" ||
+                locationFilter !== "all" ||
+                recoveryAttentionFilterActive
                   ? t.equipmentList.empty.filteredHint
                   : t.equipmentList.empty.emptyHint
               }
               action={
-                search || statusFilter !== "all" || folderFilter !== "all" || locationFilter !== "all" ? (
+                search ||
+                statusFilter !== "all" ||
+                folderFilter !== "all" ||
+                locationFilter !== "all" ||
+                recoveryAttentionFilterActive ? (
                   <Button
                     variant="outline"
                     size="sm"
@@ -821,7 +881,7 @@ export default function EquipmentListPage() {
                 )
               }
             />
-          ) : filtered.length > VIRTUALIZATION_THRESHOLD && !selectMode ? (
+          ) : displayList.length > VIRTUALIZATION_THRESHOLD && !selectMode ? (
             <div data-testid="equipment-list">
               {/*
                 Row height 112 (comfortable) or 104 (compact): card padding p-4 vs p-3
@@ -829,7 +889,7 @@ export default function EquipmentListPage() {
                 keeps the row stable. pb-3 on the virtualized row wrapper is in the item height.
               */}
               <VirtualizedEquipmentList
-                items={filtered}
+                items={displayList}
                 height={600}
                 itemHeight={virtualizedItemHeight}
                 renderItem={renderVirtualizedRow}
@@ -914,6 +974,11 @@ function EquipmentItem({
   const isCheckedOut = !!eq.checkedOutById;
   const checkedOutByMe = eq.checkedOutById === userId;
   const expiryState = getExpiryBadgeState(eq.expiryDate);
+  const recoveryBadgeKey = isEquipmentRecoveryUiEnabled
+    ? resolveEquipmentListRecoveryBadgeKey(
+        deriveEquipmentRecoverySnapshotFromSource(eq),
+      )
+    : null;
 
   const checkoutMut = useMutation({
     mutationFn: () => api.equipment.checkout(eq.id),
@@ -1108,6 +1173,15 @@ function EquipmentItem({
                       fullDeployable={eq.custodyState === "docked" && eq.readinessState === "ready" && eq.usageState === "available"}
                       compact
                     />
+                  )}
+                  {recoveryBadgeKey && (
+                    <Badge
+                      variant="outline"
+                      className="shrink-0 text-[10px] px-2 py-0.5"
+                      data-testid={`equipment-list-recovery-badge-${eq.id}`}
+                    >
+                      {t.equipmentList[recoveryBadgeKey]}
+                    </Badge>
                   )}
                 </div>
               </div>

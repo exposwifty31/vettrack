@@ -131,6 +131,11 @@ const translations = {
       checkoutError: d.equipmentList.toast.checkoutError,
       returnError: d.equipmentList.toast.returnError,
     },
+    recoveryBadgeStale: d.equipmentList.recoveryBadgeStale,
+    recoveryBadgeVeryStale: d.equipmentList.recoveryBadgeVeryStale,
+    recoveryBadgeCheckedOutLong: d.equipmentList.recoveryBadgeCheckedOutLong,
+    recoveryAttentionFilter: d.equipmentList.recoveryAttentionFilter,
+    recoveryAttentionSummary: d.equipmentList.recoveryAttentionSummary,
   },
 
   shiftHandoverPage: {

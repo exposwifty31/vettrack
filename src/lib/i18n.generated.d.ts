@@ -102,6 +102,11 @@ export interface TStructure {
       returnError: string;
     };
     linkedInUse: string;
+    recoveryBadgeStale: string;
+    recoveryBadgeVeryStale: string;
+    recoveryBadgeCheckedOutLong: string;
+    recoveryAttentionFilter: string;
+    recoveryAttentionSummary: string;
   };
   shiftHandoverPage: {
     title: string;

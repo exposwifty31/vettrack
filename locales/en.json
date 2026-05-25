@@ -98,7 +98,12 @@
       "checkoutError": "Equipment checkout failed",
       "returnError": "Return failed"
     },
-    "linkedInUse": "In use for: {name}"
+    "linkedInUse": "In use for: {name}",
+    "recoveryBadgeStale": "Needs confirm",
+    "recoveryBadgeVeryStale": "Very stale",
+    "recoveryBadgeCheckedOutLong": "Checked out long",
+    "recoveryAttentionFilter": "Needs attention",
+    "recoveryAttentionSummary": "{count} item(s) need attention"
   },
   "shiftHandoverPage": {
     "title": "Shift End",

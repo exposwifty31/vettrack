@@ -98,7 +98,12 @@
       "checkoutError": "ההוצאה לשימוש נכשלה",
       "returnError": "ההחזרה נכשלה"
     },
-    "linkedInUse": "בשימוש אצל: {name}"
+    "linkedInUse": "בשימוש אצל: {name}",
+    "recoveryBadgeStale": "דורש אימות",
+    "recoveryBadgeVeryStale": "מיושן מאוד",
+    "recoveryBadgeCheckedOutLong": "מושאל זמן רב",
+    "recoveryAttentionFilter": "דורש תשומת לב",
+    "recoveryAttentionSummary": "{count} פריטים דורשים תשומת לב"
   },
   "shiftHandoverPage": {
     "title": "סיום משמרת",
