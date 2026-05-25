@@ -19,6 +19,8 @@ import { recordOperationalMetric } from "../services/operational-metrics.service
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
 import { enqueueChargeAlertJob } from "../workers/chargeAlertWorker.js";
 import { promoteStagingQueueNext } from "../lib/staging-promotion.js";
+import { EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS } from "../lib/equipment-replay-idempotency.js";
+import { equipmentReplayIdempotency } from "../middleware/equipment-replay-idempotency.js";
 
 const EQUIPMENT_STATUS_VALUES = [
   "ok",
@@ -748,7 +750,14 @@ router.get("/:id", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/", requireAuth, writeLimiter, requireEffectiveRole("technician"), validateBody(createEquipmentSchema), async (req, res) => {
+router.post(
+  "/",
+  requireAuth,
+  writeLimiter,
+  requireEffectiveRole("technician"),
+  validateBody(createEquipmentSchema),
+  equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.create),
+  async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
@@ -840,7 +849,15 @@ router.post("/", requireAuth, writeLimiter, requireEffectiveRole("technician"), 
   }
 });
 
-router.patch("/:id", requireAuth, writeLimiter, requireEffectiveRole("technician"), validateUuid("id"), validateBody(patchEquipmentSchema), async (req, res) => {
+router.patch(
+  "/:id",
+  requireAuth,
+  writeLimiter,
+  requireEffectiveRole("technician"),
+  validateUuid("id"),
+  validateBody(patchEquipmentSchema),
+  equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.update),
+  async (req, res) => {
 const requestId = resolveRequestId(res, req.headers["x-request-id"]);
 try {
     const clinicId = req.clinicId!;
@@ -1015,7 +1032,14 @@ try {
   }
 });
 
-router.delete("/:id", requireAuth, writeLimiter, requireAdmin, validateUuid("id"), async (req, res) => {
+router.delete(
+  "/:id",
+  requireAuth,
+  writeLimiter,
+  requireAdmin,
+  validateUuid("id"),
+  equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.delete),
+  async (req, res) => {
 const requestId = resolveRequestId(res, req.headers["x-request-id"]);
 try {
     const clinicId = req.clinicId!;
@@ -1300,6 +1324,7 @@ router.post(
   requireEffectiveRole("student"),
   validateUuid("id"),
   validateBody(checkoutSchema),
+  equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.checkout),
   async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
@@ -1669,6 +1694,7 @@ router.post(
   requireEffectiveRole("student"),
   validateUuid("id"),
   validateBody(equipmentReturnBodySchema),
+  equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.return),
   async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
@@ -1901,6 +1927,7 @@ router.post(
   writeLimiter,
   validateUuid("id"),
   validateBody(seenSchema),
+  equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.seen),
   async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
     try {
@@ -1954,7 +1981,15 @@ router.post(
 );
 
 // POST /api/equipment/:id/scan
-router.post("/:id/scan", requireAuth, scanLimiter, requireEffectiveRole("student"), validateUuid("id"), validateBody(scanSchema), async (req, res) => {
+router.post(
+  "/:id/scan",
+  requireAuth,
+  scanLimiter,
+  requireEffectiveRole("student"),
+  validateUuid("id"),
+  validateBody(scanSchema),
+  equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.scan),
+  async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;

@@ -278,6 +278,10 @@ async function attemptSync(item: PendingSync): Promise<ItemResult> {
     ...liveHeaders,
   };
   if (item.clientTimestamp) headers["X-Client-Timestamp"] = String(item.clientTimestamp);
+  const idempotencyKey = item.idempotencyKey?.trim();
+  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
+  const clientMutationId = item.clientMutationId?.trim();
+  if (clientMutationId) headers["X-Client-Mutation-Id"] = clientMutationId;
 
   try {
     const controller = new AbortController();

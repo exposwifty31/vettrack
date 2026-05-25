@@ -281,16 +281,18 @@ describe("offline-pending-sync-schema — new enqueue rows", () => {
   });
 });
 
-describe("offline-pending-sync-schema — replay unchanged (Phase 3 storage only)", () => {
-  it("sync-engine does not send Idempotency-Key or clientMutationId on replay", () => {
+describe("offline-pending-sync-schema — replay ordering (Phase 3 storage; Phase 4 headers)", () => {
+  it("sync-engine reads Phase 3 fields for replay headers without regenerating keys", () => {
     const source = readFileSync(join(process.cwd(), "src/lib/sync-engine.ts"), "utf8");
-    expect(source).not.toMatch(/Idempotency-Key/i);
-    expect(source).not.toContain("clientMutationId");
-    expect(source).not.toContain("idempotencyKey");
+    expect(source).toContain('headers["Idempotency-Key"]');
+    expect(source).toContain("item.idempotencyKey");
+    expect(source).toContain('headers["X-Client-Mutation-Id"]');
+    expect(source).toContain("item.clientMutationId");
+    expect(source).not.toMatch(/randomUUID\(\)/);
     expect(source).toContain('headers["X-Client-Timestamp"]');
   });
 
-  it("getPendingSync still orders by clientTimestamp (FIFO)", async () => {
+  it("getPendingSync still orders by clientTimestamp (FIFO unchanged)", async () => {
     await offlineDb.delete();
     await offlineDb.open();
     await addPendingSync(

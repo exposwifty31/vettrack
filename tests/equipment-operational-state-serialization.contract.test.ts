@@ -59,7 +59,7 @@ describe("equipment operational state API serialization contract", () => {
   it("spreads equipmentOperationalStateSelect on GET /api/equipment/:id", () => {
     const block = sliceBetweenMarkers(
       'router.get("/:id", requireAuth',
-      'router.post("/", requireAuth',
+      'EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.create',
     );
     expect(block).toContain("...equipmentOperationalStateSelect");
   });
