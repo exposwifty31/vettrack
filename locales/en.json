@@ -879,7 +879,14 @@
     "recoveryBadgeStale": "Needs confirm",
     "recoveryBadgeVeryStale": "Very stale",
     "recoveryBadgeCheckedOutLong": "Checked out long",
-    "recoveryAttentionSummary": "{count} item(s) need attention"
+    "recoveryAttentionSummary": "{count} item(s) need attention",
+    "personalDebtBannerCheckedOutLong": "{count} checked-out item(s) held too long",
+    "personalDebtBannerVeryStale": "{count} checked-out item(s) very stale — confirm location",
+    "personalDebtBannerStale": "{count} checked-out item(s) need confirm",
+    "personalDebtBreakdownCheckedOutLong": "{count} long checkout",
+    "personalDebtBreakdownVeryStale": "{count} very stale",
+    "personalDebtBreakdownStale": "{count} stale",
+    "personalDebtNone": "All checkouts look current"
   },
   "notFoundPage": {
     "title": "Page not found — VetTrack"
@@ -1231,7 +1238,8 @@
     "listBulletNone": "  None",
     "checkedOutLineWithLoc": "• {name} — {loc} since {since}",
     "checkedOutLineNoLoc": "• {name} since {since}",
-    "todayUsageHeader": "Checkouts today ({count}):"
+    "todayUsageHeader": "Checkouts today ({count}):",
+    "personalDebtCompactLine": "{summary}"
   },
   "adminPage": {
     "tabFolders": "Folders",

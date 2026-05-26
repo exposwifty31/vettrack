@@ -883,6 +883,13 @@ export interface TStructure {
     recoveryBadgeVeryStale: string;
     recoveryBadgeCheckedOutLong: string;
     recoveryAttentionSummary: string;
+    personalDebtBannerCheckedOutLong: string;
+    personalDebtBannerVeryStale: string;
+    personalDebtBannerStale: string;
+    personalDebtBreakdownCheckedOutLong: string;
+    personalDebtBreakdownVeryStale: string;
+    personalDebtBreakdownStale: string;
+    personalDebtNone: string;
   };
   notFoundPage: {
     title: string;
@@ -1235,6 +1242,7 @@ export interface TStructure {
     checkedOutLineWithLoc: string;
     checkedOutLineNoLoc: string;
     todayUsageHeader: string;
+    personalDebtCompactLine: string;
   };
   adminPage: {
     tabFolders: string;

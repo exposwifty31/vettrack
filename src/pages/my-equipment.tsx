@@ -45,8 +45,12 @@ import { isEquipmentRecoveryUiEnabled } from "@/lib/equipment-recovery-ui-flag";
 import {
   compareRecoveryAttention,
   deriveEquipmentRecoverySnapshotFromSource,
-  filterEquipmentNeedingAttention,
 } from "@/lib/equipment-recovery-adapter";
+import { derivePersonalEquipmentDebt } from "@/lib/equipment-personal-debt";
+import {
+  formatPersonalDebtBreakdown,
+  resolvePersonalDebtBannerKey,
+} from "./my-equipment-personal-debt-labels";
 import { resolveMyEquipmentRecoveryBadgeKey } from "./my-equipment-recovery-labels";
 
 export default function MyEquipmentPage() {
@@ -76,9 +80,9 @@ export default function MyEquipmentPage() {
     );
   }, [items]);
 
-  const recoveryAttentionCount = useMemo(() => {
-    if (!isEquipmentRecoveryUiEnabled || !items?.length) return 0;
-    return filterEquipmentNeedingAttention(items).length;
+  const personalDebt = useMemo(() => {
+    if (!isEquipmentRecoveryUiEnabled || !items?.length) return null;
+    return derivePersonalEquipmentDebt(items);
   }, [items]);
 
   const listItems = isEquipmentRecoveryUiEnabled ? displayItems : items;
@@ -216,14 +220,33 @@ export default function MyEquipmentPage() {
           />
         ) : (
           <div className="flex flex-col gap-2">
-            {isEquipmentRecoveryUiEnabled && recoveryAttentionCount > 0 && (
-              <p className="text-sm text-muted-foreground">
-                {t.myEquipmentPage.recoveryAttentionSummary.replace(
+            {isEquipmentRecoveryUiEnabled &&
+              personalDebt &&
+              personalDebt.attentionCount > 0 &&
+              (() => {
+                const bannerKey = resolvePersonalDebtBannerKey(personalDebt);
+                if (!bannerKey) return null;
+                const bannerText = t.myEquipmentPage[bannerKey].replace(
                   "{count}",
-                  String(recoveryAttentionCount),
-                )}
-              </p>
-            )}
+                  String(personalDebt.attentionCount),
+                );
+                const breakdownText = formatPersonalDebtBreakdown(personalDebt, {
+                  personalDebtBreakdownCheckedOutLong:
+                    t.myEquipmentPage.personalDebtBreakdownCheckedOutLong,
+                  personalDebtBreakdownVeryStale:
+                    t.myEquipmentPage.personalDebtBreakdownVeryStale,
+                  personalDebtBreakdownStale:
+                    t.myEquipmentPage.personalDebtBreakdownStale,
+                });
+                return (
+                  <div className="text-sm text-muted-foreground">
+                    <p>{bannerText}</p>
+                    {breakdownText && (
+                      <p className="text-xs mt-0.5">{breakdownText}</p>
+                    )}
+                  </div>
+                );
+              })()}
             {(listItems ?? []).map((item) => {
               const recoveryBadgeKey = isEquipmentRecoveryUiEnabled
                 ? resolveMyEquipmentRecoveryBadgeKey(

@@ -879,7 +879,14 @@
     "recoveryBadgeStale": "דורש אימות",
     "recoveryBadgeVeryStale": "מיושן מאוד",
     "recoveryBadgeCheckedOutLong": "מושאל זמן רב",
-    "recoveryAttentionSummary": "{count} פריטים דורשים תשומת לב"
+    "recoveryAttentionSummary": "{count} פריטים דורשים תשומת לב",
+    "personalDebtBannerCheckedOutLong": "{count} פריטים מושאלים זמן רב מדי",
+    "personalDebtBannerVeryStale": "{count} פריטים מושאלים מיושנים מאוד — אשר מיקום",
+    "personalDebtBannerStale": "{count} פריטים מושאלים דורשים אימות",
+    "personalDebtBreakdownCheckedOutLong": "{count} השאלה ארוכה",
+    "personalDebtBreakdownVeryStale": "{count} מיושן מאוד",
+    "personalDebtBreakdownStale": "{count} דורש אימות",
+    "personalDebtNone": "כל ההשאלות נראות מעודכנות"
   },
   "notFoundPage": {
     "title": "העמוד לא נמצא — VetTrack"
@@ -1231,7 +1238,8 @@
     "listBulletNone": "  אין",
     "checkedOutLineWithLoc": "• {name} — {loc} מאז {since}",
     "checkedOutLineNoLoc": "• {name} מאז {since}",
-    "todayUsageHeader": "שימושים היום ({count}):"
+    "todayUsageHeader": "שימושים היום ({count}):",
+    "personalDebtCompactLine": "{summary}"
   },
   "adminPage": {
     "tabFolders": "תיקיות",

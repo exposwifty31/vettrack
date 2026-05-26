@@ -5,7 +5,9 @@ import {
   VERY_STALE_MS,
 } from "../src/lib/equipment-recovery-thresholds";
 import { deriveEquipmentRecoverySnapshotFromSource } from "../src/lib/equipment-recovery-adapter";
+import { derivePersonalEquipmentDebt } from "../src/lib/equipment-personal-debt";
 import { resolveMyEquipmentRecoveryBadgeKey } from "../src/pages/my-equipment-recovery-labels";
+import { resolvePersonalDebtBannerKey } from "../src/pages/my-equipment-personal-debt-labels";
 
 const NOW = new Date("2026-05-25T12:00:00.000Z");
 
@@ -73,5 +75,20 @@ describe("resolveMyEquipmentRecoveryBadgeKey", () => {
     expect(resolveMyEquipmentRecoveryBadgeKey(snapshot)).toBe(
       "recoveryBadgeCheckedOutLong",
     );
+  });
+});
+
+describe("personal debt banner keys", () => {
+  it("resolves a bounded banner key when attention items exist", () => {
+    const snapshot = derivePersonalEquipmentDebt(
+      [
+        {
+          lastSeen: iso(STALE_MS),
+        },
+      ],
+      NOW,
+    );
+    expect(snapshot.attentionCount).toBe(1);
+    expect(resolvePersonalDebtBannerKey(snapshot)).toBe("personalDebtBannerStale");
   });
 });

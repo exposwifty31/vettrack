@@ -1,5 +1,5 @@
 import { t, formatDateTimeByLocale } from "@/lib/i18n";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
@@ -25,6 +25,9 @@ import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import type { AlertAcknowledgment } from "@/types";
 import { safeClipboardWriteText } from "@/lib/safe-browser";
+import { isEquipmentRecoveryUiEnabled } from "@/lib/equipment-recovery-ui-flag";
+import { derivePersonalEquipmentDebt } from "@/lib/equipment-personal-debt";
+import { resolvePersonalDebtBannerKey } from "@/pages/my-equipment-personal-debt-labels";
 
 interface ShiftSummarySheetProps {
   open: boolean;
@@ -124,6 +127,21 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
       (a.severity === "critical" || a.severity === "high") &&
       !acksSet.has(`${a.equipmentId}:${a.type}`)
   );
+
+  const personalDebt = useMemo(() => {
+    if (!isEquipmentRecoveryUiEnabled || !myItems?.length) return null;
+    return derivePersonalEquipmentDebt(myItems);
+  }, [myItems]);
+
+  const personalDebtCompactSummary = useMemo(() => {
+    if (!personalDebt || personalDebt.attentionCount === 0) return null;
+    const bannerKey = resolvePersonalDebtBannerKey(personalDebt);
+    if (!bannerKey) return null;
+    return t.myEquipmentPage[bannerKey].replace(
+      "{count}",
+      String(personalDebt.attentionCount),
+    );
+  }, [personalDebt]);
 
   function buildSummaryText(): string {
     const dateStr = format(new Date(), "MMMM d, yyyy");
@@ -298,6 +316,14 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
                     {myItems?.length ?? 0}
                   </Badge>
                 </div>
+                {isEquipmentRecoveryUiEnabled && personalDebtCompactSummary && (
+                  <p className="text-xs text-amber-700 mb-2">
+                    {t.shiftSummaryPage.personalDebtCompactLine.replace(
+                      "{summary}",
+                      personalDebtCompactSummary,
+                    )}
+                  </p>
+                )}
                 {myItems && myItems.length > 0 ? (
                   <div className="flex flex-col gap-2">
                     {myItems.map((item) => (
