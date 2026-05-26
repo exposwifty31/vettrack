@@ -114,6 +114,7 @@ describe("GET /api/metrics — jobRegistry (F1d-1)", () => {
       legacyWorkerStarterUsed: 0,
       jobRuntimeWorkerUnavailable: 0,
       jobEnqueueQueueUnavailable: 0,
+      runtimeReadiness: { started: false, workers: [] },
     });
   });
 
@@ -133,8 +134,16 @@ describe("GET /api/metrics — jobRegistry (F1d-1)", () => {
       legacyWorkerStarterUsed: 1,
       jobRuntimeWorkerUnavailable: 1,
       jobEnqueueQueueUnavailable: 1,
+      runtimeReadiness: { started: false, workers: [] },
     });
     expect(body.jobRegistry).toEqual(getMetricsSnapshot().jobRegistry);
+  });
+
+  it("includes jobRegistry.runtimeReadiness from getMetricsSnapshot", async () => {
+    const { statusCode, body } = await getMetricsViaRoute();
+    expect(statusCode).toBe(200);
+    const readiness = (body.jobRegistry as { runtimeReadiness?: unknown }).runtimeReadiness;
+    expect(readiness).toEqual({ started: false, workers: [] });
   });
 
   it("does not expose snake_case metric names as dynamic jobRegistry keys", async () => {

@@ -35,6 +35,7 @@ describe("F1b-1 server metrics — bounded counters", () => {
       legacyWorkerStarterUsed: 0,
       jobRuntimeWorkerUnavailable: 0,
       jobEnqueueQueueUnavailable: 0,
+      runtimeReadiness: { started: false, workers: [] },
     });
   });
 

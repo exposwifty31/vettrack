@@ -24,9 +24,13 @@ type RuntimeWorkerEntry = {
   connection: Redis;
 };
 
-let runtimeStarted = false;
+import {
+  getRuntimeReadiness,
+  resetJobRuntimeReadinessForTests,
+  setJobRuntimeReadinessState,
+} from "./runtime-readiness.js";
+
 const runtimeWorkers: RuntimeWorkerEntry[] = [];
-let workerStartupResults: Array<{ name: string; ok: boolean }> = [];
 
 function buildJobContext(job: Job): JobContext {
   const data = job.data as { clinicId?: string } | undefined;
@@ -148,7 +152,7 @@ async function startPilotWorker(
  * Redis unavailable → warn and return (does not throw).
  */
 export async function startJobRuntime(): Promise<void> {
-  if (runtimeStarted) return;
+  if (getRuntimeReadiness().started) return;
 
   try {
     await ensureChargeAlertProducerQueue();
@@ -164,8 +168,10 @@ export async function startJobRuntime(): Promise<void> {
     results.push(await startPilotWorker(queueName));
   }
 
-  workerStartupResults = results;
-  runtimeStarted = results.every((r) => r.ok);
+  setJobRuntimeReadinessState({
+    started: results.every((r) => r.ok),
+    workers: results,
+  });
   console.log("[job-runtime] pilot runtime active", {
     queues: PILOT_QUEUE_NAMES,
     workers: runtimeWorkers.map((e) => e.queueName),
@@ -189,27 +195,17 @@ export async function closeJobRuntime(): Promise<void> {
     }
   }
   runtimeWorkers.length = 0;
-  runtimeStarted = false;
-  workerStartupResults = [];
+  resetJobRuntimeReadinessForTests();
 }
 
 export function isJobRuntimeStarted(): boolean {
-  return runtimeStarted;
+  return getRuntimeReadiness().started;
 }
 
-export function getRuntimeReadiness(): {
-  started: boolean;
-  workers: Array<{ name: string; ok: boolean }>;
-} {
-  return {
-    started: runtimeStarted,
-    workers: workerStartupResults.map((r) => ({ name: r.name, ok: r.ok })),
-  };
-}
+export { getRuntimeReadiness } from "./runtime-readiness.js";
 
 /** Test-only: reset runtime singleton state without closing Redis. */
 export function resetJobRuntimeStateForTests(): void {
   runtimeWorkers.length = 0;
-  runtimeStarted = false;
-  workerStartupResults = [];
+  resetJobRuntimeReadinessForTests();
 }

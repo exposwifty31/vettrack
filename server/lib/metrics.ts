@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { getRuntimeReadiness } from "../jobs/runtime-readiness.js";
 import { getAliveCount as getDisplayHeartbeatsAlive } from "./display-heartbeat-store.js";
 
 type MetricName =
@@ -599,6 +600,11 @@ export interface MetricsSnapshot {
     legacyWorkerStarterUsed: number;
     jobRuntimeWorkerUnavailable: number;
     jobEnqueueQueueUnavailable: number;
+    /** F2b — live pilot runtime readiness (not a counter). */
+    runtimeReadiness: {
+      started: boolean;
+      workers: Array<{ name: string; ok: boolean }>;
+    };
   };
   timestamp: string;
 }
@@ -872,6 +878,30 @@ function safeGetDisplayHeartbeatsAlive(): number {
   } catch {
     return 0;
   }
+}
+
+const JOB_REGISTRY_RUNTIME_READINESS_FALLBACK = {
+  started: false,
+  workers: [] as Array<{ name: string; ok: boolean }>,
+};
+
+/** F1b/F2b — job registry counters + live pilot runtime readiness snapshot. */
+export function buildJobRegistryMetrics(): MetricsSnapshot["jobRegistry"] {
+  let runtimeReadiness = JOB_REGISTRY_RUNTIME_READINESS_FALLBACK;
+  try {
+    runtimeReadiness = getRuntimeReadiness();
+  } catch {
+    // Best-effort: readiness must not break metrics snapshot.
+  }
+
+  return {
+    replayIdempotencyCollision: metrics.replay_idempotency_collision,
+    jobRuntimeUnknownJobName: metrics.job_runtime_unknown_job_name,
+    legacyWorkerStarterUsed: metrics.legacy_worker_starter_used,
+    jobRuntimeWorkerUnavailable: metrics.job_runtime_worker_unavailable,
+    jobEnqueueQueueUnavailable: metrics.job_enqueue_queue_unavailable,
+    runtimeReadiness,
+  };
 }
 
 export function getMetricsSnapshot(): MetricsSnapshot {
@@ -1159,13 +1189,7 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           rateLimit: metrics.telemetry_payload_rejected_rate_limit,
         },
       },
-      jobRegistry: {
-        replayIdempotencyCollision: metrics.replay_idempotency_collision,
-        jobRuntimeUnknownJobName: metrics.job_runtime_unknown_job_name,
-        legacyWorkerStarterUsed: metrics.legacy_worker_starter_used,
-        jobRuntimeWorkerUnavailable: metrics.job_runtime_worker_unavailable,
-        jobEnqueueQueueUnavailable: metrics.job_enqueue_queue_unavailable,
-      },
+      jobRegistry: buildJobRegistryMetrics(),
       timestamp: new Date().toISOString(),
     };
   } catch {
@@ -1362,6 +1386,7 @@ export function getMetricsSnapshot(): MetricsSnapshot {
         legacyWorkerStarterUsed: 0,
         jobRuntimeWorkerUnavailable: 0,
         jobEnqueueQueueUnavailable: 0,
+        runtimeReadiness: JOB_REGISTRY_RUNTIME_READINESS_FALLBACK,
       },
       timestamp: new Date().toISOString(),
     };

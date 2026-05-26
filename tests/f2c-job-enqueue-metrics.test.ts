@@ -34,6 +34,7 @@ describe("F2c — job_enqueue_queue_unavailable metric", () => {
       legacyWorkerStarterUsed: 0,
       jobRuntimeWorkerUnavailable: 0,
       jobEnqueueQueueUnavailable: 0,
+      runtimeReadiness: { started: false, workers: [] },
     });
   });
 
