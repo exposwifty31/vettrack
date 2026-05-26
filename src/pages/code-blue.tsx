@@ -5,8 +5,9 @@ import { AlertTriangle, Shield, Zap } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { authFetch } from "@/lib/auth-fetch";
+import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
-import { useCodeBlueSession } from "@/hooks/useCodeBlueSession";
+import { clearCodeBlueSessionCache, useCodeBlueSession } from "@/hooks/useCodeBlueSession";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 import { toast } from "sonner";
@@ -322,20 +323,15 @@ function ActiveSession() {
     if (!outcome || !session) return;
     setShowOutcomeModal(false);
     try {
-      const res = await authFetch(`/api/code-blue/sessions/${session.id}/end`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ outcome }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Unknown error" }));
-        const msg = typeof body?.message === "string" ? body.message : t.codeBlue.endSessionFailed;
-        toast.error(msg, { id: "cb-end-failed" });
-        return;
-      }
+      await api.codeBlue.sessions.end(session.id, { outcome });
+      clearCodeBlueSessionCache();
       navigate("/home");
-    } catch {
-      toast.error(t.api.networkUnavailable, { id: "cb-end-failed" });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        toast.error(err.message || t.codeBlue.endSessionFailed, { id: "cb-end-failed" });
+      } else {
+        toast.error(t.api.networkUnavailable, { id: "cb-end-failed" });
+      }
     }
   };
 
@@ -515,23 +511,22 @@ export default function CodeBluePage() {
   const handleStart = async (preCheckPassed: boolean, manager: { id: string; name: string }) => {
     setStarting(true);
     try {
-      const res = await authFetch("/api/code-blue/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          idempotencyKey: crypto.randomUUID(),
-          managerUserId: manager.id,
-          managerUserName: manager.name,
-          preCheckPassed,
-          hospitalizationId: initHospId,
-          patientId: initPatientId,
-        }),
+      await api.codeBlue.sessions.start({
+        idempotencyKey: crypto.randomUUID(),
+        managerUserId: manager.id,
+        managerUserName: manager.name,
+        preCheckPassed,
+        hospitalizationId: initHospId,
+        patientId: initPatientId,
       });
-      if (!res.ok) {
-        toast.error(res.status === 409 ? t.codeBlue.activeSessionExists : t.codeBlue.startSessionFailed);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        toast.error(
+          err.status === 409 ? t.codeBlue.activeSessionExists : err.message || t.codeBlue.startSessionFailed,
+        );
+      } else {
+        toast.error(t.api.networkUnavailable);
       }
-    } catch {
-      toast.error(t.api.networkUnavailable);
     } finally {
       setStarting(false);
     }

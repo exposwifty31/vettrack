@@ -1888,6 +1888,48 @@ export const api = {
       }),
   },
   codeBlue: {
+    /** Active session poll + emergency session mutations (via `request()` / offline doctrine). */
+    sessions: {
+      getActive: () =>
+        request<import("@/hooks/useCodeBlueSession").SessionPollResult>(
+          "/api/code-blue/sessions/active",
+        ),
+      start: (body: {
+        idempotencyKey: string;
+        managerUserId: string;
+        managerUserName: string;
+        preCheckPassed: boolean;
+        hospitalizationId?: string;
+        patientId?: string;
+      }) =>
+        request<{ id: string }>("/api/code-blue/sessions", {
+          method: "POST",
+          body: JSON.stringify(body),
+        }),
+      end: (sessionId: string, body: { outcome: string }) =>
+        request<{ ok?: boolean }>(`/api/code-blue/sessions/${sessionId}/end`, {
+          method: "PATCH",
+          body: JSON.stringify(body),
+        }),
+      appendLog: (
+        sessionId: string,
+        body: {
+          idempotencyKey: string;
+          elapsedMs: number;
+          label: string;
+          category: "drug" | "shock" | "cpr" | "note" | "equipment";
+          equipmentId?: string;
+        },
+      ) =>
+        request<{ id: string }>(`/api/code-blue/sessions/${sessionId}/logs`, {
+          method: "POST",
+          body: JSON.stringify(body),
+        }),
+      sendPresence: (sessionId: string) =>
+        request<void>(`/api/code-blue/sessions/${sessionId}/presence`, {
+          method: "PATCH",
+        }, undefined, true),
+    },
     startEvent: (data: import("@/types").StartCodeBlueRequest) =>
       request<import("@/types").StartCodeBlueResponse>("/api/code-blue/events", {
         method: "POST",

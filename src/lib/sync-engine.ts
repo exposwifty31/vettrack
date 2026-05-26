@@ -117,7 +117,9 @@ function openCircuit() {
   }, CIRCUIT_COOLDOWN_MS);
 }
 
-export async function processQueue(): Promise<void> {
+const SYNC_QUEUE_LOCK_NAME = "vt-sync-queue";
+
+async function processQueueBody(): Promise<void> {
   if (syncing || !isOnline()) return;
 
   if (Date.now() < circuitOpenUntil) {
@@ -214,6 +216,16 @@ export async function processQueue(): Promise<void> {
     notifyListeners();
     void maybeReportOfflineSyncTelemetry();
   }
+}
+
+export async function processQueue(): Promise<void> {
+  if (typeof navigator !== "undefined" && navigator.locks?.request) {
+    await navigator.locks.request(SYNC_QUEUE_LOCK_NAME, { mode: "exclusive" }, async () => {
+      await processQueueBody();
+    });
+    return;
+  }
+  await processQueueBody();
 }
 
 function extractEquipmentId(endpoint: string): string | null {

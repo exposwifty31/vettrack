@@ -285,6 +285,9 @@ function writeStoredLastOutboxId(id: number): void {
 function clearStoredLastOutboxId(): void {
   try {
     localStorage.removeItem(LAST_OUTBOX_STORAGE_KEY);
+    // Cross-tab: mirror localStorage clear before cursor gossip so peers observe
+    // RESET_STATE / last_event_pruned recovery (localStorage is source for storage events).
+    publishCursor(0);
   } catch {
     // ignore
   }
@@ -558,9 +561,17 @@ export class EventIngestor {
 
   /** Another tab advanced the cursor — catch up without applying skipped ids locally. */
   private async handlePeerAhead(peerCursor: number): Promise<void> {
+    if (peerCursor === 0 && (this.lastAppliedEventId ?? 0) > 0) {
+      await this.handleResetState();
+      return;
+    }
     if (this.lastAppliedEventId !== null && peerCursor <= this.lastAppliedEventId) return;
     if (this.peerRecoveryInFlight) {
       await this.peerRecoveryInFlight;
+      if (peerCursor === 0 && (this.lastAppliedEventId ?? 0) > 0) {
+        await this.handleResetState();
+        return;
+      }
       if (this.lastAppliedEventId !== null && peerCursor <= this.lastAppliedEventId) return;
     }
 
@@ -738,6 +749,12 @@ function attachSharedStream(): void {
   if (source) return;
 
   source = new EventSource("/api/realtime/stream");
+  source.onopen = () => {
+    // SSE reconnect replays at most 1000 rows; paginated HTTP catch-up closes larger gaps.
+    for (const ing of ingestors) {
+      void ing.replayHttpCatchUpAfter(ing.getLastAppliedEventId());
+    }
+  };
   source.onmessage = (event) => {
     try {
       const parsed = JSON.parse(event.data) as unknown;

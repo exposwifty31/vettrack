@@ -47,8 +47,8 @@ describe("useCodeBlueSession hook", () => {
   });
 
   it.skipIf(hook === null)("fails loud on CB log network error (Phase 9 doctrine — no offline queue)", () => {
-    expect(hook).toContain("classifyEmergencyEndpoint");
-    expect(hook).toContain("recordEmergencyBlockLocally");
+    expect(hook).toContain("api.codeBlue.sessions.appendLog");
+    expect(hook).toContain("OfflineEmergencyMutationBlockedError");
     expect(hook).not.toContain("vt_cb_queue");
   });
 

@@ -4,6 +4,7 @@
  * emergency paths fail loud (toast + bounded telemetry / local buffer).
  */
 import "fake-indexeddb/auto";
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   _clearEmergencyBlockBufferForTests,
@@ -148,8 +149,8 @@ describe("P0-1: Code Blue offline queue removed", () => {
     expect(source).not.toContain("loadQueue");
     expect(source).not.toContain("saveQueue");
     expect(source).not.toContain("_flushInProgress");
-    expect(source).toContain("classifyEmergencyEndpoint");
-    expect(source).toContain("recordEmergencyBlockLocally");
+    expect(source).toContain("api.codeBlue.sessions");
+    expect(source).toContain("OfflineEmergencyMutationBlockedError");
   });
 });
 
@@ -204,41 +205,15 @@ describe("P0-1: Code Blue never enqueued in pendingSync", () => {
     },
   );
 
-  it("hook-layer log mutation rejects offline before authFetch (useCodeBlueSession contract)", () => {
-    const sessionId = "sess-offline-log";
-    const url = `/api/code-blue/sessions/${sessionId}/logs`;
-    const emergencyClass = classifyEmergencyEndpoint(url, "POST");
-    expect(emergencyClass).toBe("log");
-
-    if (emergencyClass && !navigator.onLine) {
-      recordEmergencyBlockLocally(emergencyClass);
-    } else {
-      void authFetchMock(url, { method: "POST" });
-    }
-
-    expect(authFetchMock).not.toHaveBeenCalled();
-    expect(_readEmergencyBlockBufferForTests()).toEqual([
-      expect.objectContaining({ endpointClass: "log", reason: "offline" }),
-    ]);
-    expect(addPendingSyncSpy).not.toHaveBeenCalled();
+  it("hook-layer log mutation uses api.request path (emergency block in request(), not authFetch)", () => {
+    const source = readFileSync("src/hooks/useCodeBlueSession.ts", "utf8");
+    expect(source).toContain("api.codeBlue.sessions.appendLog");
+    expect(source).not.toMatch(/authFetch\s*\(\s*[`'"]\/api\/code-blue\/sessions/);
   });
 
-  it("hook-layer presence heartbeat rejects offline before authFetch (useCodeBlueSession contract)", () => {
-    const sessionId = "sess-offline-presence";
-    const url = `/api/code-blue/sessions/${sessionId}/presence`;
-    const emergencyClass = classifyEmergencyEndpoint(url, "PATCH");
-    expect(emergencyClass).toBe("presence");
-
-    if (emergencyClass && !navigator.onLine) {
-      recordEmergencyBlockLocally(emergencyClass);
-    } else {
-      void authFetchMock(url, { method: "PATCH" });
-    }
-
-    expect(authFetchMock).not.toHaveBeenCalled();
-    expect(_readEmergencyBlockBufferForTests()).toEqual([
-      expect.objectContaining({ endpointClass: "presence", reason: "offline" }),
-    ]);
-    expect(addPendingSyncSpy).not.toHaveBeenCalled();
+  it("hook-layer presence uses api.request path (emergency block in request(), not authFetch)", () => {
+    const source = readFileSync("src/hooks/useCodeBlueSession.ts", "utf8");
+    expect(source).toContain("api.codeBlue.sessions.sendPresence");
+    expect(source).not.toMatch(/authFetch\s*\(\s*[`'"]\/api\/code-blue\/sessions/);
   });
 });
