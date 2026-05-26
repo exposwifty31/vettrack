@@ -114,6 +114,7 @@ describe("GET /api/metrics — jobRegistry (F1d-1)", () => {
       legacyWorkerStarterUsed: 0,
       jobRuntimeWorkerUnavailable: 0,
       jobEnqueueQueueUnavailable: 0,
+      jobEnqueueSucceeded: 0,
       runtimeReadiness: { started: false, workers: [] },
     });
   });
@@ -124,6 +125,7 @@ describe("GET /api/metrics — jobRegistry (F1d-1)", () => {
     incrementMetric("legacy_worker_starter_used");
     incrementMetric("job_runtime_worker_unavailable");
     incrementMetric("job_enqueue_queue_unavailable");
+    incrementMetric("job_enqueue_succeeded");
 
     const { statusCode, body } = await getMetricsViaRoute();
 
@@ -134,6 +136,7 @@ describe("GET /api/metrics — jobRegistry (F1d-1)", () => {
       legacyWorkerStarterUsed: 1,
       jobRuntimeWorkerUnavailable: 1,
       jobEnqueueQueueUnavailable: 1,
+      jobEnqueueSucceeded: 1,
       runtimeReadiness: { started: false, workers: [] },
     });
     expect(body.jobRegistry).toEqual(getMetricsSnapshot().jobRegistry);

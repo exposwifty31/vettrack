@@ -52,6 +52,7 @@ const JOB_REGISTRY_COUNTER_KEYS = [
   "legacyWorkerStarterUsed",
   "jobRuntimeWorkerUnavailable",
   "jobEnqueueQueueUnavailable",
+  "jobEnqueueSucceeded",
 ] as const;
 
 const DEFAULT_COUNTERS = {
@@ -60,6 +61,7 @@ const DEFAULT_COUNTERS = {
   legacyWorkerStarterUsed: 0,
   jobRuntimeWorkerUnavailable: 0,
   jobEnqueueQueueUnavailable: 0,
+  jobEnqueueSucceeded: 0,
 };
 
 const DEFAULT_RUNTIME_READINESS = { started: false, workers: [] as Array<{ name: string; ok: boolean }> };

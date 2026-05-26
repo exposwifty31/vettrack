@@ -20,6 +20,7 @@ const F1_COUNTERS = [
   "legacy_worker_starter_used",
   "job_runtime_worker_unavailable",
   "job_enqueue_queue_unavailable",
+  "job_enqueue_succeeded",
 ] as const;
 
 describe("F1b-1 server metrics — bounded counters", () => {
@@ -35,6 +36,7 @@ describe("F1b-1 server metrics — bounded counters", () => {
       legacyWorkerStarterUsed: 0,
       jobRuntimeWorkerUnavailable: 0,
       jobEnqueueQueueUnavailable: 0,
+      jobEnqueueSucceeded: 0,
       runtimeReadiness: { started: false, workers: [] },
     });
   });
@@ -57,6 +59,9 @@ describe("F1b-1 server metrics — bounded counters", () => {
         break;
       case "job_enqueue_queue_unavailable":
         expect(snap.jobRegistry.jobEnqueueQueueUnavailable).toBe(1);
+        break;
+      case "job_enqueue_succeeded":
+        expect(snap.jobRegistry.jobEnqueueSucceeded).toBe(1);
         break;
       default:
         throw new Error(`unhandled counter: ${name}`);

@@ -248,7 +248,8 @@ type MetricName =
   | "job_runtime_unknown_job_name"
   | "legacy_worker_starter_used"
   | "job_runtime_worker_unavailable"
-  | "job_enqueue_queue_unavailable";
+  | "job_enqueue_queue_unavailable"
+  | "job_enqueue_succeeded";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -600,6 +601,7 @@ export interface MetricsSnapshot {
     legacyWorkerStarterUsed: number;
     jobRuntimeWorkerUnavailable: number;
     jobEnqueueQueueUnavailable: number;
+    jobEnqueueSucceeded: number;
     /** F2b — live pilot runtime readiness (not a counter). */
     runtimeReadiness: {
       started: boolean;
@@ -794,6 +796,7 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   legacy_worker_starter_used: 0,
   job_runtime_worker_unavailable: 0,
   job_enqueue_queue_unavailable: 0,
+  job_enqueue_succeeded: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
@@ -900,6 +903,7 @@ export function buildJobRegistryMetrics(): MetricsSnapshot["jobRegistry"] {
     legacyWorkerStarterUsed: metrics.legacy_worker_starter_used,
     jobRuntimeWorkerUnavailable: metrics.job_runtime_worker_unavailable,
     jobEnqueueQueueUnavailable: metrics.job_enqueue_queue_unavailable,
+    jobEnqueueSucceeded: metrics.job_enqueue_succeeded,
     runtimeReadiness,
   };
 }
@@ -1386,6 +1390,7 @@ export function getMetricsSnapshot(): MetricsSnapshot {
         legacyWorkerStarterUsed: 0,
         jobRuntimeWorkerUnavailable: 0,
         jobEnqueueQueueUnavailable: 0,
+        jobEnqueueSucceeded: 0,
         runtimeReadiness: JOB_REGISTRY_RUNTIME_READINESS_FALLBACK,
       },
       timestamp: new Date().toISOString(),

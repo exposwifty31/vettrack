@@ -64,13 +64,27 @@ function observeEnqueueQueueUnavailable(params: {
   });
 }
 
+function observeEnqueueSucceeded(params: {
+  kind: StaticJobKind | typeof INTEGRATION_SYNC_ENQUEUE_KIND;
+  queueName: string;
+}): void {
+  incrementMetric("job_enqueue_succeeded");
+  console.warn("[job-enqueue]", {
+    event: "job_enqueue_succeeded",
+    kind: params.kind,
+    queueName: params.queueName,
+  });
+}
+
 async function withEnqueueQueueObservability<T>(
   kind: StaticJobKind | typeof INTEGRATION_SYNC_ENQUEUE_KIND,
   queueName: string,
   fn: () => Promise<T>,
 ): Promise<T> {
   try {
-    return await fn();
+    const result = await fn();
+    observeEnqueueSucceeded({ kind, queueName });
+    return result;
   } catch (error) {
     if (isEnqueueQueueUnavailableError(error)) {
       observeEnqueueQueueUnavailable({
