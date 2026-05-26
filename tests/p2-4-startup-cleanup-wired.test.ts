@@ -20,16 +20,19 @@ describe("P2-4: runStartupCleanup wired from initSyncEngine", () => {
     const fs = await import("fs");
     const source = fs.readFileSync("src/lib/sync-engine.ts", "utf8");
 
-    const initFn = source.slice(
-      source.indexOf("export function initSyncEngine"),
-      source.indexOf("window.addEventListener", source.indexOf("export function initSyncEngine")),
-    );
+    const initStart = source.indexOf("export function initSyncEngine");
+    const initFn = source.slice(initStart, source.indexOf("return () => {", initStart));
 
-    // Must call runStartupCleanup with .catch() (fire-and-forget)
-    expect(initFn).toContain("runStartupCleanup(queryClient).catch(");
+    // Phase 5: recover processing → hydrate conflicts → cleanup → first replay.
+    expect(initFn).toContain("recoverProcessingPendingSync()");
+    expect(initFn).toContain("runStartupCleanup(queryClient)");
+    expect(initFn).toMatch(/runStartupCleanup\(queryClient\)[\s\S]*processQueue\(\)/);
+    const beforeRecovery = source.slice(initStart, source.indexOf("recoverProcessingPendingSync", initStart));
+    expect(beforeRecovery).not.toContain("if (isOnline())");
+    expect(initFn).toContain(".catch(() => {})");
   });
 
-  it("runStartupCleanup removes synced rows and old failed rows", async () => {
+  it("runStartupCleanup removes synced rows and old dead-letter rows", async () => {
     const fs = await import("fs");
     const source = fs.readFileSync("src/lib/offline-db.ts", "utf8");
 
@@ -41,8 +44,9 @@ describe("P2-4: runStartupCleanup wired from initSyncEngine", () => {
     // Cleans synced rows
     expect(fn).toContain('"synced"');
     expect(fn).toContain("bulkDelete");
-    // Cleans old failed rows (7-day threshold)
-    expect(fn).toContain('"failed"');
-    expect(fn).toContain("7 * 24 * 60 * 60 * 1000");
+    // Phase 5: optional dead-letter retention only — never auto-delete conflict.
+    expect(fn).toContain('"dead"');
+    expect(fn).toContain("DEAD_LETTER_RETENTION_MS");
+    expect(fn).not.toContain('.equals("failed")');
   });
 });

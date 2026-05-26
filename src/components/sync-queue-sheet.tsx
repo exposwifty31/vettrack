@@ -97,29 +97,34 @@ function SyncQueueItem({
   }
 
   const isPending = item.status === "pending";
-  const isFailed = item.status === "failed";
+  const isConflictStatus = item.status === "conflict" || isConflict;
+  const isDead = item.status === "dead";
+  const isRetryableFailed = item.status === "failed";
+  const needsAttention = isConflictStatus || isDead || isRetryableFailed;
 
   const statusLabel = isPending
     ? t.syncQueueSheet.pending
-    : isConflict
+    : isConflictStatus
     ? t.syncQueueSheet.conflict
+    : isDead
+    ? t.syncQueueSheet.failed
     : t.syncQueueSheet.failed;
 
   const statusColorClass = isPending
     ? "bg-amber-100 text-amber-700"
-    : isConflict
+    : isConflictStatus
     ? "bg-orange-100 text-orange-700"
     : "bg-red-100 text-red-700";
 
   const cardColorClass = isPending
     ? "bg-amber-50 border-amber-200"
-    : isConflict
+    : isConflictStatus
     ? "bg-orange-50 border-orange-200"
     : "bg-red-50 border-red-200";
 
   const iconNode = isPending ? (
     <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin shrink-0" />
-  ) : isConflict ? (
+  ) : isConflictStatus ? (
     <AlertTriangle className="w-3.5 h-3.5 text-orange-500 shrink-0" />
   ) : (
     <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
@@ -139,7 +144,7 @@ function SyncQueueItem({
                 className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${
                   isPending
                     ? "bg-amber-200 text-amber-800"
-                    : isConflict
+                    : isConflictStatus
                     ? "bg-orange-200 text-orange-800"
                     : "bg-red-200 text-red-800"
                 }`}
@@ -159,13 +164,13 @@ function SyncQueueItem({
           </div>
         </div>
 
-        {isFailed && (
+        {needsAttention && (
           <div className="flex items-center gap-1.5 shrink-0">
             <Button
               size="sm"
               variant="outline"
               className={`h-11 text-xs gap-1 ${
-                isConflict
+                isConflictStatus
                   ? "border-orange-300 text-orange-700 hover:bg-orange-100"
                   : "border-amber-300 text-amber-700 hover:bg-amber-100"
               }`}
@@ -194,8 +199,8 @@ function SyncQueueItem({
         )}
       </div>
 
-      {isFailed && item.errorMessage && (
-        <p className={`text-xs mt-0.5 pl-5 ${isConflict ? "text-orange-700" : "text-red-600"}`}>
+      {needsAttention && item.errorMessage && (
+        <p className={`text-xs mt-0.5 pl-5 ${isConflictStatus ? "text-orange-700" : "text-red-600"}`}>
           {item.errorMessage}
         </p>
       )}
@@ -350,12 +355,12 @@ export function SyncQueueSheet({ open, onClose }: SyncQueueSheetProps) {
                   key={item.id}
                   item={item}
                   isConflict={item.id !== undefined && conflictIds.has(item.id)}
-                  onRetry={() => {
-                    if (item.id !== undefined) removeConflict(item.id);
+                  onRetry={async () => {
+                    if (item.id !== undefined) await removeConflict(item.id);
                     return retry(item.id!);
                   }}
-                  onDiscard={() => {
-                    if (item.id !== undefined) removeConflict(item.id);
+                  onDiscard={async () => {
+                    if (item.id !== undefined) await removeConflict(item.id);
                     discard(item.id!);
                   }}
                 />

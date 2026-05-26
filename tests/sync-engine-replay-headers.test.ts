@@ -31,7 +31,9 @@ vi.mock("../src/lib/offline-db", () => ({
   updatePendingSync: vi.fn().mockResolvedValue(undefined),
   removePendingSync: vi.fn().mockResolvedValue(undefined),
   runStartupCleanup: vi.fn().mockResolvedValue(undefined),
-  PENDING_SYNC_SCHEMA_VERSION: 1,
+  recoverProcessingPendingSync: vi.fn().mockResolvedValue(0),
+  PENDING_SYNC_MAX_RETRIES: 5,
+  PENDING_SYNC_SCHEMA_VERSION: 2,
 }));
 
 vi.mock("../src/lib/safe-browser", () => ({
@@ -44,6 +46,8 @@ vi.mock("../src/lib/auth-store", () => ({
 
 vi.mock("../src/lib/conflict-store", () => ({
   addConflict: vi.fn(),
+  ensureConflictsHydrated: vi.fn().mockResolvedValue(undefined),
+  persistConflictPayload: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../src/lib/offline-session", () => ({

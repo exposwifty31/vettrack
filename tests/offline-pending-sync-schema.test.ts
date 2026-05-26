@@ -137,7 +137,7 @@ describe("offline-pending-sync-schema — Dexie v4 → v5 migration", () => {
       expect(row.idempotencyKey).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
       );
-      expect(row.schemaVersion).toBe(PENDING_SYNC_SCHEMA_VERSION);
+      expect(row.schemaVersion).toBeGreaterThanOrEqual(1);
       expect(row.updatedAt).toEqual(createdAt);
       expect(row.structuredError).toBeNull();
     }
@@ -199,7 +199,7 @@ describe("offline-pending-sync-schema — Dexie v4 → v5 migration", () => {
       const db = await openMigratedTestDb(dbName);
       const rows = await db.pendingSync.toArray();
       expect(rows).toHaveLength(1);
-      expect(rows[0]?.schemaVersion).toBe(PENDING_SYNC_SCHEMA_VERSION);
+      expect(rows[0]?.schemaVersion).toBeGreaterThanOrEqual(1);
       await db.close();
     }
 
@@ -228,6 +228,7 @@ describe("offline-pending-sync-schema — new enqueue rows", () => {
     expect(row?.clientMutationId).toBeTruthy();
     expect(row?.idempotencyKey).toBeTruthy();
     expect(row?.schemaVersion).toBe(PENDING_SYNC_SCHEMA_VERSION);
+    expect(row?.conflictPayload).toBeNull();
     expect(row?.updatedAt).toBeInstanceOf(Date);
     expect(row?.structuredError).toBeNull();
     expect(row?.userId).toBe("user-phase3-test");

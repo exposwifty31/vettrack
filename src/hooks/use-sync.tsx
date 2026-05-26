@@ -53,15 +53,33 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const pendingCount = useMemo(() => allItems.filter((i) => i.status === "pending").length, [allItems]);
-  const failedCount = useMemo(() => allItems.filter((i) => i.status === "failed").length, [allItems]);
-  const items = useMemo(() => allItems.filter((i) => i.status === "pending" || i.status === "failed"), [allItems]);
+  const failedCount = useMemo(
+    () =>
+      allItems.filter((i) =>
+        i.status === "failed" || i.status === "dead" || i.status === "conflict",
+      ).length,
+    [allItems],
+  );
+  const items = useMemo(
+    () =>
+      allItems.filter((i) =>
+        i.status === "pending" ||
+        i.status === "failed" ||
+        i.status === "dead" ||
+        i.status === "conflict",
+      ),
+    [allItems],
+  );
   const recentItems = useMemo(() => allItems.slice(-20), [allItems]);
 
   const applyAll = useCallback((all: PendingSync[]) => {
     const p = all.filter((i) => i.status === "pending").length;
-    const f = all.filter((i) => i.status === "failed").length;
+    const processing = all.filter((i) => i.status === "processing").length;
+    const f = all.filter((i) =>
+      i.status === "failed" || i.status === "dead" || i.status === "conflict",
+    ).length;
 
-    if (prevPendingRef.current > 0 && p === 0 && f === 0) {
+    if (prevPendingRef.current > 0 && p === 0 && processing === 0 && f === 0) {
       setJustSynced(true);
       if (justSyncedTimerRef.current) clearTimeout(justSyncedTimerRef.current);
       justSyncedTimerRef.current = setTimeout(() => setJustSynced(false), 3000);
@@ -116,7 +134,13 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const retry = useCallback(async (id: number) => {
-    await updatePendingSync(id, { status: "pending", retries: 0, errorMessage: undefined });
+    await updatePendingSync(id, {
+      status: "pending",
+      retries: 0,
+      errorMessage: undefined,
+      conflictPayload: null,
+      structuredError: null,
+    });
     processQueue().catch(() => {});
   }, []);
 

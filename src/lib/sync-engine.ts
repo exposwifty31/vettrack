@@ -7,14 +7,17 @@ import {
   updatePendingSync,
   removePendingSync,
   runStartupCleanup,
+  recoverProcessingPendingSync,
+  PENDING_SYNC_MAX_RETRIES,
   type PendingSync,
+  type PendingSyncConflictPayload,
 } from "./offline-db";
 import { getAuthHeaders } from "./auth-store";
 import { clearOfflineSession } from "./offline-session";
-import { addConflict } from "./conflict-store";
+import { addConflict, ensureConflictsHydrated, persistConflictPayload } from "./conflict-store";
 import { isOnline } from "./safe-browser";
 
-const MAX_RETRIES = 5;
+const MAX_RETRIES = PENDING_SYNC_MAX_RETRIES;
 const RETRY_DELAYS_MS = [2000, 5000, 10000];
 const BURST_LIMIT = 50;
 const BURST_DELAY_MS = 500;
@@ -212,18 +215,28 @@ async function processSingleItemWithRetry(item: PendingSync): Promise<ItemResult
       return "success";
     }
 
-    if (result === "conflict" || result === "auth_halt" || result === "client_error" || result === "permission_error") {
+    if (
+      result === "conflict" ||
+      result === "auth_halt" ||
+      result === "client_error" ||
+      result === "permission_error"
+    ) {
       return result;
     }
 
     currentRetries++;
-    try { await updatePendingSync(item.id, { retries: currentRetries }); } catch {}
+    try {
+      await updatePendingSync(item.id, {
+        status: "pending",
+        retries: currentRetries,
+      });
+    } catch {}
     notifyListeners();
 
     if (currentRetries >= MAX_RETRIES) {
       try {
         await updatePendingSync(item.id, {
-          status: "failed",
+          status: "dead",
           retries: currentRetries,
           errorMessage: `Failed after ${MAX_RETRIES} attempts`,
         });
@@ -272,6 +285,10 @@ async function processSingleItemWithRetry(item: PendingSync): Promise<ItemResult
 async function attemptSync(item: PendingSync): Promise<ItemResult> {
   if (!item.id) return "transient_failure";
 
+  try {
+    await updatePendingSync(item.id, { status: "processing" });
+  } catch {}
+
   const liveHeaders = getAuthHeaders();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -306,19 +323,25 @@ async function attemptSync(item: PendingSync): Promise<ItemResult> {
 
     if (res.status === 409) {
       const serverData = await res.json().catch(() => ({}));
-
-      addConflict({
-        id: item.id!,
-        endpoint: item.endpoint,
-        method: item.method,
+      const localData = JSON.parse(item.body || "{}");
+      const conflictPayload: PendingSyncConflictPayload = {
         serverData,
-        localData: JSON.parse(item.body || "{}"),
-      });
+        localData,
+        capturedAt: Date.now(),
+      };
+      const errorMessage =
+        (serverData as Record<string, string>).error ||
+        "Conflict: another change was made to this item";
 
       try {
-        await updatePendingSync(item.id, {
-          status: "failed",
-          errorMessage: (serverData as Record<string, string>).error || "Conflict: another change was made to this item",
+        await persistConflictPayload(item.id, conflictPayload);
+        await updatePendingSync(item.id, { errorMessage });
+        addConflict({
+          id: item.id!,
+          endpoint: item.endpoint,
+          method: item.method,
+          serverData,
+          localData,
         });
       } catch {}
 
@@ -329,8 +352,9 @@ async function attemptSync(item: PendingSync): Promise<ItemResult> {
       haltQueue = true;
       clearOfflineSession();
       if (queryClientRef) queryClientRef.clear();
+      // Non-retryable client error — terminal `dead` (operator must re-auth / discard).
       await updatePendingSync(item.id, {
-        status: "failed",
+        status: "dead",
         errorMessage: "Auth error — please sign in again",
       });
       toast.error(t.syncEngine.sessionExpiredSignInAgain, {
@@ -353,8 +377,9 @@ async function attemptSync(item: PendingSync): Promise<ItemResult> {
         },
       });
       console.error("[sync] 403 permission denied:", item.endpoint, errMsg);
+      // Non-retryable 4xx — terminal `dead` (not `failed`; `failed` is retryable-only).
       await updatePendingSync(item.id, {
-        status: "failed",
+        status: "dead",
         errorMessage: errMsg,
       });
       return "permission_error";
@@ -365,7 +390,7 @@ async function attemptSync(item: PendingSync): Promise<ItemResult> {
       const errMsg = errData.error || `Request failed: ${res.status}`;
       console.error("[sync] client error:", item.endpoint, res.status, errMsg);
       await updatePendingSync(item.id, {
-        status: "failed",
+        status: "dead",
         errorMessage: errMsg,
       });
       return "client_error";
@@ -387,17 +412,24 @@ async function attemptSync(item: PendingSync): Promise<ItemResult> {
 export function initSyncEngine(queryClient?: QueryClient) {
   queryClientRef = queryClient;
 
-  runStartupCleanup(queryClient).catch(() => {});
-
   const handleOnline = () => {
     processQueue();
   };
 
   window.addEventListener("online", handleOnline);
 
-  if (isOnline()) {
-    processQueue();
-  }
+  // Order: recover in-flight claims → hydrate conflicts → cleanup → first replay.
+  // Do not call processQueue() before recovery completes — getPendingSync() only
+  // sees `pending` rows; recovered claims would be missed on the first pass.
+  void recoverProcessingPendingSync()
+    .then(() => ensureConflictsHydrated())
+    .then(() => runStartupCleanup(queryClient))
+    .then(() => {
+      if (isOnline()) {
+        processQueue();
+      }
+    })
+    .catch(() => {});
 
   return () => {
     window.removeEventListener("online", handleOnline);

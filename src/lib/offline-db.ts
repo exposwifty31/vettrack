@@ -4,7 +4,28 @@ import type { Equipment, ScanLog, Folder, Room } from "@/types";
 import { assertPendingSyncEnqueueAllowed } from "@/lib/offline-policy";
 import { getCurrentClinicId, getCurrentUserId } from "@/lib/auth-store";
 
-export type PendingSyncStatus = "pending" | "synced" | "failed";
+/** Phase 5 queue state machine — see docs/offline-first-architecture-plan.md § Phase 5. */
+export type PendingSyncStatus =
+  | "pending"
+  | "processing"
+  | "synced"
+  | "failed"
+  | "dead"
+  | "conflict";
+
+/** Must match `MAX_RETRIES` in sync-engine.ts (replay retry budget). */
+export const PENDING_SYNC_MAX_RETRIES = 5;
+
+/** Terminal `dead` rows older than this may be purged on startup (never `conflict`). */
+export const DEAD_LETTER_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+const PERMANENT_FAILURE_MESSAGE = `Failed after ${PENDING_SYNC_MAX_RETRIES} attempts`;
+
+export interface PendingSyncConflictPayload {
+  serverData: unknown;
+  localData: unknown;
+  capturedAt: number;
+}
 export type PendingSyncType =
   | "scan"
   | "seen"
@@ -16,7 +37,7 @@ export type PendingSyncType =
   | "return_with_charge";
 
 /** Current Dexie pendingSync row schema version (queue evolution). */
-export const PENDING_SYNC_SCHEMA_VERSION = 1;
+export const PENDING_SYNC_SCHEMA_VERSION = 2;
 
 export type PendingSyncStructuredErrorDetails = Record<
   string,
@@ -49,6 +70,8 @@ export interface PendingSync {
   optimisticData?: string;
   errorMessage?: string;
   equipmentName?: string;
+  /** Set when status is `conflict` (409 OCC); survives reload. */
+  conflictPayload?: PendingSyncConflictPayload | null;
 }
 
 /** Fields auto-filled at enqueue; callers omit these unless overriding clinicId/userId. */
@@ -99,6 +122,64 @@ export function applyPendingSyncSchemaDefaults(row: PendingSync): void {
   if (row.structuredError === undefined) {
     row.structuredError = null;
   }
+  if (row.conflictPayload === undefined) {
+    row.conflictPayload = null;
+  }
+}
+
+function isLegacyTerminalFailedRow(row: PendingSync): boolean {
+  if (row.status !== "failed") return false;
+  if ((row.retries ?? 0) >= PENDING_SYNC_MAX_RETRIES) return true;
+  const msg = row.errorMessage?.trim() ?? "";
+  if (msg === PERMANENT_FAILURE_MESSAGE) return true;
+  if (/failed after \d+ attempts/i.test(msg)) return true;
+  return false;
+}
+
+function isLegacyConflictFailedRow(row: PendingSync): boolean {
+  if (row.status !== "failed") return false;
+  const msg = row.errorMessage?.toLowerCase() ?? "";
+  if (msg.includes("conflict")) return true;
+  const code = row.structuredError?.code?.toLowerCase() ?? "";
+  return code.includes("conflict");
+}
+
+function backfillConflictPayloadFromLegacyRow(
+  row: PendingSync,
+): PendingSyncConflictPayload | null {
+  if (row.conflictPayload) return row.conflictPayload;
+  try {
+    const localData = JSON.parse(row.body || "{}");
+    return {
+      serverData: row.structuredError?.details ?? null,
+      localData,
+      capturedAt: row.updatedAt?.getTime?.() ?? Date.now(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Phase 5 migration: terminal legacy `failed` → `dead` or `conflict`; schema v2 defaults.
+ */
+export async function upgradePendingSyncPhase5(
+  table: Table<PendingSync, number>,
+): Promise<void> {
+  await table.toCollection().modify((row) => {
+    applyPendingSyncSchemaDefaults(row);
+    if (row.status === "processing") {
+      row.status = "pending";
+    }
+    if (isLegacyConflictFailedRow(row)) {
+      row.status = "conflict";
+      row.conflictPayload = backfillConflictPayloadFromLegacyRow(row);
+      return;
+    }
+    if (isLegacyTerminalFailedRow(row)) {
+      row.status = "dead";
+    }
+  });
 }
 
 export async function upgradePendingSyncTable(
@@ -130,6 +211,7 @@ function materializePendingSyncRow(op: PendingSyncCreateInput): Omit<PendingSync
     schemaVersion: PENDING_SYNC_SCHEMA_VERSION,
     updatedAt: now,
     structuredError: null,
+    conflictPayload: null,
   };
 }
 
@@ -163,6 +245,15 @@ class VetTrackDB extends Dexie {
       pendingSync: PENDING_SYNC_STORES,
     }).upgrade(async (tx) => {
       await upgradePendingSyncTable(tx.table("pendingSync"));
+    });
+    this.version(6).stores({
+      equipment: "id, name, status, folderId, roomId, location, lastSeen, createdAt",
+      scanLogs: "id, equipmentId, timestamp",
+      folders: "id, name, type",
+      rooms: "id, name, syncStatus",
+      pendingSync: PENDING_SYNC_STORES,
+    }).upgrade(async (tx) => {
+      await upgradePendingSyncPhase5(tx.table("pendingSync"));
     });
   }
 }
@@ -313,16 +404,56 @@ export async function getFailedCount(): Promise<number> {
   return offlineDb.pendingSync.where("status").equals("failed").count();
 }
 
+export async function getDeadCount(): Promise<number> {
+  return offlineDb.pendingSync.where("status").equals("dead").count();
+}
+
+export async function getConflictCount(): Promise<number> {
+  return offlineDb.pendingSync.where("status").equals("conflict").count();
+}
+
+/** Rows needing operator attention (retryable, terminal, or OCC conflict). */
+export async function getAttentionCount(): Promise<number> {
+  const [failed, dead, conflict] = await Promise.all([
+    getFailedCount(),
+    getDeadCount(),
+    getConflictCount(),
+  ]);
+  return failed + dead + conflict;
+}
+
+/**
+ * Crash/tab-kill safety: in-flight claims return to the FIFO queue.
+ * Call before `runStartupCleanup` (see `initSyncEngine`).
+ */
+export async function recoverProcessingPendingSync(): Promise<number> {
+  const processingIds = (await offlineDb.pendingSync
+    .where("status")
+    .equals("processing")
+    .primaryKeys()) as number[];
+  if (processingIds.length === 0) return 0;
+  await offlineDb.pendingSync
+    .where("status")
+    .equals("processing")
+    .modify({ status: "pending", updatedAt: new Date() });
+  return processingIds.length;
+}
+
+export async function getConflictRows(): Promise<PendingSync[]> {
+  return offlineDb.pendingSync.where("status").equals("conflict").toArray();
+}
+
 export async function runStartupCleanup(queryClient?: QueryClient): Promise<void> {
   try {
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const failedOld = await offlineDb.pendingSync
+    // Optional retention for terminal dead-letter only — never auto-delete `conflict`.
+    const deadCutoff = new Date(Date.now() - DEAD_LETTER_RETENTION_MS);
+    const deadOld = await offlineDb.pendingSync
       .where("status")
-      .equals("failed")
-      .and((item) => item.createdAt < sevenDaysAgo)
+      .equals("dead")
+      .and((item) => item.createdAt < deadCutoff)
       .primaryKeys();
-    if (failedOld.length > 0) {
-      await offlineDb.pendingSync.bulkDelete(failedOld as number[]);
+    if (deadOld.length > 0) {
+      await offlineDb.pendingSync.bulkDelete(deadOld as number[]);
     }
 
     const syncedIds = await offlineDb.pendingSync
