@@ -1,12 +1,91 @@
 # VetTrack Pilot — Feature Reference
 
-Tag: **`pilot-v1`** (commit `0b40981`)
+This document covers two related topics:
 
-This document describes every feature introduced during the pilot stabilization sprint (Days 5–13). It is the authoritative reference for what is enabled, how it is gated, and what an operator needs to know before deploying.
+1. **Pilot readiness (mainline)** — operational hardening merged for hospital pilot go-live (integration gate, ops dashboard, Code Blue / realtime client fixes). See [Pilot readiness runbook](#pilot-readiness-runbook-mainline) below.
+2. **Pilot v1 equipment mode** — compile-time equipment-only UI (`VITE_PILOT_MODE` / `PILOT_MODE`). Tag: **`pilot-v1`** (commit `0b40981`).
 
 ---
 
-## Activation
+## Pilot readiness runbook (mainline)
+
+Use this section when deploying or operating the **full** VetTrack stack for a clinic pilot (not equipment-only `PILOT_MODE`).
+
+### Prerequisites
+
+| Requirement | Notes |
+|-------------|--------|
+| Node.js ≥ 22.12, pnpm 9.15.9 | See `.nvmrc` |
+| PostgreSQL 16 | `pnpm db:migrate` at startup and in CI |
+| Redis | Required in production for BullMQ (inventory, notifications, job runtime cron workers) |
+| Clerk (production) | `CLERK_SECRET_KEY` + `VITE_CLERK_PUBLISHABLE_KEY` + `ALLOWED_ORIGIN` |
+
+### Minimal local dev (no Clerk)
+
+Copy `.env.example` → `.env` and set at minimum:
+
+```env
+DATABASE_URL=postgres://vettrack:vettrack@localhost:5432/vettrack
+SESSION_SECRET=dev-session-secret-for-local-development
+NODE_ENV=development
+```
+
+Omit `CLERK_SECRET_KEY` and `VITE_CLERK_PUBLISHABLE_KEY` to use **dev-bypass auth** (hardcoded admin, `clinicId = dev-clinic-default`). API routes work; the browser may show Clerk warnings unless keys are configured — see `docs/dev-signin-runbook.md`.
+
+```bash
+pnpm install
+pnpm db:migrate
+PORT=3001 pnpm dev    # API :3001, Vite :5000
+```
+
+### Verification commands (pre-deploy)
+
+```bash
+npx tsc --noEmit
+pnpm test
+pnpm test:integration:ops   # Postgres required; same job as CI "Integration ops"
+```
+
+CI merge gate also runs Playwright E2E shards on every PR.
+
+### Operator surfaces (post-readiness merges)
+
+| Surface | Route / API | Who | Purpose |
+|---------|-------------|-----|---------|
+| Ops dashboard | `/admin/ops-dashboard` | Admin | Outbox health, queue metrics, offline sync telemetry, **event outbox DLQ** (list / retry all / drop selected) |
+| Code Blue | `/code-blue` | Clinical roles | Emergency session; mutations use `api.request()` and **fail loud offline** (never queued) |
+| Ward / ER realtime | Display, ER command center | Staff | SSE `/api/realtime/stream` + HTTP replay catch-up on reconnect |
+| Equipment ops gate | CI `integration-ops` | Engineering | `tests/equipment-operational-state.integration.test.ts` against Postgres 16 |
+
+### Code Blue — operator expectations
+
+- **Offline:** starting a session, logging entries, ending a session, or presence heartbeats **do not** queue for later sync. The UI shows an immediate error and records bounded telemetry only.
+- **Session end:** navigation away from the active session happens only after the server accepts `PATCH …/end` (no optimistic local termination).
+- **Ward display:** follows server snapshot + SSE keepalive; do not rely on stale `localStorage` (`vt_cb_cache` is cleared when the server reports no active session).
+
+### Realtime — operator expectations
+
+- Transport is **SSE only** (`/api/realtime/stream`), not WebSockets. Do not set `VITE_WS_URL` for new work.
+- After long disconnects, clients paginate `GET /api/realtime/replay` to close gaps larger than the SSE reconnect batch.
+- If the outbox cursor was pruned, clients receive `RESET_STATE` and resync ward/ER caches; cross-tab tabs gossip cursor `0` after reset.
+
+### Background jobs (JR-MIG wave 2)
+
+When Redis is up, `startJobRuntime()` owns **expiry-check** and **stale-checkin-sweep** cron consumers (legacy `startExpiryCheckWorker` / `startStaleCheckInSweepWorker` are not called from `start-schedulers.ts`).
+
+Optional: `STALE_CHECKIN_SWEEP_ENABLED=true` to register the stale clinical check-in sweep (default off).
+
+### Multi-tenancy
+
+Every clinic’s data is isolated by `clinicId` from auth middleware. Admin DLQ actions, procurement reads, and alert acknowledgements are clinic-scoped — operators only see their clinic’s rows.
+
+### Frozen architecture (do not change without architecture review)
+
+See `README.md` and `CLAUDE.md`: SSE/outbox replay, emergency SW denylist, Code Blue offline block list, bounded realtime telemetry, Strategy A authority safety net.
+
+---
+
+## Activation (pilot v1 equipment mode)
 
 Pilot mode is a compile-time flag. Nothing is enabled without it.
 
