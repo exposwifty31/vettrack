@@ -6,15 +6,27 @@ import {
   removePendingSync,
   type PendingSync,
 } from "@/lib/offline-db";
+import { removeConflict } from "@/lib/conflict-store";
+import {
+  filterPendingSyncRowsForEquipment,
+  resolveLocalEntityState,
+  type LocalEntityState,
+} from "@/lib/local-entity-sync-state";
 import { processQueue, onSyncStateChange, getSyncProgress, initSyncEngine } from "@/lib/sync-engine";
 
 interface SyncState {
   pendingCount: number;
   failedCount: number;
+  deadCount: number;
+  conflictCount: number;
   isSyncing: boolean;
   justSynced: boolean;
   recentItems: PendingSync[];
   items: PendingSync[];
+  pendingItems: PendingSync[];
+  processingItems: PendingSync[];
+  deadLetterItems: PendingSync[];
+  retryableFailedItems: PendingSync[];
   isCircuitOpen: boolean;
   circuitResetsAt: number;
   batchCurrent: number;
@@ -27,10 +39,16 @@ interface SyncState {
 const SyncContext = createContext<SyncState>({
   pendingCount: 0,
   failedCount: 0,
+  deadCount: 0,
+  conflictCount: 0,
   isSyncing: false,
   justSynced: false,
   recentItems: [],
   items: [],
+  pendingItems: [],
+  processingItems: [],
+  deadLetterItems: [],
+  retryableFailedItems: [],
   isCircuitOpen: false,
   circuitResetsAt: 0,
   batchCurrent: 0,
@@ -53,6 +71,11 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const pendingCount = useMemo(() => allItems.filter((i) => i.status === "pending").length, [allItems]);
+  const deadCount = useMemo(() => allItems.filter((i) => i.status === "dead").length, [allItems]);
+  const conflictCount = useMemo(
+    () => allItems.filter((i) => i.status === "conflict").length,
+    [allItems],
+  );
   const failedCount = useMemo(
     () =>
       allItems.filter((i) =>
@@ -60,15 +83,32 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       ).length,
     [allItems],
   );
+  const pendingItems = useMemo(
+    () => allItems.filter((i) => i.status === "pending"),
+    [allItems],
+  );
+  const processingItems = useMemo(
+    () => allItems.filter((i) => i.status === "processing"),
+    [allItems],
+  );
+  const deadLetterItems = useMemo(
+    () => allItems.filter((i) => i.status === "dead" || i.status === "conflict"),
+    [allItems],
+  );
+  const retryableFailedItems = useMemo(
+    () => allItems.filter((i) => i.status === "failed"),
+    [allItems],
+  );
   const items = useMemo(
     () =>
-      allItems.filter((i) =>
-        i.status === "pending" ||
-        i.status === "failed" ||
-        i.status === "dead" ||
-        i.status === "conflict",
+      [...pendingItems, ...processingItems, ...deadLetterItems, ...retryableFailedItems].sort(
+        (a, b) => {
+          const at = a.createdAt instanceof Date ? a.createdAt.getTime() : Number(a.createdAt);
+          const bt = b.createdAt instanceof Date ? b.createdAt.getTime() : Number(b.createdAt);
+          return at - bt;
+        },
       ),
-    [allItems],
+    [pendingItems, processingItems, deadLetterItems, retryableFailedItems],
   );
   const recentItems = useMemo(() => allItems.slice(-20), [allItems]);
 
@@ -134,6 +174,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const retry = useCallback(async (id: number) => {
+    await removeConflict(id);
     await updatePendingSync(id, {
       status: "pending",
       retries: 0,
@@ -145,6 +186,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const discard = useCallback(async (id: number) => {
+    await removeConflict(id);
     await removePendingSync(id);
   }, []);
 
@@ -158,10 +200,16 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     <SyncContext.Provider value={{
       pendingCount,
       failedCount,
+      deadCount,
+      conflictCount,
       isSyncing,
       justSynced,
       recentItems,
       items,
+      pendingItems,
+      processingItems,
+      deadLetterItems,
+      retryableFailedItems,
       isCircuitOpen,
       circuitResetsAt,
       batchCurrent,
@@ -180,6 +228,48 @@ export function useSync() {
 }
 
 export function useSyncQueue() {
-  const { pendingCount, failedCount, items, retry, discard } = useContext(SyncContext);
-  return { pendingCount, failedCount, items, retry, discard };
+  const {
+    pendingCount,
+    failedCount,
+    deadCount,
+    conflictCount,
+    items,
+    pendingItems,
+    processingItems,
+    deadLetterItems,
+    retryableFailedItems,
+    retry,
+    discard,
+  } = useContext(SyncContext);
+  return {
+    pendingCount,
+    failedCount,
+    deadCount,
+    conflictCount,
+    items,
+    pendingItems,
+    processingItems,
+    deadLetterItems,
+    retryableFailedItems,
+    retry,
+    discard,
+  };
+}
+
+/** Live queue rows + derived LocalEntityState for one equipment asset. */
+export function usePendingSyncForEquipment(equipmentId: string | undefined): {
+  rows: PendingSync[];
+  localState: LocalEntityState;
+} {
+  const { items: allQueueItems } = useSync();
+  return useMemo(() => {
+    if (!equipmentId) {
+      return { rows: [], localState: "synced" as const };
+    }
+    const rows = filterPendingSyncRowsForEquipment(equipmentId, allQueueItems);
+    return {
+      rows,
+      localState: resolveLocalEntityState(equipmentId, allQueueItems),
+    };
+  }, [equipmentId, allQueueItems]);
 }

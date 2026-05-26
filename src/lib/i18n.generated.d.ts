@@ -295,6 +295,10 @@ export interface TStructure {
     updateStatusTitle: string;
     statusLabel: string;
     reportIssueTitle: string;
+    localStatePendingSync: string;
+    localStateConflict: string;
+    localStateSyncFailed: string;
+    openSyncQueue: string;
     toast: {
       undone: string;
       undoFailed: string;
@@ -706,6 +710,9 @@ export interface TStructure {
     };
   };
   syncQueueSheet: {
+    title: string;
+    subtitleProcessing: string;
+    subtitleActionsPending: string;
     typeScan: string;
     typeSeen: string;
     typeCreate: string;
@@ -719,10 +726,26 @@ export interface TStructure {
     pending: string;
     failed: string;
     conflict: string;
+    statusDead: string;
+    statusConflict: string;
+    statusProcessing: string;
     resumingNow: string;
     allSynced: string;
     syncingNow: string;
     syncNow: string;
+    pendingSection: string;
+    deadLetterSection: string;
+    failedSection: string;
+    discardConfirmTitle: string;
+    discardConfirmBody: string;
+    discardConfirmAction: string;
+    discardConfirmCancel: string;
+    emptyAllSyncedTitle: string;
+    emptyAllSyncedBody: string;
+    circuitPausedTitle: string;
+    circuitPausedBody: string;
+    discardNotAllowed: string;
+    closeAria: string;
   };
   settingsPage: {
     title: string;

@@ -79,7 +79,7 @@ import { statusToBadgeVariant } from "@/lib/design-tokens";
 import { toast } from "sonner";
 import { toastSuccess } from "@/lib/ui-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { useSyncQueue } from "@/hooks/use-sync";
+import { usePendingSyncForEquipment, useSyncQueue } from "@/hooks/use-sync";
 import { MoveRoomSheet } from "@/components/move-room-sheet";
 import { ReturnPlugDialog } from "@/components/return-plug-dialog";
 import { DeployabilityBadge } from "@/components/equipment/DeployabilityBadge";
@@ -140,6 +140,7 @@ export default function EquipmentDetailPage() {
   const hasVetAccess = isAdmin || effectiveRole === "vet" || role === "vet";
   const { settings } = useSettings();
   const { discard } = useSyncQueue();
+  const { localState: equipmentLocalSyncState } = usePendingSyncForEquipment(id);
   const queryClient = useQueryClient();
   const [scanDialogOpen, setScanDialogOpen] = useState(false);
   const [scanActionSheetOpen, setScanActionSheetOpen] = useState(false);
@@ -921,6 +922,47 @@ export default function EquipmentDetailPage() {
             )}
           </div>
         </div>
+
+        {equipmentLocalSyncState !== "synced" && (
+          <div
+            className={cn(
+              "rounded-xl border px-3 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between",
+              equipmentLocalSyncState === "conflict"
+                ? "bg-orange-50 border-orange-200"
+                : equipmentLocalSyncState === "sync_failed"
+                ? "bg-red-50 border-red-200"
+                : "bg-amber-50 border-amber-200",
+            )}
+            data-testid="equipment-local-sync-banner"
+          >
+            <p
+              className={cn(
+                "text-sm font-medium",
+                equipmentLocalSyncState === "conflict"
+                  ? "text-orange-900"
+                  : equipmentLocalSyncState === "sync_failed"
+                  ? "text-red-900"
+                  : "text-amber-900",
+              )}
+            >
+              {equipmentLocalSyncState === "pending_sync"
+                ? t.equipmentDetail.localStatePendingSync
+                : equipmentLocalSyncState === "conflict"
+                ? t.equipmentDetail.localStateConflict
+                : t.equipmentDetail.localStateSyncFailed}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9 text-xs shrink-0"
+              onClick={() => window.dispatchEvent(new CustomEvent("vettrack:open-sync-queue"))}
+              data-testid="btn-open-sync-queue"
+            >
+              {t.equipmentDetail.openSyncQueue}
+            </Button>
+          </div>
+        )}
 
         {/* Quick Action Bar — ICU-moment: 1–2 large, instantly tappable actions */}
         <div className="flex flex-col gap-2" data-testid="quick-action-bar">

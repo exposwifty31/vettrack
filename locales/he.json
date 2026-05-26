@@ -292,6 +292,10 @@
     "updateStatusTitle": "עדכון סטטוס",
     "statusLabel": "סטטוס",
     "reportIssueTitle": "דיווח על תקלה",
+    "localStatePendingSync": "נשמר מקומית · ממתין לסנכרון",
+    "localStateConflict": "קונפליקט סנכרון — פתח את התור לפתרון",
+    "localStateSyncFailed": "הסנכרון נכשל — פתח את התור לניסיון חוזר או להסרה",
+    "openSyncQueue": "פתח תור סנכרון",
     "toast": {
       "undone": "הפעולה בוטלה",
       "undoFailed": "הביטול נכשל — הזמן פג",
@@ -703,6 +707,9 @@
     }
   },
   "syncQueueSheet": {
+    "title": "תור סנכרון",
+    "subtitleProcessing": "מעבד {current} מתוך {total}…",
+    "subtitleActionsPending": "{count, plural, one {פעולה אחת ממתינה} two {שתי פעולות ממתינות} many {# פעולות ממתינות} other {# פעולות ממתינות}}",
     "typeScan": "סריקה",
     "typeSeen": "זיהוי מטופל",
     "typeCreate": "יצירה",
@@ -716,10 +723,26 @@
     "pending": "ממתין",
     "failed": "נכשל",
     "conflict": "קונפליקט",
+    "statusDead": "מכתב מת",
+    "statusConflict": "קונפליקט",
+    "statusProcessing": "מסנכרן…",
     "resumingNow": "ממשיך עכשיו...",
     "allSynced": "כל הפעולות סונכרנו",
     "syncingNow": "מסנכרן...",
-    "syncNow": "סנכרן עכשיו"
+    "syncNow": "סנכרן עכשיו",
+    "pendingSection": "ממתין",
+    "deadLetterSection": "מכתב מת",
+    "failedSection": "נכשל — דורש טיפול",
+    "discardConfirmTitle": "להסיר מהתור?",
+    "discardConfirmBody": "פעולה מקומית זו לא תישלח לשרת.",
+    "discardConfirmAction": "הסר",
+    "discardConfirmCancel": "ביטול",
+    "emptyAllSyncedTitle": "הכל מסונכרן",
+    "emptyAllSyncedBody": "אין פעולות ממתינות או שנכשלו",
+    "circuitPausedTitle": "הסנכרון הושהה — יותר מדי שגיאות",
+    "circuitPausedBody": "יתחדש אוטומטית בעוד {seconds} שנ׳",
+    "discardNotAllowed": "רק המשתמש שיצר את הפעולה או מנהל יכולים להסיר אותה",
+    "closeAria": "סגור תור סנכרון"
   },
   "settingsPage": {
     "title": "הגדרות",

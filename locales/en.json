@@ -292,6 +292,10 @@
     "updateStatusTitle": "Update status",
     "statusLabel": "Status",
     "reportIssueTitle": "Report an issue",
+    "localStatePendingSync": "Saved locally · waiting to sync",
+    "localStateConflict": "Sync conflict — open queue to resolve",
+    "localStateSyncFailed": "Sync failed — open queue to retry or remove",
+    "openSyncQueue": "Open sync queue",
     "toast": {
       "undone": "Action undone",
       "undoFailed": "Undo failed — time expired",
@@ -703,6 +707,9 @@
     }
   },
   "syncQueueSheet": {
+    "title": "Sync queue",
+    "subtitleProcessing": "Processing {current} of {total}…",
+    "subtitleActionsPending": "{count, plural, one {# action pending} other {# actions pending}}",
     "typeScan": "Scan",
     "typeSeen": "Patient link",
     "typeCreate": "Create",
@@ -716,10 +723,26 @@
     "pending": "Pending",
     "failed": "Failed",
     "conflict": "Conflict",
+    "statusDead": "Dead letter",
+    "statusConflict": "Conflict",
+    "statusProcessing": "Syncing…",
     "resumingNow": "Resuming now...",
     "allSynced": "All actions synced",
     "syncingNow": "Syncing...",
-    "syncNow": "Sync now"
+    "syncNow": "Sync now",
+    "pendingSection": "Pending",
+    "deadLetterSection": "Dead letter",
+    "failedSection": "Failed — needs attention",
+    "discardConfirmTitle": "Remove from queue?",
+    "discardConfirmBody": "This local action will not be sent to the server.",
+    "discardConfirmAction": "Remove",
+    "discardConfirmCancel": "Cancel",
+    "emptyAllSyncedTitle": "All synced",
+    "emptyAllSyncedBody": "No pending or failed actions",
+    "circuitPausedTitle": "Sync paused — too many errors",
+    "circuitPausedBody": "Auto-resumes in {seconds}s",
+    "discardNotAllowed": "Only the user who queued this action or an admin can remove it",
+    "closeAria": "Close sync queue"
   },
   "settingsPage": {
     "title": "Settings",

@@ -77,6 +77,11 @@ import {
 import { formatRelativeTime, getExpiryBadgeState } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { useSync } from "@/hooks/use-sync";
+import {
+  buildLocalEntityStateByEquipmentId,
+  type LocalEntityState,
+} from "@/lib/local-entity-sync-state";
 import { useSettings } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
 import { QrScanner } from "@/components/qr-scanner";
@@ -216,6 +221,11 @@ export default function EquipmentListPage() {
   const { settings } = useSettings();
   const queryClient = useQueryClient();
   const { userId, isAdmin } = useAuth();
+  const { items: syncQueueItems } = useSync();
+  const localSyncByEquipmentId = useMemo(
+    () => buildLocalEntityStateByEquipmentId(syncQueueItems),
+    [syncQueueItems],
+  );
   const [, navigate] = useLocation();
   const searchStr = useSearch();
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -457,17 +467,21 @@ export default function EquipmentListPage() {
     }
   };
 
-  const renderVirtualizedRow = useCallback((eq: Equipment) => (
-    <div className="pb-3">
-      <EquipmentItem
-        equipment={eq}
-        selectMode={false}
-        selected={false}
-        onToggleSelect={() => {}}
-        virtualized
-      />
-    </div>
-  ), []);
+  const renderVirtualizedRow = useCallback(
+    (eq: Equipment) => (
+      <div className="pb-3">
+        <EquipmentItem
+          equipment={eq}
+          selectMode={false}
+          selected={false}
+          onToggleSelect={() => {}}
+          virtualized
+          localSyncState={localSyncByEquipmentId.get(eq.id) ?? "synced"}
+        />
+      </div>
+    ),
+    [localSyncByEquipmentId],
+  );
 
   const manualFolders = folders?.filter((f) => f.type !== "smart") || [];
 
@@ -904,6 +918,7 @@ export default function EquipmentListPage() {
                   selectMode={selectMode}
                   selected={selected.has(eq.id)}
                   onToggleSelect={() => toggleSelect(eq.id)}
+                  localSyncState={localSyncByEquipmentId.get(eq.id) ?? "synced"}
                 />
               ))}
             </div>
@@ -957,12 +972,14 @@ function EquipmentItem({
   selected,
   onToggleSelect,
   virtualized = false,
+  localSyncState = "synced",
 }: {
   equipment: Equipment;
   selectMode: boolean;
   selected: boolean;
   onToggleSelect: () => void;
   virtualized?: boolean;
+  localSyncState?: LocalEntityState;
 }) {
   const { settings } = useSettings();
   const { userId, isAdmin } = useAuth();
@@ -1125,6 +1142,19 @@ function EquipmentItem({
               {/* Main info */}
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-base truncate leading-snug">{eq.name}</p>
+                {(localSyncState === "pending_sync" || localSyncState === "conflict") && (
+                  <p
+                    className={cn(
+                      "text-xs font-medium mt-0.5",
+                      localSyncState === "conflict" ? "text-orange-700" : "text-amber-700",
+                    )}
+                    data-testid={`equipment-list-sync-hint-${eq.id}`}
+                  >
+                    {localSyncState === "pending_sync"
+                      ? t.equipmentDetail.localStatePendingSync
+                      : t.equipmentDetail.localStateConflict}
+                  </p>
+                )}
                 {eq.linkedAnimalName && (
                   <p className="flex items-center gap-1 text-xs font-medium text-violet-700 dark:text-violet-300 mt-0.5">
                     <PawPrint className="w-3.5 h-3.5 shrink-0" aria-hidden />
