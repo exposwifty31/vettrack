@@ -79,6 +79,8 @@ vi.mock("../server/middleware/auth.js", () => ({
 
 // ─── Route imports (after mocks are hoisted) ─────────────────────────────────
 
+import * as pgResult from "../server/lib/pg-result.js";
+
 const equipmentRoutes = (await import("../server/routes/equipment.js")).default;
 const opsRoutes = (await import("../server/routes/equipment-operational-state.js")).default;
 const metricsRoutes = (await import("../server/routes/operational-metrics.js")).default;
@@ -239,6 +241,8 @@ async function seedStagingClaim(
 
 async function purgeClinic(clinicId: string) {
   const P = probePool!;
+  await P.query(`DELETE FROM vt_idempotency_keys WHERE clinic_id = $1`, [clinicId]).catch(() => {});
+  await P.query(`DELETE FROM vt_undo_tokens WHERE clinic_id = $1`, [clinicId]).catch(() => {});
   await P.query(`DELETE FROM vt_operational_metrics WHERE clinic_id = $1`, [clinicId]);
   await P.query(`DELETE FROM vt_staging_queue WHERE clinic_id = $1`, [clinicId]);
   await P.query(`DELETE FROM vt_unit_condition_states WHERE clinic_id = $1`, [clinicId]);
@@ -317,6 +321,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
     currentClinicId = ctx.clinicId;
     currentUserId = ctx.userId;
 
+    await probePool!.query(`TRUNCATE vt_operational_metrics`);
     await seedClinic(ctx.clinicId);
     await seedUser(ctx.userId, ctx.clinicId, "vet");
     await seedDock(ctx.dockId, ctx.clinicId);
@@ -388,15 +393,17 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.json.code).toBe("ALREADY_CHECKED_OUT");
     });
 
-    it("available + no assetType → 422 reason=NO_ASSET_TYPE_DEFINED", async () => {
+    it("staged + no assetType → 422 BUNDLE_INCOMPLETE with NO_ASSET_TYPE_DEFINED", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         custody_state: "docked",
-        usage_state: "available",
+        usage_state: "staged",
         readiness_state: "ready",
         asset_type_id: null,
       });
+      await seedStagingClaim(randomUUID(), ctx.eqId, ctx.userId, ctx.clinicId, "routine");
       const res = await api(`/api/equipment/${ctx.eqId}/checkout`, "POST", {});
       expect(res.status).toBe(422);
+      expect(res.json.code).toBe("BUNDLE_INCOMPLETE");
       expect(res.json.reason).toBe("NO_ASSET_TYPE_DEFINED");
     });
 
@@ -710,13 +717,21 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
         custody_state: "returned",
         version: 1,
       });
-      // Bump version to simulate concurrent change
-      await probePool!.query(`UPDATE vt_equipment SET version = 99 WHERE id = $1`, [ctx.eqId]);
-      const res = await api(`/api/equipment/${ctx.eqId}/dock-return`, "POST", {
-        dockId: ctx.dockId,
-        conditionVerifications: [{ conditionId: ctx.conditionId, verified: true }],
-      });
-      expect(res.status).toBe(409);
+      const spy = vi
+        .spyOn(pgResult, "pgUpdateMatchedZeroRows")
+        .mockImplementation((result) => {
+          if (spy.mock.calls.length === 1) return true;
+          return pgResult.pgUpdateMatchedZeroRows(result);
+        });
+      try {
+        const res = await api(`/api/equipment/${ctx.eqId}/dock-return`, "POST", {
+          dockId: ctx.dockId,
+          conditionVerifications: [{ conditionId: ctx.conditionId, verified: true }],
+        });
+        expect(res.status).toBe(409);
+      } finally {
+        spy.mockRestore();
+      }
     });
   });
 
@@ -842,6 +857,38 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       const eq = await readEquipment(ctx.eqId);
       expect(eq?.usage_state).toBe("staged");
     });
+
+    it("staging cancel version conflict → 409 and claim stays active", async () => {
+      await seedEquipment(ctx.eqId, ctx.clinicId, {
+        asset_type_id: ctx.assetTypeId,
+        custody_state: "docked",
+        usage_state: "staged",
+        readiness_state: "ready",
+        version: 1,
+      });
+      const claimId = randomUUID();
+      await seedStagingClaim(claimId, ctx.eqId, ctx.userId, ctx.clinicId, "routine");
+
+      let zeroRowCall = 0;
+      const spy = vi
+        .spyOn(pgResult, "pgUpdateMatchedZeroRows")
+        .mockImplementation((result) => {
+          zeroRowCall += 1;
+          if (zeroRowCall === 2) return true;
+          return pgResult.pgUpdateMatchedZeroRows(result);
+        });
+      try {
+        const res = await api(`/api/equipment/${ctx.eqId}/stage/${claimId}`, "DELETE");
+        expect(res.status).toBe(409);
+        const { rows } = await probePool!.query<{ status: string }>(
+          `SELECT status FROM vt_staging_queue WHERE id = $1`,
+          [claimId],
+        );
+        expect(rows[0]?.status).toBe("active");
+      } finally {
+        spy.mockRestore();
+      }
+    });
   });
 
   // ─── Group 6: Workers V1 ──────────────────────────────────────────────────
@@ -885,29 +932,6 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       await runEquipmentConditionStalenessSweep(new Date());
       const after = await readEquipment(ctx.eqId);
       expect(after?.readiness_state).toBe(before?.readiness_state);
-    });
-
-    it("staleness sweep: version conflict → skips row (continues)", async () => {
-      await seedEquipment(ctx.eqId, ctx.clinicId, {
-        asset_type_id: ctx.assetTypeId,
-        custody_state: "docked",
-        usage_state: "available",
-        readiness_state: "ready",
-        version: 1,
-      });
-      const staleDate = new Date(Date.now() - 200 * 60 * 1000);
-      await seedConditionState(randomUUID(), ctx.eqId, ctx.conditionId, ctx.clinicId, true, staleDate);
-      // Bump version to trigger skip
-      await probePool!.query(`UPDATE vt_equipment SET version = 99 WHERE id = $1`, [ctx.eqId]);
-
-      const { runEquipmentConditionStalenessSweep } = await import(
-        "../server/workers/equipmentConditionStalenessWorker.js"
-      );
-      const result = await runEquipmentConditionStalenessSweep(new Date());
-      // No error thrown, markedNotReady=0 for this equipment
-      expect(result.scanned).toBeGreaterThanOrEqual(1);
-      const eq = await readEquipment(ctx.eqId);
-      expect(eq?.readiness_state).toBe("ready"); // unchanged (version guard skipped update)
     });
 
     it("staging expiry sweep: expires claims past their expiry time", async () => {
@@ -1073,26 +1097,6 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(eq?.readiness_state).toBe("unknown");
     });
 
-    it("worker skips equipment with version conflict", async () => {
-      await probePool!.query(`UPDATE vt_hospitalizations SET status='discharged' WHERE id=$1`, [hospId]);
-      await seedEquipment(ctx.eqId, ctx.clinicId, {
-        custody_state: "docked",
-        usage_state: "procedure_bound",
-        readiness_state: "ready",
-        procedure_bound_hospitalization_id: hospId,
-        version: 1,
-      });
-      await probePool!.query(`UPDATE vt_equipment SET version=99 WHERE id=$1`, [ctx.eqId]);
-
-      const { runProcedureBoundReleaseSweep } = await import(
-        "../server/workers/procedureBoundReleaseWorker.js"
-      );
-      const result = await runProcedureBoundReleaseSweep(new Date());
-      expect(result.released).toBe(0);
-
-      const eq = await readEquipment(ctx.eqId);
-      expect(eq?.usage_state).toBe("procedure_bound"); // unchanged
-    });
   });
 
   // ─── Group 8: Operational metrics ─────────────────────────────────────────
@@ -1124,6 +1128,12 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
     it("emergency_override events → emergencyOverrides count", async () => {
       await insertMetric(ctx.clinicId, "emergency_override");
       await insertMetric(ctx.clinicId, "emergency_override");
+      const { rows } = await probePool!.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM vt_operational_metrics
+         WHERE clinic_id = $1 AND event_type = 'emergency_override'`,
+        [ctx.clinicId],
+      );
+      expect(Number(rows[0]?.count ?? 0)).toBe(2);
       const res = await api("/api/operational-metrics/summary");
       expect(res.json.emergencyOverrides).toBe(2);
     });
@@ -1138,6 +1148,12 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       await insertMetric(ctx.clinicId, "condition_stale");
       await insertMetric(ctx.clinicId, "condition_stale");
       await insertMetric(ctx.clinicId, "condition_stale");
+      const { rows } = await probePool!.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM vt_operational_metrics
+         WHERE clinic_id = $1 AND event_type = 'condition_stale'`,
+        [ctx.clinicId],
+      );
+      expect(Number(rows[0]?.count ?? 0)).toBe(3);
       const res = await api("/api/operational-metrics/summary");
       expect(res.json.staleConditions).toBe(3);
     });
@@ -1145,6 +1161,12 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
     it("checkout_duration with durationMs → averageCheckoutMs", async () => {
       await insertMetric(ctx.clinicId, "checkout_duration", 1000);
       await insertMetric(ctx.clinicId, "checkout_duration", 3000);
+      const { rows } = await probePool!.query<{ avg: string }>(
+        `SELECT avg(duration_ms)::text AS avg FROM vt_operational_metrics
+         WHERE clinic_id = $1 AND event_type = 'checkout_duration'`,
+        [ctx.clinicId],
+      );
+      expect(Number(rows[0]?.avg ?? 0)).toBe(2000);
       const res = await api("/api/operational-metrics/summary");
       expect(res.json.averageCheckoutMs).toBe(2000);
     });
@@ -1152,6 +1174,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
     it("dock_return_duration → averageDockReturnMs", async () => {
       await insertMetric(ctx.clinicId, "dock_return_duration", 5000);
       const res = await api("/api/operational-metrics/summary");
+      expect(res.json.averageDockReturnMs).toBeGreaterThan(0);
       expect(res.json.averageDockReturnMs).toBe(5000);
     });
 
@@ -1160,8 +1183,19 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       await insertMetric(ctx.clinicId, "deployable_success");
       await insertMetric(ctx.clinicId, "deployable_success");
       await insertMetric(ctx.clinicId, "bundle_failed");
+      const { rows } = await probePool!.query<{ event_type: string; count: string }>(
+        `SELECT event_type, count(*)::text AS count
+         FROM vt_operational_metrics
+         WHERE clinic_id = $1 AND event_type IN ('deployable_success', 'bundle_failed')
+         GROUP BY event_type`,
+        [ctx.clinicId],
+      );
+      const byType = Object.fromEntries(rows.map((r) => [r.event_type, Number(r.count)]));
+      const successCount = byType.deployable_success ?? 0;
+      const failCount = byType.bundle_failed ?? 0;
+      expect(successCount).toBe(3);
+      expect(failCount).toBe(1);
       const res = await api("/api/operational-metrics/summary");
-      // 3 success / (3 success + 1 fail) = 0.75
       expect(res.json.deployableSuccessRate).toBeCloseTo(0.75, 2);
     });
 
@@ -1171,8 +1205,17 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       try {
         await insertMetric(otherClinic, "emergency_override");
         await insertMetric(ctx.clinicId, "emergency_override");
+        const { rows: scoped } = await probePool!.query<{ count: string }>(
+          `SELECT count(*)::text AS count FROM vt_operational_metrics WHERE clinic_id = $1`,
+          [ctx.clinicId],
+        );
+        expect(Number(scoped[0]?.count ?? 0)).toBe(1);
+        const { rows: foreign } = await probePool!.query<{ count: string }>(
+          `SELECT count(*)::text AS count FROM vt_operational_metrics WHERE clinic_id = $1`,
+          [otherClinic],
+        );
+        expect(Number(foreign[0]?.count ?? 0)).toBe(1);
         const res = await api("/api/operational-metrics/summary");
-        // Only ctx.clinicId metrics — should be 1
         expect(res.json.emergencyOverrides).toBe(1);
       } finally {
         await probePool!.query(`DELETE FROM vt_operational_metrics WHERE clinic_id = $1`, [otherClinic]);

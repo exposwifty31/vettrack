@@ -25,6 +25,7 @@ import {
 import { apiError } from "../lib/apiError.js";
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
 import { promoteStagingQueueNext } from "../lib/staging-promotion.js";
+import { isPostgresUniqueViolation, pgUpdateMatchedZeroRows } from "../lib/pg-result.js";
 
 const router = Router();
 
@@ -269,7 +270,7 @@ router.post("/equipment/:equipmentId/dock-return", requireAuth, validateBody(doc
           eq(equipment.version, capturedVersion),
         ));
 
-      if ((updated as unknown as { rowCount?: number }).rowCount === 0) {
+      if (pgUpdateMatchedZeroRows(updated)) {
         throw new Error("VERSION_CONFLICT");
       }
 
@@ -354,7 +355,7 @@ router.post("/equipment/:equipmentId/stage", requireAuth, validateBody(stageSche
           .set({ usageState: "staged", usageStateSince: now, version: sql`${equipment.version} + 1` })
           .where(and(...conditions));
 
-        if ((updated as unknown as { rowCount?: number }).rowCount === 0) {
+        if (pgUpdateMatchedZeroRows(updated)) {
           throw new Error("VERSION_CONFLICT");
         }
 
@@ -408,7 +409,7 @@ router.post("/equipment/:equipmentId/stage", requireAuth, validateBody(stageSche
       if (err.message === "CUSTODY_CHAIN_BROKEN") return apiError(req, res, "operationalState.invalidCustodyForStaging", undefined, 422);
       if (err.message === "EQUIPMENT_NOT_READY") return apiError(req, res, "operationalState.equipmentNotReady", undefined, 422);
     }
-    if ((err as { code?: string }).code === "23505") {
+    if (isPostgresUniqueViolation(err)) {
       return res.status(409).json({ code: "DUPLICATE_CLAIM", error: "You already have an active claim for this equipment" });
     }
     throw err;
@@ -446,7 +447,7 @@ router.delete("/equipment/:equipmentId/stage/:claimId", requireAuth, async (req,
           eq(stagingQueue.status, "active"),
         ));
 
-      if ((updated as unknown as { rowCount?: number }).rowCount === 0) {
+      if (pgUpdateMatchedZeroRows(updated)) {
         throw new Error("CLAIM_NOT_ACTIVE");
       }
 
@@ -469,7 +470,7 @@ router.delete("/equipment/:equipmentId/stage/:claimId", requireAuth, async (req,
             eq(equipment.usageState, "staged"),
             eq(equipment.version, capturedVersion),
           ));
-        if ((revertResult as unknown as { rowCount?: number }).rowCount === 0) {
+        if (pgUpdateMatchedZeroRows(revertResult)) {
           throw new Error("VERSION_CONFLICT");
         }
       }

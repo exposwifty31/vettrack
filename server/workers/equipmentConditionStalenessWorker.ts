@@ -5,6 +5,7 @@ import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
 import {
   computeBundleReadinessGate,
 } from "../services/equipment-operational-state.service.js";
+import { pgUpdateMatchedZeroRows } from "../lib/pg-result.js";
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
 
 const STALENESS_SWEEP_INTERVAL_MS = 15 * 60 * 1000;
@@ -57,7 +58,7 @@ export async function runEquipmentConditionStalenessSweep(now: Date = new Date()
           ),
         );
 
-      if ((updateResult as unknown as { rowCount?: number }).rowCount === 0) {
+      if (pgUpdateMatchedZeroRows(updateResult)) {
         // Equipment state changed concurrently — skip
         continue;
       }

@@ -15,7 +15,7 @@ describe("equipment stage cancel — version guard", () => {
     const cancelBody = routeSource.slice(cancelStart, cancelEnd);
 
     expect(cancelBody).toContain("revertResult");
-    expect(cancelBody).toMatch(/rowCount\s*===\s*0/);
+    expect(cancelBody).toMatch(/pgUpdateMatchedZeroRows\(revertResult\)/);
     expect(cancelBody).toContain('throw new Error("VERSION_CONFLICT")');
     expect(cancelBody).toMatch(
       /VERSION_CONFLICT[\s\S]*operationalState\.versionConflict/,

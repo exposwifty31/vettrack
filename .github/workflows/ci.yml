@@ -77,6 +77,54 @@ jobs:
       - name: 🧪 Test suite
         run: pnpm test
 
+  integration-ops:
+    name: 🔌 Integration ops
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: vettrack
+          POSTGRES_PASSWORD: vettrack
+          POSTGRES_DB: vettrack_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://vettrack:vettrack@localhost:5432/vettrack_test
+      SESSION_SECRET: ci-test-secret-that-is-long-enough-32chars
+      PORT: 3001
+
+    steps:
+      - name: ⬇️ Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: 🟢 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🗄️ Database migrations
+        run: pnpm migrate
+
+      - name: 🔌 Integration ops suite
+        run: pnpm test:integration:ops
+
   deploy-check:
     name: 🚀 Deploy pre-flight
     runs-on: ubuntu-latest
@@ -181,7 +229,7 @@ jobs:
   gate:
     name: ✅ Merge gate
     runs-on: ubuntu-latest
-    needs: [test, deploy-check, deploy]
+    needs: [test, integration-ops, deploy-check, deploy]
     if: always()
 
     steps:
@@ -189,6 +237,10 @@ jobs:
         run: |
           if [[ "${{ needs.test.result }}" != "success" ]]; then
             echo "❌ Tests failed — blocking merge"
+            exit 1
+          fi
+          if [[ "${{ needs.integration-ops.result }}" != "success" ]]; then
+            echo "❌ Integration ops failed — blocking merge"
             exit 1
           fi
           if [[ "${{ needs.deploy-check.result }}" != "success" ]]; then

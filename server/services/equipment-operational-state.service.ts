@@ -2,6 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import type { AssetTypeCondition, UnitConditionState } from "../db.js";
 import { db, equipment } from "../db.js";
 import { logAudit } from "../lib/audit.js";
+import { pgUpdateMatchedZeroRows } from "../lib/pg-result.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
 import { recordOperationalMetric } from "./operational-metrics.service.js";
 
@@ -163,7 +164,7 @@ export async function releaseProcedureBoundEquipment(
           ),
         );
 
-      if ((result as unknown as { rowCount?: number }).rowCount === 0) continue;
+      if (pgUpdateMatchedZeroRows(result)) continue;
       released++;
 
       logAudit({
