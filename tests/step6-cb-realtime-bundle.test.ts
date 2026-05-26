@@ -45,9 +45,11 @@ describe("STEP 6 — realtime reconnect + cross-tab prune", () => {
     expect(fn).toMatch(/removeItem\(LAST_OUTBOX_STORAGE_KEY\)[\s\S]*publishCursor\(0\)/);
   });
 
-  it("peer cursor 0 triggers handleResetState for tabs with advanced cursor", () => {
+  it("peer cursor 0 triggers handleResetState only for matching clinic gossip", () => {
     const src = readFileSync("src/lib/realtime.ts", "utf8");
-    expect(src).toMatch(/peerCursor === 0[\s\S]*handleResetState/);
+    expect(src).toContain("shouldApplyPeerPruneReset");
+    expect(src).toMatch(/peerCursor === 0[\s\S]*shouldApplyPeerPruneReset[\s\S]*handleResetState/);
+    expect(src).toMatch(/payload:\s*clinicId\s*\?\s*\{\s*clinicId\s*\}/);
   });
 });
 
