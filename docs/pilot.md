@@ -67,7 +67,7 @@ CI merge gate also runs Playwright E2E shards on every PR.
 
 - Transport is **SSE only** (`/api/realtime/stream`), not WebSockets. Do not set `VITE_WS_URL` for new work.
 - After long disconnects, clients paginate `GET /api/realtime/replay` to close gaps larger than the SSE reconnect batch.
-- If the outbox cursor was pruned, clients receive `RESET_STATE` and resync ward/ER caches; cross-tab tabs gossip cursor `0` after reset.
+- If the outbox cursor was pruned, clients receive `RESET_STATE` and resync ward/ER caches; cross-tab cursor `0` gossip is **clinic-scoped** (same origin, different clinic tabs do not force reset).
 
 ### Background jobs (JR-MIG wave 2)
 
