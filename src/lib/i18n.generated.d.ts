@@ -2260,6 +2260,12 @@ export interface TStructure {
     queueDegraded: string;
     queueDegradedHint: string;
     queueHealthy: string;
+    offlineSyncTitle: string;
+    offlineSyncSubtitle: string;
+    offlineSyncPendingReports: string;
+    offlineSyncDeadLetterReports: string;
+    offlineSyncConflictReports: string;
+    offlineSyncOldestAgeReports: string;
   };
   sync: {
     status: {

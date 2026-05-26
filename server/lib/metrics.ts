@@ -243,6 +243,31 @@ type MetricName =
   // "rate-limit drops counted at the handler" — not "no rate limiting
   // active". Documented here so operators don't misread a 0.
   | "telemetry_payload_rejected_rate_limit"
+  // OFF-08 — bounded offline sync queue telemetry (client Dexie aggregates).
+  | "offline_sync_pending_reported_zero"
+  | "offline_sync_pending_reported_one"
+  | "offline_sync_pending_reported_two_to_five"
+  | "offline_sync_pending_reported_six_plus"
+  | "offline_sync_oldest_pending_none"
+  | "offline_sync_oldest_pending_lt_60s"
+  | "offline_sync_oldest_pending_lt_5m"
+  | "offline_sync_oldest_pending_lt_1h"
+  | "offline_sync_oldest_pending_gte_1h"
+  | "offline_sync_dead_letter_zero"
+  | "offline_sync_dead_letter_one"
+  | "offline_sync_dead_letter_two_plus"
+  | "offline_sync_conflict_zero"
+  | "offline_sync_conflict_one_plus"
+  | "offline_sync_session_success_zero"
+  | "offline_sync_session_success_one_to_five"
+  | "offline_sync_session_success_six_plus"
+  | "offline_sync_session_conflict_zero"
+  | "offline_sync_session_conflict_one_to_five"
+  | "offline_sync_session_conflict_six_plus"
+  | "offline_sync_session_dead_zero"
+  | "offline_sync_session_dead_one_to_five"
+  | "offline_sync_session_dead_six_plus"
+  | "offline_sync_idempotency_replay_served"
   // F1b-1 — job registry / idempotency bounded server counters (no labels).
   | "replay_idempotency_collision"
   | "job_runtime_unknown_job_name"
@@ -594,6 +619,47 @@ export interface MetricsSnapshot {
       rateLimit: number;
     };
   };
+  /** OFF-08 — client-reported Dexie queue health (bounded buckets only). */
+  offlineSync: {
+    pendingReported: {
+      zero: number;
+      one: number;
+      twoToFive: number;
+      sixPlus: number;
+    };
+    oldestPendingAge: {
+      none: number;
+      lt60s: number;
+      lt5m: number;
+      lt1h: number;
+      gte1h: number;
+    };
+    deadLetter: {
+      zero: number;
+      one: number;
+      twoPlus: number;
+    };
+    conflict: {
+      zero: number;
+      onePlus: number;
+    };
+    sessionSuccess: {
+      zero: number;
+      oneToFive: number;
+      sixPlus: number;
+    };
+    sessionConflict: {
+      zero: number;
+      oneToFive: number;
+      sixPlus: number;
+    };
+    sessionDead: {
+      zero: number;
+      oneToFive: number;
+      sixPlus: number;
+    };
+    idempotencyReplayServed: number;
+  };
   /** F1b-1 — job registry / equipment replay idempotency (bounded names only). */
   jobRegistry: {
     replayIdempotencyCollision: number;
@@ -791,6 +857,30 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   telemetry_payload_rejected_enum_mismatch: 0,
   telemetry_payload_rejected_shape: 0,
   telemetry_payload_rejected_rate_limit: 0,
+  offline_sync_pending_reported_zero: 0,
+  offline_sync_pending_reported_one: 0,
+  offline_sync_pending_reported_two_to_five: 0,
+  offline_sync_pending_reported_six_plus: 0,
+  offline_sync_oldest_pending_none: 0,
+  offline_sync_oldest_pending_lt_60s: 0,
+  offline_sync_oldest_pending_lt_5m: 0,
+  offline_sync_oldest_pending_lt_1h: 0,
+  offline_sync_oldest_pending_gte_1h: 0,
+  offline_sync_dead_letter_zero: 0,
+  offline_sync_dead_letter_one: 0,
+  offline_sync_dead_letter_two_plus: 0,
+  offline_sync_conflict_zero: 0,
+  offline_sync_conflict_one_plus: 0,
+  offline_sync_session_success_zero: 0,
+  offline_sync_session_success_one_to_five: 0,
+  offline_sync_session_success_six_plus: 0,
+  offline_sync_session_conflict_zero: 0,
+  offline_sync_session_conflict_one_to_five: 0,
+  offline_sync_session_conflict_six_plus: 0,
+  offline_sync_session_dead_zero: 0,
+  offline_sync_session_dead_one_to_five: 0,
+  offline_sync_session_dead_six_plus: 0,
+  offline_sync_idempotency_replay_served: 0,
   replay_idempotency_collision: 0,
   job_runtime_unknown_job_name: 0,
   legacy_worker_starter_used: 0,
@@ -1193,6 +1283,46 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           rateLimit: metrics.telemetry_payload_rejected_rate_limit,
         },
       },
+      offlineSync: {
+        pendingReported: {
+          zero: metrics.offline_sync_pending_reported_zero,
+          one: metrics.offline_sync_pending_reported_one,
+          twoToFive: metrics.offline_sync_pending_reported_two_to_five,
+          sixPlus: metrics.offline_sync_pending_reported_six_plus,
+        },
+        oldestPendingAge: {
+          none: metrics.offline_sync_oldest_pending_none,
+          lt60s: metrics.offline_sync_oldest_pending_lt_60s,
+          lt5m: metrics.offline_sync_oldest_pending_lt_5m,
+          lt1h: metrics.offline_sync_oldest_pending_lt_1h,
+          gte1h: metrics.offline_sync_oldest_pending_gte_1h,
+        },
+        deadLetter: {
+          zero: metrics.offline_sync_dead_letter_zero,
+          one: metrics.offline_sync_dead_letter_one,
+          twoPlus: metrics.offline_sync_dead_letter_two_plus,
+        },
+        conflict: {
+          zero: metrics.offline_sync_conflict_zero,
+          onePlus: metrics.offline_sync_conflict_one_plus,
+        },
+        sessionSuccess: {
+          zero: metrics.offline_sync_session_success_zero,
+          oneToFive: metrics.offline_sync_session_success_one_to_five,
+          sixPlus: metrics.offline_sync_session_success_six_plus,
+        },
+        sessionConflict: {
+          zero: metrics.offline_sync_session_conflict_zero,
+          oneToFive: metrics.offline_sync_session_conflict_one_to_five,
+          sixPlus: metrics.offline_sync_session_conflict_six_plus,
+        },
+        sessionDead: {
+          zero: metrics.offline_sync_session_dead_zero,
+          oneToFive: metrics.offline_sync_session_dead_one_to_five,
+          sixPlus: metrics.offline_sync_session_dead_six_plus,
+        },
+        idempotencyReplayServed: metrics.offline_sync_idempotency_replay_served,
+      },
       jobRegistry: buildJobRegistryMetrics(),
       timestamp: new Date().toISOString(),
     };
@@ -1383,6 +1513,16 @@ export function getMetricsSnapshot(): MetricsSnapshot {
         swForcedReload: { active: 0, idle: 0, kiosk: 0 },
         swForcedReloadLoopSuppressed: 0,
         telemetryPayloadRejected: { enumMismatch: 0, shape: 0, rateLimit: 0 },
+      },
+      offlineSync: {
+        pendingReported: { zero: 0, one: 0, twoToFive: 0, sixPlus: 0 },
+        oldestPendingAge: { none: 0, lt60s: 0, lt5m: 0, lt1h: 0, gte1h: 0 },
+        deadLetter: { zero: 0, one: 0, twoPlus: 0 },
+        conflict: { zero: 0, onePlus: 0 },
+        sessionSuccess: { zero: 0, oneToFive: 0, sixPlus: 0 },
+        sessionConflict: { zero: 0, oneToFive: 0, sixPlus: 0 },
+        sessionDead: { zero: 0, oneToFive: 0, sixPlus: 0 },
+        idempotencyReplayServed: 0,
       },
       jobRegistry: {
         replayIdempotencyCollision: 0,

@@ -2256,7 +2256,13 @@
     "queueRedisUnavailable": "Redis unavailable — live counts not available.",
     "queueDegraded": "Queue degraded",
     "queueDegradedHint": "Worker is not responding, circuit is broken, or DLQ has pending jobs.",
-    "queueHealthy": "Queue healthy"
+    "queueHealthy": "Queue healthy",
+    "offlineSyncTitle": "Offline sync queue (client reports)",
+    "offlineSyncSubtitle": "Bounded Dexie queue health from throttled client telemetry (aggregate buckets only).",
+    "offlineSyncPendingReports": "Pending depth reports",
+    "offlineSyncDeadLetterReports": "Dead-letter reports",
+    "offlineSyncConflictReports": "Conflict reports",
+    "offlineSyncOldestAgeReports": "Oldest-pending age reports"
   },
   "sync": {
     "status": {

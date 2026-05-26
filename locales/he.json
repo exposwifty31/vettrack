@@ -2256,7 +2256,13 @@
     "queueRedisUnavailable": "Redis אינו זמין — ספירות חיות אינן זמינות.",
     "queueDegraded": "תור מושבת",
     "queueDegradedHint": "ה-Worker אינו מגיב, המעגל מנותק, או שיש משימות ממתינות ב-DLQ.",
-    "queueHealthy": "תור תקין"
+    "queueHealthy": "תור תקין",
+    "offlineSyncTitle": "תור סנכרון לא מקוון (דיווחי לקוח)",
+    "offlineSyncSubtitle": "בריאות תור Dexie מדיווחי טלמטריה מוגבלים (דליים מצטברים בלבד).",
+    "offlineSyncPendingReports": "דיווחי עומק ממתין",
+    "offlineSyncDeadLetterReports": "דיווחי מכתב מת",
+    "offlineSyncConflictReports": "דיווחי התנגשות",
+    "offlineSyncOldestAgeReports": "דיווחי גיל הממתין הישן ביותר"
   },
   "sync": {
     "status": {

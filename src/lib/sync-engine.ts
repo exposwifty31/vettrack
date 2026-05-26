@@ -16,6 +16,15 @@ import { getAuthHeaders } from "./auth-store";
 import { clearOfflineSession } from "./offline-session";
 import { addConflict, ensureConflictsHydrated, persistConflictPayload } from "./conflict-store";
 import { isOnline } from "./safe-browser";
+import {
+  recordOfflineSyncSessionConflict,
+  recordOfflineSyncSessionDead,
+  recordOfflineSyncSessionSuccess,
+} from "./offline-sync-session-counters";
+import {
+  maybeReportOfflineSyncTelemetry,
+  MIN_REPORT_INTERVAL_MS,
+} from "./offline-sync-telemetry-reporter";
 
 const MAX_RETRIES = PENDING_SYNC_MAX_RETRIES;
 const RETRY_DELAYS_MS = [2000, 5000, 10000];
@@ -146,16 +155,22 @@ export async function processQueue(): Promise<void> {
 
       if (result === "success") {
         consecutiveFailures = 0;
+        recordOfflineSyncSessionSuccess();
+      } else if (result === "conflict") {
+        consecutiveFailures = 0;
+        recordOfflineSyncSessionConflict();
+      } else if (result === "auth_halt") {
+        recordOfflineSyncSessionDead();
+        break;
+      } else if (result === "permission_error" || result === "client_error") {
+        consecutiveFailures = 0;
+        recordOfflineSyncSessionDead();
       } else if (result === "transient_failure") {
         consecutiveFailures++;
         if (consecutiveFailures >= CIRCUIT_THRESHOLD) {
           openCircuit();
           break;
         }
-      } else if (result === "auth_halt") {
-        break;
-      } else if (result === "permission_error" || result === "client_error" || result === "conflict") {
-        consecutiveFailures = 0;
       }
 
       batchCurrent++;
@@ -189,6 +204,7 @@ export async function processQueue(): Promise<void> {
       batchTotal = 0;
     }
     notifyListeners();
+    void maybeReportOfflineSyncTelemetry();
   }
 }
 
@@ -241,6 +257,7 @@ async function processSingleItemWithRetry(item: PendingSync): Promise<ItemResult
           errorMessage: `Failed after ${MAX_RETRIES} attempts`,
         });
       } catch {}
+      recordOfflineSyncSessionDead();
       // S4 — Report permanent sync failures to Sentry for the 7-day failure rate metric.
       // Sentry.captureEvent is a no-op when VITE_SENTRY_DSN is not configured.
       Sentry.captureEvent({
@@ -418,6 +435,10 @@ export function initSyncEngine(queryClient?: QueryClient) {
 
   window.addEventListener("online", handleOnline);
 
+  const telemetryIntervalId = setInterval(() => {
+    void maybeReportOfflineSyncTelemetry();
+  }, MIN_REPORT_INTERVAL_MS);
+
   // Order: recover in-flight claims → hydrate conflicts → cleanup → first replay.
   // Do not call processQueue() before recovery completes — getPendingSync() only
   // sees `pending` rows; recovered claims would be missed on the first pass.
@@ -428,10 +449,12 @@ export function initSyncEngine(queryClient?: QueryClient) {
       if (isOnline()) {
         processQueue();
       }
+      void maybeReportOfflineSyncTelemetry({ force: true });
     })
     .catch(() => {});
 
   return () => {
     window.removeEventListener("online", handleOnline);
+    clearInterval(telemetryIntervalId);
   };
 }

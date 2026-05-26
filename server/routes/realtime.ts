@@ -314,6 +314,58 @@ function isAllowedSwReloadSurface(value: unknown): value is SwReloadSurface {
   );
 }
 
+// OFF-08 — bounded offline Dexie queue telemetry (closed enums only).
+const ALLOWED_OFFLINE_SYNC_PENDING_BUCKETS = ["0", "1", "2_5", "6_plus"] as const;
+type OfflineSyncPendingBucket = (typeof ALLOWED_OFFLINE_SYNC_PENDING_BUCKETS)[number];
+function isAllowedOfflineSyncPendingBucket(value: unknown): value is OfflineSyncPendingBucket {
+  return (
+    typeof value === "string" &&
+    (ALLOWED_OFFLINE_SYNC_PENDING_BUCKETS as readonly string[]).includes(value)
+  );
+}
+
+const ALLOWED_OFFLINE_SYNC_OLDEST_AGE_BUCKETS = [
+  "none",
+  "lt_60s",
+  "lt_5m",
+  "lt_1h",
+  "gte_1h",
+] as const;
+type OfflineSyncOldestAgeBucket = (typeof ALLOWED_OFFLINE_SYNC_OLDEST_AGE_BUCKETS)[number];
+function isAllowedOfflineSyncOldestAgeBucket(value: unknown): value is OfflineSyncOldestAgeBucket {
+  return (
+    typeof value === "string" &&
+    (ALLOWED_OFFLINE_SYNC_OLDEST_AGE_BUCKETS as readonly string[]).includes(value)
+  );
+}
+
+const ALLOWED_OFFLINE_SYNC_DEAD_LETTER_BUCKETS = ["0", "1", "2_plus"] as const;
+type OfflineSyncDeadLetterBucket = (typeof ALLOWED_OFFLINE_SYNC_DEAD_LETTER_BUCKETS)[number];
+function isAllowedOfflineSyncDeadLetterBucket(value: unknown): value is OfflineSyncDeadLetterBucket {
+  return (
+    typeof value === "string" &&
+    (ALLOWED_OFFLINE_SYNC_DEAD_LETTER_BUCKETS as readonly string[]).includes(value)
+  );
+}
+
+const ALLOWED_OFFLINE_SYNC_CONFLICT_BUCKETS = ["0", "1_plus"] as const;
+type OfflineSyncConflictBucket = (typeof ALLOWED_OFFLINE_SYNC_CONFLICT_BUCKETS)[number];
+function isAllowedOfflineSyncConflictBucket(value: unknown): value is OfflineSyncConflictBucket {
+  return (
+    typeof value === "string" &&
+    (ALLOWED_OFFLINE_SYNC_CONFLICT_BUCKETS as readonly string[]).includes(value)
+  );
+}
+
+const ALLOWED_OFFLINE_SYNC_SESSION_BUCKETS = ["0", "1_5", "6_plus"] as const;
+type OfflineSyncSessionBucket = (typeof ALLOWED_OFFLINE_SYNC_SESSION_BUCKETS)[number];
+function isAllowedOfflineSyncSessionBucket(value: unknown): value is OfflineSyncSessionBucket {
+  return (
+    typeof value === "string" &&
+    (ALLOWED_OFFLINE_SYNC_SESSION_BUCKETS as readonly string[]).includes(value)
+  );
+}
+
 /** Best-effort client telemetry for duplicate sequence drops and gap-driven resyncs (see admin outbox-health). */
 router.post("/telemetry", requireAuth, (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -345,6 +397,13 @@ router.post("/telemetry", requireAuth, (req, res) => {
       swForcedReloadSurface?: unknown;
       swForcedReloadLoopSuppressed?: unknown;
       displayWakeLockReacquireExhausted?: unknown;
+      offlineSyncPendingCountBucket?: unknown;
+      offlineSyncOldestPendingAgeBucket?: unknown;
+      offlineSyncDeadLetterBucket?: unknown;
+      offlineSyncConflictBucket?: unknown;
+      offlineSyncSessionSuccessBucket?: unknown;
+      offlineSyncSessionConflictBucket?: unknown;
+      offlineSyncSessionDeadBucket?: unknown;
     };
     if (body?.duplicateDrop === true) {
       incrementMetric("realtime_duplicate_drops");
@@ -420,6 +479,80 @@ router.post("/telemetry", requireAuth, (req, res) => {
         if (swReloadSurface === "active") incrementMetric("sw_forced_reload_active");
         else if (swReloadSurface === "idle") incrementMetric("sw_forced_reload_idle");
         else if (swReloadSurface === "kiosk") incrementMetric("sw_forced_reload_kiosk");
+      } else {
+        incrementMetric("telemetry_payload_rejected_enum_mismatch");
+      }
+    }
+
+    // OFF-08 — offline queue aggregate buckets (one counter per field per report).
+    if (body?.offlineSyncPendingCountBucket !== undefined) {
+      const bucket = body.offlineSyncPendingCountBucket;
+      if (isAllowedOfflineSyncPendingBucket(bucket)) {
+        if (bucket === "0") incrementMetric("offline_sync_pending_reported_zero");
+        else if (bucket === "1") incrementMetric("offline_sync_pending_reported_one");
+        else if (bucket === "2_5") incrementMetric("offline_sync_pending_reported_two_to_five");
+        else incrementMetric("offline_sync_pending_reported_six_plus");
+      } else {
+        incrementMetric("telemetry_payload_rejected_enum_mismatch");
+      }
+    }
+    if (body?.offlineSyncOldestPendingAgeBucket !== undefined) {
+      const bucket = body.offlineSyncOldestPendingAgeBucket;
+      if (isAllowedOfflineSyncOldestAgeBucket(bucket)) {
+        if (bucket === "none") incrementMetric("offline_sync_oldest_pending_none");
+        else if (bucket === "lt_60s") incrementMetric("offline_sync_oldest_pending_lt_60s");
+        else if (bucket === "lt_5m") incrementMetric("offline_sync_oldest_pending_lt_5m");
+        else if (bucket === "lt_1h") incrementMetric("offline_sync_oldest_pending_lt_1h");
+        else incrementMetric("offline_sync_oldest_pending_gte_1h");
+      } else {
+        incrementMetric("telemetry_payload_rejected_enum_mismatch");
+      }
+    }
+    if (body?.offlineSyncDeadLetterBucket !== undefined) {
+      const bucket = body.offlineSyncDeadLetterBucket;
+      if (isAllowedOfflineSyncDeadLetterBucket(bucket)) {
+        if (bucket === "0") incrementMetric("offline_sync_dead_letter_zero");
+        else if (bucket === "1") incrementMetric("offline_sync_dead_letter_one");
+        else incrementMetric("offline_sync_dead_letter_two_plus");
+      } else {
+        incrementMetric("telemetry_payload_rejected_enum_mismatch");
+      }
+    }
+    if (body?.offlineSyncConflictBucket !== undefined) {
+      const bucket = body.offlineSyncConflictBucket;
+      if (isAllowedOfflineSyncConflictBucket(bucket)) {
+        if (bucket === "0") incrementMetric("offline_sync_conflict_zero");
+        else incrementMetric("offline_sync_conflict_one_plus");
+      } else {
+        incrementMetric("telemetry_payload_rejected_enum_mismatch");
+      }
+    }
+    if (body?.offlineSyncSessionSuccessBucket !== undefined) {
+      const bucket = body.offlineSyncSessionSuccessBucket;
+      if (isAllowedOfflineSyncSessionBucket(bucket)) {
+        if (bucket === "0") incrementMetric("offline_sync_session_success_zero");
+        else if (bucket === "1_5") incrementMetric("offline_sync_session_success_one_to_five");
+        else incrementMetric("offline_sync_session_success_six_plus");
+      } else {
+        incrementMetric("telemetry_payload_rejected_enum_mismatch");
+      }
+    }
+    if (body?.offlineSyncSessionConflictBucket !== undefined) {
+      const bucket = body.offlineSyncSessionConflictBucket;
+      if (isAllowedOfflineSyncSessionBucket(bucket)) {
+        if (bucket === "0") incrementMetric("offline_sync_session_conflict_zero");
+        else if (bucket === "1_5") incrementMetric("offline_sync_session_conflict_one_to_five");
+        else incrementMetric("offline_sync_session_conflict_six_plus");
+      } else {
+        incrementMetric("telemetry_payload_rejected_enum_mismatch");
+      }
+    }
+    if (body?.offlineSyncSessionDeadBucket !== undefined) {
+      const bucket = body.offlineSyncSessionDeadBucket;
+      if (isAllowedOfflineSyncSessionBucket(bucket)) {
+        if (bucket === "0") incrementMetric("offline_sync_session_dead_zero");
+        else if (bucket === "1_5") incrementMetric("offline_sync_session_dead_one_to_five");
+        else incrementMetric("offline_sync_session_dead_six_plus");
       } else {
         incrementMetric("telemetry_payload_rejected_enum_mismatch");
       }

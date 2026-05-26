@@ -34,6 +34,14 @@ export default function AdminOpsDashboardPage() {
     refetchIntervalInBackground: true,
   });
 
+  const runtimeMetricsQ = useQuery({
+    queryKey: ["/api/metrics"],
+    queryFn: api.metrics.get,
+    enabled: isAdmin,
+    refetchInterval: POLL_MS,
+    refetchIntervalInBackground: true,
+  });
+
   if (!isAdmin) {
     return (
       <Layout title={t.adminOpsDashboard.title}>
@@ -44,6 +52,7 @@ export default function AdminOpsDashboardPage() {
 
   const d = outboxQ.data;
   const qd = queueQ.data;
+  const offlineSync = runtimeMetricsQ.data?.offlineSync;
 
   return (
     <Layout title={t.adminOpsDashboard.title}>
@@ -158,6 +167,94 @@ export default function AdminOpsDashboardPage() {
         {outboxQ.isError && (
           <p className="text-sm text-destructive">{(outboxQ.error as Error)?.message ?? "Error"}</p>
         )}
+
+        <div className="border-t" />
+
+        {/* OFF-08 — offline Dexie queue telemetry (server aggregates) */}
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold">{t.adminOpsDashboard.offlineSyncTitle}</h2>
+            <p className="text-sm text-muted-foreground">{t.adminOpsDashboard.offlineSyncSubtitle}</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+              title={t.adminOpsDashboard.offlineSyncPendingReports}
+              loading={runtimeMetricsQ.isLoading}
+              error={runtimeMetricsQ.isError}
+              value={
+                offlineSync == null ? null : (
+                  <OfflineSyncBucketSummary
+                    buckets={[
+                      offlineSync.pendingReported.zero,
+                      offlineSync.pendingReported.one,
+                      offlineSync.pendingReported.twoToFive,
+                      offlineSync.pendingReported.sixPlus,
+                    ]}
+                    labels={["0", "1", "2–5", "6+"]}
+                  />
+                )
+              }
+            />
+            <MetricCard
+              title={t.adminOpsDashboard.offlineSyncDeadLetterReports}
+              loading={runtimeMetricsQ.isLoading}
+              error={runtimeMetricsQ.isError}
+              highlightDestructive={
+                (offlineSync?.deadLetter.one ?? 0) + (offlineSync?.deadLetter.twoPlus ?? 0) > 0
+              }
+              value={
+                offlineSync == null ? null : (
+                  <OfflineSyncBucketSummary
+                    buckets={[
+                      offlineSync.deadLetter.zero,
+                      offlineSync.deadLetter.one,
+                      offlineSync.deadLetter.twoPlus,
+                    ]}
+                    labels={["0", "1", "2+"]}
+                  />
+                )
+              }
+            />
+            <MetricCard
+              title={t.adminOpsDashboard.offlineSyncConflictReports}
+              loading={runtimeMetricsQ.isLoading}
+              error={runtimeMetricsQ.isError}
+              highlightDestructive={(offlineSync?.conflict.onePlus ?? 0) > 0}
+              value={
+                offlineSync == null ? null : (
+                  <OfflineSyncBucketSummary
+                    buckets={[offlineSync.conflict.zero, offlineSync.conflict.onePlus]}
+                    labels={["0", "1+"]}
+                  />
+                )
+              }
+            />
+            <MetricCard
+              title={t.adminOpsDashboard.offlineSyncOldestAgeReports}
+              loading={runtimeMetricsQ.isLoading}
+              error={runtimeMetricsQ.isError}
+              value={
+                offlineSync == null ? null : (
+                  <OfflineSyncBucketSummary
+                    buckets={[
+                      offlineSync.oldestPendingAge.none,
+                      offlineSync.oldestPendingAge.lt60s,
+                      offlineSync.oldestPendingAge.lt5m,
+                      offlineSync.oldestPendingAge.lt1h,
+                      offlineSync.oldestPendingAge.gte1h,
+                    ]}
+                    labels={["—", "<1m", "<5m", "<1h", "≥1h"]}
+                  />
+                )
+              }
+            />
+          </div>
+          {runtimeMetricsQ.isError && (
+            <p className="text-sm text-destructive">
+              {(runtimeMetricsQ.error as Error)?.message ?? "Error"}
+            </p>
+          )}
+        </div>
 
         <div className="border-t" />
 
@@ -335,6 +432,23 @@ function HeartbeatValue(props: { status: "ok" | "stale" | "dead" | "no_redis"; a
         <span className="block text-sm font-normal text-muted-foreground">{ageLabel}</span>
       )}
     </span>
+  );
+}
+
+function OfflineSyncBucketSummary(props: { buckets: number[]; labels: string[] }) {
+  const total = props.buckets.reduce((a, b) => a + b, 0);
+  if (total === 0) {
+    return <span className="text-base text-muted-foreground">—</span>;
+  }
+  return (
+    <ul className="space-y-1 text-sm font-normal text-muted-foreground">
+      {props.labels.map((label, i) => (
+        <li key={label} className="flex justify-between gap-4 tabular-nums">
+          <span>{label}</span>
+          <span className="font-semibold text-foreground">{props.buckets[i]?.toLocaleString() ?? 0}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

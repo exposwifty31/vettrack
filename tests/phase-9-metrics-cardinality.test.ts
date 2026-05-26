@@ -63,6 +63,34 @@ const PHASE_9_COUNTERS = [
   "telemetry_payload_rejected_rate_limit",
 ] as const;
 
+/** OFF-08 — offline Dexie queue telemetry (bounded bucket counters). */
+export const OFFLINE_PHASE_8_COUNTERS = [
+  "offline_sync_pending_reported_zero",
+  "offline_sync_pending_reported_one",
+  "offline_sync_pending_reported_two_to_five",
+  "offline_sync_pending_reported_six_plus",
+  "offline_sync_oldest_pending_none",
+  "offline_sync_oldest_pending_lt_60s",
+  "offline_sync_oldest_pending_lt_5m",
+  "offline_sync_oldest_pending_lt_1h",
+  "offline_sync_oldest_pending_gte_1h",
+  "offline_sync_dead_letter_zero",
+  "offline_sync_dead_letter_one",
+  "offline_sync_dead_letter_two_plus",
+  "offline_sync_conflict_zero",
+  "offline_sync_conflict_one_plus",
+  "offline_sync_session_success_zero",
+  "offline_sync_session_success_one_to_five",
+  "offline_sync_session_success_six_plus",
+  "offline_sync_session_conflict_zero",
+  "offline_sync_session_conflict_one_to_five",
+  "offline_sync_session_conflict_six_plus",
+  "offline_sync_session_dead_zero",
+  "offline_sync_session_dead_one_to_five",
+  "offline_sync_session_dead_six_plus",
+  "offline_sync_idempotency_replay_served",
+] as const;
+
 describe("Phase 9 metrics — bounded-cardinality enforcement", () => {
   it("includes every declared Phase 9 counter in the snapshot", () => {
     resetMetrics();
@@ -107,6 +135,22 @@ describe("Phase 9 metrics — bounded-cardinality enforcement", () => {
     expect(snap.phase9Observability.telemetryPayloadRejected.enumMismatch).toBe(1);
     expect(snap.phase9Observability.telemetryPayloadRejected.shape).toBe(1);
     expect(snap.phase9Observability.telemetryPayloadRejected.rateLimit).toBe(1);
+  });
+
+  it("includes every OFF-08 counter in offlineSync snapshot", () => {
+    resetMetrics();
+    for (const name of OFFLINE_PHASE_8_COUNTERS) {
+      incrementMetric(name, 1);
+    }
+    const snap = getMetricsSnapshot();
+    expect(snap.offlineSync.pendingReported.zero).toBe(1);
+    expect(snap.offlineSync.pendingReported.sixPlus).toBe(1);
+    expect(snap.offlineSync.oldestPendingAge.gte1h).toBe(1);
+    expect(snap.offlineSync.deadLetter.twoPlus).toBe(1);
+    expect(snap.offlineSync.conflict.onePlus).toBe(1);
+    expect(snap.offlineSync.sessionSuccess.sixPlus).toBe(1);
+    expect(snap.offlineSync.sessionDead.oneToFive).toBe(1);
+    expect(snap.offlineSync.idempotencyReplayServed).toBe(1);
   });
 
   it("silently drops unknown counter names — no dynamic series", () => {

@@ -924,6 +924,48 @@ export interface AlertAcknowledgment {
   acknowledgedAt: string;
 }
 
+/** OFF-08 — server aggregate counters from client offline queue telemetry. */
+export interface OfflineSyncMetricsSnapshot {
+  pendingReported: {
+    zero: number;
+    one: number;
+    twoToFive: number;
+    sixPlus: number;
+  };
+  oldestPendingAge: {
+    none: number;
+    lt60s: number;
+    lt5m: number;
+    lt1h: number;
+    gte1h: number;
+  };
+  deadLetter: {
+    zero: number;
+    one: number;
+    twoPlus: number;
+  };
+  conflict: {
+    zero: number;
+    onePlus: number;
+  };
+  sessionSuccess: {
+    zero: number;
+    oneToFive: number;
+    sixPlus: number;
+  };
+  sessionConflict: {
+    zero: number;
+    oneToFive: number;
+    sixPlus: number;
+  };
+  sessionDead: {
+    zero: number;
+    oneToFive: number;
+    sixPlus: number;
+  };
+  idempotencyReplayServed: number;
+}
+
 export interface SystemMetrics {
   uptime: number;
   memoryMb: number;
@@ -934,6 +976,7 @@ export interface SystemMetrics {
     syncSuccessCount: number;
     syncFailCount: number;
   };
+  offlineSync?: OfflineSyncMetricsSnapshot;
 }
 
 export const EQUIPMENT_CATEGORIES = [

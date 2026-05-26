@@ -1935,6 +1935,14 @@ export const api = {
       // exhaustion event (the hook itself enforces one-shot semantics via
       // the `exhaustedLogged` flag).
       displayWakeLockReacquireExhausted?: boolean;
+      // OFF-08 — bounded offline Dexie queue aggregates (no PII / per-row labels).
+      offlineSyncPendingCountBucket?: "0" | "1" | "2_5" | "6_plus";
+      offlineSyncOldestPendingAgeBucket?: "none" | "lt_60s" | "lt_5m" | "lt_1h" | "gte_1h";
+      offlineSyncDeadLetterBucket?: "0" | "1" | "2_plus";
+      offlineSyncConflictBucket?: "0" | "1_plus";
+      offlineSyncSessionSuccessBucket?: "0" | "1_5" | "6_plus";
+      offlineSyncSessionConflictBucket?: "0" | "1_5" | "6_plus";
+      offlineSyncSessionDeadBucket?: "0" | "1_5" | "6_plus";
     }) =>
       request<{ ok: boolean }>("/api/realtime/telemetry", {
         method: "POST",

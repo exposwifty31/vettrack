@@ -136,6 +136,7 @@ export function equipmentReplayIdempotency(endpoint: string): RequestHandler {
           });
           return;
         }
+        incrementMetric("offline_sync_idempotency_replay_served");
         if (existing.statusCode === 204) {
           res.status(204).send();
           return;
