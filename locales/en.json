@@ -2262,7 +2262,8 @@
     "offlineSyncPendingReports": "Pending depth reports",
     "offlineSyncDeadLetterReports": "Dead-letter reports",
     "offlineSyncConflictReports": "Conflict reports",
-    "offlineSyncOldestAgeReports": "Oldest-pending age reports"
+    "offlineSyncOldestAgeReports": "Oldest-pending age reports",
+    "offlineSyncEngineTelemetryLine": "Sync engine events (client): {permanent} permanent failures, {circuit} circuit opens"
   },
   "sync": {
     "status": {

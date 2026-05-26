@@ -2266,6 +2266,7 @@ export interface TStructure {
     offlineSyncDeadLetterReports: string;
     offlineSyncConflictReports: string;
     offlineSyncOldestAgeReports: string;
+    offlineSyncEngineTelemetryLine: string;
   };
   sync: {
     status: {

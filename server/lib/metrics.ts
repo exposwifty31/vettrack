@@ -268,6 +268,8 @@ type MetricName =
   | "offline_sync_session_dead_one_to_five"
   | "offline_sync_session_dead_six_plus"
   | "offline_sync_idempotency_replay_served"
+  | "offline_sync_permanent_failure"
+  | "offline_sync_circuit_open"
   // F1b-1 — job registry / idempotency bounded server counters (no labels).
   | "replay_idempotency_collision"
   | "job_runtime_unknown_job_name"
@@ -659,6 +661,10 @@ export interface MetricsSnapshot {
       sixPlus: number;
     };
     idempotencyReplayServed: number;
+    engine: {
+      permanentFailure: number;
+      circuitOpen: number;
+    };
   };
   /** F1b-1 — job registry / equipment replay idempotency (bounded names only). */
   jobRegistry: {
@@ -881,6 +887,8 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   offline_sync_session_dead_one_to_five: 0,
   offline_sync_session_dead_six_plus: 0,
   offline_sync_idempotency_replay_served: 0,
+  offline_sync_permanent_failure: 0,
+  offline_sync_circuit_open: 0,
   replay_idempotency_collision: 0,
   job_runtime_unknown_job_name: 0,
   legacy_worker_starter_used: 0,
@@ -1322,6 +1330,10 @@ export function getMetricsSnapshot(): MetricsSnapshot {
           sixPlus: metrics.offline_sync_session_dead_six_plus,
         },
         idempotencyReplayServed: metrics.offline_sync_idempotency_replay_served,
+        engine: {
+          permanentFailure: metrics.offline_sync_permanent_failure,
+          circuitOpen: metrics.offline_sync_circuit_open,
+        },
       },
       jobRegistry: buildJobRegistryMetrics(),
       timestamp: new Date().toISOString(),
@@ -1523,6 +1535,7 @@ export function getMetricsSnapshot(): MetricsSnapshot {
         sessionConflict: { zero: 0, oneToFive: 0, sixPlus: 0 },
         sessionDead: { zero: 0, oneToFive: 0, sixPlus: 0 },
         idempotencyReplayServed: 0,
+        engine: { permanentFailure: 0, circuitOpen: 0 },
       },
       jobRegistry: {
         replayIdempotencyCollision: 0,

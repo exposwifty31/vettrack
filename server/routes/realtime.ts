@@ -404,6 +404,8 @@ router.post("/telemetry", requireAuth, (req, res) => {
       offlineSyncSessionSuccessBucket?: unknown;
       offlineSyncSessionConflictBucket?: unknown;
       offlineSyncSessionDeadBucket?: unknown;
+      syncPermanentFailure?: unknown;
+      syncCircuitOpen?: unknown;
     };
     if (body?.duplicateDrop === true) {
       incrementMetric("realtime_duplicate_drops");
@@ -553,6 +555,22 @@ router.post("/telemetry", requireAuth, (req, res) => {
         if (bucket === "0") incrementMetric("offline_sync_session_dead_zero");
         else if (bucket === "1_5") incrementMetric("offline_sync_session_dead_one_to_five");
         else incrementMetric("offline_sync_session_dead_six_plus");
+      } else {
+        incrementMetric("telemetry_payload_rejected_enum_mismatch");
+      }
+    }
+
+    // SYNC-TEL — sync engine permanent failure + circuit breaker (strict booleans).
+    if (body?.syncPermanentFailure !== undefined) {
+      if (body.syncPermanentFailure === true) {
+        incrementMetric("offline_sync_permanent_failure");
+      } else {
+        incrementMetric("telemetry_payload_rejected_enum_mismatch");
+      }
+    }
+    if (body?.syncCircuitOpen !== undefined) {
+      if (body.syncCircuitOpen === true) {
+        incrementMetric("offline_sync_circuit_open");
       } else {
         incrementMetric("telemetry_payload_rejected_enum_mismatch");
       }

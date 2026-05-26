@@ -25,6 +25,11 @@ import {
   maybeReportOfflineSyncTelemetry,
   MIN_REPORT_INTERVAL_MS,
 } from "./offline-sync-telemetry-reporter";
+import {
+  reportSyncCircuitOpen,
+  reportSyncPermanentFailure,
+  resetSyncCircuitOpenTelemetryIfExpired,
+} from "./sync-engine-telemetry";
 
 const MAX_RETRIES = PENDING_SYNC_MAX_RETRIES;
 const RETRY_DELAYS_MS = [2000, 5000, 10000];
@@ -100,9 +105,12 @@ function openCircuit() {
     duration: 8000,
   });
 
+  reportSyncCircuitOpen(circuitOpenUntil);
+
   if (circuitResetTimerId) clearTimeout(circuitResetTimerId);
   circuitResetTimerId = setTimeout(() => {
     circuitResetTimerId = null;
+    resetSyncCircuitOpenTelemetryIfExpired();
     notifyListeners();
     toast.success(t.syncEngine.resumedTryingPending, { duration: 3000 });
     if (isOnline() && !haltQueue) processQueue().catch(() => {});
@@ -285,6 +293,7 @@ async function processSingleItemWithRetry(item: PendingSync): Promise<ItemResult
           },
         },
       });
+      reportSyncPermanentFailure();
       return "transient_failure";
     }
 

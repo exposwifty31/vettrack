@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { getCurrentLocale, t } from "@/lib/i18n";
+import { interpolate } from "../../lib/i18n/index";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { enUS, he as heLocale } from "date-fns/locale";
@@ -249,6 +250,12 @@ export default function AdminOpsDashboardPage() {
               }
             />
           </div>
+          <p className="text-sm text-muted-foreground">
+            {interpolate(t.adminOpsDashboard.offlineSyncEngineTelemetryLine, {
+              permanent: String(offlineSync?.engine.permanentFailure ?? 0),
+              circuit: String(offlineSync?.engine.circuitOpen ?? 0),
+            })}
+          </p>
           {runtimeMetricsQ.isError && (
             <p className="text-sm text-destructive">
               {(runtimeMetricsQ.error as Error)?.message ?? "Error"}

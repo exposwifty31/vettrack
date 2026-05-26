@@ -1943,6 +1943,9 @@ export const api = {
       offlineSyncSessionSuccessBucket?: "0" | "1_5" | "6_plus";
       offlineSyncSessionConflictBucket?: "0" | "1_5" | "6_plus";
       offlineSyncSessionDeadBucket?: "0" | "1_5" | "6_plus";
+      /** SYNC-TEL — event-driven sync engine signals (strict booleans). */
+      syncPermanentFailure?: boolean;
+      syncCircuitOpen?: boolean;
     }) =>
       request<{ ok: boolean }>("/api/realtime/telemetry", {
         method: "POST",

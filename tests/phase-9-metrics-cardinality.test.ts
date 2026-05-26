@@ -91,6 +91,12 @@ export const OFFLINE_PHASE_8_COUNTERS = [
   "offline_sync_idempotency_replay_served",
 ] as const;
 
+/** SYNC-TEL — event-driven sync engine telemetry (strict booleans). */
+export const SYNC_ENGINE_TELEMETRY_COUNTERS = [
+  "offline_sync_permanent_failure",
+  "offline_sync_circuit_open",
+] as const;
+
 describe("Phase 9 metrics — bounded-cardinality enforcement", () => {
   it("includes every declared Phase 9 counter in the snapshot", () => {
     resetMetrics();
@@ -151,6 +157,16 @@ describe("Phase 9 metrics — bounded-cardinality enforcement", () => {
     expect(snap.offlineSync.sessionSuccess.sixPlus).toBe(1);
     expect(snap.offlineSync.sessionDead.oneToFive).toBe(1);
     expect(snap.offlineSync.idempotencyReplayServed).toBe(1);
+  });
+
+  it("includes every SYNC-TEL counter in offlineSync.engine snapshot", () => {
+    resetMetrics();
+    for (const name of SYNC_ENGINE_TELEMETRY_COUNTERS) {
+      incrementMetric(name, 1);
+    }
+    const snap = getMetricsSnapshot();
+    expect(snap.offlineSync.engine.permanentFailure).toBe(1);
+    expect(snap.offlineSync.engine.circuitOpen).toBe(1);
   });
 
   it("silently drops unknown counter names — no dynamic series", () => {

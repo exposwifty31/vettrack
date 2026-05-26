@@ -964,6 +964,10 @@ export interface OfflineSyncMetricsSnapshot {
     sixPlus: number;
   };
   idempotencyReplayServed: number;
+  engine: {
+    permanentFailure: number;
+    circuitOpen: number;
+  };
 }
 
 export interface SystemMetrics {

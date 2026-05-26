@@ -2262,7 +2262,8 @@
     "offlineSyncPendingReports": "דיווחי עומק ממתין",
     "offlineSyncDeadLetterReports": "דיווחי מכתב מת",
     "offlineSyncConflictReports": "דיווחי התנגשות",
-    "offlineSyncOldestAgeReports": "דיווחי גיל הממתין הישן ביותר"
+    "offlineSyncOldestAgeReports": "דיווחי גיל הממתין הישן ביותר",
+    "offlineSyncEngineTelemetryLine": "אירועי מנוע סנכרון (לקוח): {permanent} כשלים סופיים, {circuit} פתיחות מפסק"
   },
   "sync": {
     "status": {
