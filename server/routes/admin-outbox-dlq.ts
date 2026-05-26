@@ -1,6 +1,6 @@
 import { Router, type Response } from "express";
 import { randomUUID } from "crypto";
-import { and, count, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray, lt } from "drizzle-orm";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
 import { deadLetterConditionForClinic } from "../lib/outbox-health.js";
 import { db, eventOutbox } from "../db.js";
@@ -9,6 +9,33 @@ import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 const router = Router();
 
 const MAX_DROP_IDS = 500;
+const DEFAULT_LIST_LIMIT = 50;
+const MAX_LIST_LIMIT = 200;
+
+export function parseDlqListLimit(raw: unknown): { ok: true; limit: number } | { ok: false; error: string } {
+  if (raw === undefined || raw === null || raw === "") {
+    return { ok: true, limit: DEFAULT_LIST_LIMIT };
+  }
+  const n = typeof raw === "string" ? Number.parseInt(raw, 10) : typeof raw === "number" ? raw : Number.NaN;
+  if (!Number.isInteger(n) || n <= 0) {
+    return { ok: false, error: "limit must be a positive integer" };
+  }
+  if (n > MAX_LIST_LIMIT) {
+    return { ok: false, error: `limit must be at most ${MAX_LIST_LIMIT}` };
+  }
+  return { ok: true, limit: n };
+}
+
+function parseDlqListCursor(raw: unknown): { ok: true; cursor?: number } | { ok: false; error: string } {
+  if (raw === undefined || raw === null || raw === "") {
+    return { ok: true };
+  }
+  const n = typeof raw === "string" ? Number.parseInt(raw, 10) : typeof raw === "number" ? raw : Number.NaN;
+  if (!Number.isInteger(n) || n <= 0) {
+    return { ok: false, error: "cursor must be a positive integer" };
+  }
+  return { ok: true, cursor: n };
+}
 
 function resolveRequestId(
   res: { getHeader: (name: string) => unknown; setHeader?: (name: string, value: string) => void },
@@ -48,6 +75,101 @@ function parsePositiveIntIds(body: unknown): { ok: false; error: string } | { ok
   }
   return { ok: true, ids: unique };
 }
+
+/**
+ * GET /api/admin/outbox/dlq
+ * Paginated dead-letter rows for the clinic (no full payload).
+ */
+router.get("/outbox/dlq", requireAuth, requireAdmin, async (req, res: Response) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  try {
+    const clinicId = req.clinicId?.trim();
+    if (!clinicId) {
+      res.status(400).json({
+        code: "MISSING_CLINIC_ID",
+        error: "MISSING_CLINIC_ID",
+        reason: "MISSING_CLINIC_ID",
+        message: "clinicId is required",
+        requestId,
+      });
+      return;
+    }
+
+    const limitParsed = parseDlqListLimit(req.query.limit);
+    if (!limitParsed.ok) {
+      res.status(400).json({
+        code: "INVALID_QUERY",
+        error: "INVALID_QUERY",
+        reason: "INVALID_QUERY",
+        message: limitParsed.error,
+        requestId,
+      });
+      return;
+    }
+
+    const cursorParsed = parseDlqListCursor(req.query.cursor);
+    if (!cursorParsed.ok) {
+      res.status(400).json({
+        code: "INVALID_QUERY",
+        error: "INVALID_QUERY",
+        reason: "INVALID_QUERY",
+        message: cursorParsed.error,
+        requestId,
+      });
+      return;
+    }
+
+    const limit = limitParsed.limit;
+    const dlqWhere = deadLetterConditionForClinic(clinicId);
+    const whereClause =
+      cursorParsed.cursor != null
+        ? and(dlqWhere, lt(eventOutbox.id, cursorParsed.cursor))
+        : dlqWhere;
+
+    const rows = await db
+      .select({
+        id: eventOutbox.id,
+        type: eventOutbox.type,
+        occurredAt: eventOutbox.occurredAt,
+        retryCount: eventOutbox.retryCount,
+        errorType: eventOutbox.errorType,
+        lastAttemptAt: eventOutbox.lastAttemptAt,
+        nextAttemptAt: eventOutbox.nextAttemptAt,
+      })
+      .from(eventOutbox)
+      .where(whereClause)
+      .orderBy(desc(eventOutbox.id))
+      .limit(limit + 1);
+
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    const nextCursor = hasMore && page.length > 0 ? page[page.length - 1]!.id : undefined;
+
+    res.status(200).json({
+      clinicId,
+      items: page.map((row) => ({
+        id: row.id,
+        type: row.type,
+        occurredAt: row.occurredAt,
+        retryCount: row.retryCount,
+        errorType: row.errorType,
+        lastAttemptAt: row.lastAttemptAt,
+        nextAttemptAt: row.nextAttemptAt,
+      })),
+      ...(nextCursor != null ? { nextCursor } : {}),
+      requestId,
+    });
+  } catch (err) {
+    console.error("[admin-outbox-dlq] list failed", err);
+    res.status(500).json({
+      code: "INTERNAL_ERROR",
+      error: "INTERNAL_ERROR",
+      reason: "INTERNAL_ERROR",
+      message: "Failed to list dead letter outbox rows",
+      requestId,
+    });
+  }
+});
 
 /**
  * POST /api/admin/outbox/dlq/retry

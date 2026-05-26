@@ -2267,6 +2267,37 @@ export interface TStructure {
     offlineSyncConflictReports: string;
     offlineSyncOldestAgeReports: string;
     offlineSyncEngineTelemetryLine: string;
+    dlqSectionTitle: string;
+    dlqSectionSubtitle: string;
+    dlqEmpty: string;
+    dlqLoadFailed: string;
+    dlqRetryAll: string;
+    dlqDropSelected: string;
+    dlqSelectAll: string;
+    dlqSelectRow: string;
+    dlqColId: string;
+    dlqColType: string;
+    dlqColErrorClass: string;
+    dlqColRetries: string;
+    dlqColLastAttempt: string;
+    dlqColOccurred: string;
+    dlqErrorPermanent: string;
+    dlqErrorTransient: string;
+    dlqErrorUnclassified: string;
+    dlqLoadMore: string;
+    dlqLoadingMore: string;
+    dlqCancel: string;
+    dlqRetryConfirmTitle: string;
+    dlqRetryConfirmDescription: string;
+    dlqForceRetryLabel: string;
+    dlqRetryConfirmAction: string;
+    dlqRetrySuccess: string;
+    dlqRetryFailed: string;
+    dlqDropConfirmTitle: string;
+    dlqDropConfirmDescription: string;
+    dlqDropConfirmAction: string;
+    dlqDropSuccess: string;
+    dlqDropFailed: string;
   };
   sync: {
     status: {

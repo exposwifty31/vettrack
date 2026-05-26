@@ -26,4 +26,14 @@ test.describe("Flow: Auth gates (dev bypass)", () => {
     const { status } = await apiGet(request, "/api/admin/outbox-health", devRoleHeaders("admin"));
     expect(status).toBe(200);
   });
+
+  test("admin-only DLQ list denies technician", async ({ request }) => {
+    const { status } = await apiGet(request, "/api/admin/outbox/dlq", devRoleHeaders("technician"));
+    expect(status).toBe(403);
+  });
+
+  test("admin-only DLQ list allows admin", async ({ request }) => {
+    const { status } = await apiGet(request, "/api/admin/outbox/dlq", devRoleHeaders("admin"));
+    expect(status).toBe(200);
+  });
 });

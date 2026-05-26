@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { enUS, he as heLocale } from "date-fns/locale";
 import type { ReactNode } from "react";
+import { OutboxDlqPanel } from "@/components/admin/outbox-dlq-panel";
 
 const POLL_MS = 10_000;
 
@@ -168,6 +169,8 @@ export default function AdminOpsDashboardPage() {
         {outboxQ.isError && (
           <p className="text-sm text-destructive">{(outboxQ.error as Error)?.message ?? "Error"}</p>
         )}
+
+        <OutboxDlqPanel outboxHealth={d} />
 
         <div className="border-t" />
 

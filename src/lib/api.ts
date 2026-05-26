@@ -1521,6 +1521,48 @@ export const api = {
         requestId: string;
       }>("/api/admin/outbox-health"),
   },
+  adminOutboxDlq: {
+    list: (params?: { limit?: number; cursor?: number }) => {
+      const qs = new URLSearchParams();
+      if (params?.limit != null) qs.set("limit", String(params.limit));
+      if (params?.cursor != null) qs.set("cursor", String(params.cursor));
+      const query = qs.toString();
+      return request<{
+        clinicId: string;
+        items: Array<{
+          id: number;
+          type: string;
+          occurredAt: string;
+          retryCount: number;
+          errorType: string | null;
+          lastAttemptAt: string | null;
+          nextAttemptAt: string | null;
+        }>;
+        nextCursor?: number;
+        requestId: string;
+      }>(`/api/admin/outbox/dlq${query ? `?${query}` : ""}`);
+    },
+    retryAll: (body?: { force?: boolean }) =>
+      request<{
+        clinicId: string;
+        resetCount: number;
+        requestId: string;
+      }>("/api/admin/outbox/dlq/retry", {
+        method: "POST",
+        body: JSON.stringify(body ?? {}),
+      }),
+    drop: (ids: number[]) =>
+      request<{
+        clinicId: string;
+        deletedCount: number;
+        deletedIds: number[];
+        skippedIds: number[];
+        requestId: string;
+      }>("/api/admin/outbox/dlq/drop", {
+        method: "POST",
+        body: JSON.stringify({ ids }),
+      }),
+  },
   adminQueueMetrics: {
     get: () =>
       request<{
