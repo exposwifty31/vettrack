@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { getCurrentClinicId } from "@/lib/auth-store";
 import { applyEvent, DISPLAY_SNAPSHOT_QUERY_KEY, forceResyncWardErCaches, resetRealtimeCaches } from "@/lib/event-reducer";
 import type { RealtimeEvent } from "@/types/realtime-events";
 import { SUPPORTED_REALTIME_EVENT_SCHEMA_VERSION } from "../../shared/realtime-schema-version";
@@ -118,12 +119,9 @@ type BcEnvelopeBase = {
 
 type BcCursorEnvelope = BcEnvelopeBase & {
   kind: "cursor";
-  // The authoritative cursor is the envelope-level `cursor` field. No
-  // additional payload is required for cursor envelopes; the receiver in
-  // `onBroadcast` only reads `data.cursor`. Keeping `payload` empty
-  // mirrors the build_tag envelope shape and avoids transmitting dead
-  // data on every cursor publish.
-  payload: Record<string, never>;
+  // Authoritative ordering is envelope-level `cursor`. Optional `clinicId` scopes
+  // cursor-zero prune gossip so another clinic's tab cannot force RESET_STATE.
+  payload: { clinicId?: string };
 };
 
 type BcBuildTagEnvelope = BcEnvelopeBase & {
@@ -168,9 +166,10 @@ function publishEnvelope(envelope: BcEnvelope): void {
 }
 
 function publishCursor(id: number): void {
+  const clinicId = getCurrentClinicId();
   publishEnvelope({
     kind: "cursor",
-    payload: {},
+    payload: clinicId ? { clinicId } : {},
     cursor: id,
     buildTag: clientBuildTag(),
     ts: Date.now(),
@@ -447,7 +446,11 @@ export class EventIngestor {
     noteBuildTagMismatchOnce(data.buildTag);
 
     if (data.kind === "cursor") {
-      void this.handlePeerAhead(data.cursor);
+      const peerClinicId =
+        typeof data.payload.clinicId === "string" && data.payload.clinicId.trim().length > 0
+          ? data.payload.clinicId.trim()
+          : undefined;
+      void this.handlePeerAhead(data.cursor, peerClinicId);
       return;
     }
 
@@ -559,9 +562,15 @@ export class EventIngestor {
     }
   }
 
-  /** Another tab advanced the cursor — catch up without applying skipped ids locally. */
-  private async handlePeerAhead(peerCursor: number): Promise<void> {
+  /**
+   * Another tab advanced the cursor — catch up without applying skipped ids locally.
+   * Cursor `0` means outbox prune / RESET_STATE only when gossip `clinicId` matches
+   * this tab's clinic (BroadcastChannel is origin-wide; legacy gossip without
+   * `clinicId` does not trigger reset).
+   */
+  private async handlePeerAhead(peerCursor: number, peerClinicId?: string): Promise<void> {
     if (peerCursor === 0 && (this.lastAppliedEventId ?? 0) > 0) {
+      if (!this.shouldApplyPeerPruneReset(peerClinicId)) return;
       await this.handleResetState();
       return;
     }
@@ -569,6 +578,7 @@ export class EventIngestor {
     if (this.peerRecoveryInFlight) {
       await this.peerRecoveryInFlight;
       if (peerCursor === 0 && (this.lastAppliedEventId ?? 0) > 0) {
+        if (!this.shouldApplyPeerPruneReset(peerClinicId)) return;
         await this.handleResetState();
         return;
       }
@@ -582,6 +592,13 @@ export class EventIngestor {
     });
 
     await this.peerRecoveryInFlight;
+  }
+
+  private shouldApplyPeerPruneReset(peerClinicId?: string): boolean {
+    if (!peerClinicId) return false;
+    const localClinicId = getCurrentClinicId();
+    if (!localClinicId) return false;
+    return peerClinicId === localClinicId;
   }
 
   private async establishBaselineAfterFullRefresh(): Promise<void> {
