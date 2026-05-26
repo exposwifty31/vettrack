@@ -59,6 +59,12 @@ const EMERGENCY_MUTATION_SNAPSHOT: ClassifierSnapshotCase[] = [
     expected: "start",
   },
   {
+    label: "POST /sessions trailing slash (P3-6)",
+    url: "/api/code-blue/sessions/",
+    method: "POST",
+    expected: "start",
+  },
+  {
     label: "POST /sessions/:id/logs",
     url: "/api/code-blue/sessions/abc-123/logs",
     method: "POST",
@@ -280,6 +286,12 @@ describe("offline-emergency-block — classifyEmergencyEndpoint snapshot (C1)", 
           "label": "POST /sessions lowercase method",
           "method": "post",
           "url": "/api/code-blue/sessions",
+        },
+        {
+          "decision": "start",
+          "label": "POST /sessions trailing slash (P3-6)",
+          "method": "POST",
+          "url": "/api/code-blue/sessions/",
         },
         {
           "decision": "log",

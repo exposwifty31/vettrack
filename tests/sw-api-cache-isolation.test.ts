@@ -3,6 +3,7 @@
  * GET responses to prevent tenant/session data bleed on shared devices.
  */
 import { describe, it, expect } from "vitest";
+import { EMERGENCY_CACHE_BYPASS_PATHS } from "../shared/emergency-surfaces.manifest";
 
 describe("P1-9: SW API cache isolation", () => {
   it("sw.js API GET handler does not write to Cache Storage", async () => {
@@ -19,9 +20,9 @@ describe("P1-9: SW API cache isolation", () => {
   it("sw.js emergency bypass denylist is preserved", async () => {
     const fs = await import("fs");
     const source = fs.readFileSync("public/sw.js", "utf8");
-    expect(source).toContain("/api/display/snapshot");
-    expect(source).toContain("/api/code-blue/sessions/active");
-    expect(source).toContain("/api/realtime/stream");
+    for (const path of EMERGENCY_CACHE_BYPASS_PATHS) {
+      expect(source).toContain(path);
+    }
     expect(source).toContain("EMERGENCY_BYPASS_PATHS");
   });
 

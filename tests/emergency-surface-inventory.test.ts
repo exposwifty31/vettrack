@@ -11,54 +11,23 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
 import {
+  EMERGENCY_CACHE_BYPASS_PATHS,
+  EMERGENCY_OFFLINE_BLOCK_MUTATIONS,
+} from "../shared/emergency-surfaces.manifest";
+import {
   classifyEmergencyEndpoint,
   type EmergencyEndpointClass,
 } from "../src/lib/offline-emergency-block";
 
 const SW_PATH = join(process.cwd(), "public/sw.js");
 
-/** Phase 9 frozen live/emergency API paths — must appear in SW denylist. */
-const SW_EMERGENCY_BYPASS_CANONICAL = [
-  "/api/display/snapshot",
-  "/api/code-blue/sessions/active",
-  "/api/realtime/stream",
-  "/api/realtime/replay",
-  "/api/realtime/outbox-head",
-  "/api/realtime/telemetry",
-] as const;
-
-/** Representative URLs for each Code Blue mutation class the classifier recognizes today. */
-const CODE_BLUE_MUTATION_INVENTORY: ReadonlyArray<{
-  label: string;
-  url: string;
-  method: string;
-  expected: EmergencyEndpointClass;
-}> = [
-  {
-    label: "session start",
-    url: "/api/code-blue/sessions",
-    method: "POST",
-    expected: "start",
-  },
-  {
-    label: "session log",
-    url: "/api/code-blue/sessions/sess-1/logs",
-    method: "POST",
-    expected: "log",
-  },
-  {
-    label: "session end",
-    url: "/api/code-blue/sessions/sess-1/end",
-    method: "PATCH",
-    expected: "end",
-  },
-  {
-    label: "session presence",
-    url: "/api/code-blue/sessions/sess-1/presence",
-    method: "PATCH",
-    expected: "presence",
-  },
-];
+/** Representative URLs from the shared manifest (offline block mutations). */
+const CODE_BLUE_MUTATION_INVENTORY = EMERGENCY_OFFLINE_BLOCK_MUTATIONS.map((m) => ({
+  label: `${m.class} (${m.method})`,
+  url: m.samplePathname,
+  method: m.method,
+  expected: m.class as EmergencyEndpointClass,
+}));
 
 /**
  * Live read paths that must bypass SW cache but must NOT be emergency mutations.
@@ -124,11 +93,13 @@ describe("emergency-surface-inventory — Phase 7a frozen paths", () => {
   const swPaths = parseSwEmergencyBypassPaths(swSource);
 
   it("public/sw.js EMERGENCY_BYPASS_PATHS matches canonical live denylist", () => {
-    const canonical = [...SW_EMERGENCY_BYPASS_CANONICAL].sort();
+    const canonical = [...EMERGENCY_CACHE_BYPASS_PATHS].sort();
     const parsed = [...swPaths].sort();
 
     const missing = canonical.filter((p) => !parsed.includes(p));
-    const extra = parsed.filter((p) => !canonical.includes(p as (typeof SW_EMERGENCY_BYPASS_CANONICAL)[number]));
+    const extra = parsed.filter(
+      (p) => !(EMERGENCY_CACHE_BYPASS_PATHS as readonly string[]).includes(p),
+    );
 
     expect(
       missing,
@@ -140,7 +111,7 @@ describe("emergency-surface-inventory — Phase 7a frozen paths", () => {
     ).toEqual([]);
   });
 
-  it.each(SW_EMERGENCY_BYPASS_CANONICAL)(
+  it.each(EMERGENCY_CACHE_BYPASS_PATHS)(
     "SW denylist includes %s in source text",
     (path) => {
       expect(swSource).toContain(`"${path}"`);

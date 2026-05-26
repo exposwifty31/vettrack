@@ -19,8 +19,13 @@
 // dependency-free and avoids a circular import.
 
 import { safeStorageGetItem, safeStorageSetItem } from "@/lib/safe-browser";
+import {
+  EMERGENCY_OFFLINE_BLOCK_MUTATIONS,
+  normalizeEmergencyPathname,
+  type EmergencyEndpointClass,
+} from "../../shared/emergency-surfaces.manifest";
 
-export type EmergencyEndpointClass = "start" | "log" | "end" | "presence";
+export type { EmergencyEndpointClass };
 
 const BUFFER_KEY = "vt_offline_emergency_buffer_v1";
 const BUFFER_MAX = 200;
@@ -35,35 +40,18 @@ type LocalBufferEntry = {
  * Classify an outgoing request as a Code Blue emergency mutation. Returns
  * the bounded enum endpoint class, or null for any non-emergency endpoint.
  *
- * Matching is intentionally narrow — only the exact mutation endpoints the
- * doctrine (§3.8) names. Read endpoints (GET /sessions/active, /history,
- * /reconciliation) are NOT blocked.
+ * Matching is intentionally narrow — only mutation endpoints listed in
+ * `EMERGENCY_OFFLINE_BLOCK_MUTATIONS` (shared/emergency-surfaces.manifest.ts).
+ * Read endpoints (GET /sessions/active, /history, /reconciliation) are NOT blocked.
  */
 export function classifyEmergencyEndpoint(url: string, method: string): EmergencyEndpointClass | null {
   const upperMethod = method.toUpperCase();
-  // Normalize: strip query strings, then check pathname suffixes.
-  const pathname = (() => {
-    try {
-      return new URL(url, "http://localhost").pathname;
-    } catch {
-      return url.split("?")[0];
-    }
-  })();
+  const pathname = normalizeEmergencyPathname(url);
 
-  if (upperMethod === "POST" && pathname === "/api/code-blue/sessions") {
-    return "start";
-  }
-  // /api/code-blue/sessions/:id/logs
-  if (upperMethod === "POST" && /^\/api\/code-blue\/sessions\/[^/]+\/logs$/.test(pathname)) {
-    return "log";
-  }
-  // /api/code-blue/sessions/:id/end
-  if (upperMethod === "PATCH" && /^\/api\/code-blue\/sessions\/[^/]+\/end$/.test(pathname)) {
-    return "end";
-  }
-  // /api/code-blue/sessions/:id/presence
-  if (upperMethod === "PATCH" && /^\/api\/code-blue\/sessions\/[^/]+\/presence$/.test(pathname)) {
-    return "presence";
+  for (const entry of EMERGENCY_OFFLINE_BLOCK_MUTATIONS) {
+    if (upperMethod === entry.method && entry.pathPattern.test(pathname)) {
+      return entry.class;
+    }
   }
   return null;
 }
