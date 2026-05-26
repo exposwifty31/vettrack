@@ -180,7 +180,11 @@ router.post("/", requireAuth, requireAdmin, validateBody(createPoSchema), async 
       }
     });
 
-    const [order] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, orderId)).limit(1);
+    const [order] = await db
+      .select()
+      .from(purchaseOrders)
+      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, orderId)))
+      .limit(1);
     const lines = await db
       .select({
         id: poLines.id,
@@ -233,7 +237,14 @@ router.patch("/:id/submit", requireAuth, requireAdmin, validateUuid("id"), async
       .set({ status: "ordered", orderedAt: new Date(), updatedAt: new Date() })
       .where(eq(purchaseOrders.id, req.params.id));
 
-    const [updated] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, req.params.id)).limit(1);
+    const [updated] = await db
+      .select()
+      .from(purchaseOrders)
+      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id)))
+      .limit(1);
+    if (!updated) {
+      return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "PO_NOT_FOUND", message: "Purchase order not found", requestId }));
+    }
     logAudit({
       actorRole: resolveAuditActorRole(req),
       clinicId,
@@ -244,7 +255,7 @@ router.patch("/:id/submit", requireAuth, requireAdmin, validateUuid("id"), async
       targetType: "purchase_order",
       metadata: {
         previousStatus: existing.status,
-        newStatus: updated?.status ?? "ordered",
+        newStatus: updated.status,
       },
     });
     res.json(updated);
@@ -373,7 +384,14 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
         .where(eq(purchaseOrders.id, req.params.id));
     });
 
-    const [updated] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, req.params.id)).limit(1);
+    const [updated] = await db
+      .select()
+      .from(purchaseOrders)
+      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id)))
+      .limit(1);
+    if (!updated) {
+      return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "PO_NOT_FOUND", message: "Purchase order not found", requestId }));
+    }
     const updatedLines = await db
       .select({
         id: poLines.id,
@@ -400,7 +418,7 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
       targetType: "purchase_order",
       metadata: {
         previousStatus: existing.status,
-        newStatus: updated?.status ?? existing.status,
+        newStatus: updated.status,
         receiveLineCount: b.lines.length,
         lines: receiveAuditLines,
       },
@@ -454,7 +472,14 @@ router.patch("/:id/cancel", requireAuth, requireAdmin, validateUuid("id"), async
       .set({ status: "cancelled", updatedAt: new Date() })
       .where(eq(purchaseOrders.id, req.params.id));
 
-    const [updated] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, req.params.id)).limit(1);
+    const [updated] = await db
+      .select()
+      .from(purchaseOrders)
+      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id)))
+      .limit(1);
+    if (!updated) {
+      return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "PO_NOT_FOUND", message: "Purchase order not found", requestId }));
+    }
     logAudit({
       actorRole: resolveAuditActorRole(req),
       clinicId,
@@ -465,7 +490,7 @@ router.patch("/:id/cancel", requireAuth, requireAdmin, validateUuid("id"), async
       targetType: "purchase_order",
       metadata: {
         previousStatus: existing.status,
-        newStatus: updated?.status ?? "cancelled",
+        newStatus: updated.status,
       },
     });
     res.json(updated);

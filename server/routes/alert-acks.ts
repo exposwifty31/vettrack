@@ -129,7 +129,11 @@ router.post("/", requireAuth, requireEffectiveRole("technician"), async (req, re
             remindAt: computeRemindAt(alertType),
           })
           .where(eq(alertAcks.id, existing.id));
-        const [updated] = await db.select().from(alertAcks).where(eq(alertAcks.id, existing.id)).limit(1);
+        const [updated] = await db
+          .select()
+          .from(alertAcks)
+          .where(and(eq(alertAcks.clinicId, clinicId), eq(alertAcks.id, existing.id)))
+          .limit(1);
         return res.json(updated);
       }
       return res.json(existing); // Already SEEN — idempotent
@@ -226,7 +230,17 @@ router.patch("/:id/resolve", requireAuth, requireEffectiveRole("technician"), as
       })
       .where(and(eq(alertAcks.id, ackId), eq(alertAcks.clinicId, clinicId)));
 
-    const [updated] = await db.select().from(alertAcks).where(eq(alertAcks.id, ackId)).limit(1);
+    const [updated] = await db
+      .select()
+      .from(alertAcks)
+      .where(and(eq(alertAcks.clinicId, clinicId), eq(alertAcks.id, ackId)))
+      .limit(1);
+
+    if (!updated) {
+      return res.status(404).json(
+        apiError({ code: "NOT_FOUND", reason: "ACK_NOT_FOUND", message: "Alert acknowledgement not found", requestId }),
+      );
+    }
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
