@@ -1059,6 +1059,19 @@
     "pushAlertsTitle": "Push alerts",
     "pushAlertsDescription": "Enable push notifications in Settings -> Push Notifications to receive real-time alerts even when the app is in the background."
   },
+  "pilotHomePage": {
+    "worthCheckingSection": "Worth checking",
+    "worthCheckingEmpty": "Equipment confirmations will appear here as staff scan items during the pilot.",
+    "recoveryBadgeStale": "Needs confirm",
+    "recoveryBadgeVeryStale": "Very stale",
+    "recoveryBadgeCheckedOutLong": "Checked out long",
+    "recoverySublineStale": "Not recently confirmed · {relative}",
+    "recoverySublineVeryStale": "Not confirmed in a long time · {relative}",
+    "recoverySublineCheckedOutLong": "Checked out for a long time",
+    "recoverySublineNeverConfirmed": "Not recently confirmed",
+    "recoveryLastConfirmed": "Last confirmed {relative}",
+    "recoveryNeverConfirmed": "Never confirmed"
+  },
   "roomRadarPage": {
     "roomVacant": "Room available",
     "patientActive": "Active patient",

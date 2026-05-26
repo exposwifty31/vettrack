@@ -11,8 +11,20 @@ import { getCurrentUserId } from "@/lib/auth-store";
 import type { Equipment } from "@/types";
 import { Search, Scan, MapPin, ChevronRight, CheckCircle2, Loader2 } from "lucide-react";
 import { t } from "@/lib/i18n";
+import { formatRelativeTime } from "@/lib/utils";
+import { isEquipmentRecoveryUiEnabled } from "@/lib/equipment-recovery-ui-flag";
+import {
+  compareRecoveryAttention,
+  deriveEquipmentRecoverySnapshotFromSource,
+  filterEquipmentNeedingAttention,
+} from "@/lib/equipment-recovery-adapter";
+import {
+  pilotHomeRecoveryDotClass,
+  resolvePilotHomeRecoveryBadgeKey,
+  resolvePilotHomeRecoverySublineKey,
+} from "./pilot-home-recovery-labels";
 
-const STALE_MS = 4 * 60 * 60 * 1000;
+const LEGACY_STALE_MS = 4 * 60 * 60 * 1000;
 const MAX_RECENT = 5;
 
 interface RecentItem {
@@ -72,9 +84,29 @@ function stalenessText(lastSeen: string | null | undefined): string {
   return `Not recently confirmed · ${rel}`;
 }
 
-function isWorthChecking(e: Equipment): boolean {
+function isWorthCheckingLegacy(e: Equipment): boolean {
   if (!e.lastSeen) return true;
-  return Date.now() - new Date(e.lastSeen).getTime() > STALE_MS;
+  return Date.now() - new Date(e.lastSeen).getTime() > LEGACY_STALE_MS;
+}
+
+function formatPilotRecoverySubline(e: Equipment): string {
+  const snapshot = deriveEquipmentRecoverySnapshotFromSource(e);
+  const key = resolvePilotHomeRecoverySublineKey(snapshot);
+  if (!key) return "";
+  if (key === "recoverySublineNeverConfirmed" || key === "recoverySublineCheckedOutLong") {
+    return t.pilotHomePage[key];
+  }
+  const relative = snapshot.confirmAt ? formatRelativeTime(snapshot.confirmAt) : "";
+  if (key === "recoverySublineVeryStale") {
+    return t.pilotHomePage.recoverySublineVeryStale(relative);
+  }
+  return t.pilotHomePage.recoverySublineStale(relative);
+}
+
+function formatPilotRecoveryLastConfirmed(e: Equipment): string {
+  const snapshot = deriveEquipmentRecoverySnapshotFromSource(e);
+  if (!snapshot.confirmAt) return t.pilotHomePage.recoveryNeverConfirmed;
+  return t.pilotHomePage.recoveryLastConfirmed(formatRelativeTime(snapshot.confirmAt));
 }
 
 export default function PilotHomePage() {
@@ -118,19 +150,27 @@ export default function PilotHomePage() {
     [equipment],
   );
 
-  const worthChecking = useMemo(
-    () =>
-      equipment
-        .filter(isWorthChecking)
-        .sort((a, b) => {
-          if (!a.lastSeen && !b.lastSeen) return 0;
-          if (!a.lastSeen) return -1;
-          if (!b.lastSeen) return 1;
-          return new Date(a.lastSeen).getTime() - new Date(b.lastSeen).getTime();
-        })
-        .slice(0, 6),
-    [equipment],
-  );
+  const worthChecking = useMemo(() => {
+    if (isEquipmentRecoveryUiEnabled) {
+      return filterEquipmentNeedingAttention(equipment)
+        .sort((a, b) =>
+          compareRecoveryAttention(
+            deriveEquipmentRecoverySnapshotFromSource(a),
+            deriveEquipmentRecoverySnapshotFromSource(b),
+          ),
+        )
+        .slice(0, 6);
+    }
+    return equipment
+      .filter(isWorthCheckingLegacy)
+      .sort((a, b) => {
+        if (!a.lastSeen && !b.lastSeen) return 0;
+        if (!a.lastSeen) return -1;
+        if (!b.lastSeen) return 1;
+        return new Date(a.lastSeen).getTime() - new Date(b.lastSeen).getTime();
+      })
+      .slice(0, 6);
+  }, [equipment]);
 
   const hasEnoughScanHistory = confirmedCount >= 5;
 
@@ -221,7 +261,9 @@ export default function PilotHomePage() {
                         <p className="truncate text-sm font-semibold text-ivory-text">{e.name}</p>
                         <p className="mt-0.5 truncate text-[11px] text-ivory-text3">
                           {e.location ? `${e.location} · ` : ""}
-                          {lastConfirmedText(e.lastSeen)}
+                          {isEquipmentRecoveryUiEnabled
+                            ? formatPilotRecoveryLastConfirmed(e)
+                            : lastConfirmedText(e.lastSeen)}
                         </p>
                         {e.usuallyFoundHere && (
                           <p className="mt-0.5 truncate text-[10.5px] text-ivory-text3/70 italic">
@@ -305,10 +347,19 @@ export default function PilotHomePage() {
             worthChecking.length > 0 && (
               <section aria-label="Worth checking">
                 <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-ivory-text3">
-                  Worth checking
+                  {isEquipmentRecoveryUiEnabled
+                    ? t.pilotHomePage.worthCheckingSection
+                    : "Worth checking"}
                 </p>
                 <div className="overflow-hidden rounded-2xl border border-ivory-border bg-ivory-surface">
-                  {worthChecking.map((e, i) => (
+                  {worthChecking.map((e, i) => {
+                    const recoverySnapshot = isEquipmentRecoveryUiEnabled
+                      ? deriveEquipmentRecoverySnapshotFromSource(e)
+                      : null;
+                    const recoveryBadgeKey =
+                      recoverySnapshot &&
+                      resolvePilotHomeRecoveryBadgeKey(recoverySnapshot);
+                    return (
                     <div
                       key={e.id}
                       className={`flex items-center gap-2 transition-colors hover:bg-muted/50 ${
@@ -320,10 +371,28 @@ export default function PilotHomePage() {
                         onClick={() => handleSelect(e)}
                         className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3"
                       >
-                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" aria-hidden />
+                        <span
+                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                            recoverySnapshot
+                              ? pilotHomeRecoveryDotClass(recoverySnapshot)
+                              : "bg-amber-400"
+                          }`}
+                          aria-hidden
+                        />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-ivory-text">{e.name}</p>
-                          <p className="mt-0.5 text-[11px] text-ivory-text3">{stalenessText(e.lastSeen)}</p>
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <p className="truncate text-sm font-semibold text-ivory-text">{e.name}</p>
+                            {recoveryBadgeKey && (
+                              <span className="shrink-0 rounded-md border border-amber-200/80 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+                                {t.pilotHomePage[recoveryBadgeKey]}
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-ivory-text3">
+                            {isEquipmentRecoveryUiEnabled
+                              ? formatPilotRecoverySubline(e)
+                              : stalenessText(e.lastSeen)}
+                          </p>
                           {e.usuallyFoundHere && (
                             <p className="mt-0.5 truncate text-[10.5px] text-ivory-text3/70 italic">
                               {e.usuallyFoundHere}
@@ -353,17 +422,22 @@ export default function PilotHomePage() {
                         <span>{confirmedId === e.id ? "Done" : "Confirm"}</span>
                       </button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
             )
           ) : (
             <section aria-label="Worth checking">
               <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-ivory-text3">
-                Worth checking
+                {isEquipmentRecoveryUiEnabled
+                  ? t.pilotHomePage.worthCheckingSection
+                  : "Worth checking"}
               </p>
               <p className="rounded-2xl border border-ivory-border bg-ivory-surface px-4 py-3 text-sm text-ivory-text3">
-                Equipment confirmations will appear here as staff scan items during the pilot.
+                {isEquipmentRecoveryUiEnabled
+                  ? t.pilotHomePage.worthCheckingEmpty
+                  : "Equipment confirmations will appear here as staff scan items during the pilot."}
               </p>
             </section>
           )

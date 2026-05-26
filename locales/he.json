@@ -1059,6 +1059,19 @@
     "pushAlertsTitle": "התראות Push",
     "pushAlertsDescription": "אפשר התראות Push בהגדרות → התראות Push לקבלת התראות בזמן אמת גם כשהאפליקציה ברקע."
   },
+  "pilotHomePage": {
+    "worthCheckingSection": "שווה לבדוק",
+    "worthCheckingEmpty": "אישורי ציוד יופיעו כאן כשהצוות סורק פריטים במהלך הפיילוט.",
+    "recoveryBadgeStale": "דורש אימות",
+    "recoveryBadgeVeryStale": "מיושן מאוד",
+    "recoveryBadgeCheckedOutLong": "מושאל זמן רב",
+    "recoverySublineStale": "לא אושר לאחרונה · {relative}",
+    "recoverySublineVeryStale": "לא אושר זמן רב · {relative}",
+    "recoverySublineCheckedOutLong": "מוצא לשימוש זמן רב",
+    "recoverySublineNeverConfirmed": "לא אושר לאחרונה",
+    "recoveryLastConfirmed": "אושר לאחרונה {relative}",
+    "recoveryNeverConfirmed": "מעולם לא אושר"
+  },
   "roomRadarPage": {
     "roomVacant": "חדר פנוי",
     "patientActive": "מטופל פעיל",

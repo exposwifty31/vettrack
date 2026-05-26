@@ -1062,6 +1062,19 @@ export interface TStructure {
     pushAlertsTitle: string;
     pushAlertsDescription: string;
   };
+  pilotHomePage: {
+    worthCheckingSection: string;
+    worthCheckingEmpty: string;
+    recoveryBadgeStale: string;
+    recoveryBadgeVeryStale: string;
+    recoveryBadgeCheckedOutLong: string;
+    recoverySublineStale: string;
+    recoverySublineVeryStale: string;
+    recoverySublineCheckedOutLong: string;
+    recoverySublineNeverConfirmed: string;
+    recoveryLastConfirmed: string;
+    recoveryNeverConfirmed: string;
+  };
   roomRadarPage: {
     roomVacant: string;
     patientActive: string;

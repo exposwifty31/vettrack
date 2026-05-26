@@ -474,6 +474,16 @@ const translations = {
 
   helpPage: d.helpPage,
 
+  pilotHomePage: {
+    ...d.pilotHomePage,
+    recoverySublineStale: (relative: string) =>
+      tr(d.pilotHomePage.recoverySublineStale, { relative }),
+    recoverySublineVeryStale: (relative: string) =>
+      tr(d.pilotHomePage.recoverySublineVeryStale, { relative }),
+    recoveryLastConfirmed: (relative: string) =>
+      tr(d.pilotHomePage.recoveryLastConfirmed, { relative }),
+  },
+
   roomRadarPage: {
     ...d.roomRadarPage,
     verifyAllInRoom: (roomName: string) => tr(d.roomRadarPage.verifyAllInRoom, { roomName }),
