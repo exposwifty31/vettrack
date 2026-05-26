@@ -1802,7 +1802,7 @@ export async function completeTask(
   const completedAt = new Date();
   const completionIdempotencyKey = `medication-task-complete:${taskId}`;
   const normalizedExecution = normalizeMedicationExecutionInput(executionInput);
-  const [{ row: updated, medicationBilling }] = await db.transaction(async (tx) => {
+  const [{ row: updated, medicationBilling, inventoryJobInserted }] = await db.transaction(async (tx) => {
     let medicationBilling: Awaited<ReturnType<typeof resolveMedicationBillingForCompletion>> | null = null;
     if (isMedicationTask && existing.animalId) {
       medicationBilling = await resolveMedicationBillingForCompletion(
@@ -1866,27 +1866,36 @@ export async function completeTask(
       }).onConflictDoNothing();
     }
 
-    return [{ row, medicationBilling }] as const;
+    let inventoryJobInserted = false;
+    if (
+      medicationBilling &&
+      normalizedExecution?.calculatedVolumeMl &&
+      row.animalId
+    ) {
+      const [jobRow] = await tx
+        .insert(inventoryJobs)
+        .values({
+          id: randomUUID(),
+          clinicId,
+          taskId,
+          containerId: medicationBilling.containerId,
+          requiredVolumeMl: String(normalizedExecution.calculatedVolumeMl),
+          animalId: row.animalId,
+          status: "pending",
+          retryCount: 0,
+          failureReason: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          resolvedAt: null,
+        })
+        .onConflictDoNothing()
+        .returning({ id: inventoryJobs.id });
+      inventoryJobInserted = Boolean(jobRow);
+    }
+
+    return [{ row, medicationBilling, inventoryJobInserted }] as const;
   });
 
-  let inventoryJobInserted = false;
-  if (medicationBilling && normalizedExecution?.calculatedVolumeMl && updated.animalId) {
-    const [jobRow] = await db.insert(inventoryJobs).values({
-      id: randomUUID(),
-      clinicId,
-      taskId,
-      containerId: medicationBilling.containerId,
-      requiredVolumeMl: String(normalizedExecution.calculatedVolumeMl),
-      animalId: updated.animalId,
-      status: "pending",
-      retryCount: 0,
-      failureReason: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      resolvedAt: null,
-    }).onConflictDoNothing().returning({ id: inventoryJobs.id });
-    inventoryJobInserted = Boolean(jobRow);
-  }
   let inventoryEnqueueFailed = false;
   if (
     inventoryJobInserted &&

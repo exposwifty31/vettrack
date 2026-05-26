@@ -460,7 +460,7 @@ router.delete("/equipment/:equipmentId/stage/:claimId", requireAuth, async (req,
         ));
 
       if (!remaining || Number(remaining.count) === 0) {
-        await tx
+        const revertResult = await tx
           .update(equipment)
           .set({ usageState: "available", usageStateSince: now, version: sql`${equipment.version} + 1` })
           .where(and(
@@ -469,6 +469,9 @@ router.delete("/equipment/:equipmentId/stage/:claimId", requireAuth, async (req,
             eq(equipment.usageState, "staged"),
             eq(equipment.version, capturedVersion),
           ));
+        if ((revertResult as unknown as { rowCount?: number }).rowCount === 0) {
+          throw new Error("VERSION_CONFLICT");
+        }
       }
 
       await insertRealtimeDomainEvent(tx, {
@@ -480,6 +483,9 @@ router.delete("/equipment/:equipmentId/stage/:claimId", requireAuth, async (req,
   } catch (err) {
     if (err instanceof Error && err.message === "CLAIM_NOT_ACTIVE") {
       return apiError(req, res, "operationalState.claimNotActive", undefined, 409);
+    }
+    if (err instanceof Error && err.message === "VERSION_CONFLICT") {
+      return apiError(req, res, "operationalState.versionConflict", undefined, 409);
     }
     throw err;
   }

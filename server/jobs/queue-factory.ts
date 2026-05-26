@@ -38,7 +38,6 @@ export async function getOrCreateQueue<T = unknown>(
 
   const connection = await createRedisConnection();
   if (!connection) {
-    initFailedQueueNames.add(config.queueName);
     throw new Error(`${config.queueName} queue unavailable: Redis connection failed`);
   }
 
