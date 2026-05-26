@@ -16,7 +16,7 @@ vi.mock("../server/lib/redis.js", () => ({
 }));
 
 vi.mock("../server/jobs/queue-factory.js", () => ({
-  getOrCreateQueue: vi.fn().mockResolvedValue({}),
+  getOrCreateQueue: vi.fn().mockResolvedValue({ add: vi.fn().mockResolvedValue(undefined) }),
 }));
 
 vi.mock("../server/workers/chargeAlertWorker.js", async (importOriginal) => {
@@ -31,6 +31,22 @@ vi.mock("../server/workers/chargeAlertWorker.js", async (importOriginal) => {
 vi.mock("../server/workers/inventory-deduction.worker.js", () => ({
   processInventoryDeductionJob: vi.fn(),
 }));
+
+vi.mock("../server/workers/expiryCheckWorker.js", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("../server/workers/expiryCheckWorker.js")>();
+  return { ...mod, runExpiryCheckWorker: vi.fn() };
+});
+
+vi.mock("../server/workers/staleCheckInSweepWorker.js", async (importOriginal) => {
+  const mod = await importOriginal<
+    typeof import("../server/workers/staleCheckInSweepWorker.js")
+  >();
+  return {
+    ...mod,
+    isStaleCheckInSweepEnabled: vi.fn().mockReturnValue(true),
+    runStaleCheckInSweep: vi.fn(),
+  };
+});
 
 import { createRedisConnection } from "../server/lib/redis.js";
 import {

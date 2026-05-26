@@ -16,6 +16,8 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../
 const LEGACY_START_WORKER_NAMES = [
   "startChargeAlertWorker",
   "startInventoryDeductionWorker",
+  "startExpiryCheckWorker",
+  "startStaleCheckInSweepWorker",
 ] as const;
 
 /** `relative/path.ts:symbol` — frozen allowlist of production import/call sites. */

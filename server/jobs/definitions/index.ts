@@ -212,10 +212,12 @@ export const definitionsByQueue = buildDefinitionsByQueue(
   staticJobDefinitions as readonly AnyJobDefinition[],
 );
 
-/** Phase 1b pilot queues — one worker per queue in {@link startJobRuntime}. */
+/** Phase 1b+ runtime queues — one worker per queue in {@link startJobRuntime}. */
 export const PILOT_QUEUE_NAMES = [
   INVENTORY_DEDUCTION_QUEUE_NAME,
   CHARGE_ALERT_QUEUE_NAME,
+  EXPIRY_CHECK_QUEUE_NAME,
+  STALE_CHECKIN_SWEEP_QUEUE_NAME,
 ] as const;
 
 export type PilotQueueName = (typeof PILOT_QUEUE_NAMES)[number];

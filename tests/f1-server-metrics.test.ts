@@ -235,6 +235,22 @@ vi.mock("../server/workers/chargeAlertWorker.js", async (importOriginal) => {
   };
 });
 
+vi.mock("../server/workers/expiryCheckWorker.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../server/workers/expiryCheckWorker.js")>();
+  return { ...actual, runExpiryCheckWorker: vi.fn().mockResolvedValue(0) };
+});
+
+vi.mock("../server/workers/staleCheckInSweepWorker.js", async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import("../server/workers/staleCheckInSweepWorker.js")
+  >();
+  return {
+    ...actual,
+    isStaleCheckInSweepEnabled: vi.fn().mockReturnValue(true),
+    runStaleCheckInSweep: vi.fn().mockResolvedValue({}),
+  };
+});
+
 import { createRedisConnection } from "../server/lib/redis.js";
 import {
   closeJobRuntime,
@@ -298,7 +314,7 @@ describe("F1b-1 — job_runtime_worker_unavailable counter", () => {
 
     await startJobRuntime();
 
-    expect(getMetricsSnapshot().jobRegistry.jobRuntimeWorkerUnavailable).toBe(2);
+    expect(getMetricsSnapshot().jobRegistry.jobRuntimeWorkerUnavailable).toBe(4);
     expect(mockWorkerCtor).not.toHaveBeenCalled();
   });
 });

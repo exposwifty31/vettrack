@@ -7,13 +7,14 @@
 import { isNull } from "drizzle-orm";
 import { Queue, Worker } from "bullmq";
 import { db, clinicalCheckIns } from "../db.js";
+import { incrementMetric } from "../lib/metrics.js";
 import { createRedisConnection } from "../lib/redis.js";
 import { createLogLimiter, type LogLimiter } from "../lib/log-safety.js";
 
-const STALE_CHECKIN_SWEEP_QUEUE_NAME = "stale-checkin-sweep";
-const STALE_CHECKIN_SWEEP_JOB_NAME = "sweep-stale-checkins";
-const STALE_CHECKIN_SWEEP_CRON = "17 */6 * * *";
-const STALE_CHECKIN_SWEEP_REPEAT_JOB_ID = "repeat-stale-checkin-sweep";
+export const STALE_CHECKIN_SWEEP_QUEUE_NAME = "stale-checkin-sweep";
+export const STALE_CHECKIN_SWEEP_JOB_NAME = "sweep-stale-checkins";
+export const STALE_CHECKIN_SWEEP_CRON = "17 */6 * * *";
+export const STALE_CHECKIN_SWEEP_REPEAT_JOB_ID = "repeat-stale-checkin-sweep";
 
 const FRESH_THRESHOLD_HOURS = 24;
 const STALE_THRESHOLD_HOURS = 36;
@@ -64,7 +65,7 @@ function ageHours(nowMs: number, checkedInAt: Date): number {
   return (nowMs - checkedInAt.getTime()) / (60 * 60 * 1000);
 }
 
-function isEnabled(): boolean {
+export function isStaleCheckInSweepEnabled(): boolean {
   return process.env.STALE_CHECKIN_SWEEP_ENABLED === "true";
 }
 
@@ -201,11 +202,26 @@ export async function runStaleCheckInSweep(now: Date = new Date()): Promise<Swee
 let sweepQueueInitialized = false;
 let sweepQueue: Queue | null = null;
 let sweepWorker: Worker | null = null;
+let legacyWorkerStarterWarned = false;
 
+function warnLegacyWorkerStarterOnce(starterName: string): void {
+  if (legacyWorkerStarterWarned) return;
+  legacyWorkerStarterWarned = true;
+  incrementMetric("legacy_worker_starter_used");
+  console.warn("[legacy-worker-starter]", {
+    event: "legacy_worker_starter_used",
+    starterName,
+  });
+}
+
+/**
+ * @deprecated Use Job Runtime registry execution instead.
+ */
 export async function startStaleCheckInSweepWorker(): Promise<void> {
+  warnLegacyWorkerStarterOnce("startStaleCheckInSweepWorker");
   if (sweepQueueInitialized) return;
 
-  if (!isEnabled()) {
+  if (!isStaleCheckInSweepEnabled()) {
     console.log(
       "[stale-checkin-sweep] disabled by STALE_CHECKIN_SWEEP_ENABLED flag",
     );

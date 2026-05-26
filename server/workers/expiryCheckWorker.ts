@@ -2,13 +2,15 @@ import { and, eq, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { Queue, Worker } from "bullmq";
 import { db, equipment } from "../db.js";
 import { sendPushToAll } from "../lib/push.js";
+import { incrementMetric } from "../lib/metrics.js";
 import { createRedisConnection } from "../lib/redis.js";
 import { loadLocale } from "../../lib/i18n/loader.js";
 import { translate } from "../../lib/i18n/index.js";
 
-const EXPIRY_CHECK_QUEUE_NAME = "expiry-check";
-const EXPIRY_CHECK_JOB_NAME = "check-expiry";
-const EXPIRY_CHECK_CRON = "0 8 * * *";
+export const EXPIRY_CHECK_QUEUE_NAME = "expiry-check";
+export const EXPIRY_CHECK_JOB_NAME = "check-expiry";
+export const EXPIRY_CHECK_CRON = "0 8 * * *";
+export const EXPIRY_CHECK_REPEAT_JOB_ID = "repeat-expiry-check";
 
 type ExpiringEquipmentRow = {
   id: string;
@@ -127,8 +129,23 @@ export async function runExpiryCheckWorker(): Promise<number> {
 let expiryCheckQueueInitialized = false;
 let expiryCheckQueue: Queue | null = null;
 let expiryCheckJobWorker: Worker | null = null;
+let legacyWorkerStarterWarned = false;
 
+function warnLegacyWorkerStarterOnce(starterName: string): void {
+  if (legacyWorkerStarterWarned) return;
+  legacyWorkerStarterWarned = true;
+  incrementMetric("legacy_worker_starter_used");
+  console.warn("[legacy-worker-starter]", {
+    event: "legacy_worker_starter_used",
+    starterName,
+  });
+}
+
+/**
+ * @deprecated Use Job Runtime registry execution instead.
+ */
 export async function startExpiryCheckWorker(): Promise<void> {
+  warnLegacyWorkerStarterOnce("startExpiryCheckWorker");
   if (expiryCheckQueueInitialized) return;
   const queueConnection = await createRedisConnection();
   const workerConnection = await createRedisConnection();
@@ -159,7 +176,7 @@ export async function startExpiryCheckWorker(): Promise<void> {
     EXPIRY_CHECK_JOB_NAME,
     {},
     {
-      jobId: "repeat-expiry-check",
+      jobId: EXPIRY_CHECK_REPEAT_JOB_ID,
       repeat: { pattern: EXPIRY_CHECK_CRON },
       removeOnComplete: 50,
       removeOnFail: 100,

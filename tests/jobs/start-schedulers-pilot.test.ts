@@ -10,9 +10,11 @@ const schedulersSrc = fs.readFileSync(
 );
 
 describe("start-schedulers Phase 1b pilot wiring", () => {
-  it("uses startJobRuntime instead of legacy inventory/charge worker starters", () => {
+  it("uses startJobRuntime instead of legacy BullMQ worker starters migrated to runtime", () => {
     expect(schedulersSrc).toContain("startJobRuntime");
     expect(schedulersSrc).not.toContain("startChargeAlertWorker");
     expect(schedulersSrc).not.toContain("startInventoryDeductionWorker");
+    expect(schedulersSrc).not.toContain("startExpiryCheckWorker");
+    expect(schedulersSrc).not.toContain("startStaleCheckInSweepWorker");
   });
 });

@@ -5,12 +5,27 @@ import { createRedisConnection } from "../lib/redis.js";
 import { processChargeAlertJob, bindChargeAlertProducerQueue } from "../workers/chargeAlertWorker.js";
 import { processInventoryDeductionJob } from "../workers/inventory-deduction.worker.js";
 import {
+  runExpiryCheckWorker,
+  EXPIRY_CHECK_CRON,
+  EXPIRY_CHECK_REPEAT_JOB_ID,
+} from "../workers/expiryCheckWorker.js";
+import {
+  runStaleCheckInSweep,
+  isStaleCheckInSweepEnabled,
+  STALE_CHECKIN_SWEEP_CRON,
+  STALE_CHECKIN_SWEEP_REPEAT_JOB_ID,
+} from "../workers/staleCheckInSweepWorker.js";
+import {
   type ChargeAlertJobPayload,
   definitionsByQueue,
+  EXPIRY_CHECK_JOB_NAME,
+  EXPIRY_CHECK_QUEUE_NAME,
   getStaticJobDefinition,
   isPilotQueueName,
   PILOT_QUEUE_NAMES,
   resolveDefinitionForJobName,
+  STALE_CHECKIN_SWEEP_JOB_NAME,
+  STALE_CHECKIN_SWEEP_QUEUE_NAME,
 } from "./definitions/index.js";
 import { INVENTORY_DEDUCTION_QUEUE_NAME } from "../queues/inventory-deduction.queue.js";
 import { CHARGE_ALERT_QUEUE_NAME } from "../workers/chargeAlertWorker.js";
@@ -31,6 +46,15 @@ import {
 } from "./runtime-readiness.js";
 
 const runtimeWorkers: RuntimeWorkerEntry[] = [];
+const repeatJobsRegistered = new Set<string>();
+
+function workerFailedLogTag(queueName: string): string {
+  if (queueName === INVENTORY_DEDUCTION_QUEUE_NAME) return "inventory-deduction";
+  if (queueName === CHARGE_ALERT_QUEUE_NAME) return "charge-alert-worker";
+  if (queueName === EXPIRY_CHECK_QUEUE_NAME) return "expiry-check-worker";
+  if (queueName === STALE_CHECKIN_SWEEP_QUEUE_NAME) return "stale-checkin-sweep";
+  return "job-runtime";
+}
 
 function buildJobContext(job: Job): JobContext {
   const data = job.data as { clinicId?: string } | undefined;
@@ -67,6 +91,16 @@ async function runPilotJob(queueName: string, job: Job): Promise<void> {
     return;
   }
 
+  if (queueName === EXPIRY_CHECK_QUEUE_NAME) {
+    await runExpiryCheckWorker();
+    return;
+  }
+
+  if (queueName === STALE_CHECKIN_SWEEP_QUEUE_NAME) {
+    await runStaleCheckInSweep();
+    return;
+  }
+
   if (definition.handler) {
     await definition.handler(job.data, ctx);
     return;
@@ -75,6 +109,47 @@ async function runPilotJob(queueName: string, job: Job): Promise<void> {
   throw new Error(
     `No pilot handler wired for queue=${queueName} job.name=${job.name}`,
   );
+}
+
+async function ensureQueueCronRepeatJob(
+  queueName: string,
+  jobName: string,
+  jobId: string,
+  cron: string,
+): Promise<void> {
+  if (repeatJobsRegistered.has(queueName)) return;
+
+  const definition = definitionsByQueue.get(queueName)?.[0];
+  if (!definition) return;
+
+  try {
+    const queue = await getOrCreateQueue({
+      queueName,
+      defaultJobOptions: mergeEnqueueJobOptions(definition),
+      logLabel: `${queueName}-queue`,
+    });
+    await queue.add(
+      jobName,
+      {},
+      {
+        jobId,
+        repeat: { pattern: cron },
+        removeOnComplete: 50,
+        removeOnFail: 100,
+      },
+    );
+    repeatJobsRegistered.add(queueName);
+    console.log("[job-runtime] repeat job scheduled", {
+      queueName,
+      jobName,
+      cron,
+    });
+  } catch (err) {
+    console.warn("[job-runtime] repeat job unavailable", {
+      queueName,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 async function ensureChargeAlertProducerQueue(): Promise<void> {
@@ -123,13 +198,7 @@ async function startPilotWorker(
   );
 
   worker.on("failed", (job, error) => {
-    const logTag =
-      queueName === INVENTORY_DEDUCTION_QUEUE_NAME
-        ? "inventory-deduction"
-        : queueName === CHARGE_ALERT_QUEUE_NAME
-          ? "charge-alert-worker"
-          : "job-runtime";
-    console.error(`[${logTag}] job failed`, {
+    console.error(`[${workerFailedLogTag(queueName)}] job failed`, {
       jobId: job?.id,
       name: job?.name,
       message: error.message,
@@ -165,7 +234,35 @@ export async function startJobRuntime(): Promise<void> {
   const results: Array<{ name: string; ok: boolean }> = [];
   for (const queueName of PILOT_QUEUE_NAMES) {
     if (!isPilotQueueName(queueName)) continue;
-    results.push(await startPilotWorker(queueName));
+
+    if (queueName === STALE_CHECKIN_SWEEP_QUEUE_NAME && !isStaleCheckInSweepEnabled()) {
+      console.log(
+        "[job-runtime] stale-checkin-sweep skipped (STALE_CHECKIN_SWEEP_ENABLED flag)",
+      );
+      results.push({ name: queueName, ok: true });
+      continue;
+    }
+
+    const workerResult = await startPilotWorker(queueName);
+    results.push(workerResult);
+
+    if (workerResult.ok) {
+      if (queueName === EXPIRY_CHECK_QUEUE_NAME) {
+        await ensureQueueCronRepeatJob(
+          EXPIRY_CHECK_QUEUE_NAME,
+          EXPIRY_CHECK_JOB_NAME,
+          EXPIRY_CHECK_REPEAT_JOB_ID,
+          EXPIRY_CHECK_CRON,
+        );
+      } else if (queueName === STALE_CHECKIN_SWEEP_QUEUE_NAME) {
+        await ensureQueueCronRepeatJob(
+          STALE_CHECKIN_SWEEP_QUEUE_NAME,
+          STALE_CHECKIN_SWEEP_JOB_NAME,
+          STALE_CHECKIN_SWEEP_REPEAT_JOB_ID,
+          STALE_CHECKIN_SWEEP_CRON,
+        );
+      }
+    }
   }
 
   setJobRuntimeReadinessState({
@@ -207,5 +304,6 @@ export { getRuntimeReadiness } from "./runtime-readiness.js";
 /** Test-only: reset runtime singleton state without closing Redis. */
 export function resetJobRuntimeStateForTests(): void {
   runtimeWorkers.length = 0;
+  repeatJobsRegistered.clear();
   resetJobRuntimeReadinessForTests();
 }
