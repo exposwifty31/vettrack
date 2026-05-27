@@ -28,6 +28,7 @@ import { recoverPendingInventoryJobs } from "../lib/inventory-job-recovery.js";
 import { startEquipmentConditionStalenessWorker } from "../workers/equipmentConditionStalenessWorker.js";
 import { startStagingExpiryWorker } from "../workers/stagingExpiryWorker.js";
 import { startProcedureBoundReleaseWorker } from "../workers/procedureBoundReleaseWorker.js";
+import { startEquipmentWaitlistReservationWorker } from "../workers/equipment-waitlist-reservation.worker.js";
 
 export async function startBackgroundSchedulers() {
   if (process.env.NODE_ENV === "test") {
@@ -77,6 +78,7 @@ export async function startBackgroundSchedulers() {
   startEquipmentConditionStalenessWorker();
   startStagingExpiryWorker();
   startProcedureBoundReleaseWorker();
+  startEquipmentWaitlistReservationWorker();
 
   // Re-enqueue stale/failed inventory deduction jobs every 10 minutes.
   try {

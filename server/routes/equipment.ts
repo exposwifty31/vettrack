@@ -19,6 +19,9 @@ import { recordOperationalMetric } from "../services/operational-metrics.service
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
 import { enqueueChargeAlertJob } from "../workers/chargeAlertWorker.js";
 import { promoteStagingQueueNext } from "../lib/staging-promotion.js";
+import { promoteEquipmentWaitlistWithNotify } from "../lib/equipment-waitlist-promotion.js";
+import { fulfillWaitlistOnCheckout } from "../services/equipment-waitlist.service.js";
+import { mountEquipmentWaitlistRoutes } from "./equipment-waitlist.js";
 import { EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS } from "../lib/equipment-replay-idempotency.js";
 import { equipmentReplayIdempotency } from "../middleware/equipment-replay-idempotency.js";
 
@@ -1603,6 +1606,8 @@ router.post(
           .where(and(eq(stagingQueue.id, v1StageClaimId), eq(stagingQueue.equipmentId, req.params.id)));
       }
 
+      await fulfillWaitlistOnCheckout(tx, clinicId, req.params.id, req.authUser!.id, checkoutTime);
+
       // V1: realtime event
       await insertRealtimeDomainEvent(tx, {
           clinicId,
@@ -1705,6 +1710,7 @@ router.post(
     let updated: EquipmentRow | null = null;
     let undoToken = "";
     let alreadyReturned = false;
+    let didTransitionCustody = false;
 
     await db.transaction(async (tx) => {
       const [existing] = await tx
@@ -1726,6 +1732,7 @@ router.post(
 
       const returnTime = clientTimestamp ? new Date(clientTimestamp) : new Date();
       const transitionCustody = existing.custodyState === "checked_out";
+      if (transitionCustody) didTransitionCustody = true;
 
       let hasActiveClaims = false;
       if (transitionCustody) {
@@ -1813,6 +1820,10 @@ router.post(
         });
       }
     });
+
+    if (updated && didTransitionCustody) {
+      void promoteEquipmentWaitlistWithNotify(clinicId, req.params.id, "return");
+    }
 
     if (!updated) {
       return res.status(404).json(
@@ -2860,5 +2871,7 @@ router.post(
     }
   }
 );
+
+mountEquipmentWaitlistRoutes(router);
 
 export default router;

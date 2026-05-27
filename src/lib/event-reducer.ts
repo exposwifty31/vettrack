@@ -12,6 +12,10 @@ import type {
 } from "@/types/cop-alerts";
 
 import type { RealtimeEvent } from "@/types/realtime-events";
+import { invalidateEquipmentCaches } from "@/lib/equipment-realtime";
+import { getCurrentUserId } from "@/lib/auth-store";
+import { toast } from "sonner";
+import { t } from "@/lib/i18n";
 
 
 
@@ -344,6 +348,55 @@ export async function applyEvent(client: QueryClient, event: RealtimeEvent): Pro
     }
 
 
+
+    case "EQUIPMENT_CUSTODY_STATE_CHANGED":
+    case "EQUIPMENT_USAGE_STATE_CHANGED":
+    case "EQUIPMENT_READINESS_STATE_CHANGED":
+    case "EQUIPMENT_DOCK_RETURN":
+    case "EQUIPMENT_STAGED":
+    case "EQUIPMENT_STAGE_CANCELLED":
+    case "EQUIPMENT_EMERGENCY_CHECKOUT":
+    case "EQUIPMENT_WAITLIST_JOINED":
+    case "EQUIPMENT_WAITLIST_LEFT":
+    case "EQUIPMENT_WAITLIST_EXPIRED": {
+      const equipmentId =
+        typeof event.payload === "object" &&
+        event.payload !== null &&
+        "equipmentId" in event.payload &&
+        typeof (event.payload as { equipmentId: unknown }).equipmentId === "string"
+          ? (event.payload as { equipmentId: string }).equipmentId
+          : undefined;
+      await invalidateEquipmentCaches(client, equipmentId);
+      return;
+    }
+
+    case "EQUIPMENT_WAITLIST_AVAILABLE": {
+      const payload = event.payload as { equipmentId?: string };
+      await invalidateEquipmentCaches(client, payload.equipmentId);
+      return;
+    }
+
+    case "EQUIPMENT_WAITLIST_PROMOTED": {
+      const payload = event.payload as {
+        equipmentId?: string;
+        userId?: string;
+      };
+      const equipmentId = payload.equipmentId;
+      await invalidateEquipmentCaches(client, equipmentId);
+      const currentUserId = getCurrentUserId();
+      if (equipmentId && payload.userId && currentUserId && payload.userId === currentUserId) {
+        toast.success(t.equipmentWaitlist.promotedToast, {
+          description: t.equipmentWaitlist.promotedToastDescription,
+          action: {
+            label: t.equipmentWaitlist.viewDevice,
+            onClick: () => {
+              window.location.href = `/equipment/${equipmentId}`;
+            },
+          },
+        });
+      }
+      return;
+    }
 
     default:
 

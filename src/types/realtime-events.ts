@@ -33,7 +33,19 @@ export type RealtimeEventType =
   /** Medication task completed without a prior matching cabinet dispense (probable leftover use). */
   | "PROBABLE_ORPHAN_USAGE"
   /** Reconcile or retroactive billing cleared a shadow-inventory alert. */
-  | "SHADOW_ORPHAN_ALERT_RESOLVED";
+  | "SHADOW_ORPHAN_ALERT_RESOLVED"
+  | "EQUIPMENT_CUSTODY_STATE_CHANGED"
+  | "EQUIPMENT_USAGE_STATE_CHANGED"
+  | "EQUIPMENT_READINESS_STATE_CHANGED"
+  | "EQUIPMENT_DOCK_RETURN"
+  | "EQUIPMENT_STAGED"
+  | "EQUIPMENT_STAGE_CANCELLED"
+  | "EQUIPMENT_EMERGENCY_CHECKOUT"
+  | "EQUIPMENT_WAITLIST_JOINED"
+  | "EQUIPMENT_WAITLIST_LEFT"
+  | "EQUIPMENT_WAITLIST_PROMOTED"
+  | "EQUIPMENT_WAITLIST_AVAILABLE"
+  | "EQUIPMENT_WAITLIST_EXPIRED";
 
 export type RealtimeEvent = {
   type: RealtimeEventType;

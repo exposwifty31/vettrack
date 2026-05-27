@@ -2823,6 +2823,33 @@
     "confirmRelease": "לשחרר את הציוד מהפרוצדורה?",
     "confirmReleaseDescription": "הציוד יחזור למצב זמין ויסומן כלא ידוע — נדרש dock-return לפני פריסה."
   },
+  "equipmentWaitlist": {
+    "title": "תור המתנה לציוד",
+    "join": "הצטרף לתור",
+    "leave": "עזוב תור",
+    "queueSize": "בתור",
+    "myPosition": "המיקום שלך",
+    "notifiedBanner": "המכשיר שמור עבורך",
+    "reservedForYou": {
+      "title": "שמור עבורך",
+      "subtitle": "בצע checkout למכשיר בתוך {minutesRemaining} דקות",
+      "checkout": "בצע checkout למכשיר",
+      "expiresIn": "ההזמנה מסתיימת בעוד",
+      "nextInLine": "אתה הבא בתור"
+    },
+    "reservationExpires": "ההזמנה מסתיימת",
+    "offlineBlocked": "תור ההמתנה דורש חיבור לאינטרנט",
+    "promotedTitle": "המכשיר זמין עבורך",
+    "promotedBody": "ניתן לבצע checkout של {name} — יש לך {minutes} דקות",
+    "promotedToast": "המכשיר זמין עבורך",
+    "promotedToastDescription": "בצע checkout לפני שפג תוקף ההזמנה",
+    "viewDevice": "פתח מכשיר",
+    "WAITLIST_NOT_IN_USE": "המכשיר לא מושאל למשתמש אחר",
+    "WAITLIST_SELF_CHECKOUT": "כבר ביצעת checkout למכשיר זה",
+    "WAITLIST_ALREADY_JOINED": "כבר נמצאת בתור",
+    "WAITLIST_NOT_ON_WAITLIST": "אינך בתור",
+    "EQUIPMENT_NOT_FOUND": "ציוד לא נמצא"
+  },
   "operationalMetrics": {
     "title": "מדדים תפעוליים",
     "emergencyOverrides": "עקיפות חירום",

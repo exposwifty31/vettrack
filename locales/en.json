@@ -2823,6 +2823,33 @@
     "confirmRelease": "Release this equipment from the procedure?",
     "confirmReleaseDescription": "Equipment will return to available and be marked unknown — dock-return required before deployment."
   },
+  "equipmentWaitlist": {
+    "title": "Device waitlist",
+    "join": "Join waitlist",
+    "leave": "Leave waitlist",
+    "queueSize": "In queue",
+    "myPosition": "Your position",
+    "notifiedBanner": "This device is reserved for you",
+    "reservedForYou": {
+      "title": "Reserved for you",
+      "subtitle": "Check out this device within {minutesRemaining} minutes",
+      "checkout": "Check Out Device",
+      "expiresIn": "Reservation ends in",
+      "nextInLine": "You are next in line"
+    },
+    "reservationExpires": "Reservation ends",
+    "offlineBlocked": "Waitlist requires an internet connection",
+    "promotedTitle": "Device available for you",
+    "promotedBody": "{name} is available — you have {minutes} minutes to check out",
+    "promotedToast": "Device available for you",
+    "promotedToastDescription": "Check out before your reservation expires",
+    "viewDevice": "Open device",
+    "WAITLIST_NOT_IN_USE": "Device is not checked out to another user",
+    "WAITLIST_SELF_CHECKOUT": "You already have this device checked out",
+    "WAITLIST_ALREADY_JOINED": "You are already on the waitlist",
+    "WAITLIST_NOT_ON_WAITLIST": "You are not on the waitlist",
+    "EQUIPMENT_NOT_FOUND": "Equipment not found"
+  },
   "operationalMetrics": {
     "title": "Operational metrics",
     "emergencyOverrides": "Emergency overrides",

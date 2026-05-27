@@ -209,7 +209,12 @@ export type AuditActionType =
   | "equipment_staged"
   | "equipment_stage_cancelled"
   | "equipment_stage_fulfilled"
-  | "equipment_stage_expired";
+  | "equipment_stage_expired"
+  | "equipment_waitlist_joined"
+  | "equipment_waitlist_left"
+  | "equipment_waitlist_promoted"
+  | "equipment_waitlist_expired"
+  | "equipment_waitlist_fulfilled";
 
 export interface LogAuditParams {
   clinicId: string;

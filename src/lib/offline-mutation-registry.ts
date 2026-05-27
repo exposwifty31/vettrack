@@ -105,6 +105,12 @@ export const offlineOnlineRequiredDomains: readonly OnlineRequiredRegistryEntry[
     hasEnqueueProducer: false,
   },
   {
+    key: "equipment.waitlist",
+    policy: "online-required",
+    reason: "Equipment waitlist join/leave requires live queue state",
+    hasEnqueueProducer: false,
+  },
+  {
     key: "medication.complete",
     policy: "online-required",
     reason: "Requires authoritative billing/inventory/clinical state",
