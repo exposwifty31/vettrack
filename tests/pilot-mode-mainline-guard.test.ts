@@ -2,7 +2,11 @@ import { describe, expect, it, afterEach } from "vitest";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { resolveBackendPilotMode, resolveFrontendPilotMode } from "../server/lib/build-info.js";
+import {
+  loadBuildInfo,
+  resolveBackendPilotMode,
+  resolveFrontendPilotMode,
+} from "../server/lib/build-info.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -67,8 +71,14 @@ describe("resolveBackendPilotMode", () => {
 });
 
 describe("resolveFrontendPilotMode", () => {
-  it("returns null when build-info.json is absent (typical unit-test / pre-build env)", () => {
-    expect(resolveFrontendPilotMode()).toBeNull();
+  it("returns null without build-info.json, otherwise reflects vitePilotMode", () => {
+    const info = loadBuildInfo();
+    const mode = resolveFrontendPilotMode();
+    if (!info) {
+      expect(mode).toBeNull();
+    } else {
+      expect(mode).toBe(info.vitePilotMode === true);
+    }
   });
 });
 
