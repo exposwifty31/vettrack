@@ -189,9 +189,37 @@ Notes:
 
 ---
 
-## 5) Railway CLI (Cloud Agent secrets)
+## 5) Railway CLI and MCP
 
-**Only configure `RAILWAY_TOKEN`** in Cursor → Cloud Agent secrets. Remove or dismiss:
+### Two tokens (do not mix them up)
+
+| Variable | Token type | Create at | Works for |
+|----------|------------|-----------|-----------|
+| `RAILWAY_TOKEN` | **Project** | Project → Settings → Tokens | `railway status`, `railway up`, `deploy.sh` |
+| `RAILWAY_API_TOKEN` | **Account** (“No workspace”) | Profile → Account settings → Tokens | `railway whoami`, `railway list`, **`railway mcp`**, MCP in Cursor |
+
+If both are set, the CLI may prefer `RAILWAY_TOKEN` and account commands fail with `Unauthorized` even when the API token is valid. For MCP/whoami: `unset RAILWAY_TOKEN` and use only `RAILWAY_API_TOKEN`.
+
+Verify an account token:
+
+```bash
+unset RAILWAY_TOKEN
+export RAILWAY_API_TOKEN='your-account-token'
+railway whoami
+```
+
+### MCP in Cursor (repo config)
+
+PR **#505** added tracked [`.cursor/mcp.json`](../.cursor/mcp.json) (CLI: `railway` + `args: ["mcp"]`). **Do not commit tokens** into that file.
+
+1. Install CLI: `bash <(curl -fsSL railway.com/install.sh) --agents -y` then `source "$HOME/.railway/env"`.
+2. Set **`RAILWAY_API_TOKEN`** in Cursor → MCP server env (or Cloud Agent secrets for cloud VMs) — not in git.
+3. Reload: **Developer: Reload Window**, or quit and reopen Cursor; check **Output → MCP** for `railway`.
+4. `railway login` needs an interactive TTY (Desktop terminal); cloud agents must use a token.
+
+### Cloud Agent secrets (injections)
+
+**For deploy/status only**, keep **`RAILWAY_TOKEN`** (project) in Cloud Agent secrets. Remove or dismiss:
 
 - `RAILWAY_API_TOKEN` (account token; conflicts with project token for some commands)
 - `RAILWAY_TOKEN_STAGING`, `RAILWAY_SERVICE_STAGING`
