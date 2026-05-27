@@ -8,6 +8,8 @@ Use `docs/cloud-agent-starter-skill.md` as the default quickstart runbook for en
 ### Cursor project rules (IDE agents)
 Persistent guidance for Cursor (and compatible agents) lives under `.cursor/rules/*.mdc`. The umbrella rule **`engineering-and-agent-principles.mdc`** is always applied and stacks with focused rules such as `typescript-standards.mdc`, `express-server.mdc`, and `vettrack-stabilization-plan.mdc`. For rationale, impact, and how to maintain these rules over time, see `docs/engineering-rules-rollout.md`.
 
+**Codex PR reviews:** Address every **chatgpt-codex-connector** inline comment before merge — fix in code, push, and reply on the thread. See `.cursor/rules/codex-review-comments.mdc`.
+
 ### Architecture
 VetTrack is a single full-stack app: React 18 + Vite frontend (port 5000) and Express + TypeScript backend (port 3001), backed by PostgreSQL. **Canonical architecture references:** `README.md` (overview, frozen architecture topics) and `CLAUDE.md` (engineering rules, post-Phase-9 doctrine). `CONTEXT.md` holds the clinical glossary. `replit.md` is a historical snapshot.
 

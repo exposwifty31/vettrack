@@ -202,3 +202,13 @@ When removing a feature, delete in order (same PR or sequenced): **UI components
 4. Before adding a DB column, add a query using it.  
 5. Before adding a locale key, add **`t.`** usage.  
 6. After structural removal, **`knip`** + **`npx tsc --noEmit`**; TS errors may expose missed dependents — fix or revert deletion scope.
+
+## Codex PR review comments
+
+When **chatgpt-codex-connector** (Codex) comments on a pull request:
+
+1. Read every inline thread before merge (`gh api repos/.../pulls/<n>/comments`).
+2. Fix valid P1/P2 feedback in code; do not merge with unresolved Codex threads.
+3. Gate noisy debug logs separately from operational errors (e.g. `AUTOMATION_RULE_*` behind `ENABLE_AUTOMATION_DEBUG`; keep `AUTOMATION_ERROR` on `console.error`).
+4. Push the fix and reply on the Codex thread summarizing the change.
+5. Re-run `npx tsc --noEmit` and targeted tests for touched files.
