@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "description": "Known madge circular dependency chains. CI fails when a new cycle appears. Shrink only via intentional PR updating this file.",
+  "cycles": {
+    "server": [
+      "lib/metrics.ts > lib/display-heartbeat-store.ts > lib/redis.ts > lib/circuit-breaker.ts",
+      "queues/inventory-deduction.queue.ts > jobs/enqueue.ts > jobs/definitions/index.ts",
+      "jobs/enqueue.ts > jobs/definitions/index.ts > workers/chargeAlertWorker.ts",
+      "services/clinical-check-in.ts > lib/authority-cache.ts"
+    ],
+    "src": ["lib/api.ts > lib/er-api.ts"]
+  }
+}

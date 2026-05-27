@@ -125,6 +125,40 @@ jobs:
       - name: 🔌 Integration ops suite
         run: pnpm test:integration:ops
 
+  architecture-gates:
+    name: 🏛️ Architecture gates (G1)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ⬇️ Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: 🟢 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: 📥 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🔷 TypeScript (frontend)
+        run: pnpm exec tsc --noEmit
+
+      - name: 🔷 TypeScript (server)
+        run: pnpm exec tsc --noEmit --project tsconfig.server-check.json
+
+      - name: 🛡️ dependency-cruiser
+        run: pnpm exec depcruise --config .dependency-cruiser.cjs --output-type err --ignore-known .dependency-cruiser-known-violations.json server src
+
+      - name: 🔄 madge cycle baseline
+        run: node scripts/architecture/compare-cycles.mjs
+
   deploy-check:
     name: 🚀 Deploy pre-flight
     runs-on: ubuntu-latest
@@ -229,7 +263,7 @@ jobs:
   gate:
     name: ✅ Merge gate
     runs-on: ubuntu-latest
-    needs: [test, integration-ops, deploy-check, deploy]
+    needs: [test, integration-ops, architecture-gates, deploy-check, deploy]
     if: always()
 
     steps:
@@ -241,6 +275,10 @@ jobs:
           fi
           if [[ "${{ needs.integration-ops.result }}" != "success" ]]; then
             echo "❌ Integration ops failed — blocking merge"
+            exit 1
+          fi
+          if [[ "${{ needs.architecture-gates.result }}" != "success" ]]; then
+            echo "❌ Architecture gates failed — blocking merge"
             exit 1
           fi
           if [[ "${{ needs.deploy-check.result }}" != "success" ]]; then

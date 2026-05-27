@@ -1,0 +1,756 @@
+[
+  {
+    "type": "dependency",
+    "from": "server/lib/forecast/approveGuard.ts",
+    "to": "src/lib/forecast/approveGate.ts",
+    "unresolvedTo": "../../../src/lib/forecast/approveGate.js",
+    "dependencyTypes": [
+      "local",
+      "export"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-server-to-frontend"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "server/lib/forecast/confidenceScorer.ts",
+    "to": "src/lib/constants/regex.ts",
+    "unresolvedTo": "../../../src/lib/constants/regex.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-server-to-frontend"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "server/lib/forecast/emailBuilder.ts",
+    "to": "src/shared/normalizeQuantityKey.ts",
+    "unresolvedTo": "../../../src/shared/normalizeQuantityKey.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-server-to-frontend"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "server/lib/forecast/flowsheetPreprocess.ts",
+    "to": "src/lib/constants/regex.ts",
+    "unresolvedTo": "../../../src/lib/constants/regex.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-server-to-frontend"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "server/lib/forecast/medicationLineCleanup.ts",
+    "to": "src/lib/constants/regex.ts",
+    "unresolvedTo": "../../../src/lib/constants/regex.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-server-to-frontend"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "server/lib/forecast/mergeApproval.ts",
+    "to": "src/shared/normalizeQuantityKey.ts",
+    "unresolvedTo": "../../../src/shared/normalizeQuantityKey.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-server-to-frontend"
+    }
+  },
+  {
+    "type": "cycle",
+    "from": "server/jobs/definitions/index.ts",
+    "to": "server/queues/inventory-deduction.queue.ts",
+    "unresolvedTo": "../../queues/inventory-deduction.queue.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "warn",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "server/queues/inventory-deduction.queue.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "server/jobs/enqueue.ts",
+        "dependencyTypes": [
+          "local",
+          "dynamic-import"
+        ]
+      },
+      {
+        "name": "server/jobs/definitions/index.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "server/jobs/definitions/index.ts",
+    "to": "server/workers/chargeAlertWorker.ts",
+    "unresolvedTo": "../../workers/chargeAlertWorker.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "warn",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "server/workers/chargeAlertWorker.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "server/jobs/enqueue.ts",
+        "dependencyTypes": [
+          "local",
+          "dynamic-import"
+        ]
+      },
+      {
+        "name": "server/jobs/definitions/index.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "server/lib/authority-cache.ts",
+    "to": "server/services/clinical-check-in.ts",
+    "unresolvedTo": "../services/clinical-check-in.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "warn",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "server/services/clinical-check-in.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "server/lib/authority-cache.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "server/lib/circuit-breaker.ts",
+    "to": "server/lib/metrics.ts",
+    "unresolvedTo": "./metrics.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "warn",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "server/lib/metrics.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "server/lib/display-heartbeat-store.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "server/lib/redis.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "server/lib/circuit-breaker.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/hooks/use-auth.tsx",
+    "to": "src/lib/api.ts",
+    "unresolvedTo": "@/lib/api",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "warn",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/lib/api.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/hooks/useCodeBlueSession.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "type-import"
+        ]
+      },
+      {
+        "name": "src/hooks/use-auth.tsx",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/hooks/use-auth.tsx",
+    "to": "src/lib/sync-engine.ts",
+    "unresolvedTo": "@/lib/sync-engine",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "warn",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/lib/sync-engine.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/lib/offline-post-sync-reconciliation.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/lib/event-reducer.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/lib/api.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/hooks/useCodeBlueSession.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "type-import"
+        ]
+      },
+      {
+        "name": "src/hooks/use-auth.tsx",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/hooks/useCodeBlueSession.ts",
+    "to": "src/lib/api.ts",
+    "unresolvedTo": "@/lib/api",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "warn",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/lib/api.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/hooks/useCodeBlueSession.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "type-import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/hooks/useCodeBlueSession.ts",
+    "to": "src/lib/realtime.ts",
+    "unresolvedTo": "@/lib/realtime",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "warn",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/lib/realtime.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/lib/api.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/hooks/useCodeBlueSession.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "type-import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/lib/api.ts",
+    "to": "src/lib/er-api.ts",
+    "unresolvedTo": "./er-api",
+    "dependencyTypes": [
+      "local",
+      "export"
+    ],
+    "rule": {
+      "severity": "warn",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/lib/er-api.ts",
+        "dependencyTypes": [
+          "local",
+          "export"
+        ]
+      },
+      {
+        "name": "src/lib/api.ts",
+        "dependencyTypes": [
+          "local",
+          "type-import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/lib/event-reducer.ts",
+    "to": "src/lib/api.ts",
+    "unresolvedTo": "@/lib/api",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "warn",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/lib/api.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/hooks/useCodeBlueSession.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "type-import"
+        ]
+      },
+      {
+        "name": "src/lib/realtime.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/lib/event-reducer.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/lib/event-reducer.ts",
+    "to": "src/lib/er-api.ts",
+    "unresolvedTo": "@/lib/er-api",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "warn",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/lib/er-api.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/lib/api.ts",
+        "dependencyTypes": [
+          "local",
+          "type-import"
+        ]
+      },
+      {
+        "name": "src/hooks/useCodeBlueSession.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "type-import"
+        ]
+      },
+      {
+        "name": "src/hooks/use-auth.tsx",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/lib/sync-engine.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/lib/offline-post-sync-reconciliation.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/lib/event-reducer.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/lib/sync-engine.ts",
+    "to": "src/lib/offline-sync-telemetry-reporter.ts",
+    "unresolvedTo": "./offline-sync-telemetry-reporter",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "warn",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/lib/offline-sync-telemetry-reporter.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/lib/api.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/hooks/useCodeBlueSession.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "type-import"
+        ]
+      },
+      {
+        "name": "src/hooks/use-auth.tsx",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/lib/sync-engine.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/lib/sync-engine.ts",
+    "to": "src/lib/sync-engine-telemetry.ts",
+    "unresolvedTo": "./sync-engine-telemetry",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "warn",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/lib/sync-engine-telemetry.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/lib/api.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/hooks/useCodeBlueSession.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "type-import"
+        ]
+      },
+      {
+        "name": "src/hooks/use-auth.tsx",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/lib/sync-engine.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "dependency",
+    "from": "src/features/er/components/ErModeGuard.tsx",
+    "to": "src/pages/not-found.tsx",
+    "unresolvedTo": "@/pages/not-found",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "dynamic-import"
+    ],
+    "rule": {
+      "severity": "warn",
+      "name": "no-features-to-pages-internals"
+    }
+  }
+]
