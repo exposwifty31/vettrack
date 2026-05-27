@@ -273,7 +273,11 @@ No new tables. Pilot features use:
 
 ## Turning pilot mode off
 
-Set `VITE_PILOT_MODE` to anything other than `"true"` (or omit it) and rebuild. All pilot UI branches vanish. The backend pilot routes return 404 when `PILOT_MODE` is unset. Existing `vt_scan_logs` data and the `pilot_stale_ms` config key are inert but harmless.
+1. In Railway (or host env): **unset** `PILOT_MODE` and `VITE_PILOT_MODE`, or set both to `"false"`.
+2. **Redeploy with a fresh frontend build** — `VITE_*` is compile-time; changing env without `pnpm build` leaves pilot UI baked in.
+3. Verify: `curl -sS https://<host>/api/version` → `pilotMode.backend` and `pilotMode.frontend` must be `false`.
+
+Mainline `railway.json` / `nixpacks.toml` builds force `VITE_PILOT_MODE=false`. Production startup **fails** if `PILOT_MODE=true` without `ALLOW_EQUIPMENT_PILOT_MODE=true`.
 
 ---
 

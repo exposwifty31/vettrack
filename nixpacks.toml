@@ -5,7 +5,8 @@ nixPkgs = ["nodejs_22"]
 cmds = ["npm install -g pnpm", "NODE_ENV=development pnpm install --frozen-lockfile"]
 
 [phases.build]
-cmds = ["pnpm build"]
+# Mainline deploys must not bake equipment-only pilot UI (VITE_* is compile-time).
+cmds = ["VITE_PILOT_MODE=false pnpm build"]
 
 [start]
 cmd = "pnpm start"
