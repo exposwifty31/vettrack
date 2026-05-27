@@ -52,6 +52,7 @@ export const PLAYWRIGHT_SUITE_MATCH: Record<string, string[]> = {
   waitlist: [
     'equipment-waitlist-sse.spec.ts',
     'equipment-waitlist-paginated-list.spec.ts',
+    'equipment-waitlist-two-browser.spec.ts',
   ],
 };
 

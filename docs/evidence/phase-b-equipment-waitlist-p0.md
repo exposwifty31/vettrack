@@ -84,7 +84,38 @@ pnpm run typecheck
 | `DATABASE_URL=... pnpm test:integration:ops` | **61 passed** (7 waitlist + 54 operational-state) |
 | `PW_SUITE=waitlist pnpm test:playwright:waitlist` | **1 passed**, 1 skipped (browser list needs Vite :5000) |
 
-### Two-browser / manual SSE
+### Two-browser proof (Playwright)
 
-- **Automated:** `equipment-waitlist-sse.spec.ts` exercises **two dev users** (`dev-user-alpha` / `dev-user-beta`) via API + `/api/realtime/replay` + paginated `GET /api/equipment` — not two Playwright browser contexts.
-- **Not in PR:** recorded manual QA with network HAR/timestamps. Program Brain may accept API replay + contract + integration as equivalent server/client proof.
+**File:** `tests/equipment-waitlist-two-browser.spec.ts`
+
+Two isolated Playwright **browser contexts** (separate sessions), user A vs user B:
+
+| Step | Context A | Context B |
+|------|-----------|-----------|
+| Checkout | API checkout | Opens `/equipment/:id`, **WaitlistPanel** visible, joins waitlist |
+| List | — | `/equipment` paginated fetch shows `checked_out` |
+| Return | API return | Replay sees `EQUIPMENT_WAITLIST_PROMOTED`; API `myStatus=notified` |
+| List | — | Paginated fetch shows `returned` without manual refresh |
+
+**Run:**
+
+```bash
+# Terminal 1: API (development, no Clerk secret)
+DATABASE_URL=postgres://vettrack:vettrack@localhost:5432/vettrack PORT=3001 NODE_ENV=development \
+  env -u CLERK_SECRET_KEY npx tsx server/index.ts
+
+# Terminal 2: Vite
+pnpm dev:web
+
+# Terminal 3: test
+TEST_BASE_URL=http://127.0.0.1:5000 PW_SUITE=waitlist pnpm exec playwright test \
+  --config=playwright.config.ts --project=chromium tests/equipment-waitlist-two-browser.spec.ts
+```
+
+**Result (2026-05-27):** 1 passed (~2.5s).
+
+Event assertions use `/api/realtime/replay` from browser B (same published outbox as SSE). After promote, detail **WaitlistPanel** hides because eligibility requires `checked_out`; reservation is proven via waitlist API + replay.
+
+### API-only fallback
+
+`equipment-waitlist-sse.spec.ts` — dual-user API replay when Vite is not running.
