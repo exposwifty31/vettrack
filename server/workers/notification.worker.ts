@@ -23,6 +23,7 @@ import {
   type ShiftReportEmailPayload,
 } from "../lib/queue.js";
 import { createRedisConnection, getRedis } from "../lib/redis.js";
+import { startWorkerHeartbeat } from "../lib/worker-heartbeat.js";
 import { incrementMetric } from "../lib/metrics.js";
 import { checkIdempotentAsync, markIdempotentAsync } from "../lib/idempotency.js";
 import { isCircuitOpen } from "../lib/circuit-breaker.js";
@@ -733,12 +734,7 @@ async function main(): Promise<void> {
     void shutdown("SIGINT");
   });
 
-  setInterval(async () => {
-    const r = await getRedis();
-    if (r) {
-      await r.set("vettrack:worker:heartbeat", Date.now().toString(), "EX", 120);
-    }
-  }, 30_000);
+  startWorkerHeartbeat("notification-worker");
 
   console.log("NOTIFICATION_WORKER_STARTED");
   console.log(

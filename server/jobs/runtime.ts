@@ -2,6 +2,7 @@ import { Worker, type Job } from "bullmq";
 import type { Redis } from "ioredis";
 import { incrementMetric } from "../lib/metrics.js";
 import { createRedisConnection } from "../lib/redis.js";
+import { startWorkerHeartbeat } from "../lib/worker-heartbeat.js";
 import { processChargeAlertJob, bindChargeAlertProducerQueue } from "../workers/chargeAlertWorker.js";
 import { processInventoryDeductionJob } from "../workers/inventory-deduction.worker.js";
 import {
@@ -269,6 +270,11 @@ export async function startJobRuntime(): Promise<void> {
     started: results.every((r) => r.ok),
     workers: results,
   });
+
+  if (runtimeWorkers.length > 0) {
+    startWorkerHeartbeat("job-runtime");
+  }
+
   console.log("[job-runtime] pilot runtime active", {
     queues: PILOT_QUEUE_NAMES,
     workers: runtimeWorkers.map((e) => e.queueName),
