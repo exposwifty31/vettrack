@@ -150,8 +150,9 @@ PROD=https://vettrack.uk
 # 1) Liveness (no auth)
 curl -sfS -o /dev/null -w "healthz %{http_code}\n" "$PROD/api/healthz"
 
-# 2) Build/version
+# 2) Build/version (pilotMode.backend and pilotMode.frontend must both be false)
 curl -sfS "$PROD/api/version"
+# Expect: "pilotMode":{"backend":false,"frontend":false,"mismatch":false}
 
 # 3) Startup / DB connectivity
 curl -sfS "$PROD/api/health/startup"
@@ -160,7 +161,7 @@ curl -sfS "$PROD/api/health/startup"
 | Endpoint | Pass |
 |----------|------|
 | `GET /api/healthz` | `200`, body `ok` |
-| `GET /api/version` | `200`, JSON includes `version` matching expected release |
+| `GET /api/version` | `200`, JSON includes `version` matching expected release; `pilotMode.backend` and `pilotMode.frontend` are `false` |
 | `GET /api/health/startup` | `200`, `status: "ok"`, `checks.databaseReachable: true` |
 
 Optional: `GET /api/health` (readiness) — may be `200` or `503` **degraded** if Clerk/VAPID/worker checks fail; investigate degraded checks but do not use readiness alone as the only release signal.

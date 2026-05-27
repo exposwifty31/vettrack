@@ -37,6 +37,16 @@ done
 
 echo "✅ Required pre-flight checks passed"
 
+# Equipment-only pilot mode is opt-in; mainline production must run full platform.
+if [ "${PILOT_MODE}" = "true" ] && [ "${ALLOW_EQUIPMENT_PILOT_MODE}" != "true" ]; then
+  echo "❌ PILOT_MODE=true without ALLOW_EQUIPMENT_PILOT_MODE=true — unset PILOT_MODE for mainline deploys"
+  exit 1
+fi
+if [ "${VITE_PILOT_MODE}" = "true" ] && [ "${ALLOW_EQUIPMENT_PILOT_MODE}" != "true" ]; then
+  echo "❌ VITE_PILOT_MODE=true without ALLOW_EQUIPMENT_PILOT_MODE=true — rebuild with VITE_PILOT_MODE=false"
+  exit 1
+fi
+
 # Check recommended environment variables (warn, don't block)
 recommended_vars=("CLERK_WEBHOOK_SECRET")
 

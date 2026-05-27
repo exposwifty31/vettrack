@@ -37,6 +37,11 @@ import { releaseStaleMedicationTasks, releaseExpiredMedicationTasks } from "./se
 import healthRoutes from "./routes/health.js";
 import { resolveAuthModeFromEnv, describeAuthMode } from "./lib/auth-mode.js";
 import { preloadClinicErModeCaches } from "./lib/er-mode.js";
+import {
+  loadBuildInfo,
+  resolveBackendPilotMode,
+  resolveFrontendPilotMode,
+} from "./lib/build-info.js";
 
 const { version: appVersion } = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "../package.json"), "utf-8")) as { version?: string };
 const isProduction = process.env.NODE_ENV === "production";
@@ -53,7 +58,26 @@ function sendHealthOk(_req: express.Request, res: express.Response) {
 app.use("/api/health", healthRoutes);
 app.get("/api/healthz", sendHealthOk);
 app.get("/api/version", (_req, res) => {
-  res.status(200).json({ version: appVersion ?? "0.0.0" });
+  const buildInfo = loadBuildInfo();
+  const backendPilotMode = resolveBackendPilotMode();
+  const frontendPilotMode = resolveFrontendPilotMode();
+  res.status(200).json({
+    version: appVersion ?? "0.0.0",
+    buildTag: buildInfo?.buildTag ?? null,
+    gitCommit:
+      buildInfo?.gitCommit ??
+      process.env.RAILWAY_GIT_COMMIT_SHA?.trim() ??
+      process.env.GITHUB_SHA?.trim() ??
+      null,
+    builtAt: buildInfo?.builtAt ?? null,
+    pilotMode: {
+      backend: backendPilotMode,
+      frontend: frontendPilotMode,
+      /** True when compile-time and runtime pilot flags disagree (stale deploy or misconfigured env). */
+      mismatch:
+        frontendPilotMode !== null && frontendPilotMode !== backendPilotMode,
+    },
+  });
 });
 
 function hasInvalidHeaderChars(value: string): boolean {

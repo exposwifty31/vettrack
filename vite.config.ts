@@ -33,6 +33,41 @@ function swBuildTagTemplate(buildTag: string): Plugin {
   };
 }
 
+/** Written to dist/public/build-info.json — consumed by GET /api/version. */
+function deployBuildInfo(appVersion: string, buildTag: string): Plugin {
+  let outDir = "dist/public";
+  return {
+    name: "vt-deploy-build-info",
+    apply: "build",
+    configResolved(config) {
+      outDir = config.build.outDir;
+    },
+    closeBundle() {
+      const allowEquipmentPilot = process.env.ALLOW_EQUIPMENT_PILOT_MODE === "true";
+      const vitePilotMode = process.env.VITE_PILOT_MODE === "true";
+      if (vitePilotMode && !allowEquipmentPilot) {
+        throw new Error(
+          "VITE_PILOT_MODE=true requires ALLOW_EQUIPMENT_PILOT_MODE=true for dedicated equipment-pilot builds. " +
+            "Mainline production/staging builds must set VITE_PILOT_MODE=false (or unset) before pnpm build.",
+        );
+      }
+      const gitCommit =
+        process.env.RAILWAY_GIT_COMMIT_SHA?.trim() ||
+        process.env.GITHUB_SHA?.trim() ||
+        process.env.VERCEL_GIT_COMMIT_SHA?.trim() ||
+        null;
+      const payload = {
+        appVersion,
+        buildTag,
+        vitePilotMode,
+        builtAt: new Date().toISOString(),
+        gitCommit,
+      };
+      writeFileSync(path.resolve(outDir, "build-info.json"), JSON.stringify(payload, null, 2), "utf8");
+    },
+  };
+}
+
 const sentryPlugin =
   process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT
     ? [
@@ -45,7 +80,7 @@ const sentryPlugin =
     : [];
 
 export default defineConfig({
-  plugins: [react(), swBuildTagTemplate(VT_BUILD_TAG), ...sentryPlugin],
+  plugins: [react(), swBuildTagTemplate(VT_BUILD_TAG), deployBuildInfo(version, VT_BUILD_TAG), ...sentryPlugin],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
