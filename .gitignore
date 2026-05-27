@@ -1,6 +1,7 @@
 .superpowers/
 node_modules
-.cursor
+.cursor/*
+!.cursor/mcp.json
 .claude/settings.local.json
 dist
 dist/
