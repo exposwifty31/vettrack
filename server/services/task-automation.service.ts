@@ -44,6 +44,11 @@ function automationDebugLog(...args: unknown[]): void {
   }
 }
 
+/** Operational failures — always visible (not gated by ENABLE_AUTOMATION_DEBUG). */
+function automationErrorLog(...args: unknown[]): void {
+  console.error(...args);
+}
+
 /** Pick first active admin in clinic (escalation notify target — does not replace vet_id). */
 export async function getAdminUserIdForClinic(clinicId: string): Promise<string | null> {
   const [row] = await db
@@ -234,7 +239,7 @@ export async function executeAutomationJob(payload: AutomationExecutePayload): P
   }
   const c = clinicId.trim();
   if (!taskId?.trim() || !c) {
-    automationDebugLog("AUTOMATION_ERROR", { rule: payload.kind, taskId, clinicId, reason: "invalid_payload" });
+    automationErrorLog("AUTOMATION_ERROR", { rule: payload.kind, taskId, clinicId, reason: "invalid_payload" });
     return;
   }
 
@@ -260,7 +265,7 @@ export async function executeAutomationJob(payload: AutomationExecutePayload): P
         }
         const adminId = await getAdminUserIdForClinic(c);
         if (!adminId) {
-          automationDebugLog("AUTOMATION_ERROR", { rule: payload.kind, taskId, clinicId: c, reason: "no_admin_user" });
+          automationErrorLog("AUTOMATION_ERROR", { rule: payload.kind, taskId, clinicId: c, reason: "no_admin_user" });
           return;
         }
         const now = new Date();
@@ -326,7 +331,7 @@ export async function executeAutomationJob(payload: AutomationExecutePayload): P
         }
         const techId = await getAvailableTechnician(c);
         if (!techId) {
-          automationDebugLog("AUTOMATION_ERROR", { rule: payload.kind, taskId, clinicId: c, reason: "no_technician" });
+          automationErrorLog("AUTOMATION_ERROR", { rule: payload.kind, taskId, clinicId: c, reason: "no_technician" });
           return;
         }
         const now = new Date();
@@ -471,7 +476,7 @@ export async function executeAutomationJob(payload: AutomationExecutePayload): P
       }
     }
   } catch (err) {
-    console.error("AUTOMATION_ERROR", {
+    automationErrorLog("AUTOMATION_ERROR", {
       rule: payload.kind,
       taskId,
       clinicId: c,
