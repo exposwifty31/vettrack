@@ -38,6 +38,12 @@ export function isAutomationEngineEnabled(): boolean {
   return process.env.ENABLE_AUTOMATION_ENGINE?.trim() === "true";
 }
 
+function automationDebugLog(...args: unknown[]): void {
+  if (process.env.ENABLE_AUTOMATION_DEBUG === "true") {
+    console.log(...args);
+  }
+}
+
 /** Pick first active admin in clinic (escalation notify target — does not replace vet_id). */
 export async function getAdminUserIdForClinic(clinicId: string): Promise<string | null> {
   const [row] = await db
@@ -100,7 +106,7 @@ export async function getAvailableTechnician(clinicId: string): Promise<string |
  */
 export async function scanAndEnqueueAutomationJobs(): Promise<void> {
   if (!isAutomationEngineEnabled()) {
-    console.log("AUTOMATION_RULE_SKIPPED", { rule: "scan", reason: "ENABLE_AUTOMATION_ENGINE not true", clinicId: "" });
+    automationDebugLog("AUTOMATION_RULE_SKIPPED", { rule: "scan", reason: "ENABLE_AUTOMATION_ENGINE not true", clinicId: "" });
     return;
   }
 
@@ -125,7 +131,7 @@ async function enqueueOverdueEscalations(): Promise<void> {
     .limit(BATCH);
 
   for (const row of rows) {
-    console.log("AUTOMATION_RULE_TRIGGERED", { rule: "overdue_escalation", taskId: row.id, clinicId: row.clinicId, reason: "candidate" });
+    automationDebugLog("AUTOMATION_RULE_TRIGGERED", { rule: "overdue_escalation", taskId: row.id, clinicId: row.clinicId, reason: "candidate" });
     incrementMetric("automation_triggered");
     broadcast(row.clinicId, {
       type: "AUTOMATION_TRIGGERED",
@@ -151,7 +157,7 @@ async function enqueueUnassignedAutoAssign(): Promise<void> {
     .limit(BATCH);
 
   for (const row of rows) {
-    console.log("AUTOMATION_RULE_TRIGGERED", { rule: "auto_assign_unassigned", taskId: row.id, clinicId: row.clinicId, reason: "candidate" });
+    automationDebugLog("AUTOMATION_RULE_TRIGGERED", { rule: "auto_assign_unassigned", taskId: row.id, clinicId: row.clinicId, reason: "candidate" });
     incrementMetric("automation_triggered");
     broadcast(row.clinicId, {
       type: "AUTOMATION_TRIGGERED",
@@ -178,7 +184,7 @@ async function enqueueStuckRecovery(): Promise<void> {
     .limit(BATCH);
 
   for (const row of rows) {
-    console.log("AUTOMATION_RULE_TRIGGERED", { rule: "stuck_recovery", taskId: row.id, clinicId: row.clinicId, reason: "candidate" });
+    automationDebugLog("AUTOMATION_RULE_TRIGGERED", { rule: "stuck_recovery", taskId: row.id, clinicId: row.clinicId, reason: "candidate" });
     incrementMetric("automation_triggered");
     broadcast(row.clinicId, {
       type: "AUTOMATION_TRIGGERED",
@@ -207,7 +213,7 @@ async function enqueuePrestartReminders(): Promise<void> {
     .limit(BATCH);
 
   for (const row of rows) {
-    console.log("AUTOMATION_RULE_TRIGGERED", { rule: "prestart_reminder", taskId: row.id, clinicId: row.clinicId, reason: "candidate" });
+    automationDebugLog("AUTOMATION_RULE_TRIGGERED", { rule: "prestart_reminder", taskId: row.id, clinicId: row.clinicId, reason: "candidate" });
     incrementMetric("automation_triggered");
     broadcast(row.clinicId, {
       type: "AUTOMATION_TRIGGERED",
@@ -223,18 +229,18 @@ export async function executeAutomationJob(payload: AutomationExecutePayload): P
   const { taskId, clinicId } = payload;
   const idempotencyKey = `auto:${payload.kind}:${taskId}`;
   if (await checkIdempotentAsync(idempotencyKey)) {
-    console.log("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId, reason: "idempotent_duplicate" });
+    automationDebugLog("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId, reason: "idempotent_duplicate" });
     return;
   }
   const c = clinicId.trim();
   if (!taskId?.trim() || !c) {
-    console.log("AUTOMATION_ERROR", { rule: payload.kind, taskId, clinicId, reason: "invalid_payload" });
+    automationDebugLog("AUTOMATION_ERROR", { rule: payload.kind, taskId, clinicId, reason: "invalid_payload" });
     return;
   }
 
   const [task] = await db.select().from(appointments).where(and(eq(appointments.id, taskId), eq(appointments.clinicId, c))).limit(1);
   if (!task) {
-    console.log("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "task_not_found" });
+    automationDebugLog("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "task_not_found" });
     return;
   }
 
@@ -245,16 +251,16 @@ export async function executeAutomationJob(payload: AutomationExecutePayload): P
       case "escalate_overdue": {
         const end = new Date(task.endTime).getTime();
         if (end >= Date.now()) {
-          console.log("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "not_overdue" });
+          automationDebugLog("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "not_overdue" });
           return;
         }
         if (task.status === "completed" || task.status === "cancelled") {
-          console.log("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "terminal" });
+          automationDebugLog("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "terminal" });
           return;
         }
         const adminId = await getAdminUserIdForClinic(c);
         if (!adminId) {
-          console.log("AUTOMATION_ERROR", { rule: payload.kind, taskId, clinicId: c, reason: "no_admin_user" });
+          automationDebugLog("AUTOMATION_ERROR", { rule: payload.kind, taskId, clinicId: c, reason: "no_admin_user" });
           return;
         }
         const now = new Date();
@@ -277,7 +283,7 @@ export async function executeAutomationJob(payload: AutomationExecutePayload): P
           .returning({ id: appointments.id });
 
         if (!updated) {
-          console.log("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "db_idempotent_noop" });
+          automationDebugLog("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "db_idempotent_noop" });
           return;
         }
         logAudit({
@@ -310,17 +316,17 @@ export async function executeAutomationJob(payload: AutomationExecutePayload): P
 
       case "auto_assign_unassigned": {
         if (task.status !== "pending" || task.vetId != null) {
-          console.log("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "not_unassigned_pending" });
+          automationDebugLog("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "not_unassigned_pending" });
           return;
         }
         const age = Date.now() - new Date(task.createdAt).getTime();
         if (age < PENDING_MIN_AGE_MS) {
-          console.log("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "too_young" });
+          automationDebugLog("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "too_young" });
           return;
         }
         const techId = await getAvailableTechnician(c);
         if (!techId) {
-          console.log("AUTOMATION_ERROR", { rule: payload.kind, taskId, clinicId: c, reason: "no_technician" });
+          automationDebugLog("AUTOMATION_ERROR", { rule: payload.kind, taskId, clinicId: c, reason: "no_technician" });
           return;
         }
         const now = new Date();
@@ -338,7 +344,7 @@ export async function executeAutomationJob(payload: AutomationExecutePayload): P
           .returning({ id: appointments.id });
 
         if (!assigned) {
-          console.log("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "db_idempotent_noop" });
+          automationDebugLog("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "db_idempotent_noop" });
           return;
         }
         logAudit({
@@ -365,11 +371,11 @@ export async function executeAutomationJob(payload: AutomationExecutePayload): P
 
       case "stuck_recovery": {
         if (!["assigned", "in_progress", "scheduled", "arrived"].includes(task.status)) {
-          console.log("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "wrong_status" });
+          automationDebugLog("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "wrong_status" });
           return;
         }
         if (new Date(task.updatedAt).getTime() >= stuckCutoff.getTime()) {
-          console.log("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "not_stuck_yet" });
+          automationDebugLog("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "not_stuck_yet" });
           return;
         }
         const now = new Date();
@@ -388,7 +394,7 @@ export async function executeAutomationJob(payload: AutomationExecutePayload): P
           .returning({ id: appointments.id });
 
         if (!marked) {
-          console.log("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "db_idempotent_noop" });
+          automationDebugLog("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "db_idempotent_noop" });
           return;
         }
         logAudit({
@@ -417,11 +423,11 @@ export async function executeAutomationJob(payload: AutomationExecutePayload): P
         const st = new Date(task.startTime).getTime();
         const nowMs = Date.now();
         if (st < nowMs || st > nowMs + PRESTART_MS) {
-          console.log("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "outside_prestart_window" });
+          automationDebugLog("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "outside_prestart_window" });
           return;
         }
         if (!NOT_STARTED.includes(task.status as (typeof NOT_STARTED)[number]) || !task.vetId) {
-          console.log("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "no_vet_or_started" });
+          automationDebugLog("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "no_vet_or_started" });
           return;
         }
         const t0 = new Date();
@@ -444,7 +450,7 @@ export async function executeAutomationJob(payload: AutomationExecutePayload): P
           .returning({ id: appointments.id });
 
         if (!rem) {
-          console.log("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "db_idempotent_noop" });
+          automationDebugLog("AUTOMATION_RULE_SKIPPED", { rule: payload.kind, taskId, clinicId: c, reason: "db_idempotent_noop" });
           return;
         }
         await enqueueAutomationNotificationJobs({
