@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync, readFileSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
+import { resolveBackendPilotMode } from "../server/lib/build-info.js";
 
 describe("build-info contract", () => {
   it("vitePilotMode is only true when explicitly enabled at build", () => {
@@ -27,5 +28,9 @@ describe("build-info contract", () => {
     const raw = JSON.parse(readFileSync(file, "utf-8")) as typeof payload;
     expect(raw.vitePilotMode).toBe(false);
     expect(raw.appVersion).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
+  it("vitePilotMode false is the safe default for mainline /api/version consumers", () => {
+    expect(resolveBackendPilotMode()).toBe(false);
   });
 });

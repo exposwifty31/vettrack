@@ -41,10 +41,16 @@ export async function notifyWaitlistPromoted(
   try {
     const equipmentName = await equipmentWaitlistPromotionDeps.getEquipmentName(equipmentId, clinicId);
     const locale = await resolveUserLocale(clinicId, promoted.userId);
-    const dict = getLocaleDictionaries(locale);
+    const { primary, fallback, locale: lc } = getLocaleDictionaries(locale);
     const priority: PushPriority = "HIGH";
-    const title = translate(dict, "equipmentWaitlist.promotedTitle");
-    const bodyTemplate = translate(dict, "equipmentWaitlist.promotedBody");
+    const title = translate(primary, "equipmentWaitlist.promotedTitle", undefined, {
+      fallbackDict: fallback,
+      locale: lc,
+    });
+    const bodyTemplate = translate(primary, "equipmentWaitlist.promotedBody", undefined, {
+      fallbackDict: fallback,
+      locale: lc,
+    });
     const body = interpolate(bodyTemplate, {
       name: equipmentName,
       minutes: EQUIPMENT_WAITLIST_RESERVATION_TTL_MINUTES,
