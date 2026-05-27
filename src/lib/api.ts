@@ -527,7 +527,17 @@ export async function request<T>(
       // (e.g. session start/end) call `request()` without an `offline`
       // object, so gating this on `offline` would silently let an emergency
       // mutation hit a network error without recording the block.
-      const emergencyClass = classifyEmergencyEndpoint(url, (init.method as string) || "GET");
+      const method = (init.method as string) || "GET";
+      if (
+        (method === "POST" || method === "DELETE") &&
+        /^\/api\/equipment\/[^/]+\/waitlist\/?$/.test(url.split("?")[0] ?? url)
+      ) {
+        if (!silent) {
+          toast.error(t.equipmentWaitlist.offlineBlocked);
+        }
+        throw new Error("EQUIPMENT_WAITLIST_OFFLINE");
+      }
+      const emergencyClass = classifyEmergencyEndpoint(url, method);
       if (emergencyClass) {
         recordEmergencyBlockLocally(emergencyClass);
         reportEmergencyBlockedSilently(emergencyClass);
@@ -1034,6 +1044,20 @@ export const api = {
     listDeleted: () => request<DeletedEquipment[]>("/api/equipment/deleted"),
     restore: (id: string) => request<Equipment>(`/api/equipment/${id}/restore`, { method: "POST" }),
     pilotCoverage: () => request<PilotCoverageResponse>("/api/equipment/pilot-coverage"),
+    waitlist: (id: string) =>
+      request<import("../../shared/equipment-waitlist.js").EquipmentWaitlistSnapshot>(
+        `/api/equipment/${id}/waitlist`,
+      ),
+    joinWaitlist: (id: string) =>
+      request<import("../../shared/equipment-waitlist.js").EquipmentWaitlistSnapshot>(
+        `/api/equipment/${id}/waitlist`,
+        { method: "POST" },
+      ),
+    leaveWaitlist: (id: string) =>
+      request<import("../../shared/equipment-waitlist.js").EquipmentWaitlistSnapshot>(
+        `/api/equipment/${id}/waitlist`,
+        { method: "DELETE" },
+      ),
   },
   pilot: {
     config: () => request<PilotConfig>("/api/pilot/config"),

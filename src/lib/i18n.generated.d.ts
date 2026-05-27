@@ -2826,6 +2826,24 @@ export interface TStructure {
     confirmRelease: string;
     confirmReleaseDescription: string;
   };
+  equipmentWaitlist: {
+    title: string;
+    join: string;
+    leave: string;
+    queueSize: string;
+    myPosition: string;
+    notifiedBanner: string;
+    reservationExpires: string;
+    offlineBlocked: string;
+    promotedToast: string;
+    promotedToastDescription: string;
+    viewDevice: string;
+    WAITLIST_NOT_IN_USE: string;
+    WAITLIST_SELF_CHECKOUT: string;
+    WAITLIST_ALREADY_JOINED: string;
+    WAITLIST_NOT_ON_WAITLIST: string;
+    EQUIPMENT_NOT_FOUND: string;
+  };
   operationalMetrics: {
     title: string;
     emergencyOverrides: string;

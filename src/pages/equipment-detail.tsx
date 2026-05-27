@@ -85,6 +85,7 @@ import { ReturnPlugDialog } from "@/components/return-plug-dialog";
 import { DeployabilityBadge } from "@/components/equipment/DeployabilityBadge";
 import { DockReturnFlow } from "@/components/equipment/DockReturnFlow";
 import { StagingQueuePanel } from "@/components/equipment/StagingQueuePanel";
+import { WaitlistPanel } from "@/components/equipment/WaitlistPanel";
 import { useSettings } from "@/hooks/use-settings";
 import { playCriticalAlertTone } from "@/lib/sounds";
 import { haptics } from "@/lib/haptics";
@@ -1499,7 +1500,10 @@ export default function EquipmentDetailPage() {
               )}
 
               {userId && (
-                <StagingQueuePanel equipment={equipment} currentUserId={userId} />
+                <>
+                  <WaitlistPanel equipment={equipment} currentUserId={userId} />
+                  <StagingQueuePanel equipment={equipment} currentUserId={userId} />
+                </>
               )}
 
               <div className="flex flex-col gap-2">

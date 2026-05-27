@@ -25,6 +25,7 @@ import {
 import { apiError } from "../lib/apiError.js";
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
 import { promoteStagingQueueNext } from "../lib/staging-promotion.js";
+import { promoteEquipmentWaitlistWithNotify } from "../lib/equipment-waitlist-promotion.js";
 import { isPostgresUniqueViolation, pgUpdateMatchedZeroRows } from "../lib/pg-result.js";
 
 const router = Router();
@@ -300,7 +301,10 @@ router.post("/equipment/:equipmentId/dock-return", requireAuth, validateBody(doc
   });
   void recordOperationalMetric({ clinicId, equipmentId, userId, eventType: "dock_return_duration", durationMs: Date.now() - dockReturnStart });
 
-  const [updated_eq] = await db.select().from(equipment).where(eq(equipment.id, equipmentId));
+  const [updated_eq] = await db.select().from(equipment).where(and(eq(equipment.id, equipmentId), eq(equipment.clinicId, clinicId)));
+  if (updated_eq && isEquipmentFullyDeployable(updated_eq)) {
+    void promoteEquipmentWaitlistWithNotify(clinicId, equipmentId, "dock_return");
+  }
   res.json({ equipmentId, readinessState: updated_eq?.readinessState, custodyState: updated_eq?.custodyState });
 });
 

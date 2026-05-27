@@ -250,6 +250,44 @@ export const stagingQueue = vtTable(
 export type StagingQueueRow = typeof stagingQueue.$inferSelect;
 export type NewStagingQueueRow = typeof stagingQueue.$inferInsert;
 
+/** Per-device queue while another technician holds checkout custody (Phase B — not dock staging). */
+export const equipmentWaitlist = vtTable(
+  "vt_equipment_waitlist",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    equipmentId: text("equipment_id").notNull().references(() => equipment.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    joinedAt: timestamp("joined_at").defaultNow().notNull(),
+    priority: integer("priority").notNull().default(0),
+    status: text("status").notNull().default("waiting"),
+    reservationExpiresAt: timestamp("reservation_expires_at"),
+    notifiedAt: timestamp("notified_at"),
+    fulfilledAt: timestamp("fulfilled_at"),
+    cancelledAt: timestamp("cancelled_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    clinicEquipmentIdx: index("vt_equipment_waitlist_clinic_equipment").on(
+      t.clinicId,
+      t.equipmentId,
+      t.status,
+    ),
+    userActiveUnique: uniqueIndex("vt_equipment_waitlist_user_active_uq")
+      .on(t.equipmentId, t.userId)
+      .where(sql`${t.status} IN ('waiting', 'notified')`),
+    oneNotifiedUnique: uniqueIndex("vt_equipment_waitlist_one_notified_uq")
+      .on(t.equipmentId)
+      .where(sql`${t.status} = 'notified'`),
+    reservationExpiryIdx: index("vt_equipment_waitlist_reservation_expiry")
+      .on(t.reservationExpiresAt)
+      .where(sql`${t.status} = 'notified' AND ${t.reservationExpiresAt} IS NOT NULL`),
+  }),
+);
+export type EquipmentWaitlistRow = typeof equipmentWaitlist.$inferSelect;
+export type NewEquipmentWaitlistRow = typeof equipmentWaitlist.$inferInsert;
+
 export const operationalMetrics = vtTable(
   "vt_operational_metrics",
   {

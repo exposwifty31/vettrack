@@ -908,6 +908,25 @@ const translations = {
     confirmReleaseDescription: d.stagingQueue.confirmReleaseDescription,
   },
 
+  equipmentWaitlist: {
+    title: d.equipmentWaitlist.title,
+    join: d.equipmentWaitlist.join,
+    leave: d.equipmentWaitlist.leave,
+    queueSize: d.equipmentWaitlist.queueSize,
+    myPosition: d.equipmentWaitlist.myPosition,
+    notifiedBanner: d.equipmentWaitlist.notifiedBanner,
+    reservationExpires: d.equipmentWaitlist.reservationExpires,
+    offlineBlocked: d.equipmentWaitlist.offlineBlocked,
+    promotedToast: d.equipmentWaitlist.promotedToast,
+    promotedToastDescription: d.equipmentWaitlist.promotedToastDescription,
+    viewDevice: d.equipmentWaitlist.viewDevice,
+    WAITLIST_NOT_IN_USE: d.equipmentWaitlist.WAITLIST_NOT_IN_USE,
+    WAITLIST_SELF_CHECKOUT: d.equipmentWaitlist.WAITLIST_SELF_CHECKOUT,
+    WAITLIST_ALREADY_JOINED: d.equipmentWaitlist.WAITLIST_ALREADY_JOINED,
+    WAITLIST_NOT_ON_WAITLIST: d.equipmentWaitlist.WAITLIST_NOT_ON_WAITLIST,
+    EQUIPMENT_NOT_FOUND: d.equipmentWaitlist.EQUIPMENT_NOT_FOUND,
+  },
+
   operationalMetrics: {
     title: d.operationalMetrics.title,
     emergencyOverrides: d.operationalMetrics.emergencyOverrides,

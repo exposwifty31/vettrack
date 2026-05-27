@@ -4,6 +4,7 @@ import { useAutoSelectOrg } from "@/features/auth/hooks/useAutoSelectOrg";
 import { startLeaderHeartbeat } from "@/lib/leader";
 import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
+import { EquipmentRealtimeBridge } from "@/components/equipment/EquipmentRealtimeBridge";
 import { RouteFallback } from "@/components/route-fallback";
 import { t } from "@/lib/i18n";
 
@@ -22,6 +23,7 @@ export default function App() {
   return (
     <>
       {CLERK_ENABLED && <AutoSelectOrg />}
+      <EquipmentRealtimeBridge />
       <Suspense fallback={<RouteFallback />}>
         <PageErrorBoundary fallbackLabel={t.errorCard.defaultMessage}>
           <AppRoutes />

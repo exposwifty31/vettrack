@@ -28,7 +28,7 @@ export function StagingQueuePanel({ equipment, currentUserId }: StagingQueuePane
     queryKey: ["staging-queue", equipment.id],
     queryFn: () => api.operationalState.stagingQueue(equipment.id),
     enabled: eligible,
-    refetchInterval: 30_000,
+    refetchInterval: 5 * 60 * 1000,
   });
 
   const stageMut = useMutation({
