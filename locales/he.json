@@ -2566,6 +2566,7 @@
   "push": {
     "role": {
       "reminderForEquipment": "תזכורת: החזר {equipmentName} למקומו",
+      "reminderForEquipmentWithWaitlist": "אנא החזר את {equipmentName}; חבר צוות ממתין.",
       "adminSummaryCount": "{count} פריטים לא הוחזרו במשמרת הנוכחית"
     },
     "overdue": {
@@ -2830,6 +2831,12 @@
     "queueSize": "בתור",
     "myPosition": "המיקום שלך",
     "notifiedBanner": "המכשיר שמור עבורך",
+    "holderContext": {
+      "inUse": "בשימוש כעת",
+      "expectedReturnAround": "החזרה צפויה בסביבות {time}",
+      "noEstimate": "זמן החזרה לא הוגדר למכשיר זה",
+      "overdue": "באיחור — ממתינים להחזרה"
+    },
     "reservedForYou": {
       "title": "שמור עבורך",
       "subtitle": "בצע checkout למכשיר בתוך {minutesRemaining} דקות",

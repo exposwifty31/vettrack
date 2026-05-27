@@ -28,6 +28,41 @@ export function shouldShowWaitlistJoinPanel(
   );
 }
 
+export type HolderReturnEstimate = {
+  hasEstimate: boolean;
+  expectedReturnAt: Date | null;
+  isOverdue: boolean;
+};
+
+export function computeHolderReturnEstimate(
+  equipment: Pick<Equipment, "checkedOutAt" | "expectedReturnMinutes" | "custodyState">,
+  nowMs: number = Date.now(),
+): HolderReturnEstimate {
+  const minutes = equipment.expectedReturnMinutes;
+  const checkedOutAt = equipment.checkedOutAt;
+  if (minutes == null || minutes <= 0 || !checkedOutAt) {
+    return { hasEstimate: false, expectedReturnAt: null, isOverdue: false };
+  }
+  const checkoutMs = new Date(checkedOutAt).getTime();
+  if (Number.isNaN(checkoutMs)) {
+    return { hasEstimate: false, expectedReturnAt: null, isOverdue: false };
+  }
+  const expectedReturnAt = new Date(checkoutMs + minutes * 60_000);
+  const isOverdue =
+    equipment.custodyState === "checked_out" && nowMs >= expectedReturnAt.getTime();
+  return { hasEstimate: true, expectedReturnAt, isOverdue };
+}
+
+/** Pre-promotion waiter context — hidden when reservation banner is active (WTL-UX-02a). */
+export function shouldShowHolderReturnContext(
+  equipment: Pick<Equipment, "custodyState" | "checkedOutById">,
+  currentUserId: string,
+  showReservationBanner: boolean,
+): boolean {
+  if (showReservationBanner) return false;
+  return shouldShowWaitlistJoinPanel(equipment, currentUserId);
+}
+
 export function reservationMinutesRemaining(
   expiresAt: string,
   nowMs: number = Date.now(),

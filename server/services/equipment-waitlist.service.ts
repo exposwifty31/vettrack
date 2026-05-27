@@ -60,6 +60,14 @@ async function loadEquipment(clinicId: string, equipmentId: string) {
   return row ?? null;
 }
 
+/** Active `waiting` rows (excludes `notified`). Used for holder reminder copy (WTL-UX-02b). */
+export async function countEquipmentWaitlistWaiting(
+  clinicId: string,
+  equipmentId: string,
+): Promise<number> {
+  return countWaiting(clinicId, equipmentId);
+}
+
 async function countWaiting(clinicId: string, equipmentId: string): Promise<number> {
   const [row] = await db
     .select({ count: sql<number>`count(*)::int` })

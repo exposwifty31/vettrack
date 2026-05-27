@@ -87,7 +87,9 @@ import { DockReturnFlow } from "@/components/equipment/DockReturnFlow";
 import { StagingQueuePanel } from "@/components/equipment/StagingQueuePanel";
 import { WaitlistPanel } from "@/components/equipment/WaitlistPanel";
 import { ReservationBanner } from "@/components/equipment/ReservationBanner";
+import { HolderReturnContext } from "@/components/equipment/HolderReturnContext";
 import {
+  shouldShowHolderReturnContext,
   shouldShowReservationBanner,
   shouldShowWaitlistJoinPanel,
 } from "@/lib/equipment-waitlist-ui";
@@ -834,6 +836,9 @@ export default function EquipmentDetailPage() {
   );
   const showWaitlistJoinPanel =
     !!userId && shouldShowWaitlistJoinPanel(equipment, userId);
+  const showHolderReturnContext =
+    !!userId &&
+    shouldShowHolderReturnContext(equipment, userId, showReservationBanner);
   const showOperationalState =
     equipment.custodyState != null &&
     equipment.readinessState != null &&
@@ -1110,6 +1115,10 @@ export default function EquipmentDetailPage() {
                 <p className="text-xs mt-0.5 opacity-70">Since {formatRelativeTime(equipment.checkedOutAt)}</p>
               </div>
             </div>
+          )}
+
+          {showHolderReturnContext && (
+            <HolderReturnContext equipment={equipment} />
           )}
 
           {showWaitlistJoinPanel && userId && (

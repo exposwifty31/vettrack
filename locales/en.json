@@ -2566,6 +2566,7 @@
   "push": {
     "role": {
       "reminderForEquipment": "Reminder: return {equipmentName} to its place",
+      "reminderForEquipmentWithWaitlist": "Please return {equipmentName}; another team member is waiting.",
       "adminSummaryCount": "{count} items not returned in the current shift"
     },
     "overdue": {
@@ -2830,6 +2831,12 @@
     "queueSize": "In queue",
     "myPosition": "Your position",
     "notifiedBanner": "This device is reserved for you",
+    "holderContext": {
+      "inUse": "Currently in use",
+      "expectedReturnAround": "Expected return around {time}",
+      "noEstimate": "Return time is not set for this device",
+      "overdue": "Overdue — waiting for return"
+    },
     "reservedForYou": {
       "title": "Reserved for you",
       "subtitle": "Check out this device within {minutesRemaining} minutes",

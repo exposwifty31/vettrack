@@ -9,6 +9,7 @@ import {
 import { getLocaleDictionaries } from "../../lib/i18n/loader.js";
 import { translate } from "../../lib/i18n/index.js";
 import { INITIAL_LOCALE } from "../../lib/i18n/types.js";
+import { countEquipmentWaitlistWaiting } from "../services/equipment-waitlist.service.js";
 
 function requireClinicId(clinicId: string | null | undefined): string {
   const normalized = clinicId?.trim();
@@ -127,10 +128,22 @@ async function getUserLocale(userId: string): Promise<string> {
   }
 }
 
-async function buildReminderMessage(userId: string, equipmentName: string): Promise<string> {
+/** WTL-UX-02b — message key when waitlist has active `waiting` rows. */
+export function resolveReturnReminderMessageKey(waitlistWaitingCount: number): string {
+  return waitlistWaitingCount > 0
+    ? "push.role.reminderForEquipmentWithWaitlist"
+    : "push.role.reminderForEquipment";
+}
+
+export async function buildReturnReminderPushBody(
+  userId: string,
+  equipmentName: string,
+  waitlistWaitingCount: number,
+): Promise<string> {
   const locale = await getUserLocale(userId);
   const { primary, fallback, locale: lc } = getLocaleDictionaries(locale);
-  return translate(primary, "push.role.reminderForEquipment", { equipmentName }, {
+  const key = resolveReturnReminderMessageKey(waitlistWaitingCount);
+  return translate(primary, key, { equipmentName }, {
     fallbackDict: fallback,
     locale: lc,
   });
@@ -173,11 +186,12 @@ async function sendScheduledCheckoutReturnReminder(
   clinicId: string,
   userId: string,
   equipmentId: string,
-  equipmentName: string
+  equipmentName: string,
+  waitlistWaitingCount: number,
 ): Promise<void> {
   await sendPushToUser(requireClinicId(clinicId), userId, {
     title: "VetTrack",
-    body: await buildReminderMessage(userId, equipmentName),
+    body: await buildReturnReminderPushBody(userId, equipmentName, waitlistWaitingCount),
     tag: `smart-reminder:${equipmentId}`,
     url: `/equipment/${equipmentId}`,
   });
@@ -210,7 +224,14 @@ async function processReturnReminderNotification(
   if (scheduledAt.getTime() > Date.now()) return;
 
   const displayName = item.name || nameFromPayload || "ציוד";
-  await sendScheduledCheckoutReturnReminder(row.clinicId, userId, equipmentId, displayName);
+  const waitlistWaitingCount = await countEquipmentWaitlistWaiting(row.clinicId, equipmentId);
+  await sendScheduledCheckoutReturnReminder(
+    row.clinicId,
+    userId,
+    equipmentId,
+    displayName,
+    waitlistWaitingCount,
+  );
 }
 
 export async function scheduleSmartReturnReminder(params: {

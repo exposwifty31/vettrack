@@ -915,6 +915,12 @@ const translations = {
     queueSize: d.equipmentWaitlist.queueSize,
     myPosition: d.equipmentWaitlist.myPosition,
     notifiedBanner: d.equipmentWaitlist.notifiedBanner,
+    holderContext: {
+      inUse: d.equipmentWaitlist.holderContext.inUse,
+      expectedReturnAround: d.equipmentWaitlist.holderContext.expectedReturnAround,
+      noEstimate: d.equipmentWaitlist.holderContext.noEstimate,
+      overdue: d.equipmentWaitlist.holderContext.overdue,
+    },
     reservedForYou: {
       title: d.equipmentWaitlist.reservedForYou.title,
       subtitle: d.equipmentWaitlist.reservedForYou.subtitle,

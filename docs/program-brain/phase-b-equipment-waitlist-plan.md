@@ -1,8 +1,10 @@
 # Program Brain — Phase B: Equipment Waitlist / Reservation System
 
-**Status:** Architecture + implementation plan (no code until Program Brain approval)  
+**Status:** **Complete** (merged PR #492 to `main`, 2026-05-27)  
 **Prerequisite:** Phase A verification passed (operational state, staging, deployability)  
-**Last updated:** 2026-05-27 — added equipment-list SSE end-state requirement
+**Last updated:** 2026-05-27 — Program Brain merge acknowledgment; WTL-UX-01 shipped in same PR  
+
+**Follow-ups (deferred):** WTL-UX-02a / 02b — see `docs/follow-ups/WTL-UX-02-estimated-return-waitlist-integration.md` and `docs/program-brain/STATE.md`.
 
 ---
 

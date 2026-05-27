@@ -2569,6 +2569,7 @@ export interface TStructure {
   push: {
     role: {
       reminderForEquipment: string;
+      reminderForEquipmentWithWaitlist: string;
       adminSummaryCount: string;
     };
     overdue: {
@@ -2833,6 +2834,12 @@ export interface TStructure {
     queueSize: string;
     myPosition: string;
     notifiedBanner: string;
+    holderContext: {
+      inUse: string;
+      expectedReturnAround: string;
+      noEstimate: string;
+      overdue: string;
+    };
     reservedForYou: {
       title: string;
       subtitle: string;

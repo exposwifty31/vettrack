@@ -2,6 +2,8 @@
 
 **Source:** Program Brain approval of PR #491 (`60dbd212`). Not a merge blocker.
 
+**Status:** **Complete** — merged in PR #492 (`main`, 2026-05-27).
+
 **Merge:** Independent of estimated-return integration. See follow-up **WTL-UX-02** in `docs/follow-ups/WTL-UX-02-estimated-return-waitlist-integration.md`.
 
 ## Problem
@@ -23,13 +25,13 @@ After waitlist promotion, equipment `custodyState` is no longer `checked_out`, s
 
 ## Acceptance criteria
 
-- [ ] `myStatus === notified` shows banner on `/equipment/:id` even when custody is not `checked_out`
-- [ ] Countdown matches server expiry
-- [ ] CTA triggers checkout; fulfill path unchanged
-- [ ] Banner clears on fulfill, leave, expiry, or lost reservation
-- [ ] Single promote toast (no `EQUIPMENT_WAITLIST_AVAILABLE` duplicate)
-- [ ] `locales/en.json` + `locales/he.json` parity
-- [ ] Automated test for post-promote banner visibility
+- [x] `myStatus === notified` shows banner on `/equipment/:id` even when custody is not `checked_out`
+- [x] Countdown matches server expiry
+- [x] CTA triggers checkout; fulfill path unchanged
+- [x] Banner clears on fulfill, leave, expiry, or lost reservation
+- [x] Single promote toast (no `EQUIPMENT_WAITLIST_AVAILABLE` duplicate)
+- [x] `locales/en.json` + `locales/he.json` parity
+- [x] Automated test for post-promote banner visibility
 
 ## Out of scope
 

@@ -116,6 +116,16 @@ test.describe("Equipment waitlist two-browser", () => {
       expect(createRes.status()).toBe(201);
       equipmentId = ((await createRes.json()) as { id: string }).id;
 
+      const patchEtaRes = await ctxA.request.patch(`/api/equipment/${equipmentId}`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...devHeaders(USER_ALPHA),
+          "x-dev-role-override": "admin",
+        },
+        data: { expectedReturnMinutes: 15 },
+      });
+      expect(patchEtaRes.status()).toBe(200);
+
       const checkoutRes = await ctxA.request.post(`/api/equipment/${equipmentId}/checkout`, {
         headers: { "Content-Type": "application/json", ...devHeaders(USER_ALPHA) },
         data: { location: "ICU" },
@@ -133,6 +143,12 @@ test.describe("Equipment waitlist two-browser", () => {
       });
       await waitForMyWaitlistStatus(pageB, equipmentId, "waiting");
       await waitForReplayType(pageB, "EQUIPMENT_WAITLIST_JOINED");
+
+      await pageB.goto(`/equipment/${equipmentId}`);
+      await expect(pageB.getByTestId("equipment-holder-return-context")).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(pageB.getByTestId("holder-expected-return")).toBeVisible();
 
       await pageB.goto("/equipment");
       await expect
@@ -162,6 +178,7 @@ test.describe("Equipment waitlist two-browser", () => {
       await expect(pageB.getByTestId("reservation-countdown")).toBeVisible();
       await expect(pageB.getByTestId("btn-reservation-checkout")).toBeVisible();
       await expect(pageB.getByTestId("equipment-waitlist-panel")).toHaveCount(0);
+      await expect(pageB.getByTestId("equipment-holder-return-context")).toHaveCount(0);
 
       await expect
         .poll(() => fetchPaginatedCustody(pageB, equipmentId), { timeout: 15_000 })
