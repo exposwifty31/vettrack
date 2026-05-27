@@ -40,8 +40,11 @@ If production is down but staging is healthy:
 
 ## Contacts
 
-Fill in before demo:
+> **Founder action required:** Replace every `[PLACEHOLDER]` below before demo GO.
 
-- Engineering on-call: _name / phone / Slack_
+- Engineering on-call (primary): **[PRIMARY_NAME]** — **[PRIMARY_PHONE]** — Slack `@[PRIMARY_SLACK]`
+- Engineering on-call (backup): **[BACKUP_NAME]** — **[BACKUP_PHONE]** — Slack `@[BACKUP_SLACK]` _(optional)_
+- Railway project: **[RAILWAY_PROJECT_URL]** (e.g. `https://railway.app/project/<id>`)
+- Clerk workspace: **[CLERK_DASHBOARD_URL]**
 - Railway support: https://railway.app/help
 - Clerk support: https://clerk.com/support
