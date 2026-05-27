@@ -92,6 +92,16 @@ describe("recoverFromChunkLoadFailure (#413 deploy recovery)", () => {
     expect(reload).not.toHaveBeenCalled();
   });
 
+  it("force: true bypasses the session guard for user-initiated retries", async () => {
+    sessionStorage.setItem(CHUNK_RECOVERY_GUARD_KEY, "1");
+
+    const scheduled = await recoverFromChunkLoadFailure({ force: true });
+
+    expect(scheduled).toBe(true);
+    expect(cacheKeys).toHaveBeenCalledOnce();
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
   it("unregisters service workers when requested", async () => {
     const unregister = vi.fn().mockResolvedValue(true);
     const getRegistrations = vi.fn().mockResolvedValue([{ unregister }]);

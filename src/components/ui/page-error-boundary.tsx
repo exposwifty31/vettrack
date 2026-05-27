@@ -32,11 +32,23 @@ export class PageErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: unknown, info: { componentStack: string }) {
     console.error("[PageErrorBoundary]", error, info.componentStack);
+    const msg = error instanceof Error ? error.message : String(error);
+    if (isChunkLoadError(msg)) {
+      // Auto-recover: a failed lazy-import chunk is almost always a stale
+      // cache after deploy. The sessionStorage guard inside the helper
+      // prevents reload loops if recovery doesn't fix it.
+      void recoverFromChunkLoadFailure({ unregisterServiceWorkers: true });
+    }
   }
 
   reset = () => {
     if (isChunkLoadError(this.state.errorMessage)) {
-      void recoverFromChunkLoadFailure().then((reloaded) => {
+      // User-initiated retry: force past the session loop guard so the button
+      // can never silently become a no-op.
+      void recoverFromChunkLoadFailure({
+        unregisterServiceWorkers: true,
+        force: true,
+      }).then((reloaded) => {
         if (!reloaded) {
           this.setState({ hasError: false, errorMessage: "" });
         }

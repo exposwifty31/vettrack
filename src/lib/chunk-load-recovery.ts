@@ -51,14 +51,19 @@ async function unregisterServiceWorkers(): Promise<void> {
  * The sessionStorage guard intentionally survives successful reloads so a
  * persistent chunk failure cannot trigger repeated automatic reloads from
  * `main.tsx`. It clears when the browser tab/session ends.
+ *
+ * Pass `force: true` for user-initiated retries (e.g. an explicit "Try again"
+ * tap) — the user is asking for a hard reload and the loop guard should not
+ * silently turn the button into a no-op.
  */
 export async function recoverFromChunkLoadFailure(options?: {
   unregisterServiceWorkers?: boolean;
+  force?: boolean;
 }): Promise<boolean> {
   if (typeof window === "undefined") return false;
 
   try {
-    if (sessionStorage.getItem(CHUNK_RECOVERY_GUARD_KEY) === "1") {
+    if (!options?.force && sessionStorage.getItem(CHUNK_RECOVERY_GUARD_KEY) === "1") {
       return false;
     }
     sessionStorage.setItem(CHUNK_RECOVERY_GUARD_KEY, "1");

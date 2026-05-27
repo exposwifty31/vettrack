@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { queryClient } from "@/lib/queryClient";
 import { t } from "@/lib/i18n";
 import { safeReloadPage } from "@/lib/safe-browser";
+import { isChunkLoadError, recoverFromChunkLoadFailure } from "@/lib/chunk-load-recovery";
 
 interface Props {
   children: ReactNode;
@@ -58,9 +59,24 @@ export class AppErrorBoundary extends Component<Props, State> {
         componentStack: info.componentStack,
       },
     });
+    const msg = error instanceof Error ? error.message : String(error);
+    if (isChunkLoadError(msg)) {
+      void recoverFromChunkLoadFailure({ unregisterServiceWorkers: true });
+    }
   }
 
   private reset = () => {
+    if (isChunkLoadError(this.state.errorMessage)) {
+      void recoverFromChunkLoadFailure({
+        unregisterServiceWorkers: true,
+        force: true,
+      }).then((reloaded) => {
+        if (!reloaded) {
+          this.setState({ hasError: false, errorMessage: "" });
+        }
+      });
+      return;
+    }
     this.setState({ hasError: false, errorMessage: "" });
   };
 

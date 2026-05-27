@@ -52,4 +52,53 @@ describe("P1-10: PageErrorBoundary reload loop guard", () => {
     expect(setState).toHaveBeenCalledWith({ hasError: false, errorMessage: "" });
     expect(reload).not.toHaveBeenCalled();
   });
+
+  it("auto-triggers recovery in componentDidCatch on chunk-load errors", () => {
+    const spy = vi
+      .spyOn(chunkRecovery, "recoverFromChunkLoadFailure")
+      .mockResolvedValue(true);
+
+    const boundary = new PageErrorBoundary({ children: null });
+    boundary.componentDidCatch(
+      new Error("Importing a module script failed"),
+      { componentStack: "" },
+    );
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    // Auto path must NOT force — the loop guard has to stop runaway reloads.
+    expect(spy.mock.calls[0][0]).toEqual({ unregisterServiceWorkers: true });
+  });
+
+  it("does not auto-trigger recovery for non-chunk errors", () => {
+    const spy = vi
+      .spyOn(chunkRecovery, "recoverFromChunkLoadFailure")
+      .mockResolvedValue(true);
+
+    const boundary = new PageErrorBoundary({ children: null });
+    boundary.componentDidCatch(new Error("Some unrelated render bug"), {
+      componentStack: "",
+    });
+
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("user-initiated Try Again forces past the session loop guard", () => {
+    const spy = vi
+      .spyOn(chunkRecovery, "recoverFromChunkLoadFailure")
+      .mockResolvedValue(true);
+
+    const boundary = new PageErrorBoundary({ children: null });
+    boundary.state = {
+      hasError: true,
+      errorMessage: "Importing a module script failed",
+    };
+    boundary.setState = vi.fn() as typeof boundary.setState;
+
+    boundary.reset();
+
+    expect(spy).toHaveBeenCalledWith({
+      unregisterServiceWorkers: true,
+      force: true,
+    });
+  });
 });
