@@ -17,6 +17,7 @@ interface Window {
 interface ImportMetaEnv {
   readonly VITE_CLERK_PUBLISHABLE_KEY: string;
   readonly VITE_WHATSAPP_PHONE: string;
+  readonly VITE_OFFLINE_PHASE9_POST_SYNC_RECONCILIATION?: string;
 }
 
 interface ImportMeta {

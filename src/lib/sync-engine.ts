@@ -30,6 +30,9 @@ import {
   reportSyncPermanentFailure,
   resetSyncCircuitOpenTelemetryIfExpired,
 } from "./sync-engine-telemetry";
+import { isOfflinePhase9PostSyncReconciliationEnabled } from "./offline-phase9-post-sync-flag";
+import { runOfflinePhase9PostSyncReconciliation } from "./offline-post-sync-reconciliation";
+import { evaluateSyncQueueIdle } from "./sync-queue-idle";
 
 const MAX_RETRIES = PENDING_SYNC_MAX_RETRIES;
 const RETRY_DELAYS_MS = [2000, 5000, 10000];
@@ -65,6 +68,8 @@ let batchCurrent = 0;
 let batchTotal = 0;
 let runTotal = 0;
 let isInRun = false;
+/** True between scheduling BURST_DELAY_MS continuation and the next `processQueue` entry. */
+let burstContinuationScheduled = false;
 
 type AuthStateGetter = () => { isSignedIn: boolean; isOfflineSession: boolean } | null;
 let authStateGetter: AuthStateGetter | null = null;
@@ -188,7 +193,11 @@ async function processQueueBody(): Promise<void> {
     }
 
     if (hasMore && !haltQueue && Date.now() >= circuitOpenUntil) {
-      setTimeout(() => processQueue(), BURST_DELAY_MS);
+      burstContinuationScheduled = true;
+      setTimeout(() => {
+        burstContinuationScheduled = false;
+        processQueue().catch(() => {});
+      }, BURST_DELAY_MS);
     } else {
       isInRun = false;
       runTotal = 0;
@@ -215,6 +224,26 @@ async function processQueueBody(): Promise<void> {
     }
     notifyListeners();
     void maybeReportOfflineSyncTelemetry();
+    void maybeRunPhase9ReconciliationAfterIdle();
+  }
+}
+
+async function maybeRunPhase9ReconciliationAfterIdle(): Promise<void> {
+  if (!isOfflinePhase9PostSyncReconciliationEnabled || !queryClientRef) return;
+
+  try {
+    const pending = await getPendingSync();
+    const idle = evaluateSyncQueueIdle({
+      isSyncing: false,
+      pendingReplayCount: pending.length,
+      hasScheduledBurst: burstContinuationScheduled,
+      isCircuitOpen: Date.now() < circuitOpenUntil,
+      haltQueue,
+    });
+    if (!idle.isIdle) return;
+    await runOfflinePhase9PostSyncReconciliation(queryClientRef);
+  } catch {
+    // Best-effort checkpoint; must not affect sync-engine lifecycle.
   }
 }
 

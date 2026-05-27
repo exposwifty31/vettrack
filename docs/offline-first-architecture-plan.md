@@ -298,14 +298,27 @@ Client throttled reporter; admin/stability surfacing.
 
 ### Phase 9 — Reconnect reconciliation
 
-After queue idle (or defined checkpoint):
+Reconciliation has **two trigger families** (no new transport):
 
-1. Finish pending replay (existing engine).
-2. Fetch **authoritative** server state (equipment list/detail/logs).
-3. Repair Dexie caches (server wins over stale optimistic fields).
-4. Invalidate TanStack queries; use existing ward/display resync hooks (`forceResyncWardErCaches`, realtime reconciliation) where applicable.
+| Trigger family | When | Implementation |
+|----------------|------|----------------|
+| **Realtime / lifecycle** | Tab visible, BFCache restore, `online`, Page Lifecycle `resume`, SSE gap / peer cursor | `src/hooks/useRealtimeReconciliation.ts` → `replayHttpCatchUpAfter` (optional ingestor) + `forceResyncWardErCaches` |
+| **Post-sync queue idle** | FIFO replay finished and queue snapshot is idle | `evaluateSyncQueueIdle` in `src/lib/sync-queue-idle.ts` → `runOfflinePhase9PostSyncReconciliation` in `src/lib/offline-post-sync-reconciliation.ts` (called from `sync-engine` `finally`; **flag default off**: `VITE_OFFLINE_PHASE9_POST_SYNC_RECONCILIATION`) |
 
-**No** new polling transport. **No** assumption that mutation responses alone suffice.
+#### Checkpoint order (post-sync path)
+
+Run only when `evaluateSyncQueueIdle` returns `{ isIdle: true, reason: "idle" }`:
+
+| Step | Checkpoint | Action (current / sketch) |
+|------|------------|---------------------------|
+| 1 | **Replay complete** | `processQueue` finished; no `pending` rows; not syncing; no scheduled burst; circuit closed; queue not halted |
+| 2 | **Authoritative fetch** | Invalidate equipment list/detail/log TanStack keys (refetch on next subscribe) |
+| 3 | **Dexie repair** | *Not in Stretch-A sketch* — server wins over stale optimistic fields (future) |
+| 4 | **Ward / ER / display** | `forceResyncWardErCaches` (same helper as realtime reconciliation) |
+
+**Idle is not** “mutation responses alone suffice.” **Idle is** “nothing left to replay in this session pass.”
+
+**No** new polling transport. **No** Dexie schema bump in Stretch-A.
 
 ---
 
