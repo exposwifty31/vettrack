@@ -132,6 +132,8 @@ jobs:
     steps:
       - name: ⬇️ Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: 📦 pnpm
         uses: pnpm/action-setup@v4
@@ -158,6 +160,13 @@ jobs:
 
       - name: 🔄 madge cycle baseline
         run: node scripts/architecture/compare-cycles.mjs
+
+      - name: 🏥 tenant query lint (warn only, G3)
+        env:
+          TENANT_LINT_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'origin/main' }}
+        run: |
+          node scripts/architecture/tenant-query-lint.mjs --warn-only --touched --base "${TENANT_LINT_BASE}"
+        continue-on-error: true
 
   deploy-check:
     name: 🚀 Deploy pre-flight

@@ -51,5 +51,14 @@ Health bypass → helmet/CORS → JSON+XSS → Clerk → i18n → tenant → ER 
 ```bash
 # After touching tenant data paths
 rg 'eq\([^)]+\.clinicId' server/path/you/changed
+pnpm tenant:lint:touched   # G3 heuristic — warn only; see scripts/architecture/tenant-query-lint.mjs
 npx tsc --noEmit
 ```
+
+### Tenant query lint (G3, warn mode)
+
+`scripts/architecture/tenant-query-lint.mjs` scans Drizzle `.from(<table>)` calls for tables in the schema-derived **TENANT_TABLES** registry (`server/schema/*.ts` with a `clinicId` column). It warns when the enclosing function body lacks a `clinicId` identifier or `<table>.clinicId` reference.
+
+False positives: waive with `// tenant-lint:scoped <reason>` on the same line or the line above the `.from(...)` call.
+
+CI runs this in **warn-only** mode on touched `server/` paths (non-blocking). Future G6 may enable `--strict` for merge-blocking on new paths.
