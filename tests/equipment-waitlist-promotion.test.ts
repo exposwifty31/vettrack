@@ -109,9 +109,9 @@ describe("promoteEquipmentWaitlistWithNotify", () => {
     promoteIfEligible.mockResolvedValueOnce(makePromotedRow());
 
     await promoteEquipmentWaitlistWithNotify("clinic-1", "eq-1", "return");
+    await vi.waitFor(() => expect(enqueueNotificationJob).toHaveBeenCalledTimes(1));
 
     expect(promoteIfEligible).toHaveBeenCalledWith("clinic-1", "eq-1", "return");
-    expect(enqueueNotificationJob).toHaveBeenCalledTimes(1);
   });
 
   it("skips notify when no eligible waiter exists", async () => {
