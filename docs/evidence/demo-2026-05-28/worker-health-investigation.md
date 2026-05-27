@@ -29,13 +29,11 @@
 { "status": "degraded", "checks": { "db": "ok", "clerk": "ok", "vapid": "ok", "worker": "fail" } }
 ```
 
-**After (#508 deployed + Worker redeploy):** Re-run:
+**After (#508 deployed + Worker redeploy, 2026-05-27 @ `ba364b32`):**
 
-```bash
-curl -sS https://vettrack.uk/api/health | jq .
+```json
+{ "status": "ok", "checks": { "db": "ok", "clerk": "ok", "vapid": "ok", "worker": "ok" } }
 ```
-
-Expected: `"worker": "ok"`.
 
 ## Non-impacting fallback
 
