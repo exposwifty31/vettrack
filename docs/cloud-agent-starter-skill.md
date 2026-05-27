@@ -209,6 +209,16 @@ railway status   # project-scoped; uses RAILWAY_TOKEN
 
 Deploy via `deploy.sh` also needs `RAILWAY_SERVICE` (GitHub secret or operator export) — not the `_STAGING` variant unless that is your intentional service id.
 
+### Removing a secret when the UI only shows Edit
+
+On **cursor.com → Cloud Agents → My Secrets**, deletion is easy to miss:
+
+1. **Use desktop width** — open the same page on a laptop browser (not mobile). Some actions only appear on wide layouts.
+2. **Inside the edit panel** — tap the secret row, then scroll to the bottom of the edit sheet. Look for **Delete**, **Remove**, or a trash icon (often red, below Save).
+3. **Row menu** — on desktop, hover the secret row for a **⋯** menu with Delete.
+4. **If there is still no delete** — you cannot remove it from the agent VM until Cursor removes it from your account. Use `source scripts/sanitize-railway-env.sh` each session as a workaround, and ask Cursor support to delete the stale keys (especially misnamed ones like `RAILWAY_TOKEN_STAGING 1`).
+5. **Do not** leave invalid Railway tokens in place hoping the CLI ignores them — `RAILWAY_API_TOKEN` can break `railway` even when `RAILWAY_TOKEN` is valid.
+
 ---
 
 ## 6) Common Cloud-agent workflow shortcuts
