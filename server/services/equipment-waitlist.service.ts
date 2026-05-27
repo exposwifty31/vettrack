@@ -20,6 +20,7 @@ export class EquipmentWaitlistError extends Error {
       | "WAITLIST_SELF_CHECKOUT"
       | "WAITLIST_ALREADY_JOINED"
       | "WAITLIST_NOT_ON_WAITLIST"
+      | "WAITLIST_RESERVATION_HELD_BY_OTHER"
       | "EQUIPMENT_NOT_FOUND",
   ) {
     super(code);
@@ -27,7 +28,7 @@ export class EquipmentWaitlistError extends Error {
   }
 }
 
-type DbExecutor = AuditDbExecutor;
+type DbExecutor = AuditDbExecutor | typeof db;
 
 const ACTIVE_STATUSES = ["waiting", "notified"] as const;
 
@@ -163,6 +164,24 @@ export async function joinEquipmentWaitlist(
 
   try {
     await db.transaction(async (tx) => {
+      const [eqInTx] = await tx
+        .select()
+        .from(equipment)
+        .where(
+          and(
+            eq(equipment.id, equipmentId),
+            eq(equipment.clinicId, clinicId),
+            sql`${equipment.deletedAt} IS NULL`,
+          ),
+        )
+        .limit(1);
+
+      if (!eqInTx) throw new EquipmentWaitlistError("EQUIPMENT_NOT_FOUND");
+      if (!isWaitlistJoinEligible(eqInTx, userId)) {
+        if (eqInTx.checkedOutById === userId) throw new EquipmentWaitlistError("WAITLIST_SELF_CHECKOUT");
+        throw new EquipmentWaitlistError("WAITLIST_NOT_IN_USE");
+      }
+
       await tx.insert(equipmentWaitlist).values({
         id,
         clinicId,
@@ -185,6 +204,7 @@ export async function joinEquipmentWaitlist(
       });
     });
   } catch (err: unknown) {
+    if (err instanceof EquipmentWaitlistError) throw err;
     if (isPostgresUniqueViolation(err)) throw new EquipmentWaitlistError("WAITLIST_ALREADY_JOINED");
     throw err;
   }
@@ -260,8 +280,17 @@ export async function findNextWaitingClaim(
 }
 
 export async function hasNotifiedHolder(clinicId: string, equipmentId: string): Promise<boolean> {
-  const [row] = await db
-    .select({ id: equipmentWaitlist.id })
+  const holder = await getActiveNotifiedUserId(clinicId, equipmentId);
+  return holder !== null;
+}
+
+export async function getActiveNotifiedUserId(
+  clinicId: string,
+  equipmentId: string,
+  executor: DbExecutor = db,
+): Promise<string | null> {
+  const [row] = await executor
+    .select({ userId: equipmentWaitlist.userId })
     .from(equipmentWaitlist)
     .where(
       and(
@@ -271,7 +300,19 @@ export async function hasNotifiedHolder(clinicId: string, equipmentId: string): 
       ),
     )
     .limit(1);
-  return !!row;
+  return row?.userId ?? null;
+}
+
+/** Blocks checkout while another user holds an active reservation (emergency checkout exempt). */
+export function assertCheckoutAllowedForWaitlist(
+  notifiedUserId: string | null,
+  checkoutUserId: string,
+  options: { isEmergency: boolean },
+): void {
+  if (options.isEmergency) return;
+  if (notifiedUserId && notifiedUserId !== checkoutUserId) {
+    throw new EquipmentWaitlistError("WAITLIST_RESERVATION_HELD_BY_OTHER");
+  }
 }
 
 /** Promote head waiter inside an open transaction; returns promoted row or null. */

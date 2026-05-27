@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  assertCheckoutAllowedForWaitlist,
+  EquipmentWaitlistError,
   isWaitlistJoinEligible,
   isWaitlistPromotionEligible,
 } from "../server/services/equipment-waitlist.service.js";
@@ -37,5 +39,31 @@ describe("equipment waitlist eligibility", () => {
 
   it("rejects promotion while still checked out", () => {
     expect(isWaitlistPromotionEligible(base)).toBe(false);
+  });
+});
+
+describe("assertCheckoutAllowedForWaitlist", () => {
+  it("allows checkout when no reservation holder", () => {
+    expect(() =>
+      assertCheckoutAllowedForWaitlist(null, "user-b", { isEmergency: false }),
+    ).not.toThrow();
+  });
+
+  it("allows checkout for the notified holder", () => {
+    expect(() =>
+      assertCheckoutAllowedForWaitlist("user-b", "user-b", { isEmergency: false }),
+    ).not.toThrow();
+  });
+
+  it("blocks checkout for a different user", () => {
+    expect(() =>
+      assertCheckoutAllowedForWaitlist("user-b", "user-c", { isEmergency: false }),
+    ).toThrow(EquipmentWaitlistError);
+  });
+
+  it("allows emergency checkout for a different user", () => {
+    expect(() =>
+      assertCheckoutAllowedForWaitlist("user-b", "user-c", { isEmergency: true }),
+    ).not.toThrow();
   });
 });

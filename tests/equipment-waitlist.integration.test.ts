@@ -11,6 +11,7 @@ import { Pool } from "pg";
 import { createServer, type Server } from "node:http";
 import express from "express";
 import { randomUUID } from "crypto";
+import { i18nMiddleware } from "../lib/i18n/middleware.js";
 
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
 let probePool: Pool | null = null;
@@ -84,6 +85,7 @@ const { runEquipmentWaitlistReservationSweep } = await import(
 function buildApp() {
   const app = express();
   app.use(express.json());
+  app.use("/api", i18nMiddleware);
   app.use("/api/equipment", equipmentRoutes);
   app.use("/api", opsRoutes);
   return app;
@@ -287,8 +289,8 @@ describe.skipIf(!dbReachable)("equipment waitlist integration", () => {
 
     await returnAs(ctx.userA);
     expect(await equipmentCustody(ctx.eqId)).toBe("returned");
+    expect(await countNotified(ctx.eqId, ctx.clinicId)).toBe(1);
 
-    await waitForNotified(ctx.eqId, ctx.clinicId, 1);
     expect(await latestOutboxType(ctx.clinicId, "EQUIPMENT_CUSTODY_STATE_CHANGED")).toBe(
       "EQUIPMENT_CUSTODY_STATE_CHANGED",
     );
@@ -359,10 +361,15 @@ describe.skipIf(!dbReachable)("equipment waitlist integration", () => {
     );
   });
 
-  it("checkout by notified user fulfills waitlist row", async () => {
+  it("checkout by notified user fulfills waitlist row; blocks other users", async () => {
     await checkoutAs(ctx.userA);
     await api(`/api/equipment/${ctx.eqId}/waitlist`, "POST", undefined, ctx.userB);
     await returnAs(ctx.userA);
+    expect(await countNotified(ctx.eqId, ctx.clinicId)).toBe(1);
+
+    const blocked = await api(`/api/equipment/${ctx.eqId}/checkout`, "POST", {}, ctx.userC);
+    expect(blocked.status).toBe(409);
+    expect(blocked.json.code).toBe("equipmentWaitlist.WAITLIST_RESERVATION_HELD_BY_OTHER");
 
     const co = await api(`/api/equipment/${ctx.eqId}/checkout`, "POST", {}, ctx.userB);
     expect(co.status).toBe(200);

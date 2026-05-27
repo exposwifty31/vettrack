@@ -2848,6 +2848,7 @@
     "WAITLIST_SELF_CHECKOUT": "כבר ביצעת checkout למכשיר זה",
     "WAITLIST_ALREADY_JOINED": "כבר נמצאת בתור",
     "WAITLIST_NOT_ON_WAITLIST": "אינך בתור",
+    "WAITLIST_RESERVATION_HELD_BY_OTHER": "המכשיר שמור למשתמש אחר בתור ההמתנה",
     "EQUIPMENT_NOT_FOUND": "ציוד לא נמצא"
   },
   "operationalMetrics": {

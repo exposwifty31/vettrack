@@ -2848,6 +2848,7 @@
     "WAITLIST_SELF_CHECKOUT": "You already have this device checked out",
     "WAITLIST_ALREADY_JOINED": "You are already on the waitlist",
     "WAITLIST_NOT_ON_WAITLIST": "You are not on the waitlist",
+    "WAITLIST_RESERVATION_HELD_BY_OTHER": "This device is reserved for another user on the waitlist",
     "EQUIPMENT_NOT_FOUND": "Equipment not found"
   },
   "operationalMetrics": {

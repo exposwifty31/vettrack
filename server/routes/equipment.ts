@@ -17,10 +17,18 @@ import { getPilotStaleMs } from "../lib/pilot-config.js";
 import { computeBundleReadinessGate } from "../services/equipment-operational-state.service.js";
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
+import { apiError as apiErrorI18n } from "../lib/apiError.js";
 import { enqueueChargeAlertJob } from "../workers/chargeAlertWorker.js";
 import { promoteStagingQueueNext } from "../lib/staging-promotion.js";
-import { promoteEquipmentWaitlistWithNotify } from "../lib/equipment-waitlist-promotion.js";
-import { fulfillWaitlistOnCheckout } from "../services/equipment-waitlist.service.js";
+import { notifyWaitlistPromoted } from "../lib/equipment-waitlist-promotion.js";
+import {
+  assertCheckoutAllowedForWaitlist,
+  EquipmentWaitlistError,
+  fulfillWaitlistOnCheckout,
+  getActiveNotifiedUserId,
+  promoteNextWaitlistInTx,
+} from "../services/equipment-waitlist.service.js";
+import type { EquipmentWaitlistRow } from "../db.js";
 import { mountEquipmentWaitlistRoutes } from "./equipment-waitlist.js";
 import { EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS } from "../lib/equipment-replay-idempotency.js";
 import { equipmentReplayIdempotency } from "../middleware/equipment-replay-idempotency.js";
@@ -1494,6 +1502,21 @@ router.post(
 
     // ─────────────────────────────────────────────────────────────────
 
+    const preCheckoutNotifiedUserId = await getActiveNotifiedUserId(clinicId, req.params.id);
+    if (
+      !isEmergency &&
+      preCheckoutNotifiedUserId &&
+      preCheckoutNotifiedUserId !== req.authUser!.id
+    ) {
+      return apiErrorI18n(
+        req,
+        res,
+        "equipmentWaitlist.WAITLIST_RESERVATION_HELD_BY_OTHER",
+        undefined,
+        409,
+      );
+    }
+
     await db.transaction(async (tx) => {
       const [existing] = await tx
         .select()
@@ -1678,6 +1701,10 @@ router.post(
         conflictInfo: `Checked out by ${err.checkedOutByEmail}`,
       });
     }
+    if (err instanceof EquipmentWaitlistError) {
+      const status = err.code === "WAITLIST_RESERVATION_HELD_BY_OTHER" ? 409 : 422;
+      return apiErrorI18n(req, res, `equipmentWaitlist.${err.code}`, undefined, status);
+    }
     console.error(err);
     trackSyncFail();
     res.status(500).json(
@@ -1711,6 +1738,7 @@ router.post(
     let undoToken = "";
     let alreadyReturned = false;
     let didTransitionCustody = false;
+    let waitlistPromotedOnReturn: EquipmentWaitlistRow | null = null;
 
     await db.transaction(async (tx) => {
       const [existing] = await tx
@@ -1818,11 +1846,17 @@ router.post(
           type: "EQUIPMENT_CUSTODY_STATE_CHANGED",
           payload: { equipmentId: req.params.id, custodyState: "returned", hasActiveClaims },
         });
+        waitlistPromotedOnReturn = await promoteNextWaitlistInTx(
+          tx,
+          clinicId,
+          req.params.id,
+          returnTime,
+        );
       }
     });
 
-    if (updated && didTransitionCustody) {
-      void promoteEquipmentWaitlistWithNotify(clinicId, req.params.id, "return");
+    if (waitlistPromotedOnReturn) {
+      void notifyWaitlistPromoted(clinicId, req.params.id, waitlistPromotedOnReturn);
     }
 
     if (!updated) {
