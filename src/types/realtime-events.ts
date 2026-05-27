@@ -45,7 +45,8 @@ export type RealtimeEventType =
   | "EQUIPMENT_WAITLIST_LEFT"
   | "EQUIPMENT_WAITLIST_PROMOTED"
   | "EQUIPMENT_WAITLIST_AVAILABLE"
-  | "EQUIPMENT_WAITLIST_EXPIRED";
+  | "EQUIPMENT_WAITLIST_EXPIRED"
+  | "EQUIPMENT_RFID_OBSERVED";
 
 export type RealtimeEvent = {
   type: RealtimeEventType;

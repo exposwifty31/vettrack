@@ -64,6 +64,7 @@ const createEquipmentSchema = z.object({
   folderId: z.string().optional().nullable(),
   roomId: z.string().optional().nullable(),
   nfcTagId: z.string().max(500).optional().nullable(),
+  rfidTagEpc: z.string().max(128).optional().nullable(),
   maintenanceIntervalDays: z.number().int().positive().optional().nullable(),
   expectedReturnMinutes: z.number().int().positive().optional().nullable(),
   imageUrl: z.string().max(500).optional().nullable(),
@@ -83,6 +84,7 @@ const patchEquipmentSchema = z.object({
   folderId: z.string().optional().nullable(),
   roomId: z.string().optional().nullable(),
   nfcTagId: z.string().max(500).optional().nullable(),
+  rfidTagEpc: z.string().max(128).optional().nullable(),
   maintenanceIntervalDays: z.number().int().positive().optional().nullable(),
   expectedReturnMinutes: z.number().int().positive().optional().nullable(),
   imageUrl: z.string().max(500).optional().nullable(),
@@ -315,6 +317,25 @@ const equipmentOperationalStateSelect = {
   dockId: equipment.dockId,
 } as const;
 
+/** Advisory RFID doorway fields (read-only signal; never mutates authoritative roomId). */
+function equipmentRfidSelect(clinicId: string) {
+  return {
+    rfidTagEpc: equipment.rfidTagEpc,
+    lastRfidSeenAt: equipment.lastRfidSeenAt,
+    lastRfidRoomId: equipment.lastRfidRoomId,
+    lastRfidGatewayCode: equipment.lastRfidGatewayCode,
+    lastRfidRoomName: sql<string | null>`(
+      SELECT r.name FROM vt_rooms r
+      WHERE r.id = ${equipment.lastRfidRoomId} AND r.clinic_id = ${clinicId}
+      LIMIT 1
+    )`.as("lastRfidRoomName"),
+    lastRfidRoomIsDock: sql<boolean>`EXISTS (
+      SELECT 1 FROM vt_docks d
+      WHERE d.room_id = ${equipment.lastRfidRoomId} AND d.clinic_id = ${clinicId}
+    )`.as("lastRfidRoomIsDock"),
+  };
+}
+
 // GET /api/equipment/my
 router.get("/my", requireAuth, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -511,6 +532,7 @@ router.get("/", requireAuth, async (req, res) => {
           LIMIT 1
         )`.as("linkedAnimalName"),
         ...equipmentOperationalStateSelect,
+        ...equipmentRfidSelect(clinicId),
       })
       .from(equipment)
       .leftJoin(folders, and(eq(equipment.folderId, folders.id), eq(folders.clinicId, clinicId), isNull(folders.deletedAt)))
@@ -730,6 +752,7 @@ router.get("/:id", requireAuth, async (req, res) => {
           LIMIT 1
         )`.as("linkedAnimalName"),
         ...equipmentOperationalStateSelect,
+        ...equipmentRfidSelect(clinicId),
       })
       .from(equipment)
       .leftJoin(folders, and(eq(equipment.folderId, folders.id), eq(folders.clinicId, clinicId), isNull(folders.deletedAt)))
@@ -783,6 +806,7 @@ router.post(
       folderId,
       roomId,
       nfcTagId,
+      rfidTagEpc,
       maintenanceIntervalDays,
       expectedReturnMinutes,
       imageUrl,
@@ -819,6 +843,7 @@ router.post(
         folderId: folderId ?? null,
         roomId: roomId ?? null,
         nfcTagId: nfcTagId ?? null,
+        rfidTagEpc: rfidTagEpc?.trim() || null,
         maintenanceIntervalDays: maintenanceIntervalDays ?? null,
         expectedReturnMinutes: expectedReturnMinutes ?? null,
         imageUrl: imageUrl ?? null,
@@ -883,6 +908,7 @@ try {
       folderId,
       roomId,
       nfcTagId,
+      rfidTagEpc,
       maintenanceIntervalDays,
       expectedReturnMinutes,
       imageUrl,
@@ -937,6 +963,7 @@ try {
           ...(folderId !== undefined && { folderId: folderId ?? null }),
           ...(roomId !== undefined && { roomId: roomId ?? null }),
           ...(nfcTagId !== undefined && { nfcTagId: nfcTagId ?? null }),
+          ...(rfidTagEpc !== undefined && { rfidTagEpc: rfidTagEpc?.trim() || null }),
           ...(maintenanceIntervalDays !== undefined && { maintenanceIntervalDays }),
           ...(expectedReturnMinutes !== undefined && { expectedReturnMinutes }),
           ...(imageUrl !== undefined && { imageUrl }),

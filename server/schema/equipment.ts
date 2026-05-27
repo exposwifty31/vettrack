@@ -29,6 +29,7 @@ export const rooms = vtTable(
     name: text("name").notNull(),
     floor: text("floor"),
     masterNfcTagId: text("master_nfc_tag_id").unique(),
+    gatewayCode: text("gateway_code"),
     syncStatus: varchar("sync_status", { length: 20 }).notNull().default("stale"),
     lastAuditAt: timestamp("last_audit_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -36,6 +37,10 @@ export const rooms = vtTable(
   },
   (table) => ({
     clinicNameUnique: uniqueIndex("vt_rooms_clinic_name_unique").on(table.clinicId, table.name),
+    clinicGatewayLookup: index("vt_rooms_clinic_gateway_code_idx").on(table.clinicId, table.gatewayCode),
+    clinicGatewayUnique: uniqueIndex("vt_rooms_clinic_gateway_code_uq")
+      .on(table.clinicId, table.gatewayCode)
+      .where(sql`${table.gatewayCode} IS NOT NULL`),
   }),
 );
 
@@ -114,6 +119,10 @@ export const equipment = vtTable("vt_equipment", {
   maintenanceIntervalDays: integer("maintenance_interval_days"),
   imageUrl: text("image_url"),
   nfcTagId: text("nfc_tag_id").unique(),
+  rfidTagEpc: text("rfid_tag_epc"),
+  lastRfidSeenAt: timestamp("last_rfid_seen_at", { withTimezone: true }),
+  lastRfidRoomId: text("last_rfid_room_id").references(() => rooms.id, { onDelete: "set null" }),
+  lastRfidGatewayCode: text("last_rfid_gateway_code"),
   billingItemId: text("billing_item_id").references(() => billingItems.id, { onDelete: "set null" }),
   lastVerifiedAt: timestamp("last_verified_at"),
   lastVerifiedById: text("last_verified_by_id"),
@@ -148,7 +157,36 @@ export const equipment = vtTable("vt_equipment", {
     () => hospitalizations.id,
     { onDelete: "set null" },
   ),
-});
+}, (table) => ({
+  clinicRfidTagLookup: index("vt_equipment_clinic_rfid_tag_epc_idx").on(table.clinicId, table.rfidTagEpc),
+  clinicRfidTagUnique: uniqueIndex("vt_equipment_clinic_rfid_tag_epc_uq")
+    .on(table.clinicId, table.rfidTagEpc)
+    .where(sql`${table.rfidTagEpc} IS NOT NULL`),
+}));
+
+export const equipmentRfidReads = vtTable(
+  "vt_equipment_rfid_reads",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    equipmentId: text("equipment_id").notNull().references(() => equipment.id, { onDelete: "cascade" }),
+    fromRoomId: text("from_room_id").references(() => rooms.id, { onDelete: "set null" }),
+    toRoomId: text("to_room_id").notNull().references(() => rooms.id, { onDelete: "restrict" }),
+    gatewayCode: text("gateway_code").notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }).notNull(),
+    batchId: text("batch_id").notNull(),
+  },
+  (t) => ({
+    clinicEquipmentReadAtIdx: index("vt_equipment_rfid_reads_clinic_equipment_read_at_idx").on(
+      t.clinicId,
+      t.equipmentId,
+      t.readAt,
+    ),
+    clinicReadAtIdx: index("vt_equipment_rfid_reads_clinic_read_at_idx").on(t.clinicId, t.readAt),
+  }),
+);
+export type EquipmentRfidRead = typeof equipmentRfidReads.$inferSelect;
+export type NewEquipmentRfidRead = typeof equipmentRfidReads.$inferInsert;
 
 export const unitConditionStates = vtTable(
   "vt_unit_condition_states",

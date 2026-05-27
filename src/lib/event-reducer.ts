@@ -13,6 +13,7 @@ import type {
 
 import type { RealtimeEvent } from "@/types/realtime-events";
 import { invalidateEquipmentCaches } from "@/lib/equipment-realtime";
+import { invalidateEquipmentRfidCaches } from "@/lib/invalidate-equipment-rfid-caches";
 import { getCurrentUserId } from "@/lib/auth-store";
 import { toast } from "sonner";
 import { t } from "@/lib/i18n";
@@ -348,6 +349,13 @@ export async function applyEvent(client: QueryClient, event: RealtimeEvent): Pro
     }
 
 
+
+    // RFID doorway advisory — explicit branch; must not fall through to EQUIPMENT_* handlers below.
+    case "EQUIPMENT_RFID_OBSERVED": {
+      const payload = event.payload as { equipmentId?: string };
+      await invalidateEquipmentRfidCaches(client, payload.equipmentId);
+      return;
+    }
 
     case "EQUIPMENT_CUSTODY_STATE_CHANGED":
     case "EQUIPMENT_USAGE_STATE_CHANGED":

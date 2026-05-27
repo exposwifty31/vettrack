@@ -63,6 +63,7 @@ const schema = z.object({
   usuallyFoundHere: z.string().max(200).optional().nullable(),
   searchAlias: z.string().max(200).optional().nullable(),
   staffNote: z.string().max(500).optional().nullable(),
+  rfidTagEpc: z.string().max(128).optional().nullable(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -159,6 +160,7 @@ export default function NewEquipmentPage() {
         usuallyFoundHere: existingEquipment.usuallyFoundHere ?? undefined,
         searchAlias: existingEquipment.searchAlias ?? undefined,
         staffNote: existingEquipment.staffNote ?? undefined,
+        rfidTagEpc: existingEquipment.rfidTagEpc ?? undefined,
       });
     }
   }, [isEditing, existingEquipment, reset]);
@@ -218,6 +220,7 @@ export default function NewEquipmentPage() {
       usuallyFoundHere: normalizeOptionalString(data.usuallyFoundHere ?? undefined) ?? null,
       searchAlias: normalizeOptionalString(data.searchAlias ?? undefined) ?? null,
       staffNote: normalizeOptionalString(data.staffNote ?? undefined) ?? null,
+      rfidTagEpc: normalizeOptionalString(data.rfidTagEpc ?? undefined),
     };
   }
 
@@ -237,6 +240,7 @@ export default function NewEquipmentPage() {
       usuallyFoundHere: normalizeOptionalString(data.usuallyFoundHere ?? undefined) ?? null,
       searchAlias: normalizeOptionalString(data.searchAlias ?? undefined) ?? null,
       staffNote: normalizeOptionalString(data.staffNote ?? undefined) ?? null,
+      rfidTagEpc: normalizeOptionalString(data.rfidTagEpc ?? undefined) ?? null,
       // Optimistic concurrency: echo back the version we loaded so the
       // server can 409 if someone else edited the row meanwhile.
       ...(existingEquipment?.version !== undefined && { version: existingEquipment.version }),
@@ -361,6 +365,19 @@ export default function NewEquipmentPage() {
                   className="h-12 rounded-xl border-border/60 bg-background text-base"
                   {...register("serialNumber")}
                   data-testid="input-serial"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="rfidTagEpc" className="text-sm font-medium">
+                  {t.equipment.rfidTagEpc.label}
+                </Label>
+                <Input
+                  id="rfidTagEpc"
+                  placeholder={t.equipment.rfidTagEpc.placeholder}
+                  className="h-12 rounded-xl border-border/60 bg-background text-base font-mono"
+                  {...register("rfidTagEpc")}
+                  data-testid="input-rfid-tag-epc"
                 />
               </div>
 

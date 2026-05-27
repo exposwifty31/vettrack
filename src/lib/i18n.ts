@@ -282,7 +282,18 @@ const translations = {
 
   home: d.home,
 
-  equipment: d.equipment,
+  equipment: {
+    ...d.equipment,
+    rfidLastSeen: {
+      line: (room: string, relative: string) =>
+        tr(d.equipment.rfidLastSeen.line, { room, relative }),
+    },
+    rfidAttention: {
+      checkedOutMismatch: (room: string, holder: string) =>
+        tr(d.equipment.rfidAttention.checkedOutMismatch, { room, holder }),
+    },
+  },
+  rooms: d.rooms,
 
   app: d.app,
 

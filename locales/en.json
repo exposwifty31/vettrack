@@ -527,7 +527,23 @@
     "shiftSummary": "Shift summary",
     "myEquipment": "My equipment",
     "importCsv": "Import CSV",
-    "select": "Select"
+    "select": "Select",
+    "rfidTagEpc": {
+      "label": "RFID tag (EPC)",
+      "placeholder": "EPC hex string"
+    },
+    "rfidLastSeen": {
+      "line": "Last seen via RFID near {room} · {relative}"
+    },
+    "rfidAttention": {
+      "checkedOutMismatch": "Detected near {room} while checked out to {holder}"
+    }
+  },
+  "rooms": {
+    "gatewayCode": {
+      "label": "Doorway gateway code",
+      "placeholder": "e.g. GW-101"
+    }
   },
   "app": {
     "pendingApprovalTitle": "Account pending hospital management approval",

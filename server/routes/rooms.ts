@@ -55,12 +55,14 @@ const createRoomSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
   floor: z.string().max(100).optional(),
   masterNfcTagId: z.string().max(200).optional(),
+  gatewayCode: z.string().max(64).optional(),
 });
 
 const patchRoomSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   floor: z.string().max(100).optional().nullable(),
   masterNfcTagId: z.string().max(200).optional().nullable(),
+  gatewayCode: z.string().max(64).optional().nullable(),
   syncStatus: z.enum(["synced", "stale", "requires_audit"]).optional(),
 });
 
@@ -257,7 +259,7 @@ router.post("/", requireAuth, requireEffectiveRole("technician"), validateBody(c
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
-    const { name, floor, masterNfcTagId } = req.body as z.infer<typeof createRoomSchema>;
+    const { name, floor, masterNfcTagId, gatewayCode } = req.body as z.infer<typeof createRoomSchema>;
 
     const [existing] = await db
       .select({ id: rooms.id })
@@ -285,6 +287,7 @@ router.post("/", requireAuth, requireEffectiveRole("technician"), validateBody(c
         name: name.trim(),
         floor: floor?.trim() ?? null,
         masterNfcTagId: masterNfcTagId?.trim() ?? null,
+        gatewayCode: gatewayCode?.trim() || null,
         syncStatus: "stale",
         createdAt: now,
         updatedAt: now,
@@ -321,7 +324,7 @@ router.patch("/:id", requireAuth, requireAdmin, validateBody(patchRoomSchema), a
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
-    const { name, floor, masterNfcTagId, syncStatus } = req.body as z.infer<typeof patchRoomSchema>;
+    const { name, floor, masterNfcTagId, gatewayCode, syncStatus } = req.body as z.infer<typeof patchRoomSchema>;
 
     const [existing] = await db
       .select()
@@ -364,6 +367,7 @@ router.patch("/:id", requireAuth, requireAdmin, validateBody(patchRoomSchema), a
         ...(name !== undefined && { name: name.trim() }),
         ...(floor !== undefined && { floor: floor ?? null }),
         ...(masterNfcTagId !== undefined && { masterNfcTagId: masterNfcTagId ?? null }),
+        ...(gatewayCode !== undefined && { gatewayCode: gatewayCode?.trim() || null }),
         ...(syncStatus !== undefined && { syncStatus }),
         updatedAt: new Date(),
       })

@@ -527,7 +527,23 @@
     "shiftSummary": "סיכום משמרת",
     "myEquipment": "הציוד שלי",
     "importCsv": "ייבוא CSV",
-    "select": "בחירה"
+    "select": "בחירה",
+    "rfidTagEpc": {
+      "label": "תג RFID (EPC)",
+      "placeholder": "מחרוזת EPC בהקסה"
+    },
+    "rfidLastSeen": {
+      "line": "זוהה לאחרונה ב־RFID ליד {room} · {relative}"
+    },
+    "rfidAttention": {
+      "checkedOutMismatch": "זוהה ליד {room} בעוד שאול ל־{holder}"
+    }
+  },
+  "rooms": {
+    "gatewayCode": {
+      "label": "מזהה שער RFID",
+      "placeholder": "לדוגמה GW-101"
+    }
   },
   "app": {
     "pendingApprovalTitle": "החשבון ממתין לאישור הנהלת ביה״ח",

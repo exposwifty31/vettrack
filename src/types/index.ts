@@ -70,6 +70,7 @@ export interface Room {
   name: string;
   floor?: string | null;
   masterNfcTagId?: string | null;
+  gatewayCode?: string | null;
   syncStatus: RoomSyncStatus;
   lastAuditAt?: string | null;
   createdAt: string;
@@ -100,12 +101,14 @@ export interface CreateRoomRequest {
   name: string;
   floor?: string;
   masterNfcTagId?: string;
+  gatewayCode?: string;
 }
 
 export interface UpdateRoomRequest {
   name?: string;
   floor?: string | null;
   masterNfcTagId?: string | null;
+  gatewayCode?: string | null;
   syncStatus?: RoomSyncStatus;
 }
 
@@ -130,6 +133,13 @@ export interface Equipment {
   roomName?: string | null;
   department?: string | null;
   nfcTagId?: string | null;
+  rfidTagEpc?: string | null;
+  lastRfidSeenAt?: string | null;
+  lastRfidRoomId?: string | null;
+  lastRfidRoomName?: string | null;
+  lastRfidGatewayCode?: string | null;
+  /** True when last RFID room has at least one vt_docks row (equipment storage). */
+  lastRfidRoomIsDock?: boolean;
   lastVerifiedAt?: string | null;
   lastVerifiedById?: string | null;
   lastVerifiedByName?: string | null;
@@ -222,6 +232,7 @@ export interface CreateEquipmentRequest {
   folderId?: string;
   roomId?: string;
   nfcTagId?: string;
+  rfidTagEpc?: string;
   maintenanceIntervalDays?: number;
   expectedReturnMinutes?: number | null;
   imageUrl?: string;
@@ -241,6 +252,7 @@ export interface UpdateEquipmentRequest {
   folderId?: string | null;
   roomId?: string | null;
   nfcTagId?: string | null;
+  rfidTagEpc?: string | null;
   maintenanceIntervalDays?: number | null;
   expectedReturnMinutes?: number | null;
   isPluggedIn?: boolean | null;

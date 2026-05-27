@@ -276,7 +276,16 @@ type MetricName =
   | "legacy_worker_starter_used"
   | "job_runtime_worker_unavailable"
   | "job_enqueue_queue_unavailable"
-  | "job_enqueue_succeeded";
+  | "job_enqueue_succeeded"
+  | "rfid_batch_received"
+  | "rfid_batch_rejected_signature"
+  | "rfid_batch_rejected_schema"
+  | "rfid_batch_rejected_flag_off"
+  | "rfid_event_unknown_tag"
+  | "rfid_event_unknown_gateway"
+  | "rfid_event_stale"
+  | "rfid_event_unchanged"
+  | "rfid_event_room_changed";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -895,6 +904,15 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   job_runtime_worker_unavailable: 0,
   job_enqueue_queue_unavailable: 0,
   job_enqueue_succeeded: 0,
+  rfid_batch_received: 0,
+  rfid_batch_rejected_signature: 0,
+  rfid_batch_rejected_schema: 0,
+  rfid_batch_rejected_flag_off: 0,
+  rfid_event_unknown_tag: 0,
+  rfid_event_unknown_gateway: 0,
+  rfid_event_stale: 0,
+  rfid_event_unchanged: 0,
+  rfid_event_room_changed: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };

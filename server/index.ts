@@ -31,6 +31,7 @@ import { sessionContextMiddleware } from "./middleware/auth.js";
 import { registerApiRoutes } from "./app/routes.js";
 import clerkWebhookRoutes from "./routes/webhooks.js";
 import inboundIntegrationWebhooks from "./integrations/webhooks/inbound.router.js";
+import rfidRoutes from "./routes/rfid.js";
 import { startBackgroundSchedulers } from "./app/start-schedulers.js";
 import { ensureClinicPhase2Defaults } from "./lib/ensure-clinic-phase2-defaults.js";
 import { releaseStaleMedicationTasks, releaseExpiredMedicationTasks } from "./services/medication-tasks.service.js";
@@ -219,6 +220,12 @@ app.use(
   "/api/integration-webhooks/:adapterId",
   express.raw({ type: () => true, limit: "512kb" }),
   inboundIntegrationWebhooks,
+);
+
+app.use(
+  "/api/rfid",
+  express.raw({ type: () => true, limit: "512kb" }),
+  rfidRoutes,
 );
 
 app.use(express.json());

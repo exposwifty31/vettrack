@@ -207,6 +207,7 @@ export default function RoomsListPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [roomName, setRoomName] = useState("");
   const [roomFloor, setRoomFloor] = useState("");
+  const [roomGatewayCode, setRoomGatewayCode] = useState("");
   const [activeZone, setActiveZone] = useState<Zone>("all");
   const roomZoneLabels = zoneLabels();
 
@@ -239,13 +240,18 @@ export default function RoomsListPage() {
       setCreateOpen(false);
       setRoomName("");
       setRoomFloor("");
+      setRoomGatewayCode("");
     },
     onError: (err: Error) => toast.error(err.message || t.roomsListPage.createRoomFailed),
   });
 
   const handleCreate = () => {
     if (!roomName.trim()) return;
-    createMut.mutate({ name: roomName.trim(), floor: roomFloor.trim() || undefined });
+    createMut.mutate({
+      name: roomName.trim(),
+      floor: roomFloor.trim() || undefined,
+      gatewayCode: roomGatewayCode.trim() || undefined,
+    });
   };
 
   const totalAvailable = rooms?.reduce((a, r) => a + (r.availableCount ?? 0), 0) ?? 0;
@@ -397,7 +403,7 @@ export default function RoomsListPage() {
       </div>
 
       {/* create room dialog */}
-      <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) { setRoomName(""); setRoomFloor(""); } }}>
+      <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) { setRoomName(""); setRoomFloor(""); setRoomGatewayCode(""); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t.roomsListPage.createRoomDialogTitle}</DialogTitle>
@@ -421,6 +427,18 @@ export default function RoomsListPage() {
                 value={roomFloor}
                 onChange={(e) => setRoomFloor(e.target.value)}
                 placeholder="e.g. Level 2"
+                onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="room-gateway">{t.rooms.gatewayCode.label}</Label>
+              <Input
+                id="room-gateway"
+                value={roomGatewayCode}
+                onChange={(e) => setRoomGatewayCode(e.target.value)}
+                placeholder={t.rooms.gatewayCode.placeholder}
+                className="font-mono"
+                data-testid="input-room-gateway-code"
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
               />
             </div>

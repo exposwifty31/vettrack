@@ -37,6 +37,10 @@ import { Input } from "@/components/ui/input";
 import { STATUS_LABELS } from "@/types";
 import type { EquipmentStatus, Equipment } from "@/types";
 import {
+  isRfidSubtitleFresh,
+  shouldShowRfidAttentionBadge,
+} from "@/lib/equipment-rfid-display";
+import {
   ArrowLeft,
   QrCode,
   Scan,
@@ -1166,6 +1170,26 @@ export default function EquipmentDetailPage() {
                   <p className="text-xs text-muted-foreground">
                     Last scan: {formatRelativeTime(equipment.lastSeen?.toString())}
                   </p>
+                  {isRfidSubtitleFresh(equipment.lastRfidSeenAt) && equipment.lastRfidRoomName && (
+                    <p className="text-xs text-muted-foreground mt-0.5" data-testid="equipment-detail-rfid-last-seen">
+                      {t.equipment.rfidLastSeen.line(
+                        equipment.lastRfidRoomName,
+                        formatRelativeTime(equipment.lastRfidSeenAt!),
+                      )}
+                    </p>
+                  )}
+                  {shouldShowRfidAttentionBadge(equipment) && (
+                    <Badge
+                      variant="outline"
+                      className="mt-1 text-[11px] border-amber-300 text-amber-900 dark:text-amber-200"
+                      data-testid="equipment-detail-rfid-attention"
+                    >
+                      {t.equipment.rfidAttention.checkedOutMismatch(
+                        equipment.lastRfidRoomName!,
+                        equipment.checkedOutByEmail || t.common.unknown,
+                      )}
+                    </Badge>
+                  )}
                   {showOperationalState && (
                     <div className="mt-1.5">
                       <DeployabilityBadge

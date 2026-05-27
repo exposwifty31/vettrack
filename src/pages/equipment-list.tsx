@@ -36,6 +36,10 @@ import { STATUS_LABELS } from "@/types";
 import type { Equipment } from "@/types";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
 import { DeployabilityBadge } from "@/components/equipment/DeployabilityBadge";
+import {
+  isRfidSubtitleFresh,
+  shouldShowRfidAttentionBadge,
+} from "@/lib/equipment-rfid-display";
 import { DockReturnFlow } from "@/components/equipment/DockReturnFlow";
 import {
   Plus,
@@ -1160,6 +1164,29 @@ function EquipmentItem({
                     <PawPrint className="w-3.5 h-3.5 shrink-0" aria-hidden />
                     {t.equipmentList.linkedInUse(eq.linkedAnimalName)}
                   </p>
+                )}
+                {isRfidSubtitleFresh(eq.lastRfidSeenAt) && eq.lastRfidRoomName && (
+                  <p
+                    className="text-xs text-muted-foreground mt-0.5"
+                    data-testid={`equipment-rfid-last-seen-${eq.id}`}
+                  >
+                    {t.equipment.rfidLastSeen.line(
+                      eq.lastRfidRoomName,
+                      formatRelativeTime(eq.lastRfidSeenAt!),
+                    )}
+                  </p>
+                )}
+                {shouldShowRfidAttentionBadge(eq) && (
+                  <Badge
+                    variant="outline"
+                    className="mt-1 text-[11px] font-medium border-amber-300 text-amber-900 dark:text-amber-200"
+                    data-testid={`equipment-rfid-attention-${eq.id}`}
+                  >
+                    {t.equipment.rfidAttention.checkedOutMismatch(
+                      eq.lastRfidRoomName!,
+                      eq.checkedOutByEmail || t.common.unknown,
+                    )}
+                  </Badge>
                 )}
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   {eq.folderName && (

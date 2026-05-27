@@ -531,6 +531,22 @@ export interface TStructure {
     myEquipment: string;
     importCsv: string;
     select: string;
+    rfidTagEpc: {
+      label: string;
+      placeholder: string;
+    };
+    rfidLastSeen: {
+      line: string;
+    };
+    rfidAttention: {
+      checkedOutMismatch: string;
+    };
+  };
+  rooms: {
+    gatewayCode: {
+      label: string;
+      placeholder: string;
+    };
   };
   app: {
     pendingApprovalTitle: string;
