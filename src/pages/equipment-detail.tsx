@@ -86,6 +86,11 @@ import { DeployabilityBadge } from "@/components/equipment/DeployabilityBadge";
 import { DockReturnFlow } from "@/components/equipment/DockReturnFlow";
 import { StagingQueuePanel } from "@/components/equipment/StagingQueuePanel";
 import { WaitlistPanel } from "@/components/equipment/WaitlistPanel";
+import { ReservationBanner } from "@/components/equipment/ReservationBanner";
+import {
+  shouldShowReservationBanner,
+  shouldShowWaitlistJoinPanel,
+} from "@/lib/equipment-waitlist-ui";
 import { useSettings } from "@/hooks/use-settings";
 import { playCriticalAlertTone } from "@/lib/sounds";
 import { haptics } from "@/lib/haptics";
@@ -364,6 +369,13 @@ export default function EquipmentDetailPage() {
     queryFn: () => api.operationalState.deployability(id!),
     enabled: !!id && equipment?.custodyState != null,
     refetchInterval: 5 * 60 * 1000,
+  });
+
+  const waitlistQ = useQuery({
+    queryKey: ["equipment-waitlist", id],
+    queryFn: () => api.equipment.waitlist(id!),
+    enabled: !!id && !!userId && queryEnabled,
+    refetchOnWindowFocus: false,
   });
 
   const hospitalizationsQ = useQuery({
@@ -816,6 +828,12 @@ export default function EquipmentDetailPage() {
   const sterilizationDue = isSterilizationDue(equipment);
   const isCheckedOut = !!equipment.checkedOutById;
   const checkedOutByMe = equipment.checkedOutById === userId;
+  const showReservationBanner = shouldShowReservationBanner(
+    waitlistQ.data?.myStatus,
+    waitlistQ.data?.reservationExpiresAt,
+  );
+  const showWaitlistJoinPanel =
+    !!userId && shouldShowWaitlistJoinPanel(equipment, userId);
   const showOperationalState =
     equipment.custodyState != null &&
     equipment.readinessState != null &&
@@ -967,6 +985,16 @@ export default function EquipmentDetailPage() {
 
         {/* Quick Action Bar — ICU-moment: 1–2 large, instantly tappable actions */}
         <div className="flex flex-col gap-2" data-testid="quick-action-bar">
+          {showReservationBanner && waitlistQ.data?.reservationExpiresAt && (
+            <ReservationBanner
+              equipmentId={equipment.id}
+              expiresAt={waitlistQ.data.reservationExpiresAt}
+              onCheckout={() => checkoutMut.mutate()}
+              checkoutPending={checkoutMut.isPending}
+              showNextInLine={waitlistQ.data.myPosition === 1}
+            />
+          )}
+
           {/* Pilot mode: Confirm here replaces checkout/return */}
           {isPilotMode ? (
             <Button
@@ -1084,12 +1112,13 @@ export default function EquipmentDetailPage() {
             </div>
           )}
 
-          {userId &&
-            equipment.custodyState === "checked_out" &&
-            equipment.checkedOutById &&
-            equipment.checkedOutById !== userId && (
-              <WaitlistPanel equipment={equipment} currentUserId={userId} />
-            )}
+          {showWaitlistJoinPanel && userId && (
+            <WaitlistPanel
+              equipment={equipment}
+              currentUserId={userId}
+              snapshot={waitlistQ.data}
+            />
+          )}
         </div>
 
         {/* Status card */}

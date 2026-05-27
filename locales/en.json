@@ -2830,6 +2830,13 @@
     "queueSize": "In queue",
     "myPosition": "Your position",
     "notifiedBanner": "This device is reserved for you",
+    "reservedForYou": {
+      "title": "Reserved for you",
+      "subtitle": "Check out this device within {minutesRemaining} minutes",
+      "checkout": "Check Out Device",
+      "expiresIn": "Reservation ends in",
+      "nextInLine": "You are next in line"
+    },
     "reservationExpires": "Reservation ends",
     "offlineBlocked": "Waitlist requires an internet connection",
     "promotedTitle": "Device available for you",

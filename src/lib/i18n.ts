@@ -915,6 +915,13 @@ const translations = {
     queueSize: d.equipmentWaitlist.queueSize,
     myPosition: d.equipmentWaitlist.myPosition,
     notifiedBanner: d.equipmentWaitlist.notifiedBanner,
+    reservedForYou: {
+      title: d.equipmentWaitlist.reservedForYou.title,
+      subtitle: d.equipmentWaitlist.reservedForYou.subtitle,
+      checkout: d.equipmentWaitlist.reservedForYou.checkout,
+      expiresIn: d.equipmentWaitlist.reservedForYou.expiresIn,
+      nextInLine: d.equipmentWaitlist.reservedForYou.nextInLine,
+    },
     reservationExpires: d.equipmentWaitlist.reservationExpires,
     offlineBlocked: d.equipmentWaitlist.offlineBlocked,
     promotedTitle: d.equipmentWaitlist.promotedTitle,

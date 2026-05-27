@@ -2833,6 +2833,13 @@ export interface TStructure {
     queueSize: string;
     myPosition: string;
     notifiedBanner: string;
+    reservedForYou: {
+      title: string;
+      subtitle: string;
+      checkout: string;
+      expiresIn: string;
+      nextInLine: string;
+    };
     reservationExpires: string;
     offlineBlocked: string;
     promotedTitle: string;

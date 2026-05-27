@@ -155,12 +155,28 @@ test.describe("Equipment waitlist two-browser", () => {
       });
       expect(replayTypes.filter((t) => t === "EQUIPMENT_WAITLIST_AVAILABLE").length).toBe(0);
 
-      // After promote, custody is `returned` — WaitlistPanel hides (join eligibility requires checked_out).
-      // Cross-browser reservation proof is API `myStatus === notified` + replay above.
-      await pageB.goto("/equipment");
+      await pageB.goto(`/equipment/${equipmentId}`);
+      await expect(pageB.getByTestId("equipment-reservation-banner")).toBeVisible({
+        timeout: 20_000,
+      });
+      await expect(pageB.getByTestId("reservation-countdown")).toBeVisible();
+      await expect(pageB.getByTestId("btn-reservation-checkout")).toBeVisible();
+      await expect(pageB.getByTestId("equipment-waitlist-panel")).toHaveCount(0);
+
       await expect
         .poll(() => fetchPaginatedCustody(pageB, equipmentId), { timeout: 15_000 })
         .toBe("returned");
+
+      const checkoutRes = await ctxB.request.post(`/api/equipment/${equipmentId}/checkout`, {
+        headers: { "Content-Type": "application/json", ...devHeaders(USER_BETA) },
+        data: { location: "ICU" },
+      });
+      expect(checkoutRes.status()).toBe(200);
+
+      await waitForMyWaitlistStatus(pageB, equipmentId, "fulfilled");
+      await expect(pageB.getByTestId("equipment-reservation-banner")).toHaveCount(0, {
+        timeout: 15_000,
+      });
 
       const promoteToasts = pageB.locator("[data-sonner-toast]", {
         hasText: /device available|available for you|המכשיר זמין/i,

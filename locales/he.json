@@ -2830,6 +2830,13 @@
     "queueSize": "בתור",
     "myPosition": "המיקום שלך",
     "notifiedBanner": "המכשיר שמור עבורך",
+    "reservedForYou": {
+      "title": "שמור עבורך",
+      "subtitle": "בצע checkout למכשיר בתוך {minutesRemaining} דקות",
+      "checkout": "בצע checkout למכשיר",
+      "expiresIn": "ההזמנה מסתיימת בעוד",
+      "nextInLine": "אתה הבא בתור"
+    },
     "reservationExpires": "ההזמנה מסתיימת",
     "offlineBlocked": "תור ההמתנה דורש חיבור לאינטרנט",
     "promotedTitle": "המכשיר זמין עבורך",

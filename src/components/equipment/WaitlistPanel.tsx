@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api, ApiError } from "@/lib/api";
@@ -7,35 +6,27 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { Equipment } from "@/types";
 import { isOnline } from "@/lib/safe-browser";
+import { shouldShowWaitlistJoinPanel } from "@/lib/equipment-waitlist-ui";
+import type { EquipmentWaitlistSnapshot } from "../../../shared/equipment-waitlist";
 
 interface WaitlistPanelProps {
   equipment: Equipment;
   currentUserId: string;
+  /** When provided, skips a duplicate waitlist fetch (equipment detail passes shared snapshot). */
+  snapshot?: EquipmentWaitlistSnapshot | null;
 }
 
-function formatCountdown(expiresAt: string): string {
-  const ms = new Date(expiresAt).getTime() - Date.now();
-  if (ms <= 0) return "0:00";
-  const totalSec = Math.floor(ms / 1000);
-  const min = Math.floor(totalSec / 60);
-  const sec = totalSec % 60;
-  return `${min}:${sec.toString().padStart(2, "0")}`;
-}
-
-export function WaitlistPanel({ equipment, currentUserId }: WaitlistPanelProps) {
+export function WaitlistPanel({ equipment, currentUserId, snapshot: snapshotProp }: WaitlistPanelProps) {
   const queryClient = useQueryClient();
-  const [countdown, setCountdown] = useState("");
-
-  const eligible =
-    equipment.custodyState === "checked_out" &&
-    !!equipment.checkedOutById &&
-    equipment.checkedOutById !== currentUserId;
+  const showJoinQueue = shouldShowWaitlistJoinPanel(equipment, currentUserId);
 
   const waitlistQ = useQuery({
     queryKey: ["equipment-waitlist", equipment.id],
     queryFn: () => api.equipment.waitlist(equipment.id),
-    enabled: eligible,
+    enabled: showJoinQueue && snapshotProp === undefined,
   });
+
+  const snapshot = snapshotProp ?? waitlistQ.data;
 
   const joinMut = useMutation({
     mutationFn: () => api.equipment.joinWaitlist(equipment.id),
@@ -57,22 +48,7 @@ export function WaitlistPanel({ equipment, currentUserId }: WaitlistPanelProps) 
     },
   });
 
-  const snapshot = waitlistQ.data;
-  const reservationExpiresAt = snapshot?.reservationExpiresAt ?? null;
-  const isNotified = snapshot?.myStatus === "notified";
-
-  useEffect(() => {
-    if (!reservationExpiresAt || !isNotified) {
-      setCountdown("");
-      return;
-    }
-    const tick = () => setCountdown(formatCountdown(reservationExpiresAt));
-    tick();
-    const id = window.setInterval(tick, 1000);
-    return () => window.clearInterval(id);
-  }, [reservationExpiresAt, isNotified]);
-
-  if (!eligible) return null;
+  if (!showJoinQueue) return null;
 
   const onJoin = () => {
     if (!isOnline()) {
@@ -106,17 +82,6 @@ export function WaitlistPanel({ equipment, currentUserId }: WaitlistPanelProps) 
           </Button>
         )}
       </div>
-
-      {isNotified && (
-        <div className="rounded-md bg-primary/10 px-3 py-2 text-sm">
-          <p className="font-medium">{t.equipmentWaitlist.notifiedBanner}</p>
-          {reservationExpiresAt && (
-            <p className="text-muted-foreground">
-              {t.equipmentWaitlist.reservationExpires}: {countdown}
-            </p>
-          )}
-        </div>
-      )}
 
       <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
         <span>
