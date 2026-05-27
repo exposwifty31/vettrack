@@ -11,16 +11,15 @@ describe("pilot mode mainline guard (deploy #496)", () => {
   const viteConfig = fs.readFileSync(path.join(repoRoot, "vite.config.ts"), "utf8");
   const dockerfile = fs.readFileSync(path.join(repoRoot, "Dockerfile"), "utf8");
 
-  it("production env validation blocks PILOT_MODE without ALLOW_EQUIPMENT_PILOT_MODE", () => {
+  it("production env validation warns when PILOT_MODE is set without ALLOW_EQUIPMENT_PILOT_MODE", () => {
     expect(envValidation).toContain('process.env.PILOT_MODE === "true"');
     expect(envValidation).toContain('process.env.ALLOW_EQUIPMENT_PILOT_MODE !== "true"');
-    expect(envValidation).toContain("PILOT_MODE=true is not allowed on mainline production");
+    expect(envValidation).toContain("PILOT_MODE=true is set but ignored on this mainline host");
   });
 
-  it("vite build fails when VITE_PILOT_MODE is set without ALLOW on mainline builds", () => {
-    expect(viteConfig).toContain("ALLOW_EQUIPMENT_PILOT_MODE === \"true\"");
-    expect(viteConfig).toContain("VITE_PILOT_MODE === \"true\"");
-    expect(viteConfig).toContain("Mainline production/staging builds must set VITE_PILOT_MODE=false");
+  it("vite warns when VITE_PILOT_MODE is set without ALLOW on mainline builds", () => {
+    expect(viteConfig).toContain("effective-pilot-mode");
+    expect(viteConfig).toContain("VITE_PILOT_MODE=true is set but ignored for this mainline build");
   });
 
   it("Docker build defaults VITE pilot flag off for mainline images", () => {
@@ -31,6 +30,7 @@ describe("pilot mode mainline guard (deploy #496)", () => {
 
 describe("resolveBackendPilotMode", () => {
   const originalPilotMode = process.env.PILOT_MODE;
+  const originalAllow = process.env.ALLOW_EQUIPMENT_PILOT_MODE;
 
   afterEach(() => {
     if (originalPilotMode === undefined) {
@@ -38,11 +38,21 @@ describe("resolveBackendPilotMode", () => {
     } else {
       process.env.PILOT_MODE = originalPilotMode;
     }
+    if (originalAllow === undefined) {
+      delete process.env.ALLOW_EQUIPMENT_PILOT_MODE;
+    } else {
+      process.env.ALLOW_EQUIPMENT_PILOT_MODE = originalAllow;
+    }
   });
 
-  it("returns true only when PILOT_MODE is exactly the string true", () => {
+  it("returns true only when ALLOW and PILOT_MODE are both exactly true", () => {
+    process.env.ALLOW_EQUIPMENT_PILOT_MODE = "true";
     process.env.PILOT_MODE = "true";
     expect(resolveBackendPilotMode()).toBe(true);
+
+    delete process.env.ALLOW_EQUIPMENT_PILOT_MODE;
+    process.env.PILOT_MODE = "true";
+    expect(resolveBackendPilotMode()).toBe(false);
 
     process.env.PILOT_MODE = "false";
     expect(resolveBackendPilotMode()).toBe(false);
@@ -50,6 +60,7 @@ describe("resolveBackendPilotMode", () => {
     delete process.env.PILOT_MODE;
     expect(resolveBackendPilotMode()).toBe(false);
 
+    process.env.ALLOW_EQUIPMENT_PILOT_MODE = "true";
     process.env.PILOT_MODE = "TRUE";
     expect(resolveBackendPilotMode()).toBe(false);
   });
