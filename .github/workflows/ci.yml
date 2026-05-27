@@ -168,6 +168,10 @@ jobs:
           node scripts/architecture/tenant-query-lint.mjs --warn-only --touched --base "${TENANT_LINT_BASE}"
         continue-on-error: true
 
+      - name: 🔑 query key registry drift (warn only, G4)
+        run: node scripts/architecture/collect-query-keys.mjs --warn-only
+        continue-on-error: true
+
   deploy-check:
     name: 🚀 Deploy pre-flight
     runs-on: ubuntu-latest

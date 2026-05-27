@@ -40,6 +40,7 @@ src/features/<domain>/
 - **Do not rename query keys** without auditing invalidation (`queryClient.invalidateQueries`, `equipment-realtime.ts`, etc.)
 - ER mode: `ER_MODE_QUERY_KEY` in `er-api.ts` — shared by guard and layout
 - Prefer colocating keys in `features/<domain>/hooks/query-keys.ts` when migrating
+- G4 audit baseline: `src/lib/query-keys/registry.ts` (not imported at runtime); run `pnpm query-keys:audit` after adding keys
 
 ## Import boundaries
 
