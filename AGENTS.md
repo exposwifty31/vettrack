@@ -74,6 +74,9 @@ All API route modules are registered via `server/app/routes.ts` (~49 routers und
 | Build | `pnpm build` |
 | E2E tests | `pnpm test:signup` (requires Playwright + Chromium) |
 
+### Railway CLI secrets (Cloud Agent)
+Configure **only** `RAILWAY_TOKEN` in Cloud Agent secrets. Remove `RAILWAY_API_TOKEN`, `RAILWAY_TOKEN_STAGING`, `RAILWAY_SERVICE_STAGING`, and any misnamed duplicates. Before CLI use: `source scripts/sanitize-railway-env.sh`. See `docs/cloud-agent-starter-skill.md` §5.
+
 ### Gotchas
 - The `predev` script runs `kill-port 3001 5000` to clear stale processes silently before starting.
 - No ESLint config exists in this repo.

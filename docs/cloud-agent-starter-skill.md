@@ -189,7 +189,29 @@ Notes:
 
 ---
 
-## 5) Common Cloud-agent workflow shortcuts
+## 5) Railway CLI (Cloud Agent secrets)
+
+**Only configure `RAILWAY_TOKEN`** in Cursor → Cloud Agent secrets. Remove or dismiss:
+
+- `RAILWAY_API_TOKEN` (account token; conflicts with project token for some commands)
+- `RAILWAY_TOKEN_STAGING`, `RAILWAY_SERVICE_STAGING`
+- Any misnamed duplicate (e.g. `RAILWAY_TOKEN_STAGING 1` with a space)
+
+Before `railway` commands in a shell where stale secrets were injected:
+
+```bash
+source scripts/sanitize-railway-env.sh
+export PATH="$HOME/.local/bin:$PATH"
+railway status   # project-scoped; uses RAILWAY_TOKEN
+```
+
+`railway whoami` requires an **account** API token (`RAILWAY_API_TOKEN`). With project token only, expect `Unauthorized` on `whoami` while `railway status` / `railway up` still work.
+
+Deploy via `deploy.sh` also needs `RAILWAY_SERVICE` (GitHub secret or operator export) — not the `_STAGING` variant unless that is your intentional service id.
+
+---
+
+## 6) Common Cloud-agent workflow shortcuts
 
 - Typecheck quickly:
   ```bash
@@ -203,7 +225,7 @@ Notes:
 
 ---
 
-## 6) Keeping this skill updated (lightweight process)
+## 7) Keeping this skill updated (lightweight process)
 
 When a new testing trick/runbook fix is discovered:
 1. Add it to the relevant "Area" section above (not a random notes dump).
