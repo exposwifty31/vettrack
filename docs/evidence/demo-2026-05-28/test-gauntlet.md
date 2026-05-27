@@ -128,10 +128,22 @@ Fix the above issues before starting the application in production.
 | Integration ops | Green |
 | Playwright shards | Green |
 
-## Deferred to CI / manual (not run in this sandbox)
+## Deferred gauntlet (local supplement)
+
+See **`test-gauntlet-deferred.md`** for 2026-05-27 cloud-agent runs:
+
+| ID | Result | Notes |
+|----|--------|-------|
+| H | PASS | `tsx tests/restock.service.test.ts` |
+| I | N/A | migration script-only |
+| J | PASS | `pnpm test:db-integration` (54 tests) |
+| K | Deferred | needs `pnpm dev` + Redis |
+| L–P | CI authoritative | Playwright green on main CI |
+
+## Original deferral note
 
 | ID | Command | Reason |
 |----|---------|--------|
-| H–K | DB integration suites | Run in CI with migrated Postgres |
-| L–P | Playwright phase9/pwa/ui-smoke/waitlist/workday | Require `pnpm dev` + Clerk or dev-bypass |
+| K | live-server vitest | Run with `pnpm dev` + Redis |
+| L–P | Playwright | Full local proof optional when CI green |
 
