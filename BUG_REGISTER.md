@@ -31,7 +31,7 @@ Register defects **before** fix PRs. Severity: **P0** (prod/safety/data loss) ·
 
 | ID | Finding | Sev | Evidence | Suggested fix |
 |----|---------|-----|----------|---------------|
-| CD-01 | `ER_API_IMPLEMENTED_ROUTES` lists `GET /api/er/queue` but handler returns **501** | P2 | `src/lib/er-api.ts` L51; `server/routes/er.ts` L843–845 `notImplemented()` | Remove from implemented list or implement queue; align admin tooling |
+| CD-01 | ~~`ER_API_IMPLEMENTED_ROUTES` lists `GET /api/er/queue`~~ **CLOSED** — route omitted from implemented list (handler remains 501) | P2 | `src/lib/er-api.ts` L51–52 comment; pre-demo audit mainline | — |
 | CD-02 | `tests/pwa.spec.ts` uses `BASE_URL` default **`:5000`** while CI/Playwright config uses **`:3001`** | P2 | `tests/pwa.spec.ts` L36; `playwright.config.ts` L14; `.github/workflows/playwright.yml` L96 | Default to `process.env.TEST_BASE_URL` only (no localhost:5000 fallback when unset) |
 | CD-03 | Raw `fetch()` bypasses `src/lib/api.ts` offline queue / 401 guard | P2 | `src/hooks/use-auth.tsx` (`/api/users/me`, `/api/users/sync`); `src/lib/sync-engine.ts` L274; `src/pages/app-tour.tsx` L41 | Route through `request()` or document explicit exceptions |
 | CD-04 | `main` vs `staging` tooling split (staging Playwright, `scripts/staging/*`, runbooks) | P2 | `TEST_AUDIT.md`; `package.json` `test:staging:*` only on staging branch | Promote via explicit release PR; document in CONTRIBUTING |
@@ -46,7 +46,7 @@ Register defects **before** fix PRs. Severity: **P0** (prod/safety/data loss) ·
 | AU-01 | CI Playwright runs **all** `*.spec.ts` except `staging-*` and `example` — includes **`signup-flow`** (Clerk mutations) and **`ui-smoke`** (session) | P1 | `playwright.config.ts` L38–39 `testIgnore`; `.github/workflows/playwright.yml` L94 `test:playwright:chromium`; safe allowlist in `scripts/run-safe-tests.sh` L60–65 | Narrow `playwright.yml` to `pwa`, `phase-9-drills`, `tests/e2e/flows/` |
 | AU-02 | `POST /api/er/handoffs/:id/ack` has router `requireAuth` only — no `requireAssignableRole` (unlike create/assign routes) | P2 | `server/routes/er.ts` L797 vs L360/L762; service allows owner or admin/vet override (`er-handoff.service.ts` L149–158) | Add `requireAssignableRole` or explicit clinical floor; block `student` at route layer |
 | AU-03 | Dev headers (`x-dev-role-override`, etc.) only in dev-bypass | P3 | `server/middleware/auth.ts`; `AGENTS.md` | Document for E2E; never set in production env |
-| AU-04 | `tests/example.spec.ts` excluded from default config but file still present | P3 | `playwright.config.ts` L39 | Delete file or move to `docs/examples/` |
+| AU-04 | ~~`tests/example.spec.ts`~~ **CLOSED** — file removed; allowlist in `playwright.shared.ts` only | P3 | pre-demo audit mainline | — |
 | AU-05 | `ROLE_HIERARCHY` includes `lead_technician` / `vet_tech` but `requireClinicalUser` Set omits them (normalized elsewhere) | P3 | `server/middleware/auth.ts`; `tests/dispense-auth-hardening.test.ts` | Document alias normalization path; avoid duplicate guards |
 
 ---
@@ -89,7 +89,7 @@ Register defects **before** fix PRs. Severity: **P0** (prod/safety/data loss) ·
 |----|---------|-----|----------|---------------|
 | EU-01 | Permanent sync failure: Sentry event + `status: failed` in Dexie — **no dedicated toast** on max retries | P2 | `sync-engine.ts` L223–245; toasts at L86, L317 only | Toast on final failure using `t.layout.sync.failedMessage`; link to sync sheet |
 | EU-02 | Phase 5 error contract tests exist | — | `tests/phase-5-error-contract.test.js` | ✅ Maintain on API changes |
-| EU-03 | Hardcoded Hebrew error string in production UI (allowlisted debt) | P2 | `src/pages/crash-cart.tsx` L95; `tests/i18n-no-hebrew-in-source.test.ts` allowlist | Extract to `locales/*.json`; remove from allowlist |
+| EU-03 | ~~Hardcoded Hebrew in crash-cart~~ **CLOSED** — uses `t.crashCart.*` | P2 | `src/pages/crash-cart.tsx`; `locales/en.json` / `he.json` | — |
 | EU-04 | `ErApiNotImplementedError` exists but queue route returns generic 501 JSON | P3 | `src/lib/er-api.ts` L22–27; server `COMING_SOON` | Map 501 to typed client error if UI calls queue |
 
 ---

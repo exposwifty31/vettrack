@@ -193,3 +193,22 @@ Full shift-level detail: **`docs/pilot-operator-checklist.md`**.
 - Operator checklist: `docs/pilot-operator-checklist.md`
 - Engineering doctrine: `CLAUDE.md`, `README.md`
 - Backlog: `BUG_REGISTER.md`
+
+---
+
+## Pre-demo audit — 2026-05-27 (updated 2026-05-27T20:05Z)
+
+**Mainline:** `ba364b32` (after #497–#503, #508 worker heartbeat, #509–#510 deploy evidence)
+
+| Gate | Status | Evidence |
+|------|--------|----------|
+| PR-1 #497 merged | **PASS** | `docs/evidence/demo-2026-05-28/pr-1-pilot-unblock.md` |
+| Production `pilotMode` false | **PASS** | `verify-prod-deploy` on `18ea8777`; `pilotMode` false |
+| PR-2 waitlist i18n | **PASS** | PR #501 merged |
+| Test gauntlet | **PASS** (CI + partial local) | `test-gauntlet.md`, `test-gauntlet-deferred.md` (#511) |
+| Demo workflow screenshots | **PENDING** | FIX-3 — needs `STAGING_E2E_PASSWORD` + `sk_test_` Clerk |
+| Railway redeploy to latest SHA | **IN PROGRESS** | Prod on `18ea8777`; #508 (`8d67fddf`) deploy + Worker redeploy pending |
+| `/api/health` worker | **PENDING** | `worker: fail` until Worker redeploy with #508 |
+| Rollback doc | **PENDING** | `docs/demo-rollback.md` — founder fills `[PRIMARY_*]` placeholders (#512) |
+
+**Interim Go/No-Go:** **CONDITIONAL GO** — production API probes pass; worker health and staging screenshots remain. Plan-B: `https://vettrack-staging.up.railway.app` per `docs/demo-rollback.md`.
