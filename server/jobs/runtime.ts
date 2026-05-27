@@ -266,12 +266,15 @@ export async function startJobRuntime(): Promise<void> {
     }
   }
 
+  const allWorkersOk = results.every((r) => r.ok);
   setJobRuntimeReadinessState({
-    started: results.every((r) => r.ok),
+    started: allWorkersOk,
     workers: results,
   });
 
-  if (runtimeWorkers.length > 0) {
+  // Only publish /api/health heartbeat when every pilot worker started (Codex P2: partial
+  // startup must not mask a failed queue consumer).
+  if (allWorkersOk && runtimeWorkers.length > 0) {
     startWorkerHeartbeat("job-runtime");
   }
 

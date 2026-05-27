@@ -15,6 +15,14 @@ vi.mock("../../server/lib/redis.js", () => ({
   createRedisConnection: vi.fn(),
 }));
 
+const { mockStartWorkerHeartbeat } = vi.hoisted(() => ({
+  mockStartWorkerHeartbeat: vi.fn(),
+}));
+
+vi.mock("../../server/lib/worker-heartbeat.js", () => ({
+  startWorkerHeartbeat: mockStartWorkerHeartbeat,
+}));
+
 vi.mock("../../server/jobs/queue-factory.js", () => ({
   getOrCreateQueue: vi.fn().mockResolvedValue({ add: vi.fn().mockResolvedValue(undefined) }),
 }));
@@ -72,6 +80,7 @@ describe("job runtime startup readiness (A1)", () => {
   beforeEach(() => {
     resetJobRuntimeStateForTests();
     vi.clearAllMocks();
+    mockStartWorkerHeartbeat.mockClear();
     vi.mocked(getOrCreateQueue).mockResolvedValue({});
   });
 
@@ -93,6 +102,8 @@ describe("job runtime startup readiness (A1)", () => {
       ],
     });
     expect(Worker).toHaveBeenCalledTimes(4);
+    expect(mockStartWorkerHeartbeat).toHaveBeenCalledTimes(1);
+    expect(mockStartWorkerHeartbeat).toHaveBeenCalledWith("job-runtime");
   });
 
   it("leaves runtimeStarted false when any pilot worker fails to start", async () => {
@@ -116,5 +127,6 @@ describe("job runtime startup readiness (A1)", () => {
       ],
     });
     expect(Worker).toHaveBeenCalledTimes(3);
+    expect(mockStartWorkerHeartbeat).not.toHaveBeenCalled();
   });
 });
