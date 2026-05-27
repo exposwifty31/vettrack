@@ -2,6 +2,8 @@
 
 **Source:** Program Brain approval of PR #491 (`60dbd212`). Not a merge blocker.
 
+**Merge:** Independent of estimated-return integration. See follow-up **WTL-UX-02** in `docs/follow-ups/WTL-UX-02-estimated-return-waitlist-integration.md`.
+
 ## Problem
 
 After waitlist promotion, equipment `custodyState` is no longer `checked_out`, so `WaitlistPanel` hides (join eligibility requires another user’s checkout). The reservation remains valid (`myStatus: notified`, TTL, checkout entitlement) but the user loses a persistent on-page cue.
