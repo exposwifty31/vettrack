@@ -6,7 +6,7 @@ cmds = ["npm install -g pnpm", "NODE_ENV=development pnpm install --frozen-lockf
 
 [phases.build]
 # Mainline deploys must not bake equipment-only pilot UI (VITE_* is compile-time).
-cmds = ["VITE_PILOT_MODE=false pnpm build"]
+cmds = ["sh -c 'if [ \"$ALLOW_EQUIPMENT_PILOT_MODE\" != \"true\" ]; then export VITE_PILOT_MODE=false; fi; pnpm build'"]
 
 [start]
 cmd = "pnpm start"

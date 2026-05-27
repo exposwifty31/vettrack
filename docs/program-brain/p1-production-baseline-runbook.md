@@ -7,18 +7,20 @@
 - PR [#496](https://github.com/dboy3156/VetTrack/pull/496) merged to `main` (commit `6b7a5836` or later).
 - Railway access to **production** service (not staging-only tokens).
 
-## Critical order (avoid startup failure)
+## Railway variables (recommended)
 
-New code **refuses production startup** when `PILOT_MODE=true` unless `ALLOW_EQUIPMENT_PILOT_MODE=true`.
+Mainline builds **ignore** `VITE_PILOT_MODE=true` unless `ALLOW_EQUIPMENT_PILOT_MODE=true` (stale service vars no longer fail the Vite build). Runtime **ignores** `PILOT_MODE=true` the same way — full APIs stay mounted.
 
-1. **First:** In Railway → production service → **Variables**, delete or set to `false`:
+Still remove legacy vars to avoid confusion and so `/api/version` reflects a clean config:
+
+1. In Railway → production service → **Variables**, delete or set to `false`:
    - `PILOT_MODE`
    - `VITE_PILOT_MODE`
    - (Do **not** set `ALLOW_EQUIPMENT_PILOT_MODE` on mainline production.)
 2. **Then:** Trigger **Redeploy** (must run a fresh build — `VITE_*` is compile-time).
 3. Wait for deployment **SUCCESS** and health checks.
 
-If you already deployed #496 while `PILOT_MODE=true` remains, the service may be crash-looping — unset `PILOT_MODE` immediately, then redeploy.
+After #496 + build override fix, redeploy should succeed even if `VITE_PILOT_MODE=true` is still listed — but **delete both vars** before calling P1 complete.
 
 ## Railway CLI (optional)
 

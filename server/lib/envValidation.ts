@@ -89,9 +89,9 @@ export function validateEnv(): void {
     process.env.PILOT_MODE === "true" &&
     process.env.ALLOW_EQUIPMENT_PILOT_MODE !== "true"
   ) {
-    errors.push(
-      '  - PILOT_MODE=true is not allowed on mainline production. Unset PILOT_MODE (or set to "false") and redeploy. ' +
-        "Dedicated equipment-pilot hosts may set ALLOW_EQUIPMENT_PILOT_MODE=true alongside PILOT_MODE=true.",
+    console.warn(
+      "⚠️  PILOT_MODE=true is set but ignored on this mainline host (full platform routes remain active). " +
+        "Remove PILOT_MODE from Railway production variables when convenient.",
     );
   }
 

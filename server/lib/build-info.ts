@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { resolveEffectiveRuntimePilotMode } from "../../shared/effective-pilot-mode.js";
 
 export interface BuildInfo {
   appVersion: string;
@@ -34,7 +35,7 @@ export function loadBuildInfo(): BuildInfo | null {
 }
 
 export function resolveBackendPilotMode(): boolean {
-  return process.env.PILOT_MODE === "true";
+  return resolveEffectiveRuntimePilotMode();
 }
 
 export function resolveFrontendPilotMode(): boolean | null {

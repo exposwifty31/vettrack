@@ -19,7 +19,8 @@ ARG VITE_PILOT_MODE=false
 ENV ALLOW_EQUIPMENT_PILOT_MODE=$ALLOW_EQUIPMENT_PILOT_MODE
 ENV VITE_PILOT_MODE=$VITE_PILOT_MODE
 
-RUN pnpm build
+# Railway service vars can set VITE_PILOT_MODE=true; mainline images must still build full platform.
+RUN if [ "$ALLOW_EQUIPMENT_PILOT_MODE" != "true" ]; then export VITE_PILOT_MODE=false; fi && pnpm build
 
 EXPOSE 5000
 CMD ["pnpm", "start"]
