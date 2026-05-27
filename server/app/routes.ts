@@ -50,8 +50,9 @@ import homeDashboardRoutes from "../routes/home-dashboard.js";
 import pilotRoutes from "../routes/pilot.js";
 import equipmentOperationalStateRoutes from "../routes/equipment-operational-state.js";
 import operationalMetricsRoutes from "../routes/operational-metrics.js";
+import { resolveEffectiveRuntimePilotMode } from "../../shared/effective-pilot-mode.js";
 
-const isPilotMode = process.env.PILOT_MODE === "true";
+const isPilotMode = resolveEffectiveRuntimePilotMode();
 
 export function registerApiRoutes(app: express.Express) {
   // --- Infrastructure (always registered) ---

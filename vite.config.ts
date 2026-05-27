@@ -4,8 +4,16 @@ import path from "path";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
+import { resolveEffectiveVitePilotMode } from "./shared/effective-pilot-mode.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const effectiveVitePilotMode = resolveEffectiveVitePilotMode();
+if (process.env.VITE_PILOT_MODE === "true" && !effectiveVitePilotMode) {
+  console.warn(
+    "[vite] VITE_PILOT_MODE=true is set but ignored for this mainline build. " +
+      "Remove VITE_PILOT_MODE from Railway or set ALLOW_EQUIPMENT_PILOT_MODE=true only on dedicated equipment-pilot hosts.",
+  );
+}
 const { version } = JSON.parse(readFileSync("./package.json", "utf-8")) as { version: string };
 
 // Phase 9 PR 9.1 — single source-of-truth build tag.
@@ -43,14 +51,7 @@ function deployBuildInfo(appVersion: string, buildTag: string): Plugin {
       outDir = config.build.outDir;
     },
     closeBundle() {
-      const allowEquipmentPilot = process.env.ALLOW_EQUIPMENT_PILOT_MODE === "true";
-      const vitePilotMode = process.env.VITE_PILOT_MODE === "true";
-      if (vitePilotMode && !allowEquipmentPilot) {
-        throw new Error(
-          "VITE_PILOT_MODE=true requires ALLOW_EQUIPMENT_PILOT_MODE=true for dedicated equipment-pilot builds. " +
-            "Mainline production/staging builds must set VITE_PILOT_MODE=false (or unset) before pnpm build.",
-        );
-      }
+      const vitePilotMode = resolveEffectiveVitePilotMode();
       const gitCommit =
         process.env.RAILWAY_GIT_COMMIT_SHA?.trim() ||
         process.env.GITHUB_SHA?.trim() ||
@@ -103,6 +104,8 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(version),
     __VT_BUILD_TAG__: JSON.stringify(VT_BUILD_TAG),
+    // Override Railway VITE_PILOT_MODE service var on mainline builds (see shared/effective-pilot-mode.ts).
+    "import.meta.env.VITE_PILOT_MODE": JSON.stringify(effectiveVitePilotMode ? "true" : "false"),
   },
   optimizeDeps: {
     include: ["recharts"],
