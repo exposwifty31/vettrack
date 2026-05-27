@@ -2,7 +2,8 @@
 
 **Branch:** `cursor/equipment-waitlist-phase-b-e82a`  
 **Migration:** `137_vt_equipment_waitlist.sql`  
-**Date:** 2026-05-27
+**Date:** 2026-05-27  
+**Latest verification (agent):** 2026-05-27 — commit `3b286389`
 
 ## 1. Paginated equipment list + SSE invalidation
 
@@ -70,3 +71,20 @@ DATABASE_URL=postgres://vettrack:vettrack@localhost:5432/vettrack pnpm test:inte
 pnpm test -- tests/equipment-waitlist
 pnpm run typecheck
 ```
+
+## Verification log (2026-05-27, commit 3b286389)
+
+| Command | Result |
+|---------|--------|
+| `npx tsc --noEmit` | pass |
+| `pnpm typecheck` | pass (client + `tsconfig.server.json`) |
+| `pnpm test` | **4053 passed**, 36 skipped (310 files) |
+| `pnpm test -- tests/equipment-waitlist*` | **13 passed**, 7 skipped (integration skipped without `test:integration:ops` config) |
+| `pnpm test -- tests/equipment-waitlist-paginated-sse.contract.test.ts` | **6 passed** |
+| `DATABASE_URL=... pnpm test:integration:ops` | **61 passed** (7 waitlist + 54 operational-state) |
+| `PW_SUITE=waitlist pnpm test:playwright:waitlist` | **1 passed**, 1 skipped (browser list needs Vite :5000) |
+
+### Two-browser / manual SSE
+
+- **Automated:** `equipment-waitlist-sse.spec.ts` exercises **two dev users** (`dev-user-alpha` / `dev-user-beta`) via API + `/api/realtime/replay` + paginated `GET /api/equipment` — not two Playwright browser contexts.
+- **Not in PR:** recorded manual QA with network HAR/timestamps. Program Brain may accept API replay + contract + integration as equivalent server/client proof.
