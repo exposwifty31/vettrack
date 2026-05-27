@@ -49,6 +49,10 @@ export const PLAYWRIGHT_SUITE_MATCH: Record<string, string[]> = {
   phase9: ['phase-9-drills.spec.ts'],
   signup: ['signup-flow.spec.ts'],
   workday: ['e2e/simulation/workday.spec.ts'],
+  waitlist: [
+    'equipment-waitlist-sse.spec.ts',
+    'equipment-waitlist-paginated-list.spec.ts',
+  ],
 };
 
 export function resolvePlaywrightSuite(): string {

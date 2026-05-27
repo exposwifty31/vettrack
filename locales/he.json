@@ -2832,6 +2832,8 @@
     "notifiedBanner": "המכשיר שמור עבורך",
     "reservationExpires": "ההזמנה מסתיימת",
     "offlineBlocked": "תור ההמתנה דורש חיבור לאינטרנט",
+    "promotedTitle": "המכשיר זמין עבורך",
+    "promotedBody": "ניתן לבצע checkout של {name} — יש לך {minutes} דקות",
     "promotedToast": "המכשיר זמין עבורך",
     "promotedToastDescription": "בצע checkout לפני שפג תוקף ההזמנה",
     "viewDevice": "פתח מכשיר",

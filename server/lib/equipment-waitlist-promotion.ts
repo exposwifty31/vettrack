@@ -1,11 +1,12 @@
 import { and, eq } from "drizzle-orm";
-import { db, equipment } from "../db.js";
+import { db, equipment, users } from "../db.js";
 import { enqueueNotificationJob as _enqueueNotificationJob, type PushPriority } from "./queue.js";
-import {
-  promoteEquipmentWaitlistIfEligible as _promoteEquipmentWaitlistIfEligible,
-  type EquipmentWaitlistRow,
-} from "../services/equipment-waitlist.service.js";
+import { promoteEquipmentWaitlistIfEligible as _promoteEquipmentWaitlistIfEligible } from "../services/equipment-waitlist.service.js";
+import type { EquipmentWaitlistRow } from "../db.js";
 import { EQUIPMENT_WAITLIST_RESERVATION_TTL_MINUTES } from "../../shared/equipment-waitlist.js";
+import { getLocaleDictionaries } from "../../lib/i18n/loader.js";
+import { interpolate, translate } from "../../lib/i18n/index.js";
+import type { Locale } from "../../lib/i18n/types.js";
 
 export async function _getEquipmentName(equipmentId: string, clinicId: string) {
   return db
@@ -22,6 +23,16 @@ export const equipmentWaitlistPromotionDeps = {
   enqueueNotificationJob: _enqueueNotificationJob,
 };
 
+async function resolveUserLocale(clinicId: string, userId: string): Promise<Locale> {
+  const [row] = await db
+    .select({ preferredLocale: users.preferredLocale })
+    .from(users)
+    .where(and(eq(users.id, userId), eq(users.clinicId, clinicId)))
+    .limit(1);
+  const loc = row?.preferredLocale;
+  return loc === "en" || loc === "he" ? loc : "he";
+}
+
 export async function notifyWaitlistPromoted(
   clinicId: string,
   equipmentId: string,
@@ -29,14 +40,22 @@ export async function notifyWaitlistPromoted(
 ): Promise<void> {
   try {
     const equipmentName = await equipmentWaitlistPromotionDeps.getEquipmentName(equipmentId, clinicId);
+    const locale = await resolveUserLocale(clinicId, promoted.userId);
+    const dict = getLocaleDictionaries(locale);
     const priority: PushPriority = "HIGH";
+    const title = translate(dict, "equipmentWaitlist.promotedTitle");
+    const bodyTemplate = translate(dict, "equipmentWaitlist.promotedBody");
+    const body = interpolate(bodyTemplate, {
+      name: equipmentName,
+      minutes: EQUIPMENT_WAITLIST_RESERVATION_TTL_MINUTES,
+    });
 
     await equipmentWaitlistPromotionDeps.enqueueNotificationJob({
       type: "push_to_user",
       clinicId,
       userId: promoted.userId,
-      title: "Device available for you",
-      body: `${equipmentName} is available — you have ${EQUIPMENT_WAITLIST_RESERVATION_TTL_MINUTES} minutes to check out`,
+      title,
+      body,
       tag: `waitlist-promoted:${equipmentId}`,
       url: `/equipment/${equipmentId}`,
       priority,

@@ -2835,6 +2835,8 @@ export interface TStructure {
     notifiedBanner: string;
     reservationExpires: string;
     offlineBlocked: string;
+    promotedTitle: string;
+    promotedBody: string;
     promotedToast: string;
     promotedToastDescription: string;
     viewDevice: string;

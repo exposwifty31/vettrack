@@ -7,7 +7,9 @@ import {
   users,
   type EquipmentWaitlistRow,
 } from "../db.js";
+import type { AuditDbExecutor } from "../lib/audit.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
+import { isPostgresUniqueViolation } from "../lib/pg-result.js";
 import { EQUIPMENT_WAITLIST_RESERVATION_TTL_MINUTES } from "../../shared/equipment-waitlist.js";
 import type { EquipmentWaitlistSnapshot } from "../../shared/equipment-waitlist.js";
 
@@ -25,7 +27,7 @@ export class EquipmentWaitlistError extends Error {
   }
 }
 
-type DbExecutor = typeof db;
+type DbExecutor = AuditDbExecutor;
 
 const ACTIVE_STATUSES = ["waiting", "notified"] as const;
 
@@ -183,7 +185,7 @@ export async function joinEquipmentWaitlist(
       });
     });
   } catch (err: unknown) {
-    if (isUniqueViolation(err)) throw new EquipmentWaitlistError("WAITLIST_ALREADY_JOINED");
+    if (isPostgresUniqueViolation(err)) throw new EquipmentWaitlistError("WAITLIST_ALREADY_JOINED");
     throw err;
   }
 
@@ -340,19 +342,6 @@ export async function promoteNextWaitlistInTx(
     level: "INFO",
   });
 
-  await insertRealtimeDomainEvent(tx, {
-    clinicId,
-    type: "EQUIPMENT_WAITLIST_AVAILABLE",
-    payload: {
-      equipmentId,
-      userId: promoted.userId,
-      waitlistId: promoted.id,
-      reservationExpiresAt: expiresAt.toISOString(),
-    },
-    category: "SYSTEM",
-    level: "INFO",
-  });
-
   return promoted;
 }
 
@@ -394,7 +383,14 @@ export async function fulfillWaitlistOnCheckout(
     );
 }
 
-export async function expireNotifiedReservations(now: Date = new Date()): Promise<number> {
+export type ExpiredWaitlistRow = {
+  id: string;
+  clinicId: string;
+  equipmentId: string;
+  userId: string;
+};
+
+export async function expireNotifiedReservations(now: Date = new Date()): Promise<ExpiredWaitlistRow[]> {
   const expiredRows = await db
     .update(equipmentWaitlist)
     .set({ status: "expired", updatedAt: now })
@@ -426,6 +422,3 @@ export async function expireNotifiedReservations(now: Date = new Date()): Promis
   return expiredRows;
 }
 
-function isUniqueViolation(err: unknown): boolean {
-  return typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === "23505";
-}

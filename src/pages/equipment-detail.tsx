@@ -363,7 +363,7 @@ export default function EquipmentDetailPage() {
     queryKey: ["deployability", id],
     queryFn: () => api.operationalState.deployability(id!),
     enabled: !!id && equipment?.custodyState != null,
-    refetchInterval: 30_000,
+    refetchInterval: 5 * 60 * 1000,
   });
 
   const hospitalizationsQ = useQuery({
@@ -1083,6 +1083,13 @@ export default function EquipmentDetailPage() {
               </div>
             </div>
           )}
+
+          {userId &&
+            equipment.custodyState === "checked_out" &&
+            equipment.checkedOutById &&
+            equipment.checkedOutById !== userId && (
+              <WaitlistPanel equipment={equipment} currentUserId={userId} />
+            )}
         </div>
 
         {/* Status card */}
@@ -1500,10 +1507,7 @@ export default function EquipmentDetailPage() {
               )}
 
               {userId && (
-                <>
-                  <WaitlistPanel equipment={equipment} currentUserId={userId} />
-                  <StagingQueuePanel equipment={equipment} currentUserId={userId} />
-                </>
+                <StagingQueuePanel equipment={equipment} currentUserId={userId} />
               )}
 
               <div className="flex flex-col gap-2">

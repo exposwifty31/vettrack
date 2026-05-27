@@ -370,12 +370,16 @@ export async function applyEvent(client: QueryClient, event: RealtimeEvent): Pro
       return;
     }
 
-    case "EQUIPMENT_WAITLIST_PROMOTED":
     case "EQUIPMENT_WAITLIST_AVAILABLE": {
+      const payload = event.payload as { equipmentId?: string };
+      await invalidateEquipmentCaches(client, payload.equipmentId);
+      return;
+    }
+
+    case "EQUIPMENT_WAITLIST_PROMOTED": {
       const payload = event.payload as {
         equipmentId?: string;
         userId?: string;
-        reservationExpiresAt?: string;
       };
       const equipmentId = payload.equipmentId;
       await invalidateEquipmentCaches(client, equipmentId);

@@ -93,7 +93,7 @@ export function WaitlistPanel({ equipment, currentUserId }: WaitlistPanelProps) 
   const myOnWaitlist = snapshot?.myStatus === "waiting" || snapshot?.myStatus === "notified";
 
   return (
-    <div className="space-y-3 rounded-lg border border-border p-4">
+    <div className="space-y-3 rounded-lg border border-border p-4" data-testid="equipment-waitlist-panel">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="text-sm font-semibold">{t.equipmentWaitlist.title}</h4>
         {!myOnWaitlist ? (

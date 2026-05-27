@@ -917,6 +917,8 @@ const translations = {
     notifiedBanner: d.equipmentWaitlist.notifiedBanner,
     reservationExpires: d.equipmentWaitlist.reservationExpires,
     offlineBlocked: d.equipmentWaitlist.offlineBlocked,
+    promotedTitle: d.equipmentWaitlist.promotedTitle,
+    promotedBody: d.equipmentWaitlist.promotedBody,
     promotedToast: d.equipmentWaitlist.promotedToast,
     promotedToastDescription: d.equipmentWaitlist.promotedToastDescription,
     viewDevice: d.equipmentWaitlist.viewDevice,

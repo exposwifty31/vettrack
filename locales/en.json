@@ -2832,6 +2832,8 @@
     "notifiedBanner": "This device is reserved for you",
     "reservationExpires": "Reservation ends",
     "offlineBlocked": "Waitlist requires an internet connection",
+    "promotedTitle": "Device available for you",
+    "promotedBody": "{name} is available — you have {minutes} minutes to check out",
     "promotedToast": "Device available for you",
     "promotedToastDescription": "Check out before your reservation expires",
     "viewDevice": "Open device",
