@@ -14,6 +14,7 @@ export const postEquipmentBulkVerifyRoomHandler: RequestHandler = async (req, re
 
     let affected = 0;
     let roomName = "";
+    const skipped: Array<{ id: string; name: string }> = [];
 
     await db.transaction(async (tx) => {
       const [room] = await tx
@@ -28,7 +29,12 @@ export const postEquipmentBulkVerifyRoomHandler: RequestHandler = async (req, re
       roomName = room.name;
 
       const items = await tx
-        .select({ id: equipment.id, name: equipment.name, status: equipment.status })
+        .select({
+          id: equipment.id,
+          name: equipment.name,
+          status: equipment.status,
+          version: equipment.version,
+        })
         .from(equipment)
         .where(and(eq(equipment.clinicId, clinicId), eq(equipment.roomId, targetRoomId), isNull(equipment.deletedAt)));
 
@@ -41,36 +47,50 @@ export const postEquipmentBulkVerifyRoomHandler: RequestHandler = async (req, re
       }
 
       const now = new Date();
-      const itemIds = items.map((i) => i.id);
+      const verifiedItems: typeof items = [];
 
-      await tx
-        .update(equipment)
-        .set({
-          lastVerifiedAt: now,
-          lastVerifiedById: req.authUser!.id,
-          lastSeen: now,
-        })
-        .where(and(eq(equipment.clinicId, clinicId), inArray(equipment.id, itemIds)));
+      for (const item of items) {
+        const [updated] = await tx
+          .update(equipment)
+          .set({
+            lastVerifiedAt: now,
+            lastVerifiedById: req.authUser!.id,
+            lastSeen: now,
+          })
+          .where(
+            and(
+              eq(equipment.clinicId, clinicId),
+              eq(equipment.id, item.id),
+              eq(equipment.version, item.version),
+            ),
+          )
+          .returning({ id: equipment.id });
 
-      await tx.insert(scanLogs).values(
-        items.map((item) => ({
-          id: randomUUID(),
-          clinicId,
-          equipmentId: item.id,
-          userId: req.authUser!.id,
-          userEmail: req.authUser!.email,
-          status: item.status,
-          note: `Room verified: ${room.name}`,
-          timestamp: now,
-        })),
-      );
+        if (updated) verifiedItems.push(item);
+        else skipped.push({ id: item.id, name: item.name });
+      }
+
+      if (verifiedItems.length > 0) {
+        await tx.insert(scanLogs).values(
+          verifiedItems.map((item) => ({
+            id: randomUUID(),
+            clinicId,
+            equipmentId: item.id,
+            userId: req.authUser!.id,
+            userEmail: req.authUser!.email,
+            status: item.status,
+            note: `Room verified: ${room.name}`,
+            timestamp: now,
+          })),
+        );
+      }
 
       await tx
         .update(rooms)
         .set({ syncStatus: "synced", lastAuditAt: now, updatedAt: now })
         .where(and(eq(rooms.clinicId, clinicId), eq(rooms.id, targetRoomId)));
 
-      affected = items.length;
+      affected = verifiedItems.length;
     });
 
     logAudit({
@@ -84,7 +104,7 @@ export const postEquipmentBulkVerifyRoomHandler: RequestHandler = async (req, re
       metadata: { roomName, count: affected },
     });
 
-    res.json({ affected, roomName });
+    res.json({ affected, skipped, roomName });
   } catch (err: unknown) {
     if (err instanceof Error && (err as Error & { status?: number }).status === 404) {
       return res.status(404).json(
