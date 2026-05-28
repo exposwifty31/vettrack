@@ -46,6 +46,7 @@ import { deleteEquipmentHandler } from "./equipment/handlers/delete-equipment.js
 import { postEquipmentBulkVerifyRoomHandler } from "./equipment/handlers/post-equipment-bulk-verify-room.js";
 import { postEquipmentBulkMoveHandler } from "./equipment/handlers/post-equipment-bulk-move.js";
 import { postEquipmentImportHandler } from "./equipment/handlers/post-equipment-import.js";
+import { postEquipmentBulkDeleteHandler } from "./equipment/handlers/post-equipment-bulk-delete.js";
 import type { EquipmentPreviousState } from "./equipment/equipment-undo-tokens.js";
 
 const EQUIPMENT_STATUS_VALUES = [
@@ -1630,66 +1631,7 @@ router.get("/:id/transfers", requireAuth, getEquipmentTransfersHandler);
 // or JSON body with a "csv" string field (backwards-compatible)
 router.post("/import", requireAuth, writeLimiter, requireAdmin, upload.single("file"), postEquipmentImportHandler);
 
-router.post("/bulk-delete", requireAuth, writeLimiter, requireAdmin, validateBody(bulkIdsSchema), async (req, res) => {
-const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-try {
-    const clinicId = req.clinicId!;
-    const { ids: typedIds } = req.body as z.infer<typeof bulkIdsSchema>;
-    const actorName = req.authUser!.name || req.authUser!.email;
-
-    await db.transaction(async (tx) => {
-      const items = await tx
-        .select({ id: equipment.id, name: equipment.name, status: equipment.status })
-        .from(equipment)
-        .where(and(eq(equipment.clinicId, clinicId), inArray(equipment.id, typedIds), isNull(equipment.deletedAt)));
-
-      const now = new Date();
-      if (items.length > 0) {
-        await tx.insert(scanLogs).values(
-          items.map((item) => ({
-            id: randomUUID(),
-            clinicId,
-            equipmentId: item.id,
-            userId: req.authUser!.id,
-            userEmail: req.authUser!.email,
-            status: item.status,
-            note: `Bulk deleted by ${actorName}`,
-            timestamp: now,
-          }))
-        );
-
-        await tx
-          .update(equipment)
-          .set({ deletedAt: now, deletedBy: req.authUser!.id })
-          .where(and(eq(equipment.clinicId, clinicId), inArray(equipment.id, items.map((i) => i.id))));
-      }
-
-      logAudit({
-        actorRole: resolveAuditActorRole(req),
-        clinicId,
-        actionType: "equipment_bulk_deleted",
-        performedBy: req.authUser!.id,
-        performedByEmail: req.authUser!.email,
-        targetId: null,
-        targetType: "equipment",
-        metadata: { ids: typedIds, count: typedIds.length },
-      });
-    });
-
-    invalidateAnalyticsCache(clinicId);
-    res.json({ affected: typedIds.length });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "EQUIPMENT_BULK_DELETE_FAILED",
-        message: "Bulk delete failed",
-        requestId,
-      }),
-    );
-  }
-});
+router.post("/bulk-delete", requireAuth, writeLimiter, requireAdmin, validateBody(bulkIdsSchema), postEquipmentBulkDeleteHandler);
 
 router.post("/bulk-move", requireAuth, writeLimiter, requireEffectiveRole("technician"), validateBody(bulkMoveSchema), postEquipmentBulkMoveHandler);
 
