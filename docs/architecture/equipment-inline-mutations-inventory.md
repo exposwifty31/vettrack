@@ -74,9 +74,14 @@ Policy: keep **all middleware** (including `equipmentReplayIdempotency`) on `rou
 | **4l** | `PATCH /:id` | Replay + offline `update` + version OCC + transfer side effects. |
 | **4m** | `POST /:id/seen` | Replay + offline `seen`; keep `recordEquipmentSeen` call; billing tests required. |
 | **4n** | `POST /:id/scan` | Replay + offline `scan` + undo tokens + push side effects. |
-| **4o** | `POST /scan` | Quick-scan toggle; **no** replay middleware today — document behavior before any move; overlaps checkout/return semantics. |
-| **Pause — explicit slice + review** | `POST /:id/checkout` | Waitlist, staging, V1 gates, outbox, emergency branch, offline checkout. |
-| **Pause — explicit slice + review** | `POST /:id/return` | Waitlist promotion, charge-alert worker, returns table, outbox, offline `return_with_charge`. |
+
+### Pause — explicit slice + review (do not schedule as pre-pause slices)
+
+| Route | Rationale |
+|-------|-----------|
+| `POST /scan` (quick-scan) | **No** replay middleware; toggle overlaps checkout/return semantics — requires product/engineering sign-off before any extraction (Codex P2 on #538). |
+| `POST /:id/checkout` | Waitlist, staging, V1 gates, outbox, emergency branch, offline checkout. |
+| `POST /:id/return` | Waitlist promotion, charge-alert worker, returns table, outbox, offline `return_with_charge`. |
 
 **Do not start** checkout, return, or quick-scan (`POST /scan`) until product/engineering sign-off on replay + offline + realtime test matrix (per post–4e stabilization pause).
 
