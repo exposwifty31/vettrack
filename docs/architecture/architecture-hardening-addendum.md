@@ -647,8 +647,11 @@ Flags queries on tenant tables missing `clinicId` identifier in function body. F
 
 ## 9.6 Merge policy summary
 
-- **Block:** tenancy risk, new cycles, forbidden imports, broken route contracts, tsc, tests
-- **Warn (grace 2 sprints):** file size overage in legacy files, query key drift
+**Enforcement pause (2026-05):** G3–G5 are **warn-only** in CI until validated on 1–2 real feature PRs. See [governance-known-limitations.md](./governance-known-limitations.md). **Do not enable G6 blocking without that review.**
+
+- **Block:** new cycles, forbidden imports (G1), tsc, tests
+- **Warn (current):** G3 tenant lint, G4 query key drift, G5 route contract drift, file size overage in legacy files
+- **Warn → block later (G6):** new-path-only strict mode for G3–G5 (proposed, not enabled)
 - **Nightly only:** entropy trends, full knip
 
 ---
@@ -733,10 +736,10 @@ Flags queries on tenant tables missing `clinicId` identifier in function body. F
 |-------|-------------|-----------------|
 | G1 | `dependency-cruiser` + baseline cycles JSON + CI job | None |
 | G2 | ADR folder + template + PR template checkbox | None |
-| G3 | Tenant lint script (warn mode) | None |
-| G4 | Query key registry + drift script | None |
-| G5 | Route contract extractor | None |
-| G6 | Flip tenant lint + route-db rules to **block** on new paths | None on existing code |
+| G3 | Tenant lint script (warn mode) | None — **CI warn-only; do not block** |
+| G4 | Query key registry + drift script | None — **CI warn-only; do not block** |
+| G5 | Route contract extractor | None — **CI warn-only; do not block** |
+| G6 | **Deferred** — block **new** violations on touched/new paths only | None on existing code; see governance-known-limitations.md |
 | G7 | ESLint boundaries for `server/routes/domains` | None until migrations touch paths |
 
 **This addendum does not authorize runtime refactors by itself** — it governs how modularization slices and future features land without eroding tenancy, clinical, or consistency guarantees.

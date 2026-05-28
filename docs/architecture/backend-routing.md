@@ -1,5 +1,14 @@
 # Backend routing
 
+## Route contract (G5, warn mode)
+
+Generated snapshot: `docs/architecture/routes-contract.json` (method, full mounted path, source file/line, `pilotGated` when registered inside `if (!isPilotMode)` in `server/app/routes.ts`).
+
+```bash
+pnpm routes:contract                              # warn on drift vs contract
+pnpm routes:contract -- --write-contract          # refresh baseline after intentional route changes
+```
+
 ## Registration (source of truth)
 
 - **Mount registry:** `server/app/routes.ts` → `registerApiRoutes()`

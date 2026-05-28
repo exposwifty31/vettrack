@@ -29,6 +29,7 @@
     "tenant:lint:all": "node scripts/architecture/tenant-query-lint.mjs --warn-only --all",
     "tenant:lint:touched": "node scripts/architecture/tenant-query-lint.mjs --warn-only --touched",
     "query-keys:audit": "node scripts/architecture/collect-query-keys.mjs --warn-only",
+    "routes:contract": "node scripts/architecture/extract-express-routes.mjs --warn-only",
     "architecture:cycles": "node scripts/architecture/compare-cycles.mjs",
     "depcruise:check": "depcruise --config .dependency-cruiser.cjs --output-type err --ignore-known .dependency-cruiser-known-violations.json server src",
     "depcruise:baseline": "depcruise --config .dependency-cruiser.cjs --output-type baseline --output-to .dependency-cruiser-known-violations.json server src",

@@ -172,6 +172,10 @@ jobs:
         run: node scripts/architecture/collect-query-keys.mjs --warn-only
         continue-on-error: true
 
+      - name: 🛣️ route contract drift (warn only, G5)
+        run: node scripts/architecture/extract-express-routes.mjs --warn-only
+        continue-on-error: true
+
   deploy-check:
     name: 🚀 Deploy pre-flight
     runs-on: ubuntu-latest

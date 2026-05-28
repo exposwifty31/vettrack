@@ -41,6 +41,7 @@ Implementation PRs must reference an **accepted** ADR (or accept the ADR in the 
 
 ## Related docs
 
+- [governance-known-limitations.md](../governance-known-limitations.md) — G3–G5 warn-only pause and false-positive catalog
 - [architecture-hardening-addendum.md](../architecture-hardening-addendum.md) §8  
 - [modularization-plan.md](../modularization-plan.md)  
 - [tooling-syntax-verification.md](../tooling-syntax-verification.md)
