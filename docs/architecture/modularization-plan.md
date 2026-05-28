@@ -19,7 +19,7 @@
 
 | Area | Scale | Primary pain |
 |------|-------|----------------|
-| Backend routes | 55 modules; largest `equipment.ts` ~1,707 lines (post–Slice 4g/4i/4h) | HTTP + DB + business mixed in routes |
+| Backend routes | 55 modules; largest `equipment.ts` ~1,386 lines (post–Slice 4j/4k/4l) | HTTP + DB + business mixed in routes |
 | Backend services | 28 files; `appointments.service.ts` ~2,186 lines | ADR-002 accepted, not implemented |
 | Schema | `server/schema/*` ~2,045 lines | Already domain-split — keep |
 | Frontend API | `src/lib/api.ts` ~2,159 lines | Monolithic `api` object |
@@ -47,7 +47,7 @@
 | 1 | Break `api.ts` ↔ `er-api.ts` cycle (`request-core.ts`) | Low |
 | 2 | Implement [ADR-002](./adr-002-appointments-service-split.md) service split | High |
 | 3 | Extract `src/lib/api/equipment.ts` + barrel | Medium — **implemented** |
-| 4 | Extract equipment route handlers (paths unchanged) | High — **reads (4a–4c)** + **mutations (4d–4e, 4f-1, 4g, 4i, 4h):** restore, delete, revert, bulk-verify-room, bulk-move, import extracted (`equipment.ts` ≈1,707 lines). **8 inline mutations** — [inventory](./equipment-inline-mutations-inventory.md). **Pause** checkout, return, `POST /scan`, `POST /:id/scan`, `POST /:id/seen`. Next: **4j** bulk-delete. |
+| 4 | Extract equipment route handlers (paths unchanged) | High — **reads (4a–4c)** + **mutations (4d–4l):** through bulk-delete, create, patch extracted (`equipment.ts` ≈1,386 lines). **5 inline mutations — all paused** — [inventory](./equipment-inline-mutations-inventory.md). **Do not extract** `POST /scan`, checkout, return, seen, `POST /:id/scan` without sign-off. Slice 4 handler extraction for non-paused routes is **complete**. |
 | 5 | Equipment repository layer (`clinicId` param) | High |
 | 6 | Split `src/types/index.ts` by domain + barrel | Medium |
 | 7 | Group `server/app/routes.ts` registrations (no path changes) | Low |

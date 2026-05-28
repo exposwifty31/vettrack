@@ -177,6 +177,22 @@ Recorded after stack merge; audits run from `main` tooling against PR heads (loc
 
 **Next extraction (not started):** `POST /bulk-delete` (4j) — no replay/offline; preserve audit-in-transaction. Paused routes unchanged.
 
+### Post–Slice 4j / 4k / 4l stabilization — create, patch, bulk-delete on `main` (2026-05-28)
+
+**Scope:** Observation only after [#548](https://github.com/dboy3156/VetTrack/pull/548) (bulk-delete), [#549](https://github.com/dboy3156/VetTrack/pull/549) (create), [#550](https://github.com/dboy3156/VetTrack/pull/550) (patch). Handler-body extraction only; middleware and replay idempotency remain on `equipment.ts`. **Do not** start paused checkout/return/scan/seen routes.
+
+| Area | Check | Result |
+|------|--------|--------|
+| **POST /bulk-delete** | `requireAuth` → `writeLimiter` → `requireAdmin` → `validateBody(bulkIdsSchema)` → handler | **OK** — `post-equipment-bulk-delete.ts`; audit-in-transaction preserved |
+| **POST /** (create) | `equipmentReplayIdempotency(create)` on router; V1 custody/readiness defaults in handler | **OK** — `post-equipment-create.ts`; offline `create` registry unchanged |
+| **PATCH /:id** | `equipmentReplayIdempotency(update)` on router; version OCC + transfer logs + push | **OK** — `patch-equipment.ts` |
+| **G5 routes:contract** | Full extract | **OK** — **320 / 320** |
+| **G1 + targeted tests** | phase-5, replay-idempotency routes, offline registry, scan lifecycle, pilot verification | **OK** — **103** tests on post-merge `main` |
+| **Handler inventory** | 8 GET + 9 mutation handlers under `handlers/`; **~1,386 lines** remain in `equipment.ts` | **OK** |
+| **Inline mutations left** | **5 paused only:** `POST /scan`, checkout, return, seen, `POST /:id/scan` | **OK** — see [equipment-inline-mutations-inventory.md](./equipment-inline-mutations-inventory.md) |
+
+**Next extraction:** None scheduled for Slice 4 until pause sign-off on custody/scan/seen routes.
+
 ### Cross-PR recurring issues (confirmed)
 
 1. **G3:** Parameter / `.where()` tenancy is correct but flagged (~245 repo-wide; ~20+ per large route touch).

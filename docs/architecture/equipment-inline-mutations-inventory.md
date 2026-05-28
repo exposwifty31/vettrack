@@ -1,8 +1,8 @@
 # Equipment route — remaining inline mutations inventory (Slice 4f+)
 
-**Status:** Documentation / inventory only (2026-05-28, updated after **4g / 4i / 4h** merge).  
-**Source:** `server/routes/equipment.ts` on `main` after Slices **4d**–**4f-1** and **4g** (`POST /bulk-verify-room`, #541), **4i** (`POST /bulk-move`, #543), **4h** (`POST /import`, #542).  
-**Scale:** `equipment.ts` ≈ **1,707 lines** (down from ~2,143 pre–4g).  
+**Status:** Documentation / inventory only (2026-05-28, updated after **4j / 4k / 4l** merge).  
+**Source:** `server/routes/equipment.ts` on `main` after Slices **4d**–**4f-1**, **4g–4i–4h** (#541–#542), and **4j–4k–4l** (#548–#550).  
+**Scale:** `equipment.ts` ≈ **1,386 lines** (down from ~2,143 pre–4g; ~1,707 pre–4j).  
 **Out of scope for this file:** read handlers under `server/routes/equipment/handlers/`; CSV helpers in `equipment-import-csv.ts`; waitlist routes in `server/routes/equipment-waitlist.ts` (mounted at bottom of `equipment.ts`).
 
 ---
@@ -14,38 +14,39 @@
 | `DELETE` | `/api/equipment/:id` | `handlers/delete-equipment.ts` | 4e |
 | `POST` | `/api/equipment/:id/restore` | `handlers/post-equipment-restore.ts` | 4d |
 | `POST` | `/api/equipment/:id/revert` | `handlers/post-equipment-revert.ts` | 4f-1 (`consumeUndoToken` in `equipment-undo-tokens.ts`) |
-| `POST` | `/api/equipment/bulk-verify-room` | `handlers/post-equipment-bulk-verify-room.ts` | **4g** (#541) |
-| `POST` | `/api/equipment/bulk-move` | `handlers/post-equipment-bulk-move.ts` | **4i** (#543) |
-| `POST` | `/api/equipment/import` | `handlers/post-equipment-import.ts` (+ `equipment-import-csv.ts`) | **4h** (#542) |
+| `POST` | `/api/equipment/bulk-verify-room` | `handlers/post-equipment-bulk-verify-room.ts` | 4g (#541) |
+| `POST` | `/api/equipment/bulk-move` | `handlers/post-equipment-bulk-move.ts` | 4i (#543) |
+| `POST` | `/api/equipment/import` | `handlers/post-equipment-import.ts` (+ `equipment-import-csv.ts`) | 4h (#542) |
+| `POST` | `/api/equipment/bulk-delete` | `handlers/post-equipment-bulk-delete.ts` | **4j** (#548) |
+| `POST` | `/api/equipment` | `handlers/post-equipment-create.ts` | **4k** (#549) |
+| `PATCH` | `/api/equipment/:id` | `handlers/patch-equipment.ts` | **4l** (#550) |
 
-Router still owns middleware registration (including replay idempotency on delete). Import route keeps `upload.single("file")` on the router.
+Router still owns middleware registration (including `equipmentReplayIdempotency` on create, update, delete). Import route keeps `upload.single("file")` on the router.
 
 **Tests:** `tests/equipment-pilot-verification.test.ts` asserts bulk-verify contract against the extracted handler module (#541).
 
 ---
 
-## Inline mutation inventory (8 remaining)
+## Inline mutation inventory (5 remaining — all paused)
+
+All remaining write mutations are **paused** pending product/engineering sign-off (replay + offline + realtime test matrix). **Do not start extraction** of these routes without explicit approval.
 
 Legend: **Replay** = `equipmentReplayIdempotency` on router. **Offline** = `src/lib/api/equipment.ts` enqueues `addPendingSync` / `handleOptimisticMutation` for that path (online-only if “No”).
 
 | # | Method | Path | Middleware stack (order) | Replay | Offline producer | Audit | Realtime / outbox | Billing / inventory / waitlist | Approx. risk |
 |---|--------|------|---------------------------|--------|------------------|-------|-------------------|-------------------------------|--------------|
-| 1 | `POST` | `/` | `requireAuth` → `writeLimiter` → `requireEffectiveRole("technician")` → `validateBody(createEquipmentSchema)` → **replay(create)** | Yes | Yes (`offlineType: "create"`) | Yes (`equipment_created`) | No | No (sets V1 custody/readiness defaults on insert) | Medium |
-| 2 | `PATCH` | `/:id` | `requireAuth` → `writeLimiter` → `requireEffectiveRole("technician")` → `validateUuid("id")` → `validateBody(patchEquipmentSchema)` → **replay(update)** | Yes | Yes (`offlineType: "update"`) | Yes (`equipment_updated`) | No | No (optional `transferLogs` + push on folder change; optimistic `version` OCC) | Medium–high |
-| 3 | `POST` | `/scan` | `requireAuth` → `checkoutLimiter` → `requireEffectiveRole("student")` → `validateBody(quickScanBodySchema)` | **No** | **No** (no `api.equipment` helper; server/pilot path) | Yes (`equipment_checked_out` / `equipment_returned`, `via: quick_scan`) | No | Light (inline checkout/return + `scanLogs` + `undoTokens`; return branch inserts `equipmentReturns` with `isPluggedIn: true`) | **Paused — high** |
-| 4 | `POST` | `/:id/checkout` | `requireAuth` → `checkoutLimiter` → `requireEffectiveRole("student")` → `validateUuid("id")` → `validateBody(checkoutSchema)` → **replay(checkout)** | Yes | Yes (`syncType: "checkout"`) | Yes (`equipment_checked_out`; emergency: `equipment_emergency_checkout`) | Yes (`EQUIPMENT_CUSTODY_STATE_CHANGED`; emergency: `EQUIPMENT_EMERGENCY_CHECKOUT`) | **Yes** — waitlist hold check, `fulfillWaitlistOnCheckout`, staging queue fulfill, V1 bundle/custody gates, `scheduleSmartReturnReminder` | **Paused — highest** |
-| 5 | `POST` | `/:id/return` | `requireAuth` → `checkoutLimiter` → `requireEffectiveRole("student")` → `validateUuid("id")` → `validateBody(equipmentReturnBodySchema)` → **replay(return)** | Yes | Yes (`syncType: "return_with_charge"`) | Yes (`equipment_returned`) | Yes (`EQUIPMENT_CUSTODY_STATE_CHANGED` on custody transition) | **Yes** — `promoteNextWaitlistInTx`, `equipmentReturns` + `enqueueChargeAlertJob` when unplugged, `cancelSmartReturnReminder` | **Paused — highest** |
-| 6 | `POST` | `/:id/seen` | `requireAuth` → `writeLimiter` → `validateUuid("id")` → `validateBody(seenSchema)` → **replay(seen)** | Yes | Yes (`type: "seen"`) | No (delegates to `recordEquipmentSeen` service) | Via service | **Yes** — `recordEquipmentSeen` → usage session + billing ledger idempotency | **Paused — high** |
-| 7 | `POST` | `/:id/scan` | `requireAuth` → `scanLimiter` → `requireEffectiveRole("student")` → `validateUuid("id")` → `validateBody(scanSchema)` → **replay(scan)** | Yes | Yes (`type: "scan"`) | Yes (`equipment_scanned`) | No | No (scan logs + undo tokens; push on issue/maintenance/sterilization) | **Paused — high** |
-| 8 | `POST` | `/bulk-delete` | `requireAuth` → `writeLimiter` → `requireAdmin` → `validateBody(bulkIdsSchema)` | No | No | Yes (`equipment_bulk_deleted`; **inside** transaction) | No | No (batch soft-delete + scan log per item) | Medium |
+| 1 | `POST` | `/scan` | `requireAuth` → `checkoutLimiter` → `requireEffectiveRole("student")` → `validateBody(quickScanBodySchema)` | **No** | **No** (no `api.equipment` helper; server/pilot path) | Yes (`equipment_checked_out` / `equipment_returned`, `via: quick_scan`) | No | Light (inline checkout/return + `scanLogs` + `undoTokens`; return branch inserts `equipmentReturns` with `isPluggedIn: true`) | **Paused — high** |
+| 2 | `POST` | `/:id/checkout` | `requireAuth` → `checkoutLimiter` → `requireEffectiveRole("student")` → `validateUuid("id")` → `validateBody(checkoutSchema)` → **replay(checkout)** | Yes | Yes (`syncType: "checkout"`) | Yes (`equipment_checked_out`; emergency: `equipment_emergency_checkout`) | Yes (`EQUIPMENT_CUSTODY_STATE_CHANGED`; emergency: `EQUIPMENT_EMERGENCY_CHECKOUT`) | **Yes** — waitlist hold check, `fulfillWaitlistOnCheckout`, staging queue fulfill, V1 bundle/custody gates, `scheduleSmartReturnReminder` | **Paused — highest** |
+| 3 | `POST` | `/:id/return` | `requireAuth` → `checkoutLimiter` → `requireEffectiveRole("student")` → `validateUuid("id")` → `validateBody(equipmentReturnBodySchema)` → **replay(return)** | Yes | Yes (`syncType: "return_with_charge"`) | Yes (`equipment_returned`) | Yes (`EQUIPMENT_CUSTODY_STATE_CHANGED` on custody transition) | **Yes** — `promoteNextWaitlistInTx`, `equipmentReturns` + `enqueueChargeAlertJob` when unplugged, `cancelSmartReturnReminder` | **Paused — highest** |
+| 4 | `POST` | `/:id/seen` | `requireAuth` → `writeLimiter` → `validateUuid("id")` → `validateBody(seenSchema)` → **replay(seen)** | Yes | Yes (`type: "seen"`) | No (delegates to `recordEquipmentSeen` service) | Via service | **Yes** — `recordEquipmentSeen` → usage session + billing ledger idempotency | **Paused — high** |
+| 5 | `POST` | `/:id/scan` | `requireAuth` → `scanLimiter` → `requireEffectiveRole("student")` → `validateUuid("id")` → `validateBody(scanSchema)` → **replay(scan)** | Yes | Yes (`type: "scan"`) | Yes (`equipment_scanned`) | No | No (scan logs + undo tokens; push on issue/maintenance/sterilization) | **Paused — high** |
 
 ### Notes
 
 - **Replay registry** (`server/lib/equipment-replay-idempotency.ts`): `create`, `update`, `delete`, `checkout`, `return`, `seen`, `scan` (`POST /api/equipment/:id/scan` only). `POST /api/equipment/scan` (quick-scan) is **not** in the replay endpoint map.
-- **DELETE** replay middleware remains on the router; handler body is extracted (`delete-equipment.ts`).
-- **PATCH** does not emit outbox events; folder transfer may send push notifications only.
-- **POST /:id/seen** keeps business logic in `recordEquipmentSeen()` — extraction should move the thin route wrapper only unless a deliberate service refactor is scoped.
-- **Removed from inline table (merged):** `POST /import`, `POST /bulk-move`, `POST /bulk-verify-room`.
+- **Create / update** handlers are extracted; **`equipmentReplayIdempotency(create|update)`** remains on the router in `equipment.ts`.
+- **POST /:id/seen** keeps business logic in `recordEquipmentSeen()` — any future extraction should move the thin route wrapper only unless a deliberate service refactor is scoped.
+- **Removed from inline table (merged):** `POST /`, `PATCH /:id`, `POST /bulk-delete`, `POST /import`, `POST /bulk-move`, `POST /bulk-verify-room`.
 
 ---
 
@@ -63,7 +64,7 @@ Checkout/return paths above already call waitlist services; do not extract waitl
 
 ---
 
-## Recommended extraction order (handler body only)
+## Extraction history (handler body only)
 
 Policy: keep **all middleware** (including `equipmentReplayIdempotency`) on `router.*` in `equipment.ts`; one handler per PR; run `pnpm routes:contract` + targeted offline/replay tests after each.
 
@@ -74,26 +75,21 @@ Policy: keep **all middleware** (including `equipmentReplayIdempotency`) on `rou
 | **4g** | `POST /bulk-verify-room` | #541 |
 | **4i** | `POST /bulk-move` | #543 |
 | **4h** | `POST /import` | #542 |
+| **4j** | `POST /bulk-delete` | #548 |
+| **4k** | `POST /` (create) | #549 |
+| **4l** | `PATCH /:id` | #550 |
 
-### Next (not paused)
-
-| Order | Route | Rationale |
-|-------|-------|-----------|
-| **4j** | `POST /bulk-delete` | No replay; audit-in-transaction quirk to preserve; mirror single delete semantics. |
-| **4k** | `POST /` (create) | Replay + offline `create`; sets operational state defaults — test replay + registry. |
-| **4l** | `PATCH /:id` | Replay + offline `update` + version OCC + transfer side effects. |
-
-### Pause — explicit slice + review (do not schedule as pre-pause slices)
+### Pause — do not schedule without sign-off
 
 | Route | Rationale |
 |-------|-----------|
-| `POST /scan` (quick-scan) | **No** replay middleware; toggle overlaps checkout/return semantics — requires product/engineering sign-off before any extraction (Codex P2 on #538). |
+| `POST /scan` (quick-scan) | **No** replay middleware; toggle overlaps checkout/return semantics — requires product/engineering sign-off (Codex P2 on #538). |
 | `POST /:id/checkout` | Waitlist, staging, V1 gates, outbox, emergency branch, offline checkout. |
 | `POST /:id/return` | Waitlist promotion, charge-alert worker, returns table, outbox, offline `return_with_charge`. |
 | `POST /:id/seen` | Replay + offline `seen`; billing via `recordEquipmentSeen` — high coupling. |
 | `POST /:id/scan` | Replay + offline `scan` + undo tokens + push side effects. |
 
-**Do not start** checkout, return, quick-scan (`POST /scan`), `POST /:id/scan`, or `POST /:id/seen` until product/engineering sign-off on replay + offline + realtime test matrix (per post–4e stabilization pause).
+**No further non-paused equipment mutations** remain in `equipment.ts` for Slice 4 handler extraction. Future work on the paused routes requires explicit approval and expanded integration coverage.
 
 ---
 
@@ -117,5 +113,5 @@ Add integration tests when touching checkout/return/seen (`tests/equipment-repla
 ## Related docs
 
 - [modularization-plan.md](./modularization-plan.md) — Slice 4 roadmap
-- [governance-known-limitations.md](./governance-known-limitations.md) — post–4d/4e/4g–4i stabilization observations
+- [governance-known-limitations.md](./governance-known-limitations.md) — post–4d/4e/4g–4l stabilization observations
 - [offline-realtime-invariants.md](./offline-realtime-invariants.md) — frozen transport / emergency doctrine
