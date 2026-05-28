@@ -159,6 +159,24 @@ Recorded after stack merge; audits run from `main` tooling against PR heads (loc
 
 **Next extraction (not started):** `DELETE /:id` or `POST /scan` only after explicit slice — both carry replay idempotency and/or offline-adjacent behavior; higher risk than restore.
 
+### Post–Slice 4g / 4i / 4h stabilization — bulk admin routes on `main` (2026-05-28)
+
+**Scope:** Observation only after [#541](https://github.com/dboy3156/VetTrack/pull/541) (bulk-verify-room), [#543](https://github.com/dboy3156/VetTrack/pull/543) (bulk-move), [#542](https://github.com/dboy3156/VetTrack/pull/542) (import). Handler-body extraction only; middleware remains on `equipment.ts`. **Do not** start checkout/return/scan/seen without pause sign-off.
+
+| Area | Check | Result |
+|------|--------|--------|
+| **POST /bulk-verify-room** | `requireAuth` → `requireEffectiveRole("technician")` → `validateBody(bulkVerifyRoomSchema)` → handler | **OK** — `post-equipment-bulk-verify-room.ts` |
+| **POST /bulk-move** | `requireAuth` → `writeLimiter` → `requireEffectiveRole("technician")` → `validateBody(bulkMoveSchema)` → handler | **OK** — `post-equipment-bulk-move.ts` |
+| **POST /import** | `requireAuth` → `writeLimiter` → `requireAdmin` → `upload.single("file")` → handler | **OK** — `post-equipment-import.ts` + `equipment-import-csv.ts` (not a service layer) |
+| **Import contract** | CSV reasons, row skip, `EQUIPMENT_IMPORT_FIELD_MAX_LENGTH` (500), `BATCH=50`, tenant-scoped folder/equipment lookups | **OK** — behavior preserved vs pre-extraction |
+| **Pilot verification** | Bulk-verify assertions target handler module + router wiring | **OK** — `equipment-pilot-verification.test.ts` (#541) |
+| **G5 routes:contract** | Full extract | **OK** — **320 / 320** |
+| **G1 + targeted tests** | phase-5, replay-idempotency routes, offline registry, scan lifecycle, pilot verification | **OK** — **103** tests on post-merge `main` |
+| **Handler inventory** | 8 GET + 6 mutation handlers under `handlers/`; **~1,707 lines** remain in `equipment.ts` | **OK** |
+| **Inline mutations left** | create, PATCH, bulk-delete + **paused** quick-scan, checkout, return, seen, `/:id/scan` | **OK** — see [equipment-inline-mutations-inventory.md](./equipment-inline-mutations-inventory.md) |
+
+**Next extraction (not started):** `POST /bulk-delete` (4j) — no replay/offline; preserve audit-in-transaction. Paused routes unchanged.
+
 ### Cross-PR recurring issues (confirmed)
 
 1. **G3:** Parameter / `.where()` tenancy is correct but flagged (~245 repo-wide; ~20+ per large route touch).
