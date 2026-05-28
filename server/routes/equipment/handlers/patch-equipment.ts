@@ -2,7 +2,7 @@ import type { RequestHandler } from "express";
 import { randomUUID } from "crypto";
 import { db, equipment, folders, transferLogs } from "../../../db.js";
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { checkDedupe, sendPushToAll } from "../../../lib/push.js";
+import { checkDedupe, sendPushToAll, shouldSendPilotEnglishEquipmentPush } from "../../../lib/push.js";
 import { invalidateAnalyticsCache } from "../../../lib/analytics-cache.js";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { apiError, resolveRequestId } from "../equipment-route-utils.js";
@@ -143,7 +143,7 @@ export const patchEquipmentHandler: RequestHandler = async (req, res) => {
         });
 
         const itemName = result?.name ?? oldItem.name;
-        if (!checkDedupe(req.params.id, "transfer")) {
+        if (shouldSendPilotEnglishEquipmentPush() && !checkDedupe(req.params.id, "transfer")) {
           const toLabel = newFolder?.name ?? "unassigned";
           sendPushToAll(clinicId, {
             title: "Equipment Transferred",

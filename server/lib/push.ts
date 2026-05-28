@@ -291,6 +291,11 @@ export async function finalizeNotificationRequestOutbox(
   });
 }
 
+/** F8 / P2.3 — when true, skip hardcoded English equipment broadcast pushes (Railway: PILOT_DISABLE_EN_PUSH=true). */
+export function shouldSendPilotEnglishEquipmentPush(): boolean {
+  return process.env.PILOT_DISABLE_EN_PUSH !== "true";
+}
+
 export async function sendPushToAll(
   clinicId: string,
   payload: PushPayload,

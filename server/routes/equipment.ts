@@ -7,7 +7,7 @@ import { eq, inArray, desc, asc, and, or, ilike, lt, gte, sql, isNull } from "dr
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { scanLimiter, checkoutLimiter, writeLimiter } from "../middleware/rate-limiters.js";
-import { checkDedupe, sendPushToAll } from "../lib/push.js";
+import { checkDedupe, sendPushToAll, shouldSendPilotEnglishEquipmentPush } from "../lib/push.js";
 import { invalidateAnalyticsCache } from "../lib/analytics-cache.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { trackSyncSuccess, trackSyncFail } from "../lib/sync-metrics.js";
@@ -1090,7 +1090,7 @@ router.post(
 
     await cancelSmartReturnReminder(clinicId, u.id, req.authUser!.id);
 
-    if (!checkDedupe(u.id, "return")) {
+    if (shouldSendPilotEnglishEquipmentPush() && !checkDedupe(u.id, "return")) {
       sendPushToAll(clinicId, {
         title: "Equipment Returned",
         body: `${u.name} has been returned and is available`,

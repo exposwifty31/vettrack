@@ -2,7 +2,7 @@ import type { RequestHandler } from "express";
 import { randomUUID } from "crypto";
 import { db, equipment, folders, transferLogs } from "../../../db.js";
 import { and, eq, isNull } from "drizzle-orm";
-import { sendPushToAll } from "../../../lib/push.js";
+import { sendPushToAll, shouldSendPilotEnglishEquipmentPush } from "../../../lib/push.js";
 import { invalidateAnalyticsCache } from "../../../lib/analytics-cache.js";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { apiError, resolveRequestId } from "../equipment-route-utils.js";
@@ -69,13 +69,15 @@ export const postEquipmentBulkMoveHandler: RequestHandler = async (req, res) => 
     invalidateAnalyticsCache(clinicId);
     res.json({ affected: typedIds.length });
 
-    const toLabel = targetFolderName ?? "Unassigned";
-    sendPushToAll(clinicId, {
-      title: "Bulk Transfer",
-      body: `${typedIds.length} item${typedIds.length !== 1 ? "s" : ""} moved to ${toLabel}`,
-      tag: `bulk-move:${Date.now()}`,
-      url: "/",
-    });
+    if (shouldSendPilotEnglishEquipmentPush()) {
+      const toLabel = targetFolderName ?? "Unassigned";
+      sendPushToAll(clinicId, {
+        title: "Bulk Transfer",
+        body: `${typedIds.length} item${typedIds.length !== 1 ? "s" : ""} moved to ${toLabel}`,
+        tag: `bulk-move:${Date.now()}`,
+        url: "/",
+      });
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json(
