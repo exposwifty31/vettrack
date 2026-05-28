@@ -43,6 +43,11 @@ export function buildSeenIdempotencyKey(animalId: string, itemId: string, at: Da
 
 const DEFAULT_EQUIPMENT_BILLING_CODE = "DEFAULT_EQUIPMENT";
 
+/** F9 / P2.4 — skip auto-created $1.00 DEFAULT_EQUIPMENT billing rows when set on Railway. */
+export function isPilotDefaultBillingSuppressed(): boolean {
+  return process.env.PILOT_SUPPRESS_DEFAULT_BILLING === "true";
+}
+
 export async function getOrCreateDefaultEquipmentBillingItem(
   tx: DbTx,
   clinicId: string,
@@ -69,7 +74,7 @@ export async function resolveBillingItemForEquipment(
   tx: DbTx,
   clinicId: string,
   row: typeof equipment.$inferSelect,
-): Promise<{ id: string; unitPriceCents: number }> {
+): Promise<{ id: string; unitPriceCents: number } | null> {
   if (row.billingItemId) {
     const [bi] = await tx
       .select({ id: billingItems.id, unitPriceCents: billingItems.unitPriceCents })
@@ -78,6 +83,7 @@ export async function resolveBillingItemForEquipment(
       .limit(1);
     if (bi) return bi;
   }
+  if (isPilotDefaultBillingSuppressed()) return null;
   return getOrCreateDefaultEquipmentBillingItem(tx, clinicId);
 }
 
@@ -137,9 +143,10 @@ export type SeenResult =
       animal: { id: string; name: string };
       roomId: string;
       usageSessionId: string;
-      ledgerId: string;
+      ledgerId?: string;
       packageLedgerIds?: string[];
       idempotentReplay?: boolean;
+      billingSkipped?: boolean;
     }
   | { ok: true; linked: false; reason: "no_room" | "no_patient_in_room"; roomId: string | null }
   | { ok: false; error: "NOT_FOUND" };
@@ -175,6 +182,33 @@ export async function processEquipmentSeenInTx(params: {
   }
 
   const billing = await resolveBillingItemForEquipment(tx, clinicId, eqRow);
+  if (!billing) {
+    await tx
+      .update(equipment)
+      .set({ lastSeen: now })
+      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, equipmentId)));
+    const [openSession] = await tx
+      .select({ id: usageSessions.id })
+      .from(usageSessions)
+      .where(
+        and(
+          eq(usageSessions.clinicId, clinicId),
+          eq(usageSessions.animalId, animal.id),
+          eq(usageSessions.equipmentId, equipmentId),
+          eq(usageSessions.status, "open"),
+        ),
+      )
+      .limit(1);
+    return {
+      ok: true,
+      linked: true,
+      animal,
+      roomId,
+      usageSessionId: openSession?.id ?? "",
+      billingSkipped: true,
+    };
+  }
+
   const idempotencyKey = buildSeenIdempotencyKey(animal.id, equipmentId, now);
   const redisSeenKey = `equipment-seen:${clinicId}:${idempotencyKey}`;
 
