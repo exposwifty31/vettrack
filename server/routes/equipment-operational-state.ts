@@ -208,7 +208,13 @@ router.post("/equipment/:equipmentId/dock-return", requireAuth, validateBody(doc
       // 1. Upsert unit condition states
       for (const v of conditionVerifications) {
         const existing = await tx.select().from(unitConditionStates)
-          .where(and(eq(unitConditionStates.equipmentId, equipmentId), eq(unitConditionStates.conditionId, v.conditionId)));
+          .where(
+            and(
+              eq(unitConditionStates.clinicId, clinicId),
+              eq(unitConditionStates.equipmentId, equipmentId),
+              eq(unitConditionStates.conditionId, v.conditionId),
+            ),
+          );
 
         if (existing.length > 0) {
           await tx.update(unitConditionStates)
@@ -219,7 +225,13 @@ router.post("/equipment/:equipmentId/dock-return", requireAuth, validateBody(doc
               notes: v.notes ?? null,
               updatedAt: now,
             })
-            .where(and(eq(unitConditionStates.equipmentId, equipmentId), eq(unitConditionStates.conditionId, v.conditionId)));
+            .where(
+              and(
+                eq(unitConditionStates.clinicId, clinicId),
+                eq(unitConditionStates.equipmentId, equipmentId),
+                eq(unitConditionStates.conditionId, v.conditionId),
+              ),
+            );
         } else {
           await tx.insert(unitConditionStates).values({
             id: randomUUID(),
