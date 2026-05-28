@@ -1,0 +1,86 @@
+/**
+ * @vitest-environment happy-dom
+ */
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { render, screen } from "@testing-library/react";
+import type { DisplaySnapshot } from "@/types";
+import WardDisplayPage from "../display";
+
+const emptySnapshot: DisplaySnapshot = {
+  currentTime: "2026-05-28T12:00:00.000Z",
+  currentShift: [{ employeeName: "Tech", role: "technician" }],
+  hospitalizations: [],
+  equipment: [
+    {
+      id: "eq-1",
+      name: "Infusion pump",
+      location: "ICU",
+      status: "ok",
+      inUse: false,
+    },
+  ],
+  upcomingTasks: [],
+  activeAlertCount: 0,
+  totalOverdueCount: 0,
+  crashCartStatus: null,
+  codeBlueSession: null,
+};
+
+vi.mock("@/hooks/useDisplaySnapshot", () => ({
+  useDisplaySnapshot: () => emptySnapshot,
+}));
+
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({}),
+}));
+
+vi.mock("@/lib/realtime", () => ({
+  connectRealtime: vi.fn(),
+  disconnectRealtime: vi.fn(),
+  EventIngestor: class {
+    getLastAppliedEventId() {
+      return null;
+    }
+    async replayHttpCatchUpAfter() {}
+    dispose() {}
+  },
+  publishBuildTagGossip: vi.fn(),
+  publishCodeBlueSeenGossip: vi.fn(),
+}));
+
+vi.mock("@/hooks/useKioskWakeLock", () => ({ useKioskWakeLock: vi.fn() }));
+vi.mock("@/hooks/useDisplayHeartbeat", () => ({ useDisplayHeartbeat: vi.fn() }));
+vi.mock("@/hooks/useRealtimeReconciliation", () => ({ useRealtimeReconciliation: vi.fn() }));
+vi.mock("@/hooks/useCodeBlueKeepaliveReconciliation", () => ({
+  useCodeBlueKeepaliveReconciliation: vi.fn(),
+}));
+
+describe("F1: Ward Display empty panes", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "BroadcastChannel",
+      class {
+        postMessage() {}
+        close() {}
+        addEventListener() {}
+        removeEventListener() {}
+      },
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("F1: renders EquipmentPane without crash-cart pill, patient grid, or upcoming tasks", () => {
+    render(<WardDisplayPage />);
+
+    expect(screen.getByText(/ציוד · מיקום ושימוש/)).toBeTruthy();
+    expect(screen.getByText("Infusion pump")).toBeTruthy();
+
+    expect(screen.queryByText(/עגלה לא נבדקה היום/)).toBeNull();
+    expect(screen.queryByText(/מאושפזים/)).toBeNull();
+    expect(screen.queryByText(/פרוצדורות קרובות/)).toBeNull();
+    expect(screen.queryByText("CPR Risk")).toBeNull();
+  });
+});

@@ -75,6 +75,26 @@ const SHIFT_ROLE_LABELS: Record<string, string> = {
   senior_technician: "טכנאי בכיר",
 };
 
+/** F1 — data-driven pane visibility for Ward Display (equipment-only pilots). */
+export function getDisplayPaneVisibility(
+  snapshot: Pick<
+    DisplaySnapshot,
+    "hospitalizations" | "upcomingTasks" | "crashCartStatus"
+  >,
+): {
+  showCrashCartPill: boolean;
+  showHospitalizationCount: boolean;
+  showPatientGrid: boolean;
+  showUpcomingTasks: boolean;
+} {
+  return {
+    showCrashCartPill: snapshot.crashCartStatus !== null,
+    showHospitalizationCount: snapshot.hospitalizations.length > 0,
+    showPatientGrid: snapshot.hospitalizations.length > 0,
+    showUpcomingTasks: snapshot.upcomingTasks.length > 0,
+  };
+}
+
 // ── AwarenessBar ─────────────────────────────────────────────────────────────
 
 function AwarenessBar({ snapshot }: { snapshot: DisplaySnapshot }) {
@@ -100,6 +120,7 @@ function AwarenessBar({ snapshot }: { snapshot: DisplaySnapshot }) {
 
   const firstOverdue = snapshot.hospitalizations.find((h) => h.overdueTaskCount > 0);
   const extraOverdue = snapshot.totalOverdueCount > 1 ? snapshot.totalOverdueCount - 1 : 0;
+  const paneVisibility = getDisplayPaneVisibility(snapshot);
 
   return (
     <div className="flex items-center gap-4 px-4 py-2 bg-[#141922] border-b border-[#1e2740] text-sm flex-wrap">
@@ -124,15 +145,17 @@ function AwarenessBar({ snapshot }: { snapshot: DisplaySnapshot }) {
 
       <div className="w-px h-5 bg-[#2d3748] shrink-0" />
 
-      {cartOk ? (
-        <span className="flex items-center gap-1 bg-green-900/30 border border-green-700/40 text-green-300 rounded px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap">
-          ✓ עגלה נבדקה · {cartAgeLabel}
-        </span>
-      ) : (
-        <span className="flex items-center gap-1 bg-amber-900/20 border border-amber-700/40 text-yellow-300 rounded px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap">
-          ⚠ עגלה לא נבדקה היום
-        </span>
-      )}
+      {paneVisibility.showCrashCartPill &&
+        cart &&
+        (cartOk ? (
+          <span className="flex items-center gap-1 bg-green-900/30 border border-green-700/40 text-green-300 rounded px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap">
+            ✓ עגלה נבדקה · {cartAgeLabel}
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 bg-amber-900/20 border border-amber-700/40 text-yellow-300 rounded px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap">
+            ⚠ עגלה לא נבדקה היום
+          </span>
+        ))}
 
       {snapshot.activeAlertCount > 0 && (
         <span className="flex items-center gap-1 bg-amber-900/20 border border-amber-700/40 text-yellow-300 rounded px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap">
@@ -147,9 +170,11 @@ function AwarenessBar({ snapshot }: { snapshot: DisplaySnapshot }) {
         </span>
       )}
 
-      <span className="ms-auto flex items-center bg-white/5 border border-white/10 text-gray-400 rounded px-2.5 py-1 text-[11px] whitespace-nowrap">
-        {snapshot.hospitalizations.length} מאושפזים
-      </span>
+      {paneVisibility.showHospitalizationCount && (
+        <span className="ms-auto flex items-center bg-white/5 border border-white/10 text-gray-400 rounded px-2.5 py-1 text-[11px] whitespace-nowrap">
+          {snapshot.hospitalizations.length} מאושפזים
+        </span>
+      )}
     </div>
   );
 }
@@ -637,16 +662,22 @@ export default function WardDisplayPage() {
     );
   }
 
+  const paneVisibility = getDisplayPaneVisibility(snapshot);
+
   return (
     <div className="min-h-screen bg-[#0d1117] text-gray-200 flex flex-col" dir="rtl">
       <AwarenessBar snapshot={snapshot} />
       <div className="flex flex-col sm:flex-row flex-1 min-h-0">
-        <div className="flex-1 min-w-0 overflow-auto">
-          <PatientGrid hospitalizations={snapshot.hospitalizations} />
-        </div>
+        {paneVisibility.showPatientGrid && (
+          <div className="flex-1 min-w-0 overflow-auto">
+            <PatientGrid hospitalizations={snapshot.hospitalizations} />
+          </div>
+        )}
         <div className="w-full sm:w-[420px] shrink-0 border-t sm:border-t-0 sm:border-r border-[#1f2937] flex flex-col overflow-auto">
           <EquipmentPane equipment={snapshot.equipment} />
-          <UpcomingTasksPane tasks={snapshot.upcomingTasks} currentTime={snapshot.currentTime} />
+          {paneVisibility.showUpcomingTasks && (
+            <UpcomingTasksPane tasks={snapshot.upcomingTasks} currentTime={snapshot.currentTime} />
+          )}
         </div>
       </div>
     </div>
