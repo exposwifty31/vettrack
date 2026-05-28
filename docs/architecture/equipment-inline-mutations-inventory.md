@@ -33,8 +33,8 @@ Legend: **Replay** = `equipmentReplayIdempotency` on router. **Offline** = `src/
 | 7 | `POST` | `/:id/scan` | `requireAuth` → `scanLimiter` → `requireEffectiveRole("student")` → `validateUuid("id")` → `validateBody(scanSchema)` → **replay(scan)** | Yes | Yes (`type: "scan"`) | Yes (`equipment_scanned`) | No | No (scan logs + undo tokens; push on issue/maintenance/sterilization) | High |
 | 8 | `POST` | `/import` | `requireAuth` → `writeLimiter` → `requireAdmin` → `upload.single("file")` | No | No (`importCsv` uses raw `fetch`, no `addPendingSync`) | Yes (`equipment_imported`) | No | No (batch insert equipment rows) | Medium |
 | 9 | `POST` | `/bulk-delete` | `requireAuth` → `writeLimiter` → `requireAdmin` → `validateBody(bulkIdsSchema)` | No | No | Yes (`equipment_bulk_deleted`; **inside** transaction) | No | No (batch soft-delete + scan log per item) | Medium |
-| 11 | `POST` | `/bulk-move` | `requireAuth` → `writeLimiter` → `requireEffectiveRole("technician")` → `validateBody(bulkMoveSchema)` | No | No | Yes (`equipment_bulk_moved`) | No | No (`transferLogs` per item; post-response push) | Medium |
-| 12 | `POST` | `/bulk-verify-room` | `requireAuth` → `requireEffectiveRole("technician")` → `validateBody(bulkVerifyRoomSchema)` | No | No | Yes (`room_bulk_verified`) | No | No (room `syncStatus`; batch verify + scan logs) | Low–medium |
+| 10 | `POST` | `/bulk-move` | `requireAuth` → `writeLimiter` → `requireEffectiveRole("technician")` → `validateBody(bulkMoveSchema)` | No | No | Yes (`equipment_bulk_moved`) | No | No (`transferLogs` per item; post-response push) | Medium |
+| 11 | `POST` | `/bulk-verify-room` | `requireAuth` → `requireEffectiveRole("technician")` → `validateBody(bulkVerifyRoomSchema)` | No | No | Yes (`room_bulk_verified`) | No | No (room `syncStatus`; batch verify + scan logs) | Low–medium |
 
 ### Notes
 
