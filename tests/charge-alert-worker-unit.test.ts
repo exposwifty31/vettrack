@@ -46,6 +46,7 @@ vi.mock("../server/lib/redis.js", () => ({
 // Mock push so we can assert calls without real VAPID keys
 vi.mock("../server/lib/push.js", () => ({
   sendPushToAll: vi.fn().mockResolvedValue(undefined),
+  shouldSendPilotEnglishEquipmentPush: () => true,
 }));
 
 // Mock Drizzle db — select/update chains are configured per-test

@@ -53,6 +53,7 @@ let secondUserId = "";
 vi.mock("../server/lib/push.js", () => ({
   checkDedupe: () => true,
   sendPushToAll: vi.fn(),
+  shouldSendPilotEnglishEquipmentPush: () => true,
 }));
 
 vi.mock("../server/lib/audit.js", () => ({

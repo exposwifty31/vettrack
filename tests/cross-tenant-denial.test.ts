@@ -89,6 +89,7 @@ vi.mock("../server/lib/audit.js", () => ({
 vi.mock("../server/lib/push.js", () => ({
   sendPushToOthers: vi.fn(async () => undefined),
   checkDedupe: () => true,
+  shouldSendPilotEnglishEquipmentPush: () => true,
 }));
 
 // ─── auth middleware mock — pass-through for clinic B user ─────────────────
