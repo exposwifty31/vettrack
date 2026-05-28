@@ -44,6 +44,7 @@ import { postEquipmentRestoreHandler } from "./equipment/handlers/post-equipment
 import { postEquipmentRevertHandler } from "./equipment/handlers/post-equipment-revert.js";
 import { deleteEquipmentHandler } from "./equipment/handlers/delete-equipment.js";
 import { postEquipmentBulkVerifyRoomHandler } from "./equipment/handlers/post-equipment-bulk-verify-room.js";
+import { postEquipmentBulkMoveHandler } from "./equipment/handlers/post-equipment-bulk-move.js";
 import type { EquipmentPreviousState } from "./equipment/equipment-undo-tokens.js";
 
 const EQUIPMENT_STATUS_VALUES = [
@@ -1942,86 +1943,7 @@ try {
   }
 });
 
-router.post("/bulk-move", requireAuth, writeLimiter, requireEffectiveRole("technician"), validateBody(bulkMoveSchema), async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const { ids: typedIds, folderId } = req.body as z.infer<typeof bulkMoveSchema>;
-    const targetFolderId = folderId ?? null;
-
-    let targetFolderName: string | null = null;
-
-    await db.transaction(async (tx) => {
-      const [targetFolder] = targetFolderId
-        ? await tx.select().from(folders).where(and(eq(folders.clinicId, clinicId), eq(folders.id, targetFolderId))).limit(1)
-        : [null];
-      targetFolderName = targetFolder?.name ?? null;
-      const moveNote = `Bulk moved to ${targetFolderName ?? "Unassigned"} (${typedIds.length} item${typedIds.length !== 1 ? "s" : ""})`;
-
-      for (const id of typedIds) {
-        const [item] = await tx
-          .select()
-          .from(equipment)
-          .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, id), isNull(equipment.deletedAt)))
-          .limit(1);
-        if (!item) continue;
-
-        const [oldFolder] = item.folderId
-          ? await tx.select().from(folders).where(and(eq(folders.clinicId, clinicId), eq(folders.id, item.folderId))).limit(1)
-          : [null];
-
-        await tx
-          .update(equipment)
-          .set({ folderId: targetFolderId })
-          .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, id)));
-
-        await tx.insert(transferLogs).values({
-          id: randomUUID(),
-          clinicId,
-          equipmentId: id,
-          fromFolderId: item.folderId ?? null,
-          fromFolderName: oldFolder?.name ?? null,
-          toFolderId: targetFolderId,
-          toFolderName: targetFolder?.name ?? null,
-          userId: req.authUser!.id,
-          note: moveNote,
-        });
-      }
-    });
-
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
-      clinicId,
-      actionType: "equipment_bulk_moved",
-      performedBy: req.authUser!.id,
-      performedByEmail: req.authUser!.email,
-      targetId: targetFolderId,
-      targetType: "folder",
-      metadata: { ids: typedIds, count: typedIds.length, targetFolderName },
-    });
-
-    invalidateAnalyticsCache(clinicId);
-    res.json({ affected: typedIds.length });
-
-    const toLabel = targetFolderName ?? "Unassigned";
-    sendPushToAll(clinicId, {
-      title: "Bulk Transfer",
-      body: `${typedIds.length} item${typedIds.length !== 1 ? "s" : ""} moved to ${toLabel}`,
-      tag: `bulk-move:${Date.now()}`,
-      url: "/",
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "EQUIPMENT_BULK_MOVE_FAILED",
-        message: "Bulk move failed",
-        requestId,
-      }),
-    );
-  }
-});
+router.post("/bulk-move", requireAuth, writeLimiter, requireEffectiveRole("technician"), validateBody(bulkMoveSchema), postEquipmentBulkMoveHandler);
 
 // POST /api/equipment/bulk-verify-room — Marks every item in a room as verified and sets sync status to 'synced'.
 router.post(
