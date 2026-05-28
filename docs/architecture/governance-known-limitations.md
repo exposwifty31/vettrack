@@ -139,6 +139,26 @@ Recorded after stack merge; audits run from `main` tooling against PR heads (loc
 
 **Follow-up for Slice 4:** Any static test that greps `src/lib/api.ts` for equipment offline strings should read `src/lib/api/equipment.ts` instead (done for return contracts in #528).
 
+### Post–Slice 4d stabilization — first equipment mutation extraction on `main` (2026-05-28)
+
+**Scope:** Observation only after [#534](https://github.com/dboy3156/VetTrack/pull/534). **Do not** start scan/checkout/return extraction until a separate slice is approved.
+
+| Area | Check | Result |
+|------|--------|--------|
+| **POST /:id/restore** | `res.json(restored)`; 404 `EQUIPMENT_NOT_FOUND_OR_NOT_DELETED`; 500 `EQUIPMENT_RESTORE_FAILED` | **OK** — `post-equipment-restore.ts` |
+| **Audit** | `equipment_restored` + `metadata: { equipmentName }` | **OK** — unchanged |
+| **Analytics cache** | `invalidateAnalyticsCache(clinicId)` after restore | **OK** |
+| **Tenant** | `eq(equipment.clinicId, clinicId)` on select/update | **OK** |
+| **Middleware (route file)** | `requireAuth`, `requireAdmin`, `validateUuid("id")` on `router.post` in `equipment.ts` | **OK** — handler body only moved |
+| **Replay idempotency** | `equipmentReplayIdempotency` on create/update/delete/checkout/return/seen/scan only | **OK** — restore route has **no** replay middleware |
+| **Offline** | `api.equipment.restore` — plain `request` POST, no `addPendingSync` | **OK** — `offline-mutation-registry` unchanged |
+| **G5 routes:contract** | Full extract | **OK** — **320 / 320** |
+| **G1 + targeted tests** | phase-5 error bundle (includes `handlers/*.ts`), replay-idempotency routes, offline registry, scan lifecycle | **OK** — 97 tests on post-merge `main` |
+| **Main CI post #534** | Merge run on `main` | **success** (see merge commit `6c349ca0`) |
+| **Handler inventory** | 8 GET + 1 POST under `handlers/`; ~2,316 lines remain in `equipment.ts` | **OK** |
+
+**Next extraction (not started):** `DELETE /:id` or `POST /scan` only after explicit slice — both carry replay idempotency and/or offline-adjacent behavior; higher risk than restore.
+
 ### Cross-PR recurring issues (confirmed)
 
 1. **G3:** Parameter / `.where()` tenancy is correct but flagged (~245 repo-wide; ~20+ per large route touch).
