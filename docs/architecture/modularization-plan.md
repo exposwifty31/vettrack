@@ -1,6 +1,6 @@
 # VetTrack modularization plan
 
-**Status:** Phase 1 complete (inventory + strategy). Implementation not started.  
+**Status:** Phase 1 complete (inventory + strategy). Slice 1 (`request-core.ts`) implemented.  
 **Principle:** Incremental, behavior-preserving refactors — not a rewrite.
 
 ## Goals
@@ -37,7 +37,7 @@
 3. `jobs/enqueue` → `jobs/definitions` → `workers/chargeAlertWorker`
 4. `services/clinical-check-in` ↔ `lib/authority-cache`
 
-**Frontend (1):** `lib/api.ts` ↔ `lib/er-api.ts`
+**Frontend:** ~~`lib/api.ts` ↔ `lib/er-api.ts`~~ resolved in Slice 1 (`request-core.ts`)
 
 ## Migration slices (ordered)
 

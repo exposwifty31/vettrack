@@ -9,6 +9,7 @@ const repoRoot = path.resolve(__dirname, "..");
 const accessDenied = fs.readFileSync(path.join(repoRoot, "server", "lib", "access-denied.ts"), "utf8");
 const auth = fs.readFileSync(path.join(repoRoot, "server", "middleware", "auth.ts"), "utf8");
 const api = fs.readFileSync(path.join(repoRoot, "src", "lib", "api.ts"), "utf8");
+const requestCore = fs.readFileSync(path.join(repoRoot, "src", "lib", "request-core.ts"), "utf8");
 
 describe("Phase 5 API error contract checks (static)", () => {
   it("Access denied payload supports code + requestId", () => {
@@ -33,9 +34,9 @@ describe("Phase 5 API error contract checks (static)", () => {
 
   it("Frontend API client understands structured error payloads with requestId", () => {
     expect(
-      api.includes("interface ApiErrorPayload") &&
-        api.includes("toApiErrorMessage") &&
-        api.includes("payload?.requestId"),
+      requestCore.includes("export interface ApiErrorPayload") &&
+        requestCore.includes("toApiErrorMessage") &&
+        requestCore.includes("payload?.requestId"),
     ).toBe(true);
   });
 });

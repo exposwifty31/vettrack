@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const apiSrc = fs.readFileSync(path.join(ROOT, "src/lib/api.ts"), "utf8");
+const requestCoreSrc = fs.readFileSync(path.join(ROOT, "src/lib/request-core.ts"), "utf8");
 const useAuthSrc = fs.readFileSync(path.join(ROOT, "src/hooks/use-auth.tsx"), "utf8");
 
 function sliceBetween(source: string, startNeedle: string, endNeedle: string): string {
@@ -59,7 +60,7 @@ describe("authFetchUsersMe / authPostUsersSync", () => {
     const fnBody = sliceBetween(
       apiSrc,
       "export async function authPostUsersSync",
-      "interface OfflineOptions",
+      "/** Success body from POST /api/containers/:id/dispense */",
     );
     expect(fnBody).toContain('"/api/users/sync"');
     expect(fnBody).toContain("bootstrapFetchWithTimeout");
@@ -68,8 +69,8 @@ describe("authFetchUsersMe / authPostUsersSync", () => {
 
   it("authenticated request() path still uses authFetch for routine API calls", () => {
     const fetchWithTimeoutBody = sliceBetween(
-      apiSrc,
-      "function fetchWithTimeout(",
+      requestCoreSrc,
+      "export function fetchWithTimeout(",
       "export async function request",
     );
     expect(fetchWithTimeoutBody).toContain("authFetch(url");

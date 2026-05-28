@@ -1,3 +1,4 @@
+import { request } from "./request-core";
 import type {
   AckErHandoffRequest,
   AckErHandoffResponse,
@@ -52,16 +53,8 @@ export const ER_API_IMPLEMENTED_ROUTES = [
   // responds 501 COMING_SOON (queue feature not built). See server/routes/er.ts.
 ] as const;
 
-type RequestFn = typeof import("./api").request;
-
-let cachedRequest: RequestFn | undefined;
-
-async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
-  if (!cachedRequest) {
-    const mod = await import("./api");
-    cachedRequest = mod.request;
-  }
-  return cachedRequest<T>(url, init);
+function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
+  return request<T>(url, init);
 }
 
 export async function getErMode(): Promise<ErModeResponse> {

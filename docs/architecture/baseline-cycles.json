@@ -8,6 +8,6 @@
       "jobs/enqueue.ts > jobs/definitions/index.ts > workers/chargeAlertWorker.ts",
       "services/clinical-check-in.ts > lib/authority-cache.ts"
     ],
-    "src": ["lib/api.ts > lib/er-api.ts"]
+    "src": []
   }
 }

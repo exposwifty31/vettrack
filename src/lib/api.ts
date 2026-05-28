@@ -106,6 +106,7 @@ import {
   classifyEmergencyEndpoint,
   recordEmergencyBlockLocally,
 } from "@/lib/offline-emergency-block";
+import { OfflineEmergencyMutationBlockedError } from "@/lib/offline-policy";
 import {
   addPendingSync,
   getCachedEquipment,
@@ -124,28 +125,31 @@ import {
   getCurrentUserId,
   getCurrentUserEmail,
 } from "./auth-store";
-import { authFetch } from "./auth-fetch";
-import { navigate } from "wouter/use-browser-location";
-import { isOnline } from "./safe-browser";
-const BASE_HEADERS: Record<string, string> = {
-  "Content-Type": "application/json",
+import {
+  request,
+  ApiError,
+  TimeoutError,
+  OfflineResponseError,
+  fetchWithTimeout,
+  mergeRequestHeaders,
+  extractApiErrorCode,
+  toApiErrorMessage,
+  isNetworkError,
+  isOfflineResponse,
+  reportEmergencyBlockedSilently,
+  throwIfUnauthorized,
+  FETCH_TIMEOUT_MS,
+  EQUIPMENT_LIST_FETCH_TIMEOUT_MS,
+  TASKS_FETCH_TIMEOUT_MS,
+} from "./request-core";
+
+/** Compatibility re-exports (Slice 1 — request core extracted). */
+export {
+  request,
+  ApiError,
+  EQUIPMENT_LIST_FETCH_TIMEOUT_MS,
+  TASKS_FETCH_TIMEOUT_MS,
 };
-
-function buildHeaders(): Record<string, string> {
-  return { ...BASE_HEADERS, "X-Locale": getStoredLocale() };
-}
-
-/** Multipart uploads must not send `Content-Type: application/json` so the boundary is preserved. */
-function mergeRequestHeaders(init: RequestInit): Record<string, string> {
-  const merged: Record<string, string> = {
-    ...buildHeaders(),
-    ...(init.headers as Record<string, string> | undefined),
-  };
-  if (typeof FormData !== "undefined" && init.body instanceof FormData) {
-    delete merged["Content-Type"];
-  }
-  return merged;
-}
 
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 10_000;
 
@@ -222,182 +226,6 @@ export async function authPostUsersSync(
   );
 }
 
-interface OfflineOptions {
-  offlineType: PendingSyncType;
-  offlineEquipmentId?: string;
-  optimisticResult?: unknown;
-}
-
-interface ApiErrorPayload {
-  code?: string;
-  error?: string;
-  reason?: string;
-  message?: string;
-  requestId?: string;
-}
-
-/** Error codes may be top-level (`error`, `code`) or nested (`data.code`) depending on handler. */
-function extractApiErrorCode(json: ApiErrorPayload & Record<string, unknown>): string {
-  if (typeof json.error === "string" && json.error) return json.error;
-  if (typeof json.code === "string" && json.code) return json.code;
-  const data = json.data;
-  if (data && typeof data === "object" && data !== null && "code" in data) {
-    const c = (data as { code?: unknown }).code;
-    if (typeof c === "string" && c) return c;
-  }
-  return "UNKNOWN";
-}
-
-class TimeoutError extends Error {
-  constructor(ms: number) {
-    super(`Request timed out after ${ms}ms`);
-    this.name = "TimeoutError";
-  }
-}
-
-class OfflineResponseError extends Error {
-  constructor() {
-    super("Offline response received");
-    this.name = "OfflineResponseError";
-  }
-}
-
-/**
- * Error thrown by `request` / `requestWithOfflineFallback` for non-2xx responses.
- * Preserves the server's error `code` and any structured fields (e.g.
- * `invalidatedItems` from POST /patient-handoffs/:id/submit) so callers can
- * branch on `e.code` and read extras without losing them in `new Error(message)`.
- */
-export class ApiError extends Error {
-  status: number;
-  code?: string;
-  requestId?: string;
-  payload: ApiErrorPayload & Record<string, unknown>;
-  invalidatedItems?: Array<{ id: string; hospitalizationId: string; reason: string }>;
-  constructor(status: number, message: string, payload: ApiErrorPayload & Record<string, unknown>) {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-    this.payload = payload;
-    if (typeof payload.code === "string" && payload.code) this.code = payload.code;
-    else if (typeof payload.error === "string" && payload.error) this.code = payload.error;
-    if (typeof payload.requestId === "string") this.requestId = payload.requestId;
-    if (Array.isArray(payload.invalidatedItems)) {
-      this.invalidatedItems = payload.invalidatedItems as ApiError["invalidatedItems"];
-    }
-  }
-}
-
-// Phase 9 PR 9.5 — shared error class with offline-policy enqueue gate (single definition).
-import { OfflineEmergencyMutationBlockedError } from "@/lib/offline-policy";
-
-/**
- * Phase 9 PR 9.5 — best-effort fire-and-forget telemetry post that records
- * an offline emergency-block event server-side. Lives inline in api.ts (not
- * in offline-emergency-block.ts) to avoid a circular dependency. The
- * `silent: true` flag suppresses the inner request's network-error toast
- * so the caller's own emergency-block-specific toast is the single
- * user-visible signal. Shared between `request()` and
- * `handleOptimisticMutation()` so the two call sites cannot diverge.
- *
- * Doctrine (plan §3.8): only the bounded enum endpointClass crosses the
- * wire; the sessionStorage buffer contents are never posted.
- *
- * Counter coverage limitation (acknowledged):
- *   This helper is only called from inside network-error handlers — i.e.
- *   when the outer request just failed. There are two cases:
- *     1. Transient network error while the page is online (timeout, 5xx,
- *        DNS hiccup, CDN blip): the navigator.onLine check below passes
- *        and the POST may succeed → server-side counter ticks.
- *     2. Page is fully offline (`navigator.onLine === false`): we skip
- *        the futile fetch entirely. The local sessionStorage buffer
- *        (`recordEmergencyBlockLocally`) remains the authoritative local
- *        record for these blocks per plan §3.8. The server-side counter
- *        will undercount pure-offline blocks — by doctrine, the buffer
- *        is the only durable evidence; deferred-telemetry shipping the
- *        buffer to the server is explicitly out of scope (future phase).
- */
-function reportEmergencyBlockedSilently(
-  endpointClass: "start" | "log" | "end" | "presence",
-): void {
-  if (typeof navigator !== "undefined" && navigator.onLine === false) {
-    return;
-  }
-  void request<{ ok: boolean }>(
-    "/api/realtime/telemetry",
-    {
-      method: "POST",
-      body: JSON.stringify({ offlineEmergencyMutationBlocked: endpointClass }),
-    },
-    undefined,
-    true,
-  ).catch(() => {});
-}
-
-function isOfflineResponse(status: number, payload: unknown): boolean {
-  if (status !== 503) return false;
-  if (!payload || typeof payload !== "object") return false;
-  const candidate = payload as { offline?: unknown; error?: unknown };
-  if (candidate.offline === true) return true;
-  return typeof candidate.error === "string" && candidate.error.toLowerCase().includes("network unavailable");
-}
-
-function isNetworkError(err: unknown): boolean {
-  if (err instanceof TimeoutError) return true;
-  if (err instanceof OfflineResponseError) return true;
-  if (err instanceof DOMException && err.name === "AbortError") return false;
-  if (!isOnline()) return true;
-  if (err instanceof TypeError) return true;
-  if (err instanceof Error && err.message.includes("Failed to fetch")) return true;
-  return false;
-}
-
-const FETCH_TIMEOUT_MS = 30_000;
-/** Shorter deadline for equipment list so a stuck Redis/backend cannot block the UI for the default 30s. */
-export const EQUIPMENT_LIST_FETCH_TIMEOUT_MS = 5_000;
-/** Fail fast task dashboards/queues so operational screens can recover quickly. */
-export const TASKS_FETCH_TIMEOUT_MS = 5_000;
-let authRedirectInProgress = false;
-
-function redirectToSignInSoft(): void {
-  if (typeof window === "undefined") return;
-  if (window.location.pathname === "/signin") return;
-  navigate("/signin", { replace: true });
-}
-
-function toApiErrorMessage(status: number, payload: ApiErrorPayload | null): string {
-  const base = payload?.message || payload?.error || `HTTP ${status}`;
-  if (payload?.requestId) {
-    return `${base} (requestId: ${payload.requestId})`;
-  }
-  return base;
-}
-
-function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
-  const outer = init.signal as AbortSignal | undefined | null;
-  const controller = new AbortController();
-  let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, timeoutMs);
-
-  if (outer) {
-    const onAbort = () => controller.abort();
-    outer.addEventListener("abort", onAbort, { once: true });
-    controller.signal.addEventListener("abort", () => outer.removeEventListener("abort", onAbort), { once: true });
-  }
-
-  return authFetch(url, { ...init, signal: controller.signal })
-    .finally(() => clearTimeout(timer))
-    .catch((err) => {
-      if (timedOut && err instanceof DOMException && err.name === "AbortError") {
-        throw new TimeoutError(timeoutMs);
-      }
-      throw err;
-    });
-}
-
 /** Success body from POST /api/containers/:id/dispense */
 export type ContainerDispenseSuccessPayload = {
   success: boolean;
@@ -439,22 +267,8 @@ export async function containerDispenseWithResult(
   const headers = mergeRequestHeaders(init);
   try {
     const res = await fetchWithTimeout(url, { ...init, headers });
-    const json = (await res.json().catch(() => ({}))) as ApiErrorPayload & Record<string, unknown>;
-
-    if (res.status === 401) {
-      const method = String(init.method ?? "GET").toUpperCase();
-      if (method === "GET") {
-        if (!authRedirectInProgress) {
-          authRedirectInProgress = true;
-          toast.error(t.api.sessionExpired);
-        }
-        if (authRedirectInProgress) {
-          redirectToSignInSoft();
-        }
-        throw new Error("Session expired");
-      }
-      throw new Error("UNAUTHORIZED");
-    }
+    throwIfUnauthorized(res, init);
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
     if (res.ok) {
       return { ok: true, data: json as ContainerDispenseSuccessPayload };
@@ -480,117 +294,16 @@ export async function containerDispenseWithResult(
   }
 }
 
-export async function request<T>(
-  url: string,
-  init: RequestInit = {},
-  offline?: OfflineOptions,
-  silent?: boolean,
-  timeoutMs?: number
-): Promise<T> {
-  const headers = mergeRequestHeaders(init);
-
-  try {
-    const res = await fetchWithTimeout(url, { ...init, headers }, timeoutMs ?? FETCH_TIMEOUT_MS);
-    if (res.status === 401) {
-      const method = String(init.method ?? "GET").toUpperCase();
-      if (method === "GET") {
-        // Token expired/invalid. Avoid reload loops; route to sign-in once.
-        if (!authRedirectInProgress) {
-          authRedirectInProgress = true;
-          toast.error(t.api.sessionExpired);
-        }
-        if (authRedirectInProgress) {
-          redirectToSignInSoft();
-        }
-        throw new Error("Session expired");
-      }
-      // For mutations, do not force a hard navigation from inside the request helper.
-      throw new Error("UNAUTHORIZED");
-    }
-    if (!res.ok) {
-      if (!silent && res.status >= 500) {
-        toast.error(t.api.serverError, { id: "server-error" });
-      }
-      const error = (await res.json().catch(() => ({ error: "Request failed" }))) as ApiErrorPayload & Record<string, unknown>;
-      if (isOfflineResponse(res.status, error)) {
-        throw new OfflineResponseError();
-      }
-      throw new ApiError(res.status, toApiErrorMessage(res.status, error), error);
-    }
-    if (res.status === 204) return undefined as T;
-    return res.json();
-  } catch (err) {
-    if (isNetworkError(err)) {
-      // Phase 9 PR 9.5 — Code Blue mutations are NEVER queued offline. The
-      // emergency check must run on ANY network error path, not just when an
-      // `offline` options object is present. Code Blue helpers in api.ts
-      // (e.g. session start/end) call `request()` without an `offline`
-      // object, so gating this on `offline` would silently let an emergency
-      // mutation hit a network error without recording the block.
-      const method = (init.method as string) || "GET";
-      if (
-        (method === "POST" || method === "DELETE") &&
-        /^\/api\/equipment\/[^/]+\/waitlist\/?$/.test(url.split("?")[0] ?? url)
-      ) {
-        if (!silent) {
-          toast.error(t.equipmentWaitlist.offlineBlocked);
-        }
-        throw new Error("EQUIPMENT_WAITLIST_OFFLINE");
-      }
-      const emergencyClass = classifyEmergencyEndpoint(url, method);
-      if (emergencyClass) {
-        recordEmergencyBlockLocally(emergencyClass);
-        reportEmergencyBlockedSilently(emergencyClass);
-        if (!silent) {
-          toast.error(t.api.networkUnavailable, { id: `emergency-blocked-${emergencyClass}` });
-        }
-        throw new OfflineEmergencyMutationBlockedError(emergencyClass);
-      }
-      if (!silent) {
-        toast.error(t.api.networkUnavailable, { id: "network-error" });
-      }
-    }
-    if (isNetworkError(err) && offline) {
-      const clientTimestamp = Date.now();
-      await addPendingSync({
-        type: offline.offlineType,
-        endpoint: url,
-        method: (init.method as string) || "GET",
-        body: (init.body as string) || "",
-        createdAt: new Date(),
-        retries: 0,
-        status: "pending",
-        clientTimestamp,
-        optimisticData: offline.optimisticResult
-          ? JSON.stringify(offline.optimisticResult)
-          : undefined,
-      });
-
-      if (offline.optimisticResult !== undefined) {
-        return offline.optimisticResult as T;
-      }
-
-      if (offline.offlineEquipmentId) {
-        const cached = await getCachedEquipmentById(offline.offlineEquipmentId);
-        if (cached) return cached as T;
-      }
-
-      throw new Error("Action queued for sync when back online");
-    }
-    throw err;
-  }
-}
-
 async function requestWithOfflineFallback<T>(
   url: string,
   fallback: () => Promise<T>,
   init: RequestInit = {}
 ): Promise<T> {
-  const headers = { ...buildHeaders(), ...(init.headers as Record<string, string> | undefined) };
+  const headers = mergeRequestHeaders(init);
   try {
     const res = await fetchWithTimeout(url, { ...init, headers });
     if (!res.ok) {
-      const error = (await res.json().catch(() => ({ error: "Request failed" }))) as ApiErrorPayload & Record<string, unknown>;
+      const error = (await res.json().catch(() => ({ error: "Request failed" }))) as Record<string, unknown>;
       if (isOfflineResponse(res.status, error)) {
         throw new OfflineResponseError();
       }

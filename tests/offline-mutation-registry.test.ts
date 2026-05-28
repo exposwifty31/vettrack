@@ -51,9 +51,14 @@ const CODE_BLUE_EMERGENCY_MUTATIONS = [
 ];
 
 const API_SOURCE_PATH = join(process.cwd(), "src/lib/api.ts");
+const REQUEST_CORE_SOURCE_PATH = join(process.cwd(), "src/lib/request-core.ts");
 
 function readApiSource(): string {
   return readFileSync(API_SOURCE_PATH, "utf8");
+}
+
+function readRequestCoreSource(): string {
+  return readFileSync(REQUEST_CORE_SOURCE_PATH, "utf8");
 }
 
 /** Representative endpoint/method per production producer (parity resolution). */
@@ -103,12 +108,14 @@ function discoverProducerTypeLiteralsInApi(apiSource: string): Set<string> {
 describe("offline-mutation-registry — E1 producer/registry parity", () => {
   const apiSource = readApiSource();
 
-  it("discovers every production addPendingSync call site only in api.ts", () => {
-    const callSites = countAddPendingSyncCallSites(apiSource);
+  it("discovers every production addPendingSync call site in api.ts and request-core.ts", () => {
+    const callSites =
+      countAddPendingSyncCallSites(apiSource) +
+      countAddPendingSyncCallSites(readRequestCoreSource());
     expect(callSites).toBeGreaterThan(0);
     expect(
       callSites,
-      "update count when adding a new addPendingSync producer in api.ts",
+      "update count when adding a new addPendingSync producer in api.ts or request-core.ts",
     ).toBe(4);
     const offlineDbSource = readFileSync(join(process.cwd(), "src/lib/offline-db.ts"), "utf8");
     expect((offlineDbSource.match(/addPendingSync\(/g) ?? []).length).toBe(1);
