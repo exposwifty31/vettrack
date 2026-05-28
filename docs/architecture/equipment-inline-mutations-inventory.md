@@ -112,6 +112,7 @@ Add integration tests when touching checkout/return/seen (`tests/equipment-repla
 
 ## Related docs
 
+- [slice-4-stabilization-report.md](../validation/slice-4-stabilization-report.md) — Option A verification (2026-05-28)
 - [modularization-plan.md](./modularization-plan.md) — Slice 4 roadmap
 - [governance-known-limitations.md](./governance-known-limitations.md) — post–4d/4e/4g–4l stabilization observations
 - [offline-realtime-invariants.md](./offline-realtime-invariants.md) — frozen transport / emergency doctrine
