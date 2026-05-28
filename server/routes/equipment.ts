@@ -47,6 +47,7 @@ import { postEquipmentBulkVerifyRoomHandler } from "./equipment/handlers/post-eq
 import { postEquipmentBulkMoveHandler } from "./equipment/handlers/post-equipment-bulk-move.js";
 import { postEquipmentImportHandler } from "./equipment/handlers/post-equipment-import.js";
 import { postEquipmentBulkDeleteHandler } from "./equipment/handlers/post-equipment-bulk-delete.js";
+import { postEquipmentCreateHandler } from "./equipment/handlers/post-equipment-create.js";
 import type { EquipmentPreviousState } from "./equipment/equipment-undo-tokens.js";
 
 const EQUIPMENT_STATUS_VALUES = [
@@ -281,99 +282,8 @@ router.post(
   requireEffectiveRole("technician"),
   validateBody(createEquipmentSchema),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.create),
-  async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const {
-      name,
-      serialNumber,
-      model,
-      manufacturer,
-      purchaseDate,
-      expiryDate,
-      location,
-      folderId,
-      roomId,
-      nfcTagId,
-      rfidTagEpc,
-      maintenanceIntervalDays,
-      expectedReturnMinutes,
-      imageUrl,
-      usuallyFoundHere,
-      searchAlias,
-      staffNote,
-    } = req.body as z.infer<typeof createEquipmentSchema>;
-
-    if (expectedReturnMinutes !== undefined && req.authUser?.role !== "admin") {
-      return res.status(403).json(
-        apiError({
-          code: "FORBIDDEN",
-          reason: "EXPECTED_RETURN_MINUTES_ADMIN_ONLY",
-          message: "Only admins can set expected return minutes",
-          requestId,
-        }),
-      );
-    }
-
-    const createdAt = new Date();
-    const [item] = await db
-      .insert(equipment)
-      .values({
-        id: randomUUID(),
-        clinicId,
-        name: name.trim(),
-        serialNumber: serialNumber ?? null,
-        model: model ?? null,
-        manufacturer: manufacturer ?? null,
-        purchaseDate: purchaseDate ?? null,
-        expiryDate: expiryDate ?? null,
-        expiryNotifiedAt: null,
-        location: location ?? null,
-        folderId: folderId ?? null,
-        roomId: roomId ?? null,
-        nfcTagId: nfcTagId ?? null,
-        rfidTagEpc: rfidTagEpc?.trim() || null,
-        maintenanceIntervalDays: maintenanceIntervalDays ?? null,
-        expectedReturnMinutes: expectedReturnMinutes ?? null,
-        imageUrl: imageUrl ?? null,
-        usuallyFoundHere: usuallyFoundHere ?? null,
-        searchAlias: searchAlias ?? null,
-        staffNote: staffNote ?? null,
-        status: "ok",
-        custodyState: "returned",
-        custodyStateSince: createdAt,
-        readinessState: "unknown",
-        readinessStateSince: createdAt,
-      })
-      .returning();
-
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
-      clinicId,
-      actionType: "equipment_created",
-      performedBy: req.authUser!.id,
-      performedByEmail: req.authUser!.email,
-      targetId: item.id,
-      targetType: "equipment",
-      metadata: { name: item.name, serialNumber: item.serialNumber },
-    });
-
-    invalidateAnalyticsCache(clinicId);
-    res.status(201).json(item);
-  } catch (err) {
-    console.error("Validation error:", err);
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "EQUIPMENT_CREATE_FAILED",
-        message: "Failed to create equipment",
-        requestId,
-      }),
-    );
-  }
-});
+  postEquipmentCreateHandler,
+);
 
 router.patch(
   "/:id",
