@@ -1,6 +1,6 @@
 import type { RequestHandler } from "express";
 import { db, equipment, scanLogs } from "../../../db.js";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { invalidateAnalyticsCache } from "../../../lib/analytics-cache.js";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { consumeUndoToken } from "../equipment-undo-tokens.js";
@@ -47,6 +47,7 @@ export const postEquipmentRevertHandler: RequestHandler = async (req, res) => {
     const prev = token.previousState;
 
     let updated: EquipmentRow | null = null;
+    let versionConflict = false;
 
     await db.transaction(async (tx) => {
       const [result] = await tx
@@ -61,9 +62,21 @@ export const postEquipmentRevertHandler: RequestHandler = async (req, res) => {
           checkedOutByEmail: prev.checkedOutByEmail,
           checkedOutAt: prev.checkedOutAt ? new Date(prev.checkedOutAt) : null,
           checkedOutLocation: prev.checkedOutLocation,
+          version: sql`${equipment.version} + 1`,
         })
-        .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id)))
+        .where(
+          and(
+            eq(equipment.clinicId, clinicId),
+            eq(equipment.id, req.params.id),
+            eq(equipment.version, existingItem.version),
+          ),
+        )
         .returning();
+
+      if (!result) {
+        versionConflict = true;
+        return;
+      }
 
       updated = result;
 
@@ -71,6 +84,17 @@ export const postEquipmentRevertHandler: RequestHandler = async (req, res) => {
         .delete(scanLogs)
         .where(and(eq(scanLogs.clinicId, clinicId), eq(scanLogs.id, token.scanLogId), eq(scanLogs.equipmentId, req.params.id)));
     });
+
+    if (versionConflict) {
+      return res.status(409).json(
+        apiError({
+          code: "CONFLICT",
+          reason: "EQUIPMENT_VERSION_CONFLICT",
+          message: "Equipment was modified by someone else — reload and retry",
+          requestId,
+        }),
+      );
+    }
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
