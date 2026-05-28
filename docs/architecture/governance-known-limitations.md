@@ -1,8 +1,10 @@
 # Architecture governance — known limitations (G3–G5)
 
-**Status:** Enforcement **paused at warn-only** (2026-05). G3–G5 run in CI with `continue-on-error: true` and exit 0 by default. **Do not flip to merge-blocking** until this doc is updated after 1–2 real feature/refactor PRs have been observed.
+**Status:** Enforcement **paused at warn-only** (2026-05). G3–G5 run in CI with `continue-on-error: true` and exit 0 by default. **Do not flip to merge-blocking** until observation below is reviewed and G6 is agreed.
 
-**Stack merge order (when ready):** [#517](https://github.com/dboy3156/VetTrack/pull/517) (G1) → [#518](https://github.com/dboy3156/VetTrack/pull/518) (G2) → [#519](https://github.com/dboy3156/VetTrack/pull/519) (G3) → [#520](https://github.com/dboy3156/VetTrack/pull/520) (G4) → [#521](https://github.com/dboy3156/VetTrack/pull/521) (G5). Rebase each branch onto the previous after merge, or merge sequentially. Undraft PRs before merge.
+**Governance stack merged to `main` (2026-05-27):** [#517](https://github.com/dboy3156/VetTrack/pull/517) G1 → [#522](https://github.com/dboy3156/VetTrack/pull/522) G2 (replaces stuck #518) → [#523](https://github.com/dboy3156/VetTrack/pull/523) G3 → [#524](https://github.com/dboy3156/VetTrack/pull/524) G4 → [#525](https://github.com/dboy3156/VetTrack/pull/525) G5. Close superseded open PRs #518–#521 when convenient.
+
+**Rebase rule:** Feature PRs branched before the stack merge do **not** run G3–G5 in CI until rebased onto current `main`.
 
 | Gate | Script / command | CI today |
 |------|------------------|----------|
@@ -98,13 +100,46 @@ Static extraction of `app.use` mounts from `server/app/routes.ts` and `server/in
 
 ---
 
+## Observation log (feature / refactor PRs)
+
+Recorded after stack merge; audits run from `main` tooling against PR heads (local replay). CI on GitHub will match once the PR branch includes #517–#525.
+
+### PR [#499](https://github.com/dboy3156/VetTrack/pull/499) — pilot env / feature-flag cleanup
+
+| Gate | Result | Notes |
+|------|--------|--------|
+| G3 `tenant:lint` (touched `server/`) | **0 warnings** | Touched: `routes.ts`, `build-info.ts`, `envValidation.ts` — no new `.from()` in diff. |
+| G4 `query-keys:audit` | **No drift** | Diff removes some `invalidateQueries` lines in `event-reducer.ts` / RFID helper; no new tuple shapes. |
+| G5 `routes:contract` | **No mount churn** | `server/app/routes.ts` import/plumbing only; no `app.use` path/method changes detected in diff. |
+
+**Takeaway:** Low noise for server-only config PRs. Rebase onto `main` so CI warn steps execute.
+
+### PR [#498](https://github.com/dboy3156/VetTrack/pull/498) — tests + waitlist / server touch
+
+| Gate | Result | Notes |
+|------|--------|--------|
+| G3 `tenant:lint` (all touched `server/` files) | **23 warnings** | All in files already on `main` (`equipment.ts`, `rooms.ts`, `task-automation.service.ts`, `notification.worker.ts`, `rfid-ingest.ts`). Typical **parameter-scope false positives**; not introduced by this PR’s logic. |
+| G4 `query-keys:audit` | **N/A** (no `queryKey` edits) | Diff only removes invalidation lines in client helpers. |
+| G5 `routes:contract` | **Not re-run on branch** | Touches `routes.ts` / `index.ts`; expect warn-only contract drift only if mounts change — verify after rebase with `pnpm routes:contract`. |
+
+**Takeaway:** **Touched-file mode is noisy** when a PR edits a large route file for unrelated reasons: CI will list every legacy `.from()` in that file. Prefer interpreting warnings as “file needs baseline waivers / G6 scope fix,” not “this PR broke tenancy.” Do **not** block merge during pause.
+
+### Cross-PR recurring issues (confirmed)
+
+1. **G3:** Parameter / `.where()` tenancy is correct but flagged (~245 repo-wide; ~20+ per large route touch).
+2. **G4:** Zero drift when keys unchanged; registry update only when adding tuples.
+3. **G5:** Contract drift only when `app.use` or `router.*` paths change; import-only edits are quiet.
+4. **CI visibility:** Old branches lack workflow steps until rebased.
+
+---
+
 ## Proposed G6 (not implemented — do not enable yet)
 
 **Goal:** Block **new** violations in **newly created or touched paths** only; grandfather existing debt.
 
 | Tool | Proposed G6 behavior |
 |------|----------------------|
-| G3 Tenant lint | `--strict` on touched files only; fix parameter-scope detection; block only unwaived **new** findings vs a touched-file baseline (or allowlist file). |
+| G3 Tenant lint | `--strict` on touched files only; **fix parameter-scope detection first**; block only unwaived **new** findings vs a touched-file baseline (or allowlist file). Do not block on legacy lines in touched files. |
 | G4 Query keys | `--strict` when new signatures appear in diff without registry update. |
 | G5 Route contract | `--strict` when method+path added/removed without `contractVersion` bump + `--write-contract`. |
 | G1 | Remains blocking (unchanged). |
