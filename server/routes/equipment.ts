@@ -32,7 +32,6 @@ import { mountEquipmentWaitlistRoutes } from "./equipment-waitlist.js";
 import { EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS } from "../lib/equipment-replay-idempotency.js";
 import { equipmentReplayIdempotency } from "../middleware/equipment-replay-idempotency.js";
 import { apiError, resolveRequestId } from "./equipment/equipment-route-utils.js";
-import { equipmentOperationalStateSelect } from "./equipment/equipment-operational-select.js";
 import { getCriticalEquipmentHandler } from "./equipment/handlers/get-critical-equipment.js";
 import { getDeletedEquipmentHandler } from "./equipment/handlers/get-deleted-equipment.js";
 import { getEquipmentByIdHandler } from "./equipment/handlers/get-equipment-by-id.js";
@@ -40,7 +39,7 @@ import { getEquipmentLogsHandler } from "./equipment/handlers/get-equipment-logs
 import { getMyEquipmentHandler } from "./equipment/handlers/get-my-equipment.js";
 import { getPilotCoverageHandler } from "./equipment/handlers/get-pilot-coverage.js";
 import { getEquipmentTransfersHandler } from "./equipment/handlers/get-equipment-transfers.js";
-import { equipmentRfidSelect } from "./equipment/equipment-rfid-select.js";
+import { getEquipmentListHandler } from "./equipment/handlers/get-equipment-list.js";
 
 const EQUIPMENT_STATUS_VALUES = [
   "ok",
@@ -296,148 +295,7 @@ class CheckoutConflictError extends Error {
 // GET /api/equipment/my
 router.get("/my", requireAuth, getMyEquipmentHandler);
 
-const EQUIPMENT_DEFAULT_PAGE_SIZE = 100;
-const EQUIPMENT_MAX_PAGE_SIZE = 1000;
-
-router.get("/", requireAuth, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const rawLimit = parseInt(req.query.limit as string, 10);
-    const rawPage = parseInt(req.query.page as string, 10);
-    const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
-    const status = typeof req.query.status === "string" ? req.query.status.trim() : "";
-    const folder = typeof req.query.folder === "string" ? req.query.folder.trim() : "";
-    const location = typeof req.query.location === "string" ? req.query.location.trim() : "";
-
-    const limit = (!isNaN(rawLimit) && rawLimit > 0)
-      ? Math.min(rawLimit, EQUIPMENT_MAX_PAGE_SIZE)
-      : EQUIPMENT_DEFAULT_PAGE_SIZE;
-    const page = (!isNaN(rawPage) && rawPage > 1) ? rawPage : 1;
-    const offset = (page - 1) * limit;
-
-    const whereClauses = [eq(equipment.clinicId, clinicId), isNull(equipment.deletedAt)];
-
-    if (q) {
-      const pattern = `%${q}%`;
-      const searchCondition = or(
-        ilike(equipment.name, pattern),
-        ilike(equipment.serialNumber, pattern),
-        ilike(equipment.model, pattern),
-        ilike(equipment.manufacturer, pattern),
-        ilike(equipment.location, pattern),
-        ilike(equipment.usuallyFoundHere, pattern),
-        ilike(equipment.searchAlias, pattern)
-      );
-      if (searchCondition) whereClauses.push(searchCondition);
-    }
-
-    if (status && status !== "all" && EQUIPMENT_STATUS_VALUES.includes(status as typeof EQUIPMENT_STATUS_VALUES[number])) {
-      whereClauses.push(eq(equipment.status, status as typeof EQUIPMENT_STATUS_VALUES[number]));
-    }
-
-    if (folder && folder !== "all") {
-      if (folder === "unfiled") {
-        whereClauses.push(isNull(equipment.folderId));
-      } else {
-        whereClauses.push(eq(equipment.folderId, folder));
-      }
-    }
-
-    if (location && location !== "all") {
-      const locationCondition = or(
-        eq(equipment.location, location),
-        eq(equipment.checkedOutLocation, location)
-      );
-      if (locationCondition) whereClauses.push(locationCondition);
-    }
-
-    const whereClause = and(...whereClauses);
-
-    const baseQuery = db
-      .select({
-        id: equipment.id,
-        name: equipment.name,
-        serialNumber: equipment.serialNumber,
-        model: equipment.model,
-        manufacturer: equipment.manufacturer,
-        purchaseDate: equipment.purchaseDate,
-        expiryDate: equipment.expiryDate,
-        expiryNotifiedAt: equipment.expiryNotifiedAt,
-        location: equipment.location,
-        folderId: equipment.folderId,
-        folderName: folders.name,
-        roomId: equipment.roomId,
-        roomName: rooms.name,
-        nfcTagId: equipment.nfcTagId,
-        lastVerifiedAt: equipment.lastVerifiedAt,
-        lastVerifiedById: equipment.lastVerifiedById,
-        lastVerifiedByName: users.name,
-        status: equipment.status,
-        lastSeen: equipment.lastSeen,
-        lastStatus: equipment.lastStatus,
-        lastMaintenanceDate: equipment.lastMaintenanceDate,
-        lastSterilizationDate: equipment.lastSterilizationDate,
-        maintenanceIntervalDays: equipment.maintenanceIntervalDays,
-        imageUrl: equipment.imageUrl,
-        checkedOutById: equipment.checkedOutById,
-        checkedOutByEmail: equipment.checkedOutByEmail,
-        checkedOutAt: equipment.checkedOutAt,
-        checkedOutLocation: equipment.checkedOutLocation,
-        expectedReturnMinutes: equipment.expectedReturnMinutes,
-        createdAt: equipment.createdAt,
-        usuallyFoundHere: equipment.usuallyFoundHere,
-        searchAlias: equipment.searchAlias,
-        staffNote: equipment.staffNote,
-        linkedAnimalId: sql<string | null>`(
-          SELECT a.id
-          FROM vt_patient_room_assignments pra
-          INNER JOIN vt_animals a ON a.id = pra.animal_id
-          WHERE pra.clinic_id = ${clinicId}
-            AND pra.room_id = ${equipment.roomId}
-            AND pra.ended_at IS NULL
-            AND a.clinic_id = ${clinicId}
-          LIMIT 1
-        )`.as("linkedAnimalId"),
-        linkedAnimalName: sql<string | null>`(
-          SELECT a.name
-          FROM vt_patient_room_assignments pra
-          INNER JOIN vt_animals a ON a.id = pra.animal_id
-          WHERE pra.clinic_id = ${clinicId}
-            AND pra.room_id = ${equipment.roomId}
-            AND pra.ended_at IS NULL
-            AND a.clinic_id = ${clinicId}
-          LIMIT 1
-        )`.as("linkedAnimalName"),
-        ...equipmentOperationalStateSelect,
-        ...equipmentRfidSelect(clinicId),
-      })
-      .from(equipment)
-      .leftJoin(folders, and(eq(equipment.folderId, folders.id), eq(folders.clinicId, clinicId), isNull(folders.deletedAt)))
-      .leftJoin(rooms, and(eq(equipment.roomId, rooms.id), eq(rooms.clinicId, clinicId)))
-      .leftJoin(users, and(eq(equipment.lastVerifiedById, users.id), eq(users.clinicId, clinicId)))
-      .where(whereClause)
-      // Stable sort key for pagination so pages do not duplicate/drop rows on equal createdAt.
-      .orderBy(desc(equipment.createdAt), desc(equipment.id));
-
-    const [{ total }] = await db
-      .select({ total: sql<number>`count(*)::int` })
-      .from(equipment)
-      .where(whereClause);
-    const items = await baseQuery.limit(limit).offset(offset);
-    res.json({ items, total, page, pageSize: limit, hasMore: offset + items.length < total });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "EQUIPMENT_LIST_FAILED",
-        message: "Failed to list equipment",
-        requestId,
-      }),
-    );
-  }
-});
+router.get("/", requireAuth, getEquipmentListHandler);
 
 // GET /api/equipment/deleted — admin only, list soft-deleted equipment
 router.get("/deleted", requireAuth, requireAdmin, getDeletedEquipmentHandler);
