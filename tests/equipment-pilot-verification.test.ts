@@ -138,12 +138,15 @@ describe("POST room verify — bulk pilot confirmation contract", () => {
     expect(routeSource).toContain("postEquipmentBulkVerifyRoomHandler");
   });
 
-  it("scopes bulk update by clinicId and item ids", () => {
-    const bulkIdx = bulkVerifyRoomHandlerSource.indexOf("inArray(equipment.id, itemIds)");
-    expect(bulkIdx).toBeGreaterThan(-1);
-    const bulkSlice = bulkVerifyRoomHandlerSource.slice(bulkIdx - 200, bulkIdx + 200);
-    expect(bulkSlice).toContain("eq(equipment.clinicId, clinicId)");
-    expect(bulkSlice).toContain("inArray(equipment.id, itemIds)");
+  it("pins each row update by clinicId, equipment id, and version (F5 OCC)", () => {
+    const versionPinIdx = bulkVerifyRoomHandlerSource.indexOf("eq(equipment.version, item.version)");
+    expect(versionPinIdx).toBeGreaterThan(-1);
+    const pinSlice = bulkVerifyRoomHandlerSource.slice(versionPinIdx - 250, versionPinIdx + 120);
+    expect(pinSlice).toContain("eq(equipment.clinicId, clinicId)");
+    expect(pinSlice).toContain("eq(equipment.id, item.id)");
+    expect(pinSlice).toContain("eq(equipment.version, item.version)");
+    expect(bulkVerifyRoomHandlerSource).toContain("skipped.push");
+    expect(bulkVerifyRoomHandlerSource).toContain("res.json({ affected, skipped, roomName })");
   });
 });
 
