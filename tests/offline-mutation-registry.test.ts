@@ -1,6 +1,6 @@
 /**
  * Phase 1–2 — offline mutation registry and enqueue policy gate.
- * E1 — producer/registry parity lock (api.ts call sites ↔ allow registry).
+ * E1 — producer/registry parity lock (equipment api + request-core ↔ allow registry).
  */
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -51,14 +51,24 @@ const CODE_BLUE_EMERGENCY_MUTATIONS = [
 ];
 
 const API_SOURCE_PATH = join(process.cwd(), "src/lib/api.ts");
+const EQUIPMENT_API_SOURCE_PATH = join(process.cwd(), "src/lib/api/equipment.ts");
 const REQUEST_CORE_SOURCE_PATH = join(process.cwd(), "src/lib/request-core.ts");
 
 function readApiSource(): string {
   return readFileSync(API_SOURCE_PATH, "utf8");
 }
 
+function readEquipmentApiSource(): string {
+  return readFileSync(EQUIPMENT_API_SOURCE_PATH, "utf8");
+}
+
 function readRequestCoreSource(): string {
   return readFileSync(REQUEST_CORE_SOURCE_PATH, "utf8");
+}
+
+/** Literal PendingSyncType producers (Slice 3 — moved from api.ts to api/equipment.ts). */
+function readEnqueueProducerSource(): string {
+  return readEquipmentApiSource();
 }
 
 /** Representative endpoint/method per production producer (parity resolution). */
@@ -106,29 +116,29 @@ function discoverProducerTypeLiteralsInApi(apiSource: string): Set<string> {
 }
 
 describe("offline-mutation-registry — E1 producer/registry parity", () => {
-  const apiSource = readApiSource();
+  const producerSource = readEnqueueProducerSource();
 
-  it("discovers every production addPendingSync call site in api.ts and request-core.ts", () => {
+  it("discovers every production addPendingSync call site in api/equipment.ts and request-core.ts", () => {
     const callSites =
-      countAddPendingSyncCallSites(apiSource) +
+      countAddPendingSyncCallSites(producerSource) +
       countAddPendingSyncCallSites(readRequestCoreSource());
     expect(callSites).toBeGreaterThan(0);
     expect(
       callSites,
-      "update count when adding a new addPendingSync producer in api.ts or request-core.ts",
+      "update count when adding a new addPendingSync producer in api/equipment.ts or request-core.ts",
     ).toBe(4);
     const offlineDbSource = readFileSync(join(process.cwd(), "src/lib/offline-db.ts"), "utf8");
     expect((offlineDbSource.match(/addPendingSync\(/g) ?? []).length).toBe(1);
   });
 
-  it("api.ts producer type literals exactly match discoverEnqueueProducerTypesFromApiSource", () => {
-    const literals = discoverProducerTypeLiteralsInApi(apiSource);
-    const discovered = discoverEnqueueProducerTypesFromApiSource(apiSource);
+  it("equipment producer literals exactly match discoverEnqueueProducerTypesFromApiSource", () => {
+    const literals = discoverProducerTypeLiteralsInApi(producerSource);
+    const discovered = discoverEnqueueProducerTypesFromApiSource(producerSource);
     expect(literals).toEqual(discovered);
   });
 
-  it("every type discovered in api.ts is in allow registry; return is the only registry-only producer", () => {
-    const discovered = discoverEnqueueProducerTypesFromApiSource(apiSource);
+  it("every type discovered in equipment module is in allow registry; return is the only registry-only producer", () => {
+    const discovered = discoverEnqueueProducerTypesFromApiSource(producerSource);
     for (const pendingType of discovered) {
       expect(PRODUCTION_ENQUEUE_PRODUCER_TYPES).toContain(pendingType);
     }
@@ -139,7 +149,7 @@ describe("offline-mutation-registry — E1 producer/registry parity", () => {
   });
 
   it("every production producer type resolves to an allow registry entry at a representative endpoint", () => {
-    const discovered = discoverEnqueueProducerTypesFromApiSource(apiSource);
+    const discovered = discoverEnqueueProducerTypesFromApiSource(producerSource);
     for (const pendingType of discovered) {
       const op = REPRESENTATIVE_PRODUCER_OPS.find((r) => r.pendingType === pendingType);
       expect(
@@ -159,8 +169,8 @@ describe("offline-mutation-registry — E1 producer/registry parity", () => {
     }
   });
 
-  it("fails discovery when api.ts introduces an unknown addPendingSync producer type", () => {
-    const poisoned = `${apiSource}\n// test-only\nofflineType: "not_a_real_producer"`;
+  it("fails discovery when equipment module introduces an unknown addPendingSync producer type", () => {
+    const poisoned = `${producerSource}\n// test-only\nofflineType: "not_a_real_producer"`;
     expect(() => discoverEnqueueProducerTypesFromApiSource(poisoned)).toThrow(
       /unknown addPendingSync producer type/,
     );
@@ -186,8 +196,8 @@ describe("offline-mutation-registry — E1 producer/registry parity", () => {
 });
 
 describe("offline-mutation-registry — production enqueue producers", () => {
-  it("discovers enqueue producer types from api.ts (not a static fixture list)", () => {
-    const discovered = discoverEnqueueProducerTypesFromApiSource(readApiSource());
+  it("discovers enqueue producer types from api/equipment.ts (not a static fixture list)", () => {
+    const discovered = discoverEnqueueProducerTypesFromApiSource(readEnqueueProducerSource());
     expect(discovered.size).toBeGreaterThan(0);
     expect(discovered.has("create")).toBe(true);
     expect(discovered.has("scan")).toBe(true);
@@ -195,8 +205,8 @@ describe("offline-mutation-registry — production enqueue producers", () => {
     expect(discovered.has("return_with_charge")).toBe(true);
   });
 
-  it("every type discovered in api.ts resolves to an allow registry entry", () => {
-    const discovered = discoverEnqueueProducerTypesFromApiSource(readApiSource());
+  it("every type discovered in equipment module resolves to an allow registry entry", () => {
+    const discovered = discoverEnqueueProducerTypesFromApiSource(readEnqueueProducerSource());
     for (const pendingType of discovered) {
       const entry = offlineAllowProducers.find((e) => e.pendingType === pendingType);
       expect(entry, `registry missing discovered producer ${pendingType}`).toBeDefined();
@@ -211,7 +221,7 @@ describe("offline-mutation-registry — production enqueue producers", () => {
   });
 
   it("every allow registry entry is exercised by a discovered api producer or documented sync contract", () => {
-    const discovered = discoverEnqueueProducerTypesFromApiSource(readApiSource());
+    const discovered = discoverEnqueueProducerTypesFromApiSource(readEnqueueProducerSource());
     for (const entry of offlineAllowProducers) {
       const endpoint = sampleEndpointForAllowEntry(entry);
       expect(
@@ -228,14 +238,15 @@ describe("offline-mutation-registry — production enqueue producers", () => {
       }
       expect(
         discovered.has(entry.pendingType),
-        `registry type ${entry.pendingType} has no literal in api.ts`,
+        `registry type ${entry.pendingType} has no literal in api/equipment.ts`,
       ).toBe(true);
     }
   });
 
-  it("addPendingSync is only invoked from api.ts (single producer module)", () => {
-    const source = readApiSource();
-    expect(source.includes("addPendingSync(")).toBe(true);
+  it("addPendingSync is only invoked from api/equipment.ts and request-core.ts", () => {
+    expect(readEquipmentApiSource().includes("addPendingSync(")).toBe(true);
+    expect(readRequestCoreSource().includes("addPendingSync(")).toBe(true);
+    expect(readApiSource().includes("await addPendingSync")).toBe(false);
     const offlineDbSource = readFileSync(join(process.cwd(), "src/lib/offline-db.ts"), "utf8");
     const dbCalls = (offlineDbSource.match(/addPendingSync\(/g) ?? []).length;
     expect(dbCalls).toBe(1);
@@ -332,8 +343,8 @@ describe("offline-policy — assertPendingSyncEnqueueAllowed", () => {
     ).toThrow(OfflineEmergencyMutationBlockedError);
   });
 
-  it("allows every type discovered from api.ts", () => {
-    const discovered = discoverEnqueueProducerTypesFromApiSource(readApiSource());
+  it("allows every type discovered from equipment producer module", () => {
+    const discovered = discoverEnqueueProducerTypesFromApiSource(readEnqueueProducerSource());
     for (const pendingType of discovered) {
       const entry = offlineAllowProducers.find((e) => e.pendingType === pendingType)!;
       expect(() =>

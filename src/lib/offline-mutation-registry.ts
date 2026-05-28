@@ -164,7 +164,7 @@ export const PRODUCTION_ENQUEUE_PRODUCER_TYPES: readonly ProducerPendingSyncType
   offlineAllowProducers.map((e) => e.pendingType);
 
 /**
- * Parse `src/lib/api.ts` source for literal PendingSyncTypes that reach `addPendingSync`.
+ * Parse enqueue producer module source (`src/lib/api/equipment.ts`) for literal PendingSyncTypes that reach `addPendingSync`.
  * Tests use this so registry coverage tracks real producers, not a static fixture list.
  */
 export function discoverEnqueueProducerTypesFromApiSource(apiSource: string): Set<ProducerPendingSyncType> {
@@ -185,7 +185,7 @@ export function discoverEnqueueProducerTypesFromApiSource(apiSource: string): Se
   for (const raw of discovered) {
     if (!allowed.has(raw)) {
       throw new Error(
-        `api.ts references unknown addPendingSync producer type "${raw}" — update registry or remove call site`,
+        `enqueue producer module references unknown addPendingSync producer type "${raw}" — update registry or remove call site`,
       );
     }
     result.add(raw as ProducerPendingSyncType);

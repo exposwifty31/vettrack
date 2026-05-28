@@ -46,7 +46,7 @@
 | 0 | Architecture docs (this folder) | None |
 | 1 | Break `api.ts` ↔ `er-api.ts` cycle (`request-core.ts`) | Low |
 | 2 | Implement [ADR-002](./adr-002-appointments-service-split.md) service split | High |
-| 3 | Extract `src/lib/api/equipment.ts` + barrel | Medium |
+| 3 | Extract `src/lib/api/equipment.ts` + barrel | Medium — **implemented** |
 | 4 | Extract equipment route handlers (paths unchanged) | High |
 | 5 | Equipment repository layer (`clinicId` param) | High |
 | 6 | Split `src/types/index.ts` by domain + barrel | Medium |

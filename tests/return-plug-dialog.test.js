@@ -13,13 +13,13 @@ const dialogPath = path.join(__dirname, "..", "src", "components", "return-plug-
 const detailPath = path.join(__dirname, "..", "src", "pages", "equipment-detail.tsx");
 const listPath = path.join(__dirname, "..", "src", "pages", "equipment-list.tsx");
 const qrPath = path.join(__dirname, "..", "src", "components", "qr-scanner.tsx");
-const apiPath = path.join(__dirname, "..", "src", "lib", "api.ts");
+const equipmentApiPath = path.join(__dirname, "..", "src", "lib", "api", "equipment.ts");
 
 const dialogSource = fs.readFileSync(dialogPath, "utf8");
 const detailSource = fs.readFileSync(detailPath, "utf8");
 const listSource = fs.readFileSync(listPath, "utf8");
 const qrSource = fs.readFileSync(qrPath, "utf8");
-const apiSource = fs.readFileSync(apiPath, "utf8");
+const equipmentApiSource = fs.readFileSync(equipmentApiPath, "utf8");
 
 describe("Return plug dialog UI tests", () => {
   it("Dialog exposes plugged yes/no controls and deadline input", () => {
@@ -68,9 +68,9 @@ describe("Return plug dialog UI tests", () => {
 
   it("Offline return replay carries plug-in tracking payload", () => {
     expect(
-      apiSource.includes('syncType: "return_with_charge"') &&
-        apiSource.includes("requestBody: returnRequest") &&
-        apiSource.includes("if (response.returnRecord)"),
+      equipmentApiSource.includes('syncType: "return_with_charge"') &&
+        equipmentApiSource.includes("requestBody: returnRequest") &&
+        equipmentApiSource.includes("if (response.returnRecord)"),
     ).toBe(true);
   });
 });

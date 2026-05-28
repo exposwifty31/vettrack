@@ -9,7 +9,10 @@ import { equipmentReturnBodySchema } from "../server/routes/equipment.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const routeSource = fs.readFileSync(path.join(__dirname, "..", "server", "routes", "equipment.ts"), "utf8");
-const apiSource = fs.readFileSync(path.join(__dirname, "..", "src", "lib", "api.ts"), "utf8");
+const equipmentApiSource = fs.readFileSync(
+  path.join(__dirname, "..", "src", "lib", "api", "equipment.ts"),
+  "utf8",
+);
 
 describe("equipment return body schema", () => {
   it("accepts offline replay payload with isPluggedIn false", () => {
@@ -44,9 +47,9 @@ describe("equipment return custody + charge tracking contracts", () => {
   });
 
   it("offline return replay still carries plug-in payload for server-side record creation", () => {
-    expect(apiSource).toContain('syncType: "return_with_charge"');
-    expect(apiSource).toContain("requestBody: returnRequest");
-    expect(apiSource).toContain("if (response.returnRecord)");
+    expect(equipmentApiSource).toContain('syncType: "return_with_charge"');
+    expect(equipmentApiSource).toContain("requestBody: returnRequest");
+    expect(equipmentApiSource).toContain("if (response.returnRecord)");
   });
 
   it("stale client-timestamp idempotent return uses the same JSON envelope as a normal return", () => {
