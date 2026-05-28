@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import multer from "multer";
 import { z } from "zod";
 import { db, equipment, equipmentReturns, folders, rooms, scanLogs, transferLogs, undoTokens, users, stagingQueue, assetTypeConditions, unitConditionStates } from "../db.js";
-import { eq, inArray, desc, asc, and, or, ilike, lt, gte, sql, isNull, isNotNull } from "drizzle-orm";
+import { eq, inArray, desc, asc, and, or, ilike, lt, gte, sql, isNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { scanLimiter, checkoutLimiter, writeLimiter } from "../middleware/rate-limiters.js";
@@ -40,6 +40,7 @@ import { getMyEquipmentHandler } from "./equipment/handlers/get-my-equipment.js"
 import { getPilotCoverageHandler } from "./equipment/handlers/get-pilot-coverage.js";
 import { getEquipmentTransfersHandler } from "./equipment/handlers/get-equipment-transfers.js";
 import { getEquipmentListHandler } from "./equipment/handlers/get-equipment-list.js";
+import { postEquipmentRestoreHandler } from "./equipment/handlers/post-equipment-restore.js";
 
 const EQUIPMENT_STATUS_VALUES = [
   "ok",
@@ -652,60 +653,7 @@ try {
 });
 
 // POST /api/equipment/:id/restore — admin only, restore a soft-deleted equipment record
-router.post("/:id/restore", requireAuth, requireAdmin, validateUuid("id"), async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const [existing] = await db
-      .select()
-      .from(equipment)
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id), isNotNull(equipment.deletedAt)))
-      .limit(1);
-
-    if (!existing) {
-      return res.status(404).json(
-        apiError({
-          code: "NOT_FOUND",
-          reason: "EQUIPMENT_NOT_FOUND_OR_NOT_DELETED",
-          message: "Equipment not found or not deleted",
-          requestId,
-        }),
-      );
-    }
-
-    const [restored] = await db
-      .update(equipment)
-      .set({ deletedAt: null, deletedBy: null })
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id)))
-      .returning();
-
-    if (restored) {
-      logAudit({
-        actorRole: resolveAuditActorRole(req),
-        clinicId,
-        actionType: "equipment_restored",
-        performedBy: req.authUser!.id,
-        performedByEmail: req.authUser!.email ?? "",
-        targetId: req.params.id,
-        targetType: "equipment",
-        metadata: { equipmentName: restored.name },
-      });
-    }
-
-    invalidateAnalyticsCache(clinicId);
-    res.json(restored);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "EQUIPMENT_RESTORE_FAILED",
-        message: "Failed to restore equipment",
-        requestId,
-      }),
-    );
-  }
-});
+router.post("/:id/restore", requireAuth, requireAdmin, validateUuid("id"), postEquipmentRestoreHandler);
 
 // POST /api/equipment/scan — quick-scan alias for pilot/demo flows.
 // Body: { equipmentId: string }  (accepts plain string IDs like "eq1", not UUID-only)
