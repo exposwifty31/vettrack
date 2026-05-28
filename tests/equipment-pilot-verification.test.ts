@@ -19,6 +19,18 @@ const routeSource = fs.readFileSync(
   path.join(__dirname, "..", "server", "routes", "equipment.ts"),
   "utf8",
 );
+const bulkVerifyRoomHandlerSource = fs.readFileSync(
+  path.join(
+    __dirname,
+    "..",
+    "server",
+    "routes",
+    "equipment",
+    "handlers",
+    "post-equipment-bulk-verify-room.ts",
+  ),
+  "utf8",
+);
 
 // ── Mirrors POST /:id/scan equipment update block ────────────────────────────
 
@@ -119,16 +131,17 @@ describe("POST /:id/scan route — pilot confirm sync contract", () => {
 
 describe("POST room verify — bulk pilot confirmation contract", () => {
   it("stamps lastVerifiedAt, lastVerifiedById, and lastSeen for every item in room", () => {
-    expect(routeSource).toContain("lastVerifiedAt: now");
-    expect(routeSource).toContain("lastVerifiedById: req.authUser!.id");
-    expect(routeSource).toContain("lastSeen: now");
-    expect(routeSource).toContain("Room verified:");
+    expect(bulkVerifyRoomHandlerSource).toContain("lastVerifiedAt: now");
+    expect(bulkVerifyRoomHandlerSource).toContain("lastVerifiedById: req.authUser!.id");
+    expect(bulkVerifyRoomHandlerSource).toContain("lastSeen: now");
+    expect(bulkVerifyRoomHandlerSource).toContain("Room verified:");
+    expect(routeSource).toContain("postEquipmentBulkVerifyRoomHandler");
   });
 
   it("scopes bulk update by clinicId and item ids", () => {
-    const bulkIdx = routeSource.indexOf("// 3. Stamp every item with lastVerifiedAt");
+    const bulkIdx = bulkVerifyRoomHandlerSource.indexOf("inArray(equipment.id, itemIds)");
     expect(bulkIdx).toBeGreaterThan(-1);
-    const bulkSlice = routeSource.slice(bulkIdx, bulkIdx + 600);
+    const bulkSlice = bulkVerifyRoomHandlerSource.slice(bulkIdx - 200, bulkIdx + 200);
     expect(bulkSlice).toContain("eq(equipment.clinicId, clinicId)");
     expect(bulkSlice).toContain("inArray(equipment.id, itemIds)");
   });

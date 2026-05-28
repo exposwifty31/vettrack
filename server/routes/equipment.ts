@@ -43,6 +43,7 @@ import { getEquipmentListHandler } from "./equipment/handlers/get-equipment-list
 import { postEquipmentRestoreHandler } from "./equipment/handlers/post-equipment-restore.js";
 import { postEquipmentRevertHandler } from "./equipment/handlers/post-equipment-revert.js";
 import { deleteEquipmentHandler } from "./equipment/handlers/delete-equipment.js";
+import { postEquipmentBulkVerifyRoomHandler } from "./equipment/handlers/post-equipment-bulk-verify-room.js";
 import type { EquipmentPreviousState } from "./equipment/equipment-undo-tokens.js";
 
 const EQUIPMENT_STATUS_VALUES = [
@@ -2022,120 +2023,13 @@ router.post("/bulk-move", requireAuth, writeLimiter, requireEffectiveRole("techn
   }
 });
 
-// POST /api/equipment/bulk-verify-room
-// Marks every item in a room as verified and sets the room's sync status to 'synced'.
+// POST /api/equipment/bulk-verify-room — Marks every item in a room as verified and sets sync status to 'synced'.
 router.post(
   "/bulk-verify-room",
   requireAuth,
   requireEffectiveRole("technician"),
   validateBody(bulkVerifyRoomSchema),
-  async (req, res) => {
-    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-    try {
-      const clinicId = req.clinicId!;
-      const { roomId: targetRoomId } = req.body as z.infer<typeof bulkVerifyRoomSchema>;
-
-      let affected = 0;
-      let roomName = "";
-
-      await db.transaction(async (tx) => {
-        // 1. Confirm the room exists
-        const [room] = await tx
-          .select()
-          .from(rooms)
-          .where(and(eq(rooms.clinicId, clinicId), eq(rooms.id, targetRoomId)))
-          .limit(1);
-
-        if (!room) {
-          throw Object.assign(new Error("Room not found"), { status: 404 });
-        }
-        roomName = room.name;
-
-        // 2. Fetch all active equipment in the room
-        const items = await tx
-          .select({ id: equipment.id, name: equipment.name, status: equipment.status })
-          .from(equipment)
-          .where(and(eq(equipment.clinicId, clinicId), eq(equipment.roomId, targetRoomId), isNull(equipment.deletedAt)));
-
-        if (items.length === 0) {
-          // Nothing to verify — still mark room synced
-          await tx
-            .update(rooms)
-            .set({ syncStatus: "synced", lastAuditAt: new Date(), updatedAt: new Date() })
-            .where(and(eq(rooms.clinicId, clinicId), eq(rooms.id, targetRoomId)));
-          return;
-        }
-
-        const now = new Date();
-        const itemIds = items.map((i) => i.id);
-
-        // 3. Stamp every item with lastVerifiedAt + lastVerifiedById + lastSeen
-        await tx
-          .update(equipment)
-          .set({
-            lastVerifiedAt: now,
-            lastVerifiedById: req.authUser!.id,
-            lastSeen: now,
-          })
-          .where(and(eq(equipment.clinicId, clinicId), inArray(equipment.id, itemIds)));
-
-        // 4. Insert a scan log entry per item for audit trail
-        await tx.insert(scanLogs).values(
-          items.map((item) => ({
-            id: randomUUID(),
-            clinicId,
-            equipmentId: item.id,
-            userId: req.authUser!.id,
-            userEmail: req.authUser!.email,
-            status: item.status,
-            note: `Room verified: ${room.name}`,
-            timestamp: now,
-          }))
-        );
-
-        // 5. Update the room's sync status
-        await tx
-          .update(rooms)
-          .set({ syncStatus: "synced", lastAuditAt: now, updatedAt: now })
-          .where(and(eq(rooms.clinicId, clinicId), eq(rooms.id, targetRoomId)));
-
-        affected = items.length;
-      });
-
-      logAudit({
-        actorRole: resolveAuditActorRole(req),
-        clinicId,
-        actionType: "room_bulk_verified",
-        performedBy: req.authUser!.id,
-        performedByEmail: req.authUser!.email,
-        targetId: targetRoomId,
-        targetType: "room",
-        metadata: { roomName, count: affected },
-      });
-
-      res.json({ affected, roomName });
-    } catch (err: unknown) {
-      if (err instanceof Error && (err as Error & { status?: number }).status === 404) {
-        return res.status(404).json(
-          apiError({
-            code: "NOT_FOUND",
-            reason: "ROOM_NOT_FOUND",
-            message: "Room not found",
-            requestId,
-          }),
-        );
-      }
-      console.error(err);
-      res.status(500).json(
-        apiError({
-          code: "INTERNAL_ERROR",
-          reason: "EQUIPMENT_BULK_VERIFY_FAILED",
-          message: "Bulk verify failed",
-          requestId,
-        }),
-      );
-    }
-  }
+  postEquipmentBulkVerifyRoomHandler,
 );
 
 mountEquipmentWaitlistRoutes(router);
