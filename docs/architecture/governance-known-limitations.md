@@ -124,6 +124,21 @@ Recorded after stack merge; audits run from `main` tooling against PR heads (loc
 
 **Takeaway:** **Touched-file mode is noisy** when a PR edits a large route file for unrelated reasons: CI will list every legacy `.from()` in that file. Prefer interpreting warnings as “file needs baseline waivers / G6 scope fix,” not “this PR broke tenancy.” Do **not** block merge during pause.
 
+### Modularization stabilization — [#527](https://github.com/dboy3156/VetTrack/pull/527) + [#528](https://github.com/dboy3156/VetTrack/pull/528) on `main` (2026-05-28)
+
+**Scope:** Frontend file moves only (`request-core.ts`, `api/equipment.ts`); `api.equipment` barrel unchanged. **Slice 4 (server route extraction) not started.**
+
+| Area | Check | Result |
+|------|--------|--------|
+| Equipment list/detail | URLs `/api/equipment`, `/api/equipment/:id`; Dexie fallback on `isNetworkError` | **OK** — static + unit contracts pass |
+| Checkout / return | `POST …/checkout`, `POST …/return`; `syncType: "return_with_charge"` | **OK** — `equipment-return-custody`, `return-plug-dialog` tests |
+| Offline fallback | `addPendingSync` in `api/equipment.ts` + `request-core.ts`; activity uses `requestWithOfflineFallback` | **OK** — `offline-mutation-registry`, phase-5/6 sync tests |
+| Auth 401 redirect | `throwIfUnauthorized` in `request-core`; bootstrap still raw `fetch` in `api.ts` | **OK** — `auth-bootstrap-fetch` tests |
+| Realtime equipment | `event-reducer.ts` → `invalidateEquipmentCaches` (unchanged) | **OK** — `event-reducer-rfid`, `invalidate-equipment-rfid-caches` tests |
+| Main CI post-merge | `26549315194` | **success** (tests, architecture gates, Playwright) |
+
+**Follow-up for Slice 4:** Any static test that greps `src/lib/api.ts` for equipment offline strings should read `src/lib/api/equipment.ts` instead (done for return contracts in #528).
+
 ### Cross-PR recurring issues (confirmed)
 
 1. **G3:** Parameter / `.where()` tenancy is correct but flagged (~245 repo-wide; ~20+ per large route touch).
