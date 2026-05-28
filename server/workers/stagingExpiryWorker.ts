@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, lt, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { db, equipment, stagingQueue } from "../db.js";
 import { logAudit } from "../lib/audit.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
@@ -7,10 +7,21 @@ import { promoteStagingQueueNext } from "../lib/staging-promotion.js";
 
 const EXPIRY_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
+export function resolveEmergencyStagingTtlHours(): number {
+  const parsed = Number.parseInt(process.env.EMERGENCY_STAGING_TTL_HOURS ?? "8", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 8;
+}
+
 export async function runStagingExpirySweep(now: Date = new Date()): Promise<{ expiredClaims: number; releasedEquipment: number }> {
+  const expiredRows: Array<{
+    id: string;
+    clinicId: string;
+    equipmentId: string;
+  }> = [];
+
   // Expire all active claims whose expires_at < now.
   // RETURNING avoids a separate SELECT and prevents race where a claim is fulfilled mid-sweep.
-  const expiredRows = await db
+  const timedExpiryRows = await db
     .update(stagingQueue)
     .set({ status: "expired", updatedAt: now })
     .where(
@@ -26,7 +37,28 @@ export async function runStagingExpirySweep(now: Date = new Date()): Promise<{ e
       equipmentId: stagingQueue.equipmentId,
     });
 
-  for (const row of expiredRows) {
+  expiredRows.push(...timedExpiryRows);
+
+  const emergencyCutoff = new Date(now.getTime() - resolveEmergencyStagingTtlHours() * 60 * 60 * 1000);
+  const emergencyExpiredRows = await db
+    .update(stagingQueue)
+    .set({ status: "expired", updatedAt: now })
+    .where(
+      and(
+        eq(stagingQueue.status, "active"),
+        isNull(stagingQueue.expiresAt),
+        lt(stagingQueue.stagedAt, emergencyCutoff),
+      ),
+    )
+    .returning({
+      id: stagingQueue.id,
+      clinicId: stagingQueue.clinicId,
+      equipmentId: stagingQueue.equipmentId,
+    });
+
+  expiredRows.push(...emergencyExpiredRows);
+
+  for (const row of timedExpiryRows) {
     logAudit({
       clinicId: row.clinicId,
       actionType: "equipment_stage_expired",
@@ -34,6 +66,18 @@ export async function runStagingExpirySweep(now: Date = new Date()): Promise<{ e
       performedByEmail: "system",
       targetId: row.equipmentId,
       metadata: { claimId: row.id },
+    });
+    void recordOperationalMetric({ clinicId: row.clinicId, equipmentId: row.equipmentId, eventType: "staging_expired" });
+  }
+
+  for (const row of emergencyExpiredRows) {
+    logAudit({
+      clinicId: row.clinicId,
+      actionType: "equipment_emergency_staging_expired",
+      performedBy: "system",
+      performedByEmail: "system",
+      targetId: row.equipmentId,
+      metadata: { claimId: row.id, ttlHours: resolveEmergencyStagingTtlHours() },
     });
     void recordOperationalMetric({ clinicId: row.clinicId, equipmentId: row.equipmentId, eventType: "staging_expired" });
   }

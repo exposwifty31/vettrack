@@ -210,6 +210,7 @@ export type AuditActionType =
   | "equipment_stage_cancelled"
   | "equipment_stage_fulfilled"
   | "equipment_stage_expired"
+  | "equipment_emergency_staging_expired"
   | "equipment_waitlist_joined"
   | "equipment_waitlist_left"
   | "equipment_waitlist_promoted"
