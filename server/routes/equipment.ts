@@ -41,6 +41,7 @@ import { getPilotCoverageHandler } from "./equipment/handlers/get-pilot-coverage
 import { getEquipmentTransfersHandler } from "./equipment/handlers/get-equipment-transfers.js";
 import { getEquipmentListHandler } from "./equipment/handlers/get-equipment-list.js";
 import { postEquipmentRestoreHandler } from "./equipment/handlers/post-equipment-restore.js";
+import { deleteEquipmentHandler } from "./equipment/handlers/delete-equipment.js";
 
 const EQUIPMENT_STATUS_VALUES = [
   "ok",
@@ -601,56 +602,8 @@ router.delete(
   requireAdmin,
   validateUuid("id"),
   equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.delete),
-  async (req, res) => {
-const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-try {
-    const clinicId = req.clinicId!;
-    const [existing] = await db
-      .select()
-      .from(equipment)
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id), isNull(equipment.deletedAt)))
-      .limit(1);
-
-    if (!existing) {
-      return res.status(404).json(
-        apiError({
-          code: "NOT_FOUND",
-          reason: "EQUIPMENT_NOT_FOUND",
-          message: "Equipment not found",
-          requestId,
-        }),
-      );
-    }
-
-    await db
-      .update(equipment)
-      .set({ deletedAt: new Date(), deletedBy: req.authUser!.id })
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id), isNull(equipment.deletedAt)));
-
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
-      clinicId,
-      actionType: "equipment_deleted",
-      performedBy: req.authUser!.id,
-      performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
-      targetType: "equipment",
-      metadata: { name: existing.name, serialNumber: existing.serialNumber },
-    });
-    invalidateAnalyticsCache(clinicId);
-    res.status(204).send();
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "EQUIPMENT_DELETE_FAILED",
-        message: "Failed to delete equipment",
-        requestId,
-      }),
-    );
-  }
-});
+  deleteEquipmentHandler,
+);
 
 // POST /api/equipment/:id/restore — admin only, restore a soft-deleted equipment record
 router.post("/:id/restore", requireAuth, requireAdmin, validateUuid("id"), postEquipmentRestoreHandler);
