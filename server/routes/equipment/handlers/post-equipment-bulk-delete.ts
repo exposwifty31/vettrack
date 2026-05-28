@@ -1,6 +1,6 @@
 import type { RequestHandler } from "express";
 import { randomUUID } from "crypto";
-import { db, equipment, scanLogs } from "../../../db.js";
+import { db, equipment, equipmentWaitlist, scanLogs, stagingQueue } from "../../../db.js";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { invalidateAnalyticsCache } from "../../../lib/analytics-cache.js";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
@@ -35,10 +35,34 @@ export const postEquipmentBulkDeleteHandler: RequestHandler = async (req, res) =
           })),
         );
 
+        const deletedIds = items.map((i) => i.id);
+
         await tx
           .update(equipment)
           .set({ deletedAt: now, deletedBy: req.authUser!.id })
-          .where(and(eq(equipment.clinicId, clinicId), inArray(equipment.id, items.map((i) => i.id))));
+          .where(and(eq(equipment.clinicId, clinicId), inArray(equipment.id, deletedIds)));
+
+        await tx
+          .update(equipmentWaitlist)
+          .set({ status: "cancelled", cancelledAt: now, updatedAt: now })
+          .where(
+            and(
+              eq(equipmentWaitlist.clinicId, clinicId),
+              inArray(equipmentWaitlist.equipmentId, deletedIds),
+              inArray(equipmentWaitlist.status, ["waiting", "notified"]),
+            ),
+          );
+
+        await tx
+          .update(stagingQueue)
+          .set({ status: "cancelled", updatedAt: now })
+          .where(
+            and(
+              eq(stagingQueue.clinicId, clinicId),
+              inArray(stagingQueue.equipmentId, deletedIds),
+              eq(stagingQueue.status, "active"),
+            ),
+          );
       }
 
       logAudit({
