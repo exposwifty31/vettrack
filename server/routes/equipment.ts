@@ -13,7 +13,6 @@ import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { trackSyncSuccess, trackSyncFail } from "../lib/sync-metrics.js";
 import { scheduleSmartReturnReminder, cancelSmartReturnReminder } from "../lib/role-notification-scheduler.js";
 import { recordEquipmentSeen } from "../lib/equipment-seen.js";
-import { getPilotStaleMs } from "../lib/pilot-config.js";
 import { computeBundleReadinessGate } from "../services/equipment-operational-state.service.js";
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
@@ -35,8 +34,13 @@ import { equipmentReplayIdempotency } from "../middleware/equipment-replay-idemp
 import { apiError, resolveRequestId } from "./equipment/equipment-route-utils.js";
 import { equipmentOperationalStateSelect } from "./equipment/equipment-operational-select.js";
 import { getCriticalEquipmentHandler } from "./equipment/handlers/get-critical-equipment.js";
+import { getDeletedEquipmentHandler } from "./equipment/handlers/get-deleted-equipment.js";
+import { getEquipmentByIdHandler } from "./equipment/handlers/get-equipment-by-id.js";
+import { getEquipmentLogsHandler } from "./equipment/handlers/get-equipment-logs.js";
 import { getMyEquipmentHandler } from "./equipment/handlers/get-my-equipment.js";
+import { getPilotCoverageHandler } from "./equipment/handlers/get-pilot-coverage.js";
 import { getEquipmentTransfersHandler } from "./equipment/handlers/get-equipment-transfers.js";
+import { equipmentRfidSelect } from "./equipment/equipment-rfid-select.js";
 
 const EQUIPMENT_STATUS_VALUES = [
   "ok",
@@ -289,25 +293,6 @@ class CheckoutConflictError extends Error {
   }
 }
 
-/** Advisory RFID doorway fields (read-only signal; never mutates authoritative roomId). */
-function equipmentRfidSelect(clinicId: string) {
-  return {
-    rfidTagEpc: equipment.rfidTagEpc,
-    lastRfidSeenAt: equipment.lastRfidSeenAt,
-    lastRfidRoomId: equipment.lastRfidRoomId,
-    lastRfidGatewayCode: equipment.lastRfidGatewayCode,
-    lastRfidRoomName: sql<string | null>`(
-      SELECT r.name FROM vt_rooms r
-      WHERE r.id = ${equipment.lastRfidRoomId} AND r.clinic_id = ${clinicId}
-      LIMIT 1
-    )`.as("lastRfidRoomName"),
-    lastRfidRoomIsDock: sql<boolean>`EXISTS (
-      SELECT 1 FROM vt_docks d
-      WHERE d.room_id = ${equipment.lastRfidRoomId} AND d.clinic_id = ${clinicId}
-    )`.as("lastRfidRoomIsDock"),
-  };
-}
-
 // GET /api/equipment/my
 router.get("/my", requireAuth, getMyEquipmentHandler);
 
@@ -455,183 +440,14 @@ router.get("/", requireAuth, async (req, res) => {
 });
 
 // GET /api/equipment/deleted — admin only, list soft-deleted equipment
-router.get("/deleted", requireAuth, requireAdmin, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const items = await db
-      .select({
-        id: equipment.id,
-        name: equipment.name,
-        serialNumber: equipment.serialNumber,
-        model: equipment.model,
-        manufacturer: equipment.manufacturer,
-        status: equipment.status,
-        deletedAt: equipment.deletedAt,
-        deletedBy: equipment.deletedBy,
-        createdAt: equipment.createdAt,
-      })
-      .from(equipment)
-      .where(and(eq(equipment.clinicId, clinicId), isNotNull(equipment.deletedAt)))
-      .orderBy(desc(equipment.deletedAt));
-    res.json(items);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "DELETED_EQUIPMENT_LIST_FAILED",
-        message: "Failed to list deleted equipment",
-        requestId,
-      }),
-    );
-  }
-});
+router.get("/deleted", requireAuth, requireAdmin, getDeletedEquipmentHandler);
 
 // GET /api/equipment/critical
 router.get("/critical", requireAuth, getCriticalEquipmentHandler);
 
-router.get("/pilot-coverage", requireAuth, requireAdmin, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
+router.get("/pilot-coverage", requireAuth, requireAdmin, getPilotCoverageHandler);
 
-    const rows = await db
-      .select({
-        id: equipment.id,
-        name: equipment.name,
-        location: equipment.location,
-        usuallyFoundHere: equipment.usuallyFoundHere,
-        folderName: folders.name,
-        lastSeen: equipment.lastSeen,
-        confirmCount: sql<number>`count(${scanLogs.id})::int`,
-      })
-      .from(equipment)
-      .leftJoin(folders, eq(equipment.folderId, folders.id))
-      .leftJoin(
-        scanLogs,
-        and(eq(scanLogs.equipmentId, equipment.id), eq(scanLogs.clinicId, clinicId)),
-      )
-      .where(and(eq(equipment.clinicId, clinicId), isNull(equipment.deletedAt)))
-      .groupBy(equipment.id, folders.name)
-      .orderBy(sql`${equipment.lastSeen} ASC NULLS FIRST`, asc(equipment.name));
-
-    const now = Date.now();
-    const staleMs = await getPilotStaleMs();
-    const summary = {
-      total: rows.length,
-      everConfirmed: rows.filter((r) => r.lastSeen != null).length,
-      confirmedToday: rows.filter(
-        (r) => r.lastSeen != null && now - new Date(r.lastSeen as Date).getTime() <= staleMs,
-      ).length,
-      neverConfirmed: rows.filter((r) => r.lastSeen == null).length,
-    };
-
-    res.json({ summary, items: rows });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "PILOT_COVERAGE_FETCH_FAILED",
-        message: "Failed to fetch pilot coverage",
-        requestId,
-      }),
-    );
-  }
-});
-
-router.get("/:id", requireAuth, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const [item] = await db
-      .select({
-        id: equipment.id,
-        name: equipment.name,
-        serialNumber: equipment.serialNumber,
-        model: equipment.model,
-        manufacturer: equipment.manufacturer,
-        purchaseDate: equipment.purchaseDate,
-        expiryDate: equipment.expiryDate,
-        expiryNotifiedAt: equipment.expiryNotifiedAt,
-        location: equipment.location,
-        folderId: equipment.folderId,
-        folderName: folders.name,
-        roomId: equipment.roomId,
-        roomName: rooms.name,
-        nfcTagId: equipment.nfcTagId,
-        lastVerifiedAt: equipment.lastVerifiedAt,
-        lastVerifiedById: equipment.lastVerifiedById,
-        lastVerifiedByName: users.name,
-        status: equipment.status,
-        lastSeen: equipment.lastSeen,
-        lastStatus: equipment.lastStatus,
-        lastMaintenanceDate: equipment.lastMaintenanceDate,
-        lastSterilizationDate: equipment.lastSterilizationDate,
-        maintenanceIntervalDays: equipment.maintenanceIntervalDays,
-        imageUrl: equipment.imageUrl,
-        checkedOutById: equipment.checkedOutById,
-        checkedOutByEmail: equipment.checkedOutByEmail,
-        checkedOutAt: equipment.checkedOutAt,
-        checkedOutLocation: equipment.checkedOutLocation,
-        expectedReturnMinutes: equipment.expectedReturnMinutes,
-        createdAt: equipment.createdAt,
-        usuallyFoundHere: equipment.usuallyFoundHere,
-        searchAlias: equipment.searchAlias,
-        staffNote: equipment.staffNote,
-        linkedAnimalId: sql<string | null>`(
-          SELECT a.id
-          FROM vt_patient_room_assignments pra
-          INNER JOIN vt_animals a ON a.id = pra.animal_id
-          WHERE pra.clinic_id = ${clinicId}
-            AND pra.room_id = ${equipment.roomId}
-            AND pra.ended_at IS NULL
-            AND a.clinic_id = ${clinicId}
-          LIMIT 1
-        )`.as("linkedAnimalId"),
-        linkedAnimalName: sql<string | null>`(
-          SELECT a.name
-          FROM vt_patient_room_assignments pra
-          INNER JOIN vt_animals a ON a.id = pra.animal_id
-          WHERE pra.clinic_id = ${clinicId}
-            AND pra.room_id = ${equipment.roomId}
-            AND pra.ended_at IS NULL
-            AND a.clinic_id = ${clinicId}
-          LIMIT 1
-        )`.as("linkedAnimalName"),
-        ...equipmentOperationalStateSelect,
-        ...equipmentRfidSelect(clinicId),
-      })
-      .from(equipment)
-      .leftJoin(folders, and(eq(equipment.folderId, folders.id), eq(folders.clinicId, clinicId), isNull(folders.deletedAt)))
-      .leftJoin(rooms, and(eq(equipment.roomId, rooms.id), eq(rooms.clinicId, clinicId)))
-      .leftJoin(users, and(eq(equipment.lastVerifiedById, users.id), eq(users.clinicId, clinicId)))
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id), isNull(equipment.deletedAt)))
-      .limit(1);
-    if (!item) {
-      return res.status(404).json(
-        apiError({
-          code: "NOT_FOUND",
-          reason: "EQUIPMENT_NOT_FOUND",
-          message: "Equipment not found",
-          requestId,
-        }),
-      );
-    }
-    res.json(item);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "EQUIPMENT_FETCH_FAILED",
-        message: "Failed to get equipment",
-        requestId,
-      }),
-    );
-  }
-});
+router.get("/:id", requireAuth, getEquipmentByIdHandler);
 
 router.post(
   "/",
@@ -2170,79 +1986,7 @@ router.post("/:id/revert", requireAuth, requireEffectiveRole("vet"), validateUui
   }
 });
 
-const LOGS_DEFAULT_PAGE_SIZE = 50;
-const LOGS_MAX_PAGE_SIZE = 200;
-
-router.get("/:id/logs", requireAuth, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const rawLimit = parseInt(req.query.limit as string, 10);
-    const rawPage = parseInt(req.query.page as string, 10);
-    const limit = (!isNaN(rawLimit) && rawLimit > 0)
-      ? Math.min(rawLimit, LOGS_MAX_PAGE_SIZE)
-      : LOGS_DEFAULT_PAGE_SIZE;
-    const page = (!isNaN(rawPage) && rawPage > 1) ? rawPage : 1;
-    const offset = (page - 1) * limit;
-
-    const rawSince = req.query.since as string | undefined;
-    const sinceDate = rawSince ? new Date(rawSince) : null;
-    const sinceFilter = sinceDate && !isNaN(sinceDate.getTime())
-      ? gte(scanLogs.timestamp, sinceDate)
-      : undefined;
-
-    const baseWhere = and(
-      eq(scanLogs.clinicId, clinicId),
-      eq(scanLogs.equipmentId, req.params.id),
-      sinceFilter,
-    );
-
-    const [{ total }] = await db
-      .select({ total: sql<number>`count(*)::int` })
-      .from(scanLogs)
-      .where(baseWhere);
-
-    const isAdmin = req.authUser?.role === "admin";
-
-    const rows = await db
-      .select({
-        id: scanLogs.id,
-        clinicId: scanLogs.clinicId,
-        equipmentId: scanLogs.equipmentId,
-        userId: scanLogs.userId,
-        userEmail: scanLogs.userEmail,
-        status: scanLogs.status,
-        note: scanLogs.note,
-        photoUrl: scanLogs.photoUrl,
-        timestamp: scanLogs.timestamp,
-        staffName: users.name,
-        staffRole: users.role,
-      })
-      .from(scanLogs)
-      .leftJoin(users, and(eq(scanLogs.userId, users.id), eq(users.clinicId, clinicId)))
-      .where(baseWhere)
-      .orderBy(desc(scanLogs.timestamp))
-      .limit(limit)
-      .offset(offset);
-
-    // Attribution boundary: staff name/role only on admin (audit) surfaces.
-    const items = isAdmin
-      ? rows
-      : rows.map(({ staffName: _sn, staffRole: _sr, ...rest }) => rest);
-
-    res.json({ items, total, page, pageSize: limit, hasMore: offset + items.length < total });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "EQUIPMENT_LOGS_FETCH_FAILED",
-        message: "Failed to get logs",
-        requestId,
-      }),
-    );
-  }
-});
+router.get("/:id/logs", requireAuth, getEquipmentLogsHandler);
 
 router.get("/:id/transfers", requireAuth, getEquipmentTransfersHandler);
 

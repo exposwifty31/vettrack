@@ -10,15 +10,9 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const equipmentRoutesPath = path.join(__dirname, "..", "server", "routes", "equipment.ts");
-const myHandlerPath = path.join(
-  __dirname,
-  "..",
-  "server",
-  "routes",
-  "equipment",
-  "handlers",
-  "get-my-equipment.ts",
-);
+const handlersDir = path.join(__dirname, "..", "server", "routes", "equipment", "handlers");
+const myHandlerPath = path.join(handlersDir, "get-my-equipment.ts");
+const detailHandlerPath = path.join(handlersDir, "get-equipment-by-id.ts");
 const operationalSelectPath = path.join(
   __dirname,
   "..",
@@ -29,6 +23,7 @@ const operationalSelectPath = path.join(
 );
 const source = fs.readFileSync(equipmentRoutesPath, "utf8");
 const myHandlerSource = fs.readFileSync(myHandlerPath, "utf8");
+const detailHandlerSource = fs.readFileSync(detailHandlerPath, "utf8");
 const operationalSelectSource = fs.readFileSync(operationalSelectPath, "utf8");
 
 const V1_FIELDS = [
@@ -70,16 +65,15 @@ describe("equipment operational state API serialization contract", () => {
   });
 
   it("spreads equipmentOperationalStateSelect on GET /api/equipment/:id", () => {
-    const block = sliceBetweenMarkers(
-      'router.get("/:id", requireAuth',
-      'EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.create',
-    );
-    expect(block).toContain("...equipmentOperationalStateSelect");
+    expect(detailHandlerSource).toContain("/** GET /api/equipment/:id */");
+    expect(detailHandlerSource).toContain("...equipmentOperationalStateSelect");
+    expect(source).toContain('router.get("/:id", requireAuth, getEquipmentByIdHandler)');
   });
 
   it("uses exactly three spreads (my handler module, list, detail)", () => {
     const routeSpreads = source.match(/\.\.\.equipmentOperationalStateSelect/g) ?? [];
     const mySpreads = myHandlerSource.match(/\.\.\.equipmentOperationalStateSelect/g) ?? [];
-    expect(routeSpreads.length + mySpreads.length).toBe(3);
+    const detailSpreads = detailHandlerSource.match(/\.\.\.equipmentOperationalStateSelect/g) ?? [];
+    expect(routeSpreads.length + mySpreads.length + detailSpreads.length).toBe(3);
   });
 });

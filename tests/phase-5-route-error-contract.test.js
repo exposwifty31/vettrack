@@ -31,10 +31,11 @@ const equipmentRouteUtils = fs.readFileSync(
   path.join(repoRoot, "server", "routes", "equipment", "equipment-route-utils.ts"),
   "utf8",
 );
-const equipmentHandlerSources = ["get-my-equipment.ts", "get-critical-equipment.ts", "get-equipment-transfers.ts"]
-  .map((name) =>
-    fs.readFileSync(path.join(repoRoot, "server", "routes", "equipment", "handlers", name), "utf8"),
-  )
+const equipmentHandlersDir = path.join(repoRoot, "server", "routes", "equipment", "handlers");
+const equipmentHandlerSources = fs
+  .readdirSync(equipmentHandlersDir)
+  .filter((name) => name.endsWith(".ts"))
+  .map((name) => fs.readFileSync(path.join(equipmentHandlersDir, name), "utf8"))
   .join("\n");
 const equipmentErrorContractSource = equipment + equipmentRouteUtils + equipmentHandlerSources;
 

@@ -47,7 +47,7 @@
 | 1 | Break `api.ts` ↔ `er-api.ts` cycle (`request-core.ts`) | Low |
 | 2 | Implement [ADR-002](./adr-002-appointments-service-split.md) service split | High |
 | 3 | Extract `src/lib/api/equipment.ts` + barrel | Medium — **implemented** |
-| 4 | Extract equipment route handlers (paths unchanged) | High — **4a started** (read-only: `GET /my`, `GET /critical`, `GET /:id/transfers`) |
+| 4 | Extract equipment route handlers (paths unchanged) | High — **4a** + **4b** read-only (`GET /deleted`, `/pilot-coverage`, `/:id`, `/:id/logs`; prior: `/my`, `/critical`, `/:id/transfers`) |
 | 5 | Equipment repository layer (`clinicId` param) | High |
 | 6 | Split `src/types/index.ts` by domain + barrel | Medium |
 | 7 | Group `server/app/routes.ts` registrations (no path changes) | Low |
