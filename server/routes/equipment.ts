@@ -113,7 +113,7 @@ const patchEquipmentSchema = z.object({
   /** Optimistic concurrency: the row `version` the client last loaded.
    *  When supplied, the PATCH is rejected 409 if the row moved on. */
   version: z.number().int().nonnegative().optional(),
-});
+}).strict();
 
 const bulkVerifyRoomSchema = z.object({
   roomId: z.string().min(1, "roomId is required"),
