@@ -1,30 +1,46 @@
+import type { Request } from "express";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
-// Global API limiter: baseline protection for all /api/* requests.
+/** F2 — per-minute ceilings (DoS backstop; normal ward use stays well below). */
+export const SCAN_LIMITER_MAX_PER_MINUTE = 600;
+export const CHECKOUT_LIMITER_MAX_PER_MINUTE = 600;
+export const WRITE_LIMITER_MAX_PER_MINUTE = 600;
+export const GLOBAL_API_LIMITER_MAX_PER_MINUTE = 6_000;
+
+/** F2 — per-user bucket when auth is present; shared-IP clinics otherwise fall back to IP. */
+export function rateLimitUserKey(req: Request): string {
+  const userId = req.authUser?.id;
+  if (userId) return `user:${userId}`;
+  return `ip:${ipKeyGenerator(req.ip ?? "127.0.0.1")}`;
+}
+
+// Global API limiter: per-IP backstop for all /api/* (DoS shield, not per-clinic UX throttle).
 export const globalApiLimiter = rateLimit({
   windowMs: 60_000,
-  max: 120,
+  max: GLOBAL_API_LIMITER_MAX_PER_MINUTE,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many API requests. Please wait a moment." },
 });
 
-// Scan actions: 10/min — POST /api/equipment/:id/scan
+// Scan actions — generous per-user ceiling (equipment pilot hot path).
 export const scanLimiter = rateLimit({
   windowMs: 60_000,
-  max: 10,
+  max: SCAN_LIMITER_MAX_PER_MINUTE,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many scan actions. Please wait a moment." },
+  keyGenerator: rateLimitUserKey,
 });
 
-// Checkout/return: 20/min — POST /api/equipment/:id/checkout|return
+// Checkout/return — per-user; mirrors scan limiter headroom.
 export const checkoutLimiter = rateLimit({
   windowMs: 60_000,
-  max: 20,
+  max: CHECKOUT_LIMITER_MAX_PER_MINUTE,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many checkout/return actions. Please wait a moment." },
+  keyGenerator: rateLimitUserKey,
 });
 
 // Auth/sensitive: 5/min — push subscribe, user creation
@@ -69,10 +85,11 @@ export const rfidEventLimiter = rateLimit({
 
 export const writeLimiter = rateLimit({
   windowMs: 60_000,
-  max: 30,
+  max: WRITE_LIMITER_MAX_PER_MINUTE,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many write operations. Please wait a moment." },
+  keyGenerator: rateLimitUserKey,
   // In test/CI mode the entire Playwright suite runs from a single IP against a
   // single server process, so sequential tests exhaust the per-IP window.
   // Skip limiting only when NODE_ENV=test or TEST_MODE=true; production is never
