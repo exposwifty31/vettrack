@@ -152,7 +152,10 @@ function AwarenessBar({ snapshot }: { snapshot: DisplaySnapshot }) {
             ✓ עגלה נבדקה · {cartAgeLabel}
           </span>
         ) : (
-          <span className="flex items-center gap-1 bg-amber-900/20 border border-amber-700/40 text-yellow-300 rounded px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap">
+          <span
+            data-testid="ward-display-crash-cart-warning"
+            className="flex items-center gap-1 bg-amber-900/20 border border-amber-700/40 text-yellow-300 rounded px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap"
+          >
             ⚠ עגלה לא נבדקה היום
           </span>
         ))}
@@ -233,7 +236,7 @@ function PatientGrid({
   });
 
   return (
-    <div className="p-4 flex-1">
+    <div className="p-4 flex-1" data-testid="ward-display-patient-grid">
       <div className="text-[11px] font-bold tracking-widest uppercase text-gray-600 mb-3">
         מטופלים מאושפזים
       </div>
@@ -276,7 +279,7 @@ function EquipmentPane({ equipment }: { equipment: DisplaySnapshotEquipment[] })
   });
 
   return (
-    <div className="p-4 border-b border-[#1f2937]">
+    <div className="p-4 border-b border-[#1f2937]" data-testid="ward-display-equipment-pane">
       <div className="text-[11px] font-bold tracking-widest uppercase text-gray-600 mb-3">
         ציוד · מיקום ושימוש
       </div>
@@ -322,7 +325,7 @@ function UpcomingTasksPane({
   const overflow = tasks.length - displayed.length;
 
   return (
-    <div className="p-4">
+    <div className="p-4" data-testid="ward-display-upcoming-tasks">
       <div className="text-[11px] font-bold tracking-widest uppercase text-gray-600 mb-3">
         פרוצדורות קרובות · 2 שע׳
       </div>

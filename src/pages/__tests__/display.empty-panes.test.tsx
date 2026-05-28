@@ -75,12 +75,11 @@ describe("F1: Ward Display empty panes", () => {
   it("F1: renders EquipmentPane without crash-cart pill, patient grid, or upcoming tasks", () => {
     render(<WardDisplayPage />);
 
-    expect(screen.getByText(/ציוד · מיקום ושימוש/)).toBeTruthy();
+    expect(screen.getByTestId("ward-display-equipment-pane")).toBeTruthy();
     expect(screen.getByText("Infusion pump")).toBeTruthy();
 
-    expect(screen.queryByText(/עגלה לא נבדקה היום/)).toBeNull();
-    expect(screen.queryByText(/מאושפזים/)).toBeNull();
-    expect(screen.queryByText(/פרוצדורות קרובות/)).toBeNull();
-    expect(screen.queryByText("CPR Risk")).toBeNull();
+    expect(screen.queryByTestId("ward-display-crash-cart-warning")).toBeNull();
+    expect(screen.queryByTestId("ward-display-patient-grid")).toBeNull();
+    expect(screen.queryByTestId("ward-display-upcoming-tasks")).toBeNull();
   });
 });
