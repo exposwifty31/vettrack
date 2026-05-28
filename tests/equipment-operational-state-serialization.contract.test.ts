@@ -10,7 +10,26 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const equipmentRoutesPath = path.join(__dirname, "..", "server", "routes", "equipment.ts");
+const myHandlerPath = path.join(
+  __dirname,
+  "..",
+  "server",
+  "routes",
+  "equipment",
+  "handlers",
+  "get-my-equipment.ts",
+);
+const operationalSelectPath = path.join(
+  __dirname,
+  "..",
+  "server",
+  "routes",
+  "equipment",
+  "equipment-operational-select.ts",
+);
 const source = fs.readFileSync(equipmentRoutesPath, "utf8");
+const myHandlerSource = fs.readFileSync(myHandlerPath, "utf8");
+const operationalSelectSource = fs.readFileSync(operationalSelectPath, "utf8");
 
 const V1_FIELDS = [
   "custodyState",
@@ -29,23 +48,17 @@ function sliceBetweenMarkers(startMarker: string, endMarker: string): string {
 }
 
 describe("equipment operational state API serialization contract", () => {
-  it("defines equipmentOperationalStateSelect with all V1 fields before /my handler", () => {
-    const myHandlerIndex = source.indexOf('router.get("/my"');
-    expect(myHandlerIndex).toBeGreaterThanOrEqual(0);
-
-    const constantBlock = source.slice(0, myHandlerIndex);
-    expect(constantBlock).toContain("const equipmentOperationalStateSelect");
+  it("defines equipmentOperationalStateSelect with all V1 fields (Slice 4a module)", () => {
+    expect(operationalSelectSource).toContain("export const equipmentOperationalStateSelect");
     for (const field of V1_FIELDS) {
-      expect(constantBlock).toContain(`${field}: equipment.${field}`);
+      expect(operationalSelectSource).toContain(`${field}: equipment.${field}`);
     }
+    expect(source).toContain('router.get("/my", requireAuth, getMyEquipmentHandler)');
   });
 
   it("spreads equipmentOperationalStateSelect on GET /api/equipment/my", () => {
-    const block = sliceBetweenMarkers(
-      '// GET /api/equipment/my',
-      'const EQUIPMENT_DEFAULT_PAGE_SIZE',
-    );
-    expect(block).toContain("...equipmentOperationalStateSelect");
+    expect(myHandlerSource).toContain("/** GET /api/equipment/my */");
+    expect(myHandlerSource).toContain("...equipmentOperationalStateSelect");
   });
 
   it("spreads equipmentOperationalStateSelect on GET /api/equipment (list)", () => {
@@ -64,8 +77,9 @@ describe("equipment operational state API serialization contract", () => {
     expect(block).toContain("...equipmentOperationalStateSelect");
   });
 
-  it("uses exactly three spreads (my, list, detail)", () => {
-    const matches = source.match(/\.\.\.equipmentOperationalStateSelect/g);
-    expect(matches?.length).toBe(3);
+  it("uses exactly three spreads (my handler module, list, detail)", () => {
+    const routeSpreads = source.match(/\.\.\.equipmentOperationalStateSelect/g) ?? [];
+    const mySpreads = myHandlerSource.match(/\.\.\.equipmentOperationalStateSelect/g) ?? [];
+    expect(routeSpreads.length + mySpreads.length).toBe(3);
   });
 });

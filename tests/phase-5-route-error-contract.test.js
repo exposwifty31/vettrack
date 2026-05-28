@@ -27,6 +27,16 @@ const testRoute = fs.readFileSync(path.join(repoRoot, "server", "routes", "test.
 const storage = fs.readFileSync(path.join(repoRoot, "server", "routes", "storage.ts"), "utf8");
 const push = fs.readFileSync(path.join(repoRoot, "server", "routes", "push.ts"), "utf8");
 const equipment = fs.readFileSync(path.join(repoRoot, "server", "routes", "equipment.ts"), "utf8");
+const equipmentRouteUtils = fs.readFileSync(
+  path.join(repoRoot, "server", "routes", "equipment", "equipment-route-utils.ts"),
+  "utf8",
+);
+const equipmentHandlerSources = ["get-my-equipment.ts", "get-critical-equipment.ts", "get-equipment-transfers.ts"]
+  .map((name) =>
+    fs.readFileSync(path.join(repoRoot, "server", "routes", "equipment", "handlers", name), "utf8"),
+  )
+  .join("\n");
+const equipmentErrorContractSource = equipment + equipmentRouteUtils + equipmentHandlerSources;
 
 describe("Phase 5 route error contract checks (static)", () => {
   it("Appointments route emits requestId and structured validation errors", () => {
@@ -230,19 +240,19 @@ describe("Phase 5 route error contract checks (static)", () => {
 
   it("Equipment route first slice emits standardized error contract", () => {
     expect(
-      equipment.includes("resolveRequestId") &&
-        equipment.includes("reason: \"MY_EQUIPMENT_FETCH_FAILED\"") &&
-        equipment.includes("reason: \"EQUIPMENT_LIST_FAILED\"") &&
-        equipment.includes("reason: \"EQUIPMENT_NOT_FOUND\"") &&
-        equipment.includes("reason: \"EXPECTED_RETURN_MINUTES_ADMIN_ONLY\"") &&
-        equipment.includes("reason: \"EQUIPMENT_RESTORE_FAILED\"") &&
-        equipment.includes("reason: \"EQUIPMENT_CHECKOUT_FAILED\"") &&
-        equipment.includes("reason: \"EQUIPMENT_RETURN_FAILED\"") &&
-        equipment.includes("reason: \"EQUIPMENT_SCAN_FAILED\"") &&
-        equipment.includes("reason: \"UNDO_TOKEN_INVALID_OR_EXPIRED\"") &&
-        equipment.includes("reason: \"EQUIPMENT_IMPORT_FAILED\"") &&
-        equipment.includes("reason: \"EQUIPMENT_BULK_MOVE_FAILED\"") &&
-        equipment.includes("reason: \"EQUIPMENT_BULK_VERIFY_FAILED\""),
+      equipmentErrorContractSource.includes("resolveRequestId") &&
+        equipmentErrorContractSource.includes("reason: \"MY_EQUIPMENT_FETCH_FAILED\"") &&
+        equipmentErrorContractSource.includes("reason: \"EQUIPMENT_LIST_FAILED\"") &&
+        equipmentErrorContractSource.includes("reason: \"EQUIPMENT_NOT_FOUND\"") &&
+        equipmentErrorContractSource.includes("reason: \"EXPECTED_RETURN_MINUTES_ADMIN_ONLY\"") &&
+        equipmentErrorContractSource.includes("reason: \"EQUIPMENT_RESTORE_FAILED\"") &&
+        equipmentErrorContractSource.includes("reason: \"EQUIPMENT_CHECKOUT_FAILED\"") &&
+        equipmentErrorContractSource.includes("reason: \"EQUIPMENT_RETURN_FAILED\"") &&
+        equipmentErrorContractSource.includes("reason: \"EQUIPMENT_SCAN_FAILED\"") &&
+        equipmentErrorContractSource.includes("reason: \"UNDO_TOKEN_INVALID_OR_EXPIRED\"") &&
+        equipmentErrorContractSource.includes("reason: \"EQUIPMENT_IMPORT_FAILED\"") &&
+        equipmentErrorContractSource.includes("reason: \"EQUIPMENT_BULK_MOVE_FAILED\"") &&
+        equipmentErrorContractSource.includes("reason: \"EQUIPMENT_BULK_VERIFY_FAILED\""),
     ).toBe(true);
   });
 });

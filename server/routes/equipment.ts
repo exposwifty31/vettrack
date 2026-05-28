@@ -32,6 +32,11 @@ import type { EquipmentWaitlistRow } from "../db.js";
 import { mountEquipmentWaitlistRoutes } from "./equipment-waitlist.js";
 import { EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS } from "../lib/equipment-replay-idempotency.js";
 import { equipmentReplayIdempotency } from "../middleware/equipment-replay-idempotency.js";
+import { apiError, resolveRequestId } from "./equipment/equipment-route-utils.js";
+import { equipmentOperationalStateSelect } from "./equipment/equipment-operational-select.js";
+import { getCriticalEquipmentHandler } from "./equipment/handlers/get-critical-equipment.js";
+import { getMyEquipmentHandler } from "./equipment/handlers/get-my-equipment.js";
+import { getEquipmentTransfersHandler } from "./equipment/handlers/get-equipment-transfers.js";
 
 const EQUIPMENT_STATUS_VALUES = [
   "ok",
@@ -182,30 +187,6 @@ const upload = multer({
 
 const router = Router();
 
-function resolveRequestId(
-  res: { getHeader: (name: string) => unknown; setHeader?: (name: string, value: string) => void },
-  incomingHeader: unknown,
-): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") {
-    res.setHeader("x-request-id", requestId);
-  }
-  return requestId;
-}
-
-function apiError(params: { code: string; reason: string; message: string; requestId: string }) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-  };
-}
-
 const _parsedUndoTtl = parseInt(process.env.UNDO_TTL_MS ?? "", 10);
 const UNDO_TTL_MS = Number.isFinite(_parsedUndoTtl) && _parsedUndoTtl > 0 ? _parsedUndoTtl : 90_000;
 const FIELD_MAX_LENGTH = 500;
@@ -308,15 +289,6 @@ class CheckoutConflictError extends Error {
   }
 }
 
-/** V1 operational state columns returned on list/detail reads for deployability UI. */
-const equipmentOperationalStateSelect = {
-  custodyState: equipment.custodyState,
-  readinessState: equipment.readinessState,
-  usageState: equipment.usageState,
-  assetTypeId: equipment.assetTypeId,
-  dockId: equipment.dockId,
-} as const;
-
 /** Advisory RFID doorway fields (read-only signal; never mutates authoritative roomId). */
 function equipmentRfidSelect(clinicId: string) {
   return {
@@ -337,86 +309,7 @@ function equipmentRfidSelect(clinicId: string) {
 }
 
 // GET /api/equipment/my
-router.get("/my", requireAuth, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const items = await db
-      .select({
-        id: equipment.id,
-        name: equipment.name,
-        serialNumber: equipment.serialNumber,
-        model: equipment.model,
-        manufacturer: equipment.manufacturer,
-        purchaseDate: equipment.purchaseDate,
-        expiryDate: equipment.expiryDate,
-        expiryNotifiedAt: equipment.expiryNotifiedAt,
-        location: equipment.location,
-        folderId: equipment.folderId,
-        folderName: folders.name,
-        roomId: equipment.roomId,
-        roomName: rooms.name,
-        nfcTagId: equipment.nfcTagId,
-        lastVerifiedAt: equipment.lastVerifiedAt,
-        lastVerifiedById: equipment.lastVerifiedById,
-        lastVerifiedByName: users.name,
-        status: equipment.status,
-        lastSeen: equipment.lastSeen,
-        lastStatus: equipment.lastStatus,
-        lastMaintenanceDate: equipment.lastMaintenanceDate,
-        lastSterilizationDate: equipment.lastSterilizationDate,
-        maintenanceIntervalDays: equipment.maintenanceIntervalDays,
-        imageUrl: equipment.imageUrl,
-        checkedOutById: equipment.checkedOutById,
-        checkedOutByEmail: equipment.checkedOutByEmail,
-        checkedOutAt: equipment.checkedOutAt,
-        checkedOutLocation: equipment.checkedOutLocation,
-        expectedReturnMinutes: equipment.expectedReturnMinutes,
-        createdAt: equipment.createdAt,
-        usuallyFoundHere: equipment.usuallyFoundHere,
-        searchAlias: equipment.searchAlias,
-        staffNote: equipment.staffNote,
-        linkedAnimalId: sql<string | null>`(
-          SELECT a.id
-          FROM vt_patient_room_assignments pra
-          INNER JOIN vt_animals a ON a.id = pra.animal_id
-          WHERE pra.clinic_id = ${clinicId}
-            AND pra.room_id = ${equipment.roomId}
-            AND pra.ended_at IS NULL
-            AND a.clinic_id = ${clinicId}
-          LIMIT 1
-        )`.as("linkedAnimalId"),
-        linkedAnimalName: sql<string | null>`(
-          SELECT a.name
-          FROM vt_patient_room_assignments pra
-          INNER JOIN vt_animals a ON a.id = pra.animal_id
-          WHERE pra.clinic_id = ${clinicId}
-            AND pra.room_id = ${equipment.roomId}
-            AND pra.ended_at IS NULL
-            AND a.clinic_id = ${clinicId}
-          LIMIT 1
-        )`.as("linkedAnimalName"),
-        ...equipmentOperationalStateSelect,
-      })
-      .from(equipment)
-      .leftJoin(folders, and(eq(equipment.folderId, folders.id), eq(folders.clinicId, clinicId), isNull(folders.deletedAt)))
-      .leftJoin(rooms, and(eq(equipment.roomId, rooms.id), eq(rooms.clinicId, clinicId)))
-      .leftJoin(users, and(eq(equipment.lastVerifiedById, users.id), eq(users.clinicId, clinicId)))
-      .where(and(eq(equipment.clinicId, clinicId), eq(equipment.checkedOutById, req.authUser!.id), isNull(equipment.deletedAt)))
-      .orderBy(desc(equipment.checkedOutAt));
-    res.json(items);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "MY_EQUIPMENT_FETCH_FAILED",
-        message: "Failed to fetch my equipment",
-        requestId,
-      }),
-    );
-  }
-});
+router.get("/my", requireAuth, getMyEquipmentHandler);
 
 const EQUIPMENT_DEFAULT_PAGE_SIZE = 100;
 const EQUIPMENT_MAX_PAGE_SIZE = 1000;
@@ -596,51 +489,7 @@ router.get("/deleted", requireAuth, requireAdmin, async (req, res) => {
 });
 
 // GET /api/equipment/critical
-router.get("/critical", requireAuth, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const items = await db
-      .select({
-        id: equipment.id,
-        name: equipment.name,
-        category: sql<string>`COALESCE(${equipment.model}, 'General')`,
-        status: equipment.status,
-        lastSeenLocation: sql<string | null>`COALESCE(${equipment.checkedOutLocation}, ${equipment.location})`,
-        lastSeenTimestamp: equipment.lastSeen,
-      })
-      .from(equipment)
-      .where(
-        and(
-          eq(equipment.clinicId, clinicId),
-          inArray(equipment.status, ["critical", "needs_attention"]),
-          isNull(equipment.deletedAt),
-        ),
-      )
-      // Stabilization plan: Proximity > Accessibility > Functional status
-      // Proximity: most recently seen first (operational "nearness" without GPS).
-      // Accessibility: known last/checked-out location before unknown.
-      // Functional: critical before needs_attention.
-      .orderBy(
-        desc(equipment.lastSeen),
-        sql`(CASE WHEN COALESCE(TRIM(${equipment.checkedOutLocation}), TRIM(${equipment.location})) IS NOT NULL AND LENGTH(TRIM(COALESCE(${equipment.checkedOutLocation}, ${equipment.location}, ''))) > 0 THEN 0 ELSE 1 END) ASC`,
-        sql`(CASE WHEN ${equipment.nfcTagId} IS NOT NULL OR ${equipment.roomId} IS NOT NULL THEN 0 ELSE 1 END) ASC`,
-        sql`CASE WHEN ${equipment.status} = 'critical' THEN 0 ELSE 1 END ASC`,
-      );
-
-    res.json(items);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "CRITICAL_EQUIPMENT_FETCH_FAILED",
-        message: "Failed to fetch critical equipment",
-        requestId,
-      }),
-    );
-  }
-});
+router.get("/critical", requireAuth, getCriticalEquipmentHandler);
 
 router.get("/pilot-coverage", requireAuth, requireAdmin, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -2395,28 +2244,7 @@ router.get("/:id/logs", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/:id/transfers", requireAuth, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const transfers = await db
-      .select()
-      .from(transferLogs)
-      .where(and(eq(transferLogs.clinicId, clinicId), eq(transferLogs.equipmentId, req.params.id)))
-      .orderBy(desc(transferLogs.timestamp));
-    res.json(transfers);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "EQUIPMENT_TRANSFERS_FETCH_FAILED",
-        message: "Failed to get transfers",
-        requestId,
-      }),
-    );
-  }
-});
+router.get("/:id/transfers", requireAuth, getEquipmentTransfersHandler);
 
 // ─── CSV helpers ────────────────────────────────────────────────────────────
 
