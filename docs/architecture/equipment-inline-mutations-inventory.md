@@ -12,12 +12,13 @@
 |--------|------|----------------|
 | `DELETE` | `/api/equipment/:id` | `handlers/delete-equipment.ts` |
 | `POST` | `/api/equipment/:id/restore` | `handlers/post-equipment-restore.ts` |
+| `POST` | `/api/equipment/:id/revert` | `handlers/post-equipment-revert.ts` (Slice **4f-1**; `consumeUndoToken` in `equipment-undo-tokens.ts`) |
 
-Router still owns middleware registration for both (including replay idempotency on delete).
+Router still owns middleware registration (including replay idempotency on delete).
 
 ---
 
-## Inline mutation inventory
+## Inline mutation inventory (11 remaining)
 
 Legend: **Replay** = `equipmentReplayIdempotency` on router. **Offline** = `src/lib/api/equipment.ts` enqueues `addPendingSync` / `handleOptimisticMutation` for that path (online-only if “No”).
 
@@ -30,11 +31,10 @@ Legend: **Replay** = `equipmentReplayIdempotency` on router. **Offline** = `src/
 | 5 | `POST` | `/:id/return` | `requireAuth` → `checkoutLimiter` → `requireEffectiveRole("student")` → `validateUuid("id")` → `validateBody(equipmentReturnBodySchema)` → **replay(return)** | Yes | Yes (`syncType: "return_with_charge"`) | Yes (`equipment_returned`) | Yes (`EQUIPMENT_CUSTODY_STATE_CHANGED` on custody transition) | **Yes** — `promoteNextWaitlistInTx`, `equipmentReturns` + `enqueueChargeAlertJob` when unplugged, `cancelSmartReturnReminder` | **Highest** |
 | 6 | `POST` | `/:id/seen` | `requireAuth` → `writeLimiter` → `validateUuid("id")` → `validateBody(seenSchema)` → **replay(seen)** | Yes | Yes (`type: "seen"`) | No (delegates to `recordEquipmentSeen` service) | Via service | **Yes** — `recordEquipmentSeen` → usage session + billing ledger idempotency | High |
 | 7 | `POST` | `/:id/scan` | `requireAuth` → `scanLimiter` → `requireEffectiveRole("student")` → `validateUuid("id")` → `validateBody(scanSchema)` → **replay(scan)** | Yes | Yes (`type: "scan"`) | Yes (`equipment_scanned`) | No | No (scan logs + undo tokens; push on issue/maintenance/sterilization) | High |
-| 8 | `POST` | `/:id/revert` | `requireAuth` → `requireEffectiveRole("vet")` → `validateUuid("id")` → `validateBody(revertSchema)` | No | No (plain `request` POST) | Yes (`equipment_reverted`) | No | No (restores snapshot from `undoTokens`; deletes one `scanLogs` row) | Low–medium |
-| 9 | `POST` | `/import` | `requireAuth` → `writeLimiter` → `requireAdmin` → `upload.single("file")` | No | No (`importCsv` uses raw `fetch`, no `addPendingSync`) | Yes (`equipment_imported`) | No | No (batch insert equipment rows) | Medium |
-| 10 | `POST` | `/bulk-delete` | `requireAuth` → `writeLimiter` → `requireAdmin` → `validateBody(bulkIdsSchema)` | No | No | Yes (`equipment_bulk_deleted`; **inside** transaction) | No | No (batch soft-delete + scan log per item) | Medium |
-| 11 | `POST` | `/bulk-move` | `requireAuth` → `writeLimiter` → `requireEffectiveRole("technician")` → `validateBody(bulkMoveSchema)` | No | No | Yes (`equipment_bulk_moved`) | No | No (`transferLogs` per item; post-response push) | Medium |
-| 12 | `POST` | `/bulk-verify-room` | `requireAuth` → `requireEffectiveRole("technician")` → `validateBody(bulkVerifyRoomSchema)` | No | No | Yes (`room_bulk_verified`) | No | No (room `syncStatus`; batch verify + scan logs) | Low–medium |
+| 8 | `POST` | `/import` | `requireAuth` → `writeLimiter` → `requireAdmin` → `upload.single("file")` | No | No (`importCsv` uses raw `fetch`, no `addPendingSync`) | Yes (`equipment_imported`) | No | No (batch insert equipment rows) | Medium |
+| 9 | `POST` | `/bulk-delete` | `requireAuth` → `writeLimiter` → `requireAdmin` → `validateBody(bulkIdsSchema)` | No | No | Yes (`equipment_bulk_deleted`; **inside** transaction) | No | No (batch soft-delete + scan log per item) | Medium |
+| 10 | `POST` | `/bulk-move` | `requireAuth` → `writeLimiter` → `requireEffectiveRole("technician")` → `validateBody(bulkMoveSchema)` | No | No | Yes (`equipment_bulk_moved`) | No | No (`transferLogs` per item; post-response push) | Medium |
+| 11 | `POST` | `/bulk-verify-room` | `requireAuth` → `requireEffectiveRole("technician")` → `validateBody(bulkVerifyRoomSchema)` | No | No | Yes (`room_bulk_verified`) | No | No (room `syncStatus`; batch verify + scan logs) | Low–medium |
 
 ### Notes
 
@@ -65,7 +65,6 @@ Policy: keep **all middleware** (including `equipmentReplayIdempotency`) on `rou
 
 | Order | Route | Rationale |
 |-------|-------|-----------|
-| **4f-1** | `POST /:id/revert` | Smallest custody-adjacent mutation; no replay/offline; undo-token scope is localized. |
 | **4g** | `POST /bulk-verify-room` | Batch verify only; no replay/offline; room + scan logs. |
 | **4h** | `POST /import` | Admin-only; multer + CSV; no replay/offline; large but isolated. |
 | **4i** | `POST /bulk-move` | No replay; transfer logs + push; no waitlist/billing. |

@@ -47,7 +47,7 @@
 | 1 | Break `api.ts` ↔ `er-api.ts` cycle (`request-core.ts`) | Low |
 | 2 | Implement [ADR-002](./adr-002-appointments-service-split.md) service split | High |
 | 3 | Extract `src/lib/api/equipment.ts` + barrel | Medium — **implemented** |
-| 4 | Extract equipment route handlers (paths unchanged) | High — **reads (4a–4c)** + **mutations (4d–4e):** restore + delete extracted. **12 inline mutations** — [inventory](./equipment-inline-mutations-inventory.md) (Slice 4f). **Pause** checkout/return/quick-scan. |
+| 4 | Extract equipment route handlers (paths unchanged) | High — **reads (4a–4c)** + **mutations (4d–4e, 4f-1):** restore, delete, revert extracted. **11 inline mutations** — [inventory](./equipment-inline-mutations-inventory.md). **Pause** checkout/return/quick-scan. |
 | 5 | Equipment repository layer (`clinicId` param) | High |
 | 6 | Split `src/types/index.ts` by domain + barrel | Medium |
 | 7 | Group `server/app/routes.ts` registrations (no path changes) | Low |
