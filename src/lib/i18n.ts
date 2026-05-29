@@ -565,6 +565,8 @@ const translations = {
 
   patientDetail: d.patientDetail,
 
+  patientsPage: d.patientsPage,
+
   inventoryItemsPage: d.inventoryItemsPage,
 
   procurementPage: d.procurementPage,

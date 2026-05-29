@@ -12,6 +12,7 @@ import {
   LayoutGrid,
   MapPin,
   Package,
+  LogOut,
   Pencil,
   Pill,
   Radar,
@@ -37,6 +38,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorCard } from "@/components/ui/error-card";
+import { DischargePatientDialog } from "@/components/patients/DischargePatientDialog";
 import { useAuth } from "@/hooks/use-auth";
 import { useSettings } from "@/hooks/use-settings";
 import { cn, computeAlerts, formatRelativeTime } from "@/lib/utils";
@@ -397,6 +399,7 @@ export default function PatientDetailPage() {
   const canBilling = roleLevel(resolvedRole) >= ROLE_LEVEL.vet;
   const canEdit = roleLevel(resolvedRole) >= ROLE_LEVEL.technician;
   const [editOpen, setEditOpen] = useState(false);
+  const [dischargeOpen, setDischargeOpen] = useState(false);
 
   // Fetch active hospitalization for this animal (if any)
   const hospQ = useQuery({
@@ -682,17 +685,30 @@ export default function PatientDetailPage() {
                   {statusBadge.label}
                 </Badge>
                 {canEdit && hospQ.data ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-9 gap-1.5"
-                    onClick={() => setEditOpen(true)}
-                    data-testid="btn-open-edit-patient"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                    {p.editButton}
-                  </Button>
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-1.5"
+                      onClick={() => setEditOpen(true)}
+                      data-testid="btn-open-edit-patient"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      {p.editButton}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-1.5 text-destructive hover:text-destructive"
+                      onClick={() => setDischargeOpen(true)}
+                      data-testid="btn-open-discharge-patient"
+                    >
+                      <LogOut className="h-3.5 w-3.5" />
+                      {p.dischargeButton}
+                    </Button>
+                  </>
                 ) : null}
               </div>
             </div>
@@ -1105,11 +1121,19 @@ export default function PatientDetailPage() {
       </div>
 
       {hospQ.data ? (
-        <EditPatientSheet
-          open={editOpen}
-          hospitalization={hospQ.data}
-          onClose={() => setEditOpen(false)}
-        />
+        <>
+          <EditPatientSheet
+            open={editOpen}
+            hospitalization={hospQ.data}
+            onClose={() => setEditOpen(false)}
+          />
+          <DischargePatientDialog
+            patient={hospQ.data}
+            open={dischargeOpen}
+            onOpenChange={setDischargeOpen}
+            onSuccess={() => navigate("/patients")}
+          />
+        </>
       ) : null}
     </>
   );

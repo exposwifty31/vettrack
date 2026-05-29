@@ -1512,6 +1512,23 @@ export interface TStructure {
     defaultFallback: string;
     tryAgain: string;
   };
+  patientsPage: {
+    removeFromList: string;
+    removeFromListAria: string;
+    dischargeTitle: string;
+    dischargeDescription: string;
+    dischargeNotesLabel: string;
+    dischargeNotesPlaceholder: string;
+    dischargeConfirm: string;
+    discharging: string;
+    dischargeSuccess: string;
+    dischargeFailed: string;
+    dischargeBlockedTitle: string;
+    dischargeBlockedMessage: string;
+    dischargeOverrideLabel: string;
+    dischargeOverridePlaceholder: string;
+    dischargeForceConfirm: string;
+  };
   patientDetail: {
     pageTitle: string;
     operatingCenter: string;
@@ -1586,6 +1603,7 @@ export interface TStructure {
     editFailedToast: string;
     editNoChanges: string;
     editStatusLocked: string;
+    dischargeButton: string;
   };
   billingLedger: {
     title: string;

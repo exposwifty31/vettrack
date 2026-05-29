@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Clock,
   Heart,
+  LogOut,
   Plus,
   Search,
   Siren,
@@ -17,6 +18,8 @@ import {
   X,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { t } from "@/lib/i18n";
+import { DischargePatientDialog } from "@/components/patients/DischargePatientDialog";
 import { Layout } from "@/components/layout";
 import { PageShell } from "@/components/layout/PageShell";
 import { Stethoscope, Map } from "lucide-react";
@@ -68,15 +71,16 @@ function admissionDuration(admittedAt: string): string {
 
 // ─── Patient card ─────────────────────────────────────────────────────────────
 
-function PatientCard({ p }: { p: Hospitalization }) {
+function PatientCard({ p, onDischarge }: { p: Hospitalization; onDischarge: () => void }) {
   const cfg = STATUS_CONFIG[p.status] ?? STATUS_CONFIG.admitted;
   const meta = [p.animal.species, p.animal.breed].filter(Boolean).join(" · ");
   const location = [p.ward, p.bay].filter(Boolean).join(" / ");
+  const pp = t.patientsPage;
 
   return (
-    <Link href={`/patients/${p.animal.id}`}>
-      <Card className="group border-border/60 bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:translate-y-0">
-        <CardContent className="flex items-start gap-3 p-4">
+    <Card className="group border-border/60 bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:translate-y-0">
+      <CardContent className="flex items-start gap-2 p-4">
+        <Link href={`/patients/${p.animal.id}`} className="flex min-w-0 flex-1 items-start gap-3">
           {/* Status dot */}
           <span className="mt-1.5 flex h-2.5 w-2.5 shrink-0 items-center justify-center">
             <span className={`h-2.5 w-2.5 rounded-full ${cfg.dot}`} />
@@ -117,9 +121,22 @@ function PatientCard({ p }: { p: Hospitalization }) {
           </div>
 
           <ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/60 transition-colors group-hover:text-foreground" />
-        </CardContent>
-      </Card>
-    </Link>
+        </Link>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+          title={pp.removeFromList}
+          aria-label={pp.removeFromListAria.replace("{name}", p.animal.name)}
+          onClick={onDischarge}
+          data-testid={`btn-discharge-patient-${p.id}`}
+        >
+          <LogOut className="h-4 w-4" />
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -356,6 +373,7 @@ export default function PatientsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [admitOpen, setAdmitOpen] = useState(false);
+  const [dischargeTarget, setDischargeTarget] = useState<Hospitalization | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["/api/patients", search, statusFilter],
@@ -498,13 +516,21 @@ export default function PatientsPage() {
         ) : (
           <div className="space-y-2.5">
             {patients.map((p) => (
-              <PatientCard key={p.id} p={p} />
+              <PatientCard key={p.id} p={p} onDischarge={() => setDischargeTarget(p)} />
             ))}
           </div>
         )}
       </div>
 
       <AdmitSheet open={admitOpen} onClose={() => setAdmitOpen(false)} />
+
+      <DischargePatientDialog
+        patient={dischargeTarget}
+        open={dischargeTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDischargeTarget(null);
+        }}
+      />
     </>
   );
   if (isDesktop) {

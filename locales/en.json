@@ -1509,6 +1509,23 @@
     "defaultFallback": "This section failed to load",
     "tryAgain": "Try again"
   },
+  "patientsPage": {
+    "removeFromList": "Remove from active list",
+    "removeFromListAria": "Discharge {name} and remove from active patients",
+    "dischargeTitle": "Discharge patient",
+    "dischargeDescription": "This ends the current hospitalization and removes {name} from the active patients list. Billing and clinical history are kept.",
+    "dischargeNotesLabel": "Discharge notes (optional)",
+    "dischargeNotesPlaceholder": "Summary or instructions for the owner…",
+    "dischargeConfirm": "Discharge",
+    "discharging": "Discharging…",
+    "dischargeSuccess": "Patient discharged",
+    "dischargeFailed": "Could not discharge patient",
+    "dischargeBlockedTitle": "Discharge blocked",
+    "dischargeBlockedMessage": "Resolve open tasks, emergency dispenses, or failed inventory jobs before discharging, or force discharge with a documented reason.",
+    "dischargeOverrideLabel": "Override reason",
+    "dischargeOverridePlaceholder": "Why discharge is proceeding despite open items…",
+    "dischargeForceConfirm": "Force discharge"
+  },
   "patientDetail": {
     "pageTitle": "Patient",
     "operatingCenter": "Operating center",
@@ -1582,7 +1599,8 @@
     "editSavedToast": "Patient updated",
     "editFailedToast": "Patient update failed",
     "editNoChanges": "Nothing changed",
-    "editStatusLocked": "Status is locked for non-active patients"
+    "editStatusLocked": "Status is locked for non-active patients",
+    "dischargeButton": "Discharge patient"
   },
   "billingLedger": {
     "title": "Billing Dashboard",
