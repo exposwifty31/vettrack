@@ -11,7 +11,7 @@ import {
   shiftPatientHandoffItems,
 } from "../db.js";
 import { logAudit } from "../lib/audit.js";
-import { PURGE_AFTER_DAYS } from "../lib/cleanup-scheduler.js";
+import { PURGE_AFTER_DAYS } from "../lib/retention-policy.js";
 import { releaseProcedureBoundEquipment } from "./equipment-operational-state.service.js";
 
 const PURGE_AFTER_MS = PURGE_AFTER_DAYS * 24 * 60 * 60 * 1000;

@@ -1,7 +1,10 @@
 import { and, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { db, users } from "../db.js";
 import { logAudit } from "./audit.js";
+import { PURGE_AFTER_DAYS } from "./retention-policy.js";
 import { countAnimalPurgeCandidates, purgeSoftDeletedAnimals } from "../services/patient-animal-lifecycle.service.js";
+
+export { PURGE_AFTER_DAYS } from "./retention-policy.js";
 
 /**
  * PURGE_AFTER_DAYS controls how long a soft-deleted user row is retained before
@@ -15,7 +18,6 @@ import { countAnimalPurgeCandidates, purgeSoftDeletedAnimals } from "../services
  * with no audit trail, causing users who had been accidentally soft-deleted to
  * permanently lose their role, status, and history associations on re-login.
  */
-export const PURGE_AFTER_DAYS = 90;
 const PURGE_AFTER_MS = PURGE_AFTER_DAYS * 24 * 60 * 60 * 1000;
 const DAILY_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
