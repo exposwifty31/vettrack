@@ -48,6 +48,16 @@ export function isPilotDefaultBillingSuppressed(): boolean {
   return process.env.PILOT_SUPPRESS_DEFAULT_BILLING === "true";
 }
 
+/**
+ * F9 / P2.4 — when PILOT_SUPPRESS_DEFAULT_BILLING=true, skip ONLY the synthetic
+ * DEFAULT_EQUIPMENT 100¢ row that would otherwise be inserted when no billing
+ * item is configured. All other ledger inserts (packageCode → fluid_protocol
+ * consumables, etc.) keep running.
+ */
+export function shouldInsertDefaultEquipmentLedger(): boolean {
+  return !isPilotDefaultBillingSuppressed();
+}
+
 export async function getOrCreateDefaultEquipmentBillingItem(
   tx: DbTx,
   clinicId: string,
@@ -83,8 +93,7 @@ export async function resolveBillingItemForEquipment(
       .limit(1);
     if (bi) return bi;
   }
-  if (isPilotDefaultBillingSuppressed()) return null;
-  return getOrCreateDefaultEquipmentBillingItem(tx, clinicId);
+  return null;
 }
 
 export async function findActiveAnimalInRoom(
@@ -181,8 +190,14 @@ export async function processEquipmentSeenInTx(params: {
     return { ok: true, linked: false, reason: "no_patient_in_room", roomId };
   }
 
-  const billing = await resolveBillingItemForEquipment(tx, clinicId, eqRow);
-  if (!billing) {
+  let billing = await resolveBillingItemForEquipment(tx, clinicId, eqRow);
+  if (!billing && shouldInsertDefaultEquipmentLedger()) {
+    billing = await getOrCreateDefaultEquipmentBillingItem(tx, clinicId);
+  }
+
+  const hasPackage = Boolean(packageCode);
+
+  if (!billing && !hasPackage) {
     await tx
       .update(equipment)
       .set({ lastSeen: now })
@@ -246,6 +261,33 @@ export async function processEquipmentSeenInTx(params: {
     };
   }
 
+  let sessionBillingItemId: string;
+  if (billing) {
+    sessionBillingItemId = billing.id;
+  } else if (packageCode) {
+    const [animalRowForSession] = await tx
+      .select({ weightKg: animals.weightKg })
+      .from(animals)
+      .where(and(eq(animals.clinicId, clinicId), eq(animals.id, animal.id)))
+      .limit(1);
+    const sessionWeightKg =
+      animalRowForSession?.weightKg == null
+        ? null
+        : Number.parseFloat(String(animalRowForSession.weightKg));
+    const expandedForSession = expandPackage(
+      packageCode,
+      Number.isFinite(sessionWeightKg) ? sessionWeightKg : null,
+    );
+    const firstPackageItem = expandedForSession[0];
+    if (!firstPackageItem) {
+      return { ok: false, error: "NOT_FOUND" };
+    }
+    const pkgSessionBilling = await getOrCreateBillingItemByCode(tx, clinicId, firstPackageItem.itemCode);
+    sessionBillingItemId = pkgSessionBilling.id;
+  } else {
+    return { ok: false, error: "NOT_FOUND" };
+  }
+
   // Create/get usage session BEFORE billing insert so we can link usageSessionId on the ledger row.
   let usageSessionId: string;
   const [open] = await tx
@@ -274,7 +316,7 @@ export async function processEquipmentSeenInTx(params: {
       clinicId,
       animalId: animal.id,
       equipmentId,
-      billingItemId: billing.id,
+      billingItemId: sessionBillingItemId,
       startedAt: now,
       endedAt: null,
       lastBilledThrough: now,
@@ -282,25 +324,28 @@ export async function processEquipmentSeenInTx(params: {
     });
   }
 
-  const ledgerId = randomUUID();
-  const qty = 1;
-  const totalCents = billing.unitPriceCents * qty;
+  let ledgerId: string | undefined;
+  if (billing) {
+    ledgerId = randomUUID();
+    const qty = 1;
+    const totalCents = billing.unitPriceCents * qty;
 
-  await tx.insert(billingLedger).values({
-    id: ledgerId,
-    clinicId,
-    animalId: animal.id,
-    itemType: "EQUIPMENT",
-    itemId: equipmentId,
-    quantity: qty,
-    unitPriceCents: billing.unitPriceCents,
-    totalAmountCents: totalCents,
-    idempotencyKey,
-    status: "pending",
-    scanLogId: scanLogId ?? null,
-    usageSessionId,
-  });
-  await markIdempotentAsync(redisSeenKey);
+    await tx.insert(billingLedger).values({
+      id: ledgerId,
+      clinicId,
+      animalId: animal.id,
+      itemType: "EQUIPMENT",
+      itemId: equipmentId,
+      quantity: qty,
+      unitPriceCents: billing.unitPriceCents,
+      totalAmountCents: totalCents,
+      idempotencyKey,
+      status: "pending",
+      scanLogId: scanLogId ?? null,
+      usageSessionId,
+    });
+    await markIdempotentAsync(redisSeenKey);
+  }
 
   const packageLedgerIds: string[] = [];
   if (packageCode) {
