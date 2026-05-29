@@ -295,11 +295,21 @@ Priority depends on team goal; all are **independent** tracks.
 
 ---
 
+## Parallel product tracks (not slice numbers)
+
+| Track | Doc | Notes |
+|-------|-----|-------|
+| **Asset Copilot** | [asset-copilot-implementation-plan.md](./asset-copilot-implementation-plan.md) | Evidence Resolver under `server/domain/equipment/`; **does not** depend on paused Slice 4 mutations or Slice 5; gated by **Zero Errors, Zero Breaks** + feature flags |
+
+---
+
 ## Related documents (index)
 
 | Document | Use |
 |----------|-----|
 | [modularization-plan.md](./modularization-plan.md) | Original strategy & slice definitions |
+| [asset-copilot-implementation-plan.md](./asset-copilot-implementation-plan.md) | Asset Copilot milestones M0–M4 (draft) |
+| [adr-003-asset-copilot-evidence-resolver.md](./adr-003-asset-copilot-evidence-resolver.md) | Resolver placement ADR |
 | [src-types-split-plan.md](./src-types-split-plan.md) | Slice 6 inventory, cycles, naming traps |
 | [slice-6h-er-display-types-plan.md](./slice-6h-er-display-types-plan.md) | ER/display/Code Blue extraction (merged) |
 | [equipment-inline-mutations-inventory.md](./equipment-inline-mutations-inventory.md) | Paused equipment writes |
