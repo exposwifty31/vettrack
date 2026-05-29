@@ -1,8 +1,8 @@
 # Slice 6 — `src/types` domain split plan (inventory draft)
 
 **Status:** **6a–6h** — domain barrels complete (`platform` through `er`). **`index.ts`** is compatibility re-exports only (~9 lines). Import migrations deferred to **6i+**.  
-**Baseline:** post–PR #577 / #580 (`main`).  
-**Parent:** [modularization-plan.md](./modularization-plan.md) Slice 6.
+**Baseline:** post–PR #589 / #591 (`main`).  
+**Parent:** [modularization-plan.md](./modularization-plan.md) Slice 6 · **Rollup:** [modularization-status.md](./modularization-status.md)
 
 ## Purpose
 
@@ -400,7 +400,7 @@ Order of `export *` lines matters only if two domains exported the same name —
 
 ---
 
-## Phased implementation roadmap (not started)
+## Phased implementation roadmap
 
 | Sub-slice | Action | Validation |
 |-----------|--------|------------|
@@ -413,8 +413,8 @@ Order of `export *` lines matters only if two domains exported the same name —
 | **6g** | Extract `forecast.ts` | **merged** (#577; see pilot F9 audit in [#580](https://github.com/dboy3156/VetTrack/pull/580)) |
 | **6h** | Extract `er.ts` (display + Code Blue + crash cart) | **merged** (#589) — [slice-6h-er-display-types-plan.md](./slice-6h-er-display-types-plan.md) |
 | **6i** | Optional `handoff.ts` wrapper for shared re-exports | shift-handover-page |
-| **6h** | Pilot import migration: `api/equipment.ts` → `@/types/equipment` | knip, no unused exports |
-| **6i+** | Gradual importer migration; keep barrel until knip clean | per-domain PRs |
+| **6j** | Pilot import migration: `api/equipment.ts` → `@/types/equipment` | knip, no unused exports |
+| **6k+** | Gradual importer migration; keep barrel until knip clean | per-domain PRs |
 
 **Recommended first importer migration:** `src/lib/api/equipment.ts` (already domain-scoped, 15 types).
 

@@ -1,6 +1,7 @@
 # VetTrack modularization plan
 
-**Status:** Phase 1 complete (inventory + strategy). Slice 1 (`request-core.ts`) implemented.  
+**Status:** Phase 1 complete (inventory + strategy). Slice 1 (`request-core.ts`) implemented. Slices **3**, **4 (safe scope)**, and **6a–6h** merged.  
+**Done vs left (living doc):** [modularization-status.md](./modularization-status.md)  
 **Principle:** Incremental, behavior-preserving refactors — not a rewrite.
 
 ## Goals
@@ -68,6 +69,7 @@ Each slice must:
 
 ## Related documents
 
+- **[Modularization status — done vs left](./modularization-status.md)** — consolidated tracker (updated 2026-05-29)
 - [Architecture hardening addendum](./architecture-hardening-addendum.md) — governance, CI fitness functions, transactions, events
 - [Tooling syntax verification](./tooling-syntax-verification.md) — validated CLI/config for dependency-cruiser, madge, knip, ESLint (pre-G1)
 - [Domain boundaries](./domain-boundaries.md)
