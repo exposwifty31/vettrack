@@ -159,7 +159,7 @@ export async function softDeletePatientByHospitalization(params: {
   hospitalizationId: string;
   performedBy: string;
   performedByEmail: string;
-  actorRole: string;
+  actorRole: string | null;
   override?: boolean;
   overrideReason?: string | null;
   dischargeNotes?: string | null;
