@@ -1,6 +1,6 @@
 # Slice 6 — `src/types` domain split plan (inventory draft)
 
-**Status:** **6a merged** (`platform.ts`). **6b** (`patients.ts`) in PR — leaf patient/hospitalization types.  
+**Status:** **6a–6b merged** (`platform.ts`, `patients.ts`). **6c** (`equipment.ts`) draft PR — equipment/rooms/scan/ops-state types.  
 **Baseline:** `main` @ `4397d96c` (post–PR #569 Slice 4 stabilization).  
 **Parent:** [modularization-plan.md](./modularization-plan.md) Slice 6.
 
@@ -370,7 +370,7 @@ src/types/
   common.ts             # optional: AlertType, shared enums (if not in equipment)
   platform.ts           # User, Shift, roles, audit log, support, metrics, uploads (**merged 6a**)
   patients.ts           # Animal, Owner, Hospitalization, admit/update/search (**6b**)
-  equipment.ts          # Equipment, Room, Folder, scan, bulk, pilot, ops state V1/V2
+  equipment.ts          # Equipment, Room, Folder, scan, bulk, pilot, ops state V1/V2 (**6c**)
   tasks.ts              # Appointment*, medication, formulary, task dashboard
   billing.ts            # Ledger, leakage
   inventory.ts          # Containers, restock, PO, inventory jobs, consumables report
@@ -405,8 +405,8 @@ Order of `export *` lines matters only if two domains exported the same name —
 | Sub-slice | Action | Validation |
 |-----------|--------|------------|
 | **6a** | Extract `platform.ts` | **merged** (#571) |
-| **6b** | Extract `patients.ts` (leaf) | tsc, architecture:gates |
-| **6c** | Extract `equipment.ts` (include alert constants) | + offline-db typecheck, equipment tests |
+| **6b** | Extract `patients.ts` (leaf) | **merged** (#572) |
+| **6c** | Extract `equipment.ts` (alerts, rooms, scan, ops state) | draft; + offline-db shape unchanged via barrel |
 | **6c** | Extract `tasks.ts` | + medication/appointment tests |
 | **6d** | Extract `billing.ts`, `inventory.ts` | + billing/inventory pages |
 | **6e** | Extract `forecast.ts` | + compare to `server/lib/forecast/types.ts` |
@@ -459,3 +459,5 @@ No code changes under `src/types/` except documentation are expected for this in
 | 2026-05-29 | Slice 6a: `platform.ts` extracted; `index.ts` re-exports + internal `ShiftRole`/`UserRole` import for remaining definitions |
 | 2026-05-29 | Slice 6a merged (#571); static test `users-me-authority` reads `platform.ts` for `User.authority` |
 | 2026-05-29 | Slice 6b: `patients.ts` — `Animal`, `Owner`, `Hospitalization`, admit/update/search, `ActivePatient` |
+| 2026-05-29 | Slice 6b merged (#572); ER/display types remain in `index.ts` |
+| 2026-05-29 | Slice 6c draft: `equipment.ts`; `index.ts` imports `EquipmentStatus` for `DisplaySnapshotEquipment` only |
