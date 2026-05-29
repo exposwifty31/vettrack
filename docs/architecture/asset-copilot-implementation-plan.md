@@ -641,6 +641,27 @@ Reviewer picks up again at **M0 exit gate** and **M0.5 sign-off** once reviewers
 
 ---
 
+## 16. Engineering acknowledgment (final review pass — thread response)
+
+**Re: Reviewer Acknowledgment — v3.2 (final review pass)**
+
+Acknowledged. **v3.2** remains the sole exit-criteria source of truth; review is converged.
+
+**§3.5-B:** Signed-off wording captured in §3.5-B and §15. The supersession golden is added to M0 scope:
+
+- **Fixture:** checkout → later **transfer** (also return / re-checkout paths) → custody **not** current
+- **PR note:** graph loader supersession scan must be clinic-scoped and complete; missed superseding event = false “current” custody (high severity)
+
+**§6.3:** Unchanged — post-mortem required before any shadow re-run.
+
+**M0.5:** Sole open blocker = **named shadow reviewers in writing** (§15). Engineering will not start M0.5 shadow until product closes that row.
+
+**M0:** Proceeding to PR1 per agreed stack: contracts → `evidence-metadata.ts` (observation vs state modes) → graph loader (with supersession) → resolvers → validator → depcruise rule → golden suite (multi-day custody + supersession).
+
+Will surface again at **M0 exit** and **M0.5 sign-off** when reviewers are named.
+
+---
+
 ## 14. Sign-off questions (answered)
 
 | Question | Answer |
