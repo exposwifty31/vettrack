@@ -169,6 +169,7 @@ Full environment variable reference: `.env.example`
 
 ## Docs
 
+- [Features, capabilities & uniqueness](docs/FEATURES_CAPABILITIES_UNIQUENESS.md)
 - [Local dev sign-in runbook](docs/dev-signin-runbook.md)
 - [Testing guide](docs/testing-guide.md)
 - [Integrations guide](docs/integrations-guide.md)
