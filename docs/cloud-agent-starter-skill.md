@@ -189,7 +189,67 @@ Notes:
 
 ---
 
-## 5) Common Cloud-agent workflow shortcuts
+## 5) Railway CLI and MCP
+
+### Two tokens (do not mix them up)
+
+| Variable | Token type | Create at | Works for |
+|----------|------------|-----------|-----------|
+| `RAILWAY_TOKEN` | **Project** | Project → Settings → Tokens | `railway status`, `railway up`, `deploy.sh` |
+| `RAILWAY_API_TOKEN` | **Account** (“No workspace”) | Profile → Account settings → Tokens | `railway whoami`, `railway list`, **`railway mcp`**, MCP in Cursor |
+
+If both are set, the CLI may prefer `RAILWAY_TOKEN` and account commands fail with `Unauthorized` even when the API token is valid. For MCP/whoami: `unset RAILWAY_TOKEN` and use only `RAILWAY_API_TOKEN`.
+
+Verify an account token:
+
+```bash
+unset RAILWAY_TOKEN
+export RAILWAY_API_TOKEN='your-account-token'
+railway whoami
+```
+
+### MCP in Cursor (repo config)
+
+PR **#505** added tracked [`.cursor/mcp.json`](../.cursor/mcp.json) (CLI: `railway` + `args: ["mcp"]`). **Do not commit tokens** into that file.
+
+1. Install CLI: `bash <(curl -fsSL railway.com/install.sh) --agents -y` then `source "$HOME/.railway/env"`.
+2. Set **`RAILWAY_API_TOKEN`** in Cursor → MCP server env (or Cloud Agent secrets for cloud VMs) — not in git.
+3. Reload: **Developer: Reload Window**, or quit and reopen Cursor; check **Output → MCP** for `railway`.
+4. `railway login` needs an interactive TTY (Desktop terminal); cloud agents must use a token.
+
+### Cloud Agent secrets (injections)
+
+**For deploy/status only**, keep **`RAILWAY_TOKEN`** (project) in Cloud Agent secrets. Remove or dismiss:
+
+- `RAILWAY_API_TOKEN` (account token; conflicts with project token for some commands)
+- `RAILWAY_TOKEN_STAGING`, `RAILWAY_SERVICE_STAGING`
+- Any misnamed duplicate (e.g. `RAILWAY_TOKEN_STAGING 1` with a space)
+
+Before `railway` commands in a shell where stale secrets were injected:
+
+```bash
+source scripts/sanitize-railway-env.sh
+export PATH="$HOME/.local/bin:$PATH"
+railway status   # project-scoped; uses RAILWAY_TOKEN
+```
+
+`railway whoami` requires an **account** API token (`RAILWAY_API_TOKEN`). With project token only, expect `Unauthorized` on `whoami` while `railway status` / `railway up` still work.
+
+Deploy via `deploy.sh` also needs `RAILWAY_SERVICE` (GitHub secret or operator export) — not the `_STAGING` variant unless that is your intentional service id.
+
+### Removing a secret when the UI only shows Edit
+
+On **cursor.com → Cloud Agents → My Secrets**, deletion is easy to miss:
+
+1. **Use desktop width** — open the same page on a laptop browser (not mobile). Some actions only appear on wide layouts.
+2. **Inside the edit panel** — tap the secret row, then scroll to the bottom of the edit sheet. Look for **Delete**, **Remove**, or a trash icon (often red, below Save).
+3. **Row menu** — on desktop, hover the secret row for a **⋯** menu with Delete.
+4. **If there is still no delete** — you cannot remove it from the agent VM until Cursor removes it from your account. Use `source scripts/sanitize-railway-env.sh` each session as a workaround, and ask Cursor support to delete the stale keys (especially misnamed ones like `RAILWAY_TOKEN_STAGING 1`).
+5. **Do not** leave invalid Railway tokens in place hoping the CLI ignores them — `RAILWAY_API_TOKEN` can break `railway` even when `RAILWAY_TOKEN` is valid.
+
+---
+
+## 6) Common Cloud-agent workflow shortcuts
 
 - Typecheck quickly:
   ```bash
@@ -203,7 +263,7 @@ Notes:
 
 ---
 
-## 6) Keeping this skill updated (lightweight process)
+## 7) Keeping this skill updated (lightweight process)
 
 When a new testing trick/runbook fix is discovered:
 1. Add it to the relevant "Area" section above (not a random notes dump).

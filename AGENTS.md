@@ -74,6 +74,11 @@ All API route modules are registered via `server/app/routes.ts` (~49 routers und
 | Build | `pnpm build` |
 | E2E tests | `pnpm test:signup` (requires Playwright + Chromium) |
 
+### Railway CLI and MCP
+- **Deploy / `railway up`:** project token → `RAILWAY_TOKEN` (+ `RAILWAY_SERVICE` for `deploy.sh`). See `docs/cloud-agent-starter-skill.md` §5.
+- **MCP / `railway whoami`:** account token (“No workspace”) → `RAILWAY_API_TOKEN`; `unset RAILWAY_TOKEN` when testing MCP. MCP config: `.cursor/mcp.json` — never commit tokens.
+- Remove stale Cloud Agent secrets (`RAILWAY_TOKEN_STAGING*`, `RAILWAY_SERVICE_STAGING`, duplicate API tokens). Session workaround: `source scripts/sanitize-railway-env.sh`.
+
 ### Gotchas
 - The `predev` script runs `kill-port 3001 5000` to clear stale processes silently before starting.
 - No ESLint config exists in this repo.
