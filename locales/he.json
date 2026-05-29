@@ -1427,7 +1427,7 @@
     "pilotStaleThresholdSaved": "הסף עודכן",
     "pilotStaleThresholdError": "עדכון הסף נכשל",
     "pilotModeCardTitle": "מצב פיילוט (בדפדפן זה)",
-    "pilotModeCardDescription": "מסתיר דפים שאינם קשורים לציוד במכשיר זה. משפיע רק על התפריט; קישורים ישירים ממשיכים לעבוד. הגדרה פר-דפדפן; נכנס לתוקף אחרי רענון.",
+    "pilotModeCardDescription": "מדמה את מצב הפיילוט (ציוד בלבד) בדפדפן הזה. מסתיר פריטי תפריט שאינם ציוד וגם מוריד את ה-routes שלהם — קישורים ישירים ל-/billing, /patients, /meds, /analytics וכו' יחזירו Not Found כל עוד מצב הפיילוט פעיל. קישורים ישירים ל-Code Blue / Crash Cart / דף מחלקה ממשיכים לעבוד (אלה routes שתמיד נטענים). הגדרה פר-דפדפן; נכנסת לתוקף אחרי רענון.",
     "pilotModeEnvDefault": "ברירת מחדל מהשרת",
     "pilotModeOverride": "דריסה מקומית",
     "pilotModeEffective": "ערך אפקטיבי",

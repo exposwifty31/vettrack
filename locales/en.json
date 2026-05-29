@@ -1427,7 +1427,7 @@
     "pilotStaleThresholdSaved": "Threshold updated",
     "pilotStaleThresholdError": "Failed to update threshold",
     "pilotModeCardTitle": "Pilot Mode (this browser)",
-    "pilotModeCardDescription": "Hide non-equipment pages on this device. Affects menu only; deep links keep working. Per-browser override; takes effect after reload.",
+    "pilotModeCardDescription": "Simulate the equipment-only pilot on this browser. Hides non-equipment menu items AND unmounts their routes — direct links to /billing, /patients, /meds, /analytics etc. will return Not Found while pilot mode is on. Code Blue / Crash Cart / Ward Display deep links DO stay reachable (those routes are always mounted). Per-browser override; takes effect after reload.",
     "pilotModeEnvDefault": "Server default",
     "pilotModeOverride": "Local override",
     "pilotModeEffective": "Currently effective",

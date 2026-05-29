@@ -8,11 +8,11 @@ Each numbered doc matches one PR. Merge order follows the sequence below.
 
 | Step | Doc | PR # | Status | Deployed SHA | Rollback |
 |------|-----|------|--------|--------------|----------|
-| 01 | [01-pilot-mode-override.md](./01-pilot-mode-override.md) | — | Shipped (code on `claude/app-demo-prep-yXiUj` @ `3e9d520`) | `3e9d520` | `git revert` or clear `localStorage.vt_pilot_mode_override` |
-| 02 | [02-display-empty-panes.md](./02-display-empty-panes.md) | — | Pending | — | `git revert` |
-| 03 | [03-rate-limiter-per-user.md](./03-rate-limiter-per-user.md) | — | Pending | — | `git revert` |
-| 04 | [04-suppress-english-pushes.md](./04-suppress-english-pushes.md) | — | Pending | — | Unset `PILOT_DISABLE_EN_PUSH` |
-| 05 | [05-suppress-default-billing.md](./05-suppress-default-billing.md) | — | Pending | — | Unset `PILOT_SUPPRESS_DEFAULT_BILLING` |
+| 01 | [01-pilot-mode-override.md](./01-pilot-mode-override.md) | #557 (doc) / #558 (code) | Shipped | `9f79536` / `52e1cb8` | `git revert` or clear `localStorage.vt_pilot_mode_override` |
+| 02 | [02-display-empty-panes.md](./02-display-empty-panes.md) | #559 | Shipped | `cedb807` | `git revert` |
+| 03 | [03-rate-limiter-per-user.md](./03-rate-limiter-per-user.md) | #562 | Shipped | `167790e` | `git revert` |
+| 04 | [04-suppress-english-pushes.md](./04-suppress-english-pushes.md) | #564 | Shipped | `ba29fab` | Unset `PILOT_DISABLE_EN_PUSH` |
+| 05 | [05-suppress-default-billing.md](./05-suppress-default-billing.md) | #563 | Shipped | `4f36d6c` | Unset `PILOT_SUPPRESS_DEFAULT_BILLING` |
 | 06 | [06-bulk-delete-cleanup.md](./06-bulk-delete-cleanup.md) | — | Pending | — | `git revert` |
 | 07 | [07-revert-version-pin.md](./07-revert-version-pin.md) | — | Pending | — | `git revert` |
 | 08 | [08-bulk-verify-room-version.md](./08-bulk-verify-room-version.md) | — | Pending | — | `git revert` |
