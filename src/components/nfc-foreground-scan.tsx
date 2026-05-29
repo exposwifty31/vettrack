@@ -21,6 +21,14 @@ export function NfcForegroundScan() {
   const [starting, setStarting] = useState(false);
   const activeRef = useRef(false);
   const handlerRef = useRef<(equipmentId: string) => void>(() => {});
+  const scanAbortRef = useRef<AbortController | null>(null);
+
+  const stopScan = useCallback(() => {
+    scanAbortRef.current?.abort();
+    scanAbortRef.current = null;
+    activeRef.current = false;
+    setEnabled(false);
+  }, []);
 
   const handleEquipmentId = useCallback(
     async (equipmentId: string) => {
@@ -42,21 +50,28 @@ export function NfcForegroundScan() {
 
     const onVisibility = () => {
       if (document.visibilityState === "hidden") {
-        activeRef.current = false;
-        setEnabled(false);
+        stopScan();
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [enabled, nfcSupported]);
+  }, [enabled, nfcSupported, stopScan]);
+
+  useEffect(() => {
+    return () => {
+      stopScan();
+    };
+  }, [stopScan]);
 
   const startScan = async () => {
     if (!nfcSupported || activeRef.current) return;
     setStarting(true);
+    const controller = new AbortController();
+    scanAbortRef.current = controller;
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ndef = new (window as any).NDEFReader();
-      await ndef.scan();
+      await ndef.scan({ signal: controller.signal });
       activeRef.current = true;
       setEnabled(true);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -69,11 +84,11 @@ export function NfcForegroundScan() {
       };
       haptics.scanSuccess();
       toast.success(t.equipmentNfc.scanReady, { duration: 3200 });
-    } catch {
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       haptics.error();
       toast.error(t.equipmentNfc.scanStartFailed);
-      activeRef.current = false;
-      setEnabled(false);
+      stopScan();
     } finally {
       setStarting(false);
     }
@@ -88,8 +103,11 @@ export function NfcForegroundScan() {
         size="sm"
         variant={enabled ? "default" : "outline"}
         className="shadow-md gap-1.5 h-10"
-        onClick={() => void startScan()}
-        disabled={starting || enabled}
+        onClick={() => {
+          if (enabled) stopScan();
+          else void startScan();
+        }}
+        disabled={starting}
         aria-pressed={enabled}
       >
         <Radio className="w-4 h-4" />

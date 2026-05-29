@@ -851,6 +851,8 @@ const translations = {
 
   operationalState: {
     invalidCustodyForDockReturn: d.operationalState.invalidCustodyForDockReturn,
+    dockMasterTagNotFound: d.operationalState.dockMasterTagNotFound,
+    ambiguousDocks: d.operationalState.ambiguousDocks,
     noAssetTypeDefined: d.operationalState.noAssetTypeDefined,
     crossClinicAssociation: d.operationalState.crossClinicAssociation,
     conditionNotFound: d.operationalState.conditionNotFound,

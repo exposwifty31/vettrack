@@ -8,13 +8,16 @@ describe("semi-dock RFID notify", () => {
 
   it("fires only for checked_out equipment entering home room", () => {
     expect(ingest).toContain('eqRow.custodyState === "checked_out"');
+    expect(ingest).toContain("buildEquipmentHomeRoomIds");
     expect(ingest).toContain("isEquipmentHomeRoom");
     expect(ingest).toContain("deliverSemiDockPush");
+    expect(ingest).not.toContain("dockRoomIds");
   });
 
-  it("dedupes via alertAcks semi_dock_return since checkout", () => {
+  it("dedupes via atomic claimSemiDockNotifySlot", () => {
     expect(notify).toContain('SEMI_DOCK_ALERT_TYPE = "semi_dock_return"');
-    expect(notify).toContain("gt(alertAcks.acknowledgedAt, checkedOutAt)");
+    expect(notify).toContain("claimSemiDockNotifySlot");
+    expect(notify).toContain("pg_advisory_xact_lock");
   });
 
   it("logs audit and metrics", () => {

@@ -5,6 +5,7 @@ import { api, ApiError } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConditionChecklist } from "@/components/equipment/ConditionChecklist";
 import {
   decodeNdefTextFromReadingEvent,
@@ -12,6 +13,7 @@ import {
 } from "@/lib/nfc-equipment-toggle";
 import type { Equipment } from "@/types";
 import { haptics } from "@/lib/haptics";
+import { useLocation } from "wouter";
 
 interface DockReturnNfcProps {
   equipment: Equipment;
@@ -26,10 +28,29 @@ interface ConditionEntry {
   notes?: string;
 }
 
+type AmbiguousDock = { id: string; name: string };
+
+function parseAmbiguousDocks(err: unknown): AmbiguousDock[] | null {
+  if (!(err instanceof ApiError) || err.status !== 422) return null;
+  if (err.code !== "operationalState.ambiguousDocks") return null;
+  const docks = err.payload.docks;
+  if (!Array.isArray(docks)) return null;
+  return docks.filter(
+    (d): d is AmbiguousDock =>
+      typeof d === "object" &&
+      d !== null &&
+      typeof (d as AmbiguousDock).id === "string" &&
+      typeof (d as AmbiguousDock).name === "string",
+  );
+}
+
 export function DockReturnNfc({ equipment, open, onClose, onSuccess }: DockReturnNfcProps) {
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const [verifications, setVerifications] = useState<ConditionEntry[]>([]);
   const [scanning, setScanning] = useState(false);
+  const [ambiguousDocks, setAmbiguousDocks] = useState<AmbiguousDock[] | null>(null);
+  const [pickedDockId, setPickedDockId] = useState("");
   const nfcSupported = typeof window !== "undefined" && "NDEFReader" in window;
 
   const conditionsQ = useQuery({
@@ -45,12 +66,14 @@ export function DockReturnNfc({ equipment, open, onClose, onSuccess }: DockRetur
   });
 
   const dockReturnMut = useMutation({
-    mutationFn: (masterNfcTagId: string) =>
+    mutationFn: (payload: { masterNfcTagId?: string; dockId?: string }) =>
       api.operationalState.dockReturn(equipment.id, {
-        masterNfcTagId,
+        ...payload,
         conditionVerifications: verifications,
       }),
     onSuccess: () => {
+      setAmbiguousDocks(null);
+      setPickedDockId("");
       queryClient.invalidateQueries({ queryKey: [`/api/equipment/${equipment.id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       queryClient.invalidateQueries({ queryKey: ["deployability", equipment.id] });
@@ -63,6 +86,13 @@ export function DockReturnNfc({ equipment, open, onClose, onSuccess }: DockRetur
     },
     onError: (err) => {
       haptics.error();
+      const docks = parseAmbiguousDocks(err);
+      if (docks && docks.length > 0) {
+        setAmbiguousDocks(docks);
+        setPickedDockId("");
+        toast.message(t.operationalState.ambiguousDocks);
+        return;
+      }
       if (err instanceof ApiError && err.status === 409) {
         toast.error(t.dockReturn.versionConflict);
         return;
@@ -75,12 +105,21 @@ export function DockReturnNfc({ equipment, open, onClose, onSuccess }: DockRetur
     },
   });
 
+  const submitDockReturn = async (payload: { masterNfcTagId?: string; dockId?: string }) => {
+    try {
+      await dockReturnMut.mutateAsync(payload);
+    } catch {
+      // onError handles user-facing toasts
+    }
+  };
+
   const scanMasterTag = async () => {
     if (!nfcSupported) {
       toast.error(t.equipmentNfc.writeUnsupported);
       return;
     }
     setScanning(true);
+    setAmbiguousDocks(null);
     try {
       const masterNfcTagId = await new Promise<string>((resolve, reject) => {
         const timeout = window.setTimeout(() => reject(new Error("timeout")), 15_000);
@@ -103,8 +142,9 @@ export function DockReturnNfc({ equipment, open, onClose, onSuccess }: DockRetur
         };
         void ndef.scan().catch(reject);
       });
-      await dockReturnMut.mutateAsync(masterNfcTagId);
-    } catch {
+      await submitDockReturn({ masterNfcTagId });
+    } catch (err) {
+      if (err instanceof ApiError) return;
       haptics.error();
       toast.error(t.dockReturn.scanDockFailed);
     } finally {
@@ -113,6 +153,22 @@ export function DockReturnNfc({ equipment, open, onClose, onSuccess }: DockRetur
   };
 
   if (!open) return null;
+
+  if (!equipment.assetTypeId) {
+    return (
+      <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t.dockReturn.nfcConfirmTitle}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{t.dockReturn.noAssetTypeBlocked}</p>
+          <Button variant="outline" onClick={() => { onClose(); navigate("/admin/asset-types"); }}>
+            {t.dockReturn.goToSetup}
+          </Button>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   const conditions = conditionsQ.data ?? [];
   const existingStates = conditionStatesQ.data ?? [];
@@ -124,6 +180,24 @@ export function DockReturnNfc({ equipment, open, onClose, onSuccess }: DockRetur
           <DialogTitle>{t.dockReturn.nfcConfirmTitle}</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">{t.dockReturn.scanDockMasterTag}</p>
+
+        {ambiguousDocks && ambiguousDocks.length > 0 ? (
+          <div>
+            <p className="text-sm text-amber-700 mb-2">{t.operationalState.ambiguousDocks}</p>
+            <Select value={pickedDockId} onValueChange={setPickedDockId}>
+              <SelectTrigger>
+                <SelectValue placeholder={t.dockReturn.selectDock} />
+              </SelectTrigger>
+              <SelectContent>
+                {ambiguousDocks.map((dock) => (
+                  <SelectItem key={dock.id} value={dock.id}>
+                    {dock.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
 
         <div>
           <p className="text-sm font-medium mb-2">{t.dockReturn.conditions}</p>
@@ -143,9 +217,18 @@ export function DockReturnNfc({ equipment, open, onClose, onSuccess }: DockRetur
           <Button variant="outline" onClick={onClose} disabled={dockReturnMut.isPending || scanning}>
             {t.common.cancel}
           </Button>
-          <Button onClick={() => void scanMasterTag()} disabled={dockReturnMut.isPending || scanning}>
-            {t.dockReturn.scanDockMasterTag}
-          </Button>
+          {ambiguousDocks && ambiguousDocks.length > 0 ? (
+            <Button
+              onClick={() => void submitDockReturn({ dockId: pickedDockId })}
+              disabled={!pickedDockId || dockReturnMut.isPending}
+            >
+              {t.dockReturn.submit}
+            </Button>
+          ) : (
+            <Button onClick={() => void scanMasterTag()} disabled={dockReturnMut.isPending || scanning}>
+              {t.dockReturn.scanDockMasterTag}
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

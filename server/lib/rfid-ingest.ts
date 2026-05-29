@@ -5,6 +5,7 @@ import { logAudit } from "./audit.js";
 import { incrementMetric } from "./metrics.js";
 import { insertRealtimeDomainEvent } from "./realtime-outbox.js";
 import {
+  buildEquipmentHomeRoomIds,
   deliverSemiDockPush,
   isEquipmentHomeRoom,
   type SemiDockNotifyCandidate,
@@ -105,13 +106,19 @@ export async function ingestRfidBatch(
       .from(equipment)
       .where(and(eq(equipment.clinicId, clinicId), inArray(equipment.rfidTagEpc, tagEpcs)));
 
-    const dockRoomRows = await tx
-      .select({ roomId: docks.roomId })
-      .from(docks)
-      .where(eq(docks.clinicId, clinicId));
-    const dockRoomIds = new Set(
-      dockRoomRows.map((r) => r.roomId).filter((id): id is string => Boolean(id)),
-    );
+    const equipmentDockIds = [
+      ...new Set(equipmentRows.map((r) => r.dockId).filter((id): id is string => Boolean(id))),
+    ];
+    const dockRoomByDockId = new Map<string, string>();
+    if (equipmentDockIds.length > 0) {
+      const dockRows = await tx
+        .select({ id: docks.id, roomId: docks.roomId })
+        .from(docks)
+        .where(and(eq(docks.clinicId, clinicId), inArray(docks.id, equipmentDockIds)));
+      for (const d of dockRows) {
+        if (d.roomId) dockRoomByDockId.set(d.id, d.roomId);
+      }
+    }
 
     const roomRows = await tx
       .select({ id: rooms.id, gatewayCode: rooms.gatewayCode })
@@ -245,11 +252,16 @@ export async function ingestRfidBatch(
       result.updated += 1;
       incrementMetric("rfid_event_room_changed");
 
+      const homeRoomIds = buildEquipmentHomeRoomIds(
+        eqRow.roomId,
+        eqRow.dockId ? dockRoomByDockId.get(eqRow.dockId) ?? null : null,
+      );
       if (
         eqRow.custodyState === "checked_out" &&
         eqRow.checkedOutById &&
         eqRow.checkedOutAt &&
-        isEquipmentHomeRoom(eqRow.roomId, roomId, dockRoomIds)
+        homeRoomIds.size > 0 &&
+        isEquipmentHomeRoom(roomId, homeRoomIds)
       ) {
         semiDockCandidates.push({
           clinicId,

@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import { alertAcks, db } from "../db.js";
 import { loadLocale } from "../../lib/i18n/loader.js";
 import { resolve as resolveI18nKey } from "../../lib/i18n/index.js";
@@ -15,21 +15,30 @@ export function buildSemiDockTag(equipmentId: string): string {
   return `semi-dock:${equipmentId}`;
 }
 
-export function isEquipmentHomeRoom(
+/** Home = equipment's assigned room and/or its dock's room — not every dock room in the clinic. */
+export function buildEquipmentHomeRoomIds(
   equipmentRoomId: string | null,
-  newRoomId: string,
-  dockRoomIds: ReadonlySet<string>,
-): boolean {
-  if (equipmentRoomId && newRoomId === equipmentRoomId) return true;
-  return dockRoomIds.has(newRoomId);
+  equipmentDockRoomId: string | null,
+): Set<string> {
+  const ids = new Set<string>();
+  if (equipmentRoomId) ids.add(equipmentRoomId);
+  if (equipmentDockRoomId) ids.add(equipmentDockRoomId);
+  return ids;
 }
+
+export function isEquipmentHomeRoom(newRoomId: string, homeRoomIds: ReadonlySet<string>): boolean {
+  return homeRoomIds.has(newRoomId);
+}
+
+type DbLike = Pick<typeof db, "select" | "insert">;
 
 export async function wasSemiDockNotifiedSinceCheckout(
   clinicId: string,
   equipmentId: string,
   checkedOutAt: Date,
+  conn: DbLike = db,
 ): Promise<boolean> {
-  const [row] = await db
+  const [row] = await conn
     .select({ id: alertAcks.id })
     .from(alertAcks)
     .where(
@@ -44,8 +53,12 @@ export async function wasSemiDockNotifiedSinceCheckout(
   return Boolean(row);
 }
 
-export async function markSemiDockNotified(clinicId: string, equipmentId: string): Promise<void> {
-  await db.insert(alertAcks).values({
+export async function markSemiDockNotified(
+  clinicId: string,
+  equipmentId: string,
+  conn: DbLike = db,
+): Promise<void> {
+  await conn.insert(alertAcks).values({
     id: randomUUID(),
     clinicId,
     equipmentId,
@@ -73,13 +86,33 @@ export interface SemiDockNotifyCandidate {
   homeRoomId: string;
 }
 
+/** Atomically claims a semi-dock notify slot for this checkout (advisory lock + insert). */
+export async function claimSemiDockNotifySlot(
+  clinicId: string,
+  equipmentId: string,
+  checkedOutAt: Date,
+): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${equipmentId}))`);
+    const already = await wasSemiDockNotifiedSinceCheckout(
+      clinicId,
+      equipmentId,
+      checkedOutAt,
+      tx,
+    );
+    if (already) return false;
+    await markSemiDockNotified(clinicId, equipmentId, tx);
+    return true;
+  });
+}
+
 export async function deliverSemiDockPush(candidate: SemiDockNotifyCandidate): Promise<void> {
-  const already = await wasSemiDockNotifiedSinceCheckout(
+  const claimed = await claimSemiDockNotifySlot(
     candidate.clinicId,
     candidate.equipmentId,
     candidate.checkedOutAt,
   );
-  if (already) {
+  if (!claimed) {
     incrementMetric("semi_dock_skipped_deduped");
     return;
   }
@@ -90,7 +123,6 @@ export async function deliverSemiDockPush(candidate: SemiDockNotifyCandidate): P
 
   try {
     await sendPushToUser(candidate.clinicId, candidate.checkedOutById, { title, body, tag, url });
-    await markSemiDockNotified(candidate.clinicId, candidate.equipmentId);
     incrementMetric("semi_dock_notified");
     logAudit({
       clinicId: candidate.clinicId,

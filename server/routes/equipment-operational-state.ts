@@ -291,6 +291,29 @@ router.post("/equipment/:equipmentId/dock-return", requireAuth, validateBody(doc
       const readinessOk = readinessResult.ok;
       const newReadiness = readinessOk ? "ready" : "not_ready";
 
+      let checkedOutClearFields: Record<string, unknown> = {};
+      if (eq_row.custodyState === "checked_out") {
+        const [activeClaims] = await tx
+          .select({ count: sql<number>`count(*)` })
+          .from(stagingQueue)
+          .where(
+            and(
+              eq(stagingQueue.equipmentId, equipmentId),
+              eq(stagingQueue.clinicId, clinicId),
+              eq(stagingQueue.status, "active"),
+            ),
+          );
+        const hasActiveClaims = Number(activeClaims?.count ?? 0) > 0;
+        checkedOutClearFields = {
+          checkedOutById: null,
+          checkedOutByEmail: null,
+          checkedOutAt: null,
+          checkedOutLocation: null,
+          usageState: hasActiveClaims ? ("staged" as const) : ("available" as const),
+          usageStateSince: now,
+        };
+      }
+
       // 4. Update equipment with version guard
       const updated = await tx
         .update(equipment)
@@ -300,14 +323,7 @@ router.post("/equipment/:equipmentId/dock-return", requireAuth, validateBody(doc
           dockId,
           readinessState: newReadiness,
           readinessStateSince: now,
-          ...(eq_row.custodyState === "checked_out"
-            ? {
-                checkedOutById: null,
-                checkedOutByEmail: null,
-                checkedOutAt: null,
-                checkedOutLocation: null,
-              }
-            : {}),
+          ...checkedOutClearFields,
           ...(readinessOk
             ? { dockConfirmedReadyAt: now, dockConfirmedById: userId, emergencyOverrideAt: null, emergencyOverrideById: null }
             : {}),

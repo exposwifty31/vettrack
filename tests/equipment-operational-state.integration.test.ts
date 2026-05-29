@@ -641,6 +641,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(eq?.custody_state).toBe("docked");
       expect(eq?.checked_out_by_id).toBeNull();
       expect(eq?.checked_out_at).toBeNull();
+      expect(eq?.usage_state).toBe("available");
     });
 
     it("no assetTypeId → 422 with operationalState.noAssetTypeDefined error", async () => {
