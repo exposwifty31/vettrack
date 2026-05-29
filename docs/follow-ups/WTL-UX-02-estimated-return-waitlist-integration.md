@@ -2,9 +2,9 @@
 
 **Source:** Program Brain review (directionally approved). **Follow-up** to Phase B waitlist + WTL-UX-01.
 
-**Status:** **Complete** — implemented in branch `cursor/wtl-ux-02-estimated-return-75c7` (02a + 02b in one PR).
+**Status:** **Complete** — merged via PR #494 (`dce98fac` on `main`, 2026-05-27).
 
-**Merge order:** WTL-UX-01 merged (#492). WTL-UX-02 ships as a single follow-up PR.
+**Merge order:** WTL-UX-01 merged (#492); WTL-UX-02a + 02b shipped together in #494.
 
 ---
 
