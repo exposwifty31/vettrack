@@ -13,12 +13,12 @@ Each numbered doc matches one PR. Merge order follows the sequence below.
 | 03 | [03-rate-limiter-per-user.md](./03-rate-limiter-per-user.md) | #562 | Shipped | `167790e` | `git revert` |
 | 04 | [04-suppress-english-pushes.md](./04-suppress-english-pushes.md) | #564 | Shipped | `ba29fab` | Unset `PILOT_DISABLE_EN_PUSH` |
 | 05 | [05-suppress-default-billing.md](./05-suppress-default-billing.md) | [#563](https://github.com/dboy3156/VetTrack/pull/563) (intended) · [#577](https://github.com/dboy3156/VetTrack/pull/577) (merge path) | Shipped on `main` | `10f0e463` + `4f36d6ca` | Unset `PILOT_SUPPRESS_DEFAULT_BILLING` |
-| 06 | [06-bulk-delete-cleanup.md](./06-bulk-delete-cleanup.md) | — | Pending | — | `git revert` |
-| 07 | [07-revert-version-pin.md](./07-revert-version-pin.md) | — | Pending | — | `git revert` |
-| 08 | [08-bulk-verify-room-version.md](./08-bulk-verify-room-version.md) | — | Pending | — | `git revert` |
-| 09 | [09-emergency-staging-ttl.md](./09-emergency-staging-ttl.md) | — | Pending | — | `git revert` (+ SQL in doc if needed) |
-| 10 | [10-patch-equipment-strict.md](./10-patch-equipment-strict.md) | — | Pending | — | `git revert` |
-| 11 | [11-unit-condition-states-clinic.md](./11-unit-condition-states-clinic.md) | — | Pending | — | `git revert` |
+| 06 | [06-bulk-delete-cleanup.md](./06-bulk-delete-cleanup.md) | [#561](https://github.com/dboy3156/VetTrack/pull/561) | Shipped | `4331a118` | `git revert` |
+| 07 | [07-revert-version-pin.md](./07-revert-version-pin.md) | [#565](https://github.com/dboy3156/VetTrack/pull/565) | Shipped | `8b2affc7` | `git revert` |
+| 08 | [08-bulk-verify-room-version.md](./08-bulk-verify-room-version.md) | [#560](https://github.com/dboy3156/VetTrack/pull/560) | Shipped | `8157ff96` | `git revert` |
+| 09 | [09-emergency-staging-ttl.md](./09-emergency-staging-ttl.md) | [#566](https://github.com/dboy3156/VetTrack/pull/566) | Shipped | `2fef5962` | `git revert` (+ SQL in doc if needed) |
+| 10 | [10-patch-equipment-strict.md](./10-patch-equipment-strict.md) | [#567](https://github.com/dboy3156/VetTrack/pull/567) | Shipped | `670f38a2` | `git revert` |
+| 11 | [11-unit-condition-states-clinic.md](./11-unit-condition-states-clinic.md) | [#568](https://github.com/dboy3156/VetTrack/pull/568) | Shipped | `5fb97645` | `git revert` |
 
 ## Critical files (update after refactor slices)
 
