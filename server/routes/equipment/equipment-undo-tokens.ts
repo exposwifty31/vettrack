@@ -13,13 +13,20 @@ export interface EquipmentPreviousState {
   checkedOutLocation: string | null;
 }
 
+type DbExecutor = typeof db;
+
+/**
+ * Atomically marks an undo token consumed. Pass the transaction client from
+ * `db.transaction` so consumption rolls back with the rest of the revert.
+ */
 export async function consumeUndoToken(
   clinicId: string,
   tokenId: string,
   equipmentId: string,
   actorId: string,
+  executor: DbExecutor = db,
 ): Promise<{ scanLogId: string; previousState: EquipmentPreviousState } | null> {
-  const [entry] = await db
+  const [entry] = await executor
     .update(undoTokens)
     .set({ consumed: true } as Partial<typeof undoTokens.$inferInsert>)
     .where(

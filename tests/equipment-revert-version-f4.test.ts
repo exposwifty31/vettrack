@@ -11,4 +11,20 @@ describe("F4: revert version pin", () => {
     expect(src).toContain("EQUIPMENT_VERSION_CONFLICT");
     expect(src).toContain("version: sql`${equipment.version} + 1`");
   });
+
+  it("F4: consumes undo token inside the revert transaction so version conflicts can retry", () => {
+    const revertSrc = readFileSync(
+      "server/routes/equipment/handlers/post-equipment-revert.ts",
+      "utf8",
+    );
+    const tokenSrc = readFileSync("server/routes/equipment/equipment-undo-tokens.ts", "utf8");
+
+    expect(revertSrc).toMatch(
+      /db\.transaction\(async \(tx\) => \{[\s\S]*consumeUndoToken\([^)]+,\s*tx\)/,
+    );
+    expect(revertSrc).not.toMatch(
+      /consumeUndoToken\([\s\S]*?\);\s*await db\.transaction/,
+    );
+    expect(tokenSrc).toContain("executor: DbExecutor = db");
+  });
 });

@@ -32,68 +32,78 @@ export const postEquipmentRevertHandler: RequestHandler = async (req, res) => {
       );
     }
 
-    const token = await consumeUndoToken(clinicId, tokenId, req.params.id, req.authUser!.id);
-    if (!token) {
-      return res.status(409).json(
-        apiError({
-          code: "CONFLICT",
-          reason: "UNDO_TOKEN_INVALID_OR_EXPIRED",
-          message: "Undo window expired or token invalid",
-          requestId,
-        }),
-      );
-    }
-
-    const prev = token.previousState;
-
     let updated: EquipmentRow | null = null;
-    let versionConflict = false;
 
-    await db.transaction(async (tx) => {
-      const [result] = await tx
-        .update(equipment)
-        .set({
-          status: prev.status,
-          lastSeen: prev.lastSeen ? new Date(prev.lastSeen) : null,
-          lastStatus: prev.lastStatus,
-          lastMaintenanceDate: prev.lastMaintenanceDate ? new Date(prev.lastMaintenanceDate) : null,
-          lastSterilizationDate: prev.lastSterilizationDate ? new Date(prev.lastSterilizationDate) : null,
-          checkedOutById: prev.checkedOutById,
-          checkedOutByEmail: prev.checkedOutByEmail,
-          checkedOutAt: prev.checkedOutAt ? new Date(prev.checkedOutAt) : null,
-          checkedOutLocation: prev.checkedOutLocation,
-          version: sql`${equipment.version} + 1`,
-        })
-        .where(
-          and(
-            eq(equipment.clinicId, clinicId),
-            eq(equipment.id, req.params.id),
-            eq(equipment.version, existingItem.version),
-          ),
-        )
-        .returning();
+    try {
+      await db.transaction(async (tx) => {
+        const token = await consumeUndoToken(clinicId, tokenId, req.params.id, req.authUser!.id, tx);
+        if (!token) {
+          throw new Error("UNDO_TOKEN_INVALID");
+        }
 
-      if (!result) {
-        versionConflict = true;
-        return;
+        const prev = token.previousState;
+
+        const [result] = await tx
+          .update(equipment)
+          .set({
+            status: prev.status,
+            lastSeen: prev.lastSeen ? new Date(prev.lastSeen) : null,
+            lastStatus: prev.lastStatus,
+            lastMaintenanceDate: prev.lastMaintenanceDate ? new Date(prev.lastMaintenanceDate) : null,
+            lastSterilizationDate: prev.lastSterilizationDate ? new Date(prev.lastSterilizationDate) : null,
+            checkedOutById: prev.checkedOutById,
+            checkedOutByEmail: prev.checkedOutByEmail,
+            checkedOutAt: prev.checkedOutAt ? new Date(prev.checkedOutAt) : null,
+            checkedOutLocation: prev.checkedOutLocation,
+            version: sql`${equipment.version} + 1`,
+          })
+          .where(
+            and(
+              eq(equipment.clinicId, clinicId),
+              eq(equipment.id, req.params.id),
+              eq(equipment.version, existingItem.version),
+            ),
+          )
+          .returning();
+
+        if (!result) {
+          throw new Error("VERSION_CONFLICT");
+        }
+
+        updated = result;
+
+        await tx
+          .delete(scanLogs)
+          .where(
+            and(
+              eq(scanLogs.clinicId, clinicId),
+              eq(scanLogs.id, token.scanLogId),
+              eq(scanLogs.equipmentId, req.params.id),
+            ),
+          );
+      });
+    } catch (err) {
+      if (err instanceof Error && err.message === "UNDO_TOKEN_INVALID") {
+        return res.status(409).json(
+          apiError({
+            code: "CONFLICT",
+            reason: "UNDO_TOKEN_INVALID_OR_EXPIRED",
+            message: "Undo window expired or token invalid",
+            requestId,
+          }),
+        );
       }
-
-      updated = result;
-
-      await tx
-        .delete(scanLogs)
-        .where(and(eq(scanLogs.clinicId, clinicId), eq(scanLogs.id, token.scanLogId), eq(scanLogs.equipmentId, req.params.id)));
-    });
-
-    if (versionConflict) {
-      return res.status(409).json(
-        apiError({
-          code: "CONFLICT",
-          reason: "EQUIPMENT_VERSION_CONFLICT",
-          message: "Equipment was modified by someone else — reload and retry",
-          requestId,
-        }),
-      );
+      if (err instanceof Error && err.message === "VERSION_CONFLICT") {
+        return res.status(409).json(
+          apiError({
+            code: "CONFLICT",
+            reason: "EQUIPMENT_VERSION_CONFLICT",
+            message: "Equipment was modified by someone else — reload and retry",
+            requestId,
+          }),
+        );
+      }
+      throw err;
     }
 
     logAudit({
