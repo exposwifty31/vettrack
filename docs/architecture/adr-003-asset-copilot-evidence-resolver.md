@@ -1,8 +1,8 @@
 # ADR-003 — Asset Copilot Evidence Resolver
 
 **Date:** 2026-05-29  
-**Status:** Accepted v1.1 — pending implementation (Milestone 0)  
-**Plan:** [asset-copilot-implementation-plan.md](./asset-copilot-implementation-plan.md) v3.1  
+**Status:** Accepted v1.2 — pending implementation (Milestone 0)  
+**Plan:** [asset-copilot-implementation-plan.md](./asset-copilot-implementation-plan.md) v3.2  
 **Parent plan:** [asset-copilot-implementation-plan.md](./asset-copilot-implementation-plan.md)  
 **Domain:** `equipment` ([domain-boundaries.md](./domain-boundaries.md))
 
@@ -75,7 +75,13 @@ M1 adds: `resolveOfflineConflict`, `searchEquipmentEvidence`.
 
 ### Freshness (M0)
 
-`evidenceFreshness` uses **per-`CitationType` thresholds** (see plan §3.5), not one global 60-minute rule. Condition citations use `assetTypeConditions.staleAfterMinutes` when applicable.
+Two families (plan §3.5):
+
+1. **Observation citations** (`rfid`, `scan`, `transfer`, `sse`, `waitlist`) — time decay via `currentMaxMinutes`.
+2. **State assertions** — custody/checkout on `equipment` row: **freshness stays `current`** while checked out until a superseding return/custody/transfer event. **Do not** mark custody stale based on `checkedOutAt` age alone.
+3. **Condition citations** — `assetTypeConditions.staleAfterMinutes` on `verifiedAt` (existing lifecycle).
+
+Optional UI: **Last corroborated** from latest scan/RFID consistent with custodian (observation decay applies only to that line).
 
 ### Cache (M1)
 
@@ -83,7 +89,7 @@ Cached answers store citation `observedAt` (ISO) only; **`ageMinutes` and freshn
 
 ### Compile-time no-mutation boundary (M0)
 
-dependency-cruiser **error**: `server/domain/equipment/evidence/**`, `server/domain/equipment/copilot/**`, and `asset-copilot-orchestrator.service.ts` must not import equipment write routes/services. See plan §3.8.
+dependency-cruiser **error**: `server/domain/equipment/evidence/**`, `server/domain/equipment/copilot/**`, and `asset-copilot-orchestrator.service.ts` must not **transitively** depend on equipment write routes/services or barrels that re-export them. See plan §3.8.
 
 ### Deployability invariant
 
@@ -94,6 +100,8 @@ Location, custodian, and waitlist resolvers have **no HTTP parity oracle**; gold
 ### Custody invariant
 
 Resolver **must not** infer custodian from RFID alone. Checked-out custodian requires `custody_state === "checked_out"` and `checkedOutById` on `vt_equipment`.
+
+Custodian **freshness** follows state-assertion rules (§3.5-B), not observation decay on `checkedOutAt`.
 
 ### Staging vs waitlist invariant
 
@@ -168,3 +176,4 @@ Each step: `npx tsc --noEmit`, `pnpm architecture:gates`, `pnpm test`.
 | Date | Change |
 |------|--------|
 | 2026-05-29 | v1.1: validity vs relevance; per-type freshness; cache contract; depcruise; RAG untrusted input; semantic parity |
+| 2026-05-29 | v1.2: custody freshness = state assertion; transitive depcruise; reviewer M0 approval |

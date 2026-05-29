@@ -39,6 +39,18 @@ module.exports = {
       from: { pathNot: "^node_modules" },
       to: { circular: true },
     },
+    {
+      name: "asset-copilot-no-mutation-imports",
+      comment:
+        "Asset Copilot evidence/resolver/orchestrator must not reach equipment write routes (direct or transitive). Plan: docs/architecture/asset-copilot-implementation-plan.md §3.8",
+      severity: "error",
+      from: {
+        path: "^server/(domain/equipment/(evidence|copilot)/|services/asset-copilot-orchestrator)",
+      },
+      to: {
+        path: "^server/routes/equipment",
+      },
+    },
   ],
   options: {
     doNotFollow: { path: ["node_modules"] },

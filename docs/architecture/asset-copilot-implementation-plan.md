@@ -1,8 +1,8 @@
 # Asset Copilot — Implementation Plan (Draft)
 
-**Status:** Draft v3.1 — reviewer revisions incorporated (2026-05-29)  
+**Status:** Draft v3.2 — reviewer confirmation incorporated (2026-05-29)  
 **Governance:** **Zero Errors, Zero Breaks** (primary constraint)  
-**Reviewer verdict:** Approve M0 start; resolve §3.5–§3.8 and §6 before M0.5 shadow begins  
+**Reviewer verdict:** **M0 approved** — v3.2 is exit-criteria source of truth. **M0.5 hold** until §15 blockers (b) named reviewers posted.  
 **Product line:** Asset Copilot succeeds when users trust its evidence more than they trust hallway conversations.  
 **Positioning:** **Evidence Copilot** — explains state, never changes it.  
 **Modularization alignment:** [modularization-plan.md](./modularization-plan.md) · [modularization-status.md](./modularization-status.md) · [domain-boundaries.md](./domain-boundaries.md)  
@@ -163,23 +163,55 @@ After merge: `pnpm routes:contract -- --write-contract` (intentional contract up
 - **`citation_validity_failure`** vs **`citation_relevance_miss`** (human sample audit) — separate counters
 - Page if `partially_cited / total > 2%` for 15m or validation failures spike
 
-### 3.5 Freshness thresholds — per evidence type (M0, not deferred)
+### 3.5 Freshness — observation decay vs state assertions (M0)
 
-A single global “60m = current” is **incorrect** for this domain. Resolver uses **`FRESHNESS_POLICY[citation.type]`** (and optional `equipment.mobilityClass` later):
+**Reviewer agreement (v3.2):** §3.5 cleared after custody recategorization below. RFID and condition entries unchanged.
 
-| `CitationType` | Default `current` window | Rationale |
-|----------------|------------------------|-----------|
-| `rfid` | 240 min (4h) | Fixed infrastructure; slow drift acceptable for “last seen” |
-| `scan` | 120 min | Manual confirmation; medium decay |
-| `equipment` (row / custody fields) | 60 min | Checkout/custody state changes faster |
-| `transfer` | 120 min | Room/folder moves |
-| `condition` | From `assetTypeConditions.staleAfterMinutes` | **Reuse existing clinical ops rule** |
-| `sse` | 30 min | Event stream is high-churn |
-| `waitlist` | 15 min | Queue position changes quickly |
+Freshness is **not** one formula for all citations. Two families:
 
-`evidenceFreshness = ageMinutes <= policy.currentMaxMinutes ? "current" : "stale"`.
+#### A — Point observations (time decay)
 
-Unit tests: at least one fixture per type crossing the threshold.
+A sighting that genuinely becomes less reliable over time.  
+`evidenceFreshness = ageMinutes(observedAt) <= policy.currentMaxMinutes ? "current" : "stale"`.
+
+| `CitationType` | `current` window | Rationale |
+|----------------|----------------|-----------|
+| `rfid` | 240 min (4h) | Infrastructure-bound; slow spatial drift |
+| `scan` | 120 min | Manual point confirmation |
+| `transfer` | 120 min | Move events age out |
+| `sse` | 30 min | High-churn event stream |
+| `waitlist` | 15 min | Queue changes quickly |
+
+#### B — State assertions (no decay on the assertion’s own timestamp)
+
+Authoritative state that holds until a **superseding event** (return, transfer, custody change, condition re-verify). The checkout record is not “stale” because it is old — a pump checked out for a multi-day procedure remains **true** until return.
+
+| `CitationType` / claim | Freshness rule | Superseding events |
+|------------------------|----------------|-------------------|
+| **`equipment` (custody / checkout row)** | **`current`** while `custody_state === "checked_out"` and `checkedOutById` set, with **no** later contradicting custody/return/transfer event in graph | `return`, custody transition to `docked`/`returned`/`untracked`, conflicting checkout |
+| **`condition`** | Use `assetTypeConditions.staleAfterMinutes` on **`verifiedAt`** (existing ops lifecycle) | Re-verify or stale sweep |
+
+**Custody claim UI (recommended):**
+
+- Primary line: custodian + **`Freshness: Current`** (state assertion — not aged from `checkedOutAt`).
+- Optional secondary: **Last corroborated:** scan/RFID consistent with holder, with observation decay from §3.5-A (`lastCorroboratedAt`).
+
+Resolver **`resolveCustodian`** must not mark custody stale solely because `checkedOutAt` is >60 minutes.
+
+#### Implementation (`evidence-metadata.ts`)
+
+```typescript
+type FreshnessMode = "observation_decay" | "state_assertion" | "condition_lifecycle";
+
+function resolveEvidenceFreshness(citation: Citation, graph: EvidenceGraph): Confidence["evidenceFreshness"];
+```
+
+Unit tests (M0):
+
+- RFID/scan: cross threshold → stale.
+- Custody: checkout 72h ago, no return → **still current**.
+- Custody + return event after checkout → custodian claim withdrawn or unknown.
+- Condition: uses `staleAfterMinutes` boundary.
 
 ### 3.6 Cache vs freshness — no frozen lies
 
@@ -193,6 +225,8 @@ Unit tests: at least one fixture per type crossing the threshold.
 - Client UI may also recompute display age from `observedAt` every render (preferred for drawer open).
 
 SSE invalidation still drops cache entries on `EQUIPMENT_*`; age drift is handled by recompute-on-serve regardless.
+
+**Regression test (M1, blocking):** Serve the same cached answer at **T** and **T+10m** with no new events; assert rendered `ageMinutes` for an observation citation **differs** (e.g. +10). Locks recompute-on-serve against caching age strings.
 
 ### 3.7 Offline and conflict coach (M1-d)
 
@@ -218,15 +252,18 @@ VetTrack is offline-first for **mutations**; Asset Copilot is **online-only** fo
 - `server/domain/equipment/copilot/**`
 - `server/services/asset-copilot-orchestrator.service.ts`
 
-**must not import** any path exporting equipment **write** handlers or mutation services, including but not limited to:
+**must not depend on** (direct **or transitive**) any module that exports equipment **write** handlers or mutation services, including but not limited to:
 
 - `server/routes/equipment.ts` (inline checkout/return/scan/seen)
 - `server/routes/equipment/handlers/post-*` mutation handlers
 - `enqueueChargeAlertJob`, checkout/return service paths
+- Shared **barrels** that re-export write paths (e.g. `server/routes/equipment/index` if it exports mutations)
 
-Allowed: `equipment-operational-state.service.ts` (readiness **read** functions), `db` **select** via graph loader only.
+dependency-cruiser follows the full dependency graph — a copilot → utils → write re-export **fails** the rule. Add a dedicated rule `asset-copilot-no-mutation-imports` in `.dependency-cruiser.cjs` (M0 PR1).
 
-Verify: `pnpm architecture:gates` fails if copilot imports a forbidden path.
+Allowed: `equipment-operational-state.service.ts` (readiness **read** functions), `db` **select** via graph loader only, `equipment-waitlist.service.ts` **read** paths only.
+
+Verify: `pnpm architecture:gates` fails if copilot **transitively** reaches a forbidden path.
 
 ---
 
@@ -268,7 +305,7 @@ Verify: `pnpm architecture:gates` fails if copilot imports a forbidden path.
 
 ### Milestone 0.5 — Shadow Mode (Weeks 3–4)
 
-**Prerequisite:** §3.5–§3.8 and §6.2 finalized in this doc (reviewer gate before shadow starts).
+**Prerequisite:** §15 M0.5 blockers cleared (custody freshness in §3.5 agreed; **named** shadow reviewers posted by product).
 
 **Deliverables**
 
@@ -278,13 +315,13 @@ Verify: `pnpm architecture:gates` fails if copilot imports a forbidden path.
 - Internal reviewer UI or script: tags per §6.2
 - 100-question bank: **10 categories × 10** (anti-overfit)
 
-**Reviewers:** Named role — **Clinical ops lead or designated equipment pilot champion** + **one engineer** per shadow batch; both tag `citation_relevance` on a 10% sample minimum.
+**Reviewers:** Roles defined — **clinical ops lead or equipment pilot champion** + **one engineer** per batch. **M0.5 requires product to post actual names + committed availability** for full-bank review (roles ≠ owners). See §15.
 
 **Exit criteria**
 
 - [ ] §6.2 shadow gate met (see statistical honesty — n=100)
 - [ ] Citation validator **0** validity failures on shadow export JSON
-- [ ] **Zero hallucinated facts** on shadow bank — **one fabricated fact = fail** (see §14 Q1)
+- [ ] **Zero hallucinated facts** on shadow bank — **one fabricated fact = fail** (see §14 Q1); **mandatory post-mortem** before re-run (§6.3)
 - [ ] Metrics emitting (bounded enums only)
 - [ ] `ENABLE_ASSET_COPILOT_SHADOW=true` staging only
 
@@ -431,9 +468,22 @@ pnpm test:integration:ops    # only if graph loader integration tests added
 
 **First milestone requiring LLM vendor + DPA:** **M1 production narration** (user-facing polish). M0.5 may stay template-only. Optional LLM in shadow is **nice-to-have**, not required for M0.5 exit.
 
+### 6.3 Shadow hallucination post-mortem (mandatory)
+
+A single fabricated fact **fails** M0.5. **Do not re-run the bank until green** without a written post-mortem classifying root cause:
+
+| Class | Example fix |
+|-------|-------------|
+| **Resolver gap** | Missing unknown branch; wrong precedence |
+| **Orchestrator prose drift** | LLM added fact not in `claims[]` — tighten prompt or disable LLM |
+| **Template bug** | Wrong string substitution in template-only path |
+| **Golden/fixture wrong** | Fix fixture, not code |
+
+Re-run only after fix + targeted regression tests for that class. Prevents “retry until lucky.”
+
 **Shadow bank categories (10×10):** Deployability · RFID anomalies · Location · Missing scans · Custody · Condition state · Transfer history · Waitlist · Conflicts · General how-to
 
-**Synthetic golden (M0):** minimum 3 per category; fixtures are oracle for location/custodian/waitlist.
+**Synthetic golden (M0):** minimum 3 per category; fixtures are oracle for location/custodian/waitlist. Include **custody multi-day checkout → freshness still current**.
 
 ---
 
@@ -483,6 +533,8 @@ Migrating `graph.loader` to an equipment repository after Slice 5 is **not optio
 | **Degraded mode** | Orchestrator **skips LLM** and returns **template-only** resolver narrative (still fully cited) — preferred over hard failure for explain/search |
 | **Conflict coach** | Counts toward same cap; template-only still allowed at cap |
 
+**Demo note:** At cap, users still get **fully cited, resolver-grounded** answers — call this out in sales demos as resilience, not failure (Evidence Copilot without the LLM polish layer).
+
 Pilot hosts: enable only after M0.5 rubric green on staging.
 
 ---
@@ -529,7 +581,9 @@ Copilot: Unknown. No custody transfer or scan evidence available.
 | 2026-05-29 | Placement under `server/domain/equipment/` + `shared/contracts/` per modularization |
 | 2026-05-29 | No paused-route extraction as dependency |
 | 2026-05-29 | v3.1: rubric statistical honesty; validity vs relevance; per-type freshness; cache contract; offline UX; depcruise no-mutation; token cap defined |
-| TBD | Product sign-off on M0 start |
+| 2026-05-29 | v3.2: custody = state assertion (no checkout-age decay); M0 approved; shadow post-mortem §6.3; transitive depcruise; cache regression test |
+| 2026-05-29 | **M0 approved** by reviewer (v3.2 exit criteria) |
+| TBD | Product: **named** shadow reviewers + availability (M0.5 blocker) |
 | TBD | LLM vendor + DPA — **required before M1 user-facing LLM narration** (not M0/M0.5 if template-only passes) |
 
 ---
@@ -551,9 +605,22 @@ Copilot: Unknown. No custody transfer or scan evidence available.
 1. Review and approve this plan (v3.1) + ADR-003.  
 2. Create tracking issue per milestone with copy-paste exit criteria checklist.  
 3. Seed 30 golden JSON fixtures from staging anonymized data.  
-4. Name shadow reviewers (clinical ops + engineer).  
-5. Implement §3.8 depcruise rule in M0 PR1.  
+4. Product: post **named** shadow reviewers (§15).  
+5. Implement §3.8 depcruise rule (transitive) in M0 PR1.  
 6. Legal/DPA before M1 LLM narration in production (template-only may ship behind flag for pilot).
+
+---
+
+## 15. M0.5 blocker tracker (product + engineering)
+
+| Blocker | Status | Owner | Requirement |
+|---------|--------|-------|-------------|
+| **§3.5 freshness table** | **Cleared (v3.2)** | Engineering | Custody = state assertion; observation types use time decay |
+| **One hallucination = fail** | **Cleared** | Engineering | §6.2 + §6.3 post-mortem before re-run |
+| **Named shadow reviewers** | **Open** | **Product** | Actual names (not roles only) + committed availability for full n=100 review |
+
+**M0:** Proceed now per v3.2 exit criteria.  
+**M0.5:** Hold until row 3 is closed in writing (e.g. comment on tracking issue with names + dates).
 
 ---
 
@@ -561,7 +628,7 @@ Copilot: Unknown. No custody transfer or scan evidence available.
 
 | Question | Answer |
 |----------|--------|
-| Does **0% hallucination on n=100** mean one bad answer fails? | **Yes — intentional.** One fabricated fact on the shadow bank fails M0.5. Document loudly in release checklist. |
+| Does **0% hallucination on n=100** mean one bad answer fails? | **Yes — intentional.** One fabricated fact fails M0.5. **Post-mortem required** before re-run (§6.3), not “retry until lucky.” |
 | Who performs **citation relevance** review? | **Clinical ops lead or equipment pilot champion** + **engineer**; 100% on M0 golden (n=30), full bank on M0.5, 10% ongoing sample in production. |
 | **Degraded behavior at token cap?** | **Template-only** resolver output (no LLM); 429 only if template path also exhausted (should not happen). See §8.1. |
 | **First milestone requiring real LLM / DPA?** | **M1** for polished user-facing narration in production. **M0.5 must pass template-only** without LLM. |
