@@ -49,7 +49,7 @@
 | 3 | Extract `src/lib/api/equipment.ts` + barrel | Medium — **implemented** |
 | 4 | Extract equipment route handlers (paths unchanged) | High — **reads (4a–4c)** + **mutations (4d–4l):** through bulk-delete, create, patch extracted (`equipment.ts` ≈1,386 lines). **5 inline mutations — all paused** — [inventory](./equipment-inline-mutations-inventory.md). **Do not extract** `POST /scan`, checkout, return, seen, `POST /:id/scan` without sign-off. Slice 4 handler extraction for non-paused routes is **complete**. |
 | 5 | Equipment repository layer (`clinicId` param) | High |
-| 6 | Split `src/types/index.ts` by domain + barrel | Medium |
+| 6 | Split `src/types/index.ts` by domain + barrel | Medium — **6a** `platform.ts` merged; **6b** `patients.ts` in progress — [plan](./src-types-split-plan.md) |
 | 7 | Group `server/app/routes.ts` registrations (no path changes) | Low |
 | 8+ | Repeat per domain: containers, billing, patients, shift-handover, forecast | Varies |
 

@@ -1,6 +1,6 @@
 # Slice 6 — `src/types` domain split plan (inventory draft)
 
-**Status:** Planning inventory + **Slice 6a implemented** (`src/types/platform.ts`, barrel re-export).  
+**Status:** **6a merged** (`platform.ts`). **6b** (`patients.ts`) in PR — leaf patient/hospitalization types.  
 **Baseline:** `main` @ `4397d96c` (post–PR #569 Slice 4 stabilization).  
 **Parent:** [modularization-plan.md](./modularization-plan.md) Slice 6.
 
@@ -368,8 +368,8 @@ These files touch the most symbols or sit on critical paths (offline, API monoli
 src/types/
   index.ts              # compatibility barrel — export * from "./<domain>.js"
   common.ts             # optional: AlertType, shared enums (if not in equipment)
-  platform.ts           # User, Shift, roles, audit log, support, metrics, uploads
-  patients.ts           # Animal, Owner, Hospitalization, admit/update requests
+  platform.ts           # User, Shift, roles, audit log, support, metrics, uploads (**merged 6a**)
+  patients.ts           # Animal, Owner, Hospitalization, admit/update/search (**6b**)
   equipment.ts          # Equipment, Room, Folder, scan, bulk, pilot, ops state V1/V2
   tasks.ts              # Appointment*, medication, formulary, task dashboard
   billing.ts            # Ledger, leakage
@@ -404,8 +404,9 @@ Order of `export *` lines matters only if two domains exported the same name —
 
 | Sub-slice | Action | Validation |
 |-----------|--------|------------|
-| **6a** | Extract `platform.ts` (done); `patients.ts` deferred to 6a₂ | tsc, architecture:gates |
-| **6b** | Extract `equipment.ts` (include alert constants) | + offline-db typecheck, equipment tests |
+| **6a** | Extract `platform.ts` | **merged** (#571) |
+| **6b** | Extract `patients.ts` (leaf) | tsc, architecture:gates |
+| **6c** | Extract `equipment.ts` (include alert constants) | + offline-db typecheck, equipment tests |
 | **6c** | Extract `tasks.ts` | + medication/appointment tests |
 | **6d** | Extract `billing.ts`, `inventory.ts` | + billing/inventory pages |
 | **6e** | Extract `forecast.ts` | + compare to `server/lib/forecast/types.ts` |
@@ -456,3 +457,5 @@ No code changes under `src/types/` except documentation are expected for this in
 | 2026-05-27 | Split `realtime-events` / `cop-alerts` pattern is precedent for direct subpath imports |
 | 2026-05-27 | `DisplaySnapshot*` and `er.ts` extracted after leaf domains to avoid cycles |
 | 2026-05-29 | Slice 6a: `platform.ts` extracted; `index.ts` re-exports + internal `ShiftRole`/`UserRole` import for remaining definitions |
+| 2026-05-29 | Slice 6a merged (#571); static test `users-me-authority` reads `platform.ts` for `User.authority` |
+| 2026-05-29 | Slice 6b: `patients.ts` — `Animal`, `Owner`, `Hospitalization`, admit/update/search, `ActivePatient` |
