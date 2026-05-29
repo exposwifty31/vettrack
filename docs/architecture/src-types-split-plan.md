@@ -406,7 +406,8 @@ Order of `export *` lines matters only if two domains exported the same name —
 |-----------|--------|------------|
 | **6a** | Extract `platform.ts` | **merged** (#571) |
 | **6b** | Extract `patients.ts` (leaf) | **merged** (#572) |
-| **6c** | Extract `equipment.ts` (alerts, rooms, scan, ops state) | draft; + offline-db shape unchanged via barrel |
+| **6c** | Extract `equipment.ts` (alerts, rooms, scan, ops state) | **merged** (#573) |
+| **6d** | Extract `tasks.ts` (appointments, medication, formulary, recommendations) | draft |
 | **6c** | Extract `tasks.ts` | + medication/appointment tests |
 | **6d** | Extract `billing.ts`, `inventory.ts` | + billing/inventory pages |
 | **6e** | Extract `forecast.ts` | + compare to `server/lib/forecast/types.ts` |
