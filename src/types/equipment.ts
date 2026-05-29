@@ -505,6 +505,31 @@ export interface Dock {
   createdAt: string;
 }
 
+export type QuickScanToggleAction = "checkout" | "return" | "blocked";
+
+export interface QuickScanToggleResult {
+  equipment: Equipment;
+  action: QuickScanToggleAction;
+  scanLogId: string;
+  undoToken: string;
+  checkedOutByEmail?: string;
+}
+
+export interface DockReturnRequest {
+  dockId?: string;
+  masterNfcTagId?: string;
+  conditionVerifications: Array<{
+    conditionId: string;
+    verified: boolean;
+    notes?: string;
+  }>;
+}
+
+export interface DockReturnAmbiguousDocksError {
+  error: "AMBIGUOUS_DOCKS";
+  docks: Array<{ id: string; name: string }>;
+}
+
 export interface OperationalMetricsSummary {
   emergencyOverrides: number;
   bundleFailures: number;

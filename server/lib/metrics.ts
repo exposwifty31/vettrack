@@ -285,7 +285,10 @@ type MetricName =
   | "rfid_event_unknown_gateway"
   | "rfid_event_stale"
   | "rfid_event_unchanged"
-  | "rfid_event_room_changed";
+  | "rfid_event_room_changed"
+  | "semi_dock_notified"
+  | "semi_dock_skipped_deduped"
+  | "dock_return_nfc_confirmed";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -913,6 +916,9 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   rfid_event_stale: 0,
   rfid_event_unchanged: 0,
   rfid_event_room_changed: 0,
+  semi_dock_notified: 0,
+  semi_dock_skipped_deduped: 0,
+  dock_return_nfc_confirmed: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };

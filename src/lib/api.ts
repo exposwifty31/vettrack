@@ -1329,12 +1329,19 @@ export const api = {
       request<UnitConditionState[]>(`/api/equipment/${id}/condition-states`),
     dockReturn: (
       id: string,
-      data: { dockId: string; conditionVerifications: { conditionId: string; verified: boolean; notes?: string }[] },
+      data: {
+        dockId?: string;
+        masterNfcTagId?: string;
+        conditionVerifications: { conditionId: string; verified: boolean; notes?: string }[];
+      },
     ) =>
-      request<{ ok: boolean; readinessState: string }>(`/api/equipment/${id}/dock-return`, {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
+      request<{ equipmentId: string; readinessState: string; custodyState: string }>(
+        `/api/equipment/${id}/dock-return`,
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+        },
+      ),
     stage: (
       id: string,
       data: { clinicalPriority: "routine" | "urgent" | "emergency"; notes?: string; emergencyStage?: boolean },

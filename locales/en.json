@@ -2824,6 +2824,23 @@
     "procedureBound": "Equipment bound to hospitalization",
     "procedureReleased": "Equipment released from procedure"
   },
+  "equipmentNfc": {
+    "toggleCheckedOut": "{name} checked out",
+    "toggleReturned": "{name} returned",
+    "toggleBlocked": "Held by {email} — cannot toggle",
+    "onlineRequired": "Connect to the network to confirm checkout or return",
+    "scanReady": "NFC scan active",
+    "scanStartFailed": "Could not start NFC scan",
+    "enableScan": "Enable NFC",
+    "writeSuccess": "NFC tag programmed",
+    "writeFailed": "Could not write NFC tag",
+    "writeUnsupported": "NFC write is not supported on this device",
+    "writeTag": "Write NFC checkout tag"
+  },
+  "semiDock": {
+    "pushTitle": "Device detected in home room",
+    "pushBody": "We detected the device back in its home room. If you finished using it, return it to the charging station."
+  },
   "dockReturn": {
     "title": "Return to Dock",
     "selectDock": "Select dock",
@@ -2834,7 +2851,12 @@
     "notReadyAfterReturn": "Returned — conditions not met",
     "noAssetTypeBlocked": "This equipment has no asset type — dock-return is unavailable",
     "goToSetup": "Configure asset type",
-    "noConditionsWarning": "No conditions defined — equipment will be marked not ready"
+    "noConditionsWarning": "No conditions defined — equipment will be marked not ready",
+    "nfcConfirmTitle": "Confirm docking at station",
+    "scanDockMasterTag": "Scan dock master NFC tag",
+    "scanDockFailed": "Could not read dock tag — try again",
+    "versionConflict": "Equipment was updated elsewhere — refresh and try again",
+    "confirmAtDockCta": "Confirm at charging station"
   },
   "bundleConditions": {
     "verified": "Verified",

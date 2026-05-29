@@ -2824,6 +2824,23 @@
     "procedureBound": "הציוד קושר לאשפוז",
     "procedureReleased": "הציוד שוחרר מהפרוצדורה"
   },
+  "equipmentNfc": {
+    "toggleCheckedOut": "{name} נלקח לשימוש",
+    "toggleReturned": "{name} הוחזר",
+    "toggleBlocked": "בשימוש אצל {email} — לא ניתן לבצע פעולה",
+    "onlineRequired": "יש להתחבר לרשת כדי לאשר checkout או return",
+    "scanReady": "סריקת NFC פעילה",
+    "scanStartFailed": "לא ניתן להפעיל סריקת NFC",
+    "enableScan": "הפעל NFC",
+    "writeSuccess": "תגית NFC נכתבה",
+    "writeFailed": "כתיבת תגית NFC נכשלה",
+    "writeUnsupported": "כתיבת NFC אינה נתמכת במכשיר זה",
+    "writeTag": "כתוב תגית NFC ל-checkout"
+  },
+  "semiDock": {
+    "pushTitle": "זוהה מכשיר בחדר הבית",
+    "pushBody": "זיהיתי שהמכשיר חזר לחדר בו הוא שייך. אם סיימת את השימוש במכשיר נא להחזיר אותו לעמדת ההטענה."
+  },
   "dockReturn": {
     "title": "החזרת ציוד לעגינה",
     "selectDock": "בחר עגינה",
@@ -2834,7 +2851,12 @@
     "notReadyAfterReturn": "הוחזר — לא עמד בתנאים",
     "noAssetTypeBlocked": "ציוד זה אינו מוגדר עם asset type — לא ניתן לבצע dock-return",
     "goToSetup": "הגדר asset type",
-    "noConditionsWarning": "אין תנאים מוגדרים — ציוד יסומן כלא מוכן"
+    "noConditionsWarning": "אין תנאים מוגדרים — ציוד יסומן כלא מוכן",
+    "nfcConfirmTitle": "אישור עגינה בעמדה",
+    "scanDockMasterTag": "סרוק תגית NFC ראשית של העמדה",
+    "scanDockFailed": "לא ניתן לקרוא את תגית העמדה — נסה שוב",
+    "versionConflict": "הציוד עודכן במקום אחר — רענן ונסה שוב",
+    "confirmAtDockCta": "אשר בעמדת ההטענה"
   },
   "bundleConditions": {
     "verified": "אומת",

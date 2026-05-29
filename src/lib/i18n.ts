@@ -374,6 +374,20 @@ const translations = {
     },
   },
 
+  equipmentNfc: {
+    toggleCheckedOut: (name: string) => tr(d.equipmentNfc.toggleCheckedOut, { name }),
+    toggleReturned: (name: string) => tr(d.equipmentNfc.toggleReturned, { name }),
+    toggleBlocked: (email: string) => tr(d.equipmentNfc.toggleBlocked, { email }),
+    onlineRequired: d.equipmentNfc.onlineRequired,
+    scanReady: d.equipmentNfc.scanReady,
+    scanStartFailed: d.equipmentNfc.scanStartFailed,
+    enableScan: d.equipmentNfc.enableScan,
+    writeSuccess: d.equipmentNfc.writeSuccess,
+    writeFailed: d.equipmentNfc.writeFailed,
+    writeUnsupported: d.equipmentNfc.writeUnsupported,
+    writeTag: d.equipmentNfc.writeTag,
+  },
+
   admin: {
     crashCart: {
       ...d.admin.crashCart,
@@ -882,6 +896,11 @@ const translations = {
     noAssetTypeBlocked: d.dockReturn.noAssetTypeBlocked,
     goToSetup: d.dockReturn.goToSetup,
     noConditionsWarning: d.dockReturn.noConditionsWarning,
+    nfcConfirmTitle: d.dockReturn.nfcConfirmTitle,
+    scanDockMasterTag: d.dockReturn.scanDockMasterTag,
+    scanDockFailed: d.dockReturn.scanDockFailed,
+    versionConflict: d.dockReturn.versionConflict,
+    confirmAtDockCta: d.dockReturn.confirmAtDockCta,
   },
 
   bundleConditions: {

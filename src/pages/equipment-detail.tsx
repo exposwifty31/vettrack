@@ -88,6 +88,12 @@ import { MoveRoomSheet } from "@/components/move-room-sheet";
 import { ReturnPlugDialog } from "@/components/return-plug-dialog";
 import { DeployabilityBadge } from "@/components/equipment/DeployabilityBadge";
 import { DockReturnFlow } from "@/components/equipment/DockReturnFlow";
+import { DockReturnNfc } from "@/components/dock-return-nfc";
+import {
+  markNfcToggleFired,
+  runEquipmentQuickToggle,
+  wasNfcToggleFiredRecently,
+} from "@/lib/nfc-equipment-toggle";
 import { StagingQueuePanel } from "@/components/equipment/StagingQueuePanel";
 import { WaitlistPanel } from "@/components/equipment/WaitlistPanel";
 import { ReservationBanner } from "@/components/equipment/ReservationBanner";
@@ -164,6 +170,8 @@ export default function EquipmentDetailPage() {
   const [checkoutLocation, setCheckoutLocation] = useState("");
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [dockReturnOpen, setDockReturnOpen] = useState(false);
+  const [dockReturnNfcOpen, setDockReturnNfcOpen] = useState(false);
+  const nfcDeepLinkToggleRef = useRef(false);
   const [isPluggedIn, setIsPluggedIn] = useState<boolean>(false);
   const [plugInDeadlineMinutes, setPlugInDeadlineMinutes] = useState<number>(30);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -322,6 +330,20 @@ export default function EquipmentDetailPage() {
     retry: false,
     refetchOnWindowFocus: false,
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchStr);
+    if (params.get("nfcAction") !== "toggle" || !id || !equipment || !userId) return;
+    if (nfcDeepLinkToggleRef.current) return;
+    nfcDeepLinkToggleRef.current = true;
+    if (!wasNfcToggleFiredRecently(id)) {
+      markNfcToggleFired(id);
+      void runEquipmentQuickToggle(id, equipment.name, queryClient).catch(() => {
+        toast.error(t.equipmentNfc.onlineRequired);
+      });
+    }
+    navigate(`/equipment/${id}`, { replace: true });
+  }, [searchStr, id, equipment, userId, queryClient, navigate]);
 
   const {
     data: scanLogsPages,
@@ -783,6 +805,24 @@ export default function EquipmentDetailPage() {
     window.open(`/equipment/${id}/qr`, "_blank");
   }
 
+  async function writeEquipmentNfcTag(equipmentId: string) {
+    if (typeof window === "undefined" || !("NDEFReader" in window)) {
+      toast.error(t.equipmentNfc.writeUnsupported);
+      return;
+    }
+    const url = `${window.location.origin}/equipment/${equipmentId}?nfcAction=toggle&source=nfc`;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ndef = new (window as any).NDEFReader();
+      await ndef.write({ records: [{ recordType: "url", data: url }] });
+      haptics.scanSuccess();
+      toast.success(t.equipmentNfc.writeSuccess);
+    } catch {
+      haptics.error();
+      toast.error(t.equipmentNfc.writeFailed);
+    }
+  }
+
   const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
 
   if (isLoading) {
@@ -1179,16 +1219,16 @@ export default function EquipmentDetailPage() {
                     </p>
                   )}
                   {shouldShowRfidAttentionBadge(equipment) && (
-                    <Badge
+                    <Button
+                      type="button"
                       variant="outline"
-                      className="mt-1 text-[11px] border-amber-300 text-amber-900 dark:text-amber-200"
+                      size="sm"
+                      className="mt-1 h-8 text-[11px] border-amber-300 text-amber-900 dark:text-amber-200"
                       data-testid="equipment-detail-rfid-attention"
+                      onClick={() => setDockReturnNfcOpen(true)}
                     >
-                      {t.equipment.rfidAttention.checkedOutMismatch(
-                        equipment.lastRfidRoomName!,
-                        equipment.checkedOutByEmail || t.common.unknown,
-                      )}
-                    </Badge>
+                      {t.dockReturn.confirmAtDockCta}
+                    </Button>
                   )}
                   {showOperationalState && (
                     <div className="mt-1.5">
@@ -1207,6 +1247,17 @@ export default function EquipmentDetailPage() {
                   <QrCode className="w-3.5 h-3.5 mr-1" />
                   {t.equipmentDetail.printQrButton}
                 </Button>
+                {isAdmin && typeof window !== "undefined" && "NDEFReader" in window && id && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-11"
+                    data-testid="btn-write-nfc-tag"
+                    onClick={() => void writeEquipmentNfcTag(id)}
+                  >
+                    {t.equipmentNfc.writeTag}
+                  </Button>
+                )}
                 {!isStudentEquipmentRole && (
                   <Button
                     variant="outline"
@@ -1606,6 +1657,17 @@ export default function EquipmentDetailPage() {
                   queryClient.invalidateQueries({ queryKey: ["condition-states", id] });
                   queryClient.invalidateQueries({ queryKey: ["staging-queue", id] });
                   setDockReturnOpen(false);
+                }}
+              />
+
+              <DockReturnNfc
+                equipment={equipment}
+                open={dockReturnNfcOpen}
+                onClose={() => setDockReturnNfcOpen(false)}
+                onSuccess={() => {
+                  queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
+                  queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+                  setDockReturnNfcOpen(false);
                 }}
               />
 

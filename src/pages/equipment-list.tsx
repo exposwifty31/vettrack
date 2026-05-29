@@ -987,6 +987,7 @@ function EquipmentItem({
 }) {
   const { settings } = useSettings();
   const { userId, isAdmin } = useAuth();
+  const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [dockReturnOpen, setDockReturnOpen] = useState(false);
@@ -1177,16 +1178,17 @@ function EquipmentItem({
                   </p>
                 )}
                 {shouldShowRfidAttentionBadge(eq) && (
-                  <Badge
-                    variant="outline"
-                    className="mt-1 text-[11px] font-medium border-amber-300 text-amber-900 dark:text-amber-200"
+                  <button
+                    type="button"
+                    className="mt-1 text-[11px] font-medium border border-amber-300 text-amber-900 dark:text-amber-200 rounded px-2 py-0.5"
                     data-testid={`equipment-rfid-attention-${eq.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/equipment/${eq.id}`);
+                    }}
                   >
-                    {t.equipment.rfidAttention.checkedOutMismatch(
-                      eq.lastRfidRoomName!,
-                      eq.checkedOutByEmail || t.common.unknown,
-                    )}
-                  </Badge>
+                    {t.dockReturn.confirmAtDockCta}
+                  </button>
                 )}
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   {eq.folderName && (

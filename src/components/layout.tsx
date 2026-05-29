@@ -54,6 +54,7 @@ import {
   Gauge,
 } from "lucide-react";
 import { OnboardingWalkthrough } from "@/components/onboarding-walkthrough";
+import { NfcForegroundScan } from "@/components/nfc-foreground-scan";
 import { HelpTooltip } from "@/components/ui/help-tooltip";
 import type { RestockContainerView } from "@/types";
 import { useState, useEffect, useMemo, useRef } from "react";
@@ -1528,6 +1529,8 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
           onClose={() => setDispenseContainerId(null)}
         />
       )}
+
+      {userId ? <NfcForegroundScan /> : null}
 
       <OnboardingWalkthrough />
     </div>

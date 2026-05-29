@@ -4,6 +4,11 @@ import { db, docks, equipment, equipmentRfidReads, rooms } from "../db.js";
 import { logAudit } from "./audit.js";
 import { incrementMetric } from "./metrics.js";
 import { insertRealtimeDomainEvent } from "./realtime-outbox.js";
+import {
+  deliverSemiDockPush,
+  isEquipmentHomeRoom,
+  type SemiDockNotifyCandidate,
+} from "./semi-dock-notify.js";
 
 export interface RfidBatchEvent {
   tagEpc: string;
@@ -28,6 +33,12 @@ export interface RfidIngestResult {
 
 type EquipmentRfidRow = {
   id: string;
+  name: string;
+  roomId: string | null;
+  dockId: string | null;
+  custodyState: string;
+  checkedOutById: string | null;
+  checkedOutAt: Date | null;
   lastRfidRoomId: string | null;
   lastRfidSeenAt: Date | null;
   rfidTagEpc: string | null;
@@ -75,17 +86,32 @@ export async function ingestRfidBatch(
 
   const tagEpcs = [...new Set(coalesced.map((e) => e.tagEpc))];
   const gatewayCodes = [...new Set(coalesced.map((e) => e.gatewayCode))];
+  const semiDockCandidates: SemiDockNotifyCandidate[] = [];
 
   await db.transaction(async (tx) => {
     const equipmentRows = await tx
       .select({
         id: equipment.id,
+        name: equipment.name,
+        roomId: equipment.roomId,
+        dockId: equipment.dockId,
+        custodyState: equipment.custodyState,
+        checkedOutById: equipment.checkedOutById,
+        checkedOutAt: equipment.checkedOutAt,
         lastRfidRoomId: equipment.lastRfidRoomId,
         lastRfidSeenAt: equipment.lastRfidSeenAt,
         rfidTagEpc: equipment.rfidTagEpc,
       })
       .from(equipment)
       .where(and(eq(equipment.clinicId, clinicId), inArray(equipment.rfidTagEpc, tagEpcs)));
+
+    const dockRoomRows = await tx
+      .select({ roomId: docks.roomId })
+      .from(docks)
+      .where(eq(docks.clinicId, clinicId));
+    const dockRoomIds = new Set(
+      dockRoomRows.map((r) => r.roomId).filter((id): id is string => Boolean(id)),
+    );
 
     const roomRows = await tx
       .select({ id: rooms.id, gatewayCode: rooms.gatewayCode })
@@ -218,8 +244,28 @@ export async function ingestRfidBatch(
       eqRow.lastRfidSeenAt = readAt;
       result.updated += 1;
       incrementMetric("rfid_event_room_changed");
+
+      if (
+        eqRow.custodyState === "checked_out" &&
+        eqRow.checkedOutById &&
+        eqRow.checkedOutAt &&
+        isEquipmentHomeRoom(eqRow.roomId, roomId, dockRoomIds)
+      ) {
+        semiDockCandidates.push({
+          clinicId,
+          equipmentId: eqRow.id,
+          equipmentName: eqRow.name,
+          checkedOutById: eqRow.checkedOutById,
+          checkedOutAt: eqRow.checkedOutAt,
+          homeRoomId: roomId,
+        });
+      }
     }
   });
+
+  for (const candidate of semiDockCandidates) {
+    void deliverSemiDockPush(candidate);
+  }
 
   return result;
 }

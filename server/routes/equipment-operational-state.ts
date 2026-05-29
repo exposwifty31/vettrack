@@ -27,6 +27,7 @@ import { recordOperationalMetric } from "../services/operational-metrics.service
 import { promoteStagingQueueNext } from "../lib/staging-promotion.js";
 import { promoteEquipmentWaitlistWithNotify } from "../lib/equipment-waitlist-promotion.js";
 import { isPostgresUniqueViolation, pgUpdateMatchedZeroRows } from "../lib/pg-result.js";
+import { incrementMetric } from "../lib/metrics.js";
 
 const router = Router();
 
@@ -157,30 +158,58 @@ router.get("/equipment/:equipmentId/deployability", requireAuth, async (req, res
 
 // ─── Equipment: Dock Return ───────────────────────────────────────────────────
 
-const dockReturnSchema = z.object({
-  dockId: z.string().min(1),
-  conditionVerifications: z.array(z.object({
-    conditionId: z.string().min(1),
-    verified: z.boolean(),
-    notes: z.string().max(500).optional(),
-  })),
-});
+const dockReturnSchema = z
+  .object({
+    dockId: z.string().min(1).optional(),
+    masterNfcTagId: z.string().min(1).max(200).optional(),
+    conditionVerifications: z.array(
+      z.object({
+        conditionId: z.string().min(1),
+        verified: z.boolean(),
+        notes: z.string().max(500).optional(),
+      }),
+    ),
+  })
+  .refine((body) => Boolean(body.dockId) !== Boolean(body.masterNfcTagId), {
+    message: "Provide exactly one of dockId or masterNfcTagId",
+  });
 
 router.post("/equipment/:equipmentId/dock-return", requireAuth, validateBody(dockReturnSchema), async (req, res) => {
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
   const { equipmentId } = req.params;
-  const { dockId, conditionVerifications } = req.body as z.infer<typeof dockReturnSchema>;
+  const body = req.body as z.infer<typeof dockReturnSchema>;
+  const { conditionVerifications } = body;
 
   const [eq_row] = await db.select().from(equipment).where(and(eq(equipment.id, equipmentId), eq(equipment.clinicId, clinicId)));
   if (!eq_row) return apiError(req, res, "errors.notFound", undefined, 404);
 
-  if (!["returned", "docked"].includes(eq_row.custodyState)) {
+  if (!["returned", "docked", "checked_out"].includes(eq_row.custodyState)) {
     return apiError(req, res, "operationalState.invalidCustodyForDockReturn", undefined, 422);
   }
   if (!eq_row.assetTypeId) {
     return apiError(req, res, "operationalState.noAssetTypeDefined", undefined, 422);
   }
+
+  const { resolveDockIdForReturn } = await import("../lib/dock-return-resolve.js");
+  const resolved = await resolveDockIdForReturn(clinicId, {
+    dockId: body.dockId,
+    masterNfcTagId: body.masterNfcTagId,
+  });
+  if (!resolved.ok) {
+    if (resolved.reason === "ambiguous_docks") {
+      return res.status(422).json({
+        error: "AMBIGUOUS_DOCKS",
+        docks: resolved.docks,
+      });
+    }
+    if (resolved.reason === "room_not_found") {
+      return apiError(req, res, "operationalState.dockMasterTagNotFound", undefined, 404);
+    }
+    return apiError(req, res, "errors.notFound", undefined, resolved.status);
+  }
+  const dockId = resolved.dockId;
+  const dockReturnVia = resolved.via === "master_nfc_tag" ? "nfc_confirm" : "manual";
 
   const [dock] = await db.select().from(docks).where(and(eq(docks.id, dockId), eq(docks.clinicId, clinicId)));
   if (!dock) return apiError(req, res, "errors.notFound", undefined, 404);
@@ -271,6 +300,14 @@ router.post("/equipment/:equipmentId/dock-return", requireAuth, validateBody(doc
           dockId,
           readinessState: newReadiness,
           readinessStateSince: now,
+          ...(eq_row.custodyState === "checked_out"
+            ? {
+                checkedOutById: null,
+                checkedOutByEmail: null,
+                checkedOutAt: null,
+                checkedOutLocation: null,
+              }
+            : {}),
           ...(readinessOk
             ? { dockConfirmedReadyAt: now, dockConfirmedById: userId, emergencyOverrideAt: null, emergencyOverrideById: null }
             : {}),
@@ -279,7 +316,7 @@ router.post("/equipment/:equipmentId/dock-return", requireAuth, validateBody(doc
         .where(and(
           eq(equipment.id, equipmentId),
           eq(equipment.clinicId, clinicId),
-          inArray(equipment.custodyState, ["returned", "docked"]),
+          inArray(equipment.custodyState, ["returned", "docked", "checked_out"]),
           eq(equipment.version, capturedVersion),
         ));
 
@@ -309,8 +346,11 @@ router.post("/equipment/:equipmentId/dock-return", requireAuth, validateBody(doc
     performedBy: userId,
     performedByEmail: email,
     targetId: equipmentId,
-    metadata: { dockId, conditionCount: conditionVerifications.length },
+    metadata: { dockId, conditionCount: conditionVerifications.length, via: dockReturnVia },
   });
+  if (dockReturnVia === "nfc_confirm") {
+    incrementMetric("dock_return_nfc_confirmed");
+  }
   void recordOperationalMetric({ clinicId, equipmentId, userId, eventType: "dock_return_duration", durationMs: Date.now() - dockReturnStart });
 
   const [updated_eq] = await db.select().from(equipment).where(and(eq(equipment.id, equipmentId), eq(equipment.clinicId, clinicId)));

@@ -2827,6 +2827,23 @@ export interface TStructure {
     procedureBound: string;
     procedureReleased: string;
   };
+  equipmentNfc: {
+    toggleCheckedOut: string;
+    toggleReturned: string;
+    toggleBlocked: string;
+    onlineRequired: string;
+    scanReady: string;
+    scanStartFailed: string;
+    enableScan: string;
+    writeSuccess: string;
+    writeFailed: string;
+    writeUnsupported: string;
+    writeTag: string;
+  };
+  semiDock: {
+    pushTitle: string;
+    pushBody: string;
+  };
   dockReturn: {
     title: string;
     selectDock: string;
@@ -2838,6 +2855,11 @@ export interface TStructure {
     noAssetTypeBlocked: string;
     goToSetup: string;
     noConditionsWarning: string;
+    nfcConfirmTitle: string;
+    scanDockMasterTag: string;
+    scanDockFailed: string;
+    versionConflict: string;
+    confirmAtDockCta: string;
   };
   bundleConditions: {
     verified: string;

@@ -18,6 +18,7 @@ import type {
   BulkMoveRequest,
   BulkResult,
   DeletedEquipment,
+  QuickScanToggleResult,
 } from "@/types";
 import type { EquipmentWaitlistSnapshot } from "../../../shared/equipment-waitlist.js";
 import { getStoredLocale, t } from "@/lib/i18n";
@@ -286,6 +287,19 @@ export const equipmentApi = {
         { method: "DELETE" },
         { offlineType: "delete" }
       ),
+    quickToggle: async (equipmentId: string): Promise<QuickScanToggleResult> => {
+      try {
+        return await request<QuickScanToggleResult>("/api/equipment/scan", {
+          method: "POST",
+          body: JSON.stringify({ equipmentId }),
+        });
+      } catch (err) {
+        if (isNetworkError(err)) {
+          throw err;
+        }
+        throw err;
+      }
+    },
     scan: async (id: string, data: ScanEquipmentRequest) => {
       const cached = await getCachedEquipmentById(id);
       const now = new Date().toISOString();
