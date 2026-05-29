@@ -298,9 +298,10 @@ function readRepo(rel: string): string {
 
 describe("Frontend wiring — types accept authority", () => {
   it("User interface declares authority?: AuthoritySnapshot", () => {
-    const src = readRepo("src/types/index.ts");
+    const src = readRepo("src/types/platform.ts");
     expect(src).toMatch(/authority\?\s*:\s*AuthoritySnapshot/);
     expect(src).toMatch(/from\s+["'][^"']*shared\/authority/);
+    expect(readRepo("src/types/index.ts")).toMatch(/export \* from ["']\.\/platform\.js["']/);
   });
 
   it("api.users.me() return type widens with authority?: AuthoritySnapshot", () => {
