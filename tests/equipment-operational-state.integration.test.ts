@@ -612,14 +612,35 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
     it("wrong custodyState → 422", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: ctx.assetTypeId,
-        custody_state: "checked_out",
-        usage_state: "in_use",
+        custody_state: "untracked",
+        usage_state: "available",
       });
       const res = await api(`/api/equipment/${ctx.eqId}/dock-return`, "POST", {
         dockId: ctx.dockId,
         conditionVerifications: [],
       });
       expect(res.status).toBe(422);
+    });
+
+    it("checked_out → docked clears checkout (NFC full-dock path)", async () => {
+      await seedEquipment(ctx.eqId, ctx.clinicId, {
+        asset_type_id: ctx.assetTypeId,
+        custody_state: "checked_out",
+        usage_state: "in_use",
+        checked_out_by_id: ctx.userId,
+        checked_out_by_email: "test@ops.local",
+        checked_out_at: new Date().toISOString(),
+        readiness_state: "unknown",
+      });
+      const res = await api(`/api/equipment/${ctx.eqId}/dock-return`, "POST", {
+        dockId: ctx.dockId,
+        conditionVerifications: [{ conditionId: ctx.conditionId, verified: true }],
+      });
+      expect(res.status).toBe(200);
+      const eq = await readEquipment(ctx.eqId);
+      expect(eq?.custody_state).toBe("docked");
+      expect(eq?.checked_out_by_id).toBeNull();
+      expect(eq?.checked_out_at).toBeNull();
     });
 
     it("no assetTypeId → 422 with operationalState.noAssetTypeDefined error", async () => {
