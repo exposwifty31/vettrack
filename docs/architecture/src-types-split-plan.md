@@ -1,6 +1,6 @@
 # Slice 6 — `src/types` domain split plan (inventory draft)
 
-**Status:** **6a–6g merged** on `main` (`platform`, `patients`, `equipment`, `tasks`, `billing`, `inventory`, `forecast`). **`index.ts` ~181 lines** — ER / display / Code Blue only. **6h** planned — [slice-6h-er-display-types-plan.md](./slice-6h-er-display-types-plan.md) (not started).  
+**Status:** **6a–6h** — domain barrels complete (`platform` through `er`). **`index.ts`** is compatibility re-exports only (~9 lines). Import migrations deferred to **6i+**.  
 **Baseline:** post–PR #577 / #580 (`main`).  
 **Parent:** [modularization-plan.md](./modularization-plan.md) Slice 6.
 
@@ -411,7 +411,7 @@ Order of `export *` lines matters only if two domains exported the same name —
 | **6e** | Extract `billing.ts` | **merged** (#575) |
 | **6f** | Extract `inventory.ts` | **merged** (#576) |
 | **6g** | Extract `forecast.ts` | **merged** (#577; see pilot F9 audit in [#580](https://github.com/dboy3156/VetTrack/pull/580)) |
-| **6h** | Extract `er.ts` (display + Code Blue + crash cart) | **planned** — [slice-6h-er-display-types-plan.md](./slice-6h-er-display-types-plan.md) |
+| **6h** | Extract `er.ts` (display + Code Blue + crash cart) | **in PR** — [slice-6h-er-display-types-plan.md](./slice-6h-er-display-types-plan.md) |
 | **6i** | Optional `handoff.ts` wrapper for shared re-exports | shift-handover-page |
 | **6h** | Pilot import migration: `api/equipment.ts` → `@/types/equipment` | knip, no unused exports |
 | **6i+** | Gradual importer migration; keep barrel until knip clean | per-domain PRs |
