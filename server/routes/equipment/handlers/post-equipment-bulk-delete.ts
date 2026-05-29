@@ -1,7 +1,7 @@
 import type { RequestHandler } from "express";
 import { randomUUID } from "crypto";
 import { db, equipment, equipmentWaitlist, scanLogs, stagingQueue } from "../../../db.js";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { invalidateAnalyticsCache } from "../../../lib/analytics-cache.js";
 import { logAudit, resolveAuditActorRole } from "../../../lib/audit.js";
 import { apiError, resolveRequestId } from "../equipment-route-utils.js";
@@ -61,6 +61,22 @@ export const postEquipmentBulkDeleteHandler: RequestHandler = async (req, res) =
               eq(stagingQueue.clinicId, clinicId),
               inArray(stagingQueue.equipmentId, deletedIds),
               eq(stagingQueue.status, "active"),
+            ),
+          );
+
+        // Reset staged usage so a later restore is checkout-usable (no active claims + usageState=staged).
+        await tx
+          .update(equipment)
+          .set({
+            usageState: "available",
+            usageStateSince: now,
+            version: sql`${equipment.version} + 1`,
+          })
+          .where(
+            and(
+              eq(equipment.clinicId, clinicId),
+              inArray(equipment.id, deletedIds),
+              eq(equipment.usageState, "staged"),
             ),
           );
       }

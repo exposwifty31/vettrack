@@ -68,6 +68,18 @@ async function seedEquipment(eqId: string, clinicId: string) {
   );
 }
 
+async function seedStagedEquipment(eqId: string, clinicId: string, version = 3) {
+  await probePool!.query(
+    `INSERT INTO vt_equipment (
+       id, clinic_id, name, status, custody_state, usage_state, usage_state_since,
+       readiness_state, version
+     )
+     VALUES ($1, $2, 'Bulk Del Staged', 'ok', 'docked', 'staged', NOW(), 'ready', $3)
+     ON CONFLICT (id) DO NOTHING`,
+    [eqId, clinicId, version],
+  );
+}
+
 async function purgeClinic(clinicId: string) {
   const P = probePool!;
   await P.query(`DELETE FROM vt_equipment_waitlist WHERE clinic_id = $1`, [clinicId]);
@@ -134,6 +146,45 @@ describe.skipIf(!dbReachable)("F3: equipment bulk-delete cleanup", () => {
       [eqId, currentClinicId],
     );
     expect(st[0]?.status).toBe("cancelled");
+
+    await purgeClinic(currentClinicId);
+  });
+
+  it("F3: bulk-delete resets usageState='staged' so future restore is checkout-usable", async () => {
+    const eqId = randomUUID();
+    const initialVersion = 3;
+    await seedStagedEquipment(eqId, currentClinicId, initialVersion);
+
+    await probePool!.query(
+      `INSERT INTO vt_staging_queue (id, clinic_id, equipment_id, requested_by_id, status, clinical_priority)
+       VALUES ($1, $2, $3, $4, 'active', 'routine')`,
+      [randomUUID(), currentClinicId, eqId, currentUserId],
+    );
+
+    const res = await fetch(`${baseUrl}/bulk-delete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [eqId] }),
+    });
+    expect(res.status).toBe(200);
+
+    const { rows: st } = await probePool!.query<{ status: string }>(
+      `SELECT status FROM vt_staging_queue WHERE equipment_id = $1 AND clinic_id = $2`,
+      [eqId, currentClinicId],
+    );
+    expect(st[0]?.status).toBe("cancelled");
+
+    const { rows: eq } = await probePool!.query<{
+      usage_state: string;
+      version: number;
+      deleted_at: Date | null;
+    }>(
+      `SELECT usage_state, version, deleted_at FROM vt_equipment WHERE id = $1 AND clinic_id = $2`,
+      [eqId, currentClinicId],
+    );
+    expect(eq[0]?.deleted_at).not.toBeNull();
+    expect(eq[0]?.usage_state).toBe("available");
+    expect(Number(eq[0]?.version)).toBe(initialVersion + 1);
 
     await purgeClinic(currentClinicId);
   });
