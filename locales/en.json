@@ -2785,7 +2785,9 @@
     "autoRefreshHint": "Auto-refreshes every 30 seconds. The background recovery scheduler re-processes failed jobs when the worker is running."
   },
   "operationalState": {
-    "invalidCustodyForDockReturn": "Dock return requires custody state: returned or docked.",
+    "invalidCustodyForDockReturn": "Dock return requires custody state: returned, docked, or checked out (NFC confirm).",
+    "dockMasterTagNotFound": "No room matches this dock master NFC tag.",
+    "ambiguousDocks": "Multiple docks in this room — choose a dock explicitly.",
     "noAssetTypeDefined": "Equipment has no asset type assigned.",
     "crossClinicAssociation": "Resource belongs to a different clinic.",
     "conditionNotFound": "Condition not found.",

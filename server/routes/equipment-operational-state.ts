@@ -199,7 +199,7 @@ router.post("/equipment/:equipmentId/dock-return", requireAuth, validateBody(doc
   if (!resolved.ok) {
     if (resolved.reason === "ambiguous_docks") {
       return res.status(422).json({
-        error: "AMBIGUOUS_DOCKS",
+        code: "operationalState.ambiguousDocks",
         docks: resolved.docks,
       });
     }
