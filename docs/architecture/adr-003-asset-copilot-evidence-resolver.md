@@ -1,7 +1,8 @@
 # ADR-003 — Asset Copilot Evidence Resolver
 
 **Date:** 2026-05-29  
-**Status:** Accepted — pending implementation (Milestone 0)  
+**Status:** Accepted v1.1 — pending implementation (Milestone 0)  
+**Plan:** [asset-copilot-implementation-plan.md](./asset-copilot-implementation-plan.md) v3.1  
 **Parent plan:** [asset-copilot-implementation-plan.md](./asset-copilot-implementation-plan.md)  
 **Domain:** `equipment` ([domain-boundaries.md](./domain-boundaries.md))
 
@@ -33,6 +34,16 @@ Introduce a **three-layer read-only stack** inside the equipment domain:
 
 LLM orchestration (`asset-copilot-orchestrator.service.ts`) may only narrate pre-validated claims. **Citations are resolver-emitted only**; `validateCopilotAnswer()` runs before every response.
 
+### Citation validity ≠ relevance
+
+| | Validity | Relevance |
+|---|----------|-----------|
+| **Question** | Does cited ID exist with a real `observedAt`? | Does that evidence support the claim? |
+| **Enforced by** | `validateCopilotAnswer()` | Human review (golden + shadow) |
+| **Metric** | `citation_validity` | `citation_relevance` |
+
+The validator must **not** be cited as proof of “100% correct citation” in exit gates.
+
 ### Module placement (modularization-aligned)
 
 ```
@@ -62,9 +73,23 @@ resolveWaitlistStatus(ctx, equipmentId, graph?, forUserId?)
 
 M1 adds: `resolveOfflineConflict`, `searchEquipmentEvidence`.
 
+### Freshness (M0)
+
+`evidenceFreshness` uses **per-`CitationType` thresholds** (see plan §3.5), not one global 60-minute rule. Condition citations use `assetTypeConditions.staleAfterMinutes` when applicable.
+
+### Cache (M1)
+
+Cached answers store citation `observedAt` (ISO) only; **`ageMinutes` and freshness labels are recomputed on serve** (and may be recomputed on the client each render). Never cache human-readable age strings.
+
+### Compile-time no-mutation boundary (M0)
+
+dependency-cruiser **error**: `server/domain/equipment/evidence/**`, `server/domain/equipment/copilot/**`, and `asset-copilot-orchestrator.service.ts` must not import equipment write routes/services. See plan §3.8.
+
 ### Deployability invariant
 
-`resolveDeployability` **must** call existing `computeBundleReadinessGate` and `isEquipmentFullyDeployable` from `equipment-operational-state.service.ts`. HTTP `GET /api/equipment/:id/deployability` remains the behavioral reference for integration tests.
+`resolveDeployability` **must** call existing `computeBundleReadinessGate` and `isEquipmentFullyDeployable` from `equipment-operational-state.service.ts`. HTTP `GET /api/equipment/:id/deployability` remains the behavioral reference for integration tests — compare with **semantic deep-equal** on a normalized shape, **not** byte-for-byte JSON.
+
+Location, custodian, and waitlist resolvers have **no HTTP parity oracle**; golden fixtures are authoritative.
 
 ### Custody invariant
 
@@ -73,6 +98,16 @@ Resolver **must not** infer custodian from RFID alone. Checked-out custodian req
 ### Staging vs waitlist invariant
 
 Resolver **must not** conflate `vt_staging_queue` (docked, next checkout) with `vt_equipment_waitlist` (device in use). Separate claims and citations per Program Brain.
+
+### RAG / clinic KB (M3 — untrusted input)
+
+When M3 adds pgvector retrieval over clinic-authored KB:
+
+1. Retrieved chunks are **untrusted data**, never system instructions.
+2. KB text **cannot** introduce citations; only the resolver may emit `Citation` objects for factual equipment state.
+3. How-to answers may quote KB procedurally (“per clinic SOP…”) with `type: "kb"` optional metadata, but **equipment facts** (location, custody, readiness) still require resolver citations.
+4. Shadow set must include at least one **poisoned KB** fixture (instruction override attempt) — answer must not obey it.
+5. Prompt assembly: fixed system prompt + resolver claims JSON + KB excerpt in a clearly delimited, non-instructional block.
 
 ---
 
@@ -86,7 +121,7 @@ Resolver **must not** conflate `vt_staging_queue` (docked, next checkout) with `
 
 ### Negative / cost
 
-- New `server/domain/equipment/` tree before Slice 5 repository exists — acceptable; graph loader queries move to repository later without API change.
+- New `server/domain/equipment/` tree before Slice 5 repository exists — acceptable; graph loader must migrate to equipment repository after Slice 5 (**owned tech debt**, plan §7.1).
 - Additional governance: depcruise may need `server/domain/**` rules (warn → error).
 
 ### Zero-break requirements
@@ -124,5 +159,12 @@ Each step: `npx tsc --noEmit`, `pnpm architecture:gates`, `pnpm test`.
 
 ## Verification
 
-- [asset-copilot-implementation-plan.md](./asset-copilot-implementation-plan.md) §4–§5 exit criteria
-- Shadow rubric 10×10 before `ENABLE_ASSET_COPILOT=true`
+- [asset-copilot-implementation-plan.md](./asset-copilot-implementation-plan.md) §4–§6 exit criteria (v3.1 statistical honesty)
+- M0.5 shadow 10×10 before `ENABLE_ASSET_COPILOT=true`; template-only must pass shadow without LLM
+- §3.5–§3.8 complete before M0.5 shadow work starts
+
+## Decision log
+
+| Date | Change |
+|------|--------|
+| 2026-05-29 | v1.1: validity vs relevance; per-type freshness; cache contract; depcruise; RAG untrusted input; semantic parity |
