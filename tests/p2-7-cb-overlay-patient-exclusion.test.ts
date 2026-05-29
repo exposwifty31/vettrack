@@ -19,7 +19,7 @@ describe("P2-7: CB overlay patient exclusion uses animalId", () => {
 
   it("DisplaySnapshotHospitalization type includes animalId", async () => {
     const fs = await import("fs");
-    const source = fs.readFileSync("src/types/index.ts", "utf8");
+    const source = fs.readFileSync("src/types/er.ts", "utf8");
 
     const typeBlock = source.slice(
       source.indexOf("export interface DisplaySnapshotHospitalization"),

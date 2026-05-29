@@ -1,6 +1,6 @@
 # Slice 6h — ER / display / Code Blue types (`er.ts`)
 
-**Status:** Planning only — **do not implement** until this doc is reviewed and a dedicated PR is opened.  
+**Status:** **Implemented** in PR (Slice 6h) — `src/types/er.ts` + barrel re-export.  
 **Parent:** [src-types-split-plan.md](./src-types-split-plan.md) · [modularization-plan.md](./modularization-plan.md) Slice 6.
 
 ## Context
