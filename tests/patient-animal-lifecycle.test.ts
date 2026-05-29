@@ -35,8 +35,16 @@ describe("Patient animal lifecycle — soft delete & retention", () => {
     expect(patientsRoute).toContain("isNull(animals.deletedAt)");
   });
 
-  it("admit restores soft-deleted animals on reuse", () => {
-    expect(patientsRoute).toContain("restoreAnimalIfSoftDeleted");
+  it("admit restores soft-deleted animals after animalId is resolved", () => {
+    const postStart = patientsRoute.indexOf('router.post("/", requireEffectiveRole("technician")');
+    const postEnd = patientsRoute.indexOf("res.status(201).json", postStart);
+    const postBody = patientsRoute.slice(postStart, postEnd);
+    const nameMatchIdx = postBody.indexOf("animalId = existing[0]");
+    const restoreIdx = postBody.indexOf("restoreAnimalIfSoftDeleted");
+    const hospInsertIdx = postBody.indexOf("await db.insert(hospitalizations)");
+    expect(nameMatchIdx).toBeGreaterThan(-1);
+    expect(restoreIdx).toBeGreaterThan(nameMatchIdx);
+    expect(hospInsertIdx).toBeGreaterThan(restoreIdx);
   });
 
   it("purge uses 90-day retention constant", () => {

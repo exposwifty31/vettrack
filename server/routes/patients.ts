@@ -392,20 +392,20 @@ router.post("/", requireEffectiveRole("technician"), async (req, res) => {
         .where(and(eq(animals.id, animalId), eq(animals.clinicId, clinicId)))
         .limit(1);
       if (!check.length) return res.status(400).json(apiError({ code: "ANIMAL_NOT_FOUND", reason: "ANIMAL_NOT_IN_CLINIC", message: "Animal not found in this clinic", requestId }));
+    }
 
-      const restored = await restoreAnimalIfSoftDeleted(clinicId, animalId);
-      if (restored) {
-        logAudit({
-          clinicId,
-          actionType: "animal_restored",
-          performedBy: req.authUser!.id,
-          performedByEmail: req.authUser!.email ?? "",
-          actorRole: resolveAuditActorRole(req),
-          targetId: animalId,
-          targetType: "animal",
-          metadata: { reason: "readmitted" },
-        });
-      }
+    const restored = await restoreAnimalIfSoftDeleted(clinicId, animalId);
+    if (restored) {
+      logAudit({
+        clinicId,
+        actionType: "animal_restored",
+        performedBy: req.authUser!.id,
+        performedByEmail: req.authUser!.email ?? "",
+        actorRole: resolveAuditActorRole(req),
+        targetId: animalId,
+        targetType: "animal",
+        metadata: { reason: "readmitted" },
+      });
     }
 
     const hospId = randomUUID();
