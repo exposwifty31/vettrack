@@ -83,6 +83,8 @@ Two families (plan §3.5):
 
 Optional UI: **Last corroborated** from latest scan/RFID consistent with custodian (observation decay applies only to that line).
 
+**Supersession (M0 golden):** Graph loader must detect superseding events clinic-scoped (`return`, re-checkout, `transfer`, custody transitions). Fixture: checkout → later transfer → custody **not** current. Missed supersession = false “current” custody — high severity.
+
 ### Cache (M1)
 
 Cached answers store citation `observedAt` (ISO) only; **`ageMinutes` and freshness labels are recomputed on serve** (and may be recomputed on the client each render). Never cache human-readable age strings.

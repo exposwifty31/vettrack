@@ -1,8 +1,8 @@
 # Asset Copilot — Implementation Plan (Draft)
 
-**Status:** Draft v3.2 — reviewer confirmation incorporated (2026-05-29)  
+**Status:** **v3.2 — exit-criteria source of truth** (final review pass converged, 2026-05-29)  
 **Governance:** **Zero Errors, Zero Breaks** (primary constraint)  
-**Reviewer verdict:** **M0 approved** — v3.2 is exit-criteria source of truth. **M0.5 hold** until §15 blockers (b) named reviewers posted.  
+**Reviewer verdict:** **M0 approved to proceed** — no further review required before M0 coding. **M0.5 held** on sole open blocker: named shadow reviewers (§15).  
 **Product line:** Asset Copilot succeeds when users trust its evidence more than they trust hallway conversations.  
 **Positioning:** **Evidence Copilot** — explains state, never changes it.  
 **Modularization alignment:** [modularization-plan.md](./modularization-plan.md) · [modularization-status.md](./modularization-status.md) · [domain-boundaries.md](./domain-boundaries.md)  
@@ -165,7 +165,7 @@ After merge: `pnpm routes:contract -- --write-contract` (intentional contract up
 
 ### 3.5 Freshness — observation decay vs state assertions (M0)
 
-**Reviewer agreement (v3.2):** §3.5 cleared after custody recategorization below. RFID and condition entries unchanged.
+**Reviewer sign-off (v3.2 final):** §3.5-B custody wording **explicitly acknowledged** — gate cleared. RFID and condition entries unchanged.
 
 Freshness is **not** one formula for all citations. Two families:
 
@@ -188,7 +188,7 @@ Authoritative state that holds until a **superseding event** (return, transfer, 
 
 | `CitationType` / claim | Freshness rule | Superseding events |
 |------------------------|----------------|-------------------|
-| **`equipment` (custody / checkout row)** | **`current`** while `custody_state === "checked_out"` and `checkedOutById` set, with **no** later contradicting custody/return/transfer event in graph | `return`, custody transition to `docked`/`returned`/`untracked`, conflicting checkout |
+| **`equipment` (custody / checkout row)** | **`current`** ⟺ `checked_out` + `checkedOutById` + **no superseding event in graph** (clinic-scoped scan). **NOT** stale because `checkedOutAt` is old | `return`, re-checkout, `transfer`, custody → `docked`/`returned`/`untracked` |
 | **`condition`** | Use `assetTypeConditions.staleAfterMinutes` on **`verifiedAt`** (existing ops lifecycle) | Re-verify or stale sweep |
 
 **Custody claim UI (recommended):**
@@ -209,9 +209,11 @@ function resolveEvidenceFreshness(citation: Citation, graph: EvidenceGraph): Con
 Unit tests (M0):
 
 - RFID/scan: cross threshold → stale.
-- Custody: checkout 72h ago, no return → **still current**.
-- Custody + return event after checkout → custodian claim withdrawn or unknown.
+- Custody: checkout 72h ago, no superseding event → **still current** (multi-day fixture).
+- Custody: checkout → **later transfer** (or return / re-checkout) in graph → custody **no longer current** (supersession golden — **load-bearing**).
 - Condition: uses `staleAfterMinutes` boundary.
+
+**Implementation note (M0 PR1, non-blocking on plan):** The “no superseding event in graph” clause is now load-bearing. Graph loader supersession scan must be **clinic-scoped** and **complete** for: `return`, re-checkout, and `transfer` (and custody state transitions). A missed superseding event would incorrectly yield a confident “current” custody claim — test the transfer path explicitly in golden suite.
 
 ### 3.6 Cache vs freshness — no frozen lies
 
@@ -583,7 +585,8 @@ Copilot: Unknown. No custody transfer or scan evidence available.
 | 2026-05-29 | v3.1: rubric statistical honesty; validity vs relevance; per-type freshness; cache contract; offline UX; depcruise no-mutation; token cap defined |
 | 2026-05-29 | v3.2: custody = state assertion (no checkout-age decay); M0 approved; shadow post-mortem §6.3; transitive depcruise; cache regression test |
 | 2026-05-29 | **M0 approved** by reviewer (v3.2 exit criteria) |
-| TBD | Product: **named** shadow reviewers + availability (M0.5 blocker) |
+| 2026-05-29 | Final review pass converged; §3.5-B explicitly signed off; supersession golden required |
+| TBD | Product: **named** shadow reviewers + availability (**sole M0.5 blocker**) |
 | TBD | LLM vendor + DPA — **required before M1 user-facing LLM narration** (not M0/M0.5 if template-only passes) |
 
 ---
@@ -615,12 +618,26 @@ Copilot: Unknown. No custody transfer or scan evidence available.
 
 | Blocker | Status | Owner | Requirement |
 |---------|--------|-------|-------------|
-| **§3.5 freshness table** | **Cleared (v3.2)** | Engineering | Custody = state assertion; observation types use time decay |
+| **§3.5 freshness table** | **Cleared & acknowledged** | Engineering | §3.5-B signed off (final review pass) |
+| **§3.5-B custody wording** | **Cleared & acknowledged** | Reviewer | `current` ⟺ checked_out + holder + no superseding event; NOT stale on `checkedOutAt` age |
 | **One hallucination = fail** | **Cleared** | Engineering | §6.2 + §6.3 post-mortem before re-run |
-| **Named shadow reviewers** | **Open** | **Product** | Actual names (not roles only) + committed availability for full n=100 review |
+| **Named shadow reviewers** | **Open** | **Product** | **Sole remaining M0.5 blocker.** Actual names + committed availability **in writing** (roles ≠ owners) |
 
-**M0:** Proceed now per v3.2 exit criteria.  
-**M0.5:** Hold until row 3 is closed in writing (e.g. comment on tracking issue with names + dates).
+**M0:** **Approved** — proceed under v3.2; no further review before coding. Start M0 PR1.  
+**M0.5:** **Held** until named reviewers row is closed. Custody-wording gate is satisfied.
+
+### Final review status (converged)
+
+| Item | Status |
+|------|--------|
+| §3.5 freshness (custody recategorized) | Cleared & acknowledged |
+| One hallucination = fail + §6.3 post-mortem | Cleared |
+| §3.6 cache/freshness regression test | Landed |
+| §3.8 transitive no-mutation rule | Landed |
+| §8.1 template-only-at-cap | Landed |
+| Named shadow reviewers | **Open — product action** |
+
+Reviewer picks up again at **M0 exit gate** and **M0.5 sign-off** once reviewers are named.
 
 ---
 
