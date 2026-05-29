@@ -46,10 +46,12 @@ describe("cleanup-scheduler.ts", () => {
   });
 
   it("PURGE_AFTER_DAYS is exported and >= 30", () => {
-    const match = src.match(/export const PURGE_AFTER_DAYS\s*=\s*(\d+)/);
-    expect(match, "PURGE_AFTER_DAYS must be exported").not.toBeNull();
+    const retentionSrc = read("server/lib/retention-policy.ts");
+    const match = retentionSrc.match(/export const PURGE_AFTER_DAYS\s*=\s*(\d+)/);
+    expect(match, "PURGE_AFTER_DAYS must be exported from retention-policy.ts").not.toBeNull();
     const days = parseInt(match[1], 10);
     expect(days).toBeGreaterThanOrEqual(30);
+    expect(src).toContain('export { PURGE_AFTER_DAYS } from "./retention-policy.js"');
   });
 
   it("countPurgeCandidates is exported (informational, no delete)", () => {
