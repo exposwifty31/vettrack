@@ -2,6 +2,7 @@ export * from "./platform.js";
 export * from "./patients.js";
 export * from "./equipment.js";
 export * from "./tasks.js";
+export * from "./billing.js";
 import type { ShiftRole } from "./platform.js";
 import type { HospitalizationStatus } from "./patients.js";
 import type { EquipmentStatus } from "./equipment.js";
@@ -104,45 +105,6 @@ export interface RestockFinishSummary {
   totalAdded: number;
   totalRemoved: number;
   itemsMissingCount: number;
-}
-
-export interface BillingLedgerEntry {
-  id: string;
-  clinicId: string;
-  animalId: string;
-  itemType: "EQUIPMENT" | "CONSUMABLE";
-  itemId: string;
-  quantity: number;
-  unitPriceCents: number;
-  totalAmountCents: number;
-  idempotencyKey: string;
-  status: "pending" | "synced" | "voided";
-  createdAt: string;
-}
-
-export interface BillingItem {
-  id: string;
-  clinicId: string;
-  code: string;
-  description: string;
-  unitPriceCents: number;
-  chargeKind: "per_scan_hour" | "per_unit";
-  createdAt: string;
-}
-
-export interface BillingSummary {
-  totalCents: number;
-  pendingCents: number;
-  syncedCents: number;
-  voidedCents: number;
-  byType: {
-    EQUIPMENT: number;
-    CONSUMABLE: number;
-  };
-  byDay: Array<{
-    date: string;
-    totalCents: number;
-  }>;
 }
 
 export const INVENTORY_ITEM_CATEGORIES = [
@@ -345,30 +307,6 @@ export interface ConsumablesReport {
   events: ConsumablesReportEvent[];
 }
 
-export interface LeakageReportItem {
-  containerId: string;
-  containerName: string;
-  unitPriceCents: number;
-  dispensedQty: number;
-  billedQty: number;
-  gapQty: number;
-  gapValueCents: number;
-  leakagePct: number;
-}
-
-export interface LeakageReport {
-  from: string;
-  to: string;
-  summary: {
-    totalDispensedQty: number;
-    totalBilledQty: number;
-    totalGapQty: number;
-    totalGapValueCents: number;
-    overallLeakagePct: number;
-  };
-  items: LeakageReportItem[];
-}
-
 export interface InventoryContainerWithItems extends InventoryContainer {
   items: Array<{
     id: string;
@@ -522,12 +460,4 @@ export interface CodeBlueDispense {
   dispensedAt: string;
   billingLedgerId: string | null;
   billedCents: number | null;
-}
-
-export interface ManualBillingRequest {
-  inventoryLogId: string;
-  itemId: string;
-  quantity: number;
-  unitPriceCents: number;
-  animalId?: string;
 }
