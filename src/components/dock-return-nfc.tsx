@@ -6,7 +6,10 @@ import { t } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ConditionChecklist } from "@/components/equipment/ConditionChecklist";
-import { decodeNdefUrlFromReadingEvent } from "@/lib/nfc-equipment-toggle";
+import {
+  decodeNdefTextFromReadingEvent,
+  decodeNdefUrlFromReadingEvent,
+} from "@/lib/nfc-equipment-toggle";
 import type { Equipment } from "@/types";
 import { haptics } from "@/lib/haptics";
 
@@ -86,20 +89,10 @@ export function DockReturnNfc({ equipment, open, onClose, onSuccess }: DockRetur
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ndef.onreading = (event: any) => {
           window.clearTimeout(timeout);
-          const records = event.message?.records ?? [];
-          for (const record of records) {
-            if (record.recordType === "text") {
-              const view =
-                record.data instanceof ArrayBuffer
-                  ? new Uint8Array(record.data)
-                  : new Uint8Array(record.data as ArrayBuffer);
-              const raw = new TextDecoder().decode(view);
-              const tagId = raw.replace(/^\x02[a-z]{2}/i, "").trim();
-              if (tagId) {
-                resolve(tagId);
-                return;
-              }
-            }
+          const textTag = decodeNdefTextFromReadingEvent(event);
+          if (textTag) {
+            resolve(textTag);
+            return;
           }
           const url = decodeNdefUrlFromReadingEvent(event);
           if (url) {

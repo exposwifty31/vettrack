@@ -72,6 +72,40 @@ export async function runEquipmentQuickToggle(
   }
 }
 
+/** Web NFC exposes record.data as ArrayBuffer or ArrayBufferView (e.g. DataView). */
+export function ndefRecordToUint8Array(data: BufferSource | undefined): Uint8Array | null {
+  if (!data) return null;
+  if (data instanceof ArrayBuffer) {
+    return new Uint8Array(data);
+  }
+  if (ArrayBuffer.isView(data)) {
+    return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  }
+  return null;
+}
+
+export function decodeNdefTextFromRecord(record: {
+  recordType?: string;
+  data?: BufferSource;
+}): string | null {
+  if (record.recordType !== "text") return null;
+  const view = ndefRecordToUint8Array(record.data);
+  if (!view?.length) return null;
+  const raw = new TextDecoder().decode(view);
+  const tagId = raw.replace(/^\x02[a-z]{2}/i, "").replace(/\0+$/, "").trim();
+  return tagId || null;
+}
+
+export function decodeNdefTextFromReadingEvent(event: {
+  message?: { records?: Array<{ recordType?: string; data?: BufferSource }> };
+}): string | null {
+  for (const record of event.message?.records ?? []) {
+    const text = decodeNdefTextFromRecord(record);
+    if (text) return text;
+  }
+  return null;
+}
+
 export function decodeNdefUrlFromReadingEvent(event: {
   message?: { records?: Array<{ recordType?: string; data?: BufferSource }> };
 }): string | null {
@@ -79,13 +113,8 @@ export function decodeNdefUrlFromReadingEvent(event: {
   if (!records?.length) return null;
   for (const record of records) {
     if (record.recordType !== "url" && record.recordType !== "absolute-url") continue;
-    const data = record.data;
-    if (!data) continue;
-    const view =
-      data instanceof ArrayBuffer
-        ? new Uint8Array(data)
-        : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
-    if (view.length === 0) continue;
+    const view = ndefRecordToUint8Array(record.data);
+    if (!view?.length) continue;
     const prefixCode = view[0] ?? 0;
     const rest = new TextDecoder().decode(view.subarray(1));
     const prefixes = [

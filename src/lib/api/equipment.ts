@@ -287,15 +287,82 @@ export const equipmentApi = {
         { method: "DELETE" },
         { offlineType: "delete" }
       ),
+    /**
+     * NFC / deep-link toggle — online-only, uses full V1 checkout/return routes
+     * (custodyState, usageState, realtime, waitlist). Does not call POST /api/equipment/scan.
+     */
     quickToggle: async (equipmentId: string): Promise<QuickScanToggleResult> => {
+      const me = getCurrentUserId();
+      let eq: Equipment;
       try {
-        return await request<QuickScanToggleResult>("/api/equipment/scan", {
-          method: "POST",
-          body: JSON.stringify({ equipmentId }),
-        });
+        eq = await request<Equipment>(`/api/equipment/${equipmentId}`);
       } catch (err) {
         if (isNetworkError(err)) {
           throw err;
+        }
+        throw err;
+      }
+
+      if (eq.checkedOutById && eq.checkedOutById !== me) {
+        return {
+          equipment: eq,
+          action: "blocked",
+          scanLogId: "",
+          undoToken: "",
+          checkedOutByEmail: eq.checkedOutByEmail ?? undefined,
+        };
+      }
+
+      const shouldReturn = eq.checkedOutById === me;
+
+      try {
+        if (shouldReturn) {
+          const result = await request<{ equipment: Equipment; undoToken: string }>(
+            `/api/equipment/${equipmentId}/return`,
+            {
+              method: "POST",
+              body: JSON.stringify({ isPluggedIn: true }),
+            },
+          );
+          await updateCachedEquipment(equipmentId, result.equipment).catch(() => {});
+          return {
+            equipment: result.equipment,
+            action: "return",
+            scanLogId: "",
+            undoToken: result.undoToken ?? "",
+          };
+        }
+
+        const result = await request<{ equipment: Equipment; undoToken: string }>(
+          `/api/equipment/${equipmentId}/checkout`,
+          {
+            method: "POST",
+            body: JSON.stringify({}),
+          },
+        );
+        await updateCachedEquipment(equipmentId, result.equipment).catch(() => {});
+        return {
+          equipment: result.equipment,
+          action: "checkout",
+          scanLogId: "",
+          undoToken: result.undoToken ?? "",
+        };
+      } catch (err) {
+        if (isNetworkError(err)) {
+          throw err;
+        }
+        if (err instanceof ApiError && err.status === 409) {
+          const email =
+            (typeof err.payload.checkedOutByEmail === "string" && err.payload.checkedOutByEmail) ||
+            eq.checkedOutByEmail ||
+            undefined;
+          return {
+            equipment: eq,
+            action: "blocked",
+            scanLogId: "",
+            undoToken: "",
+            checkedOutByEmail: email,
+          };
         }
         throw err;
       }
