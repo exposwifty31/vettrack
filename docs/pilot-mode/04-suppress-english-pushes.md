@@ -2,17 +2,27 @@
 
 ## Context
 
-**F8:** Three equipment routes broadcast English push titles ("Equipment Transferred", "Equipment Returned", "Bulk Transfer") via `sendPushToAll`. Hebrew-default pilot clinics already get localized charge-alert / waitlist pushes elsewhere.
+**F8:** Five equipment workflows broadcast hardcoded English push titles via `sendPushToAll`. Hebrew-default pilot clinics already get localized charge-alert / waitlist pushes elsewhere.
 
 ## Change
 
 | File | Summary |
 |------|---------|
 | `server/lib/push.ts` | `shouldSendPilotEnglishEquipmentPush()` — false when `PILOT_DISABLE_EN_PUSH=true`. |
-| `server/routes/equipment/handlers/patch-equipment.ts` | Gate transfer push. |
-| `server/routes/equipment.ts` | Gate return push. |
-| `server/routes/equipment/handlers/post-equipment-bulk-move.ts` | Gate bulk-move push. |
-| `tests/pilot-disable-en-push-f8.test.ts` | Env flag both branches. |
+| `server/routes/equipment/handlers/patch-equipment.ts` | Gate **transfer** push (`Equipment Transferred`). |
+| `server/routes/equipment.ts` | Gate **return** push (`Equipment Returned`). |
+| `server/routes/equipment.ts` | Gate **checkout** push (`Equipment Checked Out`). |
+| `server/routes/equipment.ts` | Gate **scan-derived** pushes: issue (`Equipment Issue Reported`), maintenance overdue (`Maintenance Overdue`), sterilization due (`Sterilization Due`). |
+| `server/routes/equipment/handlers/post-equipment-bulk-move.ts` | Gate **bulk-move** push (`Bulk Transfer`). |
+| `tests/pilot-disable-en-push-f8.test.ts` | Env flag + source contract for all gated sites. |
+
+### Gated English push sites (5 workflows, 7 titles)
+
+1. **Transfer** — `patch-equipment.ts`  
+2. **Return** — `equipment.ts`  
+3. **Bulk move** — `post-equipment-bulk-move.ts`  
+4. **Checkout** — `equipment.ts` (`/:id/checkout`)  
+5. **Scan-derived alerts** — `equipment.ts` (status scan handler): issue, maintenance overdue, sterilization due
 
 Set `PILOT_DISABLE_EN_PUSH=true` on Railway before pilot launch.
 

@@ -833,7 +833,7 @@ router.post(
       checkedOutAt: reminderBaseTime ?? u.checkedOutAt,
     });
 
-    if (!checkDedupe(u.id, "checkout")) {
+    if (shouldSendPilotEnglishEquipmentPush() && !checkDedupe(u.id, "checkout")) {
       sendPushToAll(clinicId, {
         title: "Equipment Checked Out",
         body: `${u.name} checked out${req.body?.location ? ` — ${req.body.location}` : ""}`,
@@ -1304,7 +1304,7 @@ router.post(
     invalidateAnalyticsCache(clinicId);
     trackSyncSuccess();
     res.json({ equipment: updatedEquipment, scanLog, undoToken });
-    if (status === "issue" && !checkDedupe(eq2.id, "issue")) {
+    if (shouldSendPilotEnglishEquipmentPush() && status === "issue" && !checkDedupe(eq2.id, "issue")) {
       sendPushToAll(clinicId, {
         title: "Equipment Issue Reported",
         body: `${eq2.name} needs attention${note ? ` — ${note}` : ""}`,
@@ -1321,7 +1321,7 @@ router.post(
     ) {
       const dueDate = new Date(eq2.lastMaintenanceDate);
       dueDate.setDate(dueDate.getDate() + eq2.maintenanceIntervalDays);
-      if (now > dueDate) {
+      if (now > dueDate && shouldSendPilotEnglishEquipmentPush()) {
         const daysOverdue = Math.ceil((now.getTime() - dueDate.getTime()) / 86_400_000);
         sendPushToAll(clinicId, {
           title: "Maintenance Overdue",
@@ -1334,7 +1334,7 @@ router.post(
 
     if (eq2.lastSterilizationDate && !checkDedupe(eq2.id, "sterilization_due")) {
       const sevenDaysAgo = new Date(now.getTime() - 7 * 86_400_000);
-      if (new Date(eq2.lastSterilizationDate) < sevenDaysAgo) {
+      if (shouldSendPilotEnglishEquipmentPush() && new Date(eq2.lastSterilizationDate) < sevenDaysAgo) {
         sendPushToAll(clinicId, {
           title: "Sterilization Due",
           body: `${eq2.name} has not been sterilized in 7+ days`,
