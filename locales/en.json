@@ -1425,7 +1425,20 @@
     "pilotStaleThresholdLabel": "Stale threshold",
     "pilotStaleThresholdHint": "Items not confirmed within this window are marked stale.",
     "pilotStaleThresholdSaved": "Threshold updated",
-    "pilotStaleThresholdError": "Failed to update threshold"
+    "pilotStaleThresholdError": "Failed to update threshold",
+    "pilotModeCardTitle": "Pilot Mode (this browser)",
+    "pilotModeCardDescription": "Hide non-equipment pages on this device. Affects menu only; deep links keep working. Per-browser override; takes effect after reload.",
+    "pilotModeEnvDefault": "Server default",
+    "pilotModeOverride": "Local override",
+    "pilotModeEffective": "Currently effective",
+    "pilotModeOn": "On",
+    "pilotModeOff": "Off",
+    "pilotModeNone": "Not set",
+    "pilotModeUseDefault": "Use server default",
+    "pilotModeForceOn": "Force on",
+    "pilotModeForceOff": "Force off",
+    "pilotModeReloadPrompt": "Reload now to apply?",
+    "pilotModeReload": "Reload"
   },
   "layoutHebrew": {
     "home": "Home",

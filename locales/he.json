@@ -1425,7 +1425,20 @@
     "pilotStaleThresholdLabel": "סף ישנות",
     "pilotStaleThresholdHint": "פריטים שלא אושרו בתוך חלון זה מסומנים כישנים.",
     "pilotStaleThresholdSaved": "הסף עודכן",
-    "pilotStaleThresholdError": "עדכון הסף נכשל"
+    "pilotStaleThresholdError": "עדכון הסף נכשל",
+    "pilotModeCardTitle": "מצב פיילוט (בדפדפן זה)",
+    "pilotModeCardDescription": "מסתיר דפים שאינם קשורים לציוד במכשיר זה. משפיע רק על התפריט; קישורים ישירים ממשיכים לעבוד. הגדרה פר-דפדפן; נכנס לתוקף אחרי רענון.",
+    "pilotModeEnvDefault": "ברירת מחדל מהשרת",
+    "pilotModeOverride": "דריסה מקומית",
+    "pilotModeEffective": "ערך אפקטיבי",
+    "pilotModeOn": "מופעל",
+    "pilotModeOff": "כבוי",
+    "pilotModeNone": "לא מוגדר",
+    "pilotModeUseDefault": "השתמש בברירת מחדל",
+    "pilotModeForceOn": "אכוף מופעל",
+    "pilotModeForceOff": "אכוף כבוי",
+    "pilotModeReloadPrompt": "לרענן עכשיו כדי להחיל?",
+    "pilotModeReload": "רענן"
   },
   "layoutHebrew": {
     "home": "ראשי",

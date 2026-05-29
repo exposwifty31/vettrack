@@ -1429,6 +1429,19 @@ export interface TStructure {
     pilotStaleThresholdHint: string;
     pilotStaleThresholdSaved: string;
     pilotStaleThresholdError: string;
+    pilotModeCardTitle: string;
+    pilotModeCardDescription: string;
+    pilotModeEnvDefault: string;
+    pilotModeOverride: string;
+    pilotModeEffective: string;
+    pilotModeOn: string;
+    pilotModeOff: string;
+    pilotModeNone: string;
+    pilotModeUseDefault: string;
+    pilotModeForceOn: string;
+    pilotModeForceOff: string;
+    pilotModeReloadPrompt: string;
+    pilotModeReload: string;
   };
   layoutHebrew: {
     home: string;
@@ -2874,6 +2887,7 @@ export interface TStructure {
     WAITLIST_SELF_CHECKOUT: string;
     WAITLIST_ALREADY_JOINED: string;
     WAITLIST_NOT_ON_WAITLIST: string;
+    WAITLIST_RESERVATION_HELD_BY_OTHER: string;
     EQUIPMENT_NOT_FOUND: string;
   };
   operationalMetrics: {

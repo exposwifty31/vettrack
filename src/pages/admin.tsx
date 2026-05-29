@@ -67,7 +67,13 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { isPilotMode } from "@/lib/pilot-mode";
+import {
+  isPilotMode,
+  pilotModeEnvDefault,
+  getPilotModeOverride,
+  setPilotModeOverride,
+  type PilotModeOverride,
+} from "@/lib/pilot-mode";
 import { usePilotStaleMs } from "@/hooks/use-pilot-config";
 import type {
   SupportTicket,
@@ -132,6 +138,16 @@ export default function AdminPage() {
   const queryClient = useQueryClient();
   const [editingStaleMs, setEditingStaleMs] = useState(false);
   const [staleMsInput, setStaleMsInput] = useState("");
+  const [pilotModeOverride, setPilotModeOverrideState] = useState<PilotModeOverride>(
+    () => getPilotModeOverride(),
+  );
+
+  const handleSetPilotOverride = (value: PilotModeOverride) => {
+    setPilotModeOverride(value);
+    setPilotModeOverrideState(value);
+    const reload = window.confirm(t.adminPage.pilotModeReloadPrompt);
+    if (reload) window.location.reload();
+  };
 
   const staleMsMut = useMutation({
     mutationFn: (ms: number) => api.pilot.setConfig(ms),
@@ -227,6 +243,67 @@ export default function AdminPage() {
             >
               Open Import Screen
             </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border/60 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Settings className="w-4 h-4 text-muted-foreground" />
+              {t.adminPage.pilotModeCardTitle}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <p className="text-xs text-muted-foreground">{t.adminPage.pilotModeCardDescription}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+              <div className="flex flex-col gap-0.5 p-2 rounded bg-muted/40">
+                <span className="text-muted-foreground">{t.adminPage.pilotModeEnvDefault}</span>
+                <span className="font-semibold">{pilotModeEnvDefault ? t.adminPage.pilotModeOn : t.adminPage.pilotModeOff}</span>
+              </div>
+              <div className="flex flex-col gap-0.5 p-2 rounded bg-muted/40">
+                <span className="text-muted-foreground">{t.adminPage.pilotModeOverride}</span>
+                <span className="font-semibold">
+                  {pilotModeOverride === null
+                    ? t.adminPage.pilotModeNone
+                    : pilotModeOverride
+                      ? t.adminPage.pilotModeOn
+                      : t.adminPage.pilotModeOff}
+                </span>
+              </div>
+              <div className="flex flex-col gap-0.5 p-2 rounded bg-muted/40">
+                <span className="text-muted-foreground">{t.adminPage.pilotModeEffective}</span>
+                <span className="font-semibold">{isPilotMode ? t.adminPage.pilotModeOn : t.adminPage.pilotModeOff}</span>
+              </div>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant={pilotModeOverride === true ? "default" : "outline"}
+                className="h-8 text-xs"
+                onClick={() => handleSetPilotOverride(true)}
+                data-testid="btn-pilot-mode-force-on"
+              >
+                {t.adminPage.pilotModeForceOn}
+              </Button>
+              <Button
+                size="sm"
+                variant={pilotModeOverride === false ? "default" : "outline"}
+                className="h-8 text-xs"
+                onClick={() => handleSetPilotOverride(false)}
+                data-testid="btn-pilot-mode-force-off"
+              >
+                {t.adminPage.pilotModeForceOff}
+              </Button>
+              <Button
+                size="sm"
+                variant={pilotModeOverride === null ? "default" : "ghost"}
+                className="h-8 text-xs"
+                onClick={() => handleSetPilotOverride(null)}
+                data-testid="btn-pilot-mode-use-default"
+              >
+                {t.adminPage.pilotModeUseDefault}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

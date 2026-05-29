@@ -541,9 +541,9 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     ];
     if (isPilotMode) {
       const pilotHrefs = new Set([
-        "/", "/equipment", "/alerts", "/code-blue", "/crash-cart",
+        "/", "/equipment", "/alerts",
         "/my-equipment", "/rooms", "/display",
-        "/admin", "/admin/code-blue-history", "/print",
+        "/admin", "/print",
         "/help", "/settings", "/whats-new",
       ]);
       return allItems.filter((item) => pilotHrefs.has(item.href));
