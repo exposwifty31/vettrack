@@ -1,7 +1,7 @@
 # Slice 6 — `src/types` domain split plan (inventory draft)
 
-**Status:** **6a–6b merged** (`platform.ts`, `patients.ts`). **6c** (`equipment.ts`) draft PR — equipment/rooms/scan/ops-state types.  
-**Baseline:** `main` @ `4397d96c` (post–PR #569 Slice 4 stabilization).  
+**Status:** **6a–6g merged** on `main` (`platform`, `patients`, `equipment`, `tasks`, `billing`, `inventory`, `forecast`). **`index.ts` ~181 lines** — ER / display / Code Blue only. **6h** planned — [slice-6h-er-display-types-plan.md](./slice-6h-er-display-types-plan.md) (not started).  
+**Baseline:** post–PR #577 / #580 (`main`).  
 **Parent:** [modularization-plan.md](./modularization-plan.md) Slice 6.
 
 ## Purpose
@@ -407,12 +407,12 @@ Order of `export *` lines matters only if two domains exported the same name —
 | **6a** | Extract `platform.ts` | **merged** (#571) |
 | **6b** | Extract `patients.ts` (leaf) | **merged** (#572) |
 | **6c** | Extract `equipment.ts` (alerts, rooms, scan, ops state) | **merged** (#573) |
-| **6d** | Extract `tasks.ts` (appointments, medication, formulary, recommendations) | draft |
-| **6c** | Extract `tasks.ts` | + medication/appointment tests |
-| **6d** | Extract `billing.ts`, `inventory.ts` | + billing/inventory pages |
-| **6e** | Extract `forecast.ts` | + compare to `server/lib/forecast/types.ts` |
-| **6f** | Extract `er.ts` (display snapshot last) | + phase-9 display tests if touched |
-| **6g** | Optional `handoff.ts` wrapper for shared re-exports | shift-handover-page |
+| **6d** | Extract `tasks.ts` | **merged** (#574) |
+| **6e** | Extract `billing.ts` | **merged** (#575) |
+| **6f** | Extract `inventory.ts` | **merged** (#576) |
+| **6g** | Extract `forecast.ts` | **merged** (#577; see pilot F9 audit in [#580](https://github.com/dboy3156/VetTrack/pull/580)) |
+| **6h** | Extract `er.ts` (display + Code Blue + crash cart) | **planned** — [slice-6h-er-display-types-plan.md](./slice-6h-er-display-types-plan.md) |
+| **6i** | Optional `handoff.ts` wrapper for shared re-exports | shift-handover-page |
 | **6h** | Pilot import migration: `api/equipment.ts` → `@/types/equipment` | knip, no unused exports |
 | **6i+** | Gradual importer migration; keep barrel until knip clean | per-domain PRs |
 
@@ -461,4 +461,6 @@ No code changes under `src/types/` except documentation are expected for this in
 | 2026-05-29 | Slice 6a merged (#571); static test `users-me-authority` reads `platform.ts` for `User.authority` |
 | 2026-05-29 | Slice 6b: `patients.ts` — `Animal`, `Owner`, `Hospitalization`, admit/update/search, `ActivePatient` |
 | 2026-05-29 | Slice 6b merged (#572); ER/display types remain in `index.ts` |
-| 2026-05-29 | Slice 6c draft: `equipment.ts`; `index.ts` imports `EquipmentStatus` for `DisplaySnapshotEquipment` only |
+| 2026-05-29 | Slice 6c merged (#573); `equipment.ts` |
+| 2026-05-29 | Slices 6d–6g merged (#574–#577); barrel exports seven domains; ER/display remain inline |
+| 2026-05-29 | Slice 6h planning doc added; extraction paused until dedicated PR |
