@@ -12,7 +12,7 @@ Each numbered doc matches one PR. Merge order follows the sequence below.
 | 02 | [02-display-empty-panes.md](./02-display-empty-panes.md) | #559 | Shipped | `cedb807` | `git revert` |
 | 03 | [03-rate-limiter-per-user.md](./03-rate-limiter-per-user.md) | #562 | Shipped | `167790e` | `git revert` |
 | 04 | [04-suppress-english-pushes.md](./04-suppress-english-pushes.md) | #564 | Shipped | `ba29fab` | Unset `PILOT_DISABLE_EN_PUSH` |
-| 05 | [05-suppress-default-billing.md](./05-suppress-default-billing.md) | #563 | Shipped | `4f36d6c` | Unset `PILOT_SUPPRESS_DEFAULT_BILLING` |
+| 05 | [05-suppress-default-billing.md](./05-suppress-default-billing.md) | [#563](https://github.com/dboy3156/VetTrack/pull/563) (intended) · [#577](https://github.com/dboy3156/VetTrack/pull/577) (merge path) | Shipped on `main` | `10f0e463` + `4f36d6ca` | Unset `PILOT_SUPPRESS_DEFAULT_BILLING` |
 | 06 | [06-bulk-delete-cleanup.md](./06-bulk-delete-cleanup.md) | — | Pending | — | `git revert` |
 | 07 | [07-revert-version-pin.md](./07-revert-version-pin.md) | — | Pending | — | `git revert` |
 | 08 | [08-bulk-verify-room-version.md](./08-bulk-verify-room-version.md) | — | Pending | — | `git revert` |
@@ -34,6 +34,19 @@ Each numbered doc matches one PR. Merge order follows the sequence below.
 | P3.4 | `server/workers/stagingExpiryWorker.ts`, `server/lib/audit.ts` |
 | P3.5 | `server/routes/equipment.ts` (`patchEquipmentSchema`) |
 | P3.6 | `server/routes/equipment-operational-state.ts` |
+
+## P2.4 / F9 — suppress default billing (audit trail)
+
+**Keep on `main`:** do not revert unless product explicitly removes the pilot billing feature.
+
+| Topic | Detail |
+|-------|--------|
+| Intended PR | [#563](https://github.com/dboy3156/VetTrack/pull/563) — `feat(billing): F9 — suppress DEFAULT_EQUIPMENT ledger when env set (P2.4)` |
+| How it reached `main` | Same commits were also on branch `cursor/slice6g-forecast-types-d51f` and entered `main` via [#577](https://github.com/dboy3156/VetTrack/pull/577) (Slice 6g forecast types). That merge was unintentional packaging; the billing work is not part of Slice 6. |
+| Commits (keep together) | [`10f0e463`](https://github.com/dboy3156/VetTrack/commit/10f0e463) (first pass) and [`4f36d6ca`](https://github.com/dboy3156/VetTrack/commit/4f36d6ca) (narrow gate — fixes package consumables). Revert or cherry-pick **both**; never leave only `10f0e463` on `main`. |
+| Activation | Opt-in: set `PILOT_SUPPRESS_DEFAULT_BILLING=true` on the server (e.g. Railway pilot). |
+| Default behavior | When the env var is **unset**, billing behavior matches pre-F9 (`server/lib/equipment-seen.ts` still creates the synthetic `DEFAULT_EQUIPMENT` row when no `billingItemId` is configured). |
+| Slice 6 | Do not continue F9 or pilot billing work under Slice 6 (types split). ER / display / Code Blue type extraction is planned separately. |
 
 ## Coordination with modular refactor
 

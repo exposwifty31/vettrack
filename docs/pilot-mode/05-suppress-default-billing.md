@@ -31,6 +31,20 @@ pnpm test
 
 Unset `PILOT_SUPPRESS_DEFAULT_BILLING` on Railway.
 
+Do **not** revert from `main` unless product explicitly removes this pilot feature. If reverting, revert commits [`10f0e463`](https://github.com/dboy3156/VetTrack/commit/10f0e463) and [`4f36d6ca`](https://github.com/dboy3156/VetTrack/commit/4f36d6ca) together.
+
+## Main merge audit trail
+
+| Item | Detail |
+|------|--------|
+| Intended PR | [#563](https://github.com/dboy3156/VetTrack/pull/563) |
+| Also merged via | [#577](https://github.com/dboy3156/VetTrack/pull/577) (Slice 6g forecast types branch carried the same F9 commits unintentionally) |
+| Commits on `main` | `10f0e463` then `4f36d6ca` — **both required**; `10f0e463` alone over-suppresses `packageCode` consumables |
+| Opt-in | `PILOT_SUPPRESS_DEFAULT_BILLING=true` only |
+| Default | Env unset → no behavior change vs pre-F9 |
+
+See also [README.md](./README.md) § P2.4 / F9 — suppress default billing (audit trail).
+
 ## Refs
 
 - Plan: P2.4 (F9)
