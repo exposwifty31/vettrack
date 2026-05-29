@@ -1121,6 +1121,26 @@ export const api = {
         },
       );
     },
+    remove: (
+      id: string,
+      options?: {
+        dischargeNotes?: string;
+        override?: boolean;
+        overrideReason?: string;
+      },
+    ) => {
+      const qs = options?.override ? "?override=true" : "";
+      return request<{ ok: boolean; animalId: string; purgeAfterDays: number }>(
+        `/api/patients/${encodeURIComponent(id)}${qs}`,
+        {
+          method: "DELETE",
+          body: JSON.stringify({
+            dischargeNotes: options?.dischargeNotes,
+            overrideReason: options?.overrideReason,
+          }),
+        },
+      );
+    },
     update: (id: string, patch: import("@/types").UpdatePatientRequest) =>
       request<{ patient: import("@/types").Hospitalization }>(`/api/patients/${encodeURIComponent(id)}`, {
         method: "PATCH",

@@ -10,7 +10,7 @@ import {
   ChevronDown,
   Clock,
   Heart,
-  LogOut,
+  Trash2,
   Plus,
   Search,
   Siren,
@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { DischargePatientDialog } from "@/components/patients/DischargePatientDialog";
+import { DeletePatientDialog } from "@/components/patients/DeletePatientDialog";
 import { Layout } from "@/components/layout";
 import { PageShell } from "@/components/layout/PageShell";
 import { Stethoscope, Map } from "lucide-react";
@@ -71,7 +71,7 @@ function admissionDuration(admittedAt: string): string {
 
 // ─── Patient card ─────────────────────────────────────────────────────────────
 
-function PatientCard({ p, onDischarge }: { p: Hospitalization; onDischarge: () => void }) {
+function PatientCard({ p, onDelete }: { p: Hospitalization; onDelete: () => void }) {
   const cfg = STATUS_CONFIG[p.status] ?? STATUS_CONFIG.admitted;
   const meta = [p.animal.species, p.animal.breed].filter(Boolean).join(" · ");
   const location = [p.ward, p.bay].filter(Boolean).join(" / ");
@@ -130,10 +130,10 @@ function PatientCard({ p, onDischarge }: { p: Hospitalization; onDischarge: () =
           className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
           title={pp.removeFromList}
           aria-label={pp.removeFromListAria.replace("{name}", p.animal.name)}
-          onClick={onDischarge}
-          data-testid={`btn-discharge-patient-${p.id}`}
+          onClick={onDelete}
+          data-testid={`btn-delete-patient-${p.id}`}
         >
-          <LogOut className="h-4 w-4" />
+          <Trash2 className="h-4 w-4" />
         </Button>
       </CardContent>
     </Card>
@@ -373,7 +373,7 @@ export default function PatientsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [admitOpen, setAdmitOpen] = useState(false);
-  const [dischargeTarget, setDischargeTarget] = useState<Hospitalization | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Hospitalization | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["/api/patients", search, statusFilter],
@@ -516,7 +516,7 @@ export default function PatientsPage() {
         ) : (
           <div className="space-y-2.5">
             {patients.map((p) => (
-              <PatientCard key={p.id} p={p} onDischarge={() => setDischargeTarget(p)} />
+              <PatientCard key={p.id} p={p} onDelete={() => setDeleteTarget(p)} />
             ))}
           </div>
         )}
@@ -524,11 +524,11 @@ export default function PatientsPage() {
 
       <AdmitSheet open={admitOpen} onClose={() => setAdmitOpen(false)} />
 
-      <DischargePatientDialog
-        patient={dischargeTarget}
-        open={dischargeTarget !== null}
+      <DeletePatientDialog
+        patient={deleteTarget}
+        open={deleteTarget !== null}
         onOpenChange={(open) => {
-          if (!open) setDischargeTarget(null);
+          if (!open) setDeleteTarget(null);
         }}
       />
     </>

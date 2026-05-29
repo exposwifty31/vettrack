@@ -59,7 +59,11 @@ export const animals = vtTable("vt_animals", {
   externalId: text("external_id"),
   externalSource: text("external_source"),
   externalSyncedAt: timestamp("external_synced_at"),
-});
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  deletedBy: text("deleted_by").references(() => users.id, { onDelete: "set null" }),
+}, (table) => ({
+  clinicDeletedIdx: index("idx_vt_animals_clinic_deleted").on(table.clinicId, table.deletedAt),
+}));
 
 // status stored as TEXT CHECK — consistent with codeBlueOutcome pattern
 export type HospitalizationStatus = "admitted" | "observation" | "critical" | "recovering" | "discharged" | "deceased";

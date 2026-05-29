@@ -12,7 +12,7 @@ import {
   LayoutGrid,
   MapPin,
   Package,
-  LogOut,
+  Trash2,
   Pencil,
   Pill,
   Radar,
@@ -38,7 +38,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorCard } from "@/components/ui/error-card";
-import { DischargePatientDialog } from "@/components/patients/DischargePatientDialog";
+import { DeletePatientDialog } from "@/components/patients/DeletePatientDialog";
 import { useAuth } from "@/hooks/use-auth";
 import { useSettings } from "@/hooks/use-settings";
 import { cn, computeAlerts, formatRelativeTime } from "@/lib/utils";
@@ -399,7 +399,7 @@ export default function PatientDetailPage() {
   const canBilling = roleLevel(resolvedRole) >= ROLE_LEVEL.vet;
   const canEdit = roleLevel(resolvedRole) >= ROLE_LEVEL.technician;
   const [editOpen, setEditOpen] = useState(false);
-  const [dischargeOpen, setDischargeOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   // Fetch active hospitalization for this animal (if any)
   const hospQ = useQuery({
@@ -702,11 +702,11 @@ export default function PatientDetailPage() {
                       variant="outline"
                       size="sm"
                       className="h-9 gap-1.5 text-destructive hover:text-destructive"
-                      onClick={() => setDischargeOpen(true)}
-                      data-testid="btn-open-discharge-patient"
+                      onClick={() => setDeleteOpen(true)}
+                      data-testid="btn-open-delete-patient"
                     >
-                      <LogOut className="h-3.5 w-3.5" />
-                      {p.dischargeButton}
+                      <Trash2 className="h-3.5 w-3.5" />
+                      {p.deleteButton}
                     </Button>
                   </>
                 ) : null}
@@ -1127,10 +1127,10 @@ export default function PatientDetailPage() {
             hospitalization={hospQ.data}
             onClose={() => setEditOpen(false)}
           />
-          <DischargePatientDialog
+          <DeletePatientDialog
             patient={hospQ.data}
-            open={dischargeOpen}
-            onOpenChange={setDischargeOpen}
+            open={deleteOpen}
+            onOpenChange={setDeleteOpen}
             onSuccess={() => navigate("/patients")}
           />
         </>

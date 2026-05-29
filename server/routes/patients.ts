@@ -7,6 +7,12 @@ import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { postSystemMessage } from "../lib/shift-chat-presence.js";
 import { releaseProcedureBoundEquipment } from "../services/equipment-operational-state.service.js";
+import { PURGE_AFTER_DAYS } from "../lib/cleanup-scheduler.js";
+import {
+  PatientDeleteBlockedError,
+  restoreAnimalIfSoftDeleted,
+  softDeletePatientByHospitalization,
+} from "../services/patient-animal-lifecycle.service.js";
 
 const router = Router();
 router.use(requireAuth, requireEffectiveRole("technician"));
@@ -69,6 +75,11 @@ const statusSchema = z.object({
 });
 
 const dischargeSchema = z.object({
+  dischargeNotes: z.string().max(1000).optional(),
+  overrideReason: z.string().min(1).max(500).optional(),
+});
+
+const deletePatientSchema = z.object({
   dischargeNotes: z.string().max(1000).optional(),
   overrideReason: z.string().min(1).max(500).optional(),
 });
@@ -163,6 +174,7 @@ router.get("/", async (req, res) => {
         and(
           eq(hospitalizations.clinicId, clinicId),
           isNull(hospitalizations.dischargedAt),
+          isNull(animals.deletedAt),
           q
             ? or(
                 ilike(animals.name, `%${q}%`),
@@ -209,6 +221,7 @@ router.get("/pending", async (req, res) => {
         and(
           eq(hospitalizations.clinicId, clinicId),
           isNull(hospitalizations.dischargedAt),
+          isNull(animals.deletedAt),
 
           // 🔥 תנאי Pending
           or(
@@ -273,6 +286,7 @@ router.get("/search", async (req, res) => {
       .where(
         and(
           eq(animals.clinicId, clinicId),
+          isNull(animals.deletedAt),
           ilike(animals.name, `%${q}%`),
         ),
       )
@@ -378,6 +392,20 @@ router.post("/", requireEffectiveRole("technician"), async (req, res) => {
         .where(and(eq(animals.id, animalId), eq(animals.clinicId, clinicId)))
         .limit(1);
       if (!check.length) return res.status(400).json(apiError({ code: "ANIMAL_NOT_FOUND", reason: "ANIMAL_NOT_IN_CLINIC", message: "Animal not found in this clinic", requestId }));
+
+      const restored = await restoreAnimalIfSoftDeleted(clinicId, animalId);
+      if (restored) {
+        logAudit({
+          clinicId,
+          actionType: "animal_restored",
+          performedBy: req.authUser!.id,
+          performedByEmail: req.authUser!.email ?? "",
+          actorRole: resolveAuditActorRole(req),
+          targetId: animalId,
+          targetType: "animal",
+          metadata: { reason: "readmitted" },
+        });
+      }
     }
 
     const hospId = randomUUID();
@@ -758,6 +786,83 @@ router.patch("/:id/discharge", async (req, res) => {
   } catch (err) {
     console.error("[patients] discharge failed", err);
     res.status(500).json(apiError({ code: "INTERNAL_ERROR", reason: "PATIENTS_DISCHARGE_FAILED", message: "Failed to discharge patient", requestId }));
+  }
+});
+
+// ─── DELETE /api/patients/:id ────────────────────────────────────────────────
+// Soft-delete the animal (ends active admission when needed). Hard purge runs
+// automatically after PURGE_AFTER_DAYS with no re-admission or clinical writes.
+
+router.delete("/:id", requireEffectiveRole("technician"), async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  const parse = deletePatientSchema.safeParse(req.body ?? {});
+  if (!parse.success) {
+    return res.status(400).json(apiError({
+      code: "VALIDATION_ERROR",
+      reason: "DELETE_VALIDATION_FAILED",
+      message: parse.error.flatten().formErrors.join(", ") || "Invalid request",
+      requestId,
+    }));
+  }
+
+  try {
+    const clinicId = req.clinicId!;
+    const override = req.query.override === "true";
+    const result = await softDeletePatientByHospitalization({
+      clinicId,
+      hospitalizationId: req.params.id,
+      performedBy: req.authUser!.id,
+      performedByEmail: req.authUser!.email ?? "",
+      actorRole: resolveAuditActorRole(req),
+      override,
+      overrideReason: parse.data.overrideReason,
+      dischargeNotes: parse.data.dischargeNotes,
+    });
+
+    res.json({ ok: true, animalId: result.animalId, purgeAfterDays: PURGE_AFTER_DAYS });
+  } catch (err) {
+    if (err instanceof PatientDeleteBlockedError) {
+      return res.status(409).json({
+        code: "BLOCKING_CONDITIONS_PREVENT_DISCHARGE",
+        error: "BLOCKING_CONDITIONS_PREVENT_DISCHARGE",
+        reason: "BLOCKING_CONDITIONS_PREVENT_DISCHARGE",
+        message:
+          "Delete blocked: resolve open tasks, emergency dispenses, or failed inventory jobs first, or pass ?override=true with overrideReason.",
+        blockingConditions: err.blockingConditions,
+        requestId,
+      });
+    }
+    if (err instanceof Error && err.message === "OVERRIDE_REASON_REQUIRED") {
+      return res.status(400).json(apiError({
+        code: "OVERRIDE_REASON_REQUIRED",
+        reason: "OVERRIDE_REASON_REQUIRED",
+        message: "overrideReason is required when override=true",
+        requestId,
+      }));
+    }
+    if (err instanceof Error && err.message === "HOSPITALIZATION_NOT_FOUND") {
+      return res.status(404).json(apiError({
+        code: "NOT_FOUND",
+        reason: "HOSPITALIZATION_NOT_FOUND",
+        message: "Hospitalization not found",
+        requestId,
+      }));
+    }
+    if (err instanceof Error && err.message === "ANIMAL_ALREADY_DELETED") {
+      return res.status(409).json(apiError({
+        code: "ANIMAL_ALREADY_DELETED",
+        reason: "ANIMAL_ALREADY_DELETED",
+        message: "Patient is already deleted",
+        requestId,
+      }));
+    }
+    console.error("[patients] delete failed", err);
+    res.status(500).json(apiError({
+      code: "INTERNAL_ERROR",
+      reason: "PATIENTS_DELETE_FAILED",
+      message: "Failed to delete patient",
+      requestId,
+    }));
   }
 });
 

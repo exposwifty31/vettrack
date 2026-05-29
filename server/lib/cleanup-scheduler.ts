@@ -1,6 +1,7 @@
 import { and, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { db, users } from "../db.js";
 import { logAudit } from "./audit.js";
+import { countAnimalPurgeCandidates, purgeSoftDeletedAnimals } from "../services/patient-animal-lifecycle.service.js";
 
 /**
  * PURGE_AFTER_DAYS controls how long a soft-deleted user row is retained before
@@ -86,8 +87,8 @@ export function startCleanupScheduler(): void {
   if (cleanupSchedulerStarted) return;
   cleanupSchedulerStarted = true;
 
-  const runCheck = () =>
-    countPurgeCandidates()
+  const runCheck = () => {
+    void countPurgeCandidates()
       .then((count) => {
         if (count > 0) {
           console.log(
@@ -97,8 +98,26 @@ export function startCleanupScheduler(): void {
         }
       })
       .catch((err) => {
-        console.error("[cleanup] purge candidate check failed:", err);
+        console.error("[cleanup] user purge candidate check failed:", err);
       });
+
+    void countAnimalPurgeCandidates()
+      .then(async (count) => {
+        if (count > 0) {
+          const { purged } = await purgeSoftDeletedAnimals();
+          if (purged > 0) {
+            console.log(`[cleanup] hard-purged ${purged} soft-deleted animal(s) after ${PURGE_AFTER_DAYS}d retention`);
+          } else {
+            console.log(
+              `[cleanup] ${count} soft-deleted animal(s) passed retention but purge did not complete (check logs)`,
+            );
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("[cleanup] animal purge failed:", err);
+      });
+  };
 
   runCheck();
   setInterval(runCheck, DAILY_INTERVAL_MS);

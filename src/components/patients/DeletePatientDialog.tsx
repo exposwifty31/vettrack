@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { LogOut } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, ApiError } from "@/lib/api";
 import { t } from "@/lib/i18n";
@@ -18,11 +18,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { Hospitalization } from "@/types";
 
-function isDischargeBlocked(err: unknown): boolean {
+const RETENTION_DAYS = 90;
+
+function isDeleteBlocked(err: unknown): boolean {
   return err instanceof ApiError && err.status === 409;
 }
 
-export function DischargePatientDialog({
+export function DeletePatientDialog({
   patient,
   open,
   onOpenChange,
@@ -50,10 +52,10 @@ export function DischargePatientDialog({
     onOpenChange(next);
   }
 
-  const dischargeMut = useMutation({
+  const deleteMut = useMutation({
     mutationFn: () => {
       if (!patient) throw new Error("No patient");
-      return api.patients.discharge(patient.id, {
+      return api.patients.remove(patient.id, {
         dischargeNotes: notes.trim() || undefined,
         override: blocked && overrideReason.trim().length > 0,
         overrideReason: blocked ? overrideReason.trim() : undefined,
@@ -61,17 +63,17 @@ export function DischargePatientDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
-      toast.success(p.dischargeSuccess);
+      toast.success(p.deleteSuccess);
       handleOpenChange(false);
       onSuccess?.();
     },
     onError: (err: unknown) => {
-      if (isDischargeBlocked(err)) {
+      if (isDeleteBlocked(err)) {
         setBlocked(true);
         return;
       }
-      const message = err instanceof Error ? err.message : p.dischargeFailed;
-      toast.error(message || p.dischargeFailed);
+      const message = err instanceof Error ? err.message : p.deleteFailed;
+      toast.error(message || p.deleteFailed);
     },
   });
 
@@ -79,33 +81,34 @@ export function DischargePatientDialog({
 
   const patientName = patient.animal.name;
   const canForce = blocked && overrideReason.trim().length > 0;
+  const description = p.deleteDescription
+    .replace("{name}", patientName)
+    .replace("{days}", String(RETENTION_DAYS));
 
   return (
     <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
-            <LogOut className="h-5 w-5 text-muted-foreground" />
-            {p.dischargeTitle}
+            <Trash2 className="h-5 w-5 text-destructive" />
+            {p.deleteTitle}
           </AlertDialogTitle>
-          <AlertDialogDescription>
-            {p.dischargeDescription.replace("{name}", patientName)}
-          </AlertDialogDescription>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
 
         {blocked ? (
           <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-900 dark:bg-amber-950/30">
-            <p className="text-sm font-medium text-foreground">{p.dischargeBlockedTitle}</p>
-            <p className="text-xs text-muted-foreground">{p.dischargeBlockedMessage}</p>
+            <p className="text-sm font-medium text-foreground">{p.deleteBlockedTitle}</p>
+            <p className="text-xs text-muted-foreground">{p.deleteBlockedMessage}</p>
             <div className="space-y-1.5">
-              <Label htmlFor="discharge-override-reason" className="text-sm">
-                {p.dischargeOverrideLabel}
+              <Label htmlFor="delete-override-reason" className="text-sm">
+                {p.deleteOverrideLabel}
               </Label>
               <Textarea
-                id="discharge-override-reason"
+                id="delete-override-reason"
                 value={overrideReason}
                 onChange={(e) => setOverrideReason(e.target.value)}
-                placeholder={p.dischargeOverridePlaceholder}
+                placeholder={p.deleteOverridePlaceholder}
                 rows={3}
                 className="resize-none"
               />
@@ -113,14 +116,14 @@ export function DischargePatientDialog({
           </div>
         ) : (
           <div className="space-y-1.5">
-            <Label htmlFor="discharge-notes" className="text-sm">
-              {p.dischargeNotesLabel}
+            <Label htmlFor="delete-notes" className="text-sm">
+              {p.deleteNotesLabel}
             </Label>
             <Textarea
-              id="discharge-notes"
+              id="delete-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder={p.dischargeNotesPlaceholder}
+              placeholder={p.deleteNotesPlaceholder}
               rows={3}
               className="resize-none"
             />
@@ -128,21 +131,21 @@ export function DischargePatientDialog({
         )}
 
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={dischargeMut.isPending}>{t.common.cancel}</AlertDialogCancel>
+          <AlertDialogCancel disabled={deleteMut.isPending}>{t.common.cancel}</AlertDialogCancel>
           <AlertDialogAction
-            disabled={dischargeMut.isPending || (blocked && !canForce)}
+            disabled={deleteMut.isPending || (blocked && !canForce)}
             onClick={(e) => {
               e.preventDefault();
-              dischargeMut.mutate();
+              deleteMut.mutate();
             }}
-            className={blocked ? "bg-destructive hover:bg-destructive/90" : undefined}
-            data-testid="btn-confirm-discharge-patient"
+            className="bg-destructive hover:bg-destructive/90"
+            data-testid="btn-confirm-delete-patient"
           >
-            {dischargeMut.isPending
-              ? p.discharging
+            {deleteMut.isPending
+              ? p.deleting
               : blocked
-                ? p.dischargeForceConfirm
-                : p.dischargeConfirm}
+                ? p.deleteForceConfirm
+                : p.deleteConfirm}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

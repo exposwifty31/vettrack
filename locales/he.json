@@ -1510,21 +1510,21 @@
     "tryAgain": "נסה שוב"
   },
   "patientsPage": {
-    "removeFromList": "הסר מרשימה פעילה",
-    "removeFromListAria": "שחרר את {name} והסר ממטופלים פעילים",
-    "dischargeTitle": "שחרור מטופל",
-    "dischargeDescription": "פעולה זו מסיימת את האשפוז הנוכחי ומסירה את {name} מרשימת המטופלים הפעילים. ההיסטוריה הקלינית והחיוב נשמרים.",
-    "dischargeNotesLabel": "הערות שחרור (אופציונלי)",
-    "dischargeNotesPlaceholder": "סיכום או הנחיות לבעלים…",
-    "dischargeConfirm": "שחרר",
-    "discharging": "משחרר…",
-    "dischargeSuccess": "המטופל שוחרר",
-    "dischargeFailed": "לא ניתן לשחרר את המטופל",
-    "dischargeBlockedTitle": "שחרור חסום",
-    "dischargeBlockedMessage": "יש לסגור משימות פתוחות, מינוני חירום או עבודות מלאי שנכשלו לפני שחרור, או לבצע שחרור כפוי עם סיבה מתועדת.",
-    "dischargeOverrideLabel": "סיבת כפייה",
-    "dischargeOverridePlaceholder": "מדוע השחרור מתבצע למרות פריטים פתוחים…",
-    "dischargeForceConfirm": "שחרור כפוי"
+    "removeFromList": "מחק מטופל",
+    "removeFromListAria": "מחק את {name} ממטופלים פעילים",
+    "deleteTitle": "מחיקת מטופל",
+    "deleteDescription": "פעולה זו מסירה את {name} ממטופלים פעילים מיד. ההיסטוריה הקלינית והחיוב נשמרות {days} יום. לאחר מכן הרשומה נמחקת לצמיתות אלא אם המטופל מאוששר מחדש או נוספים נתונים קליניים.",
+    "deleteNotesLabel": "הערות שחרור (אופציונלי)",
+    "deleteNotesPlaceholder": "סיכום או הנחיות לבעלים…",
+    "deleteConfirm": "מחק מטופל",
+    "deleting": "מוחק…",
+    "deleteSuccess": "המטופל נמחק",
+    "deleteFailed": "לא ניתן למחוק את המטופל",
+    "deleteBlockedTitle": "מחיקה חסומה",
+    "deleteBlockedMessage": "יש לסגור משימות פתוחות, מינוני חירום או עבודות מלאי שנכשלו לפני מחיקה, או לבצע מחיקה כפויה עם סיבה מתועדת.",
+    "deleteOverrideLabel": "סיבת כפייה",
+    "deleteOverridePlaceholder": "מדוע המחיקה מתבצעת למרות פריטים פתוחים…",
+    "deleteForceConfirm": "מחיקה כפויה"
   },
   "patientDetail": {
     "pageTitle": "מטופל",
@@ -1600,7 +1600,7 @@
     "editFailedToast": "עדכון המטופל נכשל",
     "editNoChanges": "אין שינויים לשמירה",
     "editStatusLocked": "סטטוס נעול עבור מטופלים שאינם פעילים",
-    "dischargeButton": "שחרור מטופל"
+    "deleteButton": "מחק מטופל"
   },
   "billingLedger": {
     "title": "לוח חיובים",

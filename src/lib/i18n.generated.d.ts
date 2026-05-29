@@ -1515,19 +1515,19 @@ export interface TStructure {
   patientsPage: {
     removeFromList: string;
     removeFromListAria: string;
-    dischargeTitle: string;
-    dischargeDescription: string;
-    dischargeNotesLabel: string;
-    dischargeNotesPlaceholder: string;
-    dischargeConfirm: string;
-    discharging: string;
-    dischargeSuccess: string;
-    dischargeFailed: string;
-    dischargeBlockedTitle: string;
-    dischargeBlockedMessage: string;
-    dischargeOverrideLabel: string;
-    dischargeOverridePlaceholder: string;
-    dischargeForceConfirm: string;
+    deleteTitle: string;
+    deleteDescription: string;
+    deleteNotesLabel: string;
+    deleteNotesPlaceholder: string;
+    deleteConfirm: string;
+    deleting: string;
+    deleteSuccess: string;
+    deleteFailed: string;
+    deleteBlockedTitle: string;
+    deleteBlockedMessage: string;
+    deleteOverrideLabel: string;
+    deleteOverridePlaceholder: string;
+    deleteForceConfirm: string;
   };
   patientDetail: {
     pageTitle: string;
@@ -1603,7 +1603,7 @@ export interface TStructure {
     editFailedToast: string;
     editNoChanges: string;
     editStatusLocked: string;
-    dischargeButton: string;
+    deleteButton: string;
   };
   billingLedger: {
     title: string;

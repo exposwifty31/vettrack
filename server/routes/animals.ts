@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { animals, appointments, db } from "../db.js";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 
@@ -50,6 +50,7 @@ router.get("/active", requireAuth, requireEffectiveRole("technician"), async (re
       .where(
         and(
           eq(appointments.clinicId, clinicId),
+          isNull(animals.deletedAt),
           isNotNull(appointments.animalId),
           ne(appointments.status, "cancelled"),
           sql`DATE_TRUNC('day', ${appointments.startTime}) = DATE_TRUNC('day', NOW())`,

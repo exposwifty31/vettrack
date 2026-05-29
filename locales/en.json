@@ -1510,21 +1510,21 @@
     "tryAgain": "Try again"
   },
   "patientsPage": {
-    "removeFromList": "Remove from active list",
-    "removeFromListAria": "Discharge {name} and remove from active patients",
-    "dischargeTitle": "Discharge patient",
-    "dischargeDescription": "This ends the current hospitalization and removes {name} from the active patients list. Billing and clinical history are kept.",
-    "dischargeNotesLabel": "Discharge notes (optional)",
-    "dischargeNotesPlaceholder": "Summary or instructions for the owner…",
-    "dischargeConfirm": "Discharge",
-    "discharging": "Discharging…",
-    "dischargeSuccess": "Patient discharged",
-    "dischargeFailed": "Could not discharge patient",
-    "dischargeBlockedTitle": "Discharge blocked",
-    "dischargeBlockedMessage": "Resolve open tasks, emergency dispenses, or failed inventory jobs before discharging, or force discharge with a documented reason.",
-    "dischargeOverrideLabel": "Override reason",
-    "dischargeOverridePlaceholder": "Why discharge is proceeding despite open items…",
-    "dischargeForceConfirm": "Force discharge"
+    "removeFromList": "Delete patient",
+    "removeFromListAria": "Delete {name} from active patients",
+    "deleteTitle": "Delete patient",
+    "deleteDescription": "This removes {name} from active patients immediately. Clinical and billing history are kept for {days} days. After that, the record is permanently deleted unless the patient is readmitted or new clinical data is added.",
+    "deleteNotesLabel": "Discharge notes (optional)",
+    "deleteNotesPlaceholder": "Summary or instructions for the owner…",
+    "deleteConfirm": "Delete patient",
+    "deleting": "Deleting…",
+    "deleteSuccess": "Patient deleted",
+    "deleteFailed": "Could not delete patient",
+    "deleteBlockedTitle": "Delete blocked",
+    "deleteBlockedMessage": "Resolve open tasks, emergency dispenses, or failed inventory jobs before deleting, or force delete with a documented reason.",
+    "deleteOverrideLabel": "Override reason",
+    "deleteOverridePlaceholder": "Why delete is proceeding despite open items…",
+    "deleteForceConfirm": "Force delete"
   },
   "patientDetail": {
     "pageTitle": "Patient",
@@ -1600,7 +1600,7 @@
     "editFailedToast": "Patient update failed",
     "editNoChanges": "Nothing changed",
     "editStatusLocked": "Status is locked for non-active patients",
-    "dischargeButton": "Discharge patient"
+    "deleteButton": "Delete patient"
   },
   "billingLedger": {
     "title": "Billing Dashboard",
