@@ -411,7 +411,7 @@ Order of `export *` lines matters only if two domains exported the same name —
 | **6e** | Extract `billing.ts` | **merged** (#575) |
 | **6f** | Extract `inventory.ts` | **merged** (#576) |
 | **6g** | Extract `forecast.ts` | **merged** (#577; see pilot F9 audit in [#580](https://github.com/dboy3156/VetTrack/pull/580)) |
-| **6h** | Extract `er.ts` (display + Code Blue + crash cart) | **in PR** — [slice-6h-er-display-types-plan.md](./slice-6h-er-display-types-plan.md) |
+| **6h** | Extract `er.ts` (display + Code Blue + crash cart) | **merged** (#589) — [slice-6h-er-display-types-plan.md](./slice-6h-er-display-types-plan.md) |
 | **6i** | Optional `handoff.ts` wrapper for shared re-exports | shift-handover-page |
 | **6h** | Pilot import migration: `api/equipment.ts` → `@/types/equipment` | knip, no unused exports |
 | **6i+** | Gradual importer migration; keep barrel until knip clean | per-domain PRs |
@@ -464,3 +464,4 @@ No code changes under `src/types/` except documentation are expected for this in
 | 2026-05-29 | Slice 6c merged (#573); `equipment.ts` |
 | 2026-05-29 | Slices 6d–6g merged (#574–#577); barrel exports seven domains; ER/display remain inline |
 | 2026-05-29 | Slice 6h planning doc added; extraction paused until dedicated PR |
+| 2026-05-29 | Slice 6h merged (#589); `er.ts` + barrel; `index.ts` re-exports only |
