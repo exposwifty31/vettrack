@@ -139,6 +139,29 @@ Recorded after stack merge; audits run from `main` tooling against PR heads (loc
 
 **Follow-up for Slice 4:** Any static test that greps `src/lib/api.ts` for equipment offline strings should read `src/lib/api/equipment.ts` instead (done for return contracts in #528).
 
+### Post–Slice 4a–4c stabilization — equipment read extraction on `main` (2026-05-28)
+
+**Scope:** Observation only — no refactors in this pass. Server read handlers extracted in [#530](https://github.com/dboy3156/VetTrack/pull/530) (4a), [#531](https://github.com/dboy3156/VetTrack/pull/531) (4b), [#532](https://github.com/dboy3156/VetTrack/pull/532) (4c). Mutations remain inline in `server/routes/equipment.ts` (~2,368 lines).
+
+| Area | Check | Result |
+|------|--------|--------|
+| **GET reads (8 handlers)** | `GET /`, `/my`, `/deleted`, `/critical`, `/pilot-coverage`, `/:id`, `/:id/logs`, `/:id/transfers` | **OK** — wired in `equipment.ts`; bodies under `server/routes/equipment/handlers/` |
+| **List pagination shape** | `{ items, total, page, pageSize, hasMore }` in `get-equipment-list.ts` | **OK** — unchanged from pre-4c |
+| **Operational + RFID projection** | `equipmentOperationalStateSelect` + `equipmentRfidSelect(clinicId)` on list/detail/my | **OK** — `equipment-operational-state-serialization.contract.test.ts` |
+| **Tenant filters (list)** | `eq(equipment.clinicId, clinicId)`, `isNull(equipment.deletedAt)`; scoped joins | **OK** — handler-only move |
+| **Offline list fallback** | `api.equipment.list` / `listPaginated` → Dexie on `isNetworkError` | **OK** — `src/lib/api/equipment.ts`; `offline-mutation-registry` |
+| **RFID cache invalidation** | `invalidateEquipmentRfidCaches` + waitlist SSE list keys | **OK** — `invalidate-equipment-rfid-caches`, `event-reducer-rfid`, `equipment-waitlist-paginated-sse.contract` |
+| **G5 routes:contract** | Full extract vs `routes-contract.json` | **OK** — **320 / 320**, no drift |
+| **G4 query-keys:audit** | Registry parity | **OK** — **109 / 109**, no drift |
+| **G1 architecture:gates** | tsc, depcruiser, madge | **OK** — src cycles 0; server baseline 4 |
+| **Phase 5 error contract** | `equipment.ts` + `handlers/*.ts` bundle | **OK** — static test includes all handler modules |
+| **Mutations untouched** | No `router.post/patch/delete` in `handlers/` | **OK** — POST/PATCH/DELETE still only in `equipment.ts` |
+| **Main CI post #532** | `26551848381` (CI), `26551848355` (Playwright) | **success** |
+
+**Local replay (post-merge `main`):** `pnpm routes:contract`, `pnpm query-keys:audit`, `pnpm architecture:gates`, and 113 tests across operational-state, phase-5, offline registry, RFID caches, return/custody, pilot verification, replay-idempotency routes — all passed.
+
+**Proposed Slice 4d (first mutation, if next PR stays green):** extract **handler body only** for `POST /api/equipment/:id/restore` (~55 lines, admin-only, no `equipmentReplayIdempotency`, no offline `addPendingSync` producer). Keep `router.post("/:id/restore", requireAuth, requireAdmin, validateUuid("id"), …)` in `equipment.ts`. Defer checkout/return/scan/delete until restore extraction is stable.
+
 ### Post–Slice 4d stabilization — first equipment mutation extraction on `main` (2026-05-28)
 
 **Scope:** Observation only after [#534](https://github.com/dboy3156/VetTrack/pull/534). **Do not** start scan/checkout/return extraction until a separate slice is approved.
@@ -158,6 +181,47 @@ Recorded after stack merge; audits run from `main` tooling against PR heads (loc
 | **Handler inventory** | 8 GET + 1 POST under `handlers/`; ~2,316 lines remain in `equipment.ts` | **OK** |
 
 **Next extraction (not started):** `DELETE /:id` or `POST /scan` only after explicit slice — both carry replay idempotency and/or offline-adjacent behavior; higher risk than restore.
+
+### Post–Slice 4e stabilization — DELETE soft-delete extraction on `main` (2026-05-28)
+
+**Scope:** Observation only after [#536](https://github.com/dboy3156/VetTrack/pull/536). **Do not** start scan, checkout, or return handler extraction.
+
+| Area | Check | Result |
+|------|--------|--------|
+| **DELETE /:id** | `res.status(204).send()`; soft-delete `deletedAt` / `deletedBy` | **OK** — `delete-equipment.ts` |
+| **Errors** | 404 `EQUIPMENT_NOT_FOUND`; 500 `EQUIPMENT_DELETE_FAILED` | **OK** |
+| **Audit** | `equipment_deleted` + `metadata: { name, serialNumber }` | **OK** |
+| **Analytics cache** | `invalidateAnalyticsCache(clinicId)` | **OK** |
+| **Tenant** | `eq(equipment.clinicId, clinicId)` + `isNull(equipment.deletedAt)` on select/update | **OK** |
+| **Middleware on router** | `writeLimiter`, `requireAdmin`, `validateUuid("id")`, `equipmentReplayIdempotency(…delete)` | **OK** — replay stays on `equipment.ts`, not in handler |
+| **POST /:id/restore** | Unchanged (`post-equipment-restore.ts`) | **OK** |
+| **High-risk routes** | scan, checkout, return, bulk, import — inline only | **OK** — diff is 2 files |
+| **G5 routes:contract** | Full extract | **OK** — **320 / 320** |
+| **Targeted tests** | phase-5, replay-idempotency routes, offline registry | **OK** — 59 tests on post-merge `main` |
+| **Main CI post #536** | Merge commit `4bc60a3d` | **success** (pre-merge CI green) |
+| **Handler inventory** | 8 GET + 2 mutations (`restore`, `delete`); ~2,269 lines in `equipment.ts` | **OK** |
+
+**Paused until new slice:** `POST /scan`, `POST …/checkout`, `POST …/return` — replay idempotency + offline/sync consumers; do not extract without dedicated review.
+
+### Post–Slice 4f-1 stabilization — revert extraction on `main` (2026-05-28)
+
+**Scope:** Observation only after [#539](https://github.com/dboy3156/VetTrack/pull/539). **Do not** start checkout, return, or `POST /scan` (quick-scan) extraction.
+
+| Area | Check | Result |
+|------|--------|--------|
+| **Route registration** | `requireAuth`, `requireEffectiveRole("vet")`, `validateUuid("id")`, `validateBody(revertSchema)` on `router.post` in `equipment.ts` | **OK** |
+| **Undo token** | `consumeUndoToken` in `equipment-undo-tokens.ts` (same consume/update SQL as pre-extract) | **OK** |
+| **Scan log delete** | `eq(scanLogs.clinicId)`, `eq(scanLogs.id, token.scanLogId)`, `eq(scanLogs.equipmentId, req.params.id)` | **OK** |
+| **Audit / response** | `equipment_reverted`; `res.json(updated)` | **OK** |
+| **Errors** | `EQUIPMENT_NOT_FOUND`, `UNDO_TOKEN_INVALID_OR_EXPIRED`, `EQUIPMENT_REVERT_FAILED` | **OK** |
+| **Replay / offline** | Revert has **no** replay middleware; no new `addPendingSync` producer | **OK** |
+| **High-risk routes** | checkout, return, `POST /scan`, bulk, import — still inline | **OK** |
+| **G5** | **320 / 320** | **OK** |
+| **Targeted tests** | phase-5, `equipment-scan-lifecycle`, return-custody, replay-idempotency routes | **OK** — 63 tests on post-merge `main` |
+| **Main CI post #539** | Merge `a088ac21` | **success** (pre-merge CI green) |
+| **Handlers** | 8 GET + 3 mutations; `equipment.ts` ~2,143 lines; colocated `equipment-undo-tokens.ts` for shared consume | **OK** |
+
+**Next per [inventory](./equipment-inline-mutations-inventory.md):** `POST /bulk-verify-room` (4g) — not checkout/return/quick-scan.
 
 ### Post–Slice 4g / 4i / 4h stabilization — bulk admin routes on `main` (2026-05-28)
 
