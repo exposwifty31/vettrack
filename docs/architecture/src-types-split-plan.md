@@ -1,6 +1,6 @@
 # Slice 6 — `src/types` domain split plan (inventory draft)
 
-**Status:** Planning / inventory only — no implementation in this document.  
+**Status:** Planning inventory + **Slice 6a implemented** (`src/types/platform.ts`, barrel re-export).  
 **Baseline:** `main` @ `4397d96c` (post–PR #569 Slice 4 stabilization).  
 **Parent:** [modularization-plan.md](./modularization-plan.md) Slice 6.
 
@@ -404,7 +404,7 @@ Order of `export *` lines matters only if two domains exported the same name —
 
 | Sub-slice | Action | Validation |
 |-----------|--------|------------|
-| **6a** | Extract `platform.ts` + `patients.ts`; barrel re-export | tsc, architecture:gates |
+| **6a** | Extract `platform.ts` (done); `patients.ts` deferred to 6a₂ | tsc, architecture:gates |
 | **6b** | Extract `equipment.ts` (include alert constants) | + offline-db typecheck, equipment tests |
 | **6c** | Extract `tasks.ts` | + medication/appointment tests |
 | **6d** | Extract `billing.ts`, `inventory.ts` | + billing/inventory pages |
@@ -455,3 +455,4 @@ No code changes under `src/types/` except documentation are expected for this in
 | 2026-05-27 | Slice 6 scope limited to planning doc; barrel preserved; no import migrations |
 | 2026-05-27 | Split `realtime-events` / `cop-alerts` pattern is precedent for direct subpath imports |
 | 2026-05-27 | `DisplaySnapshot*` and `er.ts` extracted after leaf domains to avoid cycles |
+| 2026-05-29 | Slice 6a: `platform.ts` extracted; `index.ts` re-exports + internal `ShiftRole`/`UserRole` import for remaining definitions |
