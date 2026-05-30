@@ -866,23 +866,23 @@ router.delete("/:id", requireEffectiveRole("technician"), async (req, res) => {
   }
 });
 
-export default router;
-
 router.patch("/:id/assign", async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
 
   try {
     const clinicId = req.clinicId!;
     const { id } = req.params;
-
-    // 👇 פתרון ל-TypeScript
-    const userId = (req as any).user.id;
+    const userId = req.authUser!.id;
 
     const now = new Date();
     const { ward, bay } = req.body || {};
 
-    // 👇 בונים אובייקט בצורה בטוחה
-    const updateData: any = {
+    const updateData: {
+      admittingVetId: string;
+      updatedAt: Date;
+      ward?: string;
+      bay?: string;
+    } = {
       admittingVetId: userId,
       updatedAt: now,
     };
@@ -897,8 +897,8 @@ router.patch("/:id/assign", async (req, res) => {
         and(
           eq(hospitalizations.id, id),
           eq(hospitalizations.clinicId, clinicId),
-          isNull(hospitalizations.dischargedAt)
-        )
+          isNull(hospitalizations.dischargedAt),
+        ),
       )
       .returning({ id: hospitalizations.id });
 
@@ -909,7 +909,7 @@ router.patch("/:id/assign", async (req, res) => {
           reason: "HOSPITALIZATION_NOT_FOUND",
           message: "Hospitalization not found",
           requestId,
-        })
+        }),
       );
     }
 
@@ -922,7 +922,9 @@ router.patch("/:id/assign", async (req, res) => {
         reason: "PATIENTS_ASSIGN_FAILED",
         message: "Failed to assign patient",
         requestId,
-      })
+      }),
     );
   }
 });
+
+export default router;

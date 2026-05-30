@@ -57,4 +57,19 @@ describe("Patient animal lifecycle — soft delete & retention", () => {
     expect(apiClient).toContain("remove:");
     expect(apiClient).toContain('method: "DELETE"');
   });
+
+  it("PATCH assign uses req.authUser (not legacy req.user)", () => {
+    const assignStart = patientsRoute.indexOf('router.patch("/:id/assign"');
+    expect(assignStart).toBeGreaterThan(-1);
+    const assignBlock = patientsRoute.slice(assignStart, assignStart + 600);
+    expect(assignBlock).toContain("req.authUser!.id");
+    expect(assignBlock).not.toMatch(/req\.user/);
+  });
+
+  it("assign route is registered before default export", () => {
+    const assignIdx = patientsRoute.indexOf('router.patch("/:id/assign"');
+    const exportIdx = patientsRoute.lastIndexOf("export default router");
+    expect(assignIdx).toBeGreaterThan(-1);
+    expect(exportIdx).toBeGreaterThan(assignIdx);
+  });
 });
