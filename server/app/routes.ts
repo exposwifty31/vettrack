@@ -101,12 +101,19 @@ function registerSafetySurfaceRoutes(app: express.Express) {
   app.use("/api/er", erRoutes);
 }
 
-function registerAdminRoutes(app: express.Express) {
+function registerAlwaysOnConfigRoutes(app: express.Express) {
+  app.use("/api/pilot", pilotRoutes);
+
   app.use("/api/admin", adminOutboxHealthRoutes);
   app.use("/api/admin", adminOutboxDlqRoutes);
   app.use("/api/admin", adminMedicationIntegrityRoutes);
   app.use("/api/admin", adminTaskOwnershipRoutes);
   app.use("/api/stability", stabilityRoutes);
+
+  // Admin-only APIs: kept outside the pilot guard because /admin is always
+  // accessible and its Formulary/Settings sections call these endpoints.
+  app.use("/api/formulary", formularyRoutes);
+  app.use("/api/forecast", forecastRoutes);
 }
 
 export function registerApiRoutes(app: express.Express) {
@@ -114,15 +121,7 @@ export function registerApiRoutes(app: express.Express) {
   registerEquipmentCoreRoutes(app);
   registerSafetySurfaceRoutes(app);
 
-  // --- Pilot config (always registered — admin-gated, read/write pilot_stale_ms) ---
-  app.use("/api/pilot", pilotRoutes);
-
-  registerAdminRoutes(app);
-
-  // Admin-only APIs: kept outside the pilot guard because /admin is always
-  // accessible and its Formulary/Settings sections call these endpoints.
-  app.use("/api/formulary", formularyRoutes);
-  app.use("/api/forecast", forecastRoutes);
+  registerAlwaysOnConfigRoutes(app);
 
   // --- Full-platform routes ([REDACTED] in pilot mode) ---
   if (!isPilotMode) {
