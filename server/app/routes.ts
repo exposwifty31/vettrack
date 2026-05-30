@@ -118,6 +118,12 @@ function registerAlwaysOnConfigRoutes(app: express.Express) {
   app.use("/api/forecast", forecastRoutes);
 }
 
+/**
+ * Registers all API route modules on the Express app.
+ * Mount order is significant (Express matches in registration order).
+ * Pilot mode skips mounts inside registerFullPlatformRoutes / if (!isPilotMode).
+ * Contract baseline: docs/architecture/routes-contract.json (320 routes, 110 pilot-gated).
+ */
 export function registerApiRoutes(app: express.Express) {
   registerInfrastructureRoutes(app);
   registerEquipmentCoreRoutes(app);
