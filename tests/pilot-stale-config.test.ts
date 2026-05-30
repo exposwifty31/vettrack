@@ -35,6 +35,20 @@ function computePilotCoverageSummary(rows: CoverageRow[], staleMs: number, now: 
   };
 }
 
+// ── Mirrors admin.tsx pilotCounts guard (#394 zero-state) ────────────────────
+
+type EquipmentRow = { lastSeen: string | null };
+
+function computeAdminPilotCounts(
+  isPilotMode: boolean,
+  equipmentList: EquipmentRow[] | undefined,
+  staleMs: number,
+  now: number,
+) {
+  if (!isPilotMode || !equipmentList) return null;
+  return computePilotCoverageSummary(equipmentList, staleMs, now);
+}
+
 // ── Mirrors admin-pilot-coverage itemStaleness ───────────────────────────────
 
 function itemStaleness(
@@ -92,6 +106,30 @@ describe("patchConfigSchema (PATCH /api/pilot/config)", () => {
 
   it("rejects fractional milliseconds", () => {
     expect(patchConfigSchema.safeParse({ staleMs: ONE_HOUR_MS + 0.5 }).success).toBe(false);
+  });
+});
+
+describe("admin pilot pulse loading guard (#394)", () => {
+  const staleMs = 24 * ONE_HOUR_MS;
+  const now = new Date("2026-05-24T10:00:00.000Z").getTime();
+
+  it("returns null while equipment list is still loading (undefined)", () => {
+    expect(computeAdminPilotCounts(true, undefined, staleMs, now)).toBeNull();
+  });
+
+  it("returns zero counts for an empty loaded list (not null)", () => {
+    expect(computeAdminPilotCounts(true, [], staleMs, now)).toEqual({
+      total: 0,
+      everConfirmed: 0,
+      confirmedToday: 0,
+      neverConfirmed: 0,
+    });
+  });
+
+  it("returns null outside pilot mode even when list is loaded", () => {
+    expect(
+      computeAdminPilotCounts(false, [{ lastSeen: "2026-05-24T09:00:00.000Z" }], staleMs, now),
+    ).toBeNull();
   });
 });
 
