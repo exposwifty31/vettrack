@@ -84,6 +84,8 @@ function registerInfrastructureRoutes(app: express.Express) {
 
 function registerEquipmentCoreRoutes(app: express.Express) {
   app.use("/api/equipment", equipmentRoutes);
+  // Bare /api mounts: operational-state and operational-metrics attach to the shared
+  // /api prefix. Keep them immediately after /api/equipment and before narrower paths.
   app.use("/api", equipmentOperationalStateRoutes);
   app.use("/api", operationalMetricsRoutes);
   app.use("/api/rooms", roomsRoutes);
