@@ -143,6 +143,8 @@ function registerFullPlatformRoutes(app: express.Express) {
     app.use("/api/billing", billingRoutes);
     app.use("/api/inventory-items", inventoryItemsRoutes);
     app.use("/api/procurement", procurementRoutes);
+
+    // --- Patients & clinical ---
     app.use("/api/animals", animalsRoutes);
     app.use("/api/patients", patientsRoutes);
     app.use("/api/clinical", clinicalCheckInRoutes);
