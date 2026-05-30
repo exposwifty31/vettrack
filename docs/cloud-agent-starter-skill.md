@@ -263,7 +263,44 @@ On **cursor.com → Cloud Agents → My Secrets**, deletion is easy to miss:
 
 ---
 
-## 7) Keeping this skill updated (lightweight process)
+## 7) Program v2 queue — merge close-out checklist
+
+Use this when closing an offline/ops/job-registry track PR (depends on `OUTBOX-DLQ`, `JR-MIG`, `SYNC-TEL` on `main`). **Verification + docs only** unless fixing a regression; do not touch frozen realtime/SSE/outbox transport or emergency cache paths.
+
+### Mandatory commands (paste summary in PR)
+
+```bash
+npx tsc --noEmit
+pnpm test
+pnpm dlx knip --no-exit-code   # note new issues vs baseline; knip is not a package script yet
+pnpm i18n:check
+```
+
+### Default CI gates (must stay in `pnpm test`, not `vite.config.ts` exclude)
+
+| Test file | What it guards |
+|-----------|----------------|
+| `tests/phase-9-metrics-cardinality.test.ts` | Bounded Phase 9 telemetry enums (no PII labels) |
+| `tests/offline-phase-7-emergency-surface-parity.test.ts` | Emergency API manifest ↔ classifier parity |
+| `tests/multi-tenancy-hardening.test.js` | Route handlers scope reads/writes by `clinicId` |
+
+Enforced statically by `tests/program-v2-hardening-ci-governance.test.ts`. Release gate also re-runs multi-tenancy explicitly (`.github/workflows/release-gate.yml`).
+
+### Explicit non-goals for hardening PRs
+
+- Equipment OCC (`CO-01`) — separate audit PR
+- Medication offline / batch sync ingestion (Phase 11)
+- Publisher/SSE/outbox transport changes
+- Large Zod `.strict()` rollout (`VA-01`)
+- Schema migrations unless fixing a regression
+
+### Infra-only tests (excluded from default `pnpm test`)
+
+See `vite.config.ts` `test.exclude` and `docs/testing-guide.md` — DB integration and live-server suites need `DATABASE_URL` and/or API on `:3001`.
+
+---
+
+## 8) Keeping this skill updated (lightweight process)
 
 When a new testing trick/runbook fix is discovered:
 1. Add it to the relevant "Area" section above (not a random notes dump).

@@ -16,7 +16,7 @@ pnpm test --watch      # watch mode (re-runs on file changes)
 pnpm test <file>       # run a specific test file
 ```
 
-Current status: **67 test files, 1352 tests, ~20s total**.
+Current status: run `pnpm test` locally for the live count (static + unit suite; typically ~290+ files, ~50s).
 
 ---
 
@@ -27,6 +27,9 @@ Tests live in `tests/` and are organized by phase/feature:
 | File | What it covers |
 |------|----------------|
 | `multi-tenancy-hardening.test.js` | Every route file uses `req.clinicId`; no cross-tenant leakage |
+| `phase-9-metrics-cardinality.test.ts` | Phase 9 counters are bounded enums (no PII / free-form labels) |
+| `offline-phase-7-emergency-surface-parity.test.ts` | Emergency endpoints match offline block + SW denylist manifest |
+| `program-v2-hardening-ci-governance.test.ts` | Asserts the three gates above are not vitest-excluded (CD-05) |
 | `phase-5-error-shape.test.js` | Error responses use `{ code, error, reason, message }` shape |
 | `phase-3-4-automation.test.js` | Automation engine feature flag wiring |
 | `phase-8-mobile-pwa.test.js` | PWA manifest, `dvh` viewport units, `inputMode` attributes |
@@ -78,7 +81,15 @@ npx vitest run tests/expiry-api.test.js
 
 ## CI
 
-Tests run automatically on every push via the project's CI pipeline. A failing test blocks merge.
+Tests run automatically on every push via `.github/workflows/ci.yml` (`pnpm test` + dual `tsc`). A failing test blocks merge.
+
+**Program v2 default gates** (always in `pnpm test`, documented in CD-05 / `BUG_REGISTER.md`):
+
+- `tests/phase-9-metrics-cardinality.test.ts`
+- `tests/offline-phase-7-emergency-surface-parity.test.ts`
+- `tests/multi-tenancy-hardening.test.js`
+
+`release-gate.yml` additionally runs multi-tenancy, medication safety, and phase-5 error-contract suites on a schedule/manual dispatch.
 
 ---
 
