@@ -123,7 +123,10 @@ export function registerApiRoutes(app: express.Express) {
 
   registerAlwaysOnConfigRoutes(app);
 
-  // --- Full-platform routes ([REDACTED] in pilot mode) ---
+  registerFullPlatformRoutes(app);
+}
+
+function registerFullPlatformRoutes(app: express.Express) {
   if (!isPilotMode) {
     app.use("/api/analytics", analyticsRoutes);
     app.use("/api/shifts", shiftsRoutes);
