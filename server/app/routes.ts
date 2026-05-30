@@ -135,6 +135,8 @@ function registerFullPlatformRoutes(app: express.Express) {
     app.use("/api/tasks", tasksRoutes);
     app.use("/api/shift-handover", shiftHandoverRoutes);
     app.use("/api/shift-handover/patient-handoffs", patientHandoffsRoutes);
+
+    // --- Inventory & pharmacy ---
     app.use("/api/containers", containersRoutes);
     app.use("/api/restock", restockRoutes);
     app.use("/api/medication-tasks", medicationTasksRoutes);
