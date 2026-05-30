@@ -101,6 +101,14 @@ function registerSafetySurfaceRoutes(app: express.Express) {
   app.use("/api/er", erRoutes);
 }
 
+function registerAdminRoutes(app: express.Express) {
+  app.use("/api/admin", adminOutboxHealthRoutes);
+  app.use("/api/admin", adminOutboxDlqRoutes);
+  app.use("/api/admin", adminMedicationIntegrityRoutes);
+  app.use("/api/admin", adminTaskOwnershipRoutes);
+  app.use("/api/stability", stabilityRoutes);
+}
+
 export function registerApiRoutes(app: express.Express) {
   registerInfrastructureRoutes(app);
   registerEquipmentCoreRoutes(app);
@@ -109,12 +117,7 @@ export function registerApiRoutes(app: express.Express) {
   // --- Pilot config (always registered — admin-gated, read/write pilot_stale_ms) ---
   app.use("/api/pilot", pilotRoutes);
 
-  // --- Admin (always registered — data management during pilot) ---
-  app.use("/api/admin", adminOutboxHealthRoutes);
-  app.use("/api/admin", adminOutboxDlqRoutes);
-  app.use("/api/admin", adminMedicationIntegrityRoutes);
-  app.use("/api/admin", adminTaskOwnershipRoutes);
-  app.use("/api/stability", stabilityRoutes);
+  registerAdminRoutes(app);
 
   // Admin-only APIs: kept outside the pilot guard because /admin is always
   // accessible and its Formulary/Settings sections call these endpoints.
