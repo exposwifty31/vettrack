@@ -149,6 +149,8 @@ function registerFullPlatformRoutes(app: express.Express) {
     app.use("/api/patients", patientsRoutes);
     app.use("/api/clinical", clinicalCheckInRoutes);
     app.use("/api/dispense", dispenseRoutes);
+
+    // --- Comms ---
     app.use("/api/shift-chat", shiftChatRoutes);
     app.use("/api/whatsapp", whatsappRoutes);
   }
