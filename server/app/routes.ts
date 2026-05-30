@@ -82,10 +82,7 @@ function registerInfrastructureRoutes(app: express.Express) {
   app.use("/health", healthRoutes);
 }
 
-export function registerApiRoutes(app: express.Express) {
-  registerInfrastructureRoutes(app);
-
-  // --- Equipment core (always registered) ---
+function registerEquipmentCoreRoutes(app: express.Express) {
   app.use("/api/equipment", equipmentRoutes);
   app.use("/api", equipmentOperationalStateRoutes);
   app.use("/api", operationalMetricsRoutes);
@@ -96,6 +93,11 @@ export function registerApiRoutes(app: express.Express) {
   app.use("/api/activity", activityRoutes);
   app.use("/api/home", homeDashboardRoutes);
   app.use("/api/display", displayRoutes);
+}
+
+export function registerApiRoutes(app: express.Express) {
+  registerInfrastructureRoutes(app);
+  registerEquipmentCoreRoutes(app);
 
   // --- Safety surfaces (always registered) ---
   app.use("/api/code-blue", codeBlueRoutes);
@@ -117,7 +119,7 @@ export function registerApiRoutes(app: express.Express) {
   app.use("/api/formulary", formularyRoutes);
   app.use("/api/forecast", forecastRoutes);
 
-  // --- Full-platform routes (disabled in pilot mode) ---
+  // --- Full-platform routes ([REDACTED] in pilot mode) ---
   if (!isPilotMode) {
     app.use("/api/analytics", analyticsRoutes);
     app.use("/api/shifts", shiftsRoutes);
