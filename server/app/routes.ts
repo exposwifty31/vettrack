@@ -128,6 +128,7 @@ export function registerApiRoutes(app: express.Express) {
 
 function registerFullPlatformRoutes(app: express.Express) {
   if (!isPilotMode) {
+    // --- Scheduling & tasks ---
     app.use("/api/analytics", analyticsRoutes);
     app.use("/api/shifts", shiftsRoutes);
     app.use("/api/appointments", appointmentsRoutes);
