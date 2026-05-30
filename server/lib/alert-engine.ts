@@ -86,8 +86,18 @@ function normalizeTotals(raw: unknown): DataIntegrityTotals {
   };
 }
 
+function dataIntegrityHealthFetchInit(): RequestInit {
+  const token = process.env.DATA_INTEGRITY_HEALTH_TOKEN?.trim();
+  if (!token) return {};
+  return { headers: { "x-health-token": token } };
+}
+
 async function fetchDataIntegrityHealth(): Promise<DataIntegrityPayload> {
-  const response = await withTimeout(fetch(ALERT_ENDPOINT), DATA_INTEGRITY_FETCH_TIMEOUT_MS, "data-integrity fetch");
+  const response = await withTimeout(
+    fetch(ALERT_ENDPOINT, dataIntegrityHealthFetchInit()),
+    DATA_INTEGRITY_FETCH_TIMEOUT_MS,
+    "data-integrity fetch",
+  );
   if (!response.ok) {
     return {
       status: "error",
