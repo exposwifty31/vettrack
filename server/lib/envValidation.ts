@@ -16,13 +16,15 @@ const REQUIRED_IN_PRODUCTION: string[] = [
   // looks healthy but breaks every integration sync/validation path.
   // See: server/lib/config-crypto.ts, server/integrations/credential-manager.ts
   "DB_CONFIG_ENCRYPTION_KEY",
+  // Clerk user/org lifecycle sync — without this, POST /api/webhooks/clerk returns 501
+  // and vt_users drifts from Clerk (server/routes/webhooks.ts).
+  "CLERK_WEBHOOK_SECRET",
+  // Tenant-isolation probe — /api/health/data-integrity returns 503 when unset in production.
+  // Required so monitoring cannot silently lose the probe (CONTRIBUTING.md).
+  "DATA_INTEGRITY_HEALTH_TOKEN",
 ];
 
-const RECOMMENDED_IN_PRODUCTION: string[] = [
-  // Clerk webhook handler returns 501 if unset (server/routes/webhooks.ts L65),
-  // so user-lifecycle sync is degraded but the rest of the app keeps running.
-  "CLERK_WEBHOOK_SECRET",
-];
+const RECOMMENDED_IN_PRODUCTION: string[] = [];
 
 function validateClerkKeyPair(): void {
   const publishable = (process.env.VITE_CLERK_PUBLISHABLE_KEY ?? "").trim();

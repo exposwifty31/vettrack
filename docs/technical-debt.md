@@ -6,16 +6,6 @@ Items tracked here are known limitations, deferred work, or architectural compro
 
 ## Active Items
 
-### HIGH — Inventory job failure visibility
-
-**What:** `vt_inventory_jobs` has no operator UI. Medication deduction failures (terminal `status='failed'`) are only visible in the raw DB or server logs. There is no admin dashboard, no alert, and no one-click retry.
-
-**Impact:** A technician completing a medication task may silently fail to deduct inventory. This requires periodic manual DB inspection to detect.
-
-**Resolution path:** Add an admin `/inventory-jobs` page with failed job list, failure reason display, and manual retry button. Worker already supports re-enqueue.
-
----
-
 ### MEDIUM — Integration outbound sync is request-scoped only
 
 **What:** Outbound patient/appointment/billing sync (VetTrack → external PMS) is not batched. The queue worker processes `direction: "outbound"` jobs as `skipped` with "not yet implemented". Outbound sync must be triggered per-record via direct API calls.
@@ -86,5 +76,8 @@ Items tracked here are known limitations, deferred work, or architectural compro
 | `jsqr` unused dependency in package.json | Phase 5 Batch 1 |
 | Missing audit logs on billing POST, equipment restore, code-blue events, integration CRUD | Phase 5 Batch 4 |
 | `DB_CONFIG_ENCRYPTION_KEY` and `CLERK_WEBHOOK_SECRET` not validated at startup | Phase 5 Batch 4 |
+| Inventory job failure visibility (no operator UI) | `/billing/inventory-jobs` admin page + `docs/runbooks/inventory-jobs-failed-deductions.md` |
+| Negative inventory at DB layer (IB-03) | Migration `125_inventory_negative_quantity_guard.sql` + `server/lib/db-constraint-errors.ts` |
+| Production `DATA_INTEGRITY_HEALTH_TOKEN` optional at boot | `envValidation.ts` + health route fail-closed |
 | No bundle chunk splitting (recharts, jspdf in main chunk) | Phase 5 Batch 2 |
 | Missing DB index on animals (clinic_id, name) for patient search | Phase 5 Batch 2 |

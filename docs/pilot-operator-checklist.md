@@ -46,7 +46,7 @@
 | Outbox DLQ growth | Ops dashboard → DLQ panel | Triage within 15 min; retry or drop per policy below |
 | Sync failures | Ops dashboard → offline telemetry | If circuit open, check network; do not bulk-delete pending sync without review |
 | Realtime stale UI | Ward / ER tabs | Hard refresh once; if persists, check SSE (browser network: `/api/realtime/stream` connected) |
-| Inventory vs billing skew | Inventory jobs UI | Expected briefly after med task complete; wait 10 min recovery sweep |
+| Inventory vs billing skew | Inventory jobs UI (`/billing/inventory-jobs`) | Expected briefly after med task complete; wait 10 min recovery sweep; see `docs/runbooks/inventory-jobs-failed-deductions.md` for failed rows |
 | Code Blue | Display + session page | Server is source of truth; do not trust local-only "ended" state |
 
 **Do not** enable WebSocket URLs (`VITE_WS_URL`) — realtime is **SSE only**.

@@ -47,12 +47,13 @@ if [ "${VITE_PILOT_MODE}" = "true" ] && [ "${ALLOW_EQUIPMENT_PILOT_MODE}" != "tr
   exit 1
 fi
 
-# Check recommended environment variables (warn, don't block)
-recommended_vars=("CLERK_WEBHOOK_SECRET")
+# Pilot-critical secrets — must match server/lib/envValidation.ts REQUIRED_IN_PRODUCTION
+pilot_required_vars=("CLERK_WEBHOOK_SECRET" "DATA_INTEGRITY_HEALTH_TOKEN")
 
-for var in "${recommended_vars[@]}"; do
+for var in "${pilot_required_vars[@]}"; do
   if [ -z "${!var}" ]; then
-    echo "⚠️  Recommended variable missing: $var (startup will warn)"
+    echo "❌ Required variable missing: $var (production startup will fail)"
+    exit 1
   fi
 done
 

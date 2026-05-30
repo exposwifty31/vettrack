@@ -18,6 +18,13 @@ describe("Phase 5 P0 hardening checks (static)", () => {
     ).toBe(true);
   });
 
+  it("Production env validation requires Clerk webhook and data-integrity health token", () => {
+    expect(envValidation).toContain("\"CLERK_WEBHOOK_SECRET\"");
+    expect(envValidation).toContain("\"DATA_INTEGRITY_HEALTH_TOKEN\"");
+    expect(envValidation).toMatch(/REQUIRED_IN_PRODUCTION[\s\S]*CLERK_WEBHOOK_SECRET/);
+    expect(envValidation).toMatch(/REQUIRED_IN_PRODUCTION[\s\S]*DATA_INTEGRITY_HEALTH_TOKEN/);
+  });
+
   it("Server defines production-aware CSP mode", () => {
     expect(serverIndex).toContain("const isProduction = process.env.NODE_ENV === \"production\"");
   });

@@ -43,8 +43,8 @@ Register defects **before** fix PRs. Severity: **P0** (prod/safety/data loss) ·
 
 | ID | Finding | Sev | Evidence | Suggested fix |
 |----|---------|-----|----------|---------------|
-| AU-01 | CI Playwright runs **all** `*.spec.ts` except `staging-*` and `example` — includes **`signup-flow`** (Clerk mutations) and **`ui-smoke`** (session) | P1 | `playwright.config.ts` L38–39 `testIgnore`; `.github/workflows/playwright.yml` L94 `test:playwright:chromium`; safe allowlist in `scripts/run-safe-tests.sh` L60–65 | Narrow `playwright.yml` to `pwa`, `phase-9-drills`, `tests/e2e/flows/` |
-| AU-02 | `POST /api/er/handoffs/:id/ack` has router `requireAuth` only — no `requireAssignableRole` (unlike create/assign routes) | P2 | `server/routes/er.ts` L797 vs L360/L762; service allows owner or admin/vet override (`er-handoff.service.ts` L149–158) | Add `requireAssignableRole` or explicit clinical floor; block `student` at route layer |
+| AU-01 | ~~CI Playwright ran full `*.spec.ts` including signup-flow~~ **CLOSED** — CI uses `pnpm test:playwright:ci` allowlist | P1 | `.github/workflows/playwright.yml`; `scripts/run-safe-tests.sh` | — |
+| AU-02 | ~~ER handoff ack missing route role guard~~ **CLOSED** — `requireAssignableRole` on `POST /handoffs/:id/ack` | P2 | `server/routes/er.ts` L797; `tests/er-handoff-ack-role-denial.test.ts` | — |
 | AU-03 | Dev headers (`x-dev-role-override`, etc.) only in dev-bypass | P3 | `server/middleware/auth.ts`; `AGENTS.md` | Document for E2E; never set in production env |
 | AU-04 | ~~`tests/example.spec.ts`~~ **CLOSED** — file removed; allowlist in `playwright.shared.ts` only | P3 | pre-demo audit mainline | — |
 | AU-05 | `ROLE_HIERARCHY` includes `lead_technician` / `vet_tech` but `requireClinicalUser` Set omits them (normalized elsewhere) | P3 | `server/middleware/auth.ts`; `tests/dispense-auth-hardening.test.ts` | Document alias normalization path; avoid duplicate guards |
@@ -67,7 +67,7 @@ Register defects **before** fix PRs. Severity: **P0** (prod/safety/data loss) ·
 |----|---------|-----|----------|---------------|
 | IB-01 | Async inventory deduction after `completeTask` (brief billing vs stock skew) | P3 (known) | `CLAUDE.md`; `vt_inventory_jobs` + recovery scheduler | Monitor; document in ops runbook |
 | IB-02 | Billing idempotency enforced in schema | — | `vt_billing_ledger.idempotency_key` unique; `tests/billing-leakage*` | ✅ Keep regression tests |
-| IB-03 | Negative on-hand not blocked at DB layer for all paths — relies on service checks | P1 if repro | `inventory.service.ts` comment "Floors at 0"; dispense compares `ci.quantity < line` | Run `data-integrity-hardening` views + manual concurrent dispense |
+| IB-03 | Negative on-hand blocked at DB for containers (`CHECK quantity >= 0`) — confirm in pilot clinic | P1 ops | Migration `125_inventory_negative_quantity_guard.sql`; `tests/inventory-negative-quantity-guard.test.ts` | Run `/api/health/data-integrity` + concurrent dispense drill before go-live |
 | IB-04 | Inventory job failure UX separate from sync queue | P3 | `src/pages/inventory-jobs.tsx` failed filter | Ensure operators see retry path after worker exhaustion |
 
 ---
@@ -76,8 +76,8 @@ Register defects **before** fix PRs. Severity: **P0** (prod/safety/data loss) ·
 
 | ID | Finding | Sev | Evidence | Suggested fix |
 |----|---------|-----|----------|---------------|
-| CO-01 | **`vt_equipment.version` not incremented or checked** on PATCH/checkout/return updates | P1 | `server/db.ts` column; **no** `version` in `server/routes/equipment.ts` updates (e.g. L776–794); `.cursorrules` claims optimistic locking | Implement read-modify-write with `version` + 409, or drop column from contract docs |
-| CO-02 | Checkout/return use status **409 CONFLICT** but not version-based OCC | P2 | `server/routes/equipment.ts` ~L1104, L1267 | Align with CO-01 or document status-only concurrency |
+| CO-01 | ~~Equipment `version` optimistic locking unused~~ **CLOSED** — PATCH/checkout/return increment `version` and return `VERSION_CONFLICT` 409 | P1 | `server/routes/equipment.ts`; `tests/equipment-version-occ.integration.test.ts` | — |
+| CO-02 | Checkout/return combine status **409** with version OCC where applicable | P2 | `server/routes/equipment.ts` | Document dual concurrency story in equipment runbook |
 | CO-03 | SSE reconnect storm / gap resync | P2 | Phase 9 drills; `tests/phase-9-deterministic-drills.test.ts` | Keep drills nightly; non-blocking on PR |
 | CO-04 | Double-submit on rapid scan not covered by Playwright | P2 | `FLOW_MATRIX.md` scan row ❌ | Add `tests/e2e/flows/` duplicate-scan spec |
 
@@ -87,7 +87,7 @@ Register defects **before** fix PRs. Severity: **P0** (prod/safety/data loss) ·
 
 | ID | Finding | Sev | Evidence | Suggested fix |
 |----|---------|-----|----------|---------------|
-| EU-01 | Permanent sync failure: Sentry event + `status: failed` in Dexie — **no dedicated toast** on max retries | P2 | `sync-engine.ts` L223–245; toasts at L86, L317 only | Toast on final failure using `t.layout.sync.failedMessage`; link to sync sheet |
+| EU-01 | ~~Permanent sync failure with no operator toast~~ **CLOSED** — `toast.error(t.layout.sync.failedMessage)` + open sync queue action | P2 | `src/lib/sync-engine.ts`; `tests/sync-engine-permanent-failure-toast.test.ts` | — |
 | EU-02 | Phase 5 error contract tests exist | — | `tests/phase-5-error-contract.test.js` | ✅ Maintain on API changes |
 | EU-03 | ~~Hardcoded Hebrew in crash-cart~~ **CLOSED** — uses `t.crashCart.*` | P2 | `src/pages/crash-cart.tsx`; `locales/en.json` / `he.json` | — |
 | EU-04 | `ErApiNotImplementedError` exists but queue route returns generic 501 JSON | P3 | `src/lib/er-api.ts` L22–27; server `COMING_SOON` | Map 501 to typed client error if UI calls queue |
@@ -98,7 +98,7 @@ Register defects **before** fix PRs. Severity: **P0** (prod/safety/data loss) ·
 
 | ID | Finding | Sev | Evidence | Suggested fix |
 |----|---------|-----|----------|---------------|
-| TZ-01 | **"Today" tasks use UTC midnight**, not clinic timezone (Israel-default locale) | P2 | `getTasksForTechnicianToday` / `getAppointmentsByDay` use `T00:00:00.000Z` (`appointments.service.ts` L2019–2027, L2107–2119) | Clinic TZ from `vt_clinics` or `req.locale`; boundary tests |
+| TZ-01 | ~~"Today" tasks used UTC midnight~~ **CLOSED** — `getClinicTimezone` + `getClinicDayUtcRange` / `clinicTodayIsoDate` | P2 | `server/lib/clinic-timezone.ts`; `tests/clinic-timezone.test.ts` | — |
 | TZ-02 | Scheduling tests exist but limited DST edge coverage | P3 | `tests/appointments-scheduling.test.js` | Add DST + Asia/Jerusalem cases |
 | TZ-03 | Authority cache comment: server-local date vs clinic TZ | P3 | `server/lib/authority-cache.ts` L41 | Document or align evaluator "day" with clinic |
 
@@ -123,7 +123,7 @@ Register defects **before** fix PRs. Severity: **P0** (prod/safety/data loss) ·
 | SE-02 | Helmet / CSP / XSS sanitizer | — | `server/index.ts` | ✅ |
 | SE-03 | Rate limits (global + scoped) | — | `server/middleware/rate-limiters.ts` | ✅ |
 | SE-04 | Production rejects test Clerk keys | — | `envValidation` patterns in tests | ✅ |
-| SE-05 | `GET /health/data-integrity` **unauthenticated when `DATA_INTEGRITY_HEALTH_TOKEN` unset** | P2 | `server/routes/health.ts` L199–215 (guard only if token configured) | Require token in production always; fail closed |
+| SE-05 | ~~Data-integrity health probe open when token unset~~ **CLOSED** — production returns 503/401; token required at boot (`envValidation.ts`) | P2 | `server/routes/health.ts`; `tests/health-data-integrity.routes.test.ts` | — |
 | SE-06 | Hebrew in server forecast email builder (allowlisted) | P3 | `tests/i18n-no-hebrew-in-source.test.ts` allowlist | Phase 6 extraction PRs |
 | SE-07 | `SMART_COP_VALIDATION_FAIL_OPEN=true` allows clinical evaluator fail-open | P2 (config) | `server/lib/clinical-invariant-error.ts` L160 | Ops: keep false in prod; monitor `clinical_invariant_fail_open` audit |
 
@@ -135,7 +135,7 @@ Register defects **before** fix PRs. Severity: **P0** (prod/safety/data loss) ·
 |----|---------|-----|----------|---------------|
 | DP-01 | Migrations before schedulers | — | `server/index.ts` `runMigrations()` before schedulers | ✅ |
 | DP-02 | Vite dev proxy → API `:3001` | — | `vite.config.ts` | ✅ |
-| DP-03 | **`ci.yml` / `playwright.yml` trigger only `main`** — PRs to **`staging` lack automated gates** | P1 | `.github/workflows/ci.yml` L6; `playwright.yml` L5–7 | Add `staging` to branch filters or require merge-via-PR from vetted CI |
+| DP-03 | ~~CI not on `staging` branch~~ **CLOSED** — `ci.yml` and `playwright.yml` include `staging` | P1 | `.github/workflows/ci.yml` L5–7 | — |
 | DP-04 | Release Gate duplicates Vitest subsets on `main` push | P3 | `release-gate.yml` vs `ci.yml` | Consolidate or mark optional checks |
 | DP-05 | `RAILWAY_USE_CLI_DEPLOY` skips deploy jobs when false | P3 | `ci.yml` deploy jobs | Document in CONTRIBUTING |
 | DP-06 | Redis optional in dev — queues log disabled | P3 | `CLAUDE.md`; worker startup logs | Production checklist: Redis required |
@@ -172,24 +172,19 @@ Register defects **before** fix PRs. Severity: **P0** (prod/safety/data loss) ·
 
 1. **SE-01** — Clerk live key rotation (runbook)
 
-### P1 — safety & CI signal
+### P1 — safety & CI signal (open)
 
-1. **AU-01 / TI-01 / TI-04** — CI Playwright scope (signup, ui-smoke)
-2. **DP-03** — CI not running on `staging` PRs
-3. **CO-01** — Equipment `version` optimistic locking unused
-4. **IB-03** — Negative inventory (confirm + guard)
+1. **IB-03** — Negative inventory: DB constraints shipped; **confirm** in pilot clinic via data-integrity probe + concurrent dispense drill
+2. **TI-01** — Keep CI Playwright aligned with `scripts/run-safe-tests.sh` on workflow changes
 
-### P2 — correctness & UX
+### P2 — correctness & UX (open)
 
-1. **TZ-01** — UTC "today" for tasks/appointments
-2. **CD-01** — ER queue 501 vs documented API
-3. **CD-02 / CD-03** — PWA base URL; api.ts bypass
-4. **EU-01 / EU-03** — Sync failure toast; crash-cart i18n
-5. **VA-01** — Zod strictness on sensitive routes
-6. **SE-05** — Data-integrity health token fail-closed
-7. **AU-02** — ER handoff ack route guard
-8. **CO-02 / CO-04** — Equipment concurrency tests
-9. **PF-01** — Realtime load documentation or k6
+1. **CD-01** — ER queue 501 vs documented API (client must not call)
+2. **CD-02 / CD-03** — PWA base URL; api.ts bypass (documented exceptions)
+3. **VA-01** — Zod strictness on sensitive routes
+4. **CO-02 / CO-04** — Equipment concurrency documentation + duplicate-scan e2e
+5. **PF-01** — Realtime load documentation or k6
+6. **IB-04** — Inventory job alerting beyond admin UI (ops dashboard tie-in)
 
 ### P3 — hygiene & docs
 
@@ -225,3 +220,4 @@ Each fix PR should include: **Risk**, **Rollback**, **Validation**, **Deployment
 | Date | Change |
 |------|--------|
 | 2026-05-21 | Full Section F audit on `staging`; corrected CO-01 (equipment version); added TZ-01, CD-01, DP-03, EU-01, SE-05; refreshed Playwright CI notes |
+| 2026-05-30 | Pre-pilot closure pass on `main`: CO-01, TZ-01, AU-01/02, DP-03, EU-01, SE-05 marked closed; production boot requires `CLERK_WEBHOOK_SECRET` + `DATA_INTEGRITY_HEALTH_TOKEN`; inventory jobs runbook added |

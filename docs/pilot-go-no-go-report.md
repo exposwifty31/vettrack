@@ -57,10 +57,10 @@ No open **application** P0 on `main` from pilot execution.
 | — | Staging cancel / inventory tx / Redis enqueue | **CLOSED** | #478 |
 | — | Cross-tenant PO / alert-ack reads | **CLOSED** | #308 |
 | — | Codex: peer cursor `0` cross-clinic reset | **CLOSED** | #487 |
-| CO-01 | Equipment `version` OCC | **CLOSED on main** | Implemented in `server/routes/equipment.ts` (STEP 8 audit); register predates fix |
-| AU-01 / TI-01 / TI-04 | Playwright CI scope vs signup-flow | **MITIGATED** | CI uses sharded safe E2E set; periodic workflow review recommended |
-| DP-03 | CI not on `staging` branch PRs | **OPEN** | Process risk for `staging`-only workstreams |
-| IB-03 | Negative inventory at DB layer | **OPEN — confirm** | Service guards; run data-integrity checks in pilot clinic |
+| CO-01 | Equipment `version` OCC | **CLOSED** | `server/routes/equipment.ts` + integration tests |
+| AU-01 / TI-01 / TI-04 | Playwright CI scope vs signup-flow | **CLOSED** | `pnpm test:playwright:ci` allowlist in workflow |
+| DP-03 | CI on `staging` branch PRs | **CLOSED** | `ci.yml` / `playwright.yml` branch filters |
+| IB-03 | Negative inventory at DB layer | **CLOSED (verify in clinic)** | Migration 125 + constraint error mapping; run data-integrity probe before go-live |
 
 ### P2 (medium — accepted for pilot with monitoring)
 
@@ -70,11 +70,11 @@ Representative open items (full list: `BUG_REGISTER.md`):
 |----|---------|-------------------|
 | CD-01 | ER `GET /api/er/queue` documented but 501 | Do not depend on queue API in pilot |
 | CD-03 | Raw `fetch()` outside `api.ts` (auth/sync) | Known exceptions; no pilot change |
-| TZ-01 | UTC "today" for tasks | Operators aware of boundary behavior |
-| EU-01 | No toast on permanent sync failure | Monitor ops dashboard sync telemetry |
+| TZ-01 | Clinic timezone for "today" tasks | **CLOSED** — `clinic-timezone.ts` |
+| EU-01 | Permanent sync failure toast | **CLOSED** — sync-engine toast + queue action |
 | VA-01 | Zod routes mostly non-strict | Incremental hardening post-pilot |
-| SE-05 | Data-integrity health token optional | Set `DATA_INTEGRITY_HEALTH_TOKEN` in prod |
-| AU-02 | ER handoff ack route guard | Service-layer auth still applies |
+| SE-05 | Data-integrity health token | **CLOSED** — required at production boot |
+| AU-02 | ER handoff ack route guard | **CLOSED** — `requireAssignableRole` |
 
 ### P3
 
