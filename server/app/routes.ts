@@ -1,55 +1,66 @@
 import type express from "express";
-import equipmentRoutes from "../routes/equipment.js";
-import analyticsRoutes from "../routes/analytics.js";
-import activityRoutes from "../routes/activity.js";
+
+// --- Infrastructure ---
 import userRoutes from "../routes/users.js";
-import stabilityRoutes from "../routes/stability.js";
+import realtimeRoutes from "../routes/realtime.js";
+import queueRoutes from "../routes/queue.js";
 import metricsRoutes from "../routes/metrics.js";
-import foldersRoutes from "../routes/folders.js";
-import alertAcksRoutes from "../routes/alert-acks.js";
-import roomsRoutes from "../routes/rooms.js";
-import supportRoutes from "../routes/support.js";
-import pushRoutes from "../routes/push.js";
-import whatsappRoutes from "../routes/whatsapp.js";
-import auditLogsRoutes from "../routes/audit-logs.js";
 import storageRoutes from "../routes/storage.js";
+import uploadsRoutes from "../routes/uploads.js";
+import pushRoutes from "../routes/push.js";
+import supportRoutes from "../routes/support.js";
+import auditLogsRoutes from "../routes/audit-logs.js";
+import integrationsRoutes from "../routes/integrations.js";
+import testRoutes from "../routes/test.js";
+import healthRoutes from "../routes/health.js";
+
+// --- Equipment core ---
+import equipmentRoutes from "../routes/equipment.js";
+import equipmentOperationalStateRoutes from "../routes/equipment-operational-state.js";
+import operationalMetricsRoutes from "../routes/operational-metrics.js";
+import roomsRoutes from "../routes/rooms.js";
+import foldersRoutes from "../routes/folders.js";
+import returnsRoutes from "../routes/returns.js";
+import alertAcksRoutes from "../routes/alert-acks.js";
+import activityRoutes from "../routes/activity.js";
+import homeDashboardRoutes from "../routes/home-dashboard.js";
+import displayRoutes from "../routes/display.js";
+
+// --- Safety surfaces ---
+import codeBlueRoutes from "../routes/code-blue.js";
+import crashCartRoutes from "../routes/crash-cart.js";
+import erRoutes from "../routes/er.js";
+
+// --- Pilot & admin config (always on) ---
+import pilotRoutes from "../routes/pilot.js";
+import adminOutboxHealthRoutes from "../routes/admin-outbox-health.js";
+import adminOutboxDlqRoutes from "../routes/admin-outbox-dlq.js";
+import adminMedicationIntegrityRoutes from "../routes/admin-medication-integrity.js";
+import adminTaskOwnershipRoutes from "../routes/admin-task-ownership.js";
+import stabilityRoutes from "../routes/stability.js";
+import formularyRoutes from "../routes/formulary.js";
+import forecastRoutes from "../routes/forecast.js";
+
+// --- Full-platform (mounted only when !isPilotMode) ---
+import analyticsRoutes from "../routes/analytics.js";
 import shiftsRoutes from "../routes/shifts.js";
 import appointmentsRoutes from "../routes/appointments.js";
 import tasksRoutes from "../routes/tasks.js";
-import testRoutes from "../routes/test.js";
-import healthRoutes from "../routes/health.js";
-import queueRoutes from "../routes/queue.js";
-import realtimeRoutes from "../routes/realtime.js";
-import returnsRoutes from "../routes/returns.js";
 import shiftHandoverRoutes from "../routes/shift-handover.js";
+import patientHandoffsRoutes from "../routes/patient-handoffs.js";
 import containersRoutes from "../routes/containers.js";
-import formularyRoutes from "../routes/formulary.js";
 import restockRoutes from "../routes/restock.js";
 import medicationTasksRoutes from "../routes/medication-tasks.js";
 import billingRoutes from "../routes/billing.js";
 import inventoryItemsRoutes from "../routes/inventory-items.js";
 import procurementRoutes from "../routes/procurement.js";
-import forecastRoutes from "../routes/forecast.js";
 import animalsRoutes from "../routes/animals.js";
 import patientsRoutes from "../routes/patients.js";
-import uploadsRoutes from "../routes/uploads.js";
 import clinicalCheckInRoutes from "../routes/clinical-check-in.js";
-import codeBlueRoutes from "../routes/code-blue.js";
-import crashCartRoutes from "../routes/crash-cart.js";
-import integrationsRoutes from "../routes/integrations.js";
-import shiftChatRoutes from "../routes/shift-chat.js";
-import displayRoutes from "../routes/display.js";
-import erRoutes from "../routes/er.js";
-import adminOutboxHealthRoutes from "../routes/admin-outbox-health.js";
-import adminOutboxDlqRoutes from "../routes/admin-outbox-dlq.js";
-import adminMedicationIntegrityRoutes from "../routes/admin-medication-integrity.js";
-import adminTaskOwnershipRoutes from "../routes/admin-task-ownership.js";
 import dispenseRoutes from "../routes/dispense.js";
-import patientHandoffsRoutes from "../routes/patient-handoffs.js";
-import homeDashboardRoutes from "../routes/home-dashboard.js";
-import pilotRoutes from "../routes/pilot.js";
-import equipmentOperationalStateRoutes from "../routes/equipment-operational-state.js";
-import operationalMetricsRoutes from "../routes/operational-metrics.js";
+import shiftChatRoutes from "../routes/shift-chat.js";
+import whatsappRoutes from "../routes/whatsapp.js";
+
 import { resolveEffectiveRuntimePilotMode } from "../../shared/effective-pilot-mode.js";
 
 const isPilotMode = resolveEffectiveRuntimePilotMode();
