@@ -65,8 +65,7 @@ import { resolveEffectiveRuntimePilotMode } from "../../shared/effective-pilot-m
 
 const isPilotMode = resolveEffectiveRuntimePilotMode();
 
-export function registerApiRoutes(app: express.Express) {
-  // --- Infrastructure (always registered) ---
+function registerInfrastructureRoutes(app: express.Express) {
   app.use("/api/users", userRoutes);
   app.use("/api/realtime", realtimeRoutes);
   app.use("/api/queue", queueRoutes);
@@ -81,6 +80,10 @@ export function registerApiRoutes(app: express.Express) {
   app.use("/api/health", healthRoutes);
   app.use("/api/health/ready", healthRoutes);
   app.use("/health", healthRoutes);
+}
+
+export function registerApiRoutes(app: express.Express) {
+  registerInfrastructureRoutes(app);
 
   // --- Equipment core (always registered) ---
   app.use("/api/equipment", equipmentRoutes);
