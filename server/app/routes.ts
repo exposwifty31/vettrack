@@ -95,14 +95,16 @@ function registerEquipmentCoreRoutes(app: express.Express) {
   app.use("/api/display", displayRoutes);
 }
 
-export function registerApiRoutes(app: express.Express) {
-  registerInfrastructureRoutes(app);
-  registerEquipmentCoreRoutes(app);
-
-  // --- Safety surfaces (always registered) ---
+function registerSafetySurfaceRoutes(app: express.Express) {
   app.use("/api/code-blue", codeBlueRoutes);
   app.use("/api/crash-cart", crashCartRoutes);
   app.use("/api/er", erRoutes);
+}
+
+export function registerApiRoutes(app: express.Express) {
+  registerInfrastructureRoutes(app);
+  registerEquipmentCoreRoutes(app);
+  registerSafetySurfaceRoutes(app);
 
   // --- Pilot config (always registered — admin-gated, read/write pilot_stale_ms) ---
   app.use("/api/pilot", pilotRoutes);
