@@ -4,7 +4,12 @@ on:
   pull_request:
     branches: [main, staging]
   push:
-    branches: [main, staging]
+    branches:
+      - main
+      - staging
+      # Cloud-agent / feature branches (PR push does not match main/staging-only filter).
+      - "cursor/**"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
