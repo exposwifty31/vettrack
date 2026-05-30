@@ -8,3 +8,4 @@ export * from "./inventory.js";
 export * from "./er.js";
 export * from "./ops.js";
 export * from "./integrations.js";
+export * from "./intelligence.js";

@@ -278,6 +278,39 @@ export interface TStructure {
     finishSessionFailed: string;
     errorWithRequestId: string;
   };
+  equipmentIntelligence: {
+    pageTitle: string;
+    subtitle: string;
+    analyzeButton: string;
+    shiftButton: string;
+    executiveSummary: string;
+    topRisks: string;
+    evidence: string;
+    impact: string;
+    recommendedAction: string;
+    createTask: string;
+    confirmTitle: string;
+    confirmDesc: string;
+    confirmCreate: string;
+    cancel: string;
+    analyzeDone: string;
+    analyzeFailed: string;
+    shiftTitle: string;
+    shiftDone: string;
+    shiftFailed: string;
+    taskCreated: string;
+    taskFailed: string;
+    navLabel: string;
+    errors: {
+      unauthorized: string;
+      analyzeFailed: string;
+      shiftFailed: string;
+      taskFailed: string;
+      recommendationNotFound: string;
+      approvalRequired: string;
+      pilotTasksUnavailable: string;
+    };
+  };
   equipmentDetail: {
     serialNumber: string;
     model: string;
@@ -2789,6 +2822,8 @@ export interface TStructure {
   };
   operationalState: {
     invalidCustodyForDockReturn: string;
+    dockMasterTagNotFound: string;
+    ambiguousDocks: string;
     noAssetTypeDefined: string;
     crossClinicAssociation: string;
     conditionNotFound: string;

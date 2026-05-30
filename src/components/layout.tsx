@@ -52,6 +52,7 @@ import {
   Stethoscope,
   Monitor,
   Gauge,
+  Brain,
 } from "lucide-react";
 import { OnboardingWalkthrough } from "@/components/onboarding-walkthrough";
 import { NfcForegroundScan } from "@/components/nfc-foreground-scan";
@@ -454,6 +455,12 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     const allItems: NavItem[] = [
     { href: "/", label: lh.home, icon: <Home className="w-5 h-5" /> },
     { href: "/equipment", label: t.equipment.title, icon: <Package className="w-5 h-5" /> },
+    {
+      href: "/equipment/intelligence",
+      label: t.equipmentIntelligence.navLabel,
+      icon: <Brain className="w-5 h-5" />,
+      menuOnly: true,
+    },
     {
       href: "/alerts",
       label: t.layout.nav.alerts,

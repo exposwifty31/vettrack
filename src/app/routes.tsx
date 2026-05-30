@@ -23,6 +23,7 @@ const RoomsListPage = lazy(() => import("@/pages/rooms-list"));
 const RoomRadarPage = lazy(() => import("@/pages/room-radar"));
 const QrPrintPage = lazy(() => import("@/pages/qr-print"));
 const EquipmentQrPrintPage = lazy(() => import("@/pages/equipment-qr-print"));
+const EquipmentIntelligencePage = lazy(() => import("@/pages/equipment-intelligence"));
 const AdminPage = lazy(() => import("@/pages/admin"));
 const SettingsPage = lazy(() => import("@/pages/settings"));
 const HelpPage = lazy(() => import("@/pages/help"));
@@ -103,6 +104,7 @@ export function AppRoutes() {
 
         {/* Equipment — always available */}
         <Route path="/equipment"><AuthGuard><EquipmentPage /></AuthGuard></Route>
+        <Route path="/equipment/intelligence"><AuthGuard><EquipmentIntelligencePage /></AuthGuard></Route>
         <Route path="/equipment/new"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/scan"><Redirect to="/equipment" replace /></Route>
         <Route path="/equipment/maintenance"><Redirect to="/equipment?status=maintenance" replace /></Route>

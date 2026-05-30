@@ -70,6 +70,10 @@ import type {
   OperationalMetricsSummary,
 } from "@/types";
 import type { OutcomeKpiRoiResponse } from "../../shared/er-types.js";
+import type {
+  IntelligenceAnalysisResponse,
+  ShiftHandoverIntelligenceResponse,
+} from "../../shared/equipment-intelligence.js";
 import type { AuthoritySnapshot } from "../../shared/authority.js";
 import type {
   HandoffEligiblePatientsResponse,
@@ -1368,6 +1372,24 @@ export const api = {
       const query = qs.toString() ? `?${qs.toString()}` : "";
       return request<OperationalMetricsSummary>(`/api/operational-metrics/summary${query}`);
     },
+  },
+  equipmentIntelligence: {
+    analyze: () =>
+      request<IntelligenceAnalysisResponse>("/api/equipment-intelligence/analyze", {
+        method: "POST",
+      }),
+    shiftHandover: () =>
+      request<ShiftHandoverIntelligenceResponse>("/api/equipment-intelligence/shift-handover", {
+        method: "POST",
+      }),
+    createTaskFromRecommendation: (
+      recommendationId: string,
+      body: { confirmed: true; notes?: string },
+    ) =>
+      request<{ taskId: string; recommendationId: string }>(
+        `/api/equipment-intelligence/recommendations/${encodeURIComponent(recommendationId)}/create-task`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
   },
 };
 
