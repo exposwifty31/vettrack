@@ -43,6 +43,7 @@ import {
   emitAuthorityDeniedAudit,
   emitAuthorityResolutionFailedAudit,
   emitDispenseLegacyFallbackAudit,
+  isAuthorityObsV1Enabled,
 } from "../lib/authority-audit.js";
 import { incrementMetric } from "../lib/metrics.js";
 
@@ -149,7 +150,7 @@ export function requireClinicalAuthority(
       });
     } catch (err) {
       incrementMetric("authority_resolution_failed");
-      if (process.env.AUTHORITY_OBS_V1 === "true") {
+      if (isAuthorityObsV1Enabled()) {
         console.error("[authority] resolution failed", err);
       }
       emitAuthorityResolutionFailedAudit({ req, error: err });

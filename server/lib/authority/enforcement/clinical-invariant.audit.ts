@@ -25,16 +25,13 @@
  * starved by other enforcement families (Phase 5 plan §4 doctrine 8).
  */
 
+import { isAuthorityObsV1Enabled } from "../../authority-audit.js";
 import { logAudit, type AuditDbExecutor } from "../../audit.js";
 import { createLogLimiter } from "../../log-safety.js";
 import type {
   OrphanLineDetail,
   OrphanReasonCode,
 } from "../../dispense-order-validation.js";
-
-function isAuthorityObsV1Enabled(): boolean {
-  return process.env.AUTHORITY_OBS_V1 === "true";
-}
 
 // Independent rate-limiter bucket. 5-minute window per the Phase 5
 // plan §9.2 sampler spec for the shadow audit kind.

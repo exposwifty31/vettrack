@@ -21,14 +21,11 @@
  * call this emitter.
  */
 
+import { isAuthorityObsV1Enabled } from "../../authority-audit.js";
 import { logAudit } from "../../audit.js";
 import { createLogLimiter } from "../../log-safety.js";
 
 export type EnforcementDenialKind = "stale" | "oprole";
-
-function isAuthorityObsV1Enabled(): boolean {
-  return process.env.AUTHORITY_OBS_V1 === "true";
-}
 
 // Two independent buckets so stale and OPROLE denials cannot starve each
 // other. 60s dedupe window matches the existing emitAuthorityDeniedAudit

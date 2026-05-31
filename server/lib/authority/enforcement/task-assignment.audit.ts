@@ -12,16 +12,13 @@
  * audit path).
  */
 
+import { isAuthorityObsV1Enabled } from "../../authority-audit.js";
 import { logAudit } from "../../audit.js";
 import { createLogLimiter } from "../../log-safety.js";
 import type {
   TaskAssignmentContext,
   TaskAssignmentDenyReason,
 } from "./result.js";
-
-function isAuthorityObsV1Enabled(): boolean {
-  return process.env.AUTHORITY_OBS_V1 === "true";
-}
 
 // Independent rate-limiter bucket so task-assignment denials cannot starve
 // stale/oprole denials and vice versa. 60s dedupe window matches the

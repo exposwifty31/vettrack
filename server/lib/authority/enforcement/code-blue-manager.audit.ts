@@ -22,16 +22,13 @@
  *     and enforce when the caller's lookup is `resolver_fault` (severity=high).
  */
 
+import { isAuthorityObsV1Enabled } from "../../authority-audit.js";
 import { logAudit, type AuditActionType } from "../../audit.js";
 import { createLogLimiter } from "../../log-safety.js";
 import type {
   CodeBlueManagerContext,
   CodeBlueManagerDenyReason,
 } from "./code-blue-manager.types.js";
-
-function isAuthorityObsV1Enabled(): boolean {
-  return process.env.AUTHORITY_OBS_V1 === "true";
-}
 
 // Independent rate-limiter buckets so each audit kind has its own 60s dedupe
 // window and one family can't starve the others. Bucket key includes the

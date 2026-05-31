@@ -14,12 +14,9 @@
  * scope of PR 3.8.
  */
 
+import { isAuthorityObsV1Enabled } from "../../authority-audit.js";
 import { logAudit, type AuditDbExecutor } from "../../audit.js";
 import { createLogLimiter } from "../../log-safety.js";
-
-function isAuthorityObsV1Enabled(): boolean {
-  return process.env.AUTHORITY_OBS_V1 === "true";
-}
 
 // Independent rate-limiter buckets so this family cannot starve other
 // authority-audit families. 60s dedupe window matches the PR 3.3 emitter.

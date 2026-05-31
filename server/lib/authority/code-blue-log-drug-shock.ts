@@ -25,6 +25,7 @@
  */
 
 import type { AuthoritySnapshot } from "../../../shared/authority.js";
+import { isAuthorityObsV1Enabled } from "../authority-audit.js";
 import { logAudit, type AuditActionType } from "../audit.js";
 import { createLogLimiter } from "../log-safety.js";
 import { incrementMetric } from "../metrics.js";
@@ -51,10 +52,6 @@ const drugShockEnforceAuditLimiter = createLogLimiter({
   sampleRate: 1,
   maxEntries: 500,
 });
-
-function isAuthorityObsV1Enabled(): boolean {
-  return process.env.AUTHORITY_OBS_V1 === "true";
-}
 
 function actorShadowDeniedCounterForReason(
   reason: CodeBlueManagerDenyReason,

@@ -10,10 +10,6 @@
 
 **Option A** — move `db.insert(inventoryJobs)` inside the `db.transaction()` callback using `tx.insert()` (not `db.insert()`). The queue enqueue stays outside. If queue fails after commit, the recovery sweep finds the orphaned job row within 10 minutes.
 
-## Kill Switch
-
-`DISABLE_INVENTORY_ENQUEUE=false` in Railway env vars. Set to `true` to pause inventory enqueue without stopping billing.
-
 ## Rollback
 
 Code-only change, no migration. `git revert [SHA]` → Railway redeploys in ~2 minutes.
@@ -35,4 +31,3 @@ Run orphan audit query against production first. Record baseline count. Do not d
 - Slept on it
 - Adversarial review done
 - Q1–Q3 answered
-- Kill switch set in Railway

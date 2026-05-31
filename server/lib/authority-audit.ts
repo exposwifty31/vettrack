@@ -25,7 +25,7 @@ export type AuthorityDenialKind =
   | "ROLE_NOT_IN_ALLOW"
   | "LEGACY_FALLBACK_NOT_MATCHED";
 
-function isAuthorityObsV1Enabled(): boolean {
+export function isAuthorityObsV1Enabled(): boolean {
   return process.env.AUTHORITY_OBS_V1 === "true";
 }
 
