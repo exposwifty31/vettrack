@@ -261,84 +261,91 @@ export async function createTaskFromIntelligenceRecommendation(params: {
     );
   }
 
-  const [rec] = await db
-    .select()
-    .from(equipmentIntelligenceRecommendations)
-    .where(
-      and(
-        eq(equipmentIntelligenceRecommendations.id, params.recommendationId),
-        eq(equipmentIntelligenceRecommendations.clinicId, params.clinicId),
-      ),
-    )
-    .limit(1);
+  // Serialize concurrent confirmed requests for the same recommendation: a row lock
+  // (SELECT ... FOR UPDATE) makes the second caller block until the first commits the
+  // `task_created` status, at which point it returns the existing task instead of
+  // creating a duplicate appointment.
+  return db.transaction(async (tx) => {
+    const [rec] = await tx
+      .select()
+      .from(equipmentIntelligenceRecommendations)
+      .where(
+        and(
+          eq(equipmentIntelligenceRecommendations.id, params.recommendationId),
+          eq(equipmentIntelligenceRecommendations.clinicId, params.clinicId),
+        ),
+      )
+      .limit(1)
+      .for("update");
 
-  if (!rec) {
-    throw new EquipmentIntelligenceError("RECOMMENDATION_NOT_FOUND", 404, "Recommendation not found.");
-  }
-  if (rec.status === "task_created" && rec.taskId) {
-    return { taskId: rec.taskId, recommendationId: rec.id };
-  }
+    if (!rec) {
+      throw new EquipmentIntelligenceError("RECOMMENDATION_NOT_FOUND", 404, "Recommendation not found.");
+    }
+    if (rec.status === "task_created" && rec.taskId) {
+      return { taskId: rec.taskId, recommendationId: rec.id };
+    }
 
-  const taskType = (rec.suggestedTaskType ?? "inspection") as "maintenance" | "repair" | "inspection";
-  const now = new Date();
-  const end = new Date(now.getTime() + 60 * 60 * 1000);
+    const taskType = (rec.suggestedTaskType ?? "inspection") as "maintenance" | "repair" | "inspection";
+    const now = new Date();
+    const end = new Date(now.getTime() + 60 * 60 * 1000);
 
-  auditIntelligence(
-    params.actor,
-    params.clinicId,
-    "equipment_intelligence_recommendation_task_approved",
-    { recommendationId: rec.id, runId: rec.runId, taskType },
-    rec.id,
-  );
-
-  const taskActor: TaskAuditActor = {
-    userId: params.actor.authUser.id,
-    email: params.actor.authUser.email,
-    role: params.actor.authUser.role,
-  };
-
-  const appointment = await createAppointment(
-    params.clinicId,
-    {
-      startTime: now.toISOString(),
-      endTime: end.toISOString(),
-      taskType,
-      priority: rec.severity === "critical" || rec.severity === "high" ? "high" : "normal",
-      notes: params.notes?.trim() || rec.recommendedAction,
-      vetId: null,
-      metadata: {
-        source: "equipment_intelligence",
-        recommendationId: rec.id,
-        runId: rec.runId,
-        finding: rec.finding,
-        evidence: rec.evidence,
-      },
-    },
-    taskActor,
-  );
-
-  await db
-    .update(equipmentIntelligenceRecommendations)
-    .set({
-      status: "task_created",
-      taskId: appointment.id,
-      approvedById: params.actor.authUser.id,
-      approvedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(equipmentIntelligenceRecommendations.id, rec.id),
-        eq(equipmentIntelligenceRecommendations.clinicId, params.clinicId),
-      ),
+    auditIntelligence(
+      params.actor,
+      params.clinicId,
+      "equipment_intelligence_recommendation_task_approved",
+      { recommendationId: rec.id, runId: rec.runId, taskType },
+      rec.id,
     );
 
-  auditIntelligence(
-    params.actor,
-    params.clinicId,
-    "equipment_intelligence_task_created",
-    { recommendationId: rec.id, taskId: appointment.id, runId: rec.runId },
-    appointment.id,
-  );
+    const taskActor: TaskAuditActor = {
+      userId: params.actor.authUser.id,
+      email: params.actor.authUser.email,
+      role: params.actor.authUser.role,
+    };
 
-  return { taskId: appointment.id, recommendationId: rec.id };
+    const appointment = await createAppointment(
+      params.clinicId,
+      {
+        startTime: now.toISOString(),
+        endTime: end.toISOString(),
+        taskType,
+        priority: rec.severity === "critical" || rec.severity === "high" ? "high" : "normal",
+        notes: params.notes?.trim() || rec.recommendedAction,
+        vetId: null,
+        metadata: {
+          source: "equipment_intelligence",
+          recommendationId: rec.id,
+          runId: rec.runId,
+          finding: rec.finding,
+          evidence: rec.evidence,
+        },
+      },
+      taskActor,
+    );
+
+    await tx
+      .update(equipmentIntelligenceRecommendations)
+      .set({
+        status: "task_created",
+        taskId: appointment.id,
+        approvedById: params.actor.authUser.id,
+        approvedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(equipmentIntelligenceRecommendations.id, rec.id),
+          eq(equipmentIntelligenceRecommendations.clinicId, params.clinicId),
+        ),
+      );
+
+    auditIntelligence(
+      params.actor,
+      params.clinicId,
+      "equipment_intelligence_task_created",
+      { recommendationId: rec.id, taskId: appointment.id, runId: rec.runId },
+      appointment.id,
+    );
+
+    return { taskId: appointment.id, recommendationId: rec.id };
+  });
 }

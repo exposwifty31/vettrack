@@ -86,11 +86,19 @@ export interface SemiDockNotifyCandidate {
   homeRoomId: string;
 }
 
-/** Atomically claims a semi-dock notify slot for this checkout (advisory lock + insert). */
+/**
+ * Claims a semi-dock notify slot for this checkout under a per-equipment advisory
+ * lock and runs `deliver` while the lock is held. The notify slot (alertAck row) is
+ * persisted **only if `deliver` resolves** — if the push fails the transaction rolls
+ * back, no ack is written, and the next RFID read can retry. The advisory lock
+ * serializes concurrent deliveries for the same equipment so the push fires once.
+ * Returns false (without running `deliver`) when a notify was already sent since checkout.
+ */
 export async function claimSemiDockNotifySlot(
   clinicId: string,
   equipmentId: string,
   checkedOutAt: Date,
+  deliver: () => Promise<void>,
 ): Promise<boolean> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${equipmentId}))`);
@@ -101,28 +109,32 @@ export async function claimSemiDockNotifySlot(
       tx,
     );
     if (already) return false;
+    // Deliver first; a throw rolls back the transaction so the ack is never written
+    // (retriable). Only mark notified once delivery has succeeded.
+    await deliver();
     await markSemiDockNotified(clinicId, equipmentId, tx);
     return true;
   });
 }
 
 export async function deliverSemiDockPush(candidate: SemiDockNotifyCandidate): Promise<void> {
-  const claimed = await claimSemiDockNotifySlot(
-    candidate.clinicId,
-    candidate.equipmentId,
-    candidate.checkedOutAt,
-  );
-  if (!claimed) {
-    incrementMetric("semi_dock_skipped_deduped");
-    return;
-  }
-
   const { title, body } = semiDockPushCopy();
   const tag = buildSemiDockTag(candidate.equipmentId);
   const url = `/equipment/${candidate.equipmentId}`;
 
   try {
-    await sendPushToUser(candidate.clinicId, candidate.checkedOutById, { title, body, tag, url });
+    const claimed = await claimSemiDockNotifySlot(
+      candidate.clinicId,
+      candidate.equipmentId,
+      candidate.checkedOutAt,
+      async () => {
+        await sendPushToUser(candidate.clinicId, candidate.checkedOutById, { title, body, tag, url });
+      },
+    );
+    if (!claimed) {
+      incrementMetric("semi_dock_skipped_deduped");
+      return;
+    }
     incrementMetric("semi_dock_notified");
     logAudit({
       clinicId: candidate.clinicId,
@@ -138,6 +150,7 @@ export async function deliverSemiDockPush(candidate: SemiDockNotifyCandidate): P
       },
     });
   } catch (err) {
-    console.error("[semi-dock-notify] push failed", err);
+    // Push failed inside the claim transaction → notify slot rolled back, retriable on next read.
+    console.error("[semi-dock-notify] push failed; notify slot rolled back for retry", err);
   }
 }

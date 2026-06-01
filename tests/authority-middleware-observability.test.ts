@@ -34,13 +34,17 @@ const recordAccessDeniedMock = vi.fn();
 vi.mock("../server/lib/authority.js", () => ({
   resolveAuthority: (input: unknown) => resolveAuthorityMock(input),
 }));
-vi.mock("../server/lib/authority-audit.js", () => ({
-  emitAuthorityDeniedAudit: (...args: unknown[]) => emitDeniedMock(...args),
-  emitAuthorityResolutionFailedAudit: (...args: unknown[]) =>
-    emitResolutionFailedMock(...args),
-  emitDispenseLegacyFallbackAudit: (...args: unknown[]) =>
-    emitLegacyFallbackMock(...args),
-}));
+vi.mock("../server/lib/authority-audit.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../server/lib/authority-audit.js")>();
+  return {
+    ...actual,
+    emitAuthorityDeniedAudit: (...args: unknown[]) => emitDeniedMock(...args),
+    emitAuthorityResolutionFailedAudit: (...args: unknown[]) =>
+      emitResolutionFailedMock(...args),
+    emitDispenseLegacyFallbackAudit: (...args: unknown[]) =>
+      emitLegacyFallbackMock(...args),
+  };
+});
 vi.mock("../server/lib/access-denied.js", () => ({
   recordAccessDenied: (...args: unknown[]) => recordAccessDeniedMock(...args),
 }));

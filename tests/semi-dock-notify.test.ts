@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  buildEquipmentHomeRoomIds,
   buildSemiDockTag,
   isEquipmentHomeRoom,
 } from "../server/lib/semi-dock-notify.js";
@@ -17,26 +18,30 @@ describe("buildSemiDockTag", () => {
   });
 });
 
-describe("isEquipmentHomeRoom", () => {
-  const dockRoomIds = new Set(["dock-room-a", "dock-room-b"]);
-
-  it("returns true when new room matches equipment home room", () => {
-    expect(isEquipmentHomeRoom("home-room", "home-room", dockRoomIds)).toBe(true);
+describe("buildEquipmentHomeRoomIds + isEquipmentHomeRoom", () => {
+  it("treats the equipment's own room as home", () => {
+    const home = buildEquipmentHomeRoomIds("home-room", null);
+    expect(isEquipmentHomeRoom("home-room", home)).toBe(true);
   });
 
-  it("returns true when new room is a known dock room (no explicit home)", () => {
-    expect(isEquipmentHomeRoom(null, "dock-room-a", dockRoomIds)).toBe(true);
+  it("treats the equipment's dock room as home", () => {
+    const home = buildEquipmentHomeRoomIds(null, "dock-room-a");
+    expect(isEquipmentHomeRoom("dock-room-a", home)).toBe(true);
   });
 
-  it("returns false for a non-home, non-dock room", () => {
-    expect(isEquipmentHomeRoom("home-room", "other-room", dockRoomIds)).toBe(false);
+  it("matches either the equipment room or its dock room", () => {
+    const home = buildEquipmentHomeRoomIds("home-room", "dock-room-a");
+    expect(isEquipmentHomeRoom("home-room", home)).toBe(true);
+    expect(isEquipmentHomeRoom("dock-room-a", home)).toBe(true);
   });
 
-  it("returns false when equipment has no home and room is not a dock", () => {
-    expect(isEquipmentHomeRoom(null, "other-room", dockRoomIds)).toBe(false);
+  it("returns false for a room that is neither the equipment room nor its dock room", () => {
+    const home = buildEquipmentHomeRoomIds("home-room", "dock-room-a");
+    expect(isEquipmentHomeRoom("other-room", home)).toBe(false);
   });
 
-  it("prefers explicit home match over dock membership", () => {
-    expect(isEquipmentHomeRoom("home-room", "home-room", new Set())).toBe(true);
+  it("returns false when equipment has no home room and no dock room", () => {
+    const home = buildEquipmentHomeRoomIds(null, null);
+    expect(isEquipmentHomeRoom("other-room", home)).toBe(false);
   });
 });
