@@ -83,18 +83,6 @@ export const rfidEventLimiter = rateLimit({
     process.env.NODE_ENV === "test" || process.env.TEST_MODE === "true",
 });
 
-/** Equipment intelligence (OpenAI-backed) — 12 requests/min per user. */
-export const intelligenceLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 12,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many intelligence requests. Please wait a moment." },
-  keyGenerator: rateLimitUserKey,
-  skip: () =>
-    process.env.NODE_ENV === "test" || process.env.TEST_MODE === "true",
-});
-
 export const writeLimiter = rateLimit({
   windowMs: 60_000,
   max: WRITE_LIMITER_MAX_PER_MINUTE,

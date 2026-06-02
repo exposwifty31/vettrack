@@ -138,11 +138,6 @@ const translations = {
     recoveryAttentionSummary: d.equipmentList.recoveryAttentionSummary,
   },
 
-  equipmentIntelligence: {
-    ...d.equipmentIntelligence,
-    taskCreated: (taskId: string) => tr(d.equipmentIntelligence.taskCreated, { taskId }),
-  },
-
   shiftHandoverPage: {
     ...d.shiftHandoverPage,
     pendingEmergenciesAlert: (count: number) => tr(d.shiftHandoverPage.pendingEmergenciesAlert, { count }),

@@ -16,7 +16,6 @@ import healthRoutes from "../routes/health.js";
 
 // --- Equipment core ---
 import equipmentRoutes from "../routes/equipment.js";
-import equipmentIntelligenceRoutes from "../routes/equipment-intelligence.js";
 import equipmentOperationalStateRoutes from "../routes/equipment-operational-state.js";
 import operationalMetricsRoutes from "../routes/operational-metrics.js";
 import roomsRoutes from "../routes/rooms.js";
@@ -85,7 +84,6 @@ function registerInfrastructureRoutes(app: express.Express) {
 
 function registerEquipmentCoreRoutes(app: express.Express) {
   app.use("/api/equipment", equipmentRoutes);
-  app.use("/api/equipment-intelligence", equipmentIntelligenceRoutes);
   // Bare /api mounts: operational-state and operational-metrics attach to the shared
   // /api prefix. Keep them immediately after /api/equipment and before narrower paths.
   app.use("/api", equipmentOperationalStateRoutes);

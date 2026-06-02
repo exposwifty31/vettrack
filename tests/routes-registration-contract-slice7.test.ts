@@ -25,7 +25,6 @@ const EXPECTED_MOUNT_PATHS = [
   "/api/health/ready",
   "/health",
   "/api/equipment",
-  "/api/equipment-intelligence",
   "/api",
   "/api",
   "/api/rooms",
