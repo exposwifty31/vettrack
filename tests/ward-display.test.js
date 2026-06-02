@@ -25,9 +25,16 @@ describe("Ward Display — route", () => {
     expect(routeSource).toContain("totalOverdueCount");
   });
 
-  it("equipment sorted: inUse first", () => {
-    expect(pageSource).toContain("inUse");
-    expect(pageSource).toMatch(/inUse.*?-1.*?1|a\.inUse.*?b\.inUse/s);
+  it("equipment sorted: held units first, then non-deployable", () => {
+    expect(pageSource).toContain("heldBy");
+    expect(pageSource).toContain("isDeployable");
+  });
+
+  it("snapshot includes equipment custody fields", () => {
+    expect(routeSource).toContain("heldBy");
+    expect(routeSource).toContain("lastCheckInAt");
+    expect(routeSource).toContain("probableLocation");
+    expect(routeSource).toContain("isDeployable");
   });
 });
 
@@ -78,14 +85,10 @@ describe("Ward Display — polling hook", () => {
   });
 });
 
-describe("Ward Display — overdue medication job", () => {
-  it("overdue_medication_alert is a valid NotificationJobData type", () => {
-    expect(queueSource).toContain("overdue_medication_alert");
-  });
-
-  it("scan_overdue_medications job is registered as repeatable", () => {
-    expect(workerSource).toContain("scan_overdue_medications");
-    expect(workerSource).toContain("repeat-overdue-medications");
+describe("Ward Display — overdue medication job (removed)", () => {
+  it("does not register scan_overdue_medications repeatable job", () => {
+    expect(workerSource).not.toContain("scan_overdue_medications");
+    expect(queueSource).not.toContain("overdue_medication_alert");
   });
 
   it("scanner sets overdueNotifiedAt to prevent duplicate notifications", () => {

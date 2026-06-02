@@ -2,15 +2,9 @@ import type {
   EquipmentReturn,
   CreateReturnRequest,
   UpdateReturnRequest,
-  ShiftHandoverSummary,
-  ShiftHandoverSession,
-  ShiftHandoverPatientsResponse,
-  ShiftHandoverSnapshotRecord,
   InventoryContainer,
   InventoryContainerWithItems,
   ConsumablesReport,
-  ActivePatient,
-  PilotConfig,
   Folder,
   Room,
   CreateRoomRequest,
@@ -35,31 +29,19 @@ import type {
   Appointment,
   AppointmentVetMeta,
   CreateAppointmentRequest,
-  MedicationExecutionPayload,
-  MedicationExecutionTask,
   UpdateAppointmentRequest,
   TaskDashboard,
   TaskRecommendations,
-  DrugFormularyEntry,
-  CreateDrugFormularyRequest,
   CrashCartItem,
   CreateCrashCartItemRequest,
   UpdateCrashCartItemRequest,
   RestockSession,
   RestockContainerView,
   RestockFinishSummary,
-  BillingLedgerEntry,
-  BillingSummary,
-  LeakageReport,
   InventoryItem,
   PurchaseOrder,
-  ForecastParseResponse,
-  ForecastApproveResponse,
-  ForecastKeepaliveResponse,
   DisplaySnapshot,
-  CodeBlueReconciliationSession,
   CodeBlueDispense,
-  ManualBillingRequest,
   ShiftCompletionResult,
   AssetType,
   AssetTypeCondition,
@@ -71,21 +53,6 @@ import type {
 } from "@/types";
 import type { OutcomeKpiRoiResponse } from "../../shared/er-types.js";
 import type { AuthoritySnapshot } from "../../shared/authority.js";
-import type {
-  HandoffEligiblePatientsResponse,
-  HandoffEligibleStaffResponse,
-  CreateHandoffResponse,
-  MyHandoffsResponse,
-  HandoffDetailResponse,
-  UpsertItemRequest,
-  UpsertItemResponse,
-  SubmitHandoffRequest,
-  SubmitHandoffResponse,
-  ReviewHandoffRequest,
-  ReviewHandoffResponse,
-  CancelHandoffRequest,
-  CancelHandoffResponse,
-} from "../../shared/patient-handoff-types.js";
 import { getStoredLocale, t } from "@/lib/i18n";
 import { toast } from "sonner";
 import {
@@ -268,14 +235,6 @@ export async function containerDispenseWithResult(
 
 export const api = {
   equipment: equipmentApi,
-  pilot: {
-    config: () => request<PilotConfig>("/api/pilot/config"),
-    setConfig: (staleMs: number) =>
-      request<PilotConfig>("/api/pilot/config", {
-        method: "PATCH",
-        body: JSON.stringify({ staleMs }),
-      }),
-  },
   returns: {
     create: (data: CreateReturnRequest) =>
       request<EquipmentReturn>("/api/returns", {
@@ -527,32 +486,10 @@ export const api = {
     active: () =>
       request<{ tasks: Appointment[] }>("/api/tasks/active", {}, undefined, undefined, TASKS_FETCH_TIMEOUT_MS)
         .then((r) => r.tasks),
-    medicationActive: () =>
-      request<{ tasks: MedicationExecutionTask[] }>(
-        "/api/tasks/medication-active",
-        {},
-        undefined,
-        undefined,
-        TASKS_FETCH_TIMEOUT_MS
-      ).then((r) => r.tasks),
     start: (id: string) =>
       request<{ task: Appointment }>(`/api/tasks/${id}/start`, { method: "POST" }).then((r) => r.task),
-    complete: (id: string, payload?: { execution?: MedicationExecutionPayload }) =>
-      request<{ task: Appointment; inventoryWarning?: boolean }>(
-        `/api/tasks/${id}/complete`,
-        { method: "POST", body: JSON.stringify(payload ?? {}) },
-      ),
-    vetApprove: (id: string) =>
-      request<{ task: Appointment }>(`/api/tasks/${id}/vet-approve`, { method: "POST" }).then((r) => r.task),
-  },
-  formulary: {
-    list: () => request<DrugFormularyEntry[]>("/api/formulary"),
-    upsert: (data: CreateDrugFormularyRequest) =>
-      request<DrugFormularyEntry>("/api/formulary", { method: "POST", body: JSON.stringify(data) }),
-    update: (id: string, data: Partial<CreateDrugFormularyRequest>) =>
-      request<DrugFormularyEntry>(`/api/formulary/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-    remove: (id: string) =>
-      request<void>(`/api/formulary/${id}`, { method: "DELETE" }),
+    complete: (id: string) =>
+      request<{ task: Appointment }>(`/api/tasks/${id}/complete`, { method: "POST" }).then((r) => r.task),
   },
   crashCartItems: {
     list: () => request<CrashCartItem[]>("/api/crash-cart/items"),
@@ -715,26 +652,6 @@ export const api = {
         requestId: string;
       }>("/api/containers/reconcile-unused-charge", { method: "POST", body: JSON.stringify(body) }),
   },
-  adminMedicationIntegrity: {
-    list: () =>
-      request<{
-        clinicId: string;
-        rows: Array<{
-          inventoryLogId: string;
-          createdAt: string;
-          animalId: string | null;
-          animalName: string | null;
-          containerId: string;
-          quantityAdded: number;
-          billingEventId: string | null;
-          billingTotalCents: number | null;
-          billingStatus: string | null;
-          activeHospitalizationId: string | null;
-          discrepancyFlags: string[];
-        }>;
-        requestId: string;
-      }>("/api/admin/medication-integrity"),
-  },
   adminOutboxHealth: {
     get: () =>
       request<{
@@ -860,52 +777,6 @@ export const api = {
         body: JSON.stringify({ containerId }),
       }),
   },
-  billing: {
-    list: (params?: { animalId?: string; status?: string; from?: string; to?: string; limit?: number; offset?: number }) => {
-      const qs = new URLSearchParams();
-      if (params?.animalId) qs.set("animalId", params.animalId);
-      if (params?.status) qs.set("status", params.status);
-      if (params?.from) qs.set("from", params.from);
-      if (params?.to) qs.set("to", params.to);
-      if (params?.limit != null) qs.set("limit", String(params.limit));
-      if (params?.offset != null) qs.set("offset", String(params.offset));
-      const query = qs.toString();
-      return request<BillingLedgerEntry[]>(`/api/billing${query ? `?${query}` : ""}`);
-    },
-    get: (id: string) => request<BillingLedgerEntry>(`/api/billing/${id}`),
-    create: (data: {
-      animalId?: string;
-      itemType: "EQUIPMENT" | "CONSUMABLE";
-      itemId: string;
-      quantity: number;
-      unitPriceCents: number;
-      note?: string;
-    }) => request<BillingLedgerEntry>("/api/billing", { method: "POST", body: JSON.stringify(data) }),
-    void: (id: string) => request<BillingLedgerEntry>(`/api/billing/${id}/void`, { method: "PATCH" }),
-    bulkSync: (ids: string[]) => request<{ updated: number }>("/api/billing/bulk-sync", { method: "PATCH", body: JSON.stringify({ ids }) }),
-    exportCsvUrl: () => "/api/billing/export.csv",
-    summary: (params?: { from?: string; to?: string }) => {
-      const qs = new URLSearchParams();
-      if (params?.from) qs.set("from", params.from);
-      if (params?.to) qs.set("to", params.to);
-      const query = qs.toString();
-      return request<BillingSummary>(`/api/billing/summary${query ? `?${query}` : ""}`);
-    },
-    leakageReport: (params?: { from?: string; to?: string }) => {
-      const qs = new URLSearchParams();
-      if (params?.from) qs.set("from", params.from);
-      if (params?.to) qs.set("to", params.to);
-      const query = qs.toString();
-      return request<import("@/types").LeakageReport>(`/api/billing/leakage-report${query ? `?${query}` : ""}`);
-    },
-    shiftTotal: () => request<{ totalCents: number; count: number; shiftActive: boolean }>("/api/billing/shift-total"),
-    inventoryJobs: (params?: { status?: string }) => {
-      const qs = params?.status ? `?status=${encodeURIComponent(params.status)}` : "";
-      return request<import("@/types").InventoryJob[]>(`/api/billing/inventory-jobs${qs}`);
-    },
-    retryInventoryJob: (id: string) =>
-      request<{ ok: boolean; id: string }>(`/api/billing/inventory-jobs/${id}/retry`, { method: "POST" }),
-  },
   inventoryItems: {
     list: () => request<InventoryItem[]>("/api/inventory-items"),
     create: (data: { code: string; label: string; category?: string; nfcTagId?: string | null }) =>
@@ -932,229 +803,6 @@ export const api = {
       request<PurchaseOrder>(`/api/procurement/${id}/receive`, { method: "PATCH", body: JSON.stringify(data) }),
     cancel: (id: string) => request<PurchaseOrder>(`/api/procurement/${id}/cancel`, { method: "PATCH" }),
   },
-  shiftHandover: {
-    getDischargeItems: (animalId: string) =>
-      request<{
-        items: Array<{
-          sessionId: string;
-          equipmentId: string;
-          equipmentName: string;
-          startedAt: string;
-        }>;
-      }>(`/api/shift-handover/discharge/${encodeURIComponent(animalId)}`),
-    getSummary: () => request<ShiftHandoverSummary>("/api/shift-handover/summary"),
-    startSession: (body?: { note?: string }) =>
-      request<ShiftHandoverSession>("/api/shift-handover/session/start", {
-        method: "POST",
-        body: JSON.stringify(body ?? {}),
-      }),
-    endSession: (body?: { note?: string }) =>
-      request<ShiftHandoverSession>("/api/shift-handover/session/end", {
-        method: "POST",
-        body: JSON.stringify(body ?? {}),
-      }),
-    consumablesReport: (from: string, to: string) =>
-      request<ConsumablesReport>(
-        `/api/shift-handover/consumables-report?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
-      ),
-    getPendingEmergencies: () =>
-      request<{
-        items: Array<{
-          id: string;
-          containerId: string;
-          itemName: string;
-          quantity: number;
-          dispensedAt: string;
-          unitPriceCents: number;
-        }>;
-      }>("/api/shift-handover/pending-emergencies"),
-    reconcileEmergency: (logId: string, data: { animalId: string; quantity?: number }) =>
-      request<{ success: boolean; ledgerId: string; alreadyReconciled: boolean }>(
-        `/api/shift-handover/emergency/${encodeURIComponent(logId)}/reconcile`,
-        { method: "PATCH", body: JSON.stringify(data) },
-      ),
-    patientHandoffs: {
-      eligiblePatients: () =>
-        request<HandoffEligiblePatientsResponse>("/api/shift-handover/patient-handoffs/eligible-patients"),
-      eligibleStaff: () =>
-        request<HandoffEligibleStaffResponse>("/api/shift-handover/patient-handoffs/eligible-staff"),
-      create: (data: { receivingUserId: string }) =>
-        request<CreateHandoffResponse>("/api/shift-handover/patient-handoffs", {
-          method: "POST",
-          body: JSON.stringify(data),
-        }),
-      mine: () =>
-        request<MyHandoffsResponse>("/api/shift-handover/patient-handoffs/mine"),
-      get: (id: string) =>
-        request<HandoffDetailResponse>(`/api/shift-handover/patient-handoffs/${encodeURIComponent(id)}`),
-      upsertItem: (id: string, hospitalizationId: string, data: UpsertItemRequest) =>
-        request<UpsertItemResponse>(
-          `/api/shift-handover/patient-handoffs/${encodeURIComponent(id)}/items/${encodeURIComponent(hospitalizationId)}`,
-          { method: "PUT", body: JSON.stringify(data) },
-        ),
-      submit: (id: string, data: SubmitHandoffRequest) =>
-        request<SubmitHandoffResponse>(
-          `/api/shift-handover/patient-handoffs/${encodeURIComponent(id)}/submit`,
-          { method: "POST", body: JSON.stringify(data) },
-        ),
-      review: (id: string, data: ReviewHandoffRequest) =>
-        request<ReviewHandoffResponse>(
-          `/api/shift-handover/patient-handoffs/${encodeURIComponent(id)}/review`,
-          { method: "POST", body: JSON.stringify(data) },
-        ),
-      cancel: (id: string, data: CancelHandoffRequest) =>
-        request<CancelHandoffResponse>(
-          `/api/shift-handover/patient-handoffs/${encodeURIComponent(id)}/cancel`,
-          { method: "POST", body: JSON.stringify(data) },
-        ),
-    },
-    getPatients: () =>
-      request<ShiftHandoverPatientsResponse>("/api/shift-handover/patients"),
-    getLatestSnapshot: () =>
-      request<ShiftHandoverSnapshotRecord>("/api/shift-handover/snapshot/latest"),
-  },
-  forecast: {
-    parseJson: (body: { text: string; windowHours?: 24 | 72; weekendMode?: boolean }) =>
-      request<ForecastParseResponse>("/api/forecast/parse", {
-        method: "POST",
-        body: JSON.stringify(body),
-      }),
-    parseMultipart: (files: File[], params?: { windowHours?: 24 | 72; weekendMode?: boolean }) => {
-      const fd = new FormData();
-      for (const file of files) {
-        fd.append("file", file);
-      }
-      if (params?.windowHours != null) fd.append("windowHours", String(params.windowHours));
-      if (params?.weekendMode != null) fd.append("weekendMode", String(params.weekendMode));
-      return request<ForecastParseResponse>("/api/forecast/parse", {
-        method: "POST",
-        body: fd,
-      });
-    },
-    approve: (body: {
-      parseId: string;
-      manualQuantities: Record<string, number>;
-      pharmacistDoseAcks?: string[];
-      patientFlagAcks?: string[];
-      confirmedDrugKeys?: string[];
-      auditTrace?: Record<string, { forecastedQty: number | null; onHandQty: number }>;
-      patientWeightOverrides?: Record<string, number>;
-    }) =>
-      request<ForecastApproveResponse>("/api/forecast/approve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
-    parseKeepalive: (parseId: string) =>
-      request<ForecastKeepaliveResponse>(`/api/forecast/parse/${encodeURIComponent(parseId)}/keepalive`, {
-        method: "POST",
-      }),
-    getPharmacyEmail: () =>
-      request<{ pharmacyEmail: string | null; forecastPdfSourceFormat: "smartflow" | "generic" }>(
-        "/api/forecast/clinic/pharmacy-email",
-      ),
-    setPharmacyEmail: (body: { pharmacyEmail: string | null; forecastPdfSourceFormat?: "smartflow" | "generic" }) =>
-      request<{ pharmacyEmail: string | null; forecastPdfSourceFormat: "smartflow" | "generic" }>(
-        "/api/forecast/clinic/pharmacy-email",
-        {
-          method: "PATCH",
-          body: JSON.stringify(body),
-        },
-      ),
-    listExclusions: () =>
-      request<{ exclusions: import("@/types").PharmacyForecastExclusion[] }>("/api/forecast/clinic/pharmacy-forecast-exclusions"),
-    addExclusion: (data: { matchSubstring: string; note?: string | null }) =>
-      request<{ exclusion: import("@/types").PharmacyForecastExclusion }>("/api/forecast/clinic/pharmacy-forecast-exclusions", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    removeExclusion: (id: string) =>
-      request<void>(`/api/forecast/clinic/pharmacy-forecast-exclusions/${id}`, { method: "DELETE" }),
-  },
-  animals: {
-    active: () =>
-      request<{ animals: ActivePatient[] }>("/api/animals/active"),
-  },
-  patients: {
-    list: (params?: { q?: string; status?: string }) => {
-      const qs = new URLSearchParams();
-      if (params?.q) qs.set("q", params.q);
-      if (params?.status) qs.set("status", params.status);
-      const query = qs.toString();
-      return request<{ patients: import("@/types").Hospitalization[] }>(
-        `/api/patients${query ? `?${query}` : ""}`,
-      );
-    },
-    search: (q: string) =>
-      request<{ animals: import("@/types").AnimalSearchResult[] }>(
-        `/api/patients/search?q=${encodeURIComponent(q)}`,
-      ),
-    get: (id: string) =>
-      request<{ patient: import("@/types").Hospitalization }>(`/api/patients/${id}`),
-    admit: (data: import("@/types").AdmitPatientRequest) =>
-      request<{ patient: import("@/types").Hospitalization }>("/api/patients", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    updateStatus: (id: string, status: import("@/types").HospitalizationStatus) =>
-      request<{ id: string; status: string }>(`/api/patients/${id}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ status }),
-      }),
-    discharge: (
-      id: string,
-      options?: {
-        dischargeNotes?: string;
-        override?: boolean;
-        overrideReason?: string;
-      },
-    ) => {
-      const qs = options?.override ? "?override=true" : "";
-      return request<{ id: string; dischargedAt: string }>(
-        `/api/patients/${encodeURIComponent(id)}/discharge${qs}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            dischargeNotes: options?.dischargeNotes,
-            overrideReason: options?.overrideReason,
-          }),
-        },
-      );
-    },
-    remove: (
-      id: string,
-      options?: {
-        dischargeNotes?: string;
-        override?: boolean;
-        overrideReason?: string;
-      },
-    ) => {
-      const qs = options?.override ? "?override=true" : "";
-      return request<{ ok: boolean; animalId: string; purgeAfterDays: number }>(
-        `/api/patients/${encodeURIComponent(id)}${qs}`,
-        {
-          method: "DELETE",
-          body: JSON.stringify({
-            dischargeNotes: options?.dischargeNotes,
-            overrideReason: options?.overrideReason,
-          }),
-        },
-      );
-    },
-    update: (id: string, patch: import("@/types").UpdatePatientRequest) =>
-      request<{ patient: import("@/types").Hospitalization }>(`/api/patients/${encodeURIComponent(id)}`, {
-        method: "PATCH",
-        body: JSON.stringify(patch),
-      }),
-    listActive: () =>
-      request<{ patients: import("@/types").Hospitalization[] }>("/api/patients"),
-    listPending: () =>
-      request<{ patients: import("@/types").Hospitalization[] }>("/api/patients/pending"),
-    assign: (id: string) =>
-      request<{ id: string; assigned: boolean }>(`/api/patients/${id}/assign`, {
-        method: "PATCH",
-      }),
-  },
   codeBlue: {
     /** Active session poll + emergency session mutations (via `request()` / offline doctrine). */
     sessions: {
@@ -1167,8 +815,7 @@ export const api = {
         managerUserId: string;
         managerUserName: string;
         preCheckPassed: boolean;
-        hospitalizationId?: string;
-        patientId?: string;
+        equipmentId?: string;
       }) =>
         request<{ id: string }>("/api/code-blue/sessions", {
           method: "POST",
@@ -1185,7 +832,7 @@ export const api = {
           idempotencyKey: string;
           elapsedMs: number;
           label: string;
-          category: "drug" | "shock" | "cpr" | "note" | "equipment";
+          category: "equipment" | "note";
           equipmentId?: string;
         },
       ) =>
@@ -1210,17 +857,6 @@ export const api = {
       }),
     history: () =>
       request<import("@/hooks/useCodeBlueSession").CodeBlueSession[]>("/api/code-blue/history"),
-    reconciliationList: () =>
-      request<{ sessions: CodeBlueReconciliationSession[] }>("/api/code-blue/reconciliation"),
-    sessionDispenses: (sessionId: string) =>
-      request<{ dispenses: CodeBlueDispense[] }>(`/api/code-blue/sessions/${sessionId}/dispenses`),
-    reconcile: (sessionId: string) =>
-      request<{ ok: boolean }>(`/api/code-blue/sessions/${sessionId}/reconcile`, { method: "PATCH" }),
-    manualBilling: (sessionId: string, body: ManualBillingRequest) =>
-      request<{ ledgerId: string }>(`/api/code-blue/sessions/${sessionId}/manual-billing`, {
-        method: "POST",
-        body: JSON.stringify(body),
-      }),
   },
   display: {
     snapshot: (): Promise<DisplaySnapshot> =>
@@ -1370,42 +1006,3 @@ export const api = {
     },
   },
 };
-
-// ── ER Wedge API (see `er-api.ts` for implementation + not-implemented handling) ─
-export type {
-  AckErHandoffRequest,
-  AckErHandoffResponse,
-  AssignErIntakeRequest,
-  AssignErIntakeResponse,
-  CreateErHandoffRequest,
-  CreateErHandoffResponse,
-  CreateErIntakeRequest,
-  ErAssigneesResponse,
-  ErBoardResponse,
-  ErEligibleHospitalizationsResponse,
-  ErImpactResponse,
-  ErIntakeResponse,
-  ErKpiWindowDays,
-  ErModeResponse,
-} from "../../shared/er-types.js";
-export {
-  ER_API_IMPLEMENTED_ROUTES,
-  ErApiNotImplementedError,
-  acceptErPatient,
-  ackErHandoff,
-  assignErIntake,
-  completeAdmission,
-  createErHandoff,
-  createErIntake,
-  enrichErIntake,
-  enterAdmissionState,
-  exitAdmissionState,
-  getAdmissionState,
-  getErEligibleHospitalizations,
-  getErAssignees,
-  getErBoard,
-  getErImpact,
-  getErMode,
-  getErStatus,
-  toggleErGlobalMode,
-} from "./er-api";

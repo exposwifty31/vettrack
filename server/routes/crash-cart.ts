@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { db, crashCartChecks, crashCartItems, hospitalizations, animals } from "../db.js";
+import { db, crashCartChecks, crashCartItems } from "../db.js";
 import { eq, and, desc, asc, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
@@ -233,34 +233,12 @@ router.get("/checks/latest", requireAuth, async (req, res) => {
       .orderBy(desc(crashCartChecks.performedAt))
       .limit(7);
 
-    // High-risk patients: active hospitalizations with status='critical'
-    const criticalPatients = await db
-      .select({
-        hospitalizationId: hospitalizations.id,
-        ward: hospitalizations.ward,
-        bay: hospitalizations.bay,
-        animalId: animals.id,
-        animalName: animals.name,
-        species: animals.species,
-        weightKg: animals.weightKg,
-      })
-      .from(hospitalizations)
-      .innerJoin(animals, eq(animals.id, hospitalizations.animalId))
-      .where(
-        and(
-          eq(hospitalizations.clinicId, clinicId),
-          sql`${hospitalizations.status} = 'critical'`,
-          sql`${hospitalizations.dischargedAt} IS NULL`,
-        ),
-      )
-      .orderBy(hospitalizations.admittedAt);
-
     const latest = recentChecks[0] ?? null;
     const checkedToday = latest
       ? new Date(latest.performedAt).getTime() > Date.now() - 24 * 60 * 60 * 1000
       : false;
 
-    res.json({ latest, checkedToday, recentChecks, criticalPatients });
+    res.json({ latest, checkedToday, recentChecks, criticalPatients: [] });
   } catch (err) {
     console.error("[crash-cart] get latest failed", err);
     res.status(500).json(apiError({ code: "INTERNAL_ERROR", reason: "CRASH_CART_GET_FAILED", message: "Failed to get latest check", requestId }));

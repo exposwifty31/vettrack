@@ -1,33 +1,12 @@
 import { db, users } from "../db.js";
 import {
-  ensureInventoryIvAndMonitorBillingCatalog,
-  getOrCreateDefaultConsumableBillingItem,
-} from "./container-billing.js";
-import { getOrCreateDefaultEquipmentBillingItem } from "./equipment-seen.js";
-import {
   seedContainersFromBlueprint,
   syncContainerTargetQuantitiesFromBlueprint,
 } from "../services/inventory.service.js";
 
-export async function ensureDefaultBillingItemsForClinic(clinicId: string): Promise<void> {
-  await db.transaction(async (tx) => {
-    await getOrCreateDefaultEquipmentBillingItem(tx, clinicId);
-    await getOrCreateDefaultConsumableBillingItem(tx, clinicId);
-    await ensureInventoryIvAndMonitorBillingCatalog(tx, clinicId);
-  });
-}
-
 async function distinctClinicIds(): Promise<string[]> {
   const rows = await db.selectDistinct({ clinicId: users.clinicId }).from(users);
   return rows.map((r) => r.clinicId).filter(Boolean);
-}
-
-/** Idempotent DEFAULT_EQUIPMENT + DEFAULT_CONSUMABLE rows per clinic (required for billing ledger). */
-export async function ensureDefaultBillingItemsForAllClinics(): Promise<void> {
-  const ids = await distinctClinicIds();
-  for (const clinicId of ids) {
-    await ensureDefaultBillingItemsForClinic(clinicId);
-  }
 }
 
 /**
@@ -45,9 +24,18 @@ export async function seedDefaultContainersForAllEmptyClinics(): Promise<void> {
   }
 }
 
-/** Run after migrations: billing catalog + optional container seed + blueprint target sync. */
+/** Run after migrations: optional container seed + blueprint target sync (billing catalog removed). */
 export async function ensureClinicPhase2Defaults(): Promise<void> {
-  await ensureDefaultBillingItemsForAllClinics();
   await seedDefaultContainersForAllEmptyClinics();
   await syncContainerTargetQuantitiesFromBlueprint();
+}
+
+/** @deprecated Billing catalog seeding removed. */
+export async function ensureDefaultBillingItemsForClinic(_clinicId: string): Promise<void> {
+  return;
+}
+
+/** @deprecated Billing catalog seeding removed. */
+export async function ensureDefaultBillingItemsForAllClinics(): Promise<void> {
+  return;
 }

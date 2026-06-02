@@ -45,12 +45,6 @@ export const clinicalInvariantMetrics = {
    */
   wouldHaveBlockedReason(reason: OrphanReasonCode): void {
     switch (reason) {
-      case "NO_PATIENT_LINKED":
-        incrementMetric("clinical_invariant_would_have_blocked_no_patient_linked");
-        return;
-      case "NO_ACTIVE_HOSPITALIZATION":
-        incrementMetric("clinical_invariant_would_have_blocked_no_active_hospitalization");
-        return;
       case "NO_ACTIVE_ORDER":
         incrementMetric("clinical_invariant_would_have_blocked_no_active_order");
         return;
@@ -72,12 +66,6 @@ export const clinicalInvariantMetrics = {
    */
   blockedReason(reason: OrphanReasonCode): void {
     switch (reason) {
-      case "NO_PATIENT_LINKED":
-        incrementMetric("clinical_invariant_orphan_reason_no_patient_linked");
-        return;
-      case "NO_ACTIVE_HOSPITALIZATION":
-        incrementMetric("clinical_invariant_orphan_reason_no_active_hospitalization");
-        return;
       case "NO_ACTIVE_ORDER":
         incrementMetric("clinical_invariant_orphan_reason_no_active_order");
         return;

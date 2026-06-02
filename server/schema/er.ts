@@ -1,17 +1,17 @@
 import { sql } from "drizzle-orm";
 import {
-  text, timestamp, boolean, varchar, integer, date, doublePrecision,
+  text, timestamp, boolean, integer,
   index, uniqueIndex, primaryKey, jsonb,
 } from "drizzle-orm/pg-core";
 import { vtTable } from "./helpers.js";
-import { clinics, users, animals, hospitalizations } from "./core.js";
+import { clinics, users } from "./core.js";
 import { equipment } from "./equipment.js";
 
 // Stored as TEXT with CHECK constraints in migrations — $type<> preserves TS safety.
 type CodeBlueOutcome = "rosc" | "died" | "transferred" | "ongoing";
 type CodeBlueSessionStatus = "active" | "ended";
 type CodeBlueSessionOutcome = "rosc" | "died" | "transferred" | "ongoing";
-type CodeBlueLogCategory = "drug" | "shock" | "cpr" | "note" | "equipment";
+type CodeBlueLogCategory = "equipment" | "note";
 
 export const codeBlueEvents = vtTable(
   "vt_code_blue_events",
@@ -41,8 +41,6 @@ export const codeBlueSessions = vtTable(
     startedByName: text("started_by_name").notNull(),
     managerUserId: text("manager_user_id").notNull(),
     managerUserName: text("manager_user_name").notNull(),
-    patientId: text("patient_id").references(() => animals.id, { onDelete: "set null" }),
-    hospitalizationId: text("hospitalization_id").references(() => hospitalizations.id, { onDelete: "set null" }),
     status: text("status").$type<CodeBlueSessionStatus>().notNull().default("active"),
     outcome: text("outcome").$type<CodeBlueSessionOutcome>(),
     preCheckPassed: boolean("pre_check_passed"),
@@ -131,167 +129,3 @@ export type CodeBlueSession = typeof codeBlueSessions.$inferSelect;
 export type CodeBlueLogEntry = typeof codeBlueLogEntries.$inferSelect;
 export type CodeBluePresence = typeof codeBluePresence.$inferSelect;
 export type CrashCartCheck = typeof crashCartChecks.$inferSelect;
-
-export const erIntakeEvents = vtTable(
-  "vt_er_intake_events",
-  {
-    id: text("id").primaryKey(),
-    clinicId: text("clinic_id")
-      .notNull()
-      .references(() => clinics.id, { onDelete: "restrict" }),
-    animalId: text("animal_id")
-      .references(() => animals.id, { onDelete: "set null" }),
-    ownerName: text("owner_name"),
-    species: text("species").notNull(),
-    severity: varchar("severity", { length: 20 }).notNull(),
-    chiefComplaint: text("chief_complaint").notNull(),
-    waitingSince: timestamp("waiting_since", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    assignedUserId: text("assigned_user_id")
-      .references(() => users.id, { onDelete: "set null" }),
-    status: varchar("status", { length: 20 })
-      .notNull()
-      .default("waiting"),
-    createdAt: timestamp("created_at")
-      .defaultNow()
-      .notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .notNull(),
-    escalatesAt: timestamp("escalates_at", { withTimezone: true }),
-    ambulation: varchar("ambulation", { length: 20 }),
-    acceptedByUserId: text("accepted_by_user_id")
-      .references(() => users.id, { onDelete: "set null" }),
-  },
-  (table) => ({
-    clinicStatusIdx: index("idx_er_intake_clinic_status").on(
-      table.clinicId,
-      table.status
-    ),
-    clinicWaitingIdx: index("idx_er_intake_clinic_waiting").on(
-      table.clinicId,
-      table.waitingSince
-    ),
-    escalatesAtIdx: index("idx_er_intake_escalates_at")
-      .on(table.escalatesAt)
-      .where(
-        sql`${table.escalatesAt} IS NOT NULL AND ${table.severity} IN ('low', 'medium') AND ${table.status} IN ('waiting', 'assigned', 'in_progress')`,
-      ),
-  }),
-);
-
-export const doctorAdmissionState = vtTable(
-  "vt_doctor_admission_state",
-  {
-    id: text("id").primaryKey(),
-    clinicId: text("clinic_id")
-      .notNull()
-      .references(() => clinics.id, { onDelete: "restrict" }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "restrict" }),
-    intakeEventId: text("intake_event_id")
-      .references(() => erIntakeEvents.id, { onDelete: "set null" }),
-    enteredAt: timestamp("entered_at").defaultNow().notNull(),
-  },
-  (table) => ({
-    clinicUserUnique: uniqueIndex("idx_doctor_admission_state_clinic_user").on(
-      table.clinicId,
-      table.userId,
-    ),
-  }),
-);
-
-export type DoctorAdmissionState = typeof doctorAdmissionState.$inferSelect;
-export type NewDoctorAdmissionState = typeof doctorAdmissionState.$inferInsert;
-
-export const erKpiDaily = vtTable(
-  "vt_er_kpi_daily",
-  {
-    id: text("id").primaryKey(),
-    clinicId: text("clinic_id")
-      .notNull()
-      .references(() => clinics.id, { onDelete: "restrict" }),
-    date: date("date", { mode: "string" }).notNull(),
-    doorToTriageMinutesP50: doublePrecision("door_to_triage_minutes_p50"),
-    missedHandoffRate: doublePrecision("missed_handoff_rate"),
-    medDelayRate: doublePrecision("med_delay_rate"),
-    sampleSizeIntakes: integer("sample_size_intakes")
-      .notNull()
-      .default(0),
-    sampleSizeHandoffs: integer("sample_size_handoffs")
-      .notNull()
-      .default(0),
-    sampleSizeMedTasks: integer("sample_size_med_tasks")
-      .notNull()
-      .default(0),
-    computedAt: timestamp("computed_at")
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => ({
-    clinicDateUnique: uniqueIndex("vt_er_kpi_daily_clinic_date_unique").on(
-      table.clinicId,
-      table.date
-    ),
-    clinicDateIdx: index("idx_er_kpi_daily_clinic_date").on(
-      table.clinicId,
-      table.date
-    ),
-  }),
-);
-
-export const erBoardEventLog = vtTable(
-  "vt_er_board_event_log",
-  {
-    id: text("id").primaryKey(),
-    clinicId: text("clinic_id")
-      .notNull()
-      .references(() => clinics.id, { onDelete: "restrict" }),
-    eventType: varchar("event_type", { length: 64 }).notNull(),
-    entityType: varchar("entity_type", { length: 32 }),
-    entityId: text("entity_id"),
-    actorUserId: text("actor_user_id").references(() => users.id, { onDelete: "set null" }),
-    payload: jsonb("payload").notNull().default(sql`'{}'::jsonb`),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => ({
-    clinicCreatedIdx: index("idx_er_board_event_log_clinic_created").on(
-      table.clinicId,
-      table.createdAt,
-    ),
-    entityIdx: index("idx_er_board_event_log_entity").on(
-      table.clinicId,
-      table.entityType,
-      table.entityId,
-    ),
-  }),
-);
-
-export const erBaselineSnapshots = vtTable(
-  "vt_er_baseline_snapshots",
-  {
-    id: text("id").primaryKey(),
-    clinicId: text("clinic_id")
-      .notNull()
-      .references(() => clinics.id, { onDelete: "restrict" }),
-    baselineStartDate: date("baseline_start_date", { mode: "string" }).notNull(),
-    baselineEndDate: date("baseline_end_date", { mode: "string" }).notNull(),
-    doorToTriageMinutesP50: doublePrecision("door_to_triage_minutes_p50"),
-    missedHandoffRate: doublePrecision("missed_handoff_rate"),
-    medDelayRate: doublePrecision("med_delay_rate"),
-    confidenceLevel: varchar("confidence_level", { length: 10 })
-      .notNull()
-      .default("low"),
-    capturedAt: timestamp("captured_at")
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => ({
-    clinicCapturedIdx: index("idx_er_baseline_clinic_captured").on(
-      table.clinicId,
-      table.capturedAt
-    ),
-  }),
-);

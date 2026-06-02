@@ -38,13 +38,14 @@ describe("Phase 6 PR 6.7 CORRECTION 1 — drug labels NOT in locale dict", () =>
 
 describe("Phase 6 PR 6.7 — codeBlue.preCheck.* + codeBlue.outcome.* resolve in both locales", () => {
   it("preCheck checklist items in both locales", () => {
-    expect(enDict.codeBlue.preCheck.title).toBe("Quick cart check");
-    expect(heDict.codeBlue.preCheck.title).toBe("בדיקה מהירה של עגלה");
-    expect(heDict.codeBlue.preCheck.defib).toBe("דפיברילטור טעון");
-    expect(heDict.codeBlue.preCheck.o2).toBe("חמצן פתוח");
-    expect(heDict.codeBlue.preCheck.iv).toBe("עירוי IV מוכן");
-    expect(heDict.codeBlue.preCheck.drugs).toBe("תרופות זמינות");
-    expect(heDict.codeBlue.preCheck.ambu).toBe("אמבו מוכן");
+    expect(enDict.codeBlue.preCheck.title).toBe("Equipment readiness");
+    expect(heDict.codeBlue.preCheck.title).toBe("מוכנות ציוד");
+    expect(enDict.codeBlue.preCheck.unitReady).toBe("Primary unit deployable");
+    expect(heDict.codeBlue.preCheck.unitReady).toBe("יחידה ראשית ניתנת לפריסה");
+    expect(enDict.codeBlue.preCheck.cartReady).toBe("Crash cart verified");
+    expect(heDict.codeBlue.preCheck.cartReady).toBe("עגלת חירום מאומתת");
+    expect(enDict.codeBlue.preCheck.monitorOnScene).toBe("Monitor / AED on scene");
+    expect(heDict.codeBlue.preCheck.transportReady).toBe("ציוד הובלה מוכן");
   });
 
   it("outcome labels in both locales", () => {
@@ -79,7 +80,6 @@ describe("Phase 6 PR 6.7 — 4 Code Blue files contain zero raw Hebrew literals"
     "src/pages/code-blue.tsx",
     "src/pages/code-blue-display.tsx",
     "src/pages/code-blue-history.tsx",
-    "src/pages/code-blue-reconciliation.tsx",
   ]) {
     it(`${file} is Hebrew-free`, () => {
       const source = readFileSync(resolve(process.cwd(), file), "utf-8");
@@ -89,24 +89,13 @@ describe("Phase 6 PR 6.7 — 4 Code Blue files contain zero raw Hebrew literals"
   }
 });
 
-describe("Phase 6 PR 6.7 CORRECTION 1 — drug catalog is inline data", () => {
-  it("code-blue.tsx uses inline English drug labels (not t.codeBlue.drugs.*)", () => {
+describe("Code Blue — equipment-only quick log", () => {
+  it("code-blue.tsx has no shock/CPR clinical quick-log", () => {
     const source = readFileSync(resolve(process.cwd(), "src/pages/code-blue.tsx"), "utf-8");
-    // The DRUGS array hardcodes English names (matching formulary's
-    // `name` field convention). Locale dict carries only UI copy.
-    expect(source).toMatch(/label:\s*"Epinephrine"/);
-    expect(source).toMatch(/label:\s*"Atropine"/);
-    expect(source).toMatch(/label:\s*"Vasopressin"/);
-    expect(source).not.toMatch(/t\.codeBlue\.drugs\./);
-    expect(source).not.toMatch(/t\.codeBlue\.units\./);
-  });
-
-  it("drug dose values + units remain hardcoded inline (data)", () => {
-    const source = readFileSync(resolve(process.cwd(), "src/pages/code-blue.tsx"), "utf-8");
-    expect(source).toMatch(/dosePerKg:\s*0\.01/);
-    expect(source).toMatch(/dosePerKg:\s*0\.04/);
-    expect(source).toMatch(/dosePerKg:\s*0\.8/);
-    expect(source).toMatch(/unit:\s*"mg"/);
-    expect(source).toMatch(/unit:\s*"units"/);
+    expect(source).not.toMatch(/category:\s*["']shock["']/);
+    expect(source).not.toMatch(/category:\s*["']cpr["']/);
+    expect(source).not.toMatch(/Epinephrine/);
+    expect(source).not.toMatch(/dosePerKg/);
+    expect(source).toContain('category: "equipment"');
   });
 });

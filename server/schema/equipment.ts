@@ -1,11 +1,10 @@
 import { sql } from "drizzle-orm";
 import {
   text, timestamp, boolean, varchar, integer, date,
-  index, uniqueIndex, pgEnum, bigint, jsonb,
+  index, uniqueIndex, primaryKey, pgEnum, bigint, jsonb,
 } from "drizzle-orm/pg-core";
 import { vtTable } from "./helpers.js";
-import { clinics, users, animals, hospitalizations } from "./core.js";
-import { billingItems, usageSessionStatusEnum } from "./billing.js";
+import { clinics, users } from "./core.js";
 import { appointments } from "./tasks.js";
 
 export const occupancySourceEnum = pgEnum("vt_occupancy_source", ["manual"]);
@@ -123,7 +122,6 @@ export const equipment = vtTable("vt_equipment", {
   lastRfidSeenAt: timestamp("last_rfid_seen_at", { withTimezone: true }),
   lastRfidRoomId: text("last_rfid_room_id").references(() => rooms.id, { onDelete: "set null" }),
   lastRfidGatewayCode: text("last_rfid_gateway_code"),
-  billingItemId: text("billing_item_id").references(() => billingItems.id, { onDelete: "set null" }),
   lastVerifiedAt: timestamp("last_verified_at"),
   lastVerifiedById: text("last_verified_by_id"),
   // Checkout / ownership
@@ -153,10 +151,6 @@ export const equipment = vtTable("vt_equipment", {
   readinessStateSince: timestamp("readiness_state_since"),
   usageState: text("usage_state").notNull().default("available"),
   usageStateSince: timestamp("usage_state_since"),
-  procedureBoundHospitalizationId: text("procedure_bound_hospitalization_id").references(
-    () => hospitalizations.id,
-    { onDelete: "set null" },
-  ),
 }, (table) => ({
   clinicRfidTagLookup: index("vt_equipment_clinic_rfid_tag_epc_idx").on(table.clinicId, table.rfidTagEpc),
   clinicRfidTagUnique: uniqueIndex("vt_equipment_clinic_rfid_tag_epc_uq")
@@ -228,34 +222,6 @@ export const equipmentReturns = vtTable("vt_equipment_returns", {
   chargeAlertJobId: text("charge_alert_job_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const usageSessions = vtTable("vt_usage_sessions", {
-  id: text("id").primaryKey(),
-  clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
-  animalId: text("animal_id")
-    .notNull()
-    .references(() => animals.id, { onDelete: "cascade" }),
-  equipmentId: text("equipment_id").references(() => equipment.id, { onDelete: "set null" }),
-  billingItemId: text("billing_item_id")
-    .notNull()
-    .references(() => billingItems.id, { onDelete: "restrict" }),
-  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
-  endedAt: timestamp("ended_at", { withTimezone: true }),
-  lastBilledThrough: timestamp("last_billed_through", { withTimezone: true }),
-  status: usageSessionStatusEnum("status").notNull().default("open"),
-});
-
-export const patientRoomAssignments = vtTable("vt_patient_room_assignments", {
-  id: text("id").primaryKey(),
-  clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
-  animalId: text("animal_id")
-    .notNull()
-    .references(() => animals.id, { onDelete: "cascade" }),
-  roomId: text("room_id").references(() => rooms.id, { onDelete: "set null" }),
-  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
-  endedAt: timestamp("ended_at", { withTimezone: true }),
-  source: occupancySourceEnum("source").notNull(),
 });
 
 export const stagingQueue = vtTable(
@@ -414,3 +380,19 @@ export const undoTokens = vtTable("vt_undo_tokens", {
   expiresAt: timestamp("expires_at").notNull(),
   consumed: boolean("consumed").notNull().default(false),
 });
+
+/** Clinic-scoped equipment readiness rules (PR4); one row per (clinic_id, key). */
+export const equipmentReadinessConfig = vtTable(
+  "vt_equipment_readiness_config",
+  {
+    clinicId: text("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "restrict" }),
+    key: text("key").notNull(),
+    value: text("value").notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    clinicKeyPk: primaryKey({ columns: [table.clinicId, table.key] }),
+  }),
+);

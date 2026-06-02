@@ -22,6 +22,7 @@ export async function invalidateEquipmentCaches(
           client.invalidateQueries({ queryKey: ["equipment-waitlist", equipmentId] }),
           client.invalidateQueries({ queryKey: ["staging-queue", equipmentId] }),
           client.invalidateQueries({ queryKey: ["deployability", equipmentId] }),
+          client.invalidateQueries({ queryKey: ["equipment-truth", equipmentId] }),
         ]
       : []),
   ]);

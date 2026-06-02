@@ -4,7 +4,7 @@
  */
 
 export type TaskPriority = "critical" | "high" | "normal";
-export type TaskType = "maintenance" | "repair" | "inspection" | "medication";
+export type TaskType = "maintenance" | "repair" | "inspection";
 
 /** Canonical task status (execution engine). */
 export type ServiceTaskStatus = "pending" | "assigned" | "in_progress" | "completed" | "cancelled";

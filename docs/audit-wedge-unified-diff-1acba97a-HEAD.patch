@@ -1,0 +1,2873 @@
+diff --git a/docs/equipment-readiness-rfid-gap-analysis.md b/docs/equipment-readiness-rfid-gap-analysis.md
+new file mode 100644
+index 00000000..ac3868de
+--- /dev/null
++++ b/docs/equipment-readiness-rfid-gap-analysis.md
+@@ -0,0 +1,32 @@
++# PR5 — RFID gap analysis (evidence contracts)
++
++**Status:** Analysis only — no new tables in this PR.
++
++## Existing schema
++
++| Table / column | Location | Role |
++|----------------|----------|------|
++| `vt_equipment.rfid_tag_epc` | `server/schema/equipment.ts` | Tag binding per clinic |
++| `vt_equipment_rfid_reads` | `server/schema/equipment.ts` | Passive read events |
++
++## Ingest path
++
++- Raw body mount: `server/index.ts` → `/api/rfid` with `express.raw`
++- Handler: `server/routes/rfid.ts` → `ingestRfidBatch` (`server/lib/rfid-ingest.ts`)
++- HMAC: `verifyVetTrackWebhookSignature` + clinic header `X-VetTrack-Clinic`
++
++## Truth / board consumption
++
++- Evidence graph loads `recentRfidReads` (`server/domain/equipment/evidence/graph.loader.ts`)
++- Location resolver uses latest RFID as **passive** evidence (`resolver/location.ts`) — does not mutate custody
++- Command board types include optional `rfid` block on unit rows (`shared/equipment-board.ts`)
++
++## Gaps (before PR6–7 implementation)
++
++1. **Idempotency contract** for batch replay — document `batchId` + event dedupe in ingest (verify in `rfid-ingest.ts`).
++2. **Outbox allowlist** — only passive event types (see master plan Part L.3).
++3. **No custody mutation** — ingest must not set `checkedOut*` or custody transitions (verified: ingest updates `lastSeen` / room observation only).
++
++## Approval gate
++
++New tables or columns require explicit sign-off before migration (PR5 rule).
+diff --git a/docs/equipment-readiness-wedge-master-execution-plan.md b/docs/equipment-readiness-wedge-master-execution-plan.md
+new file mode 100644
+index 00000000..308b6052
+--- /dev/null
++++ b/docs/equipment-readiness-wedge-master-execution-plan.md
+@@ -0,0 +1,897 @@
++# VetTrack Equipment Readiness Wedge — Full Master Execution Plan with Code References, PR Breakdown, and Modular Architecture
++
++**Document type:** Controlling execution plan (review-first; not yet incorporated until human sign-off)  
++**Repository inspected:** `cursor/equipment-focus-cleanup-0bf6` (clean working tree)  
++**Inspection date:** 2026-06-01 (read-only)
++
++---
++
++## Canonical status
++
++**Approved with blockers — cleanup patch pending incorporation.**
++
++Until incorporated into the master execution plan, this governance patch is **advisory governance text** and is **not** the controlling execution plan.
++
++- **Incorporation requires explicit human sign-off.**
++- **This document does not self-authorize incorporation.**
++- After explicit approval and incorporation, it becomes the **governing blocker appendix** for the Equipment Readiness Wedge execution plan.
++- **No application code work may begin from the pre-incorporation plan.**
++
++---
++
++## Part A — Product scope and non-goals
++
++### A.1 Core product question
++
++**Can this exact equipment unit be safely used right now?**
++
++The wedge answers:
++
++1. Where is this equipment?
++2. Can it be used right now?
++3. Who has it?
++4. Why is it blocked?
++5. What action fixes it?
++6. Are we buying, repairing, or retiring equipment based on evidence?
++
++### A.2 Primary equipment categories
++
++Infusion pumps, monitors, anesthesia machines, oxygen cages, ultrasound, warming devices, ventilators, crash carts / critical kits, shared mobile equipment.
++
++### A.3 Identification methods
++
++RFID passive detection, NFC, QR/barcode, manual fallback.
++
++### A.4 Truth Card (target UX contract)
++
++Must show: readiness status, current location, custody / checked-out-by, RFID last-seen, human confirmation evidence, conflicts, blocking reasons, citations/evidence, next recommended action, one primary action.
++
++### A.5 Readiness statuses (wedge target type)
++
++```ts
++export type EquipmentReadinessStatus =
++  | "ready"
++  | "in_use"
++  | "blocked"
++  | "stale"
++  | "overdue"
++  | "unknown";
++```
++
++**Repo note:** `GET /api/equipment/:id/truth` today returns `deployability.readinessState` / `custodyState` / `usageState` from operational-state resolvers (`shared/equipment-truth.ts`), not yet the wedge enum above. PR7–PR8 map resolver output → wedge statuses.
++
++### A.6 Non-goals
++
++No expansion back into broad hospital OS: patient workflow, billing, broad ER queue, drug inventory, dispense, CPR/shock guidance, medication advice, clinical decisioning, general appointments (beyond equipment tasks alias), staff chat, shift handover (except equipment handoff), broad non-readiness analytics, **AI command execution**, **RFID-driven custody mutation**.
++
++**Code Blue / emergency:** equipment/note only, **online-only**, not offline queued, no drugs/CPR/shock/patient workflow/clinical decisioning. Frozen Phase-9 realtime/PWA doctrine applies.
++
++---
++
++## Part B — Governance precedence and incorporation
++
++### B.1 Governance precedence
++
++If this plan conflicts with prior blocker/cleanup/review/draft text, **this incorporated plan controls** until superseded by a later explicitly approved governance patch. **Do not choose the less restrictive interpretation.**
++
++Tie-break: preserve compatibility → prevent drift → smaller PR scope → avoid hidden state mutation → tenant isolation → explicit review before risky work.
++
++### B.2 Incorporation conflict check
++
++Reviewer must attach conflict table **or** state in an **approved location**:
++
++```text
++No conflicts found during incorporation sweep.
++```
++
++| Conflicting source A | Conflicting source B | Conflict summary | Chosen interpretation | Reason | Approving reviewer |
++|----------------------|----------------------|------------------|-------------------------|--------|--------------------|
++
++**Owner record (required):**
++
++| Incorporation review area | Owner | Status | Notes |
++|---------------------------|-------|--------|-------|
++| conflict sweep / no-conflicts statement | owner required | pending / approved / rejected | |
++
++### B.3 Conflict statement location
++
++- incorporation notes
++- review package
++- governance conflict section
++- master plan incorporation summary
++
++Must include: owner, approval status, date/review ID. Chat-only statements insufficient unless copied into approved location.
++
++### B.4 Precedence reconciliation completion
++
++Reconciled only when (1) no-conflicts statement with owner approval, or (2) complete conflict table for every conflict. Blocked if check missing, table incomplete, interpretation/reviewer missing, unresolved conflict remains.
++
++### B.5 Terminology / reference sweep
++
++| Sweep area | Owner | Approval status | Notes |
++|------------|-------|-----------------|-------|
++| terminology/reference sweep | owner required | pending / approved / rejected | |
++
++Every hit: `replaced` | `removed` | `retained with justification`. Sweep scope: master plan, blocker/cleanup appendices, PR templates, copied sections, Cursor review templates, **approval tables/templates**.
++
++Stale targets include: `implementation-ready`, `safe to execute blindly`, `PR1.1 fallback`, old PR numbers, all commands in PR12, silent shell deferral, global clinic readiness config, same Router aliasing, scan-truth freeform writes, `maybe`, blank owner/status.
++
++---
++
++## Part C — Master modular architecture
++
++| Module | Owns | Must not own |
++|--------|------|----------------|
++| **7.1 Frontend route & nav** | Aliases, route-family match, active nav, shells, canonical hrefs, additive i18n | Page business logic, API, display payload, Code Blue behavior |
++| **7.2 API alias** | Semantic aliases, router factories, parity | Same Router instance twice, semantic/auth/tenant changes, redirects, side-effect changes |
++| **7.3 Equipment truth** | Deterministic readiness, evidence priority, conflicts, citations | AI override of truth |
++| **7.4 Command board** | Board snapshot contract, rows, alerts, ROI signals | Breaking legacy display snapshot |
++| **7.5 Readiness rules** | Clinic-scoped config, thresholds | Global config for clinic semantics |
++| **7.6 RFID evidence** | Passive ingest, raw body/HMAC, passive outbox allowlist | Custody mutation |
++| **7.7 scan-truth** | Resolve tag, approved evidence insert, truth + suggested action | Checkout/return/custody/emergency/task mutations |
++| **7.8 Command façade** | `performCheckout` / `performReturn`, idempotency at service boundary | Internal HTTP delegation, duplicate state machine |
++| **7.9 Emergency equipment log** | Presentation aliases, online-only framing | Domain rename without audit |
++| **7.10 Feature flags** | Non-wedge API flags, capabilities | Production default flips before audit |
++| **7.11 AI copilot** | Validators, advisory HTTP (PR17) | Command execution, separate evidence priority |
++
++**Dependency direction (allowed):** PR0 → PR1 → PR2 → PR3 → PR4 → PR5 → PR6 → PR7 → PR8–10 → PR11 → PR12 → PR13–18. PR16 before PR17. PR0 before all.
++
++---
++
++## Part D — Canonical route policy (frontend)
++
++### D.1 Canonical paths (generated links)
++
++- `/equipment-board`
++- `/equipment-tasks`
++- `/locations`
++- `/critical-kit-check`
++- `/emergency-equipment-log`
++
++### D.2 Legacy aliases (keep working; **no redirect** on `/display`)
++
++- `/display`
++- `/appointments`
++- `/rooms`
++- `/crash-cart`
++- `/code-blue`
++
++### D.3 Canonical product labels
++
++Equipment · Equipment Command Board · Equipment Tasks · Critical Kit Check · Locations · My Equipment
++
++Additive i18n only; keep `layoutHebrew.*`, `t.layout.nav.*`, `appointmentsPage.*`, etc.
++
++### D.4 Planned route infrastructure (PR1a — **does not exist today**)
++
++| Planned file | Intended shape | Inspect today | PR | Risk | Validation |
++|--------------|----------------|---------------|-----|------|------------|
++| `src/lib/routes/route-alias-groups.ts` | `ROUTE_ALIAS_GROUPS` const | **Missing** — create | PR1a | Route-family drift | Unit tests per matrix row |
++| `src/lib/routes/matches-route-family.ts` | `matchesRouteFamily(pathname, routes)` | **Missing** | PR1a | Naive `startsWith` | Tests: `/locations/123`, `/locations/123/` |
++| `src/lib/routes/route-family-ids.ts` | `ROUTE_FAMILY_MATCH_ORDER`, `resolveRouteFamilyId` | **Missing** | PR1a | Wrong active tab | Internal `//123` → `null` |
++| `src/lib/routes/normalize-pathname.ts` | `normalizePathname` + `stripTrailingSlashes` | **Missing** | PR1a | Alias split on `/display/` | Full test matrix §D.6 |
++| `src/lib/routes/canonical-hrefs.ts` (optional) | `CANONICAL_HREFS.*` | **Missing** | PR1a | Legacy href generation | Grep + inventory |
++
++### D.5 `normalizePathname` test matrix (mandatory)
++
++| Input | Expected |
++|-------|----------|
++| `""` | `/` |
++| `"display"` | `/display` |
++| `"/display/"` | `/display` |
++| `"/display//"` | `/display` |
++| `"/locations/123/"` | `/locations/123` |
++| `"/locations//123"` | `/locations//123` (internal slashes preserved) |
++| `"/display?mode=wall"` | `/display` |
++| `"/display#kiosk"` | `/display` |
++| `"https://example.com/display?mode=wall#kiosk"` | `/display` |
++| `"//example.com/display"` | `/display` |
++| `"?mode=wall"` | `/` |
++| `"#kiosk"` | `/` |
++
++### D.6 `resolveRouteFamilyId` (mandatory)
++
++```ts
++resolveRouteFamilyId("/locations/123") === "locations";
++resolveRouteFamilyId("/locations/123/") === "locations";
++resolveRouteFamilyId("/locations//123") === null;
++resolveRouteFamilyId("/display//settings") === null;
++```
++
++### D.7 `ROUTE_ALIAS_GROUPS` (planned)
++
++```ts
++export const ROUTE_ALIAS_GROUPS = {
++  equipmentBoard: ["/equipment-board", "/display"],
++  equipmentTasks: ["/equipment-tasks", "/appointments"],
++  locations: ["/locations", "/rooms"],
++  criticalKitCheck: ["/critical-kit-check", "/crash-cart"],
++  emergencyEquipmentLog: ["/emergency-equipment-log", "/code-blue"],
++} as const;
++```
++
++### D.8 `matchesRouteFamily` (required helper)
++
++```ts
++export function matchesRouteFamily(
++  pathname: string,
++  routes: readonly string[],
++): boolean {
++  return routes.some((route) => {
++    if (pathname === route) return true;
++    return pathname.startsWith(`${route}/`);
++  });
++}
++```
++
++Fallback active matching:
++
++```ts
++return matchesRouteFamily(location, [href]);
++```
++
++Not:
++
++```ts
++return location === href || location.startsWith(`${href}/`);
++```
++
++### D.9 `ROUTE_FAMILY_MATCH_ORDER` (planned)
++
++```ts
++export const ROUTE_FAMILY_MATCH_ORDER = [
++  "emergencyEquipmentWall",
++  "emergencyEquipmentHistory",
++  "emergencyEquipmentLog",
++  "equipmentBoard",
++  "equipmentTasks",
++  "criticalKitCheck",
++  "locations",
++] as const;
++```
++
++**Repo finding:** `/code-blue/display` exists (`CodeBlueDisplay`); **not** `/code-blue-display`. PR14 must follow PR0 inventory for wall/history aliases.
++
++### D.10 `normalizePathname` reference implementation
++
++```ts
++function stripTrailingSlashes(pathname: string): string {
++  if (pathname === "/") return "/";
++  return pathname.replace(/\/+$/, "") || "/";
++}
++
++export function normalizePathname(input: string): string {
++  let pathname: string;
++  try {
++    pathname = new URL(input, "http://local").pathname || "/";
++  } catch {
++    const withoutHash = input.split("#", 1)[0] ?? "";
++    const withoutQuery = withoutHash.split("?", 1)[0] ?? "";
++    const normalized = withoutQuery || "/";
++    pathname = normalized.startsWith("/") ? normalized : `/${normalized}`;
++  }
++  return stripTrailingSlashes(pathname);
++}
++```
++
++---
++
++## Part E — Canonical API policy
++
++| Concept | Value |
++|---------|--------|
++| Mount (canonical board) | `/api/equipment-board` |
++| Endpoint | `GET /api/equipment-board/snapshot` |
++| Compatibility | `GET /api/display/snapshot` |
++
++**Today:** only `app.use("/api/display", displayRoutes)` in `server/app/routes.ts`; `server/routes/display.ts` exports **singleton** `router` with `GET /snapshot`.
++
++**Required PR2 pattern:**
++
++```ts
++export function createDisplayRouter(deps: DisplayRouterDeps) {
++  const router = Router();
++  router.get("/snapshot", createDisplaySnapshotHandler(deps));
++  return router;
++}
++app.use("/api/display", createDisplayRouter(deps));
++app.use("/api/equipment-board", createDisplayRouter(deps));
++```
++
++**Forbidden:** mounting same `displayRoutes` instance twice.
++
++---
++
++## Part F — Canonical PR sequence
++
++| PR | Title |
++|----|--------|
++| PR0 | Baseline route/API/schema inventory |
++| PR1 | Frontend canonical aliases, nav, active-state, route-family helpers, i18n keys |
++| PR2 | API alias router factories and endpoint parity |
++| PR3 | Equipment Command Board contract + additive display snapshot field |
++| PR4 | Clinic-scoped readiness rules |
++| PR5 | RFID gap analysis + evidence contracts |
++| PR6 | RFID ingest and raw-body-safe mount helper |
++| PR7 | Truth resolver RFID evidence integration |
++| PR8 | Equipment Board critical rows and status derivation |
++| PR9 | Equipment Board alerts |
++| PR10 | Equipment Board ROI/utilization signals |
++| PR11 | scan-truth endpoint and DB mutation contract |
++| PR12 | Command façade MVP for checkout/return only |
++| PR13 | One-hand/glove scan UX |
++| PR14 | Emergency Equipment Log presentation aliases |
++| PR15 | Non-wedge API feature flags and capabilities surface |
++| PR16 | AI safety foundation, validator, threat model, red-team tests |
++| PR17 | AI Copilot routes behind `ENABLE_ASSET_COPILOT` |
++| PR18 | Docs, smoke tests, release hardening |
++
++---
++
++## Part G — PR0 baseline inventory
++
++### G.1 Frontend routes (from `src/app/routes.tsx`)
++
++| Current route | Component | Planned canonical / alias | Phase | Repo reference | Notes |
++|---------------|-----------|---------------------------|-------|----------------|-------|
++| `/display` | `WardDisplayPage` | alias of `/equipment-board` | PR1 | `routes.tsx:95` | Hard alias, no Redirect |
++| `/equipment-board` | — | **new** → same as `/display` | PR1 | — | Add route |
++| `/appointments` | `AppointmentsPage` | alias of `/equipment-tasks` | PR1 | `routes.tsx:114` | |
++| `/equipment-tasks` | — | **new** | PR1 | — | |
++| `/rooms` | `RoomsListPage` | alias of `/locations` | PR1 | `routes.tsx:90` | |
++| `/rooms/:id` | `RoomRadarPage` | `/locations/:id` | PR1 | `routes.tsx:91` | Detail route exists |
++| `/crash-cart` | `CrashCartCheckPage` | alias of `/critical-kit-check` | PR1 | `routes.tsx:97` | |
++| `/code-blue` | `CodeBluePage` | alias of `/emergency-equipment-log` | PR1 | `routes.tsx:94` | Secondary nav only |
++| `/code-blue/display` | `CodeBlueDisplay` | `/emergency-equipment-wall` per PR14 | PR14 | `routes.tsx:96` | Separate from ward `/display` |
++| `/admin/code-blue-history` | `CodeBlueHistoryPage` | `/emergency-equipment-history` | PR14 | `routes.tsx:98` | Admin menu |
++| `/equipment` | `EquipmentPage` | keep | — | `routes.tsx:80` | Primary nav anchor |
++| `/my-equipment` | `MyEquipmentPage` | keep | — | `routes.tsx:89` | |
++| `/alerts` | `AlertsPage` | keep direct access | — | `routes.tsx:88` | Not primary wedge nav |
++
++### G.2 Navigation inventory (shared shells)
++
++| Surface | File | Current href / behavior | Decision | Planned | Phase |
++|---------|------|-------------------------|----------|---------|-------|
++| Primary sidebar | `layout.tsx` | `/code-blue`, `/crash-cart` in primary list | PR1b update + reorder | Canonical hrefs + labels | PR1 |
++| Active state | `layout.tsx:113` | `location === href` exact | Fix | `matchesRouteFamily` | PR1 |
++| Operation menu whitelist | `layout.tsx:485` | legacy paths | Update | Canonical paths | PR1 |
++| Bottom nav Rooms | `layout.tsx:1244` | `href="/rooms"` | **PR1** | `href="/locations"` | PR1 |
++| Bottom nav active | `layout.tsx:510` | `startsWith("/rooms")` | Fix | `locations` family | PR1 |
++| Topbar | `Topbar.tsx:17-18` | `/appointments`, `/display` | Update | canonical paths | PR1 |
++| IconSidebar | `IconSidebar.tsx:35` | `startsWith(item.href)` | Fix per item | route-family | PR1 |
++| PageShell | `PageShell.tsx` | wraps Topbar | Indirect | Topbar canonical | PR1 |
++| Home CTAs | `home.tsx:421,440` | `/appointments` | Review | inventory row | PR1 |
++| Room radar back | `room-radar.tsx:545,569` | `/rooms` | Review | `/locations` if in scope | PR1 |
++
++### G.3 API mounts
++
++| Mount | Router | Planned alias | Phase |
++|-------|--------|---------------|-------|
++| `/api/display` | `displayRoutes` singleton | keep | — |
++| `/api/equipment-board` | — | `createDisplayRouter(deps)` | PR2 |
++| `/api/equipment` | `equipmentRoutes` | `/:id/truth` | PR7+ |
++| `/api/rfid` | raw body in `index.ts:222-225` | extend PR6 | PR5-6 |
++| Copilot routes | none | PR17 | PR17 |
++
++### G.4 Schema / services
++
++| Asset | Purpose | Reuse? | Gap | Phase |
++|-------|---------|--------|-----|-------|
++| `vt_equipment` + RFID | EPC, last seen | Yes | Passive contract | PR5-7 |
++| `vt_equipment_rfid_reads` | Raw reads | Yes | Idempotency PR5 | PR5-6 |
++| `vt_scan_logs` | Scan audit | Maybe | No identity_confirmed — PR11 contract | PR11 |
++| Checkout/return | Custody | Inline route | Extract services | PR12 |
++| `GET /:id/truth` | Truth API | Yes | Wedge enum mapping | PR7-8 |
++| `vt_server_config` | Config | Partial | Global keys — clinic scope PR4 | PR4 |
++| Display snapshot | Ward board | Yes | No `commandBoard` | PR3 |
++
++### G.5 PR0 deliverable
++
++- Output **in chat** by default; no repo doc unless explicitly approved (this file is explicit human request for `.md` output).
++- Shell inventory row-per-source-hit
++- Coverage table per grep command
++- `startsWith` classification artifact
++
++---
++
++## Part H — PR1 Frontend canonical aliases, nav, active state, i18n
++
++### H.1 Scope lock
++
++**Allowed:** `src/app/routes.tsx`, `src/lib/routes/*`, `layout.tsx`, `Topbar.tsx`, `IconSidebar.tsx`, additive locales.
++
++**Forbidden:** `server/`, `shared/`, `src/pages/`, API, schema, display payload, Code Blue behavior, RFID, AI, commands, route deletion, `/display` Redirect.
++
++### H.2 PR1a / PR1b
++
++- **PR1a:** aliases, route-family helpers, `normalizePathname`, match order, additive i18n.
++- **PR1b:** layout nav, shared shells, bottom nav wedge links, operation menus, active state, canonical hrefs, grep classification.
++
++**Must not merge** until both complete in **same PR** unless explicit approved split recorded.
++
++### H.3 Primary nav order (planned)
++
++1. Equipment → `/equipment`
++2. Equipment Command Board → `/equipment-board`
++3. Equipment Tasks → `/equipment-tasks`
++4. Critical Kit Check → `/critical-kit-check`
++5. Locations → `/locations`
++6. My Equipment → `/my-equipment`
++
++**Secondary/menu-only:** Emergency Equipment Log, Emergency Equipment Wall, Emergency Equipment History, Alerts, Reports/Admin.
++
++### H.4 Planned route additions (`src/app/routes.tsx`)
++
++```tsx
++<Route path="/equipment-board"><AuthGuard><WardDisplayPage /></AuthGuard></Route>
++<Route path="/equipment-tasks"><AuthGuard><AppointmentsPage /></AuthGuard></Route>
++<Route path="/locations"><AuthGuard><RoomsListPage /></AuthGuard></Route>
++<Route path="/locations/:id"><AuthGuard><RoomRadarPage /></AuthGuard></Route>
++<Route path="/critical-kit-check"><AuthGuard><CrashCartCheckPage /></AuthGuard></Route>
++<Route path="/emergency-equipment-log"><AuthGuard><CodeBluePage /></AuthGuard></Route>
++```
++
++### H.5 PR1 ownership gates
++
++| Gate | Owner | Blocks |
++|------|-------|--------|
++| PR1 scope re-review | required | Implementation start |
++| Shell inventory completeness | required | Implementation + merge |
++| Classification owner | required | Merge |
++| Reconciliation completion | required | Merge |
++
++### H.6 Shell inventory grep commands
++
++```bash
++rg 'to="/display"|to="/appointments"|to="/rooms"|to="/crash-cart"|to="/code-blue"' src
++rg 'navigate\("/(display|appointments|rooms|crash-cart|code-blue)' src
++rg 'href="/display"|href="/appointments"|href="/rooms"|href="/crash-cart"|href="/code-blue"' src
++rg '"/display"|"/appointments"|"/rooms"|"/crash-cart"|"/code-blue"' src
++```
++
++**Dedup key:** file path + matched expression + stable snippet (line number supporting only).
++
++**Coverage status:** `complete` | `no hits` | `blocked` | `needs review` — do not proceed on `blocked` or `needs review`.
++
++### H.7 Allowed classifications
++
++- shared shell/nav — update in PR1
++- bottom nav wedge link — update in PR1
++- secondary/menu-only nav — update or preserve per policy
++- generated link — migrate to canonical
++- active-state logic — normalize via alias family map
++- analytics/page attribution — normalize or follow-up
++- already canonical / already compliant — evidence required; **no mixed compliance**
++- unrelated utility — no change, explain
++- page internals — out of scope; stop for review if wedge links
++- test fixture — update if appropriate
++- alias route definition — keep
++- compatibility route — keep
++- ambiguous — stop for review
++
++### H.8 Reconciliation
++
++| Allowed status | Blocked status |
++|----------------|----------------|
++| `complete` | `pending` |
++| `approved no-change` (with evidence) | `unresolved` |
++| `reclassified with approval` | `needs review` |
++
++**Proof cardinality:** one proof may satisfy multiple rows only if each row references it explicitly. No implicit proof sharing.
++
++**Evidence location for `approved no-change`:** reconciliation table, shell inventory row ref, review package, PR comment, out-of-scope record.
++
++### H.9 Classification source of truth
++
++One classification per row. Reclassification requires inventory row update **or** approved override table. Merge blocked if inventory and reconciliation conflict.
++
++### H.10 startsWith validation
++
++```bash
++rg 'startsWith\(' src/components src/lib/routes
++```
++
++Classify every hit. Merge blocked if naive prefix matching in active-route logic outside centralized helper. Fixed hits need route-family or shell active-state test.
++
++### H.11 PR1 validation
++
++```bash
++git status --short
++rg "<Route path=" src/app/routes.tsx
++rg 'equipment-board|equipment-tasks|critical-kit-check|emergency-equipment|locations' src/app/routes.tsx
++rg 'to="/display"|to="/appointments"|to="/rooms"|to="/crash-cart"|to="/code-blue"' src
++rg 'navigate\("/(display|appointments|rooms|crash-cart|code-blue)' src
++rg 'href="/display"|href="/appointments"|href="/rooms"|href="/crash-cart"|href="/code-blue"' src
++rg '"/display"|"/appointments"|"/rooms"|"/crash-cart"|"/code-blue"' src
++rg 'startsWith\(' src/components src/lib/routes
++npx tsc --noEmit
++pnpm test
++git diff --name-only | rg '^server/' && exit 1 || true
++git diff --name-only | rg '^shared/' && exit 1 || true
++git diff --name-only | rg '^src/pages/' && exit 1 || true
++```
++
++### H.12 PR1 manual smoke
++
++- `/display` renders; URL stays `/display`; no Redirect from `/display`
++- `/equipment-board` same surface as display
++- All legacy/canonical pairs work
++- Active nav correct for canonical and legacy paths
++- Primary nav order per §H.3; Emergency Equipment Log not primary
++- `/alerts` still works if present
++- No `server/`, `shared/`, `src/pages/` diff
++
++---
++
++## Part I — PR2 API alias router factories and endpoint parity
++
++### I.1 Planned files
++
++| File | Change |
++|------|--------|
++| `server/routes/display.ts` | `createDisplayRouter`, `createDisplaySnapshotHandler` |
++| `server/app/routes.ts` | Two factory mounts |
++| `tests/api/display-alias-parity.test.ts` | **New** parity suite |
++
++### I.2 Auth/tenant parity matrix
++
++| Case | Expected parity |
++|------|-----------------|
++| unauthenticated | same status/error semantics |
++| authenticated, correct clinic, permitted | same success semantics |
++| same session, entity other clinic | same 404/403 per **legacy** |
++| wrong clinic context | same 404/403 per legacy |
++| missing permission | same forbidden |
++| entity not found in clinic | same not-found |
++| invalid input | same validation |
++
++**Do not correct** legacy 404 vs 403 in PR2.
++
++### I.3 Error parity
++
++Use stable discriminator when exposed (`code`, `reason` from `display.ts` `apiError`). No invented discriminator. Incidental headers (`date`, `server`, trace IDs) not blockers unless consumer-visible.
++
++### I.4 Success parity
++
++Same success status, content-type, materially relevant headers, redirect behavior, deterministic payload subset (strip volatile fields). **No add/remove/change** writes, audit, outbox, cache invalidation, session/auth/tenant side effects, domain events.
++
++---
++
++## Part J — PR3 Equipment Command Board + additive snapshot
++
++### J.1 Planned files
++
++| File | Purpose |
++|------|---------|
++| `shared/equipment-board.ts` | `EquipmentCommandBoardSnapshot` types |
++| `server/services/equipment-command-board.service.ts` | `buildCommandBoardSnapshot` |
++| `server/routes/display.ts` | Handler timeout wrapper |
++| `tests/display-command-board-timeout.test.ts` | throw, timeout, metrics failure |
++
++### J.2 Contract
++
++```ts
++commandBoard: EquipmentCommandBoardSnapshot | null; // always present; never undefined
++```
++
++### J.3 Failure isolation
++
++```ts
++const COMMAND_BOARD_TIMEOUT_MS = 2500; // explicit, review-visible
++
++let commandBoard: EquipmentCommandBoardSnapshot | null = null;
++try {
++  commandBoard = await withTimeout(
++    buildCommandBoardSnapshot({ clinicId }),
++    COMMAND_BOARD_TIMEOUT_MS,
++  );
++} catch (error) {
++  safeLogWarn({ error, clinicId }, "command_board_build_failed");
++}
++return { ...legacySnapshot, commandBoard };
++```
++
++**Acceptance:** Builder failure never breaks legacy snapshot response; observability best-effort.
++
++---
++
++## Part K — PR4 Clinic-scoped readiness rules
++
++**Blocked** until clinic-scoped storage approved (`server/lib/server-config.ts` is global today).
++
++| File | Purpose |
++|------|---------|
++| `shared/equipment-readiness-rules.ts` | `equipment.readinessRules.v1` schema |
++| `server/services/equipment-readiness-rules.service.ts` | `getReadinessRules(clinicId)` |
++| Migration | **DO NOT APPLY UNTIL APPROVED** |
++
++Cache keys must include `clinicId`. No global fallback changing clinic semantics.
++
++---
++
++## Part L — PR5 / PR6 RFID evidence layer
++
++### L.1 PR5 gap analysis (no new tables until approved)
++
++Prove against: `server/schema/equipment.ts`, `server/routes/rfid.ts`, `server/index.ts` raw mount.
++
++### L.2 PR6 mount helper
++
++```ts
++export function mountRfidRoutes(app: Express, path: string, deps: RfidDeps) {
++  app.use(path, express.raw({ type: "application/json" }), createRfidRouter(deps));
++}
++```
++
++### L.3 RFID outbox allowlist
++
++**Allowed:** `equipment.evidence_observed`, `equipment.passive_location_observed`, `equipment.rfid_presence_changed`, `equipment.truth_may_have_changed`, `equipment.board_may_have_changed`
++
++**Forbidden:** custody/checkout/return/emergency/task/ready/unavailable mutations
++
++---
++
++## Part M — PR7 Truth resolver RFID integration
++
++- Passive evidence only; no custody mutation
++- Distinguish `passiveObservedLocation` vs `humanConfirmedLocation`
++- Status priority: blocked > overdue > stale > in_use > ready > unknown
++- Expose conflict metadata for PR16
++
++**Inspect:** `server/routes/equipment/handlers/get-equipment-truth.ts`, `server/domain/equipment/evidence/resolver/*`
++
++---
++
++## Part N — PR8 / PR9 / PR10 Board rows, alerts, ROI
++
++| PR | Deliverable |
++|----|-------------|
++| PR8 | `criticalUnits`, `overview`, `byType`, `byLocation` |
++| PR9 | Alert taxonomy; max one primary alert per unit |
++| PR10 | ROI signals; utilization formula |
++
++```ts
++const utilizationScore =
++  scanEvents30d * 1 + checkoutEvents30d * 3 + emergencyUseEvents30d * 5;
++```
++
++Avoid guaranteed savings / actual ROI wording without cost data.
++
++---
++
++## Part O — PR11 scan-truth + DB mutation contract
++
++**Design-blocked** until mapping table concrete and owners approved.
++
++| Required field | Status |
++|----------------|--------|
++| target table | concrete required |
++| allowed columns | concrete required |
++| allowed status/type values | concrete required |
++| outbox behavior | concrete required |
++| truth-ranking behavior | concrete required |
++| clinicId filter | concrete required |
++| forbidden side effects | concrete required |
++
++**May:** resolve tag; insert approved evidence; return truth + suggested action.
++
++**Must not:** checkout, return, custody, emergency, task complete, ready/unavailable, custody/emergency outbox.
++
++**Do not** invent freeform `vt_scan_logs.status` without approved evidence-event contract.
++
++---
++
++## Part P — PR12 Command façade (checkout/return only)
++
++```ts
++export async function performCheckout(input: CheckoutCommandInput): Promise<CheckoutDomainResult> {
++  // authorization, validation, transaction, custody, evidence, audit, outbox
++}
++```
++
++**Routes (planned):**
++
++- `POST /api/equipment/:id/commands/checkout`
++- `POST /api/equipment/:id/commands/return`
++
++**Forbidden:** `fetch("/api/equipment/:id/checkout")`, internal HTTP, Express handlers as pseudo-services, duplicate state machine.
++
++**Idempotency:** shared service boundary or approved adapter above it.
++
++**Future commands (not PR12):** confirm-location, mark-issue, complete-inspection, mark-repaired, post-emergency-reset.
++
++---
++
++## Part Q — PR13 One-hand / glove scan UX
++
++| File | Purpose |
++|------|---------|
++| `/scan` route | Scan screen |
++| Global Scan FAB | Quick access |
++| Glove mode | 48px / 64px / 72px targets |
++| `use-scan-truth` hook | PR11 client |
++
++RFID suggests; human acts.
++
++---
++
++## Part R — PR14 Emergency Equipment Log presentation aliases
++
++| Canonical | Compatibility (repo) |
++|----------|----------------------|
++| `/emergency-equipment-log` | `/code-blue` |
++| `/emergency-equipment-wall` | `/code-blue/display` |
++| `/emergency-equipment-history` | `/admin/code-blue-history` |
++
++Presentation only until audit. Online-only; no offline queue.
++
++---
++
++## Part S — PR15 Feature flags + capabilities
++
++Flags (audit-first): `ENABLE_CLINICAL_API`, `ENABLE_DISPENSE_API`, `ENABLE_SHIFT_CHAT_API`, `ENABLE_BROAD_INVENTORY`, `ENABLE_BROAD_PROCUREMENT`
++
++Preferred: `GET /api/platform/capabilities`
++
++---
++
++## Part T — PR16 AI safety foundation
++
++**Default:** `ENABLE_ASSET_COPILOT=false`
++
++**Exists:** `citation-validator.ts` (validity only), `shared/contracts/asset-copilot.v1.js`, resolver under `server/domain/equipment/evidence/`
++
++**PR16 adds:** claim-support, freshness, type, contradiction vs resolver priority; read-only metadata contract; red-team tests.
++
++**Minimum resolver metadata:** readiness status, freshness, source type, confidence, conflict state/type, priority outcome, passive vs intentional, location/custody confirmation, citation IDs.
++
++**PR16 approval table:**
++
++| Approval area | Primary owner | Objections recorded? | Objection disposition | Status |
++|---------------|---------------|----------------------|-------------------------|--------|
++| truth/evidence resolver metadata | required | yes/no | none/pending/… | pending |
++| AI validator sufficiency | required | yes/no | | pending |
++| read-only contract and tenant isolation | required | yes/no | | pending |
++
++Written objections only. Unresolved written objections block progress.
++
++---
++
++## Part U — PR17 AI Copilot HTTP (after PR16)
++
++- `POST /api/equipment/:id/copilot/explain`
++- `POST /api/equipment-board/copilot/brief`
++- `POST /api/equipment-copilot/query`
++- `POST /api/equipment-copilot/feedback`
++
++Flag-gated; advisory only; no command execution.
++
++---
++
++## Part V — PR18 Docs, smoke, release hardening
++
++Route/API smoke, tenant isolation regression, no offline emergency mutation regression, release notes, rollback notes, alias sunset plan (audit-only).
++
++---
++
++## Part W — Tenant isolation (every backend PR)
++
++- `eq(table.clinicId, clinicId)` on target table
++- No trust of client `clinicId`
++- Cache keys include `clinicId`
++- Cross-clinic tests for tag, name, room, reader, session cross-entity access
++
++---
++
++## Part X — Binding-when-touched
++
++Binding when actual diff touches area. Reviewer of record is arbiter.
++
++| Area | When touched |
++|------|----------------|
++| startsWith / active route | route-family or shell test |
++| PR3 timeout | abort preferred; else handler timeout; `commandBoard: null` |
++| PR12 idempotency | service boundary |
++| Label shortening | PR + i18n notes + tests |
++
++Dispute table required when disputed; merge blocked while `pending`.
++
++---
++
++## Part Y — PR merge gates summary
++
++| PR | Must not merge if |
++|----|-------------------|
++| PR1 | Aliases incomplete; `/display` redirects; shell/reconciliation/owners incomplete; partial PR1a/PR1b without approval |
++| PR2 | Same Router twice; parity incomplete |
++| PR3 | `commandBoard` undefined; builder breaks legacy; no timeout |
++| PR4 | Global clinic readiness config |
++| PR5 | RFID migration before gap approval |
++| PR6 | RFID outbox implies custody mutation |
++| PR7 | RFID mutates custody |
++| PR11 | TBD mapping or pending owners |
++| PR12 | Duplicate logic; internal HTTP |
++| PR16 | Metadata/validators incomplete |
++| PR17 | Before PR16 approved |
++
++---
++
++## Part Z — PR template
++
++```markdown
++## PR{N} — {title}
++
++### Scope
++- In scope:
++- Out of scope:
++
++### Governance owners
++| Area | Owner | Status |
++
++### Planned files
++| File | Change |
++
++### Validation
++```bash
++# commands
++```
++
++### Acceptance criteria
++- [ ] ...
++
++### Rollback
++- ...
++```
++
++---
++
++## Part AA — Rollback and deployment
++
++| PR range | Rollback |
++|----------|----------|
++| PR1 | Revert nav/routes; legacy paths remain |
++| PR2 | Remove equipment-board mount |
++| PR3 | Clients ignore `commandBoard` |
++| PR16–17 | `ENABLE_ASSET_COPILOT=false` |
++
++Deploy: PR1 → PR2 → PR3 before UI depends on `commandBoard`.
++
++---
++
++## Part AB — Review references
++
++| Planned change | Plan ref | Repo evidence | Risk gate |
++|----------------|----------|---------------|-----------|
++| `/equipment-board` alias | PR1 | `routes.tsx:95` `/display` | PR1 smoke |
++| Route-family active nav | PR1 | `layout.tsx:113` | tests |
++| `/api/equipment-board` | PR2 | `routes.ts:82` singleton | factory |
++| `commandBoard` field | PR3 | `display.ts` response | timeout |
++| `performCheckout` | PR12 | `equipment.ts:497+` | no internal HTTP |
++| Copilot HTTP | PR17 | no copilot routes | PR16 |
++
++---
++
++## Part AC — startsWith classification seed
++
++| File | Line | Classification | Action |
++|------|------|----------------|--------|
++| `layout.tsx` | 266, 291 | unrelated utility | document |
++| `layout.tsx` | 509-510 | legacy active-route | fix |
++| `Topbar.tsx` | 36 | legacy active-route | fix |
++| `IconSidebar.tsx` | 35 | legacy active-route | fix per item |
++
++---
++
++## Final implementation hold
++
++Approved with blockers — cleanup patch pending incorporation. Do not begin implementation until the full master execution plan is output in chat with planned code references, PR breakdown, modular architecture, governance blockers, validation gates, and acceptance criteria; this plan is reviewed and explicitly approved by a human; prior governance patches are reconciled under the precedence rule; PR1 scope is reviewed again; PR1a + PR1b are confirmed to complete in the same PR unless an explicit approved split is recorded; and PR1 shell inventory plus reconciliation have no pending classification, proof, approval, coverage, or conflict rows.
++
++---
++
++## Incorporation next steps (human)
++
++1. Record `No conflicts found during incorporation sweep.` or conflict table in incorporation notes.
++2. Complete terminology sweep with owner **approved**.
++3. Sign off this document as controlling appendix.
++4. Run PR0 full inventory (expand grep to row-per-source-hit table).
++5. Assign PR1 owners; begin PR1 only after PR1 scope re-review **approved**.
+diff --git a/locales/en.json b/locales/en.json
+index 81b16cf7..065f78d2 100644
+--- a/locales/en.json
++++ b/locales/en.json
+@@ -38,6 +38,12 @@
+   },
+   "layout": {
+     "nav": {
++      "equipmentCommandBoard": "Equipment Command Board",
++      "equipmentTasks": "Equipment Tasks",
++      "criticalKitCheck": "Critical Kit Check",
++      "locations": "Locations",
++      "emergencyEquipmentLog": "Emergency Equipment Log",
++      "emergencyEquipmentHistory": "Emergency Equipment History",
+       "alerts": "Alerts",
+       "mine": "Mine",
+       "operationalControlSection": "Operational control",
+diff --git a/locales/he.json b/locales/he.json
+index 17086c77..7b02358f 100644
+--- a/locales/he.json
++++ b/locales/he.json
+@@ -38,6 +38,12 @@
+   },
+   "layout": {
+     "nav": {
++      "equipmentCommandBoard": "לוח פיקוד ציוד",
++      "equipmentTasks": "משימות ציוד",
++      "criticalKitCheck": "בדיקת ערכת קריטית",
++      "locations": "מיקומים",
++      "emergencyEquipmentLog": "יומן ציוד חירום",
++      "emergencyEquipmentHistory": "היסטוריית ציוד חירום",
+       "alerts": "התראות",
+       "mine": "שלי",
+       "operationalControlSection": "בקרה תפעולית",
+diff --git a/server/app/routes.ts b/server/app/routes.ts
+index 125a0448..ff74c221 100644
+--- a/server/app/routes.ts
++++ b/server/app/routes.ts
+@@ -25,7 +25,9 @@ import returnsRoutes from "../routes/returns.js";
+ import alertAcksRoutes from "../routes/alert-acks.js";
+ import activityRoutes from "../routes/activity.js";
+ import homeDashboardRoutes from "../routes/home-dashboard.js";
+-import displayRoutes from "../routes/display.js";
++import { createDisplayRouter } from "../routes/display.js";
++import platformCapabilitiesRoutes from "../routes/platform-capabilities.js";
++import equipmentCopilotRoutes from "../routes/equipment-copilot.js";
+ 
+ // --- Safety surfaces ---
+ import codeBlueRoutes from "../routes/code-blue.js";
+@@ -70,6 +72,7 @@ function registerInfrastructureRoutes(app: express.Express) {
+ 
+ function registerEquipmentCoreRoutes(app: express.Express) {
+   app.use("/api/equipment", equipmentRoutes);
++  app.use("/api/equipment", equipmentCopilotRoutes);
+   app.use("/api/equipment-intelligence", equipmentIntelligenceRoutes);
+   app.use("/api", equipmentOperationalStateRoutes);
+   app.use("/api", operationalMetricsRoutes);
+@@ -79,7 +82,8 @@ function registerEquipmentCoreRoutes(app: express.Express) {
+   app.use("/api/alert-acks", alertAcksRoutes);
+   app.use("/api/activity", activityRoutes);
+   app.use("/api/home", homeDashboardRoutes);
+-  app.use("/api/display", displayRoutes);
++  app.use("/api/display", createDisplayRouter());
++  app.use("/api/equipment-board", createDisplayRouter());
+ }
+ 
+ function registerSafetySurfaceRoutes(app: express.Express) {
+@@ -94,6 +98,10 @@ function registerAdminConfigRoutes(app: express.Express) {
+   app.use("/api/stability", stabilityRoutes);
+ }
+ 
++function registerPlatformCapabilitiesRoutes(app: express.Express) {
++  app.use("/api/platform", platformCapabilitiesRoutes);
++}
++
+ function registerPlatformRoutes(app: express.Express) {
+   app.use("/api/analytics", analyticsRoutes);
+   app.use("/api/shifts", shiftsRoutes);
+@@ -118,5 +126,6 @@ export function registerApiRoutes(app: express.Express) {
+   registerEquipmentCoreRoutes(app);
+   registerSafetySurfaceRoutes(app);
+   registerAdminConfigRoutes(app);
++  registerPlatformCapabilitiesRoutes(app);
+   registerPlatformRoutes(app);
+ }
+diff --git a/server/domain/equipment/copilot/ai-safety-validator.ts b/server/domain/equipment/copilot/ai-safety-validator.ts
+new file mode 100644
+index 00000000..87e4a94f
+--- /dev/null
++++ b/server/domain/equipment/copilot/ai-safety-validator.ts
+@@ -0,0 +1,49 @@
++import type { CopilotAnswer } from "../../../../shared/contracts/asset-copilot.v1.js";
++import type { EvidenceGraph } from "../evidence/graph.types.js";
++import { validateCopilotAnswer, type CitationValidityResult } from "./citation-validator.js";
++
++const FINANCIAL_CLAIM_RE =
++  /\b(saves?\s+\$|roi\b|guaranteed\s+savings|actual\s+roi|revenue\s+increase|cost\s+reduction)\b/i;
++
++const MAX_EVIDENCE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
++
++export type AiSafetyValidationResult =
++  | { safe: true }
++  | { safe: false; errors: string[]; uncertainty?: string[] };
++
++/** PR16: structured output safety beyond citation validity. */
++export function validateCopilotAnswerSafety(
++  answer: CopilotAnswer,
++  graph: EvidenceGraph,
++  now: Date = new Date(),
++): AiSafetyValidationResult {
++  const errors: string[] = [];
++  const uncertainty: string[] = [];
++
++  const citationResult: CitationValidityResult = validateCopilotAnswer(answer, graph);
++  if (!citationResult.valid) errors.push(...citationResult.errors);
++
++  for (const claim of answer.claims) {
++    if (!claim.citations?.length) {
++      errors.push("claim_missing_citation_support");
++    }
++    if (FINANCIAL_CLAIM_RE.test(claim.value ?? "")) {
++      errors.push("financial_claim_without_cost_evidence");
++    }
++    for (const citation of claim.citations) {
++      const observedAt = citation.evidence?.observedAt;
++      if (observedAt) {
++        const age = now.getTime() - new Date(observedAt).getTime();
++        if (age > MAX_EVIDENCE_AGE_MS) {
++          uncertainty.push(`stale_evidence:${citation.type}:${citation.id}`);
++        }
++      }
++      if (!["equipment", "rfid", "scan", "transfer", "room", "condition", "dock", "staging", "waitlist"].includes(citation.type)) {
++        errors.push(`unsupported_evidence_type:${citation.type}`);
++      }
++    }
++  }
++
++  if (errors.length > 0) return { safe: false, errors, uncertainty };
++  return { safe: true, ...(uncertainty.length > 0 ? { uncertainty } : {}) };
++}
+diff --git a/server/index.ts b/server/index.ts
+index 723034af..00ffd811 100644
+--- a/server/index.ts
++++ b/server/index.ts
+@@ -31,6 +31,7 @@ import { registerApiRoutes } from "./app/routes.js";
+ import clerkWebhookRoutes from "./routes/webhooks.js";
+ import inboundIntegrationWebhooks from "./integrations/webhooks/inbound.router.js";
+ import rfidRoutes from "./routes/rfid.js";
++import { mountRfidRoutes } from "./lib/mount-rfid-routes.js";
+ import { startBackgroundSchedulers } from "./app/start-schedulers.js";
+ import { ensureClinicPhase2Defaults } from "./lib/ensure-clinic-phase2-defaults.js";
+ import healthRoutes from "./routes/health.js";
+@@ -219,11 +220,7 @@ app.use(
+   inboundIntegrationWebhooks,
+ );
+ 
+-app.use(
+-  "/api/rfid",
+-  express.raw({ type: () => true, limit: "512kb" }),
+-  rfidRoutes,
+-);
++mountRfidRoutes(app, "/api/rfid", () => rfidRoutes);
+ 
+ app.use(express.json());
+ 
+diff --git a/server/lib/mount-rfid-routes.ts b/server/lib/mount-rfid-routes.ts
+new file mode 100644
+index 00000000..aef8a02a
+--- /dev/null
++++ b/server/lib/mount-rfid-routes.ts
+@@ -0,0 +1,15 @@
++import type { Express, RequestHandler } from "express";
++import express from "express";
++
++export type RfidRouterFactory = () => RequestHandler;
++
++/**
++ * Mount RFID ingest with raw JSON body (HMAC-safe). Each mount gets its own parser stack.
++ */
++export function mountRfidRoutes(
++  app: Express,
++  path: string,
++  createRouter: RfidRouterFactory,
++): void {
++  app.use(path, express.raw({ type: () => true, limit: "512kb" }), createRouter());
++}
+diff --git a/server/lib/with-timeout.ts b/server/lib/with-timeout.ts
+new file mode 100644
+index 00000000..b66d62c8
+--- /dev/null
++++ b/server/lib/with-timeout.ts
+@@ -0,0 +1,24 @@
++export class OperationTimeoutError extends Error {
++  constructor(message = "Operation timed out") {
++    super(message);
++    this.name = "OperationTimeoutError";
++  }
++}
++
++export function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
++  return new Promise<T>((resolve, reject) => {
++    const timer = setTimeout(() => {
++      reject(new OperationTimeoutError(`Timed out after ${timeoutMs}ms`));
++    }, timeoutMs);
++    promise.then(
++      (value) => {
++        clearTimeout(timer);
++        resolve(value);
++      },
++      (error) => {
++        clearTimeout(timer);
++        reject(error);
++      },
++    );
++  });
++}
+diff --git a/server/routes/display.ts b/server/routes/display.ts
+index 0e1aad23..14c31fdd 100644
+--- a/server/routes/display.ts
++++ b/server/routes/display.ts
+@@ -1,5 +1,6 @@
+ // server/routes/display.ts
+ import { randomUUID } from "crypto";
++import type { RequestHandler } from "express";
+ import { Router } from "express";
+ import { and, desc, eq, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
+ import { fetchLinkedEquipmentForSession } from "../lib/code-blue-linked-equipment.js";
+@@ -18,9 +19,20 @@ import {
+ import { requireAuth } from "../middleware/auth.js";
+ import { recordHeartbeat } from "../lib/display-heartbeat-store.js";
+ import { incrementMetric } from "../lib/metrics.js";
++import { withTimeout } from "../lib/with-timeout.js";
+ import { isEquipmentFullyDeployable } from "../services/equipment-operational-state.service.js";
++import {
++  buildCommandBoardSnapshot,
++  type BuildCommandBoardSnapshotFn,
++} from "../services/equipment-command-board.service.js";
++import type { EquipmentCommandBoardSnapshot } from "../../shared/equipment-board.js";
++
++export const COMMAND_BOARD_TIMEOUT_MS = 2500;
+ 
+-const router = Router();
++export type DisplayRouterDeps = {
++  buildCommandBoardSnapshot?: BuildCommandBoardSnapshotFn;
++  commandBoardTimeoutMs?: number;
++};
+ 
+ function resolveRequestId(
+   res: { getHeader: (n: string) => unknown; setHeader?: (n: string, v: string) => void },
+@@ -63,252 +75,283 @@ function resolveHeldBy(row: {
+   return row.checkedOutByEmail?.trim() || null;
+ }
+ 
+-router.get("/snapshot", requireAuth, async (req, res) => {
+-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+-  try {
+-    const clinicId = req.clinicId!;
+-    const now = new Date();
+-    const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+-
+-    const overdueRows = await db
+-      .select({
+-        id: appointments.id,
+-        startTime: appointments.startTime,
+-        notes: appointments.notes,
+-        taskType: appointments.taskType,
+-      })
+-      .from(appointments)
+-      .where(
+-        and(
+-          eq(appointments.clinicId, clinicId),
+-          inArray(appointments.status, ["pending", "assigned"]),
+-          lt(appointments.startTime, now),
+-        ),
+-      )
+-      .orderBy(appointments.startTime);
++export function createDisplaySnapshotHandler(deps: DisplayRouterDeps = {}): RequestHandler {
++  const buildBoard = deps.buildCommandBoardSnapshot ?? buildCommandBoardSnapshot;
++  const commandBoardTimeoutMs = deps.commandBoardTimeoutMs ?? COMMAND_BOARD_TIMEOUT_MS;
+ 
+-    const upcomingRows = await db
+-      .select({
+-        id: appointments.id,
+-        startTime: appointments.startTime,
+-        taskType: appointments.taskType,
+-        notes: appointments.notes,
+-        status: appointments.status,
+-      })
+-      .from(appointments)
+-      .where(
+-        and(
+-          eq(appointments.clinicId, clinicId),
+-          inArray(appointments.status, ["pending", "assigned", "scheduled"]),
+-          gte(appointments.startTime, now),
+-          lte(appointments.startTime, twoHoursLater),
+-        ),
+-      )
+-      .orderBy(appointments.startTime)
+-      .limit(20);
++  return async (req, res) => {
++    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
++    try {
++      const clinicId = req.clinicId!;
++      const now = new Date();
++      const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+ 
+-    const equipRows = await db
+-      .select({
+-        id: equipment.id,
+-        name: equipment.name,
+-        status: equipment.status,
+-        lastSeen: equipment.lastSeen,
+-        usuallyFoundHere: equipment.usuallyFoundHere,
+-        location: equipment.location,
+-        checkedOutLocation: equipment.checkedOutLocation,
+-        checkedOutById: equipment.checkedOutById,
+-        checkedOutByEmail: equipment.checkedOutByEmail,
+-        checkedOutAt: equipment.checkedOutAt,
+-        custodyState: equipment.custodyState,
+-        readinessState: equipment.readinessState,
+-        usageState: equipment.usageState,
+-        roomName: rooms.name,
+-        holderDisplayName: users.displayName,
+-      })
+-      .from(equipment)
+-      .leftJoin(rooms, and(eq(equipment.roomId, rooms.id), eq(rooms.clinicId, clinicId)))
+-      .leftJoin(users, and(eq(equipment.checkedOutById, users.id), eq(users.clinicId, clinicId)))
+-      .where(and(eq(equipment.clinicId, clinicId), isNull(equipment.deletedAt)));
+-
+-    const [alertCountRow] = await db
+-      .select({ count: sql<number>`count(*)::int` })
+-      .from(equipment)
+-      .where(
+-        and(
+-          eq(equipment.clinicId, clinicId),
+-          isNull(equipment.deletedAt),
+-          inArray(equipment.status, ["critical", "issue", "needs_attention"]),
+-        ),
+-      );
++      const overdueRows = await db
++        .select({
++          id: appointments.id,
++          startTime: appointments.startTime,
++          notes: appointments.notes,
++          taskType: appointments.taskType,
++        })
++        .from(appointments)
++        .where(
++          and(
++            eq(appointments.clinicId, clinicId),
++            inArray(appointments.status, ["pending", "assigned"]),
++            lt(appointments.startTime, now),
++          ),
++        )
++        .orderBy(appointments.startTime);
+ 
+-    const todayDate = now.toISOString().slice(0, 10);
+-    const nowTimeStr = now.toISOString().slice(11, 16);
+-    const shiftRows = await db
+-      .select()
+-      .from(shifts)
+-      .where(
+-        and(
+-          eq(shifts.clinicId, clinicId),
+-          eq(shifts.date, todayDate),
+-          lte(shifts.startTime, nowTimeStr),
+-          gte(shifts.endTime, nowTimeStr),
+-        ),
+-      );
++      const upcomingRows = await db
++        .select({
++          id: appointments.id,
++          startTime: appointments.startTime,
++          taskType: appointments.taskType,
++          notes: appointments.notes,
++          status: appointments.status,
++        })
++        .from(appointments)
++        .where(
++          and(
++            eq(appointments.clinicId, clinicId),
++            inArray(appointments.status, ["pending", "assigned", "scheduled"]),
++            gte(appointments.startTime, now),
++            lte(appointments.startTime, twoHoursLater),
++          ),
++        )
++        .orderBy(appointments.startTime)
++        .limit(20);
+ 
+-    const [latestCart] = await db
+-      .select()
+-      .from(crashCartChecks)
+-      .where(eq(crashCartChecks.clinicId, clinicId))
+-      .orderBy(desc(crashCartChecks.performedAt))
+-      .limit(1);
++      const equipRows = await db
++        .select({
++          id: equipment.id,
++          name: equipment.name,
++          status: equipment.status,
++          lastSeen: equipment.lastSeen,
++          usuallyFoundHere: equipment.usuallyFoundHere,
++          location: equipment.location,
++          checkedOutLocation: equipment.checkedOutLocation,
++          checkedOutById: equipment.checkedOutById,
++          checkedOutByEmail: equipment.checkedOutByEmail,
++          checkedOutAt: equipment.checkedOutAt,
++          custodyState: equipment.custodyState,
++          readinessState: equipment.readinessState,
++          usageState: equipment.usageState,
++          roomName: rooms.name,
++          holderDisplayName: users.displayName,
++        })
++        .from(equipment)
++        .leftJoin(rooms, and(eq(equipment.roomId, rooms.id), eq(rooms.clinicId, clinicId)))
++        .leftJoin(users, and(eq(equipment.checkedOutById, users.id), eq(users.clinicId, clinicId)))
++        .where(and(eq(equipment.clinicId, clinicId), isNull(equipment.deletedAt)));
+ 
+-    const [activeSession] = await db
+-      .select()
+-      .from(codeBlueSessions)
+-      .where(
+-        and(eq(codeBlueSessions.clinicId, clinicId), eq(codeBlueSessions.status, "active")),
+-      );
++      const [alertCountRow] = await db
++        .select({ count: sql<number>`count(*)::int` })
++        .from(equipment)
++        .where(
++          and(
++            eq(equipment.clinicId, clinicId),
++            isNull(equipment.deletedAt),
++            inArray(equipment.status, ["critical", "issue", "needs_attention"]),
++          ),
++        );
+ 
+-    let codeBluePayload = null;
+-    if (activeSession) {
+-      const logEntries = await db
++      const todayDate = now.toISOString().slice(0, 10);
++      const nowTimeStr = now.toISOString().slice(11, 16);
++      const shiftRows = await db
+         .select()
+-        .from(codeBlueLogEntries)
++        .from(shifts)
+         .where(
+           and(
+-            eq(codeBlueLogEntries.sessionId, activeSession.id),
+-            eq(codeBlueLogEntries.clinicId, clinicId),
++            eq(shifts.clinicId, clinicId),
++            eq(shifts.date, todayDate),
++            lte(shifts.startTime, nowTimeStr),
++            gte(shifts.endTime, nowTimeStr),
+           ),
+-        )
+-        .orderBy(codeBlueLogEntries.elapsedMs);
++        );
++
++      const [latestCart] = await db
++        .select()
++        .from(crashCartChecks)
++        .where(eq(crashCartChecks.clinicId, clinicId))
++        .orderBy(desc(crashCartChecks.performedAt))
++        .limit(1);
+ 
+-      const presence = await db
++      const [activeSession] = await db
+         .select()
+-        .from(codeBluePresence)
+-        .where(eq(codeBluePresence.sessionId, activeSession.id));
++        .from(codeBlueSessions)
++        .where(
++          and(eq(codeBlueSessions.clinicId, clinicId), eq(codeBlueSessions.status, "active")),
++        );
+ 
+-      const linkedEquipment = await fetchLinkedEquipmentForSession(clinicId, logEntries);
++      let codeBluePayload = null;
++      if (activeSession) {
++        const logEntries = await db
++          .select()
++          .from(codeBlueLogEntries)
++          .where(
++            and(
++              eq(codeBlueLogEntries.sessionId, activeSession.id),
++              eq(codeBlueLogEntries.clinicId, clinicId),
++            ),
++          )
++          .orderBy(codeBlueLogEntries.elapsedMs);
+ 
+-      codeBluePayload = {
+-        id: activeSession.id,
+-        startedAt: activeSession.startedAt.toISOString(),
+-        managerUserName: activeSession.managerUserName,
+-        preCheckPassed: activeSession.preCheckPassed,
+-        pushSentAt: activeSession.startedAt.toISOString(),
+-        linkedEquipment,
+-        logEntries: logEntries.map((e) => ({
+-          elapsedMs: e.elapsedMs,
+-          label: e.label,
+-          category: e.category,
+-          equipmentId: e.equipmentId,
+-          loggedByName: e.loggedByName,
+-        })),
+-        presence: presence.map((p) => ({
+-          userId: p.userId,
+-          userName: p.userName,
+-          lastSeenAt: p.lastSeenAt.toISOString(),
+-        })),
+-      };
+-    }
++        const presence = await db
++          .select()
++          .from(codeBluePresence)
++          .where(eq(codeBluePresence.sessionId, activeSession.id));
+ 
+-    res.json({
+-      currentTime: now.toISOString(),
+-      currentShift: shiftRows.map((s) => ({
+-        employeeName: s.employeeName,
+-        role: s.role,
+-      })),
+-      hospitalizations: [],
+-      equipment: equipRows.map((e) => ({
+-        id: e.id,
+-        name: e.name,
+-        status: e.status,
+-        inUse: !!e.checkedOutAt,
+-        heldBy: resolveHeldBy(e),
+-        lastCheckInAt: e.lastSeen?.toISOString() ?? null,
+-        probableLocation: resolveProbableLocation(e),
+-        isDeployable: isEquipmentFullyDeployable(
+-          e.custodyState,
+-          e.readinessState,
+-          e.usageState,
+-        ),
+-        custodyState: e.custodyState,
+-        readinessState: e.readinessState,
+-        usageState: e.usageState,
+-      })),
+-      upcomingTasks: upcomingRows.map((r) => ({
+-        id: r.id,
+-        startTime: r.startTime.toISOString(),
+-        taskType: r.taskType,
+-        notes: r.notes,
+-        status: r.status,
+-      })),
+-      overdueTasks: overdueRows.map((r) => ({
+-        id: r.id,
+-        startTime: r.startTime.toISOString(),
+-        taskType: r.taskType,
+-        notes: r.notes,
+-      })),
+-      activeAlertCount: alertCountRow?.count ?? 0,
+-      totalOverdueCount: overdueRows.length,
+-      crashCartStatus: latestCart
+-        ? {
+-            lastCheckedAt: latestCart.performedAt.toISOString(),
+-            allPassed: latestCart.allPassed,
+-            performedByName: latestCart.performedByName,
+-          }
+-        : null,
+-      codeBlueSession: codeBluePayload,
+-    });
+-  } catch (err) {
+-    console.error("[display snapshot]", err);
+-    res.status(500).json(
+-      apiError({
+-        code: "INTERNAL_ERROR",
+-        reason: "SNAPSHOT_FAILED",
+-        message: "Failed to load display snapshot",
+-        requestId,
+-      }),
+-    );
+-  }
+-});
++        const linkedEquipment = await fetchLinkedEquipmentForSession(clinicId, logEntries);
++
++        codeBluePayload = {
++          id: activeSession.id,
++          startedAt: activeSession.startedAt.toISOString(),
++          managerUserName: activeSession.managerUserName,
++          preCheckPassed: activeSession.preCheckPassed,
++          pushSentAt: activeSession.startedAt.toISOString(),
++          linkedEquipment,
++          logEntries: logEntries.map((e) => ({
++            elapsedMs: e.elapsedMs,
++            label: e.label,
++            category: e.category,
++            equipmentId: e.equipmentId,
++            loggedByName: e.loggedByName,
++          })),
++          presence: presence.map((p) => ({
++            userId: p.userId,
++            userName: p.userName,
++            lastSeenAt: p.lastSeenAt.toISOString(),
++          })),
++        };
++      }
+ 
+-router.post("/heartbeat", requireAuth, async (req, res) => {
+-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+-  try {
+-    const body: unknown = req.body ?? {};
+-    const sessionId =
+-      typeof (body as { displaySessionId?: unknown }).displaySessionId === "string"
+-        ? (body as { displaySessionId: string }).displaySessionId
+-        : null;
+-    const kioskMode = (body as { kioskMode?: unknown }).kioskMode === true;
++      let commandBoard: EquipmentCommandBoardSnapshot | null = null;
++      try {
++        commandBoard = await withTimeout(
++          buildBoard({ clinicId }),
++          commandBoardTimeoutMs,
++        );
++      } catch (error) {
++        console.warn("[display snapshot] command_board_build_failed", {
++          clinicId,
++          error: error instanceof Error ? error.message : String(error),
++        });
++      }
+ 
+-    if (!sessionId) {
+-      return res.status(400).json(
++      res.json({
++        currentTime: now.toISOString(),
++        currentShift: shiftRows.map((s) => ({
++          employeeName: s.employeeName,
++          role: s.role,
++        })),
++        hospitalizations: [],
++        equipment: equipRows.map((e) => ({
++          id: e.id,
++          name: e.name,
++          status: e.status,
++          inUse: !!e.checkedOutAt,
++          heldBy: resolveHeldBy(e),
++          lastCheckInAt: e.lastSeen?.toISOString() ?? null,
++          probableLocation: resolveProbableLocation(e),
++          isDeployable: isEquipmentFullyDeployable(
++            e.custodyState,
++            e.readinessState,
++            e.usageState,
++          ),
++          custodyState: e.custodyState,
++          readinessState: e.readinessState,
++          usageState: e.usageState,
++        })),
++        upcomingTasks: upcomingRows.map((r) => ({
++          id: r.id,
++          startTime: r.startTime.toISOString(),
++          taskType: r.taskType,
++          notes: r.notes,
++          status: r.status,
++        })),
++        overdueTasks: overdueRows.map((r) => ({
++          id: r.id,
++          startTime: r.startTime.toISOString(),
++          taskType: r.taskType,
++          notes: r.notes,
++        })),
++        activeAlertCount: alertCountRow?.count ?? 0,
++        totalOverdueCount: overdueRows.length,
++        crashCartStatus: latestCart
++          ? {
++              lastCheckedAt: latestCart.performedAt.toISOString(),
++              allPassed: latestCart.allPassed,
++              performedByName: latestCart.performedByName,
++            }
++          : null,
++        codeBlueSession: codeBluePayload,
++        commandBoard,
++      });
++    } catch (err) {
++      console.error("[display snapshot]", err);
++      res.status(500).json(
+         apiError({
+-          code: "INVALID_INPUT",
+-          reason: "MISSING_DISPLAY_SESSION_ID",
+-          message: "displaySessionId is required",
++          code: "INTERNAL_ERROR",
++          reason: "SNAPSHOT_FAILED",
++          message: "Failed to load display snapshot",
+           requestId,
+         }),
+       );
+     }
++  };
++}
+ 
+-    const result = await recordHeartbeat({ rawSessionId: sessionId, kioskMode });
++function createDisplayHeartbeatHandler(): RequestHandler {
++  return async (req, res) => {
++    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
++    try {
++      const body: unknown = req.body ?? {};
++      const sessionId =
++        typeof (body as { displaySessionId?: unknown }).displaySessionId === "string"
++          ? (body as { displaySessionId: string }).displaySessionId
++          : null;
++      const kioskMode = (body as { kioskMode?: unknown }).kioskMode === true;
+ 
+-    if (result.accepted) {
+-      incrementMetric(
+-        result.kioskMode
+-          ? "display_heartbeats_received_kiosk"
+-          : "display_heartbeats_received_non_kiosk",
+-        1,
+-      );
++      if (!sessionId) {
++        return res.status(400).json(
++          apiError({
++            code: "INVALID_INPUT",
++            reason: "MISSING_DISPLAY_SESSION_ID",
++            message: "displaySessionId is required",
++            requestId,
++          }),
++        );
++      }
++
++      const result = await recordHeartbeat({ rawSessionId: sessionId, kioskMode });
++
++      if (result.accepted) {
++        incrementMetric(
++          result.kioskMode
++            ? "display_heartbeats_received_kiosk"
++            : "display_heartbeats_received_non_kiosk",
++          1,
++        );
++      }
++
++      res.json({ ok: true });
++    } catch (err) {
++      console.warn("[display:heartbeat]", (err as Error).message);
++      res.json({ ok: true });
+     }
++  };
++}
+ 
+-    res.json({ ok: true });
+-  } catch (err) {
+-    console.warn("[display:heartbeat]", (err as Error).message);
+-    res.json({ ok: true });
+-  }
+-});
++/** Factory — mount a fresh Router per path (never reuse the same instance). */
++export function createDisplayRouter(deps: DisplayRouterDeps = {}): Router {
++  const router = Router();
++  router.get("/snapshot", requireAuth, createDisplaySnapshotHandler(deps));
++  router.post("/heartbeat", requireAuth, createDisplayHeartbeatHandler());
++  return router;
++}
+ 
+-export default router;
++/** @deprecated Prefer `createDisplayRouter()` at mount sites. */
++const defaultRouter = createDisplayRouter();
++export default defaultRouter;
+diff --git a/server/routes/equipment-copilot.ts b/server/routes/equipment-copilot.ts
+new file mode 100644
+index 00000000..f9e369d0
+--- /dev/null
++++ b/server/routes/equipment-copilot.ts
+@@ -0,0 +1,39 @@
++import { Router } from "express";
++import { requireAuth } from "../middleware/auth.js";
++
++const router = Router();
++
++function copilotDisabled(_req: Parameters<typeof requireAuth>[0], res: import("express").Response) {
++  return res.status(404).json({
++    code: "NOT_FOUND",
++    error: "NOT_FOUND",
++    reason: "COPILOT_DISABLED",
++    message: "Asset copilot is not enabled",
++  });
++}
++
++function requireCopilotEnabled(
++  req: Parameters<typeof requireAuth>[0],
++  res: import("express").Response,
++  next: () => void,
++) {
++  if (process.env.ENABLE_ASSET_COPILOT?.trim() !== "true") {
++    return copilotDisabled(req, res);
++  }
++  next();
++}
++
++router.use(requireAuth);
++router.use(requireCopilotEnabled);
++
++/** Advisory-only stub — full LLM wiring is out of PR17 scope without provider keys. */
++router.post("/:id/copilot/explain", (_req, res) => {
++  res.status(501).json({
++    code: "NOT_IMPLEMENTED",
++    error: "NOT_IMPLEMENTED",
++    reason: "COPILOT_ADVISORY_STUB",
++    message: "Copilot explain is not wired in this environment",
++  });
++});
++
++export default router;
+diff --git a/server/routes/platform-capabilities.ts b/server/routes/platform-capabilities.ts
+new file mode 100644
+index 00000000..157cd350
+--- /dev/null
++++ b/server/routes/platform-capabilities.ts
+@@ -0,0 +1,18 @@
++import { Router } from "express";
++import { requireAuth } from "../middleware/auth.js";
++
++const router = Router();
++
++/** Audit-first capability surface (defaults unchanged). */
++router.get("/capabilities", requireAuth, (_req, res) => {
++  res.json({
++    clinicalApi: process.env.ENABLE_CLINICAL_API === "true",
++    dispenseApi: process.env.ENABLE_DISPENSE_API === "true",
++    shiftChatApi: process.env.ENABLE_SHIFT_CHAT_API === "true",
++    broadInventory: process.env.ENABLE_BROAD_INVENTORY === "true",
++    broadProcurement: process.env.ENABLE_BROAD_PROCUREMENT === "true",
++    assetCopilot: process.env.ENABLE_ASSET_COPILOT === "true",
++  });
++});
++
++export default router;
+diff --git a/server/services/equipment-command-board.service.ts b/server/services/equipment-command-board.service.ts
+new file mode 100644
+index 00000000..edbea349
+--- /dev/null
++++ b/server/services/equipment-command-board.service.ts
+@@ -0,0 +1,174 @@
++import { and, eq, inArray, isNull } from "drizzle-orm";
++import { db, equipment, rooms } from "../db.js";
++import type {
++  EquipmentBoardAlert,
++  EquipmentBoardTypeRow,
++  EquipmentBoardUnitRow,
++  EquipmentCommandBoardSnapshot,
++  EquipmentReadinessStatus,
++} from "../../shared/equipment-board.js";
++import { isEquipmentFullyDeployable } from "./equipment-operational-state.service.js";
++import { getReadinessRules } from "./equipment-readiness-rules.service.js";
++
++export type BuildCommandBoardSnapshotFn = (params: {
++  clinicId: string;
++}) => Promise<EquipmentCommandBoardSnapshot>;
++
++function deriveReadinessStatus(row: {
++  checkedOutAt: Date | null;
++  custodyState: string;
++  readinessState: string;
++  usageState: string;
++  status: string;
++  lastSeen: Date | null;
++}): EquipmentReadinessStatus {
++  if (row.status === "critical" && row.usageState === "emergency_use") return "in_use";
++  if (!isEquipmentFullyDeployable(row.custodyState, row.readinessState, row.usageState)) {
++    if (row.readinessState === "not_ready" || row.usageState !== "available") return "blocked";
++    return "unknown";
++  }
++  if (row.checkedOutAt) return "in_use";
++  return "ready";
++}
++
++/** Builds equipment command board snapshot (critical rows, overview, alerts, utilization signals). */
++export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (params) => {
++  const { clinicId } = params;
++  const now = new Date();
++  const rules = await getReadinessRules(clinicId);
++  const staleCutoff = new Date(now.getTime() - rules.staleEvidenceMs);
++
++  const rows = await db
++    .select({
++      id: equipment.id,
++      name: equipment.name,
++      status: equipment.status,
++      assetTypeId: equipment.assetTypeId,
++      checkedOutAt: equipment.checkedOutAt,
++      custodyState: equipment.custodyState,
++      readinessState: equipment.readinessState,
++      usageState: equipment.usageState,
++      lastSeen: equipment.lastSeen,
++      roomName: rooms.name,
++    })
++    .from(equipment)
++    .leftJoin(rooms, and(eq(equipment.roomId, rooms.id), eq(rooms.clinicId, clinicId)))
++    .where(
++      and(
++        eq(equipment.clinicId, clinicId),
++        isNull(equipment.deletedAt),
++        inArray(equipment.status, ["critical", "issue", "needs_attention"]),
++      ),
++    );
++
++  const criticalUnits: EquipmentBoardUnitRow[] = rows.map((row) => {
++    const status = deriveReadinessStatus(row);
++    const stale =
++      row.lastSeen != null
++        ? row.lastSeen < staleCutoff
++        : true;
++    const resolvedStatus: EquipmentReadinessStatus = stale && status === "ready" ? "stale" : status;
++    return {
++      equipmentId: row.id,
++      displayName: row.name,
++      status: resolvedStatus,
++      locationName: row.roomName ?? undefined,
++      lastEvidenceAt: row.lastSeen?.toISOString(),
++      blockingReasons:
++        resolvedStatus === "blocked" ? [`readiness:${row.readinessState}`] : [],
++      citationsCount: 0,
++      truthHref: `/api/equipment/${row.id}/truth`,
++    };
++  });
++
++  const overview = {
++    totalCritical: criticalUnits.length,
++    ready: criticalUnits.filter((u) => u.status === "ready").length,
++    inUse: criticalUnits.filter((u) => u.status === "in_use").length,
++    blocked: criticalUnits.filter((u) => u.status === "blocked").length,
++    stale: criticalUnits.filter((u) => u.status === "stale").length,
++    overdue: criticalUnits.filter((u) => u.status === "overdue").length,
++    unknown: criticalUnits.filter((u) => u.status === "unknown").length,
++    belowThresholdTypes: 0,
++    activeEmergencyUnits: criticalUnits.filter((u) => u.status === "in_use").length,
++  };
++
++  const byTypeMap = new Map<string, EquipmentBoardTypeRow>();
++  for (const unit of criticalUnits) {
++    const typeName = rows.find((r) => r.id === unit.equipmentId)?.assetTypeId ?? "uncategorized";
++    const key = String(typeName);
++    const existing = byTypeMap.get(key) ?? {
++      typeName: key,
++      total: 0,
++      ready: 0,
++      inUse: 0,
++      blocked: 0,
++      stale: 0,
++      overdue: 0,
++      unknown: 0,
++      belowMinimumReady: false,
++    };
++    existing.total += 1;
++    if (unit.status === "ready") existing.ready += 1;
++    else if (unit.status === "in_use") existing.inUse += 1;
++    else if (unit.status === "blocked") existing.blocked += 1;
++    else if (unit.status === "stale") existing.stale += 1;
++    else if (unit.status === "overdue") existing.overdue += 1;
++    else existing.unknown += 1;
++    const minReady = rules.minimumReadyByType[key];
++    if (typeof minReady === "number" && existing.ready < minReady) {
++      existing.belowMinimumReady = true;
++      existing.minimumReady = minReady;
++    }
++    byTypeMap.set(key, existing);
++  }
++
++  const alerts: EquipmentBoardAlert[] = [];
++  for (const unit of criticalUnits) {
++    if (unit.status === "blocked") {
++      alerts.push({
++        id: `blocked:${unit.equipmentId}`,
++        type: "critical_unit_blocked",
++        severity: "critical",
++        equipmentId: unit.equipmentId,
++        message: `${unit.displayName} is blocked`,
++        recommendedAction: "open_detail",
++      });
++    } else if (unit.status === "stale") {
++      alerts.push({
++        id: `stale:${unit.equipmentId}`,
++        type: "critical_unit_stale",
++        severity: "warning",
++        equipmentId: unit.equipmentId,
++        message: `${unit.displayName} has stale evidence`,
++        recommendedAction: "confirm_location",
++      });
++    }
++  }
++
++  overview.belowThresholdTypes = [...byTypeMap.values()].filter((t) => t.belowMinimumReady).length;
++
++  const utilizationScore = (unit: EquipmentBoardUnitRow) =>
++    (unit.status === "in_use" ? 3 : 0) + (unit.status === "ready" ? 1 : 0);
++
++  const sortedByUtil = [...criticalUnits].sort(
++    (a, b) => utilizationScore(b) - utilizationScore(a),
++  );
++
++  return {
++    generatedAt: now.toISOString(),
++    clinicId,
++    overview,
++    byType: [...byTypeMap.values()],
++    byLocation: [],
++    criticalUnits,
++    alerts,
++    roiSignals: {
++      overusedUnits: sortedByUtil.slice(0, 5),
++      underusedUnits: sortedByUtil.slice(-5).reverse(),
++      repairReplaceCandidates: criticalUnits.filter((u) => u.status === "blocked"),
++      typeShortages: [...byTypeMap.values()].filter((t) => t.belowMinimumReady),
++      duplicatePurchaseRisks: [],
++    },
++  };
++};
+diff --git a/server/services/equipment-readiness-rules.service.ts b/server/services/equipment-readiness-rules.service.ts
+new file mode 100644
+index 00000000..9c0d8e11
+--- /dev/null
++++ b/server/services/equipment-readiness-rules.service.ts
+@@ -0,0 +1,31 @@
++import { eq } from "drizzle-orm";
++import { db, serverConfig } from "../db.js";
++import {
++  parseEquipmentReadinessRulesV1,
++  type EquipmentReadinessRulesV1,
++} from "../../shared/equipment-readiness-rules.js";
++
++/** Per-clinic key in `vt_server_config` (no global clinic semantics). */
++export const READINESS_RULES_CONFIG_KEY = (clinicId: string) =>
++  `equipment.readinessRules.v1:${clinicId}`;
++
++const rulesCache = new Map<string, { rules: EquipmentReadinessRulesV1; loadedAt: number }>();
++const CACHE_TTL_MS = 60_000;
++
++export async function getReadinessRules(clinicId: string): Promise<EquipmentReadinessRulesV1> {
++  const cached = rulesCache.get(clinicId);
++  if (cached && Date.now() - cached.loadedAt < CACHE_TTL_MS) {
++    return cached.rules;
++  }
++
++  const key = READINESS_RULES_CONFIG_KEY(clinicId);
++  const [row] = await db
++    .select({ value: serverConfig.value })
++    .from(serverConfig)
++    .where(eq(serverConfig.key, key))
++    .limit(1);
++
++  const rules = parseEquipmentReadinessRulesV1(row?.value ?? null);
++  rulesCache.set(clinicId, { rules, loadedAt: Date.now() });
++  return rules;
++}
+diff --git a/shared/equipment-board.ts b/shared/equipment-board.ts
+new file mode 100644
+index 00000000..84cb420c
+--- /dev/null
++++ b/shared/equipment-board.ts
+@@ -0,0 +1,131 @@
++export type EquipmentReadinessStatus =
++  | "ready"
++  | "in_use"
++  | "blocked"
++  | "stale"
++  | "overdue"
++  | "unknown";
++
++export type EquipmentBoardUnitRow = {
++  equipmentId: string;
++  displayName: string;
++  typeName?: string;
++  status: EquipmentReadinessStatus;
++  locationName?: string;
++  custodianName?: string;
++  lastEvidenceAt?: string;
++  lastHumanConfirmationAt?: string;
++  rfid?: {
++    lastSeenAt?: string;
++    readerId?: string;
++    readerName?: string;
++    locationId?: string;
++    locationName?: string;
++    confidence: "low" | "medium" | "high";
++    readsInWindow?: number;
++  };
++  evidenceConflict?: {
++    type:
++      | "rfid_overrides_human_location"
++      | "ambiguous_rfid_location"
++      | "custody_location_mismatch";
++    action: "confirm_location" | "return" | "open_detail";
++    message: string;
++  };
++  blockingReasons: string[];
++  citationsCount: number;
++  nextAction?: string;
++  truthHref: string;
++};
++
++export type EquipmentBoardTypeRow = {
++  typeId?: string;
++  typeName: string;
++  total: number;
++  ready: number;
++  inUse: number;
++  blocked: number;
++  stale: number;
++  overdue: number;
++  unknown: number;
++  minimumReady?: number;
++  belowMinimumReady: boolean;
++};
++
++export type EquipmentBoardLocationRow = {
++  locationId?: string;
++  locationName: string;
++  totalCritical: number;
++  ready: number;
++  inUse: number;
++  blocked: number;
++  stale: number;
++  overdue: number;
++  unknown: number;
++};
++
++export type EquipmentBoardAlert = {
++  id: string;
++  type:
++    | "critical_unit_blocked"
++    | "critical_unit_stale"
++    | "critical_unit_unknown"
++    | "inspection_overdue"
++    | "maintenance_overdue"
++    | "type_below_minimum_ready"
++    | "location_below_expected_ready"
++    | "active_emergency_equipment_in_use"
++    | "post_emergency_reset_required"
++    | "repeated_repair"
++    | "high_downtime"
++    | "truth_resolution_failed"
++    | "ambiguous_rfid_location"
++    | "custody_location_mismatch"
++    | "rfid_reader_offline";
++  severity: "info" | "warning" | "critical";
++  equipmentId?: string;
++  message: string;
++  recommendedAction?: string;
++  citationIds?: string[];
++};
++
++export type EquipmentBoardRoiSignals = {
++  overusedUnits: unknown[];
++  underusedUnits: unknown[];
++  repairReplaceCandidates: unknown[];
++  typeShortages: unknown[];
++  duplicatePurchaseRisks: unknown[];
++};
++
++export type EquipmentCommandBoardSnapshot = {
++  generatedAt: string;
++  clinicId: string;
++  overview: {
++    totalCritical: number;
++    ready: number;
++    inUse: number;
++    blocked: number;
++    stale: number;
++    overdue: number;
++    unknown: number;
++    belowThresholdTypes: number;
++    activeEmergencyUnits: number;
++  };
++  byType: EquipmentBoardTypeRow[];
++  byLocation: EquipmentBoardLocationRow[];
++  criticalUnits: EquipmentBoardUnitRow[];
++  alerts: EquipmentBoardAlert[];
++  activeEmergency?: {
++    sessionId: string;
++    startedAt: string;
++    elapsedMs: number;
++    linkedEquipment: Array<{
++      equipmentId: string;
++      displayName: string;
++      typeName?: string;
++      currentStatus: EquipmentReadinessStatus;
++      locationName?: string;
++    }>;
++  };
++  roiSignals: EquipmentBoardRoiSignals;
++};
+diff --git a/shared/equipment-readiness-rules.ts b/shared/equipment-readiness-rules.ts
+new file mode 100644
+index 00000000..35af35ad
+--- /dev/null
++++ b/shared/equipment-readiness-rules.ts
+@@ -0,0 +1,33 @@
++/** Clinic-scoped readiness rules (`equipment.readinessRules.v1`). */
++export type EquipmentReadinessRulesV1 = {
++  version: 1;
++  staleEvidenceMs: number;
++  minimumReadyByType: Record<string, number>;
++};
++
++export const DEFAULT_EQUIPMENT_READINESS_RULES_V1: EquipmentReadinessRulesV1 = {
++  version: 1,
++  staleEvidenceMs: 86_400_000,
++  minimumReadyByType: {},
++};
++
++export function parseEquipmentReadinessRulesV1(raw: string | null): EquipmentReadinessRulesV1 {
++  if (!raw?.trim()) return DEFAULT_EQUIPMENT_READINESS_RULES_V1;
++  try {
++    const parsed = JSON.parse(raw) as Partial<EquipmentReadinessRulesV1>;
++    if (parsed.version !== 1) return DEFAULT_EQUIPMENT_READINESS_RULES_V1;
++    return {
++      version: 1,
++      staleEvidenceMs:
++        typeof parsed.staleEvidenceMs === "number" && parsed.staleEvidenceMs > 0
++          ? parsed.staleEvidenceMs
++          : DEFAULT_EQUIPMENT_READINESS_RULES_V1.staleEvidenceMs,
++      minimumReadyByType:
++        parsed.minimumReadyByType && typeof parsed.minimumReadyByType === "object"
++          ? parsed.minimumReadyByType
++          : {},
++    };
++  } catch {
++    return DEFAULT_EQUIPMENT_READINESS_RULES_V1;
++  }
++}
+diff --git a/src/app/routes.tsx b/src/app/routes.tsx
+index 8d88cee7..cab55039 100644
+--- a/src/app/routes.tsx
++++ b/src/app/routes.tsx
+@@ -80,7 +80,8 @@ export function AppRoutes() {
+         <Route path="/equipment"><AuthGuard><EquipmentPage /></AuthGuard></Route>
+         <Route path="/equipment/intelligence"><Redirect to="/equipment" replace /></Route>
+         <Route path="/equipment/new"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
+-        <Route path="/equipment/scan"><Redirect to="/equipment" replace /></Route>
++        <Route path="/scan"><Redirect to="/equipment?scan=1" replace /></Route>
++        <Route path="/equipment/scan"><Redirect to="/equipment?scan=1" replace /></Route>
+         <Route path="/equipment/maintenance"><Redirect to="/equipment?status=maintenance" replace /></Route>
+         <Route path="/equipment/:id/edit"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
+         <Route path="/equipment/:id/qr"><AuthGuard><EquipmentQrPrintPage /></AuthGuard></Route>
+@@ -89,13 +90,22 @@ export function AppRoutes() {
+         <Route path="/my-equipment"><AuthGuard><MyEquipmentPage /></AuthGuard></Route>
+         <Route path="/rooms"><AuthGuard><RoomsListPage /></AuthGuard></Route>
+         <Route path="/rooms/:id"><AuthGuard><RoomRadarPage /></AuthGuard></Route>
++        <Route path="/locations"><AuthGuard><RoomsListPage /></AuthGuard></Route>
++        <Route path="/locations/:id"><AuthGuard><RoomRadarPage /></AuthGuard></Route>
+         <Route path="/print"><AuthGuard><QrPrintPage /></AuthGuard></Route>
+ 
+         <Route path="/code-blue"><AuthGuard><CodeBluePage /></AuthGuard></Route>
++        <Route path="/emergency-equipment-log"><AuthGuard><CodeBluePage /></AuthGuard></Route>
+         <Route path="/display"><AuthGuard><WardDisplayPage /></AuthGuard></Route>
++        <Route path="/equipment-board"><AuthGuard><WardDisplayPage /></AuthGuard></Route>
+         <Route path="/code-blue/display"><AuthGuard><CodeBlueDisplay /></AuthGuard></Route>
++        <Route path="/emergency-equipment-wall"><AuthGuard><CodeBlueDisplay /></AuthGuard></Route>
++        <Route path="/appointments"><AuthGuard><AppointmentsPage /></AuthGuard></Route>
++        <Route path="/equipment-tasks"><AuthGuard><AppointmentsPage /></AuthGuard></Route>
+         <Route path="/crash-cart"><AuthGuard><CrashCartCheckPage /></AuthGuard></Route>
++        <Route path="/critical-kit-check"><AuthGuard><CrashCartCheckPage /></AuthGuard></Route>
+         <Route path="/admin/code-blue-history"><AuthGuard><CodeBlueHistoryPage /></AuthGuard></Route>
++        <Route path="/emergency-equipment-history"><AuthGuard><CodeBlueHistoryPage /></AuthGuard></Route>
+ 
+         <Route path="/admin"><AuthGuard><AdminPage /></AuthGuard></Route>
+         <Route path="/settings"><AuthGuard><SettingsPage /></AuthGuard></Route>
+@@ -111,7 +121,6 @@ export function AppRoutes() {
+         <Route path="/admin/asset-types"><AuthGuard><AdminAssetTypesPage /></AuthGuard></Route>
+         <Route path="/admin/docks"><AuthGuard><AdminDocksPage /></AuthGuard></Route>
+         <Route path="/admin/metrics"><AuthGuard><OperationalMetricsDashboardPage /></AuthGuard></Route>
+-        <Route path="/appointments"><AuthGuard><AppointmentsPage /></AuthGuard></Route>
+         <Route path="/meds"><Redirect to="/appointments" replace /></Route>
+         <Route path="/pharmacy-forecast"><Redirect to="/appointments" replace /></Route>
+         <Route path="/admin/medication-integrity"><Redirect to="/admin" replace /></Route>
+diff --git a/src/components/layout.tsx b/src/components/layout.tsx
+index e8aee442..38c25b45 100644
+--- a/src/components/layout.tsx
++++ b/src/components/layout.tsx
+@@ -77,6 +77,10 @@ import {
+   safeStorageSetItem,
+ } from "@/lib/safe-browser";
+ import { DispenseSheet } from "@/features/containers/components/DispenseSheet";
++import { CANONICAL_HREFS } from "@/lib/routes/canonical-hrefs";
++import { matchesRouteFamily } from "@/lib/routes/matches-route-family";
++import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
++import { ROUTE_ALIAS_GROUPS } from "@/lib/routes/route-alias-groups";
+ interface NavItem {
+   href: string;
+   label: string;
+@@ -110,7 +114,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
+ 
+   const [location, navigate] = useLocation();
+ 
+-  const isNavItemActive = (href: string) => location === href;
++  const isNavItemActive = (href: string) => resolveNavItemActive(location, href);
+ 
+   const [menuOpen, setMenuOpen] = useState(false);
+   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
+@@ -415,34 +419,48 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
+     { href: "/", label: lh.home, icon: <Home className="w-5 h-5" /> },
+     { href: "/equipment", label: t.equipment.title, icon: <Package className="w-5 h-5" /> },
+     {
+-      href: "/alerts",
+-      label: t.layout.nav.alerts,
+-      icon: <AlertTriangle className="w-5 h-5" />,
+-      badgeCount: alertCount,
++      href: CANONICAL_HREFS.equipmentBoard,
++      label: t.layout.nav.equipmentCommandBoard,
++      icon: <Monitor className="w-5 h-5" />,
++    },
++    {
++      href: CANONICAL_HREFS.equipmentTasks,
++      label: t.layout.nav.equipmentTasks,
++      icon: <CalendarDays className="w-5 h-5" />,
+     },
+     ...(canAccessCodeBlue
+       ? [{
+-          href: "/code-blue",
+-          label: lh.codeBlue,
+-          icon: <Siren className="w-5 h-5 text-red-500" />,
+-        } satisfies NavItem]
+-      : []),
+-    ...(canAccessCodeBlue
+-      ? [{
+-          href: "/crash-cart",
+-          label: lh.crashCart,
++          href: CANONICAL_HREFS.criticalKitCheck,
++          label: t.layout.nav.criticalKitCheck,
+           icon: <CheckCircle2 className="w-5 h-5" />,
+         } satisfies NavItem]
+       : []),
++    {
++      href: CANONICAL_HREFS.locations,
++      label: t.layout.nav.locations,
++      icon: <Radar className="w-5 h-5" />,
++    },
+     {
+       href: "/my-equipment",
+       label: t.layout.nav.mine,
+       icon: <PackageOpen className="w-5 h-5" />,
+       badgeCount: myCount,
+     },
+-    { href: "/appointments", label: lh.tasks, icon: <CalendarDays className="w-5 h-5" />, menuOnly: true },
+-    { href: "/display", label: lh.wardDisplay, icon: <Monitor className="w-5 h-5" />, menuOnly: true },
+-    { href: "/rooms", label: lh.radar, icon: <Radar className="w-5 h-5" /> },
++    {
++      href: "/alerts",
++      label: t.layout.nav.alerts,
++      icon: <AlertTriangle className="w-5 h-5" />,
++      badgeCount: alertCount,
++      menuOnly: true,
++    },
++    ...(canAccessCodeBlue
++      ? [{
++          href: CANONICAL_HREFS.emergencyEquipmentLog,
++          label: t.layout.nav.emergencyEquipmentLog,
++          icon: <Siren className="w-5 h-5 text-red-500" />,
++          menuOnly: true,
++        } satisfies NavItem]
++      : []),
+     ...(canAccessInventoryNav
+       ? [{ href: "/inventory", label: lh.inventory, icon: <Package className="w-5 h-5" /> } satisfies NavItem]
+       : []),
+@@ -465,7 +483,13 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
+       adminOnly: true,
+       menuOnly: true,
+     },
+-    { href: "/admin/code-blue-history", label: lh.codeBlueHistory, icon: <Clock className="w-5 h-5" />, adminOnly: true, menuOnly: true },
++    {
++      href: CANONICAL_HREFS.emergencyEquipmentHistory,
++      label: t.layout.nav.emergencyEquipmentHistory,
++      icon: <Clock className="w-5 h-5" />,
++      adminOnly: true,
++      menuOnly: true,
++    },
+     { href: "/settings", label: lh.settings, icon: <Settings className="w-5 h-5" />, menuOnly: true },
+     ];
+     return allItems;
+@@ -482,7 +506,17 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
+ 
+   const operationMenuItems = useMemo(
+     () =>
+-      ["/", "/equipment", "/alerts", "/code-blue", "/crash-cart", "/my-equipment", "/appointments", "/display", "/rooms", "/inventory"]
++      [
++        "/",
++        "/equipment",
++        CANONICAL_HREFS.equipmentBoard,
++        CANONICAL_HREFS.equipmentTasks,
++        CANONICAL_HREFS.criticalKitCheck,
++        CANONICAL_HREFS.locations,
++        "/my-equipment",
++        "/alerts",
++        "/inventory",
++      ]
+         .map((href) => visibleItems.find((i) => i.href === href))
+         .filter((x): x is NavItem => x != null),
+     [visibleItems],
+@@ -497,7 +531,16 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
+   const operationalControlMenuItems = useMemo(() => [] as NavItem[], []);
+   const systemMenuItems = useMemo(
+     () =>
+-      ["/app-tour", "/whats-new", "/help", "/audit-log", "/admin/ops-dashboard", "/admin/code-blue-history", "/settings"]
++      [
++        "/app-tour",
++        "/whats-new",
++        "/help",
++        "/audit-log",
++        "/admin/ops-dashboard",
++        CANONICAL_HREFS.emergencyEquipmentHistory,
++        CANONICAL_HREFS.emergencyEquipmentLog,
++        "/settings",
++      ]
+         .map((href) => visibleItems.find((i) => i.href === href))
+         .filter((x): x is NavItem => x != null),
+     [visibleItems],
+@@ -506,15 +549,15 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
+   const bottomNavActive = useMemo(
+     () => ({
+       home: location === "/home" || location === "/" || location === "",
+-      equipment: location.startsWith("/equipment"),
+-      rooms: location.startsWith("/rooms"),
++      equipment: matchesRouteFamily(location, ["/equipment"]),
++      locations: matchesRouteFamily(location, ROUTE_ALIAS_GROUPS.locations),
+     }),
+     [location],
+   );
+ 
+   const activeTabIndex = useMemo(() => {
+     if (menuOpen) return 4;
+-    if (bottomNavActive.rooms) return 3;
++    if (bottomNavActive.locations) return 3;
+     if (bottomNavActive.equipment) return 1;
+     if (bottomNavActive.home) return 0;
+     return -1;
+@@ -1241,24 +1284,24 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
+               </div>
+ 
+               <Link
+-                href="/rooms"
++                href={CANONICAL_HREFS.locations}
+                 className="flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] transition-opacity duration-150 active:opacity-80 motion-reduce:active:opacity-100 rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface cursor-pointer"
+-                data-testid="bottom-nav-rooms"
++                data-testid="bottom-nav-locations"
+               >
+                 <Map
+                   className={cn(
+                     "w-6 h-6 transition-all duration-200",
+-                    bottomNavActive.rooms ? "text-ivory-green scale-110" : "text-ivory-text3 scale-100",
++                    bottomNavActive.locations ? "text-ivory-green scale-110" : "text-ivory-text3 scale-100",
+                   )}
+                   aria-hidden
+                 />
+                 <span
+                   className={cn(
+                     "text-[10px] font-semibold leading-tight text-center max-w-[4.5rem] truncate px-0.5",
+-                    bottomNavActive.rooms ? "text-ivory-green" : "text-ivory-text3",
++                    bottomNavActive.locations ? "text-ivory-green" : "text-ivory-text3",
+                   )}
+                 >
+-                  {lh.bottomRooms}
++                  {t.layout.nav.locations}
+                 </span>
+               </Link>
+ 
+diff --git a/src/components/layout/IconSidebar.tsx b/src/components/layout/IconSidebar.tsx
+index 141070eb..118eb387 100644
+--- a/src/components/layout/IconSidebar.tsx
++++ b/src/components/layout/IconSidebar.tsx
+@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
+ import { cn } from "@/lib/utils";
+ import { useDirection } from "@/hooks/useDirection";
+ import type { LucideIcon } from "lucide-react";
++import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
+ 
+ export interface SidebarItem {
+   href: string;
+@@ -32,7 +33,7 @@ export function IconSidebar({ items }: IconSidebarProps) {
+       )}
+     >
+       {items.map((item) => {
+-        const isActive = location.startsWith(item.href);
++        const isActive = resolveNavItemActive(location, item.href);
+         const Icon = item.icon;
+         return (
+           <Link key={item.href} href={item.href}>
+diff --git a/src/components/layout/Topbar.tsx b/src/components/layout/Topbar.tsx
+index d6447066..6ae6e036 100644
+--- a/src/components/layout/Topbar.tsx
++++ b/src/components/layout/Topbar.tsx
+@@ -3,6 +3,8 @@ import { Link, useLocation } from "wouter";
+ import { cn } from "@/lib/utils";
+ import { useAuth } from "@/hooks/use-auth";
+ import { useDirection } from "@/hooks/useDirection";
++import { CANONICAL_HREFS } from "@/lib/routes/canonical-hrefs";
++import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
+ 
+ export interface TopbarSection {
+   href: string;
+@@ -14,8 +16,8 @@ export interface TopbarSection {
+ const SECTIONS: TopbarSection[] = [
+   { href: "/home",         label: "Home" },
+   { href: "/equipment",    label: "Equipment" },
+-  { href: "/appointments", label: "Shifts",    pilotHidden: true },
+-  { href: "/display",      label: "Ward" },
++  { href: CANONICAL_HREFS.equipmentTasks, label: "Equipment Tasks", pilotHidden: true },
++  { href: CANONICAL_HREFS.equipmentBoard, label: "Equipment Command Board" },
+   { href: "/admin",        label: "Admin", adminOnly: true },
+ ];
+ 
+@@ -28,12 +30,11 @@ export function Topbar() {
+     ( !s.adminOnly || isAdmin)
+   );
+ 
+-  // Match the most specific prefix
+   const activeHref =
+     visibleSections
+       .slice()
+       .sort((a, b) => b.href.length - a.href.length)
+-      .find((s) => location.startsWith(s.href))?.href ?? "";
++      .find((s) => resolveNavItemActive(location, s.href))?.href ?? "";
+ 
+   return (
+     <header
+diff --git a/src/lib/i18n.generated.d.ts b/src/lib/i18n.generated.d.ts
+index d961cf98..1a14d731 100644
+--- a/src/lib/i18n.generated.d.ts
++++ b/src/lib/i18n.generated.d.ts
+@@ -41,6 +41,12 @@ export interface TStructure {
+   };
+   layout: {
+     nav: {
++      equipmentCommandBoard: string;
++      equipmentTasks: string;
++      criticalKitCheck: string;
++      locations: string;
++      emergencyEquipmentLog: string;
++      emergencyEquipmentHistory: string;
+       alerts: string;
+       mine: string;
+       operationalControlSection: string;
+diff --git a/src/lib/routes/canonical-hrefs.ts b/src/lib/routes/canonical-hrefs.ts
+new file mode 100644
+index 00000000..be1444c4
+--- /dev/null
++++ b/src/lib/routes/canonical-hrefs.ts
+@@ -0,0 +1,10 @@
++/** Canonical generated hrefs for migrated wedge surfaces. */
++export const CANONICAL_HREFS = {
++  equipmentBoard: "/equipment-board",
++  equipmentTasks: "/equipment-tasks",
++  locations: "/locations",
++  criticalKitCheck: "/critical-kit-check",
++  emergencyEquipmentLog: "/emergency-equipment-log",
++  emergencyEquipmentWall: "/emergency-equipment-wall",
++  emergencyEquipmentHistory: "/emergency-equipment-history",
++} as const;
+diff --git a/src/lib/routes/matches-route-family.ts b/src/lib/routes/matches-route-family.ts
+new file mode 100644
+index 00000000..1510ce2f
+--- /dev/null
++++ b/src/lib/routes/matches-route-family.ts
+@@ -0,0 +1,14 @@
++import { normalizePathname } from "./normalize-pathname.js";
++
++/** Segment-aware route-family match (no naive prefix on unrelated paths). */
++export function matchesRouteFamily(
++  location: string,
++  routes: readonly string[],
++): boolean {
++  const pathname = normalizePathname(location);
++  return routes.some((route) => {
++    const normalizedRoute = normalizePathname(route);
++    if (pathname === normalizedRoute) return true;
++    return pathname.startsWith(`${normalizedRoute}/`);
++  });
++}
+diff --git a/src/lib/routes/normalize-pathname.ts b/src/lib/routes/normalize-pathname.ts
+new file mode 100644
+index 00000000..ed821031
+--- /dev/null
++++ b/src/lib/routes/normalize-pathname.ts
+@@ -0,0 +1,18 @@
++function stripTrailingSlashes(pathname: string): string {
++  if (pathname === "/") return "/";
++  return pathname.replace(/\/+$/, "") || "/";
++}
++
++/** Mandatory route-family pathname normalization (trailing slashes only). */
++export function normalizePathname(input: string): string {
++  let pathname: string;
++  try {
++    pathname = new URL(input, "http://local").pathname || "/";
++  } catch {
++    const withoutHash = input.split("#", 1)[0] ?? "";
++    const withoutQuery = withoutHash.split("?", 1)[0] ?? "";
++    const normalized = withoutQuery || "/";
++    pathname = normalized.startsWith("/") ? normalized : `/${normalized}`;
++  }
++  return stripTrailingSlashes(pathname);
++}
+diff --git a/src/lib/routes/resolve-nav-active.ts b/src/lib/routes/resolve-nav-active.ts
+new file mode 100644
+index 00000000..3ed700f6
+--- /dev/null
++++ b/src/lib/routes/resolve-nav-active.ts
+@@ -0,0 +1,19 @@
++import { matchesRouteFamily } from "./matches-route-family.js";
++import { ROUTE_ALIAS_GROUPS } from "./route-alias-groups.js";
++import { normalizePathname } from "./normalize-pathname.js";
++
++const HREF_TO_ALIAS_GROUP = new Map<string, readonly string[]>();
++for (const routes of Object.values(ROUTE_ALIAS_GROUPS)) {
++  for (const href of routes) {
++    HREF_TO_ALIAS_GROUP.set(href, routes);
++  }
++}
++
++/** Active nav state for canonical or legacy href within the same alias family. */
++export function resolveNavItemActive(location: string, href: string): boolean {
++  const aliasRoutes = HREF_TO_ALIAS_GROUP.get(href);
++  if (aliasRoutes) {
++    return matchesRouteFamily(location, aliasRoutes);
++  }
++  return normalizePathname(location) === normalizePathname(href);
++}
+diff --git a/src/lib/routes/route-alias-groups.ts b/src/lib/routes/route-alias-groups.ts
+new file mode 100644
+index 00000000..83e42782
+--- /dev/null
++++ b/src/lib/routes/route-alias-groups.ts
+@@ -0,0 +1,14 @@
++export const ROUTE_ALIAS_GROUPS = {
++  equipmentBoard: ["/equipment-board", "/display"],
++  equipmentTasks: ["/equipment-tasks", "/appointments"],
++  locations: ["/locations", "/rooms"],
++  criticalKitCheck: ["/critical-kit-check", "/crash-cart"],
++  emergencyEquipmentLog: ["/emergency-equipment-log", "/code-blue"],
++  emergencyEquipmentWall: ["/emergency-equipment-wall", "/code-blue/display"],
++  emergencyEquipmentHistory: [
++    "/emergency-equipment-history",
++    "/admin/code-blue-history",
++  ],
++} as const;
++
++export type RouteAliasGroupId = keyof typeof ROUTE_ALIAS_GROUPS;
+diff --git a/src/lib/routes/route-family-ids.ts b/src/lib/routes/route-family-ids.ts
+new file mode 100644
+index 00000000..600c2f02
+--- /dev/null
++++ b/src/lib/routes/route-family-ids.ts
+@@ -0,0 +1,35 @@
++import { normalizePathname } from "./normalize-pathname.js";
++import { ROUTE_ALIAS_GROUPS, type RouteAliasGroupId } from "./route-alias-groups.js";
++
++/** Longest / most specific families first. */
++export const ROUTE_FAMILY_MATCH_ORDER = [
++  "emergencyEquipmentWall",
++  "emergencyEquipmentHistory",
++  "emergencyEquipmentLog",
++  "equipmentBoard",
++  "equipmentTasks",
++  "criticalKitCheck",
++  "locations",
++] as const satisfies readonly RouteAliasGroupId[];
++
++export type RouteFamilyId = (typeof ROUTE_FAMILY_MATCH_ORDER)[number];
++
++/**
++ * Resolves wedge route-family id from a pathname.
++ * Internal duplicate slashes (e.g. /locations//123) return null — not canonical identity.
++ */
++export function resolveRouteFamilyId(pathnameInput: string): RouteFamilyId | null {
++  const pathname = normalizePathname(pathnameInput);
++  if (pathname.includes("//")) return null;
++
++  for (const familyId of ROUTE_FAMILY_MATCH_ORDER) {
++    const routes = ROUTE_ALIAS_GROUPS[familyId];
++    const matched = routes.some((route) => {
++      const normalizedRoute = normalizePathname(route);
++      if (pathname === normalizedRoute) return true;
++      return pathname.startsWith(`${normalizedRoute}/`);
++    });
++    if (matched) return familyId;
++  }
++  return null;
++}
+diff --git a/tests/api/display-alias-parity.test.ts b/tests/api/display-alias-parity.test.ts
+new file mode 100644
+index 00000000..00426b53
+--- /dev/null
++++ b/tests/api/display-alias-parity.test.ts
+@@ -0,0 +1,26 @@
++/**
++ * PR2: display vs equipment-board mounts use distinct router factories.
++ */
++import { describe, it, expect } from "vitest";
++import { createDisplayRouter } from "../../server/routes/display.js";
++
++describe("display API alias router factory", () => {
++  it("createDisplayRouter returns a new Router instance each call", () => {
++    const displayRouter = createDisplayRouter();
++    const boardRouter = createDisplayRouter();
++    expect(displayRouter).not.toBe(boardRouter);
++  });
++
++  it("each router exposes snapshot and heartbeat routes", () => {
++    const router = createDisplayRouter();
++    const stack = router.stack as Array<{ route?: { path: string; methods: Record<string, boolean> } }>;
++    const paths = stack
++      .filter((layer) => layer.route)
++      .map((layer) => ({
++        path: layer.route!.path,
++        methods: Object.keys(layer.route!.methods),
++      }));
++    expect(paths).toContainEqual({ path: "/snapshot", methods: expect.arrayContaining(["get"]) });
++    expect(paths).toContainEqual({ path: "/heartbeat", methods: expect.arrayContaining(["post"]) });
++  });
++});
+diff --git a/tests/asset-copilot/ai-safety-validator.test.ts b/tests/asset-copilot/ai-safety-validator.test.ts
+new file mode 100644
+index 00000000..fdec0158
+--- /dev/null
++++ b/tests/asset-copilot/ai-safety-validator.test.ts
+@@ -0,0 +1,70 @@
++import { describe, it, expect } from "vitest";
++import { validateCopilotAnswerSafety } from "../../server/domain/equipment/copilot/ai-safety-validator.js";
++import type { EvidenceGraph } from "../../server/domain/equipment/evidence/graph.types.js";
++import { ASSET_COPILOT_RESOLVER_VERSION } from "../../shared/contracts/asset-copilot.v1.js";
++
++const baseGraph: EvidenceGraph = {
++  clinicId: "c1",
++  equipmentId: "eq1",
++  equipment: {
++    id: "eq1",
++    clinicId: "c1",
++    name: "Pump",
++    custodyState: "docked",
++    readinessState: "ready",
++    usageState: "available",
++  } as EvidenceGraph["equipment"],
++  recentRfidReads: [],
++  recentScans: [],
++  recentTransfers: [],
++  rooms: [],
++  assetTypeConditions: [],
++  activeStaging: [],
++};
++
++describe("ai safety validator (PR16)", () => {
++  it("rejects financial claims without cost evidence", () => {
++    const result = validateCopilotAnswerSafety(
++      {
++        resolverVersion: ASSET_COPILOT_RESOLVER_VERSION,
++        equipmentId: "eq1",
++        unknowns: [],
++        citations: [],
++        claims: [
++          {
++            key: "roi",
++            value: "This unit saves $5000 per month guaranteed savings",
++            confidence: { evidenceStrength: "low", evidenceFreshness: "current" },
++            citations: [],
++          },
++        ],
++      },
++      baseGraph,
++    );
++    expect(result.safe).toBe(false);
++    if (!result.safe) {
++      expect(result.errors).toContain("financial_claim_without_cost_evidence");
++    }
++  });
++
++  it("requires citation support per claim", () => {
++    const result = validateCopilotAnswerSafety(
++      {
++        resolverVersion: ASSET_COPILOT_RESOLVER_VERSION,
++        equipmentId: "eq1",
++        unknowns: [],
++        citations: [],
++        claims: [
++          {
++            key: "ready",
++            value: "Unit is ready",
++            confidence: { evidenceStrength: "medium", evidenceFreshness: "current" },
++            citations: [],
++          },
++        ],
++      },
++      baseGraph,
++    );
++    expect(result.safe).toBe(false);
++  });
++});
+diff --git a/tests/display-command-board-timeout.test.ts b/tests/display-command-board-timeout.test.ts
+new file mode 100644
+index 00000000..7646713d
+--- /dev/null
++++ b/tests/display-command-board-timeout.test.ts
+@@ -0,0 +1,27 @@
++/**
++ * PR3: command board timeout helper + handler always includes commandBoard key.
++ */
++import { describe, it, expect } from "vitest";
++import fs from "node:fs";
++import { COMMAND_BOARD_TIMEOUT_MS } from "../server/routes/display.js";
++import { OperationTimeoutError, withTimeout } from "../server/lib/with-timeout.js";
++
++describe("command board timeout", () => {
++  it("COMMAND_BOARD_TIMEOUT_MS is explicit and review-visible", () => {
++    expect(COMMAND_BOARD_TIMEOUT_MS).toBe(2500);
++  });
++
++  it("withTimeout rejects slow operations", async () => {
++    const never = new Promise<void>(() => {});
++    await expect(withTimeout(never, 30)).rejects.toBeInstanceOf(OperationTimeoutError);
++  });
++});
++
++describe("display snapshot commandBoard contract", () => {
++  it("handler attaches commandBoard on success path and null on failure path", () => {
++    const source = fs.readFileSync("server/routes/display.ts", "utf8");
++    expect(source).toContain("let commandBoard: EquipmentCommandBoardSnapshot | null = null");
++    expect(source).toContain("command_board_build_failed");
++    expect(source).toMatch(/commandBoard,\s*\n\s*\}\);/);
++  });
++});
+diff --git a/tests/equipment-readiness-rules.service.test.ts b/tests/equipment-readiness-rules.service.test.ts
+new file mode 100644
+index 00000000..86f22778
+--- /dev/null
++++ b/tests/equipment-readiness-rules.service.test.ts
+@@ -0,0 +1,22 @@
++import { describe, it, expect } from "vitest";
++import {
++  DEFAULT_EQUIPMENT_READINESS_RULES_V1,
++  parseEquipmentReadinessRulesV1,
++} from "../shared/equipment-readiness-rules.js";
++import { READINESS_RULES_CONFIG_KEY } from "../server/services/equipment-readiness-rules.service.js";
++
++describe("equipment readiness rules", () => {
++  it("uses per-clinic config keys", () => {
++    expect(READINESS_RULES_CONFIG_KEY("clinic-a")).toBe("equipment.readinessRules.v1:clinic-a");
++    expect(READINESS_RULES_CONFIG_KEY("clinic-b")).not.toBe(READINESS_RULES_CONFIG_KEY("clinic-a"));
++  });
++
++  it("parses v1 JSON or falls back to defaults", () => {
++    expect(parseEquipmentReadinessRulesV1(null)).toEqual(DEFAULT_EQUIPMENT_READINESS_RULES_V1);
++    expect(
++      parseEquipmentReadinessRulesV1(
++        JSON.stringify({ version: 1, staleEvidenceMs: 60_000, minimumReadyByType: { pump: 2 } }),
++      ).minimumReadyByType.pump,
++    ).toBe(2);
++  });
++});
+diff --git a/tests/equipment-readiness-wedge-smoke.test.ts b/tests/equipment-readiness-wedge-smoke.test.ts
+new file mode 100644
+index 00000000..d8cdd616
+--- /dev/null
++++ b/tests/equipment-readiness-wedge-smoke.test.ts
+@@ -0,0 +1,28 @@
++/**
++ * PR18: release smoke — canonical routes and API mounts exist in source.
++ */
++import { describe, it, expect } from "vitest";
++import fs from "node:fs";
++
++describe("equipment readiness wedge smoke", () => {
++  it("registers canonical frontend aliases", () => {
++    const routes = fs.readFileSync("src/app/routes.tsx", "utf8");
++    expect(routes).toContain('path="/equipment-board"');
++    expect(routes).toContain('path="/equipment-tasks"');
++    expect(routes).toContain('path="/locations"');
++    expect(routes).toContain('path="/critical-kit-check"');
++    expect(routes).toContain('path="/display"');
++    expect(routes).not.toMatch(/path="\/display"[^>]*>\s*<Redirect/);
++  });
++
++  it("mounts equipment-board API alias via router factory", () => {
++    const appRoutes = fs.readFileSync("server/app/routes.ts", "utf8");
++    expect(appRoutes).toContain('app.use("/api/equipment-board", createDisplayRouter())');
++    expect(appRoutes).toContain('app.use("/api/display", createDisplayRouter())');
++  });
++
++  it("snapshot includes commandBoard field", () => {
++    const display = fs.readFileSync("server/routes/display.ts", "utf8");
++    expect(display).toContain("commandBoard");
++  });
++});
+diff --git a/tests/routes/normalize-pathname.test.ts b/tests/routes/normalize-pathname.test.ts
+new file mode 100644
+index 00000000..1cb3ce64
+--- /dev/null
++++ b/tests/routes/normalize-pathname.test.ts
+@@ -0,0 +1,23 @@
++import { describe, expect, it } from "vitest";
++import { normalizePathname } from "../../src/lib/routes/normalize-pathname.js";
++
++describe("normalizePathname", () => {
++  it.each([
++    ["", "/"],
++    ["display", "/display"],
++    ["/display", "/display"],
++    ["/display/", "/display"],
++    ["/display//", "/display"],
++    ["/locations/123/", "/locations/123"],
++    ["/locations//123", "/locations//123"],
++    ["/display?mode=wall", "/display"],
++    ["/display#kiosk", "/display"],
++    ["/display?mode=wall#kiosk", "/display"],
++    ["https://example.com/display?mode=wall#kiosk", "/display"],
++    ["//example.com/display", "/display"],
++    ["?mode=wall", "/"],
++    ["#kiosk", "/"],
++  ] as const)("normalizes %s", (input, expected) => {
++    expect(normalizePathname(input)).toBe(expected);
++  });
++});
+diff --git a/tests/routes/route-family-ids.test.ts b/tests/routes/route-family-ids.test.ts
+new file mode 100644
+index 00000000..96cc0e9d
+--- /dev/null
++++ b/tests/routes/route-family-ids.test.ts
+@@ -0,0 +1,20 @@
++import { describe, expect, it } from "vitest";
++import { resolveRouteFamilyId } from "../../src/lib/routes/route-family-ids.js";
++
++describe("resolveRouteFamilyId", () => {
++  it("matches locations family for canonical and trailing slash paths", () => {
++    expect(resolveRouteFamilyId("/locations/123")).toBe("locations");
++    expect(resolveRouteFamilyId("/locations/123/")).toBe("locations");
++    expect(resolveRouteFamilyId("/rooms/abc")).toBe("locations");
++  });
++
++  it("returns null for internal duplicate slash paths", () => {
++    expect(resolveRouteFamilyId("/locations//123")).toBeNull();
++    expect(resolveRouteFamilyId("/display//settings")).toBeNull();
++  });
++
++  it("matches equipment board aliases", () => {
++    expect(resolveRouteFamilyId("/display")).toBe("equipmentBoard");
++    expect(resolveRouteFamilyId("/equipment-board")).toBe("equipmentBoard");
++  });
++});

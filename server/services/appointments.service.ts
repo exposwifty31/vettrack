@@ -5,10 +5,8 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, gt, gte, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import type { TaskPriority, TaskType } from "../domain/service-task.adapter.js";
-import { animals, appointments, billingItems, billingLedger, clinicalCheckIns, containers, db, inventoryJobs, owners, shifts, users } from "../db.js";
+import { appointments, clinicalCheckIns, db, shifts, users } from "../db.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
-import { markIdempotentAsync } from "../lib/idempotency.js";
-import { validateJustificationText, MedJustificationError, resolvePresetLabel } from "../lib/med-justification.js";
 import {
   clinicTodayIsoDate,
   getClinicDayUtcRange,
@@ -17,8 +15,6 @@ import {
 import { incrementMetric } from "../lib/metrics.js";
 import { broadcast } from "../lib/realtime.js";
 import { sendTaskNotification } from "../lib/task-notification.js";
-import { canPerformMedicationTaskAction } from "../lib/task-rbac.js";
-import { inventoryDeductionQueue } from "../queues/inventory-deduction.queue.js";
 import {
   resolveStaleTaskOwnershipEnforcementMode,
   resolveTaskAssignmentEnforcementMode,
@@ -29,8 +25,6 @@ import type {
   TaskAssignmentTargetUser,
   TaskAssignmentTransition,
 } from "../lib/authority/enforcement/result.js";
-import { doseDeviationRatio, justificationTier, requiresDoseJustification } from "../../shared/medication-justification.js";
-
 export type AppointmentStatus =
   | "pending"
   | "assigned"
@@ -49,38 +43,15 @@ export interface TaskAuditActor {
   role?: string;
 }
 
-export interface MedicationExecutionTask {
-  id: string;
-  clinicId: string;
-  animalId: string | null;
-  ownerId: string | null;
-  vetId: string | null;
-  startTime: string;
-  endTime: string;
-  scheduledAt: string | null;
-  completedAt: string | null;
-  status: AppointmentStatus;
-  conflictOverride: boolean;
-  overrideReason: string | null;
-  notes: string | null;
-  metadata: Record<string, unknown> | null;
-  priority: TaskPriority;
-  taskType: TaskType | null;
-  createdAt: string;
-  updatedAt: string;
-  animalWeightKg: number | null;
-}
 
 export type { TaskPriority, TaskType } from "../domain/service-task.adapter.js";
 
 type AppointmentRecord = typeof appointments.$inferSelect;
 
 const PRIORITIES: TaskPriority[] = ["critical", "high", "normal"];
-const TASK_TYPES: TaskType[] = ["maintenance", "repair", "inspection", "medication"];
+const TASK_TYPES: TaskType[] = ["maintenance", "repair", "inspection"];
 
 export interface AppointmentInput {
-  animalId?: string | null;
-  ownerId?: string | null;
   /** When omitted or empty, task is unassigned (pending queue). */
   vetId?: string | null;
   startTime: string | Date;
@@ -93,8 +64,6 @@ export interface AppointmentInput {
   metadata?: Record<string, unknown> | null;
   priority?: TaskPriority;
   taskType?: TaskType | null;
-  /** Links this task to a specific hospitalization episode (required for medication taskType). */
-  hospitalizationId?: string | null;
   /** Scheduling context / purpose label. */
   appointmentType?: string | null;
   /** Who created this appointment/task (userId). */
@@ -102,8 +71,6 @@ export interface AppointmentInput {
 }
 
 export interface AppointmentUpdateInput {
-  animalId?: string | null;
-  ownerId?: string | null;
   vetId?: string | null;
   startTime?: string | Date;
   endTime?: string | Date;
@@ -115,7 +82,6 @@ export interface AppointmentUpdateInput {
   metadata?: Record<string, unknown> | null;
   priority?: TaskPriority;
   taskType?: TaskType | null;
-  hospitalizationId?: string | null;
   appointmentType?: string | null;
 }
 
@@ -157,153 +123,6 @@ const VALID_STATUS_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]> =
 };
 
 const DB_ACTIVE_STATUSES: AppointmentStatus[] = ["pending", "assigned", "scheduled", "arrived", "in_progress"];
-
-function resolveMedicationDedupFingerprint(meta: Record<string, unknown>): {
-  drugId: string | null;
-  normalizedName: string | null;
-} {
-  const rawId = meta.drugId;
-  const drugId = typeof rawId === "string" && rawId.trim().length > 0 ? rawId.trim() : null;
-  const rawName =
-    (typeof meta.drugName === "string" ? meta.drugName : null) ??
-    (typeof meta.medicationName === "string" ? meta.medicationName : null);
-  const normalizedName =
-    rawName && rawName.trim().length > 0 ? rawName.trim().toLowerCase() : null;
-  return { drugId, normalizedName };
-}
-
-function medicationAppointmentDedupCondition(fingerprint: {
-  drugId: string | null;
-  normalizedName: string | null;
-}) {
-  if (fingerprint.drugId) {
-    return sql`(${appointments.metadata}->>'drugId') = ${fingerprint.drugId}`;
-  }
-  if (fingerprint.normalizedName) {
-    return sql`lower(trim(coalesce(${appointments.metadata}->>'drugName', ${appointments.metadata}->>'medicationName', ''))) = ${fingerprint.normalizedName}`;
-  }
-  return null;
-}
-
-async function findOpenDuplicateMedicationAppointment(
-  clinicId: string,
-  animalId: string,
-  metadata: Record<string, unknown>,
-): Promise<{ id: string } | null> {
-  const fingerprint = resolveMedicationDedupFingerprint(metadata);
-  const matchSql = medicationAppointmentDedupCondition(fingerprint);
-  if (!matchSql) return null;
-
-  const [row] = await db
-    .select({ id: appointments.id })
-    .from(appointments)
-    .where(
-      and(
-        eq(appointments.clinicId, clinicId),
-        eq(appointments.animalId, animalId),
-        eq(appointments.taskType, "medication"),
-        inArray(appointments.status, DB_ACTIVE_STATUSES),
-        matchSql,
-      ),
-    )
-    .limit(1);
-
-  return row ?? null;
-}
-
-type MedicationJustificationKind = "preset" | "custom";
-
-interface MedicationMetadata {
-  kind?: "medication";
-  createdBy?: string;
-  acknowledgedBy?: string;
-  completedBy?: string;
-  containerId?: string;
-  containerBillingItemId?: string;
-  acknowledged_at?: string;
-  completed_at?: string;
-  prescribedByName?: string;
-  doseMgPerKg?: number;
-  defaultDoseMgPerKg?: number;
-  desiredDoseMg?: number;
-  concentrationMgPerMl?: number;
-  calculatedVolumeMl?: number;
-  doseJustification?: string;
-  doseJustificationKind?: MedicationJustificationKind;
-  doseJustificationPresetCode?: string;
-  vetApproved?: boolean;
-  vetApprovedBy?: string;
-  vetApprovedAt?: string;
-  [key: string]: unknown;
-}
-
-export interface MedicationExecutionInput {
-  weightKg?: number;
-  prescribedDosePerKg?: number;
-  concentrationMgPerMl?: number;
-  formularyConcentrationMgPerMl?: number;
-  doseUnit?: "mg_per_kg" | "mcg_per_kg";
-  convertedDoseMgPerKg?: number;
-  calculatedVolumeMl?: number;
-  concentrationOverridden?: boolean;
-}
-
-const DOSE_DEVIATION_HARD_CAP = 0.5;
-
-function normalizeMedicationExecutionInput(input: MedicationExecutionInput | null | undefined): MedicationExecutionInput | null {
-  if (!input) return null;
-  const normalized: MedicationExecutionInput = {};
-  if (Number.isFinite(input.weightKg)) normalized.weightKg = Number(input.weightKg);
-  if (Number.isFinite(input.prescribedDosePerKg)) normalized.prescribedDosePerKg = Number(input.prescribedDosePerKg);
-  if (Number.isFinite(input.concentrationMgPerMl)) normalized.concentrationMgPerMl = Number(input.concentrationMgPerMl);
-  if (Number.isFinite(input.formularyConcentrationMgPerMl)) {
-    normalized.formularyConcentrationMgPerMl = Number(input.formularyConcentrationMgPerMl);
-  }
-  if (input.doseUnit === "mg_per_kg" || input.doseUnit === "mcg_per_kg") normalized.doseUnit = input.doseUnit;
-  if (Number.isFinite(input.convertedDoseMgPerKg)) normalized.convertedDoseMgPerKg = Number(input.convertedDoseMgPerKg);
-  if (Number.isFinite(input.calculatedVolumeMl)) normalized.calculatedVolumeMl = Number(input.calculatedVolumeMl);
-  if (typeof input.concentrationOverridden === "boolean") normalized.concentrationOverridden = input.concentrationOverridden;
-  return Object.keys(normalized).length > 0 ? normalized : null;
-}
-
-function normalizeRole(roleInput: string | null | undefined): string {
-  return (roleInput ?? "").trim().toLowerCase();
-}
-
-function isMedicationTaskType(taskType: TaskType | null | undefined): boolean {
-  return taskType === "medication";
-}
-
-function isCalculatorMedicationTask(
-  taskType: TaskType | null | undefined,
-  metadata: Record<string, unknown> | null | undefined,
-): boolean {
-  if (!isMedicationTaskType(taskType)) return false;
-  if (!metadata) return false;
-  const source = typeof metadata.source === "string" ? metadata.source.trim().toLowerCase() : "";
-  return source === "calculator";
-}
-
-function asMetadataRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
-}
-
-function medicationMetadataFromUnknown(value: unknown): MedicationMetadata {
-  const record = asMetadataRecord(value);
-  return record ? ({ ...record } as MedicationMetadata) : {};
-}
-
-function matchesAcknowledgedActor(
-  acknowledgedBy: string | null,
-  actor: { userId: string; clerkId?: string | null },
-): boolean {
-  const ack = (acknowledgedBy ?? "").trim();
-  if (!ack) return false;
-  const actorUserId = actor.userId.trim();
-  const actorClerkId = (actor.clerkId ?? "").trim();
-  return ack === actorUserId || (actorClerkId.length > 0 && ack === actorClerkId);
-}
 
 /**
  * Phase 3 PR 3.4 — Hydrate target user fields for the task-assignment evaluator.
@@ -621,200 +440,6 @@ export async function applyStaleTaskOwnershipObservation(args: {
   }
 }
 
-function computeDoseDeviation(meta: MedicationMetadata): number {
-  if (!Number.isFinite(meta.doseMgPerKg) || !Number.isFinite(meta.defaultDoseMgPerKg)) return 0;
-  return doseDeviationRatio(meta.doseMgPerKg as number, meta.defaultDoseMgPerKg as number);
-}
-
-function normalizeMedicationMetadata(
-  metadataInput: unknown,
-  actor: TaskAuditActor | undefined,
-): MedicationMetadata {
-  const metadata = medicationMetadataFromUnknown(metadataInput);
-  metadata.kind = "medication";
-  const actorIdentifier = actor?.clerkId?.trim() || actor?.userId;
-
-  if (actorIdentifier && !metadata.createdBy) {
-    metadata.createdBy = actorIdentifier;
-  }
-
-  const hasDoseInputs =
-    Number.isFinite(metadata.doseMgPerKg) && Number.isFinite(metadata.defaultDoseMgPerKg);
-  if (!hasDoseInputs) {
-    delete metadata.doseJustification;
-    delete metadata.doseJustificationKind;
-    delete metadata.doseJustificationPresetCode;
-    return metadata;
-  }
-
-  const deviation = computeDoseDeviation(metadata);
-  if (deviation > DOSE_DEVIATION_HARD_CAP) {
-    throw new AppointmentServiceError(
-      "DOSE_DEVIATION_EXCEEDS_CAP",
-      403,
-      "Dose deviation above 50% is blocked by clinical policy",
-    );
-  }
-  const tier = justificationTier(deviation);
-  const needsJustification = requiresDoseJustification(
-    metadata.doseMgPerKg as number,
-    metadata.defaultDoseMgPerKg as number,
-  );
-
-  if (!needsJustification) {
-    delete metadata.doseJustification;
-    delete metadata.doseJustificationKind;
-    delete metadata.doseJustificationPresetCode;
-    return metadata;
-  }
-
-  if (metadata.doseJustificationKind === "preset") {
-    const presetCode = String(metadata.doseJustificationPresetCode ?? "").trim();
-    if (!presetCode) {
-      throw new AppointmentServiceError("JUSTIFICATION_TOO_SHORT", 400, "Justification preset is required");
-    }
-    const label = resolvePresetLabel(presetCode);
-    metadata.doseJustification = validateJustificationText(label, tier);
-    metadata.doseJustificationPresetCode = presetCode;
-    return metadata;
-  }
-
-  const rawText = String(metadata.doseJustification ?? "");
-  metadata.doseJustification = validateJustificationText(rawText, tier);
-  metadata.doseJustificationKind = "custom";
-  delete metadata.doseJustificationPresetCode;
-  return metadata;
-}
-
-function actorCanOverrideMedicationOwnership(roleInput: string | null | undefined): boolean {
-  const role = normalizeRole(roleInput);
-  return role === "admin" || role === "vet" || role === "senior_technician";
-}
-
-const MISSING_MEDICATION_BILLING_MESSAGE = "Missing billing configuration for medication task";
-
-function extractMedicationContainerIdFromMetadata(metadata: Record<string, unknown> | null | undefined): string | null {
-  if (!metadata || typeof metadata !== "object") return null;
-  const raw = (metadata as { containerId?: unknown }).containerId;
-  if (typeof raw !== "string") return null;
-  const t = raw.trim();
-  return t.length > 0 ? t : null;
-}
-
-/** Prefer persisted column; fall back to legacy metadata.containerId. */
-export function resolveMedicationTaskContainerId(
-  row: Pick<AppointmentRecord, "containerId" | "metadata">,
-): string {
-  const col =
-    typeof row.containerId === "string" && row.containerId.trim().length > 0 ? row.containerId.trim() : "";
-  if (col) return col;
-  const taskMetadata = medicationMetadataFromUnknown(row.metadata);
-  const fromMeta = typeof taskMetadata.containerId === "string" ? taskMetadata.containerId.trim() : "";
-  return fromMeta;
-}
-
-function resolvePublicContainerId(row: AppointmentRecord): string | null {
-  const resolved = resolveMedicationTaskContainerId(row);
-  return resolved.length > 0 ? resolved : null;
-}
-
-/**
- * Resolves billing for medication task completion. Must succeed before any completion writes.
- * Does not auto-create catalog rows or accept zero pricing.
- */
-async function resolveMedicationBillingForCompletion(
-  executor: Pick<typeof db, "select">,
-  clinicId: string,
-  rawContainerId: string,
-): Promise<{ billingItemId: string; unitPriceCents: number; containerId: string }> {
-  if (!rawContainerId) {
-    throw new AppointmentServiceError(
-      "MISSING_MEDICATION_BILLING_CONFIG",
-      400,
-      MISSING_MEDICATION_BILLING_MESSAGE,
-      { reason: "MISSING_CONTAINER_ID" },
-    );
-  }
-
-  const [containerRow] = await executor
-    .select({
-      id: containers.id,
-      billingItemId: containers.billingItemId,
-    })
-    .from(containers)
-    .where(and(eq(containers.id, rawContainerId), eq(containers.clinicId, clinicId)))
-    .limit(1);
-
-  if (!containerRow) {
-    throw new AppointmentServiceError(
-      "MISSING_MEDICATION_BILLING_CONFIG",
-      400,
-      MISSING_MEDICATION_BILLING_MESSAGE,
-      { reason: "CONTAINER_NOT_FOUND", containerId: rawContainerId },
-    );
-  }
-
-  const linkedBillingItemId =
-    typeof containerRow.billingItemId === "string" ? containerRow.billingItemId.trim() : "";
-  if (!linkedBillingItemId) {
-    throw new AppointmentServiceError(
-      "MISSING_MEDICATION_BILLING_CONFIG",
-      400,
-      MISSING_MEDICATION_BILLING_MESSAGE,
-      { reason: "MISSING_CONTAINER_BILLING_ITEM", containerId: rawContainerId },
-    );
-  }
-
-  const [billingItem] = await executor
-    .select({ id: billingItems.id, unitPriceCents: billingItems.unitPriceCents })
-    .from(billingItems)
-    .where(and(eq(billingItems.id, linkedBillingItemId), eq(billingItems.clinicId, clinicId)))
-    .limit(1);
-
-  if (!billingItem) {
-    throw new AppointmentServiceError(
-      "MISSING_MEDICATION_BILLING_CONFIG",
-      400,
-      MISSING_MEDICATION_BILLING_MESSAGE,
-      {
-        reason: "BILLING_ITEM_NOT_FOUND",
-        containerId: rawContainerId,
-        billingItemId: linkedBillingItemId,
-      },
-    );
-  }
-
-  if (!Number.isFinite(billingItem.unitPriceCents) || billingItem.unitPriceCents <= 0) {
-    throw new AppointmentServiceError(
-      "MISSING_MEDICATION_BILLING_CONFIG",
-      400,
-      MISSING_MEDICATION_BILLING_MESSAGE,
-      {
-        reason: "INVALID_UNIT_PRICE",
-        billingItemId: billingItem.id,
-        unitPriceCents: billingItem.unitPriceCents,
-      },
-    );
-  }
-
-  return {
-    billingItemId: billingItem.id,
-    unitPriceCents: billingItem.unitPriceCents,
-    containerId: rawContainerId,
-  };
-}
-
-function normalizeMedicationMetadataOrThrow(metadataInput: unknown, actor: TaskAuditActor | undefined): MedicationMetadata {
-  try {
-    return normalizeMedicationMetadata(metadataInput, actor);
-  } catch (error) {
-    if (error instanceof MedJustificationError) {
-      throw new AppointmentServiceError(error.code, 400, error.message);
-    }
-    throw error;
-  }
-}
-
 function assertClinicId(clinicId: string): string {
   const normalized = clinicId.trim();
   if (!normalized) {
@@ -874,7 +499,26 @@ function normalizePriority(priority: TaskPriority | undefined): TaskPriority {
   return priority;
 }
 
+
+function normalizeRole(roleInput: string | null | undefined): string {
+  return (roleInput ?? "").trim().toLowerCase();
+}
+
+function asMetadataRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function assertServiceTaskType(taskType: TaskType | null | undefined): void {
+  if ((taskType as string | null | undefined) === "medication") {
+    throw new AppointmentServiceError("MEDICATION_TASKS_DISABLED", 410, "Medication tasks are no longer supported");
+  }
+}
+
 function normalizeTaskType(taskType: TaskType | null | undefined): TaskType | null {
+  if ((taskType as string | null | undefined) === "medication") {
+    throw new AppointmentServiceError("INVALID_TASK_TYPE", 400, "Medication tasks are no longer supported", { taskType });
+  }
   if (taskType === undefined || taskType === null) return null;
   if (!TASK_TYPES.includes(taskType)) {
     throw new AppointmentServiceError("INVALID_TASK_TYPE", 400, "Invalid taskType", { taskType });
@@ -914,29 +558,6 @@ async function getVetInClinic(clinicId: string, vetId: string): Promise<{ id: st
     throw new AppointmentServiceError("VET_NOT_IN_CLINIC", 403, "Vet does not belong to this clinic");
   }
   return vet;
-}
-
-async function assertOwnerInClinic(clinicId: string, ownerId: string): Promise<void> {
-  const [owner] = await db
-    .select({ id: owners.id })
-    .from(owners)
-    .where(and(eq(owners.id, ownerId), eq(owners.clinicId, clinicId)))
-    .limit(1);
-  if (!owner) {
-    throw new AppointmentServiceError("OWNER_NOT_IN_CLINIC", 403, "Owner does not belong to this clinic");
-  }
-}
-
-async function assertAnimalInClinic(clinicId: string, animalId: string): Promise<{ ownerId: string | null }> {
-  const [animal] = await db
-    .select({ id: animals.id, ownerId: animals.ownerId })
-    .from(animals)
-    .where(and(eq(animals.id, animalId), eq(animals.clinicId, clinicId)))
-    .limit(1);
-  if (!animal) {
-    throw new AppointmentServiceError("ANIMAL_NOT_IN_CLINIC", 403, "Animal does not belong to this clinic");
-  }
-  return { ownerId: animal.ownerId };
 }
 
 async function findActiveVetConflict(args: {
@@ -1137,17 +758,17 @@ function auditTaskChange(
 }
 
 function serializeAppointment(row: AppointmentRecord) {
-  const resolvedContainerId = resolvePublicContainerId(row);
+  const col =
+    typeof row.containerId === "string" && row.containerId.trim().length > 0 ? row.containerId.trim() : null;
   return {
     ...row,
-    containerId: resolvedContainerId,
+    containerId: col,
     vetId: row.vetId ?? null,
     startTime: new Date(row.startTime).toISOString(),
     endTime: new Date(row.endTime).toISOString(),
     scheduledAt: row.scheduledAt ? new Date(row.scheduledAt).toISOString() : null,
     completedAt: row.completedAt ? new Date(row.completedAt).toISOString() : null,
     metadata: row.metadata ?? null,
-    hospitalizationId: row.hospitalizationId ?? null,
     appointmentType: row.appointmentType ?? null,
     createdBy: row.createdBy ?? null,
     createdAt: new Date(row.createdAt).toISOString(),
@@ -1184,21 +805,12 @@ export async function createAppointment(clinicIdInput: string, payload: Appointm
   const priority = normalizePriority(payload.priority);
   const taskType = normalizeTaskType(payload.taskType);
   const metadataInput = payload.metadata ?? null;
-  const ownerId = payload.ownerId?.trim() || null;
-  const animalId = payload.animalId?.trim() || null;
   const vetId = payload.vetId?.trim() ? payload.vetId.trim() : null;
 
   const status = resolveCreateStatus(payload, vetId);
 
   if (vetId) {
     await assertVetInClinic(clinicId, vetId);
-  }
-  if (ownerId) await assertOwnerInClinic(clinicId, ownerId);
-  if (animalId) {
-    const animal = await assertAnimalInClinic(clinicId, animalId);
-    if (ownerId && animal.ownerId && animal.ownerId !== ownerId) {
-      throw new AppointmentServiceError("ANIMAL_OWNER_MISMATCH", 400, "animalId does not belong to ownerId");
-    }
   }
 
   // Phase 3 PR 3.4 — task-assignment evaluator wiring (assign). No-op in `off` mode.
@@ -1220,33 +832,9 @@ export async function createAppointment(clinicIdInput: string, payload: Appointm
   let finalOverrideReason = overrideReason;
   let metadataRecord = asMetadataRecord(metadataInput);
 
-  if (isMedicationTaskType(taskType)) {
-    if (actor && !canPerformMedicationTaskAction(actor.role, "med.task.create")) {
-      throw new AppointmentServiceError("INSUFFICIENT_ROLE", 403, "Insufficient medication task permissions");
-    }
-    metadataRecord = normalizeMedicationMetadataOrThrow(metadataInput, actor);
-    if (metadataRecord) {
-      metadataRecord.scheduled_at = scheduledAt.toISOString();
-    }
-    if (animalId && metadataRecord) {
-      const dupAppt = await findOpenDuplicateMedicationAppointment(clinicId, animalId, metadataRecord);
-      if (dupAppt) {
-        throw new AppointmentServiceError(
-          "DUPLICATE_ACTIVE_MEDICATION_TASK",
-          409,
-          "An active medication task already exists for this patient and medication.",
-          { existingAppointmentId: dupAppt.id },
-        );
-      }
-    }
-  }
-
-  const skipShiftValidation = isCalculatorMedicationTask(taskType, metadataRecord);
 
   if (status !== "cancelled" && status !== "no_show") {
-    if (!skipShiftValidation) {
-      await assertWithinVetShift({ clinicId, vetId, startTime, endTime });
-    }
+    await assertWithinVetShift({ clinicId, vetId, startTime, endTime });
     const conflict = vetId
       ? await findActiveVetConflict({ clinicId, vetId, startTime, endTime })
       : null;
@@ -1283,8 +871,6 @@ export async function createAppointment(clinicIdInput: string, payload: Appointm
     .values({
       id: randomUUID(),
       clinicId,
-      animalId,
-      ownerId,
       vetId,
       startTime,
       endTime,
@@ -1297,10 +883,7 @@ export async function createAppointment(clinicIdInput: string, payload: Appointm
       metadata: metadataRecord,
       priority,
       taskType,
-      containerId: isMedicationTaskType(taskType)
-        ? extractMedicationContainerIdFromMetadata(metadataRecord ?? null)
-        : null,
-      hospitalizationId: payload.hospitalizationId?.trim() || null,
+      containerId: null,
       appointmentType: payload.appointmentType?.trim() || null,
       createdBy: payload.createdBy?.trim() || actor?.userId || null,
       createdAt: now,
@@ -1368,8 +951,6 @@ export async function updateAppointment(
     payload.conflictOverride === undefined ? existing.conflictOverride : payload.conflictOverride === true;
   const nextOverrideReason =
     payload.overrideReason === undefined ? existing.overrideReason : normalizeNotes(payload.overrideReason);
-  const nextOwnerId = payload.ownerId === undefined ? existing.ownerId : (payload.ownerId?.trim() || null);
-  const nextAnimalId = payload.animalId === undefined ? existing.animalId : (payload.animalId?.trim() || null);
   const nextNotes = payload.notes === undefined ? existing.notes : normalizeNotes(payload.notes);
   const nextMetadataInput = payload.metadata === undefined ? existing.metadata : payload.metadata;
   const nextPriority =
@@ -1382,15 +963,6 @@ export async function updateAppointment(
       : normalizeTaskType((existing as { taskType?: TaskType | null }).taskType);
   let nextMetadata = asMetadataRecord(nextMetadataInput);
 
-  if (isMedicationTaskType(nextTaskType)) {
-    if (actor && !canPerformMedicationTaskAction(actor.role, "med.dose.edit")) {
-      throw new AppointmentServiceError("INSUFFICIENT_ROLE", 403, "Insufficient medication task permissions");
-    }
-    nextMetadata = normalizeMedicationMetadataOrThrow(nextMetadataInput, actor);
-    if (nextMetadata && nextScheduledAt) {
-      nextMetadata.scheduled_at = new Date(nextScheduledAt).toISOString();
-    }
-  }
 
   if (!nextVetId && nextStatus !== "pending" && nextStatus !== "cancelled") {
     throw new AppointmentServiceError(
@@ -1420,14 +992,6 @@ export async function updateAppointment(
       currentAcknowledgedUserId: existing.acknowledgedUserId,
       currentStatus: existing.status,
     });
-  }
-
-  if (nextOwnerId) await assertOwnerInClinic(clinicId, nextOwnerId);
-  if (nextAnimalId) {
-    const animal = await assertAnimalInClinic(clinicId, nextAnimalId);
-    if (nextOwnerId && animal.ownerId && animal.ownerId !== nextOwnerId) {
-      throw new AppointmentServiceError("ANIMAL_OWNER_MISMATCH", 400, "animalId does not belong to ownerId");
-    }
   }
 
   let finalConflictOverride = nextConflictOverride;
@@ -1488,21 +1052,10 @@ export async function updateAppointment(
     throw new AppointmentServiceError("OVERRIDE_REASON_REQUIRED", 400, "overrideReason is required when conflictOverride is true");
   }
 
-  const extractedContainer = extractMedicationContainerIdFromMetadata(nextMetadata ?? null);
-  const persistedContainerId =
-    typeof existing.containerId === "string" && existing.containerId.trim().length > 0
-      ? existing.containerId.trim()
-      : null;
-  const nextContainerIdForRow = isMedicationTaskType(nextTaskType)
-    ? extractedContainer ?? persistedContainerId
-    : null;
-
   const [updated] = await db
     .update(appointments)
     .set({
       vetId: nextVetId,
-      animalId: nextAnimalId,
-      ownerId: nextOwnerId,
       startTime: nextStartTime,
       endTime: nextEndTime,
       scheduledAt: nextScheduledAt,
@@ -1514,10 +1067,7 @@ export async function updateAppointment(
       metadata: nextMetadata,
       priority: nextPriority,
       taskType: nextTaskType,
-      containerId: nextContainerIdForRow,
-      ...(payload.hospitalizationId !== undefined
-        ? { hospitalizationId: payload.hospitalizationId?.trim() || null }
-        : {}),
+      containerId: existing.containerId,
       ...(payload.appointmentType !== undefined
         ? { appointmentType: payload.appointmentType?.trim() || null }
         : {}),
@@ -1607,11 +1157,9 @@ export async function startTask(clinicIdInput: string, taskId: string, actor: Ta
     throw new AppointmentServiceError("APPOINTMENT_NOT_FOUND", 404, "Appointment not found");
   }
 
-  const isMedicationTask = isMedicationTaskType(existing.taskType as TaskType | null);
+  assertServiceTaskType(existing.taskType as TaskType | null);
+
   const actorRole = normalizeRole(actor.role);
-  if (isMedicationTask && !canPerformMedicationTaskAction(actorRole, "med.start")) {
-    throw new AppointmentServiceError("INSUFFICIENT_ROLE", 403, "Insufficient medication task permissions");
-  }
 
   const vetId = existing.vetId;
   if (!vetId) {
@@ -1649,17 +1197,8 @@ export async function startTask(clinicIdInput: string, taskId: string, actor: Ta
   }
 
   const from = existing.status as AppointmentStatus;
-  if (isMedicationTask) {
-    // Fix C/D: medication tasks must pass through 'approved' before a technician can start.
-    if (from !== "approved") {
-      throw new AppointmentServiceError("VET_APPROVAL_REQUIRED", 400, "Medication tasks must be approved by a vet before they can be started", {
-        from,
-        to: "in_progress",
-        required: "approved",
-      });
-    }
-  } else {
-    // Non-medication tasks (maintenance, repair, inspection) may start from pre-work states.
+  {
+    // Service tasks (maintenance, repair, inspection) may start from pre-work states.
     if (!["scheduled", "assigned", "arrived", "approved"].includes(from)) {
       throw new AppointmentServiceError("INVALID_STATUS_TRANSITION", 400, "Task cannot be started from this status", {
         from,
@@ -1689,19 +1228,11 @@ export async function startTask(clinicIdInput: string, taskId: string, actor: Ta
   await assertVetInClinic(clinicId, vetId);
 
   const now = new Date();
-  const metadata = isMedicationTask ? medicationMetadataFromUnknown(existing.metadata) : null;
-  const actorIdentifier = actor.clerkId?.trim() || actor.userId;
-  if (metadata) {
-    metadata.acknowledgedBy = actorIdentifier;
-    metadata.acknowledged_at = now.toISOString();
-    metadata.scheduled_at = new Date(existing.scheduledAt ?? existing.startTime).toISOString();
-  }
   const previousSnapshot = { ...serializeAppointment(existing) };
   const [updated] = await db
     .update(appointments)
     .set({
       status: "in_progress",
-      ...(metadata ? { metadata } : {}),
       scheduledAt: existing.scheduledAt ?? existing.startTime,
       updatedAt: now,
     })
@@ -1730,7 +1261,6 @@ export async function completeTask(
   clinicIdInput: string,
   taskId: string,
   actor: TaskAuditActor,
-  executionInput?: MedicationExecutionInput | null,
 ) {
   const clinicId = assertClinicId(clinicIdInput);
   const [existing] = await db
@@ -1743,35 +1273,18 @@ export async function completeTask(
     throw new AppointmentServiceError("APPOINTMENT_NOT_FOUND", 404, "Appointment not found");
   }
 
-  const isMedicationTask = isMedicationTaskType(existing.taskType as TaskType | null);
-  const actorRole = normalizeRole(actor.role);
-  if (isMedicationTask && !canPerformMedicationTaskAction(actorRole, "med.complete")) {
-    throw new AppointmentServiceError("INSUFFICIENT_ROLE", 403, "Insufficient medication task permissions");
-  }
+  assertServiceTaskType(existing.taskType as TaskType | null);
 
   const vetId = existing.vetId;
   if (!vetId) {
     throw new AppointmentServiceError("TASK_NOT_ASSIGNED", 400, "Task has no technician assigned");
   }
 
-  if (isMedicationTask) {
-    const metadata = medicationMetadataFromUnknown(existing.metadata);
-    const acknowledgedBy = typeof metadata.acknowledgedBy === "string" ? metadata.acknowledgedBy : null;
-    const canOverride = actorCanOverrideMedicationOwnership(actorRole);
-    if (!canOverride && !matchesAcknowledgedActor(acknowledgedBy, actor)) {
-      throw new AppointmentServiceError(
-        "TASK_NOT_OWNED_BY_TECH",
-        403,
-        "Medication tasks can only be completed by the acknowledging technician or vet/admin",
-      );
-    }
-  } else if (vetId !== actor.userId) {
+  const actorRole = normalizeRole(actor.role);
+  const canBypassOwnership = actorRole === "admin" || actorRole === "vet" || actorRole === "senior_technician";
+  if (vetId !== actor.userId && !canBypassOwnership) {
     throw new AppointmentServiceError("TASK_NOT_OWNED_BY_TECH", 403, "Only the assigned technician can complete this task");
   }
-
-  // Vet approval is now enforced by the state machine (pending → approved → in_progress).
-  // By the time a task is in_progress, it has already passed through 'approved'.
-  // No separate metadata.vetApproved check is needed here.
 
   const from = existing.status as AppointmentStatus;
   if (from !== "in_progress") {
@@ -1800,124 +1313,18 @@ export async function completeTask(
 
   const previousSnapshot = { ...serializeAppointment(existing) };
   const completedAt = new Date();
-  const completionIdempotencyKey = `medication-task-complete:${taskId}`;
-  const normalizedExecution = normalizeMedicationExecutionInput(executionInput);
-  const [{ row: updated, medicationBilling, inventoryJobInserted }] = await db.transaction(async (tx) => {
-    let medicationBilling: Awaited<ReturnType<typeof resolveMedicationBillingForCompletion>> | null = null;
-    if (isMedicationTask && existing.animalId) {
-      medicationBilling = await resolveMedicationBillingForCompletion(
-        tx,
-        clinicId,
-        resolveMedicationTaskContainerId(existing),
-      );
-    }
+  const [updated] = await db
+    .update(appointments)
+    .set({
+      status: "completed",
+      completedAt,
+      updatedAt: completedAt,
+    })
+    .where(and(eq(appointments.id, taskId), eq(appointments.clinicId, clinicId)))
+    .returning();
 
-    const existingMetadata = isMedicationTask ? medicationMetadataFromUnknown(existing.metadata) : null;
-    const actorIdentifier = actor.clerkId?.trim() || actor.userId;
-    if (existingMetadata) {
-      existingMetadata.completedBy = actorIdentifier;
-      existingMetadata.completed_at = completedAt.toISOString();
-      existingMetadata.scheduled_at = new Date(existing.scheduledAt ?? existing.startTime).toISOString();
-      if (normalizedExecution) {
-        existingMetadata.execution_weight_kg = normalizedExecution.weightKg ?? null;
-        existingMetadata.execution_prescribed_dose_per_kg = normalizedExecution.prescribedDosePerKg ?? null;
-        existingMetadata.execution_dose_unit = normalizedExecution.doseUnit ?? null;
-        existingMetadata.execution_converted_dose_mg_per_kg = normalizedExecution.convertedDoseMgPerKg ?? null;
-        existingMetadata.execution_concentration_mg_per_ml = normalizedExecution.concentrationMgPerMl ?? null;
-        existingMetadata.execution_formulary_concentration_mg_per_ml =
-          normalizedExecution.formularyConcentrationMgPerMl ?? null;
-        existingMetadata.execution_concentration_overridden = normalizedExecution.concentrationOverridden ?? null;
-        existingMetadata.execution_calculated_volume_ml = normalizedExecution.calculatedVolumeMl ?? null;
-      }
-    }
-
-    const [row] = await tx
-      .update(appointments)
-      .set({
-        status: "completed",
-        completedAt,
-        ...(existingMetadata ? { metadata: existingMetadata } : {}),
-        updatedAt: completedAt,
-      })
-      .where(and(eq(appointments.id, taskId), eq(appointments.clinicId, clinicId)))
-      .returning();
-
-    if (!row) {
-      throw new AppointmentServiceError("APPOINTMENT_NOT_FOUND", 404, "Appointment not found");
-    }
-
-    if (medicationBilling && row.animalId) {
-      const idempotencyKey = completionIdempotencyKey;
-      await tx.insert(billingLedger).values({
-        id: randomUUID(),
-        clinicId,
-        animalId: row.animalId,
-        itemType: "CONSUMABLE",
-        itemId: medicationBilling.billingItemId,
-        quantity: 1,
-        unitPriceCents: medicationBilling.unitPriceCents,
-        totalAmountCents: medicationBilling.unitPriceCents,
-        idempotencyKey,
-        status: "pending",
-        entryType: "CHARGE",
-        sourceType: "TASK",
-        taskId,
-        createdBy: actor.userId,
-      }).onConflictDoNothing();
-    }
-
-    let inventoryJobInserted = false;
-    if (
-      medicationBilling &&
-      normalizedExecution?.calculatedVolumeMl &&
-      row.animalId
-    ) {
-      const [jobRow] = await tx
-        .insert(inventoryJobs)
-        .values({
-          id: randomUUID(),
-          clinicId,
-          taskId,
-          containerId: medicationBilling.containerId,
-          requiredVolumeMl: String(normalizedExecution.calculatedVolumeMl),
-          animalId: row.animalId,
-          status: "pending",
-          retryCount: 0,
-          failureReason: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          resolvedAt: null,
-        })
-        .onConflictDoNothing()
-        .returning({ id: inventoryJobs.id });
-      inventoryJobInserted = Boolean(jobRow);
-    }
-
-    return [{ row, medicationBilling, inventoryJobInserted }] as const;
-  });
-
-  let inventoryEnqueueFailed = false;
-  if (
-    inventoryJobInserted &&
-    medicationBilling &&
-    normalizedExecution?.calculatedVolumeMl &&
-    updated.animalId
-  ) {
-    try {
-      await inventoryDeductionQueue.add({
-        taskId,
-        containerId: medicationBilling.containerId,
-        requiredVolumeMl: normalizedExecution.calculatedVolumeMl,
-        clinicId,
-        animalId: updated.animalId,
-      });
-    } catch (error) {
-      inventoryEnqueueFailed = true;
-      console.error("[completeTask] inventory deduction enqueue failed", {
-        taskId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+  if (!updated) {
+    throw new AppointmentServiceError("APPOINTMENT_NOT_FOUND", 404, "Appointment not found");
   }
 
   const serialized = serializeAppointment(updated);
@@ -1935,88 +1342,7 @@ export async function completeTask(
   void sendTaskNotification("TASK_COMPLETED", serialized, actor).catch(() => {});
   broadcast(clinicId, { type: "TASK_COMPLETED", payload: serialized });
   broadcast(clinicId, { type: "TASK_UPDATED", payload: serialized });
-  if (isMedicationTask) {
-    await markIdempotentAsync(completionIdempotencyKey);
-  }
-  return { task: serialized, inventoryEnqueueFailed };
-}
-
-/**
- * Vet approval gate — transitions medication task from pending → approved.
- *
- * Fix C/D: approval is now a first-class status transition, not a metadata flag.
- * This must happen BEFORE startTask (which requires 'approved' for medication tasks).
- * Allowed from: pending | assigned | scheduled (pre-start states).
- */
-export async function vetApproveTask(clinicIdInput: string, taskId: string, actor: TaskAuditActor) {
-  const clinicId = assertClinicId(clinicIdInput);
-
-  const [existing] = await db
-    .select()
-    .from(appointments)
-    .where(and(eq(appointments.id, taskId), eq(appointments.clinicId, clinicId)))
-    .limit(1);
-
-  if (!existing) {
-    throw new AppointmentServiceError("APPOINTMENT_NOT_FOUND", 404, "Appointment not found");
-  }
-
-  const isMedicationTask = isMedicationTaskType(existing.taskType as TaskType | null);
-  if (!isMedicationTask) {
-    throw new AppointmentServiceError("NOT_A_MEDICATION_TASK", 400, "Vet approval is only applicable to medication tasks");
-  }
-
-  // Idempotent: already approved or further along
-  if (existing.status === "approved") {
-    return serializeAppointment(existing);
-  }
-
-  const allowedFromStatuses: AppointmentStatus[] = ["pending", "assigned", "scheduled", "arrived"];
-  const from = existing.status as AppointmentStatus;
-  if (!allowedFromStatuses.includes(from)) {
-    throw new AppointmentServiceError("INVALID_STATUS_TRANSITION", 400, "Task cannot be approved from its current status", {
-      from,
-      to: "approved",
-      allowedFrom: allowedFromStatuses,
-    });
-  }
-
-  const actorIdentifier = actor.clerkId?.trim() || actor.userId;
-  const previousSnapshot = { ...serializeAppointment(existing) };
-  const now = new Date();
-
-  const [updated] = await db
-    .update(appointments)
-    .set({
-      status: "approved",
-      updatedAt: now,
-    })
-    .where(and(eq(appointments.id, taskId), eq(appointments.clinicId, clinicId)))
-    .returning();
-
-  if (!updated) {
-    throw new AppointmentServiceError("APPOINTMENT_NOT_FOUND", 404, "Appointment not found");
-  }
-
-  const serialized = serializeAppointment(updated);
-  logAudit({
-    clinicId,
-    actionType: "task_approved",
-    performedBy: actor.userId,
-    performedByEmail: actor.email,
-    actorRole: resolveAuditActorRole({ effectiveRole: actor.role }),
-    targetId: taskId,
-    targetType: "task",
-    metadata: {
-      approvedBy: actorIdentifier,
-      previousStatus: from,
-      newStatus: "approved",
-      previousState: previousSnapshot,
-    },
-  });
-  broadcast(clinicId, { type: "TASK_APPROVED", payload: serialized });
-  broadcast(clinicId, { type: "TASK_UPDATED", payload: serialized });
-  return serialized;
+  return { task: serialized };
 }
 
 export async function getTasksForTechnician(clinicIdInput: string, technicianId: string) {
@@ -2080,42 +1406,6 @@ export async function getActiveTasks(clinicIdInput: string) {
     .orderBy(appointments.startTime);
 
   return serializeAppointmentRowsSkippingMalformed(rows, "getActiveTasks");
-}
-
-// === MEDICATION EXECUTION QUERIES (→ medication-execution.service.ts) ========
-
-export async function getActiveMedicationTasks(clinicIdInput: string): Promise<MedicationExecutionTask[]> {
-  const clinicId = assertClinicId(clinicIdInput);
-  const rows = await db
-    .select({
-      appointment: appointments,
-      animalWeightKg: animals.weightKg,
-    })
-    .from(appointments)
-    .leftJoin(animals, and(eq(animals.id, appointments.animalId), eq(animals.clinicId, appointments.clinicId)))
-    .where(
-      and(
-        eq(appointments.clinicId, clinicId),
-        eq(appointments.taskType, "medication"),
-        inArray(appointments.status, DB_ACTIVE_STATUSES),
-      ),
-    )
-    .orderBy(appointments.startTime);
-
-  const tasks: MedicationExecutionTask[] = [];
-  for (const { appointment, animalWeightKg } of rows) {
-    try {
-      const serialized = serializeAppointment(appointment);
-      const normalizedWeight =
-        animalWeightKg == null ? null : Number.isFinite(Number.parseFloat(String(animalWeightKg)))
-          ? Number.parseFloat(String(animalWeightKg))
-          : null;
-      tasks.push({ ...serialized, animalWeightKg: normalizedWeight } as MedicationExecutionTask);
-    } catch (rowErr) {
-      console.warn("[getActiveMedicationTasks] skipping malformed row id=%s:", appointment?.id, rowErr);
-    }
-  }
-  return tasks;
 }
 
 export async function getTodayTasks(clinicIdInput: string) {

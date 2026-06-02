@@ -13,7 +13,7 @@ export interface CodeBlueLogEntry {
   sessionId: string;
   elapsedMs: number;
   label: string;
-  category: "drug" | "shock" | "cpr" | "note" | "equipment";
+  category: "equipment" | "note";
   equipmentId?: string | null;
   loggedByUserId: string;
   loggedByName: string;
@@ -28,14 +28,15 @@ export interface CodeBlueSession {
   startedByName: string;
   managerUserId: string;
   managerUserName: string;
-  patientId?: string | null;
-  hospitalizationId?: string | null;
-  patientName?: string | null;
-  patientWeight?: number | null;
   status: "active" | "ended";
   outcome?: string | null;
   preCheckPassed?: boolean | null;
   endedAt?: string | null;
+}
+
+export interface LinkedEquipmentItem {
+  id: string;
+  name: string;
 }
 
 export interface CartStatus {
@@ -49,6 +50,7 @@ export interface SessionPollResult {
   logEntries: CodeBlueLogEntry[];
   presence: Array<{ userId: string; userName: string; lastSeenAt: string }>;
   cartStatus: CartStatus | null;
+  linkedEquipment: LinkedEquipmentItem[];
 }
 
 const SESSION_CACHE_KEY = "vt_cb_cache";
@@ -97,8 +99,12 @@ export function useCodeBlueSession() {
     queryKey: ACTIVE_SESSION_QUERY_KEY,
     queryFn: async () => {
       const data = await api.codeBlue.sessions.getActive();
-      cacheSession(data);
-      return data;
+      const normalized: SessionPollResult = {
+        ...data,
+        linkedEquipment: data.linkedEquipment ?? [],
+      };
+      cacheSession(normalized);
+      return normalized;
     },
     refetchInterval: 2000,
     refetchOnWindowFocus: false,
@@ -141,7 +147,7 @@ export function useCodeBlueSession() {
   const logEntry = useCallback(
     async (entry: {
       label: string;
-      category: "drug" | "shock" | "cpr" | "note" | "equipment";
+      category: "equipment" | "note";
       equipmentId?: string;
     }) => {
       if (!sessionId) return;
@@ -202,6 +208,7 @@ export function useCodeBlueSession() {
     logEntries: query.data?.logEntries ?? [],
     presence: query.data?.presence ?? [],
     cartStatus: query.data?.cartStatus ?? null,
+    linkedEquipment: query.data?.linkedEquipment ?? [],
     isLoading: query.isPending,
     isError: query.isError,
     logEntry,

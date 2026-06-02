@@ -7,7 +7,6 @@ import { CalendarDays, CheckCircle2, ChevronRight, Clock3, Plus, User, Zap } fro
 import { Layout } from "@/components/layout";
 import { PageShell } from "@/components/layout/PageShell";
 import type { SidebarItem } from "@/components/layout/IconSidebar";
-import { MedicationCalculator } from "@/components/MedicationCalculator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingSection } from "@/components/ui/loading-section";
 import { Input } from "@/components/ui/input";
@@ -96,14 +95,6 @@ const TASK_CARD_STYLES = {
 };
 
 const ACTION_BUTTON_BASE = "h-9 px-3 text-sm";
-
-type MedicationMetadata = {
-  createdBy?: string;
-  acknowledgedBy?: string;
-  prescribedByName?: string;
-  doseJustification?: string;
-  [key: string]: unknown;
-};
 
 function ActionTooltip({
   content,
@@ -213,47 +204,15 @@ function canStartTask(a: Appointment, meId: string | undefined, role?: string | 
   return ["scheduled", "assigned", "arrived"].includes(a.status);
 }
 
-function medicationMetadata(appointment: Appointment): MedicationMetadata | null {
-  if (!appointment.metadata || typeof appointment.metadata !== "object") return null;
-  return appointment.metadata as MedicationMetadata;
-}
-
 function getScheduledIso(appointment: Appointment): string | null {
   if (appointment.scheduledAt) return appointment.scheduledAt;
-  const metadata = medicationMetadata(appointment);
-  if (metadata && typeof metadata.scheduled_at === "string") return metadata.scheduled_at;
   return appointment.startTime ?? null;
-}
-
-function isDelayedMedicationTask(appointment: Appointment): boolean {
-  if (appointment.taskType !== "medication") return false;
-  if (appointment.status !== "pending") return false;
-  const scheduledIso = getScheduledIso(appointment);
-  if (!scheduledIso) return false;
-  const scheduledMs = new Date(scheduledIso).getTime();
-  if (!Number.isFinite(scheduledMs)) return false;
-  return Date.now() > scheduledMs + 15 * 60 * 1000;
 }
 
 function formatScheduledLabel(appointment: Appointment): string | null {
   const scheduledIso = getScheduledIso(appointment);
   if (!scheduledIso) return null;
   return t.appointmentsPage.scheduledAt(formatTimeHHMM(new Date(scheduledIso)));
-}
-
-function formatPrescribedByLabel(appointment: Appointment): string | null {
-  if (appointment.taskType !== "medication") return null;
-  const metadata = medicationMetadata(appointment);
-  const prescribedByRaw = typeof metadata?.prescribedByName === "string"
-    ? metadata.prescribedByName
-    : typeof metadata?.createdBy === "string"
-      ? metadata.createdBy
-      : null;
-  const prescribedBy = prescribedByRaw && !looksLikeUuid(prescribedByRaw)
-    ? prescribedByRaw
-    : t.appointmentsPage.staffMember;
-  if (!prescribedBy) return null;
-  return t.appointmentsPage.prescribedBy(prescribedBy);
 }
 
 function completeButtonState(args: {
@@ -276,25 +235,6 @@ function completeButtonState(args: {
 
   if (!meId || !appointment.vetId || appointment.vetId !== meId) {
     return { visible: false, disabled: true, tooltip: "" };
-  }
-
-  if (appointment.taskType !== "medication") {
-    return { visible: true, disabled: false, tooltip: "" };
-  }
-
-  const metadata = medicationMetadata(appointment);
-  const acknowledgedBy = typeof metadata?.acknowledgedBy === "string" ? metadata.acknowledgedBy : "";
-  const meUserId = (meId ?? "").trim();
-  const meClerk = (meClerkId ?? "").trim();
-  const isAcknowledgedOwner =
-    !!acknowledgedBy &&
-    (acknowledgedBy === meUserId || (meClerk.length > 0 && acknowledgedBy === meClerk));
-  if (!isAcknowledgedOwner) {
-    return {
-      visible: true,
-      disabled: true,
-      tooltip: t.appointmentsPage.acknowledgeTooltip,
-    };
   }
 
   return { visible: true, disabled: false, tooltip: "" };
@@ -359,19 +299,6 @@ function getTaskReasonBullets(scoreBreakdown: {
   return bullets;
 }
 
-function isMedicationNeedingApproval(appointment: Appointment): boolean {
-  if (appointment.taskType !== "medication") return false;
-  if (appointment.status !== "in_progress") return false;
-  const meta = appointment.metadata;
-  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return false;
-  return (meta as Record<string, unknown>).vetApproved !== true;
-}
-
-function isVetOrAdmin(role: string | null | undefined, effectiveRole: string | null | undefined): boolean {
-  const r = String(effectiveRole ?? role ?? "").trim().toLowerCase();
-  return r === "vet" || r === "admin";
-}
-
 const USER_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 export default function AppointmentsPage() {
@@ -399,8 +326,6 @@ export default function AppointmentsPage() {
   const [formEndLocal, setFormEndLocal] = useState<string>(() => toLocalDateTimeInputValue(new Date(Date.now() + 20 * 60 * 1000)));
   const [selectedDuration, setSelectedDuration] = useState<number>(20);
   const [manualEndOverride, setManualEndOverride] = useState(false);
-
-  const isMedicationForm = formTaskType === "medication";
 
   const meQuery = useQuery({
     queryKey: ["/api/users/me"],
@@ -541,20 +466,6 @@ export default function AppointmentsPage() {
     },
   });
 
-  const vetApproveMutation = useMutation({
-    mutationFn: (id: string) => api.tasks.vetApprove(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/appointments", day], exact: true });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", meUserId ?? ""], exact: true });
-      toast.success(t.appointmentsPage.toast.medicationAcknowledged);
-    },
-    onError: (error: Error) => {
-      toast.error(toErrorMessage(error));
-    },
-  });
-
-  const canApproveAsMedVet = isVetOrAdmin(role, effectiveRole);
-
   const handleRealtimeEvent = useCallback((event: { type: string; payload: unknown }) => {
     if (
       event.type === "TASK_CREATED" ||
@@ -649,13 +560,6 @@ export default function AppointmentsPage() {
   }
 
   function submitCreate(conflictOverride = false, overrideReason?: string) {
-    if (formTaskType === "medication") {
-      throw new Error(
-        "[VetTrack] Medication must be created via MedicationCalculator. " +
-        "Task dialog creation is blocked for medication task type.",
-      );
-    }
-
     if (!formVetId.trim()) {
       toast.error(t.appointmentsPage.toast.errorPickTechnician);
       return;
@@ -673,11 +577,6 @@ export default function AppointmentsPage() {
     }
     if (end.getTime() <= start.getTime()) {
       toast.error(t.appointmentsPage.toast.errorEndAfterStart);
-      return;
-    }
-
-    if (isMedicationForm) {
-      toast.error(t.appointmentsPage.toast.errorMedicationViaCalculator);
       return;
     }
 
@@ -770,9 +669,9 @@ export default function AppointmentsPage() {
                       <div className="text-xs text-muted-foreground">
                         {compactMeta(formatLocation(nbt.ownerId), resolveVet(nbt.vetId), timeRange)}
                       </div>
-                      {formatScheduledLabel(nbt) || formatPrescribedByLabel(nbt) ? (
-                        <div className="text-xs text-muted-foreground">
-                          {compactMeta(formatScheduledLabel(nbt), formatPrescribedByLabel(nbt))}
+                      {formatScheduledLabel(nbt) ? (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {formatScheduledLabel(nbt)}
                         </div>
                       ) : null}
                     </div>
@@ -794,22 +693,6 @@ export default function AppointmentsPage() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {isDelayedMedicationTask(nbt) ? (
-                      <Badge variant="outline" className="text-[10px] bg-red-100 border-red-300 text-red-900">
-                        {t.appointmentsPage.delayed}
-                      </Badge>
-                    ) : null}
-                    {canApproveAsMedVet && isMedicationNeedingApproval(nbt) ? (
-                      <Button
-                        size="sm"
-                        variant="default"
-                        className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-                        disabled={vetApproveMutation.isPending}
-                        onClick={() => vetApproveMutation.mutate(nbt.id)}
-                      >
-                        {t.appointmentsPage.administerMedication}
-                      </Button>
-                    ) : null}
                     {canStartTask(nbt, meQuery.data?.id, role, effectiveRole) ? (
                       <Button
                         size="sm"
@@ -874,9 +757,9 @@ export default function AppointmentsPage() {
                           `${formatTimeHHMM(new Date(overdueItem.startTime))}\u2009\u2013\u2009${formatTimeHHMM(new Date(overdueItem.endTime))}`,
                         )}
                       </div>
-                      {formatScheduledLabel(overdueItem) || formatPrescribedByLabel(overdueItem) ? (
+                      {formatScheduledLabel(overdueItem) ? (
                         <div className="text-xs text-muted-foreground mt-1">
-                          {compactMeta(formatScheduledLabel(overdueItem), formatPrescribedByLabel(overdueItem))}
+                          {formatScheduledLabel(overdueItem)}
                         </div>
                       ) : null}
                     </li>
@@ -899,9 +782,9 @@ export default function AppointmentsPage() {
                           `${formatTimeHHMM(new Date(urgentItem.startTime))}\u2009\u2013\u2009${formatTimeHHMM(new Date(urgentItem.endTime))}`,
                         )}
                       </div>
-                      {formatScheduledLabel(urgentItem) || formatPrescribedByLabel(urgentItem) ? (
+                      {formatScheduledLabel(urgentItem) ? (
                         <div className="text-xs text-muted-foreground mt-1">
-                          {compactMeta(formatScheduledLabel(urgentItem), formatPrescribedByLabel(urgentItem))}
+                          {formatScheduledLabel(urgentItem)}
                         </div>
                       ) : null}
                     </li>
@@ -983,11 +866,6 @@ export default function AppointmentsPage() {
                           <PatientChartLink animalId={todayTask.animalId} />
                         </div>
                         <div className="flex flex-wrap items-center justify-end gap-1 shrink-0">
-                          {isDelayedMedicationTask(todayTask) ? (
-                            <Badge variant="outline" className="text-[10px] bg-red-100 border-red-300 text-red-900">
-                              {t.appointmentsPage.delayed}
-                            </Badge>
-                          ) : null}
                           <Badge
                             variant="outline"
                             className={`text-[10px] ${PRIORITY_COLORS[todayTask.priority ?? "normal"]}`}
@@ -1003,23 +881,12 @@ export default function AppointmentsPage() {
                           `${formatTimeHHMM(new Date(todayTask.startTime))}\u2009\u2013\u2009${formatTimeHHMM(new Date(todayTask.endTime))}`,
                         )}
                       </div>
-                      {formatScheduledLabel(todayTask) || formatPrescribedByLabel(todayTask) ? (
-                        <div className="text-xs text-muted-foreground">
-                          {compactMeta(formatScheduledLabel(todayTask), formatPrescribedByLabel(todayTask))}
+                      {formatScheduledLabel(todayTask) ? (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {formatScheduledLabel(todayTask)}
                         </div>
                       ) : null}
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {canApproveAsMedVet && isMedicationNeedingApproval(todayTask) ? (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-                            disabled={vetApproveMutation.isPending}
-                            onClick={() => vetApproveMutation.mutate(todayTask.id)}
-                          >
-                            {t.appointmentsPage.administerMedication}
-                          </Button>
-                        ) : null}
                         {canStartTask(todayTask, meQuery.data?.id, role, effectiveRole) ? (
                           <Button
                             size="sm"
@@ -1104,11 +971,6 @@ export default function AppointmentsPage() {
                           <PatientChartLink animalId={myTask.animalId} />
                         </div>
                         <div className="flex flex-wrap items-center justify-end gap-1 shrink-0">
-                          {isDelayedMedicationTask(myTask) ? (
-                            <Badge variant="outline" className="text-[10px] bg-red-100 border-red-300 text-red-900">
-                              {t.appointmentsPage.delayed}
-                            </Badge>
-                          ) : null}
                           <Badge
                             variant="outline"
                             className={`text-[10px] ${PRIORITY_COLORS[myTask.priority ?? "normal"]}`}
@@ -1124,23 +986,12 @@ export default function AppointmentsPage() {
                           `${formatTimeHHMM(new Date(myTask.startTime))}\u2009\u2013\u2009${formatTimeHHMM(new Date(myTask.endTime))}`,
                         )}
                       </div>
-                      {formatScheduledLabel(myTask) || formatPrescribedByLabel(myTask) ? (
-                        <div className="text-xs text-muted-foreground">
-                          {compactMeta(formatScheduledLabel(myTask), formatPrescribedByLabel(myTask))}
+                      {formatScheduledLabel(myTask) ? (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {formatScheduledLabel(myTask)}
                         </div>
                       ) : null}
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {canApproveAsMedVet && isMedicationNeedingApproval(myTask) ? (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-                            disabled={vetApproveMutation.isPending}
-                            onClick={() => vetApproveMutation.mutate(myTask.id)}
-                          >
-                            {t.appointmentsPage.administerMedication}
-                          </Button>
-                        ) : null}
                         {canStartTask(myTask, meQuery.data?.id, role, effectiveRole) ? (
                           <Button
                             size="sm"
@@ -1402,11 +1253,6 @@ export default function AppointmentsPage() {
                             <PatientChartLink animalId={appointment.animalId} />
                           </div>
                           <div className="flex flex-wrap justify-end gap-1 shrink-0">
-                            {isDelayedMedicationTask(appointment) ? (
-                              <Badge variant="outline" className="text-[10px] bg-red-100 border-red-300 text-red-900">
-                                {t.appointmentsPage.delayed}
-                              </Badge>
-                            ) : null}
                             <Badge variant="secondary" className="text-[10px]">
                               {appointmentStatusLabels[appointment.status]}
                             </Badge>
@@ -1425,9 +1271,9 @@ export default function AppointmentsPage() {
                             `${formatTimeHHMM(start)}\u2009\u2013\u2009${formatTimeHHMM(end)}`,
                           )}
                         </div>
-                        {formatScheduledLabel(appointment) || formatPrescribedByLabel(appointment) ? (
+                        {formatScheduledLabel(appointment) ? (
                           <div className="text-[11px] mt-1 truncate text-muted-foreground">
-                            {compactMeta(formatScheduledLabel(appointment), formatPrescribedByLabel(appointment))}
+                            {formatScheduledLabel(appointment)}
                           </div>
                         ) : null}
                         {appointment.conflictOverride ? (
@@ -1508,77 +1354,19 @@ export default function AppointmentsPage() {
         <DialogContent dir={dir} className="text-start max-h-[85dvh] flex flex-col overflow-hidden p-0">
           <DialogHeader className="shrink-0 px-6 pt-6">
             <div className="flex items-start gap-2">
-              {isMedicationForm ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="shrink-0 h-9 w-9"
-                  aria-label={t.appointmentsPage.backToTaskType}
-                  onClick={() => setFormTaskType("maintenance")}
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </Button>
-              ) : null}
               <div className="min-w-0 flex-1 space-y-1 text-start">
-                <DialogTitle>{isMedicationForm ? t.appointmentsPage.giveMedication : t.appointmentsPage.newTask}</DialogTitle>
+                <DialogTitle>{t.appointmentsPage.newTask}</DialogTitle>
                 <DialogDescription>
-                  {isMedicationForm ? (
-                    <>{t.appointmentsPage.dialogDescMedication}</>
-                  ) : (
-                    <>
                       {t.appointmentsPage.dialogDescTask}{" "}
                       <span dir="ltr" className="inline-block">
                         {t.appointmentsPage.dialogDescTapSlot}
                       </span>
-                    </>
-                  )}
-                </DialogDescription>
+                    </DialogDescription>
               </div>
             </div>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
-          {formTaskType === "medication" ? (
-  <div className="flex flex-col gap-4">
-    <div>
-      <label className="text-xs text-muted-foreground block text-start">{t.appointmentsPage.labelDeviceAsset} <span className="text-destructive" aria-hidden>*</span></label>
-      <Input
-        dir="ltr"
-        className="text-left"
-        value={formAnimalId}
-        onChange={(e) => setFormAnimalId(e.target.value)}
-        placeholder={t.appointmentsPage.placeholderDevice}
-      />
-    </div>
-
-    {!formAnimalId.trim() ? (
-      <p
-        role="alert"
-        className="text-sm text-destructive text-center rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2"
-      >
-        {t.appointmentsPage.enterDeviceFirst}
-      </p>
-    ) : (
-      <MedicationCalculator
-        animalId={formAnimalId.trim()}
-        onCancel={() => setFormTaskType("maintenance")}
-        onComplete={() => {
-          toast.success(t.appointmentsPage.medicationGiven);
-          queryClient.invalidateQueries({ queryKey: ["/api/appointments", day], exact: true });
-          queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", meUserId ?? ""], exact: true });
-          queryClient.invalidateQueries({ queryKey: ["/api/tasks/recommendations"], exact: true });
-
-          setBookingOpen(false);
-          setFormNotes("");
-          setFormAnimalId("");
-          setFormOwnerId("");
-          setFormTaskType("maintenance");
-        }}
-      />
-    )}
-  </div>
-) : (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
     <div>
       <label htmlFor={`${bookingFormId}-vet`} className="text-xs text-muted-foreground block text-start">
         {t.appointmentsPage.labelTechnician} <span className="text-destructive" aria-hidden>*</span>
@@ -1712,26 +1500,23 @@ export default function AppointmentsPage() {
       />
     </div>
   </div>
-)}
           </div>
           <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
             <Button variant="outline" onClick={() => setBookingOpen(false)}>
               {t.common.cancel}
             </Button>
-            {!isMedicationForm ? (
-              <Button
-                onClick={() => submitCreate(false)}
-                disabled={
-                  createMutation.isPending
-                  || !formVetId.trim()
-                  || !formAnimalId.trim()
-                  || !formStartLocal
-                  || !formEndLocal
-                }
-              >
-                {createMutation.isPending ? t.appointmentsPage.saving : t.appointmentsPage.createTask}
-              </Button>
-            ) : null}
+            <Button
+              onClick={() => submitCreate(false)}
+              disabled={
+                createMutation.isPending
+                || !formVetId.trim()
+                || !formAnimalId.trim()
+                || !formStartLocal
+                || !formEndLocal
+              }
+            >
+              {createMutation.isPending ? t.appointmentsPage.saving : t.appointmentsPage.createTask}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

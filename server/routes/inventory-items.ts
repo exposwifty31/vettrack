@@ -2,7 +2,7 @@ import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { and, asc, eq, isNull } from "drizzle-orm";
-import { drugFormulary, inventoryItemPrices, inventoryItems, db, users } from "../db.js";
+import { inventoryItemPrices, inventoryItems, db, users } from "../db.js";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
@@ -40,8 +40,6 @@ export const createItemSchema = z.object({
   unit: z.string().min(1).max(30).optional().nullable(),
   category: z.string().max(100).optional(),
   nfcTagId: z.string().max(200).optional().nullable(),
-  /** Required when itemType = 'DRUG'. Must reference an active formulary entry. */
-  formularyId: z.string().uuid().optional().nullable(),
 }).strict();
 
 export const updateItemSchema = z.object({
@@ -52,7 +50,6 @@ export const updateItemSchema = z.object({
   nfcTagId: z.string().max(200).optional().nullable(),
   isBillable: z.boolean().optional(),
   minimumDispenseToCapture: z.number().int().min(1).optional(),
-  formularyId: z.string().uuid().optional().nullable(),
 }).strict();
 
 export const addPriceSchema = z.object({
@@ -62,35 +59,6 @@ export const addPriceSchema = z.object({
   currency: z.string().length(3).default("ILS"),
   effectiveFrom: z.string().datetime({ offset: true }).optional(),
 }).strict();
-
-/** Enforce DRUG ↔ formulary coupling at service level. */
-async function resolveFormularyVersion(
-  clinicId: string,
-  itemType: string,
-  formularyId: string | null | undefined,
-): Promise<{ formularyId: string; formularyVersion: number } | null> {
-  if (itemType === "DRUG") {
-    if (!formularyId) {
-      throw Object.assign(new Error("DRUG items must have a formularyId."), { statusCode: 400, code: "DRUG_REQUIRES_FORMULARY" });
-    }
-    const [formularyRow] = await db
-      .select({ id: drugFormulary.id, version: drugFormulary.version, isActive: drugFormulary.isActive })
-      .from(drugFormulary)
-      .where(and(eq(drugFormulary.id, formularyId), eq(drugFormulary.clinicId, clinicId), isNull(drugFormulary.deletedAt)))
-      .limit(1);
-    if (!formularyRow) {
-      throw Object.assign(new Error("Formulary entry not found."), { statusCode: 404, code: "FORMULARY_NOT_FOUND" });
-    }
-    if (!formularyRow.isActive) {
-      throw Object.assign(new Error("Formulary entry is not active. Reference an active formulary version."), { statusCode: 409, code: "FORMULARY_INACTIVE" });
-    }
-    return { formularyId: formularyRow.id, formularyVersion: formularyRow.version };
-  }
-  if (formularyId) {
-    throw Object.assign(new Error("formularyId must be null for non-DRUG items."), { statusCode: 400, code: "NON_DRUG_CANNOT_HAVE_FORMULARY" });
-  }
-  return null;
-}
 
 // GET /api/inventory-items — list active items for the clinic
 router.get("/", requireAuth, requireEffectiveRole("technician"), async (req, res) => {
@@ -126,15 +94,6 @@ router.post("/", requireAuth, requireAdmin, validateBody(createItemSchema), asyn
     const b = req.body as z.infer<typeof createItemSchema>;
     const id = randomUUID();
 
-    const formularyRef = await resolveFormularyVersion(clinicId, b.itemType, b.formularyId).catch((err) => {
-      const e = err as { statusCode?: number; code?: string; message?: string };
-      res.status(e.statusCode ?? 400).json(
-        apiError({ code: e.code ?? "VALIDATION_ERROR", reason: e.code ?? "VALIDATION_ERROR", message: e.message ?? "Validation failed", requestId }),
-      );
-      return undefined;
-    });
-    if (formularyRef === undefined && b.itemType === "DRUG") return;
-
     await db.insert(inventoryItems).values({
       id,
       clinicId,
@@ -144,8 +103,6 @@ router.post("/", requireAuth, requireAdmin, validateBody(createItemSchema), asyn
       unit: b.unit?.trim() || null,
       category: b.category?.trim() || null,
       nfcTagId: b.nfcTagId?.trim() || null,
-      formularyId: formularyRef?.formularyId ?? null,
-      formularyVersion: formularyRef?.formularyVersion ?? null,
       isActive: true,
     });
 
@@ -164,8 +121,6 @@ router.post("/", requireAuth, requireAdmin, validateBody(createItemSchema), asyn
         label: b.label.trim(),
         itemType: b.itemType,
         unit: b.unit ?? null,
-        formularyId: formularyRef?.formularyId ?? null,
-        formularyVersion: formularyRef?.formularyVersion ?? null,
       },
     });
 
@@ -175,11 +130,6 @@ router.post("/", requireAuth, requireAdmin, validateBody(createItemSchema), asyn
     if (pgErr?.code === "23505") {
       return res.status(409).json(
         apiError({ code: "CONFLICT", reason: "CODE_EXISTS", message: "An item with this code already exists", requestId }),
-      );
-    }
-    if (pgErr?.code === "23514") {
-      return res.status(400).json(
-        apiError({ code: "DRUG_FORMULARY_CONSTRAINT", reason: "DRUG_FORMULARY_CONSTRAINT", message: "DRUG items require formularyId and formularyVersion; non-DRUG items must not have them", requestId }),
       );
     }
     console.error(err);
@@ -204,18 +154,6 @@ router.patch("/:id", requireAuth, requireAdmin, validateUuid("id"), validateBody
 
     if (!existing) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "ITEM_NOT_FOUND", message: "Inventory item not found", requestId }));
 
-    const resolvedType = b.itemType ?? existing.itemType;
-    const resolvedFormuaryId = b.formularyId !== undefined ? b.formularyId : existing.formularyId;
-
-    const formularyRef = await resolveFormularyVersion(clinicId, resolvedType, resolvedFormuaryId).catch((err) => {
-      const e = err as { statusCode?: number; code?: string; message?: string };
-      res.status(e.statusCode ?? 400).json(
-        apiError({ code: e.code ?? "VALIDATION_ERROR", reason: e.code ?? "VALIDATION_ERROR", message: e.message ?? "Validation failed", requestId }),
-      );
-      return undefined;
-    });
-    if (formularyRef === undefined && resolvedType === "DRUG") return;
-
     const updates: Record<string, unknown> = {};
     if (b.label !== undefined) updates.label = b.label.trim();
     if (b.itemType !== undefined) updates.itemType = b.itemType;
@@ -224,13 +162,6 @@ router.patch("/:id", requireAuth, requireAdmin, validateUuid("id"), validateBody
     if (b.nfcTagId !== undefined) updates.nfcTagId = b.nfcTagId?.trim() || null;
     if (b.isBillable !== undefined) updates.isBillable = b.isBillable;
     if (b.minimumDispenseToCapture !== undefined) updates.minimumDispenseToCapture = b.minimumDispenseToCapture;
-    if (formularyRef != null) {
-      updates.formularyId = formularyRef.formularyId;
-      updates.formularyVersion = formularyRef.formularyVersion;
-    } else if (resolvedType !== "DRUG") {
-      updates.formularyId = null;
-      updates.formularyVersion = null;
-    }
 
     await db.update(inventoryItems).set(updates).where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, req.params.id)));
     const [updated] = await db.select().from(inventoryItems).where(eq(inventoryItems.id, req.params.id)).limit(1);
@@ -249,11 +180,6 @@ router.patch("/:id", requireAuth, requireAdmin, validateUuid("id"), validateBody
     res.json(updated);
   } catch (err) {
     const pgErr = err as { code?: string };
-    if (pgErr?.code === "23514") {
-      return res.status(400).json(
-        apiError({ code: "DRUG_FORMULARY_CONSTRAINT", reason: "DRUG_FORMULARY_CONSTRAINT", message: "DRUG items require formularyId; non-DRUG items must not have one", requestId }),
-      );
-    }
     console.error(err);
     res.status(500).json(
       apiError({ code: "INTERNAL_ERROR", reason: "ITEM_UPDATE_FAILED", message: "Failed to update inventory item", requestId }),

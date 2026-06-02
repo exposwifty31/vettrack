@@ -10,7 +10,6 @@ import {
   unitConditionStates,
   stagingQueue,
   users,
-  hospitalizations,
 } from "../db.js";
 import { eq, and, inArray, sql, asc } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
@@ -650,183 +649,13 @@ router.post(
   requireAuth,
   requireEffectiveRole("vet"),
   validateBody(procedureBindSchema),
-  async (req, res) => {
-    const clinicId = req.clinicId!;
-    const { id: userId, email } = req.authUser!;
-    const { equipmentId } = req.params;
-    const { hospitalizationId } = req.body as z.infer<typeof procedureBindSchema>;
-
-    const [hosp] = await db
-      .select()
-      .from(hospitalizations)
-      .where(and(eq(hospitalizations.id, hospitalizationId), eq(hospitalizations.clinicId, clinicId)))
-      .limit(1);
-    if (!hosp) return res.status(404).json({ code: "NOT_FOUND", error: "Hospitalization not found" });
-    if (hosp.status === "discharged") {
-      return res.status(422).json({ code: "HOSPITALIZATION_DISCHARGED", error: "Hospitalization is already discharged" });
-    }
-
-    const [eq_row] = await db
-      .select()
-      .from(equipment)
-      .where(and(eq(equipment.id, equipmentId), eq(equipment.clinicId, clinicId)))
-      .limit(1);
-    if (!eq_row) return res.status(404).json({ code: "NOT_FOUND", error: "Equipment not found" });
-    if (eq_row.custodyState !== "docked") {
-      return res.status(422).json({ code: "INVALID_CUSTODY", error: "Equipment must be docked to bind to a procedure" });
-    }
-    if (eq_row.usageState !== "available") {
-      return res.status(422).json({ code: "EQUIPMENT_UNAVAILABLE", error: `Equipment usage state ${eq_row.usageState} blocks procedure bind` });
-    }
-
-    let updated: { id: string; usageState: string | null; readinessState: string | null; version: number } | undefined;
-    try {
-      await db.transaction(async (tx) => {
-        const [row] = await tx
-          .update(equipment)
-          .set({
-            usageState: "procedure_bound",
-            usageStateSince: new Date(),
-            procedureBoundHospitalizationId: hospitalizationId,
-            version: sql`${equipment.version} + 1`,
-          })
-          .where(and(
-            eq(equipment.id, equipmentId),
-            eq(equipment.clinicId, clinicId),
-            eq(equipment.custodyState, "docked"),
-            eq(equipment.usageState, "available"),
-            eq(equipment.version, eq_row.version),
-          ))
-          .returning({
-            id: equipment.id,
-            usageState: equipment.usageState,
-            readinessState: equipment.readinessState,
-            version: equipment.version,
-          });
-
-        if (!row) throw new Error("VERSION_CONFLICT");
-        updated = row;
-
-        await insertRealtimeDomainEvent(tx, {
-          clinicId,
-          type: "EQUIPMENT_USAGE_STATE_CHANGED",
-          payload: { equipmentId, usageState: "procedure_bound", hospitalizationId },
-        });
-      });
-    } catch (err) {
-      if (err instanceof Error && err.message === "VERSION_CONFLICT") {
-        return res.status(409).json({ code: "VERSION_CONFLICT", error: "Version conflict, please retry" });
-      }
-      throw err;
-    }
-
-    logAudit({
-      clinicId,
-      actionType: "equipment_usage_state_changed",
-      performedBy: userId,
-      performedByEmail: email,
-      targetId: equipmentId,
-      metadata: { usageState: "procedure_bound", hospitalizationId, action: "bind", readinessState: eq_row.readinessState },
-    });
-    void recordOperationalMetric({
-      clinicId,
-      equipmentId,
-      eventType: "procedure_bound",
-      metadata: { hospitalizationId, action: "bind" },
-    });
-
-    res.json({ ok: true, equipment: updated });
+  async (_req, res) => {
+    return res.status(410).json({ code: "GONE", error: "Procedure bind is no longer supported" });
   },
 );
 
-router.delete("/equipment/:equipmentId/procedure-bind", requireAuth, requireEffectiveRole("vet"), async (req, res) => {
-  const clinicId = req.clinicId!;
-  const { id: userId, email } = req.authUser!;
-  const { equipmentId } = req.params;
-
-  const [eq_row] = await db
-    .select()
-    .from(equipment)
-    .where(and(eq(equipment.id, equipmentId), eq(equipment.clinicId, clinicId)))
-    .limit(1);
-  if (!eq_row) return res.status(404).json({ code: "NOT_FOUND", error: "Equipment not found" });
-  if (eq_row.usageState !== "procedure_bound") {
-    return res.status(422).json({ code: "EQUIPMENT_NOT_BOUND", error: "Equipment is not procedure-bound" });
-  }
-
-  const now = new Date();
-  const prevHospitalizationId = eq_row.procedureBoundHospitalizationId;
-  let updated: { id: string; usageState: string | null; readinessState: string | null; version: number } | undefined;
-  let cancelledClaimIds: string[] = [];
-
-  try {
-    await db.transaction(async (tx) => {
-      const cancelled = await tx
-        .update(stagingQueue)
-        .set({ status: "cancelled", updatedAt: now })
-        .where(and(
-          eq(stagingQueue.equipmentId, equipmentId),
-          eq(stagingQueue.clinicId, clinicId),
-          eq(stagingQueue.status, "active"),
-        ))
-        .returning({ id: stagingQueue.id });
-      cancelledClaimIds = cancelled.map((r) => r.id);
-
-      const [row] = await tx
-        .update(equipment)
-        .set({
-          usageState: "available",
-          usageStateSince: now,
-          readinessState: "unknown",
-          readinessStateSince: now,
-          procedureBoundHospitalizationId: null,
-          version: sql`${equipment.version} + 1`,
-        })
-        .where(and(
-          eq(equipment.id, equipmentId),
-          eq(equipment.clinicId, clinicId),
-          eq(equipment.usageState, "procedure_bound"),
-          eq(equipment.version, eq_row.version),
-        ))
-        .returning({
-          id: equipment.id,
-          usageState: equipment.usageState,
-          readinessState: equipment.readinessState,
-          version: equipment.version,
-        });
-
-      if (!row) throw new Error("VERSION_CONFLICT");
-      updated = row;
-
-      await insertRealtimeDomainEvent(tx, {
-        clinicId,
-        type: "EQUIPMENT_USAGE_STATE_CHANGED",
-        payload: { equipmentId, usageState: "available", reason: "manual_unbind" },
-      });
-    });
-  } catch (err) {
-    if (err instanceof Error && err.message === "VERSION_CONFLICT") {
-      return res.status(409).json({ code: "VERSION_CONFLICT", error: "Version conflict, please retry" });
-    }
-    throw err;
-  }
-
-  logAudit({
-    clinicId,
-    actionType: "equipment_usage_state_changed",
-    performedBy: userId,
-    performedByEmail: email,
-    targetId: equipmentId,
-    metadata: { usageState: "available", reason: "manual_unbind", prevHospitalizationId },
-  });
-  void recordOperationalMetric({
-    clinicId,
-    equipmentId,
-    eventType: "procedure_bound",
-    metadata: { hospitalizationId: prevHospitalizationId, action: "unbind" },
-  });
-
-  res.json({ ok: true, equipment: updated });
+router.delete("/equipment/:equipmentId/procedure-bind", requireAuth, requireEffectiveRole("vet"), async (_req, res) => {
+  return res.status(410).json({ code: "GONE", error: "Procedure bind is no longer supported" });
 });
 
 export default router;

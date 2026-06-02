@@ -25,6 +25,7 @@ describe("F4: revert version pin", () => {
     expect(revertSrc).not.toMatch(
       /consumeUndoToken\([\s\S]*?\);\s*await db\.transaction/,
     );
+    expect(tokenSrc).toContain("type DbExecutor = AuditDbExecutor | typeof db");
     expect(tokenSrc).toContain("executor: DbExecutor = db");
   });
 });

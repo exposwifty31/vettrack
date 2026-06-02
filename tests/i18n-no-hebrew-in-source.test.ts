@@ -53,8 +53,6 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "server/workers/notification.worker.ts",
   "shared/doctor-operational-shift.ts",
   "shared/drug-formulary-seed.ts",
-  "src/components/equipment/EquipmentFilters.tsx",
-  "src/components/equipment/EquipmentTable.tsx",
   "src/components/layout.tsx",
   "src/components/phone-sign-in.tsx",
   "src/components/sw-update-banner.tsx",

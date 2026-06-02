@@ -68,7 +68,7 @@ describe("PR 3.4 wiring — off-mode invariant", () => {
       actor: { userId: "actor", email: "a@e", role: "vet" },
       targetUserId: "target",
       transition: "assign",
-      taskType: "medication",
+      taskType: "maintenance",
       currentAcknowledgedUserId: null,
       currentStatus: "pending",
     });
@@ -82,7 +82,7 @@ describe("PR 3.4 wiring — off-mode invariant", () => {
       actor: { userId: "admin", email: "a@e", role: "admin" },
       targetUserId: "new-tech",
       transition: "reassign",
-      taskType: "medication",
+      taskType: "maintenance",
       currentAcknowledgedUserId: "old-tech",
       currentStatus: "assigned",
     });
@@ -96,7 +96,7 @@ describe("PR 3.4 wiring — off-mode invariant", () => {
       actor: { userId: "tech", email: "t@e", role: "technician" },
       targetUserId: "tech",
       transition: "acknowledge",
-      taskType: "medication",
+      taskType: "maintenance",
       currentAcknowledgedUserId: null,
       currentStatus: "approved",
     });
@@ -111,7 +111,7 @@ describe("PR 3.4 wiring — off-mode invariant", () => {
         actor: { userId: "x", email: "x@e", role: "technician" }, // would deny in shadow/enforce
         targetUserId: "y",
         transition: "assign",
-        taskType: "medication",
+        taskType: "maintenance",
         currentAcknowledgedUserId: null,
         currentStatus: "pending",
       });
@@ -142,7 +142,7 @@ describe("PR 3.4 wiring — off-mode invariant", () => {
         actor: { userId: "x", email: "x@e", role: "vet" },
         targetUserId: "y",
         transition: "assign",
-        taskType: "medication",
+        taskType: "maintenance",
         currentAcknowledgedUserId: null,
         currentStatus: "pending",
       }),

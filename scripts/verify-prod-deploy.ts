@@ -73,7 +73,6 @@ async function main(): Promise<void> {
 
   for (const path of [
     "/api/appointments",
-    "/api/medication-tasks",
     "/api/billing",
     "/api/tasks/dashboard",
     "/api/shift-handover/summary",

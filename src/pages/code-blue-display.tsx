@@ -48,6 +48,7 @@ export default function CodeBlueDisplay() {
   const session = pollQ.data?.session ?? null;
   const logEntries = pollQ.data?.logEntries ?? [];
   const presence = pollQ.data?.presence ?? [];
+  const linkedEquipment = pollQ.data?.linkedEquipment ?? [];
 
   const startedAtRef = useRef<string | null>(null);
   if (session?.startedAt) {
@@ -61,8 +62,7 @@ export default function CodeBlueDisplay() {
     [logEntries]
   );
 
-  const cprCycle = session ? Math.floor(elapsed / 120000) + 1 : 0;
-  const msToNext = session ? 120000 - (elapsed % 120000) : 0;
+  const equipmentCount = linkedEquipment.length;
 
   return (
     <div
@@ -97,9 +97,9 @@ export default function CodeBlueDisplay() {
           <div className="px-8 py-4 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between">
             <div>
               <div className="text-red-400 font-black tracking-widest text-2xl">⚠ CODE BLUE ACTIVE</div>
-              {session.patientName && (
-                <div className="text-zinc-400 text-base mt-1">
-                  {session.patientName}{session.patientWeight ? ` — ${t.codeBlue.patientWeightSuffix(session.patientWeight)}` : ""}
+              {linkedEquipment.length > 0 && (
+                <div className="text-amber-300/90 text-base mt-1">
+                  {t.codeBlue.display.equipmentInEvent}: {linkedEquipment.map((e) => e.name).join(" · ")}
                 </div>
               )}
             </div>
@@ -114,11 +114,13 @@ export default function CodeBlueDisplay() {
             <div className="font-black text-9xl tracking-widest font-mono leading-none">
               {formatElapsed(elapsed)}
             </div>
-            <div className="flex gap-6 justify-center items-center mt-4">
-              <span className="bg-red-700 text-white text-base font-bold px-4 py-1 rounded-full">
-                {t.codeBlue.display.cycle(cprCycle)}
-              </span>
-              <span className="text-zinc-400 text-base">{t.codeBlue.display.nextCheck(formatElapsed(msToNext))}</span>
+            <div className="flex gap-6 justify-center items-center mt-4 text-zinc-400 text-base">
+              <span>{t.codeBlue.display.elapsedLabel}</span>
+              {equipmentCount > 0 && (
+                <span className="text-amber-300/90 font-semibold">
+                  {t.codeBlue.display.equipmentCountLine(equipmentCount)}
+                </span>
+              )}
             </div>
           </div>
 

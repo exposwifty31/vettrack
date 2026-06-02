@@ -103,27 +103,25 @@ describe("Migration 119 — ADD COLUMN IF NOT EXISTS container_id", () => {
 // ---------------------------------------------------------------------------
 
 describe("Query site — dispense-order-validation.ts", () => {
-  it("selects appointments.containerId in the orphan-check query", () => {
-    expect(validationSource).toContain("appointments.containerId");
-  });
-
-  it("filters on appointments.containerId in the WHERE clause", () => {
-    expect(validationSource).toContain("eq(appointments.containerId, containerId)");
+  it("does not query medication appointments for orphan checks", () => {
+    expect(validationSource).not.toContain("appointments.containerId");
+    expect(validationSource).toContain("return { orphanLines: [] }");
   });
 });
 
 describe("Query site — inventory-deduction.worker.ts", () => {
-  it("selects containerId from appointments for the deduction job", () => {
-    expect(workerSource).toContain("containerId: appointments.containerId");
+  it("does not load appointment containerId for medication deduction", () => {
+    expect(workerSource).not.toContain("containerId: appointments.containerId");
   });
 });
 
 describe("Query site — appointments.service.ts", () => {
-  it("uses resolveMedicationTaskContainerId helper (column + metadata fallback)", () => {
-    expect(appointmentsServiceSource).toContain("resolveMedicationTaskContainerId");
+  it("serializes containerId from persisted column when present", () => {
+    expect(appointmentsServiceSource).toContain("containerId: col");
   });
 
-  it("prefers persisted column over legacy metadata.containerId", () => {
-    expect(appointmentsServiceSource).toContain("Prefer persisted column; fall back to legacy metadata.containerId");
+  it("exposes containerId from the persisted appointments.container_id column", () => {
+    expect(appointmentsServiceSource).toMatch(/containerId:\s*col/);
+    expect(appointmentsServiceSource).not.toContain("resolveMedicationTaskContainerId");
   });
 });

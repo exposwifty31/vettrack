@@ -4,7 +4,7 @@ import {
   date, time, uuid, index, uniqueIndex, primaryKey, bigserial, pgEnum,
 } from "drizzle-orm/pg-core";
 import { vtTable } from "./helpers.js";
-import { clinics, users, animals, hospitalizations } from "./core.js";
+import { clinics, users } from "./core.js";
 import { appointments } from "./tasks.js";
 
 export const shiftRole = pgEnum("vt_shift_role", ["technician", "senior_technician", "admin"]);
@@ -235,106 +235,6 @@ export type ShiftMessage = typeof shiftMessages.$inferSelect;
 export type ShiftMessageAck = typeof shiftMessageAcks.$inferSelect;
 export type ShiftMessageReaction = typeof shiftMessageReactions.$inferSelect;
 
-export const shiftHandoffs = vtTable(
-  "vt_shift_handoffs",
-  {
-    id: text("id").primaryKey(),
-    clinicId: text("clinic_id")
-      .notNull()
-      .references(() => clinics.id, { onDelete: "restrict" }),
-    hospitalizationId: text("hospitalization_id")
-      .references(() => hospitalizations.id, { onDelete: "set null" }),
-    outgoingUserId: text("outgoing_user_id")
-      .references(() => users.id, { onDelete: "set null" }),
-    status: varchar("status", { length: 20 })
-      .notNull()
-      .default("open"),
-    createdAt: timestamp("created_at")
-      .defaultNow()
-      .notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => ({
-    clinicStatusIdx: index("idx_shift_handoffs_clinic_status").on(
-      table.clinicId,
-      table.status
-    ),
-    clinicCreatedIdx: index("idx_shift_handoffs_clinic_created").on(
-      table.clinicId,
-      table.createdAt
-    ),
-  }),
-);
-
-export const shiftHandoffItems = vtTable(
-  "vt_shift_handoff_items",
-  {
-    id: text("id").primaryKey(),
-    clinicId: text("clinic_id")
-      .notNull()
-      .references(() => clinics.id, { onDelete: "restrict" }),
-    handoffId: text("handoff_id")
-      .notNull()
-      .references(() => shiftHandoffs.id, { onDelete: "cascade" }),
-    activeIssue: text("active_issue").notNull(),
-    nextAction: text("next_action").notNull(),
-    currentStability: text("current_stability").notNull().default(""),
-    pendingTasks: text("pending_tasks").notNull().default(""),
-    criticalWarnings: text("critical_warnings").notNull().default(""),
-    etaMinutes: integer("eta_minutes").notNull(),
-    ownerUserId: text("owner_user_id")
-      .references(() => users.id, { onDelete: "set null" }),
-    riskFlags: jsonb("risk_flags")
-      .notNull()
-      .default(sql`'[]'::jsonb`),
-    pendingMedicationTaskId: text("pending_medication_task_id"),
-    note: text("note"),
-    ackBy: text("ack_by")
-      .references(() => users.id, { onDelete: "set null" }),
-    ackAt: timestamp("ack_at"),
-    slaBreachedAt: timestamp("sla_breached_at", { withTimezone: true }),
-    overriddenBy: text("overridden_by")
-      .references(() => users.id, { onDelete: "set null" }),
-    overrideReason: text("override_reason"),
-    createdAt: timestamp("created_at")
-      .defaultNow()
-      .notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => ({
-    handoffIdx: index("idx_shift_handoff_items_handoff").on(table.handoffId),
-    clinicOwnerIdx: index("idx_shift_handoff_items_clinic_owner").on(
-      table.clinicId,
-      table.ownerUserId
-    ),
-  }),
-);
-
-export const shiftHandoverSnapshots = vtTable(
-  "vt_shift_handover_snapshots",
-  {
-    id: text("id").primaryKey(),
-    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
-    shiftSessionId: text("shift_session_id")
-      .notNull()
-      .references(() => shiftSessions.id, { onDelete: "restrict" }),
-    generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),
-    patientsPayload: jsonb("patients_payload").notNull(),
-    summaryCounts: jsonb("summary_counts").notNull(),
-    createdBy: text("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
-  },
-  (table) => ({
-    clinicShiftIdx: index("idx_vt_shift_handover_snapshots_clinic_shift").on(table.clinicId, table.shiftSessionId),
-    clinicGeneratedIdx: index("idx_vt_shift_handover_snapshots_clinic_generated").on(table.clinicId, table.generatedAt),
-  }),
-);
-
-export type ShiftHandoverSnapshot = typeof shiftHandoverSnapshots.$inferSelect;
-
 export const operationalTasks = vtTable(
   "vt_tasks",
   {
@@ -342,7 +242,6 @@ export const operationalTasks = vtTable(
     clinicId: text("clinic_id")
       .notNull()
       .references(() => clinics.id, { onDelete: "cascade" }),
-    patientId: text("patient_id").references(() => animals.id, { onDelete: "set null" }),
     type: text("type").notNull(),
     tag: text("tag").notNull(),
     title: text("title").notNull(),
@@ -371,69 +270,6 @@ export const idempotencyKeys = vtTable(
     clinicCreatedIdx: index("idx_vt_idempotency_keys_clinic_created").on(table.clinicId, table.createdAt),
   }),
 );
-
-export const shiftPatientHandoffs = vtTable(
-  "vt_shift_patient_handoffs",
-  {
-    id: text("id").primaryKey(),
-    clinicId: text("clinic_id")
-      .notNull()
-      .references(() => clinics.id, { onDelete: "restrict" }),
-    outgoingUserId: text("outgoing_user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "restrict" }),
-    receivingUserId: text("receiving_user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "restrict" }),
-    status: varchar("status", { length: 20 }).notNull().default("draft"),
-    version: integer("version").notNull().default(1),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    submittedAt: timestamp("submitted_at", { withTimezone: true }),
-    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
-    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => ({
-    clinicStatusIdx: index("idx_vt_sph_clinic_status").on(t.clinicId, t.status),
-    receivingIdx: index("idx_vt_sph_receiving").on(t.receivingUserId, t.status),
-    outgoingIdx: index("idx_vt_sph_outgoing").on(t.outgoingUserId, t.status),
-  }),
-);
-export type ShiftPatientHandoff = typeof shiftPatientHandoffs.$inferSelect;
-
-export const shiftPatientHandoffItems = vtTable(
-  "vt_shift_patient_handoff_items",
-  {
-    id: text("id").primaryKey(),
-    clinicId: text("clinic_id")
-      .notNull()
-      .references(() => clinics.id, { onDelete: "restrict" }),
-    handoffId: text("handoff_id")
-      .notNull()
-      .references(() => shiftPatientHandoffs.id, { onDelete: "cascade" }),
-    hospitalizationId: text("hospitalization_id")
-      .notNull()
-      .references(() => hospitalizations.id, { onDelete: "restrict" }),
-    animalId: text("animal_id")
-      .notNull()
-      .references(() => animals.id, { onDelete: "restrict" }),
-    status: varchar("status", { length: 20 }).notNull().default("draft"),
-    skipReason: text("skip_reason"),
-    currentStability: text("current_stability").notNull().default(""),
-    pendingTasksNote: text("pending_tasks_note").notNull().default(""),
-    criticalWarnings: text("critical_warnings").notNull().default(""),
-    clinicalNote: text("clinical_note").notNull().default(""),
-    patientSnapshot: jsonb("patient_snapshot").notNull().default(sql`'{}'::jsonb`),
-    version: integer("version").notNull().default(1),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => ({
-    handoffIdx: index("idx_vt_sphi_handoff").on(t.handoffId),
-    handoffHospUq: uniqueIndex("uq_vt_sphi_handoff_hosp").on(t.handoffId, t.hospitalizationId),
-  }),
-);
-export type ShiftPatientHandoffItem = typeof shiftPatientHandoffItems.$inferSelect;
 
 export const clinicalCheckIns = vtTable(
   "vt_clinical_check_ins",

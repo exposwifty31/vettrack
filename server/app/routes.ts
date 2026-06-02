@@ -24,46 +24,33 @@ import returnsRoutes from "../routes/returns.js";
 import alertAcksRoutes from "../routes/alert-acks.js";
 import activityRoutes from "../routes/activity.js";
 import homeDashboardRoutes from "../routes/home-dashboard.js";
-import displayRoutes from "../routes/display.js";
+import { createDisplayRouter } from "../routes/display.js";
+import platformCapabilitiesRoutes from "../routes/platform-capabilities.js";
+import equipmentCopilotRoutes from "../routes/equipment-copilot.js";
 
 // --- Safety surfaces ---
 import codeBlueRoutes from "../routes/code-blue.js";
 import crashCartRoutes from "../routes/crash-cart.js";
-import erRoutes from "../routes/er.js";
 
-// --- Pilot & admin config (always on) ---
-import pilotRoutes from "../routes/pilot.js";
+// --- Admin config (always on) ---
 import adminOutboxHealthRoutes from "../routes/admin-outbox-health.js";
 import adminOutboxDlqRoutes from "../routes/admin-outbox-dlq.js";
-import adminMedicationIntegrityRoutes from "../routes/admin-medication-integrity.js";
 import adminTaskOwnershipRoutes from "../routes/admin-task-ownership.js";
 import stabilityRoutes from "../routes/stability.js";
-import formularyRoutes from "../routes/formulary.js";
-import forecastRoutes from "../routes/forecast.js";
 
-// --- Full-platform (mounted only when !isPilotMode) ---
+// --- Platform (scheduling, inventory, clinical) ---
 import analyticsRoutes from "../routes/analytics.js";
 import shiftsRoutes from "../routes/shifts.js";
 import appointmentsRoutes from "../routes/appointments.js";
 import tasksRoutes from "../routes/tasks.js";
-import shiftHandoverRoutes from "../routes/shift-handover.js";
-import patientHandoffsRoutes from "../routes/patient-handoffs.js";
 import containersRoutes from "../routes/containers.js";
 import restockRoutes from "../routes/restock.js";
-import medicationTasksRoutes from "../routes/medication-tasks.js";
-import billingRoutes from "../routes/billing.js";
 import inventoryItemsRoutes from "../routes/inventory-items.js";
 import procurementRoutes from "../routes/procurement.js";
-import animalsRoutes from "../routes/animals.js";
-import patientsRoutes from "../routes/patients.js";
 import clinicalCheckInRoutes from "../routes/clinical-check-in.js";
 import dispenseRoutes from "../routes/dispense.js";
 import shiftChatRoutes from "../routes/shift-chat.js";
 import whatsappRoutes from "../routes/whatsapp.js";
-
-import { resolveEffectiveRuntimePilotMode } from "../../shared/effective-pilot-mode.js";
-
-const isPilotMode = resolveEffectiveRuntimePilotMode();
 
 function registerInfrastructureRoutes(app: express.Express) {
   app.use("/api/users", userRoutes);
@@ -94,72 +81,50 @@ function registerEquipmentCoreRoutes(app: express.Express) {
   app.use("/api/alert-acks", alertAcksRoutes);
   app.use("/api/activity", activityRoutes);
   app.use("/api/home", homeDashboardRoutes);
-  app.use("/api/display", displayRoutes);
+  app.use("/api/display", createDisplayRouter());
+  app.use("/api/equipment-board", createDisplayRouter());
 }
 
 function registerSafetySurfaceRoutes(app: express.Express) {
   app.use("/api/code-blue", codeBlueRoutes);
   app.use("/api/crash-cart", crashCartRoutes);
-  app.use("/api/er", erRoutes);
 }
 
-function registerAlwaysOnConfigRoutes(app: express.Express) {
-  app.use("/api/pilot", pilotRoutes);
-
+function registerAdminConfigRoutes(app: express.Express) {
   app.use("/api/admin", adminOutboxHealthRoutes);
   app.use("/api/admin", adminOutboxDlqRoutes);
-  app.use("/api/admin", adminMedicationIntegrityRoutes);
   app.use("/api/admin", adminTaskOwnershipRoutes);
   app.use("/api/stability", stabilityRoutes);
+}
 
-  // Admin-only APIs: kept outside the pilot guard because /admin is always
-  // accessible and its Formulary/Settings sections call these endpoints.
-  app.use("/api/formulary", formularyRoutes);
-  app.use("/api/forecast", forecastRoutes);
+function registerPlatformCapabilitiesRoutes(app: express.Express) {
+  app.use("/api/platform", platformCapabilitiesRoutes);
+}
+
+function registerPlatformRoutes(app: express.Express) {
+  app.use("/api/analytics", analyticsRoutes);
+  app.use("/api/shifts", shiftsRoutes);
+  app.use("/api/appointments", appointmentsRoutes);
+  app.use("/api/tasks", tasksRoutes);
+  app.use("/api/containers", containersRoutes);
+  app.use("/api/restock", restockRoutes);
+  app.use("/api/inventory-items", inventoryItemsRoutes);
+  app.use("/api/procurement", procurementRoutes);
+  app.use("/api/clinical", clinicalCheckInRoutes);
+  app.use("/api/dispense", dispenseRoutes);
+  app.use("/api/shift-chat", shiftChatRoutes);
+  app.use("/api/whatsapp", whatsappRoutes);
 }
 
 /**
  * Registers all API route modules on the Express app.
  * Mount order is significant (Express matches in registration order).
- * Pilot mode skips mounts inside registerFullPlatformRoutes / if (!isPilotMode).
- * Contract baseline: docs/architecture/routes-contract.json (320 routes, 110 pilot-gated).
  */
 export function registerApiRoutes(app: express.Express) {
   registerInfrastructureRoutes(app);
   registerEquipmentCoreRoutes(app);
   registerSafetySurfaceRoutes(app);
-
-  registerAlwaysOnConfigRoutes(app);
-
-  registerFullPlatformRoutes(app);
-}
-
-function registerFullPlatformRoutes(app: express.Express) {
-  if (!isPilotMode) {
-    // --- Scheduling & tasks ---
-    app.use("/api/analytics", analyticsRoutes);
-    app.use("/api/shifts", shiftsRoutes);
-    app.use("/api/appointments", appointmentsRoutes);
-    app.use("/api/tasks", tasksRoutes);
-    app.use("/api/shift-handover", shiftHandoverRoutes);
-    app.use("/api/shift-handover/patient-handoffs", patientHandoffsRoutes);
-
-    // --- Inventory & pharmacy ---
-    app.use("/api/containers", containersRoutes);
-    app.use("/api/restock", restockRoutes);
-    app.use("/api/medication-tasks", medicationTasksRoutes);
-    app.use("/api/billing", billingRoutes);
-    app.use("/api/inventory-items", inventoryItemsRoutes);
-    app.use("/api/procurement", procurementRoutes);
-
-    // --- Patients & clinical ---
-    app.use("/api/animals", animalsRoutes);
-    app.use("/api/patients", patientsRoutes);
-    app.use("/api/clinical", clinicalCheckInRoutes);
-    app.use("/api/dispense", dispenseRoutes);
-
-    // --- Comms ---
-    app.use("/api/shift-chat", shiftChatRoutes);
-    app.use("/api/whatsapp", whatsappRoutes);
-  }
+  registerAdminConfigRoutes(app);
+  registerPlatformCapabilitiesRoutes(app);
+  registerPlatformRoutes(app);
 }

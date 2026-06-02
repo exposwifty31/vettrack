@@ -47,7 +47,7 @@ function baseContext(overrides: Partial<TaskAssignmentContext> = {}): TaskAssign
       status: "active",
       deletedAt: null,
     },
-    taskType: "medication",
+    taskType: "maintenance",
     currentOwnership: { acknowledgedUserId: null, status: "pending" },
     ...overrides,
   };

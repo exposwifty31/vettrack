@@ -1,19 +1,14 @@
 import { Router, type Response } from "express";
 import { z } from "zod";
-import { and, desc, eq, gte, isNull, or, sql } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { appointments, db, shifts, users } from "../db.js";
+import { db, shifts, users } from "../db.js";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { idempotencyMiddleware } from "../middleware/idempotency.js";
 import { toServiceTask, type AppointmentLike } from "../domain/service-task.adapter.js";
 import { isServiceTaskModeForUser } from "../lib/feature-flags.js";
 import { logServiceChange } from "../lib/service-change-log.js";
-import {
-  canPerformMedicationTaskAction,
-  canPerformTaskAction,
-  type MedicationTaskAction,
-  type TaskAction,
-} from "../lib/task-rbac.js";
+import { canPerformTaskAction, type TaskAction } from "../lib/task-rbac.js";
 import {
   AppointmentServiceError,
   cancelAppointment,
@@ -23,15 +18,6 @@ import {
   listAppointmentsByRange,
   updateAppointment,
 } from "../services/appointments.service.js";
-import {
-  buildMedicationIdempotencyKey,
-  CALC_MISMATCH_TOLERANCE_PERCENT,
-  CALCULATION_VERSION,
-  MEDICATION_IDEMPOTENCY_LOOKBACK_MS,
-  percentDiff,
-  recalculateMedicationPayload,
-} from "../lib/medication-calculator-hardening.js";
-
 const router = Router();
 
 function resolveRequestId(res: Response, incomingHeader: unknown): string {
@@ -74,7 +60,7 @@ const statusSchema = z.enum([
   "no_show",
 ]);
 const prioritySchema = z.enum(["critical", "high", "normal"]);
-const taskTypeSchema = z.enum(["maintenance", "repair", "inspection", "medication"]);
+const taskTypeSchema = z.enum(["maintenance", "repair", "inspection"]);
 const metadataSchema = z.record(z.unknown()).optional().nullable();
 
 const createAppointmentSchema = z.object({
@@ -181,42 +167,6 @@ function requireTaskActionPermission(
   return false;
 }
 
-function requireMedicationActionPermission(
-  req: { authUser?: { role?: string }; effectiveRole?: string },
-  res: Response,
-  action: MedicationTaskAction,
-): boolean {
-  const role = resolveTaskAuthRole(req);
-  if (canPerformMedicationTaskAction(role, action)) return true;
-  const requestId = resolveRequestId(res, null);
-  res.status(403).json(
-    apiError({
-      code: "INSUFFICIENT_ROLE",
-      reason: "INSUFFICIENT_ROLE",
-      message: "Insufficient medication task permissions",
-      requestId,
-    }),
-  );
-  return false;
-}
-
-function metadataRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-  return value as Record<string, unknown>;
-}
-
-function readPositiveWeightKgFromMetadata(metadata: Record<string, unknown>): number | null {
-  const raw = metadata.weightKg;
-  const parsed =
-    typeof raw === "number"
-      ? raw
-      : typeof raw === "string"
-        ? Number.parseFloat(raw.trim())
-        : Number.NaN;
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return parsed;
-}
-
 router.post(
   "/",
   requireAuth,
@@ -239,226 +189,17 @@ router.post(
     });
   }
 
-  const role = resolveTaskAuthRole(req);
-  const source = (() => {
-    const metadata = metadataRecord(parsed.data.metadata);
-    return typeof metadata.source === "string" ? metadata.source.trim().toLowerCase() : "";
-  })();
-  const isCalculatorSourceMedication = parsed.data.taskType === "medication" && source === "calculator";
-
-  if (parsed.data.taskType === "medication") {
-    // Clinical policy: medication task creation is veterinarian-only.
-    const canInitiateMedication = role === "vet";
-    if (!canInitiateMedication) {
-      return res.status(403).json(
-        apiError({
-          code: "INSUFFICIENT_ROLE",
-          reason: "MEDICATION_CREATE_NOT_PERMITTED",
-          message: "Only vets may create medication tasks.",
-          requestId,
-        }),
-      );
-    }
-    if (!requireMedicationActionPermission(req, res, "med.task.create")) {
-      return;
-    }
-  } else {
-    if (!requireTaskActionPermission(req, res, "task.create")) {
-      return;
-    }
-    if (parsed.data.vetId?.trim() && !requireTaskActionPermission(req, res, "task.assign")) {
-      return;
-    }
+  if (!requireTaskActionPermission(req, res, "task.create")) {
+    return;
+  }
+  if (parsed.data.vetId?.trim() && !requireTaskActionPermission(req, res, "task.assign")) {
+    return;
   }
 
   try {
-    if (parsed.data.taskType === "medication") {
-      const weightKg = readPositiveWeightKgFromMetadata(metadataRecord(parsed.data.metadata));
-      if (weightKg == null) {
-        return res.status(400).json(
-          apiError({
-            code: "VALIDATION_FAILED",
-            reason: "MEDICATION_WEIGHT_REQUIRED",
-            message: "Patient Weight (kg) is required for medication tasks.",
-            requestId,
-          }),
-        );
-      }
-    }
-
-    let payload = parsed.data;
-
-    if (isCalculatorSourceMedication) {
-      const metadata = metadataRecord(parsed.data.metadata);
-      const drugNameRaw = metadata.drugName ?? metadata.medicationName ?? parsed.data.notes ?? "";
-      const drugName = typeof drugNameRaw === "string" ? drugNameRaw.trim() : "";
-      const weightKg = typeof metadata.weightKg === "number" ? metadata.weightKg : Number.NaN;
-      const chosenDoseMgPerKgRaw =
-        typeof metadata.chosenDoseMgPerKg === "number"
-          ? metadata.chosenDoseMgPerKg
-          : typeof metadata.doseMgPerKg === "number"
-            ? metadata.doseMgPerKg
-            : Number.NaN;
-      const concentrationMgPerMl =
-        typeof metadata.concentrationMgPerMl === "number" ? metadata.concentrationMgPerMl : Number.NaN;
-      const recommendedDoseMgPerKg =
-        typeof metadata.recommendedDoseMgPerKg === "number"
-          ? metadata.recommendedDoseMgPerKg
-          : typeof metadata.defaultDoseMgPerKg === "number"
-            ? metadata.defaultDoseMgPerKg
-            : null;
-      const doseUnit =
-        metadata.doseUnit === "mcg_per_kg" || metadata.doseUnit === "mg_per_kg"
-          ? metadata.doseUnit
-          : "mg_per_kg";
-
-      if (!drugName || !Number.isFinite(weightKg) || !Number.isFinite(chosenDoseMgPerKgRaw) || !Number.isFinite(concentrationMgPerMl)) {
-        return res.status(400).json(
-          apiError({
-            code: "VALIDATION_FAILED",
-            reason: "INVALID_CALCULATOR_METADATA",
-            message: "Calculator medication metadata is missing required fields.",
-            requestId,
-          }),
-        );
-      }
-
-      const recalculated = recalculateMedicationPayload({
-        weightKg,
-        chosenDosePerKg: chosenDoseMgPerKgRaw,
-        concentrationMgPerMl,
-        recommendedDosePerKg: recommendedDoseMgPerKg,
-        doseUnit,
-      });
-      if (!recalculated) {
-        return res.status(422).json(
-          apiError({
-            code: "CALCULATION_FAILED",
-            reason: "INVALID_CALCULATION_INPUT",
-            message: "Server calculation failed for medication payload.",
-            requestId,
-          }),
-        );
-      }
-      if (recalculated.volumeMl > 100) {
-        return res.status(422).json(
-          apiError({
-            code: "CALCULATION_FAILED",
-            reason: "VOLUME_EXCEEDS_100ML",
-            message: "Calculated medication volume exceeds 100 mL safety threshold.",
-            requestId,
-          }),
-        );
-      }
-      if (
-        recalculated.deviationPercent !== null
-        && Number.isFinite(recalculated.deviationPercent)
-        && Math.abs(recalculated.deviationPercent) > 50
-      ) {
-        return res.status(403).json(
-          apiError({
-            code: "DOSE_DEVIATION_EXCEEDS_CAP",
-            reason: "DOSE_DEVIATION_EXCEEDS_CAP",
-            message: "Dose deviation above 50% is blocked by clinical policy.",
-            requestId,
-          }),
-        );
-      }
-
-      const idempotencyKey = buildMedicationIdempotencyKey({
-        userId: req.authUser!.id,
-        drugName,
-        weightKg,
-        chosenDoseMgPerKg: recalculated.normalizedDoseMgPerKg,
-      });
-      const cutoff = new Date(Date.now() - MEDICATION_IDEMPOTENCY_LOOKBACK_MS);
-      const existing = await db
-        .select()
-        .from(appointments)
-        .where(
-          and(
-            eq(appointments.clinicId, req.clinicId!),
-            eq(appointments.taskType, "medication"),
-            gte(appointments.createdAt, cutoff),
-            sql`${appointments.metadata} ->> 'idempotencyKey' = ${idempotencyKey}`,
-          ),
-        )
-        .orderBy(desc(appointments.createdAt))
-        .limit(1);
-
-      if (existing[0]) {
-        return res.status(200).json({ appointment: existing[0], idempotent: true });
-      }
-
-      const clientTotalMg = typeof metadata.totalMg === "number" ? metadata.totalMg : null;
-      const clientVolumeMl = typeof metadata.volumeMl === "number" ? metadata.volumeMl : null;
-      const clientDeviation = typeof metadata.deviationPercent === "number" ? metadata.deviationPercent : null;
-      const totalMgMismatch =
-        clientTotalMg !== null
-          ? percentDiff(recalculated.totalMg, clientTotalMg) > CALC_MISMATCH_TOLERANCE_PERCENT
-          : false;
-      const volumeMismatch =
-        clientVolumeMl !== null
-          ? percentDiff(recalculated.volumeMl, clientVolumeMl) > CALC_MISMATCH_TOLERANCE_PERCENT
-          : false;
-      const deviationMismatch =
-        clientDeviation !== null && recalculated.deviationPercent !== null
-          ? percentDiff(recalculated.deviationPercent, clientDeviation) > CALC_MISMATCH_TOLERANCE_PERCENT
-          : false;
-      if (totalMgMismatch || volumeMismatch || deviationMismatch) {
-        return res.status(422).json(
-          apiError({
-            code: "CALCULATION_MISMATCH",
-            reason: "CLIENT_SERVER_MISMATCH",
-            message: "Submitted medication values do not match trusted server calculations.",
-            requestId,
-            details: {
-              totalMg: recalculated.totalMg,
-              volumeMl: recalculated.volumeMl,
-              deviationPercent: recalculated.deviationPercent,
-            },
-          }),
-        );
-      }
-
-      const hardenedMetadata: Record<string, unknown> = {
-        ...metadata,
-        source: "calculator",
-        drugName,
-        medicationName: drugName,
-        doseUnit: "mg_per_kg",
-        weightKg,
-        chosenDoseMgPerKg: recalculated.normalizedDoseMgPerKg,
-        doseMgPerKg: recalculated.normalizedDoseMgPerKg,
-        concentrationMgPerMl,
-        recommendedDoseMgPerKg:
-          typeof recommendedDoseMgPerKg === "number" && Number.isFinite(recommendedDoseMgPerKg)
-            ? recommendedDoseMgPerKg
-            : null,
-        defaultDoseMgPerKg:
-          typeof recommendedDoseMgPerKg === "number" && Number.isFinite(recommendedDoseMgPerKg)
-            ? recommendedDoseMgPerKg
-            : null,
-        totalMg: recalculated.totalMg,
-        volumeMl: recalculated.volumeMl,
-        calculatedVolumeMl: recalculated.volumeMl,
-        deviationPercent: recalculated.deviationPercent,
-        idempotencyKey,
-        createdByRole: role,
-        calculationVersion: CALCULATION_VERSION,
-      };
-
-      payload = {
-        ...parsed.data,
-        vetId: req.authUser!.id,
-        status: "in_progress",
-        metadata: hardenedMetadata,
-      };
-    }
-
     const appointment = await createAppointment(
       req.clinicId!,
-      payload,
+      parsed.data,
       req.authUser
         ? {
             userId: req.authUser.id,
@@ -686,9 +427,6 @@ router.patch(
   }
 
   if (parsed.data.status === "cancelled" && !requireTaskActionPermission(req, res, "task.cancel")) {
-    return;
-  }
-  if (parsed.data.taskType === "medication" && !requireMedicationActionPermission(req, res, "med.dose.edit")) {
     return;
   }
 

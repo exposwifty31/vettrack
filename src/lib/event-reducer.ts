@@ -2,8 +2,6 @@ import type { QueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 
-import { ER_MODE_QUERY_KEY, getErAssignees, getErBoard, getErEligibleHospitalizations, getErMode } from "@/lib/er-api";
-
 import type {
   CopAlertEntry,
   PotentialOrphanUsePayload,
@@ -17,16 +15,6 @@ import { invalidateEquipmentRfidCaches } from "@/lib/invalidate-equipment-rfid-c
 import { getCurrentUserId } from "@/lib/auth-store";
 import { toast } from "sonner";
 import { t } from "@/lib/i18n";
-
-
-
-/** ER Command Center — kept in sync with `src/pages/er-command-center.tsx`. */
-
-export const ER_BOARD_QUERY_KEY = ["er", "board"] as const;
-
-export const ER_ASSIGNEES_QUERY_KEY = ["er", "assignees"] as const;
-
-export const ER_ELIGIBLE_HOSP_QUERY_KEY = ["er", "eligible-hospitalizations"] as const;
 
 
 
@@ -59,56 +47,6 @@ export async function applyEvent(client: QueryClient, event: RealtimeEvent): Pro
       await resetRealtimeCaches(client);
 
       return;
-
-
-
-    case "ER_MODE_CHANGED": {
-
-      const mode = await getErMode();
-
-      client.setQueryData(ER_MODE_QUERY_KEY, mode);
-
-      return;
-
-    }
-
-
-
-    case "ER_INTAKE_CREATED":
-
-    case "ER_INTAKE_UPDATED":
-
-    case "QUEUE_SEVERITY_ESCALATED":
-
-    case "ER_HANDOFF_CREATED":
-
-    case "ER_HANDOFF_ACKNOWLEDGED":
-
-    case "ER_HANDOFF_SLA_BREACHED": {
-
-      const [board, assignees] = await Promise.all([
-
-        getErBoard(),
-
-        getErAssignees(),
-
-      ]);
-
-      client.setQueryData(ER_BOARD_QUERY_KEY, board);
-
-      client.setQueryData(ER_ASSIGNEES_QUERY_KEY, assignees);
-
-      const eligible = await getErEligibleHospitalizations().catch(() => null);
-
-      if (eligible) {
-
-        client.setQueryData(ER_ELIGIBLE_HOSP_QUERY_KEY, eligible);
-
-      }
-
-      return;
-
-    }
 
 
 
@@ -202,7 +140,6 @@ export async function applyEvent(client: QueryClient, event: RealtimeEvent): Pro
 
       });
 
-      await client.invalidateQueries({ queryKey: ["/api/tasks/medication-active"] });
 
       return;
 
@@ -296,7 +233,6 @@ export async function applyEvent(client: QueryClient, event: RealtimeEvent): Pro
 
       });
 
-      await client.invalidateQueries({ queryKey: ["/api/tasks/medication-active"] });
 
       return;
 
@@ -416,17 +352,11 @@ export async function applyEvent(client: QueryClient, event: RealtimeEvent): Pro
 
 
 
-/** Invalidates sequence state and refetches ward + ER caches (gap detection — keeps orphan Cop alerts). */
+/** Invalidates sequence state and refetches ward display caches (gap detection — keeps orphan Cop alerts). */
 
 export async function forceResyncWardErCaches(client: QueryClient): Promise<void> {
 
   await Promise.all([
-
-    client.refetchQueries({ queryKey: ER_BOARD_QUERY_KEY }),
-
-    client.refetchQueries({ queryKey: ER_ASSIGNEES_QUERY_KEY }),
-
-    client.refetchQueries({ queryKey: ER_ELIGIBLE_HOSP_QUERY_KEY }),
 
     client.refetchQueries({ queryKey: DISPLAY_SNAPSHOT_QUERY_KEY }),
 

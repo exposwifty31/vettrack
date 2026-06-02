@@ -37,7 +37,6 @@ const SKIP_REL_FILES = new Set([
 const IGNORE_STATIC_JOB_NAME_LITERALS = new Set([
   "send_notification",
   "scan_overdue_reminders",
-  "scan_overdue_medications",
   "automation_tick",
   "automation_execute",
   "billing_webhook",
@@ -245,7 +244,6 @@ describe("E3 — job registry / enqueue parity", () => {
   it("registry static bullmq job names match frozen snapshot", () => {
     expect(REGISTRY_STATIC_BULLMQ_JOB_NAMES).toMatchInlineSnapshot(`
       [
-        "admission-fanout",
         "check-expiry",
         "check-plug",
         "inventory-deduction",
@@ -283,7 +281,6 @@ describe("E3 — job registry / enqueue parity", () => {
 
     expect([...discovered].sort()).toMatchInlineSnapshot(`
       [
-        "admission-fanout",
         "check-expiry",
         "check-plug",
         "inventory-deduction",

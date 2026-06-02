@@ -112,13 +112,12 @@ describe("PR 4.5 — PATCH /sessions/:id/end enforce-mode 403", () => {
     );
   });
 
-  it("403 fires BEFORE the 15-min gate and the UPDATE / archive flow", () => {
+  it("403 fires BEFORE the UPDATE / archive flow (no CPR duration gate)", () => {
     const denyIdx = block.lastIndexOf("MANAGER_NOT_CODE_BLUE_ELIGIBLE");
-    const fifteenMinIdx = block.indexOf("FIFTEEN_MINUTES_MS");
     const updateIdx = block.indexOf(".update(codeBlueSessions)");
     const archiveIdx = block.indexOf("insert(codeBlueEvents)");
     expect(denyIdx).toBeGreaterThan(0);
-    expect(fifteenMinIdx).toBeGreaterThan(denyIdx);
+    expect(block).not.toContain("FIFTEEN_MINUTES_MS");
     expect(updateIdx).toBeGreaterThan(denyIdx);
     expect(archiveIdx).toBeGreaterThan(denyIdx);
   });
@@ -133,45 +132,22 @@ describe("PR 4.5 — PATCH /sessions/:id/end enforce-mode 403", () => {
   });
 });
 
-describe("PR 4.5 — POST /sessions/:id/logs drug/shock enforce-mode 403", () => {
+describe("POST /sessions/:id/logs — equipment-focused categories", () => {
   const block = extractHandlerBlock(/router\.post\(\s*["']\/sessions\/:id\/logs["']/);
 
-  it("calls evaluateDrugShockActorForRoute (the verdict-returning helper)", () => {
-    expect(block).toContain("evaluateDrugShockActorForRoute");
+  it("logEntrySchema allows only equipment and note", () => {
+    expect(routeSrc).toMatch(/category:\s*z\.enum\(\[["']equipment["'],\s*["']note["']\]\)/);
   });
 
-  it("acts on drug/shock verdict action === \"deny\" by returning 403", () => {
-    expect(block).toMatch(/drugShockVerdict\.action\s*===\s*["']deny["']/);
-    expect(block).toContain("DRUG_SHOCK_AUTHORITY_REQUIRED");
-  });
-
-  it("403 response includes the verdict's reason code", () => {
-    expect(block).toMatch(
-      /apiError\(\s*\{[^}]*reason\s*:\s*drugShockVerdict\.reason/,
-    );
-  });
-
-  it("403 fires BEFORE the codeBlueLogEntries insert", () => {
-    const denyIdx = block.indexOf("DRUG_SHOCK_AUTHORITY_REQUIRED");
-    const insertIdx = block.indexOf("insert(codeBlueLogEntries)");
-    expect(denyIdx).toBeGreaterThan(0);
-    expect(insertIdx).toBeGreaterThan(denyIdx);
-  });
-
-  it("drug/shock gate runs ONLY for category ∈ {drug, shock}", () => {
-    const evalIdx = block.indexOf("evaluateDrugShockActorForRoute");
-    const preCall = block.slice(Math.max(0, evalIdx - 300), evalIdx);
-    expect(preCall).toMatch(/body\.category\s*===\s*["']drug["']/);
-    expect(preCall).toMatch(/body\.category\s*===\s*["']shock["']/);
-  });
-
-  it("the PR 4.4b post-insert fire-and-forget detectDrugShockActorDrift is no longer invoked from this handler", () => {
-    // PR 4.5's pre-insert evaluator supersedes PR 4.4b's post-insert
-    // observability call. Running both would emit duplicate observability.
-    // The substring may appear in doc comments explaining the supersession;
-    // strip comments before asserting on executable code.
+  it("does not invoke drug/shock authority evaluator on log writes", () => {
     const codeOnly = block.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, "");
+    expect(codeOnly).not.toContain("evaluateDrugShockActorForRoute");
     expect(codeOnly).not.toContain("detectDrugShockActorDrift");
+    expect(codeOnly).not.toContain("DRUG_SHOCK_AUTHORITY_REQUIRED");
+  });
+
+  it("persists log rows via codeBlueLogEntries insert", () => {
+    expect(block).toContain("insert(codeBlueLogEntries)");
   });
 });
 
@@ -330,7 +306,7 @@ describe("evaluateDrugShockActorForRoute — verdict shape under each mode", () 
       snapshot: snapshotOk(),
       actorUserId: "u",
       actorEmail: "u@e.com",
-      category: "drug",
+      category: "shock",
       now: FIXED_NOW,
     });
     expect(verdict).toEqual({ action: "allow", protected: "MODE_OFF" });
@@ -346,7 +322,7 @@ describe("evaluateDrugShockActorForRoute — verdict shape under each mode", () 
       snapshot: snapshotOk(),
       actorUserId: "u",
       actorEmail: "u@e.com",
-      category: "drug",
+      category: "shock",
       now: FIXED_NOW,
     });
     expect(verdict).toEqual({ action: "allow", protected: "ALLOWLIST_OK" });
@@ -362,7 +338,7 @@ describe("evaluateDrugShockActorForRoute — verdict shape under each mode", () 
       snapshot: { ...snapshotOk(), operationalRole: "night_admission_only" },
       actorUserId: "u",
       actorEmail: "u@e.com",
-      category: "drug",
+      category: "shock",
       now: FIXED_NOW,
     });
     expect(verdict).toEqual({
@@ -388,7 +364,7 @@ describe("evaluateDrugShockActorForRoute — verdict shape under each mode", () 
       snapshot: { ...snapshotOk(), operationalRole: "night_admission_only" },
       actorUserId: "u",
       actorEmail: "u@e.com",
-      category: "drug",
+      category: "shock",
       now: FIXED_NOW,
     });
     expect(verdict).toEqual({
@@ -422,7 +398,7 @@ describe("evaluateDrugShockActorForRoute — verdict shape under each mode", () 
       },
       actorUserId: "u",
       actorEmail: "u@e.com",
-      category: "drug",
+      category: "shock",
       now: FIXED_NOW,
     });
     expect(verdict).toEqual({ action: "deny", reason: "NO_OPEN_CHECK_IN" });
@@ -440,7 +416,7 @@ describe("evaluateDrugShockActorForRoute — verdict shape under each mode", () 
       snapshot: { ...snapshotOk(), operationalRole: null, reason: "EZSHIFT_NONE" },
       actorUserId: "u",
       actorEmail: "u@e.com",
-      category: "drug",
+      category: "shock",
       now: FIXED_NOW,
     });
     expect(verdict).toEqual({
@@ -460,7 +436,7 @@ describe("evaluateDrugShockActorForRoute — verdict shape under each mode", () 
       snapshot: null,
       actorUserId: "u",
       actorEmail: "u@e.com",
-      category: "drug",
+      category: "shock",
       now: FIXED_NOW,
     });
     expect(verdict).toEqual({
@@ -480,7 +456,7 @@ describe("evaluateDrugShockActorForRoute — verdict shape under each mode", () 
         snapshot: ineligible,
         actorUserId: "u-rate",
         actorEmail: "u@e.com",
-        category: "drug",
+        category: "shock",
         now: FIXED_NOW,
       });
     }
@@ -500,7 +476,7 @@ describe("evaluateDrugShockActorForRoute — verdict shape under each mode", () 
       snapshot: snapshotOk(),
       actorUserId: "u",
       actorEmail: "u@e.com",
-      category: "drug",
+      category: "shock",
       now: FIXED_NOW,
     });
     // Config throw → mode resolution falls through to "off" (the

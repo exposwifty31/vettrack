@@ -45,8 +45,6 @@ import { useAuth } from "@/hooks/use-auth";
 import type { Equipment, Room, RoomActivityEntry, EquipmentStatus } from "@/types";
 import { ReturnPlugDialog } from "@/components/return-plug-dialog";
 import { haptics } from "@/lib/haptics";
-import { isPilotMode } from "@/lib/pilot-mode";
-import { usePilotStaleMs } from "@/hooks/use-pilot-config";
 
 function toInitials(name: string | null | undefined): string {
   if (!name?.trim()) return "?";
@@ -175,7 +173,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
     ? { label: t.roomRadarPage.returnLabel, icon: LogOut, action: () => setReturnDialogOpen(true), pending: returnMut.isPending, cls: "text-primary border-primary/30 hover:bg-primary/10 dark:hover:bg-primary/15" }
     : null;
 
-  const pilotAction = isPilotMode
+  const pilotAction = false
     ? {
         label: justConfirmed ? t.roomRadarPage.pilotConfirmedHere : t.roomRadarPage.pilotConfirmHere,
         icon: justConfirmed ? CheckCircle2 : ShieldCheck,
@@ -187,15 +185,9 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
       }
     : null;
 
-  const activeQuickAction = isPilotMode ? pilotAction : quickAction;
+  const activeQuickAction = false ? pilotAction : quickAction;
 
-  const pilotStaleness = isPilotMode
-    ? !eq.lastSeen
-      ? "never"
-      : Date.now() - new Date(eq.lastSeen).getTime() <= staleMs
-      ? "recent"
-      : "stale"
-    : null;
+  const pilotStaleness: "never" | "recent" | "stale" | null = null;
 
   const verifierInitials = justVerified ? null : toInitials(eq.lastVerifiedByName);
   const verifiedLabel = justVerified
@@ -274,7 +266,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
                   {locationLabel}
                 </span>
               )}
-              {!isPilotMode && (verifiedLabel ? (
+              {!false && (verifiedLabel ? (
                 <span className={cn(
                   "flex items-center gap-1",
                   justVerified ? "text-emerald-600 dark:text-emerald-400 font-semibold" : ""
@@ -311,7 +303,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
                     e.preventDefault();
                     e.stopPropagation();
                     if (!activeQuickAction.pending && !busyRef.current) {
-                      if (!isPilotMode) {
+                      if (!false) {
                         busyRef.current = true;
                         setTapped(true);
                         tapTimerRef.current = setTimeout(() => setTapped(false), 300);
@@ -378,7 +370,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
 export default function RoomRadarPage() {
   const { id } = useParams<{ id: string }>();
   const { userId } = useAuth();
-  const staleMs = usePilotStaleMs();
+  const staleMs = 24 * 60 * 60 * 1000;
   const searchStr = useSearch();
   const nfcParam = new URLSearchParams(searchStr).get("verify");
   const queryClient = useQueryClient();

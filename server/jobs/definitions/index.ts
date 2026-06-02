@@ -1,10 +1,4 @@
 import type { JobsOptions } from "bullmq";
-import { MAX_INVENTORY_JOB_RETRIES } from "../../lib/inventory-constants.js";
-import {
-  ADMISSION_FANOUT_JOB_NAME,
-  ADMISSION_FANOUT_QUEUE_NAME,
-  type AdmissionFanoutJobData,
-} from "../../queues/admission-fanout.queue.js";
 import {
   INTEGRATION_QUEUE_LEGACY_NAME,
   integrationQueueNameForClinic,
@@ -14,11 +8,6 @@ import {
   type IntegrationSyncJobType,
   type IntegrationSyncDirection,
 } from "../../queues/integration.queue.js";
-import {
-  INVENTORY_DEDUCTION_JOB_NAME,
-  INVENTORY_DEDUCTION_QUEUE_NAME,
-  type InventoryDeductionJobData,
-} from "../../queues/inventory-deduction.queue.js";
 import {
   STALE_TASK_OWNERSHIP_SWEEP_JOB_NAME,
   STALE_TASK_OWNERSHIP_SWEEP_QUEUE_NAME,
@@ -60,24 +49,11 @@ export type ExpiryCheckJobPayload = Record<string, never>;
 export type StaleCheckInSweepJobPayload = Record<string, never>;
 
 export type PayloadForStaticKind = {
-  "inventory-deduction": InventoryDeductionJobData;
   "check-plug": ChargeAlertJobPayload;
-  "admission-fanout": AdmissionFanoutJobData;
   "task-ownership-backfill": TaskOwnershipBackfillJobData;
   "stale-task-ownership-sweep": StaleTaskOwnershipSweepJobData;
   "check-expiry": ExpiryCheckJobPayload;
   "sweep-stale-checkins": StaleCheckInSweepJobPayload;
-};
-
-const inventoryDeductionDefinition: JobDefinition<InventoryDeductionJobData> = {
-  kind: INVENTORY_DEDUCTION_JOB_NAME,
-  queue: INVENTORY_DEDUCTION_QUEUE_NAME,
-  bullmqJobName: INVENTORY_DEDUCTION_JOB_NAME,
-  workerConcurrency: 1,
-  attempts: MAX_INVENTORY_JOB_RETRIES,
-  backoff: { type: "exponential", delay: 5000 },
-  removeOnComplete: 1000,
-  removeOnFail: 5000,
 };
 
 /** Producer uses per-add opts only (no queue defaultJobOptions); attempts follow BullMQ default (1). */
@@ -90,17 +66,6 @@ const chargeAlertDefinition: JobDefinition<ChargeAlertJobPayload> = {
   backoff: { type: "exponential", delay: 2000 },
   removeOnComplete: 50,
   removeOnFail: 100,
-};
-
-const admissionFanoutDefinition: JobDefinition<AdmissionFanoutJobData> = {
-  kind: ADMISSION_FANOUT_JOB_NAME,
-  queue: ADMISSION_FANOUT_QUEUE_NAME,
-  bullmqJobName: ADMISSION_FANOUT_JOB_NAME,
-  workerConcurrency: 5,
-  attempts: 3,
-  backoff: { type: "exponential", delay: 3000 },
-  removeOnComplete: 500,
-  removeOnFail: 2000,
 };
 
 const taskOwnershipBackfillDefinition: JobDefinition<TaskOwnershipBackfillJobData> = {
@@ -149,9 +114,7 @@ const staleCheckInSweepDefinition: JobDefinition<StaleCheckInSweepJobPayload> = 
 };
 
 export const staticJobDefinitions = [
-  inventoryDeductionDefinition,
   chargeAlertDefinition,
-  admissionFanoutDefinition,
   taskOwnershipBackfillDefinition,
   staleTaskOwnershipSweepDefinition,
   expiryCheckDefinition,
@@ -214,7 +177,6 @@ export const definitionsByQueue = buildDefinitionsByQueue(
 
 /** Phase 1b+ runtime queues — one worker per queue in {@link startJobRuntime}. */
 export const PILOT_QUEUE_NAMES = [
-  INVENTORY_DEDUCTION_QUEUE_NAME,
   CHARGE_ALERT_QUEUE_NAME,
   EXPIRY_CHECK_QUEUE_NAME,
   STALE_CHECKIN_SWEEP_QUEUE_NAME,

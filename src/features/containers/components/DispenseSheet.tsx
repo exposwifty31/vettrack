@@ -20,7 +20,7 @@ import {
   Plus,
   ChevronRight,
 } from "lucide-react";
-import type { InventoryContainerWithItems, ActivePatient } from "@/types";
+import type { InventoryContainerWithItems } from "@/types";
 
 interface DispenseSheetProps {
   containerId: string;
@@ -158,16 +158,7 @@ export function DispenseSheet({
     retry: false,
   });
 
-  // Fetch today's active patients via dedicated endpoint
-  const activePatientsQ = useQuery({
-    queryKey: ["/api/animals/active"],
-    queryFn: () => api.animals.active(),
-    enabled: isOpen,
-    staleTime: 60_000,
-    retry: false,
-  });
-
-  const activePatients: ActivePatient[] = activePatientsQ.data?.animals ?? [];
+  const activePatients: { animalId: string; animalName: string; species?: string }[] = [];
 
   const applyDispenseSuccess = useCallback(
     (result: ContainerDispenseSuccessPayload) => {
@@ -534,12 +525,7 @@ export function DispenseSheet({
               <p className="text-sm text-muted-foreground text-right">בחר מטופל או השאר ללא שיוך</p>
             </SheetHeader>
 
-            {activePatientsQ.isLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <>
+            <>
                 <div className="grid grid-cols-2 gap-2">
                   {activePatients.map((p) => (
                     <button
@@ -660,8 +646,7 @@ export function DispenseSheet({
                     חזור
                   </button>
                 </div>
-              </>
-            )}
+            </>
           </div>
         </SheetContent>
       </Sheet>

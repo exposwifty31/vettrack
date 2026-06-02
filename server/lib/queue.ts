@@ -195,15 +195,6 @@ export type NotificationJobData =
       broadcastKey: string;
     }
   | {
-      type: "overdue_medication_alert";
-      clinicId: string;
-      userId: string;
-      animalName: string;
-      drugName: string;
-      minutesLate: number;
-      animalId: string;
-    }
-  | {
       type: "code_blue_broadcast";
       clinicId: string;
       title: string;

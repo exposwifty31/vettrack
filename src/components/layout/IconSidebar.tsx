@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useDirection } from "@/hooks/useDirection";
 import type { LucideIcon } from "lucide-react";
+import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
 
 export interface SidebarItem {
   href: string;
@@ -32,7 +33,7 @@ export function IconSidebar({ items }: IconSidebarProps) {
       )}
     >
       {items.map((item) => {
-        const isActive = location.startsWith(item.href);
+        const isActive = resolveNavItemActive(location, item.href);
         const Icon = item.icon;
         return (
           <Link key={item.href} href={item.href}>

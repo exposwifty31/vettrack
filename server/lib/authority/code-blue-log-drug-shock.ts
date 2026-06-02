@@ -85,7 +85,7 @@ function actorEnforceDeniedCounterForReason(
   }
 }
 
-export type CodeBlueLogDrugShockCategory = "drug" | "shock";
+export type CodeBlueLogDrugShockCategory = "shock";
 
 export interface DetectDrugShockActorDriftInput {
   clinicId: string;

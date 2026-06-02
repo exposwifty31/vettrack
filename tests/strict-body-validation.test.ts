@@ -9,7 +9,6 @@
 import { describe, it, expect } from "vitest";
 
 import { draftSchema, confirmSchema, emergencySchema } from "../server/routes/dispense.js";
-import { createTaskSchema, completeTaskSchema, cancelTaskSchema } from "../server/routes/medication-tasks.js";
 import {
   startSchema,
   endSchema,
@@ -19,12 +18,6 @@ import {
   reconcileSchema,
   manualBillingSchema,
 } from "../server/routes/code-blue.js";
-import {
-  createChargeSchema,
-  reverseChargeSchema,
-  leakageOnePagerSchema,
-  bulkSyncSchema,
-} from "../server/routes/billing.js";
 import { createItemSchema, updateItemSchema, addPriceSchema } from "../server/routes/inventory-items.js";
 import { createPoSchema, receivePoSchema } from "../server/routes/procurement.js";
 import { checkoutSchema, scanSchema } from "../server/routes/equipment.js";
@@ -45,31 +38,17 @@ const cases: Case[] = [
   { name: "dispense confirmSchema", schema: confirmSchema, valid: {} },
   { name: "dispense emergencySchema", schema: emergencySchema, requiredKey: "bypassReason",
     valid: { containerId: UUID, items: [], bypassReason: "EMERGENCY_CPR" } },
-  { name: "medication createTaskSchema", schema: createTaskSchema, requiredKey: "animalId",
-    valid: { animalId: "a1", drugId: "d1", route: "IV",
-      calculationInput: { weightKg: 5, prescribedDosePerKg: 2, doseUnit: "mg_per_kg" } } },
-  { name: "medication completeTaskSchema", schema: completeTaskSchema, requiredKey: "actualVolume",
-    valid: { actualVolume: 1.5 } },
-  { name: "medication cancelTaskSchema", schema: cancelTaskSchema, valid: { reason: "done" } },
   { name: "code-blue startSchema", schema: startSchema, valid: {} },
   { name: "code-blue endSchema", schema: endSchema, valid: { outcome: "rosc" } },
   { name: "code-blue startSessionSchema", schema: startSessionSchema, requiredKey: "managerUserId",
     valid: { managerUserId: "u1", managerUserName: "Tech One" } },
   { name: "code-blue logEntrySchema", schema: logEntrySchema, requiredKey: "label",
-    valid: { idempotencyKey: UUID, elapsedMs: 0, label: "epi", category: "drug" } },
+    valid: { idempotencyKey: UUID, elapsedMs: 0, label: "Defibrillator on scene", category: "equipment" } },
   { name: "code-blue endSessionSchema", schema: endSessionSchema, requiredKey: "outcome",
     valid: { outcome: "rosc" } },
   { name: "code-blue reconcileSchema", schema: reconcileSchema, valid: {} },
   { name: "code-blue manualBillingSchema", schema: manualBillingSchema, requiredKey: "itemId",
     valid: { inventoryLogId: "l1", itemId: "i1", quantity: 1, unitPriceCents: 100 } },
-  { name: "billing createChargeSchema", schema: createChargeSchema, requiredKey: "itemId",
-    valid: { itemType: "EQUIPMENT", itemId: "i1", quantity: 1, unitPriceCents: 100 } },
-  { name: "billing reverseChargeSchema", schema: reverseChargeSchema, requiredKey: "reversalReason",
-    valid: { reversalReason: "billed twice" } },
-  { name: "billing leakageOnePagerSchema", schema: leakageOnePagerSchema, requiredKey: "summary",
-    valid: { summary: { totalGapValueCents: 0, totalGapQty: 0 } } },
-  { name: "billing bulkSyncSchema", schema: bulkSyncSchema, requiredKey: "ids",
-    valid: { ids: ["a"] } },
   { name: "inventory createItemSchema", schema: createItemSchema, requiredKey: "code",
     valid: { code: "ITEM_1", label: "Item One" } },
   { name: "inventory updateItemSchema", schema: updateItemSchema, valid: { label: "Renamed" } },
@@ -92,8 +71,7 @@ describe("H4 audit remediation — production client payloads", () => {
       managerUserId: "u1",
       managerUserName: "Tech One",
       preCheckPassed: true,
-      hospitalizationId: "h1",
-      patientId: "p1",
+      equipmentId: "eq-1",
     };
     expect(startSessionSchema.safeParse(body).success).toBe(true);
   });

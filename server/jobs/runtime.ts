@@ -4,7 +4,6 @@ import { incrementMetric } from "../lib/metrics.js";
 import { createRedisConnection } from "../lib/redis.js";
 import { startWorkerHeartbeat } from "../lib/worker-heartbeat.js";
 import { processChargeAlertJob, bindChargeAlertProducerQueue } from "../workers/chargeAlertWorker.js";
-import { processInventoryDeductionJob } from "../workers/inventory-deduction.worker.js";
 import {
   runExpiryCheckWorker,
   EXPIRY_CHECK_CRON,
@@ -28,12 +27,9 @@ import {
   STALE_CHECKIN_SWEEP_JOB_NAME,
   STALE_CHECKIN_SWEEP_QUEUE_NAME,
 } from "./definitions/index.js";
-import { INVENTORY_DEDUCTION_QUEUE_NAME } from "../queues/inventory-deduction.queue.js";
 import { CHARGE_ALERT_QUEUE_NAME } from "../workers/chargeAlertWorker.js";
 import { getOrCreateQueue } from "./queue-factory.js";
 import { mergeEnqueueJobOptions, type JobContext } from "./registry.js";
-import type { InventoryDeductionJobData } from "../queues/inventory-deduction.queue.js";
-
 type RuntimeWorkerEntry = {
   queueName: string;
   worker: Worker;
@@ -50,7 +46,6 @@ const runtimeWorkers: RuntimeWorkerEntry[] = [];
 const repeatJobsRegistered = new Set<string>();
 
 function workerFailedLogTag(queueName: string): string {
-  if (queueName === INVENTORY_DEDUCTION_QUEUE_NAME) return "inventory-deduction";
   if (queueName === CHARGE_ALERT_QUEUE_NAME) return "charge-alert-worker";
   if (queueName === EXPIRY_CHECK_QUEUE_NAME) return "expiry-check-worker";
   if (queueName === STALE_CHECKIN_SWEEP_QUEUE_NAME) return "stale-checkin-sweep";
@@ -81,11 +76,6 @@ async function runPilotJob(queueName: string, job: Job): Promise<void> {
   }
 
   const ctx = buildJobContext(job);
-
-  if (queueName === INVENTORY_DEDUCTION_QUEUE_NAME) {
-    await processInventoryDeductionJob(job.data as InventoryDeductionJobData);
-    return;
-  }
 
   if (queueName === CHARGE_ALERT_QUEUE_NAME) {
     await processChargeAlertJob(job.data as ChargeAlertJobPayload);

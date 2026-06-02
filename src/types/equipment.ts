@@ -22,6 +22,15 @@ export const ALERT_SEVERITY: Record<AlertType, AlertSeverity> = {
   inactive: "low",
 };
 
+export interface CriticalEquipment {
+  id: string;
+  name: string;
+  category: string;
+  status: string;
+  lastSeenLocation: string | null;
+  lastSeenTimestamp: string | null;
+}
+
 export interface DeletedEquipment {
   id: string;
   name: string;

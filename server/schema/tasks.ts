@@ -1,12 +1,10 @@
 import { text, timestamp, boolean, varchar, jsonb } from "drizzle-orm/pg-core";
 import { vtTable } from "./helpers.js";
-import { clinics, animals, owners, users } from "./core.js";
+import { clinics, users } from "./core.js";
 
 export const appointments = vtTable("vt_appointments", {
   id: text("id").primaryKey(),
   clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
-  animalId: text("animal_id").references(() => animals.id, { onDelete: "set null" }),
-  ownerId: text("owner_id").references(() => owners.id, { onDelete: "set null" }),
   vetId: text("vet_id").references(() => users.id, { onDelete: "restrict" }),
   startTime: timestamp("start_time", { withTimezone: true }).notNull(),
   endTime: timestamp("end_time", { withTimezone: true }).notNull(),
@@ -17,8 +15,6 @@ export const appointments = vtTable("vt_appointments", {
    * Full machine: pending → approved → in_progress → completed | cancelled
    */
   status: varchar("status", { length: 20 }).notNull().default("scheduled"),
-  /** Links this task to the specific hospitalization episode it belongs to. */
-  hospitalizationId: text("hospitalization_id"),
   /** Scheduling type/purpose (e.g. 'checkup', 'followup', 'medication', 'maintenance'). */
   appointmentType: varchar("appointment_type", { length: 40 }),
   /** Who created this appointment/task. */

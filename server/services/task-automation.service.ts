@@ -312,7 +312,6 @@ export async function executeAutomationJob(payload: AutomationExecutePayload): P
         postSystemMessage(c, "task_escalated", {
           taskId,
           escalatedTo: adminId,
-          animalId: task.animalId ?? null,
           taskType: task.taskType ?? null,
         }).catch(() => {});
         await markIdempotentAsync(idempotencyKey);

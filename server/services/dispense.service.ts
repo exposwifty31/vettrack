@@ -1,8 +1,6 @@
 import { randomUUID } from "crypto";
 import { and, eq, lt, sql } from "drizzle-orm";
 import {
-  animals,
-  billingLedger,
   containerItems,
   containers,
   db,
@@ -14,7 +12,6 @@ import {
 } from "../db.js";
 import { logAudit, type AuditDbExecutor } from "../lib/audit.js";
 import { postSystemMessage } from "../lib/shift-chat-presence.js";
-import { captureConsumableBillingForDispenseLine } from "../lib/container-consumable-billing.js";
 import {
   loadInventoryItemLabelCode,
   type DispenseLineForValidation,
@@ -71,7 +68,6 @@ export interface DispenseItem {
 export interface CreateDraftInput {
   clinicId: string;
   containerId: string;
-  patientId?: string | null;
   items: DispenseItem[];
   createdBy: string;
   idempotencyKey: string;
@@ -131,7 +127,6 @@ async function loadDispenseValidationLines(
 export interface CreateEmergencyDispenseInput {
   clinicId: string;
   containerId: string;
-  patientId?: string | null;
   items: DispenseItem[];
   bypassReason: string;
   createdBy: string;
@@ -173,7 +168,6 @@ export async function createDraftDispense(input: CreateDraftInput): Promise<Disp
       id: randomUUID(),
       clinicId: input.clinicId,
       containerId: input.containerId,
-      patientId: input.patientId ?? null,
       status: "DRAFT",
       items: input.items,
       idempotencyKey: input.idempotencyKey,
@@ -377,8 +371,8 @@ export async function confirmDispense(input: ConfirmDispenseInput): Promise<Conf
           {
             tx,
             clinicId,
-            animalId: event.patientId ?? null,
-            containerId: event.containerId,
+        animalId: null,
+        containerId: event.containerId,
             lines: validationLines,
             isEmergency,
             bypassReason,
@@ -417,8 +411,8 @@ export async function confirmDispense(input: ConfirmDispenseInput): Promise<Conf
           // (§9.4 ordering contract).
           await emitClinicalInvariantOrphanDispenseDeniedAuditInTx(tx, {
             clinicId,
-            animalId: event.patientId ?? null,
-            containerId: event.containerId,
+        animalId: null,
+        containerId: event.containerId,
             requestId,
             orphanLines: ciVerdict.orphanLines,
           });
@@ -455,8 +449,8 @@ export async function confirmDispense(input: ConfirmDispenseInput): Promise<Conf
           ciVerdict.orphanLines
         ) {
           pendingShadowAudit = {
-            animalId: event.patientId ?? null,
-            containerId: event.containerId,
+        animalId: null,
+        containerId: event.containerId,
             requestId,
             orphanLines: ciVerdict.orphanLines,
           };
@@ -514,7 +508,6 @@ export async function confirmDispense(input: ConfirmDispenseInput): Promise<Conf
     }
     // ─────────────────────────────────────────────────────────────────────
 
-    let billingEventId: string | null = null;
     let anyInventoryMismatch = false;
 
     for (const lineItem of items) {
@@ -536,24 +529,6 @@ export async function confirmDispense(input: ConfirmDispenseInput): Promise<Conf
         // Continue — will be flagged; deduction job handles the shortage
       }
 
-      // Insert billing inside TX (Fix G/B)
-      const inventoryLogId = randomUUID();
-      const ledgerIdempotencyKey = `dispense-event:${event.id}:item:${lineItem.itemId}`;
-      const capture = await captureConsumableBillingForDispenseLine(tx, {
-        clinicId,
-        containerId: event.containerId,
-        inventoryLogId,
-        itemId: lineItem.itemId,
-        patientId: event.patientId ?? null,
-        qty: lineItem.quantity,
-        idempotencyKey: ledgerIdempotencyKey,
-        sourceType: "DISPENSE",
-        dispenseEventId: event.id,
-        createdBy: confirmedBy,
-      });
-      if (capture.billingEventId && !billingEventId) {
-        billingEventId = capture.billingEventId;
-      }
     }
 
     const now = new Date();
@@ -565,7 +540,6 @@ export async function confirmDispense(input: ConfirmDispenseInput): Promise<Conf
         confirmedAt: now,
         inventoryStatus: "PENDING",
         inventoryMismatch: anyInventoryMismatch,
-        billingEventId,
       })
       .where(and(eq(dispenseEvents.clinicId, clinicId), eq(dispenseEvents.id, dispenseEventId)))
       .returning();
@@ -722,7 +696,6 @@ async function enqueueDispenseInventoryDeduction(clinicId: string, event: Dispen
         quantityBefore: currentQty,
         quantityAdded: -actualDeduct,
         quantityAfter: newQty,
-        animalId: event.patientId ?? null,
         note: anyMismatch ? "Partial deduction — insufficient stock" : null,
         metadata: {
           dispenseEventId: event.id,
@@ -730,7 +703,6 @@ async function enqueueDispenseInventoryDeduction(clinicId: string, event: Dispen
           actualDeduct,
           inventoryMismatch: actualDeduct < requestedQty,
         },
-        billingEventId: event.billingEventId ?? null,
         createdByUserId: event.confirmedBy ?? event.createdBy,
       });
     }
@@ -764,7 +736,6 @@ export async function createEmergencyDispense(input: CreateEmergencyDispenseInpu
       id: randomUUID(),
       clinicId: input.clinicId,
       containerId: input.containerId,
-      patientId: input.patientId ?? null,
       status: "EMERGENCY_PENDING",
       items: input.items,
       bypassReason: input.bypassReason,
@@ -834,7 +805,6 @@ export async function scanUnresolvedEmergencyDispenses(clinicId?: string): Promi
     await db.insert(operationalTasks).values({
       id: randomUUID(),
       clinicId: event.clinicId,
-      patientId: event.patientId ?? null,
       type: "SYSTEM",
       tag: `EMERGENCY_DISPENSE_UNRESOLVED_${tier}`,
       title: `Emergency dispense unresolved (${tier.toLowerCase()} priority) — ${Math.round(ageMs / 60000)} min ago`,
@@ -843,7 +813,6 @@ export async function scanUnresolvedEmergencyDispenses(clinicId?: string): Promi
 
     postSystemMessage(event.clinicId, "emergency_dispense_unresolved", {
       dispenseEventId: event.id,
-      patientId: event.patientId ?? null,
       ageMinutes: Math.round(ageMs / 60000),
       tier,
     }).catch(() => {});

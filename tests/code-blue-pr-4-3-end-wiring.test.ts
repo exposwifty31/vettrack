@@ -104,14 +104,6 @@ describe("PATCH /sessions/:id/end — evaluator wiring & ordering", () => {
     expect(managerInactiveIdx).toBeLessThan(evaluatorIdx);
   });
 
-  it("evaluator runs BEFORE the 15-minute gate (TOO_EARLY response)", () => {
-    const evaluatorIdx = endBlock.indexOf("evaluateCodeBlueManagerForRoute");
-    const fifteenMinIdx = endBlock.indexOf("FIFTEEN_MINUTES_MS");
-    const tooEarlyIdx = endBlock.indexOf("TOO_EARLY");
-    expect(evaluatorIdx).toBeLessThan(fifteenMinIdx);
-    expect(evaluatorIdx).toBeLessThan(tooEarlyIdx);
-  });
-
   it("evaluator runs BEFORE the session UPDATE write", () => {
     const evaluatorIdx = endBlock.indexOf("evaluateCodeBlueManagerForRoute");
     const updateIdx = endBlock.indexOf(".update(codeBlueSessions)");
@@ -160,12 +152,10 @@ describe("PATCH /sessions/:id/end — evaluator wiring & ordering", () => {
     const lastTryIdx = preEvaluator.lastIndexOf("try {");
     expect(lastTryIdx).toBeGreaterThanOrEqual(0);
     const postEvaluator = endBlock.slice(evaluatorIdx);
-    // The first `} catch (` after the evaluator call must come BEFORE the
-    // 15-min gate so the evaluator's throw is locally absorbed.
     const localCatchIdx = postEvaluator.search(/\}\s*catch\s*\(/);
-    const fifteenMinIdxAfter = postEvaluator.indexOf("FIFTEEN_MINUTES_MS");
+    const updateIdxAfter = postEvaluator.indexOf(".update(codeBlueSessions)");
     expect(localCatchIdx).toBeGreaterThanOrEqual(0);
-    expect(localCatchIdx).toBeLessThan(fifteenMinIdxAfter);
+    expect(localCatchIdx).toBeLessThan(updateIdxAfter);
   });
 });
 
@@ -175,9 +165,9 @@ describe("PATCH /sessions/:id/end — preserved existing semantics", () => {
     expect(endBlock).toContain("403");
   });
 
-  it("15-minute gate behavior is preserved (FIFTEEN_MINUTES_MS, TOO_EARLY 422)", () => {
-    expect(endBlock).toContain("FIFTEEN_MINUTES_MS");
-    expect(endBlock).toContain("TOO_EARLY");
+  it("CPR 15-minute minimum gate removed (equipment-focused end)", () => {
+    expect(endBlock).not.toContain("FIFTEEN_MINUTES_MS");
+    expect(endBlock).not.toContain("TOO_EARLY");
   });
 
   it("earlyStopReason waiver remains a 400 when below the 3-char minimum", () => {

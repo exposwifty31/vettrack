@@ -34,7 +34,7 @@ import { safeRedisSetex } from "../lib/redis.js";
 import { decryptConfigValue } from "../lib/config-crypto.js";
 import { getUsersWithOverdueTaskCounts } from "../services/task-recall.service.js";
 import { executeAutomationJob, scanAndEnqueueAutomationJobs } from "../services/task-automation.service.js";
-import { db, animals, appointments, billingLedger, inventoryLogs, serverConfig, shiftSessions, users } from "../db.js";
+import { db, inventoryLogs, serverConfig, shiftSessions, users } from "../db.js";
 import { and, eq, gte, inArray, isNotNull, isNull, lt, lte, sql } from "drizzle-orm";
 import { getLocaleDictionaries } from "../../lib/i18n/loader.js";
 import { translate } from "../../lib/i18n/index.js";
@@ -87,75 +87,6 @@ async function scanOverdueAndEnqueue(): Promise<void> {
   if (process.env.NODE_ENV !== "production") console.log("OVERDUE_SCAN_ENQUEUED", { users: rows.length });
 }
 
-const OVERDUE_MED_SCAN_MS = 60_000;
-
-async function scanOverdueMedications(): Promise<void> {
-  const now = new Date();
-
-  // Phase 1: find candidates (join animals for display name)
-  const candidates = await db
-    .select({
-      id: appointments.id,
-      clinicId: appointments.clinicId,
-      animalId: appointments.animalId,
-      animalName: animals.name,
-      notes: appointments.notes,
-      startTime: appointments.startTime,
-      vetId: appointments.vetId,
-    })
-    .from(appointments)
-    .innerJoin(animals, eq(appointments.animalId, animals.id))
-    .where(
-      and(
-        eq(appointments.taskType, "medication"),
-        inArray(appointments.status, ["pending", "assigned"]),
-        lt(appointments.startTime, now),
-        isNull(appointments.overdueNotifiedAt),
-        isNotNull(appointments.animalId),
-        isNotNull(appointments.vetId), // only claim rows with an assigned vet
-      ),
-    );
-
-  if (candidates.length === 0) return;
-
-  // Phase 2: atomically claim the rows by stamping overdueNotifiedAt.
-  // Two concurrent workers may both complete Phase 1 before either writes here.
-  // The extra isNull guard ensures only the first writer claims each row.
-  const ids = candidates.map((a) => a.id);
-  const claimed = await db
-    .update(appointments)
-    .set({ overdueNotifiedAt: now })
-    .where(and(inArray(appointments.id, ids), isNull(appointments.overdueNotifiedAt)))
-    .returning({ id: appointments.id });
-
-  const claimedIds = new Set(claimed.map((c) => c.id));
-
-  // Phase 3: enqueue only for rows this worker actually claimed
-  let notified = 0;
-  for (const appt of candidates) {
-    if (!claimedIds.has(appt.id)) continue; // another worker beat us to this row
-    if (!appt.animalId || !appt.clinicId || !appt.vetId) continue;
-
-    const minutesLate = Math.floor((now.getTime() - appt.startTime.getTime()) / 60_000);
-    const drugName = appt.notes ?? "תרופה";
-
-    await enqueueNotificationJob({
-      type: "overdue_medication_alert",
-      clinicId: appt.clinicId,
-      userId: appt.vetId,
-      animalName: appt.animalName,
-      drugName,
-      minutesLate,
-      animalId: appt.animalId,
-    });
-    notified++;
-  }
-
-  if (process.env.NODE_ENV !== "production") {
-    console.log("OVERDUE_MED_SCAN", { scanned: candidates.length, notified });
-  }
-}
-
 async function processSendNotification(data: NotificationJobData): Promise<void> {
   if (isCircuitOpen("push")) {
     incrementMetric("circuit_breaker_opened");
@@ -206,19 +137,6 @@ async function processSendNotification(data: NotificationJobData): Promise<void>
       }),
       5000,
       "automation push role",
-    );
-    return;
-  }
-  if (data.type === "overdue_medication_alert") {
-    await withTimeout(
-      sendPushToUser(data.clinicId, data.userId, {
-        title: "💊 תרופה באיחור",
-        body: `${data.animalName} — ${data.drugName} · ${data.minutesLate} דק׳ באיחור`,
-        tag: `overdue-med-${data.animalId}`,
-        url: `/patients/${data.animalId}`,
-      }),
-      5_000,
-      "overdue medication alert",
     );
     return;
   }
@@ -376,34 +294,14 @@ async function handleShiftReportEmail(payload: ShiftReportEmailPayload): Promise
   const windowStart = session ? new Date(session.startedAt) : new Date(Date.now() - 12 * 60 * 60 * 1000);
   const windowEnd = session?.endedAt ? new Date(session.endedAt) : new Date();
 
-  // Billing summary
-  const [billingRow] = await db
-    .select({
-      totalAmountCents: sql<number>`coalesce(sum(${billingLedger.totalAmountCents}), 0)::int`,
-      entryCount: sql<number>`count(*)::int`,
-    })
-    .from(billingLedger)
-    .where(
-      and(
-        eq(billingLedger.clinicId, clinicId),
-        gte(billingLedger.createdAt, windowStart),
-        lte(billingLedger.createdAt, windowEnd),
-      ),
-    );
-
-  const totalAmountCents = billingRow?.totalAmountCents ?? 0;
-  const entryCount = billingRow?.entryCount ?? 0;
+  const totalAmountCents = 0;
+  const entryCount = 0;
   const totalAmountDollars = (totalAmountCents / 100).toFixed(2);
 
   // Consumables summary — unBilledCount + pendingEmergencies
   const consumableRows = await db
     .select({
       metadata: inventoryLogs.metadata,
-      billedCheck: sql<string | null>`(
-        SELECT id FROM vt_billing_ledger bl
-        WHERE bl.idempotency_key = 'adjustment_' || ${inventoryLogs.id}
-        LIMIT 1
-      )`,
     })
     .from(inventoryLogs)
     .where(
@@ -416,7 +314,7 @@ async function handleShiftReportEmail(payload: ShiftReportEmailPayload): Promise
       ),
     );
 
-  const unBilledCount = consumableRows.filter((r) => !r.billedCheck).length;
+  const unBilledCount: number = 0;
   const pendingEmergencies = consumableRows.filter((r) => {
     const meta = r.metadata as Record<string, unknown> | null;
     return meta?.isEmergency === true && meta?.pendingCompletion === true;
@@ -563,19 +461,8 @@ async function main(): Promise<void> {
     },
   );
 
-  await queue.add(
-    "scan_overdue_medications",
-    {},
-    {
-      jobId: "repeat-overdue-medications",
-      repeat: { every: OVERDUE_MED_SCAN_MS },
-      removeOnComplete: 100,
-    },
-  );
-
   void scanOverdueAndEnqueue().catch((err) => console.error("[worker] initial overdue scan failed:", err));
   void scanAndEnqueueAutomationJobs().catch((err) => console.error("[worker] initial automation scan failed:", err));
-  void scanOverdueMedications().catch((err) => console.error("[worker] initial overdue med scan failed:", err));
 
   // Heartbeat: health checks read this key to confirm the worker is alive.
   // TTL is 120s; we write every 30s, so two missed writes = dead worker alert.
@@ -604,8 +491,6 @@ async function main(): Promise<void> {
       try {
         if (job.name === "scan_overdue_reminders") {
           await scanOverdueAndEnqueue();
-        } else if (job.name === "scan_overdue_medications") {
-          await scanOverdueMedications();
         } else if (job.name === "automation_tick") {
           await scanAndEnqueueAutomationJobs();
         } else if (job.name === "automation_execute") {

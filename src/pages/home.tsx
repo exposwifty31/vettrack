@@ -97,14 +97,6 @@ export default function HomePage() {
     refetchOnWindowFocus: false,
   });
 
-  const { data: patientsData } = useQuery({
-    queryKey: ["/api/patients"],
-    queryFn: () => api.patients.list({}),
-    enabled: !!userId,
-    retry: false,
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
-  });
 
   const { data: pulse } = useQuery({
     queryKey: ["/api/home/dashboard"],
@@ -118,7 +110,7 @@ export default function HomePage() {
   const alerts = equipment ? computeAlerts(equipment) : [];
   const alertCount = alerts.length;
   const totalCount = equipment?.length ?? 0;
-  const activePatientsCount = patientsData?.patients.length ?? 0;
+  const activePatientsCount = 0;
 
   const tasksDone = pulse?.tasksCompletedToday ?? 0;
   const tasksOpen = (taskDashboard?.counts.today ?? 0) + (taskDashboard?.counts.overdue ?? 0);
