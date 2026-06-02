@@ -13,14 +13,14 @@ import type {
   EquipmentSeenResponse,
   ScanLog,
   TransferLog,
-  PilotCoverageResponse,
-  BulkDeleteRequest,
+    BulkDeleteRequest,
   BulkMoveRequest,
   BulkResult,
   DeletedEquipment,
   QuickScanToggleResult,
 } from "@/types";
 import type { EquipmentWaitlistSnapshot } from "../../../shared/equipment-waitlist.js";
+import type { EquipmentTruthResponse } from "../../../shared/equipment-truth.js";
 import { getStoredLocale, t } from "@/lib/i18n";
 import { toast } from "sonner";
 import type { PendingSyncType } from "../offline-db";
@@ -252,6 +252,13 @@ export const equipmentApi = {
         throw err;
       }
     },
+    truth: (id: string) =>
+      request<EquipmentTruthResponse>(`/api/equipment/${encodeURIComponent(id)}/truth`),
+    confirmInRoom: (id: string, body: { roomId: string }) =>
+      request<{ equipmentId: string; roomId: string; roomName: string; status: string }>(
+        `/api/equipment/${encodeURIComponent(id)}/confirm-in-room`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
     getCriticalEquipment: () => request<CriticalEquipment[]>("/api/equipment/critical"),
     create: (data: CreateEquipmentRequest, signal?: AbortSignal) =>
       request<Equipment>(
@@ -598,7 +605,6 @@ export const equipmentApi = {
       ),
     listDeleted: () => request<DeletedEquipment[]>("/api/equipment/deleted"),
     restore: (id: string) => request<Equipment>(`/api/equipment/${id}/restore`, { method: "POST" }),
-    pilotCoverage: () => request<PilotCoverageResponse>("/api/equipment/pilot-coverage"),
     waitlist: (id: string) =>
       request<EquipmentWaitlistSnapshot>(`/api/equipment/${id}/waitlist`),
     joinWaitlist: (id: string) =>

@@ -1,25 +1,38 @@
 // server/routes/display.ts
 import { randomUUID } from "crypto";
+import type { RequestHandler } from "express";
 import { Router } from "express";
-import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, notInArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
+import { fetchLinkedEquipmentForSession } from "../lib/code-blue-linked-equipment.js";
 import {
   db,
-  animals,
   appointments,
   codeBlueSessions,
   codeBlueLogEntries,
   codeBluePresence,
   crashCartChecks,
   equipment,
-  hospitalizations,
+  rooms,
   shifts,
   users,
 } from "../db.js";
 import { requireAuth } from "../middleware/auth.js";
 import { recordHeartbeat } from "../lib/display-heartbeat-store.js";
 import { incrementMetric } from "../lib/metrics.js";
+import { withTimeout } from "../lib/with-timeout.js";
+import { isEquipmentFullyDeployable } from "../services/equipment-operational-state.service.js";
+import {
+  buildCommandBoardSnapshot,
+  type BuildCommandBoardSnapshotFn,
+} from "../services/equipment-command-board.service.js";
+import type { EquipmentCommandBoardSnapshot } from "../../shared/equipment-board.js";
 
-const router = Router();
+export const COMMAND_BOARD_TIMEOUT_MS = 2500;
+
+export type DisplayRouterDeps = {
+  buildCommandBoardSnapshot?: BuildCommandBoardSnapshotFn;
+  commandBoardTimeoutMs?: number;
+};
 
 function resolveRequestId(
   res: { getHeader: (n: string) => unknown; setHeader?: (n: string, v: string) => void },
@@ -37,343 +50,308 @@ function apiError(p: { code: string; reason: string; message: string; requestId:
   return { code: p.code, error: p.code, reason: p.reason, message: p.message, requestId: p.requestId };
 }
 
-router.get("/snapshot", requireAuth, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const now = new Date();
-    const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+function resolveProbableLocation(row: {
+  usuallyFoundHere: string | null;
+  roomName: string | null;
+  checkedOutLocation: string | null;
+  location: string | null;
+}): string | null {
+  const candidates = [row.usuallyFoundHere, row.roomName, row.checkedOutLocation, row.location];
+  for (const value of candidates) {
+    const trimmed = value?.trim();
+    if (trimmed) return trimmed;
+  }
+  return null;
+}
 
-    // ── 1. Active hospitalizations ─────────────────────────────────────────
-    const hospRows = await db
-      .select({ hosp: hospitalizations, animal: animals, vetName: users.name })
-      .from(hospitalizations)
-      .innerJoin(animals, eq(hospitalizations.animalId, animals.id))
-      .leftJoin(users, eq(hospitalizations.admittingVetId, users.id))
-      .where(
-        and(
-          eq(hospitalizations.clinicId, clinicId),
-          notInArray(hospitalizations.status, ["discharged", "deceased"]),
-        ),
-      )
-      .orderBy(hospitalizations.admittedAt);
+function resolveHeldBy(row: {
+  checkedOutById: string | null;
+  checkedOutByEmail: string | null;
+  holderDisplayName: string | null;
+}): string | null {
+  if (!row.checkedOutById && !row.checkedOutByEmail) return null;
+  const name = row.holderDisplayName?.trim();
+  if (name) return name;
+  return row.checkedOutByEmail?.trim() || null;
+}
 
-    // ── 2. Overdue medication tasks ────────────────────────────────────────
-    const overdueRows = await db
-      .select({
-        animalId: appointments.animalId,
-        startTime: appointments.startTime,
-        notes: appointments.notes,
-        taskType: appointments.taskType,
-      })
-      .from(appointments)
-      .where(
-        and(
-          eq(appointments.clinicId, clinicId),
-          inArray(appointments.status, ["pending", "assigned"]),
-          lt(appointments.startTime, now),
-          isNotNull(appointments.animalId),
-        ),
-      )
-      .orderBy(appointments.startTime);
+export function createDisplaySnapshotHandler(deps: DisplayRouterDeps = {}): RequestHandler {
+  const buildBoard = deps.buildCommandBoardSnapshot ?? buildCommandBoardSnapshot;
+  const commandBoardTimeoutMs = deps.commandBoardTimeoutMs ?? COMMAND_BOARD_TIMEOUT_MS;
 
-    // Group overdue by animalId
-    const overdueByAnimal = new Map<
-      string,
-      Array<{ startTime: Date; notes: string | null; taskType: string | null }>
-    >();
-    for (const row of overdueRows) {
-      if (!row.animalId) continue;
-      if (!overdueByAnimal.has(row.animalId)) overdueByAnimal.set(row.animalId, []);
-      overdueByAnimal.get(row.animalId)!.push({
-        startTime: row.startTime,
-        notes: row.notes,
-        taskType: row.taskType,
-      });
-    }
+  return async (req, res) => {
+    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    try {
+      const clinicId = req.clinicId!;
+      const now = new Date();
+      const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
 
-    // ── 3. Upcoming tasks (next 2h) ────────────────────────────────────────
-    const upcomingRows = await db
-      .select({
-        id: appointments.id,
-        startTime: appointments.startTime,
-        taskType: appointments.taskType,
-        notes: appointments.notes,
-        status: appointments.status,
-        animalName: animals.name,
-      })
-      .from(appointments)
-      .innerJoin(animals, eq(appointments.animalId, animals.id))
-      .where(
-        and(
-          eq(appointments.clinicId, clinicId),
-          inArray(appointments.status, ["pending", "assigned", "scheduled"]),
-          gte(appointments.startTime, now),
-          lte(appointments.startTime, twoHoursLater),
-        ),
-      )
-      .orderBy(appointments.startTime)
-      .limit(20);
-
-    // ── 4. Equipment ───────────────────────────────────────────────────────
-    const equipRows = await db
-      .select()
-      .from(equipment)
-      .where(and(eq(equipment.clinicId, clinicId), isNull(equipment.deletedAt)));
-
-    // ── 5. Active alert count (equipment with critical/issue/needs_attention) ─
-    const [alertCountRow] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(equipment)
-      .where(
-        and(
-          eq(equipment.clinicId, clinicId),
-          isNull(equipment.deletedAt),
-          inArray(equipment.status, ["critical", "issue", "needs_attention"]),
-        ),
-      );
-
-    // ── 6. Current shift ───────────────────────────────────────────────────
-    // Use UTC consistently for both date and time to avoid mixed-timezone issues
-    const todayDate = now.toISOString().slice(0, 10); // "YYYY-MM-DD" UTC
-    const nowTimeStr = now.toISOString().slice(11, 16); // "HH:MM" UTC
-    const shiftRows = await db
-      .select()
-      .from(shifts)
-      .where(
-        and(
-          eq(shifts.clinicId, clinicId),
-          eq(shifts.date, todayDate),
-          lte(shifts.startTime, nowTimeStr),
-          gte(shifts.endTime, nowTimeStr),
-        ),
-      );
-
-    // ── 7. Crash cart — latest check ───────────────────────────────────────
-    const [latestCart] = await db
-      .select()
-      .from(crashCartChecks)
-      .where(eq(crashCartChecks.clinicId, clinicId))
-      .orderBy(desc(crashCartChecks.performedAt))
-      .limit(1);
-
-    // ── 8. Active Code Blue session ────────────────────────────────────────
-    const [activeSession] = await db
-      .select()
-      .from(codeBlueSessions)
-      .where(
-        and(eq(codeBlueSessions.clinicId, clinicId), eq(codeBlueSessions.status, "active")),
-      );
-
-    let codeBluePayload = null;
-    if (activeSession) {
-      const logEntries = await db
-        .select()
-        .from(codeBlueLogEntries)
+      const overdueRows = await db
+        .select({
+          id: appointments.id,
+          startTime: appointments.startTime,
+          notes: appointments.notes,
+          taskType: appointments.taskType,
+        })
+        .from(appointments)
         .where(
           and(
-            eq(codeBlueLogEntries.sessionId, activeSession.id),
-            eq(codeBlueLogEntries.clinicId, clinicId),
+            eq(appointments.clinicId, clinicId),
+            inArray(appointments.status, ["pending", "assigned"]),
+            lt(appointments.startTime, now),
           ),
         )
-        .orderBy(codeBlueLogEntries.elapsedMs);
+        .orderBy(appointments.startTime);
 
-      const presence = await db
+      const upcomingRows = await db
+        .select({
+          id: appointments.id,
+          startTime: appointments.startTime,
+          taskType: appointments.taskType,
+          notes: appointments.notes,
+          status: appointments.status,
+        })
+        .from(appointments)
+        .where(
+          and(
+            eq(appointments.clinicId, clinicId),
+            inArray(appointments.status, ["pending", "assigned", "scheduled"]),
+            gte(appointments.startTime, now),
+            lte(appointments.startTime, twoHoursLater),
+          ),
+        )
+        .orderBy(appointments.startTime)
+        .limit(20);
+
+      const equipRows = await db
+        .select({
+          id: equipment.id,
+          name: equipment.name,
+          status: equipment.status,
+          lastSeen: equipment.lastSeen,
+          usuallyFoundHere: equipment.usuallyFoundHere,
+          location: equipment.location,
+          checkedOutLocation: equipment.checkedOutLocation,
+          checkedOutById: equipment.checkedOutById,
+          checkedOutByEmail: equipment.checkedOutByEmail,
+          checkedOutAt: equipment.checkedOutAt,
+          custodyState: equipment.custodyState,
+          readinessState: equipment.readinessState,
+          usageState: equipment.usageState,
+          roomName: rooms.name,
+          holderDisplayName: users.displayName,
+        })
+        .from(equipment)
+        .leftJoin(rooms, and(eq(equipment.roomId, rooms.id), eq(rooms.clinicId, clinicId)))
+        .leftJoin(users, and(eq(equipment.checkedOutById, users.id), eq(users.clinicId, clinicId)))
+        .where(and(eq(equipment.clinicId, clinicId), isNull(equipment.deletedAt)));
+
+      const [alertCountRow] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(equipment)
+        .where(
+          and(
+            eq(equipment.clinicId, clinicId),
+            isNull(equipment.deletedAt),
+            inArray(equipment.status, ["critical", "issue", "needs_attention"]),
+          ),
+        );
+
+      const todayDate = now.toISOString().slice(0, 10);
+      const nowTimeStr = now.toISOString().slice(11, 16);
+      const shiftRows = await db
         .select()
-        .from(codeBluePresence)
-        .where(eq(codeBluePresence.sessionId, activeSession.id));
+        .from(shifts)
+        .where(
+          and(
+            eq(shifts.clinicId, clinicId),
+            eq(shifts.date, todayDate),
+            lte(shifts.startTime, nowTimeStr),
+            gte(shifts.endTime, nowTimeStr),
+          ),
+        );
 
-      let patientName: string | null = null;
-      let patientWeight: number | null = null;
-      let patientSpecies: string | null = null;
-      let cbWard: string | null = null;
-      let cbBay: string | null = null;
+      const [latestCart] = await db
+        .select()
+        .from(crashCartChecks)
+        .where(eq(crashCartChecks.clinicId, clinicId))
+        .orderBy(desc(crashCartChecks.performedAt))
+        .limit(1);
 
-      if (activeSession.patientId) {
-        const [animal] = await db
+      const [activeSession] = await db
+        .select()
+        .from(codeBlueSessions)
+        .where(
+          and(eq(codeBlueSessions.clinicId, clinicId), eq(codeBlueSessions.status, "active")),
+        );
+
+      let codeBluePayload = null;
+      if (activeSession) {
+        const logEntries = await db
           .select()
-          .from(animals)
-          .where(and(eq(animals.id, activeSession.patientId), eq(animals.clinicId, clinicId)));
-        if (animal) {
-          patientName = animal.name;
-          patientWeight = animal.weightKg ? Number(animal.weightKg) : null;
-          patientSpecies = animal.species ?? null;
-        }
-        const [cbHosp] = await db
-          .select()
-          .from(hospitalizations)
+          .from(codeBlueLogEntries)
           .where(
             and(
-              eq(hospitalizations.clinicId, clinicId),
-              eq(hospitalizations.animalId, activeSession.patientId),
-              notInArray(hospitalizations.status, ["discharged", "deceased"]),
+              eq(codeBlueLogEntries.sessionId, activeSession.id),
+              eq(codeBlueLogEntries.clinicId, clinicId),
             ),
-          );
-        if (cbHosp) {
-          cbWard = cbHosp.ward;
-          cbBay = cbHosp.bay;
-        }
+          )
+          .orderBy(codeBlueLogEntries.elapsedMs);
+
+        const presence = await db
+          .select()
+          .from(codeBluePresence)
+          .where(eq(codeBluePresence.sessionId, activeSession.id));
+
+        const linkedEquipment = await fetchLinkedEquipmentForSession(clinicId, logEntries);
+
+        codeBluePayload = {
+          id: activeSession.id,
+          startedAt: activeSession.startedAt.toISOString(),
+          managerUserName: activeSession.managerUserName,
+          preCheckPassed: activeSession.preCheckPassed,
+          pushSentAt: activeSession.startedAt.toISOString(),
+          linkedEquipment,
+          logEntries: logEntries.map((e) => ({
+            elapsedMs: e.elapsedMs,
+            label: e.label,
+            category: e.category,
+            equipmentId: e.equipmentId,
+            loggedByName: e.loggedByName,
+          })),
+          presence: presence.map((p) => ({
+            userId: p.userId,
+            userName: p.userName,
+            lastSeenAt: p.lastSeenAt.toISOString(),
+          })),
+        };
       }
 
-      codeBluePayload = {
-        id: activeSession.id,
-        startedAt: activeSession.startedAt.toISOString(),
-        managerUserName: activeSession.managerUserName,
-        patientId: activeSession.patientId,
-        patientName,
-        patientWeight,
-        patientSpecies,
-        ward: cbWard,
-        bay: cbBay,
-        preCheckPassed: activeSession.preCheckPassed,
-        pushSentAt: activeSession.startedAt.toISOString(),
-        logEntries: logEntries.map((e) => ({
-          elapsedMs: e.elapsedMs,
-          label: e.label,
-          category: e.category,
-          loggedByName: e.loggedByName,
-        })),
-        presence: presence.map((p) => ({
-          userId: p.userId,
-          userName: p.userName,
-          lastSeenAt: p.lastSeenAt.toISOString(),
-        })),
-      };
-    }
-
-    // ── Build response ─────────────────────────────────────────────────────
-    const hospData = hospRows.map(({ hosp, animal, vetName }) => {
-      const overdueList = overdueByAnimal.get(hosp.animalId) ?? [];
-      let overdueLabel: string | null = null;
-      if (overdueList.length > 0) {
-        const first = overdueList[0];
-        const minutesLate = Math.floor((now.getTime() - first.startTime.getTime()) / 60_000);
-        const drugName = first.notes ?? "תרופה";
-        const timeStr = first.startTime.toLocaleTimeString("he-IL", {
-          hour: "2-digit",
-          minute: "2-digit",
-          timeZone: "Asia/Jerusalem",
+      let commandBoard: EquipmentCommandBoardSnapshot | null = null;
+      try {
+        commandBoard = await withTimeout(
+          buildBoard({ clinicId }),
+          commandBoardTimeoutMs,
+        );
+      } catch (error) {
+        console.warn("[display snapshot] command_board_build_failed", {
+          clinicId,
+          error: error instanceof Error ? error.message : String(error),
         });
-        overdueLabel = `${drugName} — ${timeStr} (${minutesLate} דק׳ באיחור)`;
       }
-      return {
-        id: hosp.id,
-        animalId: hosp.animalId,
-        status: hosp.status,
-        ward: hosp.ward,
-        bay: hosp.bay,
-        admittingVetName: vetName ?? null,
-        admittedAt: hosp.admittedAt.toISOString(),
-        animal: {
-          name: animal.name,
-          species: animal.species,
-          breed: animal.breed,
-          weightKg: animal.weightKg ? Number(animal.weightKg) : null,
-        },
-        overdueTaskCount: overdueList.length,
-        overdueTaskLabel: overdueLabel,
-      };
-    });
 
-    res.json({
-      currentTime: now.toISOString(),
-      currentShift: shiftRows.map((s) => ({
-        employeeName: s.employeeName,
-        role: s.role,
-      })),
-      hospitalizations: hospData,
-      equipment: equipRows.map((e) => ({
-        id: e.id,
-        name: e.name,
-        status: e.status,
-        inUse: !!e.checkedOutAt,
-        location: e.checkedOutLocation ?? e.location ?? null,
-      })),
-      upcomingTasks: upcomingRows.map((r) => ({
-        id: r.id,
-        startTime: r.startTime.toISOString(),
-        taskType: r.taskType,
-        notes: r.notes,
-        animalName: r.animalName,
-        status: r.status,
-      })),
-      activeAlertCount: alertCountRow?.count ?? 0,
-      totalOverdueCount: overdueRows.filter((r) => r.animalId).length,
-      crashCartStatus: latestCart
-        ? {
-            lastCheckedAt: latestCart.performedAt.toISOString(),
-            allPassed: latestCart.allPassed,
-            performedByName: latestCart.performedByName,
-          }
-        : null,
-      codeBlueSession: codeBluePayload,
-    });
-  } catch (err) {
-    console.error("[display snapshot]", err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "SNAPSHOT_FAILED",
-        message: "Failed to load display snapshot",
-        requestId,
-      }),
-    );
-  }
-});
-
-// Phase 9 PR 9.2 — Department Display heartbeat (operational liveness only).
-//
-// Contract (plan §3.2):
-//   - operational liveness only; never an input to clinical/authority/audit/
-//     billing/enforcement.
-//   - reuse existing app session/auth context (no new auth system).
-//   - coalesce by displaySessionId at ≤ 1 per 10 s per session.
-//   - Redis-with-TTL primary, bounded in-process Map fallback. No DB writes.
-//   - bounded enum labels only. No PII / userId / clinicId / requestId / IP /
-//     UA / device ID / tab ID labels.
-//   - heartbeat post failure never affects display rendering or any clinical
-//     workflow. Counters are best-effort.
-router.post("/heartbeat", requireAuth, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const body: unknown = req.body ?? {};
-    const sessionId =
-      typeof (body as { displaySessionId?: unknown }).displaySessionId === "string"
-        ? (body as { displaySessionId: string }).displaySessionId
-        : null;
-    const kioskMode = (body as { kioskMode?: unknown }).kioskMode === true;
-
-    if (!sessionId) {
-      return res.status(400).json(
+      res.json({
+        currentTime: now.toISOString(),
+        currentShift: shiftRows.map((s) => ({
+          employeeName: s.employeeName,
+          role: s.role,
+        })),
+        hospitalizations: [],
+        equipment: equipRows.map((e) => ({
+          id: e.id,
+          name: e.name,
+          status: e.status,
+          inUse: !!e.checkedOutAt,
+          heldBy: resolveHeldBy(e),
+          lastCheckInAt: e.lastSeen?.toISOString() ?? null,
+          probableLocation: resolveProbableLocation(e),
+          isDeployable: isEquipmentFullyDeployable(
+            e.custodyState,
+            e.readinessState,
+            e.usageState,
+          ),
+          custodyState: e.custodyState,
+          readinessState: e.readinessState,
+          usageState: e.usageState,
+        })),
+        upcomingTasks: upcomingRows.map((r) => ({
+          id: r.id,
+          startTime: r.startTime.toISOString(),
+          taskType: r.taskType,
+          notes: r.notes,
+          status: r.status,
+        })),
+        overdueTasks: overdueRows.map((r) => ({
+          id: r.id,
+          startTime: r.startTime.toISOString(),
+          taskType: r.taskType,
+          notes: r.notes,
+        })),
+        activeAlertCount: alertCountRow?.count ?? 0,
+        totalOverdueCount: overdueRows.length,
+        crashCartStatus: latestCart
+          ? {
+              lastCheckedAt: latestCart.performedAt.toISOString(),
+              allPassed: latestCart.allPassed,
+              performedByName: latestCart.performedByName,
+            }
+          : null,
+        codeBlueSession: codeBluePayload,
+        commandBoard,
+      });
+    } catch (err) {
+      console.error("[display snapshot]", err);
+      res.status(500).json(
         apiError({
-          code: "INVALID_INPUT",
-          reason: "MISSING_DISPLAY_SESSION_ID",
-          message: "displaySessionId is required",
+          code: "INTERNAL_ERROR",
+          reason: "SNAPSHOT_FAILED",
+          message: "Failed to load display snapshot",
           requestId,
         }),
       );
     }
+  };
+}
 
-    const result = await recordHeartbeat({ rawSessionId: sessionId, kioskMode });
+function createDisplayHeartbeatHandler(): RequestHandler {
+  return async (req, res) => {
+    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    try {
+      const body: unknown = req.body ?? {};
+      const sessionId =
+        typeof (body as { displaySessionId?: unknown }).displaySessionId === "string"
+          ? (body as { displaySessionId: string }).displaySessionId
+          : null;
+      const kioskMode = (body as { kioskMode?: unknown }).kioskMode === true;
 
-    if (result.accepted) {
-      incrementMetric(
-        result.kioskMode
-          ? "display_heartbeats_received_kiosk"
-          : "display_heartbeats_received_non_kiosk",
-        1,
-      );
+      if (!sessionId) {
+        return res.status(400).json(
+          apiError({
+            code: "INVALID_INPUT",
+            reason: "MISSING_DISPLAY_SESSION_ID",
+            message: "displaySessionId is required",
+            requestId,
+          }),
+        );
+      }
+
+      const result = await recordHeartbeat({ rawSessionId: sessionId, kioskMode });
+
+      if (result.accepted) {
+        incrementMetric(
+          result.kioskMode
+            ? "display_heartbeats_received_kiosk"
+            : "display_heartbeats_received_non_kiosk",
+          1,
+        );
+      }
+
+      res.json({ ok: true });
+    } catch (err) {
+      console.warn("[display:heartbeat]", (err as Error).message);
+      res.json({ ok: true });
     }
+  };
+}
 
-    // Always 2xx — coalesced and invalid-after-sanitize are treated as silent
-    // no-ops at the wire level (per plan §3.2 "drops silently, 2xx no-op").
-    res.json({ ok: true });
-  } catch (err) {
-    // Heartbeat failure must never propagate as a hard error in any way that
-    // could affect clinical workflows. Log and return 2xx.
-    console.warn("[display:heartbeat]", (err as Error).message);
-    res.json({ ok: true });
-  }
-});
+/** Factory — mount a fresh Router per path (never reuse the same instance). */
+export function createDisplayRouter(deps: DisplayRouterDeps = {}): Router {
+  const router = Router();
+  router.get("/snapshot", requireAuth, createDisplaySnapshotHandler(deps));
+  router.post("/heartbeat", requireAuth, createDisplayHeartbeatHandler());
+  return router;
+}
 
-export default router;
+/** @deprecated Prefer `createDisplayRouter()` at mount sites. */
+const defaultRouter = createDisplayRouter();
+export default defaultRouter;

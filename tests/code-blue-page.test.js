@@ -27,8 +27,9 @@ describe("Code Blue page structure tests", () => {
     expect(codeBluePage).toContain("managerUserName");
   });
 
-  it("15-minute CPR gate is enforced on the stop button", () => {
-    expect(codeBluePage).toMatch(/15\s*\*\s*60\s*\*\s*1000/);
+  it("manager can end event without CPR time gate", () => {
+    expect(codeBluePage).toContain("endEventChooseOutcome");
+    expect(codeBluePage).not.toMatch(/15\s*\*\s*60\s*\*\s*1000/);
   });
 
   it("Code Blue nav button is role-gated", () => {

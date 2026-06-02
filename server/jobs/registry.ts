@@ -12,9 +12,7 @@ export type JobContext = {
  * Must match existing Redis job names — do not rename without a migration window.
  */
 export type StaticJobKind =
-  | "inventory-deduction"
   | "check-plug"
-  | "admission-fanout"
   | "task-ownership-backfill"
   | "stale-task-ownership-sweep"
   | "check-expiry"

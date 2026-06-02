@@ -4,7 +4,6 @@ import { useQRScanner } from "@/hooks/use-qr-scanner";
 import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { ER_MODE_QUERY_KEY, getErMode } from "@/lib/er-api";
 import { computeAlerts } from "@/lib/utils";
 import {
   Home,
@@ -52,7 +51,6 @@ import {
   Stethoscope,
   Monitor,
   Gauge,
-  Brain,
 } from "lucide-react";
 import { OnboardingWalkthrough } from "@/components/onboarding-walkthrough";
 import { NfcForegroundScan } from "@/components/nfc-foreground-scan";
@@ -79,16 +77,16 @@ import {
   safeStorageSetItem,
 } from "@/lib/safe-browser";
 import { DispenseSheet } from "@/features/containers/components/DispenseSheet";
-import { ErModeToggle } from "@/features/er-admin/ErModeToggle";
-import { isPilotMode } from "@/lib/pilot-mode";
-
+import { CANONICAL_HREFS } from "@/lib/routes/canonical-hrefs";
+import { matchesRouteFamily } from "@/lib/routes/matches-route-family";
+import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
+import { ROUTE_ALIAS_GROUPS } from "@/lib/routes/route-alias-groups";
 interface NavItem {
   href: string;
   label: string;
   icon: React.ReactNode;
   adminOnly?: boolean;
   /** Product-owner / configured allowlist — clinic-wide ER lock control surface */
-  erModeManagerOnly?: boolean;
   menuOnly?: boolean;
   badgeCount?: number;
 }
@@ -116,17 +114,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
 
   const [location, navigate] = useLocation();
 
-  const isNavItemActive = (href: string) => {
-    if (href === "/er") {
-      return (
-        location === "/er" ||
-        location === "/er/" ||
-        (location.startsWith("/er") && !location.startsWith("/er/impact"))
-      );
-    }
-    if (href === "/er/impact") return location.startsWith("/er/impact");
-    return location === href;
-  };
+  const isNavItemActive = (href: string) => resolveNavItemActive(location, href);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
@@ -144,22 +132,8 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   const [dispenseContainerId, setDispenseContainerId] = useState<string | null>(null);
   const navLockToastDebounceRef = useRef(false);
   const prevAlertCountRef = useRef(0);
-  const { isAdmin, role, userId, effectiveRole, canManageErMode } = useAuth();
-  const { data: erMode } = useQuery({
-    queryKey: ER_MODE_QUERY_KEY,
-    queryFn: getErMode,
-    enabled: Boolean(userId),
-    staleTime: 60_000,
-  });
-  const erConcealment = erMode?.state === "enforced";
+  const { isAdmin, role, userId, effectiveRole } = useAuth();
   const resolvedNavRole = String(effectiveRole ?? role ?? "").trim().toLowerCase();
-  const canAccessPharmacyForecastNav =
-    resolvedNavRole === "technician" ||
-    resolvedNavRole === "lead_technician" ||
-    resolvedNavRole === "vet_tech" ||
-    resolvedNavRole === "senior_technician" ||
-    resolvedNavRole === "vet" ||
-    resolvedNavRole === "admin";
   const { pendingCount, failedCount, isSyncing, justSynced, triggerSync } = useSync();
   const { settings, update } = useSettings();
   const quickSettingsRef = useRef<HTMLDivElement>(null);
@@ -385,7 +359,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   const { data: equipment } = useQuery({
     queryKey: ["/api/equipment"],
     queryFn: api.equipment.list,
-    enabled: Boolean(userId) && !erConcealment,
+    enabled: Boolean(userId),
     staleTime: 60_000,
     retry: false,
     refetchOnWindowFocus: false,
@@ -394,7 +368,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   const { data: myEquipment } = useQuery({
     queryKey: ["/api/equipment/my"],
     queryFn: api.equipment.listMy,
-    enabled: Boolean(userId) && !erConcealment,
+    enabled: Boolean(userId),
     staleTime: 30_000,
     retry: false,
     refetchOnWindowFocus: false,
@@ -437,82 +411,60 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
 
   const canAccessCodeBlue = isAdmin || role === "vet" || role === "senior_technician" || role === "technician";
 
-  const canAccessHandoverInventory =
+  const canAccessInventoryNav =
     role === "admin" || role === "vet" || role === "senior_technician" || role === "technician";
 
   const navItems: NavItem[] = useMemo(() => {
-    if (erConcealment) {
-      return [
-        { href: "/er", label: t.erCommandCenter.title, icon: <Monitor className="w-5 h-5" /> },
-        {
-          href: "/er/impact",
-          label: t.erCommandCenter.impactLink,
-          icon: <Gauge className="w-5 h-5" />,
-          menuOnly: true,
-        },
-      ];
-    }
     const allItems: NavItem[] = [
     { href: "/", label: lh.home, icon: <Home className="w-5 h-5" /> },
     { href: "/equipment", label: t.equipment.title, icon: <Package className="w-5 h-5" /> },
     {
-      href: "/alerts",
-      label: t.layout.nav.alerts,
-      icon: <AlertTriangle className="w-5 h-5" />,
-      badgeCount: alertCount,
+      href: CANONICAL_HREFS.equipmentBoard,
+      label: t.layout.nav.equipmentCommandBoard,
+      icon: <Monitor className="w-5 h-5" />,
+    },
+    {
+      href: CANONICAL_HREFS.equipmentTasks,
+      label: t.layout.nav.equipmentTasks,
+      icon: <CalendarDays className="w-5 h-5" />,
     },
     ...(canAccessCodeBlue
       ? [{
-          href: "/code-blue",
-          label: lh.codeBlue,
-          icon: <Siren className="w-5 h-5 text-red-500" />,
-        } satisfies NavItem]
-      : []),
-    ...(canAccessCodeBlue
-      ? [{
-          href: "/crash-cart",
-          label: lh.crashCart,
+          href: CANONICAL_HREFS.criticalKitCheck,
+          label: t.layout.nav.criticalKitCheck,
           icon: <CheckCircle2 className="w-5 h-5" />,
         } satisfies NavItem]
       : []),
+    {
+      href: CANONICAL_HREFS.locations,
+      label: t.layout.nav.locations,
+      icon: <Radar className="w-5 h-5" />,
+    },
     {
       href: "/my-equipment",
       label: t.layout.nav.mine,
       icon: <PackageOpen className="w-5 h-5" />,
       badgeCount: myCount,
     },
-    { href: "/appointments", label: lh.tasks, icon: <CalendarDays className="w-5 h-5" />, menuOnly: true },
-    { href: "/patients", label: lh.activePatients, icon: <Stethoscope className="w-5 h-5" />, menuOnly: true },
-    { href: "/display", label: lh.wardDisplay, icon: <Monitor className="w-5 h-5" />, menuOnly: true },
-    { href: "/meds", label: lh.medicationHub, icon: <Pill className="w-5 h-5" />, menuOnly: true },
-    ...(canAccessPharmacyForecastNav
+    {
+      href: "/alerts",
+      label: t.layout.nav.alerts,
+      icon: <AlertTriangle className="w-5 h-5" />,
+      badgeCount: alertCount,
+      menuOnly: true,
+    },
+    ...(canAccessCodeBlue
       ? [{
-          href: "/pharmacy-forecast",
-          label: t.pharmacyForecast.navLabel,
-          icon: <Syringe className="w-5 h-5" />,
+          href: CANONICAL_HREFS.emergencyEquipmentLog,
+          label: t.layout.nav.emergencyEquipmentLog,
+          icon: <Siren className="w-5 h-5 text-red-500" />,
           menuOnly: true,
         } satisfies NavItem]
       : []),
-    { href: "/rooms", label: lh.radar, icon: <Radar className="w-5 h-5" /> },
-    ...(canManageErMode
-      ? [
-          {
-            href: "/er",
-            label: t.layout.nav.operationalCommandCenter,
-            icon: <Siren className="w-5 h-5 text-amber-500" />,
-            menuOnly: true,
-            erModeManagerOnly: true,
-          } satisfies NavItem,
-        ]
-      : []),
-    ...(canAccessHandoverInventory
-      ? [
-          { href: "/shift-handover", label: lh.shiftHandover, icon: <ClipboardList className="w-5 h-5" /> } satisfies NavItem,
-          { href: "/inventory", label: lh.inventory, icon: <Package className="w-5 h-5" /> } satisfies NavItem,
-        ]
+    ...(canAccessInventoryNav
+      ? [{ href: "/inventory", label: lh.inventory, icon: <Package className="w-5 h-5" /> } satisfies NavItem]
       : []),
     { href: "/analytics", label: lh.analytics, icon: <BarChart3 className="w-5 h-5" /> },
-    { href: "/billing", label: lh.billing, icon: <ReceiptText className="w-5 h-5" /> },
     { href: "/dashboard", label: lh.dashboard, icon: <LayoutDashboard className="w-5 h-5" />, menuOnly: true },
     { href: "/print", label: lh.printQr, icon: <QrCode className="w-5 h-5" />, menuOnly: true },
     { href: "/inventory-items", label: lh.inventoryItems, icon: <Package className="w-5 h-5" />, adminOnly: true, menuOnly: true },
@@ -525,115 +477,92 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     { href: "/help", label: lh.quickGuide, icon: <HelpCircle className="w-5 h-5" />, menuOnly: true },
     { href: "/audit-log", label: lh.auditLog, icon: <FileText className="w-5 h-5" />, adminOnly: true, menuOnly: true },
     {
-      href: "/admin/medication-integrity",
-      label: lh.medIntegrity,
-      icon: <Pill className="w-5 h-5" />,
-      adminOnly: true,
-      menuOnly: true,
-    },
-    {
       href: "/admin/ops-dashboard",
       label: lh.opsDashboard,
       icon: <Gauge className="w-5 h-5" />,
       adminOnly: true,
       menuOnly: true,
     },
-    { href: "/admin/code-blue-history", label: lh.codeBlueHistory, icon: <Clock className="w-5 h-5" />, adminOnly: true, menuOnly: true },
+    {
+      href: CANONICAL_HREFS.emergencyEquipmentHistory,
+      label: t.layout.nav.emergencyEquipmentHistory,
+      icon: <Clock className="w-5 h-5" />,
+      adminOnly: true,
+      menuOnly: true,
+    },
     { href: "/settings", label: lh.settings, icon: <Settings className="w-5 h-5" />, menuOnly: true },
     ];
-    if (isPilotMode) {
-      const pilotHrefs = new Set([
-        "/", "/equipment", "/alerts",
-        "/my-equipment", "/rooms", "/display",
-        "/admin", "/print",
-        "/help", "/settings", "/whats-new",
-      ]);
-      return allItems.filter((item) => pilotHrefs.has(item.href));
-    }
     return allItems;
   }, [
-    erConcealment,
     alertCount,
     canAccessCodeBlue,
-    canAccessHandoverInventory,
-    canAccessPharmacyForecastNav,
-    canManageErMode,
+    canAccessInventoryNav,
     myCount,
     lh,
     t,
-    isPilotMode,
   ]);
 
-  const visibleItems = navItems.filter(
-    (item) =>
-      (!item.adminOnly || isAdmin) && (!item.erModeManagerOnly || canManageErMode),
-  );
+  const visibleItems = navItems.filter((item) => !item.adminOnly || isAdmin);
 
   const operationMenuItems = useMemo(
     () =>
-      erConcealment
-        ? visibleItems
-        : ["/", "/equipment", "/alerts", "/code-blue", "/crash-cart", "/my-equipment", "/appointments", "/patients", "/display", "/meds", "/pharmacy-forecast", "/rooms", "/shift-handover", "/inventory"]
-            .map((href) => visibleItems.find((i) => i.href === href))
-            .filter((x): x is NavItem => x != null),
-    [erConcealment, visibleItems],
+      [
+        "/",
+        "/equipment",
+        CANONICAL_HREFS.equipmentBoard,
+        CANONICAL_HREFS.equipmentTasks,
+        CANONICAL_HREFS.criticalKitCheck,
+        CANONICAL_HREFS.locations,
+        "/my-equipment",
+        "/alerts",
+        "/inventory",
+      ]
+        .map((href) => visibleItems.find((i) => i.href === href))
+        .filter((x): x is NavItem => x != null),
+    [visibleItems],
   );
   const managementMenuItems = useMemo(
     () =>
-      erConcealment
-        ? []
-        : ["/analytics", "/billing", "/dashboard", "/inventory-items", "/procurement", "/admin", "/admin/shifts", "/stability", "/print"]
-            .map((href) => visibleItems.find((i) => i.href === href))
-            .filter((x): x is NavItem => x != null),
-    [erConcealment, visibleItems],
+      ["/analytics", "/dashboard", "/inventory-items", "/procurement", "/admin", "/admin/shifts", "/stability", "/print"]
+        .map((href) => visibleItems.find((i) => i.href === href))
+        .filter((x): x is NavItem => x != null),
+    [visibleItems],
   );
-  const operationalControlMenuItems = useMemo(
-    () =>
-      erConcealment
-        ? []
-        : ["/er"]
-            .map((href) => visibleItems.find((i) => i.href === href))
-            .filter((x): x is NavItem => x != null),
-    [erConcealment, visibleItems],
-  );
+  const operationalControlMenuItems = useMemo(() => [] as NavItem[], []);
   const systemMenuItems = useMemo(
     () =>
-      erConcealment
-        ? []
-        : ["/app-tour", "/whats-new", "/help", "/audit-log", "/admin/medication-integrity", "/admin/ops-dashboard", "/admin/code-blue-history", "/settings"]
-            .map((href) => visibleItems.find((i) => i.href === href))
-            .filter((x): x is NavItem => x != null),
-    [erConcealment, visibleItems],
+      [
+        "/app-tour",
+        "/whats-new",
+        "/help",
+        "/audit-log",
+        "/admin/ops-dashboard",
+        CANONICAL_HREFS.emergencyEquipmentHistory,
+        CANONICAL_HREFS.emergencyEquipmentLog,
+        "/settings",
+      ]
+        .map((href) => visibleItems.find((i) => i.href === href))
+        .filter((x): x is NavItem => x != null),
+    [visibleItems],
   );
 
   const bottomNavActive = useMemo(
     () => ({
       home: location === "/home" || location === "/" || location === "",
-      erCommand:
-        location === "/er" ||
-        location === "/er/" ||
-        (location.startsWith("/er") && !location.startsWith("/er/impact")),
-      erImpact: location.startsWith("/er/impact"),
-      equipment: location.startsWith("/equipment"),
+      equipment: matchesRouteFamily(location, ["/equipment"]),
       recap: location.startsWith("/recap"),
-      rooms: location.startsWith("/rooms"),
+      locations: matchesRouteFamily(location, ROUTE_ALIAS_GROUPS.locations),
     }),
     [location],
   );
 
   const activeTabIndex = useMemo(() => {
-    if (erConcealment) {
-      if (menuOpen) return 2;
-      if (location.startsWith("/er/impact")) return 1;
-      if (location.startsWith("/er")) return 0;
-      return -1;
-    }
     if (menuOpen) return 4;
     if (bottomNavActive.recap) return 3;
     if (bottomNavActive.equipment) return 1;
     if (bottomNavActive.home) return 0;
     return -1;
-  }, [bottomNavActive, erConcealment, location, menuOpen]);
+  }, [bottomNavActive, location, menuOpen]);
 
   const hasPending = pendingCount > 0;
   const hasFailed = failedCount > 0;
@@ -692,7 +621,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
         <UpdateBanner />
         <div className="flex h-14 items-center justify-between px-4 max-w-2xl mx-auto">
           <Link
-            href={erConcealment ? "/er" : "/home"}
+            href="/home"
             className="flex cursor-pointer items-center gap-2 group select-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <div
@@ -795,7 +724,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
               />
             )}
 
-            {!erConcealment && alertCount > 0 && (
+            {alertCount > 0 && (
               <Link href="/alerts">
                 <Button
                   variant="ghost"
@@ -832,7 +761,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
             )}
 
             <div className="relative" ref={quickSettingsRef}>
-              {!erConcealment && (
+              {(
               <Button
                 ref={quickSettingsToggleRef}
                 variant="ghost"
@@ -849,7 +778,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
               </Button>
               )}
 
-              {!erConcealment && qsMounted && (
+              {qsMounted && (
                 <div
                   className={cn(
                     "w-72 bg-card border border-border rounded-2xl z-50 p-3 space-y-2",
@@ -1006,22 +935,11 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                 );
               })}
 
-              {erConcealment && !canManageErMode ? (
-                <p className="text-xs text-ivory-text3 px-3 py-2 leading-snug border-t border-ivory-border/40 mt-1">
-                  {t.layout.nav.erConcealmentStaffHint}
-                </p>
-              ) : null}
-
-              {canManageErMode || operationalControlMenuItems.length > 0 ? (
+              {operationalControlMenuItems.length > 0 ? (
                 <>
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-ivory-text3 px-3 pt-2 pb-0.5">
                     {t.layout.nav.operationalControlSection}
                   </p>
-                  {canManageErMode ? (
-                    <div className="px-3 pb-2">
-                      <ErModeToggle />
-                    </div>
-                  ) : null}
                   {operationalControlMenuItems.map((item, index) => {
                     const isActive = isNavItemActive(item.href);
                     const stagger = operationMenuItems.length + index;
@@ -1257,98 +1175,17 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
         }}
         aria-label={lh.bottomMenu}
       >
-        <div
-          className={cn(
-            "relative grid max-w-2xl mx-auto items-end min-h-[68px] px-0.5 pt-1",
-            erConcealment ? "grid-cols-3" : "grid-cols-5",
-          )}
-        >
+        <div className="relative grid max-w-2xl mx-auto items-end min-h-[68px] px-0.5 pt-1 grid-cols-5">
           {activeTabIndex >= 0 && (
             <div
               aria-hidden
               className="vt-bottom-nav-tab-pill absolute top-1 h-[3px] w-6 rounded-full bg-ivory-green pointer-events-none"
               style={{
-                left: erConcealment
-                  ? `calc(${activeTabIndex} * (100% / 3) + (100% / 6) - 12px)`
-                  : `calc(${activeTabIndex} * 20% + 10% - 12px)`,
+                left: `calc(${activeTabIndex} * 20% + 10% - 12px)`,
               }}
             />
           )}
-          {erConcealment ? (
-            <>
-              <Link
-                href="/er"
-                className="flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] transition-opacity duration-150 active:opacity-80 motion-reduce:active:opacity-100 rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface cursor-pointer"
-                data-testid="bottom-nav-er-command"
-              >
-                <Monitor
-                  className={cn(
-                    "w-6 h-6 transition-all duration-200",
-                    bottomNavActive.erCommand ? "text-ivory-green scale-110" : "text-ivory-text3 scale-100",
-                  )}
-                  aria-hidden
-                />
-                <span
-                  className={cn(
-                    "text-[10px] font-semibold leading-tight text-center max-w-[5rem] truncate px-0.5",
-                    bottomNavActive.erCommand ? "text-ivory-green" : "text-ivory-text3",
-                  )}
-                >
-                  {t.erCommandCenter.title}
-                </span>
-              </Link>
-
-              <Link
-                href="/er/impact"
-                className="flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] transition-opacity duration-150 active:opacity-80 motion-reduce:active:opacity-100 rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface cursor-pointer"
-                data-testid="bottom-nav-er-impact"
-              >
-                <Gauge
-                  className={cn(
-                    "w-6 h-6 transition-all duration-200",
-                    bottomNavActive.erImpact ? "text-ivory-green scale-110" : "text-ivory-text3 scale-100",
-                  )}
-                  aria-hidden
-                />
-                <span
-                  className={cn(
-                    "text-[10px] font-semibold leading-tight text-center max-w-[5rem] truncate px-0.5",
-                    bottomNavActive.erImpact ? "text-ivory-green" : "text-ivory-text3",
-                  )}
-                >
-                  {t.erCommandCenter.impactLink}
-                </span>
-              </Link>
-
-              <button
-                type="button"
-                onClick={() => setMenuOpen((o) => !o)}
-                className={cn(
-                  "flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] w-full",
-                  "transition-opacity duration-150 active:opacity-80 motion-reduce:active:opacity-100",
-                  "rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                  "cursor-pointer",
-                  navigationLocked && "opacity-40",
-                )}
-                aria-expanded={menuOpen}
-                aria-label={menuOpen ? t.common.closeNavigationMenu : lh.bottomMenu}
-                data-testid="bottom-nav-menu"
-              >
-                {menuOpen ? (
-                  <X
-                    className={cn("w-6 h-6 transition-all duration-200", "text-ivory-green scale-110")}
-                    aria-hidden
-                  />
-                ) : (
-                  <Menu className={cn("w-6 h-6 transition-all duration-200", "text-ivory-text3 scale-100")} aria-hidden />
-                )}
-                <span className={cn("text-[10px] font-semibold", menuOpen ? "text-ivory-green" : "text-ivory-text3")}>
-                  {lh.bottomMenu}
-                </span>
-              </button>
-            </>
-          ) : (
-            <>
+          <>
               <Link
                 href="/home"
                 className="flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] transition-opacity duration-150 active:opacity-80 motion-reduce:active:opacity-100 rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface cursor-pointer"
@@ -1498,8 +1335,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                   {lh.bottomMenu}
                 </span>
               </button>
-            </>
-          )}
+          </>
         </div>
       </nav>
 

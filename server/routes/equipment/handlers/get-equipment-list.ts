@@ -2,6 +2,7 @@ import type { RequestHandler } from "express";
 import { db, equipment, folders, rooms, users } from "../../../db.js";
 import { and, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { apiError, resolveRequestId } from "../equipment-route-utils.js";
+import { equipmentLinkedAnimalSelect } from "../equipment-linked-animal-select.js";
 import { equipmentOperationalStateSelect } from "../equipment-operational-select.js";
 import { equipmentRfidSelect } from "../equipment-rfid-select.js";
 
@@ -111,26 +112,7 @@ export const getEquipmentListHandler: RequestHandler = async (req, res) => {
         usuallyFoundHere: equipment.usuallyFoundHere,
         searchAlias: equipment.searchAlias,
         staffNote: equipment.staffNote,
-        linkedAnimalId: sql<string | null>`(
-          SELECT a.id
-          FROM vt_patient_room_assignments pra
-          INNER JOIN vt_animals a ON a.id = pra.animal_id
-          WHERE pra.clinic_id = ${clinicId}
-            AND pra.room_id = ${equipment.roomId}
-            AND pra.ended_at IS NULL
-            AND a.clinic_id = ${clinicId}
-          LIMIT 1
-        )`.as("linkedAnimalId"),
-        linkedAnimalName: sql<string | null>`(
-          SELECT a.name
-          FROM vt_patient_room_assignments pra
-          INNER JOIN vt_animals a ON a.id = pra.animal_id
-          WHERE pra.clinic_id = ${clinicId}
-            AND pra.room_id = ${equipment.roomId}
-            AND pra.ended_at IS NULL
-            AND a.clinic_id = ${clinicId}
-          LIMIT 1
-        )`.as("linkedAnimalName"),
+        ...equipmentLinkedAnimalSelect,
         ...equipmentOperationalStateSelect,
         ...equipmentRfidSelect(clinicId),
       })

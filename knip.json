@@ -2,6 +2,8 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "drizzle": false,
   "ignore": [
+    "android/**",
+    "ios/**",
     "src/lib/tokens.ts",
     "drizzle.config.ts",
     "server/seed.ts",

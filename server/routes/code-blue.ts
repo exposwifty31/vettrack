@@ -5,19 +5,17 @@ import { z } from "zod";
 import {
   db,
   pool,
-  billingLedger,
   codeBlueEvents,
   codeBlueSessions,
   codeBlueLogEntries,
   codeBluePresence,
   crashCartChecks,
-  animals,
-  hospitalizations,
   users,
+  equipment,
 } from "../db.js";
 import { eq, and, desc, inArray, isNull } from "drizzle-orm";
+import { fetchLinkedEquipmentForSession } from "../lib/code-blue-linked-equipment.js";
 import { sql } from "drizzle-orm";
-import { inventoryJobs } from "../db.js";
 import { requireAuth, requireAdmin, requireClinicalUser } from "../middleware/auth.js";
 import { requireClinicalAuthority } from "../middleware/authority.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
@@ -29,8 +27,6 @@ import { invalidateActiveCodeBlueCache } from "../lib/code-blue-keepalive.js";
 import { evaluateCodeBlueManagerForRoute } from "../lib/authority/code-blue-manager.wiring.js";
 import { codeBlueManagerMetrics } from "../lib/authority/enforcement/code-blue-manager.metrics.js";
 import { detectMidsessionManagerDrift } from "../lib/authority/code-blue-manager-midsession.js";
-import { evaluateDrugShockActorForRoute } from "../lib/authority/code-blue-log-drug-shock.js";
-
 const router = Router();
 
 function resolveRequestId(
@@ -65,10 +61,10 @@ export const endSchema = z.object({
 export const startSessionSchema = z.object({
   managerUserId: z.string().min(1),
   managerUserName: z.string().min(1),
-  patientId: z.string().optional(),
-  hospitalizationId: z.string().optional(),
   preCheckPassed: z.boolean().optional(),
   localStartedAt: z.string().datetime().optional(),
+  /** Primary unit for this event (logged at elapsed 0). */
+  equipmentId: z.string().min(1).optional(),
   /** Accepted for client idempotency hygiene; not persisted on session start. */
   idempotencyKey: z.string().min(1).max(128).optional(),
 }).strict();
@@ -77,7 +73,7 @@ export const logEntrySchema = z.object({
   idempotencyKey: z.string().uuid(),
   elapsedMs: z.number().int().min(0),
   label: z.string().min(1).max(200),
-  category: z.enum(["drug", "shock", "cpr", "note", "equipment"]),
+  category: z.enum(["equipment", "note"]),
   equipmentId: z.string().optional(),
 }).strict();
 
@@ -376,6 +372,32 @@ router.post(
       );
     }
 
+    let primaryEquipment: { id: string; name: string } | null = null;
+    if (body.equipmentId) {
+      const [eqRow] = await db
+        .select({ id: equipment.id, name: equipment.name })
+        .from(equipment)
+        .where(
+          and(
+            eq(equipment.id, body.equipmentId),
+            eq(equipment.clinicId, clinicId),
+            isNull(equipment.deletedAt),
+          ),
+        )
+        .limit(1);
+      if (!eqRow) {
+        return res.status(400).json(
+          apiError({
+            code: "INVALID_EQUIPMENT",
+            reason: "INVALID_EQUIPMENT",
+            message: "Equipment not found in this clinic",
+            requestId,
+          }),
+        );
+      }
+      primaryEquipment = eqRow;
+    }
+
     const id = randomUUID();
     const startedAt = new Date();
 
@@ -411,11 +433,25 @@ router.post(
         startedByName: req.authUser!.name,
         managerUserId: managerUser.id,
         managerUserName: managerUser.name,
-        patientId: body.patientId ?? null,
-        hospitalizationId: body.hospitalizationId ?? null,
         preCheckPassed: body.preCheckPassed ?? null,
         status: "active",
       });
+
+      if (primaryEquipment) {
+        await tx.insert(codeBlueLogEntries).values({
+          id: randomUUID(),
+          sessionId: id,
+          clinicId,
+          idempotencyKey: randomUUID(),
+          elapsedMs: 0,
+          label: primaryEquipment.name,
+          category: "equipment",
+          equipmentId: primaryEquipment.id,
+          loggedByUserId: userId,
+          loggedByName: req.authUser!.name,
+        });
+      }
+
       codeBlueNotificationRequestOutboxId = await insertRealtimeDomainEvent(tx, {
         clinicId,
         type: "NOTIFICATION_REQUESTED",
@@ -519,7 +555,7 @@ router.get("/sessions/active", requireAuth, async (req, res) => {
       : null;
 
     if (!session) {
-      return res.json({ session: null, logEntries: [], presence: [], cartStatus });
+      return res.json({ session: null, logEntries: [], presence: [], cartStatus, linkedEquipment: [] });
     }
 
     // Log entries ordered by elapsed time
@@ -540,26 +576,14 @@ router.get("/sessions/active", requireAuth, async (req, res) => {
         ),
       );
 
-    // Patient details if linked
-    let patientName: string | null = null;
-    let patientWeight: number | null = null;
-    if (session.patientId) {
-      const [animal] = await db
-        .select({ name: animals.name, weight: animals.weightKg })
-        .from(animals)
-        .where(and(eq(animals.id, session.patientId), eq(animals.clinicId, clinicId)))
-        .limit(1);
-      if (animal) {
-        patientName = animal.name;
-        patientWeight = animal.weight !== null ? Number(animal.weight) : null;
-      }
-    }
+    const linkedEquipment = await fetchLinkedEquipmentForSession(clinicId, logEntries);
 
     res.json({
-      session: { ...session, patientName, patientWeight },
+      session,
       logEntries,
       presence,
       cartStatus,
+      linkedEquipment,
     });
   } catch (err) {
     console.error("[code-blue] poll failed", err);
@@ -608,7 +632,6 @@ router.post(
     const [session] = await db
       .select({
         id: codeBlueSessions.id,
-        patientId: codeBlueSessions.patientId,
         managerUserId: codeBlueSessions.managerUserId,
       })
       .from(codeBlueSessions)
@@ -633,36 +656,6 @@ router.post(
 
     if (existing) {
       return res.json({ id: existing.id, duplicate: true });
-    }
-
-    // Phase 4 PR 4.5 — drug/shock actor authority enforcement gate.
-    // Runs BEFORE the insert so an enforce-mode deny returns 403 without
-    // persisting the log row. In shadow / off / mode-inactive / fault-open
-    // paths the verdict is `allow` and the route proceeds. The helper emits
-    // appropriate observability (audit + metric) based on the resolved mode.
-    // Only triggered for category ∈ {drug, shock}; note/cpr/equipment skip
-    // the check entirely.
-    if (body.category === "drug" || body.category === "shock") {
-      const drugShockVerdict = await evaluateDrugShockActorForRoute({
-        clinicId,
-        sessionId,
-        snapshot: req.authoritySnapshot ?? null,
-        actorUserId: req.authUser!.id,
-        actorEmail: req.authUser!.email ?? "",
-        category: body.category,
-        now: new Date(),
-      });
-      if (drugShockVerdict.action === "deny") {
-        return res.status(403).json(
-          apiError({
-            code: "DRUG_SHOCK_AUTHORITY_REQUIRED",
-            reason: drugShockVerdict.reason,
-            message:
-              "Recording drug/shock entries requires a Code-Blue-eligible operational role. Reconfigure the clinic to shadow / off to bypass.",
-            requestId,
-          }),
-        );
-      }
     }
 
     const entryId = randomUUID();
@@ -706,14 +699,6 @@ router.post(
         err,
       );
     });
-
-    // Note: Phase 4 PR 4.4b's post-insert fire-and-forget drug/shock shadow
-    // detection (`detectDrugShockActorDrift`) is superseded in PR 4.5 by the
-    // pre-insert sync `evaluateDrugShockActorForRoute` call above. The new
-    // call covers BOTH shadow-mode observability emission AND enforce-mode
-    // denial; running both would emit duplicate observability signals.
-    // The PR 4.4b helper remains exported for callers outside the route
-    // (it is not removed; it is no longer invoked from this handler).
 
     res.status(201).json({ id: entryId, duplicate: false });
   } catch (err) {
@@ -930,15 +915,6 @@ router.patch("/sessions/:id/end", requireAuth, validateUuid("id"), validateBody(
       }
     }
 
-    // 15-minute minimum gate — waivable only with an explicit earlyStopReason
-    const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
-    const durationMs = Date.now() - session.startedAt.getTime();
-    if (durationMs < FIFTEEN_MINUTES_MS && !earlyStopReason) {
-      return res.status(422).json(
-        apiError({ code: "TOO_EARLY", reason: "TOO_EARLY", message: "Session must run for at least 15 minutes, or supply an earlyStopReason", requestId }),
-      );
-    }
-
     const endedAt = new Date();
 
     // Fetch log entries for auto-summary
@@ -1064,26 +1040,21 @@ router.get("/reconciliation", requireAuth, requireAdmin, async (req, res) => {
          s.started_at        AS "startedAt",
          s.ended_at          AS "endedAt",
          s.outcome,
-         s.patient_id        AS "patientId",
          s.is_reconciled     AS "isReconciled",
          s.reconciled_at     AS "reconciledAt",
-         a.name              AS "patientName",
          COUNT(il.id)::int   AS "dispenseCount",
-         COUNT(bl.id) FILTER (WHERE bl.id IS NOT NULL)::int AS "billedCount",
-         COALESCE(SUM(bl.total_amount_cents) FILTER (WHERE bl.status != 'voided'), 0)::int AS "totalBilledCents"
+         0::int              AS "billedCount",
+         0::int              AS "totalBilledCents"
        FROM vt_code_blue_sessions s
-       LEFT JOIN vt_animals a ON a.id = s.patient_id
        LEFT JOIN vt_inventory_logs il
          ON il.clinic_id = s.clinic_id
          AND il.quantity_added < 0
          AND il.created_at >= s.started_at
          AND il.created_at <= COALESCE(s.ended_at, NOW())
-       LEFT JOIN vt_billing_ledger bl
-         ON bl.idempotency_key = 'adjustment_' || il.id
        WHERE s.clinic_id = $1
          AND s.status = 'ended'
-       GROUP BY s.id, s.started_at, s.ended_at, s.outcome, s.patient_id,
-                s.is_reconciled, s.reconciled_at, a.name
+       GROUP BY s.id, s.started_at, s.ended_at, s.outcome,
+                s.is_reconciled, s.reconciled_at
        ORDER BY s.started_at DESC
        LIMIT 100`,
       [clinicId],
@@ -1119,16 +1090,12 @@ router.get("/sessions/:id/dispenses", requireAuth, requireAdmin, async (req, res
          il.id,
          il.quantity_added       AS "quantityAdded",
          il.created_at           AS "createdAt",
-         il.animal_id            AS "animalId",
          c.name                  AS "containerName",
-         bl.id                   AS "billingId",
-         bl.total_amount_cents   AS "totalAmountCents",
-         bl.status               AS "billingStatus"
+         NULL::text             AS "billingId",
+         NULL::int              AS "totalAmountCents",
+         NULL::text             AS "billingStatus"
        FROM vt_inventory_logs il
        JOIN vt_containers c ON c.id = il.container_id
-       LEFT JOIN vt_billing_ledger bl
-         ON bl.idempotency_key = 'adjustment_' || il.id
-         AND bl.status != 'voided'
        WHERE il.clinic_id = $1
          AND il.quantity_added < 0
          AND il.created_at >= $2
@@ -1175,54 +1142,6 @@ router.patch("/sessions/:id/reconcile", requireAuth, requireAdmin, validateBody(
     if (!session) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "SESSION_NOT_FOUND", message: "Session not found", requestId }));
     if (session.isReconciled) return res.json({ id: sessionId, isReconciled: true, alreadyReconciled: true });
 
-    if (!force) {
-      // Fix D: verify billing completeness and no failed inventory jobs
-      const sessionEnd = session.endedAt ?? new Date();
-      const dispenseVsBillingResult = await pool.query<{ dispense_count: number; billed_count: number }>(
-        `SELECT
-           COUNT(il.id)::int AS dispense_count,
-           COUNT(bl.id) FILTER (WHERE bl.id IS NOT NULL AND bl.status != 'voided')::int AS billed_count
-         FROM vt_inventory_logs il
-         LEFT JOIN vt_billing_ledger bl
-           ON bl.idempotency_key = 'adjustment_' || il.id
-         WHERE il.clinic_id = $1
-           AND il.quantity_added < 0
-           AND il.created_at >= $2
-           AND il.created_at <= $3`,
-        [clinicId, session.startedAt.toISOString(), sessionEnd.toISOString()],
-      );
-
-      const dispenseCount = dispenseVsBillingResult.rows[0]?.dispense_count ?? 0;
-      const billedCount = dispenseVsBillingResult.rows[0]?.billed_count ?? 0;
-      const billingGapCount = dispenseCount - billedCount;
-
-      // Check failed inventory jobs overlapping this session window
-      const failedJobsResult = await pool.query<{ count: number }>(
-        `SELECT COUNT(*)::int AS count
-         FROM vt_inventory_jobs
-         WHERE clinic_id = $1
-           AND status = 'failed'
-           AND created_at >= $2
-           AND created_at <= $3`,
-        [clinicId, session.startedAt.toISOString(), sessionEnd.toISOString()],
-      );
-      const failedJobCount = failedJobsResult.rows[0]?.count ?? 0;
-
-      if (billingGapCount > 0 || failedJobCount > 0) {
-        return res.status(409).json({
-          code: "UNRESOLVED_RECONCILIATION",
-          error: "UNRESOLVED_RECONCILIATION",
-          reason: "UNRESOLVED_RECONCILIATION",
-          message: "Cannot reconcile: billing or inventory gaps remain. Resolve gaps or pass ?force=true with forceReason.",
-          billingGapCount,
-          failedInventoryJobCount: failedJobCount,
-          dispenseCount,
-          billedCount,
-          requestId,
-        });
-      }
-    }
-
     const [updated] = await db
       .update(codeBlueSessions)
       .set({ isReconciled: true, reconciledAt: new Date(), reconciledByUserId: req.authUser!.id })
@@ -1260,73 +1179,20 @@ export const manualBillingSchema = z.object({
   itemId: z.string().min(1),
   quantity: z.number().int().min(1),
   unitPriceCents: z.number().int().min(0),
-  animalId: z.string().nullable().optional(),
   /** When set, clears matching `PROBABLE_ORPHAN_USAGE` Smart Cop alert after billing linkage. */
   resolveTaskId: z.string().uuid().optional(),
 }).strict();
 
 router.post("/sessions/:id/manual-billing", requireAuth, requireAdmin, validateBody(manualBillingSchema), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const sessionId = req.params.id;
-    const b = req.body as z.infer<typeof manualBillingSchema>;
-    const [session] = await db
-      .select({ clinicId: codeBlueSessions.clinicId })
-      .from(codeBlueSessions)
-      .where(and(eq(codeBlueSessions.id, sessionId), eq(codeBlueSessions.clinicId, clinicId)))
-      .limit(1);
-    if (!session) {
-      return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "SESSION_NOT_FOUND", message: "Session not found", requestId }));
-    }
-    const { randomUUID } = await import("crypto");
-    const id = randomUUID();
-    const idempotencyKey = `adjustment_${b.inventoryLogId}`;
-    const [row] = await db.transaction(async (tx) => {
-      await tx.insert(billingLedger).values({
-        id,
-        clinicId,
-        animalId: b.animalId ?? null,
-        itemType: "CONSUMABLE",
-        itemId: b.itemId,
-        quantity: b.quantity,
-        unitPriceCents: b.unitPriceCents,
-        totalAmountCents: b.unitPriceCents * b.quantity,
-        idempotencyKey,
-        status: "pending",
-      }).onConflictDoNothing();
-      const [ledgerRow] = await tx.select().from(billingLedger).where(eq(billingLedger.idempotencyKey, idempotencyKey)).limit(1);
-      const resolvedId = ledgerRow?.id ?? id;
-      await insertRealtimeDomainEvent(tx, {
-        clinicId,
-        type: "SHADOW_ORPHAN_ALERT_RESOLVED",
-        payload: {
-          billingLedgerId: resolvedId,
-          inventoryLogId: b.inventoryLogId,
-          resolution: "retroactive_billing_link",
-          source: "code_blue_manual_billing",
-          ...(b.resolveTaskId ? { taskId: b.resolveTaskId } : {}),
-        },
-      });
-      return [ledgerRow] as const;
-    });
-    logAudit({
-      clinicId,
-      actionType: "billing_charge_created",
-      performedBy: req.authUser!.id,
-      performedByEmail: req.authUser!.email ?? "",
-      targetId: row?.id ?? id,
-      targetType: "billing_ledger",
-      actorRole: resolveAuditActorRole(req),
-      metadata: { source: "code_blue_manual", sessionId, inventoryLogId: b.inventoryLogId },
-    });
-    res.status(201).json(row ?? { id, idempotencyKey, status: "pending" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({ code: "INTERNAL_ERROR", reason: "MANUAL_BILLING_FAILED", message: "Failed to create manual billing entry", requestId }),
-    );
-  }
+  return res.status(410).json(
+    apiError({
+      code: "BILLING_REMOVED",
+      reason: "BILLING_SCHEMA_REMOVED",
+      message: "Manual billing is no longer available.",
+      requestId,
+    }),
+  );
 });
 
 export default router;

@@ -14,6 +14,9 @@
     "dev:ci": "concurrently -k -p \"[{name}]\" -n \"api,web\" -c \"cyan,teal\" \"pnpm dev:api\" \"pnpm dev:web\"",
     "dev": "concurrently -k -p \"[{name}]\" -n \"api,web\" -c \"cyan,teal\" \"cross-env PORT=3001 tsx watch server/index.ts\" \"vite --port 5000 --host\"",
     "build": "vite build",
+    "cap:sync": "pnpm build && npx cap sync",
+    "cap:open:ios": "npx cap open ios",
+    "cap:open:android": "npx cap open android",
     "start": "cross-env NODE_ENV=production tsx server/index.ts",
     "worker": "tsx server/workers/notification.worker.ts",
     "worker:notifications": "tsx server/workers/notification.worker.ts",
@@ -55,7 +58,6 @@
     "dev:db:push": "cross-env-shell \"drizzle-kit push\"",
     "seed:dev": "tsx server/seed.ts",
     "seed:dev:e2e": "tsx scripts/seed-dev.ts",
-    "seed:pilot": "tsx scripts/seed-pilot.ts",
     "staging:seed": "tsx scripts/staging/seed.ts",
     "staging:cleanup": "tsx scripts/staging/cleanup.ts",
     "test:staging:e2e": "playwright test --config=playwright.staging.config.ts tests/staging-auth-smoke.spec.ts tests/staging-code-blue-gating.spec.ts --reporter=list",
@@ -63,6 +65,9 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1037.0",
+    "@capacitor/app": "8",
+    "@capacitor/core": "8",
+    "@capgo/capacitor-nfc": "8",
     "@clerk/clerk-react": "^5.0.0",
     "@clerk/clerk-sdk-node": "^5.1.6",
     "@clerk/express": "^1.0.0",
@@ -142,6 +147,9 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@capacitor/android": "8",
+    "@capacitor/cli": "8",
+    "@capacitor/ios": "8",
     "@clerk/testing": "^2.0.11",
     "@playwright/test": "^1.59.1",
     "@sentry/vite-plugin": "^5.2.0",

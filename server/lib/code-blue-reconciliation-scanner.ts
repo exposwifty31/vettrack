@@ -27,7 +27,6 @@ async function scanUnreconciledCodeBlueSessions(): Promise<void> {
         id: codeBlueSessions.id,
         clinicId: codeBlueSessions.clinicId,
         endedAt: codeBlueSessions.endedAt,
-        patientId: codeBlueSessions.patientId,
         startedAt: codeBlueSessions.startedAt,
       })
       .from(codeBlueSessions)
@@ -57,7 +56,6 @@ async function scanUnreconciledCodeBlueSessions(): Promise<void> {
 
       postSystemMessage(session.clinicId, "code_blue_unreconciled", {
         sessionId: session.id,
-        patientId: session.patientId ?? null,
         endedAt: session.endedAt?.toISOString() ?? null,
         ageMinutes,
         message: `Code Blue session from ${ageMinutes} minutes ago has not been reconciled.`,

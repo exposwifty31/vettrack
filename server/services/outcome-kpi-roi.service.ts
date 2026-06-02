@@ -1,10 +1,5 @@
-import { and, count, eq, gte, isNotNull, lt, sql } from "drizzle-orm";
-import {
-  computeAvgDailyBillingRevenueCents,
-  computeDirectAckRate,
-  computeDoorToTriageP50,
-} from "./er-impact.service.js";
-import { billingLedger, db, erIntakeEvents, pool, serverConfig, shiftHandoffItems } from "../db.js";
+import { eq } from "drizzle-orm";
+import { db, pool, serverConfig } from "../db.js";
 import type { OutcomeKpiRoiMetric, OutcomeKpiRoiResponse } from "../../shared/er-types.js";
 
 /** Default: 14 days of pre-activation baseline and a trailing 14-day post-activation period. */
@@ -26,7 +21,6 @@ async function readActivationAt(clinicId: string): Promise<Date | null> {
 
 /**
  * Consumable billing leakage: (dispensed qty − billed qty) / dispensed qty in the window.
- * Mirrors billing analytics semantics (`server/routes/analytics.ts`).
  */
 async function computeBillingLeakageGapPercent(
   clinicId: string,
@@ -64,78 +58,39 @@ async function computeBillingLeakageGapPercent(
   return Number.isFinite(n) ? n : null;
 }
 
+async function computeAvgDailyBillingRevenueCents(
+  clinicId: string,
+  windowStart: Date,
+  windowEnd: Date,
+): Promise<number | null> {
+  const result = await pool.query<{ avgCents: string | null }>(
+    `SELECT ROUND(AVG(daily_cents))::bigint AS "avgCents"
+     FROM (
+       SELECT DATE(created_at AT TIME ZONE 'UTC') AS day,
+              COALESCE(SUM(amount_cents), 0)::bigint AS daily_cents
+       FROM vt_billing_ledger
+       WHERE clinic_id = $1
+         AND status != 'voided'
+         AND created_at >= $2::timestamptz AND created_at < $3::timestamptz
+       GROUP BY 1
+     ) d`,
+    [clinicId, windowStart, windowEnd],
+  );
+  const raw = result.rows[0]?.avgCents;
+  if (raw === null || raw === undefined) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
 function revenueRecoveryScoreFromGap(leakageGapPercent: number | null): number | null {
   if (leakageGapPercent === null) return null;
   return Math.max(0, Math.min(100, Math.round((100 - leakageGapPercent) * 100) / 100));
 }
 
-/** Positive % = faster triage (lower minutes). */
-function improvementPercentTriage(baseline: number | null, current: number | null): number | null {
-  if (baseline === null || current === null || baseline <= 0) return null;
-  return Math.round(((baseline - current) / baseline) * 10000) / 100;
-}
-
-/** Positive % = higher value is better. */
 function improvementPercentHigherIsBetter(baseline: number | null, current: number | null): number | null {
   if (baseline === null || current === null) return null;
   if (baseline === 0) return current > 0 ? 100 : null;
   return Math.round(((current - baseline) / baseline) * 10000) / 100;
-}
-
-async function countAssignedIntakesInWindow(
-  clinicId: string,
-  windowStart: Date,
-  windowEnd: Date,
-): Promise<number> {
-  const [row] = await db
-    .select({ n: count() })
-    .from(erIntakeEvents)
-    .where(
-      and(
-        eq(erIntakeEvents.clinicId, clinicId),
-        isNotNull(erIntakeEvents.assignedUserId),
-        gte(erIntakeEvents.updatedAt, windowStart),
-        lt(erIntakeEvents.updatedAt, windowEnd),
-      ),
-    );
-  return Number(row?.n ?? 0);
-}
-
-async function countHandoffItemsInWindow(
-  clinicId: string,
-  windowStart: Date,
-  windowEnd: Date,
-): Promise<number> {
-  const [row] = await db
-    .select({ n: count() })
-    .from(shiftHandoffItems)
-    .where(
-      and(
-        eq(shiftHandoffItems.clinicId, clinicId),
-        gte(shiftHandoffItems.createdAt, windowStart),
-        lt(shiftHandoffItems.createdAt, windowEnd),
-      ),
-    );
-  return Number(row?.n ?? 0);
-}
-
-async function countNonVoidBillingLines(
-  clinicId: string,
-  windowStart: Date,
-  windowEnd: Date,
-): Promise<number> {
-  const [row] = await db
-    .select({ n: count() })
-    .from(billingLedger)
-    .where(
-      and(
-        eq(billingLedger.clinicId, clinicId),
-        sql`${billingLedger.status} != 'voided'`,
-        gte(billingLedger.createdAt, windowStart),
-        lt(billingLedger.createdAt, windowEnd),
-      ),
-    );
-  return Number(row?.n ?? 0);
 }
 
 function buildMetric(params: {
@@ -154,9 +109,18 @@ function buildMetric(params: {
   };
 }
 
+const stubMetric = (): OutcomeKpiRoiMetric =>
+  buildMetric({
+    baseline: null,
+    current: null,
+    improvementPercent: null,
+    baselineSampleSize: 0,
+    currentSampleSize: 0,
+  });
+
 /**
- * Phase 7 — Outcome KPI & ROI: baseline = 14 days before activation; current = trailing 14 days since activation (floor at activation).
- * Requires `outcome_kpi_activation_at:{clinicId}` in `vt_server_config` (ISO 8601).
+ * Outcome KPI dashboard — ER/handoff metrics stubbed after patient module removal.
+ * Billing leakage and avg daily revenue still computed when activation is set.
  */
 export async function getOutcomeKpiRoiDashboard(clinicId: string): Promise<OutcomeKpiRoiResponse> {
   const generatedAt = new Date();
@@ -170,34 +134,10 @@ export async function getOutcomeKpiRoiDashboard(clinicId: string): Promise<Outco
       baselineWindow: null,
       currentWindow: null,
       generatedAt: generatedAt.toISOString(),
-      timeToTriageMinutesP50: buildMetric({
-        baseline: null,
-        current: null,
-        improvementPercent: null,
-        baselineSampleSize: 0,
-        currentSampleSize: 0,
-      }),
-      handoffIntegrityDirectAckPercent: buildMetric({
-        baseline: null,
-        current: null,
-        improvementPercent: null,
-        baselineSampleSize: 0,
-        currentSampleSize: 0,
-      }),
-      revenueRecoveryScore: buildMetric({
-        baseline: null,
-        current: null,
-        improvementPercent: null,
-        baselineSampleSize: 0,
-        currentSampleSize: 0,
-      }),
-      avgDailyBillingCents: buildMetric({
-        baseline: null,
-        current: null,
-        improvementPercent: null,
-        baselineSampleSize: 0,
-        currentSampleSize: 0,
-      }),
+      timeToTriageMinutesP50: stubMetric(),
+      handoffIntegrityDirectAckPercent: stubMetric(),
+      revenueRecoveryScore: stubMetric(),
+      avgDailyBillingCents: stubMetric(),
     };
   }
 
@@ -208,43 +148,15 @@ export async function getOutcomeKpiRoiDashboard(clinicId: string): Promise<Outco
     Math.max(activationAt.getTime(), generatedAt.getTime() - CURRENT_TRAILING_DAYS * 86_400_000),
   );
 
-  const [
-    baseTriage,
-    curTriage,
-    baseAck,
-    curAck,
-    baseLeak,
-    curLeak,
-    baseAvgBill,
-    curAvgBill,
-    triBaseN,
-    triCurN,
-    hoBaseN,
-    hoCurN,
-    billBaseN,
-    billCurN,
-  ] = await Promise.all([
-    computeDoorToTriageP50(clinicId, baselineStart, baselineEnd),
-    computeDoorToTriageP50(clinicId, currentStart, currentEnd),
-    computeDirectAckRate(clinicId, baselineStart, baselineEnd),
-    computeDirectAckRate(clinicId, currentStart, currentEnd),
+  const [baseLeak, curLeak, baseAvgBill, curAvgBill] = await Promise.all([
     computeBillingLeakageGapPercent(clinicId, baselineStart, baselineEnd),
     computeBillingLeakageGapPercent(clinicId, currentStart, currentEnd),
     computeAvgDailyBillingRevenueCents(clinicId, baselineStart, baselineEnd),
     computeAvgDailyBillingRevenueCents(clinicId, currentStart, currentEnd),
-    countAssignedIntakesInWindow(clinicId, baselineStart, baselineEnd),
-    countAssignedIntakesInWindow(clinicId, currentStart, currentEnd),
-    countHandoffItemsInWindow(clinicId, baselineStart, baselineEnd),
-    countHandoffItemsInWindow(clinicId, currentStart, currentEnd),
-    countNonVoidBillingLines(clinicId, baselineStart, baselineEnd),
-    countNonVoidBillingLines(clinicId, currentStart, currentEnd),
   ]);
 
   const baseRecovery = revenueRecoveryScoreFromGap(baseLeak);
   const curRecovery = revenueRecoveryScoreFromGap(curLeak);
-
-  const baseAckPct = baseAck === null ? null : Math.round(baseAck * 10000) / 100;
-  const curAckPct = curAck === null ? null : Math.round(curAck * 10000) / 100;
 
   return {
     clinicId,
@@ -266,33 +178,21 @@ export async function getOutcomeKpiRoiDashboard(clinicId: string): Promise<Outco
       label: "trailing_post_activation_14d",
     },
     generatedAt: generatedAt.toISOString(),
-    timeToTriageMinutesP50: buildMetric({
-      baseline: baseTriage,
-      current: curTriage,
-      improvementPercent: improvementPercentTriage(baseTriage, curTriage),
-      baselineSampleSize: triBaseN,
-      currentSampleSize: triCurN,
-    }),
-    handoffIntegrityDirectAckPercent: buildMetric({
-      baseline: baseAckPct,
-      current: curAckPct,
-      improvementPercent: improvementPercentHigherIsBetter(baseAckPct, curAckPct),
-      baselineSampleSize: hoBaseN,
-      currentSampleSize: hoCurN,
-    }),
+    timeToTriageMinutesP50: stubMetric(),
+    handoffIntegrityDirectAckPercent: stubMetric(),
     revenueRecoveryScore: buildMetric({
       baseline: baseRecovery,
       current: curRecovery,
       improvementPercent: improvementPercentHigherIsBetter(baseRecovery, curRecovery),
-      baselineSampleSize: billBaseN,
-      currentSampleSize: billCurN,
+      baselineSampleSize: 0,
+      currentSampleSize: 0,
     }),
     avgDailyBillingCents: buildMetric({
       baseline: baseAvgBill,
       current: curAvgBill,
       improvementPercent: improvementPercentHigherIsBetter(baseAvgBill, curAvgBill),
-      baselineSampleSize: billBaseN,
-      currentSampleSize: billCurN,
+      baselineSampleSize: 0,
+      currentSampleSize: 0,
     }),
   };
 }

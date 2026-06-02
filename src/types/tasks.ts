@@ -15,7 +15,7 @@ export type AppointmentStatus =
   | "no_show";
 
 export type TaskPriority = "critical" | "high" | "normal";
-export type TaskType = "maintenance" | "repair" | "inspection" | "medication";
+export type TaskType = "maintenance" | "repair" | "inspection";
 
 export interface Appointment {
   id: string;
@@ -38,61 +38,6 @@ export interface Appointment {
   updatedAt: string;
   /** Set by task recall dashboard — end_time is before now. */
   isOverdue?: boolean;
-}
-
-export interface MedicationExecutionPayload {
-  weightKg?: number;
-  weightSourcedFromRecord?: boolean;
-  prescribedDosePerKg?: number;
-  concentrationMgPerMl?: number;
-  formularyConcentrationMgPerMl?: number;
-  doseUnit?: "mg_per_kg" | "mcg_per_kg" | "mEq_per_kg" | "tablet";
-  convertedDoseMgPerKg?: number;
-  calculatedVolumeMl?: number;
-  concentrationOverridden?: boolean;
-  containerId?: string;
-}
-
-export interface MedicationExecutionTask extends Appointment {
-  animalWeightKg: number | null;
-}
-
-export interface DrugFormularyEntry {
-  id: string;
-  clinicId: string;
-  name: string;
-  genericName: string;
-  brandNames?: string[];
-  targetSpecies?: string[] | null;
-  category?: string | null;
-  dosageNotes?: string | null;
-  concentrationMgMl: number;
-  standardDose: number;
-  minDose?: number | null;
-  maxDose?: number | null;
-  doseUnit: "mg_per_kg" | "mcg_per_kg" | "mEq_per_kg" | "tablet";
-  defaultRoute?: string | null;
-  unitType?: "vial" | "ampule" | "tablet" | "capsule" | "bag" | null;
-  unitVolumeMl?: number | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateDrugFormularyRequest {
-  name: string;
-  genericName: string;
-  brandNames?: string[];
-  targetSpecies?: string[];
-  category?: string | null;
-  dosageNotes?: string | null;
-  concentrationMgMl: number;
-  standardDose: number;
-  minDose?: number | null;
-  maxDose?: number | null;
-  doseUnit: "mg_per_kg" | "mcg_per_kg" | "mEq_per_kg" | "tablet";
-  defaultRoute?: string | null;
-  unitType?: "vial" | "ampule" | "tablet" | "capsule" | "bag" | null;
-  unitVolumeMl?: number | null;
 }
 
 /** GET /api/tasks/dashboard — single payload for Daily Recall UI. */

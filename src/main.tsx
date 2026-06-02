@@ -25,6 +25,8 @@ import {
   isServiceWorkerSupported,
   registerServiceWorkerSafe,
 } from "@/lib/safe-browser";
+import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import { primeNfcSupportCache } from "@/lib/nfc-platform";
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const CLERK_ENABLED = Boolean(PUBLISHABLE_KEY);
@@ -72,6 +74,10 @@ function AppBootstrap() {
   }, []);
 
   useEffect(() => {
+    if (isCapacitorNative()) {
+      void primeNfcSupportCache();
+      return;
+    }
     if (!isServiceWorkerSupported()) return;
     if (import.meta.env.DEV) {
       // In dev, unregister any cached SW so Vite HMR is never intercepted.

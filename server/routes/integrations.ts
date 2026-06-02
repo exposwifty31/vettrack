@@ -56,7 +56,6 @@ import {
   getCachedIntegrationDashboard,
   invalidateIntegrationDashboardCache,
 } from "../integrations/dashboard/dashboard-cache.js";
-import { buildMonthlyBillingMismatchReport } from "../integrations/billing/monthly-mismatch.js";
 import { buildProductAnalyticsStub } from "../integrations/analytics/product-analytics.js";
 import { buildIntegrationsHealth } from "../integrations/health/build-integrations-health.js";
 import opsRoutes from "../integrations/routes/ops.routes.js";
@@ -102,10 +101,8 @@ router.get("/dashboard", requireAdmin, async (req, res) => {
 // ---------------------------------------------------------------------------
 router.get("/billing/mismatch-report", requireAdmin, async (req, res) => {
   const requestId = randomUUID();
-  const clinicId = req.clinicId!;
   const month = typeof req.query.month === "string" ? req.query.month.trim() : "";
-  const report = await buildMonthlyBillingMismatchReport(clinicId, month);
-  if (!report) {
+  if (!/^\d{4}-\d{2}$/.test(month)) {
     return res.status(400).json(
       apiError({
         code: "INVALID_MONTH",
@@ -115,7 +112,12 @@ router.get("/billing/mismatch-report", requireAdmin, async (req, res) => {
       }),
     );
   }
-  res.json(report);
+  res.json({
+    month,
+    mismatches: [],
+    summary: { totalMismatches: 0, totalAmountCents: 0 },
+    billingRemoved: true,
+  });
 });
 
 // ---------------------------------------------------------------------------

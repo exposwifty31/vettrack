@@ -1,8 +1,6 @@
 export * from "./platform.js";
-export * from "./patients.js";
+export type { HospitalizationStatus } from "./patients.js";
 export * from "./equipment.js";
 export * from "./tasks.js";
-export * from "./billing.js";
 export * from "./inventory.js";
-export * from "./forecast.js";
-export * from "./er.js";
+export * from "./safety-surfaces.js";

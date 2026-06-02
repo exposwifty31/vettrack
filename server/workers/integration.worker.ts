@@ -20,22 +20,12 @@ import {
   db,
   integrationConfigs,
   integrationSyncLog,
-  animals,
   appointments,
-  billingLedger,
-  billingItems,
   inventoryItems,
 } from "../db.js";
 import { getAdapter } from "../integrations/index.js";
 import { getCredentials } from "../integrations/credential-manager.js";
 import { evaluateIntegrationGloballyKill } from "../integrations/feature-flags.js";
-import {
-  extractPatientConflictPolicy,
-  patientRowsDiffer,
-  resolvePatientInboundConflict,
-  type LocalPatientRow,
-} from "../integrations/conflicts/conflict-engine.js";
-import { insertPatientConflict } from "../integrations/conflicts/repository.js";
 import { markWebhookEventTerminal } from "../integrations/webhooks/repository.js";
 import { recordSyncFailureAnomaly } from "../integrations/anomaly/sync-failure-hooks.js";
 import {
@@ -55,7 +45,6 @@ import { createRedisConnection } from "../lib/redis.js";
 import { listIntegrationWorkerQueueNames } from "../queues/integration-shards.js";
 import { type IntegrationSyncJobData } from "../queues/integration.queue.js";
 import type {
-  ExternalPatient,
   ExternalInventoryItem,
   ExternalAppointment,
   VetTrackBillingEntry,
@@ -97,171 +86,17 @@ function assertBillingExportIdempotency(entry: VetTrackBillingEntry): void {
   }
 }
 
-function toLocalPatientRow(row: (typeof animals)["$inferSelect"]): LocalPatientRow {
-  return {
-    id: row.id,
-    name: row.name ?? "",
-    species: row.species ?? null,
-    breed: row.breed ?? null,
-    sex: row.sex ?? null,
-    color: row.color ?? null,
-    recordNumber: row.recordNumber ?? null,
-    updatedAt: row.updatedAt,
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Sync handlers
 // ---------------------------------------------------------------------------
 
 async function handleInboundPatients(
-  clinicId: string,
-  adapterId: string,
+  _clinicId: string,
+  _adapterId: string,
   _jobId: string,
-  data: IntegrationSyncJobData,
+  _data: IntegrationSyncJobData,
 ): Promise<{ attempted: number; succeeded: number; failed: number }> {
-  const adapter = getAdapter(adapterId);
-  if (!adapter?.fetchPatients) throw new Error(`${adapterId}: fetchPatients not supported`);
-
-  const credentialsRaw = await getCredentials(clinicId, adapterId);
-  if (!credentialsRaw) throw new Error(`${adapterId}: credentials not found`);
-
-  const config = await db
-    .select({
-      lastPatientSyncAt: integrationConfigs.lastPatientSyncAt,
-      metadata: integrationConfigs.metadata,
-    })
-    .from(integrationConfigs)
-    .where(and(eq(integrationConfigs.clinicId, clinicId), eq(integrationConfigs.adapterId, adapterId)))
-    .limit(1)
-    .then((rows) => rows[0] ?? null);
-
-  const credentials = mergeCredentialsWithVendorMetadata(credentialsRaw, config?.metadata);
-
-  const conflictPolicy = extractPatientConflictPolicy(config?.metadata);
-
-  const since = data.since ?? config?.lastPatientSyncAt?.toISOString();
-  const patients: ExternalPatient[] = await guardedAdapterCall(
-    integrationWorkerRedis,
-    clinicId,
-    adapterId,
-    () => adapter.fetchPatients!(credentials, { clinicId, since }),
-  );
-
-  if (data.dryRun) {
-    return { attempted: patients.length, succeeded: patients.length, failed: 0 };
-  }
-
-  let succeeded = 0;
-  let failed = 0;
-
-  for (const patient of patients) {
-    try {
-      const existing = await db
-        .select()
-        .from(animals)
-        .where(and(eq(animals.clinicId, clinicId), eq(animals.externalSource, adapterId), eq(animals.externalId, patient.externalId)))
-        .limit(1)
-        .then((rows) => rows[0] ?? null);
-
-      if (!existing) {
-        await db.insert(animals).values({
-          id: nanoid(),
-          clinicId,
-          name: patient.name,
-          species: patient.species ?? null,
-          breed: patient.breed ?? null,
-          sex: patient.sex ?? null,
-          color: patient.color ?? null,
-          recordNumber: patient.recordNumber ?? null,
-          externalId: patient.externalId,
-          externalSource: adapterId,
-          externalSyncedAt: new Date(),
-        });
-        succeeded++;
-        continue;
-      }
-
-      const local = toLocalPatientRow(existing);
-
-      if (!patientRowsDiffer(local, patient)) {
-        await db
-          .update(animals)
-          .set({ externalSyncedAt: new Date(), updatedAt: new Date() })
-          .where(eq(animals.id, existing.id));
-        succeeded++;
-        continue;
-      }
-
-      const resolution = resolvePatientInboundConflict(conflictPolicy, local, patient);
-
-      // Fix B: log ALL conflicts regardless of resolution kind.
-      // manual_conflict → severity HIGH (requires review).
-      // auto-resolved → severity LOW (logged for visibility, not blocking).
-      const diffFields = resolution.snapshot?.diffFields ?? [];
-      const conflictResolution =
-        resolution.kind === "manual_conflict" ? "pending_manual" :
-        resolution.kind === "keep_local" ? "auto_vettrack_wins" :
-        "auto_external_wins";
-      const conflictSeverity = resolution.kind === "manual_conflict" ? "HIGH" as const : "LOW" as const;
-
-      await insertPatientConflict({
-        id: nanoid(),
-        clinicId,
-        adapterId,
-        localId: local.id,
-        externalId: patient.externalId,
-        policyUsed: conflictPolicy,
-        payloadSnapshot: resolution.snapshot ?? {
-          entityType: "patient",
-          policyUsed: conflictPolicy,
-          diffFields,
-          localUpdatedAtIso: local.updatedAt.toISOString(),
-          externalUpdatedAtIso: patient.externalUpdatedAt ?? null,
-        },
-        severity: conflictSeverity,
-        resolution: conflictResolution,
-      }).catch(() => {});
-
-      if (resolution.kind === "manual_conflict") {
-        failed++;
-        continue;
-      }
-
-      if (resolution.kind === "keep_local") {
-        await db
-          .update(animals)
-          .set({ externalSyncedAt: new Date() })
-          .where(eq(animals.id, existing.id));
-        succeeded++;
-        continue;
-      }
-
-      await db
-        .update(animals)
-        .set({
-          name: patient.name,
-          species: patient.species ?? null,
-          breed: patient.breed ?? null,
-          sex: patient.sex ?? null,
-          color: patient.color ?? null,
-          recordNumber: patient.recordNumber ?? null,
-          externalSyncedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(animals.id, existing.id));
-      succeeded++;
-    } catch {
-      failed++;
-    }
-  }
-
-  await db
-    .update(integrationConfigs)
-    .set({ lastPatientSyncAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(integrationConfigs.clinicId, clinicId), eq(integrationConfigs.adapterId, adapterId)));
-
-  return { attempted: patients.length, succeeded, failed };
+  return { attempted: 0, succeeded: 0, failed: 0 };
 }
 
 async function handleInboundInventory(
@@ -438,94 +273,11 @@ async function handleInboundAppointments(
 }
 
 async function handleOutboundBilling(
-  clinicId: string,
-  adapterId: string,
-  data: IntegrationSyncJobData,
+  _clinicId: string,
+  _adapterId: string,
+  _data: IntegrationSyncJobData,
 ): Promise<{ attempted: number; succeeded: number; failed: number }> {
-  const adapter = getAdapter(adapterId);
-  if (!adapter?.exportBillingEntry) throw new Error(`${adapterId}: exportBillingEntry not supported`);
-
-  const credentialsRaw = await getCredentials(clinicId, adapterId);
-  if (!credentialsRaw) throw new Error(`${adapterId}: credentials not found`);
-
-  const metaRow = await db
-    .select({ metadata: integrationConfigs.metadata })
-    .from(integrationConfigs)
-    .where(and(eq(integrationConfigs.clinicId, clinicId), eq(integrationConfigs.adapterId, adapterId)))
-    .limit(1)
-    .then((rows) => rows[0] ?? null);
-
-  const credentials = mergeCredentialsWithVendorMetadata(credentialsRaw, metaRow?.metadata);
-
-  const pendingRows = await db
-    .select({
-      ledger: billingLedger,
-      description: billingItems.description,
-    })
-    .from(billingLedger)
-    .leftJoin(billingItems, eq(billingLedger.itemId, billingItems.id))
-    .where(and(eq(billingLedger.clinicId, clinicId), eq(billingLedger.status, "pending")))
-    .limit(100);
-
-  if (data.dryRun) {
-    const n = pendingRows.length;
-    return { attempted: n, succeeded: n, failed: 0 };
-  }
-
-  let attempted = 0;
-  let succeeded = 0;
-  let failed = 0;
-
-  for (const row of pendingRows) {
-    attempted++;
-    const ledger = row.ledger;
-    const qty = ledger.quantity > 0 ? ledger.quantity : 1;
-    const unitCost = Math.round(ledger.totalAmountCents / qty);
-    const entry: VetTrackBillingEntry = {
-      id: ledger.id,
-      clinicId: ledger.clinicId,
-      patientName: null,
-      itemLabel: row.description ?? ledger.itemId,
-      quantity: ledger.quantity,
-      unitCostCents: unitCost,
-      totalCents: ledger.totalAmountCents,
-      billedAt: ledger.createdAt.toISOString(),
-      status: ledger.status,
-      idempotencyKey: ledger.idempotencyKey,
-      externalId: ledger.externalId ?? null,
-    };
-
-    assertBillingExportIdempotency(entry);
-
-    try {
-      const out = await guardedAdapterCall(integrationWorkerRedis, clinicId, adapterId, () =>
-        adapter.exportBillingEntry!(credentials, entry),
-      );
-      if (out.status === "failed" || out.status === "skipped") {
-        failed++;
-        continue;
-      }
-      await db
-        .update(billingLedger)
-        .set({
-          status: "synced",
-          externalSyncedAt: new Date(),
-          externalSource: adapterId,
-          externalId: out.externalId ?? ledger.externalId,
-        })
-        .where(eq(billingLedger.id, ledger.id));
-      succeeded++;
-    } catch {
-      failed++;
-    }
-  }
-
-  await db
-    .update(integrationConfigs)
-    .set({ lastBillingExportAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(integrationConfigs.clinicId, clinicId), eq(integrationConfigs.adapterId, adapterId)));
-
-  return { attempted, succeeded, failed };
+  return { attempted: 0, succeeded: 0, failed: 0 };
 }
 
 // ---------------------------------------------------------------------------

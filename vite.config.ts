@@ -4,12 +4,10 @@ import path from "path";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
-import { resolveEffectiveVitePilotMode } from "./shared/effective-pilot-mode.js";
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const { version } = JSON.parse(readFileSync("./package.json", "utf-8")) as { version: string };
 
-/** Merge Vite .env* files into process.env before pilot-mode resolution (addresses Codex #497). */
+/** Merge Vite .env* files into process.env. */
 function applyViteEnvFiles(mode: string): void {
   const env = loadEnv(mode, process.cwd(), "");
   for (const [key, value] of Object.entries(env)) {
@@ -17,17 +15,6 @@ function applyViteEnvFiles(mode: string): void {
       process.env[key] = value;
     }
   }
-}
-
-function resolveEffectiveVitePilotModeForBuild(): boolean {
-  const effective = resolveEffectiveVitePilotMode();
-  if (process.env.VITE_PILOT_MODE === "true" && !effective) {
-    console.warn(
-      "[vite] VITE_PILOT_MODE=true is set but ignored for this mainline build. " +
-        "Remove VITE_PILOT_MODE from Railway or set ALLOW_EQUIPMENT_PILOT_MODE=true only on dedicated equipment-pilot hosts.",
-    );
-  }
-  return effective;
 }
 
 function swBuildTagTemplate(buildTag: string): Plugin {
@@ -79,7 +66,7 @@ function deployBuildInfo(appVersion: string, buildTag: string): Plugin {
 
 export default defineConfig(({ mode }) => {
   applyViteEnvFiles(mode);
-  const effectiveVitePilotMode = resolveEffectiveVitePilotModeForBuild();
+  const effectiveVitePilotMode = false;
   const VT_BUILD_TAG = `${version}-${Date.now().toString(36)}`;
 
   const sentryPlugin =

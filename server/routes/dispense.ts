@@ -111,7 +111,6 @@ router.post(
     const event = await createDraftDispense({
       clinicId: req.clinicId!,
       containerId: body.containerId,
-      patientId: body.patientId ?? null,
       items: body.items,
       createdBy: req.authUser!.id,
       idempotencyKey,
@@ -182,7 +181,6 @@ router.post(
     const event = await createEmergencyDispense({
       clinicId: req.clinicId!,
       containerId: body.containerId,
-      patientId: body.patientId ?? null,
       items: body.items,
       bypassReason: body.bypassReason,
       createdBy: req.authUser!.id,

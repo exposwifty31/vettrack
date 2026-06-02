@@ -12,7 +12,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EquipmentListSkeleton } from "@/components/skeletons/equipment-list-skeleton";
 import { ErrorCard } from "@/components/ui/error-card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { LoadingSection } from "@/components/ui/loading-section";
 import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import {
   Select,
@@ -65,11 +64,6 @@ import {
   CalendarCheck,
   PawPrint,
   CheckCircle2,
-  Clock,
-  LayoutGrid,
-  Home,
-  ScanLine,
-  Wrench,
 } from "lucide-react";
 import { CsvImportDialog } from "@/components/csv-import-dialog";
 import {
@@ -97,13 +91,6 @@ import {
 import { exportEquipmentToExcel } from "@/lib/export-excel";
 import { ReturnPlugDialog } from "@/components/return-plug-dialog";
 import { haptics } from "@/lib/haptics";
-import { PageShell } from "@/components/layout/PageShell";
-import { StatCard } from "@/components/stats/StatCard";
-import { EquipmentTable } from "@/components/equipment/EquipmentTable";
-import { EquipmentFilters } from "@/components/equipment/EquipmentFilters";
-import { AlertCard } from "@/components/alerts/AlertCard";
-import type { SidebarItem } from "@/components/layout/IconSidebar";
-import { isPilotMode } from "@/lib/pilot-mode";
 import { isEquipmentRecoveryUiEnabled } from "@/lib/equipment-recovery-ui-flag";
 import {
   deriveEquipmentRecoverySnapshotFromSource,
@@ -113,98 +100,8 @@ import {
   buildEquipmentListForDisplay,
   resolveEquipmentListRecoveryBadgeKey,
 } from "@/lib/equipment-list-recovery-labels";
-
-const EQUIPMENT_SIDEBAR: SidebarItem[] = isPilotMode
-  ? [
-      { href: "/equipment", icon: LayoutGrid, label: "All Equipment" },
-      { href: "/rooms",     icon: Home,       label: "Rooms" },
-    ]
-  : [
-      { href: "/equipment",             icon: LayoutGrid, label: "All Equipment" },
-      { href: "/rooms",                 icon: Home,       label: "Rooms" },
-      { href: "/equipment/scan",               icon: ScanLine, label: "Scan Log" },
-      { href: "/equipment?status=maintenance", icon: Wrench, label: "Maintenance", alertDot: false },
-    ];
-
-function DesktopEquipmentView({
-  equipment,
-  isLoading,
-}: {
-  equipment: Equipment[] | undefined;
-  isLoading: boolean;
-}) {
-  const [search, setSearch] = useState("");
-  const [, navigate] = useLocation();
-
-  const rows = (equipment ?? [])
-    .filter(
-      (eq) =>
-        eq.name.toLowerCase().includes(search.toLowerCase()) ||
-        eq.id.toLowerCase().includes(search.toLowerCase())
-    )
-    .map((eq) => ({
-      id:       eq.id,
-      name:     eq.name,
-      location: eq.location ?? "—",
-      lastScan: eq.lastSeen
-        ? new Date(eq.lastSeen).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" })
-        : "Never",
-      status:
-        eq.status === "ok"          ? "Operational"
-        : eq.status === "issue"     ? "Review Needed"
-        : eq.status === "critical"  ? "Review Needed"
-        : eq.status === "needs_attention" ? "Due Check"
-        : eq.status === "maintenance" ? "Maintenance"
-        : eq.status === "sterilized"  ? "Sterilized"
-        : "Operational",
-    }));
-
-  const total       = equipment?.length ?? 0;
-  const operational = equipment?.filter((e) => e.status === "ok").length ?? 0;
-  const maintenance = equipment?.filter((e) => e.status === "maintenance").length ?? 0;
-  const review      = equipment?.filter((e) => e.status === "issue" || e.status === "critical").length ?? 0;
-
-  const alerts = [
-    review > 0      && { tone: "err"  as const, icon: AlertTriangle, title: `${review} overdue check${review > 1 ? "s" : ""}` },
-    maintenance > 0 && { tone: "warn" as const, icon: Clock,         title: `${maintenance} device${maintenance > 1 ? "s" : ""} in maintenance` },
-    operational > 0 && { tone: "ok"   as const, icon: CheckCircle2,  title: `${operational} device${operational > 1 ? "s" : ""} healthy` },
-  ].filter(Boolean) as { tone: "err" | "warn" | "ok"; icon: typeof AlertTriangle; title: string }[];
-
-  return (
-    <div className="flex flex-col gap-5">
-      <h1 className="text-[19px] font-bold tracking-[-0.02em] text-ivory-text leading-none">
-        Equipment Overview
-      </h1>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard title="Total"        value={String(total)}       sub="items tracked"   tone="info" />
-        <StatCard title="Operational"  value={String(operational)} sub={`${total > 0 ? ((operational / total) * 100).toFixed(1) : 0}% uptime`} tone="ok" />
-        <StatCard title="Maintenance"  value={String(maintenance)} sub="scheduled"       tone="warn" />
-        <StatCard title="Needs Review" value={String(review)}      sub="action required" tone="err" delta={review > 0 ? "overdue" : undefined} deltaDir="down" />
-      </div>
-
-      <EquipmentFilters
-        search={search}
-        onSearchChange={setSearch}
-        onAdd={() => navigate("/equipment/new")}
-      />
-
-      {isLoading ? (
-        <LoadingSection rows={5} />
-      ) : (
-        <EquipmentTable rows={rows} />
-      )}
-
-      {alerts.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {alerts.map((a) => (
-            <AlertCard key={a.title} icon={a.icon} title={a.title} tone={a.tone} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+import { EquipmentHeroCoverageStrip } from "@/components/equipment/EquipmentHeroCoverageStrip";
+import { EquipmentRoomSweepSheet } from "@/components/equipment/EquipmentRoomSweepSheet";
 
 const VIRTUALIZATION_THRESHOLD = 100;
 const SERVER_PAGE_SIZE = 100;
@@ -224,7 +121,8 @@ const PAGE_SIZE = 9;
 export default function EquipmentListPage() {
   const { settings } = useSettings();
   const queryClient = useQueryClient();
-  const { userId, isAdmin } = useAuth();
+  const { userId, isAdmin, effectiveRole } = useAuth();
+  const canRoomSweep = effectiveRole !== "student";
   const { items: syncQueueItems } = useSync();
   const localSyncByEquipmentId = useMemo(
     () => buildLocalEntityStateByEquipmentId(syncQueueItems),
@@ -240,8 +138,10 @@ export default function EquipmentListPage() {
   const [folderSearch, setFolderSearch] = useState("");
   const [page, setPage] = useState(1);
   const [recoveryAttentionFilterActive, setRecoveryAttentionFilterActive] = useState(false);
+  const [roomSweepOpen, setRoomSweepOpen] = useState(false);
 
   const params = useMemo(() => new URLSearchParams(searchStr), [searchStr]);
+  const openScanFromUrl = params.get("scan") === "1";
   const search = params.get("q") ?? "";
   const statusFilter = params.get("status") ?? "all";
   const folderFilter = params.get("folder") ?? "all";
@@ -262,6 +162,16 @@ export default function EquipmentListPage() {
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (openScanFromUrl) {
+      setIsScannerOpen(true);
+      const next = new URLSearchParams(searchStrRef.current);
+      next.delete("scan");
+      const qs = next.toString();
+      navigate(qs ? `/equipment?${qs}` : "/equipment", { replace: true });
+    }
+  }, [openScanFromUrl, navigate]);
 
   function handleSearchInputChange(val: string) {
     setSearchInput(val);
@@ -489,17 +399,6 @@ export default function EquipmentListPage() {
 
   const manualFolders = folders?.filter((f) => f.type !== "smart") || [];
 
-  // Desktop render — all hooks already called above this point.
-  // Note: for production, replace with a proper useMediaQuery hook.
-  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
-  if (isDesktop) {
-    return (
-      <PageShell sidebarItems={EQUIPMENT_SIDEBAR}>
-        <DesktopEquipmentView equipment={equipment} isLoading={isLoading} />
-      </PageShell>
-    );
-  }
-
   return (
     <Layout>
       <Helmet>
@@ -509,18 +408,21 @@ export default function EquipmentListPage() {
       </Helmet>
       <div className="flex flex-col gap-4 pb-24 animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold leading-tight">{t.equipment.title}</h1>
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold leading-tight">{t.equipment.title}</h1>
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">{t.equipmentTruth.heroTagline}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               size="sm"
-              variant="outline"
+              variant="default"
               className="h-11 text-xs"
               onClick={() => setIsScannerOpen(true)}
               data-testid="btn-scan-qr"
             >
               <QrCode className="w-4 h-4 mr-1" />
-              Scan QR
+              {t.equipmentTruth.scanFabLabel}
             </Button>
             {isAdmin && (
               <Button
@@ -554,6 +456,19 @@ export default function EquipmentListPage() {
             </Link>
           </div>
         </div>
+
+        <EquipmentHeroCoverageStrip
+          recoveryAttentionCount={
+            isEquipmentRecoveryUiEnabled ? recoveryAttentionCount : 0
+          }
+          recoveryFilterActive={recoveryAttentionFilterActive}
+          onFilterNeedsAttention={() => {
+            setRecoveryAttentionFilterActive((prev) => !prev);
+            setPage(1);
+          }}
+          onOpenRoomSweep={() => setRoomSweepOpen(true)}
+          showRoomSweep={canRoomSweep}
+        />
 
         {/* Search + filters */}
         <div className="flex flex-col gap-2">
@@ -830,15 +745,6 @@ export default function EquipmentListPage() {
           )}
         </div>
 
-        {isEquipmentRecoveryUiEnabled && recoveryAttentionCount > 0 && (
-          <p className="text-sm text-muted-foreground -mt-1">
-            {t.equipmentList.recoveryAttentionSummary.replace(
-              "{count}",
-              String(recoveryAttentionCount),
-            )}
-          </p>
-        )}
-
         {/* Count + page info */}
         <p className="text-xs text-muted-foreground -mt-2">
           {displayList.length} of {totalCount || equipment.length} items
@@ -966,6 +872,22 @@ export default function EquipmentListPage() {
       {isScannerOpen && (
         <QrScanner onClose={() => setIsScannerOpen(false)} />
       )}
+
+      {!isScannerOpen && (
+        <Button
+          type="button"
+          size="lg"
+          className="fixed bottom-20 end-4 z-40 h-14 rounded-full shadow-lg px-5 gap-2 md:hidden"
+          onClick={() => setIsScannerOpen(true)}
+          data-testid="fab-scan-equipment"
+          aria-label={t.equipmentTruth.scanFabLabel}
+        >
+          <QrCode className="w-5 h-5" />
+          {t.equipmentTruth.scanFabLabel}
+        </Button>
+      )}
+
+      <EquipmentRoomSweepSheet open={roomSweepOpen} onOpenChange={setRoomSweepOpen} />
     </Layout>
   );
 }
@@ -1121,8 +1043,7 @@ function EquipmentItem({
               flexShrink 0 on all trailing elements prevents sibling shift during load.
             */}
             <CardContent
-              className={cn(listCardContentPad, "flex items-center gap-3")}
-              style={virtualized ? { minHeight: 72 } : { aspectRatio: "5/4", minHeight: 72 }}
+              className={cn(listCardContentPad, "flex items-center gap-3 min-h-[72px]")}
             >
               {/* Icon / Image — explicit w/h + loading=lazy prevents CLS */}
               {eq.imageUrl ? (

@@ -1,5 +1,6 @@
 import { db, undoTokens } from "../../db.js";
 import { and, eq, sql } from "drizzle-orm";
+import type { AuditDbExecutor } from "../../lib/audit.js";
 
 export interface EquipmentPreviousState {
   status: string;
@@ -13,7 +14,7 @@ export interface EquipmentPreviousState {
   checkedOutLocation: string | null;
 }
 
-type DbExecutor = typeof db;
+type DbExecutor = AuditDbExecutor | typeof db;
 
 /**
  * Atomically marks an undo token consumed. Pass the transaction client from

@@ -26,12 +26,7 @@
  */
 
 import { createLogLimiter } from "../../log-safety.js";
-import {
-  canPerformMedicationTaskAction,
-  canPerformTaskAction,
-  type MedicationTaskAction,
-  type TaskAction,
-} from "../../task-rbac.js";
+import { canPerformTaskAction, type TaskAction } from "../../task-rbac.js";
 import { resolveTaskAssignmentEnforcementMode } from "./config.js";
 import { taskAssignmentEnforceMetrics } from "./task-assignment.metrics.js";
 import { emitTaskAssignmentDenialAudit } from "./task-assignment.audit.js";
@@ -90,13 +85,8 @@ export function computeTaskAssignmentDeny(
     }
   }
 
-  // 4. Target-role permission to *hold* this task type. We probe the existing
-  //    role-RBAC by asking "can this role start this kind of task?". For
-  //    medication tasks we use canPerformMedicationTaskAction("med.start");
-  //    for non-medication we use canPerformTaskAction("task.start").
-  const targetCanStart = ctx.taskType === "medication"
-    ? canPerformMedicationTaskAction(ctx.target.role, "med.start" satisfies MedicationTaskAction)
-    : canPerformTaskAction(ctx.target.role, "task.start" satisfies TaskAction);
+  // 4. Target-role permission to *hold* this task type (can start maintenance/repair/inspection).
+  const targetCanStart = canPerformTaskAction(ctx.target.role, "task.start" satisfies TaskAction);
   if (!targetCanStart) {
     return "TARGET_ROLE_NOT_PERMITTED";
   }

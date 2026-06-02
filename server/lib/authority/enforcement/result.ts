@@ -110,7 +110,7 @@ export interface TaskAssignmentContext {
   };
   target: TaskAssignmentTargetUser;
   /** `null` for non-typed maintenance/inspection rows in the schema. */
-  taskType: "maintenance" | "repair" | "inspection" | "medication" | null;
+  taskType: "maintenance" | "repair" | "inspection" | null;
   currentOwnership: {
     acknowledgedUserId: string | null;
     /** Raw appointment.status. */

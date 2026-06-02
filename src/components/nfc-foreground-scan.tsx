@@ -7,25 +7,29 @@ import { t } from "@/lib/i18n";
 import { toast } from "sonner";
 import { haptics } from "@/lib/haptics";
 import {
-  decodeNdefUrlFromReadingEvent,
   markNfcToggleFired,
   runEquipmentQuickToggle,
   wasNfcToggleFiredRecently,
 } from "@/lib/nfc-equipment-toggle";
 import { getCachedEquipmentById } from "@/lib/offline-db";
+import { useNfcSupported } from "@/hooks/use-nfc-supported";
+import { startNfcScanSession } from "@/lib/nfc-platform";
 
 export function NfcForegroundScan() {
   const queryClient = useQueryClient();
-  const nfcSupported = typeof window !== "undefined" && "NDEFReader" in window;
+  const { supported: nfcSupported } = useNfcSupported();
   const [enabled, setEnabled] = useState(false);
   const [starting, setStarting] = useState(false);
   const activeRef = useRef(false);
   const handlerRef = useRef<(equipmentId: string) => void>(() => {});
   const scanAbortRef = useRef<AbortController | null>(null);
+  const sessionStopRef = useRef<(() => Promise<void>) | null>(null);
 
   const stopScan = useCallback(() => {
     scanAbortRef.current?.abort();
     scanAbortRef.current = null;
+    void sessionStopRef.current?.();
+    sessionStopRef.current = null;
     activeRef.current = false;
     setEnabled(false);
   }, []);
@@ -69,19 +73,19 @@ export function NfcForegroundScan() {
     const controller = new AbortController();
     scanAbortRef.current = controller;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ndef = new (window as any).NDEFReader();
-      await ndef.scan({ signal: controller.signal });
+      const session = await startNfcScanSession({
+        signal: controller.signal,
+        onRead: async (payload) => {
+          const url = payload.url;
+          if (!url) return;
+          const equipmentId = extractEquipmentId(url);
+          if (!equipmentId) return;
+          await handlerRef.current(equipmentId);
+        },
+      });
+      sessionStopRef.current = session.stop;
       activeRef.current = true;
       setEnabled(true);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ndef.onreading = async (event: any) => {
-        const url = decodeNdefUrlFromReadingEvent(event);
-        if (!url) return;
-        const equipmentId = extractEquipmentId(url);
-        if (!equipmentId) return;
-        await handlerRef.current(equipmentId);
-      };
       haptics.scanSuccess();
       toast.success(t.equipmentNfc.scanReady, { duration: 3200 });
     } catch (err) {

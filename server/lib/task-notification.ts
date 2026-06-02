@@ -62,13 +62,13 @@ export async function dispatchTaskNotificationSync(
   const windowLabel = formatWindow(task.startTime, task.endTime);
   const asset = task.animalId?.trim() || "Unassigned asset";
   const typeLabel = task.taskType?.trim() || "task";
-  const medicationUrl = task.taskType === "medication" ? "/meds" : "/appointments";
+  const taskUrl = "/appointments";
 
   const payloadFor = (title: string, body: string) => ({
     title,
     body,
     tag: taskTag(event, task.id),
-    url: medicationUrl,
+    url: taskUrl,
   });
 
   try {

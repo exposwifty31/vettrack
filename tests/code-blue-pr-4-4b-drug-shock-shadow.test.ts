@@ -4,7 +4,7 @@
  * Two layers:
  *
  *   1. Static-analysis tests over `server/routes/code-blue.ts` that lock the
- *      drug/shock helper call: it runs ONLY for category ∈ {drug, shock},
+ *      shock authority helper: route gate runs ONLY for category shock,
  *      uses the actor's own `req.authoritySnapshot`, is fire-and-forget, and
  *      runs after the log insert.
  *
@@ -192,7 +192,7 @@ describe("detectDrugShockActorDrift — mode off (default)", () => {
       snapshot: snapshotOk(),
       actorUserId: "u",
       actorEmail: "u@example.com",
-      category: "drug",
+      category: "shock",
       now: FIXED_NOW,
     });
     expect(logAuditMock).not.toHaveBeenCalled();
@@ -218,7 +218,7 @@ describe("detectDrugShockActorDrift — shadow mode", () => {
       snapshot: snapshotOk(),
       actorUserId: "actor-1",
       actorEmail: "actor@example.com",
-      category: "drug",
+      category: "shock",
       now: FIXED_NOW,
     });
     expect(getMetricsSnapshot().codeBlue.logDrugShockActor.allow).toBe(1);
@@ -260,7 +260,7 @@ describe("detectDrugShockActorDrift — shadow mode", () => {
       },
       actorUserId: "actor-3",
       actorEmail: "actor@example.com",
-      category: "drug",
+      category: "shock",
       now: FIXED_NOW,
     });
     expect(
@@ -277,7 +277,7 @@ describe("detectDrugShockActorDrift — shadow mode", () => {
       snapshot: { ...snapshotOk(), operationalRole: null, reason: "EZSHIFT_NONE" },
       actorUserId: "actor-4",
       actorEmail: "actor@example.com",
-      category: "drug",
+      category: "shock",
       now: FIXED_NOW,
     });
     expect(getMetricsSnapshot().codeBlue.logDrugShockActor.modeInactiveStrategyA).toBe(1);
@@ -291,7 +291,7 @@ describe("detectDrugShockActorDrift — shadow mode", () => {
       snapshot: null,
       actorUserId: "actor-5",
       actorEmail: "actor@example.com",
-      category: "drug",
+      category: "shock",
       now: FIXED_NOW,
     });
     expect(getMetricsSnapshot().codeBlue.logDrugShockActor.allow).toBe(0);
@@ -318,7 +318,7 @@ describe("detectDrugShockActorDrift — rate-limited audit emission (60s dedupe)
         snapshot: ineligibleSnapshot,
         actorUserId: "actor-rate",
         actorEmail: "actor@example.com",
-        category: "drug",
+        category: "shock",
         now: FIXED_NOW,
       });
     }
@@ -340,7 +340,7 @@ describe("detectDrugShockActorDrift — rate-limited audit emission (60s dedupe)
       snapshot: ineligibleSnapshot,
       actorUserId: "actor-A",
       actorEmail: "a@example.com",
-      category: "drug",
+      category: "shock",
       now: FIXED_NOW,
     });
     await detectDrugShockActorDrift({
@@ -349,7 +349,7 @@ describe("detectDrugShockActorDrift — rate-limited audit emission (60s dedupe)
       snapshot: ineligibleSnapshot,
       actorUserId: "actor-B",
       actorEmail: "b@example.com",
-      category: "drug",
+      category: "shock",
       now: FIXED_NOW,
     });
     expect(logAuditMock).toHaveBeenCalledTimes(2);
@@ -370,7 +370,7 @@ describe("detectDrugShockActorDrift — AUTHORITY_OBS_V1 gating", () => {
       snapshot: { ...snapshotOk(), operationalRole: "night_admission_only" },
       actorUserId: "u",
       actorEmail: "u@example.com",
-      category: "drug",
+      category: "shock",
       now: FIXED_NOW,
     });
     expect(
@@ -398,7 +398,7 @@ describe("detectDrugShockActorDrift — never-throw contract", () => {
         snapshot: { ...snapshotOk(), operationalRole: "night_admission_only" },
         actorUserId: "u",
         actorEmail: "u@example.com",
-        category: "drug",
+        category: "shock",
         now: FIXED_NOW,
       }),
     ).resolves.toBeUndefined();
@@ -422,7 +422,7 @@ describe("detectDrugShockActorDrift — never-throw contract", () => {
         snapshot: snapshotOk(),
         actorUserId: "u",
         actorEmail: "u@example.com",
-        category: "drug",
+        category: "shock",
         now: FIXED_NOW,
       }),
     ).resolves.toBeUndefined();
@@ -448,7 +448,7 @@ describe("Distinctness: mid-session manager vs drug/shock actor signals", () => 
       snapshot: { ...snapshotOk(), operationalRole: "night_admission_only" },
       actorUserId: "actor-d",
       actorEmail: "actor@example.com",
-      category: "drug",
+      category: "shock",
       now: FIXED_NOW,
     });
     const snap = getMetricsSnapshot();

@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { and, eq, sql } from "drizzle-orm";
-import { billingLedger, containerItems, containers, db, inventoryItems, inventoryLogs } from "../db.js";
+import { containerItems, containers, db, inventoryItems, inventoryLogs } from "../db.js";
 import {
   consumedFromBlueprint,
   INVENTORY_BLUEPRINT,
@@ -8,7 +8,6 @@ import {
   resolveBlueprintEntryForContainerName,
   targetQuantityFromSupplies,
 } from "../config/inventoryBlueprint.js";
-import { findActiveAnimalInRoom, resolveBillingItemForContainer, restockLedgerIdempotencyKey } from "../lib/container-billing.js";
 import { RestockServiceError } from "./restock.service.js";
 import {
   isCheckViolation,
@@ -83,88 +82,11 @@ type RestockContainerResult =
       ok: true;
       container: typeof containers.$inferSelect;
       consumed: number;
-      ledgerId: string | null;
-      animal: { id: string; name: string } | null;
     }
 ;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DbTx = any;
-
-export interface DeductMedicationInventoryParams {
-  clinicId: string;
-  containerId: string;
-  volumeMl: number;
-  actorUserId: string;
-  taskId: string;
-  animalId: string | null;
-}
-
-type DeductResult =
-  | { ok: true; containerId: string; quantityBefore: number; quantityAfter: number }
-  | { alreadyApplied: true; containerId: string }
-  | { error: "CONTAINER_NOT_FOUND" | "INSUFFICIENT_STOCK" };
-
-/**
- * Deducts medication volume from container inventory within an existing transaction.
- * Uses integer quantity — volumeMl is rounded to nearest integer unit.
- * Does NOT bill — billing is handled separately in completeTask.
- * Floors at 0 — will not go negative.
- */
-export async function deductMedicationInventoryInTx(
-  tx: DbTx,
-  params: DeductMedicationInventoryParams,
-): Promise<DeductResult> {
-  const unitsToDeduct = Math.max(1, Math.round(params.volumeMl));
-
-  const [c] = await tx
-    .select()
-    .from(containers)
-    .where(and(eq(containers.clinicId, params.clinicId), eq(containers.id, params.containerId)))
-    .limit(1);
-
-  if (!c) return { error: "CONTAINER_NOT_FOUND" as const };
-  if (c.currentQuantity <= 0) return { error: "INSUFFICIENT_STOCK" as const };
-
-  const quantityBefore = c.currentQuantity;
-  const quantityAfter = Math.max(0, quantityBefore - unitsToDeduct);
-  const [logRow] = await tx.insert(inventoryLogs).values({
-    id: randomUUID(),
-    clinicId: params.clinicId,
-    containerId: c.id,
-    taskId: params.taskId,
-    logType: "adjustment",
-    quantityBefore,
-    quantityAdded: -unitsToDeduct,
-    quantityAfter,
-    consumedDerived: unitsToDeduct,
-    variance: null,
-    animalId: params.animalId,
-    roomId: c.roomId,
-    note: `Medication task ${params.taskId} — administered ${params.volumeMl.toFixed(3)} mL`,
-    createdByUserId: params.actorUserId,
-  }).onConflictDoNothing().returning({ id: inventoryLogs.id });
-
-  if (!logRow) {
-    return { alreadyApplied: true as const, containerId: c.id };
-  }
-
-  try {
-    await tx
-      .update(containers)
-      .set({
-        currentQuantity: sql`GREATEST(0, ${containers.currentQuantity} - ${unitsToDeduct})`,
-      })
-      .where(and(eq(containers.clinicId, params.clinicId), eq(containers.id, c.id)));
-  } catch (err) {
-    if (isCheckViolation(err)) {
-      throw toInventoryConstraintError(err);
-    }
-    throw err;
-  }
-
-  return { ok: true as const, containerId: c.id, quantityBefore, quantityAfter };
-}
 
 /**
  * Restock flow uses the container row's aggregate `targetQuantity` (sum of blueprint
@@ -199,38 +121,6 @@ export async function restockContainerInTx(
     throw err;
   }
 
-  const animal = await findActiveAnimalInRoom(tx, params.clinicId, c.roomId);
-  let ledgerId: string | null = null;
-
-  if (consumed > 0 && animal) {
-    const billing = await resolveBillingItemForContainer(tx, params.clinicId, c);
-    const idempotencyKey = restockLedgerIdempotencyKey(c.id, now, consumed);
-    const [existing] = await tx
-      .select({ id: billingLedger.id })
-      .from(billingLedger)
-      .where(and(eq(billingLedger.clinicId, params.clinicId), eq(billingLedger.idempotencyKey, idempotencyKey)))
-      .limit(1);
-
-    if (!existing) {
-      ledgerId = randomUUID();
-      const totalCents = billing.unitPriceCents * consumed;
-      await tx.insert(billingLedger).values({
-        id: ledgerId,
-        clinicId: params.clinicId,
-        animalId: animal.id,
-        itemType: "CONSUMABLE",
-        itemId: c.id,
-        quantity: consumed,
-        unitPriceCents: billing.unitPriceCents,
-        totalAmountCents: totalCents,
-        idempotencyKey,
-        status: "pending",
-      });
-    } else {
-      ledgerId = existing.id;
-    }
-  }
-
   await tx.insert(inventoryLogs).values({
     id: randomUUID(),
     clinicId: params.clinicId,
@@ -241,7 +131,6 @@ export async function restockContainerInTx(
     quantityAfter,
     consumedDerived: consumed,
     variance: null,
-    animalId: animal?.id ?? null,
     roomId: c.roomId,
     note: null,
     createdByUserId: params.actorUserId,
@@ -251,8 +140,6 @@ export async function restockContainerInTx(
     ok: true as const,
     container: { ...c, currentQuantity: quantityAfter },
     consumed,
-    ledgerId,
-    animal,
   };
 }
 

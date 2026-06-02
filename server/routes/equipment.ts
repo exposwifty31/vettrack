@@ -35,9 +35,10 @@ import { apiError, resolveRequestId } from "./equipment/equipment-route-utils.js
 import { getCriticalEquipmentHandler } from "./equipment/handlers/get-critical-equipment.js";
 import { getDeletedEquipmentHandler } from "./equipment/handlers/get-deleted-equipment.js";
 import { getEquipmentByIdHandler } from "./equipment/handlers/get-equipment-by-id.js";
+import { getEquipmentTruthHandler } from "./equipment/handlers/get-equipment-truth.js";
+import { postEquipmentConfirmInRoomHandler } from "./equipment/handlers/post-equipment-confirm-in-room.js";
 import { getEquipmentLogsHandler } from "./equipment/handlers/get-equipment-logs.js";
 import { getMyEquipmentHandler } from "./equipment/handlers/get-my-equipment.js";
-import { getPilotCoverageHandler } from "./equipment/handlers/get-pilot-coverage.js";
 import { getEquipmentTransfersHandler } from "./equipment/handlers/get-equipment-transfers.js";
 import { getEquipmentListHandler } from "./equipment/handlers/get-equipment-list.js";
 import { postEquipmentRestoreHandler } from "./equipment/handlers/post-equipment-restore.js";
@@ -116,6 +117,10 @@ const patchEquipmentSchema = z.object({
 }).strict();
 
 const bulkVerifyRoomSchema = z.object({
+  roomId: z.string().min(1, "roomId is required"),
+});
+
+const confirmInRoomSchema = z.object({
   roomId: z.string().min(1, "roomId is required"),
 });
 
@@ -272,7 +277,16 @@ router.get("/deleted", requireAuth, requireAdmin, getDeletedEquipmentHandler);
 // GET /api/equipment/critical
 router.get("/critical", requireAuth, getCriticalEquipmentHandler);
 
-router.get("/pilot-coverage", requireAuth, requireAdmin, getPilotCoverageHandler);
+router.get("/:id/truth", requireAuth, getEquipmentTruthHandler);
+
+router.post(
+  "/:id/confirm-in-room",
+  requireAuth,
+  scanLimiter,
+  requireEffectiveRole("student"),
+  validateBody(confirmInRoomSchema),
+  postEquipmentConfirmInRoomHandler,
+);
 
 router.get("/:id", requireAuth, getEquipmentByIdHandler);
 
@@ -1136,12 +1150,11 @@ router.post(
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
     try {
       const clinicId = req.clinicId!;
-      const { roomId, packageCode, scanLogId } = req.body as z.infer<typeof seenSchema>;
+      const { roomId, scanLogId } = req.body as z.infer<typeof seenSchema>;
       const result = await recordEquipmentSeen({
         clinicId,
         equipmentId: req.params.id,
         roomId: roomId ?? null,
-        packageCode: packageCode ?? null,
         scanLogId: scanLogId ?? null,
       });
       if (!result.ok) {
@@ -1154,21 +1167,9 @@ router.post(
           }),
         );
       }
-      if (!result.linked) {
-        return res.json({
-          linked: false,
-          reason: result.reason,
-          roomId: result.roomId,
-        });
-      }
       res.json({
-        linked: true,
-        animal: result.animal,
+        linked: result.linked,
         roomId: result.roomId,
-        usageSessionId: result.usageSessionId,
-        ledgerId: result.ledgerId,
-        packageLedgerIds: result.packageLedgerIds ?? [],
-        idempotentReplay: result.idempotentReplay ?? false,
       });
     } catch (err) {
       console.error(err);

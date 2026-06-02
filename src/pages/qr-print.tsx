@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 import type { Equipment } from "@/types";
 import { useAuth } from "@/hooks/use-auth";
-import { isPilotMode } from "@/lib/pilot-mode";
 
 export default function QrPrintPage() {
   const { userId } = useAuth();
@@ -46,13 +45,7 @@ export default function QrPrintPage() {
       eq.serialNumber?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const filtered = isPilotMode && baseFiltered
-    ? [...baseFiltered].sort((a, b) => {
-        const aNever = a.lastSeen == null ? 0 : 1;
-        const bNever = b.lastSeen == null ? 0 : 1;
-        return aNever - bNever;
-      })
-    : baseFiltered;
+  const filtered = baseFiltered;
 
   const selectUnconfirmed = () => {
     const unconfirmed = equipment?.filter((e) => e.lastSeen == null) ?? [];
@@ -202,7 +195,7 @@ export default function QrPrintPage() {
                 ? t.qrPrintPage.unselectAll
                 : t.qrPrintPage.selectAll}
             </Button>
-            {isPilotMode && (
+            {false && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -274,7 +267,7 @@ export default function QrPrintPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-sm truncate">{eq.name}</p>
-                      {isPilotMode && eq.lastSeen == null && (
+                      {false && eq.lastSeen == null && (
                         <Badge variant="issue" className="text-[9px] py-0 px-1.5 h-4 shrink-0">
                           {t.qrPrintPage.pilotNeverBadge}
                         </Badge>

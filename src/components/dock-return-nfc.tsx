@@ -7,10 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConditionChecklist } from "@/components/equipment/ConditionChecklist";
-import {
-  decodeNdefTextFromReadingEvent,
-  decodeNdefUrlFromReadingEvent,
-} from "@/lib/nfc-equipment-toggle";
+import { useNfcSupported } from "@/hooks/use-nfc-supported";
+import { readNfcOnce, resolveNfcTagId } from "@/lib/nfc-platform";
 import type { Equipment } from "@/types";
 import { haptics } from "@/lib/haptics";
 import { useLocation } from "wouter";
@@ -51,7 +49,7 @@ export function DockReturnNfc({ equipment, open, onClose, onSuccess }: DockRetur
   const [scanning, setScanning] = useState(false);
   const [ambiguousDocks, setAmbiguousDocks] = useState<AmbiguousDock[] | null>(null);
   const [pickedDockId, setPickedDockId] = useState("");
-  const nfcSupported = typeof window !== "undefined" && "NDEFReader" in window;
+  const { supported: nfcSupported } = useNfcSupported();
 
   const conditionsQ = useQuery({
     queryKey: ["/api/asset-types", equipment.assetTypeId, "conditions"],
@@ -121,27 +119,9 @@ export function DockReturnNfc({ equipment, open, onClose, onSuccess }: DockRetur
     setScanning(true);
     setAmbiguousDocks(null);
     try {
-      const masterNfcTagId = await new Promise<string>((resolve, reject) => {
-        const timeout = window.setTimeout(() => reject(new Error("timeout")), 15_000);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const ndef = new (window as any).NDEFReader();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ndef.onreading = (event: any) => {
-          window.clearTimeout(timeout);
-          const textTag = decodeNdefTextFromReadingEvent(event);
-          if (textTag) {
-            resolve(textTag);
-            return;
-          }
-          const url = decodeNdefUrlFromReadingEvent(event);
-          if (url) {
-            resolve(url.trim());
-            return;
-          }
-          reject(new Error("no_tag"));
-        };
-        void ndef.scan().catch(reject);
-      });
+      const payload = await readNfcOnce({ timeoutMs: 15_000 });
+      const masterNfcTagId = resolveNfcTagId(payload);
+      if (!masterNfcTagId) throw new Error("no_tag");
       await submitDockReturn({ masterNfcTagId });
     } catch (err) {
       if (err instanceof ApiError) return;

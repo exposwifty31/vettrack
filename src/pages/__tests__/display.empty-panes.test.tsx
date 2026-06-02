@@ -14,12 +14,19 @@ const emptySnapshot: DisplaySnapshot = {
     {
       id: "eq-1",
       name: "Infusion pump",
-      location: "ICU",
       status: "ok",
       inUse: false,
+      heldBy: null,
+      lastCheckInAt: "2026-05-28T11:00:00.000Z",
+      probableLocation: "ICU",
+      isDeployable: true,
+      custodyState: "docked",
+      readinessState: "ready",
+      usageState: "available",
     },
   ],
   upcomingTasks: [],
+  overdueTasks: [],
   activeAlertCount: 0,
   totalOverdueCount: 0,
   crashCartStatus: null,
@@ -77,6 +84,8 @@ describe("F1: Ward Display empty panes", () => {
 
     expect(screen.getByTestId("ward-display-equipment-pane")).toBeTruthy();
     expect(screen.getByText("Infusion pump")).toBeTruthy();
+    expect(screen.getByTestId("ward-display-equipment-row-eq-1")).toBeTruthy();
+    expect(screen.getByText("מוכן")).toBeTruthy();
 
     expect(screen.queryByTestId("ward-display-crash-cart-warning")).toBeNull();
     expect(screen.queryByTestId("ward-display-patient-grid")).toBeNull();

@@ -26,18 +26,16 @@ import { runMigrations } from "./migrate.js";
 import { globalApiLimiter } from "./middleware/rate-limiters.js";
 import { i18nMiddleware } from "../lib/i18n/middleware.js";
 import { tenantContext } from "./middleware/tenant-context.js";
-import { erModeConcealmentMiddleware } from "./middleware/er-mode-concealment.js";
 import { sessionContextMiddleware } from "./middleware/auth.js";
 import { registerApiRoutes } from "./app/routes.js";
 import clerkWebhookRoutes from "./routes/webhooks.js";
 import inboundIntegrationWebhooks from "./integrations/webhooks/inbound.router.js";
 import rfidRoutes from "./routes/rfid.js";
+import { mountRfidRoutes } from "./lib/mount-rfid-routes.js";
 import { startBackgroundSchedulers } from "./app/start-schedulers.js";
 import { ensureClinicPhase2Defaults } from "./lib/ensure-clinic-phase2-defaults.js";
-import { releaseStaleMedicationTasks, releaseExpiredMedicationTasks } from "./services/medication-tasks.service.js";
 import healthRoutes from "./routes/health.js";
 import { resolveAuthModeFromEnv, describeAuthMode } from "./lib/auth-mode.js";
-import { preloadClinicErModeCaches } from "./lib/er-mode.js";
 import {
   loadBuildInfo,
   resolveBackendPilotMode,
@@ -222,11 +220,7 @@ app.use(
   inboundIntegrationWebhooks,
 );
 
-app.use(
-  "/api/rfid",
-  express.raw({ type: () => true, limit: "512kb" }),
-  rfidRoutes,
-);
+mountRfidRoutes(app, "/api/rfid", () => rfidRoutes);
 
 app.use(express.json());
 
@@ -273,11 +267,8 @@ if (authModeResolution.mode === "clerk") {
 // Global API limiter runs before route-specific limiters.
 app.use("/api", globalApiLimiter);
 app.use("/api", i18nMiddleware);
-// ER concealment order: tenant hint → session (authUser + clinicId) → concealment 404.
-// `erModeConcealmentMiddleware` must run after `tenantContext` and `sessionContextMiddleware`.
 app.use("/api", tenantContext);
 app.use("/api", sessionContextMiddleware);
-app.use("/api", erModeConcealmentMiddleware);
 
 registerApiRoutes(app);
 
@@ -399,41 +390,11 @@ runMigrations()
       return;
     }
 
-    try {
-      const releasedStaleTasks = await releaseStaleMedicationTasks();
-      console.log(`[startup] Released ${releasedStaleTasks} stale medication task(s)`);
-    } catch (err) {
-      console.error("[startup] releaseStaleMedicationTasks failed:", err);
-    }
-
-    try {
-      await preloadClinicErModeCaches();
-    } catch (err) {
-      console.error("ER mode cache preload failed (non-fatal)", err);
-    }
-
     startBackgroundSchedulers().catch((err) => {
       console.error("Failed to initialize push notifications", err);
     });
     console.log("✅ Background schedulers started");
 
-    startResilientInterval({
-      name: "medication-task-recovery",
-      intervalMs: 5 * 60 * 1000,
-      task: async () => {
-        const n = await releaseStaleMedicationTasks();
-        if (n > 0) console.log(`[medication-task-recovery] released ${n} stale task(s)`);
-      },
-    });
-
-    startResilientInterval({
-      name: "medication-task-lock",
-      intervalMs: 2 * 60 * 1000,
-      task: async () => {
-        const n = await releaseExpiredMedicationTasks();
-        if (n > 0) console.log(`[medication-task-lock] released ${n} expired soft-lock(s)`);
-      },
-    });
   })
   .catch((err) => {
     console.error("💥 Migration failed, aborting scheduler start", err);

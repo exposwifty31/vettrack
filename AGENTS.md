@@ -72,6 +72,7 @@ All API route modules are registered via `server/app/routes.ts` (~49 routers und
 | Type check | `npx tsc --noEmit` |
 | Tests | `pnpm test` (runs 5 test suites: basic, concurrency, offline, conflict, pwa.system) |
 | Build | `pnpm build` |
+| Native app (Capacitor) | `pnpm cap:sync` then `pnpm cap:open:ios` — see `docs/capacitor-native-app.md` |
 | E2E tests | `pnpm test:signup` (requires Playwright + Chromium) |
 
 ### Railway CLI and MCP

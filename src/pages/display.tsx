@@ -13,6 +13,8 @@ import { useKioskWakeLock } from "@/hooks/useKioskWakeLock";
 import { useDisplayHeartbeat } from "@/hooks/useDisplayHeartbeat";
 import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
 import { useCodeBlueKeepaliveReconciliation } from "@/hooks/useCodeBlueKeepaliveReconciliation";
+import { formatRelativeTime } from "@/lib/utils";
+import { t } from "@/lib/i18n";
 import type {
   DisplaySnapshot,
   DisplaySnapshotHospitalization,
@@ -118,9 +120,9 @@ function AwarenessBar({ snapshot }: { snapshot: DisplaySnapshot }) {
         : `${Math.round(cartCheckedAgoMs / 3_600_000)} שע׳`
       : null;
 
-  const firstOverdue = snapshot.hospitalizations.find((h) => h.overdueTaskCount > 0);
-  const extraOverdue = snapshot.totalOverdueCount > 1 ? snapshot.totalOverdueCount - 1 : 0;
   const paneVisibility = getDisplayPaneVisibility(snapshot);
+  const notDeployableCount = snapshot.equipment.filter((e) => !e.isDeployable).length;
+  const checkedOutCount = snapshot.equipment.filter((e) => e.heldBy).length;
 
   return (
     <div className="flex items-center gap-4 px-4 py-2 bg-[#141922] border-b border-[#1e2740] text-sm flex-wrap">
@@ -166,18 +168,21 @@ function AwarenessBar({ snapshot }: { snapshot: DisplaySnapshot }) {
         </span>
       )}
 
-      {snapshot.totalOverdueCount > 0 && firstOverdue && (
-        <span className="flex items-center gap-1 bg-red-900/30 border border-red-600/60 text-red-300 rounded px-2.5 py-1 text-[11px] font-semibold animate-pulse whitespace-nowrap">
-          💊 תרופה באיחור — {firstOverdue.animal.name}
-          {extraOverdue > 0 && ` ועוד ${extraOverdue}`}
+      {checkedOutCount > 0 && (
+        <span className="flex items-center gap-1 bg-sky-900/25 border border-sky-700/40 text-sky-200 rounded px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap">
+          {checkedOutCount} יחידות בידי צוות
         </span>
       )}
 
-      {paneVisibility.showHospitalizationCount && (
-        <span className="ms-auto flex items-center bg-white/5 border border-white/10 text-gray-400 rounded px-2.5 py-1 text-[11px] whitespace-nowrap">
-          {snapshot.hospitalizations.length} מאושפזים
+      {notDeployableCount > 0 && (
+        <span className="flex items-center gap-1 bg-amber-900/25 border border-amber-700/40 text-amber-200 rounded px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap">
+          {notDeployableCount} לא מוכנות לפריסה
         </span>
       )}
+
+      <span className="ms-auto flex items-center bg-white/5 border border-white/10 text-gray-400 rounded px-2.5 py-1 text-[11px] whitespace-nowrap">
+        {snapshot.equipment.length} יחידות
+      </span>
     </div>
   );
 }
@@ -211,7 +216,7 @@ function PatientCard({ hosp }: { hosp: DisplaySnapshotHospitalization }) {
       {hosp.admittingVetName && (
         <div className="text-[11px] text-gray-500 mt-0.5">{hosp.admittingVetName}</div>
       )}
-      {hosp.overdueTaskCount > 0 && hosp.overdueTaskLabel && (
+      {(hosp.overdueTaskCount ?? 0) > 0 && hosp.overdueTaskLabel && (
         <div className="overdue-alert mt-2 rounded px-2 py-1.5 text-[10px] font-semibold text-red-300 border border-red-600/60 bg-red-950/30 animate-pulse">
           💊 {hosp.overdueTaskLabel}
         </div>
@@ -254,58 +259,84 @@ function PatientGrid({
 
 // ── EquipmentPane ─────────────────────────────────────────────────────────────
 
-const EQ_STATUS_LABELS: Record<string, string> = {
-  ok: "פנוי",
-  sterilized: "פנוי",
-  issue: "תקלה",
-  critical: "קריטי",
-  needs_attention: "דורש טיפול",
-  maintenance: "תחזוקה",
-};
-
-const EQ_STATUS_CLASSES: Record<string, string> = {
-  ok: "bg-indigo-900/20 text-indigo-300",
-  sterilized: "bg-indigo-900/20 text-indigo-300",
-  issue: "bg-red-900/25 text-red-300",
-  critical: "bg-red-900/25 text-red-300",
-  needs_attention: "bg-amber-900/20 text-yellow-300",
-  maintenance: "bg-red-900/25 text-red-300",
-};
+function deployableHint(eq: DisplaySnapshotEquipment): string | null {
+  if (eq.isDeployable) return null;
+  if (eq.usageState !== "available") return "בשימוש / לא זמין";
+  if (eq.readinessState !== "ready") return "לא מוכן";
+  if (eq.custodyState !== "docked") {
+    if (eq.heldBy) return "בידי צוות";
+    return "לא במעגן";
+  }
+  return null;
+}
 
 function EquipmentPane({ equipment }: { equipment: DisplaySnapshotEquipment[] }) {
   const sorted = [...equipment].sort((a, b) => {
-    if (a.inUse !== b.inUse) return a.inUse ? -1 : 1;
+    const aHeld = Boolean(a.heldBy);
+    const bHeld = Boolean(b.heldBy);
+    if (aHeld !== bHeld) return aHeld ? -1 : 1;
+    if (a.isDeployable !== b.isDeployable) return a.isDeployable ? 1 : -1;
     return a.name.localeCompare(b.name, "he");
   });
 
   return (
-    <div className="p-4 border-b border-[#1f2937]" data-testid="ward-display-equipment-pane">
+    <div className="flex-1 p-4 overflow-auto" data-testid="ward-display-equipment-pane">
       <div className="text-[11px] font-bold tracking-widest uppercase text-gray-600 mb-3">
-        ציוד · מיקום ושימוש
+        ציוד · אחזקה ופריסה
       </div>
-      <div>
-        {sorted.map((eq) => (
-          <div
-            key={eq.id}
-            className="flex items-start justify-between py-1.5 border-b border-[#1a1f2b] last:border-0"
-          >
-            <div className="min-w-0 me-2">
-              <div className="text-[12px] text-gray-300 truncate">{eq.name}</div>
-              <div className="text-[10px] text-gray-500 truncate">
-                {eq.location ?? "—"}
+      <div
+        className="hidden sm:grid gap-2 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-gray-600 border-b border-[#1f2937] mb-1"
+        style={{ gridTemplateColumns: "minmax(140px,1.4fr) minmax(100px,1fr) minmax(90px,0.9fr) minmax(120px,1.1fr) minmax(88px,0.7fr)" }}
+      >
+        <span>יחידה</span>
+        <span>בידי</span>
+        <span>צ׳ק-אין אחרון</span>
+        <span>מיקום משוער</span>
+        <span>פריסה</span>
+      </div>
+      <div className="space-y-2">
+        {sorted.map((eq) => {
+          const hint = deployableHint(eq);
+          return (
+            <div
+              key={eq.id}
+              data-testid={`ward-display-equipment-row-${eq.id}`}
+              className="rounded-lg border border-[#1f2937] bg-[#121820] px-3 py-2.5 sm:grid sm:items-center sm:gap-2"
+              style={{ gridTemplateColumns: "minmax(140px,1.4fr) minmax(100px,1fr) minmax(90px,0.9fr) minmax(120px,1.1fr) minmax(88px,0.7fr)" }}
+            >
+              <div className="min-w-0">
+                <div className="text-[13px] font-semibold text-gray-200 truncate">{eq.name}</div>
+                <div className="sm:hidden text-[10px] text-gray-500 mt-0.5">
+                  {eq.probableLocation ?? "מיקום לא ידוע"}
+                </div>
+              </div>
+              <div className="text-[12px] text-gray-300 truncate mt-1 sm:mt-0">
+                <span className="sm:hidden text-gray-600 me-1">בידי:</span>
+                {eq.heldBy ?? "—"}
+              </div>
+              <div className="text-[11px] text-gray-400 mt-1 sm:mt-0 tabular-nums">
+                <span className="sm:hidden text-gray-600 me-1">צ׳ק-אין:</span>
+                {eq.lastCheckInAt ? formatRelativeTime(eq.lastCheckInAt) : "לא דווח"}
+              </div>
+              <div className="text-[12px] text-gray-400 truncate mt-1 sm:mt-0">
+                <span className="sm:hidden text-gray-600 me-1">מיקום:</span>
+                {eq.probableLocation ?? "—"}
+              </div>
+              <div className="mt-2 sm:mt-0 flex flex-col items-start gap-0.5">
+                <span
+                  className={`text-[11px] font-bold px-2 py-0.5 rounded ${
+                    eq.isDeployable
+                      ? "bg-green-900/35 text-green-300 border border-green-700/40"
+                      : "bg-amber-900/30 text-amber-200 border border-amber-700/40"
+                  }`}
+                >
+                  {eq.isDeployable ? "מוכן" : "לא מוכן"}
+                </span>
+                {hint ? <span className="text-[10px] text-gray-500">{hint}</span> : null}
               </div>
             </div>
-            <span
-              className={`text-[11px] font-semibold px-2 py-0.5 rounded shrink-0 ${
-                eq.inUse
-                  ? "bg-green-900/30 text-green-300"
-                  : (EQ_STATUS_CLASSES[eq.status] ?? "bg-white/5 text-gray-400")
-              }`}
-            >
-              {eq.inUse ? "בשימוש" : (EQ_STATUS_LABELS[eq.status] ?? eq.status)}
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -339,7 +370,6 @@ function UpcomingTasksPane({
             minute: "2-digit",
             hour12: false,
           });
-          const isMed = task.taskType === "medication";
           return (
             <div
               key={task.id}
@@ -353,16 +383,10 @@ function UpcomingTasksPane({
                 {timeLabel}
               </span>
               <span className="flex-1 text-gray-300 truncate">
-                {task.notes ?? task.taskType ?? "משימה"} — {task.animalName}
+                {task.notes ?? task.taskType ?? "משימה"}
               </span>
-              <span
-                className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
-                  isMed
-                    ? "bg-violet-900/30 text-violet-300"
-                    : "bg-sky-900/20 text-sky-300"
-                }`}
-              >
-                {isMed ? "תרופה" : "פרוצדורה"}
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 bg-sky-900/20 text-sky-300">
+                {task.taskType ?? "פרוצדורה"}
               </span>
             </div>
           );
@@ -379,10 +403,8 @@ function UpcomingTasksPane({
 
 function CodeBlueOverlay({
   session,
-  hospitalizations,
 }: {
   session: DisplaySnapshotCodeBlueSession;
-  hospitalizations: DisplaySnapshotHospitalization[];
 }) {
   // Live timer — updates every second using server startedAt (not local clock)
   const [elapsedMs, setElapsedMs] = useState(
@@ -408,13 +430,8 @@ function CodeBlueOverlay({
     ? Math.floor((Date.now() - new Date(session.pushSentAt).getTime()) / 60_000)
     : null;
 
-  const attachedEquipment = session.logEntries.filter((e) => e.category === "equipment");
-  // Show last 15 entries — enough to fill the column without scroll
+  const linkedEquipment = session.linkedEquipment ?? [];
   const displayedLogs = session.logEntries.slice(-15);
-
-  const remaining = hospitalizations.filter(
-    (h) => !session.patientId || h.animalId !== session.patientId,
-  );
 
   return (
     <div className="flex flex-col min-h-screen bg-[#0d0505]" dir="rtl">
@@ -442,53 +459,28 @@ function CodeBlueOverlay({
 
       {/* Three-column body */}
       <div className="flex flex-1 divide-x divide-red-900/30 divide-x-reverse">
-        {/* Column 1 — Patient */}
+        {/* Column 1 — Equipment */}
         <div className="flex-1 p-5">
           <div className="text-[10px] font-bold tracking-[.1em] uppercase text-red-700/80 mb-3">
-            מטופל
+            {t.codeBlue.overlay.equipmentColumn}
           </div>
-          {session.patientName ? (
-            <>
-              <div className="text-[20px] font-bold text-white mb-1">{session.patientName}</div>
-              <div className="text-[13px] text-red-200 leading-loose">
-                {[
-                  session.patientSpecies,
-                  session.patientWeight ? `${session.patientWeight} ק״ג` : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-                {(session.ward || session.bay) && (
-                  <>
-                    <br />
-                    {[session.ward, session.bay ? `מיטה ${session.bay}` : null]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </>
-                )}
-              </div>
-              <div className="mt-3 text-red-500 font-bold text-[13px]">⚠ CPR Risk</div>
-            </>
-          ) : (
-            <div className="text-gray-500 text-[13px]">מטופל לא צוין</div>
-          )}
-          {attachedEquipment.length > 0 && (
-            <div className="mt-5">
-              <div className="text-[10px] font-bold tracking-[.08em] uppercase text-red-700/60 mb-2">
-                ציוד מחובר
-              </div>
-              {attachedEquipment.map((e) => (
-                <div key={e.label} className="text-[12px] text-red-200 mb-1">
-                  {e.label}
+          {linkedEquipment.length > 0 ? (
+            <div className="space-y-2">
+              {linkedEquipment.map((eq) => (
+                <div key={eq.id} className="text-[16px] font-bold text-white">
+                  {eq.name}
                 </div>
               ))}
             </div>
+          ) : (
+            <div className="text-gray-500 text-[13px]">{t.codeBlue.noEquipmentInEvent}</div>
           )}
         </div>
 
         {/* Column 2 — Event timeline */}
         <div className="flex-1 p-5">
           <div className="text-[10px] font-bold tracking-[.1em] uppercase text-red-700/80 mb-3">
-            יומן אירוע
+            {t.codeBlue.overlay.timelineColumn}
           </div>
           <div className="space-y-2">
             {displayedLogs.map((entry, idx) => {
@@ -508,44 +500,28 @@ function CodeBlueOverlay({
           </div>
         </div>
 
-        {/* Column 3 — Sidebar */}
+        {/* Column 3 — Status */}
         <div className="w-64 shrink-0 p-5">
           <div className="text-[10px] font-bold tracking-[.1em] uppercase text-red-700/80 mb-3">
-            שאר המאושפזים
-          </div>
-          <div className="space-y-1 mb-5">
-            {remaining.map((h) => (
-              <div key={h.id} className="text-[12px] text-gray-400">
-                {h.animal.name} · {h.ward} {h.bay} ·{" "}
-                <span
-                  className={
-                    h.status === "critical"
-                      ? "text-red-400"
-                      : h.status === "observation"
-                        ? "text-amber-400"
-                        : "text-green-400"
-                  }
-                >
-                  {STATUS_LABELS_HE[h.status as HospitalizationStatus] ?? h.status}
-                </span>
-              </div>
-            ))}
+            {t.codeBlue.overlay.sidebarColumn}
           </div>
 
           <div className="text-[10px] font-bold tracking-[.1em] uppercase text-red-700/80 mb-2">
-            עגלת חירום
+            {t.codeBlue.overlay.crashCart}
           </div>
           <div className={`text-[12px] mb-4 ${session.preCheckPassed === false ? "text-red-400" : "text-green-400"}`}>
-            {session.preCheckPassed === false ? "⚠ לא נבדקה" : "✓ זמינה"}
+            {session.preCheckPassed === false
+              ? `⚠ ${t.codeBlue.overlay.cartNotChecked}`
+              : `✓ ${t.codeBlue.overlay.cartReady}`}
           </div>
 
           {minutesSincePush !== null && (
             <>
               <div className="text-[10px] font-bold tracking-[.1em] uppercase text-red-700/80 mb-2">
-                הודעות
+                {t.codeBlue.display.present}
               </div>
               <div className="text-[11px] text-gray-400">
-                📱 Push נשלח לכל הצוות
+                {t.codeBlue.overlay.pushSent}
                 <br />
                 <span className="text-gray-600 text-[10px]">לפני {minutesSincePush} דק׳</span>
               </div>
@@ -658,10 +634,7 @@ export default function WardDisplayPage() {
 
   if (snapshot.codeBlueSession) {
     return (
-      <CodeBlueOverlay
-        session={snapshot.codeBlueSession}
-        hospitalizations={snapshot.hospitalizations}
-      />
+      <CodeBlueOverlay session={snapshot.codeBlueSession} />
     );
   }
 
@@ -670,18 +643,13 @@ export default function WardDisplayPage() {
   return (
     <div className="min-h-screen bg-[#0d1117] text-gray-200 flex flex-col" dir="rtl">
       <AwarenessBar snapshot={snapshot} />
-      <div className="flex flex-col sm:flex-row flex-1 min-h-0">
-        {paneVisibility.showPatientGrid && (
-          <div className="flex-1 min-w-0 overflow-auto">
-            <PatientGrid hospitalizations={snapshot.hospitalizations} />
+      <div className="flex flex-col flex-1 min-h-0">
+        <EquipmentPane equipment={snapshot.equipment} />
+        {paneVisibility.showUpcomingTasks && (
+          <div className="shrink-0 border-t border-[#1f2937] max-h-[28vh] overflow-auto">
+            <UpcomingTasksPane tasks={snapshot.upcomingTasks} currentTime={snapshot.currentTime} />
           </div>
         )}
-        <div className="w-full sm:w-[420px] shrink-0 border-t sm:border-t-0 sm:border-r border-[#1f2937] flex flex-col overflow-auto">
-          <EquipmentPane equipment={snapshot.equipment} />
-          {paneVisibility.showUpcomingTasks && (
-            <UpcomingTasksPane tasks={snapshot.upcomingTasks} currentTime={snapshot.currentTime} />
-          )}
-        </div>
       </div>
     </div>
   );

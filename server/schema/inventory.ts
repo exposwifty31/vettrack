@@ -4,9 +4,7 @@ import {
   numeric, index, uniqueIndex, check, pgEnum,
 } from "drizzle-orm/pg-core";
 import { vtTable } from "./helpers.js";
-import { clinics, users, animals } from "./core.js";
-import { billingLedger, billingItems } from "./billing.js";
-import { drugFormulary } from "./medication.js";
+import { clinics, users } from "./core.js";
 import { rooms } from "./equipment.js";
 
 export const inventoryLogTypeEnum = pgEnum("vt_inventory_log_type", ["restock", "blind_audit", "adjustment"]);
@@ -20,7 +18,6 @@ export const containers = vtTable("vt_containers", {
   targetQuantity: integer("target_quantity").notNull().default(0),
   currentQuantity: integer("current_quantity").notNull().default(0),
   roomId: text("room_id").references(() => rooms.id, { onDelete: "set null" }),
-  billingItemId: text("billing_item_id").references(() => billingItems.id, { onDelete: "set null" }),
   nfcTagId: text("nfc_tag_id").unique(),
 }, (table) => ({
   // On-hand stock can never be negative — DB-level safety net behind the
@@ -48,10 +45,6 @@ export const inventoryItems = vtTable(
     minimumDispenseToCapture: integer("minimum_dispense_to_capture").notNull().default(1),
     /** Soft-delete: inactive items cannot be used in new operations. */
     isActive: boolean("is_active").notNull().default(true),
-    /** For DRUG-type items: references the drug formulary entry (clinical source of truth). */
-    formularyId: text("formulary_id").references(() => drugFormulary.id, { onDelete: "restrict" }),
-    /** Formulary version captured at the time of item-formulary linkage. */
-    formularyVersion: integer("formulary_version"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     externalId: text("external_id"),
     externalSource: text("external_source"),
@@ -61,7 +54,6 @@ export const inventoryItems = vtTable(
     clinicCodeUnique: uniqueIndex("vt_items_clinic_code_unique").on(table.clinicId, table.code),
     clinicIdx: index("idx_items_clinic").on(table.clinicId),
     clinicActiveIdx: index("idx_items_clinic_active").on(table.clinicId, table.isActive),
-    formularyIdx: index("idx_items_formulary_id").on(table.formularyId),
   }),
 );
 
@@ -190,7 +182,6 @@ export const inventoryLogs = vtTable(
     quantityAfter: integer("quantity_after").notNull(),
     consumedDerived: integer("consumed_derived"),
     variance: integer("variance"),
-    animalId: text("animal_id").references(() => animals.id, { onDelete: "set null" }),
     roomId: text("room_id").references(() => rooms.id, { onDelete: "set null" }),
     note: text("note"),
     metadata: jsonb("metadata"),
@@ -198,10 +189,6 @@ export const inventoryLogs = vtTable(
     createdByUserId: text("created_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
-    /** Set when a consumable dispense produced a vt_billing_ledger row (revenue capture). */
-    billingEventId: text("billing_event_id").references(() => billingLedger.id, {
-      onDelete: "set null",
-    }),
   },
   (table) => ({
     taskClinicIdx: index("vt_inventory_logs_task_clinic_idx").on(table.taskId, table.clinicId),
@@ -215,7 +202,7 @@ export const inventoryLogs = vtTable(
 
 /**
  * First-class dispense event entity.
- * DRAFT → CONFIRMED (billing in TX) → COMPLETED (inventory async).
+ * DRAFT → CONFIRMED → COMPLETED (inventory async).
  * EMERGENCY_PENDING → CONFIRMED (after staff completion).
  */
 export const dispenseEvents = vtTable(
@@ -226,7 +213,6 @@ export const dispenseEvents = vtTable(
     containerId: text("container_id")
       .notNull()
       .references(() => containers.id, { onDelete: "restrict" }),
-    patientId: text("patient_id").references(() => animals.id, { onDelete: "set null" }),
     /** DRAFT | CONFIRMED | COMPLETED | EMERGENCY_PENDING */
     status: varchar("status", { length: 30 }).notNull().default("DRAFT"),
     /** PENDING | SUCCESS | FAILED — populated after confirmation */
@@ -244,8 +230,6 @@ export const dispenseEvents = vtTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
-    /** Linked billing ledger row created at confirmation. */
-    billingEventId: text("billing_event_id").references(() => billingLedger.id, { onDelete: "set null" }),
   },
   (table) => ({
     clinicStatusIdx: index("idx_vt_dispense_events_clinic_status").on(table.clinicId, table.status),
@@ -261,27 +245,6 @@ export const dispenseEvents = vtTable(
 
 export type DispenseEvent = typeof dispenseEvents.$inferSelect;
 export type NewDispenseEvent = typeof dispenseEvents.$inferInsert;
-
-export const inventoryJobs = vtTable(
-  "vt_inventory_jobs",
-  {
-    id: text("id").primaryKey(),
-    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
-    taskId: text("task_id").notNull(),
-    containerId: text("container_id").notNull(),
-    requiredVolumeMl: numeric("required_volume_ml").notNull(),
-    animalId: text("animal_id"),
-    status: text("status").notNull().default("pending"),
-    retryCount: integer("retry_count").notNull().default(0),
-    failureReason: text("failure_reason"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-    resolvedAt: timestamp("resolved_at"),
-  },
-  (table) => ({
-    taskUnique: uniqueIndex("vt_inventory_jobs_task_unique").on(table.taskId),
-  }),
-);
 
 export const purchaseOrders = vtTable(
   "vt_purchase_orders",

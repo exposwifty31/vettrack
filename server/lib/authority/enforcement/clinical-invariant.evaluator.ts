@@ -123,7 +123,6 @@ export async function evaluateClinicalInvariant(
   //    inventory / billing / outbox / event side effect in the tx).
   const { orphanLines } = await evaluateDispenseAgainstOrders(ctx.tx, {
     clinicId: ctx.clinicId,
-    animalId: ctx.animalId,
     containerId: ctx.containerId,
     lines: ctx.lines,
   });

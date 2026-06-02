@@ -3,7 +3,8 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useDirection } from "@/hooks/useDirection";
-import { isPilotMode } from "@/lib/pilot-mode";
+import { CANONICAL_HREFS } from "@/lib/routes/canonical-hrefs";
+import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
 
 export interface TopbarSection {
   href: string;
@@ -14,11 +15,9 @@ export interface TopbarSection {
 
 const SECTIONS: TopbarSection[] = [
   { href: "/home",         label: "Home" },
-  { href: "/patients",     label: "Patients",  pilotHidden: true },
   { href: "/equipment",    label: "Equipment" },
-  { href: "/meds",         label: "Pharmacy",  pilotHidden: true },
-  { href: "/appointments", label: "Shifts",    pilotHidden: true },
-  { href: "/display",      label: "Ward" },
+  { href: CANONICAL_HREFS.equipmentTasks, label: "Equipment Tasks", pilotHidden: true },
+  { href: CANONICAL_HREFS.equipmentBoard, label: "Equipment Command Board" },
   { href: "/admin",        label: "Admin", adminOnly: true },
 ];
 
@@ -28,15 +27,14 @@ export function Topbar() {
   const dir = useDirection();
 
   const visibleSections = SECTIONS.filter((s) =>
-    (!s.adminOnly || isAdmin) && (!isPilotMode || !s.pilotHidden)
+    ( !s.adminOnly || isAdmin)
   );
 
-  // Match the most specific prefix
   const activeHref =
     visibleSections
       .slice()
       .sort((a, b) => b.href.length - a.href.length)
-      .find((s) => location.startsWith(s.href))?.href ?? "";
+      .find((s) => resolveNavItemActive(location, s.href))?.href ?? "";
 
   return (
     <header

@@ -30,6 +30,7 @@ import {
 import { useLocation } from "wouter";
 import { getCurrentUserId } from "@/lib/auth-store";
 import { useAuth } from "@/hooks/use-auth";
+import { useNfcSupported } from "@/hooks/use-nfc-supported";
 import { haptics } from "@/lib/haptics";
 import { safeStorageGetItem, safeStorageRemoveItem, safeStorageSetItem } from "@/lib/safe-browser";
 
@@ -492,7 +493,7 @@ export default function InventoryPage() {
 
   // ── NFC ───────────────────────────────────────────────────────────────────
 
-  const nfcSupported = typeof window !== "undefined" && "NDEFReader" in window;
+  const { supported: nfcSupported } = useNfcSupported();
 
   const handleNFCTag = useCallback((tagId: string) => {
     // Container tag → switch tab + start session
@@ -576,16 +577,21 @@ export default function InventoryPage() {
     handleNFCTagRef.current = handleNFCTag;
   }, [handleNFCTag]);
 
+  const nfcSessionStopRef = useRef<(() => Promise<void>) | null>(null);
+
   const startNFCScan = async () => {
     if (!nfcSupported || nfcActiveRef.current) return;
     setIsNfcStarting(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ndef = new (window as any).NDEFReader();
-      await ndef.scan();
+      const { startNfcScanSession, resolveNfcTagId } = await import("@/lib/nfc-platform");
+      const session = await startNfcScanSession({
+        onRead: async (payload) => {
+          const tagId = resolveNfcTagId(payload);
+          if (tagId) handleNFCTagRef.current(tagId);
+        },
+      });
+      nfcSessionStopRef.current = session.stop;
       nfcActiveRef.current = true;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ndef.onreading = (event: any) => handleNFCTagRef.current(event.serialNumber as string);
       navigator.vibrate?.([20, 25, 20]);
       toast.success(p.nfcReady, { duration: 3200 });
     } catch {

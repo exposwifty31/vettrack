@@ -37,12 +37,7 @@ import { Input } from "@/components/ui/input";
 import { STATUS_LABELS } from "@/types";
 import type { EquipmentStatus, Equipment } from "@/types";
 import {
-  isRfidSubtitleFresh,
-  shouldShowRfidAttentionBadge,
-} from "@/lib/equipment-rfid-display";
-import {
   ArrowLeft,
-  QrCode,
   Scan,
   ClipboardEdit,
   Pencil,
@@ -51,7 +46,6 @@ import {
   AlertTriangle,
   Wrench,
   Droplets,
-  MessageCircle,
   Package,
   MapPin,
   Calendar,
@@ -68,6 +62,7 @@ import {
   CalendarX,
   CalendarClock,
   CalendarCheck,
+  MoreHorizontal,
 } from "lucide-react";
 import {
   cn,
@@ -86,7 +81,10 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePendingSyncForEquipment, useSyncQueue } from "@/hooks/use-sync";
 import { MoveRoomSheet } from "@/components/move-room-sheet";
 import { ReturnPlugDialog } from "@/components/return-plug-dialog";
-import { DeployabilityBadge } from "@/components/equipment/DeployabilityBadge";
+import { EquipmentTruthCard } from "@/components/equipment/EquipmentTruthCard";
+import { EquipmentDetailStatusStrip } from "@/components/equipment/EquipmentDetailStatusStrip";
+import { EquipmentDetailToolsSheet } from "@/components/equipment/EquipmentDetailToolsSheet";
+import { EquipmentDetailActivityTab } from "@/components/equipment/EquipmentDetailActivityTab";
 import { DockReturnFlow } from "@/components/equipment/DockReturnFlow";
 import { DockReturnNfc } from "@/components/dock-return-nfc";
 import {
@@ -104,11 +102,12 @@ import {
   shouldShowWaitlistJoinPanel,
 } from "@/lib/equipment-waitlist-ui";
 import { useSettings } from "@/hooks/use-settings";
+import { useNfcSupported } from "@/hooks/use-nfc-supported";
+import { writeNfcUrl } from "@/lib/nfc-platform";
 import { playCriticalAlertTone } from "@/lib/sounds";
 import { haptics } from "@/lib/haptics";
 import { safeStorageSetItem } from "@/lib/safe-browser";
 import { isOnline } from "@/lib/safe-browser";
-import { isPilotMode } from "@/lib/pilot-mode";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { isEquipmentRecoveryUiEnabled } from "@/lib/equipment-recovery-ui-flag";
 import { deriveEquipmentRecoverySnapshotFromSource } from "@/lib/equipment-recovery-adapter";
@@ -116,13 +115,6 @@ import {
   resolveEquipmentDetailRecoveryBadgeKey,
   resolveEquipmentDetailRecoveryCalloutKey,
 } from "@/lib/equipment-detail-recovery-labels";
-
-const STATUS_CONFIG = {
-  ok: { icon: CheckCircle2, color: "text-emerald-600", iconBg: "bg-emerald-50" },
-  issue: { icon: AlertTriangle, color: "text-red-500", iconBg: "bg-red-50" },
-  maintenance: { icon: Wrench, color: "text-amber-500", iconBg: "bg-amber-50" },
-  sterilized: { icon: Droplets, color: "text-teal-500", iconBg: "bg-teal-50" },
-};
 
 const UNDO_WINDOW_MS = 15_000;
 
@@ -157,6 +149,7 @@ export default function EquipmentDetailPage() {
   // Pattern from shift-chat-panel.tsx — effectiveRole may differ from role during shift
   const hasVetAccess = isAdmin || effectiveRole === "vet" || role === "vet";
   const { settings } = useSettings();
+  const { supported: nfcWriteSupported } = useNfcSupported();
   const { discard } = useSyncQueue();
   const { localState: equipmentLocalSyncState } = usePendingSyncForEquipment(id);
   const queryClient = useQueryClient();
@@ -185,6 +178,8 @@ export default function EquipmentDetailPage() {
   const [confirmingHere, setConfirmingHere] = useState(false);
   const [justConfirmed, setJustConfirmed] = useState(false);
   const [scanHistoryRange, setScanHistoryRange] = useState<"today" | "7d" | "all">("today");
+  const [detailTab, setDetailTab] = useState("details");
+  const [toolsSheetOpen, setToolsSheetOpen] = useState(false);
 
   const [moveRoomOpen, setMoveRoomOpen] = useState(false);
   const [reportIssueOpen, setReportIssueOpen] = useState(false);
@@ -378,7 +373,7 @@ export default function EquipmentDetailPage() {
   const { data: adminScanLogs, isLoading: adminLogsLoading } = useQuery({
     queryKey: [`/api/equipment/${id}/logs`, "admin", scanHistoryRange],
     queryFn: () => api.equipment.logsAdmin(id!, scanHistorySince),
-    enabled: isAdmin && isPilotMode && !!id && queryEnabled,
+    enabled: isAdmin && !!id && queryEnabled,
     staleTime: 30_000,
     retry: false,
     refetchOnWindowFocus: false,
@@ -387,7 +382,7 @@ export default function EquipmentDetailPage() {
   const { data: transfers, isLoading: transfersLoading } = useQuery({
     queryKey: [`/api/equipment/${id}/transfers`],
     queryFn: () => api.equipment.transfers(id!),
-    enabled: !!id && queryEnabled,
+    enabled: !!id && queryEnabled && detailTab === "activity",
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -408,7 +403,7 @@ export default function EquipmentDetailPage() {
 
   const hospitalizationsQ = useQuery({
     queryKey: ["/api/patients", "active"],
-    queryFn: () => api.patients.listActive(),
+    queryFn: async () => ({ patients: [] as Array<{ id: string; status: string; animal?: { name?: string } }> }),
     enabled: bindOpen,
   });
 
@@ -417,6 +412,7 @@ export default function EquipmentDetailPage() {
       api.operationalState.procedureBind(id!, { hospitalizationId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ["equipment-truth", id] });
       queryClient.invalidateQueries({ queryKey: ["deployability", id] });
       queryClient.invalidateQueries({ queryKey: ["staging-queue", id] });
       setBindOpen(false);
@@ -429,6 +425,7 @@ export default function EquipmentDetailPage() {
     mutationFn: () => api.operationalState.procedureUnbind(id!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ["equipment-truth", id] });
       queryClient.invalidateQueries({ queryKey: ["deployability", id] });
       queryClient.invalidateQueries({ queryKey: ["staging-queue", id] });
       setReleaseConfirmOpen(false);
@@ -450,6 +447,7 @@ export default function EquipmentDetailPage() {
       await api.equipment.scan(id, { status: "ok" });
       queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}/logs`] });
+      queryClient.invalidateQueries({ queryKey: ["equipment-truth", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       setJustConfirmed(true);
       setTimeout(() => setJustConfirmed(false), 1500);
@@ -515,6 +513,7 @@ export default function EquipmentDetailPage() {
 
       queryClient.setQueryData([`/api/equipment/${id}`], updated);
       queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}/logs`] });
+      queryClient.invalidateQueries({ queryKey: ["equipment-truth", id] });
       invalidateAll();
 
       if (prev && !isStudentEquipmentRole) {
@@ -806,15 +805,13 @@ export default function EquipmentDetailPage() {
   }
 
   async function writeEquipmentNfcTag(equipmentId: string) {
-    if (typeof window === "undefined" || !("NDEFReader" in window)) {
+    if (!nfcWriteSupported) {
       toast.error(t.equipmentNfc.writeUnsupported);
       return;
     }
     const url = `${window.location.origin}/equipment/${equipmentId}?nfcAction=toggle&source=nfc`;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ndef = new (window as any).NDEFReader();
-      await ndef.write({ records: [{ recordType: "url", data: url }] });
+      await writeNfcUrl(url);
       haptics.scanSuccess();
       toast.success(t.equipmentNfc.writeSuccess);
     } catch {
@@ -868,8 +865,6 @@ export default function EquipmentDetailPage() {
     return <Layout>{notFoundContent}</Layout>;
   }
 
-  const statusConf = STATUS_CONFIG[equipment.status as keyof typeof STATUS_CONFIG];
-  const StatusIcon = statusConf?.icon || Package;
   const overdue = isOverdue(equipment);
   const sterilizationDue = isSterilizationDue(equipment);
   const isCheckedOut = !!equipment.checkedOutById;
@@ -887,11 +882,6 @@ export default function EquipmentDetailPage() {
     equipment.custodyState != null &&
     equipment.readinessState != null &&
     equipment.usageState != null;
-  const fullDeployable =
-    equipment.custodyState === "docked" &&
-    equipment.readinessState === "ready" &&
-    equipment.usageState === "available";
-
   const recoverySnapshot = isEquipmentRecoveryUiEnabled
     ? deriveEquipmentRecoverySnapshotFromSource(equipment)
     : null;
@@ -901,6 +891,8 @@ export default function EquipmentDetailPage() {
   const recoveryCalloutKey = recoverySnapshot
     ? resolveEquipmentDetailRecoveryCalloutKey(recoverySnapshot)
     : null;
+  const showWriteNfc = isAdmin && nfcWriteSupported && !!id;
+  const showWhatsAppTools = !isStudentEquipmentRole;
 
   const pageContent = (
     <>
@@ -956,6 +948,15 @@ export default function EquipmentDetailPage() {
                 <Pencil className="w-4 h-4" aria-hidden />
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setToolsSheetOpen(true)}
+              aria-label={t.equipmentDetail.toolsSheetTitle}
+              data-testid="btn-equipment-tools"
+            >
+              <MoreHorizontal className="w-4 h-4" aria-hidden />
+            </Button>
             {isAdmin && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -1032,6 +1033,8 @@ export default function EquipmentDetailPage() {
           </div>
         )}
 
+        <EquipmentTruthCard equipmentId={equipment.id} equipmentName={equipment.name} />
+
         {/* Quick Action Bar — ICU-moment: 1–2 large, instantly tappable actions */}
         <div className="flex flex-col gap-2" data-testid="quick-action-bar">
           {showReservationBanner && waitlistQ.data?.reservationExpiresAt && (
@@ -1044,28 +1047,7 @@ export default function EquipmentDetailPage() {
             />
           )}
 
-          {/* Pilot mode: Confirm here replaces checkout/return */}
-          {isPilotMode ? (
-            <Button
-              className={cn(
-                "w-full h-12 gap-2 text-sm font-semibold rounded-2xl active:scale-[0.98] transition-all",
-                justConfirmed
-                  ? "bg-emerald-600 hover:bg-emerald-600 text-white border-emerald-600"
-                  : "border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/50",
-              )}
-              variant="outline"
-              onClick={handleConfirmHere}
-              disabled={confirmingHere}
-              data-testid="btn-confirm-here"
-            >
-              {confirmingHere ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <CheckCircle2 className="w-4 h-4" />
-              )}
-              {justConfirmed ? t.equipmentDetail.confirmedHere : t.equipmentDetail.confirmHere}
-            </Button>
-          ) : equipment.custodyState === "returned" && equipment.status === "ok" ? (
+          {equipment.custodyState === "returned" && equipment.status === "ok" ? (
             <Button
               variant="outline"
               className="w-full h-12 gap-2 text-sm font-semibold rounded-2xl active:scale-[0.98] transition-all text-blue-700 border-blue-200 hover:bg-blue-50"
@@ -1146,7 +1128,7 @@ export default function EquipmentDetailPage() {
           </div>
 
           {/* In-use context indicator — full-platform only */}
-          {!isPilotMode && isCheckedOut && (
+          {isCheckedOut && (
             <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border/60 bg-muted/50 text-sm">
               <User className="w-4 h-4 shrink-0" />
               <div className="min-w-0">
@@ -1174,146 +1156,20 @@ export default function EquipmentDetailPage() {
           )}
         </div>
 
-        {/* Status card */}
-        <Card className="bg-card border-border/60 shadow-sm">
-          <CardContent className="p-4">
-            {recoveryCalloutKey && (
-              <div
-                className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-sm text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-100"
-                data-testid="equipment-detail-recovery-callout"
-              >
-                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                <p>{t.equipmentDetail[recoveryCalloutKey]}</p>
-              </div>
-            )}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${statusConf?.iconBg || "bg-muted"}`}>
-                  <StatusIcon className={`w-5 h-5 ${statusConf?.color || ""}`} />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Current Status</p>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-lg font-bold">
-                      {STATUS_LABELS[equipment.status as keyof typeof STATUS_LABELS] || equipment.status}
-                    </p>
-                    {recoveryBadgeKey && (
-                      <Badge
-                        variant="outline"
-                        className="shrink-0 text-xs"
-                        data-testid="equipment-detail-recovery-badge"
-                      >
-                        {t.equipmentDetail[recoveryBadgeKey]}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Last scan: {formatRelativeTime(equipment.lastSeen?.toString())}
-                  </p>
-                  {isRfidSubtitleFresh(equipment.lastRfidSeenAt) && equipment.lastRfidRoomName && (
-                    <p className="text-xs text-muted-foreground mt-0.5" data-testid="equipment-detail-rfid-last-seen">
-                      {t.equipment.rfidLastSeen.line(
-                        equipment.lastRfidRoomName,
-                        formatRelativeTime(equipment.lastRfidSeenAt!),
-                      )}
-                    </p>
-                  )}
-                  {shouldShowRfidAttentionBadge(equipment) && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="mt-1 h-8 text-[11px] border-amber-300 text-amber-900 dark:text-amber-200"
-                      data-testid="equipment-detail-rfid-attention"
-                      onClick={() => setDockReturnNfcOpen(true)}
-                    >
-                      {t.dockReturn.confirmAtDockCta}
-                    </Button>
-                  )}
-                  {showOperationalState && (
-                    <div className="mt-1.5">
-                      <DeployabilityBadge
-                        custodyState={equipment.custodyState}
-                        readinessState={equipment.readinessState}
-                        usageState={equipment.usageState}
-                        fullDeployable={fullDeployable}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex flex-col gap-1.5 items-end shrink-0">
-                <Button variant="outline" size="sm" onClick={handlePrintQr} data-testid="btn-print-qr" className="h-11">
-                  <QrCode className="w-3.5 h-3.5 mr-1" />
-                  {t.equipmentDetail.printQrButton}
-                </Button>
-                {isAdmin && typeof window !== "undefined" && "NDEFReader" in window && id && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-11"
-                    data-testid="btn-write-nfc-tag"
-                    onClick={() => void writeEquipmentNfcTag(id)}
-                  >
-                    {t.equipmentNfc.writeTag}
-                  </Button>
-                )}
-                {!isStudentEquipmentRole && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const waUrl = buildWhatsAppUrl(
-                        undefined,
-                        equipment.name,
-                        equipment.status as EquipmentStatus,
-                        t.whatsAppMessage.statusReport(equipment.name),
-                        t.whatsAppMessage
-                      );
-                      window.open(waUrl, "_blank");
-                    }}
-                    className="h-11 text-green-700 border-green-200 hover:bg-green-50"
-                    data-testid="btn-whatsapp"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5 mr-1" />
-                    WhatsApp
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {undoCountdown > 0 && (
-              <div className="mt-3 pt-3 border-t border-border/40">
-                <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary/70 rounded-full transition-none"
-                    style={{ width: `${(undoCountdown / (UNDO_WINDOW_MS / 1000)) * 100}%`, transition: "width 1s linear" }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {(overdue || sterilizationDue) && (
-              <div className="mt-3 pt-3 border-t border-border/40 flex flex-col gap-1">
-                {overdue && (
-                  <div className="flex items-center gap-2 text-xs text-red-700 font-medium">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    Maintenance overdue!
-                  </div>
-                )}
-                {sterilizationDue && (
-                  <div className="flex items-center gap-2 text-xs text-amber-700 font-medium">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    Sterilization due (7+ days)
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <EquipmentDetailStatusStrip
+          equipment={equipment}
+          recoveryCalloutKey={recoveryCalloutKey}
+          recoveryBadgeKey={recoveryBadgeKey}
+          undoCountdown={undoCountdown}
+          undoWindowSec={Math.ceil(UNDO_WINDOW_MS / 1000)}
+          showOperationalState={showOperationalState}
+          overdue={overdue}
+          sterilizationDue={sterilizationDue}
+          onRfidAttention={() => setDockReturnNfcOpen(true)}
+        />
 
         {/* Pilot: scan count — no names, aggregate only */}
-        {isPilotMode && scanLogsPages && (
+        {scanLogsPages && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
             <span>{t.equipmentDetail.scanCount(scanLogsPages.pages[0]?.total ?? 0)}</span>
@@ -1398,21 +1254,20 @@ export default function EquipmentDetailPage() {
         )}
 
         {/* Info tabs */}
-        <Tabs defaultValue="details">
+        <Tabs value={detailTab} onValueChange={setDetailTab}>
           <TabsList className="w-full">
-            <TabsTrigger value="details" className="flex-1">Details</TabsTrigger>
-            <TabsTrigger value="history" className="flex-1">
-              History ({scanLogs?.length ?? 0})
+            <TabsTrigger value="details" className="flex-1">
+              {t.equipmentDetail.tabDetails}
             </TabsTrigger>
-            <TabsTrigger value="transfers" className="flex-1">
-              Transfers ({transfers?.length ?? 0})
+            <TabsTrigger value="activity" className="flex-1" data-testid="tab-activity">
+              {t.equipmentDetail.tabActivity}
             </TabsTrigger>
             {equipment?.custodyState != null && (
               <TabsTrigger value="readiness" className="flex-1" data-testid="tab-readiness">
                 {t.stagingQueue.readinessTab}
               </TabsTrigger>
             )}
-            {isAdmin && isPilotMode && (
+            {isAdmin && (
               <TabsTrigger value="scanlog" className="flex-1">
                 {t.equipmentDetail.scanLogTab}
               </TabsTrigger>
@@ -1487,137 +1342,27 @@ export default function EquipmentDetailPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="history">
-            <div className="flex flex-col gap-2">
-              {logsLoading ? (
-                <>
-                  <Skeleton className="h-20 w-full rounded-xl" />
-                  <Skeleton className="h-20 w-full rounded-xl" />
-                  <Skeleton className="h-20 w-full rounded-xl" />
-                </>
-              ) : !scanLogs || scanLogs.length === 0 ? (
-                <Card className="bg-card border-border/60 shadow-sm">
-                  <CardContent className="p-8 text-center">
-                    <p className="text-muted-foreground text-sm">No scan history yet</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <>
-                  {scanLogs.map((log) => (
-                    <Card key={log.id} className="bg-card border-border/60 shadow-sm">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <Badge variant={statusToBadgeVariant(log.status)}>
-                                {STATUS_LABELS[log.status as keyof typeof STATUS_LABELS] || log.status}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground truncate">
-                                {log.userEmail}
-                              </span>
-                            </div>
-                            {log.note && (
-                              <p className="text-xs text-muted-foreground mt-1">{log.note}</p>
-                            )}
-                            {log.photoUrl && (
-                              <img
-                                src={log.photoUrl}
-                                alt={t.equipmentDetail.issuePhoto}
-                                width={96}
-                                height={96}
-                                loading="lazy"
-                                decoding="async"
-                                className="mt-2 rounded-lg w-24 h-24 object-cover border"
-                                style={{ aspectRatio: "1 / 1" }}
-                              />
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground shrink-0">
-                            {formatRelativeTime(log.timestamp.toString())}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                  {hasOlderLogs && (
-                    <div className="flex justify-center pt-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-11 text-xs"
-                        onClick={() => fetchOlderLogs()}
-                        disabled={isFetchingOlderLogs}
-                        data-testid="btn-load-older-logs"
-                      >
-                        {isFetchingOlderLogs ? (
-                          <><Loader2 className="w-4 h-4 mr-1 animate-spin" />טוען...</>
-                        ) : (
-                          t.equipmentDetail.loadOlder
-                        )}
-                      </Button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="transfers">
-            <div className="flex flex-col gap-2">
-              {transfersLoading ? (
-                <>
-                  <Skeleton className="h-16 w-full rounded-xl" />
-                  <Skeleton className="h-16 w-full rounded-xl" />
-                  <Skeleton className="h-16 w-full rounded-xl" />
-                </>
-              ) : !transfers || transfers.length === 0 ? (
-                <Card className="bg-card border-border/60 shadow-sm">
-                  <CardContent className="p-8 text-center">
-                    <p className="text-muted-foreground text-sm">No transfers recorded</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                transfers.map((transfer) => (
-                  <Card key={transfer.id} className="bg-card border-border/60 shadow-sm">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" />
-                            <span className="text-sm font-medium truncate">
-                              {transfer.fromFolderName ?? "—"} → {transfer.toFolderName ?? "—"}
-                            </span>
-                          </div>
-                        </div>
-                        <p className="text-xs text-muted-foreground shrink-0">
-                          {formatRelativeTime(transfer.timestamp.toString())}
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </div>
+          <TabsContent value="activity">
+            <EquipmentDetailActivityTab
+              scanLogs={scanLogs}
+              transfers={transfers}
+              logsLoading={logsLoading}
+              transfersLoading={transfersLoading}
+              hasOlderLogs={!!hasOlderLogs}
+              isFetchingOlderLogs={isFetchingOlderLogs}
+              onLoadOlder={() => fetchOlderLogs()}
+            />
           </TabsContent>
 
           {equipment?.custodyState != null && (
             <TabsContent value="readiness" className="space-y-4 p-4">
-              {deployabilityQ.data && (
-                <div className="flex flex-col gap-1">
-                  <DeployabilityBadge
-                    custodyState={deployabilityQ.data.custodyState}
-                    readinessState={deployabilityQ.data.readinessState}
-                    usageState={deployabilityQ.data.usageState}
-                    fullDeployable={deployabilityQ.data.fullDeployable}
-                  />
-                  {!deployabilityQ.data.bundleGate.ok &&
-                    deployabilityQ.data.bundleGate.reason && (
-                    <p className="text-xs text-muted-foreground">
-                      {deployabilityQ.data.bundleGate.reason}
-                    </p>
-                  )}
-                </div>
-              )}
+              {deployabilityQ.data &&
+                !deployabilityQ.data.bundleGate.ok &&
+                deployabilityQ.data.bundleGate.reason && (
+                  <p className="text-xs text-muted-foreground">
+                    {deployabilityQ.data.bundleGate.reason}
+                  </p>
+                )}
 
               {userId && (
                 <StagingQueuePanel equipment={equipment} currentUserId={userId} />
@@ -1731,7 +1476,7 @@ export default function EquipmentDetailPage() {
             </TabsContent>
           )}
 
-          {isAdmin && isPilotMode && (
+          {isAdmin && (
             <TabsContent value="scanlog">
               <div className="flex flex-col gap-3">
                 <div className="flex gap-2">
@@ -2192,6 +1937,19 @@ export default function EquipmentDetailPage() {
             )}
           </div>
         </div>
+      )}
+
+      {equipment && id && (
+        <EquipmentDetailToolsSheet
+          equipment={equipment}
+          equipmentId={id}
+          open={toolsSheetOpen}
+          onOpenChange={setToolsSheetOpen}
+          onPrintQr={handlePrintQr}
+          onWriteNfc={showWriteNfc ? () => void writeEquipmentNfcTag(id) : undefined}
+          showWhatsApp={showWhatsAppTools}
+          showWriteNfc={showWriteNfc}
+        />
       )}
 
       {/* Move to Room bottom sheet */}

@@ -138,6 +138,22 @@ const translations = {
     recoveryAttentionSummary: d.equipmentList.recoveryAttentionSummary,
   },
 
+  equipmentTruth: {
+    ...d.equipmentTruth,
+    evidenceToggle: (count: number) => tr(d.equipmentTruth.evidenceToggle, { count }),
+    locationCheckedOut: (place: string) => tr(d.equipmentTruth.locationCheckedOut, { place }),
+    locationRfidRoom: (room: string) => tr(d.equipmentTruth.locationRfidRoom, { room }),
+    locationRoom: (room: string) => tr(d.equipmentTruth.locationRoom, { room }),
+    coverageNeverConfirmed: (count: number) =>
+      tr(d.equipmentTruth.coverageNeverConfirmed, { count }),
+    passiveRfidDetail: (label: string, observedAt: string) =>
+      tr(d.equipmentTruth.passiveRfidDetail, { label, observedAt }),
+    confirmInRoomDesc: (name: string) => tr(d.equipmentTruth.confirmInRoomDesc, { name }),
+    confirmInRoomDone: (roomName: string) => tr(d.equipmentTruth.confirmInRoomDone, { roomName }),
+    roomSweepDone: (roomName: string, count: number) =>
+      tr(d.equipmentTruth.roomSweepDone, { roomName, count }),
+  },
+
   shiftHandoverPage: {
     ...d.shiftHandoverPage,
     pendingEmergenciesAlert: (count: number) => tr(d.shiftHandoverPage.pendingEmergenciesAlert, { count }),
@@ -197,6 +213,17 @@ const translations = {
     scanLogWeek: d.equipmentDetail.scanLogWeek,
     scanLogAll: d.equipmentDetail.scanLogAll,
     scanLogEmpty: d.equipmentDetail.scanLogEmpty,
+    tabDetails: d.equipmentDetail.tabDetails,
+    tabActivity: d.equipmentDetail.tabActivity,
+    lastScanLabel: (time: string) => tr(d.equipmentDetail.lastScanLabel, { time }),
+    toolsSheetTitle: d.equipmentDetail.toolsSheetTitle,
+    activityEmpty: d.equipmentDetail.activityEmpty,
+    activityScan: d.equipmentDetail.activityScan,
+    activityTransfer: d.equipmentDetail.activityTransfer,
+    maintenanceOverdue: d.equipmentDetail.maintenanceOverdue,
+    sterilizationDue: d.equipmentDetail.sterilizationDue,
+    expiryExpired: d.equipmentDetail.expiryExpired,
+    expirySoon: d.equipmentDetail.expirySoon,
     recoveryBadgeStale: d.equipmentDetail.recoveryBadgeStale,
     recoveryBadgeVeryStale: d.equipmentDetail.recoveryBadgeVeryStale,
     recoveryBadgeCheckedOutLong: d.equipmentDetail.recoveryBadgeCheckedOutLong,
@@ -331,18 +358,16 @@ const translations = {
   codeBlue: {
     ...d.codeBlue,
     selectedManager: (name: string) => tr(d.codeBlue.selectedManager, { name }),
-    stopCprLocked: (countdown: string) => tr(d.codeBlue.stopCprLocked, { countdown }),
-    cprCycleLine: (n: number, time: string) => tr(d.codeBlue.cprCycleLine, { n, time }),
-    patientWeightSuffix: (weight: number | string) =>
-      tr(d.codeBlue.patientWeightSuffix, { weight: String(weight) }),
+    equipmentLogCount: (n: number) => tr(d.codeBlue.equipmentLogCount, { n }),
+    startingForEquipment: (name: string) => tr(d.codeBlue.startingForEquipment, { name }),
+    overlay: { ...d.codeBlue.overlay },
     preCheck: {
       ...d.codeBlue.preCheck,
       cartCheckedBy: (name: string) => tr(d.codeBlue.preCheck.cartCheckedBy, { name }),
     },
     display: {
       ...d.codeBlue.display,
-      cycle: (n: number) => tr(d.codeBlue.display.cycle, { n }),
-      nextCheck: (time: string) => tr(d.codeBlue.display.nextCheck, { time }),
+      equipmentCountLine: (n: number) => tr(d.codeBlue.display.equipmentCountLine, { n }),
     },
     history: {
       ...d.codeBlue.history,
