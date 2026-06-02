@@ -1,6 +1,6 @@
 import { t } from "@/lib/i18n";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Html5Qrcode, Html5QrcodeScannerState } from "html5-qrcode";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import {
   Tag,
 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
@@ -31,6 +32,12 @@ import type { Equipment } from "@/types";
 import { ReturnPlugDialog } from "@/components/return-plug-dialog";
 import { haptics } from "@/lib/haptics";
 import { isOnline } from "@/lib/safe-browser";
+import { FirstScanCelebration } from "@/components/first-scan-celebration";
+import {
+  hasCelebratedFirstScanToday,
+  markFirstScanCelebratedToday,
+} from "@/lib/first-scan-day";
+import type { HomeDashboardPulse } from "@/types/tasks";
 
 interface QrScannerProps {
   onClose: () => void;
@@ -47,6 +54,7 @@ type ScannerPhase =
   | "error"
   | "not_found"
   | "manual"
+  | "first_scan_celebration"
   | "result";
 
 const DEBOUNCE_MS = 300;
@@ -128,6 +136,15 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
   const initTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showFallbackHint, setShowFallbackHint] = useState(false);
   const [confirmFlash, setConfirmFlash] = useState(false);
+  const [scanCountPop, setScanCountPop] = useState(false);
+  const [pendingFirstScan, setPendingFirstScan] = useState(false);
+
+  const { data: pulse } = useQuery({
+    queryKey: ["/api/home/dashboard"],
+    queryFn: () => api.home.dashboard(),
+    enabled: !!userId,
+    staleTime: 30_000,
+  });
   const containerId = "qr-scanner-container";
 
   const navigateToEquipment = useCallback(
@@ -249,9 +266,25 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
       setConfirmFlash(true);
       setTimeout(() => setConfirmFlash(false), 260);
       setScannedEquipment(eq);
-      setPhase("result");
+
+      const firstToday = !hasCelebratedFirstScanToday(userId);
+      if (firstToday) {
+        markFirstScanCelebratedToday(userId);
+        setPendingFirstScan(true);
+        setPhase("first_scan_celebration");
+      } else {
+        setPhase("result");
+      }
+
+      queryClient.setQueryData<HomeDashboardPulse | undefined>(
+        ["/api/home/dashboard"],
+        (old) => (old ? { ...old, scansToday: old.scansToday + 1 } : old),
+      );
+      setScanCountPop(true);
+      setTimeout(() => setScanCountPop(false), 320);
+      void queryClient.invalidateQueries({ queryKey: ["/api/home/dashboard"] });
     },
-    [resolveEquipmentId, resolveAsContainer, onDispense, onClose]
+    [resolveEquipmentId, resolveAsContainer, onDispense, userId, queryClient]
   );
 
   const stopScanner = useCallback(async () => {
@@ -559,7 +592,13 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
 
       {/* Camera viewport — collapsed (not display:none) during manual/result so the
           container div keeps its DOM presence for html5-qrcode re-init */}
-      <div className={`relative flex items-center justify-center bg-black overflow-hidden ${phase === "manual" || phase === "result" ? "flex-none h-0" : "flex-1 min-h-0"}`}>
+      <div
+        className={`relative flex items-center justify-center bg-black overflow-hidden ${
+          phase === "manual" || phase === "result" || phase === "first_scan_celebration"
+            ? "flex-none h-0"
+            : "flex-1 min-h-0"
+        }`}
+      >
         <div id={containerId} className="w-full h-full" />
 
         {/* Loading */}
@@ -806,6 +845,14 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
         </div>
       )}
 
+      <FirstScanCelebration
+        open={phase === "first_scan_celebration" && pendingFirstScan}
+        onContinue={() => {
+          setPendingFirstScan(false);
+          setPhase("result");
+        }}
+      />
+
       {/* Inline quick-action sheet — shown after successful QR resolve */}
       {phase === "result" && scannedEquipment && (
         <div className="flex-1 bg-black/95 flex flex-col justify-end" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
@@ -814,7 +861,17 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
             data-testid="scan-inline-sheet"
           >
             <div className="w-10 h-1 bg-border rounded-full mx-auto mb-5" />
-            <div className="mb-4 rounded-2xl border border-emerald-200/70 bg-emerald-50 px-3 py-3 dark:border-emerald-800/60 dark:bg-emerald-950/35">
+            <div
+              className={cn(
+                "mb-3 flex items-center justify-between gap-2 rounded-xl border border-border/60 bg-muted/50 px-3 py-2 text-xs font-semibold tabular-nums text-muted-foreground",
+                scanCountPop && "motion-safe:[animation:scan-count-pop_320ms_ease-out]",
+              )}
+              data-testid="scan-daily-counter"
+            >
+              <span>{t.scanCelebration.scansToday}</span>
+              <span className="text-base text-foreground">{(pulse?.scansToday ?? 0)}</span>
+            </div>
+            <div className="mb-4 rounded-2xl border border-emerald-200/70 bg-emerald-50 px-3 py-3 dark:border-emerald-800/60 dark:bg-emerald-950/35 vt-action-green">
               <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-200">
                 <div className="relative">
                   <CheckCircle2 className="h-5 w-5" />

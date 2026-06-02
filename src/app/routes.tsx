@@ -10,6 +10,7 @@ import  PendingPage  from "@/pages/pending";
 
 // --- Always-available pages ---
 const HomePage = lazy(() => import("@/pages/home"));
+const ShiftRecapPage = lazy(() => import("@/pages/shift-recap"));
 const PilotHomePage = lazy(() => import("@/pages/pilot-home"));
 const LandingPage = lazy(() => import("@/pages/landing"));
 const SignUpPage = lazy(() => import("@/pages/signup"));
@@ -100,6 +101,11 @@ export function AppRoutes() {
         {/* /home — pilot mode shows equipment radar; full platform shows shift dashboard */}
         <Route path="/home">
           <AuthGuard>{isPilotMode ? <PilotHomePage /> : <HomePage />}</AuthGuard>
+        </Route>
+        <Route path="/recap">
+          <AuthGuard>
+            <ShiftRecapPage />
+          </AuthGuard>
         </Route>
 
         {/* Equipment — always available */}

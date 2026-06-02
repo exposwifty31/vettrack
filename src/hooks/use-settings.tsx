@@ -11,9 +11,12 @@ import { safeStorageGetItem, safeStorageSetItem } from "@/lib/safe-browser";
 export type Density = "compact" | "comfortable";
 export type TimeFormat = "12h" | "24h";
 export type DateFormat = "MM/DD/YYYY" | "DD/MM/YYYY" | "YYYY-MM-DD";
+/** Forest = brand green; Clinical = 60/30/10 blue brand + green action-only. */
+export type ColorTheme = "forest" | "clinical";
 
 export interface Settings {
   locale: Locale;
+  colorTheme: ColorTheme;
   darkMode: boolean;
   density: Density;
   soundEnabled: boolean;
@@ -31,6 +34,7 @@ const STORAGE_KEY = "vettrack-settings";
 
 const DEFAULT_SETTINGS: Settings = {
   locale: getStoredLocale(),
+  colorTheme: "forest",
   darkMode: false,
   density: "comfortable",
   soundEnabled: true,
@@ -54,6 +58,9 @@ function loadSettings(): Settings {
       delete parsed.language;
     }
     if (!isSupportedLocale(parsed.locale)) parsed.locale = getStoredLocale();
+    if (parsed.colorTheme !== "forest" && parsed.colorTheme !== "clinical") {
+      parsed.colorTheme = "forest";
+    }
     return { ...DEFAULT_SETTINGS, ...parsed };
   } catch {
     return DEFAULT_SETTINGS;
@@ -77,6 +84,7 @@ function applySettings(settings: Settings) {
     list?.remove("dark");
   }
   html.setAttribute("data-density", settings.density);
+  html.setAttribute("data-color-theme", settings.colorTheme);
   const locale = setStoredLocale(settings.locale);
   applyLocaleDocumentAttributes(locale);
   const brightness = Math.min(100, Math.max(30, settings.brightness ?? 100));

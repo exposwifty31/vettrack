@@ -23,7 +23,6 @@ import {
   ChevronRight,
   ClipboardCheck,
   Clock,
-  Flame,
   Plus,
   Scan,
   ShieldAlert,
@@ -33,83 +32,6 @@ import { cn } from "@/lib/utils";
 /** Deep forest used for accent bars, primary CTAs, and the solid quick action. */
 const FOREST = "#1a3d28";
 const FOREST_MID = "#2d6b45";
-
-interface RingDatum {
-  key: string;
-  label: string;
-  color: string;
-  n: number;
-  of: number;
-  pct: number;
-}
-
-/** Eased count-up. Jumps straight to the value when reduced motion is on. */
-function CountUp({ to, durationMs = 900, reduced }: { to: number; durationMs?: number; reduced: boolean }) {
-  const [n, setN] = useState(reduced ? to : 0);
-  useEffect(() => {
-    if (reduced) {
-      setN(to);
-      return;
-    }
-    let raf = 0;
-    let start = 0;
-    const tick = (ts: number) => {
-      if (!start) start = ts;
-      const p = Math.min(1, (ts - start) / durationMs);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setN(Math.round(to * eased));
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [to, durationMs, reduced]);
-  return <>{n}</>;
-}
-
-/** Three concentric shift-progress arcs that draw in on mount. */
-function ShiftRings({ rings, reduced }: { rings: RingDatum[]; reduced: boolean }) {
-  const [drawn, setDrawn] = useState(reduced);
-  useEffect(() => {
-    if (reduced) {
-      setDrawn(true);
-      return;
-    }
-    const raf = requestAnimationFrame(() => requestAnimationFrame(() => setDrawn(true)));
-    return () => cancelAnimationFrame(raf);
-  }, [reduced]);
-
-  const cx = 110;
-  const cy = 110;
-  const radii = [86, 68, 50];
-
-  return (
-    <svg viewBox="0 0 220 220" className="h-36 w-36 shrink-0 sm:h-40 sm:w-40" aria-hidden="true">
-      {rings.map((r, i) => {
-        const radius = radii[i] ?? 50;
-        const circ = 2 * Math.PI * radius;
-        const pct = drawn ? Math.max(0, Math.min(1, r.pct)) : 0;
-        return (
-          <g key={r.key}>
-            <circle cx={cx} cy={cy} r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={11} />
-            <circle
-              cx={cx}
-              cy={cy}
-              r={radius}
-              fill="none"
-              stroke={r.color}
-              strokeWidth={11}
-              strokeLinecap="round"
-              strokeDasharray={`${circ * pct} ${circ * (1 - pct)}`}
-              strokeDashoffset={circ * 0.25}
-              transform={`rotate(-90 ${cx} ${cy})`}
-              style={reduced ? undefined : { transition: "stroke-dasharray 1100ms cubic-bezier(0.34,1.56,0.64,1)" }}
-            />
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
 
 /** Localized "5h 12m" style duration. */
 function humanizeMinutes(min: number): string {
@@ -203,35 +125,13 @@ export default function HomePage() {
   const tasksTotal = tasksDone + tasksOpen;
   const scansDone = pulse?.scansToday ?? 0;
 
-  const rings: RingDatum[] = [
-    {
-      key: "tasks",
-      label: t.homePage.ringTasks,
-      color: "#6ba888",
-      n: tasksDone,
-      of: tasksTotal,
-      pct: tasksTotal > 0 ? tasksDone / tasksTotal : 0,
-    },
-    {
-      key: "scans",
-      label: t.homePage.ringScans,
-      color: "#9aa8a2",
-      n: scansDone,
-      of: totalCount,
-      pct: totalCount > 0 ? Math.min(1, scansDone / totalCount) : 0,
-    },
-    {
-      key: "patients",
-      label: t.homePage.ringPatients,
-      color: "#c2a981",
-      n: activePatientsCount,
-      of: activePatientsCount,
-      pct: activePatientsCount > 0 ? 1 : 0,
-    },
-  ];
-
   const heroPct = tasksTotal > 0 ? Math.round((tasksDone / tasksTotal) * 100) : null;
-  const streak = pulse?.streak ?? 0;
+  const taskProgress = tasksTotal > 0 ? tasksDone / tasksTotal : 0;
+
+  const microWins: string[] = [];
+  if (alertCount === 0 && totalCount > 0) microWins.push(t.homePage.winNoAlerts);
+  if (tasksOpen === 0 && tasksDone > 0) microWins.push(t.homePage.winTasksClear);
+  if (scansDone > 0) microWins.push(t.homePage.winScansToday(scansDone));
 
   const firstName = name?.split(" ")[0] || t.homePage.fallbackName;
   const dateChip = formatDateByLocale(new Date(), { weekday: "short", day: "numeric", month: "short" });
@@ -261,8 +161,7 @@ export default function HomePage() {
     : "";
 
   const activityItems = activityData?.items ?? [];
-  const freshEvent = activityItems[0] ?? null;
-  const todayItems = activityItems.slice(1, 6);
+  const todayItems = activityItems.slice(0, 6);
 
   const sectionFade = reduced ? "" : "motion-safe:animate-page-enter";
   const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
@@ -315,78 +214,43 @@ export default function HomePage() {
           />
         )}
 
-        {/* Hero — shift rings */}
+        {/* Glance — single progress line (read-only, top zone) */}
         <section
-          className="relative overflow-hidden rounded-3xl p-4 text-white sm:p-5"
-          style={{
-            background: "linear-gradient(160deg, #0f1f11 0%, #17291d 100%)",
-            boxShadow: "0 18px 36px -20px rgba(10,31,21,0.55), inset 0 1px 0 rgba(255,255,255,0.05)",
-          }}
+          className="rounded-2xl border border-ivory-border bg-ivory-surface px-3.5 py-3 shadow-sm"
+          aria-label={t.homePage.heroKicker}
         >
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/55">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-ivory-text3">
               {t.homePage.heroKicker}
             </span>
             {heroPct !== null && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold tabular-nums text-white/90">
-                <span className="h-1 w-1 rounded-full bg-[#6ba888]" aria-hidden />
+              <span className="text-[11px] font-semibold tabular-nums text-ivory-text2">
                 {t.homePage.progressComplete(heroPct)}
               </span>
             )}
           </div>
-
-          <div className="flex items-center gap-3">
-            <div className="-ms-2 shrink-0">
-              <ShiftRings rings={rings} reduced={reduced} />
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-3">
-              {rings.map((r, i) => (
-                <div key={r.key}>
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="inline-flex items-center gap-2 text-xs font-medium text-white/80">
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: r.color }} aria-hidden />
-                      {r.label}
-                    </span>
-                    <span className="text-[11px] tabular-nums text-white/55">
-                      <span className="font-semibold text-white">
-                        <CountUp to={r.n} durationMs={900 + i * 150} reduced={reduced} />
-                      </span>
-                      {r.of > 0 && <span> / {r.of}</span>}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-white/10">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${Math.max(0, Math.min(1, r.pct)) * 100}%`,
-                        background: r.color,
-                        transition: reduced ? undefined : "width 1100ms cubic-bezier(0.34,1.56,0.64,1)",
-                      }}
-                    />
-                  </div>
-                </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary motion-safe:transition-[width] motion-safe:duration-700"
+              style={{ width: `${Math.max(0, Math.min(1, taskProgress)) * 100}%` }}
+            />
+          </div>
+          <p className="mt-2 text-xs tabular-nums text-ivory-text3">
+            {t.homePage.glanceLine(tasksDone, tasksTotal, scansDone, activePatientsCount)}
+          </p>
+          {microWins.length > 0 && (
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {microWins.map((label) => (
+                <span
+                  key={label}
+                  className="inline-flex max-w-full items-center whitespace-nowrap rounded-full border border-emerald-200/80 bg-emerald-50 px-2.5 py-1 text-[10.5px] font-semibold text-emerald-800 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-200"
+                >
+                  {label}
+                </span>
               ))}
             </div>
-          </div>
+          )}
         </section>
-
-        {/* Streak — celebrated only when there is one */}
-        {streak > 0 && (
-          <div className="flex items-center gap-3 rounded-2xl border border-primary/15 bg-primary/5 p-3">
-            <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-lg font-bold tabular-nums text-primary-foreground">
-              {streak}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="inline-flex items-center gap-1 text-[10.5px] font-bold uppercase tracking-[0.14em] text-primary">
-                <Flame className="h-3 w-3" aria-hidden />
-                {t.homePage.streakLabel(streak)}
-              </p>
-              <p className="mt-0.5 text-[13px] font-semibold text-ivory-text">
-                {t.homePage.streakTitle}
-              </p>
-            </div>
-          </div>
-        )}
 
         {/* Next up — the thumb-zone hero */}
         <section className="relative overflow-hidden rounded-[20px] border border-ivory-border bg-ivory-surface p-4 shadow-card">
@@ -456,15 +320,13 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Quick actions — mobile relies on bottom-nav scan; desktop shows scan + alerts */}
-        <section>
-          {isDesktop && (
+        {/* Quick actions — desktop only; mobile uses bottom nav scan + menu */}
+        {isDesktop && (
+          <section>
             <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-ivory-text3">
               {t.homePage.orLabel}
             </p>
-          )}
-          <div className={cn("grid gap-2", isDesktop ? "grid-cols-2" : "grid-cols-1")}>
-            {isDesktop && (
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setScannerOpen(true)}
@@ -480,28 +342,28 @@ export default function HomePage() {
                   <Scan className="h-[17px] w-[17px]" aria-hidden />
                 </span>
               </button>
-            )}
 
-            <Link
-              href="/alerts"
-              data-testid="quick-action-alerts"
-              className="flex min-h-[76px] items-center justify-between gap-2.5 rounded-2xl border border-ivory-border bg-ivory-surface p-3.5 text-start shadow-sm transition-colors hover:border-primary/30 motion-safe:active:scale-[0.98]"
-            >
-              <span className="min-w-0">
-                <span className="block text-[13.5px] font-bold text-ivory-text">{t.homePage.triageAlerts}</span>
-                <span className="mt-0.5 block text-[11px] text-ivory-text3">
-                  {alertCount > 0 ? t.homePage.triageAlertsHint(alertCount) : t.homePage.triageAlertsClear}
-                </span>
-              </span>
-              <span
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted"
-                style={{ color: FOREST }}
+              <Link
+                href="/alerts"
+                data-testid="quick-action-alerts"
+                className="flex min-h-[76px] items-center justify-between gap-2.5 rounded-2xl border border-ivory-border bg-ivory-surface p-3.5 text-start shadow-sm transition-colors hover:border-primary/30 motion-safe:active:scale-[0.98]"
               >
-                <ShieldAlert className="h-[17px] w-[17px]" aria-hidden />
-              </span>
-            </Link>
-          </div>
-        </section>
+                <span className="min-w-0">
+                  <span className="block text-[13.5px] font-bold text-ivory-text">{t.homePage.triageAlerts}</span>
+                  <span className="mt-0.5 block text-[11px] text-ivory-text3">
+                    {alertCount > 0 ? t.homePage.triageAlertsHint(alertCount) : t.homePage.triageAlertsClear}
+                  </span>
+                </span>
+                <span
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted"
+                  style={{ color: FOREST }}
+                >
+                  <ShieldAlert className="h-[17px] w-[17px]" aria-hidden />
+                </span>
+              </Link>
+            </div>
+          </section>
+        )}
 
         {/* Get started — brand-new clinic with no equipment yet */}
         {!equipmentLoading && totalCount === 0 && (
@@ -521,28 +383,6 @@ export default function HomePage() {
               {t.home.addEquipment}
             </Link>
           </div>
-        )}
-
-        {/* Fresh event — the most recent thing that happened */}
-        {freshEvent && (
-          <Link
-            href={`/equipment/${freshEvent.equipmentId}`}
-            className="flex items-center gap-3 rounded-2xl border border-ivory-border bg-ivory-surface px-3.5 py-2.5 shadow-sm transition-colors hover:border-primary/30"
-          >
-            <span className="relative flex h-2.5 w-2.5 shrink-0">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-60 motion-safe:animate-ping" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary">
-                {t.homePage.latestLabel}
-              </p>
-              <p className="truncate text-[12.5px] text-ivory-text">{freshEvent.equipmentName}</p>
-            </div>
-            <span className="shrink-0 text-[10.5px] tabular-nums text-ivory-text3">
-              {formatRelativeTime(freshEvent.timestamp)}
-            </span>
-          </Link>
         )}
 
         {/* Today */}
@@ -570,15 +410,13 @@ export default function HomePage() {
               ))}
             </div>
           ) : (
-            !freshEvent && (
-              <div className="rounded-2xl border border-ivory-border bg-ivory-surface">
-                <EmptyState
-                  icon={Activity}
-                  message={t.homePage.activityFeedEmpty}
-                  subMessage={t.homePage.activityFeedEmptyHint}
-                />
-              </div>
-            )
+            <div className="rounded-2xl border border-ivory-border bg-ivory-surface">
+              <EmptyState
+                icon={Activity}
+                message={t.homePage.activityFeedEmpty}
+                subMessage={t.homePage.activityFeedEmptyHint}
+              />
+            </div>
           )}
         </section>
       </div>

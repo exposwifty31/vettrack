@@ -499,7 +499,22 @@ const translations = {
     etaMinutes: (count: number) => tr(d.homePage.etaMinutes, { count }),
     etaHours: (count: number) => tr(d.homePage.etaHours, { count }),
     triageAlertsHint: (count: number) => tr(d.homePage.triageAlertsHint, { count }),
+    glanceLine: (tasksDone: number, tasksTotal: number, scans: number, patients: number) =>
+      tr(d.homePage.glanceLine, { tasksDone, tasksTotal, scans, patients }),
+    winScansToday: (count: number) => tr(d.homePage.winScansToday, { count }),
   },
+
+  shiftRecap: {
+    ...d.shiftRecap,
+    cardGreeting: (name: string) => tr(d.shiftRecap.cardGreeting, { name }),
+    shareHeadline: (name: string, date: string) => tr(d.shiftRecap.shareHeadline, { name, date }),
+    shareProgress: (pct: number) => tr(d.shiftRecap.shareProgress, { pct }),
+    shareTasks: (done: number, total: number) => tr(d.shiftRecap.shareTasks, { done, total }),
+    shareScans: (count: number) => tr(d.shiftRecap.shareScans, { count }),
+    shareStreak: (count: number) => tr(d.shiftRecap.shareStreak, { count }),
+  },
+
+  scanCelebration: d.scanCelebration,
 
   landingPage: {
     ...d.landingPage,

@@ -621,6 +621,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
         (location.startsWith("/er") && !location.startsWith("/er/impact")),
       erImpact: location.startsWith("/er/impact"),
       equipment: location.startsWith("/equipment"),
+      recap: location.startsWith("/recap"),
       rooms: location.startsWith("/rooms"),
     }),
     [location],
@@ -634,7 +635,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
       return -1;
     }
     if (menuOpen) return 4;
-    if (bottomNavActive.rooms) return 3;
+    if (bottomNavActive.recap) return 3;
     if (bottomNavActive.equipment) return 1;
     if (bottomNavActive.home) return 0;
     return -1;
@@ -1420,7 +1421,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                       ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 hover:bg-emerald-600"
                       : navigationLocked
                         ? "bg-amber-500 text-white shadow-lg shadow-amber-500/35 hover:bg-amber-600"
-                        : "bg-ivory-green text-white shadow-lg shadow-ivory-green/30 hover:bg-ivory-greenMid",
+                        : "vt-scan-fab bg-ivory-green text-white shadow-lg shadow-ivory-green/30 hover:bg-ivory-greenMid",
                   )}
                   aria-label={scannerUIOpen ? lh.closeScannerAria : lh.bottomScan}
                   data-testid="bottom-nav-scan"
@@ -1453,24 +1454,24 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
               </div>
 
               <Link
-                href="/rooms"
+                href="/recap"
                 className="flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] transition-opacity duration-150 active:opacity-80 motion-reduce:active:opacity-100 rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface cursor-pointer"
-                data-testid="bottom-nav-rooms"
+                data-testid="bottom-nav-recap"
               >
-                <Map
+                <Sparkles
                   className={cn(
                     "w-6 h-6 transition-all duration-200",
-                    bottomNavActive.rooms ? "text-ivory-green scale-110" : "text-ivory-text3 scale-100",
+                    bottomNavActive.recap ? "text-ivory-green scale-110" : "text-ivory-text3 scale-100",
                   )}
                   aria-hidden
                 />
                 <span
                   className={cn(
                     "text-[10px] font-semibold leading-tight text-center max-w-[4.5rem] truncate px-0.5",
-                    bottomNavActive.rooms ? "text-ivory-green" : "text-ivory-text3",
+                    bottomNavActive.recap ? "text-ivory-green" : "text-ivory-text3",
                   )}
                 >
-                  {lh.bottomRooms}
+                  {lh.bottomRecap}
                 </span>
               </Link>
 
