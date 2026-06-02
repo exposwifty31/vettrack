@@ -220,13 +220,7 @@ export type AuditActionType =
   | "equipment_waitlist_expired"
   | "equipment_waitlist_fulfilled"
   | "equipment_rfid_observed_room_changed"
-  | "equipment_semi_dock_notified"
-  | "equipment_intelligence_analyze_requested"
-  | "equipment_intelligence_analyze_completed"
-  | "equipment_intelligence_shift_handover_requested"
-  | "equipment_intelligence_shift_handover_completed"
-  | "equipment_intelligence_recommendation_task_approved"
-  | "equipment_intelligence_task_created";
+  | "equipment_semi_dock_notified";
 
 export interface LogAuditParams {
   clinicId: string;

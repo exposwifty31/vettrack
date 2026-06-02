@@ -456,12 +456,6 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     { href: "/", label: lh.home, icon: <Home className="w-5 h-5" /> },
     { href: "/equipment", label: t.equipment.title, icon: <Package className="w-5 h-5" /> },
     {
-      href: "/equipment/intelligence",
-      label: t.equipmentIntelligence.navLabel,
-      icon: <Brain className="w-5 h-5" />,
-      menuOnly: true,
-    },
-    {
       href: "/alerts",
       label: t.layout.nav.alerts,
       icon: <AlertTriangle className="w-5 h-5" />,
