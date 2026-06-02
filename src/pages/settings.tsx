@@ -189,6 +189,18 @@ export default function SettingsPage() {
         <section className="space-y-2">
           <SettingsSectionHeader label={t.settingsPage.display} />
           <div className="space-y-2">
+            <SettingsSelect
+              icon={<Sun className="w-5 h-5" />}
+              label={t.settingsPage.colorTheme}
+              description={t.settingsPage.colorThemeDescription}
+              value={settings.colorTheme}
+              options={[
+                { value: "forest", label: t.settingsPage.colorThemeForest },
+                { value: "clinical", label: t.settingsPage.colorThemeClinical },
+              ]}
+              onValueChange={(v) => update({ colorTheme: v as "forest" | "clinical" })}
+              data-testid="settings-color-theme"
+            />
             <SettingsToggle
               icon={settings.darkMode ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
               label={t.settingsPage.darkMode}

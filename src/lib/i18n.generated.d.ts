@@ -767,6 +767,10 @@ export interface TStructure {
     title: string;
     subtitle: string;
     display: string;
+    colorTheme: string;
+    colorThemeDescription: string;
+    colorThemeForest: string;
+    colorThemeClinical: string;
     darkMode: string;
     darkModeDescription: string;
     displaySize: string;
@@ -977,6 +981,41 @@ export interface TStructure {
     triageAlertsClear: string;
     todayLabel: string;
     latestLabel: string;
+    glanceLine: string;
+    winNoAlerts: string;
+    winTasksClear: string;
+    winScansToday: string;
+  };
+  shiftRecap: {
+    pageTitle: string;
+    kicker: string;
+    title: string;
+    backHome: string;
+    cardLabel: string;
+    cardGreeting: string;
+    cardSubline: string;
+    statProgress: string;
+    statTasks: string;
+    statScans: string;
+    shareCta: string;
+    hint: string;
+    shareTitle: string;
+    shareHeadline: string;
+    shareProgress: string;
+    shareTasks: string;
+    shareScans: string;
+    shareStreak: string;
+    shareFooter: string;
+    copySuccess: string;
+    copyError: string;
+  };
+  scanCelebration: {
+    kicker: string;
+    title: string;
+    body: string;
+    continue: string;
+    scansToday: string;
+    scanSuccess: string;
   };
   landingPage: {
     seoTitle: string;
@@ -1453,6 +1492,7 @@ export interface TStructure {
     restockNavLockedToast: string;
     navLockActiveAria: string;
     bottomRooms: string;
+    bottomRecap: string;
     bottomMenu: string;
     radar: string;
     shiftHandover: string;
