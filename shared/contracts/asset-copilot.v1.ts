@@ -45,3 +45,11 @@ export interface CopilotAnswer {
   /** Flat deduplicated list for validator convenience. */
   citations: Citation[];
 }
+
+/** POST /api/equipment/:id/copilot/explain — resolver-grounded + optional Claude narrative. */
+export interface CopilotExplainResponse {
+  answer: CopilotAnswer;
+  narrative: string;
+  llmUsed: boolean;
+  validationFailed: boolean;
+}
