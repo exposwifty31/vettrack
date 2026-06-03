@@ -20,6 +20,10 @@ import type {
   SystemMetrics,
   SupportTicket,
   CreateSupportTicketRequest,
+  CursorBugFixerConfigResponse,
+  CursorBugFixerDispatchResponse,
+  CursorBugFixerAgentSummary,
+  CursorBugFixerRunSummary,
   Shift,
   UserRole,
   ShiftRole,
@@ -515,6 +519,23 @@ export const api = {
       request<SupportTicket>(
         `/api/support/${id}`,
         { method: "PATCH", body: JSON.stringify(data) }
+      ),
+  },
+  cursorBugFixer: {
+    getConfig: () =>
+      request<CursorBugFixerConfigResponse>("/api/admin/cursor-bug-fixer/config"),
+    dispatchFromTicket: (ticketId: string) =>
+      request<CursorBugFixerDispatchResponse & { supportTicketId?: string }>(
+        `/api/admin/cursor-bug-fixer/support-tickets/${ticketId}/dispatch`,
+        { method: "POST" },
+      ),
+    getAgent: (agentId: string) =>
+      request<CursorBugFixerAgentSummary>(
+        `/api/admin/cursor-bug-fixer/agents/${encodeURIComponent(agentId)}`,
+      ),
+    getRun: (agentId: string, runId: string) =>
+      request<CursorBugFixerRunSummary>(
+        `/api/admin/cursor-bug-fixer/agents/${encodeURIComponent(agentId)}/runs/${encodeURIComponent(runId)}`,
       ),
   },
   auditLogs: {

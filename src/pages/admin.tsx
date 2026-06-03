@@ -59,6 +59,7 @@ import {
   Settings,
   Mail,
   FlaskConical,
+  Sparkles,
   X,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -1396,6 +1397,31 @@ function SupportSection() {
     refetchOnWindowFocus: false,
   });
 
+  const { data: cursorBugFixerConfig } = useQuery({
+    queryKey: ["/api/admin/cursor-bug-fixer/config"],
+    queryFn: api.cursorBugFixer.getConfig,
+    enabled: !!userId,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const cursorBugFixerReady =
+    cursorBugFixerConfig?.enabled === true &&
+    cursorBugFixerConfig.apiKeyConfigured === true &&
+    cursorBugFixerConfig.repoUrlConfigured === true;
+
+  const dispatchCursorMut = useMutation({
+    mutationFn: (ticketId: string) => api.cursorBugFixer.dispatchFromTicket(ticketId),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/support"] });
+      toast.success(t.adminPage.cursorBugFixerDispatched);
+      if (result.agentUrl) {
+        window.open(result.agentUrl, "_blank", "noopener,noreferrer");
+      }
+    },
+    onError: () => toast.error(t.adminPage.cursorBugFixerFailed),
+  });
+
   const updateMut = useMutation({
     mutationFn: ({
       id,
@@ -1607,6 +1633,28 @@ function SupportSection() {
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Admin Actions
                 </p>
+                {cursorBugFixerReady && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full justify-start gap-2"
+                    data-testid="btn-dispatch-cursor-bug-fixer"
+                    disabled={
+                      dispatchCursorMut.isPending ||
+                      selectedTicket.status === "resolved"
+                    }
+                    onClick={() => dispatchCursorMut.mutate(selectedTicket.id)}
+                  >
+                    {dispatchCursorMut.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4" />
+                    )}
+                    {dispatchCursorMut.isPending
+                      ? t.adminPage.dispatchingCursorBugFixer
+                      : t.adminPage.dispatchCursorBugFixer}
+                  </Button>
+                )}
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="ticket-status" className="text-xs">
                     Status

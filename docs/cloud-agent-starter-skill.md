@@ -79,6 +79,7 @@ This codebase has few classic feature flags; use these practical toggles:
 - Omit `CLERK_SECRET_KEY` in `NODE_ENV=development`: enables dev auth bypass.
 - Stability dashboard "Testing Mode" (`/stability`) acts as a safe CRUD test toggle.
 - `x-dev-role-override` + `x-dev-user-id-override` headers: mock auth personas for backend tests.
+- **Cursor bug fixer:** `ENABLE_CURSOR_BUG_FIXER=true`, `CURSOR_API_KEY` (Cloud Agents → My Settings → API Keys), `CURSOR_BUG_FIXER_REPO_URL` (GitHub). Admin → Support → dispatch on a ticket.
 
 ---
 
