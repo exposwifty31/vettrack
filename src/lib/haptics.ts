@@ -1,40 +1,56 @@
 /**
- * Haptic feedback vocabulary for VetTrack.
- * Each pattern is a Vibration API sequence: [duration, pause, duration, ...]
- * All calls are no-ops on unsupported devices.
+ * Haptic feedback vocabulary — aligned with docs/design-handoff/.../MOTION_HAPTICS_SOUND.md.
+ * Always paired with visual feedback; gated by settings.hapticsEnabled.
  */
 import { triggerVibration } from "@/lib/safe-browser";
+import { safeStorageGetItem } from "@/lib/safe-browser";
+
+const SETTINGS_KEY = "vettrack-settings";
+
+function hapticsEnabled(): boolean {
+  try {
+    const raw = safeStorageGetItem(SETTINGS_KEY);
+    if (!raw) return true;
+    const parsed = JSON.parse(raw) as { hapticsEnabled?: boolean };
+    return parsed.hapticsEnabled !== false;
+  } catch {
+    return true;
+  }
+}
 
 function vibrate(pattern: VibratePattern) {
+  if (!hapticsEnabled()) return;
   triggerVibration(pattern, {
-    // Haptics should only respond to direct user intent.
     requireUserActivation: true,
     silent: true,
   });
 }
 
 export const haptics = {
-  /** Barely-there tap — confirms a UI press */
-  tap: () => vibrate([8]),
+  /** Routine confirm (checkout, toggle) */
+  tap: () => vibrate(10),
 
-  /** Double-pulse "confirmed" — successful QR/NFC scan */
-  scanSuccess: () => vibrate([40, 30, 80]),
+  /** Scan logged, task complete */
+  scanSuccess: () => vibrate([0, 30]),
 
-  /** Single light pulse — item added to restock */
-  itemAdded: () => vibrate([50]),
+  /** @deprecated use scanSuccess — kept for existing call sites */
+  itemAdded: () => vibrate([0, 30]),
 
-  /** Three quick taps — wrong action / warning */
-  warning: () => vibrate([60, 40, 60, 40, 60]),
+  /** Overdue / validation block */
+  warning: () => vibrate([0, 20, 40, 20]),
 
-  /** Single firm buzz — hard error */
-  error: () => vibrate([200]),
+  /** Hard error */
+  error: () => vibrate([0, 80]),
 
-  /** Ascending reward pattern — sync complete */
-  syncComplete: () => vibrate([30, 20, 30, 20, 80]),
+  /** First scan, streak, milestone */
+  celebrate: () => vibrate([0, 18, 40, 18, 40, 28]),
 
-  /** Assertive single buzz — navigation locked attempt */
-  locked: () => vibrate([150]),
+  /** Sync complete */
+  syncComplete: () => vibrate([0, 18, 40, 18, 40, 28]),
 
-  /** Decreasing pulses — alert resolved */
-  resolved: () => vibrate([80, 30, 50, 30, 20]),
+  /** Navigation locked */
+  locked: () => vibrate([0, 50]),
+
+  /** Alert resolved */
+  resolved: () => vibrate([0, 30, 50, 30]),
 };

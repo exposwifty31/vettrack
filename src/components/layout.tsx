@@ -1166,8 +1166,9 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
       </main>
 
       <nav
-        className="bottom-bar fixed bottom-0 left-0 right-0 z-50 border-t border-ivory-border bg-ivory-surface/98 backdrop-blur-md shadow-[0_-4px_24px_-8px_rgba(0,0,0,0.12)]"
+        className="bottom-bar fixed bottom-0 left-0 right-0 z-50 border-t border-ivory-border backdrop-blur-xl shadow-[0_-4px_24px_-8px_rgba(0,0,0,0.12)]"
         style={{
+          background: "var(--nav-bg)",
           paddingBottom: "env(safe-area-inset-bottom)",
           willChange: "transform",
           WebkitTransform: "translateZ(0)",
@@ -1179,7 +1180,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
           {activeTabIndex >= 0 && (
             <div
               aria-hidden
-              className="vt-bottom-nav-tab-pill absolute top-1 h-[3px] w-6 rounded-full bg-ivory-green pointer-events-none"
+              className="vt-bottom-nav-tab-pill absolute top-1 h-[3px] w-6 rounded-full bg-[var(--brand)] pointer-events-none"
               style={{
                 left: `calc(${activeTabIndex} * 20% + 10% - 12px)`,
               }}

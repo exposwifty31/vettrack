@@ -11,13 +11,14 @@ import { safeStorageGetItem, safeStorageSetItem } from "@/lib/safe-browser";
 export type Density = "compact" | "comfortable";
 export type TimeFormat = "12h" | "24h";
 export type DateFormat = "MM/DD/YYYY" | "DD/MM/YYYY" | "YYYY-MM-DD";
-/** Forest = brand green; Clinical = 60/30/10 blue brand + green action-only. */
-export type ColorTheme = "forest" | "clinical";
+/** Forest = brand green; Clinical = 60/30/10; Dark = clinical dark palette. */
+export type ColorTheme = "forest" | "clinical" | "dark";
 
 export interface Settings {
   locale: Locale;
   colorTheme: ColorTheme;
   darkMode: boolean;
+  hapticsEnabled: boolean;
   density: Density;
   soundEnabled: boolean;
   criticalAlertsSound: boolean;
@@ -34,8 +35,9 @@ const STORAGE_KEY = "vettrack-settings";
 
 const DEFAULT_SETTINGS: Settings = {
   locale: getStoredLocale(),
-  colorTheme: "forest",
+  colorTheme: "clinical",
   darkMode: false,
+  hapticsEnabled: true,
   density: "comfortable",
   soundEnabled: true,
   criticalAlertsSound: true,
@@ -58,8 +60,15 @@ function loadSettings(): Settings {
       delete parsed.language;
     }
     if (!isSupportedLocale(parsed.locale)) parsed.locale = getStoredLocale();
-    if (parsed.colorTheme !== "forest" && parsed.colorTheme !== "clinical") {
-      parsed.colorTheme = "forest";
+    if (
+      parsed.colorTheme !== "forest" &&
+      parsed.colorTheme !== "clinical" &&
+      parsed.colorTheme !== "dark"
+    ) {
+      parsed.colorTheme = "clinical";
+    }
+    if (typeof parsed.hapticsEnabled !== "boolean") {
+      parsed.hapticsEnabled = true;
     }
     return { ...DEFAULT_SETTINGS, ...parsed };
   } catch {
@@ -78,7 +87,8 @@ function applySettings(settings: Settings) {
   const html = document.documentElement;
   const list = html?.classList;
   if (!list) return;
-  if (settings.darkMode) {
+  const useDarkClass = settings.colorTheme === "dark" || settings.darkMode;
+  if (useDarkClass) {
     list?.add("dark");
   } else {
     list?.remove("dark");

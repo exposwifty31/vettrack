@@ -29,6 +29,8 @@ import type { Alert, AlertType, AlertAcknowledgment } from "@/types";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { haptics } from "@/lib/haptics";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { AlertsProView } from "@/components/alerts/AlertsProView";
 
 function formatRelativeTime(date: Date): string {
   const diffMs = Date.now() - date.getTime();
@@ -150,7 +152,7 @@ export default function AlertsPage() {
 
   const priorityOrder: AlertType[] = ["issue", "overdue", "sterilization_due", "inactive"];
 
-  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
+  const isDesktop = useIsDesktop();
   const pageContent = (
     <>
       <Helmet>
@@ -220,6 +222,17 @@ export default function AlertsPage() {
                 </Button>
               </Link>
             }
+          />
+        ) : !isDesktop ? (
+          <AlertsProView
+            alerts={alerts}
+            acksMap={acksMap}
+            equipmentLocationMap={equipmentLocationMap}
+            hasAckError={hasAckError}
+            onNavigate={(id) => navigate(`/equipment/${id}`)}
+            onAck={(equipmentId, alertType) => ackMut.mutate({ equipmentId, alertType })}
+            onUnAck={(equipmentId, alertType) => unAckMut.mutate({ equipmentId, alertType })}
+            formatRelativeTime={formatRelativeTime}
           />
         ) : (
           priorityOrder

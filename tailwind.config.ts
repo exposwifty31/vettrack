@@ -88,6 +88,11 @@ export default {
           "sans-serif",
         ],
         mono: ["IBM Plex Mono", "ui-monospace", "monospace"],
+        num: ["DM Mono", "IBM Plex Mono", "ui-monospace", "monospace"],
+      },
+      transitionTimingFunction: {
+        enter: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        reward: "cubic-bezier(0.34, 1.56, 0.64, 1)",
       },
       keyframes: {
         "accordion-down": {
@@ -107,6 +112,10 @@ export default {
           from: { opacity: "0", transform: "translateY(4px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        "pro-rise": {
+          from: { opacity: "0", transform: "translateY(10px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
         "slide-in": {
           from: { transform: "translateX(-100%)" },
           to: { transform: "translateX(0)" },
@@ -117,6 +126,7 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
         "fade-in": "fade-in 0.3s ease-out",
         "page-enter": "page-enter 0.22s ease-out both",
+        "pro-rise": "pro-rise 620ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
         "slide-in": "slide-in 0.3s ease-out",
       },
     },

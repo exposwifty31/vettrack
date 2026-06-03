@@ -28,10 +28,11 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-/** Deep forest used for accent bars, primary CTAs, and the solid quick action. */
-const FOREST = "#1a3d28";
-const FOREST_MID = "#2d6b45";
+import { useEnterOnce } from "@/hooks/use-enter-once";
+import {
+  ShiftProgressHero,
+  shiftProgressStatsFromHome,
+} from "@/components/home/ShiftProgressHero";
 
 /** Localized "5h 12m" style duration. */
 function humanizeMinutes(min: number): string {
@@ -58,11 +59,8 @@ export default function HomePage() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [shiftSummaryOpen, setShiftSummaryOpen] = useState(false);
   const searchStr = useSearch();
-  const [reduced] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true,
-  );
+  const enterOnce = useEnterOnce("home");
+  const rise = enterOnce ? "vt-pro-rise" : "";
 
   useRealtimeReconciliation({ queryClient });
 
@@ -155,8 +153,8 @@ export default function HomePage() {
   const activityItems = activityData?.items ?? [];
   const todayItems = activityItems.slice(0, 6);
 
-  const sectionFade = reduced ? "" : "motion-safe:animate-page-enter";
   const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
+  const heroPctDisplay = heroPct ?? 0;
 
   const pageContent = (
     <>
@@ -170,10 +168,10 @@ export default function HomePage() {
       </Helmet>
 
       <div
-        className={`relative mx-auto flex w-full max-w-[680px] flex-col gap-3.5 px-3 pb-nav-safe pt-2 sm:px-5 ${sectionFade}`}
+        className="vt-enter-stagger relative mx-auto flex w-full max-w-[680px] flex-col gap-3.5 px-3 pb-nav-safe pt-2 sm:px-5"
       >
         {/* Greeting — glance only */}
-        <header className="flex items-start justify-between gap-3 pt-3">
+        <header className={cn("flex items-start justify-between gap-3 pt-3", rise)}>
           <div className="min-w-0 flex-1 space-y-1">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-foreground/5 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-ivory-text2">
               <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
@@ -206,54 +204,42 @@ export default function HomePage() {
           />
         )}
 
-        {/* Glance — single progress line (read-only, top zone) */}
-        <section
-          className="rounded-2xl border border-ivory-border bg-ivory-surface px-3.5 py-3 shadow-sm"
-          aria-label={t.homePage.heroKicker}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-ivory-text3">
-              {t.homePage.heroKicker}
-            </span>
-            {heroPct !== null && (
-              <span className="text-[11px] font-semibold tabular-nums text-ivory-text2">
-                {t.homePage.progressComplete(heroPct)}
-              </span>
-            )}
-          </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary motion-safe:transition-[width] motion-safe:duration-700"
-              style={{ width: `${Math.max(0, Math.min(1, taskProgress)) * 100}%` }}
-            />
-          </div>
-          <p className="mt-2 text-xs tabular-nums text-ivory-text3">
-            {t.homePage.glanceLine(tasksDone, tasksTotal, scansDone, activePatientsCount)}
-          </p>
+        {/* V4 Pro — shift progress hero */}
+        <div className={rise}>
+          <ShiftProgressHero
+            progressPct={heroPctDisplay}
+            progressLabel={t.homePage.progressLabel}
+            stats={shiftProgressStatsFromHome({
+              tasksDone,
+              tasksTotal,
+              scansDone,
+              activePatients: activePatientsCount,
+            })}
+            animateRing={enterOnce}
+          />
           {microWins.length > 0 && (
-            <div className="mt-2.5 flex flex-wrap gap-1.5">
+            <div className="mt-2 flex flex-wrap gap-1.5">
               {microWins.map((label) => (
                 <span
                   key={label}
-                  className="inline-flex max-w-full items-center whitespace-nowrap rounded-full border border-emerald-200/80 bg-emerald-50 px-2.5 py-1 text-[10.5px] font-semibold text-emerald-800 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-200"
+                  className="inline-flex max-w-full items-center whitespace-nowrap rounded-full border border-[var(--action-border)] bg-[var(--action-soft)] px-2.5 py-1 text-[10.5px] font-semibold text-[var(--action-ink)]"
                 >
                   {label}
                 </span>
               ))}
             </div>
           )}
-        </section>
+        </div>
 
         {/* Next up — the thumb-zone hero */}
-        <section className="relative overflow-hidden rounded-[20px] border border-ivory-border bg-ivory-surface p-4 shadow-card">
+        <section className={cn("relative overflow-hidden rounded-[20px] border border-ivory-border bg-ivory-surface p-4 shadow-card", rise)}>
           <span
-            className="absolute inset-y-3.5 start-0 w-[3px] rounded-full"
-            style={{ background: `linear-gradient(180deg, ${FOREST}, ${FOREST_MID})` }}
+            className="absolute inset-y-3.5 start-0 w-[3px] rounded-full bg-gradient-to-b from-[var(--brand)] to-[var(--brand-deep)]"
             aria-hidden
           />
           <div className="ps-2.5">
             <div className="mb-1.5 flex items-center justify-between gap-2.5">
-              <span className="text-[10.5px] font-bold uppercase tracking-[0.16em]" style={{ color: FOREST }}>
+              <span className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-brand">
                 {t.homePage.nextUp}
               </span>
               {nextTask && (
@@ -284,10 +270,9 @@ export default function HomePage() {
                 <Link
                   href="/appointments"
                   data-testid="btn-next-up"
-                  className="flex h-[60px] w-full items-center justify-center gap-2.5 rounded-2xl text-[15px] font-bold text-white transition-transform motion-safe:active:scale-[0.98]"
+                  className="flex h-[60px] w-full items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-deep)] text-[15px] font-bold text-white shadow-lg transition-transform motion-safe:active:scale-[0.98]"
                   style={{
-                    background: `linear-gradient(135deg, ${FOREST} 0%, ${FOREST_MID} 100%)`,
-                    boxShadow: "0 10px 22px -10px rgba(26,61,40,0.55), inset 0 1px 0 rgba(255,255,255,0.08)",
+                    boxShadow: "0 10px 22px -10px color-mix(in srgb, var(--brand) 55%, transparent)",
                   }}
                 >
                   {t.homePage.nextUpStart}
@@ -323,8 +308,7 @@ export default function HomePage() {
                 type="button"
                 onClick={() => setScannerOpen(true)}
                 data-testid="quick-action-scan"
-                className="flex min-h-[76px] items-center justify-between gap-2.5 rounded-2xl p-3.5 text-start text-white transition-transform motion-safe:active:scale-[0.98]"
-                style={{ background: FOREST, boxShadow: "0 10px 22px -12px rgba(26,61,40,0.45)" }}
+                className="vt-action-green flex min-h-[76px] items-center justify-between gap-2.5 rounded-2xl p-3.5 text-start text-white transition-transform motion-safe:active:scale-[0.98]"
               >
                 <span className="min-w-0">
                   <span className="block text-[13.5px] font-bold">{t.homePage.scanEquipment}</span>
@@ -346,10 +330,7 @@ export default function HomePage() {
                     {alertCount > 0 ? t.homePage.triageAlertsHint(alertCount) : t.homePage.triageAlertsClear}
                   </span>
                 </span>
-                <span
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted"
-                  style={{ color: FOREST }}
-                >
+                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted text-brand">
                   <ShieldAlert className="h-[17px] w-[17px]" aria-hidden />
                 </span>
               </Link>
@@ -368,8 +349,7 @@ export default function HomePage() {
             <Link
               href="/equipment/new"
               data-testid="btn-get-started"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-bold text-white"
-              style={{ background: `linear-gradient(135deg, ${FOREST} 0%, ${FOREST_MID} 100%)` }}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-deep)] px-5 text-sm font-bold text-white"
             >
               <Plus className="h-4 w-4" aria-hidden />
               {t.home.addEquipment}
