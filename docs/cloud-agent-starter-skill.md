@@ -80,6 +80,7 @@ This codebase has few classic feature flags; use these practical toggles:
 - Stability dashboard "Testing Mode" (`/stability`) acts as a safe CRUD test toggle.
 - `x-dev-role-override` + `x-dev-user-id-override` headers: mock auth personas for backend tests.
 - **Asset Copilot + Claude:** set `ENABLE_ASSET_COPILOT=true`, add `ANTHROPIC_API_KEY`, then `ASSET_COPILOT_LLM_ENABLED=true` for Claude narration (template-only works without the key). Keys stay server-side only — never `VITE_*`.
+- **Cursor bug fixer:** `ENABLE_CURSOR_BUG_FIXER=true`, `CURSOR_API_KEY` (Cloud Agents → My Settings → API Keys), `CURSOR_BUG_FIXER_REPO_URL` (GitHub). Admin → Support → dispatch on a ticket.
 
 ---
 

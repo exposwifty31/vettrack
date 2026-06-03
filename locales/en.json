@@ -1570,7 +1570,12 @@
     "pilotModeForceOn": "Force on",
     "pilotModeForceOff": "Force off",
     "pilotModeReloadPrompt": "Reload now to apply?",
-    "pilotModeReload": "Reload"
+    "pilotModeReload": "Reload",
+    "dispatchCursorBugFixer": "Dispatch Cursor bug fixer",
+    "dispatchingCursorBugFixer": "Starting Cursor agent…",
+    "cursorBugFixerDispatched": "Cursor agent started — track progress in the new tab",
+    "cursorBugFixerFailed": "Could not start Cursor bug fixer",
+    "cursorBugFixerNotConfigured": "Cursor bug fixer is not fully configured on the server"
   },
   "layoutHebrew": {
     "home": "Home",

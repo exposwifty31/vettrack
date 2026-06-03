@@ -1570,7 +1570,12 @@
     "pilotModeForceOn": "אכוף מופעל",
     "pilotModeForceOff": "אכוף כבוי",
     "pilotModeReloadPrompt": "לרענן עכשיו כדי להחיל?",
-    "pilotModeReload": "רענן"
+    "pilotModeReload": "רענן",
+    "dispatchCursorBugFixer": "שלח לתיקון באג ב-Cursor",
+    "dispatchingCursorBugFixer": "מפעיל סוכן Cursor…",
+    "cursorBugFixerDispatched": "סוכן Cursor הופעל — עקבו בלשונית החדשה",
+    "cursorBugFixerFailed": "לא ניתן להפעיל את מתקן הבאגים של Cursor",
+    "cursorBugFixerNotConfigured": "מתקן הבאגים של Cursor לא מוגדר במלואו בשרת"
   },
   "layoutHebrew": {
     "home": "ראשי",

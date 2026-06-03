@@ -1574,6 +1574,11 @@ export interface TStructure {
     pilotModeForceOff: string;
     pilotModeReloadPrompt: string;
     pilotModeReload: string;
+    dispatchCursorBugFixer: string;
+    dispatchingCursorBugFixer: string;
+    cursorBugFixerDispatched: string;
+    cursorBugFixerFailed: string;
+    cursorBugFixerNotConfigured: string;
   };
   layoutHebrew: {
     home: string;

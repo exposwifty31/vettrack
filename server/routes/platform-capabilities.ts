@@ -12,6 +12,7 @@ router.get("/capabilities", requireAuth, (_req, res) => {
     broadInventory: process.env.ENABLE_BROAD_INVENTORY === "true",
     broadProcurement: process.env.ENABLE_BROAD_PROCUREMENT === "true",
     assetCopilot: process.env.ENABLE_ASSET_COPILOT === "true",
+    cursorBugFixer: process.env.ENABLE_CURSOR_BUG_FIXER === "true",
   });
 });
 

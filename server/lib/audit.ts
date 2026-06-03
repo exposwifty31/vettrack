@@ -112,6 +112,7 @@ export type AuditActionType =
   | "emergency_dispense_reconciled"
   | "support_ticket_created"
   | "support_ticket_updated"
+  | "cursor_bug_fixer_dispatched"
   | "er_intake_patient_accepted"
   | "er_intake_patient_accept_released"
   | "er_admission_state_entered"
