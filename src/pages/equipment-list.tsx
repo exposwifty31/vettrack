@@ -442,7 +442,7 @@ export default function EquipmentListPage() {
             <Button
               size="sm"
               variant="default"
-              className="h-11 text-xs"
+              className="hidden md:inline-flex h-11 text-xs"
               onClick={() => setIsScannerOpen(true)}
               data-testid="btn-scan-qr"
             >
@@ -912,20 +912,6 @@ export default function EquipmentListPage() {
 
       {isScannerOpen && (
         <QrScanner onClose={() => setIsScannerOpen(false)} />
-      )}
-
-      {!isScannerOpen && (
-        <Button
-          type="button"
-          size="lg"
-          className="fixed bottom-20 end-4 z-40 h-14 rounded-full shadow-lg px-5 gap-2 md:hidden"
-          onClick={() => setIsScannerOpen(true)}
-          data-testid="fab-scan-equipment"
-          aria-label={t.equipmentTruth.scanFabLabel}
-        >
-          <QrCode className="w-5 h-5" />
-          {t.equipmentTruth.scanFabLabel}
-        </Button>
       )}
 
       <EquipmentRoomSweepSheet open={roomSweepOpen} onOpenChange={setRoomSweepOpen} />

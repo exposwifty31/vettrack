@@ -17,6 +17,7 @@ import { safeClipboardWriteText } from "@/lib/safe-browser";
 import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { useEnterOnce } from "@/hooks/use-enter-once";
 import { cn } from "@/lib/utils";
+import { AssetCopilotPanel } from "@/components/equipment/AssetCopilotPanel";
 
 export default function ShiftRecapPage() {
   const { name } = useAuth();
@@ -173,7 +174,7 @@ export default function ShiftRecapPage() {
               </Button>
             </section>
 
-            <p className="text-center text-xs leading-relaxed text-ivory-text3">{t.shiftRecap.hint}</p>
+            <AssetCopilotPanel />
           </>
         )}
       </div>

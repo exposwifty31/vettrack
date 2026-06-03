@@ -1026,4 +1026,16 @@ export const api = {
       return request<OperationalMetricsSummary>(`/api/operational-metrics/summary${query}`);
     },
   },
+  platform: {
+    capabilities: () =>
+      request<{
+        clinicalApi: boolean;
+        dispenseApi: boolean;
+        shiftChatApi: boolean;
+        broadInventory: boolean;
+        broadProcurement: boolean;
+        assetCopilot: boolean;
+        cursorBugFixer: boolean;
+      }>("/api/platform/capabilities"),
+  },
 };

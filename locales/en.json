@@ -61,6 +61,12 @@
     "toast": {
       "equipmentNotFound": "Equipment not found — try again"
     },
+    "alertsDropdown": {
+      "toggleAria": "Alerts ({count})",
+      "activeCount": "{count} active",
+      "empty": "No active alerts right now.",
+      "seeAll": "See all alerts"
+    },
     "sync": {
       "pendingActions": "{count} actions pending sync — tap to sync",
       "failedActions": "{count} actions failed to sync",
@@ -1093,6 +1099,14 @@
     "winTasksClear": "Tasks clear",
     "winScansToday": "{count} scans today"
   },
+  "assetCopilot": {
+    "title": "Asset Copilot",
+    "description": "Evidence-based AI answers about equipment location, custody, and readiness — grounded in live clinic data.",
+    "equipmentIdPlaceholder": "Equipment ID or scan result",
+    "explainCta": "Explain",
+    "disabledHint": "Asset Copilot is not enabled for this clinic. Ask your admin to turn on ENABLE_ASSET_COPILOT.",
+    "error": "Could not load Copilot answer. Check the equipment ID and try again."
+  },
   "shiftRecap": {
     "pageTitle": "Shift recap — VetTrack",
     "kicker": "Reflect",
@@ -1105,7 +1119,6 @@
     "statTasks": "Tasks",
     "statScans": "Scans",
     "shareCta": "Share shift card",
-    "hint": "Streaks and celebrations live here — not on the work surface.",
     "shareTitle": "VetTrack shift recap",
     "shareHeadline": "{name} · {date}",
     "shareProgress": "Shift progress: {pct}%",

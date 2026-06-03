@@ -107,6 +107,12 @@ const translations = {
     nav: d.layout.nav,
     settings: d.layout.settings,
     toast: d.layout.toast,
+    alertsDropdown: {
+      toggleAria: (count: number) => tr(d.layout.alertsDropdown.toggleAria, { count }),
+      activeCount: (count: number) => tr(d.layout.alertsDropdown.activeCount, { count }),
+      empty: d.layout.alertsDropdown.empty,
+      seeAll: d.layout.alertsDropdown.seeAll,
+    },
     sync: {
       pendingActions: (count: number) => tr(d.layout.sync.pendingActions, { count }),
       failedActions: (count: number) => tr(d.layout.sync.failedActions, { count }),
@@ -533,6 +539,8 @@ const translations = {
       tr(d.homePage.glanceLine, { tasksDone, tasksTotal, scans, patients }),
     winScansToday: (count: number) => tr(d.homePage.winScansToday, { count }),
   },
+
+  assetCopilot: d.assetCopilot,
 
   shiftRecap: {
     ...d.shiftRecap,

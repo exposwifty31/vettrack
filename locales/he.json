@@ -61,6 +61,12 @@
     "toast": {
       "equipmentNotFound": "הציוד לא נמצא — נסה שוב"
     },
+    "alertsDropdown": {
+      "toggleAria": "התראות ({count})",
+      "activeCount": "{count} פעילות",
+      "empty": "אין התראות פעילות כרגע.",
+      "seeAll": "כל ההתראות"
+    },
     "sync": {
       "pendingActions": "{count} פעולות ממתינות לסנכרון — לחץ לסנכרון",
       "failedActions": "{count} פעולות נכשלו בסנכרון",
@@ -1093,6 +1099,14 @@
     "winTasksClear": "משימות סגורות",
     "winScansToday": "{count} סריקות היום"
   },
+  "assetCopilot": {
+    "title": "Asset Copilot",
+    "description": "תשובות AI מבוססות ראיות על מיקום, אחזקה ומוכנות ציוד — מנתוני המרפאה בזמן אמת.",
+    "equipmentIdPlaceholder": "מזהה ציוד או תוצאת סריקה",
+    "explainCta": "הסבר",
+    "disabledHint": "Asset Copilot לא מופעל במרפאה זו. בקש מהמנהל להפעיל ENABLE_ASSET_COPILOT.",
+    "error": "לא ניתן לטעון תשובת Copilot. בדוק את מזהה הציוד ונסה שוב."
+  },
   "shiftRecap": {
     "pageTitle": "סיכום משמרת — VetTrack",
     "kicker": "סיכום",
@@ -1105,7 +1119,6 @@
     "statTasks": "משימות",
     "statScans": "סריקות",
     "shareCta": "שיתוף כרטיס משמרת",
-    "hint": "רצפים וחגיגות נמצאים כאן — לא על מסך העבודה.",
     "shareTitle": "סיכום משמרת VetTrack",
     "shareHeadline": "{name} · {date}",
     "shareProgress": "התקדמות משמרת: {pct}%",
