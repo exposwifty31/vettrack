@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../colors_and_type.css" />
+<link rel="stylesheet" href="_shell.css" />
+<style>
+  .row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 0 14px;
+    height: 36px; border-radius: 999px; font: 600 12.5px/1 var(--font-sans);
+    border: 1px solid var(--ivory-border); background: var(--ivory-surface); color: var(--ivory-text-3);
+    cursor: pointer;
+  }
+  .chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .chip svg { width: 13px; height: 13px; }
+  .label { font: 500 10.5px/1 var(--font-mono); color: var(--ivory-text-3); margin: 14px 0 6px; }
+</style>
+</head>
+<body>
+  <div class="label">Status filter chips</div>
+  <div class="row">
+    <span class="chip active">All</span>
+    <span class="chip">Operational</span>
+    <span class="chip">Review needed</span>
+    <span class="chip">Maintenance</span>
+    <span class="chip">Sterilized</span>
+  </div>
+  <div class="label">Room chips · pinned to scroll horizontally</div>
+  <div class="row">
+    <span class="chip active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>All rooms</span>
+    <span class="chip">ICU 1</span>
+    <span class="chip">ICU 2</span>
+    <span class="chip">OR 3</span>
+    <span class="chip">Recovery</span>
+  </div>
+</body>
+</html>

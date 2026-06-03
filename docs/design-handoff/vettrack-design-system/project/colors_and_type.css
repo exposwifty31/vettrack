@@ -1,0 +1,327 @@
+/* ============================================================================
+   VetTrack — Colors & Type
+   Single source of truth for the design system. Lifted from src/index.css +
+   tailwind.config.ts of the VetTrack codebase (https://github.com/dboy3156/VetTrack).
+   ============================================================================ */
+
+/* ── Fonts ───────────────────────────────────────────────────────────────── */
+/* VetTrack uses webfonts loaded from Google Fonts. The full Hebrew stack
+   is required because the app ships with Hebrew as the default locale. */
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=DM+Mono:wght@400;500&family=Heebo:wght@400;500;600;700&family=Rubik:wght@400;500;600;700&display=swap");
+
+:root {
+  /* ── Font stacks ───────────────────────────────────────────────────────── */
+  --font-sans: "Plus Jakarta Sans", "Heebo", "Noto Sans Hebrew", "Rubik",
+    system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  /* Numeric / instrument font — IDs, times, counts, serials. DM Mono gives the
+     UI an "instrument panel" read that separates data from prose. */
+  --font-num: "DM Mono", "IBM Plex Mono", ui-monospace, monospace;
+
+  /* ── Brand palette (raw) ───────────────────────────────────────────────── */
+  /* The "navy" is actually a deep forest green — VetTrack's signature surface. */
+  --brand-navy:        #0f1f11; /* deep forest — header bar, PWA splash, theme-color */
+  --brand-green:       #1e4a25; /* primary green — buttons, focus, accents */
+  --brand-green-mid:   #1e7a32; /* mid green — emphasis, hover */
+  --brand-green-bright:#4cde6a; /* QR/scanline highlight (in favicon) */
+  --brand-green-bg:    #e6f2e7; /* tinted surface for active items */
+
+  /* ── Ivory neutrals (page chrome) ──────────────────────────────────────── */
+  --ivory-bg:        #f3f1eb; /* warm parchment page background */
+  --ivory-surface:   #ffffff; /* card / sheet surface */
+  --ivory-border:    #d4d0c8; /* subtle border */
+  --ivory-border-md: #b8b4aa; /* mid-weight border */
+  --ivory-text:      #111a12; /* primary text */
+  --ivory-text-2:    #354838; /* secondary text */
+  --ivory-text-3:    #7a8a7e; /* muted / label text */
+
+  /* ════════════════════════════════════════════════════════════════════════
+     CANONICAL APP THEME — Clinical (60 / 30 / 10)
+     The product UI (V4 "Pro") is built on a three-tier color contract:
+       60%  surface + background  (--background, --ivory-surface)
+       30%  --brand               (nav, headers, primary task CTA, progress)
+       10%  --action              (scan, confirm, completion — the "go" color)
+     Status colors are SEPARATE and never reassigned by a theme.
+     Swap the whole palette by setting  <html data-theme="clinical|forest|dark">.
+     The :root defaults below ARE the Clinical theme (the canonical direction).
+     ════════════════════════════════════════════════════════════════════════ */
+  --brand:         #2563eb; /* 30% — primary brand blue */
+  --brand-deep:    #1d4ed8; /* gradient end / pressed */
+  --brand-ink:     #1e3a8a; /* text on tint */
+  --brand-soft:    #eff4ff; /* tinted brand surface */
+  --brand-border:  #c7d8ee;
+  --brand-shadow:  rgba(37, 99, 235, 0.45);
+  --hero-a:        #0f1e3d; /* hero gradient (deep navy) */
+  --hero-b:        #1e3a8a;
+
+  --action:        #22c55e; /* 10% — scan / confirm / completion */
+  --action-deep:   #16a34a;
+  --action-ink:    #15803d; /* text on action tint */
+  --action-soft:   #ecfdf3; /* tinted action surface (win chips) */
+  --action-border: #bbf7d0;
+
+  --nav-bg:        hsl(210 40% 100% / 0.96); /* frosted bottom-nav */
+
+  /* ── Semantic foreground/background pairs (hsl, shadcn-style) ─────────── */
+  --background:           hsl(45 25% 94%);
+  --foreground:           hsl(127 21% 8%);
+  --card:                 hsl(0 0% 100%);
+  --card-foreground:      hsl(127 21% 8%);
+  --popover:              hsl(0 0% 100%);
+  --popover-foreground:   hsl(127 21% 8%);
+  --primary:              hsl(130 42% 20%);   /* same as --brand-green */
+  --primary-foreground:   hsl(0 0% 100%);
+  --secondary:            hsl(125 32% 93%);
+  --secondary-foreground: hsl(129 15% 25%);
+  --muted:                hsl(42 18% 91%);
+  --muted-foreground:     hsl(135 6% 51%);
+  --accent:               hsl(122 28% 90%);
+  --accent-foreground:    hsl(129 15% 25%);
+  --destructive:          hsl(0 72% 51%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border:               hsl(40 12% 81%);
+  --input:                hsl(40 12% 81%);
+  --ring:                 hsl(130 42% 20%);
+
+  /* ── Status semantics ──────────────────────────────────────────────────── */
+  --status-ok:           #16a34a;
+  --status-issue:        #dc2626;
+  --status-maintenance:  #d97706;
+  --status-sterilized:   #2563eb;
+  --status-info:         #2563eb;
+
+  /* Status pill (StatusBadge) — pale fills */
+  --status-ok-bg:         #f0faf2;
+  --status-ok-fg:         #166534;
+  --status-ok-border:     #a7f3bd;
+  --status-issue-bg:      #fff1f1;
+  --status-issue-fg:      #7f1d1d;
+  --status-issue-border:  #fca5a5;
+  --status-maint-bg:      #fffbeb;
+  --status-maint-fg:      #78350f;
+  --status-maint-border:  #fcd34d;
+  --status-steril-bg:     #eff6ff;
+  --status-steril-fg:     #1e40af;
+  --status-steril-border: #93c5fd;
+
+  /* Warning callouts (e.g. ER reconciliation triangle) */
+  --warning-bg:     #fef3c7;
+  --warning-border: #d97706;
+  --warning-text:   #92400e;
+
+  /* ── Radii ─────────────────────────────────────────────────────────────── */
+  --radius:    0.75rem;        /* 12px — base */
+  --radius-sm: 0.5rem;         /* 8px  */
+  --radius-md: 0.625rem;       /* 10px */
+  --radius-lg: 0.75rem;        /* 12px */
+  --radius-xl: 1rem;           /* 16px — cards */
+  --radius-2xl: 1.25rem;       /* 20px — feature cards */
+  --radius-pill: 9999px;       /* chips, badges */
+
+  /* ── Spacing scale (Tailwind defaults, listed here for reference) ──────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ── Shadows ───────────────────────────────────────────────────────────── */
+  --shadow-card:        0 1px 2px 0 rgb(15 23 42 / 0.05), 0 8px 24px -16px rgb(15 23 42 / 0.24);
+  --shadow-card-hover:  0 2px 4px 0 rgb(15 23 42 / 0.06), 0 14px 30px -14px rgb(15 23 42 / 0.28);
+  --shadow-surface:     0 0 0 1px rgb(148 163 184 / 0.08), 0 10px 30px -18px rgb(15 23 42 / 0.28);
+  --shadow-primary-cta: 0 10px 24px -12px rgb(15 31 17 / 0.45);
+
+  /* ── Type scale ────────────────────────────────────────────────────────── */
+  /* Display & headings — Plus Jakarta Sans, tight tracking */
+  --type-h1-size: clamp(1.875rem, 2.5vw + 1rem, 3.75rem); /* ~30 → 60px */
+  --type-h1-weight: 800;
+  --type-h1-leading: 1.05;
+  --type-h1-tracking: -0.025em;
+
+  --type-h2-size: 1.5rem;       /* 24px (md: 30px via class) */
+  --type-h2-weight: 700;
+  --type-h2-leading: 1.15;
+  --type-h2-tracking: -0.02em;
+
+  --type-h3-size: 1.125rem;     /* 18px */
+  --type-h3-weight: 600;
+  --type-h3-leading: 1.25;
+
+  --type-body-size: 1rem;
+  --type-body-weight: 400;
+  --type-body-leading: 1.6;
+
+  --type-small-size: 0.75rem;   /* 12px — `<small>` and meta */
+  --type-small-leading: 1.4;
+
+  --type-kicker-size: 0.75rem;
+  --type-kicker-weight: 600;
+  --type-kicker-tracking: 0.2em;
+  --type-kicker-transform: uppercase;
+}
+
+/* ── Dark theme (forest/navy, NOT cool blue-grey) ──────────────────────── */
+.dark {
+  --background:           hsl(128 35% 9%);
+  --foreground:           hsl(45 20% 92%);
+  --card:                 hsl(130 28% 12%);
+  --card-foreground:      hsl(45 18% 93%);
+  --popover:              hsl(130 28% 12%);
+  --popover-foreground:   hsl(45 18% 93%);
+  --primary:              hsl(125 38% 42%);
+  --primary-foreground:   hsl(0 0% 100%);
+  --secondary:            hsl(130 22% 18%);
+  --secondary-foreground: hsl(45 15% 88%);
+  --muted:                hsl(130 18% 16%);
+  --muted-foreground:     hsl(135 8% 62%);
+  --accent:               hsl(130 25% 20%);
+  --accent-foreground:    hsl(42 25% 90%);
+  --destructive:          hsl(0 65% 52%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border:               hsl(130 14% 22%);
+  --input:                hsl(130 14% 24%);
+  --ring:                 hsl(125 38% 45%);
+
+  --ivory-bg:        #0d1f0e;
+  --ivory-surface:   #111e12;
+  --ivory-border:    #2a352a;
+  --ivory-border-md: #374537;
+  --ivory-text:      #ece9e0;
+  --ivory-text-2:    #a8c4ad;
+  --ivory-text-3:    #628068;
+
+  --warning-bg:     hsl(32 45% 22%);
+  --warning-border: hsl(38 92% 50%);
+  --warning-text:   hsl(48 96% 88%);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   THEME PALETTES — set on <html data-theme="…">
+   Each block overrides the 60/30/10 contract + neutrals. Status colors and
+   type are inherited from :root and never change. Clinical is the canonical
+   default (already in :root); the block below restates it for explicitness.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* CLINICAL — canonical. Cool slate canvas, blue brand, green action. */
+[data-theme="clinical"] {
+  --background: #f8fafc; --ivory-bg: #f8fafc; --ivory-surface: #ffffff;
+  --ivory-border: #e5e7eb; --ivory-border-md: #cbd5e1;
+  --ivory-text: #0f172a; --ivory-text-2: #334155; --ivory-text-3: #64748b;
+  --brand: #2563eb; --brand-deep: #1d4ed8; --brand-ink: #1e3a8a;
+  --brand-soft: #eff4ff; --brand-border: #c7d8ee; --brand-shadow: rgba(37,99,235,0.45);
+  --hero-a: #0f1e3d; --hero-b: #1e3a8a;
+  --action: #22c55e; --action-deep: #16a34a; --action-ink: #15803d;
+  --action-soft: #ecfdf3; --action-border: #bbf7d0;
+  --nav-bg: hsl(210 40% 100% / 0.96);
+}
+
+/* FOREST — VetTrack's original brand. Warm parchment, forest brand, emerald action. */
+[data-theme="forest"] {
+  --background: #f3f1eb; --ivory-bg: #f3f1eb; --ivory-surface: #ffffff;
+  --ivory-border: #e2ded4; --ivory-border-md: #b8b4aa;
+  --ivory-text: #111a12; --ivory-text-2: #354838; --ivory-text-3: #7a8a7e;
+  --brand: #1a3d28; --brand-deep: #0f2a18; --brand-ink: #1a3d28;
+  --brand-soft: #ecf6ee; --brand-border: #c7e3cf; --brand-shadow: rgba(26,61,40,0.5);
+  --hero-a: #0a1f15; --hero-b: #18371f;
+  --action: #16a34a; --action-deep: #15803d; --action-ink: #1a6d38;
+  --action-soft: #ecf6ee; --action-border: #c7e3cf;
+  --nav-bg: hsl(0 0% 100% / 0.96);
+}
+
+/* DARK — clinical, dark-from-day-one. Deep navy canvas, bright blue brand, green action. */
+[data-theme="dark"] {
+  --background: #0b1220; --ivory-bg: #0b1220; --ivory-surface: #131c2e;
+  --ivory-border: #24314a; --ivory-border-md: #34456a;
+  --ivory-text: #e8edf6; --ivory-text-2: #aab6cc; --ivory-text-3: #6b7a96;
+  --brand: #3b82f6; --brand-deep: #2563eb; --brand-ink: #93c5fd;
+  --brand-soft: rgba(59,130,246,0.12); --brand-border: rgba(59,130,246,0.3); --brand-shadow: rgba(0,0,0,0.6);
+  --hero-a: #0a1326; --hero-b: #16264a;
+  --action: #22c55e; --action-deep: #16a34a; --action-ink: #4ade80;
+  --action-soft: rgba(34,197,94,0.12); --action-border: rgba(34,197,94,0.3);
+  --nav-bg: hsl(222 40% 12% / 0.96);
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/* Semantic element styles. Use these directly in markup; they ensure        */
+/* designs stay coherent with the codebase even without Tailwind.            */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-leading);
+  color: var(--foreground);
+  background: var(--background);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overflow-wrap: break-word;
+}
+
+h1 {
+  font-family: var(--font-sans);
+  font-size: var(--type-h1-size);
+  font-weight: var(--type-h1-weight);
+  line-height: var(--type-h1-leading);
+  letter-spacing: var(--type-h1-tracking);
+  color: var(--foreground);
+  text-wrap: balance;
+}
+
+h2 {
+  font-family: var(--font-sans);
+  font-size: var(--type-h2-size);
+  font-weight: var(--type-h2-weight);
+  line-height: var(--type-h2-leading);
+  letter-spacing: var(--type-h2-tracking);
+  color: var(--foreground);
+}
+@media (min-width: 768px) {
+  h2 { font-size: 1.875rem; } /* 30px */
+}
+
+h3 {
+  font-family: var(--font-sans);
+  font-size: var(--type-h3-size);
+  font-weight: var(--type-h3-weight);
+  line-height: var(--type-h3-leading);
+  color: var(--foreground);
+}
+
+p {
+  line-height: var(--type-body-leading);
+  text-wrap: pretty;
+}
+
+small {
+  font-size: var(--type-small-size);
+  color: var(--muted-foreground);
+}
+
+code, pre, kbd, samp {
+  font-family: var(--font-mono);
+  font-feature-settings: "ss01" 1, "zero" 1;
+}
+
+/* Eyebrow / kicker — used above section titles on marketing pages */
+.kicker {
+  display: inline-block;
+  font-size: var(--type-kicker-size);
+  font-weight: var(--type-kicker-weight);
+  letter-spacing: var(--type-kicker-tracking);
+  text-transform: var(--type-kicker-transform);
+  color: var(--primary);
+}
+
+/* Selection — soft primary tint */
+::selection {
+  background-color: hsl(130 42% 20% / 0.18);
+  color: var(--foreground);
+}
+
+/* RTL — VetTrack's default locale is Hebrew */
+[dir="rtl"] body { text-align: right; }
+[dir="rtl"] .rtl-mirror { transform: scaleX(-1); }

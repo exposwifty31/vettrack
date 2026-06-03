@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../colors_and_type.css" />
+<link rel="stylesheet" href="_shell.css" />
+<style>
+  .row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 8px; border-radius: 4px; border: 1px solid;
+    font: 600 11px/1.2 var(--font-sans);
+  }
+  .dot { width: 5px; height: 5px; border-radius: 999px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 10px; border-radius: 9999px; font: 600 11px/1.2 var(--font-sans);
+  }
+  .legend { font: 500 11px/1 var(--font-mono); color: var(--ivory-text-3); margin-top: 14px; }
+</style>
+</head>
+<body>
+  <div class="row">
+    <span class="pill" style="background:#f0faf2;color:#166534;border-color:#a7f3bd"><span class="dot" style="background:#16a34a"></span>Operational</span>
+    <span class="pill" style="background:#fffbeb;color:#78350f;border-color:#fcd34d"><span class="dot" style="background:#d97706"></span>Due Check</span>
+    <span class="pill" style="background:#fff1f1;color:#7f1d1d;border-color:#fca5a5"><span class="dot" style="background:#dc2626"></span>Review Needed</span>
+    <span class="pill" style="background:#eff6ff;color:#1e40af;border-color:#93c5fd"><span class="dot" style="background:#2563eb"></span>Sterilized</span>
+    <span class="pill" style="background:#fffbeb;color:#78350f;border-color:#fcd34d"><span class="dot" style="background:#d97706"></span>Maintenance</span>
+  </div>
+  <div class="legend">StatusBadge — 4px radius, dot + label, never abbreviated.</div>
+  <div class="row" style="margin-top:18px">
+    <span class="badge" style="background:hsl(130 42% 20%);color:#fff">3 alerts</span>
+    <span class="badge" style="background:#dc2626;color:#fff">2 overdue</span>
+    <span class="badge" style="background:hsl(125 32% 93%);color:hsl(129 15% 25%)">Today</span>
+    <span class="badge" style="background:hsl(130 42% 20% / 0.1);color:hsl(130 42% 20%);border:1px solid hsl(130 42% 20% / 0.3)">Sterilized · in cycle</span>
+  </div>
+  <div class="legend">Pill badge — full radius, for counts and contextual tags.</div>
+</body>
+</html>

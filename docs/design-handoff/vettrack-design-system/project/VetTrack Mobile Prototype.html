@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>VetTrack — Mobile prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+<link rel="stylesheet" href="colors_and_type.css" />
+<style>
+  html, body { margin: 0; padding: 0; background: linear-gradient(180deg, #0f1f11 0%, #1a2e1c 100%); min-height: 100vh; }
+  body { font-family: var(--font-sans); }
+  .stage { min-height: 100vh; padding: 40px 24px 80px; display: flex; flex-direction: column; align-items: center; gap: 24px; }
+  .heading { text-align: center; max-width: 480px; color: #ece9e0; }
+  .heading h1 { margin: 0; font: 800 24px/1.1 var(--font-sans); letter-spacing: -0.02em; }
+  .heading p { margin: 8px 0 0; font: 400 13px/1.5 var(--font-sans); color: rgba(236,233,224,0.7); }
+  .phone-shell {
+    position: relative; width: 392px; height: 820px; border-radius: 48px;
+    background: #050a06; padding: 14px; overflow: hidden;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05);
+  }
+  .phone-screen {
+    width: 100%; height: 100%; border-radius: 36px; overflow: hidden;
+    background: var(--background); position: relative;
+    display: flex; flex-direction: column;
+  }
+  .island {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    width: 110px; height: 32px; border-radius: 20px; background: #000; z-index: 100;
+  }
+  .status-bar {
+    height: 44px; padding: 14px 30px 0; display: flex; justify-content: space-between; align-items: center;
+    font: 600 13px/1 -apple-system, system-ui, sans-serif; color: var(--ivory-text);
+    flex-shrink: 0;
+  }
+  .status-bar .right { display: inline-flex; gap: 6px; align-items: center; }
+  .body { flex: 1; overflow: auto; }
+  .body::-webkit-scrollbar { width: 0; }
+  /* Compact density override */
+  [data-density="compact"] .body { font-size: 13px; }
+</style>
+</head>
+<body style="background-color: rgb(213, 209, 209); font-family: &quot;Abril Fatface&quot;">
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="ui_kits/_shared/Icons.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/MobileTopbar.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/BottomNav.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/Cards.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/EquipmentScreen.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/AlertsScreen.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/EquipmentScreenMagnetic.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/EquipmentScreenPro.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/EquipmentDetailScreen.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/ScanResultScreen.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/AlertsScreenPro.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/AlertsScreenMagnetic.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/ShiftRecapScreen.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/ScanOverlay.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/FirstScanCelebration.jsx"></script>
+  <script type="text/babel" src="variants/V1Refined.jsx"></script>
+  <script type="text/babel" src="variants/V2Operational.jsx"></script>
+  <script type="text/babel" src="variants/V3Calm.jsx"></script>
+  <script type="text/babel" src="variants/V4Magnetic.jsx"></script>
+  <script type="text/babel" src="variants/V4Pro.jsx"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+      "variant": "pro",
+      "locale": "he",
+      "theme": "clinical",
+      "density": "comfortable"
+    }/*EDITMODE-END*/;
+
+    // ── Theme token sets ──────────────────────────────────────────────────
+    // 60% bg/surface · 30% --brand (nav, headers, primary CTA, progress) · 10% --action (scan/confirm).
+    const THEMES = {
+      forest: {
+        "--background": "#f3f1eb", "--ivory-bg": "#f3f1eb", "--ivory-surface": "#ffffff",
+        "--ivory-border": "#e2ded4", "--ivory-text": "#111a12", "--ivory-text-2": "#354838", "--ivory-text-3": "#7a8a7e",
+        "--primary": "#1a3d28", "--ring": "#1a3d28",
+        "--brand": "#1a3d28", "--brand-deep": "#0f2a18", "--brand-shadow": "rgba(26,61,40,0.5)",
+        "--hero-a": "#0a1f15", "--hero-b": "#18371f",
+        "--action": "#16a34a", "--action-soft": "#ecf6ee", "--action-ink": "#1a6d38", "--action-border": "#c7e3cf",
+        "--nav-bg": "hsl(0 0% 100% / 0.96)",
+      },
+      clinical: {
+        "--background": "#f8fafc", "--ivory-bg": "#f8fafc", "--ivory-surface": "#ffffff",
+        "--ivory-border": "#e5e7eb", "--ivory-text": "#0f172a", "--ivory-text-2": "#334155", "--ivory-text-3": "#64748b",
+        "--primary": "#2563eb", "--ring": "#2563eb",
+        "--brand": "#2563eb", "--brand-deep": "#1d4ed8", "--brand-shadow": "rgba(37,99,235,0.45)",
+        "--hero-a": "#0f1e3d", "--hero-b": "#1e3a8a",
+        "--action": "#22c55e", "--action-soft": "#ecfdf3", "--action-ink": "#15803d", "--action-border": "#bbf7d0",
+        "--nav-bg": "hsl(210 40% 100% / 0.96)",
+      },
+      dark: {
+        "--background": "#0b1220", "--ivory-bg": "#0b1220", "--ivory-surface": "#131c2e",
+        "--ivory-border": "#24314a", "--ivory-text": "#e8edf6", "--ivory-text-2": "#aab6cc", "--ivory-text-3": "#6b7a96",
+        "--primary": "#3b82f6", "--ring": "#3b82f6",
+        "--brand": "#3b82f6", "--brand-deep": "#2563eb", "--brand-shadow": "rgba(0,0,0,0.6)",
+        "--hero-a": "#0a1326", "--hero-b": "#16264a",
+        "--action": "#22c55e", "--action-soft": "rgba(34,197,94,0.12)", "--action-ink": "#4ade80", "--action-border": "rgba(34,197,94,0.3)",
+        "--nav-bg": "hsl(222 40% 12% / 0.96)",
+      },
+    };
+
+    // Hebrew copy for each variant — used when locale is "he"
+    const HE_STRINGS_V1 = {
+      today: "ראשון · 4 במאי", greet: "בוקר טוב, מאיה",
+      sub: "טיפול נמרץ 1 · משמרת 2 מתוך 3 · עד 19:00",
+      focalLabel: "מטופלים פעילים", focalValue: "18", focalDelta: "‎+3 מ-07:00",
+      cta: "פתח סיכום משמרת",
+      strip: [
+        { label: "משימות", value: "12", sub: "4 באיחור" },
+        { label: "התראות", value: "3", sub: "דורש בדיקה" },
+        { label: "המשמרת", value: "₪4,820", sub: "23 נרשמו" },
+      ],
+      quickHead: "עכשיו",
+      quick: [
+        { icon: "scan", title: "סרוק ציוד", hint: "QR או NFC" },
+        { icon: "filePlus", title: "הוסף משימה", hint: "צור או שייך" },
+        { icon: "shieldAlert", title: "טפל בהתראות", hint: "3 דורשות בדיקה" },
+      ],
+      feedHead: "פעילות חיה", feedSub: "30 הדקות האחרונות",
+      feed: [
+        { name: "מוניטור uMEC10", who: "מאיה סרקה", time: "2ד'", tone: "ok", detail: "טיפול 1 · פעיל" },
+        { name: "דפיברילטור EQ-0492", who: "בדיקה אוטומטית", time: "11ד'", tone: "warn", detail: "עיקור עד 6ש'" },
+        { name: "משאבת מזרק SP-118", who: "דניאל החזיר", time: "23ד'", tone: "ok", detail: "מחובר · 30ד'" },
+        { name: "עגלת חירום C-2", who: "התראת מלאי", time: "48ד'", tone: "err", detail: "אדרנלין — 0" },
+      ],
+    };
+    const HE_STRINGS_V2 = {
+      shiftBar: { mode: "משמרת ICU", who: "מאיה · DVM", time: "07:00 → 19:00", remaining: "5ש' 12ד' נותרו" },
+      statusStrip: [
+        { label: "ICU 1", val: "8 פצ", tone: "ok" },
+        { label: "ICU 2", val: "6 פצ", tone: "ok" },
+        { label: "OR 3", val: "2 פצ", tone: "warn" },
+        { label: "ER", val: "2 פצ", tone: "err" },
+      ],
+      kpis: [
+        { label: "פצ", value: "18", delta: "+3", tone: "ok" },
+        { label: "משימות", value: "12", delta: "4↑", tone: "warn" },
+        { label: "התראות", value: "3", delta: "1↑", tone: "err" },
+        { label: "₪", value: "4,820", delta: "23×", tone: "ok" },
+        { label: "זמין", value: "92%", delta: "—", tone: "ok" },
+        { label: "אופ׳", value: "0", delta: "—", tone: "ok" },
+      ],
+      feedHead: "יומן אירועים",
+      cols: ["שעה", "פריט", "פעולה", "סטטוס"],
+      feed: [
+        { time: "16:42", item: "uMEC10", action: "סריקה / מאיה", s: "Operational" },
+        { time: "16:33", item: "EQ-0492", action: "אוטו׳", s: "Due Check" },
+        { time: "16:21", item: "SP-118", action: "החזרה / דניאל", s: "Operational" },
+        { time: "15:58", item: "Hamilton", action: "עיקור", s: "Sterilized" },
+        { time: "15:42", item: "Cart C-2", action: "מלאי", s: "Review Needed" },
+        { time: "15:11", item: "ARKRAY", action: "כיול", s: "Maintenance" },
+        { time: "14:52", item: "uMEC10·R2", action: "סריקה / דניאל", s: "Operational" },
+      ],
+    };
+    const HE_STRINGS_V3 = {
+      today: "ראשון · 4 במאי", greet: "מאיה",
+      sub: "משמרת ICU · 12:48",
+      cardKicker: "הבא במשמרת",
+      cardTitle: "עיקור עגלת חירום C-2",
+      cardBody: "חידוש אדרנלין + מחזור עיקור. עד 17:00.",
+      cardEta: "בעוד 12ד׳", cardCta: "התחל משימה",
+      secondaryHead: "היום",
+      secondary: [
+        { label: "מטופלים פעילים", value: "18", icon: "users" },
+        { label: "משימות לביצוע", value: "12", icon: "listTodo" },
+        { label: "התראות לבדיקה", value: "3", icon: "shieldAlert" },
+      ],
+      feedHead: "פעילות אחרונה",
+      feed: [
+        { name: "מוניטור uMEC10", action: "נסרק", time: "2ד׳" },
+        { name: "משאבת מזרק SP-118", action: "הוחזרה ע״י דניאל", time: "23ד׳" },
+        { name: "דפיברילטור EQ-0492", action: "סומנה לעיקור", time: "1ש׳" },
+      ],
+    };
+    const HE_STRINGS_V4 = {
+      hello: "היי מאיה,",
+      sub: "5ש' 12ד' נותרו במשמרת. את עליה.",
+      chipDate: "א׳ · 4 במאי · ICU",
+      heroKicker: "המשמרת שלך",
+      ringLabels: ["משימות", "סריקות", "מטופלים"],
+      rings: [
+        { label: "משימות",  pct: 8/12, n: 8, of: 12, color: "#4cde6a" },
+        { label: "סריקות",  pct: 0.78, n: 23, of: 30, color: "#86efac" },
+        { label: "מטופלים", pct: 18/18, n: 18, of: 18, color: "#fcd34d" },
+      ],
+      progress: "67% מהמשמרת",
+      streakKicker: "רצף",
+      streakTitle: "5 משמרות בלי בדיקה באיחור",
+      streakBody: "הצוות הקודם הגיע לזה פעם אחת. את שומרת על הסטנדרט.",
+      quickHead: "ניצחונות קטנים",
+      quick: [
+        { icon: "scan",        title: "סרוק משהו",   hint: "QR או NFC",     tint: "primary" },
+        { icon: "filePlus",    title: "הוסף משימה",  hint: "או שייך",       tint: "lemon" },
+        { icon: "shieldAlert", title: "טפל בהתראות", hint: "3 לבדיקה",      tint: "berry" },
+      ],
+      pulse: "הרגע",
+      pulseText: "סרקת את uMEC10. ICU 1 מסודר.",
+      feedHead: "היום",
+      feed: [
+        { name: "דניאל החזיר SP-118",         time: "23ד׳" },
+        { name: "עיקור EQ-0492 בתור",          time: "1ש׳" },
+        { name: "עגלת C-2 דורשת אדרנלין",      time: "1ש׳" },
+      ],
+      end: "נבנה למשמרות כמו שלך.",
+    };
+
+    const HE_STRINGS_V4_PRO = {
+      hello: "אחר הצהריים טובים, מאיה",
+      sub: "ICU · 5ש' 12ד' נותרו",
+      progressLabel: "התקדמות המשמרת",
+      progressPct: 0.67, progressNum: "67%",
+      stats: [
+        { label: "משימות", val: "8/12" },
+        { label: "סריקות", val: "23" },
+        { label: "בזמן", val: "98%" },
+      ],
+      wins: ["עגלת חירום מוכנה", "אין בדיקות באיחור"],
+      nextKicker: "הבא בתור", nextEta: "12 דק'",
+      nextTitle: "עיקור עגלת חירום C-2",
+      nextBody: "חידוש אדרנלין, ואז מחזור עיקור.",
+      nextCta: "התחל עכשיו", scanCta: "סרוק ציוד",
+      feedHead: "מוקדם היום",
+      feed: [
+        { name: "דניאל החזיר SP-118", room: "ICU 2", time: "23ד'" },
+        { name: "EQ-0492 בתור לעיקור", room: "OR 3", time: "1ש'" },
+        { name: "מוניטור ECG נסרק", room: "ICU 1", time: "2ש'" },
+      ],
+      feedView: "כל הפעילות",
+    };
+
+    // Map an equipment row → the detail screen's richer record shape.
+    function mapDetail(eq, dir) {
+      const isRtl = dir === "rtl";
+      const typeMap = {
+        err:  isRtl ? "החייאה" : "Resuscitation",
+        warn: isRtl ? "תחזוקה" : "Maintenance",
+        use:  isRtl ? "ניטור" : "Monitoring",
+        ok:   isRtl ? "כללי" : "General",
+      };
+      return {
+        id: eq.id, name: eq.name, type: typeMap[eq.status] || "—",
+        loc: eq.loc, status: eq.status, statusLabel: eq.pill,
+        serial: `${eq.id}-2022-${String(eq.id.length * 7).padStart(3, "0")}`,
+        since: eq.detail || (isRtl ? `לפני ${eq.time}` : `${eq.time} in status`),
+      };
+    }
+
+    function StatusBar() {
+      return (        <div className="status-bar">
+          <span>9:41</span>
+          <span className="right">
+            <svg width="16" height="11" viewBox="0 0 14 10" fill="currentColor"><rect x="0" y="6" width="2" height="4" rx="0.5"/><rect x="3.5" y="4" width="2" height="6" rx="0.5"/><rect x="7" y="2" width="2" height="8" rx="0.5"/><rect x="10.5" y="0" width="2" height="10" rx="0.5"/></svg>
+            <svg width="14" height="10" viewBox="0 0 16 12" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M2 6c1.5-1.5 4.5-3 6-3s4.5 1.5 6 3"/><path d="M4 8c1-1 3-2 4-2s3 1 4 2"/><circle cx="8" cy="10" r="0.8" fill="currentColor"/></svg>
+            <svg width="24" height="11" viewBox="0 0 22 10" fill="none" stroke="currentColor" strokeWidth="1"><rect x="0.5" y="0.5" width="18" height="9" rx="2"/><rect x="2.5" y="2.5" width="13" height="5" rx="0.5" fill="currentColor"/><rect x="19.5" y="3.5" width="1.5" height="3" rx="0.4" fill="currentColor"/></svg>
+          </span>
+        </div>
+      );
+    }
+
+    function Prototype() {
+      const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+      const [tab, setTab] = useState("home");
+      const [scanOpen, setScanOpen] = useState(false);
+      const [celebrateOpen, setCelebrateOpen] = useState(false);
+      const [scanned, setScanned] = useState(false);
+      const [scanCount, setScanCount] = useState(23);
+      const [detailItem, setDetailItem] = useState(null);
+      const [scanResult, setScanResult] = useState(false);
+      const dir = t.locale === "he" ? "rtl" : "ltr";
+      const proMode = t.variant === "pro" || t.variant === "v4";
+
+      // Apply theme token set
+      useEffect(() => {
+        const set = THEMES[t.theme] || THEMES.forest;
+        const root = document.documentElement;
+        Object.entries(set).forEach(([k, v]) => root.style.setProperty(k, v));
+      }, [t.theme]);
+
+      // Apply density
+      useEffect(() => {
+        document.documentElement.dataset.density = t.density;
+      }, [t.density]);
+
+      // The scan FAB: first tap of the day = celebration moment, then opens scanner.
+      const handleScanTap = () => {
+        if (!scanned) {
+          setScanned(true);
+          setCelebrateOpen(true);
+        } else {
+          setScanOpen(true);
+        }
+      };
+
+      // Scanner success → full scan-result screen
+      const handleScanned = () => {
+        setScanCount(c => c + 1);
+        setScanOpen(false);
+        setScanResult(true);
+      };
+
+      // Render home variant
+      const renderHome = () => {
+        if (t.variant === "pro") return <V4Pro          dir={dir} strings={t.locale === "he" ? HE_STRINGS_V4_PRO : undefined} />;
+        if (t.variant === "v2")  return <V2Operational dir={dir} strings={t.locale === "he" ? HE_STRINGS_V2 : undefined} />;
+        if (t.variant === "v3")  return <V3Calm        dir={dir} strings={t.locale === "he" ? HE_STRINGS_V3 : undefined} />;
+        if (t.variant === "v4")  return <V4Magnetic    dir={dir} strings={t.locale === "he" ? HE_STRINGS_V4 : undefined} />;
+        return                      <V1Refined         dir={dir} strings={t.locale === "he" ? HE_STRINGS_V1 : undefined} />;
+      };
+
+      // Build a custom BottomNav that wires up the scan FAB + active state.
+      const NavItem = ({ id, icon, label, badge }) => {
+        const active = id === tab && !detailItem && !scanResult;
+        return (
+          <button onClick={() => { setTab(id); setDetailItem(null); setScanResult(false); }} style={{
+            background: "transparent", border: 0, padding: "6px 4px",
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+            color: active ? "var(--primary)" : "var(--ivory-text-3)",
+            position: "relative", flex: 1, minWidth: 0, cursor: "pointer",
+          }}>
+            <span style={{ position: "relative", display: "inline-flex" }}>
+              <Icon name={icon} size={20} />
+              {badge && (
+                <span style={{
+                  position: "absolute", top: -6, right: -10, minWidth: 16, height: 16, padding: "0 4px",
+                  background: "#dc2626", color: "#fff", borderRadius: 999, fontSize: 10, fontWeight: 700,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                }}>{badge}</span>
+              )}
+            </span>
+            <span style={{ fontSize: 10, fontWeight: 600 }}>{label}</span>
+          </button>
+        );
+      };
+      const isRtl = dir === "rtl";
+      const labels = isRtl
+        ? { home: "בית", equip: "ציוד", scan: "סרוק", recap: "סיכום", alerts: "התראות" }
+        : { home: "Home", equip: "Equipment", scan: "Scan", recap: "Recap", alerts: "Alerts" };
+
+      // Equipment + Alerts: Pro screens in pro/magnetic mode, classic otherwise.
+      const renderEquip  = () => proMode ? <EquipmentScreenPro dir={dir} onScan={handleScanTap} onOpen={(eq) => setDetailItem(eq)} /> : <EquipmentScreen dir={dir} />;
+      const renderAlerts = () => proMode ? <AlertsScreenPro dir={dir} onOpen={(eq) => setDetailItem(eq)} /> : <AlertsScreen dir={dir} />;
+
+      return (
+        <>
+          <div className="phone-shell">
+            <div className="island" />
+            <div className="phone-screen" dir={dir}>
+              <StatusBar />
+              <MobileTopbar title="VetTrack" dir={dir} />
+              <div className="body" key={`${tab}-${t.variant}-${dir}-${detailItem?.id || ""}-${scanResult}`}>
+                {scanResult ? (
+                  <ScanResultScreen dir={dir} onClose={() => setScanResult(false)} onAction={() => setScanResult(false)} />
+                ) : detailItem ? (
+                  <EquipmentDetailScreen dir={dir} item={mapDetail(detailItem, dir)} onBack={() => setDetailItem(null)} onScan={handleScanTap} />
+                ) : (
+                  <>
+                    {tab === "home"   && renderHome()}
+                    {tab === "equip"  && renderEquip()}
+                    {tab === "recap"  && <ShiftRecapScreen dir={dir} />}
+                    {tab === "alerts" && renderAlerts()}
+                  </>
+                )}
+              </div>
+              <nav dir={dir} style={{
+                position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 40,
+                background: "var(--nav-bg)", backdropFilter: "blur(12px)",
+                borderTop: "1px solid var(--ivory-border)",
+                padding: "8px 8px 22px",
+                display: "flex", justifyContent: "space-between", alignItems: "end", gap: 4,
+              }}>
+                <NavItem id="home"   icon="home"        label={labels.home} />
+                <NavItem id="equip"  icon="boxes"       label={labels.equip} />
+                <button
+                  onClick={handleScanTap}
+                  style={{
+                    width: 56, height: 56, borderRadius: 18, flexShrink: 0,
+                    background: "var(--action)", color: "#fff",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center", border: 0,
+                    boxShadow: "0 10px 24px -8px var(--brand-shadow)", marginTop: -16, cursor: "pointer",
+                  }}><Icon name="scanLine" size={22} /></button>
+                <NavItem id="recap"  icon="sparkles"    label={labels.recap} />
+                <NavItem id="alerts" icon="shieldAlert" label={labels.alerts} badge={3} />
+              </nav>
+              <ScanOverlay open={scanOpen} onClose={() => setScanOpen(false)} dir={dir} scanCount={scanCount} onScanned={handleScanned} />
+              <FirstScanCelebration open={celebrateOpen} onClose={() => setCelebrateOpen(false)} dir={dir} />
+            </div>
+          </div>
+
+          <TweaksPanel title="Tweaks">
+            <TweakSection label="Variant">
+              <TweakRadio
+                label="Home layout"
+                value={t.variant}
+                options={[
+                  { value: "pro", label: "Pro" },
+                  { value: "v4", label: "Magnetic" },
+                  { value: "v1", label: "Refined" },
+                  { value: "v3", label: "Calm" },
+                ]}
+                onChange={(v) => setTweak("variant", v)}
+              />
+            </TweakSection>
+            <TweakSection label="Locale">
+              <TweakRadio
+                label="Direction"
+                value={t.locale}
+                options={[
+                  { value: "en", label: "English LTR" },
+                  { value: "he", label: "Hebrew RTL" },
+                ]}
+                onChange={(v) => setTweak("locale", v)}
+              />
+            </TweakSection>
+            <TweakSection label="Theme">
+              <TweakRadio
+                label="Palette"
+                value={t.theme}
+                options={[
+                  { value: "forest", label: "Forest" },
+                  { value: "clinical", label: "Clinical" },
+                  { value: "dark", label: "Dark" },
+                ]}
+                onChange={(v) => setTweak("theme", v)}
+              />
+              <TweakRadio
+                label="Density"
+                value={t.density}
+                options={[
+                  { value: "comfortable", label: "Comfortable" },
+                  { value: "compact",     label: "Compact" },
+                ]}
+                onChange={(v) => setTweak("density", v)}
+              />
+            </TweakSection>
+            <TweakSection label="Moments">
+              <TweakButton label="Replay first-scan moment" onClick={() => { setScanned(true); setCelebrateOpen(true); }} />
+            </TweakSection>
+          </TweaksPanel>
+        </>
+      );
+    }
+
+    function App() {
+      return (
+        <div className="stage" data-screen-label="01 Mobile prototype">
+          <div className="heading">
+            <h1>VetTrack — Mobile prototype</h1>
+            <p>Tap the bottom nav to switch screens. Hit the green scan button to launch the QR scanner. Use Tweaks (toolbar) to flip variants, locale, accent, and density.</p>
+          </div>
+          <Prototype />
+        </div>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

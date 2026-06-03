@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>VetTrack — App UI Kit</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg" />
+<link rel="stylesheet" href="../../colors_and_type.css" />
+<style>
+  html, body { margin: 0; padding: 0; background: var(--background); }
+  body { font-family: var(--font-sans); color: var(--foreground); }
+  .stage {
+    padding: 40px 32px 60px;
+    display: flex; flex-wrap: wrap; gap: 48px; justify-content: center; align-items: flex-start;
+  }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .label {
+    font: 600 11.5px/1 var(--font-mono); color: var(--ivory-text-3);
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .device-shell { position: relative; }
+  .seg {
+    display: inline-flex; padding: 4px; gap: 4px;
+    background: var(--ivory-bg); border: 1px solid var(--ivory-border);
+    border-radius: 12px;
+  }
+  .seg button {
+    border: 0; background: transparent; padding: 6px 14px; border-radius: 8px;
+    font: 600 12px/1 var(--font-sans); color: var(--ivory-text-3); cursor: pointer;
+  }
+  .seg button.active { background: var(--ivory-surface); color: var(--ivory-text); box-shadow: 0 1px 2px 0 rgb(15 23 42 / 0.06); }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="../_shared/Icons.jsx"></script>
+  <script type="text/babel" src="ios-frame.jsx"></script>
+  <script type="text/babel" src="MobileTopbar.jsx"></script>
+  <script type="text/babel" src="BottomNav.jsx"></script>
+  <script type="text/babel" src="Cards.jsx"></script>
+  <script type="text/babel" src="HomeScreen.jsx"></script>
+  <script type="text/babel" src="EquipmentScreen.jsx"></script>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    const HE_STRINGS = {
+      greeting: "בוקר טוב, מאיה",
+      sub: "סקירת ציוד · 4 במאי",
+      shiftSummary: "סיכום משמרת",
+      kpi: {
+        patients: { title: "מטופלים פעילים",  value: "18", sub: "בטיפול פעיל" },
+        tasks:    { title: "משימות לביצוע",   value: "12", sub: "היום + באיחור" },
+        alerts:   { title: "התראות מלאי",     value: "3",  sub: "דורש בדיקה" },
+        charges:  { title: "נרשם במשמרת",     value: "₪4,820", sub: "23 רשומות חיוב" },
+      },
+      quick: { scan: "סריקה", scanH: "QR או NFC", task: "הוסף משימה", taskH: "צור או שייך", inv: "מלאי", invH: "ציוד ונכסים", bill: "חיובים", billH: "חיובים ופנקס" },
+      activity: { heading: "פעילות חיה", count: "6 אירועים", view: "הכל" },
+      alerts: { heading: "התראות מלאי", view: "הכל", empty: "הכל תקין" },
+    };
+
+    function PhoneFrame({ title, screen, dir, strings }) {
+      return (
+        <div className="device-shell">
+          <IOSDevice width={372} height={764} title={null}>
+            <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--background)' }}>
+              <div style={{ paddingTop: 44 }}>
+                <MobileTopbar title={title} dir={dir} />
+              </div>
+              <div style={{ flex: 1, overflow: 'auto' }}>
+                {screen === "home"
+                  ? <HomeScreen dir={dir} strings={strings} />
+                  : <EquipmentScreen dir={dir} />}
+              </div>
+              <BottomNav active={screen} dir={dir} />
+            </div>
+          </IOSDevice>
+        </div>
+      );
+    }
+
+    function App() {
+      const [screen, setScreen] = useState("home");
+      return (
+        <main data-screen-label="01 App UI Kit">
+          <div style={{ padding: "28px 32px 0", display: "flex", justifyContent: "center", gap: 14 }}>
+            <div className="seg">
+              <button className={screen === "home" ? "active" : ""}      onClick={() => setScreen("home")}>Home</button>
+              <button className={screen === "equip" ? "active" : ""}     onClick={() => setScreen("equip")}>Equipment</button>
+            </div>
+          </div>
+          <div className="stage">
+            <div className="col">
+              <span className="label">English · LTR</span>
+              <PhoneFrame title="VetTrack" screen={screen} dir="ltr" />
+            </div>
+            <div className="col">
+              <span className="label">עברית · RTL</span>
+              <PhoneFrame title="VetTrack" screen={screen} dir="rtl" strings={HE_STRINGS} />
+            </div>
+          </div>
+        </main>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
