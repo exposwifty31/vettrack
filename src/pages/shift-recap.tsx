@@ -14,14 +14,17 @@ import { useDirection } from "@/hooks/useDirection";
 import { getCurrentUserId } from "@/lib/auth-store";
 import { toast } from "sonner";
 import { safeClipboardWriteText } from "@/lib/safe-browser";
-
-const FOREST = "#1a3d28";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { useEnterOnce } from "@/hooks/use-enter-once";
+import { cn } from "@/lib/utils";
 
 export default function ShiftRecapPage() {
   const { name } = useAuth();
   const userId = getCurrentUserId();
   const direction = useDirection();
   const Chevron = direction === "rtl" ? ChevronLeft : ChevronRight;
+  const isDesktop = useIsDesktop();
+  const enterOnce = useEnterOnce("shift-recap");
   const firstName = name?.split(" ")[0] || t.homePage.fallbackName;
 
   const { data: pulse, isLoading: pulseLoading } = useQuery({
@@ -102,7 +105,13 @@ export default function ShiftRecapPage() {
         ) : (
           <>
             {streak > 0 && (
-              <div className="flex items-center gap-3 rounded-2xl border border-primary/15 bg-primary/5 p-4">
+              <div
+                className={cn(
+                  "flex items-center gap-3 rounded-2xl border border-primary/15 bg-primary/5 p-4",
+                  enterOnce && "motion-safe:animate-[badgePop_0.6s_ease-out_both]",
+                )}
+                data-testid="shift-recap-streak"
+              >
                 <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary text-xl font-bold tabular-nums text-primary-foreground">
                   {streak}
                 </div>
@@ -155,8 +164,7 @@ export default function ShiftRecapPage() {
 
               <Button
                 type="button"
-                className="mt-5 h-14 w-full gap-2 rounded-2xl text-base font-bold"
-                style={{ background: `linear-gradient(135deg, ${FOREST} 0%, #2d6b45 100%)` }}
+                className="mt-5 h-14 w-full gap-2 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-deep)] text-base font-bold text-white"
                 onClick={() => void handleShare()}
                 data-testid="btn-share-shift-recap"
               >
@@ -172,7 +180,7 @@ export default function ShiftRecapPage() {
     </>
   );
 
-  if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+  if (isDesktop) {
     return <PageShell>{content}</PageShell>;
   }
 

@@ -109,6 +109,14 @@
     "recoveryBadgeVeryStale": "מיושן מאוד",
     "recoveryBadgeCheckedOutLong": "מושאל זמן רב",
     "recoveryAttentionFilter": "דורש תשומת לב",
+    "triageAttention": "דורש טיפול",
+    "triageInUse": "בשימוש",
+    "triageOperational": "תקין",
+    "statTotal": "סה״כ",
+    "statAttention": "דורש טיפול",
+    "statInUse": "בשימוש",
+    "statUptime": "זמינות",
+    "filterAll": "הכל",
     "recoveryAttentionSummary": "{count} פריטים דורשים תשומת לב"
   },
   "shiftHandoverPage": {
@@ -861,6 +869,9 @@
     "colorThemeDescription": "יער — ירוק מותג; קליני — כחול לניווט, ירוק רק לפעולות",
     "colorThemeForest": "יער (מותג)",
     "colorThemeClinical": "קליני",
+    "colorThemeDark": "כהה",
+    "haptics": "רטט (הפטיקה)",
+    "hapticsDescription": "רטט בסריקה ואישור (PWA באנדרואיד)",
     "darkMode": "מצב לילה",
     "darkModeDescription": "מפחית עומס על העיניים בתאורה חלשה",
     "displaySize": "גודל תצוגה",
@@ -961,7 +972,12 @@
     "browseEquipment": "דפדף בציוד",
     "inProgressSince": "בטיפול מאז",
     "removeAckAria": "הסר סטטוס טיפול",
-    "takeOwnership": "אני מטפל/ת בזה"
+    "takeOwnership": "אני מטפל/ת בזה",
+    "worstFirst": "הכי דחוף",
+    "handleNow": "טפל עכשיו",
+    "sectionUrgent": "דחוף",
+    "sectionMaintenance": "תחזוקה",
+    "openSummary": "{total} פתוחות · {urgent} דחופות"
   },
   "analyticsPage": {
     "title": "ניתוח נתונים",
@@ -1045,6 +1061,7 @@
     "shiftLine": "{time} במשמרת · את עליה",
     "shiftLineFallback": "הנה המשמרת שלך במבט מהיר",
     "heroKicker": "המשמרת שלך",
+    "progressLabel": "התקדמות משמרת",
     "progressComplete": "{pct}% הושלמו",
     "ringTasks": "משימות",
     "ringScans": "סריקות",

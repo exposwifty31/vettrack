@@ -5,6 +5,9 @@ import { Link, useLocation, useSearch } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
 import { Layout } from "@/components/layout";
+import { PageShell } from "@/components/layout/PageShell";
+import type { SidebarItem } from "@/components/layout/IconSidebar";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +36,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { STATUS_LABELS } from "@/types";
 import type { Equipment } from "@/types";
-import { statusToBadgeVariant } from "@/lib/design-tokens";
+import { equipmentTriageTier, statusToBadgeVariant } from "@/lib/design-tokens";
+import {
+  EquipmentStatStrip,
+  EquipmentTriageList,
+} from "@/components/equipment/EquipmentTriageList";
 import { DeployabilityBadge } from "@/components/equipment/DeployabilityBadge";
 import {
   isRfidSubtitleFresh,
@@ -44,12 +51,12 @@ import {
   Plus,
   Search,
   QrCode,
+  Package,
   FolderOpen,
   CheckSquare,
   Square,
   Trash2,
   FolderInput,
-  Package,
   ChevronRight,
   ChevronLeft,
   MapPin,
@@ -118,7 +125,12 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 const PAGE_SIZE = 9;
 
 
+const EQUIPMENT_SIDEBAR: SidebarItem[] = [
+  { href: "/equipment", icon: Package, label: "Equipment" },
+];
+
 export default function EquipmentListPage() {
+  const isDesktop = useIsDesktop();
   const { settings } = useSettings();
   const queryClient = useQueryClient();
   const { userId, isAdmin, effectiveRole } = useAuth();
@@ -359,6 +371,19 @@ export default function EquipmentListPage() {
     [displayList, safePage],
   );
 
+  const triageCounts = useMemo(() => {
+    let attention = 0;
+    let inUse = 0;
+    for (const eq of displayList) {
+      const tier = equipmentTriageTier(eq);
+      if (tier === "attention") attention += 1;
+      else if (tier === "in_use") inUse += 1;
+    }
+    return { total: displayList.length, attention, inUse };
+  }, [displayList]);
+
+  const useMobileTriage = !selectMode && !isVirtualized && pageItems.length > 0;
+
   // Reset to page 1 when totalPages changes (filter changed to fewer results).
   useEffect(() => {
     if (page > totalPages) setPage(1);
@@ -399,8 +424,8 @@ export default function EquipmentListPage() {
 
   const manualFolders = folders?.filter((f) => f.type !== "smart") || [];
 
-  return (
-    <Layout>
+  const pageBody = (
+    <>
       <Helmet>
         <title>Equipment — VetTrack</title>
         <meta name="description" content="Browse, search, and manage all veterinary equipment. Filter by status or folder, bulk-move items, and scan QR codes to quickly locate any asset." />
@@ -819,8 +844,24 @@ export default function EquipmentListPage() {
                 renderItem={renderVirtualizedRow}
               />
             </div>
-          ) : (
-            <div className="flex flex-col gap-3" data-testid="equipment-list">
+          ) : useMobileTriage ? (
+            <div className="md:hidden space-y-3" data-testid="equipment-list-triage">
+              <EquipmentStatStrip
+                total={triageCounts.total}
+                attention={triageCounts.attention}
+                inUse={triageCounts.inUse}
+              />
+              <EquipmentTriageList items={pageItems} />
+            </div>
+          ) : null}
+          {!isVirtualized && pageItems.length > 0 && (
+            <div
+              className={cn(
+                "flex flex-col gap-3",
+                useMobileTriage && "hidden md:flex",
+              )}
+              data-testid="equipment-list"
+            >
               {pageItems.map((eq) => (
                 <EquipmentItem
                   key={eq.id}
@@ -888,8 +929,14 @@ export default function EquipmentListPage() {
       )}
 
       <EquipmentRoomSweepSheet open={roomSweepOpen} onOpenChange={setRoomSweepOpen} />
-    </Layout>
+    </>
   );
+
+  if (isDesktop) {
+    return <PageShell sidebarItems={EQUIPMENT_SIDEBAR}>{pageBody}</PageShell>;
+  }
+
+  return <Layout>{pageBody}</Layout>;
 }
 
 function EquipmentItem({

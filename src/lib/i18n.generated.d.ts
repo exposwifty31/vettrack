@@ -112,6 +112,14 @@ export interface TStructure {
     recoveryBadgeVeryStale: string;
     recoveryBadgeCheckedOutLong: string;
     recoveryAttentionFilter: string;
+    triageAttention: string;
+    triageInUse: string;
+    triageOperational: string;
+    statTotal: string;
+    statAttention: string;
+    statInUse: string;
+    statUptime: string;
+    filterAll: string;
     recoveryAttentionSummary: string;
   };
   shiftHandoverPage: {
@@ -864,6 +872,9 @@ export interface TStructure {
     colorThemeDescription: string;
     colorThemeForest: string;
     colorThemeClinical: string;
+    colorThemeDark: string;
+    haptics: string;
+    hapticsDescription: string;
     darkMode: string;
     darkModeDescription: string;
     displaySize: string;
@@ -965,6 +976,11 @@ export interface TStructure {
     inProgressSince: string;
     removeAckAria: string;
     takeOwnership: string;
+    worstFirst: string;
+    handleNow: string;
+    sectionUrgent: string;
+    sectionMaintenance: string;
+    openSummary: string;
   };
   analyticsPage: {
     title: string;
@@ -1048,6 +1064,7 @@ export interface TStructure {
     shiftLine: string;
     shiftLineFallback: string;
     heroKicker: string;
+    progressLabel: string;
     progressComplete: string;
     ringTasks: string;
     ringScans: string;

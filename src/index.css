@@ -64,6 +64,47 @@
     --color-background-warning: #fef3c7;
     --color-border-warning: #d97706;
     --color-text-warning: #92400e;
+
+    /* 60/30/10 — forest (default palette) */
+    --brand: #1a3d28;
+    --brand-deep: #0f2a18;
+    --brand-ink: #1a3d28;
+    --brand-soft: #ecf6ee;
+    --brand-border: #c7e3cf;
+    --brand-shadow: rgba(26, 61, 40, 0.5);
+    --hero-a: #0a1f15;
+    --hero-b: #18371f;
+    --action: #16a34a;
+    --action-deep: #15803d;
+    --action-ink: #1a6d38;
+    --action-soft: #ecf6ee;
+    --action-border: #c7e3cf;
+    --nav-bg: hsl(0 0% 100% / 0.96);
+
+    --font-num: "DM Mono", "IBM Plex Mono", ui-monospace, monospace;
+
+    /* Motion tokens (MOTION_HAPTICS_SOUND.md) */
+    --motion-instant: 120ms;
+    --motion-quick: 200ms;
+    --motion-enter: 620ms;
+    --motion-celebrate: 700ms;
+    --motion-pill: 320ms;
+    --ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ease-reward: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* Status pill fills (StatusBadge) */
+    --status-ok-bg: #f0faf2;
+    --status-ok-fg: #166534;
+    --status-ok-border: #a7f3bd;
+    --status-issue-bg: #fff1f1;
+    --status-issue-fg: #7f1d1d;
+    --status-issue-border: #fca5a5;
+    --status-maint-bg: #fffbeb;
+    --status-maint-fg: #78350f;
+    --status-maint-border: #fcd34d;
+    --status-steril-bg: #eff6ff;
+    --status-steril-fg: #1e40af;
+    --status-steril-border: #93c5fd;
   }
 
   .dark {
@@ -135,6 +176,58 @@
     --ivory-greenMid: 29 78 216;
     --ivory-greenBg:  239 246 255;
     --status-ok: 142 71% 45%;
+    --brand: #2563eb;
+    --brand-deep: #1d4ed8;
+    --brand-ink: #1e3a8a;
+    --brand-soft: #eff4ff;
+    --brand-border: #c7d8ee;
+    --brand-shadow: rgba(37, 99, 235, 0.45);
+    --hero-a: #0f1e3d;
+    --hero-b: #1e3a8a;
+    --action: #22c55e;
+    --action-deep: #16a34a;
+    --action-ink: #15803d;
+    --action-soft: #ecfdf3;
+    --action-border: #bbf7d0;
+    --nav-bg: hsl(210 40% 100% / 0.96);
+  }
+
+  :root[data-color-theme="dark"] {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 98%;
+    --card: 222 40% 10%;
+    --card-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 33% 17%;
+    --muted: 217 33% 14%;
+    --muted-foreground: 215 20% 65%;
+    --ring: 217 91% 60%;
+    --ivory-bg:       11 18 32;
+    --ivory-surface:  19 28 46;
+    --ivory-border:   36 49 74;
+    --ivory-borderMd: 52 69 106;
+    --ivory-text:     232 237 246;
+    --ivory-text2:    170 182 204;
+    --ivory-text3:    107 122 150;
+    --ivory-navy:     59 130 246;
+    --ivory-green:    59 130 246;
+    --ivory-greenMid: 37 99 235;
+    --ivory-greenBg:  30 58 138;
+    --brand: #3b82f6;
+    --brand-deep: #2563eb;
+    --brand-ink: #93c5fd;
+    --brand-soft: rgba(59, 130, 246, 0.12);
+    --brand-border: rgba(59, 130, 246, 0.3);
+    --brand-shadow: rgba(0, 0, 0, 0.6);
+    --hero-a: #0a1326;
+    --hero-b: #16264a;
+    --action: #22c55e;
+    --action-deep: #16a34a;
+    --action-ink: #4ade80;
+    --action-soft: rgba(34, 197, 94, 0.12);
+    --action-border: rgba(34, 197, 94, 0.3);
+    --nav-bg: hsl(222 40% 12% / 0.96);
   }
 
   .dark[data-color-theme="clinical"] {
@@ -161,12 +254,17 @@
     --ivory-greenBg:  30 58 138;
   }
 
-  /* Action green on scan FAB / success surfaces when Clinical theme is active */
-  :root[data-color-theme="clinical"] .vt-scan-fab,
-  :root[data-color-theme="clinical"] .vt-action-green {
-    --tw-bg-opacity: 1;
-    background-color: rgb(34 197 94 / var(--tw-bg-opacity)) !important;
-    box-shadow: 0 10px 22px -10px rgba(34, 197, 94, 0.45) !important;
+  /* Scan / confirm uses action color (10% tier), not brand */
+  .vt-scan-fab,
+  .vt-action-green {
+    background-color: var(--action) !important;
+    color: #fff !important;
+    box-shadow: 0 10px 22px -10px color-mix(in srgb, var(--action) 45%, transparent) !important;
+  }
+
+  .vt-scan-fab:hover,
+  .vt-action-green:hover {
+    background-color: var(--action-deep) !important;
   }
 }
 
@@ -311,6 +409,35 @@
  */
 
 @layer utilities {
+  .font-num {
+    font-family: var(--font-num);
+    font-feature-settings: "zero" 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bg-brand {
+    background-color: var(--brand);
+  }
+  .bg-action {
+    background-color: var(--action);
+  }
+  .text-brand {
+    color: var(--brand);
+  }
+  .text-action {
+    color: var(--action);
+  }
+
+  /* One entrance choreography per screen load */
+  .vt-pro-rise {
+    animation: proRise var(--motion-enter) var(--ease-enter) both;
+  }
+  .vt-enter-stagger > .vt-pro-rise:nth-child(1) { animation-delay: 0ms; }
+  .vt-enter-stagger > .vt-pro-rise:nth-child(2) { animation-delay: 70ms; }
+  .vt-enter-stagger > .vt-pro-rise:nth-child(3) { animation-delay: 140ms; }
+  .vt-enter-stagger > .vt-pro-rise:nth-child(4) { animation-delay: 210ms; }
+  .vt-enter-stagger > .vt-pro-rise:nth-child(5) { animation-delay: 280ms; }
+
   /* Sticky position anchored below the status bar */
   .top-safe {
     top: env(safe-area-inset-top);
@@ -631,12 +758,26 @@ nav,
   50%       { opacity: 1;    transform: scaleX(1);    }
 }
 
+/* Screen entrance — enter once per mount (V4 Pro / MOTION_HAPTICS_SOUND.md) */
+@keyframes proRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Honour reduced-motion: stop decorative @keyframes; layout uses inline `style={{ animation: ... }}` and Tailwind arbitrary `[animation:…]` — both must be covered. Do not add global `transition: none` here (state opacity transitions stay visible). */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
   }
 
+  .vt-pro-rise,
+  [class*="badgePop_"],
   .qr-scan-line,
   [class*="scanAmbient_"],
   [class*="menuReveal_"],

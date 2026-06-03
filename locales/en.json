@@ -109,6 +109,14 @@
     "recoveryBadgeVeryStale": "Very stale",
     "recoveryBadgeCheckedOutLong": "Checked out long",
     "recoveryAttentionFilter": "Needs attention",
+    "triageAttention": "Needs attention",
+    "triageInUse": "In use",
+    "triageOperational": "Operational",
+    "statTotal": "Total",
+    "statAttention": "Attention",
+    "statInUse": "In use",
+    "statUptime": "Uptime",
+    "filterAll": "All",
     "recoveryAttentionSummary": "{count} item(s) need attention"
   },
   "shiftHandoverPage": {
@@ -861,6 +869,9 @@
     "colorThemeDescription": "Forest uses brand green; Clinical uses blue navigation with green for actions only",
     "colorThemeForest": "Forest (brand)",
     "colorThemeClinical": "Clinical",
+    "colorThemeDark": "Dark",
+    "haptics": "Haptic feedback",
+    "hapticsDescription": "Vibration on scan and confirm (Android PWA)",
     "darkMode": "Dark mode",
     "darkModeDescription": "Reduces eye strain in low light",
     "displaySize": "Display size",
@@ -961,7 +972,12 @@
     "browseEquipment": "Browse equipment",
     "inProgressSince": "In progress since",
     "removeAckAria": "Remove acknowledgment status",
-    "takeOwnership": "I'm handling this"
+    "takeOwnership": "I'm handling this",
+    "worstFirst": "Worst first",
+    "handleNow": "Handle now",
+    "sectionUrgent": "Urgent",
+    "sectionMaintenance": "Maintenance",
+    "openSummary": "{total} open · {urgent} urgent"
   },
   "analyticsPage": {
     "title": "Analytics",
@@ -1045,6 +1061,7 @@
     "shiftLine": "{time} on shift · you've got this",
     "shiftLineFallback": "Here's your shift at a glance",
     "heroKicker": "Your shift",
+    "progressLabel": "Shift progress",
     "progressComplete": "{pct}% done",
     "ringTasks": "Tasks",
     "ringScans": "Scans",

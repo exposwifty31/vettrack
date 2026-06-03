@@ -135,6 +135,14 @@ const translations = {
     recoveryBadgeVeryStale: d.equipmentList.recoveryBadgeVeryStale,
     recoveryBadgeCheckedOutLong: d.equipmentList.recoveryBadgeCheckedOutLong,
     recoveryAttentionFilter: d.equipmentList.recoveryAttentionFilter,
+    triageAttention: d.equipmentList.triageAttention,
+    triageInUse: d.equipmentList.triageInUse,
+    triageOperational: d.equipmentList.triageOperational,
+    statTotal: d.equipmentList.statTotal,
+    statAttention: d.equipmentList.statAttention,
+    statInUse: d.equipmentList.statInUse,
+    statUptime: d.equipmentList.statUptime,
+    filterAll: d.equipmentList.filterAll,
     recoveryAttentionSummary: d.equipmentList.recoveryAttentionSummary,
   },
 
@@ -493,6 +501,8 @@ const translations = {
     hoursAgo: (hours: number) => tr(d.alertsPage.hoursAgo, { hours }),
     daysAgo: (days: number) => tr(d.alertsPage.daysAgo, { days }),
     activeCount: (count: number) => tr(d.alertsPage.activeCount, { count }),
+    openSummary: (total: number, urgent: number) =>
+      tr(d.alertsPage.openSummary, { total, urgent }),
   },
 
   analyticsPage: {

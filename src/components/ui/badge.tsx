@@ -58,18 +58,79 @@ interface StatusConfig {
 }
 
 const STATUS_CONFIG: Record<string, StatusConfig> = {
-  Operational:     { bg: "bg-[#f0faf2]", text: "text-[#166534]", border: "border-[#a7f3bd]", dot: "bg-[#16a34a]" },
-  "Due Check":     { bg: "bg-[#fffbeb]", text: "text-[#78350f]", border: "border-[#fcd34d]", dot: "bg-[#d97706]" },
-  "Review Needed": { bg: "bg-[#fff1f1]", text: "text-[#7f1d1d]", border: "border-[#fca5a5]", dot: "bg-[#dc2626]" },
-  Sterilized:      { bg: "bg-[#eff6ff]", text: "text-[#1e40af]", border: "border-[#93c5fd]", dot: "bg-[#2563eb]" },
-  Maintenance:     { bg: "bg-[#fffbeb]", text: "text-[#78350f]", border: "border-[#fcd34d]", dot: "bg-[#d97706]" },
+  ok: {
+    bg: "bg-[var(--status-ok-bg)]",
+    text: "text-[var(--status-ok-fg)]",
+    border: "border-[var(--status-ok-border)]",
+    dot: "bg-[var(--status-ok-fg)]",
+  },
+  issue: {
+    bg: "bg-[var(--status-issue-bg)]",
+    text: "text-[var(--status-issue-fg)]",
+    border: "border-[var(--status-issue-border)]",
+    dot: "bg-[var(--status-issue-fg)]",
+  },
+  maintenance: {
+    bg: "bg-[var(--status-maint-bg)]",
+    text: "text-[var(--status-maint-fg)]",
+    border: "border-[var(--status-maint-border)]",
+    dot: "bg-[var(--status-maint-fg)]",
+  },
+  sterilized: {
+    bg: "bg-[var(--status-steril-bg)]",
+    text: "text-[var(--status-steril-fg)]",
+    border: "border-[var(--status-steril-border)]",
+    dot: "bg-[var(--status-steril-fg)]",
+  },
+  critical: {
+    bg: "bg-[var(--status-issue-bg)]",
+    text: "text-[var(--status-issue-fg)]",
+    border: "border-[var(--status-issue-border)]",
+    dot: "bg-[var(--status-issue-fg)]",
+  },
+  needs_attention: {
+    bg: "bg-[var(--status-maint-bg)]",
+    text: "text-[var(--status-maint-fg)]",
+    border: "border-[var(--status-maint-border)]",
+    dot: "bg-[var(--status-maint-fg)]",
+  },
+  Operational: {
+    bg: "bg-[var(--status-ok-bg)]",
+    text: "text-[var(--status-ok-fg)]",
+    border: "border-[var(--status-ok-border)]",
+    dot: "bg-[var(--status-ok-fg)]",
+  },
+  "Due Check": {
+    bg: "bg-[var(--status-maint-bg)]",
+    text: "text-[var(--status-maint-fg)]",
+    border: "border-[var(--status-maint-border)]",
+    dot: "bg-[var(--status-maint-fg)]",
+  },
+  "Review Needed": {
+    bg: "bg-[var(--status-issue-bg)]",
+    text: "text-[var(--status-issue-fg)]",
+    border: "border-[var(--status-issue-border)]",
+    dot: "bg-[var(--status-issue-fg)]",
+  },
+  Sterilized: {
+    bg: "bg-[var(--status-steril-bg)]",
+    text: "text-[var(--status-steril-fg)]",
+    border: "border-[var(--status-steril-border)]",
+    dot: "bg-[var(--status-steril-fg)]",
+  },
+  Maintenance: {
+    bg: "bg-[var(--status-maint-bg)]",
+    text: "text-[var(--status-maint-fg)]",
+    border: "border-[var(--status-maint-border)]",
+    dot: "bg-[var(--status-maint-fg)]",
+  },
 };
 
 const FALLBACK: StatusConfig = {
-  bg: "bg-[#f5f5f5]",
-  text: "text-[#555]",
-  border: "border-[#ddd]",
-  dot: "bg-[#aaa]",
+  bg: "bg-muted",
+  text: "text-muted-foreground",
+  border: "border-border",
+  dot: "bg-muted-foreground",
 };
 
 export function StatusBadge({ status }: { status: string }) {

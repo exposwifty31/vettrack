@@ -197,8 +197,15 @@ export default function SettingsPage() {
               options={[
                 { value: "forest", label: t.settingsPage.colorThemeForest },
                 { value: "clinical", label: t.settingsPage.colorThemeClinical },
+                { value: "dark", label: t.settingsPage.colorThemeDark },
               ]}
-              onValueChange={(v) => update({ colorTheme: v as "forest" | "clinical" })}
+              onValueChange={(v) => {
+                const colorTheme = v as "forest" | "clinical" | "dark";
+                update({
+                  colorTheme,
+                  ...(colorTheme === "dark" ? { darkMode: true } : {}),
+                });
+              }}
               data-testid="settings-color-theme"
             />
             <SettingsToggle
@@ -208,6 +215,14 @@ export default function SettingsPage() {
               checked={settings.darkMode}
               onCheckedChange={(v) => update({ darkMode: v })}
               data-testid="settings-dark-mode"
+            />
+            <SettingsToggle
+              icon={<AlignJustify className="w-5 h-5" />}
+              label={t.settingsPage.haptics}
+              description={t.settingsPage.hapticsDescription}
+              checked={settings.hapticsEnabled}
+              onCheckedChange={(v) => update({ hapticsEnabled: v })}
+              data-testid="settings-haptics"
             />
             <SettingsSelect
               icon={<AlignJustify className="w-5 h-5" />}

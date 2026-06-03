@@ -262,17 +262,18 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
       }
 
       await stopScannerRef.current();
-      haptics.scanSuccess();
       setConfirmFlash(true);
       setTimeout(() => setConfirmFlash(false), 260);
       setScannedEquipment(eq);
 
       const firstToday = !hasCelebratedFirstScanToday(userId);
       if (firstToday) {
+        haptics.celebrate();
         markFirstScanCelebratedToday(userId);
         setPendingFirstScan(true);
         setPhase("first_scan_celebration");
       } else {
+        haptics.scanSuccess();
         setPhase("result");
       }
 

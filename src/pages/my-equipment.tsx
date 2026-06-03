@@ -5,6 +5,9 @@ import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
 import { Layout } from "@/components/layout";
+import { PageShell } from "@/components/layout/PageShell";
+import type { SidebarItem } from "@/components/layout/IconSidebar";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,7 +56,12 @@ import {
 } from "./my-equipment-personal-debt-labels";
 import { resolveMyEquipmentRecoveryBadgeKey } from "./my-equipment-recovery-labels";
 
+const MY_EQUIPMENT_SIDEBAR: SidebarItem[] = [
+  { href: "/my-equipment", icon: PackageOpen, label: "My equipment" },
+];
+
 export default function MyEquipmentPage() {
+  const isDesktop = useIsDesktop();
   const { userId } = useAuth();
   const queryClient = useQueryClient();
   const [returningAll, setReturningAll] = useState(false);
@@ -116,8 +124,8 @@ export default function MyEquipmentPage() {
     }
   }
 
-  return (
-    <Layout>
+  const pageBody = (
+    <>
       <Helmet>
         <title>{t.equipment.myEquipment} — VetTrack</title>
         <meta name="description" content="View all equipment currently checked out to you. Return individual items or use Return All for quick end-of-shift handoffs." />
@@ -347,6 +355,12 @@ export default function MyEquipmentPage() {
           );
         }}
       />
-    </Layout>
+    </>
   );
+
+  if (isDesktop) {
+    return <PageShell sidebarItems={MY_EQUIPMENT_SIDEBAR}>{pageBody}</PageShell>;
+  }
+
+  return <Layout>{pageBody}</Layout>;
 }
