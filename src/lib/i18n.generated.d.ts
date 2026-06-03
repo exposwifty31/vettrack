@@ -64,6 +64,12 @@ export interface TStructure {
     toast: {
       equipmentNotFound: string;
     };
+    alertsDropdown: {
+      toggleAria: string;
+      activeCount: string;
+      empty: string;
+      seeAll: string;
+    };
     sync: {
       pendingActions: string;
       failedActions: string;
@@ -1096,6 +1102,14 @@ export interface TStructure {
     winTasksClear: string;
     winScansToday: string;
   };
+  assetCopilot: {
+    title: string;
+    description: string;
+    equipmentIdPlaceholder: string;
+    explainCta: string;
+    disabledHint: string;
+    error: string;
+  };
   shiftRecap: {
     pageTitle: string;
     kicker: string;
@@ -1108,7 +1122,6 @@ export interface TStructure {
     statTasks: string;
     statScans: string;
     shareCta: string;
-    hint: string;
     shareTitle: string;
     shareHeadline: string;
     shareProgress: string;

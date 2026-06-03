@@ -88,8 +88,12 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
   const roomTags = UNIQUE_ROOM_TAGS(chat.messages);
 
   return (
-    <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent side="bottom" className="max-h-[92dvh] p-0 flex flex-col rounded-t-2xl">
+    <Sheet open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <SheetContent
+        side="bottom"
+        hideCloseButton
+        className="max-h-[92dvh] p-0 flex flex-col rounded-t-2xl"
+      >
 
         <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
           <div className="flex items-center gap-2">

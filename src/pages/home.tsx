@@ -33,6 +33,7 @@ import {
   ShiftProgressHero,
   shiftProgressStatsFromHome,
 } from "@/components/home/ShiftProgressHero";
+import { pickNextDashboardTask } from "@/lib/task-dashboard-filters";
 
 /** Localized "5h 12m" style duration. */
 function humanizeMinutes(min: number): string {
@@ -132,9 +133,9 @@ export default function HomePage() {
     shiftLine = t.homePage.shiftLine(humanizeMinutes(elapsedMin));
   }
 
-  // Next-up task: most overdue first, then soonest due today, then upcoming.
-  const nextTask: Appointment | null =
-    taskDashboard?.overdue[0] ?? taskDashboard?.today[0] ?? taskDashboard?.upcoming[0] ?? null;
+  const nextTask: Appointment | null = taskDashboard
+    ? pickNextDashboardTask(taskDashboard)
+    : null;
 
   let nextEtaMin = 0;
   let nextOverdue = false;

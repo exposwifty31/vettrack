@@ -82,6 +82,7 @@ import { usePendingSyncForEquipment, useSyncQueue } from "@/hooks/use-sync";
 import { MoveRoomSheet } from "@/components/move-room-sheet";
 import { ReturnPlugDialog } from "@/components/return-plug-dialog";
 import { EquipmentTruthCard } from "@/components/equipment/EquipmentTruthCard";
+import { AssetCopilotPanel } from "@/components/equipment/AssetCopilotPanel";
 import { EquipmentDetailStatusStrip } from "@/components/equipment/EquipmentDetailStatusStrip";
 import { EquipmentDetailToolsSheet } from "@/components/equipment/EquipmentDetailToolsSheet";
 import { EquipmentDetailActivityTab } from "@/components/equipment/EquipmentDetailActivityTab";
@@ -1034,6 +1035,8 @@ export default function EquipmentDetailPage() {
         )}
 
         <EquipmentTruthCard equipmentId={equipment.id} equipmentName={equipment.name} />
+
+        <AssetCopilotPanel defaultEquipmentId={equipment.id} className="mt-3" />
 
         {/* Quick Action Bar — ICU-moment: 1–2 large, instantly tappable actions */}
         <div className="flex flex-col gap-2" data-testid="quick-action-bar">

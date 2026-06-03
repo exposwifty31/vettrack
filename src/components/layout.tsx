@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Siren,
   QrCode,
+  Stethoscope,
   Shield,
   Menu,
   X,
@@ -48,7 +49,6 @@ import {
   Film,
   Sparkles,
   FileText,
-  Stethoscope,
   Monitor,
   Gauge,
 } from "lucide-react";
@@ -69,6 +69,7 @@ import { SettingsToggle, SettingsSelect } from "@/components/settings-controls";
 import { playFeedbackTone, playMuteTone } from "@/lib/sounds";
 import { ReportIssueDialog } from "@/components/report-issue-dialog";
 import { SyncQueueSheet } from "@/components/sync-queue-sheet";
+import { AlertsDropdown } from "@/components/alerts-dropdown";
 import { UpdateBanner } from "@/components/update-banner";
 import { haptics } from "@/lib/haptics";
 import {
@@ -396,7 +397,8 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     return () => document.removeEventListener("mousedown", handleClick);
   }, [quickSettingsOpen]);
 
-  const alertCount = equipment ? computeAlerts(equipment).length : 0;
+  const alerts = equipment ? computeAlerts(equipment) : [];
+  const alertCount = alerts.length;
   const myCount = myEquipment?.length ?? 0;
 
   useEffect(() => {
@@ -595,17 +597,9 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
 
   return (
     <div className="min-h-[100dvh] min-w-0 bg-ivory-bg">
-      {menuMounted && (
-        <div
-          className="fixed inset-0 z-[54]"
-          aria-hidden
-          onClick={() => setMenuOpen(false)}
-        />
-      )}
       <header
         className={cn(
-          "sticky top-safe border-b bg-ivory-navy backdrop-blur supports-[backdrop-filter]:bg-ivory-navy/95",
-          menuMounted ? "z-[55]" : "z-40",
+          "sticky top-safe border-b bg-ivory-navy backdrop-blur supports-[backdrop-filter]:bg-ivory-navy/95 z-40",
           navigationLocked ? "border-amber-400/60" : "border-[#0a1509]",
           "transition-colors duration-300"
         )}
@@ -633,8 +627,8 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                 "transition-all duration-200 ease-out"
               )}
             >
-              <QrCode
-                className="w-4 h-4 text-[#4cde6a] transition-transform duration-300 ease-out group-hover:rotate-[15deg]"
+              <Stethoscope
+                className="w-4 h-4 text-[#4cde6a] transition-transform duration-300 ease-out group-hover:scale-110"
                 aria-hidden
               />
             </div>
@@ -724,41 +718,11 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
               />
             )}
 
-            {alertCount > 0 && (
-              <Link href="/alerts">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="relative text-[#8ab89a] hover:text-white hover:bg-white/10"
-                  aria-label={lh.alertAria(alertCount)}
-                  data-testid="alert-bell"
-                >
-                  <AlertTriangle
-                    className={cn(
-                      "w-4 h-4 transition-colors duration-200",
-                      alertCount > 5 ? "text-red-500" : "text-amber-500"
-                    )}
-                    aria-hidden
-                  />
-                  <span
-                    className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-red-400 pointer-events-none"
-                    style={{ animation: "alertPing 2s ease-out infinite" }}
-                    aria-hidden
-                  />
-                  <span
-                    key={alertCount}
-                    className={cn(
-                      "absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 text-white text-[9px]",
-                      "rounded-full flex items-center justify-center font-bold z-10",
-                      alertBadgeAnimating && "[animation:badgePop_420ms_cubic-bezier(0.68,-0.55,0.265,1.55)_forwards]"
-                    )}
-                    aria-hidden
-                  >
-                    {alertCount > 9 ? "9+" : alertCount}
-                  </span>
-                </Button>
-              </Link>
-            )}
+            <AlertsDropdown
+              alerts={alerts}
+              alertCount={alertCount}
+              badgeAnimating={alertBadgeAnimating}
+            />
 
             <div className="relative" ref={quickSettingsRef}>
               {(
@@ -873,18 +837,46 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
             </div>
           </div>
         </div>
+      </header>
 
-        {menuMounted && (
+      {menuMounted && (
+        <>
           <div
+            className="fixed inset-0 z-[54] bg-black/50 backdrop-blur-[2px]"
+            aria-hidden
+            onClick={() => setMenuOpen(false)}
+          />
+          <aside
             className={cn(
-              "border-t border-ivory-border bg-ivory-bg px-4 py-3 max-w-2xl mx-auto max-h-[75dvh] overflow-y-auto",
-              "origin-top will-change-transform",
+              "fixed inset-y-0 inset-inline-start-0 z-[55] w-[min(20rem,88vw)]",
+              "bg-ivory-bg border-e border-ivory-border shadow-2xl overflow-y-auto",
+              "transition-transform duration-220 ease-out will-change-transform",
               menuVisible
-                ? "[animation:menuReveal_220ms_cubic-bezier(0.16,1,0.3,1)_forwards]"
-                : "opacity-0 pointer-events-none"
+                ? "translate-x-0"
+                : "-translate-x-full rtl:translate-x-full pointer-events-none",
             )}
-            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}
+            style={{
+              paddingTop: "env(safe-area-inset-top)",
+              paddingBottom: "env(safe-area-inset-bottom)",
+            }}
+            role="dialog"
+            aria-modal="true"
+            aria-label={lh.bottomMenu}
+            data-testid="mobile-nav-drawer"
           >
+            <div className="flex items-center justify-between gap-2 border-b border-ivory-border px-4 py-3">
+              <p className="text-sm font-bold text-ivory-text">{lh.bottomMenu}</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setMenuOpen(false)}
+                aria-label={t.common.closeNavigationMenu}
+              >
+                <X className="w-5 h-5" aria-hidden />
+              </Button>
+            </div>
+            <div className="px-4 py-3">
             <nav className="vt-header-menu flex flex-col gap-1">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-ivory-text3 px-3 pt-1 pb-0.5">Operations</p>
               {operationMenuItems.map((item, index) => {
@@ -1152,9 +1144,10 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                 <span className="text-sm font-medium">{lh.reportIssue}</span>
               </button>
             </nav>
-          </div>
-        )}
-      </header>
+            </div>
+          </aside>
+        </>
+      )}
 
       <main
         className={cn(

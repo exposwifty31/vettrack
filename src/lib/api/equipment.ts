@@ -21,6 +21,7 @@ import type {
 } from "@/types";
 import type { EquipmentWaitlistSnapshot } from "../../../shared/equipment-waitlist.js";
 import type { EquipmentTruthResponse } from "../../../shared/equipment-truth.js";
+import type { CopilotExplainResponse } from "../../../shared/contracts/asset-copilot.v1.js";
 import { getStoredLocale, t } from "@/lib/i18n";
 import { toast } from "sonner";
 import type { PendingSyncType } from "../offline-db";
@@ -611,6 +612,11 @@ export const equipmentApi = {
       request<EquipmentWaitlistSnapshot>(`/api/equipment/${id}/waitlist`, { method: "POST" }),
     leaveWaitlist: (id: string) =>
       request<EquipmentWaitlistSnapshot>(`/api/equipment/${id}/waitlist`, { method: "DELETE" }),
+    copilotExplain: (id: string) =>
+      request<CopilotExplainResponse>(
+        `/api/equipment/${encodeURIComponent(id)}/copilot/explain`,
+        { method: "POST" },
+      ),
 };
 
 export type EquipmentApi = typeof equipmentApi;

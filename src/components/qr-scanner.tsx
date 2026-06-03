@@ -553,7 +553,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
   }
 
   return (
-    <div className="fixed top-0 left-0 right-0 qr-scanner-overlay-root z-50 bg-black flex flex-col motion-safe:animate-page-enter" data-testid="qr-scanner-overlay">
+    <div className="fixed top-0 left-0 right-0 qr-scanner-overlay-root z-[70] bg-black flex flex-col motion-safe:animate-page-enter" data-testid="qr-scanner-overlay">
       {confirmFlash && <div className="pointer-events-none absolute inset-0 z-50 bg-emerald-400/20 animate-pulse" />}
       {/* Header */}
       <div className="relative z-10 flex items-center justify-between px-4 pb-3 bg-gradient-to-b from-black/95 to-black/65 backdrop-blur-sm" style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}>
@@ -563,7 +563,22 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
             {t.qrScanner.subtitleEquipmentQr}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          {(phase === "scanning" || phase === "init" || phase === "resolving") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-10 gap-1.5 px-2.5 text-white hover:bg-white/10"
+              onClick={() => {
+                stopScanner();
+                setPhase("manual");
+              }}
+              data-testid="btn-switch-manual-header"
+            >
+              <Keyboard className="w-4 h-4 shrink-0" aria-hidden />
+              <span className="text-xs font-semibold">{t.qrScanner.manualEnterButton}</span>
+            </Button>
+          )}
           {torchSupported && phase === "scanning" && (
             <Button
               variant="ghost"
