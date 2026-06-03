@@ -1,0 +1,602 @@
+# VetTrack — GitLab CI (migrated from .github/workflows/)
+#
+# GitLab pipeline schedules (set SCHEDULED_JOB on each):
+#   flake-detection     cron: 0 3 * * *  (03:00 UTC)
+#   workday-simulation  cron: 0 4 * * *  (04:00 UTC)
+#   e2e-simulation      cron: 0 5 * * *  (05:00 UTC)
+workflow:
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^cleaner-v/
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_MERGE_REQUEST_ID
+    - if: $CI_COMMIT_BRANCH =~ /^(main|staging|master)$/
+    - if: $CI_COMMIT_BRANCH =~ /^cursor\//
+    - when: manual
+stages:
+  - typecheck
+  - build
+  - test
+  - integration
+  - architecture
+  - deploy
+  - playwright
+  - flake-detection
+  - release-gate
+  - e2e-simulation
+  - workday-simulation
+  - staging-e2e
+  - desktop-cleaner
+variables:
+  FLAKE_REPEAT_COUNT: "3"
+.pnpm_cache: &pnpm_cache
+  key:
+    files:
+      - pnpm-lock.yaml
+  paths:
+    - node_modules/
+    - .pnpm-store/
+  policy: pull-push
+.pnpm_before: &pnpm_before
+  - npm install -g pnpm
+  - pnpm config set store-dir .pnpm-store
+  - pnpm install --frozen-lockfile
+.node_job:
+  image: node:20-alpine
+  cache: *pnpm_cache
+  before_script: *pnpm_before
+.playwright_job:
+  extends: .node_job
+  image: node:20-bookworm
+  timeout: 45m
+.postgres_service:
+  extends: .node_job
+  services:
+    - name: postgres:16
+      alias: postgres
+  variables:
+    POSTGRES_USER: vettrack
+    POSTGRES_PASSWORD: vettrack
+    POSTGRES_DB: vettrack_test
+    DATABASE_URL: postgresql://vettrack:vettrack@postgres:5432/vettrack_test
+    SESSION_SECRET: ci-test-secret-that-is-long-enough-32chars
+    PORT: "3001"
+    NODE_ENV: test
+.ci_branch_rules:
+  rules:
+    - if: $CI_MERGE_REQUEST_ID && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(main|staging)$/
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "staging"
+    - if: $CI_COMMIT_BRANCH =~ /^cursor\//
+    - when: manual
+.playwright_branch_rules:
+  rules:
+    - if: $CI_MERGE_REQUEST_ID && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(main|master|staging)$/
+    - if: $CI_COMMIT_BRANCH =~ /^(main|master|staging)$/
+# --- ci.yml -------------------------------------------------------------------
+typecheck:frontend:
+  extends: .node_job
+  stage: typecheck
+  rules:
+    - !reference [.ci_branch_rules, rules]
+  script:
+    - pnpm exec tsc --noEmit
+typecheck:server:
+  extends: .node_job
+  stage: typecheck
+  rules:
+    - !reference [.ci_branch_rules, rules]
+  script:
+    - pnpm exec tsc --noEmit --project tsconfig.server-check.json
+build:frontend:
+  extends: .node_job
+  stage: build
+  needs: [typecheck:frontend, typecheck:server]
+  rules:
+    - !reference [.ci_branch_rules, rules]
+  script:
+    - export VITE_CLERK_PUBLISHABLE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-pk_test_ci_dummy_publishable_key}"
+    - pnpm build
+test:vitest:
+  extends: .postgres_service
+  stage: test
+  needs: [build:frontend]
+  rules:
+    - !reference [.ci_branch_rules, rules]
+  script:
+    - pnpm migrate
+    - pnpm test
+integration:ops:
+  extends: .postgres_service
+  stage: integration
+  rules:
+    - !reference [.ci_branch_rules, rules]
+  script:
+    - pnpm migrate
+    - pnpm test:integration:ops
+architecture:gates:
+  extends: .node_job
+  stage: architecture
+  variables:
+    GIT_DEPTH: "0"
+  rules:
+    - !reference [.ci_branch_rules, rules]
+  script:
+    - pnpm exec tsc --noEmit
+    - pnpm exec tsc --noEmit --project tsconfig.server-check.json
+    - pnpm exec depcruise --config .dependency-cruiser.cjs --output-type err --ignore-known .dependency-cruiser-known-violations.json server src
+    - node scripts/architecture/compare-cycles.mjs
+    - |
+      TENANT_LINT_BASE="origin/main"
+      if [ -n "$CI_MERGE_REQUEST_ID" ]; then
+        TENANT_LINT_BASE="origin/${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
+      fi
+      node scripts/architecture/tenant-query-lint.mjs --warn-only --touched --base "${TENANT_LINT_BASE}" || true
+    - node scripts/architecture/collect-query-keys.mjs --warn-only || true
+    - node scripts/architecture/extract-express-routes.mjs --warn-only || true
+deploy:preflight:
+  extends: .node_job
+  stage: deploy
+  needs: [test:vitest]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push" && $RAILWAY_USE_CLI_DEPLOY == "true"
+  variables:
+    NODE_ENV: production
+    DATABASE_URL: $DATABASE_URL
+    REDIS_URL: $REDIS_URL
+    SESSION_SECRET: $SESSION_SECRET
+    CLERK_SECRET_KEY: $CLERK_SECRET_KEY
+    VITE_CLERK_PUBLISHABLE_KEY: $VITE_CLERK_PUBLISHABLE_KEY
+    ALLOWED_ORIGIN: $ALLOWED_ORIGIN
+    DB_CONFIG_ENCRYPTION_KEY: $DB_CONFIG_ENCRYPTION_KEY
+    CLERK_WEBHOOK_SECRET: $CLERK_WEBHOOK_SECRET
+    DATA_INTEGRITY_HEALTH_TOKEN: $DATA_INTEGRITY_HEALTH_TOKEN
+    PORT: "3001"
+  script:
+    - |
+      missing=0
+      for var in DATABASE_URL REDIS_URL SESSION_SECRET CLERK_SECRET_KEY VITE_CLERK_PUBLISHABLE_KEY ALLOWED_ORIGIN DB_CONFIG_ENCRYPTION_KEY CLERK_WEBHOOK_SECRET DATA_INTEGRITY_HEALTH_TOKEN; do
+        eval "val=\$$var"
+        if [ -z "$val" ]; then
+          echo "Missing $var for deploy pre-flight."
+          missing=1
+        fi
+      done
+      if [ "$missing" -eq 1 ]; then
+        echo "Skipping deploy pre-flight — required deploy variables unavailable."
+        exit 0
+      fi
+    - bash deploy.sh --check --no-color
+deploy:railway:
+  extends: .node_job
+  stage: deploy
+  needs: [test:vitest, deploy:preflight]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push" && $RAILWAY_USE_CLI_DEPLOY == "true"
+  variables:
+    NODE_ENV: production
+    DATABASE_URL: $DATABASE_URL
+    REDIS_URL: $REDIS_URL
+    SESSION_SECRET: $SESSION_SECRET
+    CLERK_SECRET_KEY: $CLERK_SECRET_KEY
+    VITE_CLERK_PUBLISHABLE_KEY: $VITE_CLERK_PUBLISHABLE_KEY
+    ALLOWED_ORIGIN: $ALLOWED_ORIGIN
+    DB_CONFIG_ENCRYPTION_KEY: $DB_CONFIG_ENCRYPTION_KEY
+    CLERK_WEBHOOK_SECRET: $CLERK_WEBHOOK_SECRET
+    DATA_INTEGRITY_HEALTH_TOKEN: $DATA_INTEGRITY_HEALTH_TOKEN
+    RAILWAY_TOKEN: $RAILWAY_TOKEN
+    RAILWAY_SERVICE: $RAILWAY_SERVICE
+    RAILWAY_USE_CLI_DEPLOY: $RAILWAY_USE_CLI_DEPLOY
+    PORT: "3001"
+  script:
+    - |
+      if [ "$RAILWAY_USE_CLI_DEPLOY" != "true" ]; then
+        echo "RAILWAY_USE_CLI_DEPLOY is not true — skipping Railway deploy."
+        exit 0
+      fi
+      if [ -z "$RAILWAY_TOKEN" ] || [ -z "$RAILWAY_SERVICE" ]; then
+        echo "RAILWAY_TOKEN or RAILWAY_SERVICE unset — skipping Railway deploy."
+        exit 0
+      fi
+    - npm install -g @railway/cli
+    - bash deploy.sh --no-color
+ci:merge-gate:
+  extends: .node_job
+  stage: deploy
+  needs:
+    - job: test:vitest
+    - job: integration:ops
+    - job: architecture:gates
+    - job: deploy:preflight
+      optional: true
+    - job: deploy:railway
+      optional: true
+  rules:
+    - !reference [.ci_branch_rules, rules]
+  script:
+    - echo "All required CI jobs succeeded."
+# --- playwright.yml -----------------------------------------------------------
+.playwright_e2e:
+  extends: .playwright_job
+  stage: playwright
+  services:
+    - name: postgres:16
+      alias: postgres
+  variables:
+    POSTGRES_USER: vettrack
+    POSTGRES_PASSWORD: vettrack
+    POSTGRES_DB: vettrack_test
+    DATABASE_URL: postgres://vettrack:vettrack@postgres:5432/vettrack_test
+    SESSION_SECRET: ci-test-secret-that-is-long-enough-32chars
+    PORT: "3001"
+    NODE_ENV: test
+    TEST_BASE_URL: http://127.0.0.1:3001
+    PLAYWRIGHT_E2E: "true"
+  rules:
+    - !reference [.playwright_branch_rules, rules]
+  script:
+    - pnpm exec playwright install --with-deps chromium
+    - export VITE_CLERK_PUBLISHABLE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-pk_test_ci_dummy_publishable_key}"
+    - NODE_ENV=production pnpm build
+    - pnpm migrate
+    - pnpm dev:api > /tmp/vettrack-playwright.log 2>&1 &
+    - |
+      for i in $(seq 1 60); do
+        if wget -q -O /dev/null http://127.0.0.1:3001/api/healthz 2>/dev/null; then
+          echo "API ready"
+          exit 0
+        fi
+        sleep 2
+      done
+      tail -n 200 /tmp/vettrack-playwright.log || true
+      exit 1
+    - pnpm seed:dev:e2e
+    - pnpm test:playwright:ci --shard=${PLAYWRIGHT_SHARD}/${PLAYWRIGHT_SHARD_TOTAL}
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - playwright-report/
+playwright:shard-1:
+  extends: .playwright_e2e
+  variables:
+    PLAYWRIGHT_SHARD: "1"
+    PLAYWRIGHT_SHARD_TOTAL: "2"
+playwright:shard-2:
+  extends: .playwright_e2e
+  variables:
+    PLAYWRIGHT_SHARD: "2"
+    PLAYWRIGHT_SHARD_TOTAL: "2"
+# --- flake-detection.yml ------------------------------------------------------
+# GitLab pipeline schedule cron: 0 3 * * *
+flake-detection:run:
+  extends: .postgres_service
+  stage: flake-detection
+  parallel:
+    matrix:
+      - FLAKE_RUN: "1"
+      - FLAKE_RUN: "2"
+      - FLAKE_RUN: "3"
+      - FLAKE_RUN: "4"
+      - FLAKE_RUN: "5"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULED_JOB == "flake-detection"
+    - if: $FLAKE_REPEAT_COUNT == "2" && $FLAKE_RUN == "3"
+      when: never
+    - if: $FLAKE_REPEAT_COUNT == "2" && $FLAKE_RUN == "4"
+      when: never
+    - if: $FLAKE_REPEAT_COUNT == "2" && $FLAKE_RUN == "5"
+      when: never
+    - if: $FLAKE_REPEAT_COUNT == "3" && $FLAKE_RUN == "4"
+      when: never
+    - if: $FLAKE_REPEAT_COUNT == "3" && $FLAKE_RUN == "5"
+      when: never
+    - if: $FLAKE_REPEAT_COUNT == "4" && $FLAKE_RUN == "5"
+      when: never
+    - when: manual
+  variables:
+    SESSION_SECRET: ci-flake-secret-that-is-long-enough-32chars
+  script:
+    - |
+      if ! echo "$FLAKE_REPEAT_COUNT" | grep -Eq '^[2-5]$'; then
+        echo "FLAKE_REPEAT_COUNT must be 2–5 (got: $FLAKE_REPEAT_COUNT)"
+        exit 1
+      fi
+    - pnpm migrate
+    - |
+      set -o pipefail
+      pnpm test -- --reporter=verbose 2>&1 | tee "flake-test-run-${FLAKE_RUN}.log"
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths:
+      - flake-test-run-*.log
+flake-detection:report:
+  extends: .node_job
+  stage: flake-detection
+  needs: [flake-detection:run]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULED_JOB == "flake-detection"
+    - when: manual
+  script:
+    - echo "Flake detection finished (FLAKE_REPEAT_COUNT=${FLAKE_REPEAT_COUNT}). Review flake-test-run-*.log artifacts."
+# --- release-gate.yml ---------------------------------------------------------
+release-gate:typecheck:
+  extends: .node_job
+  stage: release-gate
+  rules:
+    - when: manual
+  script:
+    - pnpm exec tsc --noEmit
+    - pnpm exec tsc --noEmit --project tsconfig.server-check.json
+release-gate:tests:
+  extends: .postgres_service
+  stage: release-gate
+  rules:
+    - when: manual
+  variables:
+    SESSION_SECRET: ci-release-gate-secret-32-chars-long
+  script:
+    - pnpm migrate
+    - pnpm test -- --reporter=verbose
+release-gate:i18n:
+  extends: .node_job
+  stage: release-gate
+  rules:
+    - when: manual
+  script:
+    - |
+      python3 - << 'PYEOF'
+      import json, sys
+      def flatten(d, prefix=''):
+          keys = []
+          for k, v in d.items():
+              full = prefix + '.' + k if prefix else k
+              if isinstance(v, dict):
+                  keys.extend(flatten(v, full))
+              else:
+                  keys.append(full)
+          return keys
+      with open('locales/en.json', encoding='utf-8') as f: en = json.load(f)
+      with open('locales/he.json', encoding='utf-8') as f: he = json.load(f)
+      en_keys = set(flatten(en))
+      he_keys = set(flatten(he))
+      only_en = sorted(en_keys - he_keys)
+      only_he = sorted(he_keys - en_keys)
+      ok = True
+      if only_en:
+          for k in only_en: print(f"  {k}")
+          ok = False
+      if only_he:
+          for k in only_he: print(f"  {k}")
+          ok = False
+      if not ok:
+          sys.exit(1)
+      print(f"Locale parity: {len(en_keys)} keys")
+      PYEOF
+    - pnpm test -- tests/no-hardcoded-ui-strings.test.js
+    - pnpm test -- tests/i18n-hardening.test.ts
+release-gate:rtl-mobile:
+  extends: .node_job
+  stage: release-gate
+  rules:
+    - when: manual
+  script:
+    - pnpm test -- tests/phase-4-i18n-rtl-foundation.test.js
+    - pnpm test -- tests/phase-8-mobile-pwa.test.js
+    - pnpm test -- tests/mobile-nav-menu.test.js
+    - pnpm test -- tests/procurement-mobile-bug.test.js
+    - pnpm test -- tests/phase-3-ui-token-consistency.test.js
+release-gate:offline-sync:
+  extends: .node_job
+  stage: release-gate
+  rules:
+    - when: manual
+  script:
+    - pnpm test -- tests/offline.test.js
+    - pnpm test -- tests/sync-queue-sheet.test.js
+    - pnpm test -- tests/pwa.system.test.js
+release-gate:workflows:
+  extends: .postgres_service
+  stage: release-gate
+  rules:
+    - when: manual
+  variables:
+    SESSION_SECRET: ci-release-gate-secret-32-chars-long
+  script:
+    - pnpm migrate
+    - pnpm test -- tests/medication-calculations.test.ts
+    - pnpm test -- tests/equipment-scan-lifecycle.test.ts
+    - pnpm test -- tests/auth-hardening.test.ts
+    - pnpm test -- tests/multi-tenancy-hardening.test.js
+    - pnpm test -- tests/data-integrity-hardening.test.js
+    - pnpm test -- tests/phase-5-error-contract.test.js tests/phase-5-error-shape-guard.test.js
+    - pnpm test -- tests/phase-6-state-consistency.test.js
+release-gate:accessibility:
+  extends: .node_job
+  stage: release-gate
+  rules:
+    - when: manual
+  script:
+    - pnpm test -- tests/ui-reduced-motion-hardening.test.js
+    - pnpm test -- tests/route-registration.test.js
+    - pnpm test -- tests/frontend-routing-structure.test.js
+    - pnpm test -- tests/server-bootstrap-structure.test.js
+release-gate:verdict:
+  extends: .node_job
+  stage: release-gate
+  rules:
+    - when: manual
+  needs:
+    - release-gate:typecheck
+    - release-gate:tests
+    - release-gate:i18n
+    - release-gate:rtl-mobile
+    - release-gate:offline-sync
+    - release-gate:workflows
+    - release-gate:accessibility
+  script:
+    - echo "All release gates passed. Build is pilot-ready."
+# --- e2e-simulation-nightly.yml -----------------------------------------------
+# GitLab pipeline schedule cron: 0 5 * * *
+e2e-simulation:nightly:
+  extends: .playwright_job
+  stage: e2e-simulation
+  allow_failure: true
+  services:
+    - name: postgres:16
+      alias: postgres
+  variables:
+    POSTGRES_USER: vettrack
+    POSTGRES_PASSWORD: vettrack
+    POSTGRES_DB: vettrack_test
+    DATABASE_URL: postgres://vettrack:vettrack@postgres:5432/vettrack_test
+    SESSION_SECRET: ci-test-secret-that-is-long-enough-32chars
+    PORT: "3001"
+    NODE_ENV: test
+    TEST_BASE_URL: http://127.0.0.1:3001
+    PLAYWRIGHT_E2E: "true"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULED_JOB == "e2e-simulation"
+    - when: manual
+  script:
+    - pnpm exec playwright install --with-deps chromium
+    - export VITE_CLERK_PUBLISHABLE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-pk_test_ci_dummy_publishable_key}"
+    - NODE_ENV=production pnpm build
+    - pnpm migrate
+    - pnpm dev:api > /tmp/vettrack-simulation.log 2>&1 &
+    - |
+      for i in $(seq 1 60); do
+        if wget -q -O /dev/null http://127.0.0.1:3001/api/healthz 2>/dev/null; then exit 0; fi
+        sleep 2
+      done
+      tail -n 200 /tmp/vettrack-simulation.log || true
+      exit 1
+    - pnpm seed:dev:e2e
+    - pnpm test:playwright:workday --reporter=list
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - playwright-report/
+# --- workday-simulation-nightly.yml -------------------------------------------
+# GitLab pipeline schedule cron: 0 4 * * *
+workday-simulation:nightly:
+  extends: .playwright_job
+  stage: workday-simulation
+  allow_failure: true
+  variables:
+    STAGING_E2E_CONFIRM: "yes"
+    TEST_BASE_URL: $TEST_BASE_URL_STAGING
+    STAGING_E2E_PASSWORD: $STAGING_E2E_PASSWORD_STAGING
+    CLERK_SECRET_KEY: $CLERK_SECRET_KEY_STAGING
+    VITE_CLERK_PUBLISHABLE_KEY: $VITE_CLERK_PUBLISHABLE_KEY_STAGING
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULED_JOB == "workday-simulation"
+    - when: manual
+  script:
+    - |
+      if [ -z "$TEST_BASE_URL" ]; then
+        echo "TEST_BASE_URL_STAGING not configured — skipping"
+        exit 0
+      fi
+    - git fetch origin staging || true
+    - git checkout staging || true
+    - pnpm exec playwright install --with-deps chromium
+    - pnpm test:playwright:workday --reporter=list
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths:
+      - artifacts/
+# --- staging-e2e-manual.yml ---------------------------------------------------
+staging-e2e:manual:
+  extends: .playwright_job
+  stage: staging-e2e
+  rules:
+    - if: $CI_COMMIT_BRANCH == "staging"
+      when: manual
+    - when: never
+  variables:
+    STAGING_E2E_CONFIRM: "yes"
+    NODE_ENV: test
+    DATABASE_URL: $DATABASE_URL_STAGING
+    CLERK_SECRET_KEY: $CLERK_SECRET_KEY_STAGING
+    VITE_CLERK_PUBLISHABLE_KEY: $VITE_CLERK_PUBLISHABLE_KEY_STAGING
+    STAGING_E2E_PASSWORD: $STAGING_E2E_PASSWORD_STAGING
+    TEST_BASE_URL: $TEST_BASE_URL_STAGING
+  script:
+    - pnpm exec playwright install --with-deps chromium
+    - pnpm staging:seed
+    - pnpm test:staging:e2e
+    - pnpm test:staging:walkthrough
+  after_script:
+    - pnpm staging:cleanup || true
+# --- desktop-cleaner-release.yml ----------------------------------------------
+desktop-cleaner:test:
+  image: python:3.12-bookworm
+  stage: desktop-cleaner
+  before_script:
+    - npm install -g pnpm
+    - apt-get update && apt-get install -y libegl1 libxcb-cursor0 libxcb-xinerama0 libxkbcommon-x11-0 libdbus-1-3
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+      changes:
+        - desktop/cleaner/**/*
+        - .gitlab-ci.yml
+    - if: $CI_COMMIT_TAG =~ /^cleaner-v/
+    - when: manual
+  variables:
+    QT_QPA_PLATFORM: offscreen
+  script:
+    - cd desktop/cleaner && pip install -e ".[dev]" && pytest
+.desktop-cleaner_build:
+  stage: desktop-cleaner
+  needs: [desktop-cleaner:test]
+  before_script:
+    - npm install -g pnpm
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^cleaner-v/
+    - when: manual
+desktop-cleaner:build:linux:
+  extends: .desktop-cleaner_build
+  image: python:3.12-bookworm
+  before_script:
+    - npm install -g pnpm
+    - apt-get update && apt-get install -y libegl1 libxcb-cursor0 libxcb-xinerama0 libxkbcommon-x11-0 libdbus-1-3
+  script:
+    - cd desktop/cleaner && pip install -e . pyinstaller && pyinstaller vettrack_cleaner.spec
+    - cd desktop/cleaner/dist && zip -r ../vettrack-cleaner-Linux.zip .
+  artifacts:
+    paths: [desktop/cleaner/vettrack-cleaner-Linux.zip]
+desktop-cleaner:build:windows:
+  extends: .desktop-cleaner_build
+  image: python:3.12
+  tags: [saas-windows-medium-amd64]
+  script:
+    - cd desktop/cleaner && pip install -e . pyinstaller && pyinstaller vettrack_cleaner.spec
+    - powershell Compress-Archive -Path dist\* -DestinationPath vettrack-cleaner-Windows.zip
+  artifacts:
+    paths: [desktop/cleaner/vettrack-cleaner-Windows.zip]
+desktop-cleaner:build:macos:
+  extends: .desktop-cleaner_build
+  image: python:3.12
+  tags: [saas-macos-medium-m1]
+  script:
+    - cd desktop/cleaner && pip install -e . pyinstaller && pyinstaller vettrack_cleaner.spec
+    - cd desktop/cleaner/dist && zip -r ../vettrack-cleaner-macOS.zip .
+  artifacts:
+    paths: [desktop/cleaner/vettrack-cleaner-macOS.zip]
+desktop-cleaner:release:
+  image: alpine:3.20
+  stage: desktop-cleaner
+  needs: [desktop-cleaner:build:linux, desktop-cleaner:build:windows, desktop-cleaner:build:macos]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^cleaner-v/
+  before_script:
+    - npm install -g pnpm
+  script:
+    - ls -la desktop/cleaner/*.zip
+  artifacts:
+    paths: [desktop/cleaner/*.zip]
+# Migrated from .github/workflows/ on 2026-06-03
+# Original GitHub Actions workflows preserved in .github/workflows/ for future use
