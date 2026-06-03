@@ -79,6 +79,7 @@ This codebase has few classic feature flags; use these practical toggles:
 - Omit `CLERK_SECRET_KEY` in `NODE_ENV=development`: enables dev auth bypass.
 - Stability dashboard "Testing Mode" (`/stability`) acts as a safe CRUD test toggle.
 - `x-dev-role-override` + `x-dev-user-id-override` headers: mock auth personas for backend tests.
+- **Asset Copilot + Claude:** set `ENABLE_ASSET_COPILOT=true`, add `ANTHROPIC_API_KEY`, then `ASSET_COPILOT_LLM_ENABLED=true` for Claude narration (template-only works without the key). Keys stay server-side only — never `VITE_*`.
 
 ---
 
