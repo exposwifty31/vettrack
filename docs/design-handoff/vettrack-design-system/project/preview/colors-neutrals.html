@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../colors_and_type.css" />
+<link rel="stylesheet" href="_shell.css" />
+<style>
+  .row5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 10px; }
+  .chip {
+    height: 64px; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--ivory-border); display: flex; align-items: end; justify-content: space-between;
+  }
+  .name { font-size: 11px; font-weight: 700; }
+  .hex  { font-family: var(--font-mono); font-size: 10px; opacity: 0.75; }
+  .legend { font-size: 11px; color: var(--ivory-text-3); margin-top: 4px; }
+</style>
+</head>
+<body>
+  <div class="row5">
+    <div class="chip" style="background:#f3f1eb;color:#111a12">
+      <span class="name">bg</span><span class="hex">#f3f1eb</span>
+    </div>
+    <div class="chip" style="background:#ffffff;color:#111a12">
+      <span class="name">surface</span><span class="hex">#ffffff</span>
+    </div>
+    <div class="chip" style="background:#d4d0c8;color:#111a12">
+      <span class="name">border</span><span class="hex">#d4d0c8</span>
+    </div>
+    <div class="chip" style="background:#b8b4aa;color:#111a12">
+      <span class="name">border md</span><span class="hex">#b8b4aa</span>
+    </div>
+    <div class="chip" style="background:#111a12;color:#ece9e0">
+      <span class="name">text</span><span class="hex">#111a12</span>
+    </div>
+  </div>
+  <div class="row5">
+    <div class="chip" style="background:#354838;color:#ece9e0">
+      <span class="name">text 2</span><span class="hex">#354838</span>
+    </div>
+    <div class="chip" style="background:#7a8a7e;color:#ffffff">
+      <span class="name">text 3</span><span class="hex">#7a8a7e</span>
+    </div>
+    <div class="chip" style="background:#f0ede6;color:#111a12">
+      <span class="name">muted</span><span class="hex">#f0ede6</span>
+    </div>
+    <div class="chip" style="background:#e9e5dd;color:#111a12">
+      <span class="name">accent</span><span class="hex">#e9e5dd</span>
+    </div>
+    <div class="chip" style="background:#fafaf8;color:#111a12">
+      <span class="name">card alt</span><span class="hex">#fafaf8</span>
+    </div>
+  </div>
+  <div class="legend">Warm parchment page over crisp white cards. Borders are putty-grey, not cool grey.</div>
+</body>
+</html>

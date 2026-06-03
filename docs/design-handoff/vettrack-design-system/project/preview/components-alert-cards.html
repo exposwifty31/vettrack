@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../colors_and_type.css" />
+<link rel="stylesheet" href="_shell.css" />
+<style>
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .alert {
+    border: 1px solid var(--ivory-border); border-radius: 12px;
+    background: var(--ivory-surface); padding: 12px;
+    border-left-width: 3px; display: flex; gap: 10px; align-items: start;
+  }
+  .alert.ok   { border-left-color: #16a34a; }
+  .alert.warn { border-left-color: #d97706; }
+  .alert.err  { border-left-color: #dc2626; }
+  .icon { width: 28px; height: 28px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .alert.ok   .icon { background: #f0faf2; color: #16a34a; }
+  .alert.warn .icon { background: #fffbeb; color: #d97706; }
+  .alert.err  .icon { background: #fff1f1; color: #dc2626; }
+  .icon svg { width: 15px; height: 15px; }
+  .title { font: 700 13px/1.2 var(--font-sans); color: var(--ivory-text); margin-bottom: 2px; }
+  .body  { font: 400 11.5px/1.4 var(--font-sans); color: var(--ivory-text-3); }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="alert err">
+      <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+      <div><div class="title">3 overdue checks</div><div class="body">Defibrillator EQ-0492 last checked 9 days ago</div></div>
+    </div>
+    <div class="alert warn">
+      <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+      <div><div class="title">2 devices in maintenance</div><div class="body">ICU 1 monitor · OR-3 syringe pump</div></div>
+    </div>
+    <div class="alert ok">
+      <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+      <div><div class="title">42 devices healthy</div><div class="body">All routine checks current</div></div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>VetTrack — Equipment v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #F0EFE9;
+    --surface:  #FAFAF7;
+    --surface2: #EEEEE8;
+    --border:   rgba(0,0,0,0.09);
+    --border-strong: rgba(0,0,0,0.16);
+    --text-1: #1A1F1C;
+    --text-2: #5A5F58;
+    --text-3: #9EA39B;
+    --green:  #1E3A2F;
+    --green-2:#2D5C45;
+    --green-t:#E6EFE9;
+    --amber:  #B86E1F;
+    --amber-t:#FBF0E4;
+    --red:    #B03020;
+    --red-t:  #FAEAE8;
+    --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: #2C2C2A;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; font-family: 'DM Sans', sans-serif;
+    padding: 40px 20px;
+  }
+  .phone {
+    width: 390px; height: 844px;
+    background: var(--bg);
+    border-radius: 52px; overflow: hidden; position: relative;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 30px 80px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(0,0,0,0.3);
+    display: flex; flex-direction: column;
+  }
+  .island {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    width: 120px; height: 34px; background: #0a0a0a; border-radius: 20px; z-index: 100;
+  }
+
+  /* STATUS BAR */
+  .sb {
+    height: 54px; display: flex; align-items: flex-end;
+    justify-content: space-between; padding: 0 28px 8px; flex-shrink: 0;
+  }
+  .sb .t { font-family: 'DM Mono', monospace; font-size: 15px; font-weight: 500; color: var(--text-1); letter-spacing: -0.3px; }
+  .sb .icons { display: flex; gap: 6px; align-items: center; color: var(--text-1); }
+
+  /* HEADER */
+  .hdr {
+    padding: 6px 20px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .hdr-l { display: flex; align-items: center; gap: 10px; }
+  .back {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .hdr-title { font-size: 16px; font-weight: 600; color: var(--text-1); letter-spacing: -0.3px; }
+  .hdr-r { display: flex; gap: 8px; }
+  .hdr-btn {
+    height: 32px; padding: 0 12px; border-radius: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+    font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
+    color: var(--text-2); cursor: pointer; display: flex; align-items: center; gap: 5px;
+  }
+  .hdr-btn.primary { background: var(--green); color: white; border-color: var(--green); }
+
+  /* SEARCH */
+  .search-row {
+    padding: 10px 16px 0;
+    flex-shrink: 0;
+  }
+  .search {
+    height: 38px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 8px;
+    display: flex; align-items: center; gap: 8px; padding: 0 12px;
+  }
+  .search svg { color: var(--text-3); flex-shrink: 0; }
+  .search span { font-size: 13px; color: var(--text-3); }
+
+  /* FILTERS */
+  .filters {
+    display: flex; gap: 6px; padding: 8px 16px 10px;
+    overflow-x: auto; flex-shrink: 0;
+  }
+  .filters::-webkit-scrollbar { display: none; }
+  .fc {
+    flex-shrink: 0; padding: 4px 11px; border-radius: 6px;
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
+    white-space: nowrap;
+  }
+  .fc.on { background: var(--green); color: white; border-color: var(--green); }
+  .fc.warn { background: var(--amber-t); color: var(--amber); border-color: rgba(184,110,31,0.2); }
+  .fc.err  { background: var(--red-t);   color: var(--red);   border-color: rgba(176,48,32,0.2); }
+
+  /* STATS ROW */
+  .stats {
+    display: flex; padding: 0 16px 10px; gap: 8px; flex-shrink: 0;
+  }
+  .stat {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 12px;
+  }
+  .stat .v { font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 500; color: var(--text-1); letter-spacing: -0.5px; line-height: 1; }
+  .stat .l { font-size: 10px; color: var(--text-3); margin-top: 3px; letter-spacing: 0.2px; }
+  .stat.warn .v { color: var(--amber); }
+  .stat.err  .v { color: var(--red); }
+
+  /* LIST */
+  .scroll {
+    flex: 1; overflow-y: auto; padding: 0 0 88px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .scroll::-webkit-scrollbar { display: none; }
+
+  /* Section header */
+  .sec {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 20px 6px;
+    position: sticky; top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+  .sec-label {
+    font-size: 10px; font-weight: 500; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--text-3);
+  }
+  .sec-line { flex: 1; height: 1px; background: var(--border); }
+  .sec-count {
+    font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-3);
+  }
+
+  /* Row */
+  .row {
+    display: flex; align-items: center;
+    padding: 11px 20px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px; cursor: pointer;
+    transition: background 0.1s;
+  }
+  .row:active { background: var(--surface2); }
+
+  /* Status bar on left edge */
+  .row-bar {
+    width: 3px; height: 36px; border-radius: 2px;
+    flex-shrink: 0; background: var(--surface2);
+  }
+  .row-bar.ok   { background: #4A9B6A; }
+  .row-bar.warn { background: var(--amber); }
+  .row-bar.err  { background: var(--red); }
+  .row-bar.use  { background: var(--green); }
+
+  .row-body { flex: 1; min-width: 0; }
+  .row-name {
+    font-size: 14px; font-weight: 500; color: var(--text-1);
+    letter-spacing: -0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .row-sub {
+    display: flex; align-items: center; gap: 5px; margin-top: 2px;
+  }
+  .row-id {
+    font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-3);
+  }
+  .dot { width: 2px; height: 2px; border-radius: 50%; background: var(--text-3); opacity: 0.5; }
+  .row-loc { font-size: 11px; color: var(--text-3); }
+
+  .row-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+  .pill {
+    padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 500; letter-spacing: 0.1px;
+  }
+  .pill.ok   { background: var(--green-t); color: var(--green-2); }
+  .pill.warn { background: var(--amber-t); color: var(--amber); }
+  .pill.err  { background: var(--red-t);   color: var(--red); }
+  .pill.use  { background: rgba(30,58,47,0.1); color: var(--green); }
+  .row-time {
+    font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-3);
+  }
+
+  /* Bottom nav */
+  .nav {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 88px;
+    background: rgba(240,239,233,0.94); backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: flex-start; justify-content: space-around; padding-top: 10px;
+  }
+  .ni { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; cursor: pointer; padding-top: 2px; }
+  .ni svg { width: 22px; height: 22px; color: var(--text-3); }
+  .ni.on svg { color: var(--green); }
+  .nl { font-size: 10px; font-weight: 500; color: var(--text-3); }
+  .ni.on .nl { color: var(--green); }
+  .nfab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 2px; cursor: pointer; }
+  .fab {
+    width: 48px; height: 48px; border-radius: 16px; background: var(--green);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 14px rgba(30,58,47,0.4); margin-top: -14px;
+  }
+  .fab svg { color: white; width: 22px; height: 22px; }
+  .fabl { font-size: 10px; font-weight: 500; color: var(--green); }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="island"></div>
+
+  <div class="sb">
+    <span class="t">9:41</span>
+    <div class="icons">
+      <svg width="17" height="12" viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity="0.3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity="0.5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity="0.7"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="currentColor" stroke-opacity="0.35"/><rect x="2" y="2" width="16" height="8" rx="2" fill="currentColor"/><path d="M23 4.5V7.5C23.8 7.2 24.5 6.5 24.5 6C24.5 5.5 23.8 4.8 23 4.5Z" fill="currentColor" opacity="0.4"/></svg>
+    </div>
+  </div>
+
+  <div class="hdr">
+    <div class="hdr-l">
+      <div class="back">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 2.5L4.5 7L9 11.5" stroke="#1A1F1C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="hdr-title">Equipment</span>
+    </div>
+    <div class="hdr-r">
+      <button class="hdr-btn">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 3h10M3 6h6M5 9h2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Filter
+      </button>
+      <button class="hdr-btn primary">+ Add</button>
+    </div>
+  </div>
+
+  <div class="search-row">
+    <div class="search">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M10 10L13 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+      <span>Search name or ID…</span>
+    </div>
+  </div>
+
+  <div class="filters">
+    <div class="fc on">All · 34</div>
+    <div class="fc">Available · 28</div>
+    <div class="fc">In use · 4</div>
+    <div class="fc warn">Restock · 2</div>
+    <div class="fc err">Overdue · 1</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="v">34</div><div class="l">TOTAL</div></div>
+    <div class="stat"><div class="v">28</div><div class="l">AVAILABLE</div></div>
+    <div class="stat warn"><div class="v">2</div><div class="l">RESTOCK</div></div>
+    <div class="stat err"><div class="v">1</div><div class="l">OVERDUE</div></div>
+  </div>
+
+  <div class="scroll">
+
+    <div class="sec">
+      <span class="sec-label">Needs attention</span>
+      <div class="sec-line"></div>
+      <span class="sec-count">2</span>
+    </div>
+
+    <div class="row">
+      <div class="row-bar err"></div>
+      <div class="row-body">
+        <div class="row-name">Defibrillator DEF-01</div>
+        <div class="row-sub">
+          <span class="row-id">DEF-01</span>
+          <span class="dot"></span>
+          <span class="row-loc">ICU 1 · Bay 2</span>
+        </div>
+      </div>
+      <div class="row-right">
+        <div class="pill err">Overdue check</div>
+        <div class="row-time">3d ago</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="row-bar warn"></div>
+      <div class="row-body">
+        <div class="row-name">Crash Cart C-2</div>
+        <div class="row-sub">
+          <span class="row-id">CC-02</span>
+          <span class="dot"></span>
+          <span class="row-loc">ICU 2 · Corridor</span>
+        </div>
+      </div>
+      <div class="row-right">
+        <div class="pill warn">Low stock</div>
+        <div class="row-time">2h ago</div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <span class="sec-label">In use</span>
+      <div class="sec-line"></div>
+      <span class="sec-count">4</span>
+    </div>
+
+    <div class="row">
+      <div class="row-bar use"></div>
+      <div class="row-body">
+        <div class="row-name">IV Pump IVP-03</div>
+        <div class="row-sub">
+          <span class="row-id">IVP-03</span>
+          <span class="dot"></span>
+          <span class="row-loc" style="color:var(--green-2);font-weight:500">Maya · Bay 2</span>
+        </div>
+      </div>
+      <div class="row-right">
+        <div class="pill use">In use</div>
+        <div class="row-time">Since 8:12</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="row-bar use"></div>
+      <div class="row-body">
+        <div class="row-name">Ventilator VT-02</div>
+        <div class="row-sub">
+          <span class="row-id">VT-02</span>
+          <span class="dot"></span>
+          <span class="row-loc" style="color:var(--green-2);font-weight:500">Daniel · Bay 5</span>
+        </div>
+      </div>
+      <div class="row-right">
+        <div class="pill use">In use</div>
+        <div class="row-time">Since 7:40</div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <span class="sec-label">Available</span>
+      <div class="sec-line"></div>
+      <span class="sec-count">28</span>
+    </div>
+
+    <div class="row">
+      <div class="row-bar ok"></div>
+      <div class="row-body">
+        <div class="row-name">IV Pump IVP-07</div>
+        <div class="row-sub">
+          <span class="row-id">IVP-07</span>
+          <span class="dot"></span>
+          <span class="row-loc">ICU 1 · Bay 4</span>
+        </div>
+      </div>
+      <div class="row-right">
+        <div class="pill ok">Available</div>
+        <div class="row-time">12m ago</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="row-bar ok"></div>
+      <div class="row-body">
+        <div class="row-name">Pulse Oximeter PO-3</div>
+        <div class="row-sub">
+          <span class="row-id">PO-03</span>
+          <span class="dot"></span>
+          <span class="row-loc">ICU 2 · Storage</span>
+        </div>
+      </div>
+      <div class="row-right">
+        <div class="pill ok">Available</div>
+        <div class="row-time">34m ago</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="row-bar ok"></div>
+      <div class="row-body">
+        <div class="row-name">Ventilator VT-01</div>
+        <div class="row-sub">
+          <span class="row-id">VT-01</span>
+          <span class="dot"></span>
+          <span class="row-loc">ICU 1 · Bay 1</span>
+        </div>
+      </div>
+      <div class="row-right">
+        <div class="pill ok">Available</div>
+        <div class="row-time">1h ago</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="row-bar ok"></div>
+      <div class="row-body">
+        <div class="row-name">Patient Scale SC-2</div>
+        <div class="row-sub">
+          <span class="row-id">SC-02</span>
+          <span class="dot"></span>
+          <span class="row-loc">ICU 1 · Entrance</span>
+        </div>
+      </div>
+      <div class="row-right">
+        <div class="pill ok">Available</div>
+        <div class="row-time">2h ago</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="row-bar ok"></div>
+      <div class="row-body">
+        <div class="row-name">ECG Monitor ECG-4</div>
+        <div class="row-sub">
+          <span class="row-id">ECG-04</span>
+          <span class="dot"></span>
+          <span class="row-loc">ICU 2 · Bay 3</span>
+        </div>
+      </div>
+      <div class="row-right">
+        <div class="pill ok">Available</div>
+        <div class="row-time">3h ago</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="nav">
+    <div class="ni">
+      <svg viewBox="0 0 22 22" fill="none"><path d="M3 9.5L11 3L19 9.5V19H14V14H8V19H3V9.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/></svg>
+      <span class="nl">Home</span>
+    </div>
+    <div class="ni on">
+      <svg viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="12" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="12" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+      <span class="nl">Equipment</span>
+    </div>
+    <div class="nfab">
+      <div class="fab">
+        <svg viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.2" stroke="white" stroke-width="1.5"/><rect x="12" y="3" width="7" height="7" rx="1.2" stroke="white" stroke-width="1.5"/><rect x="3" y="12" width="7" height="7" rx="1.2" stroke="white" stroke-width="1.5"/><path d="M15.5 12v7M12 15.5h7" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+      <span class="fabl">Scan</span>
+    </div>
+    <div class="ni">
+      <svg viewBox="0 0 22 22" fill="none"><path d="M11 3L13.5 8.5H19L14.5 12L16.5 18L11 14.5L5.5 18L7.5 12L3 8.5H8.5L11 3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      <span class="nl">Recap</span>
+    </div>
+    <div class="ni">
+      <svg viewBox="0 0 22 22" fill="none"><path d="M11 2C8.2 2 6 4.2 6 7V12L4 15H18L16 12V7C16 4.2 13.8 2 11 2Z" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M9 15C9 16.1 9.9 17 11 17C12.1 17 13 16.1 13 15" stroke="currentColor" stroke-width="1.5"/></svg>
+      <span class="nl">Alerts</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

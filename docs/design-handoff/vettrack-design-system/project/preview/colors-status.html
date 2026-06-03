@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../colors_and_type.css" />
+<link rel="stylesheet" href="_shell.css" />
+<style>
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .item { display: flex; flex-direction: column; gap: 8px; }
+  .swatch {
+    height: 56px; border-radius: 10px; display: flex; align-items: flex-end; padding: 8px 10px;
+    color: #fff; font-family: var(--font-mono); font-size: 10.5px;
+  }
+  .label { font-size: 11.5px; font-weight: 700; color: var(--ivory-text); }
+  .role  { font-size: 10.5px; color: var(--ivory-text-3); }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="item">
+      <div class="swatch" style="background:#16a34a">#16a34a</div>
+      <div class="label">OK</div>
+      <div class="role">Operational · success toasts</div>
+    </div>
+    <div class="item">
+      <div class="swatch" style="background:#dc2626">#dc2626</div>
+      <div class="label">Issue / destructive</div>
+      <div class="role">Review needed · delete</div>
+    </div>
+    <div class="item">
+      <div class="swatch" style="background:#d97706">#d97706</div>
+      <div class="label">Maintenance / warn</div>
+      <div class="role">Due check · scheduled work</div>
+    </div>
+    <div class="item">
+      <div class="swatch" style="background:#2563eb">#2563eb</div>
+      <div class="label">Sterilized / info</div>
+      <div class="role">Sterilized · info chips</div>
+    </div>
+  </div>
+</body>
+</html>

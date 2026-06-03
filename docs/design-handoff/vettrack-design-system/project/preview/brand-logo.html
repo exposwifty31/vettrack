@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../colors_and_type.css" />
+<link rel="stylesheet" href="_shell.css" />
+<style>
+  .row { display: flex; gap: 24px; align-items: center; }
+  .frame { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .navy-bg { background: #0f1f11; padding: 18px; border-radius: 16px; display: flex; align-items: center; justify-content: center; }
+  .ivory-bg { background: var(--ivory-bg); padding: 18px; border-radius: 16px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--ivory-border); }
+  img.app  { width: 84px; height: 84px; }
+  .lockup { display: flex; align-items: center; gap: 12px; }
+  .lock-mark {
+    width: 44px; height: 44px; border-radius: 14px;
+    background: var(--primary); color: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 16px -8px rgb(15 31 17 / 0.4);
+  }
+  .lock-mark svg { width: 22px; height: 22px; }
+  .word { font: 800 26px/1 var(--font-sans); letter-spacing: -0.02em; color: var(--ivory-text); }
+  .tag  { font: 500 11px/1 var(--font-sans); color: var(--ivory-text-3); margin-top: 4px; }
+  .label { font: 500 10.5px/1 var(--font-mono); color: var(--ivory-text-3); }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="frame">
+      <div class="navy-bg"><img class="app" src="../assets/icon-192.png" alt="VetTrack app icon" /></div>
+      <span class="label">App icon · #0f1f11</span>
+    </div>
+    <div class="frame">
+      <div class="ivory-bg"><img class="app" src="../assets/icon-192.png" alt="VetTrack app icon ivory" style="filter: drop-shadow(0 8px 12px rgb(15 31 17 / 0.18))" /></div>
+      <span class="label">App icon · Ivory bg</span>
+    </div>
+    <div class="frame" style="flex:1">
+      <div class="lockup">
+        <span class="lock-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3M14 17h3M14 20h7M17 14v7"/></svg></span>
+        <div>
+          <div class="word">VetTrack</div>
+          <div class="tag">ICU Equipment QR Tracking</div>
+        </div>
+      </div>
+      <span class="label">Horizontal lockup · marketing chrome</span>
+    </div>
+  </div>
+</body>
+</html>

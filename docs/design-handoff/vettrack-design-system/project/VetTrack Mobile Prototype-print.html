@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en" data-theme="clinical">
+<head>
+<meta charset="utf-8" />
+<title>VetTrack — Mobile prototype (print)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+<link rel="stylesheet" href="colors_and_type.css" />
+<style>
+  html, body { margin: 0; padding: 0; background: #e9eef4; }
+  body { font-family: var(--font-sans); }
+  .sheet {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 40px 24px 56px; gap: 8px;
+  }
+  .sheet + .sheet { border-top: 1px dashed #c2ccd8; }
+  .cap { text-align: center; max-width: 420px; margin-bottom: 8px; }
+  .cap h2 { margin: 0; font: 700 16px/1.2 var(--font-sans); color: #0f172a; letter-spacing: -0.01em; }
+  .cap p  { margin: 4px 0 0; font: 400 12px/1.5 var(--font-sans); color: #64748b; }
+
+  .phone-shell {
+    position: relative; width: 392px; border-radius: 48px;
+    background: #050a06; padding: 14px;
+    box-shadow: 0 24px 60px rgba(15,23,42,0.28), 0 0 0 1px rgba(0,0,0,0.06);
+  }
+  .phone-screen {
+    width: 100%; border-radius: 36px; overflow: hidden;
+    background: var(--background); position: relative;
+    display: flex; flex-direction: column;
+  }
+  .island {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    width: 110px; height: 32px; border-radius: 20px; background: #000; z-index: 100;
+  }
+  .status-bar {
+    height: 44px; padding: 14px 30px 0; display: flex; justify-content: space-between; align-items: center;
+    font: 600 13px/1 -apple-system, system-ui, sans-serif; color: var(--ivory-text);
+    flex-shrink: 0;
+  }
+  .status-bar .right { display: inline-flex; gap: 6px; align-items: center; }
+  .body { flex: 1; }
+  .navbar {
+    position: relative; left: 0; right: 0; z-index: 40;
+    background: var(--ivory-surface);
+    border-top: 1px solid var(--ivory-border);
+    padding: 8px 8px 22px;
+    display: flex; justify-content: space-between; align-items: end; gap: 4;
+  }
+  .navitem {
+    background: transparent; border: 0; padding: 6px 4px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    color: var(--ivory-text-3); position: relative; flex: 1; min-width: 0;
+  }
+  .navitem.active { color: var(--brand); }
+  .navitem .lbl { font-size: 10px; font-weight: 600; }
+  .navfab {
+    width: 56px; height: 56px; border-radius: 18px; flex-shrink: 0;
+    background: var(--action); color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; border: 0;
+    box-shadow: 0 10px 24px -8px var(--brand-shadow); margin-top: -16px;
+  }
+
+  @media print {
+    @page { size: A4 portrait; margin: 0.5cm; }
+    html, body { background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .sheet { break-inside: avoid; page-break-inside: avoid; break-after: page; page-break-after: always; padding: 24px 0; border-top: 0; }
+    .sheet:last-child { break-after: auto; page-break-after: auto; }
+    .phone-shell { box-shadow: 0 0 0 1px #d4d0c8; }
+    /* Freeze entrance animations at their end state — never revert to hidden base */
+    *, *::before, *::after {
+      animation-delay: -99s !important; animation-duration: .001s !important;
+      animation-iteration-count: 1 !important; animation-fill-mode: both !important;
+      animation-play-state: running !important; transition-duration: 0s !important;
+    }
+  }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="ui_kits/_shared/Icons.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/MobileTopbar.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/Cards.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/EquipmentScreenMagnetic.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/AlertsScreenMagnetic.jsx"></script>
+  <script type="text/babel" src="ui_kits/app/ShiftRecapScreen.jsx"></script>
+  <script type="text/babel" src="variants/V4Pro.jsx"></script>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    function StatusBar() {
+      return (
+        <div className="status-bar">
+          <span>9:41</span>
+          <span className="right">
+            <svg width="16" height="11" viewBox="0 0 14 10" fill="currentColor"><rect x="0" y="6" width="2" height="4" rx="0.5"/><rect x="3.5" y="4" width="2" height="6" rx="0.5"/><rect x="7" y="2" width="2" height="8" rx="0.5"/><rect x="10.5" y="0" width="2" height="10" rx="0.5"/></svg>
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M1 4.5 A10 10 0 0 1 15 4.5"/><path d="M3.5 7 A6 6 0 0 1 12.5 7"/><circle cx="8" cy="10" r="1" fill="currentColor" stroke="none"/></svg>
+            <svg width="24" height="12" viewBox="0 0 24 12" fill="none"><rect x="0.5" y="1" width="20" height="10" rx="2.5" stroke="currentColor"/><rect x="2" y="2.5" width="15" height="7" rx="1" fill="currentColor"/><rect x="21.5" y="4" width="1.5" height="4" rx="0.6" fill="currentColor"/></svg>
+          </span>
+        </div>
+      );
+    }
+
+    const NAV = [
+      { id: "home",   icon: "home",        label: "Home" },
+      { id: "equip",  icon: "boxes",       label: "Equipment" },
+      { id: "recap",  icon: "sparkles",    label: "Recap" },
+      { id: "alerts", icon: "shieldAlert", label: "Alerts", badge: 3 },
+    ];
+
+    function NavBar({ active }) {
+      // Render: home, equip, FAB, recap, alerts (FAB sits center)
+      return (
+        <nav className="navbar">
+          {["home", "equip"].map(id => {
+            const it = NAV.find(n => n.id === id);
+            return (
+              <span key={id} className={"navitem" + (active === id ? " active" : "")}>
+                <Icon name={it.icon} size={20} />
+                <span className="lbl">{it.label}</span>
+              </span>
+            );
+          })}
+          <span className="navfab"><Icon name="scanLine" size={22} /></span>
+          {["recap", "alerts"].map(id => {
+            const it = NAV.find(n => n.id === id);
+            return (
+              <span key={id} className={"navitem" + (active === id ? " active" : "")}>
+                <span style={{ position: "relative", display: "inline-flex" }}>
+                  <Icon name={it.icon} size={20} />
+                  {it.badge && (
+                    <span style={{
+                      position: "absolute", top: -6, right: -10, minWidth: 16, height: 16, padding: "0 4px",
+                      background: "#dc2626", color: "#fff", borderRadius: 999, fontSize: 10, fontWeight: 700,
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    }}>{it.badge}</span>
+                  )}
+                </span>
+                <span className="lbl">{it.label}</span>
+              </span>
+            );
+          })}
+        </nav>
+      );
+    }
+
+    function Phone({ active, children }) {
+      return (
+        <div className="phone-shell">
+          <div className="island" />
+          <div className="phone-screen" dir="ltr">
+            <StatusBar />
+            <MobileTopbar title="VetTrack" dir="ltr" />
+            <div className="body">{children}</div>
+            <NavBar active={active} />
+          </div>
+        </div>
+      );
+    }
+
+    const SCREENS = [
+      { active: "home",   cap: ["Home — your shift at a glance", "Clinical theme · one job per screen: progress, the next action, recent activity."], render: () => <V4Pro dir="ltr" /> },
+      { active: "equip",  cap: ["Equipment", "Scan-first. Health score, live status, the freshest item pulsing."], render: () => <EquipmentScreenMagnetic dir="ltr" /> },
+      { active: "recap",  cap: ["Recap — the reflecting room", "Weekly numbers, milestones, and a shareable shift card."], render: () => <ShiftRecapScreen dir="ltr" /> },
+      { active: "alerts", cap: ["Alerts", "Worst-first triage with one clear action in the thumb zone."], render: () => <AlertsScreenMagnetic dir="ltr" /> },
+    ];
+
+    function PrintDoc() {
+      return (
+        <>
+          {SCREENS.map((s, i) => (
+            <div className="sheet" key={i}>
+              <div className="cap">
+                <h2>{s.cap[0]}</h2>
+                <p>{s.cap[1]}</p>
+              </div>
+              <Phone active={s.active}>{s.render()}</Phone>
+            </div>
+          ))}
+        </>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<PrintDoc />);
+
+    // Auto-print once fonts + render settle
+    (async () => {
+      try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) {}
+      setTimeout(() => window.print(), 900);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>VetTrack — Scan Result</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #F0EFE9;
+    --surface:   #FAFAF7;
+    --surface2:  #EFEFEA;
+    --border:    rgba(0,0,0,0.08);
+    --text-primary:   #1A1F1C;
+    --text-secondary: #6B7068;
+    --text-muted:     #9EA39B;
+    --green-deep:  #1E3A2F;
+    --green-mid:   #2D5C45;
+    --green-accent:#3D7A5A;
+    --green-light: #E8F0EB;
+    --amber:       #C97B2A;
+    --amber-light: #FDF3E7;
+    --red:         #C0392B;
+    --red-light:   #FDECEA;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+    --r-sm: 10px; --r-md: 16px; --r-lg: 22px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body {
+    background:#2C2C2A; display:flex; align-items:center; justify-content:center;
+    min-height:100vh; font-family:'DM Sans',sans-serif; padding:40px 20px;
+  }
+  .phone {
+    width:390px; height:844px; background:var(--bg);
+    border-radius:52px; overflow:hidden; position:relative;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 30px 80px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(0,0,0,0.3);
+    display:flex; flex-direction:column;
+  }
+  .island { position:absolute; top:14px; left:50%; transform:translateX(-50%); width:120px; height:34px; background:#0a0a0a; border-radius:20px; z-index:100; }
+
+  .statusbar { height:54px; display:flex; align-items:flex-end; justify-content:space-between; padding:0 28px 8px; flex-shrink:0; }
+  .statusbar .time { font-family:'DM Mono',monospace; font-size:15px; font-weight:500; color:var(--text-primary); letter-spacing:-0.3px; }
+  .statusbar .icons { display:flex; gap:6px; align-items:center; color:var(--text-primary); }
+
+  .header { padding:8px 20px 14px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+  .header-left { display:flex; align-items:center; gap:10px; }
+  .icon-btn { width:36px; height:36px; border-radius:10px; background:var(--surface); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow-sm); cursor:pointer; }
+  .logo-mark { width:36px; height:36px; background:var(--green-deep); border-radius:10px; display:flex; align-items:center; justify-content:center; }
+  .brand { font-size:17px; font-weight:600; color:var(--text-primary); letter-spacing:-0.4px; }
+
+  .scroll { flex:1; overflow-y:auto; padding:0 16px 100px; -webkit-overflow-scrolling:touch; }
+  .scroll::-webkit-scrollbar { display:none; }
+
+  /* ── SCAN SUCCESS BANNER ── */
+  .scan-banner {
+    background: var(--green-deep);
+    border-radius: var(--r-lg);
+    padding: 20px;
+    margin-bottom: 12px;
+    position: relative;
+    overflow: hidden;
+    animation: fadeUp 0.3s ease both;
+  }
+  .scan-banner::before {
+    content:'';
+    position:absolute; top:-30px; right:-30px;
+    width:130px; height:130px;
+    background: radial-gradient(circle, rgba(61,122,90,0.5) 0%, transparent 70%);
+    pointer-events:none;
+  }
+  .scan-top {
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;
+  }
+  .scan-badge {
+    display:flex; align-items:center; gap:6px;
+    background: rgba(255,255,255,0.12); border-radius:100px;
+    padding: 4px 10px;
+  }
+  .scan-badge-dot { width:6px; height:6px; border-radius:50%; background:#5DB584; }
+  .scan-badge span { font-size:11px; font-weight:500; color:rgba(255,255,255,0.8); }
+  .scan-time { font-family:'DM Mono',monospace; font-size:11px; color:rgba(255,255,255,0.4); }
+
+  .scan-name { font-size:22px; font-weight:600; color:white; letter-spacing:-0.5px; line-height:1.2; margin-bottom:4px; }
+  .scan-id { font-family:'DM Mono',monospace; font-size:12px; color:rgba(255,255,255,0.45); }
+
+  .scan-meta-row {
+    display:flex; gap:16px; margin-top:16px;
+    padding-top:16px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+  .scan-meta-item { display:flex; flex-direction:column; gap:2px; }
+  .scan-meta-label { font-size:10px; color:rgba(255,255,255,0.4); letter-spacing:0.5px; text-transform:uppercase; }
+  .scan-meta-value { font-size:13px; font-weight:500; color:rgba(255,255,255,0.85); }
+
+  /* ── REQUIRED ACTIONS ── */
+  .section-label {
+    font-size:10px; font-weight:500; letter-spacing:1.2px;
+    text-transform:uppercase; color:var(--text-muted);
+    padding:0 4px; margin-bottom:8px; margin-top:4px;
+  }
+
+  .action-card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--r-md); padding:16px;
+    margin-bottom:8px; box-shadow:var(--shadow-sm);
+    animation: fadeUp 0.35s ease both;
+  }
+
+  /* Required action — amber border left */
+  .action-card.required { border-left:3px solid var(--amber); }
+  .action-card.optional { border-left:3px solid var(--surface2); }
+
+  .action-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px; }
+  .action-title { font-size:15px; font-weight:600; color:var(--text-primary); letter-spacing:-0.3px; line-height:1.3; }
+  .action-pill {
+    padding:3px 10px; border-radius:100px; font-size:11px; font-weight:500; flex-shrink:0; margin-left:8px;
+  }
+  .action-pill.req  { background:var(--amber-light); color:var(--amber); }
+  .action-pill.opt  { background:var(--surface2); color:var(--text-secondary); }
+  .action-desc { font-size:13px; color:var(--text-secondary); line-height:1.5; margin-bottom:14px; }
+
+  .action-btn {
+    width:100%; height:44px; border-radius:var(--r-sm); border:none;
+    font-family:'DM Sans',sans-serif; font-size:14px; font-weight:500;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;
+    transition: transform 0.1s;
+  }
+  .action-btn:active { transform:scale(0.98); }
+  .action-btn.primary { background:var(--green-deep); color:white; }
+  .action-btn.secondary { background:var(--surface2); color:var(--text-primary); }
+  .action-btn svg { width:15px; height:15px; }
+
+  /* ── ITEM DETAILS ── */
+  .detail-card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--r-md); padding:16px;
+    margin-bottom:8px; box-shadow:var(--shadow-sm);
+    animation: fadeUp 0.4s 0.05s ease both;
+  }
+  .detail-row {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:9px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .detail-row:last-child { border-bottom:none; padding-bottom:0; }
+  .detail-row:first-child { padding-top:0; }
+  .detail-key { font-size:13px; color:var(--text-muted); }
+  .detail-val { font-size:13px; font-weight:500; color:var(--text-primary); text-align:right; }
+  .detail-val.mono { font-family:'DM Mono',monospace; font-size:12px; }
+  .detail-val.ok   { color:var(--green-accent); }
+  .detail-val.warn { color:var(--amber); }
+
+  /* ── HISTORY ── */
+  .history-item {
+    display:flex; align-items:center; gap:12px;
+    padding:10px 0; border-bottom:1px solid var(--border);
+  }
+  .history-item:last-child { border-bottom:none; }
+  .h-dot { width:8px; height:8px; border-radius:50%; background:var(--surface2); border:1.5px solid var(--border); flex-shrink:0; }
+  .h-dot.done { background:var(--green-accent); border-color:var(--green-accent); }
+  .h-body { flex:1; }
+  .h-title { font-size:13px; font-weight:500; color:var(--text-primary); }
+  .h-meta  { font-size:11px; color:var(--text-muted); margin-top:1px; }
+  .h-time  { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted); flex-shrink:0; }
+
+  /* Bottom nav */
+  .bottomnav {
+    position:absolute; bottom:0; left:0; right:0; height:88px;
+    background:rgba(240,239,233,0.92); backdrop-filter:blur(20px);
+    border-top:1px solid var(--border);
+    display:flex; align-items:flex-start; justify-content:space-around; padding-top:10px;
+  }
+  .nav-item { display:flex; flex-direction:column; align-items:center; gap:4px; flex:1; cursor:pointer; padding-top:2px; }
+  .nav-item svg { width:22px; height:22px; color:var(--text-muted); }
+  .nav-item.active svg { color:var(--green-deep); }
+  .nav-label { font-size:10px; font-weight:500; color:var(--text-muted); }
+  .nav-item.active .nav-label { color:var(--green-deep); }
+  .nav-fab { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding-top:2px; cursor:pointer; }
+  .fab-circle { width:48px; height:48px; border-radius:16px; background:var(--green-deep); display:flex; align-items:center; justify-content:center; box-shadow:0 4px 14px rgba(30,58,47,0.4); margin-top:-14px; }
+  .fab-circle svg { color:white; width:22px; height:22px; }
+  .fab-label { font-size:10px; font-weight:500; color:var(--green-deep); }
+
+  @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="island"></div>
+
+  <div class="statusbar">
+    <span class="time">9:41</span>
+    <div class="icons">
+      <svg width="17" height="12" viewBox="0 0 17 12" fill="none"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor" opacity="0.3"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor" opacity="0.5"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor" opacity="0.7"/><rect x="13.5" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+      <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M8 2.5C10.2 2.5 12.2 3.4 13.6 4.9L15 3.5C13.2 1.6 10.7 0.5 8 0.5C5.3 0.5 2.8 1.6 1 3.5L2.4 4.9C3.8 3.4 5.8 2.5 8 2.5Z" fill="currentColor" opacity="0.5"/><circle cx="8" cy="10" r="1.5" fill="currentColor"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="currentColor" stroke-opacity="0.35"/><rect x="2" y="2" width="16" height="8" rx="2" fill="currentColor"/></svg>
+    </div>
+  </div>
+
+  <div class="header">
+    <div class="header-left">
+      <div class="icon-btn">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8L10 13" stroke="#1A1F1C" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="logo-mark">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="6" height="6" rx="1.5" fill="white"/><rect x="10" y="2" width="6" height="6" rx="1.5" fill="white" opacity="0.6"/><rect x="2" y="10" width="6" height="6" rx="1.5" fill="white" opacity="0.6"/><rect x="10" y="10" width="6" height="6" rx="1.5" fill="white" opacity="0.3"/></svg>
+      </div>
+      <span class="brand">Scan Result</span>
+    </div>
+    <div class="icon-btn">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="4" r="1.2" fill="#1A1F1C"/><circle cx="8" cy="8" r="1.2" fill="#1A1F1C"/><circle cx="8" cy="12" r="1.2" fill="#1A1F1C"/></svg>
+    </div>
+  </div>
+
+  <div class="scroll">
+
+    <!-- Scan success banner -->
+    <div class="scan-banner">
+      <div class="scan-top">
+        <div class="scan-badge">
+          <div class="scan-badge-dot"></div>
+          <span>NFC scan · success</span>
+        </div>
+        <span class="scan-time">09:41:22</span>
+      </div>
+      <div class="scan-name">Crash Cart C-2</div>
+      <div class="scan-id">CC-02</div>
+      <div class="scan-meta-row">
+        <div class="scan-meta-item">
+          <span class="scan-meta-label">Location</span>
+          <span class="scan-meta-value">ICU 2 · Corridor</span>
+        </div>
+        <div class="scan-meta-item">
+          <span class="scan-meta-label">Last scan</span>
+          <span class="scan-meta-value">2h ago</span>
+        </div>
+        <div class="scan-meta-item">
+          <span class="scan-meta-label">Assigned to</span>
+          <span class="scan-meta-value">Maya</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Required actions -->
+    <div class="section-label">Required Actions</div>
+
+    <div class="action-card required" style="animation-delay:0.05s">
+      <div class="action-top">
+        <div class="action-title">Epinephrine restock</div>
+        <div class="action-pill req">Required</div>
+      </div>
+      <div class="action-desc">Stock is below minimum threshold. Restock before returning cart to service.</div>
+      <button class="action-btn primary">
+        <svg viewBox="0 0 15 15" fill="none"><path d="M7.5 2v11M2 7.5h11" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Log restock
+      </button>
+    </div>
+
+    <div class="action-card required" style="animation-delay:0.08s">
+      <div class="action-top">
+        <div class="action-title">Run sterilization cycle</div>
+        <div class="action-pill req">Required</div>
+      </div>
+      <div class="action-desc">Sterilization is overdue by 14 hours. Complete cycle before next use.</div>
+      <button class="action-btn primary">
+        <svg viewBox="0 0 15 15" fill="none"><path d="M13 7.5A5.5 5.5 0 112 7.5" stroke="white" stroke-width="1.5" stroke-linecap="round"/><path d="M13 4.5V7.5H10" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Start cycle
+      </button>
+    </div>
+
+    <!-- Optional actions -->
+    <div class="section-label" style="margin-top:12px">Optional</div>
+
+    <div class="action-card optional" style="animation-delay:0.11s">
+      <div class="action-top">
+        <div class="action-title">Add note</div>
+        <div class="action-pill opt">Optional</div>
+      </div>
+      <button class="action-btn secondary">
+        <svg viewBox="0 0 15 15" fill="none"><path d="M2 11L2 13H4L12 5L10 3L2 11Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        Write note
+      </button>
+    </div>
+
+    <!-- Item details -->
+    <div class="section-label" style="margin-top:12px">Item Details</div>
+
+    <div class="detail-card">
+      <div class="detail-row">
+        <span class="detail-key">Type</span>
+        <span class="detail-val">Crash Cart</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-key">Serial</span>
+        <span class="detail-val mono">CC-02-2022-004</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-key">Status</span>
+        <span class="detail-val warn">Low stock</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-key">Last sterilized</span>
+        <span class="detail-val warn">Yesterday 19:12</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-key">Next check due</span>
+        <span class="detail-val">Today 22:00</span>
+      </div>
+    </div>
+
+    <!-- Scan history -->
+    <div class="section-label" style="margin-top:12px">Recent History</div>
+
+    <div class="detail-card">
+      <div class="history-item">
+        <div class="h-dot done"></div>
+        <div class="h-body">
+          <div class="h-title">Restocked · Atropine</div>
+          <div class="h-meta">Daniel</div>
+        </div>
+        <div class="h-time">2h ago</div>
+      </div>
+      <div class="history-item">
+        <div class="h-dot done"></div>
+        <div class="h-body">
+          <div class="h-title">Sterilization completed</div>
+          <div class="h-meta">Maya</div>
+        </div>
+        <div class="h-time">Yesterday</div>
+      </div>
+      <div class="history-item">
+        <div class="h-dot done"></div>
+        <div class="h-body">
+          <div class="h-title">Routine check</div>
+          <div class="h-meta">Lior</div>
+        </div>
+        <div class="h-time">2d ago</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="bottomnav">
+    <div class="nav-item">
+      <svg viewBox="0 0 22 22" fill="none"><path d="M3 9.5L11 3L19 9.5V19H14V14H8V19H3V9.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/></svg>
+      <span class="nav-label">Home</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="12" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="12" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+      <span class="nav-label">Equipment</span>
+    </div>
+    <div class="nav-fab">
+      <div class="fab-circle">
+        <svg viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.2" stroke="white" stroke-width="1.5"/><rect x="12" y="3" width="7" height="7" rx="1.2" stroke="white" stroke-width="1.5"/><rect x="3" y="12" width="7" height="7" rx="1.2" stroke="white" stroke-width="1.5"/><path d="M15.5 12v7M12 15.5h7" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+      <span class="fab-label">Scan</span>
+    </div>
+    <div class="nav-item active">
+      <svg viewBox="0 0 22 22" fill="none"><path d="M11 3L13.5 8.5H19L14.5 12L16.5 18L11 14.5L5.5 18L7.5 12L3 8.5H8.5L11 3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      <span class="nav-label">Recap</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 22 22" fill="none"><path d="M11 2C8.2 2 6 4.2 6 7V12L4 15H18L16 12V7C16 4.2 13.8 2 11 2Z" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M9 15C9 16.1 9.9 17 11 17C12.1 17 13 16.1 13 15" stroke="currentColor" stroke-width="1.5"/></svg>
+      <span class="nav-label">Alerts</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
