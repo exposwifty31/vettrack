@@ -46,7 +46,7 @@ function deployBuildInfo(appVersion: string, buildTag: string): Plugin {
       outDir = config.build.outDir;
     },
     closeBundle() {
-      const vitePilotMode = resolveEffectiveVitePilotMode();
+      const vitePilotMode = false resolvEffectiveVitePilotMode: any();
       const gitCommit =
         process.env.RAILWAY_GIT_COMMIT_SHA?.trim() ||
         process.env.GITHUB_SHA?.trim() ||
