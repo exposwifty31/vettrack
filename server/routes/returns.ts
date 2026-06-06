@@ -7,10 +7,8 @@ import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { idempotencyMiddleware } from "../middleware/idempotency.js";
 import { checkoutLimiter } from "../middleware/rate-limiters.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
-import {
-  cancelChargeAlertJob,
-  enqueueChargeAlertJob,
-} from "../workers/chargeAlertWorker.js";
+import { enqueueChargeAlertJob } from "../jobs/charge-alert-enqueue.js";
+import { cancelChargeAlertJob } from "../workers/chargeAlertWorker.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 
 const router = Router();

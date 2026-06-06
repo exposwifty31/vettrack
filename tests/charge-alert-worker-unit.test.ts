@@ -64,13 +64,13 @@ vi.mock("../server/db.js", () => ({
 // Imports (resolved AFTER mocks are registered)
 // ---------------------------------------------------------------------------
 
+import { enqueueChargeAlertJob } from "../server/jobs/charge-alert-enqueue.js";
 import {
   processChargeAlertJob,
   buildChargeAlertJobId,
-  enqueueChargeAlertJob,
-  CHARGE_ALERT_JOB_PREFIX,
   DEFAULT_PLUG_IN_DEADLINE_MINUTES,
 } from "../server/workers/chargeAlertWorker.js";
+import { CHARGE_ALERT_JOB_PREFIX } from "../server/queues/charge-alert.queue.js";
 import { sendPushToAll } from "../server/lib/push.js";
 import { db } from "../server/db.js";
 
@@ -179,38 +179,48 @@ describe("Delay calculation — normalizePlugInDeadlineMinutes", () => {
 // 2. Source-level assertion — delay formula present in worker source
 // ---------------------------------------------------------------------------
 
-describe("Worker source — delay formula contract", () => {
-  const source = fs.readFileSync(
+describe("Charge-alert source — delay formula contract", () => {
+  const enqueueSource = fs.readFileSync(
+    path.resolve(__dirname, "../server/jobs/charge-alert-enqueue.ts"),
+    "utf8",
+  );
+  const queueSource = fs.readFileSync(
+    path.resolve(__dirname, "../server/queues/charge-alert.queue.ts"),
+    "utf8",
+  );
+  const workerSource = fs.readFileSync(
     path.resolve(__dirname, "../server/workers/chargeAlertWorker.ts"),
     "utf8",
   );
 
   it("job delay is calculated as plugInDeadlineMinutes × 60 × 1000 ms", () => {
-    expect(source).toContain("normalizePlugInDeadlineMinutes(params.plugInDeadlineMinutes) * 60 * 1000");
+    expect(enqueueSource).toContain(
+      "normalizePlugInDeadlineMinutes(params.plugInDeadlineMinutes) * 60 * 1000",
+    );
   });
 
   it("queue name is 'charge-alert'", () => {
-    expect(source).toContain('CHARGE_ALERT_QUEUE_NAME = "charge-alert"');
+    expect(queueSource).toContain('CHARGE_ALERT_QUEUE_NAME = "charge-alert"');
   });
 
   it("job name is 'check-plug'", () => {
-    expect(source).toContain('CHARGE_ALERT_JOB_NAME = "check-plug"');
+    expect(queueSource).toContain('CHARGE_ALERT_JOB_NAME = "check-plug"');
   });
 
   it("job payload contains returnId, equipmentId, clinicId", () => {
-    expect(source).toContain("returnId: params.returnId");
-    expect(source).toContain("equipmentId: params.equipmentId");
-    expect(source).toContain("clinicId: params.clinicId");
+    expect(enqueueSource).toContain("returnId: params.returnId");
+    expect(enqueueSource).toContain("equipmentId: params.equipmentId");
+    expect(enqueueSource).toContain("clinicId: params.clinicId");
   });
 
   it("job is idempotent — uses a stable jobId derived from returnId", () => {
-    expect(source).toContain("jobId,");
-    expect(source).toContain("buildChargeAlertJobId(params.returnId)");
+    expect(enqueueSource).toContain("jobId,");
+    expect(enqueueSource).toContain("buildChargeAlertJobId(params.returnId)");
   });
 
   it("plugInAlertSentAt is set after push is sent (dedup guard)", () => {
-    expect(source).toContain("markChargeAlertSent");
-    expect(source).toContain("plugInAlertSentAt");
+    expect(workerSource).toContain("markChargeAlertSent");
+    expect(workerSource).toContain("plugInAlertSentAt");
   });
 });
 

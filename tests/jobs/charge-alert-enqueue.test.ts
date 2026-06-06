@@ -10,12 +10,12 @@ vi.mock("../../server/jobs/enqueue.js", () => ({
   enqueueJob: mockEnqueueJob,
 }));
 
+import { enqueueChargeAlertJob } from "../../server/jobs/charge-alert-enqueue.js";
 import {
   bindChargeAlertProducerQueue,
   buildChargeAlertJobId,
   CHARGE_ALERT_JOB_NAME,
-  enqueueChargeAlertJob,
-} from "../../server/workers/chargeAlertWorker.js";
+} from "../../server/queues/charge-alert.queue.js";
 
 describe("enqueueChargeAlertJob — enqueueJob delegation (1c-1)", () => {
   beforeEach(() => {
