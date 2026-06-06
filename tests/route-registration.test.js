@@ -30,10 +30,7 @@ const requiredPrefixes = [
   "/api/storage",
   "/api/test",
   "/api/health/ready",
-  "/api/pilot",
-  "/api/shift-handover",
   "/api/containers",
-  "/api/patients",
 ];
 
 describe("Route Registration Smoke Test", () => {

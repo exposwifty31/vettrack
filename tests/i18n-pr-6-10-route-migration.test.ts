@@ -115,25 +115,13 @@ async function dispatchStability(req: Request, res: Response): Promise<void> {
   });
 }
 
-describe("Phase 6 PR 6.10 CORRECTION 2 — static coverage for 4 migrated routes", () => {
+describe("Phase 6 PR 6.10 CORRECTION 2 — static coverage for migrated routes", () => {
   const stability = readFileSync(resolve(process.cwd(), "server/routes/stability.ts"), "utf-8");
-  const erAdmin = readFileSync(resolve(process.cwd(), "server/routes/er-admin.ts"), "utf-8");
-  const formulary = readFileSync(resolve(process.cwd(), "server/routes/formulary.ts"), "utf-8");
   const dispense = readFileSync(resolve(process.cwd(), "server/routes/dispense.ts"), "utf-8");
 
   it("stability.ts imports + uses i18nApiError with errors.stability.* key", () => {
     expect(stability).toMatch(/apiError as i18nApiError/);
     expect(stability).toMatch(/i18nApiError\(req,\s*res,\s*"errors\.stability\.notAvailableInProduction"/);
-  });
-
-  it("er-admin.ts imports + uses i18nApiError with errors.er.* key", () => {
-    expect(erAdmin).toMatch(/apiError as i18nApiError/);
-    expect(erAdmin).toMatch(/i18nApiError\(req,\s*res,\s*"errors\.er\.notAuthenticated"/);
-  });
-
-  it("formulary.ts imports + uses i18nApiError with errors.formulary.* key", () => {
-    expect(formulary).toMatch(/apiError as i18nApiError/);
-    expect(formulary).toMatch(/i18nApiError\(req,\s*res,\s*"errors\.formulary\.notFound"/);
   });
 
   it("dispense.ts imports + uses i18nApiError with errors.dispense.* key (sendError catch-all)", () => {

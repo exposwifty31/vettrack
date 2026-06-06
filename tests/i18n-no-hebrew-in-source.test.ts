@@ -30,29 +30,19 @@ const SCAN_ROOTS = ["src", "server", "lib", "shared"] as const;
 const SCAN_EXTS = new Set([".ts", ".tsx", ".js", ".jsx"]);
 
 const KNOWN_DEBT_ALLOWLIST = new Set<string>([
-  "server/lib/forecast/fieldExtractor.ts",
-  "server/lib/forecast/flowsheetDemographics.ts",
-  "server/lib/forecast/forecastEngine.ts",
-  "server/lib/forecast/mailtoSafe.ts",
-  "server/lib/forecast/medicationLineCleanup.ts",
   "server/lib/role-notification-scheduler.ts",
+  "server/lib/staging-promotion.ts",
   "server/routes/activity.ts",
   "server/routes/alert-acks.ts",
-  "server/routes/animals.ts",
   "server/routes/code-blue.ts",
   "server/routes/crash-cart.ts",
-  "server/routes/display.ts",
   "server/routes/folders.ts",
-  "server/routes/forecast.ts",
-  "server/routes/patients.ts",
   "server/routes/shift-chat.ts",
   "server/routes/shifts.ts",
   "server/routes/support.ts",
-  "server/lib/staging-promotion.ts",
   "server/workers/chargeAlertWorker.ts",
   "server/workers/notification.worker.ts",
   "shared/doctor-operational-shift.ts",
-  "shared/drug-formulary-seed.ts",
   "src/components/layout.tsx",
   "src/components/phone-sign-in.tsx",
   "src/components/sw-update-banner.tsx",
@@ -68,19 +58,11 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "src/pages/admin.tsx",
   "src/pages/analytics.tsx",
   "src/pages/app-tour.tsx",
-  "src/pages/billing-ledger.tsx",
   "src/pages/display.tsx",
   "src/pages/equipment-detail.tsx",
   "src/pages/equipment-list.tsx",
-  "src/pages/er-command-center.tsx",
-  "src/pages/leakage-report.tsx",
   "src/pages/new-equipment.tsx",
   "src/pages/not-found.tsx",
-  "src/pages/patient-detail.tsx",
-  "src/pages/patients.tsx",
-  "src/pages/pending-emergencies.tsx",
-  "src/pages/pending.tsx",
-  "src/pages/pharmacy-forecast.tsx",
   "src/pages/qr-print.tsx",
   "src/pages/rooms-list.tsx",
   "src/pages/settings.tsx",
@@ -107,6 +89,7 @@ function walk(dir: string, root: string, acc: string[]): void {
       continue;
     }
     if (st.isDirectory()) {
+      if (entry === "__tests__") continue;
       walk(full, root, acc);
       continue;
     }

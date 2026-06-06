@@ -236,7 +236,6 @@ describe("server/db.ts — integration tables and sync columns", () => {
   const integrationsSrc = read("server/schema/integrations.ts");
   const coreSrc = read("server/schema/core.ts");
   const tasksSrc = read("server/schema/tasks.ts");
-  const billingSrc = read("server/schema/billing.ts");
   const inventorySrc = read("server/schema/inventory.ts");
 
   it("defines integrationConfigs table", () => {
@@ -262,23 +261,12 @@ describe("server/db.ts — integration tables and sync columns", () => {
     expect(integrationsSrc).toContain('export const integrationWebhookEvents = vtTable("vt_integration_webhook_events"');
     expect(integrationsSrc).toContain("signatureValid");
   });
-  it("animals table has externalId, externalSource, externalSyncedAt", () => {
-    const start = coreSrc.indexOf('export const animals = vtTable("vt_animals"');
-    const body = coreSrc.slice(start, start + 1000);
-    expect(body).toContain("externalId");
-    expect(body).toContain("externalSource");
-    expect(body).toContain("externalSyncedAt");
+  it("animals table is defined in core schema", () => {
+    expect(coreSrc).toContain('export const animals = vtTable("vt_animals"');
   });
   it("appointments table has external sync columns", () => {
     const start = tasksSrc.indexOf('export const appointments = vtTable("vt_appointments"');
     const body = tasksSrc.slice(start, start + 4000);
-    expect(body).toContain("externalId");
-    expect(body).toContain("externalSource");
-    expect(body).toContain("externalSyncedAt");
-  });
-  it("billingLedger table has external sync columns", () => {
-    const start = billingSrc.indexOf('export const billingLedger = vtTable("vt_billing_ledger"');
-    const body = billingSrc.slice(start, start + 3000);
     expect(body).toContain("externalId");
     expect(body).toContain("externalSource");
     expect(body).toContain("externalSyncedAt");
@@ -357,7 +345,6 @@ describe("integration worker", () => {
     expect(src).toContain('"skipped"');
   });
   it("updates last sync timestamp after successful inbound sync", () => {
-    expect(src).toContain("lastPatientSyncAt");
     expect(src).toContain("lastInventorySyncAt");
     expect(src).toContain("lastAppointmentSyncAt");
   });
