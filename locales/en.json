@@ -30,11 +30,13 @@
     }
   },
   "status": {
-    "ok": "OK",
+    "ok": "Ready",
     "issue": "Issue",
     "maintenance": "Maintenance",
     "sterilized": "Sterilized",
-    "all": "All statuses"
+    "all": "All statuses",
+    "info": "Info",
+    "neutral": "Unknown"
   },
   "layout": {
     "nav": {
@@ -3123,5 +3125,8 @@
     "deployableSuccessRate": "Deployable success rate",
     "noData": "No data for this period",
     "metricsDisabled": "Metrics tracking disabled (ENABLE_OPERATIONAL_METRICS)"
+  },
+  "metrics": {
+    "disabled": "Metrics are turned off for this period."
   }
 }

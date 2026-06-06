@@ -67,16 +67,17 @@ export default {
         },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-        xl: "calc(var(--radius) + 4px)",
-        "2xl": "calc(var(--radius) + 8px)",
+        sm: 'var(--radius-sm)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius)',
+        xl: 'var(--radius-xl)',
+        "2xl": 'var(--radius-2xl)',
+        pill: 'var(--radius-pill)',
       },
       boxShadow: {
-        card: "0 1px 2px 0 rgb(15 23 42 / 0.05), 0 8px 24px -16px rgb(15 23 42 / 0.24)",
-        "card-hover": "0 2px 4px 0 rgb(15 23 42 / 0.06), 0 14px 30px -14px rgb(15 23 42 / 0.28)",
-        surface: "0 0 0 1px rgb(148 163 184 / 0.08), 0 10px 30px -18px rgb(15 23 42 / 0.28)",
+        card: 'var(--shadow-card)',
+        'card-hover': 'var(--shadow-card-hover)',
+        surface: 'var(--shadow-surface)',
       },
       fontFamily: {
         sans: [

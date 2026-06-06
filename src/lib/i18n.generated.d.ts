@@ -38,6 +38,11 @@ export interface TStructure {
     maintenance: string;
     sterilized: string;
     all: string;
+    info: string;
+    neutral: string;
+  };
+  metrics: {
+    disabled: string;
   };
   layout: {
     nav: {

@@ -46,3 +46,32 @@ export const MOTION = {
   easeEnter: "var(--ease-enter)",
   easeReward: "var(--ease-reward)",
 } as const;
+
+// --- Unified status vocabulary (single source of truth) ---
+
+export type StatusKind =
+  | "ok"
+  | "issue"
+  | "maintenance"
+  | "sterilized"
+  | "info"
+  | "neutral";
+
+// Fold every legacy status string into one StatusKind. Unknown → "neutral".
+const KNOWN_STATUS_KINDS = new Set<string>(["ok", "issue", "maintenance", "sterilized", "info"]);
+
+export function normalizeStatus(s: string): StatusKind {
+  if (s === "critical" || s === "needs_attention") return "issue";
+  if (s === "due" || s === "sterilization_due") return "maintenance";
+  return KNOWN_STATUS_KINDS.has(s) ? (s as StatusKind) : "neutral";
+}
+
+// i18n key for each kind's label (resolved by the component, never inlined).
+export const STATUS_LABEL_KEY: Record<StatusKind, string> = {
+  ok: "status.ok",
+  issue: "status.issue",
+  maintenance: "status.maintenance",
+  sterilized: "status.sterilized",
+  info: "status.info",
+  neutral: "status.neutral",
+};

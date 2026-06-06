@@ -34,7 +34,9 @@
     "issue": "תקלה",
     "maintenance": "תחזוקה",
     "sterilized": "עבר חיטוי",
-    "all": "כל הסטטוסים"
+    "all": "כל הסטטוסים",
+    "info": "מידע",
+    "neutral": "לא ידוע"
   },
   "layout": {
     "nav": {
@@ -3123,5 +3125,8 @@
     "deployableSuccessRate": "שיעור הצלחת פריסה",
     "noData": "אין נתונים לתקופה זו",
     "metricsDisabled": "מדידת מדדים לא פעילה (ENABLE_OPERATIONAL_METRICS)"
+  },
+  "metrics": {
+    "disabled": "המדדים כבויים עבור תקופה זו."
   }
 }

@@ -39,14 +39,14 @@ export function Topbar() {
   return (
     <header
       dir={dir}
-      className="h-10 bg-ivory-navy border-b-2 border-[#0a1509] flex items-center px-4 gap-0.5 shrink-0"
+      className="h-10 bg-[var(--brand-navy)] border-b-2 border-black/40 flex items-center px-4 gap-0.5 shrink-0"
     >
       {/* Logo */}
       <Link
         href="/home"
-        className="text-[13.5px] font-bold tracking-[-0.03em] text-white me-4 shrink-0"
+        className="text-sm font-bold tracking-[-0.03em] text-white me-4 shrink-0"
       >
-        Vet<em className="text-[#4cde6a] not-italic">Track</em>
+        Vet<em className="text-[var(--brand-green-bright)] not-italic">Track</em>
       </Link>
 
       {/* Section nav */}
@@ -56,10 +56,10 @@ export function Topbar() {
             key={s.href}
             href={s.href}
             className={cn(
-              "text-[12px] font-medium px-2.5 py-1 rounded-[4px] whitespace-nowrap transition-colors duration-100",
+              "text-sm font-medium px-2.5 py-1 rounded-[4px] whitespace-nowrap transition-colors duration-100",
               activeHref === s.href
-                ? "bg-ivory-green text-white font-semibold"
-                : "text-[#8ab89a] hover:text-[#bbd8c0]"
+                ? "bg-[var(--brand-green-mid)] text-white font-semibold"
+                : "text-white/60 hover:text-white/85"
             )}
           >
             {s.label}
@@ -83,7 +83,7 @@ function ShiftBadge({
 }) {
   if (!activeShift) return null;
   return (
-    <span className="text-[11px] font-medium bg-white/[0.08] border border-white/10 text-[#8ab89a] px-2.5 py-0.5 rounded-full">
+    <span className="text-xs font-medium bg-white/[0.08] border border-white/10 text-white/60 px-2.5 py-0.5 rounded-full">
       {activeShift.startTime}–{activeShift.endTime}
     </span>
   );
@@ -99,7 +99,7 @@ function UserAvatar({ name }: { name: string | null }) {
         .toUpperCase()
     : "??";
   return (
-    <div className="w-7 h-7 rounded-full bg-ivory-green flex items-center justify-center text-[10.5px] font-bold text-white select-none shrink-0">
+    <div className="w-7 h-7 rounded-full bg-ivory-green flex items-center justify-center text-xs font-bold text-white select-none shrink-0">
       {initials}
     </div>
   );
