@@ -14,7 +14,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { execSync } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -89,23 +89,95 @@ const ALLOWED_ROUTE_FILES: ReadonlySet<string> = new Set([
   CODE_BLUE_ROUTE_FILE,
 ]);
 
-function gitGrepLines(args: string): string[] {
-  try {
-    // --untracked so newly-added files in this PR are searched too.
-    const out = execSync(`git grep --untracked ${args}`, {
-      cwd: repoRoot,
-      encoding: "utf8",
-    });
-    return out
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0);
-  } catch (err: unknown) {
-    // git grep exits 1 when no matches found
-    const status = (err as { status?: number }).status;
-    if (status === 1) return [];
-    throw err;
+/**
+ * Collect all regular files under `root` (recursively), filtering to those
+ * whose path (relative to repoRoot) starts with one of the given `targets`
+ * (each target may be a file path or a directory prefix).
+ */
+function collectFiles(root: string, targets: string[]): string[] {
+  const results: string[] = [];
+  function walk(dir: string) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        // skip node_modules and hidden dirs
+        if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+        walk(abs);
+      } else if (entry.isFile()) {
+        const rel = path.relative(root, abs);
+        const matches = targets.some((t) => {
+          // t ends with "/" → directory prefix; otherwise exact file match
+          if (t.endsWith("/")) return rel.startsWith(t) || rel.startsWith(t.slice(0, -1) + path.sep);
+          return rel === t || rel.replace(/\\/g, "/") === t;
+        });
+        if (matches) results.push(rel);
+      }
+    }
   }
+  walk(root);
+  return results;
+}
+
+/**
+ * Drop-in replacement for `git grep` using native Node.js filesystem access.
+ * Supports a strict subset of git-grep flags used in this file:
+ *   -l  → list matching files only (one path per line)
+ *   -n  → include line numbers (output: "rel/path:linenum:content")
+ *   -E  → pattern is an extended regex (always treated as RegExp here)
+ *   --  → separator before path specs
+ *
+ * Path specs after `--` may be files or directory prefixes (ending with `/`).
+ */
+function gitGrepLines(args: string): string[] {
+  // Parse flags
+  const listOnly = /(?:^|\s)-[a-zA-Z]*l/.test(args);
+  const withLineNums = /(?:^|\s)-[a-zA-Z]*n/.test(args);
+
+  // Extract pattern — first quoted token or the first unquoted word after flags
+  const patternMatch = args.match(/["']([^"']+)["']/);
+  if (!patternMatch) return [];
+  const patternStr = patternMatch[1]!;
+  const pattern = new RegExp(patternStr);
+
+  // Extract paths after `--`
+  const afterDash = args.slice(args.indexOf("--") + 2).trim();
+  const targets = afterDash.split(/\s+/).filter(Boolean).map((t) => {
+    // Normalise: remove leading ./ and ensure dirs end with /
+    const s = t.replace(/^\.\//, "");
+    if (!s.includes(".") || s.endsWith("/")) {
+      return s.endsWith("/") ? s : s + "/";
+    }
+    return s;
+  });
+
+  const files = collectFiles(repoRoot, targets);
+  const matchingFiles = new Set<string>();
+  const lineHits: string[] = [];
+
+  for (const rel of files) {
+    const abs = path.join(repoRoot, rel);
+    let content: string;
+    try {
+      content = fs.readFileSync(abs, "utf8");
+    } catch {
+      continue;
+    }
+    const lines = content.split("\n");
+    let fileMatched = false;
+    lines.forEach((line, idx) => {
+      if (pattern.test(line)) {
+        fileMatched = true;
+        if (withLineNums) {
+          lineHits.push(`${rel.replace(/\\/g, "/")}:${idx + 1}:${line}`);
+        }
+      }
+    });
+    if (fileMatched) matchingFiles.add(rel.replace(/\\/g, "/"));
+  }
+
+  if (listOnly) return [...matchingFiles];
+  if (withLineNums) return lineHits;
+  return [...matchingFiles];
 }
 
 /**
