@@ -23,9 +23,13 @@ vi.mock("../../server/lib/worker-heartbeat.js", () => ({
   startWorkerHeartbeat: mockStartWorkerHeartbeat,
 }));
 
-vi.mock("../../server/jobs/queue-factory.js", () => ({
-  getOrCreateQueue: vi.fn().mockResolvedValue({ add: vi.fn().mockResolvedValue(undefined) }),
-}));
+vi.mock("../../server/jobs/queue-factory.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../server/jobs/queue-factory.js")>();
+  return {
+    ...actual,
+    getOrCreateQueue: vi.fn().mockResolvedValue({ add: vi.fn().mockResolvedValue(undefined) }),
+  };
+});
 
 vi.mock("../../server/workers/chargeAlertWorker.js", async (importOriginal) => {
   const mod = await importOriginal<typeof import("../../server/workers/chargeAlertWorker.js")>();
@@ -110,6 +114,7 @@ describe("job runtime startup readiness (A1)", () => {
     let redisConnectAttempts = 0;
     vi.mocked(createRedisConnection).mockImplementation(async () => {
       redisConnectAttempts += 1;
+      // getOrCreateQueue is mocked — attempt 1: charge-alert worker; 2: expiry-check worker
       if (redisConnectAttempts === 2) return null;
       return fakeRedisConnection() as Awaited<ReturnType<typeof createRedisConnection>>;
     });
@@ -120,8 +125,8 @@ describe("job runtime startup readiness (A1)", () => {
     expect(getRuntimeReadiness()).toEqual({
       started: false,
       workers: [
-        { name: CHARGE_ALERT_QUEUE_NAME, ok: false },
-        { name: EXPIRY_CHECK_QUEUE_NAME, ok: true },
+        { name: CHARGE_ALERT_QUEUE_NAME, ok: true },
+        { name: EXPIRY_CHECK_QUEUE_NAME, ok: false },
         { name: STALE_CHECKIN_SWEEP_QUEUE_NAME, ok: true },
       ],
     });

@@ -1,7 +1,7 @@
 /**
- * Job Registry 1c-2 — inventory-deduction producer delegates to enqueueJob().
+ * Inventory deduction queue — legacy producer stub (billing schema removed).
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 const mockEnqueueJob = vi.hoisted(() => vi.fn().mockResolvedValue({ id: "job-1" }));
 
@@ -33,26 +33,15 @@ describe("inventory-deduction.queue module", () => {
   });
 });
 
-describe("inventoryDeductionQueue.add — enqueueJob delegation (1c-2)", () => {
-  beforeEach(() => {
-    mockEnqueueJob.mockClear();
-  });
-
-  it("calls enqueueJob with inventory-deduction kind and payload", async () => {
+describe("inventoryDeductionQueue.add — disabled producer stub", () => {
+  it("does not call enqueueJob (deduction runs inline at completion)", async () => {
     await inventoryDeductionQueue.add(BASE_PAYLOAD);
-
-    expect(mockEnqueueJob).toHaveBeenCalledTimes(1);
-    expect(mockEnqueueJob.mock.calls[0]?.[0]).toBe(INVENTORY_DEDUCTION_JOB_NAME);
-    expect(mockEnqueueJob).toHaveBeenCalledWith("inventory-deduction", BASE_PAYLOAD, undefined);
+    expect(mockEnqueueJob).not.toHaveBeenCalled();
   });
 
-  it("passes per-add BullMQ options through bullmq override", async () => {
-    const options = { jobId: "deduct-task-1", delay: 5000 };
-
-    await inventoryDeductionQueue.add(BASE_PAYLOAD, options);
-
-    expect(mockEnqueueJob).toHaveBeenCalledWith("inventory-deduction", BASE_PAYLOAD, {
-      bullmq: options,
-    });
+  it("accepts optional BullMQ options as a no-op", async () => {
+    await inventoryDeductionQueue.add(BASE_PAYLOAD, { jobId: "deduct-task-1", delay: 5000 });
+    expect(mockEnqueueJob).not.toHaveBeenCalled();
+    expect(INVENTORY_DEDUCTION_JOB_NAME).toBe("inventory-deduction");
   });
 });
