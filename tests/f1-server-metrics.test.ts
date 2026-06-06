@@ -258,8 +258,6 @@ import {
   startJobRuntime,
 } from "../server/jobs/runtime.js";
 import { resetQueueFactoryForTests } from "../server/jobs/queue-factory.js";
-import { INVENTORY_DEDUCTION_QUEUE_NAME } from "../server/queues/inventory-deduction.queue.js";
-
 function mockRedisConnection() {
   return { quit: mockConnectionQuit, on: vi.fn() };
 }
@@ -281,16 +279,16 @@ describe("F1b-1 — job_runtime_unknown_job_name counter", () => {
 
     await startJobRuntime();
 
-    const inventoryCall = mockWorkerCtor.mock.calls.find(
-      (c) => c[0] === INVENTORY_DEDUCTION_QUEUE_NAME,
+    const chargeAlertCall = mockWorkerCtor.mock.calls.find(
+      (c) => c[0] === "charge-alert",
     );
-    const processor = inventoryCall?.[1] as (job: Job) => Promise<void>;
+    const processor = chargeAlertCall?.[1] as (job: Job) => Promise<void>;
 
     await expect(
       processor({
         id: "j1",
         name: "unknown-job",
-        data: { clinicId: "c1", taskId: "t1" },
+        data: { clinicId: "c1", returnId: "r1" },
         attemptsMade: 0,
       } as Job),
     ).rejects.toThrow(/No JobDefinition/);
@@ -314,7 +312,7 @@ describe("F1b-1 — job_runtime_worker_unavailable counter", () => {
 
     await startJobRuntime();
 
-    expect(getMetricsSnapshot().jobRegistry.jobRuntimeWorkerUnavailable).toBe(4);
+    expect(getMetricsSnapshot().jobRegistry.jobRuntimeWorkerUnavailable).toBe(3);
     expect(mockWorkerCtor).not.toHaveBeenCalled();
   });
 });
@@ -346,22 +344,12 @@ describe("F1b-1 — legacy_worker_starter_used counter", () => {
     incSpy.mockRestore();
   });
 
-  it("increments when startInventoryDeductionWorker is first called", async () => {
-    const incSpy = vi.spyOn(
-      await import("../server/lib/metrics.js"),
-      "incrementMetric",
-    );
-
-    vi.doMock("../server/lib/redis.js", () => ({
-      createRedisConnection: vi.fn().mockResolvedValue(null),
-    }));
+  it("does not increment legacy_worker_starter_used for disabled inventory starter", async () => {
     const { startInventoryDeductionWorker } = await import(
       "../server/workers/inventory-deduction.worker.js"
     );
     await startInventoryDeductionWorker();
 
-    expect(incSpy).toHaveBeenCalledWith("legacy_worker_starter_used");
-    expect(getMetricsSnapshot().jobRegistry.legacyWorkerStarterUsed).toBe(1);
-    incSpy.mockRestore();
+    expect(getMetricsSnapshot().jobRegistry.legacyWorkerStarterUsed).toBe(0);
   });
 });

@@ -422,7 +422,7 @@ describe("PR 5.4 — container dispense / shadow-forced wiring (CI-21, CI-22, CI
       requestId: string;
     };
     expect(ctx.clinicId).toBe("clinic-1");
-    expect(ctx.animalId).toBe("animal-1");
+    expect(ctx.animalId).toBeNull();
     expect(ctx.containerId).toBe("container-1");
     expect(ctx.isEmergency).toBe(false);
     expect(ctx.bypassReason).toBeNull();

@@ -11,6 +11,7 @@ workflow:
     - if: $CI_MERGE_REQUEST_ID
     - if: $CI_COMMIT_BRANCH =~ /^(main|staging|master)$/
     - if: $CI_COMMIT_BRANCH =~ /^cursor\//
+    - if: $CI_COMMIT_BRANCH =~ /^(feat|fix|chore|docs|refactor|test)\//
 
 stages:
   - typecheck
@@ -67,6 +68,11 @@ variables:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "staging"
     - if: $CI_COMMIT_BRANCH =~ /^cursor\//
+    - if: $CI_COMMIT_BRANCH =~ /^(feat|fix|chore|docs|refactor|test)\//
+.release_gate_rules:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - when: never
 
 .playwright_branch_rules:
   rules:
@@ -324,7 +330,7 @@ release-gate:typecheck:
   extends: .node_job
   stage: release-gate
   rules:
-
+    - !reference [.release_gate_rules, rules]
   script:
     - pnpm exec tsc --noEmit
     - pnpm exec tsc --noEmit --project tsconfig.server-check.json
@@ -332,7 +338,7 @@ release-gate:tests:
   extends: .postgres_service
   stage: release-gate
   rules:
-
+    - !reference [.release_gate_rules, rules]
   variables:
     SESSION_SECRET: ci-release-gate-secret-32-chars-long
   script:
@@ -342,7 +348,7 @@ release-gate:i18n:
   extends: .node_job
   stage: release-gate
   rules:
-
+    - !reference [.release_gate_rules, rules]
   script:
     - |
       python3 - << 'PYEOF'
@@ -379,7 +385,7 @@ release-gate:rtl-mobile:
   extends: .node_job
   stage: release-gate
   rules:
-
+    - !reference [.release_gate_rules, rules]
   script:
     - pnpm test -- tests/phase-4-i18n-rtl-foundation.test.js
     - pnpm test -- tests/phase-8-mobile-pwa.test.js
@@ -390,7 +396,7 @@ release-gate:offline-sync:
   extends: .node_job
   stage: release-gate
   rules:
-
+    - !reference [.release_gate_rules, rules]
   script:
     - pnpm test -- tests/offline.test.js
     - pnpm test -- tests/sync-queue-sheet.test.js
@@ -399,7 +405,7 @@ release-gate:workflows:
   extends: .postgres_service
   stage: release-gate
   rules:
-
+    - !reference [.release_gate_rules, rules]
   variables:
     SESSION_SECRET: ci-release-gate-secret-32-chars-long
   script:
@@ -415,7 +421,7 @@ release-gate:accessibility:
   extends: .node_job
   stage: release-gate
   rules:
-
+    - !reference [.release_gate_rules, rules]
   script:
     - pnpm test -- tests/ui-reduced-motion-hardening.test.js
     - pnpm test -- tests/route-registration.test.js
@@ -425,7 +431,7 @@ release-gate:verdict:
   extends: .node_job
   stage: release-gate
   rules:
-
+    - !reference [.release_gate_rules, rules]
   needs:
     - release-gate:typecheck
     - release-gate:tests

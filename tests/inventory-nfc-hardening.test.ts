@@ -58,7 +58,7 @@ describe("handleNFCTag — stale closure fix", () => {
   });
 
   it("ndef.onreading uses handleNFCTagRef.current instead of direct handleNFCTag", () => {
-    expect(page).toContain("handleNFCTagRef.current(event.serialNumber");
+    expect(page).toContain("handleNFCTagRef.current(tagId)");
     expect(page).not.toMatch(/ndef\.onreading\s*=\s*\(event[^)]*\)\s*=>\s*handleNFCTag\(/);
   });
 });

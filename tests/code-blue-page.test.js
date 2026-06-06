@@ -32,9 +32,9 @@ describe("Code Blue page structure tests", () => {
     expect(codeBluePage).not.toMatch(/15\s*\*\s*60\s*\*\s*1000/);
   });
 
-  it("Code Blue nav button is role-gated", () => {
+  it("Code Blue nav is role-gated via canAccessCodeBlue", () => {
     expect(layout).toContain("canAccessCodeBlue");
-    expect(layout).toContain('href: "/code-blue"');
+    expect(layout).toContain("CANONICAL_HREFS.emergencyEquipmentLog");
   });
 
   it("Code Blue route is registered behind AuthGuard", () => {

@@ -144,10 +144,11 @@ describe("Code Blue sessions — no auto-checkout on equipment log", () => {
     expect(logHandler).toContain("insert");
   });
 
-  it("equipment import is no longer present in code-blue route", () => {
-    // Ensures the unused import was cleaned up
+  it("equipment import is read-only for linked equipment (no checkout mutation)", () => {
     const importBlock = routes.slice(0, routes.indexOf("const router"));
-    expect(importBlock).not.toMatch(/\bequipment\b/);
+    expect(importBlock).toContain("equipment");
+    expect(routes).toContain("fetchLinkedEquipmentForSession");
+    expect(routes).not.toMatch(/\.update\(equipment/);
   });
 });
 

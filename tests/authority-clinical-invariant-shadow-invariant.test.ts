@@ -128,12 +128,13 @@ describe("clinical-invariant evaluator — shadow-mode invariant", () => {
 
   it("shadow + orphans: ticks _would_have_blocked total + per-reason counter", async () => {
     evaluateDispenseAgainstOrdersMock.mockResolvedValue({
-      orphanLines: [orphan("item-1", ["NO_ACTIVE_HOSPITALIZATION"])],
+      orphanLines: [orphan("item-1", ["NO_ACTIVE_ORDER"])],
     });
     await evaluateClinicalInvariant(baseContext(), { modeResolver: async () => "shadow" });
     const snap = getMetricsSnapshot().clinicalInvariant;
     expect(snap.shadowWouldHaveBlocked.total).toBe(1);
-    expect(snap.shadowWouldHaveBlocked.noActiveHospitalization).toBe(1);
+    expect(snap.shadowWouldHaveBlocked.noActiveOrder).toBe(1);
+    expect(snap.shadowWouldHaveBlocked.noActiveHospitalization).toBe(0);
   });
 
   it("shadow emits NO audit row in PR 5.2 (audit kind + emitter land in PR 5.5)", async () => {

@@ -54,11 +54,11 @@ describe("job registry consistency", () => {
   });
 
   it("uses existing BullMQ job names for static kinds", () => {
-    expect(definitionByKind.has("inventory-deduction")).toBe(true);
     expect(definitionByKind.has("check-plug")).toBe(true);
     expect(definitionByKind.has("stale-task-ownership-sweep")).toBe(true);
     expect(definitionByKind.has("check-expiry")).toBe(true);
     expect(definitionByKind.has("sweep-stale-checkins")).toBe(true);
+    expect(definitionByKind.has("task-ownership-backfill")).toBe(true);
   });
 });
 
@@ -91,7 +91,7 @@ describe("enqueueJob option passthrough", () => {
   });
 
   it("merges definition defaults with bullmq overrides", async () => {
-    const def = definitionByKind.get("inventory-deduction")!;
+    const def = definitionByKind.get("stale-task-ownership-sweep")!;
     const merged = mergeEnqueueJobOptions(def, { attempts: 9 });
     expect(merged.attempts).toBe(9);
     expect(merged.backoff).toEqual({ type: "exponential", delay: 5000 });

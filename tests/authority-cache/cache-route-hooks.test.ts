@@ -5,7 +5,6 @@
  *  - test #8 PATCH /:id/role  → invalidateForUser
  *  - test #8b PATCH /:id/display_name → invalidateForUser
  *  - test #8c POST /sync (both existing-user and insert paths) → invalidateForUser
- *  - test #9 POST /shift-handover/session/start and /session/end → invalidateClinicShift
  *
  * Handlers are extracted directly from the routers, mirroring the existing
  * pattern in `tests/users-me-authority.test.ts`.
@@ -233,14 +232,10 @@ interface RouterShape {
 }
 
 async function loadHandler(
-  modulePath: "users" | "shift-handover",
   method: "patch" | "post",
   path: string,
 ): Promise<(req: Request, res: Response) => Promise<void> | void> {
-  const mod =
-    modulePath === "users"
-      ? await import("../../server/routes/users.js")
-      : await import("../../server/routes/shift-handover.js");
+  const mod = await import("../../server/routes/users.js");
   const router = mod.default as unknown as RouterShape;
   const layer = router.stack.find(
     (l) => l.route?.path === path && l.route?.methods[method],
@@ -270,7 +265,7 @@ describe("PATCH /:id/role invalidation (test #8)", () => {
     // 2. update users → returns updated row
     dbResolves.push([{ id: "user-1", role: "vet" }]);
 
-    const handler = await loadHandler("users", "patch", "/:id/role");
+    const handler = await loadHandler("patch", "/:id/role");
     const req = {
       params: { id: "user-1" },
       body: { role: "vet" },
@@ -294,7 +289,7 @@ describe("PATCH /:id/display_name invalidation (test #8b)", () => {
     // 2. update → returns updated row
     dbResolves.push([{ id: "user-1", displayName: "New Name" }]);
 
-    const handler = await loadHandler("users", "patch", "/:id/display_name");
+    const handler = await loadHandler("patch", "/:id/display_name");
     const req = {
       params: { id: "user-1" },
       body: { display_name: "New Name" },
@@ -328,7 +323,7 @@ describe("POST /sync invalidation (test #8c)", () => {
       { id: "user-1", clinicId: "clinic-a", role: "technician", name: "User", email: "u@x.com" },
     ]);
 
-    const handler = await loadHandler("users", "post", "/sync");
+    const handler = await loadHandler("post", "/sync");
     const req = {
       params: {},
       body: { clerkId: "clerk-1", email: "u@x.com" },
@@ -362,7 +357,7 @@ describe("POST /sync invalidation (test #8c)", () => {
       },
     ]);
 
-    const handler = await loadHandler("users", "post", "/sync");
+    const handler = await loadHandler("post", "/sync");
     const req = {
       params: {},
       body: { clerkId: "clerk-2", email: "n@x.com" },
@@ -382,62 +377,5 @@ describe("POST /sync invalidation (test #8c)", () => {
       "clinic-a",
       "newly-created-id",
     );
-  });
-});
-
-// ─── Test #9: shift-handover session start/end ─────────────────────────────
-describe("POST /shift-handover/session/start invalidation (test #9)", () => {
-  it("calls invalidateClinicShift after start", async () => {
-    // 1. getOpenShiftSession → returns no row
-    dbResolves.push([]);
-    // 2. insert shift session → ignored (chain.then)
-    dbResolves.push([]);
-
-    const handler = await loadHandler("shift-handover", "post", "/session/start");
-    const req = {
-      body: { note: "starting" },
-      clinicId: "clinic-a",
-      authUser: { id: "user-1", email: "u@x.com", role: "technician" },
-      headers: {},
-    } as unknown as Request;
-    const { res } = makeRes();
-    await handler(req, res);
-    expect(invalidateClinicShiftSpy).toHaveBeenCalledWith("clinic-a");
-  });
-});
-
-describe("POST /shift-handover/session/end invalidation (test #9)", () => {
-  it("calls invalidateClinicShift after end", async () => {
-    // 1. getOpenShiftSession → existing open
-    dbResolves.push([
-      {
-        id: "session-1",
-        clinicId: "clinic-a",
-        startedAt: new Date(),
-        endedAt: null,
-        note: null,
-      },
-    ]);
-    // 2. active hospitalizations → none
-    dbResolves.push([]);
-    // 3. unreconciled code blue → none
-    dbResolves.push([]);
-    // 4. buildPatientHandoverPayload's calls (we override below)
-    // 5. insert snapshot → []
-    dbResolves.push([]);
-    // 6. update shiftSessions → []
-    dbResolves.push([]);
-
-    const handler = await loadHandler("shift-handover", "post", "/session/end");
-    const req = {
-      body: { note: "ending" },
-      query: {},
-      clinicId: "clinic-a",
-      authUser: { id: "user-1", email: "u@x.com", role: "technician" },
-      headers: {},
-    } as unknown as Request;
-    const { res } = makeRes();
-    await handler(req, res);
-    expect(invalidateClinicShiftSpy).toHaveBeenCalledWith("clinic-a");
   });
 });

@@ -37,36 +37,28 @@ const SCAN_EXTS = new Set([".ts", ".js"]);
  */
 const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "server/routes/activity.ts", // owner: activity
-  "server/routes/admin-medication-integrity.ts", // owner: medication-integrity
   "server/routes/admin-outbox-dlq.ts", // owner: outbox
   "server/routes/admin-outbox-health.ts", // owner: outbox
   "server/routes/admin-task-ownership.ts", // owner: authority
   "server/routes/alert-acks.ts", // owner: alerts
   "server/routes/analytics.ts", // owner: analytics
-  "server/routes/animals.ts", // owner: patients
   "server/routes/appointments.ts", // owner: tasks
   "server/routes/audit-logs.ts", // owner: observability
-  "server/routes/billing.ts", // owner: billing
   "server/routes/clinical-check-in.ts", // owner: authority
   "server/routes/code-blue.ts", // owner: code-blue
   "server/routes/containers.ts", // owner: inventory
   "server/routes/crash-cart.ts", // owner: code-blue
+  "server/routes/cursor-bug-fixer.ts", // owner: admin
   "server/routes/dispense.ts", // owner: dispense (PR 6.10 target)
   "server/routes/display.ts", // owner: display
+  "server/routes/equipment-copilot.ts", // owner: equipment
   "server/routes/equipment-operational-state.ts", // owner: equipment-ops-v2 (V2 procedure-bind; will be i18n'd in שלב 5)
   "server/routes/equipment.ts", // owner: equipment
-  "server/routes/er-admin.ts", // owner: er-admin (PR 6.10 target)
-  "server/routes/er.ts", // owner: er
   "server/routes/folders.ts", // owner: equipment
-  "server/routes/forecast.ts", // owner: pharmacy
-  "server/routes/formulary.ts", // owner: formulary (PR 6.10 target)
   "server/routes/health.ts", // owner: infra (probe endpoints — frozen contract)
   "server/routes/integrations.ts", // owner: integrations
   "server/routes/inventory-items.ts", // owner: inventory
-  "server/routes/medication-tasks.ts", // owner: tasks
   "server/routes/metrics.ts", // owner: observability
-  "server/routes/patient-handoffs.ts", // owner: handoff
-  "server/routes/patients.ts", // owner: patients
   "server/routes/procurement.ts", // owner: procurement
   "server/routes/push.ts", // owner: push
   "server/routes/queue.ts", // owner: infra
@@ -75,7 +67,6 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "server/routes/returns.ts", // owner: equipment
   "server/routes/rooms.ts", // owner: rooms
   "server/routes/shift-chat.ts", // owner: shift-chat
-  "server/routes/shift-handover.ts", // owner: handoff
   "server/routes/shifts.ts", // owner: shifts
   "server/routes/stability.ts", // owner: stability (PR 6.10 target)
   "server/routes/storage.ts", // owner: storage

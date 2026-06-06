@@ -368,6 +368,9 @@ beforeEach(() => {
   loadInventoryItemLabelCodeMock.mockReset();
   loadInventoryItemLabelCodeMock.mockResolvedValue({ label: "Drug X", code: "DX" });
   logAuditMock.mockReset();
+  dispenseEventRow.clinicId = "clinic-1";
+  dispenseEventRow.containerId = "container-1";
+  dispenseEventRow.patientId = "animal-1";
   dispenseEventRow.status = "DRAFT";
   dispenseEventRow.bypassReason = null;
   delete process.env.SMART_COP_VALIDATION_FAIL_OPEN;
@@ -447,7 +450,7 @@ describe("PR 5.7 — 422 envelope shape (confirmDispense)", () => {
       orphanLines: [
         { ...sampleOrphanLine, itemId: "item-A", reasons: ["NO_ACTIVE_ORDER"] },
         { ...sampleOrphanLine, itemId: "item-B", reasons: ["NO_ACTIVE_ORDER"] },
-        { ...sampleOrphanLine, itemId: "item-C", reasons: ["NO_PATIENT_LINKED"] },
+        { ...sampleOrphanLine, itemId: "item-C", reasons: ["QUANTITY_EXCEEDS_ORDER"] },
       ],
     });
 
@@ -459,7 +462,7 @@ describe("PR 5.7 — 422 envelope shape (confirmDispense)", () => {
     // 3 orphan lines, but only 2 distinct reasons across them.
     expect(snap.blockedTotal).toBe(1);
     expect(snap.orphanReason.noActiveOrder).toBe(1);
-    expect(snap.orphanReason.noPatientLinked).toBe(1);
+    expect(snap.orphanReason.quantityExceedsOrder).toBe(1);
   });
 });
 
@@ -493,11 +496,11 @@ describe("PR 5.7 — in-tx rollback semantics (confirmDispense)", () => {
   });
 
   it("enforce + deny: in-tx denial audit IS attempted before the throw (ordering contract — §9.4)", async () => {
-    // Unique animalId — the deny-audit rate-limiter has module-level
-    // state that survives across tests in the same process. A fresh
-    // `(clinicId, animalId, containerId)` key guarantees a non-deduped
-    // emission for this assertion.
-    dispenseEventRow.patientId = "animal-ordering-test";
+    // Unique clinicId — the deny-audit rate-limiter has module-level
+    // state that survives across tests in the same process. Wiring now
+    // passes `animalId: null`, so `(clinicId, containerId)` must differ
+    // from prior deny tests to guarantee a non-deduped emission.
+    dispenseEventRow.clinicId = "clinic-ordering-audit";
     resolveClinicalInvariantEnforcementModeMock.mockResolvedValue("enforce");
     evaluateClinicalInvariantMock.mockResolvedValue({
       action: "deny",
@@ -505,9 +508,11 @@ describe("PR 5.7 — in-tx rollback semantics (confirmDispense)", () => {
       orphanLines: [sampleOrphanLine],
     });
 
-    await expect(confirmDispense(defaultConfirmInput())).rejects.toBeInstanceOf(
-      ClinicalInvariantDenyError,
-    );
+    await expect(
+      confirmDispense(
+        defaultConfirmInput({ clinicId: "clinic-ordering-audit", requestId: "req-ordering-test" }),
+      ),
+    ).rejects.toBeInstanceOf(ClinicalInvariantDenyError);
 
     // The denial audit attempt MUST occur — even though the row is
     // rolled back with the tx (CI-26 non-durability).

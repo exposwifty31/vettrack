@@ -68,14 +68,13 @@ describe("Code Blue page — manager gate", () => {
     expect(page).toContain("isManager");
   });
 
-  it.skipIf(page === null)("Stop CPR button only renders/enables for manager", () => {
-    // isManager must appear near the Stop/end action, not just anywhere in the file
-    expect(page).toMatch(/isManager[\s\S]{0,300}[Ss]top|[Ss]top[\s\S]{0,300}isManager/);
+  it.skipIf(page === null)("end-event button only renders for manager", () => {
+    expect(page).toMatch(/isManager[\s\S]{0,400}endEventChooseOutcome/);
   });
 
-  it.skipIf(page === null)("CPR gate countdown uses session.startedAt from server", () => {
-    expect(page).toContain("session.startedAt");
-    expect(page).toMatch(/15\s*\*\s*60\s*\*\s*1000/);
+  it.skipIf(page === null)("elapsed timer uses session startedAt via useElapsed hook", () => {
+    expect(page).toContain("useElapsed(session?.startedAt");
+    expect(page).toContain("function useElapsed(startedAt");
   });
 });
 

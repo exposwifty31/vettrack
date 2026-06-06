@@ -36,10 +36,6 @@ vi.mock("../../server/workers/chargeAlertWorker.js", async (importOriginal) => {
   };
 });
 
-vi.mock("../../server/workers/inventory-deduction.worker.js", () => ({
-  processInventoryDeductionJob: vi.fn(),
-}));
-
 vi.mock("../../server/workers/expiryCheckWorker.js", async (importOriginal) => {
   const mod = await importOriginal<typeof import("../../server/workers/expiryCheckWorker.js")>();
   return { ...mod, runExpiryCheckWorker: vi.fn() };
@@ -59,7 +55,6 @@ vi.mock("../../server/workers/staleCheckInSweepWorker.js", async (importOriginal
 import { Worker } from "bullmq";
 import { createRedisConnection } from "../../server/lib/redis.js";
 import { getOrCreateQueue } from "../../server/jobs/queue-factory.js";
-import { INVENTORY_DEDUCTION_QUEUE_NAME } from "../../server/queues/inventory-deduction.queue.js";
 import { CHARGE_ALERT_QUEUE_NAME } from "../../server/workers/chargeAlertWorker.js";
 import {
   EXPIRY_CHECK_QUEUE_NAME,
@@ -95,13 +90,12 @@ describe("job runtime startup readiness (A1)", () => {
     expect(getRuntimeReadiness()).toEqual({
       started: true,
       workers: [
-        { name: INVENTORY_DEDUCTION_QUEUE_NAME, ok: true },
         { name: CHARGE_ALERT_QUEUE_NAME, ok: true },
         { name: EXPIRY_CHECK_QUEUE_NAME, ok: true },
         { name: STALE_CHECKIN_SWEEP_QUEUE_NAME, ok: true },
       ],
     });
-    expect(Worker).toHaveBeenCalledTimes(4);
+    expect(Worker).toHaveBeenCalledTimes(3);
     expect(mockStartWorkerHeartbeat).toHaveBeenCalledTimes(1);
     expect(mockStartWorkerHeartbeat).toHaveBeenCalledWith("job-runtime");
   });
@@ -120,13 +114,12 @@ describe("job runtime startup readiness (A1)", () => {
     expect(getRuntimeReadiness()).toEqual({
       started: false,
       workers: [
-        { name: INVENTORY_DEDUCTION_QUEUE_NAME, ok: true },
-        { name: CHARGE_ALERT_QUEUE_NAME, ok: false },
-        { name: EXPIRY_CHECK_QUEUE_NAME, ok: true },
+        { name: CHARGE_ALERT_QUEUE_NAME, ok: true },
+        { name: EXPIRY_CHECK_QUEUE_NAME, ok: false },
         { name: STALE_CHECKIN_SWEEP_QUEUE_NAME, ok: true },
       ],
     });
-    expect(Worker).toHaveBeenCalledTimes(3);
+    expect(Worker).toHaveBeenCalledTimes(2);
     expect(mockStartWorkerHeartbeat).not.toHaveBeenCalled();
   });
 });

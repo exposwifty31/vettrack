@@ -87,16 +87,14 @@ describe("F2c — enqueueJob queue-unavailable observability", () => {
 
   it("derives REDIS_CONNECTION_FAILED from factory error message", async () => {
     getOrCreateQueueMock.mockRejectedValue(
-      new Error("inventory-deduction queue unavailable: Redis connection failed"),
+      new Error("charge-alert queue unavailable: Redis connection failed"),
     );
 
     await expect(
-      enqueueJob("inventory-deduction", {
-        taskId: "t1",
+      enqueueJob("check-plug", {
+        returnId: "r1",
+        equipmentId: "e1",
         clinicId: "c1",
-        containerId: "cont-1",
-        requiredVolumeMl: 1,
-        animalId: null,
       }),
     ).rejects.toThrow(/Redis connection failed/);
 
@@ -105,7 +103,7 @@ describe("F2c — enqueueJob queue-unavailable observability", () => {
       "[job-enqueue]",
       expect.objectContaining({
         event: "job_enqueue_queue_unavailable",
-        kind: "inventory-deduction",
+        kind: "check-plug",
         reason: "REDIS_CONNECTION_FAILED",
       }),
     );

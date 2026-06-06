@@ -17,7 +17,7 @@ import { computeBundleReadinessGate } from "../services/equipment-operational-st
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
 import { apiError as apiErrorI18n } from "../lib/apiError.js";
-import { enqueueChargeAlertJob } from "../workers/chargeAlertWorker.js";
+import { enqueueChargeAlertJob } from "../jobs/charge-alert-enqueue.js";
 import { promoteStagingQueueNext } from "../lib/staging-promotion.js";
 import { notifyWaitlistPromoted } from "../lib/equipment-waitlist-promotion.js";
 import {

@@ -4,22 +4,28 @@ import { db, equipment, equipmentReturns } from "../db.js";
 import { sendPushToAll } from "../lib/push.js";
 import { incrementMetric } from "../lib/metrics.js";
 import { createRedisConnection } from "../lib/redis.js";
+import {
+  bindChargeAlertProducerQueue,
+  CHARGE_ALERT_JOB_NAME,
+  CHARGE_ALERT_QUEUE_NAME,
+  buildChargeAlertJobId,
+  getChargeAlertProducerQueue,
+  isChargeAlertProducerQueueInitialized,
+  type ChargeAlertJobPayload,
+} from "../queues/charge-alert.queue.js";
 
-export const CHARGE_ALERT_QUEUE_NAME = "charge-alert";
-export const CHARGE_ALERT_JOB_NAME = "check-plug";
-export const CHARGE_ALERT_JOB_PREFIX = "plug-check-";
+export {
+  CHARGE_ALERT_JOB_NAME,
+  CHARGE_ALERT_QUEUE_NAME,
+  bindChargeAlertProducerQueue,
+  buildChargeAlertJobId,
+  isChargeAlertProducerQueueReady,
+} from "../queues/charge-alert.queue.js";
+
 export const DEFAULT_PLUG_IN_DEADLINE_MINUTES = 30;
 const MAX_PLUG_IN_DEADLINE_MINUTES = 1440;
 
-type ChargeAlertJobPayload = {
-  returnId: string;
-  equipmentId: string;
-  clinicId: string;
-};
-
-let chargeAlertQueue: Queue | null = null;
 let chargeAlertWorker: Worker | null = null;
-let chargeAlertQueueInitialized = false;
 let legacyWorkerStarterWarned = false;
 
 const logger = {
@@ -33,20 +39,6 @@ function warnLegacyWorkerStarterOnce(starterName: string): void {
   legacyWorkerStarterWarned = true;
   incrementMetric("legacy_worker_starter_used");
   logger.warn({ event: "legacy_worker_starter_used", starterName });
-}
-
-/** Binds the producer queue used by {@link enqueueChargeAlertJob} (e.g. job runtime startup). */
-export function bindChargeAlertProducerQueue(queue: Queue): void {
-  chargeAlertQueue = queue;
-  chargeAlertQueueInitialized = true;
-}
-
-export function isChargeAlertProducerQueueReady(): boolean {
-  return chargeAlertQueue !== null;
-}
-
-export function buildChargeAlertJobId(returnId: string): string {
-  return `${CHARGE_ALERT_JOB_PREFIX}${returnId}`;
 }
 
 function normalizePlugInDeadlineMinutes(value: number): number {
@@ -149,38 +141,8 @@ export async function processChargeAlertJob(
   return "alerted";
 }
 
-export async function enqueueChargeAlertJob(params: {
-  returnId: string;
-  equipmentId: string;
-  clinicId: string;
-  plugInDeadlineMinutes: number;
-}): Promise<string | null> {
-  const jobId = buildChargeAlertJobId(params.returnId);
-  if (!chargeAlertQueue) {
-    return jobId;
-  }
-  const delayMs = normalizePlugInDeadlineMinutes(params.plugInDeadlineMinutes) * 60 * 1000;
-  const { enqueueJob } = await import("../jobs/enqueue.js");
-  await enqueueJob(
-    "check-plug",
-    {
-      returnId: params.returnId,
-      equipmentId: params.equipmentId,
-      clinicId: params.clinicId,
-    } satisfies ChargeAlertJobPayload,
-    {
-      jobId,
-      delayMs,
-      bullmq: {
-        removeOnComplete: 50,
-        removeOnFail: 100,
-      },
-    },
-  );
-  return jobId;
-}
-
 export async function cancelChargeAlertJob(returnId: string): Promise<void> {
+  const chargeAlertQueue = getChargeAlertProducerQueue();
   if (!chargeAlertQueue) {
     return;
   }
@@ -210,7 +172,7 @@ export async function runChargeAlertJobForReturn(
  */
 export async function startChargeAlertWorker(): Promise<void> {
   warnLegacyWorkerStarterOnce("startChargeAlertWorker");
-  if (chargeAlertQueueInitialized) return;
+  if (isChargeAlertProducerQueueInitialized()) return;
   const queueConnection = await createRedisConnection();
   const workerConnection = await createRedisConnection();
   if (!queueConnection || !workerConnection) {

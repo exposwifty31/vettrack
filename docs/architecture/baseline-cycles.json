@@ -4,8 +4,7 @@
   "cycles": {
     "server": [
       "lib/metrics.ts > lib/display-heartbeat-store.ts > lib/redis.ts > lib/circuit-breaker.ts",
-      "queues/inventory-deduction.queue.ts > jobs/enqueue.ts > jobs/definitions/index.ts",
-      "jobs/enqueue.ts > jobs/definitions/index.ts > workers/chargeAlertWorker.ts",
+      "workers/chargeAlertWorker.ts > jobs/enqueue.ts > jobs/definitions/index.ts",
       "services/clinical-check-in.ts > lib/authority-cache.ts"
     ],
     "src": []

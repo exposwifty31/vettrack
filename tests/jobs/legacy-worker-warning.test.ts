@@ -52,20 +52,24 @@ describe("B2b — legacy pilot worker starter warnings", () => {
     vi.restoreAllMocks();
   });
 
-  it("documents @deprecated on both legacy starters", () => {
+  it("documents @deprecated on charge-alert legacy starter", () => {
     const chargeSrc = readFileSync(
       path.join(repoRoot, "server/workers/chargeAlertWorker.ts"),
-      "utf8",
-    );
-    const inventorySrc = readFileSync(
-      path.join(repoRoot, "server/workers/inventory-deduction.worker.ts"),
       "utf8",
     );
     const marker = "@deprecated Use Job Runtime registry execution instead.";
     expect(chargeSrc).toContain(marker);
     expect(chargeSrc).toContain("export async function startChargeAlertWorker");
-    expect(inventorySrc).toContain(marker);
+  });
+
+  it("documents deprecated inventory starter as disabled no-op", () => {
+    const inventorySrc = readFileSync(
+      path.join(repoRoot, "server/workers/inventory-deduction.worker.ts"),
+      "utf8",
+    );
+    expect(inventorySrc).toContain("@deprecated Inventory deduction runs inline at task/dispense completion.");
     expect(inventorySrc).toContain("export async function startInventoryDeductionWorker");
+    expect(inventorySrc).toContain("worker disabled (billing schema removed)");
   });
 
   describe("startChargeAlertWorker", () => {
@@ -118,11 +122,7 @@ describe("B2b — legacy pilot worker starter warnings", () => {
   });
 
   describe("startInventoryDeductionWorker", () => {
-    it("emits legacy_worker_starter_used once on first call", async () => {
-      vi.doMock("../../server/lib/redis.js", () => ({
-        createRedisConnection: vi.fn().mockResolvedValue(null),
-      }));
-
+    it("logs disabled warning and does not start a worker", async () => {
       const { startInventoryDeductionWorker } = await import(
         "../../server/workers/inventory-deduction.worker.js"
       );
@@ -130,19 +130,14 @@ describe("B2b — legacy pilot worker starter warnings", () => {
       await startInventoryDeductionWorker();
 
       const warnSpy = vi.mocked(console.warn);
-      expect(legacyStarterWarnFields(warnSpy)).toEqual([
-        {
-          event: "legacy_worker_starter_used",
-          starterName: "startInventoryDeductionWorker",
-        },
-      ]);
+      expect(legacyStarterWarnFields(warnSpy)).toHaveLength(0);
+      expect(warnSpy).toHaveBeenCalledWith(
+        "[inventory-deduction] worker disabled (billing schema removed)",
+      );
+      expect(mockWorkerCtor).not.toHaveBeenCalled();
     });
 
-    it("does not emit additional legacy warnings on repeated calls", async () => {
-      vi.doMock("../../server/lib/redis.js", () => ({
-        createRedisConnection: vi.fn().mockResolvedValue(null),
-      }));
-
+    it("remains a no-op on repeated calls", async () => {
       const { startInventoryDeductionWorker } = await import(
         "../../server/workers/inventory-deduction.worker.js"
       );
@@ -150,21 +145,10 @@ describe("B2b — legacy pilot worker starter warnings", () => {
       await startInventoryDeductionWorker();
       await startInventoryDeductionWorker();
 
-      expect(legacyStarterWarnFields(vi.mocked(console.warn))).toHaveLength(1);
-    });
-
-    it("preserves starter behavior when Redis is available", async () => {
-      vi.doMock("../../server/lib/redis.js", () => ({
-        createRedisConnection: vi.fn().mockResolvedValue({ on: vi.fn() }),
-      }));
-
-      const { startInventoryDeductionWorker } = await import(
-        "../../server/workers/inventory-deduction.worker.js"
-      );
-
-      await startInventoryDeductionWorker();
-
-      expect(mockWorkerCtor).toHaveBeenCalled();
+      const warnSpy = vi.mocked(console.warn);
+      expect(warnSpy).toHaveBeenCalledTimes(2);
+      expect(legacyStarterWarnFields(warnSpy)).toHaveLength(0);
+      expect(mockWorkerCtor).not.toHaveBeenCalled();
     });
   });
 });

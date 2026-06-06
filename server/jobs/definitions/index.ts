@@ -21,7 +21,8 @@ import {
 import {
   CHARGE_ALERT_JOB_NAME,
   CHARGE_ALERT_QUEUE_NAME,
-} from "../../workers/chargeAlertWorker.js";
+  type ChargeAlertJobPayload,
+} from "../../queues/charge-alert.queue.js";
 import {
   resolveBullmqJobName,
   type AnyJobDefinition,
@@ -37,12 +38,6 @@ export const STALE_CHECKIN_SWEEP_JOB_NAME = "sweep-stale-checkins";
 
 /** Matches {@link STALE_TASK_OWNERSHIP_SWEEP_DEDUP_WINDOW_MS} in staleTaskOwnershipSweep.queue.ts */
 export const STALE_TASK_OWNERSHIP_SWEEP_DEDUP_WINDOW_MS = 60_000;
-
-export type ChargeAlertJobPayload = {
-  returnId: string;
-  equipmentId: string;
-  clinicId: string;
-};
 
 export type ExpiryCheckJobPayload = Record<string, never>;
 
@@ -244,6 +239,11 @@ export function assertJobRegistryConsistency(): void {
   }
 }
 
-export type { IntegrationSyncJobData, IntegrationSyncJobType, IntegrationSyncDirection };
+export type {
+  ChargeAlertJobPayload,
+  IntegrationSyncJobData,
+  IntegrationSyncJobType,
+  IntegrationSyncDirection,
+};
 
 export { INTEGRATION_QUEUE_LEGACY_NAME, STALE_TASK_OWNERSHIP_SWEEP_QUEUE_NAME };

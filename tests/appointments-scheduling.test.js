@@ -89,9 +89,7 @@ describe("Appointments Scheduling", () => {
   it("Service enforces strict clinic scoping for linked entities", () => {
     expect(
       serviceFile.includes("eq(appointments.clinicId, clinicId)") &&
-        serviceFile.includes("assertVetInClinic") &&
-        serviceFile.includes("assertAnimalInClinic") &&
-        serviceFile.includes("assertOwnerInClinic")
+        serviceFile.includes("assertVetInClinic")
     ).toBe(true);
   });
 

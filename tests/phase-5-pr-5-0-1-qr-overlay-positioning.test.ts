@@ -91,7 +91,7 @@ describe("Phase 5 PR 5.0.1 — QR scanner overlay positioning fix", () => {
       );
       expect(rootMatch).not.toBeNull();
       const cls = rootMatch![1];
-      for (const token of ["fixed", "top-0", "left-0", "right-0", "z-50", "flex", "flex-col"]) {
+      for (const token of ["fixed", "top-0", "left-0", "right-0", "z-[70]", "flex", "flex-col"]) {
         expect(cls).toContain(token);
       }
     });

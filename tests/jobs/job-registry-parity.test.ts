@@ -246,7 +246,6 @@ describe("E3 — job registry / enqueue parity", () => {
       [
         "check-expiry",
         "check-plug",
-        "inventory-deduction",
         "stale-task-ownership-sweep",
         "sweep-stale-checkins",
         "task-ownership-backfill",
@@ -283,7 +282,6 @@ describe("E3 — job registry / enqueue parity", () => {
       [
         "check-expiry",
         "check-plug",
-        "inventory-deduction",
         "stale-task-ownership-sweep",
         "sweep-stale-checkins",
         "task-ownership-backfill",
@@ -306,7 +304,7 @@ describe("E3 — job registry / enqueue parity", () => {
     expect(registrySet.has(poison)).toBe(false);
     expect(resolveStaticJobName(poison)).toBeNull();
 
-    const fakeDiscovered = new Set(["inventory-deduction", poison]);
+    const fakeDiscovered = new Set(["check-plug", poison]);
     const missing = [...fakeDiscovered].filter((n) => !registrySet.has(n));
     expect(missing).toEqual([poison]);
   });
