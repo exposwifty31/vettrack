@@ -4,6 +4,8 @@ import { api, ApiError } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { Button } from "@/components/ui/button";
 
 const DATE_RANGES = [
   { label: "7d", days: 7 },
@@ -46,8 +48,9 @@ export function OperationalMetricsDashboard() {
 
   if (data?.metricsEnabled === false) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-        {t.operationalMetrics.metricsDisabled}
+      <div className="flex items-center gap-2">
+        <StatusBadge kind="maintenance" />
+        <span className="text-sm text-muted-foreground">{t.operationalMetrics.metricsDisabled}</span>
       </div>
     );
   }
@@ -65,17 +68,14 @@ export function OperationalMetricsDashboard() {
     <div className="space-y-4">
       <div className="flex gap-2">
         {DATE_RANGES.map((r) => (
-          <button
+          <Button
             key={r.days}
+            size="sm"
+            variant={rangeDays === r.days ? "default" : "outline"}
             onClick={() => setRangeDays(r.days)}
-            className={`px-3 py-1 rounded text-xs font-medium border transition-colors ${
-              rangeDays === r.days
-                ? "bg-primary text-primary-foreground border-primary"
-                : "border-border text-muted-foreground hover:bg-muted"
-            }`}
           >
             {r.label}
-          </button>
+          </Button>
         ))}
       </div>
 

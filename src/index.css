@@ -37,6 +37,22 @@
     --input: 40 12% 81%;
     --ring: 130 42% 20%;
     --radius: 0.75rem;
+    /* ── Radius ramp — each step as an explicit CSS variable ── */
+    --radius-sm:   0.5rem;        /* 8px  */
+    --radius-md:   0.625rem;      /* 10px */
+    --radius-xl:   1rem;          /* 16px */
+    --radius-2xl:  1.25rem;       /* 20px */
+    --radius-pill: 9999px;
+    /* ── Shadows ── */
+    --shadow-card:       0 1px 2px 0 rgb(15 23 42 / 0.05), 0 8px 24px -16px rgb(15 23 42 / 0.24);
+    --shadow-card-hover: 0 2px 4px 0 rgb(15 23 42 / 0.06), 0 14px 30px -14px rgb(15 23 42 / 0.28);
+    --shadow-surface:    0 0 0 1px rgb(148 163 184 / 0.08), 0 10px 30px -18px rgb(15 23 42 / 0.28);
+    /* ── Brand extended palette ── */
+    --brand-navy:          #16291c;
+    --brand-green-bright:  #6fd389;
+    --brand-green-mid:     #2f9150;
+    /* ── Status info token ── */
+    --status-info:         #2563eb;
     --status-ok: 142 76% 36%;
     --status-issue: 0 72% 51%;
     --status-maintenance: 32 95% 44%;

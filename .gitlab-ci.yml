@@ -1,4 +1,4 @@
-# VetTrack â GitLab CI (migrated from .github/workflows/)
+# VetTrack  - GitLab CI (migrated from .github/workflows/)
 #
 # GitLab pipeline schedules (set SCHEDULED_JOB on each):
 #   flake-detection     cron: 0 3 * * *  (03:00 UTC)
@@ -166,7 +166,7 @@ deploy:preflight:
         fi
       done
       if [ "$missing" -eq 1 ]; then
-        echo "Skipping deploy pre-flight â required deploy variables unavailable."
+        echo "Skipping deploy pre-flight  - required deploy variables unavailable."
         exit 0
       fi
     - bash deploy.sh --check --no-color
@@ -194,11 +194,11 @@ deploy:railway:
   script:
     - |
       if [ "$RAILWAY_USE_CLI_DEPLOY" != "true" ]; then
-        echo "RAILWAY_USE_CLI_DEPLOY is not true â skipping Railway deploy."
+        echo "RAILWAY_USE_CLI_DEPLOY is not true  - skipping Railway deploy."
         exit 0
       fi
       if [ -z "$RAILWAY_TOKEN" ] || [ -z "$RAILWAY_SERVICE" ]; then
-        echo "RAILWAY_TOKEN or RAILWAY_SERVICE unset â skipping Railway deploy."
+        echo "RAILWAY_TOKEN or RAILWAY_SERVICE unset  - skipping Railway deploy."
         exit 0
       fi
     - npm install -g @railway/cli
@@ -302,7 +302,7 @@ flake-detection:run:
   script:
     - |
       if ! echo "$FLAKE_REPEAT_COUNT" | grep -Eq '^[2-5]$'; then
-        echo "FLAKE_REPEAT_COUNT must be 2â5 (got: $FLAKE_REPEAT_COUNT)"
+        echo "FLAKE_REPEAT_COUNT must be 2-5 (got: $FLAKE_REPEAT_COUNT)"
         exit 1
       fi
     - pnpm migrate
@@ -500,7 +500,7 @@ workday-simulation:nightly:
   script:
     - |
       if [ -z "$TEST_BASE_URL" ]; then
-        echo "TEST_BASE_URL_STAGING not configured â skipping"
+        echo "TEST_BASE_URL_STAGING not configured  - skipping"
         exit 0
       fi
     - git fetch origin staging || true

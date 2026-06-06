@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { UserCheck, X, ChevronRight, ChevronLeft } from "lucide-react";
 import type { Alert, AlertAcknowledgment, AlertType } from "@/types";
 import { useDirection } from "@/hooks/useDirection";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { normalizeStatus } from "@/lib/design-tokens";
 import { useEnterOnce } from "@/hooks/use-enter-once";
 
 const URGENT_TYPES: AlertType[] = ["issue", "overdue"];
@@ -93,7 +95,7 @@ export function AlertsProView({
             </p>
             <Button
               type="button"
-              className="mt-3 h-[50px] w-full rounded-[13px] bg-[var(--status-issue-fg)] text-sm font-semibold text-white hover:bg-[var(--status-issue-fg)]/90"
+              className="mt-3 h-12 w-full rounded-lg bg-[var(--status-issue-fg)] text-sm font-semibold text-white hover:bg-[var(--status-issue-fg)]/90"
               onClick={() => onNavigate(worst.equipmentId)}
               data-testid="btn-alerts-handle-worst"
             >
@@ -118,8 +120,9 @@ export function AlertsProView({
             tone === "err" ? "var(--status-issue)" : "var(--status-maintenance)";
 
           return (
-            <div className="flex min-h-[56px] items-stretch">
-              <span className="w-[3px] shrink-0 self-stretch" style={{ background: bar }} aria-hidden />
+            <div className="flex min-h-14 items-stretch">
+              <span className="w-1 shrink-0 self-stretch" style={{ background: bar }} aria-hidden />
+            <StatusBadge kind={normalizeStatus(tone)} className="self-center ms-1" />
               <div className="min-w-0 flex-1 px-3 py-2.5">
                 <button
                   type="button"
