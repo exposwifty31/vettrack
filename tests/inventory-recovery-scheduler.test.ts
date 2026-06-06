@@ -1,9 +1,8 @@
 /**
- * Static-analysis tests for inventory job recovery scheduler isolation (PR 1.3).
+ * Static-analysis tests for inventory job recovery scheduler (PR 1.3).
  *
- * Verifies that the recovery scheduler registration is isolated in its own
- * try/catch block so a failure during registration does not crash the server
- * or prevent other schedulers from starting.
+ * Billing inventory jobs were removed — recovery is a no-op and is no longer
+ * registered from start-schedulers.ts.
  */
 
 import { describe, it, expect } from "vitest";
@@ -19,65 +18,24 @@ function read(rel: string) {
 }
 
 const schedulers = read("server/app/start-schedulers.ts");
+const recovery = read("server/lib/inventory-job-recovery.ts");
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Import verification
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe("inventory-job-recovery — import", () => {
-  it("recoverPendingInventoryJobs is imported", () => {
-    expect(schedulers).toContain("recoverPendingInventoryJobs");
-    expect(schedulers).toContain("inventory-job-recovery");
+describe("inventory-job-recovery — scheduler wiring", () => {
+  it("is not imported or scheduled from start-schedulers.ts", () => {
+    expect(schedulers).not.toContain("recoverPendingInventoryJobs");
+    expect(schedulers).not.toContain("inventory-job-recovery");
+    expect(schedulers).not.toContain("INVENTORY_RECOVERY_INTERVAL_MS");
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Isolation
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe("inventory-job-recovery — isolation", () => {
-  it("recovery scheduler is wrapped in an isolated try/catch", () => {
-    // The recovery block starts after the import line; find the function call site
-    const fnBodyStart = schedulers.indexOf("startBackgroundSchedulers");
-    const firstCallIdx = schedulers.indexOf("recoverPendingInventoryJobs()", fnBodyStart);
-    expect(firstCallIdx).toBeGreaterThan(-1);
-    // There must be a try block before the call
-    const tryBeforeRecovery = schedulers.lastIndexOf("try", firstCallIdx);
-    expect(tryBeforeRecovery).toBeGreaterThan(-1);
-    // There must be a catch after the try
-    const catchAfterTry = schedulers.indexOf("catch (err)", tryBeforeRecovery);
-    expect(catchAfterTry).toBeGreaterThan(tryBeforeRecovery);
-    // The catch must contain an error log about scheduler registration failure
-    const catchBlock = schedulers.slice(catchAfterTry, catchAfterTry + 300);
-    expect(catchBlock).toContain("scheduler registration failed");
+describe("inventory-job-recovery — no-op contract", () => {
+  it("documents billing inventory removal", () => {
+    expect(recovery).toContain("no-op");
   });
 
-  it("startup recovery call logs on success with enqueued/skipped", () => {
-    expect(schedulers).toContain("enqueued");
-    expect(schedulers).toContain("skipped");
-    expect(schedulers).toContain("startup recovery complete");
-  });
-
-  it("interval recovery catches errors independently", () => {
-    expect(schedulers).toContain("interval recovery failed");
-  });
-
-  it("scheduler registration success is logged", () => {
-    expect(schedulers).toContain("scheduler registered");
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Interval setup
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe("inventory-job-recovery — interval", () => {
-  it("uses setInterval for periodic recovery", () => {
-    const recoveryBlock = schedulers.slice(schedulers.indexOf("recoverPendingInventoryJobs"));
-    expect(recoveryBlock).toContain("setInterval");
-  });
-
-  it("uses a named interval constant", () => {
-    expect(schedulers).toContain("INVENTORY_RECOVERY_INTERVAL_MS");
+  it("returns enqueued/skipped metrics without touching inventoryJobs", () => {
+    expect(recovery).toContain("enqueued");
+    expect(recovery).toContain("skipped");
+    expect(recovery).not.toContain("inventoryJobs");
   });
 });

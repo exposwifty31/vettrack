@@ -61,12 +61,10 @@ import { recoverPendingInventoryJobs } from "../server/lib/inventory-job-recover
 // ---------------------------------------------------------------------------
 
 describe("Scheduler registration location", () => {
-  it("recoverPendingInventoryJobs is imported in start-schedulers.ts", () => {
-    expect(schedulerSource).toContain("recoverPendingInventoryJobs");
-  });
-
-  it("inventory recovery setInterval is defined in start-schedulers.ts", () => {
-    expect(schedulerSource).toContain("INVENTORY_RECOVERY_INTERVAL_MS");
+  it("inventory recovery is not scheduled in start-schedulers.ts (billing schema removed)", () => {
+    expect(schedulerSource).not.toContain("recoverPendingInventoryJobs");
+    expect(schedulerSource).not.toContain("INVENTORY_RECOVERY_INTERVAL_MS");
+    expect(schedulerSource).not.toContain("inventory-job-recovery");
   });
 
   it("inventory recovery is NOT wired inline in index.ts", () => {
@@ -83,17 +81,9 @@ describe("Scheduler registration location", () => {
 // ---------------------------------------------------------------------------
 
 describe("No duplicate scheduler registration", () => {
-  it("INVENTORY_RECOVERY_INTERVAL_MS appears exactly once in start-schedulers.ts", () => {
-    const occurrences = schedulerSource.split("INVENTORY_RECOVERY_INTERVAL_MS").length - 1;
-    // Declaration + usage = 2 occurrences is correct; >2 would indicate duplication
-    expect(occurrences).toBeLessThanOrEqual(2);
-    expect(occurrences).toBeGreaterThanOrEqual(1);
-  });
-
-  it("inventory-job-recovery is imported exactly once in start-schedulers.ts", () => {
-    // Count import statements (not log tags or comments) referencing the module
+  it("inventory-job-recovery is not imported in start-schedulers.ts", () => {
     const importOccurrences = (schedulerSource.match(/^import .+ from ".*inventory-job-recovery/gm) ?? []).length;
-    expect(importOccurrences).toBe(1);
+    expect(importOccurrences).toBe(0);
   });
 });
 
@@ -186,9 +176,9 @@ describe("recoverPendingInventoryJobs idempotency", () => {
 // 5. Interval constant is 10 minutes
 // ---------------------------------------------------------------------------
 
-describe("Recovery interval is 10 minutes", () => {
-  it("scheduler source uses 10 * 60 * 1000 for recovery interval", () => {
-    expect(schedulerSource).toContain("10 * 60 * 1000");
+describe("recoverPendingInventoryJobs no-op contract", () => {
+  it("recovery module documents billing inventory removal", () => {
+    expect(recoverySource).toContain("no-op");
   });
 
   it("10 * 60 * 1000 equals 600000 ms", () => {
