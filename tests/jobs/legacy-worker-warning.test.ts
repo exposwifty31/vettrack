@@ -52,21 +52,24 @@ describe("B2b — legacy pilot worker starter warnings", () => {
     vi.restoreAllMocks();
   });
 
-  it("documents @deprecated on both legacy starters", () => {
+  it("documents @deprecated on charge-alert legacy starter", () => {
     const chargeSrc = readFileSync(
       path.join(repoRoot, "server/workers/chargeAlertWorker.ts"),
       "utf8",
     );
+    const marker = "@deprecated Use Job Runtime registry execution instead.";
+    expect(chargeSrc).toContain(marker);
+    expect(chargeSrc).toContain("export async function startChargeAlertWorker");
+  });
+
+  it("documents deprecated inventory starter as disabled no-op", () => {
     const inventorySrc = readFileSync(
       path.join(repoRoot, "server/workers/inventory-deduction.worker.ts"),
       "utf8",
     );
-    expect(chargeSrc).toContain("@deprecated Use Job Runtime registry execution instead.");
-    expect(chargeSrc).toContain("export async function startChargeAlertWorker");
-    expect(inventorySrc).toContain(
-      "@deprecated Inventory deduction runs inline at task/dispense completion.",
-    );
+    expect(inventorySrc).toContain("@deprecated Inventory deduction runs inline at task/dispense completion.");
     expect(inventorySrc).toContain("export async function startInventoryDeductionWorker");
+    expect(inventorySrc).toContain("worker disabled (billing schema removed)");
   });
 
   describe("startChargeAlertWorker", () => {
@@ -119,7 +122,7 @@ describe("B2b — legacy pilot worker starter warnings", () => {
   });
 
   describe("startInventoryDeductionWorker", () => {
-    it("logs disabled warning and does not start a BullMQ worker", async () => {
+    it("logs disabled warning and does not start a worker", async () => {
       const { startInventoryDeductionWorker } = await import(
         "../../server/workers/inventory-deduction.worker.js"
       );
@@ -127,9 +130,23 @@ describe("B2b — legacy pilot worker starter warnings", () => {
       await startInventoryDeductionWorker();
 
       const warnSpy = vi.mocked(console.warn);
+      expect(legacyStarterWarnFields(warnSpy)).toHaveLength(0);
       expect(warnSpy).toHaveBeenCalledWith(
         "[inventory-deduction] worker disabled (billing schema removed)",
       );
+      expect(mockWorkerCtor).not.toHaveBeenCalled();
+    });
+
+    it("remains a no-op on repeated calls", async () => {
+      const { startInventoryDeductionWorker } = await import(
+        "../../server/workers/inventory-deduction.worker.js"
+      );
+
+      await startInventoryDeductionWorker();
+      await startInventoryDeductionWorker();
+
+      const warnSpy = vi.mocked(console.warn);
+      expect(warnSpy).toHaveBeenCalledTimes(2);
       expect(legacyStarterWarnFields(warnSpy)).toHaveLength(0);
       expect(mockWorkerCtor).not.toHaveBeenCalled();
     });

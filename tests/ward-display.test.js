@@ -91,9 +91,9 @@ describe("Ward Display — overdue medication job (removed)", () => {
     expect(queueSource).not.toContain("overdue_medication_alert");
   });
 
-  it("scanner sets overdueNotifiedAt to prevent duplicate notifications", () => {
-    expect(workerSource).toContain("overdueNotifiedAt");
-    expect(workerSource).toContain("scanOverdueMedications");
+  it("notification worker no longer scans overdue medications", () => {
+    expect(workerSource).not.toContain("scanOverdueMedications");
+    expect(workerSource).not.toContain("overdueNotifiedAt");
   });
 
   it("WardDisplayPage contains no interactive elements (read-only)", () => {

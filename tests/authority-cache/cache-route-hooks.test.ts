@@ -5,7 +5,6 @@
  *  - test #8 PATCH /:id/role  → invalidateForUser
  *  - test #8b PATCH /:id/display_name → invalidateForUser
  *  - test #8c POST /sync (both existing-user and insert paths) → invalidateForUser
- *  (shift-handover routes removed — session invalidation tests dropped)
  *
  * Handlers are extracted directly from the routers, mirroring the existing
  * pattern in `tests/users-me-authority.test.ts`.
@@ -243,7 +242,7 @@ async function loadHandler(
   );
   if (!layer?.route) {
     throw new Error(
-      `${method.toUpperCase()} ${path} handler not found in users router`,
+      `${method.toUpperCase()} ${path} handler not found in ${modulePath} router`,
     );
   }
   return layer.route.stack[layer.route.stack.length - 1]!
@@ -266,7 +265,7 @@ describe("PATCH /:id/role invalidation (test #8)", () => {
     // 2. update users → returns updated row
     dbResolves.push([{ id: "user-1", role: "vet" }]);
 
-    const handler = await loadHandler( "patch", "/:id/role");
+    const handler = await loadHandler("patch", "/:id/role");
     const req = {
       params: { id: "user-1" },
       body: { role: "vet" },
@@ -290,7 +289,7 @@ describe("PATCH /:id/display_name invalidation (test #8b)", () => {
     // 2. update → returns updated row
     dbResolves.push([{ id: "user-1", displayName: "New Name" }]);
 
-    const handler = await loadHandler( "patch", "/:id/display_name");
+    const handler = await loadHandler("patch", "/:id/display_name");
     const req = {
       params: { id: "user-1" },
       body: { display_name: "New Name" },
@@ -324,7 +323,7 @@ describe("POST /sync invalidation (test #8c)", () => {
       { id: "user-1", clinicId: "clinic-a", role: "technician", name: "User", email: "u@x.com" },
     ]);
 
-    const handler = await loadHandler( "post", "/sync");
+    const handler = await loadHandler("post", "/sync");
     const req = {
       params: {},
       body: { clerkId: "clerk-1", email: "u@x.com" },
@@ -358,7 +357,7 @@ describe("POST /sync invalidation (test #8c)", () => {
       },
     ]);
 
-    const handler = await loadHandler( "post", "/sync");
+    const handler = await loadHandler("post", "/sync");
     const req = {
       params: {},
       body: { clerkId: "clerk-2", email: "n@x.com" },
@@ -380,4 +379,3 @@ describe("POST /sync invalidation (test #8c)", () => {
     );
   });
 });
-

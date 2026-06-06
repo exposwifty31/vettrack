@@ -232,9 +232,8 @@ describe("integrations/index.ts", () => {
 // ---------------------------------------------------------------------------
 // 6. DB schema — new tables and sync columns
 // ---------------------------------------------------------------------------
-describe("server/db.ts — integration tables and sync columns", () => {
+describe("server/schema — integration tables and sync columns", () => {
   const integrationsSrc = read("server/schema/integrations.ts");
-  const coreSrc = read("server/schema/core.ts");
   const tasksSrc = read("server/schema/tasks.ts");
   const inventorySrc = read("server/schema/inventory.ts");
 
@@ -260,9 +259,6 @@ describe("server/db.ts — integration tables and sync columns", () => {
   it("defines integrationWebhookEvents table", () => {
     expect(integrationsSrc).toContain('export const integrationWebhookEvents = vtTable("vt_integration_webhook_events"');
     expect(integrationsSrc).toContain("signatureValid");
-  });
-  it("animals table is defined in core schema", () => {
-    expect(coreSrc).toContain('export const animals = vtTable("vt_animals"');
   });
   it("appointments table has external sync columns", () => {
     const start = tasksSrc.indexOf('export const appointments = vtTable("vt_appointments"');
@@ -347,6 +343,7 @@ describe("integration worker", () => {
   it("updates last sync timestamp after successful inbound sync", () => {
     expect(src).toContain("lastInventorySyncAt");
     expect(src).toContain("lastAppointmentSyncAt");
+    expect(src).not.toContain("lastPatientSyncAt");
   });
   it("handles Redis unavailability gracefully", () => {
     expect(src).toContain("Redis unavailable");

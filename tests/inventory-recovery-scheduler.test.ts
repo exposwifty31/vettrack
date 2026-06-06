@@ -1,8 +1,7 @@
 /**
- * Static-analysis tests for inventory job recovery scheduler (PR 1.3).
+ * Inventory job recovery scheduler — retired with billing inventory jobs.
  *
- * Billing inventory jobs were removed — recovery is a no-op and is no longer
- * registered from start-schedulers.ts.
+ * Verifies the recovery helper is a no-op and is absent from start-schedulers.
  */
 
 import { describe, it, expect } from "vitest";
@@ -20,22 +19,15 @@ function read(rel: string) {
 const schedulers = read("server/app/start-schedulers.ts");
 const recovery = read("server/lib/inventory-job-recovery.ts");
 
-describe("inventory-job-recovery — scheduler wiring", () => {
-  it("is not imported or scheduled from start-schedulers.ts", () => {
+describe("inventory-job-recovery — retired scheduler", () => {
+  it("recoverPendingInventoryJobs is not imported in start-schedulers.ts", () => {
     expect(schedulers).not.toContain("recoverPendingInventoryJobs");
     expect(schedulers).not.toContain("inventory-job-recovery");
     expect(schedulers).not.toContain("INVENTORY_RECOVERY_INTERVAL_MS");
   });
-});
 
-describe("inventory-job-recovery — no-op contract", () => {
-  it("documents billing inventory removal", () => {
-    expect(recovery).toContain("no-op");
-  });
-
-  it("returns enqueued/skipped metrics without touching inventoryJobs", () => {
-    expect(recovery).toContain("enqueued");
-    expect(recovery).toContain("skipped");
-    expect(recovery).not.toContain("inventoryJobs");
+  it("recovery module is a documented no-op stub", () => {
+    expect(recovery).toMatch(/no-op/i);
+    expect(recovery).toContain("export async function recoverPendingInventoryJobs");
   });
 });

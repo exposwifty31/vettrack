@@ -113,7 +113,7 @@ afterEach(() => {
 describe("PR 5.5 — evaluator returns orphanLines on the WOULD_HAVE_BLOCKED_SHADOW verdict", () => {
   it("shadow + orphans: verdict carries `orphanLines` so the wiring layer can emit post-commit", async () => {
     const detected = [
-      orphan("item-1", ["NO_PATIENT_LINKED", "NO_ACTIVE_ORDER"]),
+      orphan("item-1", ["NO_ACTIVE_ORDER", "QUANTITY_EXCEEDS_ORDER"]),
       orphan("item-2", ["NO_ACTIVE_ORDER"]),
     ];
     evaluateDispenseAgainstOrdersMock.mockResolvedValue({ orphanLines: detected });
@@ -156,7 +156,7 @@ describe("PR 5.5 — evaluator returns orphanLines on the WOULD_HAVE_BLOCKED_SHA
 
   it("counters still tick in the evaluator (shadow set semantics preserved)", async () => {
     evaluateDispenseAgainstOrdersMock.mockResolvedValue({
-      orphanLines: [orphan("item-1", ["NO_PATIENT_LINKED", "NO_ACTIVE_ORDER"])],
+      orphanLines: [orphan("item-1", ["NO_ACTIVE_ORDER", "QUANTITY_EXCEEDS_ORDER"])],
     });
 
     await evaluateClinicalInvariant(ctx({ animalId: "animal-v4" }), {
@@ -165,8 +165,8 @@ describe("PR 5.5 — evaluator returns orphanLines on the WOULD_HAVE_BLOCKED_SHA
 
     const snap = getMetricsSnapshot().clinicalInvariant.shadowWouldHaveBlocked;
     expect(snap.total).toBe(1);
-    expect(snap.noPatientLinked).toBe(1);
     expect(snap.noActiveOrder).toBe(1);
+    expect(snap.quantityExceedsOrder).toBe(1);
   });
 });
 
@@ -251,7 +251,7 @@ describe("PR 5.5 — sampled shadow audit emitter (direct invocation)", () => {
       animalId: null,
       containerId: "container-1",
       requestId: "req-null-1",
-      orphanLines: [orphan("item-1", ["NO_PATIENT_LINKED"])],
+      orphanLines: [orphan("item-1", ["NO_ACTIVE_ORDER"])],
     });
     expect(shadowAuditCalls()).toHaveLength(1);
     const meta =

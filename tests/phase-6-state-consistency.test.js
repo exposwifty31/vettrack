@@ -112,8 +112,8 @@ describe("Wave 6 state consistency checks (static)", () => {
 
   it("Equipment list desktop view uses skeleton loading instead of hardcoded text", () => {
     expect(
-      equipmentList.includes("import { LoadingSection }") &&
-        equipmentList.includes("<LoadingSection rows={5} />") &&
+      equipmentList.includes("EquipmentListSkeleton") &&
+        equipmentList.includes("isLoading ? (") &&
         !equipmentList.includes("טוען..."),
     ).toBe(true);
   });

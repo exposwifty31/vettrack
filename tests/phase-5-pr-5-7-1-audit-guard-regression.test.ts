@@ -388,7 +388,7 @@ describe("PR 5.7.1 — enforce-deny audit attempt is made before the throw", () 
     ];
     expect(args).toMatchObject({
       clinicId: "clinic-1",
-      animalId: "animal-1",
+      animalId: null,
       containerId: "container-1",
       requestId: "req-pr-5-7-1",
       orphanLines: sampleOrphanLines,

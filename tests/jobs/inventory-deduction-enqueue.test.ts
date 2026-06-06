@@ -1,7 +1,7 @@
 /**
- * Inventory deduction queue — legacy producer stub (billing schema removed).
+ * inventory-deduction producer is a no-op — billing/inventory jobs removed from registry.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockEnqueueJob = vi.hoisted(() => vi.fn().mockResolvedValue({ id: "job-1" }));
 
@@ -10,7 +10,6 @@ vi.mock("../../server/jobs/enqueue.js", () => ({
 }));
 
 import {
-  INVENTORY_DEDUCTION_JOB_NAME,
   inventoryDeductionQueue,
   type InventoryDeductionJobData,
 } from "../../server/queues/inventory-deduction.queue.js";
@@ -33,15 +32,22 @@ describe("inventory-deduction.queue module", () => {
   });
 });
 
-describe("inventoryDeductionQueue.add — disabled producer stub", () => {
-  it("does not call enqueueJob (deduction runs inline at completion)", async () => {
+describe("inventoryDeductionQueue.add — no-op producer", () => {
+  beforeEach(() => {
+    mockEnqueueJob.mockClear();
+  });
+
+  it("does not delegate to enqueueJob", async () => {
     await inventoryDeductionQueue.add(BASE_PAYLOAD);
+
     expect(mockEnqueueJob).not.toHaveBeenCalled();
   });
 
-  it("accepts optional BullMQ options as a no-op", async () => {
-    await inventoryDeductionQueue.add(BASE_PAYLOAD, { jobId: "deduct-task-1", delay: 5000 });
+  it("ignores per-add BullMQ options without enqueuing", async () => {
+    const options = { jobId: "deduct-task-1", delay: 5000 };
+
+    await inventoryDeductionQueue.add(BASE_PAYLOAD, options);
+
     expect(mockEnqueueJob).not.toHaveBeenCalled();
-    expect(INVENTORY_DEDUCTION_JOB_NAME).toBe("inventory-deduction");
   });
 });

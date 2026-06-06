@@ -93,16 +93,6 @@ describe("dvh usage in bottom sheets", () => {
 // 5. inputmode on numeric inputs in critical components
 // ---------------------------------------------------------------------------
 describe("inputmode attributes", () => {
-  it("MedicationCalculator has inputMode='decimal' on all number inputs", () => {
-    const src = read("src/components/MedicationCalculator.tsx");
-    // Count type="number" occurrences
-    const typeNumberCount = (src.match(/type="number"/g) ?? []).length;
-    // Count inputMode="decimal" occurrences
-    const inputModeCount = (src.match(/inputMode="decimal"/g) ?? []).length;
-    // Every number input should have inputMode
-    expect(inputModeCount).toBe(typeNumberCount);
-  });
-
   it("return-plug-dialog has inputMode='numeric' on minute input", () => {
     const src = read("src/components/return-plug-dialog.tsx");
     expect(src).toContain('inputMode="numeric"');
@@ -112,18 +102,16 @@ describe("inputmode attributes", () => {
 // ---------------------------------------------------------------------------
 // 6. layout.tsx navigation menu uses dvh
 // ---------------------------------------------------------------------------
-describe("layout.tsx navigation menu", () => {
-  it("nav dropdown uses max-h-[*dvh] not max-h-[*vh]", () => {
+describe("layout.tsx navigation shell", () => {
+  it("root shell uses min-h-[100dvh] for mobile viewport stability", () => {
     const src = read("src/components/layout.tsx");
-    // The menu dropdown div uses a cn() with the max-height class.
-    // "menuReveal_220ms" is unique to the main nav dropdown (quick-settings uses 160ms).
-    const anchor = "menuReveal_220ms";
-    const anchorIdx = src.indexOf(anchor);
-    expect(anchorIdx, "Could not find menuReveal anchor in layout.tsx").toBeGreaterThan(-1);
-    // Look at the 400 chars before the anchor (the cn() call with class names)
-    const menuSection = src.slice(anchorIdx - 400, anchorIdx + 200);
-    expect(menuSection).toContain("dvh");
-    expect(menuSection).not.toMatch(/max-h-\[\d+vh\]/);
+    expect(src).toContain("min-h-[100dvh]");
+  });
+
+  it("mobile nav drawer uses safe-area inset padding", () => {
+    const src = read("src/components/layout.tsx");
+    expect(src).toContain("env(safe-area-inset-top)");
+    expect(src).toContain("env(safe-area-inset-bottom)");
   });
 });
 

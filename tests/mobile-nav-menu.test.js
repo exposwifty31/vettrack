@@ -68,7 +68,7 @@ describe("Mobile nav — reduced-motion fallback", () => {
 // 2. Core nav items remain wired up and use i18n labels
 // ─────────────────────────────────────────────────────────────────────────────
 
-const CORE_NAV_HREFS = ["/", "/equipment", "/alerts", "/rooms"];
+const CORE_NAV_HREFS = ["/", "/equipment", "/alerts", "/inventory"];
 
 describe("Mobile nav — core items present", () => {
   for (const href of CORE_NAV_HREFS) {
@@ -103,17 +103,8 @@ describe("Mobile nav — core items present", () => {
 // filters falsy labels would drop the item entirely.
 const LH_KEYS_USED_IN_NAV = [
   "home",
-  "codeBlue",
-  "crashCart",
-  "tasks",
-  "activePatients",
-  "wardDisplay",
-  "medicationHub",
-  "radar",
-  "shiftHandover",
   "inventory",
   "analytics",
-  "billing",
   "dashboard",
   "printQr",
   "inventoryItems",
@@ -125,11 +116,28 @@ const LH_KEYS_USED_IN_NAV = [
   "whatsNew",
   "quickGuide",
   "auditLog",
-  "medIntegrity",
   "opsDashboard",
-  "codeBlueHistory",
   "settings",
   "reportIssue",
+  "restockNavLockedToast",
+  "navLockActiveAria",
+  "offline",
+  "syncing",
+  "synced",
+  "pendingTitle",
+  "pendingShort",
+  "failedTitle",
+  "failedShort",
+  "pendingTooltip",
+  "quickSettings",
+  "allSettings",
+  "bottomMenu",
+  "bottomHome",
+  "bottomEquipment",
+  "closeScannerAria",
+  "bottomScan",
+  "bottomScanClose",
+  "bottomRecap",
 ];
 
 describe("Mobile nav — i18n labels resolve in every locale", () => {

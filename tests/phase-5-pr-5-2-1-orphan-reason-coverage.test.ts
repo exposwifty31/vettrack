@@ -9,7 +9,7 @@
  * counter-granularity contract from plan §10.1 / §10.2.
  *
  * Specifically locks:
- *   - All four `OrphanReasonCode` values reachable from BOTH the
+ *   - Both `OrphanReasonCode` values reachable from BOTH the
  *     shadow path (per-reason `_would_have_blocked_*` increments)
  *     AND the enforce path (deny verdict mirrors `orphanLines`).
  *   - Per-reason counter is a SET counter (one tick per unique
@@ -19,8 +19,8 @@
  *   - Multi-line same-reason: total ticks once; per-reason ticks once.
  *   - Multi-line different-reason: total ticks once; each distinct
  *     reason's bucket ticks once.
- *   - All-four-reasons in one request: total ticks once; each of the
- *     four per-reason buckets ticks once.
+ *   - Both-reasons in one request: total ticks once; each of the
+ *     two per-reason buckets ticks once.
  *   - Two sequential requests accumulate additively and independently
  *     (no cross-request state leak).
  *   - Enforce path's deny verdict echoes `orphanLines` byte-identically
@@ -69,14 +69,12 @@ import type { OrphanLineDetail, OrphanReasonCode } from "../server/lib/dispense-
 const FAKE_TX = {} as ClinicalInvariantContext["tx"];
 
 /**
- * The four frozen `OrphanReasonCode` values (plan §19.27).
+ * The two frozen `OrphanReasonCode` values (plan §19.27).
  * Iterating this list mechanically reaches every reason bucket and
  * surfaces any future widening of the union as a TypeScript error at
  * the per-reason switch in `clinical-invariant.metrics.ts`.
  */
 const ALL_REASONS: readonly OrphanReasonCode[] = [
-  "NO_PATIENT_LINKED",
-  "NO_ACTIVE_HOSPITALIZATION",
   "NO_ACTIVE_ORDER",
   "QUANTITY_EXCEEDS_ORDER",
 ] as const;
@@ -84,10 +82,8 @@ const ALL_REASONS: readonly OrphanReasonCode[] = [
 /** Counter snapshot keys aligned with `MetricsSnapshot.clinicalInvariant.shadowWouldHaveBlocked`. */
 const REASON_TO_COUNTER_KEY: Record<
   OrphanReasonCode,
-  "noPatientLinked" | "noActiveHospitalization" | "noActiveOrder" | "quantityExceedsOrder"
+  "noActiveOrder" | "quantityExceedsOrder"
 > = {
-  NO_PATIENT_LINKED: "noPatientLinked",
-  NO_ACTIVE_HOSPITALIZATION: "noActiveHospitalization",
   NO_ACTIVE_ORDER: "noActiveOrder",
   QUANTITY_EXCEEDS_ORDER: "quantityExceedsOrder",
 };
@@ -208,10 +204,8 @@ describe("PR 5.2.1 — shadow / multi-line counter set semantics", () => {
   it("multi-line different reasons (one per line): each reason bucket ticks once, total ticks once", async () => {
     evaluateDispenseAgainstOrdersMock.mockResolvedValue({
       orphanLines: [
-        orphan("item-1", ["NO_PATIENT_LINKED"]),
-        orphan("item-2", ["NO_ACTIVE_HOSPITALIZATION"]),
-        orphan("item-3", ["NO_ACTIVE_ORDER"]),
-        orphan("item-4", ["QUANTITY_EXCEEDS_ORDER"]),
+        orphan("item-1", ["NO_ACTIVE_ORDER"]),
+        orphan("item-2", ["QUANTITY_EXCEEDS_ORDER"]),
       ],
     });
 
@@ -219,8 +213,8 @@ describe("PR 5.2.1 — shadow / multi-line counter set semantics", () => {
 
     expect(shadowCounters()).toEqual({
       total: 1,
-      noPatientLinked: 1,
-      noActiveHospitalization: 1,
+      noPatientLinked: 0,
+      noActiveHospitalization: 0,
       noActiveOrder: 1,
       quantityExceedsOrder: 1,
     });
@@ -231,7 +225,7 @@ describe("PR 5.2.1 — shadow / multi-line counter set semantics", () => {
       orphanLines: [
         orphan("item-1", ["NO_ACTIVE_ORDER", "QUANTITY_EXCEEDS_ORDER"]),
         orphan("item-2", ["NO_ACTIVE_ORDER"]),
-        orphan("item-3", ["QUANTITY_EXCEEDS_ORDER", "NO_ACTIVE_HOSPITALIZATION"]),
+        orphan("item-3", ["QUANTITY_EXCEEDS_ORDER"]),
       ],
     });
 
@@ -240,7 +234,7 @@ describe("PR 5.2.1 — shadow / multi-line counter set semantics", () => {
     expect(shadowCounters()).toEqual({
       total: 1,
       noPatientLinked: 0,
-      noActiveHospitalization: 1,
+      noActiveHospitalization: 0,
       noActiveOrder: 1, // observed twice across lines but ticks once
       quantityExceedsOrder: 1, // observed twice across lines but ticks once
     });
@@ -248,11 +242,11 @@ describe("PR 5.2.1 — shadow / multi-line counter set semantics", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shadow path — single line carrying ALL four reasons
+// Shadow path — single line carrying BOTH reasons
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("PR 5.2.1 — shadow / all-four-reasons surface", () => {
-  it("a single line with all four reasons ticks each bucket exactly once", async () => {
+describe("PR 5.2.1 — shadow / both-reasons surface", () => {
+  it("a single line with both reasons ticks each bucket exactly once", async () => {
     evaluateDispenseAgainstOrdersMock.mockResolvedValue({
       orphanLines: [orphan("item-1", [...ALL_REASONS])],
     });
@@ -261,14 +255,14 @@ describe("PR 5.2.1 — shadow / all-four-reasons surface", () => {
 
     expect(shadowCounters()).toEqual({
       total: 1,
-      noPatientLinked: 1,
-      noActiveHospitalization: 1,
+      noPatientLinked: 0,
+      noActiveHospitalization: 0,
       noActiveOrder: 1,
       quantityExceedsOrder: 1,
     });
   });
 
-  it("four lines each carrying one distinct reason ticks each bucket exactly once", async () => {
+  it("two lines each carrying one distinct reason ticks each bucket exactly once", async () => {
     evaluateDispenseAgainstOrdersMock.mockResolvedValue({
       orphanLines: ALL_REASONS.map((r, idx) => orphan(`item-${idx}`, [r])),
     });
@@ -277,8 +271,8 @@ describe("PR 5.2.1 — shadow / all-four-reasons surface", () => {
 
     expect(shadowCounters()).toEqual({
       total: 1,
-      noPatientLinked: 1,
-      noActiveHospitalization: 1,
+      noPatientLinked: 0,
+      noActiveHospitalization: 0,
       noActiveOrder: 1,
       quantityExceedsOrder: 1,
     });
@@ -293,7 +287,7 @@ describe("PR 5.2.1 — shadow / sequential request isolation", () => {
   it("two sequential requests accumulate per-reason totals independently and additively", async () => {
     evaluateDispenseAgainstOrdersMock
       .mockResolvedValueOnce({
-        orphanLines: [orphan("item-1", ["NO_PATIENT_LINKED", "NO_ACTIVE_ORDER"])],
+        orphanLines: [orphan("item-1", ["NO_ACTIVE_ORDER", "QUANTITY_EXCEEDS_ORDER"])],
       })
       .mockResolvedValueOnce({
         orphanLines: [orphan("item-2", ["QUANTITY_EXCEEDS_ORDER"])],
@@ -308,10 +302,10 @@ describe("PR 5.2.1 — shadow / sequential request isolation", () => {
 
     expect(shadowCounters()).toEqual({
       total: 2,
-      noPatientLinked: 1,
+      noPatientLinked: 0,
       noActiveHospitalization: 0,
       noActiveOrder: 1,
-      quantityExceedsOrder: 1,
+      quantityExceedsOrder: 2,
     });
   });
 
@@ -365,9 +359,9 @@ describe("PR 5.2.1 — enforce / per-reason deny coverage", () => {
 
   it("enforce + multi-line mixed reasons: deny + complete orphanLines mirror", async () => {
     const orphans = [
-      orphan("item-1", ["NO_PATIENT_LINKED"], 1),
-      orphan("item-2", ["NO_ACTIVE_HOSPITALIZATION", "QUANTITY_EXCEEDS_ORDER"], 3),
-      orphan("item-3", ["NO_ACTIVE_ORDER"], 5),
+      orphan("item-1", ["NO_ACTIVE_ORDER"], 1),
+      orphan("item-2", ["QUANTITY_EXCEEDS_ORDER"], 3),
+      orphan("item-3", ["NO_ACTIVE_ORDER", "QUANTITY_EXCEEDS_ORDER"], 5),
     ];
     evaluateDispenseAgainstOrdersMock.mockResolvedValue({ orphanLines: orphans });
 
@@ -382,9 +376,9 @@ describe("PR 5.2.1 — enforce / per-reason deny coverage", () => {
       expect(verdict.orphanLines.map((l) => l.quantity)).toEqual([1, 3, 5]);
       // Reasons are preserved as-is from the upstream utility.
       expect(verdict.orphanLines.map((l) => l.reasons)).toEqual([
-        ["NO_PATIENT_LINKED"],
-        ["NO_ACTIVE_HOSPITALIZATION", "QUANTITY_EXCEEDS_ORDER"],
         ["NO_ACTIVE_ORDER"],
+        ["QUANTITY_EXCEEDS_ORDER"],
+        ["NO_ACTIVE_ORDER", "QUANTITY_EXCEEDS_ORDER"],
       ]);
     }
 

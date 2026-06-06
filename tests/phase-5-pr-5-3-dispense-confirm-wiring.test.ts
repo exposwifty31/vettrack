@@ -404,7 +404,7 @@ describe("PR 5.3 — confirmDispense / shadow-forced wiring (CI-21, CI-16)", () 
       requestId: string;
     };
     expect(evalArg.clinicId).toBe("clinic-1");
-    expect(evalArg.animalId).toBe("animal-1");
+    expect(evalArg.animalId).toBeNull();
     expect(evalArg.containerId).toBe("container-1");
     expect(evalArg.isEmergency).toBe(false);
     expect(evalArg.bypassReason).toBeNull();

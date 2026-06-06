@@ -44,8 +44,7 @@ describe("Wave 3 UI token consistency checks (static)", () => {
       layout.includes("fixed bottom-0 left-0 right-0 z-50") &&
         layout.includes("border-t") &&
         layout.includes("border-ivory-border") &&
-        layout.includes("bg-ivory-surface/98") &&
-        layout.includes("bg-ivory-green text-white"),
+        layout.includes("text-ivory-green"),
     ).toBe(true);
   });
 

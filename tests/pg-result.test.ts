@@ -25,10 +25,10 @@ describe("version guard source contracts", () => {
     expect(src).toMatch(/pgUpdateMatchedZeroRows\(updateResult\)/);
   });
 
-  it("procedure-bound release UPDATE filters by snapshot version", () => {
+  it("procedure-bound release is a billing-surface no-op stub", () => {
     const src = readFileSync("server/services/equipment-operational-state.service.ts", "utf8");
-    expect(src).toMatch(/eq\(equipment\.version, row\.version\)/);
-    expect(src).toMatch(/pgUpdateMatchedZeroRows\(result\)/);
+    expect(src).toContain("export async function releaseProcedureBoundEquipment");
+    expect(src).toMatch(/return\s*\{\s*released:\s*0\s*\}/);
   });
 
   it("dock-return UPDATE filters by capturedVersion", () => {

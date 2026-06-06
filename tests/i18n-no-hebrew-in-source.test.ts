@@ -31,7 +31,6 @@ const SCAN_EXTS = new Set([".ts", ".tsx", ".js", ".jsx"]);
 
 const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "server/lib/role-notification-scheduler.ts",
-  "server/lib/staging-promotion.ts",
   "server/routes/activity.ts",
   "server/routes/alert-acks.ts",
   "server/routes/code-blue.ts",
@@ -40,6 +39,7 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "server/routes/shift-chat.ts",
   "server/routes/shifts.ts",
   "server/routes/support.ts",
+  "server/lib/staging-promotion.ts",
   "server/workers/chargeAlertWorker.ts",
   "server/workers/notification.worker.ts",
   "shared/doctor-operational-shift.ts",

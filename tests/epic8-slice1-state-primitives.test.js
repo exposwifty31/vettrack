@@ -91,8 +91,8 @@ describe("Equipment list state integration", () => {
     expect(equipmentList).toContain("isLoading ? (");
   });
 
-  it("loading state: desktop view uses LoadingSection skeleton (no raw text)", () => {
-    expect(equipmentList).toContain("<LoadingSection rows={5} />");
+  it("loading state: list view uses EquipmentListSkeleton (no raw text)", () => {
+    expect(equipmentList).toContain("<EquipmentListSkeleton count={PAGE_SIZE} />");
     expect(equipmentList).not.toContain("טוען...");
   });
 
@@ -110,7 +110,7 @@ describe("Equipment list state integration", () => {
 
   it("rendering order: loading checked before empty", () => {
     const loadingIdx = equipmentList.indexOf("isLoading ? (");
-    const emptyIdx   = equipmentList.indexOf("filtered.length === 0");
+    const emptyIdx   = equipmentList.indexOf("displayList.length === 0");
     expect(loadingIdx).toBeGreaterThan(-1);
     expect(emptyIdx).toBeGreaterThan(-1);
     expect(loadingIdx).toBeLessThan(emptyIdx);

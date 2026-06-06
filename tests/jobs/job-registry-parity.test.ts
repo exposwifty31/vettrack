@@ -304,7 +304,7 @@ describe("E3 — job registry / enqueue parity", () => {
     expect(registrySet.has(poison)).toBe(false);
     expect(resolveStaticJobName(poison)).toBeNull();
 
-    const fakeDiscovered = new Set([poison]);
+    const fakeDiscovered = new Set(["check-plug", poison]);
     const missing = [...fakeDiscovered].filter((n) => !registrySet.has(n));
     expect(missing).toEqual([poison]);
   });

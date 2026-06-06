@@ -1,16 +1,10 @@
 /**
  * Phase 6 PR 6.10 CORRECTION 2 — representative migration coverage for
- * the 4 target server routes.
+ * remaining migrated server routes (stability.ts, dispense.ts).
  *
- * Asserts that each of the 4 plan-§15-PR-6.10 routes has at least one
- * 4xx/5xx branch migrated to the i18n-aware `apiError(req, res, key,
- * params?, status?)` helper, and that the migrated branch references
- * the expected `errors.<route>.*` key.
- *
- * Combines static-analysis assertions (which scale across the 4 files)
- * with a representative integration test for stability.ts (drives the
- * Express router directly, asserting Hebrew vs English body on
- * x-locale switch).
+ * er-admin.ts and formulary.ts were removed with their admin surfaces.
+ * Combines static-analysis assertions with a representative integration
+ * test for stability.ts (Hebrew vs English body on x-locale switch).
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";

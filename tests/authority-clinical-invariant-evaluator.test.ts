@@ -260,25 +260,23 @@ describe("evaluateClinicalInvariant — shadow + orphans", () => {
   it("per-reason counter ticks once per UNIQUE reason in the request", async () => {
     evaluateDispenseAgainstOrdersMock.mockResolvedValue({
       orphanLines: [
-        orphanLine("item-1", ["NO_PATIENT_LINKED", "NO_ACTIVE_ORDER"]),
+        orphanLine("item-1", ["NO_ACTIVE_ORDER"]),
         orphanLine("item-2", ["NO_ACTIVE_ORDER", "QUANTITY_EXCEEDS_ORDER"]),
       ],
     });
     await evaluateClinicalInvariant(baseContext(), { modeResolver: modeResolver("shadow") });
     const snap = getMetricsSnapshot().clinicalInvariant;
     expect(snap.shadowWouldHaveBlocked.total).toBe(1);
-    expect(snap.shadowWouldHaveBlocked.noPatientLinked).toBe(1);
     expect(snap.shadowWouldHaveBlocked.noActiveOrder).toBe(1); // not 2
     expect(snap.shadowWouldHaveBlocked.quantityExceedsOrder).toBe(1);
+    expect(snap.shadowWouldHaveBlocked.noPatientLinked).toBe(0);
     expect(snap.shadowWouldHaveBlocked.noActiveHospitalization).toBe(0);
   });
 
-  it("all four OrphanReasonCode buckets are reachable", async () => {
+  it("both active OrphanReasonCode buckets are reachable", async () => {
     evaluateDispenseAgainstOrdersMock.mockResolvedValue({
       orphanLines: [
         orphanLine("item-1", [
-          "NO_PATIENT_LINKED",
-          "NO_ACTIVE_HOSPITALIZATION",
           "NO_ACTIVE_ORDER",
           "QUANTITY_EXCEEDS_ORDER",
         ]),
@@ -288,8 +286,8 @@ describe("evaluateClinicalInvariant — shadow + orphans", () => {
     const snap = getMetricsSnapshot().clinicalInvariant;
     expect(snap.shadowWouldHaveBlocked).toEqual({
       total: 1,
-      noPatientLinked: 1,
-      noActiveHospitalization: 1,
+      noPatientLinked: 0,
+      noActiveHospitalization: 0,
       noActiveOrder: 1,
       quantityExceedsOrder: 1,
     });

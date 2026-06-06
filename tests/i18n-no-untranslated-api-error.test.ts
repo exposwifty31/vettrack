@@ -39,6 +39,7 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "server/routes/activity.ts", // owner: activity
   "server/routes/admin-outbox-dlq.ts", // owner: outbox
   "server/routes/admin-outbox-health.ts", // owner: outbox
+  "server/routes/admin-task-ownership.ts", // owner: authority
   "server/routes/alert-acks.ts", // owner: alerts
   "server/routes/analytics.ts", // owner: analytics
   "server/routes/appointments.ts", // owner: tasks
@@ -48,9 +49,10 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "server/routes/containers.ts", // owner: inventory
   "server/routes/crash-cart.ts", // owner: code-blue
   "server/routes/cursor-bug-fixer.ts", // owner: admin
+  "server/routes/dispense.ts", // owner: dispense (PR 6.10 target)
   "server/routes/display.ts", // owner: display
   "server/routes/equipment-copilot.ts", // owner: equipment
-  "server/routes/equipment-operational-state.ts", // owner: equipment-ops-v2
+  "server/routes/equipment-operational-state.ts", // owner: equipment-ops-v2 (V2 procedure-bind; will be i18n'd in שלב 5)
   "server/routes/equipment.ts", // owner: equipment
   "server/routes/folders.ts", // owner: equipment
   "server/routes/health.ts", // owner: infra (probe endpoints — frozen contract)
@@ -66,11 +68,11 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "server/routes/rooms.ts", // owner: rooms
   "server/routes/shift-chat.ts", // owner: shift-chat
   "server/routes/shifts.ts", // owner: shifts
-  "server/routes/stability.ts", // owner: stability
+  "server/routes/stability.ts", // owner: stability (PR 6.10 target)
   "server/routes/storage.ts", // owner: storage
   "server/routes/support.ts", // owner: support
   "server/routes/tasks.ts", // owner: tasks
-  "server/routes/test.ts", // owner: test-only
+  "server/routes/test.ts", // owner: test-only (PR 6.3 light adoption)
   "server/routes/uploads.ts", // owner: storage
   "server/routes/users.ts", // owner: users
   "server/routes/webhooks.ts", // owner: integrations

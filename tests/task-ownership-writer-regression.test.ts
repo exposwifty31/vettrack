@@ -1,8 +1,13 @@
 /**
  * Phase 3 PR 3.2 — writer regression test.
  *
- * Task ownership now persists on `vt_appointments.acknowledged_user_id`
- * (not `metadata.acknowledgedBy`). Writers must stay centralized.
+ * Task ownership is persisted on `vt_appointments.acknowledged_user_id`
+ * (typed FK), not the legacy `metadata.acknowledgedBy` string.
+ *
+ * Allowed writers:
+ *   - server/routes/admin-task-ownership.ts (admin confirm path)
+ *   - server/workers/taskOwnershipBackfill.worker.ts (historical backfill)
+ *   - server/workers/staleTaskOwnershipSweepWorker.ts (staleness clear)
  */
 import { describe, expect, it } from "vitest";
 import fs from "fs";
@@ -11,25 +16,34 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
-const APPOINTMENTS_SERVICE = path.join(REPO_ROOT, "server/services/appointments.service.ts");
+
+const ALLOWED_WRITERS = [
+  path.join(REPO_ROOT, "server/routes/admin-task-ownership.ts"),
+  path.join(REPO_ROOT, "server/workers/taskOwnershipBackfill.worker.ts"),
+  path.join(REPO_ROOT, "server/workers/staleTaskOwnershipSweepWorker.ts"),
+];
 
 describe("acknowledgedUserId writer regression — inventory invariant", () => {
   it("appointments.service.ts does not assign metadata.acknowledgedBy", () => {
-    const src = fs.readFileSync(APPOINTMENTS_SERVICE, "utf-8");
+    const src = fs.readFileSync(
+      path.join(REPO_ROOT, "server/services/appointments.service.ts"),
+      "utf-8",
+    );
     expect(src).not.toMatch(/metadata\.acknowledgedBy\s*=(?!=)/);
   });
 
-  it("appointments.service.ts reads acknowledgedUserId for ownership observation", () => {
-    const src = fs.readFileSync(APPOINTMENTS_SERVICE, "utf-8");
-    expect(src).toContain("acknowledgedUserId");
+  it("admin confirm path sets acknowledgedUserId on appointments", () => {
+    const src = fs.readFileSync(ALLOWED_WRITERS[0], "utf-8");
+    expect(src).toMatch(/acknowledgedUserId:\s*confirmedUserId/);
+    expect(src).toMatch(/acknowledgedAt:/);
   });
 
-  it("only approved server files assign appointments.acknowledgedUserId", () => {
-    const allowedWriters = new Set([
-      path.join(REPO_ROOT, "server/routes/admin-task-ownership.ts"),
-      path.join(REPO_ROOT, "server/workers/taskOwnershipBackfill.worker.ts"),
-      path.join(REPO_ROOT, "server/workers/staleTaskOwnershipSweepWorker.ts"),
-    ]);
+  it("backfill worker sets acknowledgedUserId from resolver userId", () => {
+    const src = fs.readFileSync(ALLOWED_WRITERS[1], "utf-8");
+    expect(src).toMatch(/acknowledgedUserId:\s*resolution\.userId/);
+  });
+
+  it("no unexpected server file assigns acknowledgedUserId on appointments", () => {
     const serverDir = path.join(REPO_ROOT, "server");
     const offenders: string[] = [];
     const walk = (dir: string): void => {
@@ -38,16 +52,15 @@ describe("acknowledgedUserId writer regression — inventory invariant", () => {
         if (entry.isDirectory()) {
           walk(p);
         } else if (entry.isFile() && /\.(ts|tsx|js)$/.test(entry.name)) {
+          if (ALLOWED_WRITERS.includes(p)) continue;
           const content = fs.readFileSync(p, "utf-8");
-          if (/acknowledgedUserId\s*:/.test(content) && !allowedWriters.has(p) && p !== APPOINTMENTS_SERVICE) {
-            if (/\.set\(\{[^}]*acknowledgedUserId/.test(content)) {
-              offenders.push(p);
-            }
+          if (/\.set\(\{[^}]*acknowledgedUserId:/.test(content)) {
+            offenders.push(p);
           }
         }
       }
     };
     walk(serverDir);
-    expect(offenders.sort()).toEqual([...allowedWriters].sort());
+    expect(offenders).toEqual([]);
   });
 });

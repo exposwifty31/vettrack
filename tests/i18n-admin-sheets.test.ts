@@ -65,7 +65,7 @@ describe("Phase 6 PR 6.9 — admin.csvImport.* resolves", () => {
   });
 });
 
-describe("Phase 6 PR 6.9 — 3 admin sheets contain zero raw Hebrew literals", () => {
+describe("Phase 6 PR 6.9 — admin sheets contain zero raw Hebrew literals", () => {
   for (const file of [
     "src/components/crash-cart-admin-sheet.tsx",
     "src/components/csv-import-dialog.tsx",

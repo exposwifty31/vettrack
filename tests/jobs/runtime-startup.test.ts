@@ -23,13 +23,9 @@ vi.mock("../../server/lib/worker-heartbeat.js", () => ({
   startWorkerHeartbeat: mockStartWorkerHeartbeat,
 }));
 
-vi.mock("../../server/jobs/queue-factory.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../server/jobs/queue-factory.js")>();
-  return {
-    ...actual,
-    getOrCreateQueue: vi.fn().mockResolvedValue({ add: vi.fn().mockResolvedValue(undefined) }),
-  };
-});
+vi.mock("../../server/jobs/queue-factory.js", () => ({
+  getOrCreateQueue: vi.fn().mockResolvedValue({ add: vi.fn().mockResolvedValue(undefined) }),
+}));
 
 vi.mock("../../server/workers/chargeAlertWorker.js", async (importOriginal) => {
   const mod = await importOriginal<typeof import("../../server/workers/chargeAlertWorker.js")>();
@@ -39,10 +35,6 @@ vi.mock("../../server/workers/chargeAlertWorker.js", async (importOriginal) => {
     processChargeAlertJob: vi.fn(),
   };
 });
-
-vi.mock("../../server/workers/inventory-deduction.worker.js", () => ({
-  processInventoryDeductionJob: vi.fn(),
-}));
 
 vi.mock("../../server/workers/expiryCheckWorker.js", async (importOriginal) => {
   const mod = await importOriginal<typeof import("../../server/workers/expiryCheckWorker.js")>();
@@ -74,7 +66,6 @@ import {
   resetJobRuntimeStateForTests,
   startJobRuntime,
 } from "../../server/jobs/runtime.js";
-import { resetQueueFactoryForTests } from "../../server/jobs/queue-factory.js";
 
 function fakeRedisConnection() {
   return { quit: vi.fn().mockResolvedValue(undefined) };
@@ -83,7 +74,6 @@ function fakeRedisConnection() {
 describe("job runtime startup readiness (A1)", () => {
   beforeEach(() => {
     resetJobRuntimeStateForTests();
-    resetQueueFactoryForTests();
     vi.clearAllMocks();
     mockStartWorkerHeartbeat.mockClear();
     vi.mocked(getOrCreateQueue).mockResolvedValue({});
@@ -114,7 +104,6 @@ describe("job runtime startup readiness (A1)", () => {
     let redisConnectAttempts = 0;
     vi.mocked(createRedisConnection).mockImplementation(async () => {
       redisConnectAttempts += 1;
-      // getOrCreateQueue is mocked — attempt 1: charge-alert worker; 2: expiry-check worker
       if (redisConnectAttempts === 2) return null;
       return fakeRedisConnection() as Awaited<ReturnType<typeof createRedisConnection>>;
     });
