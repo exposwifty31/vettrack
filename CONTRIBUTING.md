@@ -5,46 +5,71 @@ Operational reference for engineers and agents working on VetTrack. Read
 covers process: branches, release flow, test execution, and ops-sensitive
 configuration that is easy to get wrong.
 
+## GitLab-first development (active)
+
+GitHub is temporarily unavailable. **Use GitLab as the primary remote:**
+
+- Remote: `https://gitlab.com/dboy3156/vettrack`
+- Full workflow: **`docs/GITLAB_DEVELOPMENT.md`**
+- CI: `.gitlab-ci.yml` (not `.github/workflows/` — preserved for GitHub return)
+- **Do not push directly to `main`.** Open merge requests (MRs) instead.
+- **Do not change Railway** or production deployment settings during the outage.
+
+### MR instead of PR
+
+| GitHub (paused) | GitLab (active) |
+|-----------------|-----------------|
+| `gh pr create` | GitLab UI, `glab mr create`, or MCP `create_merge_request` |
+| Pull request | Merge request (MR) |
+| Actions run on PR | CI runs on MR targeting `main` or `staging` |
+| Squash merge | Squash merge (same rule for red intermediate commits) |
+
+Verify per-commit CI before merge (GitLab):
+
+```bash
+glab mr view <iid> --web   # open MR
+# In GitLab UI: MR → Pipelines → view commit pipelines
+# Squash-merge required if any intermediate commit failed CI
+```
+
 ## Branches: `main` vs `staging`
 
-- **`staging`** — integration branch. Feature work and audit-remediation PRs
-  branch from and merge into `staging`. CI (`ci.yml`, `playwright.yml`) runs
-  on pull requests targeting `staging` and on pushes to it.
+- **`staging`** — integration branch. Feature work and audit-remediation MRs
+  branch from and merge into `staging`. GitLab CI (`.gitlab-ci.yml`) runs
+  on merge requests targeting `staging` and on pushes to it.
 - **`main`** — release branch. `main` is what deploys. The Release Gate
-  (`release-gate.yml`) and the Railway deploy jobs in `ci.yml` are gated to
-  `main`.
+  (`release-gate:*` jobs in `.gitlab-ci.yml`) and the Railway deploy jobs are
+  gated to `main`.
 - **Promotion** — changes flow `staging → main` via a deliberate, reviewed
   merge. Scheduled workflows (e.g. `workday-simulation-nightly.yml`) only
   fire from the **default branch (`main`)** — a workflow file that lives only
   on `staging` will never run on its cron until promoted to `main`.
 
-### Multi-step remediation PRs
+### Multi-step remediation MRs
 
-If intermediate commits in a PR left CI red (because a later commit in the same PR fixes them), the PR MUST be squash-merged. Do not preserve red commits on `staging` history — bisect must remain meaningful.
+If intermediate commits in an MR left CI red (because a later commit in the same MR fixes them), the MR MUST be squash-merged. Do not preserve red commits on `staging` history — bisect must remain meaningful.
 
-How to verify before merge:
+How to verify before merge (GitLab):
 
 ```bash
-gh pr view <number> --json commits --jq '.commits[].oid' | while read sha; do
-echo "=== $sha ==="
-gh run list --commit "$sha" --json status,conclusion,name --jq '.[] | select(.name | test("CI|Playwright")) | "\(.name): \(.conclusion)"'
-done
+glab mr view <iid> --web
+# Review pipeline status per commit in the MR Commits tab
 ```
 
-If any intermediate commit shows `conclusion: failure`, squash-merge is required.
+If any intermediate commit shows a failed pipeline, squash-merge is required.
 
 ## Release flow
 
-1. PRs merge into `staging`; `ci.yml` enforces `tsc` (frontend + server),
+1. MRs merge into `staging`; `.gitlab-ci.yml` enforces `tsc` (frontend + server),
    the frontend build, migrations, and the full `vitest` suite.
 2. `staging → main` promotion merge.
-3. On push to `main`, `ci.yml` runs the same gate and — when
+3. On push to `main`, CI runs the same gate and — when
    `RAILWAY_USE_CLI_DEPLOY` is enabled — the deploy pre-flight + Railway
    deploy jobs.
-4. `release-gate.yml` is a **manual, dispatch-only** release-readiness check
-   (seven named gates). It is not automatic; trigger it from the Actions UI
-   before a release. The automatic typecheck + full suite on `main` is owned
-   by `ci.yml` (the two were de-duplicated — see PR-05 / DP-04).
+4. **Release gate** is a **manual** pipeline run (CI/CD → Run pipeline on `main`).
+   It is not automatic; trigger it before a release. The automatic typecheck +
+   full suite on `main` is owned by the main CI jobs (de-duplicated from
+   release-gate — see PR-05 / DP-04).
 
 ## Running tests
 
@@ -76,9 +101,10 @@ server as part of release validation.
 
 ## Deployment & infrastructure config
 
-- **`RAILWAY_USE_CLI_DEPLOY`** — repository variable. When `true`, the
-  `deploy-check` and `deploy` jobs in `ci.yml` run on push to `main`; when
-  unset/false they are skipped (the merge gate tolerates skipped deploy jobs).
+- **`RAILWAY_USE_CLI_DEPLOY`** — GitLab CI/CD variable. When `true`, the
+  `deploy:preflight` and `deploy:railway` jobs in `.gitlab-ci.yml` run on push
+  to `main`; when unset/false they are skipped (the merge gate tolerates
+  skipped deploy jobs).
 - **Redis is required in production.** Redis is optional in dev (queues log
   `QUEUE_DISABLED_NO_REDIS` and the app still runs), but every BullMQ worker
   and scheduler in `server/app/start-schedulers.ts` needs Redis in prod.
