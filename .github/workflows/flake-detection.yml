@@ -144,7 +144,8 @@ jobs:
           for run in $(seq 1 "$REPEAT_COUNT"); do
             log="/tmp/flake-results/test-run-${run}.log"
             if [ -f "$log" ]; then
-              if grep -q "Tests.*passed" "$log" && ! grep -q "failed" "$log"; then
+              # vitest reporter format: "X tests | Y passed | Z failed"
+                            if grep -qE "[0-9]+ passed" "$log" && ! grep -qE "[0-9]+ failed" "$log"; then
                 echo "| Run ${run} | ✅ All passed |" >> $GITHUB_STEP_SUMMARY
               else
                 echo "| Run ${run} | ❌ Failures detected |" >> $GITHUB_STEP_SUMMARY
