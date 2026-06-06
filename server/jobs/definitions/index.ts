@@ -239,6 +239,11 @@ export function assertJobRegistryConsistency(): void {
   }
 }
 
-export type { IntegrationSyncJobData, IntegrationSyncJobType, IntegrationSyncDirection };
+export type {
+  ChargeAlertJobPayload,
+  IntegrationSyncJobData,
+  IntegrationSyncJobType,
+  IntegrationSyncDirection,
+};
 
 export { INTEGRATION_QUEUE_LEGACY_NAME, STALE_TASK_OWNERSHIP_SWEEP_QUEUE_NAME };

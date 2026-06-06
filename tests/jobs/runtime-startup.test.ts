@@ -59,7 +59,6 @@ vi.mock("../../server/workers/staleCheckInSweepWorker.js", async (importOriginal
 import { Worker } from "bullmq";
 import { createRedisConnection } from "../../server/lib/redis.js";
 import { getOrCreateQueue } from "../../server/jobs/queue-factory.js";
-import { INVENTORY_DEDUCTION_QUEUE_NAME } from "../../server/queues/inventory-deduction.queue.js";
 import { CHARGE_ALERT_QUEUE_NAME } from "../../server/workers/chargeAlertWorker.js";
 import {
   EXPIRY_CHECK_QUEUE_NAME,
@@ -71,6 +70,7 @@ import {
   resetJobRuntimeStateForTests,
   startJobRuntime,
 } from "../../server/jobs/runtime.js";
+import { resetQueueFactoryForTests } from "../../server/jobs/queue-factory.js";
 
 function fakeRedisConnection() {
   return { quit: vi.fn().mockResolvedValue(undefined) };
@@ -79,6 +79,7 @@ function fakeRedisConnection() {
 describe("job runtime startup readiness (A1)", () => {
   beforeEach(() => {
     resetJobRuntimeStateForTests();
+    resetQueueFactoryForTests();
     vi.clearAllMocks();
     mockStartWorkerHeartbeat.mockClear();
     vi.mocked(getOrCreateQueue).mockResolvedValue({});
@@ -95,13 +96,12 @@ describe("job runtime startup readiness (A1)", () => {
     expect(getRuntimeReadiness()).toEqual({
       started: true,
       workers: [
-        { name: INVENTORY_DEDUCTION_QUEUE_NAME, ok: true },
         { name: CHARGE_ALERT_QUEUE_NAME, ok: true },
         { name: EXPIRY_CHECK_QUEUE_NAME, ok: true },
         { name: STALE_CHECKIN_SWEEP_QUEUE_NAME, ok: true },
       ],
     });
-    expect(Worker).toHaveBeenCalledTimes(4);
+    expect(Worker).toHaveBeenCalledTimes(3);
     expect(mockStartWorkerHeartbeat).toHaveBeenCalledTimes(1);
     expect(mockStartWorkerHeartbeat).toHaveBeenCalledWith("job-runtime");
   });
@@ -120,13 +120,12 @@ describe("job runtime startup readiness (A1)", () => {
     expect(getRuntimeReadiness()).toEqual({
       started: false,
       workers: [
-        { name: INVENTORY_DEDUCTION_QUEUE_NAME, ok: true },
         { name: CHARGE_ALERT_QUEUE_NAME, ok: false },
         { name: EXPIRY_CHECK_QUEUE_NAME, ok: true },
         { name: STALE_CHECKIN_SWEEP_QUEUE_NAME, ok: true },
       ],
     });
-    expect(Worker).toHaveBeenCalledTimes(3);
+    expect(Worker).toHaveBeenCalledTimes(2);
     expect(mockStartWorkerHeartbeat).not.toHaveBeenCalled();
   });
 });

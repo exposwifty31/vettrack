@@ -87,8 +87,6 @@ import {
   startJobRuntime,
 } from "../../server/jobs/runtime.js";
 import { resetQueueFactoryForTests } from "../../server/jobs/queue-factory.js";
-import { INVENTORY_DEDUCTION_QUEUE_NAME } from "../../server/queues/inventory-deduction.queue.js";
-
 function mockRedisConnection() {
   return { quit: mockConnectionQuit, on: vi.fn() };
 }
@@ -121,14 +119,9 @@ describe("startJobRuntime", () => {
       .map((call) => call[1] as Record<string, unknown> | undefined)
       .filter((fields) => fields?.event === "job_runtime_worker_unavailable");
 
-    expect(unavailableWarns).toHaveLength(4);
+    expect(unavailableWarns).toHaveLength(3);
     expect(unavailableWarns).toEqual(
       expect.arrayContaining([
-        {
-          event: "job_runtime_worker_unavailable",
-          queueName: INVENTORY_DEDUCTION_QUEUE_NAME,
-          reason: "REDIS_UNAVAILABLE",
-        },
         {
           event: "job_runtime_worker_unavailable",
           queueName: "charge-alert",
@@ -164,17 +157,16 @@ describe("startJobRuntime", () => {
     await startJobRuntime();
 
     expect(mockBindQueue).toHaveBeenCalled();
-    expect(mockWorkerCtor).toHaveBeenCalledTimes(4);
-    expect(mockWorkerCtor.mock.calls[0]?.[0]).toBe(INVENTORY_DEDUCTION_QUEUE_NAME);
-    expect(mockWorkerCtor.mock.calls[1]?.[0]).toBe("charge-alert");
-    expect(mockWorkerCtor.mock.calls[2]?.[0]).toBe("expiry-check");
-    expect(mockWorkerCtor.mock.calls[3]?.[0]).toBe("stale-checkin-sweep");
+    expect(mockWorkerCtor).toHaveBeenCalledTimes(3);
+    expect(mockWorkerCtor.mock.calls[0]?.[0]).toBe("charge-alert");
+    expect(mockWorkerCtor.mock.calls[1]?.[0]).toBe("expiry-check");
+    expect(mockWorkerCtor.mock.calls[2]?.[0]).toBe("stale-checkin-sweep");
     expect(mockWorkerCtor.mock.calls[0]?.[2]).toEqual(
       expect.objectContaining({ concurrency: 1 }),
     );
   });
 
-  it("throws on unknown job.name for pilot inventory queue", async () => {
+  it("throws on unknown job.name for a pilot queue", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     vi.mocked(createRedisConnection).mockImplementation(async () =>
@@ -183,21 +175,19 @@ describe("startJobRuntime", () => {
 
     await startJobRuntime();
 
-    const inventoryCall = mockWorkerCtor.mock.calls.find(
-      (c) => c[0] === INVENTORY_DEDUCTION_QUEUE_NAME,
+    const chargeAlertCall = mockWorkerCtor.mock.calls.find(
+      (c) => c[0] === "charge-alert",
     );
-    const processor = inventoryCall?.[1] as (job: Job) => Promise<void>;
+    const processor = chargeAlertCall?.[1] as (job: Job) => Promise<void>;
 
     await expect(
       processor({
         id: "j1",
         name: "unknown-job",
-        data: { clinicId: "c1", taskId: "t1" },
+        data: { clinicId: "c1", returnId: "r1" },
         attemptsMade: 0,
       } as Job),
-    ).rejects.toThrow(/No JobDefinition for queue=inventory-deduction/);
-
-    expect(mockProcessInventory).not.toHaveBeenCalled();
+    ).rejects.toThrow(/No JobDefinition for queue=charge-alert/);
 
     const unknownJobWarn = warnSpy.mock.calls.find(
       (call) => call[1] && (call[1] as Record<string, unknown>).event === "job_runtime_unknown_job_name",
@@ -206,44 +196,14 @@ describe("startJobRuntime", () => {
     const [, fields] = unknownJobWarn as [string, Record<string, unknown>];
     expect(fields).toEqual({
       event: "job_runtime_unknown_job_name",
-      queueName: INVENTORY_DEDUCTION_QUEUE_NAME,
+      queueName: "charge-alert",
       jobName: "unknown-job",
     });
     expect(fields).not.toHaveProperty("body");
     expect(fields).not.toHaveProperty("payload");
     expect(fields).not.toHaveProperty("data");
-    expect(JSON.stringify(unknownJobWarn)).not.toContain("taskId");
 
     warnSpy.mockRestore();
-  });
-
-  it("dispatches known inventory-deduction jobs to processInventoryDeductionJob", async () => {
-    vi.mocked(createRedisConnection).mockImplementation(async () =>
-      mockRedisConnection() as never,
-    );
-
-    await startJobRuntime();
-
-    const inventoryCall = mockWorkerCtor.mock.calls.find(
-      (c) => c[0] === INVENTORY_DEDUCTION_QUEUE_NAME,
-    );
-    const processor = inventoryCall?.[1] as (job: Job) => Promise<void>;
-
-    const payload = {
-      taskId: "t1",
-      containerId: "cont1",
-      requiredVolumeMl: 1,
-      clinicId: "c1",
-      animalId: null,
-    };
-    await processor({
-      id: "j2",
-      name: "inventory-deduction",
-      data: payload,
-      attemptsMade: 0,
-    } as Job);
-
-    expect(mockProcessInventory).toHaveBeenCalledWith(payload);
   });
 
   it("dispatches check-expiry jobs to runExpiryCheckWorker", async () => {
