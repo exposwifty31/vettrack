@@ -1,4 +1,4 @@
-# VetTrack — GitLab CI (migrated from .github/workflows/)
+# VetTrack â GitLab CI (migrated from .github/workflows/)
 #
 # GitLab pipeline schedules (set SCHEDULED_JOB on each):
 #   flake-detection     cron: 0 3 * * *  (03:00 UTC)
@@ -6,7 +6,6 @@
 #   e2e-simulation      cron: 0 5 * * *  (05:00 UTC)
 workflow:
   rules:
-    - if: $CI_COMMIT_TAG =~ /^cleaner-v/
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: $CI_MERGE_REQUEST_ID
     - if: $CI_COMMIT_BRANCH =~ /^(main|staging|master)$/
@@ -26,7 +25,6 @@ stages:
   - e2e-simulation
   - workday-simulation
   - staging-e2e
-  - desktop-cleaner
 variables:
   FLAKE_REPEAT_COUNT: "3"
 .pnpm_cache: &pnpm_cache
@@ -168,7 +166,7 @@ deploy:preflight:
         fi
       done
       if [ "$missing" -eq 1 ]; then
-        echo "Skipping deploy pre-flight — required deploy variables unavailable."
+        echo "Skipping deploy pre-flight â required deploy variables unavailable."
         exit 0
       fi
     - bash deploy.sh --check --no-color
@@ -196,11 +194,11 @@ deploy:railway:
   script:
     - |
       if [ "$RAILWAY_USE_CLI_DEPLOY" != "true" ]; then
-        echo "RAILWAY_USE_CLI_DEPLOY is not true — skipping Railway deploy."
+        echo "RAILWAY_USE_CLI_DEPLOY is not true â skipping Railway deploy."
         exit 0
       fi
       if [ -z "$RAILWAY_TOKEN" ] || [ -z "$RAILWAY_SERVICE" ]; then
-        echo "RAILWAY_TOKEN or RAILWAY_SERVICE unset — skipping Railway deploy."
+        echo "RAILWAY_TOKEN or RAILWAY_SERVICE unset â skipping Railway deploy."
         exit 0
       fi
     - npm install -g @railway/cli
@@ -304,7 +302,7 @@ flake-detection:run:
   script:
     - |
       if ! echo "$FLAKE_REPEAT_COUNT" | grep -Eq '^[2-5]$'; then
-        echo "FLAKE_REPEAT_COUNT must be 2–5 (got: $FLAKE_REPEAT_COUNT)"
+        echo "FLAKE_REPEAT_COUNT must be 2â5 (got: $FLAKE_REPEAT_COUNT)"
         exit 1
       fi
     - pnpm migrate
@@ -502,7 +500,7 @@ workday-simulation:nightly:
   script:
     - |
       if [ -z "$TEST_BASE_URL" ]; then
-        echo "TEST_BASE_URL_STAGING not configured — skipping"
+        echo "TEST_BASE_URL_STAGING not configured â skipping"
         exit 0
       fi
     - git fetch origin staging || true
@@ -537,72 +535,3 @@ staging-e2e:manual:
     - pnpm test:staging:walkthrough
   after_script:
     - pnpm staging:cleanup || true
-# --- desktop-cleaner-release.yml ----------------------------------------------
-desktop-cleaner:test:
-  image: python:3.12-bookworm
-  stage: desktop-cleaner
-  before_script:
-    - npm install -g pnpm
-    - apt-get update && apt-get install -y libegl1 libxcb-cursor0 libxcb-xinerama0 libxkbcommon-x11-0 libdbus-1-3
-  rules:
-    - if: $CI_MERGE_REQUEST_ID
-      changes:
-        - desktop/cleaner/**/*
-        - .gitlab-ci.yml
-    - if: $CI_COMMIT_TAG =~ /^cleaner-v/
-
-  variables:
-    QT_QPA_PLATFORM: offscreen
-  script:
-    - cd desktop/cleaner && pip install -e ".[dev]" && pytest
-.desktop-cleaner_build:
-  stage: desktop-cleaner
-  needs: [desktop-cleaner:test]
-  before_script:
-    - npm install -g pnpm
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^cleaner-v/
-
-desktop-cleaner:build:linux:
-  extends: .desktop-cleaner_build
-  image: python:3.12-bookworm
-  before_script:
-    - npm install -g pnpm
-    - apt-get update && apt-get install -y libegl1 libxcb-cursor0 libxcb-xinerama0 libxkbcommon-x11-0 libdbus-1-3
-  script:
-    - cd desktop/cleaner && pip install -e . pyinstaller && pyinstaller vettrack_cleaner.spec
-    - cd desktop/cleaner/dist && zip -r ../vettrack-cleaner-Linux.zip .
-  artifacts:
-    paths: [desktop/cleaner/vettrack-cleaner-Linux.zip]
-desktop-cleaner:build:windows:
-  extends: .desktop-cleaner_build
-  image: python:3.12
-  tags: [saas-windows-medium-amd64]
-  script:
-    - cd desktop/cleaner && pip install -e . pyinstaller && pyinstaller vettrack_cleaner.spec
-    - powershell Compress-Archive -Path dist\* -DestinationPath vettrack-cleaner-Windows.zip
-  artifacts:
-    paths: [desktop/cleaner/vettrack-cleaner-Windows.zip]
-desktop-cleaner:build:macos:
-  extends: .desktop-cleaner_build
-  image: python:3.12
-  tags: [saas-macos-medium-m1]
-  script:
-    - cd desktop/cleaner && pip install -e . pyinstaller && pyinstaller vettrack_cleaner.spec
-    - cd desktop/cleaner/dist && zip -r ../vettrack-cleaner-macOS.zip .
-  artifacts:
-    paths: [desktop/cleaner/vettrack-cleaner-macOS.zip]
-desktop-cleaner:release:
-  image: alpine:3.20
-  stage: desktop-cleaner
-  needs: [desktop-cleaner:build:linux, desktop-cleaner:build:windows, desktop-cleaner:build:macos]
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^cleaner-v/
-  before_script:
-    - npm install -g pnpm
-  script:
-    - ls -la desktop/cleaner/*.zip
-  artifacts:
-    paths: [desktop/cleaner/*.zip]
-# Migrated from .github/workflows/ on 2026-06-03
-# Original GitHub Actions workflows preserved in .github/workflows/ for future use
