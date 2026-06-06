@@ -1,7 +1,7 @@
 /**
  * Equipment Operational State V1/V2 integration tests.
  *
- * Requires DATABASE_URL and migrations 130–136 applied.
+ * Requires DATABASE_URL and migrations 130â136 applied.
  * Run: pnpm test:integration:ops
  * Default CI also guards serialization via equipment-operational-state-serialization.contract.test.ts
  *
@@ -11,7 +11,6 @@
  *   4. dock-return (8)
  *   5. staging CRUD (8)
  *   6. workers V1 (6)
- *   7. procedure_bound V2 (7)
  *   8. operational-metrics (8)
  */
 
@@ -22,7 +21,7 @@ import { createServer, type Server } from "node:http";
 import express from "express";
 import { randomUUID } from "crypto";
 
-// ─── DB probe ────────────────────────────────────────────────────────────────
+// âââ DB probe ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
 let probePool: Pool | null = null;
@@ -42,7 +41,7 @@ if (DATABASE_URL) {
   }
 }
 
-// ─── Mocks (hoisted before dynamic imports) ──────────────────────────────────
+// âââ Mocks (hoisted before dynamic imports) ââââââââââââââââââââââââââââââââââ
 
 let currentClinicId = "";
 let currentUserId = "";
@@ -78,7 +77,7 @@ vi.mock("../server/middleware/auth.js", () => ({
   requireEffectiveRole: () => (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
-// ─── Route imports (after mocks are hoisted) ─────────────────────────────────
+// âââ Route imports (after mocks are hoisted) âââââââââââââââââââââââââââââââââ
 
 import * as pgResult from "../server/lib/pg-result.js";
 
@@ -95,12 +94,12 @@ function buildApp() {
   return app;
 }
 
-// ─── Server lifecycle ─────────────────────────────────────────────────────────
+// âââ Server lifecycle âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 let server: Server;
 let baseUrl: string;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// âââ Helpers âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 type JsonObj = Record<string, unknown>;
 
@@ -127,7 +126,7 @@ async function api(
   return { status: res.status, json };
 }
 
-// ─── Seed helpers (raw SQL — avoids Drizzle module-level side effects) ────────
+// âââ Seed helpers (raw SQL â avoids Drizzle module-level side effects) ââââââââ
 
 async function seedClinic(clinicId: string) {
   await probePool!.query(`INSERT INTO vt_clinics (id) VALUES ($1) ON CONFLICT DO NOTHING`, [clinicId]);
@@ -205,26 +204,6 @@ async function seedConditionState(
   );
 }
 
-async function seedAnimal(animalId: string, clinicId: string) {
-  await probePool!.query(
-    `INSERT INTO vt_animals (id, clinic_id, name) VALUES ($1, $2, 'Test Animal') ON CONFLICT DO NOTHING`,
-    [animalId, clinicId],
-  );
-}
-
-async function seedHospitalization(
-  hospId: string,
-  animalId: string,
-  clinicId: string,
-  status: "admitted" | "discharged" | "observation" | "critical" | "recovering" | "deceased" = "admitted",
-) {
-  await probePool!.query(
-    `INSERT INTO vt_hospitalizations (id, clinic_id, animal_id, admitted_at, status)
-     VALUES ($1, $2, $3, now(), $4) ON CONFLICT DO NOTHING`,
-    [hospId, clinicId, animalId, status],
-  );
-}
-
 async function seedStagingClaim(
   claimId: string,
   eqId: string,
@@ -272,7 +251,7 @@ async function readEquipment(eqId: string) {
   return rows[0] ?? null;
 }
 
-// ─── Per-test fixture ─────────────────────────────────────────────────────────
+// âââ Per-test fixture âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 interface TestFixture {
   clinicId: string;
@@ -285,7 +264,7 @@ interface TestFixture {
 
 let ctx: TestFixture;
 
-// ─── Test suites ─────────────────────────────────────────────────────────────
+// âââ Test suites âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
   beforeAll(async () => {
@@ -334,7 +313,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
     await purgeClinic(ctx.clinicId);
   });
 
-  // ─── Equipment list/detail serialization ───────────────────────────────────
+  // âââ Equipment list/detail serialization âââââââââââââââââââââââââââââââââââ
 
   describe("equipment list serialization", () => {
     it("GET /api/equipment includes V1 operational state fields", async () => {
@@ -374,17 +353,17 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
     });
   });
 
-  // ─── Group 2: Checkout paths ───────────────────────────────────────────────
+  // âââ Group 2: Checkout paths âââââââââââââââââââââââââââââââââââââââââââââââ
 
   describe("checkout paths", () => {
-    it("untracked → 422 CUSTODY_CHAIN_BROKEN", async () => {
+    it("untracked â 422 CUSTODY_CHAIN_BROKEN", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, { custody_state: "untracked" });
       const res = await api(`/api/equipment/${ctx.eqId}/checkout`, "POST", {});
       expect(res.status).toBe(422);
       expect(res.json.code).toBe("CUSTODY_CHAIN_BROKEN");
     });
 
-    it("checked_out → 409 ALREADY_CHECKED_OUT", async () => {
+    it("checked_out â 409 ALREADY_CHECKED_OUT", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         custody_state: "checked_out",
         checked_out_by_id: ctx.userId,
@@ -394,7 +373,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.json.code).toBe("ALREADY_CHECKED_OUT");
     });
 
-    it("staged + no assetType → 422 BUNDLE_INCOMPLETE with NO_ASSET_TYPE_DEFINED", async () => {
+    it("staged + no assetType â 422 BUNDLE_INCOMPLETE with NO_ASSET_TYPE_DEFINED", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         custody_state: "docked",
         usage_state: "staged",
@@ -408,7 +387,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.json.reason).toBe("NO_ASSET_TYPE_DEFINED");
     });
 
-    it("available + ready with all conditions verified → 200", async () => {
+    it("available + ready with all conditions verified â 200", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: ctx.assetTypeId,
         dock_id: ctx.dockId,
@@ -423,7 +402,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(eq?.custody_state).toBe("checked_out");
     });
 
-    it("returned + conditions → 422 reason=CONDITIONS_NOT_MET (custody!=docked)", async () => {
+    it("returned + conditions â 422 reason=CONDITIONS_NOT_MET (custody!=docked)", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: ctx.assetTypeId,
         custody_state: "returned",
@@ -435,7 +414,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.json.reason).toBe("CONDITIONS_NOT_MET");
     });
 
-    it("staged + top-holder → 200 (user has highest-priority active claim)", async () => {
+    it("staged + top-holder â 200 (user has highest-priority active claim)", async () => {
       const claimId = randomUUID();
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: ctx.assetTypeId,
@@ -450,7 +429,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.status).toBe(200);
     });
 
-    it("staged + non-holder → 409 STAGING_CONFLICT", async () => {
+    it("staged + non-holder â 409 STAGING_CONFLICT", async () => {
       const otherId = randomUUID();
       await seedUser(otherId, ctx.clinicId, "vet");
       const claimId = randomUUID();
@@ -466,7 +445,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.json.code).toBe("STAGING_CONFLICT");
     });
 
-    it("staged + no active claims → 409 STAGING_CONFLICT", async () => {
+    it("staged + no active claims â 409 STAGING_CONFLICT", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         custody_state: "docked",
         usage_state: "staged",
@@ -477,7 +456,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.json.code).toBe("STAGING_CONFLICT");
     });
 
-    it("emergency + docked + reason → 200", async () => {
+    it("emergency + docked + reason â 200", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         custody_state: "docked",
         usage_state: "available",
@@ -494,7 +473,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(eq?.usage_state).toBe("emergency_use");
     });
 
-    it("emergency + returned + reason → 200 (emergency allows returned custody)", async () => {
+    it("emergency + returned + reason â 200 (emergency allows returned custody)", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         custody_state: "returned",
         usage_state: "available",
@@ -509,7 +488,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.status).toBe(200);
     });
 
-    it("emergency + no reason → 422 EMERGENCY_REASON_REQUIRED", async () => {
+    it("emergency + no reason â 422 EMERGENCY_REASON_REQUIRED", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         custody_state: "docked",
         usage_state: "available",
@@ -525,10 +504,10 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
     });
   });
 
-  // ─── Group 3: Return ───────────────────────────────────────────────────────
+  // âââ Group 3: Return âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
   describe("return", () => {
-    it("success: checked_out → custodyState=returned, usageState=available", async () => {
+    it("success: checked_out â custodyState=returned, usageState=available", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         custody_state: "checked_out",
         usage_state: "in_use",
@@ -544,7 +523,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(eq?.usage_state).toBe("available");
     });
 
-    it("with active staging claims → usageState=staged after return", async () => {
+    it("with active staging claims â usageState=staged after return", async () => {
       const claimUserId = randomUUID();
       await seedUser(claimUserId, ctx.clinicId, "vet");
       await seedEquipment(ctx.eqId, ctx.clinicId, {
@@ -562,7 +541,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(eq?.usage_state).toBe("staged");
     });
 
-    it("no staging claims → usageState=available after return", async () => {
+    it("no staging claims â usageState=available after return", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         custody_state: "checked_out",
         usage_state: "in_use",
@@ -575,21 +554,21 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(eq?.usage_state).toBe("available");
     });
 
-    it("wrong custodyState (already returned) → 200, V1 fields unchanged", async () => {
+    it("wrong custodyState (already returned) â 200, V1 fields unchanged", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         custody_state: "returned",
         usage_state: "available",
         readiness_state: "unknown",
       });
       const res = await api(`/api/equipment/${ctx.eqId}/return`, "POST");
-      // Return is idempotent — succeeds even if already returned
+      // Return is idempotent â succeeds even if already returned
       expect(res.status).toBe(200);
       const eq = await readEquipment(ctx.eqId);
-      // V1 update WHERE custodyState='checked_out' fires 0 rows — state stays 'returned'
+      // V1 update WHERE custodyState='checked_out' fires 0 rows â state stays 'returned'
       expect(eq?.custody_state).toBe("returned");
     });
 
-    it("version conflict → V1 fields silently not updated (returns 200)", async () => {
+    it("version conflict â V1 fields silently not updated (returns 200)", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         custody_state: "checked_out",
         usage_state: "in_use",
@@ -606,10 +585,10 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
     });
   });
 
-  // ─── Group 4: Dock-return ──────────────────────────────────────────────────
+  // âââ Group 4: Dock-return ââââââââââââââââââââââââââââââââââââââââââââââââââ
 
   describe("dock-return", () => {
-    it("wrong custodyState → 422", async () => {
+    it("wrong custodyState â 422", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: ctx.assetTypeId,
         custody_state: "untracked",
@@ -622,7 +601,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.status).toBe(422);
     });
 
-    it("checked_out → docked clears checkout (NFC full-dock path)", async () => {
+    it("checked_out â docked clears checkout (NFC full-dock path)", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: ctx.assetTypeId,
         custody_state: "checked_out",
@@ -644,7 +623,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(eq?.usage_state).toBe("available");
     });
 
-    it("no assetTypeId → 422 with operationalState.noAssetTypeDefined error", async () => {
+    it("no assetTypeId â 422 with operationalState.noAssetTypeDefined error", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: null,
         custody_state: "returned",
@@ -656,9 +635,9 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.status).toBe(422);
     });
 
-    it("cross-clinic dock → 422", async () => {
+    it("cross-clinic dock â 422", async () => {
       const otherDockId = randomUUID();
-      // Don't insert the dock — it won't be found for this clinic
+      // Don't insert the dock â it won't be found for this clinic
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: ctx.assetTypeId,
         custody_state: "returned",
@@ -670,7 +649,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.status).toBe(404);
     });
 
-    it("condition belongs to wrong assetType → 422", async () => {
+    it("condition belongs to wrong assetType â 422", async () => {
       const otherAtId = randomUUID();
       const otherCondId = randomUUID();
       await seedAssetType(otherAtId, ctx.clinicId, "Other Type");
@@ -686,7 +665,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.status).toBe(422);
     });
 
-    it("failed verification → readinessState=not_ready", async () => {
+    it("failed verification â readinessState=not_ready", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: ctx.assetTypeId,
         custody_state: "returned",
@@ -702,7 +681,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(eq?.custody_state).toBe("docked");
     });
 
-    it("all verified → readinessState=ready", async () => {
+    it("all verified â readinessState=ready", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: ctx.assetTypeId,
         custody_state: "returned",
@@ -734,7 +713,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(eq?.emergency_override_at).toBeNull();
     });
 
-    it("version conflict → 409 VERSION_CONFLICT", async () => {
+    it("version conflict â 409 VERSION_CONFLICT", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: ctx.assetTypeId,
         custody_state: "returned",
@@ -758,10 +737,10 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
     });
   });
 
-  // ─── Group 5: Staging CRUD ─────────────────────────────────────────────────
+  // âââ Group 5: Staging CRUD âââââââââââââââââââââââââââââââââââââââââââââââââ
 
   describe("staging CRUD", () => {
-    it("available → staged (first claim)", async () => {
+    it("available â staged (first claim)", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: ctx.assetTypeId,
         custody_state: "docked",
@@ -776,7 +755,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(eq?.usage_state).toBe("staged");
     });
 
-    it("already staged → second claim inserted (usageState stays staged)", async () => {
+    it("already staged â second claim inserted (usageState stays staged)", async () => {
       const user2 = randomUUID();
       await seedUser(user2, ctx.clinicId, "vet");
       await seedEquipment(ctx.eqId, ctx.clinicId, {
@@ -794,7 +773,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.status).toBe(201);
     });
 
-    it("duplicate requester → 409 DUPLICATE_CLAIM", async () => {
+    it("duplicate requester â 409 DUPLICATE_CLAIM", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: ctx.assetTypeId,
         custody_state: "docked",
@@ -809,7 +788,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.json.code).toBe("DUPLICATE_CLAIM");
     });
 
-    it("returned equipment → 422 (custodyState must be docked)", async () => {
+    it("returned equipment â 422 (custodyState must be docked)", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: ctx.assetTypeId,
         custody_state: "returned",
@@ -820,7 +799,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.status).toBe(422);
     });
 
-    it("not_ready → 422 (readiness gate blocks non-emergency)", async () => {
+    it("not_ready â 422 (readiness gate blocks non-emergency)", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: ctx.assetTypeId,
         custody_state: "docked",
@@ -845,7 +824,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.status).toBe(201);
     });
 
-    it("delete last claim → usageState=available", async () => {
+    it("delete last claim â usageState=available", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: ctx.assetTypeId,
         custody_state: "docked",
@@ -861,7 +840,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(eq?.usage_state).toBe("available");
     });
 
-    it("delete one claim with remaining → usageState stays staged", async () => {
+    it("delete one claim with remaining â usageState stays staged", async () => {
       const user2 = randomUUID();
       await seedUser(user2, ctx.clinicId, "vet");
       const claimId1 = randomUUID();
@@ -881,7 +860,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(eq?.usage_state).toBe("staged");
     });
 
-    it("staging cancel version conflict → 409 and claim stays active", async () => {
+    it("staging cancel version conflict â 409 and claim stays active", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: ctx.assetTypeId,
         custody_state: "docked",
@@ -914,10 +893,10 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
     });
   });
 
-  // ─── Group 6: Workers V1 ──────────────────────────────────────────────────
+  // âââ Group 6: Workers V1 ââââââââââââââââââââââââââââââââââââââââââââââââââ
 
   describe("workers V1", () => {
-    it("staleness sweep: ready equipment with stale condition → marks not_ready", async () => {
+    it("staleness sweep: ready equipment with stale condition â marks not_ready", async () => {
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: ctx.assetTypeId,
         custody_state: "docked",
@@ -979,7 +958,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(rows[0]?.status).toBe("expired");
     });
 
-    it("staging expiry sweep: staged → available when no remaining active claims", async () => {
+    it("staging expiry sweep: staged â available when no remaining active claims", async () => {
       const claimId = randomUUID();
       await seedEquipment(ctx.eqId, ctx.clinicId, {
         asset_type_id: ctx.assetTypeId,
@@ -1003,7 +982,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
         usage_state: "in_use",
         readiness_state: "unknown",
       });
-      // No active claims for this equipment — nothing to expire
+      // No active claims for this equipment â nothing to expire
 
       const { runStagingExpirySweep } = await import("../server/workers/stagingExpiryWorker.js");
       await runStagingExpirySweep(new Date());
@@ -1012,117 +991,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
     });
   });
 
-  // ─── Group 7: procedure_bound (V2) ────────────────────────────────────────
-
-  describe("procedure_bound (V2)", () => {
-    let hospId: string;
-    let animalId: string;
-
-    beforeEach(async () => {
-      hospId = randomUUID();
-      animalId = randomUUID();
-      await seedAnimal(animalId, ctx.clinicId);
-      await seedHospitalization(hospId, animalId, ctx.clinicId, "admitted");
-    });
-
-    it("bind success: docked + available → procedure_bound", async () => {
-      await seedEquipment(ctx.eqId, ctx.clinicId, {
-        asset_type_id: ctx.assetTypeId,
-        custody_state: "docked",
-        usage_state: "available",
-        readiness_state: "ready",
-        dock_id: ctx.dockId,
-      });
-      const res = await api(`/api/equipment/${ctx.eqId}/procedure-bind`, "POST", {
-        hospitalizationId: hospId,
-      });
-      expect(res.status).toBe(200);
-      expect(res.json.ok).toBe(true);
-      const eq = await readEquipment(ctx.eqId);
-      expect(eq?.usage_state).toBe("procedure_bound");
-      expect(eq?.procedure_bound_hospitalization_id).toBe(hospId);
-    });
-
-    it("bind non-docked → 422 INVALID_CUSTODY", async () => {
-      await seedEquipment(ctx.eqId, ctx.clinicId, {
-        custody_state: "returned",
-        usage_state: "available",
-        readiness_state: "unknown",
-      });
-      const res = await api(`/api/equipment/${ctx.eqId}/procedure-bind`, "POST", {
-        hospitalizationId: hospId,
-      });
-      expect(res.status).toBe(422);
-      expect(res.json.code).toBe("INVALID_CUSTODY");
-    });
-
-    it("bind staged equipment → 422 EQUIPMENT_UNAVAILABLE", async () => {
-      await seedEquipment(ctx.eqId, ctx.clinicId, {
-        custody_state: "docked",
-        usage_state: "staged",
-        readiness_state: "ready",
-      });
-      const res = await api(`/api/equipment/${ctx.eqId}/procedure-bind`, "POST", {
-        hospitalizationId: hospId,
-      });
-      expect(res.status).toBe(422);
-      expect(res.json.code).toBe("EQUIPMENT_UNAVAILABLE");
-    });
-
-    it("bind to discharged hospitalization → 422 HOSPITALIZATION_DISCHARGED", async () => {
-      const dischargedHospId = randomUUID();
-      await seedHospitalization(dischargedHospId, animalId, ctx.clinicId, "discharged");
-      await seedEquipment(ctx.eqId, ctx.clinicId, {
-        custody_state: "docked",
-        usage_state: "available",
-        readiness_state: "ready",
-      });
-      const res = await api(`/api/equipment/${ctx.eqId}/procedure-bind`, "POST", {
-        hospitalizationId: dischargedHospId,
-      });
-      expect(res.status).toBe(422);
-      expect(res.json.code).toBe("HOSPITALIZATION_DISCHARGED");
-    });
-
-    it("unbind → usageState=available, readinessState=unknown", async () => {
-      await seedEquipment(ctx.eqId, ctx.clinicId, {
-        custody_state: "docked",
-        usage_state: "procedure_bound",
-        readiness_state: "ready",
-        procedure_bound_hospitalization_id: hospId,
-      });
-      const res = await api(`/api/equipment/${ctx.eqId}/procedure-bind`, "DELETE");
-      expect(res.status).toBe(200);
-      expect(res.json.ok).toBe(true);
-      const eq = await readEquipment(ctx.eqId);
-      expect(eq?.usage_state).toBe("available");
-      expect(eq?.readiness_state).toBe("unknown");
-      expect(eq?.procedure_bound_hospitalization_id).toBeNull();
-    });
-
-    it("worker releases equipment when hospitalization is discharged", async () => {
-      await probePool!.query(`UPDATE vt_hospitalizations SET status='discharged' WHERE id=$1`, [hospId]);
-      await seedEquipment(ctx.eqId, ctx.clinicId, {
-        custody_state: "docked",
-        usage_state: "procedure_bound",
-        readiness_state: "ready",
-        procedure_bound_hospitalization_id: hospId,
-      });
-
-      const { runProcedureBoundReleaseSweep } = await import(
-        "../server/workers/procedureBoundReleaseWorker.js"
-      );
-      const result = await runProcedureBoundReleaseSweep(new Date());
-      expect(result.released).toBeGreaterThanOrEqual(1);
-
-      const eq = await readEquipment(ctx.eqId);
-      expect(eq?.usage_state).toBe("available");
-      expect(eq?.readiness_state).toBe("unknown");
-    });
-
-  });
-
-  // ─── Group 8: Operational metrics ─────────────────────────────────────────
+  // âââ Group 8: Operational metrics âââââââââââââââââââââââââââââââââââââââââ
 
   describe("operational metrics", () => {
     async function insertMetric(
@@ -1148,7 +1017,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.json.averageDockReturnMs).toBeNull();
     });
 
-    it("emergency_override events → emergencyOverrides count", async () => {
+    it("emergency_override events â emergencyOverrides count", async () => {
       await insertMetric(ctx.clinicId, "emergency_override");
       await insertMetric(ctx.clinicId, "emergency_override");
       const { rows } = await probePool!.query<{ count: string }>(
@@ -1161,13 +1030,13 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.json.emergencyOverrides).toBe(2);
     });
 
-    it("bundle_failed events → bundleFailures count", async () => {
+    it("bundle_failed events â bundleFailures count", async () => {
       await insertMetric(ctx.clinicId, "bundle_failed");
       const res = await api("/api/operational-metrics/summary");
       expect(res.json.bundleFailures).toBe(1);
     });
 
-    it("condition_stale events → staleConditions count", async () => {
+    it("condition_stale events â staleConditions count", async () => {
       await insertMetric(ctx.clinicId, "condition_stale");
       await insertMetric(ctx.clinicId, "condition_stale");
       await insertMetric(ctx.clinicId, "condition_stale");
@@ -1181,7 +1050,7 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.json.staleConditions).toBe(3);
     });
 
-    it("checkout_duration with durationMs → averageCheckoutMs", async () => {
+    it("checkout_duration with durationMs â averageCheckoutMs", async () => {
       await insertMetric(ctx.clinicId, "checkout_duration", 1000);
       await insertMetric(ctx.clinicId, "checkout_duration", 3000);
       const { rows } = await probePool!.query<{ avg: string }>(
@@ -1194,14 +1063,14 @@ describe.skipIf(!dbReachable)("equipment-operational-state integration", () => {
       expect(res.json.averageCheckoutMs).toBe(2000);
     });
 
-    it("dock_return_duration → averageDockReturnMs", async () => {
+    it("dock_return_duration â averageDockReturnMs", async () => {
       await insertMetric(ctx.clinicId, "dock_return_duration", 5000);
       const res = await api("/api/operational-metrics/summary");
       expect(res.json.averageDockReturnMs).toBeGreaterThan(0);
       expect(res.json.averageDockReturnMs).toBe(5000);
     });
 
-    it("deployable_success + bundle_failed → deployableSuccessRate", async () => {
+    it("deployable_success + bundle_failed â deployableSuccessRate", async () => {
       await insertMetric(ctx.clinicId, "deployable_success");
       await insertMetric(ctx.clinicId, "deployable_success");
       await insertMetric(ctx.clinicId, "deployable_success");
