@@ -2,8 +2,7 @@ import { t } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
-import { Layout } from "@/components/layout";
-import { PageShell } from "@/components/layout/PageShell";
+import { AppShell } from "@/components/layout/AppShell";
 import { ErrorCard } from "@/components/ui/error-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -618,7 +617,6 @@ export default function InventoryPage() {
 
   // ── render ────────────────────────────────────────────────────────────────
 
-  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
   const pageContent = (
     <>
       <Helmet>
@@ -1010,7 +1008,7 @@ export default function InventoryPage() {
       <div className="fixed left-0 right-0 flex justify-center px-4 z-40 pointer-events-none" style={{ bottom: "calc(5rem + env(safe-area-inset-bottom, 0px))" }}>
         <button
           onClick={handleOpenDispense}
-          className="pointer-events-auto flex items-center gap-2 bg-primary text-primary-foreground font-bold rounded-full px-6 py-3 shadow-lg min-h-[52px] active:scale-95 transition-transform"
+          className="pointer-events-auto flex items-center gap-2 bg-primary text-primary-foreground font-bold rounded-full px-6 py-3 shadow-lg min-h-[52px] motion-safe:active:scale-95 transition-transform"
         >
           <span className="text-lg">📦</span>
           {p.takeConsumables}
@@ -1027,6 +1025,5 @@ export default function InventoryPage() {
 
     </>
   );
-  if (isDesktop) return <PageShell>{pageContent}</PageShell>;
-  return <Layout title={p.title}>{pageContent}</Layout>;
+  return <AppShell title={p.title}>{pageContent}</AppShell>;
 }

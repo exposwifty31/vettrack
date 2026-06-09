@@ -3,8 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
-import { Layout } from "@/components/layout";
-import { PageShell } from "@/components/layout/PageShell";
+import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -353,6 +352,5 @@ export default function AlertsPage() {
       </div>
     </>
   );
-  if (isDesktop) return <PageShell>{pageContent}</PageShell>;
-  return <Layout>{pageContent}</Layout>;
+  return <AppShell>{pageContent}</AppShell>;
 }

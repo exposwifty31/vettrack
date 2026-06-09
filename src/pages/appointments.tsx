@@ -4,8 +4,7 @@ import { Link, Redirect } from "wouter";
 import { t } from "@/lib/i18n";
 import { useDirection } from "@/hooks/useDirection";
 import { CalendarDays, CheckCircle2, ChevronRight, Clock3, Plus, User, Zap } from "lucide-react";
-import { Layout } from "@/components/layout";
-import { PageShell } from "@/components/layout/PageShell";
+import { AppShell } from "@/components/layout/AppShell";
 import type { SidebarItem } from "@/components/layout/IconSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingSection } from "@/components/ui/loading-section";
@@ -605,7 +604,6 @@ export default function AppointmentsPage() {
     { href: "/appointments", icon: CalendarDays, label: t.appointmentsPage.tasks },
   ];
 
-  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
   const pageContent = (
     <>
       <div dir={dir} className="flex flex-col gap-4 pb-24 text-start">
@@ -1556,8 +1554,9 @@ export default function AppointmentsPage() {
       </Dialog>
     </>
   );
-  if (isDesktop) {
-    return <PageShell sidebarItems={TASKS_SIDEBAR}>{pageContent}</PageShell>;
-  }
-  return <Layout title={t.appointmentsPage.tasks}>{pageContent}</Layout>;
+  return (
+    <AppShell sidebarItems={TASKS_SIDEBAR} title={t.appointmentsPage.tasks}>
+      {pageContent}
+    </AppShell>
+  );
 }

@@ -217,7 +217,7 @@ function PatientCard({ hosp }: { hosp: DisplaySnapshotHospitalization }) {
         <div className="text-[11px] text-gray-500 mt-0.5">{hosp.admittingVetName}</div>
       )}
       {(hosp.overdueTaskCount ?? 0) > 0 && hosp.overdueTaskLabel && (
-        <div className="overdue-alert mt-2 rounded px-2 py-1.5 text-[10px] font-semibold text-red-300 border border-red-600/60 bg-red-950/30 animate-pulse">
+        <div className="overdue-alert mt-2 rounded px-2 py-1.5 text-[10px] font-semibold text-red-300 border border-red-600/60 bg-red-950/30 motion-safe:animate-pulse">
           💊 {hosp.overdueTaskLabel}
         </div>
       )}
@@ -436,7 +436,7 @@ function CodeBlueOverlay({
   return (
     <div className="flex flex-col min-h-screen bg-[#0d0505]" dir="rtl">
       {/* Pulsing red header */}
-      <div className="flex items-center gap-4 px-6 py-4 bg-red-600 animate-pulse flex-wrap">
+      <div className="flex items-center gap-4 px-6 py-4 bg-red-600 motion-safe:animate-pulse flex-wrap">
         <span className="text-2xl font-black tracking-wider text-white">⚠ CODE BLUE</span>
         <span className="font-mono text-[22px] font-bold text-white bg-black/25 px-3 py-1 rounded tabular-nums">
           {timerStr}
@@ -450,7 +450,7 @@ function CodeBlueOverlay({
               key={p.userId}
               className="flex items-center gap-1.5 bg-red-900/40 border border-red-600/40 rounded-full px-3 py-0.5 text-[11px] text-red-200"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping shrink-0" />
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400 motion-safe:animate-ping shrink-0" />
               {p.userName}
             </div>
           ))}

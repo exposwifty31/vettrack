@@ -1099,7 +1099,13 @@
     "glanceLine": "{tasksDone} מתוך {tasksTotal} משימות · {scans} סריקות · {patients} מטופלים",
     "winNoAlerts": "אין התראות פתוחות",
     "winTasksClear": "משימות סגורות",
-    "winScansToday": "{count} סריקות היום"
+    "winScansToday": "{count} סריקות היום",
+    "urgentCodeBlue": "קוד כחול פעיל",
+    "urgentCodeBlueHint": "סשן חירום פעיל — לחץ לניהול",
+    "urgentCriticalAlerts": "{count} התראות קריטיות",
+    "urgentCriticalAlertsHint": "ציוד דורש התייחסות מיידית",
+    "urgentOverdueTasks": "{count} באיחור",
+    "urgentOverdueTasksHint": "משימות מאחרות — בדוק עכשיו"
   },
   "assetCopilot": {
     "title": "Asset Copilot",

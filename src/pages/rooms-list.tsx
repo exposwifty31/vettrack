@@ -4,8 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
-import { Layout } from "@/components/layout";
-import { PageShell } from "@/components/layout/PageShell";
+import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -123,7 +122,7 @@ function RoomCard({ room }: { room: Room }) {
 
   return (
     <Link href={`/rooms/${room.id}`}>
-      <Card className="bg-card border-border/60 shadow-sm hover:shadow-md active:scale-[0.98] transition-all cursor-pointer h-full">
+      <Card className="bg-card border-border/60 shadow-sm hover:shadow-md motion-safe:active:scale-[0.98] transition-all cursor-pointer h-full">
         <CardContent className="p-4 flex flex-col gap-3">
           {/* Top row: health ring + sync badge */}
           <div className="flex items-start justify-between gap-1">
@@ -259,7 +258,6 @@ export default function RoomsListPage() {
   const totalIssues = rooms?.reduce((a, r) => a + (r.issueCount ?? 0), 0) ?? 0;
   const syncedCount = rooms?.filter((r) => r.syncStatus === "synced").length ?? 0;
 
-  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
   const pageContent = (
     <>
       <Helmet>
@@ -460,6 +458,5 @@ export default function RoomsListPage() {
       </Dialog>
     </>
   );
-  if (isDesktop) return <PageShell>{pageContent}</PageShell>;
-  return <Layout>{pageContent}</Layout>;
+  return <AppShell>{pageContent}</AppShell>;
 }

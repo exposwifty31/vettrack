@@ -48,7 +48,7 @@ export function SettingsToggle({
       onClick={() => onCheckedChange(!checked)}
       className={cn(
         "w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors text-left",
-        "bg-muted/40 hover:bg-muted/70 active:scale-[0.98]"
+        "bg-muted/40 hover:bg-muted/70 motion-safe:active:scale-[0.98]"
       )}
     >
       <span className="flex-shrink-0 text-muted-foreground">{icon}</span>

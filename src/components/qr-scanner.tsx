@@ -559,7 +559,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
       <div className="relative z-10 flex items-center justify-between px-4 pb-3 bg-gradient-to-b from-black/95 to-black/65 backdrop-blur-sm" style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}>
         <div className="flex flex-col">
           <span className="text-white font-semibold text-lg">{t.qrScanner.title}</span>
-          <span className="text-[11px] uppercase tracking-[0.16em] text-white/70">
+          <span className="text-xs uppercase tracking-[0.16em] text-white/70">
             {t.qrScanner.subtitleEquipmentQr}
           </span>
         </div>
@@ -729,7 +729,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                 {t.qrScanner.unknownTagDesc}
               </p>
               {notFoundId ? (
-                <p className="w-full max-w-full break-all rounded-lg bg-white/5 px-2 py-1.5 text-left font-mono text-[11px] text-white/90">
+                <p className="w-full max-w-full break-all rounded-lg bg-white/5 px-2 py-1.5 text-left font-mono text-xs text-white/90">
                   {notFoundId}
                 </p>
               ) : null}
@@ -780,16 +780,16 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
               }}
             >
               {/* Corner brackets */}
-              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-xl" />
-              <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-xl" />
-              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-xl" />
-              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-xl" />
+              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-xl" aria-hidden="true" />
+              <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-xl" aria-hidden="true" />
+              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-xl" aria-hidden="true" />
+              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-xl" aria-hidden="true" />
               {/* Animated scan line — the surrounding `phase === "scanning"` gate
                   unmounts/remounts this whole overlay each time scanning is
                   re-entered, which restarts the CSS animation cleanly. */}
               <div className="qr-scan-line absolute left-0 right-0 h-0.5 bg-primary/80" />
               {/* Helper text below the frame */}
-              <p className="absolute -bottom-10 left-0 right-0 px-2 text-center text-[11px] leading-snug text-white/80 sm:text-xs">
+              <p className="absolute -bottom-10 inset-x-0 px-2 text-center text-xs leading-snug text-white/80">
                 {t.qrScanner.guideAim}
               </p>
             </div>

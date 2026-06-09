@@ -3,8 +3,7 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tansta
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
 import { leaderPoll } from "@/lib/leader";
-import { Layout } from "@/components/layout";
-import { PageShell } from "@/components/layout/PageShell";
+import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -105,8 +104,6 @@ export default function AdminPage() {
   });
 
   const queryClient = useQueryClient();
-  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
-
   if (!isAdmin) {
     const earlyContent = (
       <>
@@ -129,8 +126,7 @@ export default function AdminPage() {
         </div>
       </>
     );
-    if (isDesktop) return <PageShell>{earlyContent}</PageShell>;
-    return <Layout>{earlyContent}</Layout>;
+    return <AppShell>{earlyContent}</AppShell>;
   }
 
   const unresolvedCount = supportUnresolved?.count ?? 0;
@@ -312,8 +308,7 @@ export default function AdminPage() {
       </div>
     </>
   );
-  if (isDesktop) return <PageShell>{pageContent}</PageShell>;
-  return <Layout>{pageContent}</Layout>;
+  return <AppShell>{pageContent}</AppShell>;
 }
 
 function FoldersSection() {

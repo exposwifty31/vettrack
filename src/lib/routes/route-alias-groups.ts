@@ -1,6 +1,6 @@
 export const ROUTE_ALIAS_GROUPS = {
-  equipmentBoard: ["/equipment-board", "/display"],
-  equipmentTasks: ["/equipment-tasks", "/appointments"],
+  equipmentBoard: ["/equipment/board", "/equipment-board", "/display"],
+  equipmentTasks: ["/equipment/tasks", "/equipment-tasks", "/appointments"],
   locations: ["/locations", "/rooms"],
   criticalKitCheck: ["/critical-kit-check", "/crash-cart"],
   emergencyEquipmentLog: ["/emergency-equipment-log", "/code-blue"],

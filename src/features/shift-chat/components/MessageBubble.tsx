@@ -38,7 +38,7 @@ export function MessageBubble({ message, currentUserId, onReact, onPin, canPin }
 
       <div className={cn("max-w-[72%]", isMe && "items-end flex flex-col")}>
         {!isMe && (
-          <div className="text-[10px] text-muted-foreground mb-0.5">{message.senderName}</div>
+          <div className="text-xs text-muted-foreground mb-0.5">{message.senderName}</div>
         )}
 
         <div

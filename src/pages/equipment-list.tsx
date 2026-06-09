@@ -4,10 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
-import { Layout } from "@/components/layout";
-import { PageShell } from "@/components/layout/PageShell";
+import { AppShell } from "@/components/layout/AppShell";
 import type { SidebarItem } from "@/components/layout/IconSidebar";
-import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +34,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { STATUS_LABELS } from "@/types";
 import type { Equipment } from "@/types";
-import { equipmentTriageTier, statusToBadgeVariant } from "@/lib/design-tokens";
+import { equipmentTriageTier, TRIAGE_ORDER, statusToBadgeVariant, type EquipmentTriageTier } from "@/lib/design-tokens";
 import {
   EquipmentStatStrip,
   EquipmentTriageList,
@@ -130,7 +128,6 @@ const EQUIPMENT_SIDEBAR: SidebarItem[] = [
 ];
 
 export default function EquipmentListPage() {
-  const isDesktop = useIsDesktop();
   const { settings } = useSettings();
   const queryClient = useQueryClient();
   const { userId, isAdmin, effectiveRole } = useAuth();
@@ -862,16 +859,37 @@ export default function EquipmentListPage() {
               )}
               data-testid="equipment-list"
             >
-              {pageItems.map((eq) => (
-                <EquipmentItem
-                  key={eq.id}
-                  equipment={eq}
-                  selectMode={selectMode}
-                  selected={selected.has(eq.id)}
-                  onToggleSelect={() => toggleSelect(eq.id)}
-                  localSyncState={localSyncByEquipmentId.get(eq.id) ?? "synced"}
-                />
-              ))}
+              {(["attention", "in_use", "operational"] as EquipmentTriageTier[])
+                .sort((a, b) => TRIAGE_ORDER[a] - TRIAGE_ORDER[b])
+                .flatMap((tier) => {
+                  const group = pageItems.filter(
+                    (eq) => equipmentTriageTier(eq) === tier,
+                  );
+                  if (!group.length) return [];
+                  const tierLabels: Record<EquipmentTriageTier, string> = {
+                    attention: t.equipmentList.triageAttention,
+                    in_use: t.equipmentList.triageInUse,
+                    operational: t.equipmentList.triageOperational,
+                  };
+                  return [
+                    <p
+                      key={`tier-hd-${tier}`}
+                      className="text-[10px] font-bold uppercase tracking-[0.18em] text-ivory-text3 pt-1 first:pt-0"
+                    >
+                      {tierLabels[tier]}
+                    </p>,
+                    ...group.map((eq) => (
+                      <EquipmentItem
+                        key={eq.id}
+                        equipment={eq}
+                        selectMode={selectMode}
+                        selected={selected.has(eq.id)}
+                        onToggleSelect={() => toggleSelect(eq.id)}
+                        localSyncState={localSyncByEquipmentId.get(eq.id) ?? "synced"}
+                      />
+                    )),
+                  ];
+                })}
             </div>
           )}
         </PageErrorBoundary>
@@ -918,11 +936,7 @@ export default function EquipmentListPage() {
     </>
   );
 
-  if (isDesktop) {
-    return <PageShell sidebarItems={EQUIPMENT_SIDEBAR}>{pageBody}</PageShell>;
-  }
-
-  return <Layout>{pageBody}</Layout>;
+  return <AppShell sidebarItems={EQUIPMENT_SIDEBAR}>{pageBody}</AppShell>;
 }
 
 function EquipmentItem({

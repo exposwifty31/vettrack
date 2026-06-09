@@ -21,16 +21,16 @@ export function BroadcastCard({ message, currentUserId, isSender, onAck }: Broad
     <div className="rounded-xl border border-indigo-500 bg-indigo-950/60 p-3 my-1">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-base">📢</span>
-        <span className="text-[11px] text-indigo-300 font-semibold">
+        <span className="text-xs text-indigo-300 font-semibold">
           {isSender ? "שלחתי" : (message.senderName ?? "טכנאית בכירה")}
         </span>
       </div>
 
-      <div className="text-[15px] font-bold text-indigo-100 mb-0.5">
+      <div className="text-base font-bold text-indigo-100 mb-0.5">
         {template?.label ?? message.broadcastKey}
       </div>
       {template?.subtitle && (
-        <div className="text-[12px] text-indigo-300 mb-3">{template.subtitle}</div>
+        <div className="text-xs text-indigo-300 mb-3">{template.subtitle}</div>
       )}
 
       {isSender && totalTechs > 0 && (
@@ -66,13 +66,15 @@ export function BroadcastCard({ message, currentUserId, isSender, onAck }: Broad
         <div className="flex gap-2 mt-1">
           <button
             onClick={() => onAck("acknowledged")}
-            className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg py-2 text-[13px] font-bold transition-colors"
+            type="button"
+            className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg py-2 text-sm font-bold transition-colors"
           >
             ✓ קיבלתי — בדרך
           </button>
           <button
             onClick={() => onAck("snoozed")}
-            className="bg-transparent border border-indigo-700 text-indigo-300 rounded-lg px-3 py-2 text-[11px] transition-colors hover:border-indigo-400"
+            type="button"
+            className="bg-transparent border border-indigo-700 text-indigo-300 rounded-lg px-3 py-2 text-xs transition-colors hover:border-indigo-400"
           >
             ⏱ 5 דק׳
           </button>
@@ -80,7 +82,7 @@ export function BroadcastCard({ message, currentUserId, isSender, onAck }: Broad
       )}
 
       {!isSender && myAck && (
-        <div className="text-[11px] text-green-400 font-semibold">
+        <div className="text-xs text-green-400 font-semibold">
           {myAck.status === "acknowledged" ? "✓ אישרת קבלה" : "⏱ נדחה — תזכורת בעוד 5 דקות"}
         </div>
       )}

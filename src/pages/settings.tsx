@@ -1,5 +1,4 @@
-import { Layout } from "@/components/layout";
-import { PageShell } from "@/components/layout/PageShell";
+import { AppShell } from "@/components/layout/AppShell";
 import { SettingsSectionHeader, SettingsToggle, SettingsSelect } from "@/components/settings-controls";
 import { useSettings } from "@/hooks/use-settings";
 import { useAuth } from "@/hooks/use-auth";
@@ -149,8 +148,6 @@ export default function SettingsPage() {
     }
   }, [isTechnicianContext, isSeniorContext, isAdminContext]);
 
-  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
-
   if (!isLoaded) {
     const loadingContent = (
       <div className="w-full max-w-full overflow-x-hidden space-y-3 pb-8">
@@ -160,8 +157,7 @@ export default function SettingsPage() {
         <Skeleton className="h-24 w-full" />
       </div>
     );
-    if (isDesktop) return <PageShell>{loadingContent}</PageShell>;
-    return <Layout title={t.settingsPage.title}>{loadingContent}</Layout>;
+    return <AppShell title={t.settingsPage.title}>{loadingContent}</AppShell>;
   }
 
   if (!isSignedIn) {
@@ -173,8 +169,7 @@ export default function SettingsPage() {
         />
       </div>
     );
-    if (isDesktop) return <PageShell>{errorContent}</PageShell>;
-    return <Layout title={t.settingsPage.title}>{errorContent}</Layout>;
+    return <AppShell title={t.settingsPage.title}>{errorContent}</AppShell>;
   }
 
   const pageContent = (
@@ -548,6 +543,5 @@ export default function SettingsPage() {
       </div>
     </>
   );
-  if (isDesktop) return <PageShell>{pageContent}</PageShell>;
-  return <Layout title={t.settingsPage.title}>{pageContent}</Layout>;
+  return <AppShell title={t.settingsPage.title}>{pageContent}</AppShell>;
 }

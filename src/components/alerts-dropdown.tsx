@@ -80,7 +80,7 @@ export function AlertsDropdown({ alerts, alertCount, badgeAnimating }: AlertsDro
           <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2.5">
             <p className="text-sm font-bold text-foreground">{t.layout.nav.alerts}</p>
             {alertCount > 0 && (
-              <span className="text-[11px] font-semibold text-muted-foreground tabular-nums">
+              <span className="text-xs font-semibold text-muted-foreground tabular-nums">
                 {t.layout.alertsDropdown.activeCount(alertCount)}
               </span>
             )}
@@ -110,7 +110,7 @@ export function AlertsDropdown({ alerts, alertCount, badgeAnimating }: AlertsDro
                       />
                       <div className="min-w-0 flex-1 text-start">
                         <p className="text-sm font-medium text-foreground truncate">{alert.equipmentName}</p>
-                        <p className="text-[11px] text-muted-foreground line-clamp-2">{alert.detail}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-2">{alert.detail}</p>
                       </div>
                     </Link>
                   </li>

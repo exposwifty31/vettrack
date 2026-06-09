@@ -1103,6 +1103,12 @@ export interface TStructure {
     winNoAlerts: string;
     winTasksClear: string;
     winScansToday: string;
+    urgentCodeBlue: string;
+    urgentCodeBlueHint: string;
+    urgentCriticalAlerts: string;
+    urgentCriticalAlertsHint: string;
+    urgentOverdueTasks: string;
+    urgentOverdueTasksHint: string;
   };
   assetCopilot: {
     title: string;
