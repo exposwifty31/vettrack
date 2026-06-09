@@ -70,8 +70,9 @@ export function EquipmentRoomSweepSheet({ open, onOpenChange }: EquipmentRoomSwe
                   key={room.id}
                   className="flex items-center gap-2 rounded-xl border border-border/60 p-2"
                 >
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
                     disabled={sweepMut.isPending}
                     onClick={() => {
                       setActiveRoomId(room.id);
@@ -93,7 +94,7 @@ export function EquipmentRoomSweepSheet({ open, onOpenChange }: EquipmentRoomSwe
                       <p className="font-medium truncate">{room.name}</p>
                       <p className="text-xs text-muted-foreground">{t.equipmentTruth.roomSweepAction}</p>
                     </div>
-                  </button>
+                  </Button>
                   <Link href={`/rooms/${room.id}`}>
                     <Button type="button" variant="ghost" size="sm" className="shrink-0 h-10">
                       <Radar className="w-4 h-4" />

@@ -24,28 +24,28 @@ export function DeployabilityBadge({
 
   if (fullDeployable) {
     label = t.operationalState.fullDeployable;
-    colorClass = "bg-emerald-100 text-emerald-800 border-emerald-200";
+    colorClass = "bg-[var(--status-ok-bg)] text-[var(--status-ok-fg)] border-[var(--status-ok-border)]";
   } else if (usageState === "in_use") {
     label = t.operationalState.usageState.in_use;
-    colorClass = "bg-blue-100 text-blue-800 border-blue-200";
+    colorClass = "bg-[var(--status-steril-bg)] text-[var(--status-steril-fg)] border-[var(--status-steril-border)]";
   } else if (usageState === "emergency_use") {
     label = t.operationalState.usageState.emergency_use;
-    colorClass = "bg-red-100 text-red-800 border-red-200";
+    colorClass = "bg-[var(--status-issue-bg)] text-[var(--status-issue-fg)] border-[var(--status-issue-border)]";
   } else if (usageState === "procedure_bound") {
     label = t.operationalState.usageState.procedure_bound;
-    colorClass = "bg-purple-100 text-purple-800 border-purple-200";
+    colorClass = "bg-[var(--status-steril-bg)] text-[var(--status-steril-fg)] border-[var(--status-steril-border)]";
   } else if (usageState === "staged") {
     label = t.operationalState.usageState.staged;
-    colorClass = "bg-amber-100 text-amber-800 border-amber-200";
+    colorClass = "bg-[var(--status-maint-bg)] text-[var(--status-maint-fg)] border-[var(--status-maint-border)]";
   } else if (readinessState === "not_ready") {
     label = t.operationalState.readinessState.not_ready;
-    colorClass = "bg-red-100 text-red-800 border-red-200";
+    colorClass = "bg-[var(--status-issue-bg)] text-[var(--status-issue-fg)] border-[var(--status-issue-border)]";
   } else if (custodyState === "untracked" || readinessState === "unknown") {
     label = t.operationalState.readinessState.unknown;
-    colorClass = "bg-gray-100 text-gray-600 border-gray-200";
+    colorClass = "bg-muted text-muted-foreground border-border";
   } else {
     label = t.operationalState.notDeployable;
-    colorClass = "bg-gray-100 text-gray-600 border-gray-200";
+    colorClass = "bg-muted text-muted-foreground border-border";
   }
 
   return (

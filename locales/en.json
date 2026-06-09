@@ -3128,5 +3128,45 @@
   },
   "metrics": {
     "disabled": "Metrics are turned off for this period."
+  },
+  "nav": {
+    "today": "Today",
+    "equipment": "Equipment",
+    "equipmentAll": "All equipment",
+    "equipmentTasks": "Tasks",
+    "equipmentScan": "Scan",
+    "equipmentNew": "Add equipment",
+    "board": "Command Board",
+    "alerts": "Alerts",
+    "rooms": "Rooms",
+    "admin": "Admin",
+    "adminOps": "Ops dashboard",
+    "adminMetrics": "Metrics",
+    "adminTypes": "Asset types",
+    "adminShifts": "Shifts"
+  },
+  "phoneSignIn": {
+    "title": "Phone Sign In",
+    "phoneFormatHintA": "Enter a phone number in international format (e.g.,",
+    "phoneFormatHintB": ") or Israeli local format (e.g.,",
+    "phoneFormatHintC": ").",
+    "phoneInputLabel": "Phone number",
+    "phoneInputPlaceholder": "+972501234567 or 0501234567",
+    "sendingAs": "Will be sent as",
+    "errorNotAvailableFull": "Phone sign-in is not available for this account. Use another sign-in method, or contact support if you are connecting with an Israeli number (+972) and getting an error — Israel must be enabled in Clerk Dashboard (Configure → Phone numbers → SMS sending → Allowed countries).",
+    "errorNotAvailableShort": "Phone sign-in is not available for this account. Try another method, or contact your admin.",
+    "errorGeneric": "An error occurred. Try again or use another sign-in method.",
+    "errorUnexpected": "An error occurred. Try again.",
+    "sendingCode": "Sending code...",
+    "sendCode": "Send verification code",
+    "codeStepTitle": "Enter verification code",
+    "codeSentTo": "Code sent to",
+    "codeInputLabel": "6-digit verification code",
+    "codeInputPlaceholder": "6-digit code",
+    "errorVerificationFailed": "Verification failed. Try again.",
+    "errorInvalidCode": "Invalid code. Try again.",
+    "verifying": "Verifying...",
+    "verify": "Verify",
+    "changePhone": "Change phone number"
   }
 }

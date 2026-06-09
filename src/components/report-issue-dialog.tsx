@@ -129,7 +129,7 @@ export function ReportIssueDialog({ open, onOpenChange }: ReportIssueDialogProps
               disabled={!title.trim() || !description.trim() || submitMut.isPending}
               data-testid="btn-submit-issue"
             >
-              {submitMut.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {submitMut.isPending && <Loader2 className="w-4 h-4 me-2 animate-spin" />}
               {t.reportIssueDialog.actions.submit}
             </Button>
           </DialogFooter>

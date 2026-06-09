@@ -312,7 +312,7 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
                 <div className="flex items-center gap-1.5 mb-2">
                   <PackageOpen className="w-4 h-4 text-primary" />
                   <h3 className="text-sm font-semibold">{t.shiftSummaryPage.checkedOutNow}</h3>
-                  <Badge variant="secondary" className="ml-auto">
+                  <Badge variant="secondary" className="ms-auto">
                     {myItems?.length ?? 0}
                   </Badge>
                 </div>
@@ -360,7 +360,7 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
                   <div className="flex items-center gap-1.5 mb-2">
                     <ArrowUpRight className="w-4 h-4 text-primary" />
                     <h3 className="text-sm font-semibold">{t.shiftSummaryPage.checkoutsToday}</h3>
-                    <Badge variant="secondary" className="ml-auto">
+                    <Badge variant="secondary" className="ms-auto">
                       {todayCheckouts.length}
                     </Badge>
                   </div>
@@ -385,7 +385,7 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
                 <div className="flex items-center gap-1.5 mb-2">
                   <Wrench className="w-4 h-4 text-amber-500" />
                   <h3 className="text-sm font-semibold">{t.shiftSummaryPage.issuesReportedToday}</h3>
-                  <Badge variant={todayIssues.length > 0 ? "maintenance" : "secondary"} className="ml-auto">
+                  <Badge variant={todayIssues.length > 0 ? "maintenance" : "secondary"} className="ms-auto">
                     {todayIssues.length}
                   </Badge>
                 </div>
@@ -416,7 +416,7 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
                 <div className="flex items-center gap-1.5 mb-2">
                   <AlertTriangle className="w-4 h-4 text-red-500" />
                   <h3 className="text-sm font-semibold">{t.shiftSummaryPage.unacknowledgedAlerts}</h3>
-                  <Badge variant={urgentAlerts.length > 0 ? "issue" : "secondary"} className="ml-auto">
+                  <Badge variant={urgentAlerts.length > 0 ? "issue" : "secondary"} className="ms-auto">
                     {urgentAlerts.length}
                   </Badge>
                 </div>

@@ -10,6 +10,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 import { DoorOpen, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -73,9 +74,10 @@ export function EquipmentConfirmInRoomSheet({
               const selected = pickedRoomId === room.id;
               const pending = confirmMut.isPending && selected;
               return (
-                <button
+                <Button
                   key={room.id}
                   type="button"
+                  variant="ghost"
                   disabled={confirmMut.isPending}
                   onClick={() => {
                     setPickedRoomId(room.id);
@@ -98,7 +100,7 @@ export function EquipmentConfirmInRoomSheet({
                   ) : selected ? (
                     <Check className="w-4 h-4 shrink-0" />
                   ) : null}
-                </button>
+                </Button>
               );
             })
           )}

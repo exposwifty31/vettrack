@@ -236,11 +236,11 @@ function SyncQueueItem({
       </div>
 
       {!canManage && needsAttention && !isProcessing && (
-        <p className="text-xs text-muted-foreground pl-5">{t.syncQueueSheet.discardNotAllowed}</p>
+        <p className="text-xs text-muted-foreground ps-5">{t.syncQueueSheet.discardNotAllowed}</p>
       )}
 
       {needsAttention && item.errorMessage && (
-        <p className={`text-xs mt-0.5 pl-5 ${isConflictStatus ? "text-orange-700" : "text-red-600"}`}>
+        <p className={`text-xs mt-0.5 ps-5 ${isConflictStatus ? "text-orange-700" : "text-red-600"}`}>
           {item.errorMessage}
         </p>
       )}

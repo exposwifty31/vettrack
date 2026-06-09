@@ -28,9 +28,9 @@ const VALUE_COLOR: Record<StatTone, string> = {
 };
 
 const DELTA_STYLE: Record<DeltaDir, string> = {
-  up:   "bg-[#dcfce7] text-[#166534]",
-  down: "bg-[#fee2e2] text-[#991b1b]",
-  same: "bg-[#f0ede6] text-ivory-text3",
+  up:   "bg-[var(--status-ok-bg)] text-[var(--status-ok-fg)]",
+  down: "bg-[var(--status-issue-bg)] text-[var(--status-issue-fg)]",
+  same: "bg-ivory-bg text-ivory-text3",
 };
 
 export function StatCard({
@@ -44,7 +44,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "bg-ivory-surface border border-ivory-border rounded-[7px]",
+        "bg-ivory-surface border border-ivory-border rounded-sm",
         "border-s-[3px]",
         BORDER[tone],
         "px-3 py-[10px]"
