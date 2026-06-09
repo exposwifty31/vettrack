@@ -124,9 +124,10 @@ export function AlertsProView({
               <span className="w-1 shrink-0 self-stretch" style={{ background: bar }} aria-hidden />
             <StatusBadge kind={normalizeStatus(tone)} className="self-center ms-1" />
               <div className="min-w-0 flex-1 px-3 py-2.5">
-                <button
+                <Button
                   type="button"
-                  className="flex w-full items-start gap-2 text-start motion-safe:active:opacity-80"
+                  variant="ghost"
+                  className="flex w-full items-start gap-2 text-start motion-safe:active:opacity-80 h-auto p-0"
                   onClick={() => onNavigate(alert.equipmentId)}
                   data-testid={`alert-navigate-${alert.equipmentId}`}
                 >
@@ -137,7 +138,7 @@ export function AlertsProView({
                     <p className="mt-0.5 line-clamp-2 text-[11px] text-ivory-text3">{alert.detail}</p>
                   </div>
                   <Chevron className="mt-0.5 h-4 w-4 shrink-0 text-ivory-text3" aria-hidden />
-                </button>
+                </Button>
                 <div className="mt-2">
                   {ack ? (
                     <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-2.5 py-2">
@@ -151,7 +152,7 @@ export function AlertsProView({
                       <Button
                         variant="ghost"
                         size="icon-sm"
-                        className="h-7 w-7 shrink-0"
+                        className="h-9 w-9 shrink-0"
                         disabled={hasAckError}
                         onClick={() => onUnAck(alert.equipmentId, alert.type)}
                         aria-label={t.alertsPage.removeAckAria}

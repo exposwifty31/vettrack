@@ -1047,6 +1047,10 @@ const translations = {
     metricsDisabled: d.operationalMetrics.metricsDisabled,
   },
 
+  phoneSignIn: d.phoneSignIn,
+
+  nav: d.nav,
+
 } as const;
 
 return stripInternalKeys(translations) as typeof translations;

@@ -41,9 +41,6 @@ export interface TStructure {
     info: string;
     neutral: string;
   };
-  metrics: {
-    disabled: string;
-  };
   layout: {
     nav: {
       equipmentCommandBoard: string;
@@ -3131,5 +3128,48 @@ export interface TStructure {
     deployableSuccessRate: string;
     noData: string;
     metricsDisabled: string;
+  };
+  metrics: {
+    disabled: string;
+  };
+  nav: {
+    today: string;
+    equipment: string;
+    equipmentAll: string;
+    equipmentTasks: string;
+    equipmentScan: string;
+    equipmentNew: string;
+    board: string;
+    alerts: string;
+    rooms: string;
+    admin: string;
+    adminOps: string;
+    adminMetrics: string;
+    adminTypes: string;
+    adminShifts: string;
+  };
+  phoneSignIn: {
+    title: string;
+    phoneFormatHintA: string;
+    phoneFormatHintB: string;
+    phoneFormatHintC: string;
+    phoneInputLabel: string;
+    phoneInputPlaceholder: string;
+    sendingAs: string;
+    errorNotAvailableFull: string;
+    errorNotAvailableShort: string;
+    errorGeneric: string;
+    errorUnexpected: string;
+    sendingCode: string;
+    sendCode: string;
+    codeStepTitle: string;
+    codeSentTo: string;
+    codeInputLabel: string;
+    codeInputPlaceholder: string;
+    errorVerificationFailed: string;
+    errorInvalidCode: string;
+    verifying: string;
+    verify: string;
+    changePhone: string;
   };
 }

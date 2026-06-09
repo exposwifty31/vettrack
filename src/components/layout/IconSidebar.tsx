@@ -3,8 +3,16 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useDirection } from "@/hooks/useDirection";
 import type { LucideIcon } from "lucide-react";
+import {
+  Home, Package, Grid, Bell, MapPin, Settings,
+  List, ListTodo, Scan, Plus, Activity, Gauge, Boxes, Clock,
+} from "lucide-react";
 import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
+import { NAV } from "@/lib/routes/nav-model";
+import { useAuth } from "@/hooks/use-auth";
+import { t } from "@/lib/i18n";
 
+/** Kept for backward compat — PageShell / my-equipment.tsx still reference this type. */
 export interface SidebarItem {
   href: string;
   icon: LucideIcon;
@@ -12,15 +20,23 @@ export interface SidebarItem {
   alertDot?: boolean;
 }
 
-interface IconSidebarProps {
-  items: SidebarItem[];
+const ICON_MAP: Record<string, LucideIcon> = {
+  Home, Package, Grid, Bell, MapPin, Settings,
+  List, ListTodo, Scan, Plus, Activity, Gauge, Boxes, Clock,
+};
+
+function navLabel(key: string): string {
+  const k = key.startsWith("nav.") ? key.slice(4) : key;
+  return (t.nav as Record<string, string>)[k] ?? key;
 }
 
-export function IconSidebar({ items }: IconSidebarProps) {
+export function IconSidebar() {
   const [location] = useLocation();
   const dir = useDirection();
+  const { isAdmin } = useAuth();
 
-  // In RTL: sidebar border moves to inline-end (left in RTL = end in RTL)
+  const visibleItems = NAV.filter((n) => !n.adminOnly || isAdmin);
+
   const borderClass =
     dir === "rtl" ? "border-e border-ivory-border" : "border-s border-ivory-border";
 
@@ -28,28 +44,26 @@ export function IconSidebar({ items }: IconSidebarProps) {
     <aside
       dir={dir}
       className={cn(
-        "w-11 bg-[#f0ede6] flex flex-col items-center py-3 gap-1 shrink-0",
+        "w-11 bg-ivory-bg flex flex-col items-center py-3 gap-1 shrink-0",
         borderClass
       )}
     >
-      {items.map((item) => {
-        const isActive = resolveNavItemActive(location, item.href);
-        const Icon = item.icon;
+      {visibleItems.map((n) => {
+        const isActive = resolveNavItemActive(location, n.href);
+        const Icon = ICON_MAP[n.icon];
+        if (!Icon) return null;
         return (
-          <Link key={item.href} href={item.href}>
+          <Link key={n.id} href={n.href}>
             <span
-              title={item.label}
+              title={navLabel(n.labelKey)}
               className={cn(
-                "relative w-[30px] h-[30px] rounded-[6px] flex items-center justify-center transition-colors duration-100 cursor-pointer",
+                "relative w-[30px] h-[30px] rounded-sm flex items-center justify-center transition-colors duration-100 cursor-pointer",
                 isActive
                   ? "bg-ivory-greenBg text-ivory-green"
-                  : "text-[#aab8ac] hover:text-ivory-text3"
+                  : "text-ivory-text3 hover:text-ivory-text2"
               )}
             >
               <Icon size={15} strokeWidth={2.2} />
-              {item.alertDot && (
-                <span className="absolute top-[3px] end-[3px] w-1.5 h-1.5 rounded-full bg-ivory-err border-[1.5px] border-[#f0ede6]" />
-              )}
             </span>
           </Link>
         );

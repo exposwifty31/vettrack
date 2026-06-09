@@ -58,7 +58,7 @@ export function CopDiscrepancyBanner() {
               type="button"
               variant="outline"
               size="sm"
-              className="h-7 shrink-0"
+              className="h-9 shrink-0"
               onClick={() => {
                 qc.setQueryData<CopAlertEntry[]>(ORPHAN_DRUG_ALERTS_QUERY_KEY, (prev) =>
                   (prev ?? []).filter((x) => x.eventId !== entry.eventId),

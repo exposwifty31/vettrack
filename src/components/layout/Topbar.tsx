@@ -3,38 +3,27 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useDirection } from "@/hooks/useDirection";
-import { CANONICAL_HREFS } from "@/lib/routes/canonical-hrefs";
 import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
+import { NAV } from "@/lib/routes/nav-model";
+import { t } from "@/lib/i18n";
 
-export interface TopbarSection {
-  href: string;
-  label: string;
-  adminOnly?: boolean;
-  pilotHidden?: boolean;
+function navLabel(key: string): string {
+  const k = key.startsWith("nav.") ? key.slice(4) : key;
+  return (t.nav as Record<string, string>)[k] ?? key;
 }
-
-const SECTIONS: TopbarSection[] = [
-  { href: "/home",         label: "Home" },
-  { href: "/equipment",    label: "Equipment" },
-  { href: CANONICAL_HREFS.equipmentTasks, label: "Equipment Tasks", pilotHidden: true },
-  { href: CANONICAL_HREFS.equipmentBoard, label: "Equipment Command Board" },
-  { href: "/admin",        label: "Admin", adminOnly: true },
-];
 
 export function Topbar() {
   const [location] = useLocation();
   const { isAdmin, name, activeShift } = useAuth();
   const dir = useDirection();
 
-  const visibleSections = SECTIONS.filter((s) =>
-    ( !s.adminOnly || isAdmin)
-  );
+  const visibleItems = NAV.filter((n) => !n.adminOnly || isAdmin);
 
   const activeHref =
-    visibleSections
+    visibleItems
       .slice()
       .sort((a, b) => b.href.length - a.href.length)
-      .find((s) => resolveNavItemActive(location, s.href))?.href ?? "";
+      .find((n) => resolveNavItemActive(location, n.href))?.href ?? "";
 
   return (
     <header
@@ -49,20 +38,20 @@ export function Topbar() {
         Vet<em className="text-[var(--brand-green-bright)] not-italic">Track</em>
       </Link>
 
-      {/* Section nav */}
+      {/* Primary nav */}
       <nav className="flex items-center gap-0.5 flex-1 overflow-x-auto">
-        {visibleSections.map((s) => (
+        {visibleItems.map((n) => (
           <Link
-            key={s.href}
-            href={s.href}
+            key={n.id}
+            href={n.href}
             className={cn(
               "text-sm font-medium px-2.5 py-1 rounded-[4px] whitespace-nowrap transition-colors duration-100",
-              activeHref === s.href
+              activeHref === n.href
                 ? "bg-[var(--brand-green-mid)] text-white font-semibold"
                 : "text-white/60 hover:text-white/85"
             )}
           >
-            {s.label}
+            {navLabel(n.labelKey)}
           </Link>
         ))}
       </nav>

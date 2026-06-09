@@ -3128,5 +3128,45 @@
   },
   "metrics": {
     "disabled": "המדדים כבויים עבור תקופה זו."
+  },
+  "nav": {
+    "today": "היום",
+    "equipment": "ציוד",
+    "equipmentAll": "כל הציוד",
+    "equipmentTasks": "משימות",
+    "equipmentScan": "סריקה",
+    "equipmentNew": "הוספת ציוד",
+    "board": "לוח פיקוד",
+    "alerts": "התראות",
+    "rooms": "חדרים",
+    "admin": "ניהול",
+    "adminOps": "לוח תפעול",
+    "adminMetrics": "מדדים",
+    "adminTypes": "סוגי נכסים",
+    "adminShifts": "משמרות"
+  },
+  "phoneSignIn": {
+    "title": "התחברות עם טלפון",
+    "phoneFormatHintA": "הזן מספר טלפון בפורמט בינלאומי (לדוגמה:",
+    "phoneFormatHintB": ") או בפורמט ישראלי מקומי (לדוגמה:",
+    "phoneFormatHintC": ").",
+    "phoneInputLabel": "מספר טלפון",
+    "phoneInputPlaceholder": "+972501234567 או 0501234567",
+    "sendingAs": "יישלח בתור",
+    "errorNotAvailableFull": "התחברות עם טלפון אינה זמינה לחשבון זה. השתמש בשיטת התחברות אחרת, או פנה לתמיכה אם אתה מתחבר עם מספר ישראלי (+972) ומקבל שגיאה — יש לאפשר ישראל ב-Clerk Dashboard (Configure → Phone numbers → SMS sending → Allowed countries).",
+    "errorNotAvailableShort": "התחברות עם טלפון אינה זמינה לחשבון זה. נסה שיטה אחרת, או פנה למנהל.",
+    "errorGeneric": "אירעה שגיאה. נסה שוב או השתמש בשיטת התחברות אחרת.",
+    "errorUnexpected": "אירעה שגיאה. נסה שוב.",
+    "sendingCode": "שולח קוד...",
+    "sendCode": "שלח קוד אימות",
+    "codeStepTitle": "הזן קוד אימות",
+    "codeSentTo": "נשלח קוד אל",
+    "codeInputLabel": "קוד אימות בן 6 ספרות",
+    "codeInputPlaceholder": "קוד בן 6 ספרות",
+    "errorVerificationFailed": "האימות נכשל. נסה שוב.",
+    "errorInvalidCode": "קוד שגוי. נסה שוב.",
+    "verifying": "מאמת...",
+    "verify": "אמת",
+    "changePhone": "שנה מספר טלפון"
   }
 }

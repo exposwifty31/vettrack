@@ -152,13 +152,13 @@ export function CrashCartAdminSheet({ open, onOpenChange }: Props) {
                       </p>
                     </div>
                     <div className="flex gap-1 shrink-0">
-                      <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEdit(item)}>
+                      <Button variant="ghost" size="sm" className="h-9 px-2" onClick={() => openEdit(item)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 px-2 text-destructive hover:text-destructive"
+                        className="h-9 px-2 text-destructive hover:text-destructive"
                         onClick={() => setDeleteTarget(item)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -172,7 +172,7 @@ export function CrashCartAdminSheet({ open, onOpenChange }: Props) {
 
           <div className="p-4 border-t" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
             <Button onClick={openCreate} className="w-full" size="sm">
-              <Plus className="h-4 w-4 ml-1" />
+              <Plus className="h-4 w-4 ms-1" />
               {t.admin.crashCart.addItem}
             </Button>
           </div>
