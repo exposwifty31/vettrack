@@ -71,27 +71,34 @@ export function AppRoutes() {
   return (
     <PageErrorBoundary fallbackLabel="Page rendering failed">
       <Switch>
+
+        {/* --- Auth & landing --- */}
         <Route path="/" component={RootRoute} />
         <Route path="/landing" component={LandingPage} />
         <Route path="/signin/*?" component={SignInPage} />
         <Route path="/signup/*?" component={SignUpPage} />
 
+        {/* --- Today & shifts --- */}
         <Route path="/home"><AuthGuard><HomePage /></AuthGuard></Route>
-        <Route path="/recap">
-          <AuthGuard>
-            <ShiftRecapPage />
-          </AuthGuard>
-        </Route>
+        <Route path="/recap"><AuthGuard><ShiftRecapPage /></AuthGuard></Route>
 
+        {/* --- Equipment & board (canonical: /equipment, /equipment/tasks, /equipment/board) --- */}
         <Route path="/equipment"><AuthGuard><EquipmentPage /></AuthGuard></Route>
-        <Route path="/equipment/intelligence"><Redirect to="/equipment" replace /></Route>
         <Route path="/equipment/new"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
-        <Route path="/scan"><Redirect to="/equipment?scan=1" replace /></Route>
-        <Route path="/equipment/scan"><Redirect to="/equipment?scan=1" replace /></Route>
-        <Route path="/equipment/maintenance"><Redirect to="/equipment?status=maintenance" replace /></Route>
+        <Route path="/equipment/tasks"><AuthGuard><AppointmentsPage /></AuthGuard></Route>
+        <Route path="/equipment/board"><AuthGuard><WardDisplayPage /></AuthGuard></Route>
         <Route path="/equipment/:id/edit"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/:id/qr"><AuthGuard><EquipmentQrPrintPage /></AuthGuard></Route>
         <Route path="/equipment/:id"><AuthGuard><EquipmentDetailPage /></AuthGuard></Route>
+        {/* Legacy aliases → canonicals */}
+        <Route path="/appointments"><Redirect to="/equipment/tasks" replace /></Route>
+        <Route path="/equipment-tasks"><Redirect to="/equipment/tasks" replace /></Route>
+        <Route path="/display"><Redirect to="/equipment/board" replace /></Route>
+        <Route path="/equipment-board"><Redirect to="/equipment/board" replace /></Route>
+        <Route path="/scan"><Redirect to="/equipment?scan=1" replace /></Route>
+        <Route path="/equipment/scan"><Redirect to="/equipment?scan=1" replace /></Route>
+        <Route path="/equipment/maintenance"><Redirect to="/equipment?status=maintenance" replace /></Route>
+        <Route path="/equipment/intelligence"><Redirect to="/equipment" replace /></Route>
         <Route path="/alerts"><AuthGuard><AlertsPage /></AuthGuard></Route>
         <Route path="/my-equipment"><AuthGuard><MyEquipmentPage /></AuthGuard></Route>
         <Route path="/rooms"><AuthGuard><RoomsListPage /></AuthGuard></Route>
@@ -100,44 +107,45 @@ export function AppRoutes() {
         <Route path="/locations/:id"><AuthGuard><RoomRadarPage /></AuthGuard></Route>
         <Route path="/print"><AuthGuard><QrPrintPage /></AuthGuard></Route>
 
+        {/* --- Emergency & safety --- */}
         <Route path="/code-blue"><AuthGuard><CodeBluePage /></AuthGuard></Route>
-        <Route path="/emergency-equipment-log"><AuthGuard><CodeBluePage /></AuthGuard></Route>
-        <Route path="/display"><AuthGuard><WardDisplayPage /></AuthGuard></Route>
-        <Route path="/equipment-board"><AuthGuard><WardDisplayPage /></AuthGuard></Route>
         <Route path="/code-blue/display"><AuthGuard><CodeBlueDisplay /></AuthGuard></Route>
-        <Route path="/emergency-equipment-wall"><AuthGuard><CodeBlueDisplay /></AuthGuard></Route>
-        <Route path="/appointments"><AuthGuard><AppointmentsPage /></AuthGuard></Route>
-        <Route path="/equipment-tasks"><AuthGuard><AppointmentsPage /></AuthGuard></Route>
         <Route path="/crash-cart"><AuthGuard><CrashCartCheckPage /></AuthGuard></Route>
-        <Route path="/critical-kit-check"><AuthGuard><CrashCartCheckPage /></AuthGuard></Route>
         <Route path="/admin/code-blue-history"><AuthGuard><CodeBlueHistoryPage /></AuthGuard></Route>
+        {/* Legacy aliases */}
+        <Route path="/emergency-equipment-log"><AuthGuard><CodeBluePage /></AuthGuard></Route>
+        <Route path="/emergency-equipment-wall"><AuthGuard><CodeBlueDisplay /></AuthGuard></Route>
+        <Route path="/critical-kit-check"><AuthGuard><CrashCartCheckPage /></AuthGuard></Route>
         <Route path="/emergency-equipment-history"><AuthGuard><CodeBlueHistoryPage /></AuthGuard></Route>
 
+        {/* --- Admin --- */}
         <Route path="/admin"><AuthGuard><AdminPage /></AuthGuard></Route>
-        <Route path="/settings"><AuthGuard><SettingsPage /></AuthGuard></Route>
-        <Route path="/help"><AuthGuard><HelpPage /></AuthGuard></Route>
-
-        <Route path="/inventory"><AuthGuard><InventoryPage /></AuthGuard></Route>
-        <Route path="/analytics/outcome-kpi"><AuthGuard><OutcomeKpiDashboardPage /></AuthGuard></Route>
-        <Route path="/analytics/shift-leaderboard"><AuthGuard><ShiftLeaderboardPage /></AuthGuard></Route>
-        <Route path="/analytics"><AuthGuard><AnalyticsPage /></AuthGuard></Route>
-        <Route path="/dashboard"><AuthGuard><ManagementDashboardPage /></AuthGuard></Route>
         <Route path="/admin/shifts"><AuthGuard><AdminShiftsPage /></AuthGuard></Route>
         <Route path="/admin/ops-dashboard"><AuthGuard><AdminOpsDashboardPage /></AuthGuard></Route>
         <Route path="/admin/asset-types"><AuthGuard><AdminAssetTypesPage /></AuthGuard></Route>
         <Route path="/admin/docks"><AuthGuard><AdminDocksPage /></AuthGuard></Route>
         <Route path="/admin/metrics"><AuthGuard><OperationalMetricsDashboardPage /></AuthGuard></Route>
-        <Route path="/meds"><Redirect to="/appointments" replace /></Route>
-        <Route path="/pharmacy-forecast"><Redirect to="/appointments" replace /></Route>
-        <Route path="/admin/medication-integrity"><Redirect to="/admin" replace /></Route>
+        <Route path="/settings"><AuthGuard><SettingsPage /></AuthGuard></Route>
+        <Route path="/help"><AuthGuard><HelpPage /></AuthGuard></Route>
         <Route path="/stability"><AuthGuard><StabilityDashboardPage /></AuthGuard></Route>
         <Route path="/audit-log"><AuthGuard><AuditLogPage /></AuthGuard></Route>
-        <Route path="/whats-new"><AuthGuard><WhatsNewPage /></AuthGuard></Route>
+        {/* Legacy admin aliases */}
+        <Route path="/admin/medication-integrity"><Redirect to="/admin" replace /></Route>
+
+        {/* --- Platform & analytics --- */}
+        <Route path="/inventory"><AuthGuard><InventoryPage /></AuthGuard></Route>
         <Route path="/inventory-items"><AuthGuard><InventoryItemsPage /></AuthGuard></Route>
         <Route path="/procurement"><AuthGuard><ProcurementPage /></AuthGuard></Route>
+        <Route path="/analytics/outcome-kpi"><AuthGuard><OutcomeKpiDashboardPage /></AuthGuard></Route>
+        <Route path="/analytics/shift-leaderboard"><AuthGuard><ShiftLeaderboardPage /></AuthGuard></Route>
+        <Route path="/analytics"><AuthGuard><AnalyticsPage /></AuthGuard></Route>
+        <Route path="/dashboard"><AuthGuard><ManagementDashboardPage /></AuthGuard></Route>
+        <Route path="/whats-new"><AuthGuard><WhatsNewPage /></AuthGuard></Route>
         <Route path="/shift-chat/:shiftId"><AuthGuard><ShiftChatArchive /></AuthGuard></Route>
         <Route path="/app-tour"><AuthGuard><AppTourPage /></AuthGuard></Route>
-
+        {/* Legacy platform aliases */}
+        <Route path="/meds"><Redirect to="/equipment/tasks" replace /></Route>
+        <Route path="/pharmacy-forecast"><Redirect to="/equipment/tasks" replace /></Route>
         <Route path="/patients"><Redirect to="/equipment" replace /></Route>
         <Route path="/patients/:id"><Redirect to="/equipment" replace /></Route>
         <Route path="/pending"><Redirect to="/equipment" replace /></Route>

@@ -21,19 +21,20 @@ export function ShiftChatFab() {
   return (
     <>
       <button
+        type="button"
         onClick={() => setIsOpen(true)}
         className={cn(
-          "fixed bottom-nav-float right-5 z-[60]",
+          "fixed bottom-nav-float end-5 z-[60]",
           "w-12 h-12 rounded-full",
           "bg-gradient-to-br from-indigo-600 to-violet-700",
           "flex items-center justify-center text-xl shadow-lg shadow-indigo-500/40",
-          "transition-transform hover:scale-105 active:scale-95",
+          "transition-transform hover:scale-105 motion-safe:active:scale-95",
         )}
         aria-label="פתח צ'אט משמרת"
       >
-        💬
+        <span aria-hidden="true">💬</span>
         {chat.unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-background">
+          <span aria-hidden="true" className="absolute -top-1 -end-1 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-background">
             {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
           </span>
         )}

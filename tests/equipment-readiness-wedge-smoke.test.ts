@@ -12,7 +12,8 @@ describe("equipment readiness wedge smoke", () => {
     expect(routes).toContain('path="/locations"');
     expect(routes).toContain('path="/critical-kit-check"');
     expect(routes).toContain('path="/display"');
-    expect(routes).not.toMatch(/path="\/display"[^>]*>\s*<Redirect/);
+    expect(routes).toContain('path="/equipment/board"');
+    expect(routes).not.toMatch(/path="\/equipment\/board"[^>]*>\s*<Redirect/);
   });
 
   it("mounts equipment-board API alias via router factory", () => {

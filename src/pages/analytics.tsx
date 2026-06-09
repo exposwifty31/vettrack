@@ -2,8 +2,7 @@ import { t } from "@/lib/i18n";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
-import { Layout } from "@/components/layout";
-import { PageShell } from "@/components/layout/PageShell";
+import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -77,7 +76,6 @@ export default function AnalyticsPage() {
       })
     : [];
 
-  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
   const pageContent = (
     <>
       <Helmet>
@@ -289,6 +287,5 @@ export default function AnalyticsPage() {
       </div>
     </>
   );
-  if (isDesktop) return <PageShell>{pageContent}</PageShell>;
-  return <Layout>{pageContent}</Layout>;
+  return <AppShell>{pageContent}</AppShell>;
 }

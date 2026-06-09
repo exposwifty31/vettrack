@@ -3,8 +3,7 @@ import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Flame, Share2, ChevronLeft, ChevronRight, ClipboardCheck } from "lucide-react";
-import { Layout } from "@/components/layout";
-import { PageShell } from "@/components/layout/PageShell";
+import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { LoadingSection } from "@/components/ui/loading-section";
 import { api } from "@/lib/api";
@@ -24,7 +23,6 @@ export default function ShiftRecapPage() {
   const userId = getCurrentUserId();
   const direction = useDirection();
   const Chevron = direction === "rtl" ? ChevronLeft : ChevronRight;
-  const isDesktop = useIsDesktop();
   const enterOnce = useEnterOnce("shift-recap");
   const firstName = name?.split(" ")[0] || t.homePage.fallbackName;
 
@@ -181,9 +179,5 @@ export default function ShiftRecapPage() {
     </>
   );
 
-  if (isDesktop) {
-    return <PageShell>{content}</PageShell>;
-  }
-
-  return <Layout>{content}</Layout>;
+  return <AppShell>{content}</AppShell>;
 }

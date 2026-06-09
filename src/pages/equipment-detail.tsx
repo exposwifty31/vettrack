@@ -1,11 +1,11 @@
 import { t } from "@/lib/i18n";
+import { Breadcrumb } from "@/components/layout/Breadcrumb";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useParams, useLocation, useSearch } from "wouter";
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
-import { Layout } from "@/components/layout";
-import { PageShell } from "@/components/layout/PageShell";
+import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -821,8 +821,6 @@ export default function EquipmentDetailPage() {
     }
   }
 
-  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
-
   if (isLoading) {
     return <EquipmentDetailSkeleton />;
   }
@@ -849,8 +847,7 @@ export default function EquipmentDetailPage() {
         </div>
       </div>
     );
-    if (isDesktop) return <PageShell>{errorContent}</PageShell>;
-    return <Layout>{errorContent}</Layout>;
+    return <AppShell>{errorContent}</AppShell>;
   }
 
   if (!equipment) {
@@ -862,8 +859,7 @@ export default function EquipmentDetailPage() {
         </Button>
       </div>
     );
-    if (isDesktop) return <PageShell>{notFoundContent}</PageShell>;
-    return <Layout>{notFoundContent}</Layout>;
+    return <AppShell>{notFoundContent}</AppShell>;
   }
 
   const overdue = isOverdue(equipment);
@@ -902,6 +898,13 @@ export default function EquipmentDetailPage() {
         <meta name="description" content={`Equipment detail for ${equipment.name}. Status: ${equipment.status}${equipment.location ? `. Location: ${equipment.location}` : ""}. Update status, check out, report issues, and view full history.`} />
         <link rel="canonical" href={`https://vettrack.replit.app/equipment/${equipment.id}`} />
       </Helmet>
+      <Breadcrumb
+        className="mb-1 hidden sm:flex"
+        items={[
+          { label: t.equipment.title, href: "/equipment" },
+          { label: equipment.name },
+        ]}
+      />
       <div className="flex flex-col gap-4 pb-28 animate-fade-in">
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
@@ -1601,10 +1604,10 @@ export default function EquipmentDetailPage() {
               <Label htmlFor="note">
                 Note
                 {scanStatus === "issue" && (
-                  <span className="text-red-500 ml-1">*</span>
+                  <span className="text-red-500 ms-1">*</span>
                 )}
                 {scanStatus !== "issue" && (
-                  <span className="text-muted-foreground text-xs ml-1">(optional)</span>
+                  <span className="text-muted-foreground text-xs ms-1">(optional)</span>
                 )}
               </Label>
               <Textarea
@@ -1633,7 +1636,7 @@ export default function EquipmentDetailPage() {
               <div className="flex flex-col gap-1.5">
                 <Label>
                   Photo
-                  <span className="text-muted-foreground text-xs ml-1">(strongly recommended)</span>
+                  <span className="text-muted-foreground text-xs ms-1">(strongly recommended)</span>
                 </Label>
                 {scanPhoto ? (
                   <div className="relative">
@@ -1645,7 +1648,7 @@ export default function EquipmentDetailPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="absolute top-1 right-1 bg-white/80 text-xs h-11 min-w-[44px]"
+                      className="absolute top-1 end-1 bg-white/80 text-xs h-11 min-w-[44px]"
                       onClick={() => setScanPhoto(null)}
                     >
                       Remove
@@ -1683,9 +1686,9 @@ export default function EquipmentDetailPage() {
               data-testid="btn-confirm-scan"
             >
               {scanMut.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="w-4 h-4 me-2 animate-spin" />
               ) : (
-                <ClipboardEdit className="w-4 h-4 mr-2" />
+                <ClipboardEdit className="w-4 h-4 me-2" />
               )}
               Log Status
             </Button>
@@ -1704,7 +1707,7 @@ export default function EquipmentDetailPage() {
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="report-issue-note">
                 Describe the issue
-                <span className="text-red-500 ml-1">*</span>
+                <span className="text-red-500 ms-1">*</span>
               </Label>
               <Textarea
                 id="report-issue-note"
@@ -1725,7 +1728,7 @@ export default function EquipmentDetailPage() {
             <div className="flex flex-col gap-1.5">
               <Label>
                 Photo
-                <span className="text-muted-foreground text-xs ml-1">(optional)</span>
+                <span className="text-muted-foreground text-xs ms-1">(optional)</span>
               </Label>
               {reportIssuePhoto ? (
                 <div className="relative">
@@ -1737,7 +1740,7 @@ export default function EquipmentDetailPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="absolute top-1 right-1 bg-white/80 text-xs h-11 min-w-[44px]"
+                    className="absolute top-1 end-1 bg-white/80 text-xs h-11 min-w-[44px]"
                     onClick={() => setReportIssuePhoto(null)}
                   >
                     Remove
@@ -1775,9 +1778,9 @@ export default function EquipmentDetailPage() {
               data-testid="btn-confirm-report-issue"
             >
               {reportIssueMut.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="w-4 h-4 me-2 animate-spin" />
               ) : (
-                <AlertTriangle className="w-4 h-4 mr-2" />
+                <AlertTriangle className="w-4 h-4 me-2" />
               )}
               Submit Issue
             </Button>
@@ -1972,6 +1975,5 @@ export default function EquipmentDetailPage() {
       )}
     </>
   );
-  if (isDesktop) return <PageShell>{pageContent}</PageShell>;
-  return <Layout>{pageContent}</Layout>;
+  return <AppShell>{pageContent}</AppShell>;
 }

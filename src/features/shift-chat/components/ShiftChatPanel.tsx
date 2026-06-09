@@ -99,17 +99,17 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-green-500 rounded-full shadow-[0_0_6px_theme(colors.green.500)]" />
             <span className="font-bold text-sm">צ׳אט משמרת</span>
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               {chat.onlineUserIds.length} מחוברים
             </span>
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-lg">✕</button>
+          <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground text-lg">✕</button>
         </div>
 
         {chat.pinnedMessage && (
           <div className="px-3 py-2 bg-amber-950/40 border-b border-amber-800/50 flex items-start gap-2 flex-shrink-0">
             <span className="text-xs">📌</span>
-            <p className="text-[11px] text-amber-300 leading-snug line-clamp-2">
+            <p className="text-xs text-amber-300 leading-snug line-clamp-2">
               {chat.pinnedMessage.body}
             </p>
           </div>
@@ -209,13 +209,14 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
                 <div className="text-[10px] text-indigo-300">{t.subtitle}</div>
               </button>
             ))}
-            <button onClick={() => setShowBroadcast(false)} className="text-[10px] text-muted-foreground mt-1">{t.common.cancel}</button>
+            <button type="button" onClick={() => setShowBroadcast(false)} className="text-xs text-muted-foreground mt-1">{t.common.cancel}</button>
           </div>
         )}
 
         <div className="px-3 pb-4 pt-2 border-t border-border flex items-center gap-2 flex-shrink-0">
           {canSendBroadcast && (
             <button
+              type="button"
               onClick={() => setShowBroadcast((v) => !v)}
               className="bg-indigo-950 border border-indigo-700 text-indigo-400 rounded-lg p-2 text-sm flex-shrink-0"
               aria-label="שלח פקודה"
@@ -235,6 +236,7 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
               style={{ maxHeight: "80px" }}
             />
             <button
+              type="button"
               onClick={() => setIsUrgent((v) => !v)}
               className={cn("text-sm flex-shrink-0", isUrgent ? "text-red-400" : "text-muted-foreground/40")}
               aria-label="סמן כדחוף"

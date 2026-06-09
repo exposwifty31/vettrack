@@ -4,8 +4,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
-import { Layout } from "@/components/layout";
-import { PageShell } from "@/components/layout/PageShell";
+import { AppShell } from "@/components/layout/AppShell";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { ErrorCard } from "@/components/ui/error-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingSection } from "@/components/ui/loading-section";
@@ -16,9 +16,11 @@ import { useAuth } from "@/hooks/use-auth";
 import { useDirection } from "@/hooks/useDirection";
 import { QrScanner } from "@/components/qr-scanner";
 import { getCurrentUserId } from "@/lib/auth-store";
+import { subscribeKeepalive } from "@/lib/realtime";
 import type { Appointment } from "@/types";
 import {
   Activity,
+  AlertTriangle,
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
@@ -26,6 +28,7 @@ import {
   Plus,
   Scan,
   ShieldAlert,
+  Siren,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEnterOnce } from "@/hooks/use-enter-once";
@@ -59,11 +62,16 @@ export default function HomePage() {
   const Chevron = direction === "rtl" ? ChevronLeft : ChevronRight;
   const [scannerOpen, setScannerOpen] = useState(false);
   const [shiftSummaryOpen, setShiftSummaryOpen] = useState(false);
+  const [activeCodeBlueId, setActiveCodeBlueId] = useState<string | null>(null);
   const searchStr = useSearch();
   const enterOnce = useEnterOnce("home");
   const rise = enterOnce ? "vt-pro-rise" : "";
 
   useRealtimeReconciliation({ queryClient });
+
+  useEffect(() => subscribeKeepalive(({ activeCodeBlueSessionId }) => {
+    setActiveCodeBlueId(activeCodeBlueSessionId);
+  }), []);
 
   useEffect(() => {
     const params = new URLSearchParams(searchStr);
@@ -108,6 +116,8 @@ export default function HomePage() {
 
   const alerts = equipment ? computeAlerts(equipment) : [];
   const alertCount = alerts.length;
+  const criticalCount = alerts.filter((a) => a.severity === "critical").length;
+  const overdueCount = taskDashboard?.counts.overdue ?? 0;
   const totalCount = equipment?.length ?? 0;
   const activePatientsCount = 0;
 
@@ -154,7 +164,7 @@ export default function HomePage() {
   const activityItems = activityData?.items ?? [];
   const todayItems = activityItems.slice(0, 6);
 
-  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
+  const isDesktop = useIsDesktop();
   const heroPctDisplay = heroPct ?? 0;
 
   const pageContent = (
@@ -203,6 +213,65 @@ export default function HomePage() {
               refetch();
             }}
           />
+        )}
+
+        {/* Urgent item — answer-first lead (Code Blue > critical alert > overdue task) */}
+        {(activeCodeBlueId || criticalCount > 0 || overdueCount > 0) && !equipmentLoading && (
+          <Link
+            href={activeCodeBlueId ? "/code-blue" : criticalCount > 0 ? "/alerts" : "/equipment/tasks"}
+            className={cn(
+              "relative flex items-center gap-3 overflow-hidden rounded-2xl border px-4 py-3.5 shadow-card transition-opacity motion-safe:active:scale-[0.99]",
+              activeCodeBlueId
+                ? "border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/30"
+                : criticalCount > 0
+                ? "border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/30"
+                : "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/30"
+            )}
+          >
+            <span
+              className={cn(
+                "absolute inset-y-3 start-0 w-[3px] rounded-full",
+                activeCodeBlueId || criticalCount > 0 ? "bg-red-500" : "bg-amber-500"
+              )}
+              aria-hidden
+            />
+            <span
+              className={cn(
+                "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl",
+                activeCodeBlueId || criticalCount > 0
+                  ? "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400"
+                  : "bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400"
+              )}
+            >
+              {activeCodeBlueId
+                ? <Siren className="h-4 w-4" aria-hidden />
+                : <AlertTriangle className="h-4 w-4" aria-hidden />}
+            </span>
+            <span className="min-w-0 flex-1 ps-1">
+              <span
+                className={cn(
+                  "block text-[13px] font-bold",
+                  activeCodeBlueId || criticalCount > 0
+                    ? "text-red-700 dark:text-red-300"
+                    : "text-amber-700 dark:text-amber-300"
+                )}
+              >
+                {activeCodeBlueId
+                  ? t.homePage.urgentCodeBlue
+                  : criticalCount > 0
+                  ? t.homePage.urgentCriticalAlerts(criticalCount)
+                  : t.homePage.urgentOverdueTasks(overdueCount)}
+              </span>
+              <span className="block text-[11px] text-ivory-text3">
+                {activeCodeBlueId
+                  ? t.homePage.urgentCodeBlueHint
+                  : criticalCount > 0
+                  ? t.homePage.urgentCriticalAlertsHint
+                  : t.homePage.urgentOverdueTasksHint}
+              </span>
+            </span>
+            <Chevron className="h-4 w-4 shrink-0 text-ivory-text3" aria-hidden />
+          </Link>
         )}
 
         {/* V4 Pro — shift progress hero */}
@@ -269,7 +338,7 @@ export default function HomePage() {
                 </h2>
                 <p className="mb-3.5 text-[12.5px] text-ivory-text3">{nextBody}</p>
                 <Link
-                  href="/appointments"
+                  href="/equipment/tasks"
                   data-testid="btn-next-up"
                   className="flex h-[60px] w-full items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-deep)] text-[15px] font-bold text-white shadow-lg transition-transform motion-safe:active:scale-[0.98]"
                   style={{
@@ -287,7 +356,7 @@ export default function HomePage() {
                 </h2>
                 <p className="mb-3.5 text-[12.5px] text-ivory-text3">{t.homePage.nextUpEmptyBody}</p>
                 <Link
-                  href="/appointments"
+                  href="/equipment/tasks"
                   className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-ivory-border bg-ivory-surface text-sm font-semibold text-ivory-text2 transition-colors hover:text-foreground motion-safe:active:scale-[0.98]"
                 >
                   {t.homePage.nextUpEmptyCta}
@@ -400,17 +469,13 @@ export default function HomePage() {
     </>
   );
 
-  if (isDesktop) {
-    return <PageShell>{pageContent}</PageShell>;
-  }
-
   return (
-    <Layout
+    <AppShell
       onScan={() => setScannerOpen(true)}
       scannerOpen={scannerOpen}
       onCloseScan={() => setScannerOpen(false)}
     >
       {pageContent}
-    </Layout>
+    </AppShell>
   );
 }

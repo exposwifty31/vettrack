@@ -538,6 +538,8 @@ const translations = {
     glanceLine: (tasksDone: number, tasksTotal: number, scans: number, patients: number) =>
       tr(d.homePage.glanceLine, { tasksDone, tasksTotal, scans, patients }),
     winScansToday: (count: number) => tr(d.homePage.winScansToday, { count }),
+    urgentCriticalAlerts: (count: number) => tr(d.homePage.urgentCriticalAlerts, { count }),
+    urgentOverdueTasks: (count: number) => tr(d.homePage.urgentOverdueTasks, { count }),
   },
 
   assetCopilot: d.assetCopilot,

@@ -1099,7 +1099,13 @@
     "glanceLine": "{tasksDone} of {tasksTotal} tasks · {scans} scans · {patients} patients",
     "winNoAlerts": "No open alerts",
     "winTasksClear": "Tasks clear",
-    "winScansToday": "{count} scans today"
+    "winScansToday": "{count} scans today",
+    "urgentCodeBlue": "Code Blue active",
+    "urgentCodeBlueHint": "Emergency session in progress — tap to manage",
+    "urgentCriticalAlerts": "{count} critical alerts",
+    "urgentCriticalAlertsHint": "Equipment needs immediate attention",
+    "urgentOverdueTasks": "{count} overdue",
+    "urgentOverdueTasksHint": "Tasks behind schedule — review now"
   },
   "assetCopilot": {
     "title": "Asset Copilot",
