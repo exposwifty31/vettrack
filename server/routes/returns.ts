@@ -10,6 +10,7 @@ import { validateBody, validateUuid } from "../middleware/validate.js";
 import { enqueueChargeAlertJob } from "../jobs/charge-alert-enqueue.js";
 import { cancelChargeAlertJob } from "../workers/chargeAlertWorker.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 const router = Router();
 
@@ -27,29 +28,7 @@ const patchReturnSchema = z.object({
   plugInDeadlineMinutes: z.number().int().min(1).max(MAX_DEADLINE_MINUTES).optional(),
 });
 
-function resolveRequestId(
-  res: { getHeader: (name: string) => unknown; setHeader?: (name: string, value: string) => void },
-  incomingHeader: unknown,
-): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") {
-    res.setHeader("x-request-id", requestId);
-  }
-  return requestId;
-}
 
-function apiError(params: { code: string; reason: string; message: string; requestId: string }) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-  };
-}
 
 async function ensureEquipmentInClinic(clinicId: string, equipmentId: string) {
   const [row] = await db

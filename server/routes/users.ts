@@ -1,3 +1,5 @@
+// TODO(arch): file exceeds 1100 lines. Split into handler modules following
+// the equipment-route-utils.ts / handlers/ pattern already started in this directory.
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
@@ -14,6 +16,7 @@ import { invalidateForUser } from "../lib/authority-cache.js";
 import { ensureUserEmail } from "../services/user-sync.service.js";
 import { countPurgeCandidates, purgeDeletedUsers, PURGE_AFTER_DAYS } from "../lib/cleanup-scheduler.js";
 import { canManageErModeForUser } from "../lib/er-mode-permissions.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 /*
  * PERMISSIONS MATRIX — /api/users
@@ -28,34 +31,6 @@ import { canManageErModeForUser } from "../lib/er-mode-permissions.js";
  */
 
 const router = Router();
-
-function resolveRequestId(res: { getHeader: (name: string) => unknown; setHeader?: (name: string, value: string) => void }, incomingHeader: unknown): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") {
-    res.setHeader("x-request-id", requestId);
-  }
-  return requestId;
-}
-
-function apiError(params: {
-  code: string;
-  reason: string;
-  message: string;
-  requestId: string;
-  details?: unknown;
-}) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-    ...(params.details !== undefined ? { details: params.details } : {}),
-  };
-}
 
 const userFields = {
   id: users.id,

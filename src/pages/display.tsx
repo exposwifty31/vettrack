@@ -1,4 +1,6 @@
-// src/pages/display.tsx
+// src/pages/display.tsx — Equipment Command Center (Ward Display)
+// Always-on TV display: dark theme, RTL, auto-refreshing via SSE + polling.
+// Phase 9 realtime infrastructure preserved byte-for-byte.
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -13,387 +15,400 @@ import { useKioskWakeLock } from "@/hooks/useKioskWakeLock";
 import { useDisplayHeartbeat } from "@/hooks/useDisplayHeartbeat";
 import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
 import { useCodeBlueKeepaliveReconciliation } from "@/hooks/useCodeBlueKeepaliveReconciliation";
-import { formatRelativeTime } from "@/lib/utils";
 import { t } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import type {
-  DisplaySnapshot,
-  DisplaySnapshotHospitalization,
-  DisplaySnapshotEquipment,
-  DisplaySnapshotTask,
   DisplaySnapshotCodeBlueSession,
-  HospitalizationStatus,
-} from "@/types";
+  EquipmentCommandBoardSnapshot,
+} from "@/types/safety-surfaces";
+import type { EquipmentBoardUnitRow, EquipmentReadinessStatus } from "../../shared/equipment-board";
 
-// ── Status lookup tables ────────────────────────────────────────────────────
+// ── Status colour tokens ────────────────────────────────────────────────────
 
-const STATUS_ORDER: Record<HospitalizationStatus, number> = {
-  critical: 0,
-  observation: 1,
-  admitted: 2,
-  recovering: 3,
-  discharged: 4,
-  deceased: 5,
+const STATUS_COLOR: Record<EquipmentReadinessStatus, string> = {
+  ready:    "text-[var(--status-ok)]",
+  in_use:   "text-[var(--status-sterilized)]",
+  blocked:  "text-[var(--status-issue)]",
+  stale:    "text-[var(--status-maintenance)]",
+  overdue:  "text-[var(--status-issue)]",
+  unknown:  "text-ivory-text3",
 };
 
-const STATUS_LABELS_HE: Record<HospitalizationStatus, string> = {
-  critical: "קריטי",
-  observation: "תצפית",
-  admitted: "מאושפז",
-  recovering: "התאוששות",
-  discharged: "שוחרר",
-  deceased: "נפטר",
+const STATUS_BG: Record<EquipmentReadinessStatus, string> = {
+  ready:   "bg-[var(--status-ok-bg)]   border-[var(--status-ok-border)]   text-[var(--status-ok-fg)]",
+  in_use:  "bg-[var(--status-steril-bg)] border-[var(--status-steril-border)] text-[var(--status-steril-fg)]",
+  blocked: "bg-[var(--status-issue-bg)] border-[var(--status-issue-border)] text-[var(--status-issue-fg)]",
+  stale:   "bg-[var(--status-maint-bg)] border-[var(--status-maint-border)] text-[var(--status-maint-fg)]",
+  overdue: "bg-[var(--status-issue-bg)] border-[var(--status-issue-border)] text-[var(--status-issue-fg)]",
+  unknown: "bg-muted border-ivory-border text-ivory-text3",
 };
 
-const STATUS_CARD: Record<HospitalizationStatus, string> = {
-  critical: "bg-red-950/40 border-red-700/50",
-  observation: "bg-amber-950/30 border-amber-700/40",
-  admitted: "bg-indigo-950/30 border-indigo-600/30",
-  recovering: "bg-green-950/20 border-green-700/30",
-  discharged: "bg-white/5 border-white/10",
-  deceased: "bg-white/5 border-white/10",
+const STATUS_BAR_COLOR: Record<EquipmentReadinessStatus, string> = {
+  ready:   "bg-[var(--status-ok)]",
+  in_use:  "bg-[var(--status-sterilized)]",
+  blocked: "bg-[var(--status-issue)]",
+  stale:   "bg-[var(--status-maintenance)]",
+  overdue: "bg-[var(--status-issue)]",
+  unknown: "bg-ivory-text3",
 };
 
-const STATUS_BAR: Record<HospitalizationStatus, string> = {
-  critical: "bg-red-600",
-  observation: "bg-amber-600",
-  admitted: "bg-indigo-500",
-  recovering: "bg-green-600",
-  discharged: "bg-gray-600",
-  deceased: "bg-gray-600",
-};
-
-const STATUS_BADGE: Record<HospitalizationStatus, string> = {
-  critical: "bg-red-600 text-white",
-  observation: "bg-amber-600 text-white",
-  admitted: "bg-indigo-500 text-white",
-  recovering: "bg-green-600 text-white",
-  discharged: "bg-gray-600 text-white",
-  deceased: "bg-gray-700 text-white",
-};
-
-const SHIFT_ROLE_LABELS: Record<string, string> = {
-  admin: "מנהל",
-  technician: "טכנאי",
-  senior_technician: "טכנאי בכיר",
-};
-
-/** F1 — data-driven pane visibility for Ward Display (equipment-only pilots). */
-export function getDisplayPaneVisibility(
-  snapshot: Pick<
-    DisplaySnapshot,
-    "hospitalizations" | "upcomingTasks" | "crashCartStatus"
-  >,
-): {
-  showCrashCartPill: boolean;
-  showHospitalizationCount: boolean;
-  showPatientGrid: boolean;
-  showUpcomingTasks: boolean;
-} {
-  return {
-    showCrashCartPill: snapshot.crashCartStatus !== null,
-    showHospitalizationCount: snapshot.hospitalizations.length > 0,
-    showPatientGrid: snapshot.hospitalizations.length > 0,
-    showUpcomingTasks: snapshot.upcomingTasks.length > 0,
+function statusLabel(s: EquipmentReadinessStatus): string {
+  const map: Record<EquipmentReadinessStatus, string> = {
+    ready:   t.board.available,
+    in_use:  t.board.deployed,
+    blocked: t.board.down,
+    stale:   t.board.stale,
+    overdue: t.board.overdue,
+    unknown: t.board.unconfirmed,
   };
+  return map[s];
 }
 
-// ── AwarenessBar ─────────────────────────────────────────────────────────────
+// ── ADRing ──────────────────────────────────────────────────────────────────
 
-function AwarenessBar({ snapshot }: { snapshot: DisplaySnapshot }) {
-  const now = new Date(snapshot.currentTime);
+function ADRing({ pct, ready, total }: { pct: number; ready: number; total: number }) {
+  const size = 140;
+  const stroke = 14;
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const dash = (pct / 100) * circ;
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90">
+          {/* Track */}
+          <circle
+            cx={size / 2} cy={size / 2} r={r}
+            fill="none"
+            stroke="var(--muted)"
+            strokeWidth={stroke}
+          />
+          {/* Progress */}
+          <circle
+            cx={size / 2} cy={size / 2} r={r}
+            fill="none"
+            stroke="var(--status-ok)"
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={circ}
+            strokeDashoffset={circ - dash}
+            style={{ transition: "stroke-dashoffset 700ms cubic-bezier(.4,0,.2,1)" }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-[28px] font-black tabular-nums text-[var(--status-ok)] leading-none">
+            {ready}
+          </span>
+          <span className="text-[11px] text-ivory-text3 leading-tight">
+            {t.board?.of ?? "מתוך"} {total}
+          </span>
+        </div>
+      </div>
+      <div className="text-center">
+        <div className="text-[13px] font-bold text-ivory-text leading-tight">
+          {t.board?.deployableNow ?? "זמין לפריסה"}
+        </div>
+        <div className="text-[11px] text-ivory-text3">{Math.round(pct)}%</div>
+      </div>
+    </div>
+  );
+}
+
+// ── ReadinessMix ─────────────────────────────────────────────────────────────
+
+function ReadinessMix({ overview }: { overview: EquipmentCommandBoardSnapshot["overview"] }) {
+  const total = overview.totalCritical || 1;
+  const segments: Array<{ key: EquipmentReadinessStatus; count: number }> = (
+    [
+      { key: "ready"   as const, count: overview.ready   },
+      { key: "in_use"  as const, count: overview.inUse   },
+      { key: "stale"   as const, count: overview.stale   },
+      { key: "blocked" as const, count: overview.blocked },
+      { key: "overdue" as const, count: overview.overdue },
+      { key: "unknown" as const, count: overview.unknown },
+    ] as Array<{ key: EquipmentReadinessStatus; count: number }>
+  ).filter((s) => s.count > 0);
+
+  return (
+    <div className="flex-1 min-w-0">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-ivory-text3 mb-2">
+        {t.board?.readinessMix ?? "תמהיל מוכנות"}
+      </div>
+      {/* Stacked bar */}
+      <div className="flex h-3 rounded-full overflow-hidden mb-3 gap-px">
+        {segments.map(({ key, count }) => (
+          <div
+            key={key}
+            className={cn("transition-all duration-700", STATUS_BAR_COLOR[key])}
+            style={{ width: `${(count / total) * 100}%` }}
+          />
+        ))}
+      </div>
+      {/* Legend */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+        {segments.map(({ key, count }) => (
+          <div key={key} className="flex items-center gap-1.5 text-[11px]">
+            <span className={cn("w-2 h-2 rounded-full shrink-0", STATUS_BAR_COLOR[key])} />
+            <span className="text-ivory-text2 truncate">{statusLabel(key)}</span>
+            <span className="tabular-nums text-ivory-text3 ms-auto">{count}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── TypeRow ──────────────────────────────────────────────────────────────────
+
+function TypeRow({ row }: { row: EquipmentCommandBoardSnapshot["byType"][number] }) {
+  const total = row.total || 1;
+  const segments: Array<{ key: EquipmentReadinessStatus; count: number }> = (
+    [
+      { key: "ready"   as const, count: row.ready   },
+      { key: "in_use"  as const, count: row.inUse   },
+      { key: "stale"   as const, count: row.stale   },
+      { key: "blocked" as const, count: row.blocked },
+      { key: "overdue" as const, count: row.overdue },
+      { key: "unknown" as const, count: row.unknown },
+    ] as Array<{ key: EquipmentReadinessStatus; count: number }>
+  ).filter((s) => s.count > 0);
+
+  const belowMin = row.belowMinimumReady && row.minimumReady != null;
+
+  return (
+    <div className="py-2 border-b border-ivory-border last:border-0">
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className={cn("text-[12px] font-semibold text-ivory-text truncate flex-1", belowMin && "text-[var(--status-issue)]")}>
+          {row.typeName}
+        </span>
+        {belowMin && (
+          <span className="text-[10px] font-bold text-[var(--status-issue-fg)] bg-[var(--status-issue-bg)] border border-[var(--status-issue-border)] rounded px-1.5 py-0.5 shrink-0">
+            ⚠ {row.ready}/{row.minimumReady} {t.board?.ready ?? "מוכן"}
+          </span>
+        )}
+        <span className="text-[11px] tabular-nums text-ivory-text3 shrink-0">{row.ready}/{row.total}</span>
+      </div>
+      <div className="flex h-2 rounded-full overflow-hidden gap-px">
+        {segments.map(({ key, count }) => (
+          <div
+            key={key}
+            className={cn("transition-all duration-700", STATUS_BAR_COLOR[key])}
+            style={{ width: `${(count / total) * 100}%` }}
+          />
+        ))}
+        {/* Empty track */}
+        {total === 0 && <div className="flex-1 bg-muted" />}
+      </div>
+    </div>
+  );
+}
+
+// ── LocationCard ─────────────────────────────────────────────────────────────
+
+function LocationCard({ row }: { row: EquipmentCommandBoardSnapshot["byLocation"][number] }) {
+  const hasIssues = row.totalCritical > row.ready;
+  return (
+    <div
+      className={cn(
+        "rounded-xl border p-3 flex flex-col gap-1",
+        hasIssues
+          ? "bg-[var(--status-issue-bg)] border-[var(--status-issue-border)]"
+          : "bg-[rgb(var(--ivory-surface))] border-ivory-border",
+      )}
+    >
+      <div className="text-[12px] font-bold text-ivory-text truncate">{row.locationName}</div>
+      <div className="flex gap-2 flex-wrap">
+        <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded border", STATUS_BG.ready)}>
+          {row.ready} {t.board?.available ?? "זמין"}
+        </span>
+        {row.inUse > 0 && (
+          <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded border", STATUS_BG.in_use)}>
+            {row.inUse} {t.board?.deployed ?? "בשימוש"}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── UnitRow ───────────────────────────────────────────────────────────────────
+
+function UnitRow({ unit }: { unit: EquipmentBoardUnitRow }) {
+  const blocking = unit.blockingReasons[0] ?? unit.nextAction ?? null;
+  return (
+    <div
+      className="flex items-start gap-3 py-2.5 border-b border-ivory-border last:border-0"
+      data-testid={`board-unit-row-${unit.equipmentId}`}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-semibold text-ivory-text truncate">{unit.displayName}</span>
+          {unit.typeName && (
+            <span className="text-[10px] text-ivory-text3 truncate shrink-0">{unit.typeName}</span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+          {unit.locationName && (
+            <span className="text-[11px] text-ivory-text3">{unit.locationName}</span>
+          )}
+          {unit.custodianName && (
+            <span className="text-[11px] text-ivory-text2">{unit.custodianName}</span>
+          )}
+          {blocking && (
+            <span className="text-[11px] text-[var(--status-issue)]">{blocking}</span>
+          )}
+        </div>
+      </div>
+      <span
+        className={cn(
+          "shrink-0 text-[11px] font-bold px-2 py-0.5 rounded border",
+          STATUS_BG[unit.status],
+        )}
+      >
+        {statusLabel(unit.status)}
+      </span>
+    </div>
+  );
+}
+
+// ── CommandBoard ─────────────────────────────────────────────────────────────
+
+function CommandBoard({
+  board,
+  currentTime,
+  currentShift,
+}: {
+  board: EquipmentCommandBoardSnapshot;
+  currentTime: string;
+  currentShift: Array<{ employeeName: string; role: string }>;
+}) {
+  const now = new Date(currentTime);
   const timeStr = now.toLocaleTimeString("he-IL", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   });
 
-  const cart = snapshot.crashCartStatus;
-  const cartCheckedAgoMs = cart
-    ? now.getTime() - new Date(cart.lastCheckedAt).getTime()
-    : null;
-  const cartOk =
-    cart !== null && cartCheckedAgoMs !== null && cartCheckedAgoMs < 24 * 3_600_000;
-  const cartAgeLabel =
-    cartCheckedAgoMs !== null
-      ? cartCheckedAgoMs < 3_600_000
-        ? `${Math.max(1, Math.round(cartCheckedAgoMs / 60_000))} דק׳`
-        : `${Math.round(cartCheckedAgoMs / 3_600_000)} שע׳`
-      : null;
+  const pct = board.overview.totalCritical > 0
+    ? (board.overview.ready / board.overview.totalCritical) * 100
+    : 0;
 
-  const paneVisibility = getDisplayPaneVisibility(snapshot);
-  const notDeployableCount = snapshot.equipment.filter((e) => !e.isDeployable).length;
-  const checkedOutCount = snapshot.equipment.filter((e) => e.heldBy).length;
-
-  return (
-    <div className="flex items-center gap-4 px-4 py-2 bg-[#141922] border-b border-[#1e2740] text-sm flex-wrap">
-      <span className="font-mono text-xl font-bold text-white tabular-nums min-w-[52px]">
-        {timeStr}
-      </span>
-      <div className="w-px h-5 bg-[#2d3748] shrink-0" />
-
-      <div className="flex gap-2 flex-wrap">
-        {snapshot.currentShift.map((s) => (
-          <div
-            key={`${s.employeeName}-${s.role}`}
-            className="flex items-center gap-1.5 bg-[#1e2740] border border-[#2d3d5c] rounded-full px-3 py-0.5 text-[11px] text-blue-300"
-          >
-            <span>{s.employeeName}</span>
-            <span className="text-gray-500 text-[10px]">
-              {SHIFT_ROLE_LABELS[s.role] ?? s.role}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <div className="w-px h-5 bg-[#2d3748] shrink-0" />
-
-      {paneVisibility.showCrashCartPill &&
-        cart &&
-        (cartOk ? (
-          <span className="flex items-center gap-1 bg-green-900/30 border border-green-700/40 text-green-300 rounded px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap">
-            ✓ עגלה נבדקה · {cartAgeLabel}
-          </span>
-        ) : (
-          <span
-            data-testid="ward-display-crash-cart-warning"
-            className="flex items-center gap-1 bg-amber-900/20 border border-amber-700/40 text-yellow-300 rounded px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap"
-          >
-            ⚠ עגלה לא נבדקה היום
-          </span>
-        ))}
-
-      {snapshot.activeAlertCount > 0 && (
-        <span className="flex items-center gap-1 bg-amber-900/20 border border-amber-700/40 text-yellow-300 rounded px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap">
-          ⚠ {snapshot.activeAlertCount} התראות
-        </span>
-      )}
-
-      {checkedOutCount > 0 && (
-        <span className="flex items-center gap-1 bg-sky-900/25 border border-sky-700/40 text-sky-200 rounded px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap">
-          {checkedOutCount} יחידות בידי צוות
-        </span>
-      )}
-
-      {notDeployableCount > 0 && (
-        <span className="flex items-center gap-1 bg-amber-900/25 border border-amber-700/40 text-amber-200 rounded px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap">
-          {notDeployableCount} לא מוכנות לפריסה
-        </span>
-      )}
-
-      <span className="ms-auto flex items-center bg-white/5 border border-white/10 text-gray-400 rounded px-2.5 py-1 text-[11px] whitespace-nowrap">
-        {snapshot.equipment.length} יחידות
-      </span>
-    </div>
+  const needAttention = board.criticalUnits.filter(
+    (u) => u.status !== "ready" && u.status !== "in_use",
   );
-}
-
-// ── PatientCard ───────────────────────────────────────────────────────────────
-
-function PatientCard({ hosp }: { hosp: DisplaySnapshotHospitalization }) {
-  const { animal } = hosp;
-  const statusKey = hosp.status as HospitalizationStatus;
-  const meta = [animal.species, animal.breed, animal.weightKg ? `${animal.weightKg} ק״ג` : null]
-    .filter(Boolean)
-    .join(" · ");
-  const location = [hosp.ward, hosp.bay ? `מיטה ${hosp.bay}` : null].filter(Boolean).join(" · ");
 
   return (
-    <div className={`rounded-lg p-3 border ${STATUS_CARD[statusKey] ?? "bg-white/5 border-white/10"}`}>
-      <div className={`h-0.5 rounded mb-3 ${STATUS_BAR[statusKey] ?? "bg-gray-600"}`} />
-      <div className="flex flex-wrap gap-1 mb-2">
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_BADGE[statusKey] ?? "bg-gray-600 text-white"}`}>
-          {STATUS_LABELS_HE[statusKey] ?? hosp.status}
+    <div className="flex flex-col min-h-screen bg-[rgb(var(--ivory-bg))] text-ivory-text" dir="rtl">
+
+      {/* Header */}
+      <header className="bg-[var(--brand-navy)] flex items-center gap-4 px-5 py-3 shrink-0 flex-wrap">
+        <span className="font-mono text-xl font-black tabular-nums text-white min-w-[52px]">
+          {timeStr}
         </span>
-        {hosp.status === "critical" && (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-950 border border-red-600 text-red-300">
-            CPR Risk
-          </span>
-        )}
-      </div>
-      <div className="text-[15px] font-bold text-white mb-0.5">{animal.name}</div>
-      {meta && <div className="text-[11px] text-gray-500 mb-2">{meta}</div>}
-      {location && <div className="text-[11px] text-gray-400">{location}</div>}
-      {hosp.admittingVetName && (
-        <div className="text-[11px] text-gray-500 mt-0.5">{hosp.admittingVetName}</div>
-      )}
-      {(hosp.overdueTaskCount ?? 0) > 0 && hosp.overdueTaskLabel && (
-        <div className="overdue-alert mt-2 rounded px-2 py-1.5 text-[10px] font-semibold text-red-300 border border-red-600/60 bg-red-950/30 motion-safe:animate-pulse">
-          💊 {hosp.overdueTaskLabel}
+        <div className="w-px h-5 bg-white/20 shrink-0" />
+
+        <span className="text-[11px] font-bold tracking-widest uppercase text-[var(--brand-green-bright)] shrink-0">
+          {t.board?.ward ?? "המחלקה · ציוד קריטי"}
+        </span>
+
+        {/* Shift staff */}
+        <div className="flex flex-wrap gap-1.5 flex-1 justify-center">
+          {currentShift.map((s) => (
+            <div
+              key={`${s.employeeName}-${s.role}`}
+              className="flex items-center gap-1.5 bg-white/10 border border-white/20 rounded-full px-3 py-0.5 text-[11px] text-white/75"
+            >
+              {s.employeeName}
+            </div>
+          ))}
         </div>
-      )}
-    </div>
-  );
-}
 
-// ── PatientGrid ───────────────────────────────────────────────────────────────
+        {/* LIVE badge */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="w-2 h-2 rounded-full bg-[var(--status-ok)] motion-safe:animate-pulse" aria-hidden />
+          <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--status-ok)]">
+            {t.board?.live ?? "חי"}
+          </span>
+        </div>
+      </header>
 
-function PatientGrid({
-  hospitalizations,
-}: {
-  hospitalizations: DisplaySnapshotHospitalization[];
-}) {
-  const sorted = [...hospitalizations].sort((a, b) => {
-    const orderDiff =
-      (STATUS_ORDER[a.status as HospitalizationStatus] ?? 99) -
-      (STATUS_ORDER[b.status as HospitalizationStatus] ?? 99);
-    if (orderDiff !== 0) return orderDiff;
-    return new Date(a.admittedAt).getTime() - new Date(b.admittedAt).getTime();
-  });
+      {/* Body */}
+      <div className="flex-1 overflow-auto p-4 grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-4">
 
-  return (
-    <div className="p-4 flex-1" data-testid="ward-display-patient-grid">
-      <div className="text-[11px] font-bold tracking-widest uppercase text-gray-600 mb-3">
-        מטופלים מאושפזים
-      </div>
-      <div
-        className="grid gap-2.5"
-        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}
-      >
-        {sorted.map((h) => (
-          <PatientCard key={h.id} hosp={h} />
-        ))}
-      </div>
-    </div>
-  );
-}
+        {/* Left: ADRing + ReadinessMix */}
+        <div className="flex flex-col gap-4 items-center lg:w-64 shrink-0">
+          <ADRing pct={pct} ready={board.overview.ready} total={board.overview.totalCritical} />
+          <ReadinessMix overview={board.overview} />
 
-// ── EquipmentPane ─────────────────────────────────────────────────────────────
-
-function deployableHint(eq: DisplaySnapshotEquipment): string | null {
-  if (eq.isDeployable) return null;
-  if (eq.usageState !== "available") return "בשימוש / לא זמין";
-  if (eq.readinessState !== "ready") return "לא מוכן";
-  if (eq.custodyState !== "docked") {
-    if (eq.heldBy) return "בידי צוות";
-    return "לא במעגן";
-  }
-  return null;
-}
-
-function EquipmentPane({ equipment }: { equipment: DisplaySnapshotEquipment[] }) {
-  const sorted = [...equipment].sort((a, b) => {
-    const aHeld = Boolean(a.heldBy);
-    const bHeld = Boolean(b.heldBy);
-    if (aHeld !== bHeld) return aHeld ? -1 : 1;
-    if (a.isDeployable !== b.isDeployable) return a.isDeployable ? 1 : -1;
-    return a.name.localeCompare(b.name, "he");
-  });
-
-  return (
-    <div className="flex-1 p-4 overflow-auto" data-testid="ward-display-equipment-pane">
-      <div className="text-[11px] font-bold tracking-widest uppercase text-gray-600 mb-3">
-        ציוד · אחזקה ופריסה
-      </div>
-      <div
-        className="hidden sm:grid gap-2 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-gray-600 border-b border-[#1f2937] mb-1"
-        style={{ gridTemplateColumns: "minmax(140px,1.4fr) minmax(100px,1fr) minmax(90px,0.9fr) minmax(120px,1.1fr) minmax(88px,0.7fr)" }}
-      >
-        <span>יחידה</span>
-        <span>בידי</span>
-        <span>צ׳ק-אין אחרון</span>
-        <span>מיקום משוער</span>
-        <span>פריסה</span>
-      </div>
-      <div className="space-y-2">
-        {sorted.map((eq) => {
-          const hint = deployableHint(eq);
-          return (
-            <div
-              key={eq.id}
-              data-testid={`ward-display-equipment-row-${eq.id}`}
-              className="rounded-lg border border-[#1f2937] bg-[#121820] px-3 py-2.5 sm:grid sm:items-center sm:gap-2"
-              style={{ gridTemplateColumns: "minmax(140px,1.4fr) minmax(100px,1fr) minmax(90px,0.9fr) minmax(120px,1.1fr) minmax(88px,0.7fr)" }}
-            >
-              <div className="min-w-0">
-                <div className="text-[13px] font-semibold text-gray-200 truncate">{eq.name}</div>
-                <div className="sm:hidden text-[10px] text-gray-500 mt-0.5">
-                  {eq.probableLocation ?? "מיקום לא ידוע"}
-                </div>
+          {/* Alerts count */}
+          {board.alerts.length > 0 && (
+            <div className="w-full rounded-xl border border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] px-3 py-2.5">
+              <div className="text-[11px] font-bold text-[var(--status-issue-fg)]">
+                {board.alerts.length} {t.board?.attention ?? "דורשים טיפול"}
               </div>
-              <div className="text-[12px] text-gray-300 truncate mt-1 sm:mt-0">
-                <span className="sm:hidden text-gray-600 me-1">בידי:</span>
-                {eq.heldBy ?? "—"}
-              </div>
-              <div className="text-[11px] text-gray-400 mt-1 sm:mt-0 tabular-nums">
-                <span className="sm:hidden text-gray-600 me-1">צ׳ק-אין:</span>
-                {eq.lastCheckInAt ? formatRelativeTime(eq.lastCheckInAt) : "לא דווח"}
-              </div>
-              <div className="text-[12px] text-gray-400 truncate mt-1 sm:mt-0">
-                <span className="sm:hidden text-gray-600 me-1">מיקום:</span>
-                {eq.probableLocation ?? "—"}
-              </div>
-              <div className="mt-2 sm:mt-0 flex flex-col items-start gap-0.5">
-                <span
-                  className={`text-[11px] font-bold px-2 py-0.5 rounded ${
-                    eq.isDeployable
-                      ? "bg-green-900/35 text-green-300 border border-green-700/40"
-                      : "bg-amber-900/30 text-amber-200 border border-amber-700/40"
-                  }`}
-                >
-                  {eq.isDeployable ? "מוכן" : "לא מוכן"}
-                </span>
-                {hint ? <span className="text-[10px] text-gray-500">{hint}</span> : null}
+              <div className="text-[10px] text-ivory-text3 mt-0.5">
+                {board.alerts.filter((a) => a.severity === "critical").length} {t.board.critical}
               </div>
             </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+          )}
+        </div>
 
-// ── UpcomingTasksPane ─────────────────────────────────────────────────────────
+        {/* Right: by-type, by-location, critical units */}
+        <div className="flex flex-col gap-4 min-w-0">
 
-function UpcomingTasksPane({
-  tasks,
-  currentTime,
-}: {
-  tasks: DisplaySnapshotTask[];
-  currentTime: string;
-}) {
-  const now = new Date(currentTime);
-  const displayed = tasks.slice(0, 6);
-  const overflow = tasks.length - displayed.length;
+          {/* By Type */}
+          {board.byType.length > 0 && (
+            <section className="rounded-xl border border-ivory-border bg-[rgb(var(--ivory-surface))] p-4">
+              <h2 className="text-[10px] font-bold uppercase tracking-widest text-ivory-text3 mb-2">
+                {t.board.byType}
+              </h2>
+              <div className="divide-y divide-ivory-border">
+                {board.byType.map((row) => (
+                  <TypeRow key={row.typeId ?? row.typeName} row={row} />
+                ))}
+              </div>
+            </section>
+          )}
 
-  return (
-    <div className="p-4" data-testid="ward-display-upcoming-tasks">
-      <div className="text-[11px] font-bold tracking-widest uppercase text-gray-600 mb-3">
-        פרוצדורות קרובות · 2 שע׳
-      </div>
-      <div>
-        {displayed.map((task) => {
-          const taskTime = new Date(task.startTime);
-          const minutesUntil = Math.round((taskTime.getTime() - now.getTime()) / 60_000);
-          const soon = minutesUntil <= 30;
-          const timeLabel = taskTime.toLocaleTimeString("he-IL", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-          });
-          return (
-            <div
-              key={task.id}
-              className="flex items-center gap-2 py-1.5 border-b border-[#1a1f2b] last:border-0 text-[12px]"
-            >
-              <span
-                className={`min-w-[38px] tabular-nums ${
-                  soon ? "text-yellow-300 font-bold" : "text-gray-500"
-                }`}
-              >
-                {timeLabel}
-              </span>
-              <span className="flex-1 text-gray-300 truncate">
-                {task.notes ?? task.taskType ?? "משימה"}
-              </span>
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 bg-sky-900/20 text-sky-300">
-                {task.taskType ?? "פרוצדורה"}
-              </span>
+          {/* By Location */}
+          {board.byLocation.length > 0 && (
+            <section>
+              <h2 className="text-[10px] font-bold uppercase tracking-widest text-ivory-text3 mb-2">
+                {t.board?.whereTitle ?? "מיקום הציוד"}
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                {board.byLocation.map((row) => (
+                  <LocationCard key={row.locationId ?? row.locationName} row={row} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Critical Units — needs attention */}
+          {needAttention.length > 0 && (
+            <section className="rounded-xl border border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] p-4">
+              <h2 className="text-[10px] font-bold uppercase tracking-widest text-[var(--status-issue-fg)] mb-2">
+                {t.board?.attention ?? "דורשים טיפול"} · {needAttention.length}
+              </h2>
+              <div>
+                {needAttention.map((u) => (
+                  <UnitRow key={u.equipmentId} unit={u} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* No issues state */}
+          {needAttention.length === 0 && board.overview.ready >= board.overview.totalCritical && (
+            <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
+              <span className="text-4xl" aria-hidden>✓</span>
+              <p className="text-[14px] font-semibold text-[var(--status-ok)]">
+                {t.board.allCriticalReady}
+              </p>
             </div>
-          );
-        })}
-        {overflow > 0 && (
-          <div className="text-[11px] text-gray-600 py-1">+{overflow} נוספים</div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
@@ -626,31 +641,54 @@ export default function WardDisplayPage() {
 
   if (!snapshot) {
     return (
-      <div className="min-h-screen bg-[#0d1117] flex items-center justify-center">
-        <div className="text-gray-500 text-sm">טוען...</div>
+      <div className="min-h-screen bg-[rgb(var(--ivory-bg))] flex items-center justify-center dark">
+        <div className="text-ivory-text3 text-sm">{t.board.loading}</div>
       </div>
     );
   }
 
   if (snapshot.codeBlueSession) {
+    return <CodeBlueOverlay session={snapshot.codeBlueSession} />;
+  }
+
+  const board = snapshot.commandBoard;
+
+  if (!board) {
+    // commandBoard timed out or service error — show legacy equipment list
     return (
-      <CodeBlueOverlay session={snapshot.codeBlueSession} />
+      <div className="min-h-screen bg-[rgb(var(--ivory-bg))] text-ivory-text flex flex-col dark" dir="rtl">
+        <div className="flex items-center gap-3 px-5 py-3 bg-[var(--brand-navy)]">
+          <span className="text-sm font-bold text-white/70">{t.board.subtitle}</span>
+          <span className="text-[10px] text-amber-300 ms-auto">{t.board.fallbackBoardUnavailable}</span>
+        </div>
+        <div className="flex-1 p-4 space-y-2" data-testid="ward-display-equipment-pane">
+          {snapshot.equipment.map((eq) => (
+            <div
+              key={eq.id}
+              data-testid={`ward-display-equipment-row-${eq.id}`}
+              className="rounded-lg border border-ivory-border bg-[rgb(var(--ivory-surface))] px-3 py-2.5 flex items-center gap-3"
+            >
+              <span className="flex-1 text-[13px] font-semibold text-ivory-text">{eq.name}</span>
+              <span className={cn(
+                "text-[11px] font-bold px-2 py-0.5 rounded border",
+                eq.isDeployable ? STATUS_BG.ready : STATUS_BG.blocked,
+              )}>
+                {eq.isDeployable ? t.board.deployable : t.board.notDeployable}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
     );
   }
 
-  const paneVisibility = getDisplayPaneVisibility(snapshot);
-
   return (
-    <div className="min-h-screen bg-[#0d1117] text-gray-200 flex flex-col" dir="rtl">
-      <AwarenessBar snapshot={snapshot} />
-      <div className="flex flex-col flex-1 min-h-0">
-        <EquipmentPane equipment={snapshot.equipment} />
-        {paneVisibility.showUpcomingTasks && (
-          <div className="shrink-0 border-t border-[#1f2937] max-h-[28vh] overflow-auto">
-            <UpcomingTasksPane tasks={snapshot.upcomingTasks} currentTime={snapshot.currentTime} />
-          </div>
-        )}
-      </div>
+    <div className="dark">
+      <CommandBoard
+        board={board}
+        currentTime={snapshot.currentTime}
+        currentShift={snapshot.currentShift}
+      />
     </div>
   );
 }

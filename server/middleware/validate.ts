@@ -8,7 +8,6 @@ export function validateBody<T>(schema: ZodSchema<T>) {
       console.error("Validation failed", {
         path: req.originalUrl,
         method: req.method,
-        body: req.body,
         zodIssues: result.error.issues,
       });
       res.status(400).json({

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { text, timestamp, varchar, jsonb } from "drizzle-orm/pg-core";
+import { text, timestamp, varchar, jsonb, index } from "drizzle-orm/pg-core";
 import { vtTable } from "./helpers.js";
 
 export const clinics = vtTable("vt_clinics", {
@@ -24,4 +24,8 @@ export const users = vtTable("vt_users", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   deletedAt: timestamp("deleted_at"),
   deletedBy: text("deleted_by"),
-});
+}, (t) => ({
+  clinicIdx: index("idx_vt_users_clinic").on(t.clinicId),
+  clinicRoleIdx: index("idx_vt_users_clinic_role").on(t.clinicId, t.role),
+  clinicStatusIdx: index("idx_vt_users_clinic_status").on(t.clinicId, t.status),
+}));

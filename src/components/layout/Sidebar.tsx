@@ -8,7 +8,7 @@ interface SidebarProps {
   sidebarItems?: SidebarItem[];
 }
 
-// NAV is the source of truth — imported here so this module participates in the nav model.
+// Ensures NAV module is evaluated for side effects / participates in nav model (prevents tree-shaking).
 void NAV;
 
 export function Sidebar(_props: SidebarProps) {

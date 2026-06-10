@@ -1,0 +1,121 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+
+reviews:
+  profile: assertive
+  request_changes_workflow: true
+  high_level_summary: true
+  review_status: true
+
+  auto_review:
+    enabled: true
+
+  path_filters:
+    - "!**/.pnpm-store/**"
+    - "!**/node_modules/**"
+    - "!**/dist/**"
+    - "!**/.git/**"
+
+  path_instructions:
+    - path: "**/*"
+      instructions: |
+        VetTrack is a production veterinary hospital management platform (React 18 + Vite, Express + TypeScript, PostgreSQL + Drizzle, BullMQ + Redis, Clerk auth, PWA/offline-first). Treat every change as clinical- and deployment-critical.
+
+        Prioritize review focus (in order): security, correctness, maintainability, accessibility, performance, production safety.
+
+        Aggressively flag and request changes for:
+        - Dead code, unused imports/exports, and orphaned routes, workers, schema columns, or locale keys
+        - Duplicate business logic across frontend, server, and shared/
+        - Unsafe TypeScript: `any`, unsafe casts, non-null assertions without guards, ignored `@ts-expect-error`
+        - Missing error handling, loading states, and empty states in user-facing flows
+        - Missing accessibility labels, roles, focus management, and keyboard support
+        - React performance issues (unnecessary re-renders, missing memoization on hot paths, large inline objects in deps)
+        - Oversized components (>300 lines) and high cyclomatic complexity without decomposition
+        - Missing or inadequate test coverage for behavioral changes (vitest under tests/)
+        - Railway deployment risks: missing env validation, startup ordering regressions, migration failures, Redis/queue assumptions in production
+
+        Block or request changes (treat as merge blockers) for:
+        - Hardcoded secrets, API keys, tokens, or credentials in source
+        - Disabled or bypassed authentication or authorization (including commented-out guards)
+        - Raw SQL string concatenation with user input; prefer Drizzle parameterization
+        - Security bypasses, weakened rate limits, or XSS sanitizer bypass on JSON routes
+        - Cross-clinic data access: every tenant query must filter the target table by `clinicId`
+        - Trusting JWT/session role claims instead of `vt_users.role` from the database
+        - Offline queuing of Code Blue / emergency mutations
+        - Caching emergency or realtime endpoints in the service worker
+
+        Architecture invariants (see .cursorrules, CLAUDE.md, AGENTS.md):
+        - Schema lives in server/db.ts only; new workers register in server/app/start-schedulers.ts
+        - API client traffic goes through src/lib/api.ts; no raw fetch() in feature code
+        - i18n user-facing copy only in locales/en.json and locales/he.json (paired keys)
+        - Medication volume must stay strictly below 100 ml for liquids
+        - Billing ledger inserts require deterministic idempotency keys
+        - Realtime uses SSE + vt_event_outbox; do not introduce parallel polling transports
+
+    - path: "src/**/*.tsx"
+      instructions: |
+        Frontend React/TypeScript review for VetTrack bedside and admin UI.
+
+        Focus on:
+        - React rendering performance (stable deps, avoid derived state bugs, list keys, suspense boundaries where appropriate)
+        - Accessibility (ARIA labels, semantic HTML, contrast, RTL/hebrew layout via i18n, touch targets for tablet/glove use)
+        - Responsive design for ward tablets and desktop admin
+        - Loading, error, and empty states for every async data path
+        - State management correctness (React Query cache invalidation, offline sync via sync-engine.ts)
+        - Component size and complexity; prefer feature modules under src/features/
+        - Route registration in src/app/routes.tsx must match lazy imports under src/pages/
+        - No hardcoded user-facing strings; use `t` from @/lib/i18n
+        - No raw fetch() for backend APIs; use src/lib/api.ts helpers
+
+    - path: "src/**/*.ts"
+      instructions: |
+        Frontend TypeScript (non-TSX) review for VetTrack.
+
+        Focus on:
+        - Type safety and domain correctness in src/lib/, src/hooks/, src/types/
+        - Offline-first safety: pendingSync enqueue on network failures, no silent mutation drops
+        - Sync engine circuit breaker and retry semantics
+        - Dexie schema changes must align with offline-db.ts consumers
+        - Dead exports in api.ts and unused PendingSyncType values
+        - Bounded telemetry enums for realtime/Code Blue surfaces (no PII, no free-form labels)
+
+    - path: "server/**/*.ts"
+      instructions: |
+        Backend Express + Drizzle review for VetTrack.
+
+        Focus on:
+        - Authentication: requireAuth/requireRole on protected routes; dev-bypass only in non-production without Clerk key
+        - Authorization: role from vt_users; requireEffectiveRole for shift context where applicable
+        - Input validation and XSS-safe JSON handling (body sanitizer in server/index.ts)
+        - Database safety: clinicId on every tenant read/write; transactions for multi-step writes
+        - PostgreSQL performance: N+1 queries, missing indexes on hot filters, unbounded list endpoints
+        - Error handling with stable API error envelopes (apiError); no leaked stack traces to clients
+        - Logging: operational errors vs debug noise; never log secrets
+        - Auditability: logAudit for critical mutations; realtime outbox in same transaction when required
+        - Service layer: async functions with explicit clinicId param; domain errors not generic 500s
+        - Workers must be started from server/app/start-schedulers.ts
+        - Rate limiters on sensitive writes; integration secrets encrypted when DB_CONFIG_ENCRYPTION_KEY is set
+
+    - path: "shared/**/*.ts"
+      instructions: |
+        Shared domain types and constants for VetTrack (frontend + backend).
+
+        Focus on:
+        - Type safety and narrow unions; avoid `any` and loose stringly-typed enums
+        - Domain correctness for clinical, billing, and inventory contracts
+        - Duplicate logic that should live in one shared module vs server-only or client-only
+        - Reusability without pulling server or React dependencies into shared/
+        - Data contract stability: breaking changes must be coordinated across api.ts and server routes
+        - Keep shared modules free of environment-specific or clinic-specific defaults
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "**/.cursorrules"
+      - "**/CLAUDE.md"
+      - "**/AGENTS.md"
+      - "**/.cursor/rules/**"

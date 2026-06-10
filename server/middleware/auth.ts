@@ -416,6 +416,12 @@ export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
     })
     .returning();
 
+  // TODO(HIGH): ADMIN_EMAILS promotion runs on every authenticated request. A user whose
+  // role was explicitly demoted via the DB will be re-promoted on the next request if their
+  // email remains in ADMIN_EMAILS. To override, remove the email from ADMIN_EMAILS first,
+  // then demote in the DB — order matters. Consider moving this check to a startup-time
+  // seed/bootstrap pass rather than per-request promotion to remove the per-request DB write
+  // and the inability to override via the UI alone.
   if (ADMIN_EMAILS.length > 0 && ADMIN_EMAILS.includes(user.email.toLowerCase())) {
     if (user.role !== "admin") {
       [user] = await db

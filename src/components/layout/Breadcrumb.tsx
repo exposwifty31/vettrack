@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 import { useDirection } from "@/hooks/useDirection";
 import { cn } from "@/lib/utils";
+import { t } from "@/lib/i18n";
 
 export interface BreadcrumbItem {
   label: string;
@@ -20,7 +21,7 @@ export function Breadcrumb({ items, className }: BreadcrumbProps) {
 
   return (
     <nav
-      aria-label="breadcrumb"
+      aria-label={t.common.breadcrumb}
       className={cn("flex items-center gap-0.5 text-xs text-ivory-text3", className)}
     >
       {items.map((item, idx) => {

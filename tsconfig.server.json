@@ -9,6 +9,7 @@
     "noEmit": true,
     "strict": true,
     "skipLibCheck": true,
+    // TODO(arch): enable both flags and add knip to CI once the dead-code sweep (fix 13-15) is complete.
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "paths": {

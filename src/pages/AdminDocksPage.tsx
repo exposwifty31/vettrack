@@ -65,12 +65,16 @@ function AdminDocksContent() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
+              <label htmlFor="dock-name" className="sr-only">Dock name</label>
               <Input
+                id="dock-name"
                 placeholder="Dock name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
               />
+              <label htmlFor="dock-desc" className="sr-only">Description</label>
               <Input
+                id="dock-desc"
                 placeholder="Description (optional)"
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}

@@ -49,5 +49,11 @@
 	<true/>
 	<key>NFCReaderUsageDescription</key>
 	<string>VetTrack reads NFC tags to identify equipment at the dock and bedside.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>VetTrack uses the camera to capture photos for equipment records.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>VetTrack reads photos from your library to attach to equipment records.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>VetTrack saves captured equipment photos to your photo library.</string>
 </dict>
 </plist>

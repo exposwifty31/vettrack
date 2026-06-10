@@ -831,6 +831,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
           <Input
             className="w-full max-w-md min-w-0 bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-primary"
             placeholder={t.qrScanner.manualInputPlaceholder}
+            aria-label={t.qrScanner.manualInputPlaceholder}
             value={manualCode}
             onChange={(e) => setManualCode(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleManualSubmit()}

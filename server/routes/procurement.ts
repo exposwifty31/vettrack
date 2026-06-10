@@ -12,30 +12,9 @@ import {
   isInventoryConstraintError,
   toInventoryConstraintError,
 } from "../lib/db-constraint-errors.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 const router = Router();
-
-function resolveRequestId(
-  res: { getHeader: (n: string) => unknown; setHeader?: (n: string, v: string) => void },
-  incoming: unknown,
-): string {
-  const incomingStr = typeof incoming === "string" ? incoming.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incomingStr || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") res.setHeader("x-request-id", requestId);
-  return requestId;
-}
-
-function apiError(params: { code: string; reason: string; message: string; requestId: string }) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-  };
-}
 
 export const createPoSchema = z.object({
   supplierName: z.string().min(1).max(200),

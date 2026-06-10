@@ -14,48 +14,11 @@ import {
 import { runExpiryCheckWorker } from "../workers/expiryCheckWorker.js";
 import { runChargeAlertJobForReturn } from "../workers/chargeAlertWorker.js";
 import { apiError as i18nApiError } from "../lib/apiError.js";
+import { resolveRequestId, apiError, requireNotProduction } from "../lib/route-utils.js";
 
 const router = Router();
 
-function resolveRequestId(
-  res: { getHeader: (name: string) => unknown; setHeader?: (name: string, value: string) => void },
-  incomingHeader: unknown,
-): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") {
-    res.setHeader("x-request-id", requestId);
-  }
-  return requestId;
-}
-
-// Phase 5-style local envelope helper, retained for the remaining 4xx/5xx
-// branches in this file. Phase 6 PR 6.10 (and subsequent migration PRs)
-// will continue swapping individual sites over to `i18nApiError`.
-function apiError(params: { code: string; reason: string; message: string; requestId: string }) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-  };
-}
-
-function requireNotProduction(req: Request, res: Response, next: NextFunction) {
-  if (process.env.NODE_ENV === "production") {
-    // Phase 6 PR 6.3 light adoption (1 of 2): swap the local envelope for
-    // the i18n-aware helper. This branch is a deny gate with no
-    // production client consumer that depends on the legacy envelope
-    // shape; the i18n migration is safe.
-    return i18nApiError(req, res, "errors.test.notAvailableInProduction", undefined, 403);
-  }
-  next();
-}
-
-router.use(requireNotProduction);
+router.use(requireNotProduction("errors.test.notAvailableInProduction"));
 
 function requireTestMode(req: Request, res: Response, next: NextFunction) {
   if (!isTestMode()) {

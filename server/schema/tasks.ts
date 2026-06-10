@@ -1,4 +1,5 @@
-import { text, timestamp, boolean, varchar, jsonb } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { text, timestamp, boolean, varchar, jsonb, index } from "drizzle-orm/pg-core";
 import { vtTable } from "./helpers.js";
 import { clinics, users } from "./core.js";
 
@@ -49,4 +50,13 @@ export const appointments = vtTable("vt_appointments", {
   externalId: text("external_id"),
   externalSource: text("external_source"),
   externalSyncedAt: timestamp("external_synced_at"),
-});
+}, (t) => ({
+  clinicStatusIdx: index("idx_vt_appointments_clinic_status").on(t.clinicId, t.status),
+  clinicStartTimeIdx: index("idx_vt_appointments_clinic_start_time").on(t.clinicId, t.startTime),
+  clinicVetStartTimeIdx: index("idx_vt_appointments_clinic_vet_start_time").on(t.clinicId, t.vetId, t.startTime),
+  acknowledgedUserIdx: index("idx_vt_appointments_acknowledged_user")
+    .on(t.clinicId, t.acknowledgedUserId)
+    .where(sql`${t.acknowledgedUserId} IS NOT NULL`),
+  clinicExternalIdx: index("idx_vt_appointments_clinic_external").on(t.clinicId, t.externalSource, t.externalId)
+    .where(sql`${t.externalId} IS NOT NULL`),
+}));

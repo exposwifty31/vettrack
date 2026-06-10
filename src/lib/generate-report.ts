@@ -1,4 +1,3 @@
-import { jsPDF } from "jspdf";
 import { format } from "date-fns";
 import type { Equipment } from "@/types";
 import {
@@ -8,7 +7,14 @@ import {
   computeOperationalPercent,
 } from "./dashboard-utils";
 
-export function generateMonthlyReport(equipment: Equipment[]): void {
+export async function generateMonthlyReport(equipment: Equipment[]): Promise<void> {
+  let jsPDF: typeof import("jspdf")["jsPDF"];
+  try {
+    ({ jsPDF } = await import("jspdf"));
+  } catch (importErr) {
+    console.error("Failed to load jsPDF module", importErr);
+    throw new Error("Could not load PDF generator. Please refresh and try again.");
+  }
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
   const pageW = 210;

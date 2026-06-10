@@ -8,6 +8,7 @@ import { analyticsCache } from "../lib/analytics-cache.js";
 import { computeUsageTrends } from "../lib/analytics-engine.js";
 import { INACTIVE_THRESHOLD_DAYS } from "../../shared/constants.js";
 import { getOutcomeKpiRoiDashboard } from "../services/outcome-kpi-roi.service.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 /*
  * PERMISSIONS MATRIX — /api/analytics
@@ -22,29 +23,7 @@ import { getOutcomeKpiRoiDashboard } from "../services/outcome-kpi-roi.service.j
 
 const router = Router();
 
-function resolveRequestId(
-  res: { getHeader: (name: string) => unknown; setHeader?: (name: string, value: string) => void },
-  incomingHeader: unknown,
-): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") {
-    res.setHeader("x-request-id", requestId);
-  }
-  return requestId;
-}
 
-function apiError(params: { code: string; reason: string; message: string; requestId: string }) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-  };
-}
 
 router.get("/", requireAuth, requireAdmin, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -249,7 +228,16 @@ router.get("/shift-completion", requireAuth, requireAdmin, async (req, res) => {
         apiError({ code: "INVALID_PARAMS", reason: "INVALID_DATE_RANGE", message: "Invalid from/to dates", requestId }),
       );
     }
-    const rows = await pool.query(
+    type ShiftCompletionRow = {
+      userId: string;
+      name: string;
+      email: string;
+      totalScans: number;
+      shiftCount: number;
+      avgScansPerShift: number;
+      zeroCaptureShifts: number;
+    };
+    const rows = await pool.query<ShiftCompletionRow>(
       `WITH user_scans AS (
          SELECT sl.user_id, COUNT(*)::int AS total_scans
          FROM vt_scan_logs sl

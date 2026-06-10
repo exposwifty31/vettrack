@@ -2,22 +2,10 @@ import { Router, type Response } from "express";
 import { randomUUID } from "crypto";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
 import { evaluateOutboxHealthForClinic } from "../lib/outbox-health.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 const router = Router();
 
-function resolveRequestId(
-  res: { getHeader: (name: string) => unknown; setHeader?: (name: string, value: string) => void },
-  incomingHeader: unknown,
-): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") {
-    res.setHeader("x-request-id", requestId);
-  }
-  return requestId;
-}
 
 /**
  * GET /api/admin/outbox-health

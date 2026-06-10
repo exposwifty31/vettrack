@@ -1,7 +1,6 @@
 import { Router, type Response } from "express";
 import { z } from "zod";
 import { and, eq, isNull, or } from "drizzle-orm";
-import { randomUUID } from "crypto";
 import { db, shifts, users } from "../db.js";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { idempotencyMiddleware } from "../middleware/idempotency.js";
@@ -18,35 +17,8 @@ import {
   listAppointmentsByRange,
   updateAppointment,
 } from "../services/appointments.service.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 const router = Router();
-
-function resolveRequestId(res: Response, incomingHeader: unknown): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") {
-    res.setHeader("x-request-id", requestId);
-  }
-  return requestId;
-}
-
-function apiError(params: {
-  code: string;
-  reason: string;
-  message: string;
-  requestId: string;
-  details?: unknown;
-}) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-    ...(params.details !== undefined ? { details: params.details } : {}),
-  };
-}
 
 const statusSchema = z.enum([
   "pending",

@@ -6,6 +6,7 @@ import { eq, and, isNull, isNotNull, sql, desc, gt } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 /*
  * PERMISSIONS MATRIX — /api/rooms
@@ -19,37 +20,6 @@ import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
  */
 
 const router = Router();
-
-function resolveRequestId(
-  res: { getHeader: (name: string) => unknown; setHeader?: (name: string, value: string) => void },
-  incomingHeader: unknown,
-): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") {
-    res.setHeader("x-request-id", requestId);
-  }
-  return requestId;
-}
-
-function apiError(params: {
-  code: string;
-  reason: string;
-  message: string;
-  requestId: string;
-  details?: unknown;
-}) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-    ...(params.details !== undefined ? { details: params.details } : {}),
-  };
-}
 
 const createRoomSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),

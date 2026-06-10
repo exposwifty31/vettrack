@@ -4,6 +4,7 @@ import { db, scanLogs, transferLogs, equipment, users } from "../db.js";
 import { and, desc, eq, count, lt } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 import { sql } from "drizzle-orm";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 /*
  * PERMISSIONS MATRIX — /api/activity
@@ -17,29 +18,7 @@ import { sql } from "drizzle-orm";
 
 const router = Router();
 
-function resolveRequestId(
-  res: { getHeader: (name: string) => unknown; setHeader?: (name: string, value: string) => void },
-  incomingHeader: unknown,
-): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") {
-    res.setHeader("x-request-id", requestId);
-  }
-  return requestId;
-}
 
-function apiError(params: { code: string; reason: string; message: string; requestId: string }) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-  };
-}
 
 const PAGE_SIZE = 30;
 

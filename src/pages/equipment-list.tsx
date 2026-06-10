@@ -5,7 +5,6 @@ import { Link, useLocation, useSearch } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
 import { AppShell } from "@/components/layout/AppShell";
-import type { SidebarItem } from "@/components/layout/IconSidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -123,10 +122,6 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 const PAGE_SIZE = 9;
 
 
-const EQUIPMENT_SIDEBAR: SidebarItem[] = [
-  { href: "/equipment", icon: Package, label: "Equipment" },
-];
-
 export default function EquipmentListPage() {
   const { settings } = useSettings();
   const queryClient = useQueryClient();
@@ -148,6 +143,7 @@ export default function EquipmentListPage() {
   const [page, setPage] = useState(1);
   const [recoveryAttentionFilterActive, setRecoveryAttentionFilterActive] = useState(false);
   const [roomSweepOpen, setRoomSweepOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const params = useMemo(() => new URLSearchParams(searchStr), [searchStr]);
   const openScanFromUrl = params.get("scan") === "1";
@@ -463,10 +459,29 @@ export default function EquipmentListPage() {
                 size="sm"
                 variant="outline"
                 className="hidden md:inline-flex h-11 text-xs"
-                onClick={() => exportEquipmentToExcel(filtered, `equipment-2026-04-10.xlsx`)}
+                disabled={isExporting}
+                onClick={async () => {
+                  if (isExporting) return;
+                  setIsExporting(true);
+                  try {
+                    await exportEquipmentToExcel(
+                      filtered,
+                      `equipment-${new Date().toISOString().slice(0, 10)}.xlsx`,
+                    );
+                  } catch (err) {
+                    console.error("exportEquipmentToExcel failed", err);
+                    toast.error(t.equipmentList.toast.exportError);
+                  } finally {
+                    setIsExporting(false);
+                  }
+                }}
                 data-testid="btn-export-excel"
               >
-                <Download className="w-4 h-4 mr-1" />
+                {isExporting ? (
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4 mr-1" />
+                )}
                 Export Excel
               </Button>
             )}
@@ -936,7 +951,7 @@ export default function EquipmentListPage() {
     </>
   );
 
-  return <AppShell sidebarItems={EQUIPMENT_SIDEBAR}>{pageBody}</AppShell>;
+  return <AppShell>{pageBody}</AppShell>;
 }
 
 function EquipmentItem({

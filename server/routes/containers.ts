@@ -1,3 +1,5 @@
+// TODO(arch): file exceeds 1100 lines. Split into handler modules following
+// the equipment-route-utils.ts / handlers/ pattern already started in this directory.
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
@@ -55,6 +57,7 @@ import {
   isInventoryConstraintError,
   toInventoryConstraintError,
 } from "../lib/db-constraint-errors.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 const router = Router();
 
@@ -75,25 +78,6 @@ const blindAuditSchema = z.object({
   physicalCount: z.number().int().min(0),
   note: z.string().max(500).optional(),
 });
-
-function resolveRequestId(res: { getHeader: (n: string) => unknown; setHeader?: (n: string, v: string) => void }, incoming: unknown): string {
-  const incomingStr = typeof incoming === "string" ? incoming.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incomingStr || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") res.setHeader("x-request-id", requestId);
-  return requestId;
-}
-
-function apiError(params: { code: string; reason: string; message: string; requestId: string }) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-  };
-}
 
 // Phase 5 PR 5.7 post-merge fix (Cursor Bugbot Low) — the local
 // `ClinicalInvariantDenyError` class and `isClinicalInvariantFailOpenActive`

@@ -1,6 +1,7 @@
 import { t } from "@/lib/i18n";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
 import { leaderPoll } from "@/lib/leader";
@@ -53,6 +54,7 @@ function formatUptime(seconds: number): string {
 export default function ManagementDashboardPage() {
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const { userId, isAdmin } = useAuth();
 
   const { data: equipment, isLoading, isError, dataUpdatedAt, refetch } = useQuery({
@@ -105,9 +107,18 @@ export default function ManagementDashboardPage() {
     });
   }
 
-  function handleGenerateReport() {
-    if (!equipment) return;
-    generateMonthlyReport(equipment);
+  async function handleGenerateReport() {
+    if (!equipment || isGeneratingReport) return;
+    setIsGeneratingReport(true);
+    try {
+      await generateMonthlyReport(equipment);
+      toast.success(t.managementDashboardPage.reportSuccess);
+    } catch (err) {
+      console.error("generateMonthlyReport failed", err);
+      toast.error(t.managementDashboardPage.reportError);
+    } finally {
+      setIsGeneratingReport(false);
+    }
   }
 
   return (
@@ -142,12 +153,12 @@ export default function ManagementDashboardPage() {
             <Button
               size="sm"
               className="gap-1.5 text-xs"
-              onClick={handleGenerateReport}
-              disabled={!equipment || equipment.length === 0}
+              onClick={() => void handleGenerateReport()}
+              disabled={!equipment || equipment.length === 0 || isGeneratingReport}
               data-testid="btn-generate-report"
             >
-              <FileDown className="w-3.5 h-3.5" />
-              Report
+              <FileDown className={cn("w-3.5 h-3.5", isGeneratingReport && "animate-pulse")} />
+              {isGeneratingReport ? t.managementDashboardPage.reportGenerating : "Report"}
             </Button>
           </div>
         </div>

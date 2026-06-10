@@ -25,9 +25,19 @@ describe("Ward Display — route", () => {
     expect(routeSource).toContain("totalOverdueCount");
   });
 
-  it("equipment sorted: held units first, then non-deployable", () => {
-    expect(pageSource).toContain("heldBy");
-    expect(pageSource).toContain("isDeployable");
+  it("command board uses criticalUnits for primary display", () => {
+    expect(pageSource).toContain("commandBoard");
+    expect(pageSource).toContain("criticalUnits");
+    expect(pageSource).toContain("isDeployable"); // legacy fallback when commandBoard absent
+  });
+
+  it("command board conditionally renders criticalUnits vs isDeployable", () => {
+    // CommandBoard component uses criticalUnits internally
+    expect(pageSource).toContain("criticalUnits");
+    // WardDisplayPage derives board from snapshot.commandBoard and passes it to CommandBoard
+    expect(pageSource).toMatch(/snapshot\.commandBoard/);
+    // When commandBoard is absent, the legacy fallback uses isDeployable
+    expect(pageSource).toMatch(/isDeployable[\s\S]{0,50}STATUS_BG/);
   });
 
   it("snapshot includes equipment custody fields", () => {

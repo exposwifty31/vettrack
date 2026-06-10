@@ -1,3 +1,5 @@
+// TODO(arch): file exceeds 1100 lines. Split into handler modules following
+// the equipment-route-utils.ts / handlers/ pattern already started in this directory.
 import { Router } from "express";
 import type { NextFunction, Request, Response } from "express";
 import { randomUUID } from "crypto";
@@ -27,23 +29,8 @@ import { invalidateActiveCodeBlueCache } from "../lib/code-blue-keepalive.js";
 import { evaluateCodeBlueManagerForRoute } from "../lib/authority/code-blue-manager.wiring.js";
 import { codeBlueManagerMetrics } from "../lib/authority/enforcement/code-blue-manager.metrics.js";
 import { detectMidsessionManagerDrift } from "../lib/authority/code-blue-manager-midsession.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 const router = Router();
-
-function resolveRequestId(
-  res: { getHeader: (n: string) => unknown; setHeader?: (n: string, v: string) => void },
-  incomingHeader: unknown,
-): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") res.setHeader("x-request-id", requestId);
-  return requestId;
-}
-
-function apiError(p: { code: string; reason: string; message: string; requestId: string }) {
-  return { code: p.code, error: p.code, reason: p.reason, message: p.message, requestId: p.requestId };
-}
 
 export const startSchema = z.object({
   localStartedAt: z.string().datetime().optional(),
@@ -1072,7 +1059,7 @@ router.get("/reconciliation", requireAuth, requireAdmin, async (req, res) => {
  * GET /api/code-blue/sessions/:id/dispenses
  * Returns inventory dispenses during a Code Blue session with billing status. Admin only.
  */
-router.get("/sessions/:id/dispenses", requireAuth, requireAdmin, async (req, res) => {
+router.get("/sessions/:id/dispenses", requireAuth, requireAdmin, validateUuid("id"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
@@ -1121,7 +1108,7 @@ export const reconcileSchema = z.object({
   forceReason: z.string().min(1).max(500).optional(),
 }).strict();
 
-router.patch("/sessions/:id/reconcile", requireAuth, requireAdmin, validateBody(reconcileSchema), async (req, res) => {
+router.patch("/sessions/:id/reconcile", requireAuth, requireAdmin, validateUuid("id"), validateBody(reconcileSchema), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;

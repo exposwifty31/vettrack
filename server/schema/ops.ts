@@ -18,7 +18,12 @@ export const shiftSessions = vtTable("vt_shift_sessions", {
     .notNull()
     .references(() => users.id, { onDelete: "restrict" }),
   note: text("note"),
-});
+}, (t) => ({
+  clinicOpenIdx: index("idx_vt_shift_sessions_clinic_open")
+    .on(t.clinicId, t.startedAt)
+    .where(sql`${t.endedAt} IS NULL`),
+  clinicStartedIdx: index("idx_vt_shift_sessions_clinic_started").on(t.clinicId, t.startedAt),
+}));
 
 export const shifts = vtTable("vt_shifts", {
   id: text("id").primaryKey(),
@@ -28,7 +33,9 @@ export const shifts = vtTable("vt_shifts", {
   endTime: time("end_time").notNull(),
   employeeName: text("employee_name").notNull(),
   role: shiftRole("role").notNull(),
-});
+}, (t) => ({
+  clinicDateIdx: index("idx_vt_shifts_clinic_date").on(t.clinicId, t.date),
+}));
 
 export const shiftImports = vtTable("vt_shift_imports", {
   id: text("id").primaryKey(),
@@ -88,7 +95,10 @@ export const pushSubscriptions = vtTable("vt_push_subscriptions", {
   seniorTeamOverdueAlertsEnabled: boolean("senior_team_overdue_alerts_enabled").notNull().default(true),
   adminHourlySummaryEnabled: boolean("admin_hourly_summary_enabled").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => ({
+  clinicIdx: index("idx_vt_push_subscriptions_clinic").on(t.clinicId),
+  clinicUserIdx: index("idx_vt_push_subscriptions_clinic_user").on(t.clinicId, t.userId),
+}));
 
 export const scheduledNotifications = vtTable("vt_scheduled_notifications", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -99,7 +109,13 @@ export const scheduledNotifications = vtTable("vt_scheduled_notifications", {
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
   sentAt: timestamp("sent_at", { withTimezone: true }),
   payload: jsonb("payload"),
-});
+}, (t) => ({
+  clinicTypeUserEquipIdx: index("idx_vt_scheduled_notifications_lookup")
+    .on(t.clinicId, t.type, t.userId, t.equipmentId),
+  pendingSweepIdx: index("idx_vt_scheduled_notifications_pending")
+    .on(t.clinicId, t.type, t.scheduledAt)
+    .where(sql`${t.sentAt} IS NULL`),
+}));
 
 export const supportTickets = vtTable("vt_support_tickets", {
   id: text("id").primaryKey(),
@@ -141,7 +157,10 @@ export const auditLogs = vtTable("vt_audit_logs", {
   targetType: varchar("target_type", { length: 50 }),
   metadata: jsonb("metadata"),
   timestamp: timestamp("timestamp").defaultNow().notNull(),
-});
+}, (t) => ({
+  clinicTimestampIdx: index("idx_vt_audit_logs_clinic_timestamp").on(t.clinicId, t.timestamp),
+  clinicActionTypeIdx: index("idx_vt_audit_logs_clinic_action_type").on(t.clinicId, t.actionType, t.timestamp),
+}));
 
 export const eventOutbox = vtTable(
   "vt_event_outbox",

@@ -218,6 +218,10 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
                 <img
                   src={eq.imageUrl}
                   alt={eq.name}
+                  width={40}
+                  height={40}
+                  loading="lazy"
+                  decoding="async"
                   className="w-10 h-10 rounded-lg object-cover shrink-0"
                 />
               ) : (

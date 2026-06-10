@@ -5,6 +5,7 @@ import { requireAdmin, requireAuth } from "../middleware/auth.js";
 import { deadLetterConditionForClinic } from "../lib/outbox-health.js";
 import { db, eventOutbox } from "../db.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 const router = Router();
 
@@ -37,19 +38,6 @@ function parseDlqListCursor(raw: unknown): { ok: true; cursor?: number } | { ok:
   return { ok: true, cursor: n };
 }
 
-function resolveRequestId(
-  res: { getHeader: (name: string) => unknown; setHeader?: (name: string, value: string) => void },
-  incomingHeader: unknown,
-): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") {
-    res.setHeader("x-request-id", requestId);
-  }
-  return requestId;
-}
 
 function parsePositiveIntIds(body: unknown): { ok: false; error: string } | { ok: true; ids: number[] } {
   if (body === null || typeof body !== "object" || Array.isArray(body)) {

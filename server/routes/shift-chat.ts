@@ -13,20 +13,9 @@ import { enqueueNotificationJob, enqueuePushNotification } from "../lib/queue.js
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
 import { touchPresence, getPresence } from "../lib/shift-chat-presence.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
+import { resolveRequestId } from "../lib/route-utils.js";
 
 const router = Router();
-
-function resolveRequestId(
-  res: { getHeader: (n: string) => unknown; setHeader?: (n: string, v: string) => void },
-  incoming: unknown,
-): string {
-  const incomingStr = typeof incoming === "string" ? incoming.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incomingStr || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") res.setHeader("x-request-id", requestId);
-  return requestId;
-}
 
 function apiError(params: { code: string; reason?: string; message: string; requestId?: string }) {
   const requestId = params.requestId ?? randomUUID();

@@ -23,7 +23,9 @@
     "sterilization": "חיטוי",
     "closeNavigationMenu": "סגור תפריט ניווט",
     "openNavigationMenu": "פתח תפריט ניווט",
+    "breadcrumb": "פירורי לחם",
     "quickSettings": "הגדרות מהירות",
+    "skipToMainContent": "דלג לתוכן הראשי",
     "toast": {
       "savedSuccess": "נשמר",
       "unexpectedError": "משהו השתבש."
@@ -109,8 +111,10 @@
       "deleteError": "המחיקה נכשלה",
       "moveSuccess": "הועבר בהצלחה",
       "moveError": "ההעברה נכשלה",
+      "exportError": "הייצוא נכשל. נא לנסות שוב.",
       "checkoutError": "ההוצאה לשימוש נכשלה",
-      "returnError": "ההחזרה נכשלה"
+      "returnError": "ההחזרה נכשלה",
+      "exportError": "הייצוא נכשל"
     },
     "linkedInUse": "בשימוש אצל: {name}",
     "recoveryBadgeStale": "דורש אימות",
@@ -1367,6 +1371,9 @@
   "managementDashboardPage": {
     "title": "לוח בקרה",
     "refresh": "רענן",
+    "reportGenerating": "מייצר דוח...",
+    "reportSuccess": "הדוח הורד",
+    "reportError": "לא ניתן לייצר דוח. נא לנסות שוב.",
     "loadEquipmentFailed": "טעינת נתוני הציוד נכשלה. נא לנסות שוב.",
     "available": "זמין",
     "inUse": "בשימוש",
@@ -1627,6 +1634,7 @@
     "bottomRooms": "רדאר חדרים",
     "bottomRecap": "סיכום",
     "bottomMenu": "תפריט",
+    "skipToMainContent": "דלג לתוכן הראשי",
     "radar": "רדאר",
     "shiftHandover": "סיום משמרת",
     "inventory": "מלאי ומתכלים",
@@ -3174,5 +3182,44 @@
     "verifying": "מאמת...",
     "verify": "אמת",
     "changePhone": "שנה מספר טלפון"
+  },
+  "board": {
+    "deployableNow": "זמין לפריסה כעת",
+    "of": "מתוך",
+    "criticalUnits": "יחידות קריטיות",
+    "readinessMix": "תמהיל מוכנות",
+    "available": "זמין",
+    "deployed": "בשימוש",
+    "down": "לא זמין",
+    "unconfirmed": "מאתר",
+    "whereTitle": "מיקום הציוד",
+    "ready": "מוכן",
+    "noUnitsHere": "אין יחידות כאן",
+    "attention": "דורשים טיפול",
+    "live": "חי",
+    "updated": "עודכן",
+    "ward": "המחלקה · ציוד קריטי",
+    "subtitle": "מרכז פיקוד ציוד",
+    "codeBlue": "קוד כחול",
+    "emergency": "אירוע חירום פעיל",
+    "elapsed": "זמן שחלף",
+    "linked": "ציוד מגויס",
+    "lead": "אחראי",
+    "location": "מיקום",
+    "stale": "מאחר",
+    "overdue": "באיחור",
+    "byType": "לפי סוג",
+    "critical": "קריטי",
+    "allCriticalReady": "כל הציוד הקריטי זמין",
+    "loading": "טוען...",
+    "fallbackBoardUnavailable": "נתוני לוח מפקד אינם זמינים",
+    "deployable": "מוכן",
+    "notDeployable": "לא מוכן"
+  },
+  "whatsNew": {
+    "title": "מה חדש — VetTrack",
+    "heading": "מה חדש",
+    "description": "התכונות והשיפורים האחרונים ב-VetTrack.",
+    "configureAlerts": "הגדר התראות בהגדרות"
   }
 }

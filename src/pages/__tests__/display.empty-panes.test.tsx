@@ -79,14 +79,17 @@ describe("F1: Ward Display empty panes", () => {
     vi.unstubAllGlobals();
   });
 
-  it("F1: renders EquipmentPane without crash-cart pill, patient grid, or upcoming tasks", () => {
+  it("F1: renders equipment fallback when commandBoard absent; no crash-cart, patient grid, or upcoming tasks", () => {
     render(<WardDisplayPage />);
 
+    // commandBoard is absent in this snapshot → legacy fallback renders equipment list
     expect(screen.getByTestId("ward-display-equipment-pane")).toBeTruthy();
     expect(screen.getByText("Infusion pump")).toBeTruthy();
     expect(screen.getByTestId("ward-display-equipment-row-eq-1")).toBeTruthy();
-    expect(screen.getByText("מוכן")).toBeTruthy();
+    // t.board.deployable resolves to "Ready" in the happy-dom test env (navigator.language = en-US)
+    expect(screen.getByText("Ready")).toBeTruthy();
 
+    // Patients and crash-cart are removed from the display
     expect(screen.queryByTestId("ward-display-crash-cart-warning")).toBeNull();
     expect(screen.queryByTestId("ward-display-patient-grid")).toBeNull();
     expect(screen.queryByTestId("ward-display-upcoming-tasks")).toBeNull();

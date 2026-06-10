@@ -8,6 +8,9 @@ import { computeAlerts } from "@/lib/utils";
 import {
   Home,
   Package,
+  Grid,
+  Bell,
+  MapPin,
   BarChart3,
   AlertTriangle,
   Siren,
@@ -82,6 +85,7 @@ import { CANONICAL_HREFS } from "@/lib/routes/canonical-hrefs";
 import { matchesRouteFamily } from "@/lib/routes/matches-route-family";
 import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
 import { ROUTE_ALIAS_GROUPS } from "@/lib/routes/route-alias-groups";
+import type { NavNode } from "@/lib/routes/nav-model";
 interface NavItem {
   href: string;
   label: string;
@@ -106,9 +110,20 @@ interface LayoutProps {
    * controls must sit under a DOM ancestor with `data-restock-allow` (see effect below).
    */
   navigationLocked?: boolean;
+  /** NAV-model items for the mobile bottom bar. Passed from AppShell. */
+  bottomNavItems?: NavNode[];
 }
 
-export function Layout({ children, title: _title, onScan, scannerOpen: scannerOpenFromParent, onCloseScan, navigationLocked }: LayoutProps) {
+const BOTTOM_NAV_ICON_MAP: Record<string, React.ElementType> = {
+  Home, Package, Grid, Bell, MapPin, Settings,
+};
+
+function navLabel(key: string): string {
+  const k = key.startsWith("nav.") ? key.slice(4) : key;
+  return (t.nav as Record<string, string>)[k] ?? key;
+}
+
+export function Layout({ children, title: _title, onScan, scannerOpen: scannerOpenFromParent, onCloseScan, navigationLocked, bottomNavItems }: LayoutProps) {
   const lh = t.layoutHebrew;
   const QUICK_SETTINGS_PANEL_WIDTH = 288;
   const QUICK_SETTINGS_MARGIN = 8;
@@ -548,23 +563,32 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     [visibleItems],
   );
 
+  const activeTabIndex = useMemo(() => {
+    if (!bottomNavItems) return -1;
+    return bottomNavItems.findIndex((n) => resolveNavItemActive(location, n.href));
+  }, [bottomNavItems, location]);
+
+  const useLegacyBottomNav = !bottomNavItems?.length;
+
   const bottomNavActive = useMemo(
     () => ({
       home: location === "/home" || location === "/" || location === "",
       equipment: matchesRouteFamily(location, ["/equipment"]),
       recap: location.startsWith("/recap"),
-      locations: matchesRouteFamily(location, ROUTE_ALIAS_GROUPS.locations),
     }),
     [location],
   );
 
-  const activeTabIndex = useMemo(() => {
+  const legacyActiveTabIndex = useMemo(() => {
     if (menuOpen) return 4;
     if (bottomNavActive.recap) return 3;
     if (bottomNavActive.equipment) return 1;
     if (bottomNavActive.home) return 0;
     return -1;
-  }, [bottomNavActive, location, menuOpen]);
+  }, [bottomNavActive, menuOpen]);
+
+  const bottomNavPillIndex = useLegacyBottomNav ? legacyActiveTabIndex : activeTabIndex;
+  const bottomNavColCount = useLegacyBottomNav ? 5 : (bottomNavItems?.length ?? 5);
 
   const hasPending = pendingCount > 0;
   const hasFailed = failedCount > 0;
@@ -597,6 +621,12 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
 
   return (
     <div className="min-h-[100dvh] min-w-0 bg-ivory-bg">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[200] focus:top-2 focus:start-2 focus:px-4 focus:py-2 focus:rounded-lg focus:bg-primary focus:text-primary-foreground focus:text-sm focus:font-medium"
+      >
+        {lh.skipToMainContent}
+      </a>
       <header
         className={cn(
           "sticky top-safe border-b bg-ivory-navy backdrop-blur supports-[backdrop-filter]:bg-ivory-navy/95 z-40",
@@ -1150,6 +1180,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
       )}
 
       <main
+        id="main-content"
         className={cn(
           "max-w-2xl mx-auto min-w-0 px-3.5 sm:px-4 pb-nav-safe",
           settings.density === "compact" ? "py-2.5" : "py-4"
@@ -1169,20 +1200,30 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
         }}
         aria-label={lh.bottomMenu}
       >
-        <div className="relative grid max-w-2xl mx-auto items-end min-h-[68px] px-0.5 pt-1 grid-cols-5">
-          {activeTabIndex >= 0 && (
+        <div
+          className={cn(
+            "relative grid max-w-2xl mx-auto items-end min-h-[68px] px-0.5 pt-1",
+            useLegacyBottomNav
+              ? "grid-cols-5"
+              : bottomNavItems!.length === 6
+                ? "grid-cols-6"
+                : "grid-cols-5",
+          )}
+        >
+          {bottomNavPillIndex >= 0 && (
             <div
               aria-hidden
               className="vt-bottom-nav-tab-pill absolute top-1 h-[3px] w-6 rounded-full bg-[var(--brand)] pointer-events-none"
               style={{
-                left: `calc(${activeTabIndex} * 20% + 10% - 12px)`,
+                insetInlineStart: `calc(${bottomNavPillIndex} * ${100 / bottomNavColCount}% + ${100 / bottomNavColCount / 2}% - 12px)`,
               }}
             />
           )}
-          <>
+          {useLegacyBottomNav ? (
+            <>
               <Link
                 href="/home"
-                className="flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] transition-opacity duration-150 active:opacity-80 motion-reduce:active:opacity-100 rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface cursor-pointer"
+                className="flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] transition-opacity duration-150 motion-safe:active:opacity-80 motion-reduce:active:opacity-100 rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface cursor-pointer"
                 data-testid="bottom-nav-home"
               >
                 <Home
@@ -1204,7 +1245,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
 
               <Link
                 href="/equipment"
-                className="flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] transition-opacity duration-150 active:opacity-80 motion-reduce:active:opacity-100 rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface cursor-pointer"
+                className="flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] transition-opacity duration-150 motion-safe:active:opacity-80 motion-reduce:active:opacity-100 rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface cursor-pointer"
                 data-testid="bottom-nav-equipment"
               >
                 <Package
@@ -1280,7 +1321,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
 
               <Link
                 href="/recap"
-                className="flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] transition-opacity duration-150 active:opacity-80 motion-reduce:active:opacity-100 rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface cursor-pointer"
+                className="flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] transition-opacity duration-150 motion-safe:active:opacity-80 motion-reduce:active:opacity-100 rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface cursor-pointer"
                 data-testid="bottom-nav-recap"
               >
                 <Sparkles
@@ -1305,7 +1346,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                 onClick={() => setMenuOpen((o) => !o)}
                 className={cn(
                   "flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] w-full",
-                  "transition-opacity duration-150 active:opacity-80 motion-reduce:active:opacity-100",
+                  "transition-opacity duration-150 motion-safe:active:opacity-80 motion-reduce:active:opacity-100",
                   "rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                   "cursor-pointer",
                   navigationLocked && "opacity-40",
@@ -1329,7 +1370,39 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                   {lh.bottomMenu}
                 </span>
               </button>
-          </>
+            </>
+          ) : (
+            bottomNavItems!.map((n) => {
+              const Icon = BOTTOM_NAV_ICON_MAP[n.icon];
+              const isActive = resolveNavItemActive(location, n.href);
+              return (
+                <Link
+                  key={n.id}
+                  href={n.href}
+                  className="flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] transition-opacity duration-150 motion-safe:active:opacity-80 motion-reduce:active:opacity-100 rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface cursor-pointer"
+                  data-testid={`bottom-nav-${n.id}`}
+                >
+                  {Icon && (
+                    <Icon
+                      className={cn(
+                        "w-6 h-6 transition-all duration-200",
+                        isActive ? "text-ivory-green scale-110" : "text-ivory-text3 scale-100",
+                      )}
+                      aria-hidden
+                    />
+                  )}
+                  <span
+                    className={cn(
+                      "text-[10px] font-semibold leading-tight text-center max-w-[4.5rem] truncate",
+                      isActive ? "text-ivory-green" : "text-ivory-text3",
+                    )}
+                  >
+                    {navLabel(n.labelKey)}
+                  </span>
+                </Link>
+              );
+            })
+          )}
         </div>
       </nav>
 

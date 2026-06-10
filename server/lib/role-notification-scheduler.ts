@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
-import { db, equipment, pushSubscriptions, scheduledNotifications, shifts, supportTickets, users } from "../db.js";
+import { clinics, db, equipment, pushSubscriptions, scheduledNotifications, shifts, supportTickets, users } from "../db.js";
 import { resolveCurrentRole, type PermanentVetTrackRole } from "./role-resolution.js";
 import { sendPushToUser } from "./push.js";
 import {
@@ -298,60 +298,37 @@ export async function cancelSmartReturnReminder(
 const isDevLog = process.env.NODE_ENV !== "production";
 
 export async function runScheduledNotifications(): Promise<void> {
-  const due = await db
-    .select()
-    .from(scheduledNotifications)
-    .where(
-      and(
-        eq(scheduledNotifications.type, "return_reminder"),
-        isNull(scheduledNotifications.sentAt),
-        lte(scheduledNotifications.scheduledAt, sql`now()`)
+  const clinicRows = await db.select({ id: clinics.id }).from(clinics);
+
+  for (const clinicRow of clinicRows) {
+    const clinicId = clinicRow.id?.trim();
+    if (!clinicId) continue;
+
+    const due = await db
+      .select()
+      .from(scheduledNotifications)
+      .where(
+        and(
+          eq(scheduledNotifications.clinicId, clinicId),
+          eq(scheduledNotifications.type, "return_reminder"),
+          isNull(scheduledNotifications.sentAt),
+          lte(scheduledNotifications.scheduledAt, sql`now()`),
+        ),
       )
-    )
-    .orderBy(asc(scheduledNotifications.scheduledAt))
-    .limit(100);
+      .orderBy(asc(scheduledNotifications.scheduledAt))
+      .limit(100);
 
-  for (const row of due) {
-    if (isDevLog) {
-      console.log("Processing scheduled notification:", {
-        id: row.id,
-        type: row.type,
-        userId: row.userId,
-      });
-    }
-
-    try {
-      await processReturnReminderNotification(row);
-      await db
-        .update(scheduledNotifications)
-        .set({ sentAt: new Date() })
-        .where(
-          and(
-            eq(scheduledNotifications.clinicId, row.clinicId),
-            eq(scheduledNotifications.id, row.id),
-            isNull(scheduledNotifications.sentAt)
-          )
-        );
+    for (const row of due) {
       if (isDevLog) {
-        console.log("Notification sent:", {
+        console.log("Processing scheduled notification:", {
           id: row.id,
+          type: row.type,
           userId: row.userId,
         });
       }
-    } catch (error) {
-      const payloadObj = parseScheduledNotificationPayload(row.payload);
-      const prevAttempts = getAttemptsFromPayload(payloadObj);
-      const attempts = prevAttempts + 1;
 
-      console.error("Notification failed:", {
-        id: row.id,
-        userId: row.userId,
-        attempts,
-        error,
-      });
-
-      if (attempts >= 4) {
-        console.warn("Notification abandoned:", { id: row.id, attempts });
+      try {
+        await processReturnReminderNotification(row);
         await db
           .update(scheduledNotifications)
           .set({ sentAt: new Date() })
@@ -359,24 +336,55 @@ export async function runScheduledNotifications(): Promise<void> {
             and(
               eq(scheduledNotifications.clinicId, row.clinicId),
               eq(scheduledNotifications.id, row.id),
-              isNull(scheduledNotifications.sentAt)
-            )
+              isNull(scheduledNotifications.sentAt),
+            ),
           );
-      } else {
-        const delayMs = backoffMsAfterFailure(attempts);
-        await db
-          .update(scheduledNotifications)
-          .set({
-            scheduledAt: new Date(Date.now() + delayMs),
-            payload: { ...payloadObj, attempts },
-          })
-          .where(
-            and(
-              eq(scheduledNotifications.clinicId, row.clinicId),
-              eq(scheduledNotifications.id, row.id),
-              isNull(scheduledNotifications.sentAt)
-            )
-          );
+        if (isDevLog) {
+          console.log("Notification sent:", {
+            id: row.id,
+            userId: row.userId,
+          });
+        }
+      } catch (error) {
+        const payloadObj = parseScheduledNotificationPayload(row.payload);
+        const prevAttempts = getAttemptsFromPayload(payloadObj);
+        const attempts = prevAttempts + 1;
+
+        console.error("Notification failed:", {
+          id: row.id,
+          userId: row.userId,
+          attempts,
+          error,
+        });
+
+        if (attempts >= 4) {
+          console.warn("Notification abandoned:", { id: row.id, attempts });
+          await db
+            .update(scheduledNotifications)
+            .set({ sentAt: new Date() })
+            .where(
+              and(
+                eq(scheduledNotifications.clinicId, row.clinicId),
+                eq(scheduledNotifications.id, row.id),
+                isNull(scheduledNotifications.sentAt),
+              ),
+            );
+        } else {
+          const delayMs = backoffMsAfterFailure(attempts);
+          await db
+            .update(scheduledNotifications)
+            .set({
+              scheduledAt: new Date(Date.now() + delayMs),
+              payload: { ...payloadObj, attempts },
+            })
+            .where(
+              and(
+                eq(scheduledNotifications.clinicId, row.clinicId),
+                eq(scheduledNotifications.id, row.id),
+                isNull(scheduledNotifications.sentAt),
+              ),
+            );
+        }
       }
     }
   }

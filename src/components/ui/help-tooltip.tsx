@@ -40,7 +40,7 @@ export function HelpTooltip({ content, side = "bottom", className = "" }: HelpTo
           e.stopPropagation();
           setOpen((o) => !o);
         }}
-        className="w-5 h-5 rounded-full flex items-center justify-center text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted transition-colors"
+        className="w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted transition-colors"
         aria-label="Help"
         aria-expanded={open}
       >

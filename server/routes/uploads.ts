@@ -2,33 +2,12 @@ import { randomUUID } from "crypto";
 import express from "express";
 import multer from "multer";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 const router = express.Router();
 
-function resolveRequestId(
-  res: { getHeader: (name: string) => unknown; setHeader?: (name: string, value: string) => void },
-  incomingHeader: unknown,
-): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") {
-    res.setHeader("x-request-id", requestId);
-  }
-  return requestId;
-}
 
-function apiError(params: { code: string; reason: string; message: string; requestId: string }) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-  };
-}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -41,18 +20,26 @@ const upload = multer({
   },
 });
 
-const s3 = new S3Client({
-  region: process.env.S3_REGION,
-  endpoint: process.env.S3_ENDPOINT,
-  credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
-  },
-});
+function getS3Client(): S3Client {
+  const accessKeyId = process.env.S3_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
+  if (!accessKeyId || !secretAccessKey) {
+    throw new Error(
+      "S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must be set. " +
+        "Add them to your Railway environment variables.",
+    );
+  }
+  return new S3Client({
+    region: process.env.S3_REGION,
+    endpoint: process.env.S3_ENDPOINT,
+    credentials: { accessKeyId, secretAccessKey },
+  });
+}
 
 router.post(
   "/fault-image",
   requireAuth,
+  requireEffectiveRole("technician"),
   upload.single("image"),
   async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -68,7 +55,7 @@ router.post(
         .slice(0, 10);
       const fileName = `faults/${Date.now()}-${randomUUID()}.${ext}`;
 
-      await s3.send(
+      await getS3Client().send(
         new PutObjectCommand({
           Bucket: process.env.S3_BUCKET,
           Key: fileName,

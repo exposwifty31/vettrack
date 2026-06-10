@@ -134,6 +134,7 @@ const translations = {
       deleteError: d.equipmentList.toast.deleteError,
       moveSuccess: d.equipmentList.toast.moveSuccess,
       moveError: d.equipmentList.toast.moveError,
+      exportError: d.equipmentList.toast.exportError,
       checkoutError: d.equipmentList.toast.checkoutError,
       returnError: d.equipmentList.toast.returnError,
     },
@@ -1052,6 +1053,10 @@ const translations = {
   phoneSignIn: d.phoneSignIn,
 
   nav: d.nav,
+
+  board: d.board,
+
+  whatsNew: d.whatsNew,
 
 } as const;
 

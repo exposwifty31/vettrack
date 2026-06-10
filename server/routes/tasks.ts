@@ -1,5 +1,4 @@
 import { Router, type Response } from "express";
-import { randomUUID } from "crypto";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { idempotencyMiddleware } from "../middleware/idempotency.js";
 import {
@@ -12,36 +11,9 @@ import {
 import { getTaskRecommendations } from "../services/task-intelligence.service.js";
 import { getTaskDashboard } from "../services/task-recall.service.js";
 import { canPerformTaskAction, type TaskAction } from "../lib/task-rbac.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 const router = Router();
-
-function resolveRequestId(res: Response, incomingHeader: unknown): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") {
-    res.setHeader("x-request-id", requestId);
-  }
-  return requestId;
-}
-
-function apiError(params: {
-  code: string;
-  reason: string;
-  message: string;
-  requestId: string;
-  details?: unknown;
-}) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-    ...(params.details !== undefined ? { details: params.details } : {}),
-  };
-}
 
 function sendServiceError(res: Response, err: unknown, requestId: string) {
   if (err instanceof AppointmentServiceError) {

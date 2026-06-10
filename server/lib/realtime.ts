@@ -1,3 +1,6 @@
+// TODO(arch): two coexisting realtime paths. This file (in-memory clientsByClinic) is the
+// legacy broadcast path. New events must use the outbox-backed path in
+// server/routes/realtime.ts. Legacy path to be removed after full outbox migration is confirmed.
 import type { Response } from "express";
 import { incrementMetric } from "./metrics.js";
 

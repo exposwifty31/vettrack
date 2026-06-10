@@ -1,4 +1,4 @@
-import { Redirect, Route, Switch } from "wouter";
+import { Redirect, Route, Switch, useSearch } from "wouter";
 import { lazy } from "react";
 import { AuthGuard } from "@/features/auth/components/AuthGuard";
 import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
@@ -52,6 +52,11 @@ const ShiftChatArchive = lazy(() =>
 );
 const AppTourPage = lazy(() => import("@/pages/app-tour"));
 
+function RedirectPreserveSearch({ to }: { to: string }) {
+  const search = useSearch();
+  return <Redirect to={`${to}${search}`} replace />;
+}
+
 /** `/` — marketing shell for guests; returning signed-in users go to `/home`; new signups see landing once (session flag). */
 function RootRoute() {
   const { isLoaded, isSignedIn, isOfflineSession } = useAuth();
@@ -93,7 +98,7 @@ export function AppRoutes() {
         {/* Legacy aliases → canonicals */}
         <Route path="/appointments"><Redirect to="/equipment/tasks" replace /></Route>
         <Route path="/equipment-tasks"><Redirect to="/equipment/tasks" replace /></Route>
-        <Route path="/display"><Redirect to="/equipment/board" replace /></Route>
+        <Route path="/display"><RedirectPreserveSearch to="/equipment/board" /></Route>
         <Route path="/equipment-board"><Redirect to="/equipment/board" replace /></Route>
         <Route path="/scan"><Redirect to="/equipment?scan=1" replace /></Route>
         <Route path="/equipment/scan"><Redirect to="/equipment?scan=1" replace /></Route>

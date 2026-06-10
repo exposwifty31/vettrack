@@ -6,6 +6,7 @@ import { db, doctorShifts, shiftImports, shifts, users } from "../db.js";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { detectDoctorOperationalShiftRole } from "../../shared/doctor-operational-shift.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 type ShiftRole = "technician" | "senior_technician" | "admin";
 
@@ -33,37 +34,6 @@ interface ShiftParseResult {
 }
 
 const router = Router();
-
-function resolveRequestId(
-  res: { getHeader: (name: string) => unknown; setHeader?: (name: string, value: string) => void },
-  incomingHeader: unknown,
-): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") {
-    res.setHeader("x-request-id", requestId);
-  }
-  return requestId;
-}
-
-function apiError(params: {
-  code: string;
-  reason: string;
-  message: string;
-  requestId: string;
-  details?: unknown;
-}) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-    ...(params.details !== undefined ? { details: params.details } : {}),
-  };
-}
 
 const upload = multer({
   storage: multer.memoryStorage(),

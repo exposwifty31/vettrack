@@ -7,6 +7,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { authSensitiveLimiter, pushTestLimiter } from "../middleware/rate-limiters.js";
 import { sendPushToUser, getVapidPublicKey, isVapidReady } from "../lib/push.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 /*
  * PERMISSIONS MATRIX — /api/push
@@ -21,29 +22,7 @@ import { sendPushToUser, getVapidPublicKey, isVapidReady } from "../lib/push.js"
 
 const router = Router();
 
-function resolveRequestId(
-  res: { getHeader: (name: string) => unknown; setHeader?: (name: string, value: string) => void },
-  incomingHeader: unknown,
-): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") {
-    res.setHeader("x-request-id", requestId);
-  }
-  return requestId;
-}
 
-function apiError(params: { code: string; reason: string; message: string; requestId: string }) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-  };
-}
 
 const subscribeSchema = z.object({
   endpoint: z.string().url("endpoint must be a valid URL"),
