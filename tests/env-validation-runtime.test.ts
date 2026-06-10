@@ -62,6 +62,9 @@ describe("validateEnv runtime", () => {
     process.env.DB_CONFIG_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef";
     process.env.CLERK_WEBHOOK_SECRET = "whsec_test";
     process.env.DATA_INTEGRITY_HEALTH_TOKEN = "health-token-test";
+    process.env.DB_SSL_REJECT_UNAUTHORIZED = "true";
+    process.env.S3_ACCESS_KEY_ID = "test-s3-access-key";
+    process.env.S3_SECRET_ACCESS_KEY = "test-s3-secret-key";
   }
 
   it("exits when Clerk publishable and secret keys are test/live mismatched", async () => {

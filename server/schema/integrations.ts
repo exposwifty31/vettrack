@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
-  text, timestamp, boolean, varchar, jsonb, integer, doublePrecision,
+  text, timestamp, boolean, varchar, jsonb, integer, doublePrecision, index, uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { vtTable } from "./helpers.js";
 import { clinics } from "./core.js";
@@ -21,7 +21,10 @@ export const integrationConfigs = vtTable("vt_integration_configs", {
   metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (t) => ({
+  clinicAdapterUnique: uniqueIndex("idx_vt_integration_configs_clinic_adapter_uq").on(t.clinicId, t.adapterId),
+  enabledIdx: index("idx_vt_integration_configs_enabled").on(t.enabled, t.syncPatients),
+}));
 
 export const integrationSyncConflicts = vtTable("vt_integration_sync_conflicts", {
   id: text("id").primaryKey(),
@@ -37,7 +40,9 @@ export const integrationSyncConflicts = vtTable("vt_integration_sync_conflicts",
   resolution: varchar("resolution", { length: 30 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   resolvedAt: timestamp("resolved_at"),
-});
+}, (t) => ({
+  clinicStatusIdx: index("idx_vt_integration_sync_conflicts_clinic_status").on(t.clinicId, t.status),
+}));
 
 export const integrationSyncLog = vtTable("vt_integration_sync_log", {
   id: text("id").primaryKey(),
@@ -54,7 +59,11 @@ export const integrationSyncLog = vtTable("vt_integration_sync_log", {
   startedAt: timestamp("started_at").notNull(),
   completedAt: timestamp("completed_at"),
   metadata: jsonb("metadata"),
-});
+}, (t) => ({
+  clinicAdapterStatusIdx: index("idx_vt_integration_sync_log_clinic_adapter_status")
+    .on(t.clinicId, t.adapterId, t.status),
+  clinicStatusIdx: index("idx_vt_integration_sync_log_clinic_status").on(t.clinicId, t.status),
+}));
 
 export const integrationMappingReviews = vtTable("vt_integration_mapping_reviews", {
   id: text("id").primaryKey(),
@@ -68,7 +77,10 @@ export const integrationMappingReviews = vtTable("vt_integration_mapping_reviews
   reviewStatus: text("review_status").notNull().default("pending"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (t) => ({
+  clinicAdapterStatusIdx: index("idx_vt_integration_mapping_reviews_clinic_adapter_status")
+    .on(t.clinicId, t.adapterId, t.reviewStatus),
+}));
 
 export const integrationWebhookEvents = vtTable("vt_integration_webhook_events", {
   id: text("id").primaryKey(),
@@ -79,7 +91,10 @@ export const integrationWebhookEvents = vtTable("vt_integration_webhook_events",
   status: text("status").notNull().default("received"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   processedAt: timestamp("processed_at"),
-});
+}, (t) => ({
+  clinicAdapterStatusIdx: index("idx_vt_integration_webhook_events_clinic_adapter_status")
+    .on(t.clinicId, t.adapterId, t.status),
+}));
 
 export const integrationWebhookEventsArchive = vtTable("vt_integration_webhook_events_archive", {
   id: text("id").primaryKey(),

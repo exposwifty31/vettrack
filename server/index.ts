@@ -200,10 +200,10 @@ app.use(
 );
 app.use(
   compression({
-    // SSE (GET /api/er/stream) must not be buffered by gzip.
+    // SSE (GET /api/realtime/stream) must not be buffered by gzip.
     filter: (req, res) => {
       const path = (req.originalUrl ?? req.url ?? "").split("?")[0] ?? "";
-      if (path.includes("/api/er/stream")) return false;
+      if (path.includes("/api/realtime/stream")) return false;
       return compression.filter(req, res);
     },
   }),

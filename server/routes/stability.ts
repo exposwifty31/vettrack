@@ -1,5 +1,4 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
-import { randomUUID } from "crypto";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import {
   runAllTests,
@@ -12,41 +11,12 @@ import {
 } from "../lib/test-runner.js";
 import { getActionLogs, clearActionLogs, logAction } from "../lib/stability-log.js";
 import { apiError as i18nApiError } from "../lib/apiError.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 const router = Router();
 
-function resolveRequestId(
-  res: { getHeader: (name: string) => unknown; setHeader?: (name: string, value: string) => void },
-  incomingHeader: unknown,
-): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") {
-    res.setHeader("x-request-id", requestId);
-  }
-  return requestId;
-}
-
-function apiError(params: { code: string; reason: string; message: string; requestId: string }) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-  };
-}
-
 function requireNotProduction(req: Request, res: Response, next: NextFunction) {
   if (process.env.NODE_ENV === "production") {
-    // Phase 6 PR 6.10 light adoption (1 of 1 in stability.ts): swap the
-    // local envelope for the i18n-aware `apiError`. Remaining 4xx
-    // branches in this file (test-mode required, schedule update, etc.)
-    // stay on the legacy local helper for a future migration PR — the
-    // file remains on the no-untranslated-api-error allowlist until
-    // full migration.
     return i18nApiError(req, res, "errors.stability.notAvailableInProduction", undefined, 403);
   }
   next();

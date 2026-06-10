@@ -40,6 +40,7 @@ export default function CodeBlueDisplay() {
       return data;
     },
     refetchInterval: 2000,
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: false,
     retry: 1,
     enabled: !!userId,

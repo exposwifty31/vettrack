@@ -107,6 +107,7 @@ export function useCodeBlueSession() {
       return normalized;
     },
     refetchInterval: 2000,
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: false,
     retry: 1,
     placeholderData: () => loadCachedSession() ?? undefined,

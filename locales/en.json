@@ -23,7 +23,9 @@
     "sterilization": "Sterilization",
     "closeNavigationMenu": "Close navigation menu",
     "openNavigationMenu": "Open navigation menu",
+    "breadcrumb": "Breadcrumb",
     "quickSettings": "Quick settings",
+    "skipToMainContent": "Skip to main content",
     "toast": {
       "savedSuccess": "Saved",
       "unexpectedError": "Something went wrong."
@@ -109,8 +111,10 @@
       "deleteError": "Deletion failed",
       "moveSuccess": "Moved successfully",
       "moveError": "Move failed",
+      "exportError": "Export failed. Please try again.",
       "checkoutError": "Equipment checkout failed",
-      "returnError": "Return failed"
+      "returnError": "Return failed",
+      "exportError": "Export failed"
     },
     "linkedInUse": "In use for: {name}",
     "recoveryBadgeStale": "Needs confirm",
@@ -1367,6 +1371,9 @@
   "managementDashboardPage": {
     "title": "Dashboard",
     "refresh": "Refresh",
+    "reportGenerating": "Generating report...",
+    "reportSuccess": "Report downloaded",
+    "reportError": "Could not generate report. Please try again.",
     "loadEquipmentFailed": "Failed to load equipment data. Please try again.",
     "available": "Available",
     "inUse": "In use",
@@ -1627,6 +1634,7 @@
     "bottomRooms": "Rooms",
     "bottomRecap": "Recap",
     "bottomMenu": "Menu",
+    "skipToMainContent": "Skip to main content",
     "radar": "Radar",
     "shiftHandover": "Shift End",
     "inventory": "Inventory & consumables",
@@ -3174,5 +3182,44 @@
     "verifying": "Verifying...",
     "verify": "Verify",
     "changePhone": "Change phone number"
+  },
+  "board": {
+    "deployableNow": "Deployable now",
+    "of": "of",
+    "criticalUnits": "critical units",
+    "readinessMix": "Readiness mix",
+    "available": "Available",
+    "deployed": "In use",
+    "down": "Not deployable",
+    "unconfirmed": "Locating",
+    "whereTitle": "Where everything is",
+    "ready": "ready",
+    "noUnitsHere": "No units here",
+    "attention": "Need attention",
+    "live": "LIVE",
+    "updated": "Updated",
+    "ward": "The Ward · Critical Equipment",
+    "subtitle": "Equipment Command Center",
+    "codeBlue": "CODE BLUE",
+    "emergency": "Emergency in progress",
+    "elapsed": "Elapsed",
+    "linked": "Equipment committed",
+    "lead": "Lead",
+    "location": "Location",
+    "stale": "Stale",
+    "overdue": "Overdue",
+    "byType": "By type",
+    "critical": "critical",
+    "allCriticalReady": "All critical equipment is available",
+    "loading": "Loading...",
+    "fallbackBoardUnavailable": "Command board data is unavailable",
+    "deployable": "Ready",
+    "notDeployable": "Not ready"
+  },
+  "whatsNew": {
+    "title": "What's New — VetTrack",
+    "heading": "What's New",
+    "description": "The latest features and improvements in VetTrack.",
+    "configureAlerts": "Configure alerts in Settings"
   }
 }

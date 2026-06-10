@@ -1,5 +1,5 @@
-import { db, alertAcks, equipment } from "../db.js";
-import { eq, isNull, and, ne } from "drizzle-orm";
+import { db, alertAcks, clinics, equipment } from "../db.js";
+import { eq, isNull, and, lte, isNotNull, inArray } from "drizzle-orm";
 import { sendPushToUser } from "./push.js";
 import { postSystemMessage } from "./shift-chat-presence.js";
 
@@ -43,28 +43,23 @@ function isAlertStillActive(alertType: string, eq_row: {
   return false;
 }
 
-async function checkAndSendReminders(): Promise<void> {
-  try {
-    const now = new Date();
-
-    // Two-level reminder logic:
-    //   SEEN acks with remindAt due → remind (condition check required)
-    //   RESOLVED acks with remindAt due → check if condition came back; if yes, re-open to SEEN
-    const pendingAcks = await db
-      .select()
-      .from(alertAcks)
-      .where(isNull(alertAcks.remindedAt));
-
-    const due = pendingAcks.filter(
-      (ack) =>
-        ack.remindAt &&
-        ack.remindAt <= now &&
-        CRITICAL_HIGH_ALERT_TYPES.has(ack.alertType)
+async function processDueAcksForClinic(clinicId: string, now: Date): Promise<void> {
+  const due = await db
+    .select()
+    .from(alertAcks)
+    .where(
+      and(
+        eq(alertAcks.clinicId, clinicId),
+        isNull(alertAcks.remindedAt),
+        isNotNull(alertAcks.remindAt),
+        lte(alertAcks.remindAt, now),
+        inArray(alertAcks.alertType, [...CRITICAL_HIGH_ALERT_TYPES]),
+      ),
     );
 
-    if (due.length === 0) return;
+  if (due.length === 0) return;
 
-    for (const ack of due) {
+  for (const ack of due) {
       const [eqRow] = await db
         .select({
           status: equipment.status,
@@ -80,7 +75,10 @@ async function checkAndSendReminders(): Promise<void> {
 
       if (!eqRow) {
         // Equipment gone — stamp remindedAt so we don't loop
-        await db.update(alertAcks).set({ remindedAt: now }).where(eq(alertAcks.id, ack.id));
+        await db
+          .update(alertAcks)
+          .set({ remindedAt: now })
+          .where(and(eq(alertAcks.clinicId, clinicId), eq(alertAcks.id, ack.id)));
         continue;
       }
 
@@ -99,7 +97,7 @@ async function checkAndSendReminders(): Promise<void> {
               remindAt: new Date(Date.now() + REMINDER_DELAY_MS),
               remindedAt: null,
             })
-            .where(eq(alertAcks.id, ack.id));
+            .where(and(eq(alertAcks.clinicId, clinicId), eq(alertAcks.id, ack.id)));
 
           await sendPushToUser(ack.clinicId, ack.acknowledgedById, {
             title: "Alert re-opened",
@@ -115,7 +113,10 @@ async function checkAndSendReminders(): Promise<void> {
           }).catch(() => {});
         } else {
           // Condition truly resolved — stamp remindedAt
-          await db.update(alertAcks).set({ remindedAt: now }).where(eq(alertAcks.id, ack.id));
+          await db
+            .update(alertAcks)
+            .set({ remindedAt: now })
+            .where(and(eq(alertAcks.clinicId, clinicId), eq(alertAcks.id, ack.id)));
         }
         continue;
       }
@@ -147,7 +148,24 @@ async function checkAndSendReminders(): Promise<void> {
       await db
         .update(alertAcks)
         .set({ remindedAt: now })
-        .where(eq(alertAcks.id, ack.id));
+        .where(and(eq(alertAcks.clinicId, clinicId), eq(alertAcks.id, ack.id)));
+    }
+}
+
+async function checkAndSendReminders(): Promise<void> {
+  try {
+    const now = new Date();
+    const clinicRows = await db.select({ id: clinics.id }).from(clinics);
+
+    for (const row of clinicRows) {
+      const clinicId = row.id?.trim();
+      if (!clinicId) continue;
+      try {
+        await processDueAcksForClinic(clinicId, now);
+      } catch (clinicErr) {
+        console.error(`Alert reminder processing failed for clinic ${clinicId}:`, clinicErr);
+        // Continue to next clinic instead of aborting entire sweep
+      }
     }
   } catch (err) {
     console.error("Alert reminder check failed:", err);

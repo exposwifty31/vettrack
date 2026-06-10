@@ -1,5 +1,4 @@
 // server/routes/display.ts
-import { randomUUID } from "crypto";
 import type { RequestHandler } from "express";
 import { Router } from "express";
 import { and, desc, eq, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
@@ -26,6 +25,7 @@ import {
   type BuildCommandBoardSnapshotFn,
 } from "../services/equipment-command-board.service.js";
 import type { EquipmentCommandBoardSnapshot } from "../../shared/equipment-board.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 export const COMMAND_BOARD_TIMEOUT_MS = 2500;
 
@@ -33,22 +33,6 @@ export type DisplayRouterDeps = {
   buildCommandBoardSnapshot?: BuildCommandBoardSnapshotFn;
   commandBoardTimeoutMs?: number;
 };
-
-function resolveRequestId(
-  res: { getHeader: (n: string) => unknown; setHeader?: (n: string, v: string) => void },
-  incomingHeader: unknown,
-): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") res.setHeader("x-request-id", requestId);
-  return requestId;
-}
-
-function apiError(p: { code: string; reason: string; message: string; requestId: string }) {
-  return { code: p.code, error: p.code, reason: p.reason, message: p.message, requestId: p.requestId };
-}
 
 function resolveProbableLocation(row: {
   usuallyFoundHere: string | null;

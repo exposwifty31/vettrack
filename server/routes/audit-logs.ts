@@ -3,31 +3,10 @@ import { randomUUID } from "crypto";
 import { db, auditLogs, users } from "../db.js";
 import { desc, eq, and, gte, lte, ilike, sql, isNull } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 const router = Router();
-function resolveRequestId(
-  res: { getHeader: (name: string) => unknown; setHeader?: (name: string, value: string) => void },
-  incomingHeader: unknown,
-): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") {
-    res.setHeader("x-request-id", requestId);
-  }
-  return requestId;
-}
 
-function apiError(params: { code: string; reason: string; message: string; requestId: string }) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-  };
-}
 
 const PAGE_SIZE = 50;
 
@@ -48,6 +27,9 @@ router.get("/", requireAuth, requireAdmin, async (req, res) => {
 
     // Case-insensitive partial name match — "sig" matches "Sigal", "dana" matches "Dana"
     if (performedBy && performedBy.trim()) {
+      if (performedBy.length > 100) {
+        return res.status(400).json(apiError({ code: "VALIDATION_FAILED", reason: "PERFORMED_BY_TOO_LONG", message: "performedBy must be 100 characters or fewer", requestId }));
+      }
       conditions.push(ilike(auditLogs.performedBy, `%${performedBy.trim()}%`));
     }
 

@@ -26,6 +26,7 @@ export const containers = vtTable("vt_containers", {
     "vt_containers_current_quantity_non_negative",
     sql`${table.currentQuantity} >= 0`,
   ),
+  clinicIdx: index("idx_vt_containers_clinic").on(table.clinicId),
 }));
 
 export const inventoryItems = vtTable(

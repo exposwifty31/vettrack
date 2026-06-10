@@ -2,13 +2,19 @@
 // Desktop (lg+): Topbar + NAV sidebar (PageShell).
 // Mobile: sticky header + bottom-nav (Layout).
 import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { useAuth } from "@/hooks/use-auth";
 import { PageShell } from "@/components/layout/PageShell";
 import { Layout } from "@/components/layout";
 import type { SidebarItem } from "@/components/layout/IconSidebar";
+import { NAV } from "@/lib/routes/nav-model";
+import type { NavNode } from "@/lib/routes/nav-model";
 
 export interface AppShellProps {
   children: React.ReactNode;
-  /** @deprecated Sidebar is NAV-driven after T2.2; ignored on desktop. */
+  /**
+   * Transitional prop retained for PageShell legacy compat until T2.2.
+   * Desktop PageShell still accepts it; IconSidebar is NAV-driven and ignores it.
+   */
   sidebarItems?: SidebarItem[];
   /** Forwarded to Layout on mobile for page-controlled scanner. */
   onScan?: (patientId?: string) => void;
@@ -32,6 +38,8 @@ export function AppShell({
   title,
 }: AppShellProps) {
   const isDesktop = useIsDesktop();
+  const { isAdmin } = useAuth();
+  const bottomNavItems: NavNode[] = NAV.filter((n) => !n.adminOnly || isAdmin);
 
   if (isDesktop) {
     return <PageShell sidebarItems={sidebarItems}>{children}</PageShell>;
@@ -44,6 +52,7 @@ export function AppShell({
       scannerOpen={scannerOpen}
       onCloseScan={onCloseScan}
       navigationLocked={navigationLocked}
+      bottomNavItems={bottomNavItems}
     >
       {children}
     </Layout>

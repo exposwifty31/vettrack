@@ -140,7 +140,9 @@ export default function HomePage() {
   let shiftLine = t.homePage.shiftLineFallback;
   if (pulse?.shift) {
     const elapsedMin = Math.round((Date.now() - new Date(pulse.shift.startedAt).getTime()) / 60_000);
-    shiftLine = t.homePage.shiftLine(humanizeMinutes(elapsedMin));
+    if (elapsedMin <= 24 * 60) {
+      shiftLine = t.homePage.shiftLine(humanizeMinutes(elapsedMin));
+    }
   }
 
   const nextTask: Appointment | null = taskDashboard

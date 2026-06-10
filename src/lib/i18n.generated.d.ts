@@ -26,6 +26,7 @@ export interface TStructure {
     sterilization: string;
     closeNavigationMenu: string;
     openNavigationMenu: string;
+    breadcrumb: string;
     quickSettings: string;
     toast: {
       savedSuccess: string;
@@ -112,6 +113,7 @@ export interface TStructure {
       deleteError: string;
       moveSuccess: string;
       moveError: string;
+      exportError: string;
       checkoutError: string;
       returnError: string;
     };
@@ -1370,6 +1372,9 @@ export interface TStructure {
   managementDashboardPage: {
     title: string;
     refresh: string;
+    reportGenerating: string;
+    reportSuccess: string;
+    reportError: string;
     loadEquipmentFailed: string;
     available: string;
     inUse: string;
@@ -1630,6 +1635,7 @@ export interface TStructure {
     bottomRooms: string;
     bottomRecap: string;
     bottomMenu: string;
+    skipToMainContent: string;
     radar: string;
     shiftHandover: string;
     inventory: string;
@@ -3177,5 +3183,44 @@ export interface TStructure {
     verifying: string;
     verify: string;
     changePhone: string;
+  };
+  board: {
+    deployableNow: string;
+    of: string;
+    criticalUnits: string;
+    readinessMix: string;
+    available: string;
+    deployed: string;
+    down: string;
+    unconfirmed: string;
+    whereTitle: string;
+    ready: string;
+    noUnitsHere: string;
+    attention: string;
+    live: string;
+    updated: string;
+    ward: string;
+    subtitle: string;
+    codeBlue: string;
+    emergency: string;
+    elapsed: string;
+    linked: string;
+    lead: string;
+    location: string;
+    stale: string;
+    overdue: string;
+    byType: string;
+    critical: string;
+    allCriticalReady: string;
+    loading: string;
+    fallbackBoardUnavailable: string;
+    deployable: string;
+    notDeployable: string;
+  };
+  whatsNew: {
+    title: string;
+    heading: string;
+    description: string;
+    configureAlerts: string;
   };
 }

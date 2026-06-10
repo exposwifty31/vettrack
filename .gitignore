@@ -19,6 +19,7 @@ drift-main/
 awesome-cursor-skills-main/
 
 # Dev / debug scratch files (never commit)
+pilot-vars-backup.txt
 .tmp-*
 *.tmp
 .pr-body-*

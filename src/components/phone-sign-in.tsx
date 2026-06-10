@@ -4,6 +4,7 @@ import { normalizePhoneE164 } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 
 type Step = "phone" | "code" | "error";
+type PhoneErrorCode = "NOT_AVAILABLE" | "GENERIC" | null;
 
 export function PhoneSignIn() {
   const { isLoaded, signIn, setActive } = useSignIn();
@@ -12,6 +13,7 @@ export function PhoneSignIn() {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [phoneErrorCode, setPhoneErrorCode] = useState<PhoneErrorCode>(null);
 
   if (!isLoaded) return null;
 
@@ -19,6 +21,7 @@ export function PhoneSignIn() {
     e.preventDefault();
     if (!signIn) return;
     setErrorMsg(null);
+    setPhoneErrorCode(null);
     setLoading(true);
     try {
       const e164 = normalizePhoneE164(phone);
@@ -29,6 +32,7 @@ export function PhoneSignIn() {
         (f) => f.strategy === "phone_code"
       );
       if (!phoneFactor || !phoneFactor.phoneNumberId) {
+        setPhoneErrorCode("NOT_AVAILABLE");
         setErrorMsg(t.phoneSignIn.errorNotAvailableFull);
         return;
       }
@@ -43,6 +47,17 @@ export function PhoneSignIn() {
         clerkErr?.errors?.[0]?.longMessage ||
         clerkErr?.errors?.[0]?.message ||
         t.phoneSignIn.errorUnexpected;
+      const lower = msg.toLowerCase();
+      if (
+        lower.includes("not supported") ||
+        lower.includes("phone sign-in is not available")
+      ) {
+        setPhoneErrorCode("NOT_AVAILABLE");
+      } else if (lower.includes("clerk") || msg.length > 120) {
+        setPhoneErrorCode("GENERIC");
+      } else {
+        setPhoneErrorCode(null);
+      }
       setErrorMsg(msg);
     } finally {
       setLoading(false);
@@ -117,9 +132,9 @@ export function PhoneSignIn() {
               className="text-sm text-destructive bg-destructive/10 border border-destructive/25 rounded-lg px-3 py-2"
               role="alert"
             >
-              {errorMsg.toLowerCase().includes("not supported") || errorMsg.toLowerCase().includes("phone sign-in is not available")
+              {phoneErrorCode === "NOT_AVAILABLE"
                 ? t.phoneSignIn.errorNotAvailableShort
-                : errorMsg.toLowerCase().includes("clerk") || errorMsg.length > 120
+                : phoneErrorCode === "GENERIC"
                 ? t.phoneSignIn.errorGeneric
                 : errorMsg}
             </p>

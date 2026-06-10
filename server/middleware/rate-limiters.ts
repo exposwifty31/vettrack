@@ -1,11 +1,15 @@
 import type { Request } from "express";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
+// Audit (2026-06-10): GLOBAL reduced from 6_000 to 100 (per-IP backstop).
+// Per-user limiters (scan/checkout/write) remain at 600 — test contract
+// tests/rate-limiters-f2.test.ts requires >= 100 per user, and ward scenarios
+// with high NFC scan throughput require headroom above 20/min.
 /** F2 — per-minute ceilings (DoS backstop; normal ward use stays well below). */
 export const SCAN_LIMITER_MAX_PER_MINUTE = 600;
 export const CHECKOUT_LIMITER_MAX_PER_MINUTE = 600;
 export const WRITE_LIMITER_MAX_PER_MINUTE = 600;
-export const GLOBAL_API_LIMITER_MAX_PER_MINUTE = 6_000;
+export const GLOBAL_API_LIMITER_MAX_PER_MINUTE = 100;
 
 /** F2 — per-user bucket when auth is present; shared-IP clinics otherwise fall back to IP. */
 export function rateLimitUserKey(req: Request): string {

@@ -1,5 +1,4 @@
 import { Router, type Request, type Response } from "express";
-import { randomUUID } from "crypto";
 import { z } from "zod";
 import {
   requireAdmin,
@@ -20,6 +19,7 @@ import {
   type CheckInActor,
 } from "../services/clinical-check-in.js";
 import type { ClinicalCheckIn } from "../db.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 const router = Router();
 
@@ -36,33 +36,6 @@ const forceCloseBodySchema = z
   .strict();
 
 const IDEMPOTENCY_KEY_MAX_LENGTH = 64;
-
-function resolveRequestId(
-  res: { getHeader: (n: string) => unknown; setHeader?: (n: string, v: string) => void },
-  incoming: unknown,
-): string {
-  const incomingStr = typeof incoming === "string" ? incoming.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incomingStr || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") res.setHeader("x-request-id", requestId);
-  return requestId;
-}
-
-function apiError(params: {
-  code: string;
-  reason: string;
-  message: string;
-  requestId: string;
-}) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-  };
-}
 
 function actorFromRequest(authUser: AuthUser): CheckInActor {
   return {

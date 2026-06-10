@@ -1,8 +1,14 @@
-import * as XLSX from "xlsx";
 import type { Equipment } from "@/types";
 import { getCurrentLocale } from "@/lib/i18n";
 
-export function exportEquipmentToExcel(items: Equipment[], filename = "equipment.xlsx") {
+export async function exportEquipmentToExcel(items: Equipment[], filename = "equipment.xlsx") {
+  let XLSX: typeof import("xlsx");
+  try {
+    XLSX = await import("xlsx");
+  } catch (err) {
+    console.error("Failed to load xlsx module", err);
+    throw new Error("Could not load Excel exporter. Please refresh and try again.");
+  }
   const locale = getCurrentLocale();
   const rows = items.map((eq) => ({
     Name: eq.name,
@@ -30,5 +36,10 @@ export function exportEquipmentToExcel(items: Equipment[], filename = "equipment
   }));
   ws["!cols"] = colWidths;
 
-  XLSX.writeFile(wb, filename);
+  try {
+    XLSX.writeFile(wb, filename);
+  } catch (err) {
+    console.error("Failed to write Excel file", err);
+    throw new Error("Export failed. Please try again.");
+  }
 }

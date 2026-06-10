@@ -8,6 +8,7 @@ import { outboxEmitter, type PublishedOutboxRow } from "../lib/event-publisher.j
 import { incrementMetric } from "../lib/metrics.js";
 import { subscribe, unsubscribe } from "../lib/realtime.js";
 import { recordStreamConnect, startKeepalive } from "../lib/code-blue-keepalive.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 const MAX_OUTBOX_REPLAY = 1000;
 
@@ -122,29 +123,7 @@ async function outboxRowExistsForClinic(clinicId: string, outboxId: number): Pro
 
 const router = Router();
 
-function resolveRequestId(
-  res: { getHeader: (name: string) => unknown; setHeader?: (name: string, value: string) => void },
-  incomingHeader: unknown,
-): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") {
-    res.setHeader("x-request-id", requestId);
-  }
-  return requestId;
-}
 
-function apiError(params: { code: string; reason: string; message: string; requestId: string }) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-  };
-}
 
 /** JSON batch replay — **published** outbox rows only (`published_at IS NOT NULL`), ordered by `id`. */
 router.get("/replay", requireAuth, async (req, res) => {

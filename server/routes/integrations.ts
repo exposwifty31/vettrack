@@ -66,23 +66,9 @@ import {
   mergeCredentialsWithVendorMetadata,
 } from "../integrations/vendor-x-rollout.js";
 import { VENDOR_X_ADAPTER_ID } from "../integrations/adapters/vendor-x.js";
+import { apiError } from "../lib/route-utils.js";
 
 const router = Router();
-
-function apiError(params: {
-  code: string;
-  reason: string;
-  message: string;
-  requestId: string;
-}) {
-  return {
-    code: params.code,
-    error: params.code,
-    reason: params.reason,
-    message: params.message,
-    requestId: params.requestId,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // GET /adapters — list registered adapters (no credentials, no clinic data)

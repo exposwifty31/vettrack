@@ -22,6 +22,12 @@ const REQUIRED_IN_PRODUCTION: string[] = [
   // Tenant-isolation probe — /api/health/data-integrity returns 503 when unset in production.
   // Required so monitoring cannot silently lose the probe (CONTRIBUTING.md).
   "DATA_INTEGRITY_HEALTH_TOKEN",
+  // SSL certificate validation — must be "true" in production to prevent MitM against
+  // the managed Postgres connection. Defaults to false when unset (see server/db.ts).
+  "DB_SSL_REJECT_UNAUTHORIZED",
+  // S3 credentials — required by server/routes/uploads.ts (throws at startup if absent).
+  "S3_ACCESS_KEY_ID",
+  "S3_SECRET_ACCESS_KEY",
 ];
 
 const RECOMMENDED_IN_PRODUCTION: string[] = [];

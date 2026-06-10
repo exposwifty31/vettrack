@@ -1,3 +1,5 @@
+// TODO(arch): file exceeds 1100 lines. Split into handler modules following
+// the equipment-route-utils.ts / handlers/ pattern already started in this directory.
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import multer from "multer";

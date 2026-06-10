@@ -3,7 +3,7 @@
  *
  * Production (Railway shell):
  *   railway run --service vettrack pnpm exec tsx scripts/ops/promote-user-by-email.ts \
- *     --email=danerez5@gmail.com --allow-production
+ *     --email=your-email@example.com --allow-production
  *
  * Also set ADMIN_EMAILS on Railway so future logins self-heal (comma-separated list).
  */

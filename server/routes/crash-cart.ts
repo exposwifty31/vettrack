@@ -5,24 +5,9 @@ import { db, crashCartChecks, crashCartItems } from "../db.js";
 import { eq, and, desc, asc, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 const router = Router();
-
-function apiError(p: { code: string; reason: string; message: string; requestId: string }) {
-  return { code: p.code, error: p.code, reason: p.reason, message: p.message, requestId: p.requestId };
-}
-
-function resolveRequestId(
-  res: { getHeader: (n: string) => unknown; setHeader?: (n: string, v: string) => void },
-  incomingHeader: unknown,
-): string {
-  const incoming = typeof incomingHeader === "string" ? incomingHeader.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incoming || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") res.setHeader("x-request-id", requestId);
-  return requestId;
-}
 
 const checkItemSchema = z.object({
   key: z.string().min(1),

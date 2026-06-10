@@ -18,7 +18,9 @@ export const folders = vtTable("vt_folders", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   deletedAt: timestamp("deleted_at"),
   deletedBy: text("deleted_by"),
-});
+}, (t) => ({
+  clinicIdx: index("idx_vt_folders_clinic").on(t.clinicId),
+}));
 
 export const rooms = vtTable(
   "vt_rooms",
@@ -222,7 +224,9 @@ export const equipmentReturns = vtTable("vt_equipment_returns", {
   chargeAlertJobId: text("charge_alert_job_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (t) => ({
+  clinicEquipmentIdx: index("idx_vt_equipment_returns_clinic_equipment").on(t.clinicId, t.equipmentId),
+}));
 
 export const stagingQueue = vtTable(
   "vt_staging_queue",
@@ -324,7 +328,11 @@ export const scanLogs = vtTable("vt_scan_logs", {
   note: text("note"),
   photoUrl: text("photo_url"),
   timestamp: timestamp("timestamp").defaultNow().notNull(),
-});
+}, (t) => ({
+  clinicTimestampIdx: index("idx_vt_scan_logs_clinic_timestamp").on(t.clinicId, t.timestamp),
+  clinicEquipmentIdx: index("idx_vt_scan_logs_clinic_equipment").on(t.clinicId, t.equipmentId),
+  clinicUserIdx: index("idx_vt_scan_logs_clinic_user").on(t.clinicId, t.userId),
+}));
 
 export const transferLogs = vtTable("vt_transfer_logs", {
   id: text("id").primaryKey(),
@@ -368,7 +376,12 @@ export const alertAcks = vtTable("vt_alert_acks", {
   resolvedAt: timestamp("resolved_at"),
   resolvedById: text("resolved_by_id"),
   resolutionNote: text("resolution_note"),
-});
+}, (t) => ({
+  clinicEquipmentAlertIdx: index("idx_vt_alert_acks_clinic_equipment_alert").on(t.clinicId, t.equipmentId, t.alertType),
+  remindIdx: index("idx_vt_alert_acks_remind")
+    .on(t.clinicId, t.remindAt)
+    .where(sql`${t.remindedAt} IS NULL AND ${t.remindAt} IS NOT NULL`),
+}));
 
 export const undoTokens = vtTable("vt_undo_tokens", {
   id: text("id").primaryKey(),

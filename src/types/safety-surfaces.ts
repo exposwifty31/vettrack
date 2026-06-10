@@ -1,3 +1,6 @@
+import type { EquipmentCommandBoardSnapshot } from "../../shared/equipment-board.js";
+export type { EquipmentCommandBoardSnapshot };
+
 /** Ward display snapshot (`GET /api/display/snapshot`). */
 export interface DisplaySnapshotEquipment {
   id: string;
@@ -77,6 +80,8 @@ export interface DisplaySnapshot {
     performedByName: string;
   } | null;
   codeBlueSession: DisplaySnapshotCodeBlueSession | null;
+  /** Equipment command board — present when buildCommandBoardSnapshot succeeds. */
+  commandBoard?: EquipmentCommandBoardSnapshot | null;
 }
 
 export interface CrashCartItem {

@@ -1,6 +1,7 @@
 import { Helmet } from "react-helmet-async";
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
+import { t } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -39,106 +40,106 @@ interface ReleaseEntry {
 const releases: ReleaseEntry[] = [
   {
     version: "1.1.2",
-    date: "מאי 2026",
+    date: "May 2026",
     highlights: [
       {
         icon: <RefreshCw className="w-5 h-5 text-primary" />,
-        title: "מה חדש וניווט ציוד",
+        title: "What's New navigation & equipment links",
         description:
-          "קישור «ראה מה חדש» מהגדרות, מבאנר העדכון ומהתפריט עובד גם במצב פיילוט. נתיבים שגויים כמו /equipment/scan מפנים כעת לרשימת הציוד במקום מסך «הדף לא נמצא».",
-        badge: { label: "תיקון", variant: "outline" },
+          "The \"See what's new\" link from Settings, the update banner, and the menu now work correctly in pilot mode. Invalid paths such as /equipment/scan now redirect to the equipment list instead of showing a page not found screen.",
+        badge: { label: "Fix", variant: "outline" },
       },
       {
         icon: <Scan className="w-5 h-5 text-primary" />,
-        title: "סריקה ברורה במובייל",
+        title: "Clearer scan button on mobile",
         description:
-          "במסך הבית ובפיילוט הוסר כפתור סריקה כפול — במובייל נשאר רק כפתור הסריקה המרכזי בתחתית. בדסקטופ עדיין זמין קיצור דרך לסריקה.",
-        badge: { label: "תיקון", variant: "outline" },
+          "Removed the duplicate scan button on the home and pilot screens on mobile — only the central scan button at the bottom remains. The desktop shortcut is still available.",
+        badge: { label: "Fix", variant: "outline" },
       },
       {
         icon: <ShieldCheck className="w-5 h-5 text-primary" />,
-        title: "אישור ציוד ברדאר חדרים",
+        title: "Equipment confirmation in Room Radar",
         description:
-          "לחיצה על «אשר כאן» מעדכנת כעת את מצב האימות (lastVerified) ומציגה הודעת שגיאה מדויקת מהשרת במקום «לא ניתן לאשר» גנרי. ספירת פריטים בחדר (למשל ICU) תואמת לנתוני השרת.",
-        badge: { label: "תיקון", variant: "outline" },
+          "Tapping \"Confirm here\" now correctly updates the verification status and shows a precise server error message instead of the generic \"Unable to confirm\". Item counts per room (e.g. ICU) match server data.",
+        badge: { label: "Fix", variant: "outline" },
       },
       {
         icon: <MapPin className="w-5 h-5 text-primary" />,
-        title: "רדאר חדרים ותחזוקה",
+        title: "Room Radar and maintenance filter",
         description:
-          "קישור «תחזוקה» בסרגל הציוד בדסקטופ מסנן את הרשימה לפריטים בתחזוקה. ניווט מחדר לפריט ציוד נפתח תמיד לעמוד הפרטים הנכון.",
+          "The \"Maintenance\" link in the desktop equipment sidebar now filters the list to items under maintenance. Navigation from a room to an equipment item always opens the correct detail page.",
       },
       {
         icon: <HeartPulse className="w-5 h-5 text-primary" />,
-        title: "רשימת עגלת החייאה לפי בית החולים",
+        title: "Crash cart list per hospital",
         description:
-          "מנהל יכול להתאים את פריטי הבדיקה היומית לעגלה במחלקה: הוספה, עריכה והסרה ממסך בדיקת העגלה או מהגדרות. הרשימה נשמרת לכל המשמרות באותו בית חולים.",
-        badge: { label: "חדש", variant: "default" },
+          "Admins can customise the daily check list items for the crash cart per ward: add, edit, and remove items from the cart check screen or from Settings. The list persists across all shifts at that hospital.",
+        badge: { label: "New", variant: "default" },
       },
     ],
   },
   {
     version: "1.1.1",
-    date: "אפריל 2026",
+    date: "April 2026",
     highlights: [
       {
         icon: <Stethoscope className="w-5 h-5 text-primary" />,
-        title: "מטופלים פעילים",
+        title: "Active patients",
         description:
-          "קבלת מטופלים ישירות מהאפליקציה. מעקב אחר סטטוס אשפוז (קבלה, קריטי, תצפית, שיקום), מיקום מחלקה ומיטה, הווטרינר הקולט וסיבת האשפוז. מד ה-KPI במסך הבית מציג כעת ספירת מטופלים מאושפזים אמיתית.",
-        badge: { label: "חדש", variant: "default" },
+          "Admit patients directly from the app. Track hospitalisation status (admitted, critical, observation, recovery), ward location and bed, admitting vet, and reason for stay. The KPI counter on the home screen now shows a live hospitalised patient count.",
+        badge: { label: "New", variant: "default" },
       },
       {
         icon: <Siren className="w-5 h-5 text-red-500" />,
-        title: "קוד כחול — מרכז פיקוד חירום",
+        title: "Code Blue — Emergency command centre",
         description:
-          "עיצוב מחדש של קוד כחול כמרכז פיקוד חירום מלא: טיימר החייאה, רשימת משימות CPR עם חותמות זמן, יומן אירועים מהיר לתיעוד בזמן אמת, ונתיב ביקורת מלא שנשמר גם לאחר סיום האירוע.",
-        badge: { label: "עוצב מחדש", variant: "secondary" },
+          "Redesigned Code Blue as a full emergency command centre: resuscitation timer, CPR task checklist with timestamps, quick event log for real-time documentation, and a full audit trail saved after the incident ends.",
+        badge: { label: "Redesigned", variant: "secondary" },
       },
     ],
   },
   {
     version: "1.1.0",
-    date: "אפריל 2026",
+    date: "April 2026",
     highlights: [
       {
         icon: <Bell className="w-5 h-5 text-primary" />,
-        title: "התראות חכמות",
+        title: "Smart alerts",
         description:
-          "התראות Push לתזכורות החזרה, התראות על איחורים לצוות (טכנאים בכירים), וסיכומים שעתיים למנהלים — הכל ניתן להגדרה לפי תפקיד בהגדרות.",
-        badge: { label: "חדש", variant: "default" },
+          "Push notifications for return reminders, overdue alerts for staff (senior technicians), and hourly summaries for managers — all configurable by role in Settings.",
+        badge: { label: "New", variant: "default" },
       },
       {
         icon: <Shield className="w-5 h-5 text-primary" />,
-        title: "תפקידים מודעי-משמרת",
+        title: "Shift-aware roles",
         description:
-          "התפקיד האפקטיבי שלך עוקב כעת אחרי המשמרת הפעילה. הרשאות, התראות והקשר לוח הבקרה מתעדכנים אוטומטית כשאתה במשמרת.",
-        badge: { label: "חדש", variant: "default" },
+          "Your effective role now tracks the active shift. Permissions, alerts, and dashboard context update automatically when you are on shift.",
+        badge: { label: "New", variant: "default" },
       },
       {
         icon: <Smartphone className="w-5 h-5 text-primary" />,
-        title: "התראות Push בדפדפן",
+        title: "Browser push notifications",
         description:
-          "הרשם להתראות Push ישירות מהדפדפן. מתגים גרעיניים מאפשרים לך לשלוט אילו התראות לקבל — תזכורות החזרה, עדכוני צוות, או סיכומים מנהליים.",
-        badge: { label: "חדש", variant: "default" },
+          "Subscribe to push notifications directly from the browser. Granular toggles let you control which alerts you receive — return reminders, staff updates, or admin summaries.",
+        badge: { label: "New", variant: "default" },
       },
       {
         icon: <Clock className="w-5 h-5 text-primary" />,
-        title: "תזכורות החזרה מתוזמנות",
+        title: "Scheduled return reminders",
         description:
-          "כשציוד יוצא לשימוש עם זמן החזרה, המערכת שולחת תזכורת Push אוטומטית כשמגיע המועד. התזכורות מבוטלות אם הפריט הוחזר מוקדם יותר.",
+          "When equipment leaves with a scheduled return time, the system sends an automatic push reminder when the time is due. Reminders are cancelled if the item is returned early.",
       },
       {
         icon: <Users className="w-5 h-5 text-primary" />,
-        title: "ניהול משתמשים למנהלים",
+        title: "User management for admins",
         description:
-          "רשימת משתמשים עם עמודים ומסננים לממתינים, פעילים וחסומים. אישור או דחיית הרשמות, שינוי תפקידים וניהול סטטוס משתמש — הכל מלוח הניהול.",
+          "A user list with pagination and filters for pending, active, and blocked accounts. Approve or reject registrations, change roles, and manage user status — all from the admin panel.",
       },
       {
         icon: <RefreshCw className="w-5 h-5 text-primary" />,
-        title: "באנר עדכון אוטומטי",
+        title: "Automatic update banner",
         description:
-          "באנר מופיע כשגרסת VetTrack חדשה מוצבת, עם קישור ישיר לדף זה. עדכוני Service Worker מציעים רענון בלחיצה אחת.",
+          "A banner appears when a new version of VetTrack is deployed, with a direct link to this page. Service worker updates offer a one-click refresh.",
       },
     ],
   },
@@ -148,14 +149,14 @@ export default function WhatsNewPage() {
   return (
     <Layout>
       <Helmet>
-        <title>מה חדש — VetTrack</title>
+        <title>{t.whatsNew.title}</title>
       </Helmet>
 
       <div className="max-w-2xl space-y-6 animate-fade-in">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold">מה חדש</h1>
+          <h1 className="text-2xl font-bold">{t.whatsNew.heading}</h1>
           <p className="text-sm text-muted-foreground">
-            הפיצ׳רים והשיפורים האחרונים של VetTrack.
+            {t.whatsNew.description}
           </p>
         </div>
 
@@ -208,7 +209,7 @@ export default function WhatsNewPage() {
             href="/settings"
             className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline underline-offset-2"
           >
-            הגדר התראות בהגדרות
+            {t.whatsNew.configureAlerts}
             <ArrowLeft className="w-3.5 h-3.5" />
           </Link>
         </div>

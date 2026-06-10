@@ -19,6 +19,7 @@ import {
   isCheckViolation,
   isInventoryConstraintError,
 } from "../lib/db-constraint-errors.js";
+import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 const router = Router();
 
@@ -43,19 +44,6 @@ export const emergencySchema = z.object({
   items: z.array(itemSchema),
   bypassReason: z.enum(["EMERGENCY_CPR", "PROTOCOL_OVERRIDE", "TECH_ERROR"]),
 }).strict();
-
-function resolveRequestId(res: { getHeader: (n: string) => unknown; setHeader?: (n: string, v: string) => void }, incoming: unknown): string {
-  const incomingStr = typeof incoming === "string" ? incoming.trim() : "";
-  const existing = res.getHeader("x-request-id");
-  const fromRes = typeof existing === "string" ? existing.trim() : "";
-  const requestId = incomingStr || fromRes || randomUUID();
-  if (typeof res.setHeader === "function") res.setHeader("x-request-id", requestId);
-  return requestId;
-}
-
-function apiError(params: { code: string; reason: string; message: string; requestId: string }) {
-  return { code: params.code, error: params.code, reason: params.reason, message: params.message, requestId: params.requestId };
-}
 
 function sendError(req: Request, res: Response, err: unknown, requestId: string): void {
   // Phase 5 PR 5.7 — render the clinical-invariant §6.3 422

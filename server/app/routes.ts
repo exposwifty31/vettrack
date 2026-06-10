@@ -71,9 +71,10 @@ function registerInfrastructureRoutes(app: express.Express) {
 }
 
 function registerEquipmentCoreRoutes(app: express.Express) {
-  // Copilot nested routes (/:id/copilot/*) — register before the main equipment router.
-  app.use("/api/equipment", equipmentCopilotRoutes);
+  // Main equipment router first; copilot nested routes (/:id/copilot/*) pass through when
+  // unmatched. Copilot middleware is scoped to POST /:id/copilot/explain only.
   app.use("/api/equipment", equipmentRoutes);
+  app.use("/api/equipment", equipmentCopilotRoutes);
   // Bare /api mounts: operational-state and operational-metrics attach to the shared
   // /api prefix. Keep them immediately after /api/equipment and before narrower paths.
   app.use("/api", equipmentOperationalStateRoutes);
