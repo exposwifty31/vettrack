@@ -565,8 +565,9 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
 
   const activeTabIndex = useMemo(() => {
     if (!bottomNavItems) return -1;
+    if (menuOpen) return bottomNavItems.length;
     return bottomNavItems.findIndex((n) => resolveNavItemActive(location, n.href));
-  }, [bottomNavItems, location]);
+  }, [bottomNavItems, location, menuOpen]);
 
   const useLegacyBottomNav = !bottomNavItems?.length;
 
@@ -588,7 +589,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   }, [bottomNavActive, menuOpen]);
 
   const bottomNavPillIndex = useLegacyBottomNav ? legacyActiveTabIndex : activeTabIndex;
-  const bottomNavColCount = useLegacyBottomNav ? 5 : (bottomNavItems?.length ?? 5);
+  const bottomNavColCount = useLegacyBottomNav ? 5 : (bottomNavItems?.length ?? 5) + 1;
 
   const hasPending = pendingCount > 0;
   const hasFailed = failedCount > 0;
@@ -617,6 +618,12 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     setQuickSettingsOpen(false);
     setMenuOpen(false);
     navigate("/settings");
+  };
+
+  /** Slide-menu navigation — explicit navigate() for reliable iOS WebView taps. */
+  const closeMenuAndNavigate = (href: string) => {
+    setMenuOpen(false);
+    navigate(href);
   };
 
   return (
@@ -915,7 +922,10 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={() => setMenuOpen(false)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      closeMenuAndNavigate(item.href);
+                    }}
                     data-testid={`nav-${item.href.replace("/", "") || "home"}`}
                     className="cursor-pointer block w-full text-left opacity-0 [animation:navItemFade_160ms_ease-out_forwards]"
                     style={{ animationDelay: menuVisible ? `${index * 16}ms` : "0ms" }}
@@ -969,7 +979,10 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                       <Link
                         key={item.href}
                         href={item.href}
-                        onClick={() => setMenuOpen(false)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          closeMenuAndNavigate(item.href);
+                        }}
                         data-testid={`nav-${item.href.replace("/", "") || "home"}`}
                         className="cursor-pointer block w-full text-left opacity-0 [animation:navItemFade_160ms_ease-out_forwards]"
                         style={{ animationDelay: menuVisible ? `${stagger * 16}ms` : "0ms" }}
@@ -1018,7 +1031,10 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={() => setMenuOpen(false)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      closeMenuAndNavigate(item.href);
+                    }}
                     data-testid={`nav-${item.href.replace("/", "") || "home"}`}
                     className="cursor-pointer block w-full text-left opacity-0 [animation:navItemFade_160ms_ease-out_forwards]"
                     style={{ animationDelay: menuVisible ? `${stagger * 16}ms` : "0ms" }}
@@ -1109,7 +1125,10 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={() => setMenuOpen(false)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      closeMenuAndNavigate(item.href);
+                    }}
                     data-testid={`nav-${item.href.replace("/", "") || "home"}`}
                     className="cursor-pointer block w-full text-left opacity-0 [animation:navItemFade_160ms_ease-out_forwards]"
                     style={{ animationDelay: menuVisible ? `${stagger * 16}ms` : "0ms" }}
@@ -1190,7 +1209,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
       </main>
 
       <nav
-        className="bottom-bar fixed bottom-0 left-0 right-0 z-50 border-t border-ivory-border backdrop-blur-xl shadow-[0_-4px_24px_-8px_rgba(0,0,0,0.12)]"
+        className="bottom-bar fixed bottom-0 left-0 right-0 z-[52] border-t border-ivory-border backdrop-blur-xl shadow-[0_-4px_24px_-8px_rgba(0,0,0,0.12)]"
         style={{
           background: "var(--nav-bg)",
           paddingBottom: "env(safe-area-inset-bottom)",
@@ -1205,9 +1224,9 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
             "relative grid max-w-2xl mx-auto items-end min-h-[68px] px-0.5 pt-1",
             useLegacyBottomNav
               ? "grid-cols-5"
-              : bottomNavItems!.length === 6
-                ? "grid-cols-6"
-                : "grid-cols-5",
+              : bottomNavItems!.length >= 6
+                ? "grid-cols-7"
+                : "grid-cols-6",
           )}
         >
           {bottomNavPillIndex >= 0 && (
@@ -1402,6 +1421,37 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                 </Link>
               );
             })
+          )}
+          {!useLegacyBottomNav && (
+            <button
+              type="button"
+              onClick={() => setMenuOpen((o) => !o)}
+              className={cn(
+                "flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] w-full",
+                "transition-opacity duration-150 motion-safe:active:opacity-80 motion-reduce:active:opacity-100",
+                "rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                "cursor-pointer",
+                navigationLocked && "opacity-40",
+              )}
+              aria-expanded={menuOpen}
+              aria-label={menuOpen ? t.common.closeNavigationMenu : lh.bottomMenu}
+              data-testid="bottom-nav-menu"
+            >
+              {menuOpen ? (
+                <X
+                  className={cn("w-6 h-6 transition-all duration-200", "text-ivory-green scale-110")}
+                  aria-hidden
+                />
+              ) : (
+                <Menu
+                  className={cn("w-6 h-6 transition-all duration-200", "text-ivory-text3 scale-100")}
+                  aria-hidden
+                />
+              )}
+              <span className={cn("text-[10px] font-semibold", menuOpen ? "text-ivory-green" : "text-ivory-text3")}>
+                {lh.bottomMenu}
+              </span>
+            </button>
           )}
         </div>
       </nav>

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
 import { leaderPoll } from "@/lib/leader";
-import { Layout } from "@/components/layout";
+import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -122,7 +122,7 @@ export default function ManagementDashboardPage() {
   }
 
   return (
-    <Layout>
+    <AppShell>
       <Helmet>
         <title>Management Dashboard — VetTrack</title>
         <meta name="description" content="Live management dashboard for veterinary hospital equipment. Track who has what, monitor locations, review critical alerts, and generate monthly PDF reports." />
@@ -465,6 +465,6 @@ export default function ManagementDashboardPage() {
       {scannerOpen && (
         <QrScanner onClose={() => setScannerOpen(false)} />
       )}
-    </Layout>
+    </AppShell>
   );
 }

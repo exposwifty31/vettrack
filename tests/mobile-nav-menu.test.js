@@ -153,6 +153,16 @@ describe("Mobile nav — i18n labels resolve in every locale", () => {
     });
   }
 
+  it("NAV bottom bar keeps a menu button for management routes", () => {
+    expect(layoutSrc).toContain('data-testid="bottom-nav-menu"');
+    expect(layoutSrc).toContain("!useLegacyBottomNav && (");
+  });
+
+  it("slide-menu items navigate via explicit navigate() for iOS WebView reliability", () => {
+    expect(layoutSrc).toContain("closeMenuAndNavigate");
+    expect(layoutSrc).toMatch(/closeMenuAndNavigate\(item\.href\)/);
+  });
+
   it("layout.tsx still routes core menu labels through i18n (no raw strings)", () => {
     // Sanity guard: make sure the home/equipment/alerts entries reference an
     // i18n token rather than a bare string — that's how the bug was masked
