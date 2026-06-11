@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import * as Sentry from "@sentry/react";
+import { resolveApiUrl } from "./api-origin";
 import { t } from "./i18n";
 import {
   getPendingSync,
@@ -374,7 +375,7 @@ async function attemptSync(item: PendingSync): Promise<ItemResult> {
     try {
       // Intentional raw fetch: replays the exact queued endpoint/method. Routing
       // through `request()` would re-enter the offline queue and 401 redirect paths.
-      res = await fetch(item.endpoint, {
+      res = await fetch(resolveApiUrl(item.endpoint), {
         method: item.method,
         headers,
         body: item.body || undefined,

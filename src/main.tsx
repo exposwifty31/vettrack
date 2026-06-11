@@ -26,6 +26,8 @@ import {
   registerServiceWorkerSafe,
 } from "@/lib/safe-browser";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import { clerkProviderPropsForRuntime } from "@/lib/clerk-capacitor-config";
+import { NativeClerkGate } from "@/components/native-clerk-gate";
 import { primeNfcSupportCache } from "@/lib/nfc-platform";
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -36,12 +38,13 @@ const CLERK_ENABLED = Boolean(PUBLISHABLE_KEY);
 //   Missing publishable key           => dev bypass mode
 // Emits a single, secret-free startup line so operators and agents can confirm
 // which mode the browser is about to run in before hitting the UI.
-if (import.meta.env.DEV) {
+if (import.meta.env.DEV || isCapacitorNative()) {
   const rawKey = typeof PUBLISHABLE_KEY === "string" ? PUBLISHABLE_KEY.trim() : "";
   const keyPrefix = rawKey ? rawKey.slice(0, 7) : "(none)";
+  const apiOrigin = import.meta.env.VITE_API_ORIGIN?.trim() || "(same-origin)";
   // eslint-disable-next-line no-console
   console.info(
-    `[auth-mode] client=${CLERK_ENABLED ? "clerk" : "dev-bypass"} publishableKey=${keyPrefix} env=${import.meta.env.MODE}`,
+    `[auth-mode] client=${CLERK_ENABLED ? "clerk" : "dev-bypass"} publishableKey=${keyPrefix} apiOrigin=${apiOrigin} env=${import.meta.env.MODE}`,
   );
 }
 
@@ -75,7 +78,9 @@ function AppBootstrap() {
 
   useEffect(() => {
     if (isCapacitorNative()) {
-      void primeNfcSupportCache();
+      void primeNfcSupportCache().catch(() => {
+        // NFC probe is best-effort; QR/manual entry remains available.
+      });
       return;
     }
     if (!isServiceWorkerSupported()) return;
@@ -195,17 +200,16 @@ if (!rootEl) {
     </QueryClientProvider>
   );
 
+  const clerkRuntime = CLERK_ENABLED ? clerkProviderPropsForRuntime(PUBLISHABLE_KEY) : null;
+
   createRoot(rootEl).render(
     <HelmetProvider>
-      {CLERK_ENABLED ? (
+      {clerkRuntime ? (
         <ClerkProvider
-          publishableKey={PUBLISHABLE_KEY}
-          // Permit the native OAuth callback scheme (vettrack://oauth-callback)
-          // used by src/lib/native-oauth.ts for system-browser social sign-in.
-          // Harmless on web (the scheme is never used there).
-          allowedRedirectOrigins={["vettrack://oauth-callback", "vettrack://"]}
+          publishableKey={clerkRuntime.publishableKey}
+          allowedRedirectOrigins={clerkRuntime.allowedRedirectOrigins}
         >
-          {appShell}
+          <NativeClerkGate>{appShell}</NativeClerkGate>
         </ClerkProvider>
       ) : (
         appShell

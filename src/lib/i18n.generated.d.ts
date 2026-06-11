@@ -28,6 +28,7 @@ export interface TStructure {
     openNavigationMenu: string;
     breadcrumb: string;
     quickSettings: string;
+    skipToMainContent: string;
     toast: {
       savedSuccess: string;
       unexpectedError: string;
@@ -615,6 +616,7 @@ export interface TStructure {
       retry: string;
       signOut: string;
       loadingApp: string;
+      nativeClerkFailed: string;
       reasons: {
         missingClinicId: string;
         dbFallbackDisabled: string;

@@ -1,9 +1,14 @@
 import { Redirect, Route, Switch, useSearch } from "wouter";
 import { lazy } from "react";
 import { AuthGuard } from "@/features/auth/components/AuthGuard";
+import { AuthBootstrapSpinner } from "@/components/native-clerk-gate";
+import { RouteFallback } from "@/components/route-fallback";
 import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { useAuth } from "@/hooks/use-auth";
+import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { shouldShowPostSignupLanding } from "@/lib/post-signup-landing";
+
+const CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
 // --- Always-available pages ---
 const HomePage = lazy(() => import("@/pages/home"));
@@ -61,8 +66,13 @@ function RedirectPreserveSearch({ to }: { to: string }) {
 function RootRoute() {
   const { isLoaded, isSignedIn, isOfflineSession } = useAuth();
 
+  // Bundled Capacitor shell: skip marketing landing — sign-in has Clerk loading/error UI.
+  if (isCapacitorNative() && CLERK_ENABLED && !isOfflineSession && !isSignedIn) {
+    return <Redirect to="/signin" replace />;
+  }
+
   if (!isLoaded && !isOfflineSession) {
-    return null;
+    return isCapacitorNative() ? <AuthBootstrapSpinner /> : <RouteFallback />;
   }
 
   if (isSignedIn && !shouldShowPostSignupLanding()) {

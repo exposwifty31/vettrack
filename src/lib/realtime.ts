@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { resolveApiUrl } from "@/lib/api-origin";
 import { getCurrentClinicId } from "@/lib/auth-store";
 import { applyEvent, DISPLAY_SNAPSHOT_QUERY_KEY, forceResyncWardErCaches, resetRealtimeCaches } from "@/lib/event-reducer";
 import type { RealtimeEvent } from "@/types/realtime-events";
@@ -765,7 +766,7 @@ export class EventIngestor {
 function attachSharedStream(): void {
   if (source) return;
 
-  source = new EventSource("/api/realtime/stream");
+  source = new EventSource(resolveApiUrl("/api/realtime/stream"));
   source.onopen = () => {
     // SSE reconnect replays at most 1000 rows; paginated HTTP catch-up closes larger gaps.
     for (const ing of ingestors) {

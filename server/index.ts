@@ -100,6 +100,12 @@ function normalizeOrigin(value: string | undefined): string | null {
   }
 }
 
+/** Capacitor bundled-shell WebView origins (cross-origin API calls from native app). */
+const CAPACITOR_WEBVIEW_ORIGINS = new Set([
+  "capacitor://localhost",
+  "ionic://localhost",
+]);
+
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -174,6 +180,11 @@ app.use(
           } catch {
             // fall through to ALLOWED_ORIGIN check
           }
+        }
+
+        if (isProduction && CAPACITOR_WEBVIEW_ORIGINS.has(requestOrigin)) {
+          callback(null, requestOrigin);
+          return;
         }
 
         const allowedOrigin = normalizeOrigin(process.env.ALLOWED_ORIGIN);

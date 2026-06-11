@@ -1,4 +1,5 @@
 import { getCurrentUserId, getStoredBearerToken } from "./auth-store";
+import { resolveApiUrl } from "./api-origin";
 
 type ClerkTokenGetter = (() => Promise<string | null>) | null;
 
@@ -29,8 +30,9 @@ async function resolveToken(): Promise<string | null> {
 }
 
 export async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const resolvedUrl = resolveApiUrl(url);
   if (!url.startsWith("/api/")) {
-    return fetch(url, { ...options, credentials: "include" });
+    return fetch(resolvedUrl, { ...options, credentials: "include" });
   }
 
   const userId = getCurrentUserId()?.trim();
@@ -52,7 +54,7 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const res = await fetch(url, {
+  const res = await fetch(resolvedUrl, {
     ...options,
     headers,
     credentials: "include",

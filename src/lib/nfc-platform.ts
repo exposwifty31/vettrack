@@ -1,3 +1,4 @@
+import { CapacitorNfc as CapacitorNfcNative } from "@capgo/capacitor-nfc";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import {
   decodeCapgoNdefRecords,
@@ -19,9 +20,10 @@ function hasWebNfc(): boolean {
   return typeof window !== "undefined" && "NDEFReader" in window;
 }
 
-async function loadCapgoNfc() {
-  const mod = await import("@capgo/capacitor-nfc");
-  return mod.CapacitorNfc;
+function loadCapgoNfc() {
+  // Static import keeps the native bridge registered on iOS/Android; dynamic import
+  // can fall through to the web stub and throw "CapacitorNfc.then() is not implemented".
+  return CapacitorNfcNative;
 }
 
 /** NFC available: Web NFC (Android Chrome) or native Capacitor plugin (iOS/Android app). */
@@ -30,7 +32,7 @@ export async function isNfcSupported(): Promise<boolean> {
   if (!isCapacitorNative()) return false;
   if (nativeSupportCache !== null) return nativeSupportCache;
   try {
-    const CapacitorNfc = await loadCapgoNfc();
+    const CapacitorNfc = loadCapgoNfc();
     const { supported } = await CapacitorNfc.isSupported();
     nativeSupportCache = supported;
     return supported;
@@ -121,7 +123,7 @@ async function readNfcOnceNative(
   signal?: AbortSignal,
   alertMessage?: string,
 ): Promise<NfcReadPayload> {
-  const CapacitorNfc = await loadCapgoNfc();
+  const CapacitorNfc = loadCapgoNfc();
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(new DOMException("Aborted", "AbortError"));
@@ -218,7 +220,7 @@ async function startNfcScanSessionNative(options: {
   signal?: AbortSignal;
   alertMessage?: string;
 }): Promise<NfcScanSession> {
-  const CapacitorNfc = await loadCapgoNfc();
+  const CapacitorNfc = loadCapgoNfc();
   const listener = await CapacitorNfc.addListener("nfcEvent", async (event) => {
     const payload = decodeCapgoNdefRecords(
       event.tag?.ndefMessage ?? null,
@@ -256,7 +258,7 @@ export async function writeNfcUrl(url: string): Promise<void> {
   }
   if (!isCapacitorNative()) throw new Error("nfc_unsupported");
 
-  const CapacitorNfc = await loadCapgoNfc();
+  const CapacitorNfc = loadCapgoNfc();
   const record = encodeCapgoNdefUrlRecord(url);
   await CapacitorNfc.startScanning({
     invalidateAfterFirstRead: false,

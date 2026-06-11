@@ -16,6 +16,8 @@ interface Window {
 
 interface ImportMetaEnv {
   readonly VITE_CLERK_PUBLISHABLE_KEY: string;
+  /** Production API host for bundled Capacitor shell (e.g. https://vettrack.uk). */
+  readonly VITE_API_ORIGIN?: string;
   readonly VITE_WHATSAPP_PHONE: string;
   readonly VITE_OFFLINE_PHASE9_POST_SYNC_RECONCILIATION?: string;
 }

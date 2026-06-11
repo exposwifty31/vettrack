@@ -15,6 +15,7 @@
     "dev": "concurrently -k -p \"[{name}]\" -n \"api,web\" -c \"cyan,teal\" \"cross-env PORT=3001 tsx watch server/index.ts\" \"vite --port 5000 --host\"",
     "build": "vite build",
     "cap:sync": "pnpm build && npx cap sync",
+    "cap:sync:remote": "CAPACITOR_SERVER_URL=https://vettrack.uk pnpm cap:sync",
     "cap:open:ios": "npx cap open ios",
     "cap:open:android": "npx cap open android",
     "start": "cross-env NODE_ENV=production tsx server/index.ts",
