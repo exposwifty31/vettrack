@@ -5,7 +5,11 @@ import { Loader2, QrCode } from "lucide-react";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignIn } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
 import { PhoneSignIn } from "@/components/phone-sign-in";
-import { clerkAppearance } from "@/lib/clerk-appearance";
+import { clerkAppearance, clerkAppearanceNative } from "@/lib/clerk-appearance";
+import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import { NativeSocialButtons } from "@/components/native-social-buttons";
+
+const IS_NATIVE = isCapacitorNative();
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
@@ -72,11 +76,12 @@ export default function SignInPage() {
                   </ClerkFailed>
                   <ClerkLoaded>
                     <div className="w-full min-h-[24rem] flex flex-col items-center justify-start">
+                      {IS_NATIVE ? <NativeSocialButtons mode="signIn" /> : null}
                       <SignIn
                         routing="hash"
                         signUpUrl="/signup"
                         fallbackRedirectUrl="/home"
-                        appearance={clerkAppearance}
+                        appearance={IS_NATIVE ? clerkAppearanceNative : clerkAppearance}
                       />
                     </div>
                   </ClerkLoaded>

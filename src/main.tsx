@@ -198,7 +198,13 @@ if (!rootEl) {
   createRoot(rootEl).render(
     <HelmetProvider>
       {CLERK_ENABLED ? (
-        <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+        <ClerkProvider
+          publishableKey={PUBLISHABLE_KEY}
+          // Permit the native OAuth callback scheme (vettrack://oauth-callback)
+          // used by src/lib/native-oauth.ts for system-browser social sign-in.
+          // Harmless on web (the scheme is never used there).
+          allowedRedirectOrigins={["vettrack://oauth-callback", "vettrack://"]}
+        >
           {appShell}
         </ClerkProvider>
       ) : (

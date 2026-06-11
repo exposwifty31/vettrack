@@ -32,3 +32,22 @@ export const clerkAppearance = {
     identityPreviewText: "text-foreground",
   },
 };
+
+/**
+ * Native (Capacitor) variant: hides Clerk's built-in social buttons and the
+ * "or" divider, because the in-WebView provider redirect is blocked by Apple /
+ * Google. In the native shell we render our own system-browser social buttons
+ * (`<NativeSocialButtons />`) above the Clerk form and keep only the
+ * email/password + email-code flows inside the Clerk component.
+ */
+export const clerkAppearanceNative = {
+  ...clerkAppearance,
+  elements: {
+    ...clerkAppearance.elements,
+    socialButtonsRoot: "hidden",
+    socialButtonsBlockButton: "hidden",
+    socialButtonsProviderIcon: "hidden",
+    dividerRow: "hidden",
+    dividerText: "hidden",
+  },
+};

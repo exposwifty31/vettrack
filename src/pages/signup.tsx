@@ -5,7 +5,11 @@ import { Helmet } from "react-helmet-async";
 import { Loader2, QrCode } from "lucide-react";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignUp } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
-import { clerkAppearance } from "@/lib/clerk-appearance";
+import { clerkAppearance, clerkAppearanceNative } from "@/lib/clerk-appearance";
+import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import { NativeSocialButtons } from "@/components/native-social-buttons";
+
+const IS_NATIVE = isCapacitorNative();
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
@@ -59,11 +63,12 @@ export default function SignUpPage() {
               </ClerkFailed>
               <ClerkLoaded>
                 <div className="w-full min-h-[24rem] flex flex-col items-center justify-start">
+                  {IS_NATIVE ? <NativeSocialButtons mode="signUp" /> : null}
                   <SignUp
                     routing="hash"
                     signInUrl="/signin"
                     fallbackRedirectUrl="/"
-                    appearance={clerkAppearance}
+                    appearance={IS_NATIVE ? clerkAppearanceNative : clerkAppearance}
                   />
                 </div>
               </ClerkLoaded>
