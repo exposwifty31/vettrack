@@ -249,12 +249,14 @@ ci:merge-gate:
       for i in $(seq 1 60); do
         if wget -q -O /dev/null http://127.0.0.1:3001/api/healthz 2>/dev/null; then
           echo "API ready"
-          exit 0
+          break
         fi
         sleep 2
       done
-      tail -n 200 /tmp/vettrack-playwright.log || true
-      exit 1
+      if ! wget -q -O /dev/null http://127.0.0.1:3001/api/healthz 2>/dev/null; then
+        tail -n 200 /tmp/vettrack-playwright.log || true
+        exit 1
+      fi
     - pnpm seed:dev:e2e
     - pnpm test:playwright:ci --shard=${PLAYWRIGHT_SHARD}/${PLAYWRIGHT_SHARD_TOTAL}
   artifacts:
@@ -272,6 +274,16 @@ playwright:shard-2:
   variables:
     PLAYWRIGHT_SHARD: "2"
     PLAYWRIGHT_SHARD_TOTAL: "2"
+ci:playwright-gate:
+  extends: .node_job
+  stage: playwright
+  needs:
+    - playwright:shard-1
+    - playwright:shard-2
+  rules:
+    - !reference [.playwright_branch_rules, rules]
+  script:
+    - echo "Playwright shards succeeded."
 # --- flake-detection.yml ------------------------------------------------------
 # GitLab pipeline schedule cron: 0 3 * * *
 flake-detection:run:
@@ -472,11 +484,16 @@ e2e-simulation:nightly:
     - pnpm dev:api > /tmp/vettrack-simulation.log 2>&1 &
     - |
       for i in $(seq 1 60); do
-        if wget -q -O /dev/null http://127.0.0.1:3001/api/healthz 2>/dev/null; then exit 0; fi
+        if wget -q -O /dev/null http://127.0.0.1:3001/api/healthz 2>/dev/null; then
+          echo "API ready"
+          break
+        fi
         sleep 2
       done
-      tail -n 200 /tmp/vettrack-simulation.log || true
-      exit 1
+      if ! wget -q -O /dev/null http://127.0.0.1:3001/api/healthz 2>/dev/null; then
+        tail -n 200 /tmp/vettrack-simulation.log || true
+        exit 1
+      fi
     - pnpm seed:dev:e2e
     - pnpm test:playwright:workday --reporter=list
   artifacts:
