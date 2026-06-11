@@ -161,6 +161,15 @@ app.use(
   cors({
     origin: (origin, callback) => {
       try {
+        // Capacitor/Ionic schemes are non-special per the WHATWG URL spec, so
+        // `new URL("capacitor://localhost").origin` is the literal string "null"
+        // — match the raw header against the fixed allowlist before normalizing.
+        const rawOrigin = origin?.trim();
+        if (isProduction && rawOrigin && CAPACITOR_WEBVIEW_ORIGINS.has(rawOrigin)) {
+          callback(null, rawOrigin);
+          return;
+        }
+
         const requestOrigin = normalizeOrigin(origin);
         if (!requestOrigin) {
           callback(null, false);
@@ -180,11 +189,6 @@ app.use(
           } catch {
             // fall through to ALLOWED_ORIGIN check
           }
-        }
-
-        if (isProduction && CAPACITOR_WEBVIEW_ORIGINS.has(requestOrigin)) {
-          callback(null, requestOrigin);
-          return;
         }
 
         const allowedOrigin = normalizeOrigin(process.env.ALLOWED_ORIGIN);
