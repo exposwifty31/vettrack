@@ -1,0 +1,21 @@
+# Mobile native projects — not needed for server build
+ios/
+android/
+
+# Dev assets and screenshots — not part of deployable server
+attached_assets/
+playwright-ui-screenshots/
+playwright-report/
+blob-report/
+test-results/
+load/
+artifacts/
+
+# Docs — not served by the Express app
+docs/
+
+# Local dev files
+*.bak
+*.tmp
+.tmp-*
+pilot-vars-backup.txt

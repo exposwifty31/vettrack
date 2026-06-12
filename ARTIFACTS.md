@@ -130,6 +130,19 @@ Extended in M10 — integration + equipment tables.
 
 Total indexes added across the program: **~35** across 14 tables. All legacy billing/hospitalization tables verified already indexed in migration 035/071.
 
+### M11 — Planning consolidation + baseline re-validation (2026-06-12)
+
+**Planning deliverables completed (Phase 1 gate):**
+- Created `docs/master-plan.md` — governing transformation plan consolidating Phase A–C + M0–M10 evidence, remaining phases R1–R4, risk register, success criteria
+- Created `docs/mobile/native-ux-audit.md` — native shell architecture (Option A/B), OAuth UX, integrations matrix, PWA install state, offline/clinical-safety behavior, prioritized findings
+
+**Baseline validation + 3 defect fixes (all verified by full suite):**
+1. **api-origin gating (staged Option-B work):** `resolveApiUrl()` prefixed `VITE_API_ORIGIN` unconditionally — with the var in local `.env`, vitest and `pnpm dev` sent API calls to production. Now gated on `needsRemoteApiOrigin()` (bundled native shell only), matching the module's documented intent. Fixed 9 test failures (`sync-engine-replay-headers`, `auth-bootstrap-fetch`); `tests/api-origin.test.ts` rewritten to assert the gated contract.
+2. **Stale static assertion:** commit `085c5413` changed the bottom bar `z-50` → `z-[52]` without updating `tests/phase-3-ui-token-consistency.test.js`; assertion no longer pins the z-index.
+3. **Timezone-dependent integration test:** `tests/equipment-waitlist.integration.test.ts` backdated `reservation_expires_at` with DB-local `now()`, but drizzle writes the naive column as UTC wall time — failed deterministically on non-UTC Postgres (Asia/Jerusalem locally; UTC CI masked it). Backdate now uses `now() AT TIME ZONE 'UTC'`.
+
+**Validation:** `npx tsc --noEmit` → 0 errors; `pnpm test` → **331/331 files, 3325/3325 tests passing** (up from 318 baseline; suite grew with merged transformation work).
+
 ---
 
 ## Metrics
@@ -172,6 +185,8 @@ Total indexes added across the program: **~35** across 14 tables. All legacy bil
 | `migrations/150_integrations_indexes.sql` | DB indexes: integration tables |
 | `migrations/151_equipment_scan_logs_indexes.sql` | DB indexes: folders, returns, scan_logs, alert_acks |
 | `docs/mobile/store-metadata.md` | App Store / Play Store metadata |
+| `docs/master-plan.md` | Governing transformation plan (Phase 1 deliverable) |
+| `docs/mobile/native-ux-audit.md` | Native & mobile UX audit (Phase 1 deliverable) |
 
 ---
 
