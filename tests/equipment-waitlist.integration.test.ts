@@ -326,7 +326,9 @@ describe.skipIf(!dbReachable)("equipment waitlist integration", () => {
     await waitForNotified(ctx.eqId, ctx.clinicId, 1);
 
     await probePool!.query(
-      `UPDATE vt_equipment_waitlist SET reservation_expires_at = now() - interval '1 minute'
+      // Drizzle writes this naive-timestamp column as UTC wall time, so backdate
+      // in UTC too — DB-local now() breaks on machines where Postgres isn't UTC.
+      `UPDATE vt_equipment_waitlist SET reservation_expires_at = (now() AT TIME ZONE 'UTC') - interval '1 minute'
        WHERE clinic_id = $1 AND equipment_id = $2 AND status = 'notified'`,
       [ctx.clinicId, ctx.eqId],
     );

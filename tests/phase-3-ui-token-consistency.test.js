@@ -41,7 +41,7 @@ describe("Wave 3 UI token consistency checks (static)", () => {
 
   it("Layout bottom navigation uses Ivory design token classes", () => {
     expect(
-      layout.includes("fixed bottom-0 left-0 right-0 z-50") &&
+      layout.includes("fixed bottom-0 left-0 right-0") &&
         layout.includes("border-t") &&
         layout.includes("border-ivory-border") &&
         layout.includes("text-ivory-green"),

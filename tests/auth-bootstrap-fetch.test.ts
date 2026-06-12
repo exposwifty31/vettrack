@@ -39,7 +39,7 @@ describe("bootstrapFetchWithTimeout", () => {
       "function bootstrapFetchWithTimeout(",
       "export async function authFetchUsersMe",
     );
-    expect(fnBody).toContain("fetch(url");
+    expect(fnBody).toContain("fetch(resolveApiUrl(url)");
     expect(fnBody).not.toContain("authFetch(");
   });
 });

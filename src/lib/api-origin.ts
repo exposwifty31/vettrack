@@ -29,16 +29,18 @@ export function needsRemoteApiOrigin(): boolean {
 export function resolveApiUrl(path: string): string {
   if (!path.startsWith("/")) return path;
 
+  // Only the bundled native shell needs an absolute origin. Browser, PWA, dev
+  // server, and live-server Capacitor must keep same-origin relative paths even
+  // when VITE_API_ORIGIN happens to be set in the build environment.
+  if (!needsRemoteApiOrigin()) return path;
+
   const configured = getConfiguredApiOrigin();
   if (configured) {
     return `${configured}${path}`;
   }
 
-  if (needsRemoteApiOrigin()) {
-    console.error(
-      "[api-origin] Bundled native app is missing VITE_API_ORIGIN — /api calls will hit the local shell.",
-    );
-  }
-
+  console.error(
+    "[api-origin] Bundled native app is missing VITE_API_ORIGIN — /api calls will hit the local shell.",
+  );
   return path;
 }
