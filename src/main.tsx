@@ -1,5 +1,5 @@
 import { createRoot } from "react-dom/client";
-import { ClerkProvider } from "@clerk/clerk-react";
+import { ClerkProvider, type ClerkProp } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
 import App from "./App";
 import "./index.css";
@@ -202,15 +202,29 @@ if (!rootEl) {
 
   const clerkRuntime = CLERK_ENABLED ? clerkProviderPropsForRuntime(PUBLISHABLE_KEY) : null;
 
-  createRoot(rootEl).render(
-    <HelmetProvider>
-      {clerkRuntime ? (
-        <ClerkProvider {...clerkRuntime}>
-          <NativeClerkGate>{appShell}</NativeClerkGate>
-        </ClerkProvider>
-      ) : (
-        appShell
-      )}
-    </HelmetProvider>
-  );
+  // The bundled Capacitor shell needs a self-constructed clerk-js instance with
+  // native request transport (_is_native=1 + Authorization header) — cookie-based
+  // hot-loaded clerk-js cannot complete system-browser OAuth on a production
+  // instance (see src/lib/clerk-native-instance.ts). Loaded dynamically so the
+  // web bundle never ships clerk-js.
+  const nativeClerkPromise: Promise<ClerkProp> =
+    clerkRuntime && isCapacitorNative()
+      ? import("@/lib/clerk-native-instance").then(
+          (m) => m.createNativeClerkInstance(PUBLISHABLE_KEY) as unknown as ClerkProp,
+        )
+      : Promise.resolve(undefined);
+
+  void nativeClerkPromise.then((nativeClerk) => {
+    createRoot(rootEl).render(
+      <HelmetProvider>
+        {clerkRuntime ? (
+          <ClerkProvider {...clerkRuntime} Clerk={nativeClerk}>
+            <NativeClerkGate>{appShell}</NativeClerkGate>
+          </ClerkProvider>
+        ) : (
+          appShell
+        )}
+      </HelmetProvider>
+    );
+  });
 }
