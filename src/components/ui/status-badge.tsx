@@ -5,22 +5,24 @@ import {
   type StatusKind,
 } from "@/lib/design-tokens";
 
+// --status-{ok,issue,maintenance,sterilized} and --muted/--muted-foreground are
+// bare HSL triplets, --ivory-* are bare RGB triplets — they are only valid CSS
+// colors wrapped in hsl()/rgb(). The *-bg/-fg/-border and --status-info vars are
+// full color values and must NOT be wrapped.
 const KIND: Record<
   StatusKind,
   { bg: string; fg: string; bd: string; dot: string }
 > = {
-  ok:          { bg: "var(--status-ok-bg)",     fg: "var(--status-ok-fg)",     bd: "var(--status-ok-border)",     dot: "var(--status-ok)" },
-  issue:       { bg: "var(--status-issue-bg)",  fg: "var(--status-issue-fg)",  bd: "var(--status-issue-border)",  dot: "var(--status-issue)" },
-  maintenance: { bg: "var(--status-maint-bg)",  fg: "var(--status-maint-fg)",  bd: "var(--status-maint-border)",  dot: "var(--status-maintenance)" },
-  sterilized:  { bg: "var(--status-steril-bg)", fg: "var(--status-steril-fg)", bd: "var(--status-steril-border)", dot: "var(--status-sterilized)" },
+  ok:          { bg: "var(--status-ok-bg)",     fg: "var(--status-ok-fg)",     bd: "var(--status-ok-border)",     dot: "hsl(var(--status-ok))" },
+  issue:       { bg: "var(--status-issue-bg)",  fg: "var(--status-issue-fg)",  bd: "var(--status-issue-border)",  dot: "hsl(var(--status-issue))" },
+  maintenance: { bg: "var(--status-maint-bg)",  fg: "var(--status-maint-fg)",  bd: "var(--status-maint-border)",  dot: "hsl(var(--status-maintenance))" },
+  sterilized:  { bg: "var(--status-steril-bg)", fg: "var(--status-steril-fg)", bd: "var(--status-steril-border)", dot: "hsl(var(--status-sterilized))" },
   info:        { bg: "var(--status-steril-bg)", fg: "var(--status-steril-fg)", bd: "var(--status-steril-border)", dot: "var(--status-info)" },
-  neutral:     { bg: "var(--muted)",            fg: "var(--muted-foreground)", bd: "var(--ivory-border)",         dot: "var(--ivory-text-3)" },
+  neutral:     { bg: "hsl(var(--muted))",       fg: "hsl(var(--muted-foreground))", bd: "rgb(var(--ivory-border))", dot: "rgb(var(--ivory-text3))" },
 };
 
 // Repository reality override: uses t.status.* accessor pattern
 // (the app uses a typed t singleton from @/lib/i18n, not a useTranslation hook).
-// ivory-text-3 is referenced via CSS var because --ivory-text-3 is defined as RGB
-// channels; use the Tailwind utility class instead for the neutral dot.
 const STATUS_LABELS: Record<StatusKind, () => string> = {
   ok:          () => t.status.ok,
   issue:       () => t.status.issue,
