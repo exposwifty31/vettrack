@@ -1,7 +1,8 @@
 // src/pages/code-blue-history.tsx
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Clock, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowRight, Clock, ChevronDown, ChevronUp } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import type { CodeBlueSession } from "@/hooks/useCodeBlueSession";
@@ -16,6 +17,7 @@ const OUTCOME_COLORS: Record<string, string> = {
 
 export default function CodeBlueHistoryPage() {
   const { userId, role, effectiveRole } = useAuth();
+  const [, navigate] = useLocation();
   const resolvedRole = effectiveRole ?? role;
   const [expandedId, setExpandedId] = useState<string | null>(null);
   // Recomputed every render so a runtime locale switch
@@ -36,21 +38,49 @@ export default function CodeBlueHistoryPage() {
     enabled: !!userId && (resolvedRole === "admin"),
   });
 
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) window.history.back();
+    else navigate("/home");
+  };
+
+  const backButton = (
+    <button
+      type="button"
+      onClick={handleBack}
+      aria-label={t.common.back}
+      data-testid="code-blue-history-back"
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-800 motion-safe:active:scale-95"
+    >
+      <ArrowRight className="h-5 w-5" aria-hidden />
+    </button>
+  );
+
   if (resolvedRole !== "admin") {
     return (
-      <div className="p-8 text-center text-zinc-500">{t.codeBlue.history.adminOnly}</div>
+      <div className="flex h-screen-safe flex-col items-center justify-center gap-4 bg-background p-8 text-center text-zinc-500" dir="rtl">
+        <p>{t.codeBlue.history.adminOnly}</p>
+        <button
+          type="button"
+          onClick={handleBack}
+          className="rounded-full border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm text-zinc-200 transition-colors hover:bg-zinc-700"
+        >
+          {t.common.back}
+        </button>
+      </div>
     );
   }
 
   const sessions = historyQ.data ?? [];
 
   return (
-    <div className="min-h-screen bg-background p-4 max-w-4xl mx-auto" dir="rtl">
-      <h1 className="text-xl font-bold mb-6 flex items-center gap-2">
+    <div className="flex flex-col h-screen-safe bg-background max-w-4xl mx-auto overflow-hidden" dir="rtl">
+      <div className="flex-shrink-0 flex items-center gap-2 px-4 py-3 border-b border-zinc-800">
+        {backButton}
         <Clock className="h-5 w-5 text-red-400" />
-        {t.codeBlue.history.title}
-      </h1>
+        <h1 className="text-xl font-bold">{t.codeBlue.history.title}</h1>
+      </div>
 
+      <div className="flex-1 overflow-y-auto p-4">
       {historyQ.isPending && <p className="text-zinc-500">{t.codeBlue.history.loading}</p>}
 
       {historyQ.isError && (
@@ -118,6 +148,7 @@ export default function CodeBlueHistoryPage() {
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );

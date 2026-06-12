@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import type { Equipment } from "@/types";
+import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import {
   computeDashboardCounts,
   computeCriticalItems,
@@ -224,5 +225,26 @@ export async function generateMonthlyReport(equipment: Equipment[]): Promise<voi
   );
 
   const filename = `vettrack-report-${format(now, "yyyy-MM")}.pdf`;
+
+  if (isCapacitorNative()) {
+    // Native (Capacitor iOS/Android): the browser download `doc.save()` is a
+    // no-op inside a WebView, so the old "downloaded" toast was misleading.
+    // Write the PDF to the cache dir and hand it to the OS share/save sheet.
+    // Imported dynamically so the web bundle never pulls in the native plugins.
+    const [{ Filesystem, Directory }, { Share }] = await Promise.all([
+      import("@capacitor/filesystem"),
+      import("@capacitor/share"),
+    ]);
+    const dataUri = doc.output("datauristring");
+    const base64 = dataUri.slice(dataUri.indexOf(",") + 1);
+    const written = await Filesystem.writeFile({
+      path: filename,
+      data: base64,
+      directory: Directory.Cache,
+    });
+    await Share.share({ title: filename, url: written.uri });
+    return;
+  }
+
   doc.save(filename);
 }

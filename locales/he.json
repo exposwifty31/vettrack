@@ -1257,6 +1257,7 @@
     "maintenanceTitle": "תחזוקה — נדרש טיפול",
     "maintenanceDescription": "מסומן לתחזוקה. בדוק עם האדמין לפני שימוש.",
     "issueTitle": "תקלה — אין להשתמש",
+    "issueDescription": "דווח על תקלה. אין להשתמש בפריט עד לאישור תקינותו.",
     "inactiveTitle": "לא פעיל — מחוץ לשירות",
     "inactiveDescription": "הפריט הוצא משירות זמנית או לצמיתות.",
     "healthRingTitle": "טבעת בריאות",
@@ -1267,6 +1268,7 @@
     "staleDescription": "החדר לא נבדק ביותר מ-24 שעות. לחץ על החדר לאימות פריטים.",
     "auditRequiredTitle": "נדרש ביקורת",
     "auditRequiredDescription": "פריט בחדר זה סומן. נדרשת ביקורת מלאה לפני שהחדר יוכל להיות נקי.",
+    "nfcTitle": "מדבקת NFC לדלת",
     "nfcDescription": "לחץ על מדבקת NFC בדלת החדר לפתיחת מסך האימות. אשר לסמן את כל הפריטים כמאומתים בלחיצה אחת.",
     "pendingTitle": "ממתין",
     "pendingDescription": "הפעולה נשמרה מקומית וממתינה לשליחה לשרת. קורה כשאתה לא מחובר. יסתנכרן אוטומטית כשתתחבר.",
@@ -1376,7 +1378,11 @@
     "title": "לוח בקרה",
     "refresh": "רענן",
     "reportGenerating": "מייצר דוח...",
-    "reportSuccess": "הדוח הורד",
+    "reportButton": "דוח",
+    "usersUnit": "משתמשים",
+    "itemsUnit": "פריטים",
+    "checkedOut": "מושאלים",
+    "reportSuccess": "הדוח מוכן",
     "reportError": "לא ניתן לייצר דוח. נא לנסות שוב.",
     "loadEquipmentFailed": "טעינת נתוני הציוד נכשלה. נא לנסות שוב.",
     "available": "זמין",
@@ -1464,6 +1470,8 @@
     "personalDebtCompactLine": "{summary}"
   },
   "adminPage": {
+    "pageHeading": "ניהול",
+    "tabShifts": "משמרות",
     "tabFolders": "תיקיות",
     "tabPending": "ממתינים",
     "tabUsers": "משתמשים",
@@ -2874,7 +2882,18 @@
       "equipment.request": "בקשת ציוד",
       "alert.received": "התראה התקבלה",
       "audit_log.search": "חיפוש ביומן",
-      "report.viewed": "דוח נצפה"
+      "report.viewed": "דוח נצפה",
+      "code_blue_started": "החייאה (Code Blue) נפתחה",
+      "code_blue_ended": "החייאה (Code Blue) הסתיימה",
+      "code_blue_initiator_authority_denied": "פתיחת החייאה נדחתה — אין הרשאה",
+      "code_blue_manager_authority_denied": "מנהל החייאה נדחה — אין הרשאה",
+      "code_blue_manager_authority_shadow_denied": "מנהל החייאה — בדיקת הרשאה (צל)",
+      "authority_denied": "הפעולה נדחתה — אין הרשאה",
+      "authority_resolution_failed": "קביעת הרשאה נכשלה",
+      "authority_enforcement_denied_stale": "נדחה — הרשאה לא עדכנית",
+      "authority_enforcement_denied_oprole": "נדחה — תפקיד תפעולי חסר",
+      "task_assignment_enforcement_denied": "שיוך משימה נדחה — אין הרשאה",
+      "clinical_invariant_orphan_dispense_denied": "ניפוק נדחה — חריגה קלינית"
     }
   },
   "whatsAppMessage": {
@@ -2896,7 +2915,7 @@
     "tableLeakagePct": "% דליפה"
   },
   "crashCart": {
-    "title": "בדיקת עגלת החייאה יומית",
+    "title": "בדיקה יומית של עגלת החייאה",
     "settingsAria": "הגדרות עגלה",
     "loadError": "שגיאה בטעינת נתוני עגלת ההחייאה",
     "saveError": "שגיאה בשמירת הבדיקה — נסה שנית",

@@ -1257,6 +1257,7 @@
     "maintenanceTitle": "Maintenance — service needed",
     "maintenanceDescription": "Marked for maintenance. Check with admin before use.",
     "issueTitle": "Issue — do not use",
+    "issueDescription": "A fault has been reported. Item should not be used until cleared.",
     "inactiveTitle": "Inactive — out of service",
     "inactiveDescription": "Item has been removed from service temporarily or permanently.",
     "healthRingTitle": "Health ring",
@@ -1267,6 +1268,7 @@
     "staleDescription": "Room has not been checked in over 24 hours. Tap the room to verify items.",
     "auditRequiredTitle": "Audit required",
     "auditRequiredDescription": "An item in this room was flagged. A full audit is required before the room can be cleared.",
+    "nfcTitle": "NFC door sticker",
     "nfcDescription": "Tap the NFC sticker on the room door to open the verification screen. Confirm to mark all items as verified in one tap.",
     "pendingTitle": "Pending",
     "pendingDescription": "Action saved locally and waiting to be sent to the server. Happens when offline. Will sync automatically when connected.",
@@ -1376,7 +1378,11 @@
     "title": "Dashboard",
     "refresh": "Refresh",
     "reportGenerating": "Generating report...",
-    "reportSuccess": "Report downloaded",
+    "reportButton": "Report",
+    "usersUnit": "users",
+    "itemsUnit": "items",
+    "checkedOut": "checked out",
+    "reportSuccess": "Report ready",
     "reportError": "Could not generate report. Please try again.",
     "loadEquipmentFailed": "Failed to load equipment data. Please try again.",
     "available": "Available",
@@ -1464,6 +1470,8 @@
     "personalDebtCompactLine": "{summary}"
   },
   "adminPage": {
+    "pageHeading": "Admin",
+    "tabShifts": "Shifts",
     "tabFolders": "Folders",
     "tabPending": "Pending",
     "tabUsers": "Users",
@@ -2874,7 +2882,18 @@
       "equipment.request": "Equipment Requested",
       "alert.received": "Alert Received",
       "audit_log.search": "Audit Log Search",
-      "report.viewed": "Report Viewed"
+      "report.viewed": "Report Viewed",
+      "code_blue_started": "Code Blue started",
+      "code_blue_ended": "Code Blue ended",
+      "code_blue_initiator_authority_denied": "Code Blue start denied — not authorized",
+      "code_blue_manager_authority_denied": "Code Blue manager denied — not authorized",
+      "code_blue_manager_authority_shadow_denied": "Code Blue manager — authority check (shadow)",
+      "authority_denied": "Action denied — not authorized",
+      "authority_resolution_failed": "Authority resolution failed",
+      "authority_enforcement_denied_stale": "Denied — stale authority",
+      "authority_enforcement_denied_oprole": "Denied — missing operational role",
+      "task_assignment_enforcement_denied": "Task assignment denied — not authorized",
+      "clinical_invariant_orphan_dispense_denied": "Dispense denied — clinical safeguard"
     }
   },
   "whatsAppMessage": {
@@ -2896,7 +2915,7 @@
     "tableLeakagePct": "Leakage %"
   },
   "crashCart": {
-    "title": "Daily crash cart check",
+    "title": "Daily Crash Cart Inspection",
     "settingsAria": "Cart settings",
     "loadError": "Failed to load crash-cart data",
     "saveError": "Failed to save the check — try again",

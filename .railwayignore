@@ -18,4 +18,6 @@ docs/
 *.bak
 *.tmp
 .tmp-*
+_tmp_*
+.pnpm-store/
 pilot-vars-backup.txt

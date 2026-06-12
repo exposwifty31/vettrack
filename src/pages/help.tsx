@@ -134,7 +134,7 @@ export default function HelpPage() {
             iconBg="bg-red-50 dark:bg-red-950/50"
             iconColor="text-red-600 dark:text-red-400"
             title={t.helpPage.issueTitle}
-            description="A fault has been reported. Item should not be used until cleared."
+            description={t.helpPage.issueDescription}
           />
           <CheatItem
             icon={Package}
@@ -179,7 +179,7 @@ export default function HelpPage() {
             icon={Nfc}
             iconBg="bg-primary/10"
             iconColor="text-primary"
-            title="NFC door sticker"
+            title={t.helpPage.nfcTitle}
             description={t.helpPage.nfcDescription}
           />
         </Section>
@@ -197,7 +197,7 @@ export default function HelpPage() {
             icon={CheckCircle2}
             iconBg="bg-emerald-50 dark:bg-emerald-950/50"
             iconColor="text-emerald-600 dark:text-emerald-400"
-            title="Synced"
+            title={t.helpPage.syncedTitle}
             description={t.helpPage.syncedDescription}
           />
           <CheatItem

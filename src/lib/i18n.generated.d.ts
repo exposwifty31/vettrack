@@ -1260,6 +1260,7 @@ export interface TStructure {
     maintenanceTitle: string;
     maintenanceDescription: string;
     issueTitle: string;
+    issueDescription: string;
     inactiveTitle: string;
     inactiveDescription: string;
     healthRingTitle: string;
@@ -1270,6 +1271,7 @@ export interface TStructure {
     staleDescription: string;
     auditRequiredTitle: string;
     auditRequiredDescription: string;
+    nfcTitle: string;
     nfcDescription: string;
     pendingTitle: string;
     pendingDescription: string;
@@ -1379,6 +1381,10 @@ export interface TStructure {
     title: string;
     refresh: string;
     reportGenerating: string;
+    reportButton: string;
+    usersUnit: string;
+    itemsUnit: string;
+    checkedOut: string;
     reportSuccess: string;
     reportError: string;
     loadEquipmentFailed: string;
@@ -1467,12 +1473,13 @@ export interface TStructure {
     personalDebtCompactLine: string;
   };
   adminPage: {
+    pageHeading: string;
+    tabShifts: string;
     tabFolders: string;
     tabPending: string;
     tabUsers: string;
     tabSupport: string;
     tabLogs: string;
-    tabShifts: string;
     foldersTitle: string;
     pendingUsersTitle: string;
     usersTitle: string;
@@ -2878,6 +2885,17 @@ export interface TStructure {
       "alert.received": string;
       "audit_log.search": string;
       "report.viewed": string;
+      code_blue_started: string;
+      code_blue_ended: string;
+      code_blue_initiator_authority_denied: string;
+      code_blue_manager_authority_denied: string;
+      code_blue_manager_authority_shadow_denied: string;
+      authority_denied: string;
+      authority_resolution_failed: string;
+      authority_enforcement_denied_stale: string;
+      authority_enforcement_denied_oprole: string;
+      task_assignment_enforcement_denied: string;
+      clinical_invariant_orphan_dispense_denied: string;
     };
   };
   whatsAppMessage: {

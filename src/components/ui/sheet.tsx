@@ -43,15 +43,18 @@ interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
     VariantProps<typeof sheetVariants> {
   hideCloseButton?: boolean;
+  /** Extra classes for the backdrop overlay — e.g. a higher z-index so the
+   *  sheet sits above fixed app chrome (the mobile bottom nav is z-[52]). */
+  overlayClassName?: string;
 }
 
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
->(({ side = "right", className, children, hideCloseButton = false, ...props }, ref) => {
+>(({ side = "right", className, children, hideCloseButton = false, overlayClassName, ...props }, ref) => {
   return (
     <SheetPortal>
-      <SheetOverlay />
+      <SheetOverlay className={overlayClassName} />
       <SheetPrimitive.Content
         ref={ref}
         className={cn(sheetVariants({ side }), className)}

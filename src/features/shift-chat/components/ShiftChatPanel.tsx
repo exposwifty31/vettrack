@@ -92,7 +92,11 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
       <SheetContent
         side="bottom"
         hideCloseButton
-        className="max-h-[92dvh] p-0 flex flex-col rounded-t-2xl"
+        /* z-[55] lifts the panel + backdrop above the fixed bottom nav (z-[52]),
+           which would otherwise cover the chat's composer and last messages.
+           h-[85dvh] gives a usable chat height instead of collapsing to content. */
+        overlayClassName="z-[55]"
+        className="z-[55] h-[85dvh] max-h-[92dvh] p-0 flex flex-col rounded-t-2xl"
       >
 
         <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">

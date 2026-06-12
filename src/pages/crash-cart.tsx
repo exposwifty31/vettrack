@@ -1,8 +1,8 @@
 // src/pages/crash-cart.tsx
 import { useState, useEffect } from "react";
-import { useSearch } from "wouter";
+import { useSearch, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Circle, AlertTriangle, Clock, Settings, ListChecks } from "lucide-react";
+import { ArrowRight, CheckCircle2, Circle, AlertTriangle, Clock, Settings, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorCard } from "@/components/ui/error-card";
 import { authFetch } from "@/lib/auth-fetch";
@@ -40,6 +40,7 @@ export default function CrashCartCheckPage() {
   const { userId, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const searchStr = useSearch();
+  const [, navigate] = useLocation();
   const configureFromUrl = new URLSearchParams(searchStr).get("configure") === "1";
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [notes, setNotes] = useState("");
@@ -99,17 +100,36 @@ export default function CrashCartCheckPage() {
   const criticalPatients = latestQ.data?.criticalPatients ?? [];
   const recentChecks = latestQ.data?.recentChecks ?? [];
 
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) window.history.back();
+    else navigate("/home");
+  };
+
+  const backButton = (
+    <button
+      type="button"
+      onClick={handleBack}
+      aria-label={t.common.back}
+      data-testid="crash-cart-back"
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted motion-safe:active:scale-95"
+    >
+      <ArrowRight className="h-5 w-5" aria-hidden />
+    </button>
+  );
+
   if (latestQ.isError) {
     return (
       <div className="min-h-screen bg-background p-4 max-w-2xl mx-auto" dir="rtl">
+        <div className="flex items-center gap-2 mb-4">{backButton}</div>
         <ErrorCard message={t.crashCart.loadError} onRetry={() => latestQ.refetch()} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 max-w-2xl mx-auto" dir="rtl">
-      <div className="flex items-center gap-2 mb-6">
+    <div className="flex flex-col h-screen-safe bg-background max-w-2xl mx-auto overflow-hidden" dir="rtl">
+      <div className="flex-shrink-0 flex items-center gap-2 px-4 py-3 border-b border-border">
+        {backButton}
         <CheckCircle2 className="h-6 w-6 text-green-500" />
         <h1 className="text-xl font-bold flex-1">{t.crashCart.title}</h1>
         {isAdmin && (
@@ -124,6 +144,8 @@ export default function CrashCartCheckPage() {
           </Button>
         )}
       </div>
+
+      <div className="flex-1 overflow-y-auto p-4">
 
       {/* Last check status */}
       {latestQ.data && (
@@ -267,6 +289,8 @@ export default function CrashCartCheckPage() {
           </div>
         </div>
       )}
+
+      </div>
 
       {isAdmin && (
         <CrashCartAdminSheet open={adminSheetOpen} onOpenChange={setAdminSheetOpen} />

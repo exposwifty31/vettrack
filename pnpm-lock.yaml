@@ -23,9 +23,15 @@ importers:
       '@capacitor/core':
         specifier: '8'
         version: 8.4.0
+      '@capacitor/filesystem':
+        specifier: ^8
+        version: 8.1.2(@capacitor/core@8.4.0)
       '@capacitor/haptics':
         specifier: '8'
         version: 8.0.2(@capacitor/core@8.4.0)
+      '@capacitor/share':
+        specifier: ^8
+        version: 8.0.1(@capacitor/core@8.4.0)
       '@capgo/capacitor-nfc':
         specifier: '8'
         version: 8.0.28(@capacitor/core@8.4.0)
@@ -666,6 +672,11 @@ packages:
   '@capacitor/core@8.4.0':
     resolution: {integrity: sha512-LrS1xPIrqLtJABBIPDGXxxKmI9OyesrzWw8DiHbxhSC9JoiLUleUAJlX1a0LWIVLRbuY4Szgf9huFeRqYH2SAQ==}
 
+  '@capacitor/filesystem@8.1.2':
+    resolution: {integrity: sha512-doaaMfGoFR2hWU6aV6u83I+5ZsGyJVq+Gz4r9lMpJzUKMm1eMu0hLnFdV1aXZlU9FlK/RndFrVD8oRZfNOqWgQ==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
+
   '@capacitor/haptics@8.0.2':
     resolution: {integrity: sha512-c2hZzRR5Fk1tbTvhG1jhh2XBAf3EhnIerMIb2sl7Mt41Gxx1fhBJFDa0/BI1IbY4loVepyyuqNC9820/GZuoWQ==}
     peerDependencies:
@@ -675,6 +686,14 @@ packages:
     resolution: {integrity: sha512-tnwstEdbTJ2nHAfoAwnurXgYRscWeLY+IIGdz69o24gN2Crfj9Xc0TWo8L5uFLF1LmpbUywH1IT0U1oHV8c+CA==}
     peerDependencies:
       '@capacitor/core': ^8.4.0
+
+  '@capacitor/share@8.0.1':
+    resolution: {integrity: sha512-3cSBKBCJVon54rKDROP2rqGyeGks4pBh9TbaEk9S375Kbek/ZHe72N50zIa0Vn9Eac/SuhwgehO/mmA4CsUOiw==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
+
+  '@capacitor/synapse@1.0.4':
+    resolution: {integrity: sha512-/C1FUo8/OkKuAT4nCIu/34ny9siNHr9qtFezu4kxm6GY1wNFxrCFWjfYx5C1tUhVGz3fxBABegupkpjXvjCHrw==}
 
   '@capgo/capacitor-nfc@8.0.28':
     resolution: {integrity: sha512-sNzbaCQ8TZxPTFuxg9ASTBjMBKu3x3Yb8a/VdtUta2sAYRDOjs2YY5NuSACaaUoKPGYKtWajrv68TMdpIQNBLg==}
@@ -7815,6 +7834,11 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
+  '@capacitor/filesystem@8.1.2(@capacitor/core@8.4.0)':
+    dependencies:
+      '@capacitor/core': 8.4.0
+      '@capacitor/synapse': 1.0.4
+
   '@capacitor/haptics@8.0.2(@capacitor/core@8.4.0)':
     dependencies:
       '@capacitor/core': 8.4.0
@@ -7822,6 +7846,12 @@ snapshots:
   '@capacitor/ios@8.4.0(@capacitor/core@8.4.0)':
     dependencies:
       '@capacitor/core': 8.4.0
+
+  '@capacitor/share@8.0.1(@capacitor/core@8.4.0)':
+    dependencies:
+      '@capacitor/core': 8.4.0
+
+  '@capacitor/synapse@1.0.4': {}
 
   '@capgo/capacitor-nfc@8.0.28(@capacitor/core@8.4.0)':
     dependencies:

@@ -493,13 +493,6 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     { href: "/help", label: lh.quickGuide, icon: <HelpCircle className="w-5 h-5" />, menuOnly: true },
     { href: "/audit-log", label: lh.auditLog, icon: <FileText className="w-5 h-5" />, adminOnly: true, menuOnly: true },
     {
-      href: "/admin/ops-dashboard",
-      label: lh.opsDashboard,
-      icon: <Gauge className="w-5 h-5" />,
-      adminOnly: true,
-      menuOnly: true,
-    },
-    {
       href: CANONICAL_HREFS.emergencyEquipmentHistory,
       label: t.layout.nav.emergencyEquipmentHistory,
       icon: <Clock className="w-5 h-5" />,
@@ -551,7 +544,6 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
         "/whats-new",
         "/help",
         "/audit-log",
-        "/admin/ops-dashboard",
         CANONICAL_HREFS.emergencyEquipmentHistory,
         CANONICAL_HREFS.emergencyEquipmentLog,
         "/settings",

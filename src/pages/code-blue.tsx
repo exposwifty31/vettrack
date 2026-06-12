@@ -102,7 +102,8 @@ function PreCheckGate({
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 p-4 max-w-md mx-auto" dir="rtl">
+    <div className="flex flex-col h-screen-safe bg-zinc-950 max-w-md mx-auto overflow-hidden" dir="rtl">
+      <div className="flex-shrink-0 px-4 pt-4 pb-3">
       {/* Leave before starting — accidental entry must never trap the user. */}
       <button
         type="button"
@@ -114,10 +115,12 @@ function PreCheckGate({
         <ArrowRight className="h-4 w-4" aria-hidden />
         {t.common.back}
       </button>
-      <div className="flex items-center gap-2 mb-6 text-red-400">
+      <div className="flex items-center gap-2 text-red-400">
         <AlertTriangle className="h-6 w-6" />
         <h1 className="text-xl font-bold">{t.codeBlue.openTitle}</h1>
       </div>
+      </div>
+      <div className="flex-1 overflow-y-auto px-4 pb-4">
 
       {initialEquipmentName && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 mb-4 text-sm text-amber-200">
@@ -182,6 +185,7 @@ function PreCheckGate({
           {t.codeBlue.proceedWithoutFullCheck}
         </button>
       )}
+      </div>
     </div>
   );
 }
@@ -301,8 +305,8 @@ function ActiveSession() {
   if (!session) return null;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white" dir="rtl" style={{ borderTop: "3px solid #dc2626" }}>
-      <div className="bg-zinc-900 border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
+    <div className="flex flex-col h-screen-safe bg-zinc-950 text-white overflow-hidden" dir="rtl" style={{ borderTop: "3px solid #dc2626" }}>
+      <div className="flex-shrink-0 bg-zinc-900 border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {/* Leave the live view without ending the session (it persists for the
               rest of the team). Ending is a separate manager-only action below. */}
@@ -330,6 +334,7 @@ function ActiveSession() {
         </div>
       </div>
 
+      <div className="flex-1 overflow-y-auto">
       {cartStatus ? (
         <div className={cn(
           "px-4 py-1.5 text-xs flex gap-2 border-b",
@@ -479,6 +484,7 @@ function ActiveSession() {
       </div>
 
       {showOutcomeModal && <OutcomeModal onClose={handleEndSession} />}
+      </div>
     </div>
   );
 }

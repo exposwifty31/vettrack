@@ -40,7 +40,6 @@ const InventoryPage = lazy(() => import("@/pages/inventory-page"));
 const AnalyticsPage = lazy(() => import("@/pages/analytics"));
 const ManagementDashboardPage = lazy(() => import("@/pages/management-dashboard"));
 const AdminShiftsPage = lazy(() => import("@/pages/admin-shifts"));
-const AdminOpsDashboardPage = lazy(() => import("@/pages/admin-ops-dashboard"));
 const AdminAssetTypesPage = lazy(() => import("@/pages/AdminAssetTypesPage"));
 const AdminDocksPage = lazy(() => import("@/pages/AdminDocksPage"));
 const OperationalMetricsDashboardPage = lazy(() => import("@/pages/OperationalMetricsDashboardPage"));
@@ -133,7 +132,6 @@ export function AppRoutes() {
         {/* --- Admin --- */}
         <Route path="/admin"><AuthGuard><AdminPage /></AuthGuard></Route>
         <Route path="/admin/shifts"><AuthGuard><AdminShiftsPage /></AuthGuard></Route>
-        <Route path="/admin/ops-dashboard"><AuthGuard><AdminOpsDashboardPage /></AuthGuard></Route>
         <Route path="/admin/asset-types"><AuthGuard><AdminAssetTypesPage /></AuthGuard></Route>
         <Route path="/admin/docks"><AuthGuard><AdminDocksPage /></AuthGuard></Route>
         <Route path="/admin/metrics"><AuthGuard><OperationalMetricsDashboardPage /></AuthGuard></Route>

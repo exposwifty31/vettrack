@@ -1,5 +1,4 @@
 import { Helmet } from "react-helmet-async";
-import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { t } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +18,6 @@ import {
   Clock,
   Smartphone,
   RefreshCw,
-  ArrowLeft,
   Scan,
   MapPin,
   ShieldCheck,
@@ -132,16 +130,6 @@ export default function WhatsNewPage() {
             </div>
           </section>
         ))}
-
-        <div className="pt-2 pb-4">
-          <Link
-            href="/settings"
-            className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline underline-offset-2"
-          >
-            {t.whatsNew.configureAlerts}
-            <ArrowLeft className="w-3.5 h-3.5" />
-          </Link>
-        </div>
       </div>
     </Layout>
   );

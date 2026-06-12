@@ -34,7 +34,6 @@ export const NAV: NavNode[] = [
     icon: "Settings",
     adminOnly: true,
     children: [
-      { id: "ad-ops",     labelKey: "nav.adminOps",     href: "/admin/ops-dashboard", icon: "Activity" },
       { id: "ad-metrics", labelKey: "nav.adminMetrics", href: "/admin/metrics",       icon: "Gauge" },
       { id: "ad-types",   labelKey: "nav.adminTypes",   href: "/admin/asset-types",   icon: "Boxes" },
       { id: "ad-shifts",  labelKey: "nav.adminShifts",  href: "/admin/shifts",        icon: "Clock" },

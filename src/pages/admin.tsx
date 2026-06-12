@@ -55,7 +55,6 @@ import {
   RotateCcw,
   Wrench,
   CalendarDays,
-  Settings,
   Mail,
   FlaskConical,
   Sparkles,
@@ -80,7 +79,7 @@ export default function AdminPage() {
   const { isAdmin, userId } = useAuth();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<
-    "folders" | "users" | "pending" | "support" | "audit-logs" | "deleted" | "settings"
+    "folders" | "users" | "pending" | "support" | "audit-logs" | "deleted"
   >("folders");
 
   const { data: supportUnresolved } = useQuery({
@@ -146,42 +145,9 @@ export default function AdminPage() {
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-2xl font-bold leading-tight flex items-center gap-2">
             <Shield className="w-6 h-6 text-primary" />
-            Admin
+            {t.adminPage.pageHeading}
           </h1>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-11 text-xs shrink-0"
-            onClick={() => navigate("/admin/shifts")}
-            data-testid="btn-open-shifts-import"
-          >
-            <CalendarDays className="w-4 h-4 mr-1" />
-            Shifts CSV Import
-          </Button>
         </div>
-
-        <Card className="bg-card border-border/60 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <CalendarDays className="w-4 h-4 text-muted-foreground" />
-              Shift CSV Import
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">
-              Import EZShift-style schedule rows (Employee, Shift, Date, Start, End) into VetTrack roles.
-            </p>
-            <Button
-              size="sm"
-              className="h-11 text-xs shrink-0"
-              onClick={() => navigate("/admin/shifts")}
-              data-testid="btn-go-to-shifts-import-card"
-            >
-              Open Import Screen
-            </Button>
-          </CardContent>
-        </Card>
-
 
         {/* Tab bar */}
         <div className="flex items-center gap-3 border-b border-border pb-0 overflow-x-auto scrollbar-none px-1 -mx-1">
@@ -255,7 +221,7 @@ export default function AdminPage() {
             )}
           >
             <CalendarDays className="w-4 h-4" />
-            Shifts
+            {t.adminPage.tabShifts}
           </button>
           <button
             onClick={() => setActiveTab("audit-logs")}
@@ -283,19 +249,6 @@ export default function AdminPage() {
             <Trash2 className="w-4 h-4" />
             {t.adminPage.tabDeleted}
           </button>
-          <button
-            onClick={() => setActiveTab("settings")}
-            data-testid="admin-tab-settings"
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-              activeTab === "settings"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Settings className="w-4 h-4" />
-            Settings
-          </button>
         </div>
 
         {activeTab === "folders" && <FoldersSection />}
@@ -304,7 +257,6 @@ export default function AdminPage() {
         {activeTab === "support" && <SupportSection />}
         {activeTab === "audit-logs" && <AuditLogsSection />}
         {activeTab === "deleted" && <DeletedItemsSection />}
-        {activeTab === "settings" && <ClinicSettingsSection />}
       </div>
     </>
   );
@@ -1726,12 +1678,3 @@ function AuditLogsSection() {
 }
 
 
-function ClinicSettingsSection() {
-  return (
-    <Card className="bg-card border-border/60 shadow-sm">
-      <CardContent className="py-6 text-sm text-muted-foreground">
-        Clinic settings (pharmacy forecast and formulary removed).
-      </CardContent>
-    </Card>
-  );
-}

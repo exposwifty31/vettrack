@@ -508,6 +508,13 @@
   .pb-nav-safe {
     padding-bottom: calc(6rem + env(safe-area-inset-bottom) + 0.375rem);
   }
+  /* Fixed-shell pages (full-screen, no Layout chrome): exactly the visible area
+     so a pinned header + internal `overflow-y-auto` content scroll, instead of
+     the whole page scrolling. Subtracts the safe-area the body already pads. */
+  .h-screen-safe {
+    height: 100dvh;
+    height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
   /* For fixed/floating elements: positions above the full bottom nav bar + safe-area inset.
      Nav bar is 68px; 0.5rem (8px) gap ensures the element clears the top edge. */
   .bottom-nav-float {

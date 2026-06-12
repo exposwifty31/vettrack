@@ -29,10 +29,6 @@ import {
   ChevronDown,
   ChevronUp,
   RefreshCw,
-  Activity,
-  Server,
-  Clock,
-  MemoryStick,
   QrCode,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -42,20 +38,11 @@ import { statusToBadgeVariant } from "@/lib/design-tokens";
 import { QrScanner } from "@/components/qr-scanner";
 import { useAuth } from "@/hooks/use-auth";
 
-function formatUptime(seconds: number): string {
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (d > 0) return `${d}d ${h}h ${m}m`;
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
-
 export default function ManagementDashboardPage() {
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
   const [scannerOpen, setScannerOpen] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-  const { userId, isAdmin } = useAuth();
+  const { userId } = useAuth();
 
   const { data: equipment, isLoading, isError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["/api/equipment"],
@@ -65,16 +52,6 @@ export default function ManagementDashboardPage() {
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
     retry: false,
-  });
-
-  const { data: metrics, isLoading: metricsLoading } = useQuery({
-    queryKey: ["/api/metrics"],
-    queryFn: api.metrics.get,
-    enabled: isAdmin && !!userId,
-    refetchInterval: leaderPoll(60_000),
-    refetchIntervalInBackground: false,
-    retry: false,
-    refetchOnWindowFocus: false,
   });
 
   const dashData = equipment ? computeDashboardData(equipment) : null;
@@ -158,7 +135,7 @@ export default function ManagementDashboardPage() {
               data-testid="btn-generate-report"
             >
               <FileDown className={cn("w-3.5 h-3.5", isGeneratingReport && "animate-pulse")} />
-              {isGeneratingReport ? t.managementDashboardPage.reportGenerating : "Report"}
+              {isGeneratingReport ? t.managementDashboardPage.reportGenerating : t.managementDashboardPage.reportButton}
             </Button>
           </div>
         </div>
@@ -181,15 +158,15 @@ export default function ManagementDashboardPage() {
           <div className="grid grid-cols-3 gap-2" data-testid="summary-strip">
             <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3 min-h-[72px]">
               <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 leading-none">{counts.available}</p>
-              <span className="text-[11px] font-semibold text-emerald-700/80 dark:text-emerald-400/80">Available</span>
+              <span className="text-[11px] font-semibold text-emerald-700/80 dark:text-emerald-400/80">{t.managementDashboardPage.available}</span>
             </div>
             <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 min-h-[72px]">
               <p className="text-2xl font-bold text-amber-700 dark:text-amber-300 leading-none">{counts.inUse}</p>
-              <span className="text-[11px] font-semibold text-amber-700/80 dark:text-amber-400/80">In Use</span>
+              <span className="text-[11px] font-semibold text-amber-700/80 dark:text-amber-400/80">{t.managementDashboardPage.inUse}</span>
             </div>
             <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-3 min-h-[72px]">
               <p className="text-2xl font-bold text-red-700 dark:text-red-300 leading-none">{counts.issues + counts.missing}</p>
-              <span className="text-[11px] font-semibold text-red-700/80 dark:text-red-400/80">Issues</span>
+              <span className="text-[11px] font-semibold text-red-700/80 dark:text-red-400/80">{t.managementDashboardPage.issues}</span>
             </div>
           </div>
         )}
@@ -273,7 +250,7 @@ export default function ManagementDashboardPage() {
               {t.managementDashboardPage.whoHasWhat}
               {userGroups.length > 0 && (
                 <span className="ms-auto text-xs text-muted-foreground">
-                  {userGroups.length} user{userGroups.length !== 1 ? "s" : ""}
+                  {userGroups.length} {t.managementDashboardPage.usersUnit}
                 </span>
               )}
             </CardTitle>
@@ -304,7 +281,7 @@ export default function ManagementDashboardPage() {
                         <div className="min-w-0">
                           <p className="font-semibold text-sm truncate">{group.userEmail}</p>
                           <p className="text-xs text-muted-foreground">
-                            {group.items.length} item{group.items.length !== 1 ? "s" : ""} checked out
+                            {group.items.length} {t.managementDashboardPage.itemsUnit} {t.managementDashboardPage.checkedOut}
                           </p>
                         </div>
                         {isExpanded ? (
@@ -372,7 +349,7 @@ export default function ManagementDashboardPage() {
                     <div key={group.location} className="flex flex-col gap-1.5">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">{group.location}</span>
-                        <span className="text-xs text-muted-foreground">{group.count} item{group.count !== 1 ? "s" : ""}</span>
+                        <span className="text-xs text-muted-foreground">{group.count} {t.managementDashboardPage.itemsUnit}</span>
                       </div>
                       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                         <div
@@ -388,78 +365,6 @@ export default function ManagementDashboardPage() {
           </CardContent>
         </Card>
 
-        {/* System health — admin-only: non-admin users skip the 403 metrics request */}
-        {isAdmin && <Card className="bg-card border-border/60 shadow-sm" data-testid="section-system-health">
-          <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <Activity className="w-4 h-4 text-muted-foreground" />
-              {t.managementDashboardPage.systemHealth}
-              <span className="ms-auto text-xs text-muted-foreground font-normal">{t.managementDashboardPage.refreshEveryMinute}</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            {metricsLoading ? (
-              <div className="grid grid-cols-2 gap-3">
-                <Skeleton className="h-16 rounded-xl" />
-                <Skeleton className="h-16 rounded-xl" />
-                <Skeleton className="h-16 rounded-xl" />
-                <Skeleton className="h-16 rounded-xl" />
-              </div>
-            ) : !metrics ? (
-              <div className="flex flex-col items-center py-5 gap-2 text-center">
-                <Server className="w-7 h-7 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">Metrics unavailable</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1 p-3 rounded-xl bg-muted/40 border border-border/40">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Clock className="w-3.5 h-3.5" />
-                    {t.managementDashboardPage.uptime}
-                  </div>
-                  <p className="text-lg font-bold">{formatUptime(metrics.uptime)}</p>
-                </div>
-                <div className="flex flex-col gap-1 p-3 rounded-xl bg-muted/40 border border-border/40">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <MemoryStick className="w-3.5 h-3.5" />
-                    {t.managementDashboardPage.memory}
-                  </div>
-                  <p className="text-lg font-bold">{metrics.memoryMb}
-                    <span className="text-sm font-normal text-muted-foreground">/{metrics.memoryTotalMb} MB</span>
-                  </p>
-                </div>
-                <div className="flex flex-col gap-1 p-3 rounded-xl bg-muted/40 border border-border/40">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Users className="w-3.5 h-3.5" />
-                    {t.managementDashboardPage.sessions}
-                  </div>
-                  <p className="text-lg font-bold">{metrics.activeSessions}</p>
-                </div>
-                <div className="flex flex-col gap-1 p-3 rounded-xl border bg-muted/40 border-border/40">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Server className="w-3.5 h-3.5" />
-                    {t.managementDashboardPage.syncSuccess}
-                  </div>
-                  <p className="text-lg font-bold text-emerald-700">
-                    {metrics.syncMetrics?.syncSuccessCount ?? 0}
-                  </p>
-                </div>
-                <div className="flex flex-col gap-1 p-3 rounded-xl border bg-muted/40 border-border/40">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Server className="w-3.5 h-3.5" />
-                    {t.managementDashboardPage.syncFailures}
-                  </div>
-                  <p className={cn(
-                    "text-lg font-bold",
-                    (metrics.syncMetrics?.syncFailCount ?? 0) > 0 ? "text-amber-700" : ""
-                  )}>
-                    {metrics.syncMetrics?.syncFailCount ?? 0}
-                  </p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>}
       </div>
 
       {scannerOpen && (

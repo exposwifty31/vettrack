@@ -857,7 +857,12 @@ const translations = {
     actions: d.auditLog.actions as Record<string, string>,
     actionLabel: (actionType: string): string => {
       const map = d.auditLog.actions as Record<string, string>;
-      return map[actionType] ?? actionType;
+      const explicit = map[actionType];
+      if (explicit) return explicit;
+      // Fallback: humanize an unmapped key (snake/dot case → spaced + capitalized)
+      // so a raw key like "code_blue_initiator_authority_denied" never leaks to the UI.
+      const humanized = actionType.replace(/[._]+/g, " ").trim();
+      return humanized ? humanized.charAt(0).toUpperCase() + humanized.slice(1) : actionType;
     },
   },
 
