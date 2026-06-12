@@ -189,7 +189,7 @@ export default function AdminPage() {
             onClick={() => setActiveTab("folders")}
             data-testid="admin-tab-folders"
             className={cn(
-              "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+              "flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
               activeTab === "folders"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground",
@@ -202,7 +202,7 @@ export default function AdminPage() {
             onClick={() => setActiveTab("pending")}
             data-testid="admin-tab-pending"
             className={cn(
-              "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors relative whitespace-nowrap",
+              "flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors relative whitespace-nowrap",
               activeTab === "pending"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground",
@@ -220,7 +220,7 @@ export default function AdminPage() {
             onClick={() => setActiveTab("users")}
             data-testid="admin-tab-users"
             className={cn(
-              "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+              "flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
               activeTab === "users"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground",
@@ -233,7 +233,7 @@ export default function AdminPage() {
             onClick={() => setActiveTab("support")}
             data-testid="admin-tab-support"
             className={cn(
-              "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors relative whitespace-nowrap",
+              "flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors relative whitespace-nowrap",
               activeTab === "support"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground",
@@ -251,7 +251,7 @@ export default function AdminPage() {
             onClick={() => navigate("/admin/shifts")}
             data-testid="admin-tab-shifts"
             className={cn(
-              "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap border-transparent text-muted-foreground hover:text-foreground",
+              "flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
             <CalendarDays className="w-4 h-4" />
@@ -261,7 +261,7 @@ export default function AdminPage() {
             onClick={() => setActiveTab("audit-logs")}
             data-testid="admin-tab-audit-logs"
             className={cn(
-              "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+              "flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
               activeTab === "audit-logs"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground",
@@ -274,7 +274,7 @@ export default function AdminPage() {
             onClick={() => setActiveTab("deleted")}
             data-testid="admin-tab-deleted"
             className={cn(
-              "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+              "flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
               activeTab === "deleted"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground",
@@ -287,7 +287,7 @@ export default function AdminPage() {
             onClick={() => setActiveTab("settings")}
             data-testid="admin-tab-settings"
             className={cn(
-              "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+              "flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
               activeTab === "settings"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground",
