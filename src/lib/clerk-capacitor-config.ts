@@ -13,6 +13,7 @@ const CLERK_WEB_REDIRECT_ORIGINS = ["vettrack://oauth-callback", "vettrack://"] 
 export type ClerkProviderRuntimeProps = {
   publishableKey: string;
   allowedRedirectOrigins: string[];
+  allowedRedirectProtocols?: string[];
   standardBrowser?: boolean;
 };
 
@@ -32,6 +33,11 @@ export function clerkProviderPropsForRuntime(publishableKey: string): ClerkProvi
     return {
       publishableKey,
       allowedRedirectOrigins: [...CLERK_NATIVE_REDIRECT_ORIGINS],
+      // Non-standard-browser clerk-js syncs an existing session by NAVIGATING to
+      // the current URL with the client JWT in the hash. windowNavigate only
+      // allows http(s) plus these — without "capacitor:" the sync bounces to
+      // "/" and the WebView reload-loops on every boot with a stored session.
+      allowedRedirectProtocols: ["capacitor:", "vettrack:"],
       standardBrowser: false,
     };
   }

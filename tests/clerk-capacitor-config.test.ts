@@ -30,6 +30,11 @@ describe("clerkProviderPropsForRuntime", () => {
     expect(clerkProviderPropsForRuntime("pk_live_test").standardBrowser).toBe(false);
   });
 
+  it("allows the capacitor: protocol for clerk-js session-sync navigation (else boot reload-loops)", () => {
+    vi.mocked(isCapacitorNative).mockReturnValue(true);
+    expect(clerkProviderPropsForRuntime("pk_live_test").allowedRedirectProtocols).toContain("capacitor:");
+  });
+
   it("leaves the web runtime in default (cookie) mode", () => {
     expect(clerkProviderPropsForRuntime("pk_live_test").standardBrowser).toBeUndefined();
   });
