@@ -41,7 +41,6 @@ import {
   AlignJustify,
   Bug,
   CloudOff,
-  FlaskConical,
   Radar,
   HelpCircle,
   ClipboardList,
@@ -51,7 +50,6 @@ import {
   ShoppingCart,
   Syringe,
   Lock,
-  Film,
   Sparkles,
   FileText,
   Monitor,
@@ -491,8 +489,6 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     { href: "/procurement", label: lh.procurement, icon: <ShoppingCart className="w-5 h-5" />, adminOnly: true, menuOnly: true },
     { href: "/admin", label: lh.admin, icon: <Shield className="w-5 h-5" />, adminOnly: true, menuOnly: true },
     { href: "/admin/shifts", label: lh.adminShifts, icon: <CalendarDays className="w-5 h-5" />, adminOnly: true, menuOnly: true },
-    { href: "/stability", label: lh.stability, icon: <FlaskConical className="w-5 h-5" />, adminOnly: true, menuOnly: true },
-    { href: "/app-tour", label: lh.appTour, icon: <Film className="w-5 h-5" />, menuOnly: true },
     { href: "/whats-new", label: lh.whatsNew, icon: <Sparkles className="w-5 h-5" />, menuOnly: true },
     { href: "/help", label: lh.quickGuide, icon: <HelpCircle className="w-5 h-5" />, menuOnly: true },
     { href: "/audit-log", label: lh.auditLog, icon: <FileText className="w-5 h-5" />, adminOnly: true, menuOnly: true },
@@ -543,7 +539,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   );
   const managementMenuItems = useMemo(
     () =>
-      ["/analytics", "/dashboard", "/inventory-items", "/procurement", "/admin", "/admin/shifts", "/stability", "/print"]
+      ["/analytics", "/dashboard", "/inventory-items", "/procurement", "/admin", "/admin/shifts", "/print"]
         .map((href) => visibleItems.find((i) => i.href === href))
         .filter((x): x is NavItem => x != null),
     [visibleItems],
@@ -552,7 +548,6 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   const systemMenuItems = useMemo(
     () =>
       [
-        "/app-tour",
         "/whats-new",
         "/help",
         "/audit-log",

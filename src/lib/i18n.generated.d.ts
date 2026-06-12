@@ -1281,6 +1281,10 @@ export interface TStructure {
     activeAlertsDescription: string;
     pushAlertsTitle: string;
     pushAlertsDescription: string;
+    title: string;
+    titleFull: string;
+    okTitle: string;
+    subtitle: string;
   };
   pilotHomePage: {
     worthCheckingSection: string;
@@ -1403,6 +1407,8 @@ export interface TStructure {
     sessions: string;
     syncSuccess: string;
     syncFailures: string;
+    titleFull: string;
+    updated: string;
   };
   qrPrintPage: {
     title: string;
@@ -3225,5 +3231,29 @@ export interface TStructure {
     heading: string;
     description: string;
     configureAlerts: string;
+    currentVersion: string;
+    currentDate: string;
+    items: {
+      nativeApp: {
+        title: string;
+        description: string;
+        badge: string;
+      };
+      signIn: {
+        title: string;
+        description: string;
+        badge: string;
+      };
+      theme: {
+        title: string;
+        description: string;
+        badge: string;
+      };
+      navigation: {
+        title: string;
+        description: string;
+        badge: string;
+      };
+    };
   };
 }

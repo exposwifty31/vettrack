@@ -1277,7 +1277,11 @@
     "activeAlertsTitle": "התראות פעילות",
     "activeAlertsDescription": "התג האדום על אייקון הפעמון מציג כמה פריטים דורשים תשומת לב. לחץ לצפייה ואישור.",
     "pushAlertsTitle": "התראות Push",
-    "pushAlertsDescription": "אפשר התראות Push בהגדרות → התראות Push לקבלת התראות בזמן אמת גם כשהאפליקציה ברקע."
+    "pushAlertsDescription": "אפשר התראות Push בהגדרות → התראות Push לקבלת התראות בזמן אמת גם כשהאפליקציה ברקע.",
+    "title": "מדריך מהיר",
+    "titleFull": "מדריך מהיר — VetTrack",
+    "okTitle": "תקין — מבצעי",
+    "subtitle": "כל מה שצריך לדעת כדי להשתמש ב-VetTrack"
   },
   "pilotHomePage": {
     "worthCheckingSection": "שווה לבדוק",
@@ -1399,7 +1403,9 @@
     "memory": "זיכרון",
     "sessions": "הפעלות",
     "syncSuccess": "הצלחות סנכרון",
-    "syncFailures": "שגיאות סנכרון"
+    "syncFailures": "שגיאות סנכרון",
+    "titleFull": "לוח בקרה — VetTrack",
+    "updated": "עודכן"
   },
   "qrPrintPage": {
     "title": "הדפסת QR",
@@ -3221,6 +3227,30 @@
     "title": "מה חדש — VetTrack",
     "heading": "מה חדש",
     "description": "התכונות והשיפורים האחרונים ב-VetTrack.",
-    "configureAlerts": "הגדר התראות בהגדרות"
+    "configureAlerts": "הגדר התראות בהגדרות",
+    "currentVersion": "1.1.2",
+    "currentDate": "יוני 2026",
+    "items": {
+      "nativeApp": {
+        "title": "אפליקציה נייטיב ל-iOS ו-Android",
+        "description": "VetTrack פועלת כעת כאפליקציה ניידת נייטיב עם סריקת NFC מובנית, צילום במצלמה ומשוב הפטי — לצד אפליקציית הווב הזמינה גם במצב לא מקוון.",
+        "badge": "חדש"
+      },
+      "signIn": {
+        "title": "כניסה עם Apple ו-Google",
+        "description": "כניסה חברתית נפתחת כעת בדפדפן המערכת לכניסה מאובטחת בנגיעה אחת בנייד, בנוסף לכניסה עם אימייל וסיסמה.",
+        "badge": "חדש"
+      },
+      "theme": {
+        "title": "מראה וערכות נושא מחודשים",
+        "description": "מראה מותג חדש לאורך האפליקציה, עם ערכות Clinical, Forest ו-Dark נבדלות שמוחלות באופן עקבי בכל מסך.",
+        "badge": "שופר"
+      },
+      "navigation": {
+        "title": "ניווט קל יותר",
+        "description": "כפתור חזרה זמין כעת בכל מסך, הכותרת נשארת קבועה בעת גלילה, ולחדר הבקרה של הציוד יש יציאה ברורה.",
+        "badge": "שופר"
+      }
+    }
   }
 }

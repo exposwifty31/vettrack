@@ -86,12 +86,6 @@ export default function AnalyticsPage() {
       <div className="flex flex-col gap-5 pb-24 animate-fade-in">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold leading-tight">{t.analyticsPage.title}</h1>
-          <Link href="/analytics/outcome-kpi">
-            <span className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-3 py-1.5 text-xs font-medium shadow-sm hover:bg-muted/50 transition-colors cursor-pointer">
-              <Activity className="h-3.5 w-3.5 text-primary" />
-              {t.outcomeKpiDashboard.title}
-            </span>
-          </Link>
           <Link href="/analytics/shift-leaderboard">
             <span className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-3 py-1.5 text-xs font-medium shadow-sm hover:bg-muted/50 transition-colors cursor-pointer">
               <TrendingUp className="h-3.5 w-3.5 text-primary" />

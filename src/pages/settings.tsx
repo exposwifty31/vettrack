@@ -196,10 +196,12 @@ export default function SettingsPage() {
               ]}
               onValueChange={(v) => {
                 const colorTheme = v as "forest" | "clinical" | "dark";
-                update({
-                  colorTheme,
-                  ...(colorTheme === "dark" ? { darkMode: true } : {}),
-                });
+                // The theme picker is authoritative over light/dark: "dark" implies
+                // dark mode; choosing "clinical"/"forest" clears it. Without the reset,
+                // switching away from "dark" left darkMode stuck on, and
+                // `.dark[data-color-theme="clinical"]` is a near-clone of the dark
+                // theme — so Clinical rendered identical to Dark.
+                update({ colorTheme, darkMode: colorTheme === "dark" });
               }}
               data-testid="settings-color-theme"
             />

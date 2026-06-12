@@ -1,7 +1,7 @@
 // src/pages/code-blue.tsx
 import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
-import { AlertTriangle, Package, Shield, StickyNote } from "lucide-react";
+import { AlertTriangle, ArrowRight, Package, Shield, StickyNote } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { authFetch } from "@/lib/auth-fetch";
@@ -78,6 +78,7 @@ function PreCheckGate({
   initialEquipmentName?: string;
 }) {
   const { userId, role, name } = useAuth();
+  const [, navigate] = useLocation();
   const isEligibleManager = role === "vet" || role === "admin";
   const QUICK_CHECK_ITEMS = [
     { key: "unitReady", label: t.codeBlue.preCheck.unitReady },
@@ -102,6 +103,17 @@ function PreCheckGate({
 
   return (
     <div className="min-h-screen bg-zinc-950 p-4 max-w-md mx-auto" dir="rtl">
+      {/* Leave before starting — accidental entry must never trap the user. */}
+      <button
+        type="button"
+        onClick={() => navigate("/home")}
+        data-testid="code-blue-leave-setup"
+        aria-label={t.common.back}
+        className="mb-4 flex h-9 items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800/80 px-3 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-700 motion-safe:active:scale-95"
+      >
+        <ArrowRight className="h-4 w-4" aria-hidden />
+        {t.common.back}
+      </button>
       <div className="flex items-center gap-2 mb-6 text-red-400">
         <AlertTriangle className="h-6 w-6" />
         <h1 className="text-xl font-bold">{t.codeBlue.openTitle}</h1>
@@ -291,9 +303,23 @@ function ActiveSession() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white" dir="rtl" style={{ borderTop: "3px solid #dc2626" }}>
       <div className="bg-zinc-900 border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
-        <span className="text-red-400 font-black tracking-widest text-sm flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4" /> CODE BLUE
-        </span>
+        <div className="flex items-center gap-2">
+          {/* Leave the live view without ending the session (it persists for the
+              rest of the team). Ending is a separate manager-only action below. */}
+          <button
+            type="button"
+            onClick={() => navigate("/home")}
+            data-testid="code-blue-leave"
+            aria-label={t.common.back}
+            className="flex h-9 items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800/80 px-3 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-700 motion-safe:active:scale-95"
+          >
+            <ArrowRight className="h-4 w-4" aria-hidden />
+            {t.common.back}
+          </button>
+          <span className="text-red-400 font-black tracking-widest text-sm flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" /> CODE BLUE
+          </span>
+        </div>
         <div className="flex gap-2 items-center">
           {presence.slice(0, 3).map((p) => (
             <span key={p.userId} className="bg-blue-900 text-blue-300 text-xs px-2 py-0.5 rounded-full">{p.userName}</span>

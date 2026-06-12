@@ -55,7 +55,6 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "src/pages/admin-shifts.tsx",
   "src/pages/admin.tsx",
   "src/pages/analytics.tsx",
-  "src/pages/app-tour.tsx",
   "src/pages/display.tsx",
   "src/pages/equipment-detail.tsx",
   "src/pages/equipment-list.tsx",
@@ -67,7 +66,6 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "src/pages/shift-leaderboard.tsx",
   "src/pages/signin.tsx",
   "src/pages/signup.tsx",
-  "src/pages/stability-dashboard.tsx",
 ]);
 
 function walk(dir: string, root: string, acc: string[]): void {

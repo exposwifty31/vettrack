@@ -38,7 +38,6 @@ const NotFoundPage = lazy(() => import("@/pages/not-found"));
 // --- Platform pages ---
 const InventoryPage = lazy(() => import("@/pages/inventory-page"));
 const AnalyticsPage = lazy(() => import("@/pages/analytics"));
-const OutcomeKpiDashboardPage = lazy(() => import("@/pages/outcome-kpi-dashboard"));
 const ManagementDashboardPage = lazy(() => import("@/pages/management-dashboard"));
 const AdminShiftsPage = lazy(() => import("@/pages/admin-shifts"));
 const AdminOpsDashboardPage = lazy(() => import("@/pages/admin-ops-dashboard"));
@@ -46,7 +45,6 @@ const AdminAssetTypesPage = lazy(() => import("@/pages/AdminAssetTypesPage"));
 const AdminDocksPage = lazy(() => import("@/pages/AdminDocksPage"));
 const OperationalMetricsDashboardPage = lazy(() => import("@/pages/OperationalMetricsDashboardPage"));
 const AppointmentsPage = lazy(() => import("@/pages/appointments"));
-const StabilityDashboardPage = lazy(() => import("@/pages/stability-dashboard"));
 const AuditLogPage = lazy(() => import("@/pages/audit-log"));
 const WhatsNewPage = lazy(() => import("@/pages/whats-new"));
 const ShiftLeaderboardPage = lazy(() => import("@/pages/shift-leaderboard"));
@@ -55,7 +53,6 @@ const ProcurementPage = lazy(() => import("@/pages/procurement"));
 const ShiftChatArchive = lazy(() =>
   import("@/features/shift-chat/components/ShiftChatArchive").then((m) => ({ default: m.ShiftChatArchive }))
 );
-const AppTourPage = lazy(() => import("@/pages/app-tour"));
 
 function RedirectPreserveSearch({ to }: { to: string }) {
   const search = useSearch();
@@ -142,7 +139,6 @@ export function AppRoutes() {
         <Route path="/admin/metrics"><AuthGuard><OperationalMetricsDashboardPage /></AuthGuard></Route>
         <Route path="/settings"><AuthGuard><SettingsPage /></AuthGuard></Route>
         <Route path="/help"><AuthGuard><HelpPage /></AuthGuard></Route>
-        <Route path="/stability"><AuthGuard><StabilityDashboardPage /></AuthGuard></Route>
         <Route path="/audit-log"><AuthGuard><AuditLogPage /></AuthGuard></Route>
         {/* Legacy admin aliases */}
         <Route path="/admin/medication-integrity"><Redirect to="/admin" replace /></Route>
@@ -151,13 +147,15 @@ export function AppRoutes() {
         <Route path="/inventory"><AuthGuard><InventoryPage /></AuthGuard></Route>
         <Route path="/inventory-items"><AuthGuard><InventoryItemsPage /></AuthGuard></Route>
         <Route path="/procurement"><AuthGuard><ProcurementPage /></AuthGuard></Route>
-        <Route path="/analytics/outcome-kpi"><AuthGuard><OutcomeKpiDashboardPage /></AuthGuard></Route>
+        <Route path="/analytics/outcome-kpi"><Redirect to="/analytics" replace /></Route>
         <Route path="/analytics/shift-leaderboard"><AuthGuard><ShiftLeaderboardPage /></AuthGuard></Route>
         <Route path="/analytics"><AuthGuard><AnalyticsPage /></AuthGuard></Route>
         <Route path="/dashboard"><AuthGuard><ManagementDashboardPage /></AuthGuard></Route>
         <Route path="/whats-new"><AuthGuard><WhatsNewPage /></AuthGuard></Route>
         <Route path="/shift-chat/:shiftId"><AuthGuard><ShiftChatArchive /></AuthGuard></Route>
-        <Route path="/app-tour"><AuthGuard><AppTourPage /></AuthGuard></Route>
+        {/* Legacy aliases for removed pages → home (no broken nav) */}
+        <Route path="/stability"><Redirect to="/home" replace /></Route>
+        <Route path="/app-tour"><Redirect to="/home" replace /></Route>
         {/* Legacy platform aliases */}
         <Route path="/meds"><Redirect to="/equipment/tasks" replace /></Route>
         <Route path="/pharmacy-forecast"><Redirect to="/equipment/tasks" replace /></Route>

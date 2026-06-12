@@ -59,7 +59,7 @@ export default function HelpPage() {
   return (
     <Layout>
       <Helmet>
-        <title>Quick Guide — VetTrack</title>
+        <title>{t.helpPage.titleFull}</title>
       </Helmet>
 
       <div className="flex flex-col gap-5 pb-20 animate-fade-in">
@@ -69,8 +69,8 @@ export default function HelpPage() {
             <HelpCircle className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold leading-tight">Quick Guide</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Everything you need to know to use VetTrack</p>
+            <h1 className="text-2xl font-bold leading-tight">{t.helpPage.title}</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">{t.helpPage.subtitle}</p>
           </div>
         </div>
 
@@ -112,7 +112,7 @@ export default function HelpPage() {
             icon={CheckCircle2}
             iconBg="bg-emerald-50 dark:bg-emerald-950/50"
             iconColor="text-emerald-600 dark:text-emerald-400"
-            title="OK — operational"
+            title={t.helpPage.okTitle}
             description={t.helpPage.okDescription}
           />
           <CheatItem

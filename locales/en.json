@@ -1277,7 +1277,11 @@
     "activeAlertsTitle": "Active alerts",
     "activeAlertsDescription": "The red badge on the bell icon shows how many items need attention. Tap to view and acknowledge.",
     "pushAlertsTitle": "Push alerts",
-    "pushAlertsDescription": "Enable push notifications in Settings -> Push Notifications to receive real-time alerts even when the app is in the background."
+    "pushAlertsDescription": "Enable push notifications in Settings -> Push Notifications to receive real-time alerts even when the app is in the background.",
+    "title": "Quick Guide",
+    "titleFull": "Quick Guide — VetTrack",
+    "okTitle": "OK — operational",
+    "subtitle": "Everything you need to know to use VetTrack"
   },
   "pilotHomePage": {
     "worthCheckingSection": "Worth checking",
@@ -1399,7 +1403,9 @@
     "memory": "Memory",
     "sessions": "Sessions",
     "syncSuccess": "Sync successes",
-    "syncFailures": "Sync failures"
+    "syncFailures": "Sync failures",
+    "titleFull": "Management Dashboard — VetTrack",
+    "updated": "Updated"
   },
   "qrPrintPage": {
     "title": "Print QR",
@@ -3221,6 +3227,30 @@
     "title": "What's New — VetTrack",
     "heading": "What's New",
     "description": "The latest features and improvements in VetTrack.",
-    "configureAlerts": "Configure alerts in Settings"
+    "configureAlerts": "Configure alerts in Settings",
+    "currentVersion": "1.1.2",
+    "currentDate": "June 2026",
+    "items": {
+      "nativeApp": {
+        "title": "Native iOS & Android app",
+        "description": "VetTrack now runs as a native mobile app with built-in NFC scanning, camera capture, and haptic feedback — alongside the offline-capable web app.",
+        "badge": "New"
+      },
+      "signIn": {
+        "title": "Sign in with Apple & Google",
+        "description": "Social sign-in now opens in the system browser for a secure, one-tap login on mobile, in addition to email and password.",
+        "badge": "New"
+      },
+      "theme": {
+        "title": "Refreshed look & themes",
+        "description": "A new brand look across the app, with distinct Clinical, Forest, and Dark themes that apply consistently on every screen.",
+        "badge": "Improved"
+      },
+      "navigation": {
+        "title": "Easier navigation",
+        "description": "A back button is now available on every screen, the header stays fixed while you scroll, and the Equipment Command Room has a clear exit.",
+        "badge": "Improved"
+      }
+    }
   }
 }

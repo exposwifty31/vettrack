@@ -124,7 +124,7 @@ export default function ManagementDashboardPage() {
   return (
     <AppShell>
       <Helmet>
-        <title>Management Dashboard — VetTrack</title>
+        <title>{t.managementDashboardPage.titleFull}</title>
         <meta name="description" content="Live management dashboard for veterinary hospital equipment. Track who has what, monitor locations, review critical alerts, and generate monthly PDF reports." />
         <link rel="canonical" href="https://vettrack.replit.app/dashboard" />
       </Helmet>
@@ -135,7 +135,7 @@ export default function ManagementDashboardPage() {
             <h1 className="text-2xl font-bold leading-tight">{t.managementDashboardPage.title}</h1>
             {lastUpdated && (
               <p className="text-xs text-muted-foreground mt-0.5">
-                Updated {lastUpdated}
+                {t.managementDashboardPage.updated} {lastUpdated}
               </p>
             )}
           </div>
