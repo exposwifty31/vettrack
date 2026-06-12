@@ -184,7 +184,7 @@ export default function AdminPage() {
 
 
         {/* Tab bar */}
-        <div className="flex gap-2 border-b border-border pb-0 overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-3 border-b border-border pb-0 overflow-x-auto scrollbar-none px-1 -mx-1">
           <button
             onClick={() => setActiveTab("folders")}
             data-testid="admin-tab-folders"
@@ -211,7 +211,7 @@ export default function AdminPage() {
             <Clock className="w-4 h-4" />
             {t.adminPage.tabPending}
             {pendingCount > 0 && (
-              <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+              <span className="ms-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
                 {pendingCount > 9 ? "9+" : pendingCount}
               </span>
             )}
@@ -242,7 +242,7 @@ export default function AdminPage() {
             <LifeBuoy className="w-4 h-4" />
             {t.adminPage.tabSupport}
             {unresolvedCount > 0 && (
-              <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-[10px] font-bold">
+              <span className="ms-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-[10px] font-bold">
                 {unresolvedCount > 9 ? "9+" : unresolvedCount}
               </span>
             )}

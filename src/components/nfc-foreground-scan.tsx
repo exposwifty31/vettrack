@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { extractEquipmentId } from "@/components/qr-scanner";
@@ -17,6 +18,7 @@ import { startNfcScanSession } from "@/lib/nfc-platform";
 
 export function NfcForegroundScan() {
   const queryClient = useQueryClient();
+  const [location] = useLocation();
   const { supported: nfcSupported } = useNfcSupported();
   const [enabled, setEnabled] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -99,6 +101,9 @@ export function NfcForegroundScan() {
   };
 
   if (!nfcSupported) return null;
+  // Quick-scan is an equipment affordance — on every other page it just
+  // crowds the floating corner (chat FAB) and covers content.
+  if (!location.startsWith("/equipment") && !location.startsWith("/scan")) return null;
 
   return (
     <div className="fixed bottom-nav-float-2 end-4 z-[60] md:bottom-6" data-testid="nfc-foreground-scan">

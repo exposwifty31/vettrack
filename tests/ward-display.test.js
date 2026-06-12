@@ -106,10 +106,16 @@ describe("Ward Display — overdue medication job (removed)", () => {
     expect(workerSource).not.toContain("overdueNotifiedAt");
   });
 
-  it("WardDisplayPage contains no interactive elements (read-only)", () => {
-    // Full page should have no click handlers or buttons
-    expect(pageSource).not.toContain("onClick");
-    expect(pageSource).not.toContain("<button");
-    expect(pageSource).not.toContain("<a href");
+  it("WardDisplayPage is read-only except the kiosk-hidden exit button", () => {
+    // The board stays read-only: the ONLY interactive element is the exit
+    // affordance (navigation-only, hidden under ?kiosk=1 for wall displays).
+    expect(pageSource).toContain('data-testid="board-exit"');
+    const withoutExit = pageSource.replace(
+      /\{!kioskMode && \([\s\S]*?board-exit[\s\S]*?\)\}/,
+      "",
+    );
+    expect(withoutExit).not.toContain("onClick");
+    expect(withoutExit).not.toContain("<button");
+    expect(withoutExit).not.toContain("<a href");
   });
 });

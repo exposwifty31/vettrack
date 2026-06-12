@@ -21,25 +21,29 @@ export function ShiftChatFab() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setIsOpen(true)}
-        className={cn(
-          "fixed bottom-nav-float end-5 z-[60]",
-          "w-12 h-12 rounded-full",
-          "bg-gradient-to-br from-[var(--brand)] to-[var(--brand-deep)]",
-          "flex items-center justify-center text-xl shadow-lg shadow-[var(--brand-shadow)]",
-          "transition-transform hover:scale-105 motion-safe:active:scale-95",
-        )}
-        aria-label={t.shiftChat.openChat}
-      >
-        <span aria-hidden="true">💬</span>
-        {chat.unreadCount > 0 && (
-          <span aria-hidden="true" className="absolute -top-1 -end-1 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-background">
-            {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
-          </span>
-        )}
-      </button>
+      {/* Launcher hides while the panel is open — otherwise it floats over the
+          panel's own close button in the same corner. */}
+      {!isOpen && (
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          className={cn(
+            "fixed bottom-nav-float end-5 z-[60]",
+            "w-12 h-12 rounded-full",
+            "bg-gradient-to-br from-[var(--brand)] to-[var(--brand-deep)]",
+            "flex items-center justify-center text-xl shadow-lg shadow-[var(--brand-shadow)]",
+            "transition-transform hover:scale-105 motion-safe:active:scale-95",
+          )}
+          aria-label={t.shiftChat.openChat}
+        >
+          <span aria-hidden="true">💬</span>
+          {chat.unreadCount > 0 && (
+            <span aria-hidden="true" className="absolute -top-1 -end-1 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-background">
+              {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
+            </span>
+          )}
+        </button>
+      )}
 
       <ShiftChatPanel
         isOpen={isOpen}

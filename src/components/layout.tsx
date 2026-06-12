@@ -602,12 +602,9 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   // have no visible exit on iOS, where there is no system back button.
   const dir = useDirection();
   const currentPath = location.split("?")[0] ?? location;
-  const rootPaths = useMemo(() => {
-    const roots = new Set(["/", "/home"]);
-    for (const n of bottomNavItems ?? []) roots.add(n.href.split("?")[0]!);
-    return roots;
-  }, [bottomNavItems]);
-  const showBack = !rootPaths.has(currentPath) && !navigationLocked;
+  // Every page except home gets the back affordance — iOS has no system back
+  // button, and section roots (rooms, admin, …) need an exit too.
+  const showBack = currentPath !== "/" && currentPath !== "/home" && !navigationLocked;
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
   const handleBack = () => {
     if (window.history.length > 1) window.history.back();
@@ -656,7 +653,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
       </a>
       <header
         className={cn(
-          "sticky top-safe border-b bg-ivory-navy backdrop-blur supports-[backdrop-filter]:bg-ivory-navy/95 z-40",
+          "sticky top-0 header-safe-bleed border-b bg-ivory-navy backdrop-blur supports-[backdrop-filter]:bg-ivory-navy/95 z-40",
           navigationLocked ? "border-amber-400/60" : "border-black/40",
           "transition-colors duration-300"
         )}

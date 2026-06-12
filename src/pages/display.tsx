@@ -3,6 +3,8 @@
 // Phase 9 realtime infrastructure preserved byte-for-byte.
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { X } from "lucide-react";
 import {
   connectRealtime,
   disconnectRealtime,
@@ -283,6 +285,16 @@ function CommandBoard({
   currentTime: string;
   currentShift: Array<{ employeeName: string; role: string }>;
 }) {
+  const [, navigate] = useLocation();
+  // Same ?kiosk=1 contract as WardDisplayPage — wall displays get no exit button.
+  const kioskMode = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return new URL(window.location.href).searchParams.get("kiosk") === "1";
+    } catch {
+      return false;
+    }
+  }, []);
   const now = new Date(currentTime);
   const timeStr = now.toLocaleTimeString("he-IL", {
     hour: "2-digit",
@@ -326,11 +338,27 @@ function CommandBoard({
 
         {/* LIVE badge */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className="w-2 h-2 rounded-full bg-[var(--status-ok)] motion-safe:animate-pulse" aria-hidden />
-          <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--status-ok)]">
+          <span className="w-2 h-2 rounded-full bg-[hsl(var(--status-ok))] motion-safe:animate-pulse" aria-hidden />
+          <span className="text-[11px] font-bold uppercase tracking-widest text-[hsl(var(--status-ok))]">
             {t.board?.live ?? "חי"}
           </span>
         </div>
+
+        {/* Exit — wall-mounted kiosks (?kiosk=1) have no operator to tap it */}
+        {!kioskMode && (
+          <button
+            type="button"
+            onClick={() => {
+              if (window.history.length > 1) window.history.back();
+              else navigate("/home");
+            }}
+            aria-label={t.common.back}
+            data-testid="board-exit"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white/85 transition-colors hover:bg-white/20 motion-safe:active:scale-95"
+          >
+            <X className="h-4 w-4" aria-hidden />
+          </button>
+        )}
       </header>
 
       {/* Body */}
