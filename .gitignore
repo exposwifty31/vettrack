@@ -67,3 +67,8 @@ desktop/cleaner/dist/
 
 # Staging E2E (Clerk user ids — never commit)
 .staging-e2e-manifest.json
+
+# Build/store artifacts that must never be committed (Phase 1 hygiene)
+.pnpm-store/
+ios/build/
+*.xcarchive/
