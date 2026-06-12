@@ -591,10 +591,10 @@ export default function InventoryPage() {
       });
       nfcSessionStopRef.current = session.stop;
       nfcActiveRef.current = true;
-      navigator.vibrate?.([20, 25, 20]);
+      haptics.scanSuccess();
       toast.success(p.nfcReady, { duration: 3200 });
     } catch {
-      navigator.vibrate?.(140);
+      haptics.error();
       toast.error(p.nfcStartFailed);
     } finally {
       setIsNfcStarting(false);

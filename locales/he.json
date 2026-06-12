@@ -111,10 +111,9 @@
       "deleteError": "המחיקה נכשלה",
       "moveSuccess": "הועבר בהצלחה",
       "moveError": "ההעברה נכשלה",
-      "exportError": "הייצוא נכשל. נא לנסות שוב.",
+      "exportError": "הייצוא נכשל",
       "checkoutError": "ההוצאה לשימוש נכשלה",
-      "returnError": "ההחזרה נכשלה",
-      "exportError": "הייצוא נכשל"
+      "returnError": "ההחזרה נכשלה"
     },
     "linkedInUse": "בשימוש אצל: {name}",
     "recoveryBadgeStale": "דורש אימות",
@@ -2833,7 +2832,8 @@
       "ackFailed": "אישור ההודעה נכשל.",
       "reactFailed": "הוספת תגובה נכשלה.",
       "pinFailed": "הצמדת ההודעה נכשלה."
-    }
+    },
+    "openChat": "פתח צ'אט משמרת"
   },
   "auditLog": {
     "actions": {

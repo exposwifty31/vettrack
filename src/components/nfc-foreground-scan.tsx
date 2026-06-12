@@ -101,7 +101,7 @@ export function NfcForegroundScan() {
   if (!nfcSupported) return null;
 
   return (
-    <div className="fixed bottom-20 end-4 z-40 md:bottom-6" data-testid="nfc-foreground-scan">
+    <div className="fixed bottom-nav-float-2 end-4 z-[60] md:bottom-6" data-testid="nfc-foreground-scan">
       <Button
         type="button"
         size="sm"

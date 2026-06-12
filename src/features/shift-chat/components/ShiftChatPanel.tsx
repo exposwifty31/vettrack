@@ -247,7 +247,7 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
           <button
             onClick={handleSend}
             disabled={!body.trim() || isSending}
-            className="bg-gradient-to-br from-indigo-600 to-violet-700 text-white rounded-full w-8 h-8 flex items-center justify-center flex-shrink-0 disabled:opacity-40"
+            className="bg-gradient-to-br from-[var(--brand)] to-[var(--brand-deep)] text-white rounded-full w-8 h-8 flex items-center justify-center flex-shrink-0 disabled:opacity-40"
             aria-label="שלח"
           >
             ➤

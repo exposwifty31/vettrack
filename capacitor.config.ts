@@ -20,7 +20,11 @@ const config: CapacitorConfig = {
       }
     : undefined,
   ios: {
-    contentInset: "automatic",
+    // "never": the WebView spans the full screen and the web layer owns safe
+    // areas via viewport-fit=cover + env(safe-area-inset-*) — same rendering as
+    // the installed PWA. "automatic" let WKWebView inset scroll content
+    // natively, which fought the CSS and pushed content under the status bar.
+    contentInset: "never",
   },
   android: {
     allowMixedContent: false,

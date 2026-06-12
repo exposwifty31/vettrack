@@ -2836,6 +2836,7 @@ export interface TStructure {
       reactFailed: string;
       pinFailed: string;
     };
+    openChat: string;
   };
   auditLog: {
     actions: {

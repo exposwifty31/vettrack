@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { t } from "@/lib/i18n";
 import { useShiftChat } from "../hooks/useShiftChat";
 import { ShiftChatPanel } from "./ShiftChatPanel";
 import { useAuth } from "@/hooks/use-auth";
@@ -26,11 +27,11 @@ export function ShiftChatFab() {
         className={cn(
           "fixed bottom-nav-float end-5 z-[60]",
           "w-12 h-12 rounded-full",
-          "bg-gradient-to-br from-indigo-600 to-violet-700",
-          "flex items-center justify-center text-xl shadow-lg shadow-indigo-500/40",
+          "bg-gradient-to-br from-[var(--brand)] to-[var(--brand-deep)]",
+          "flex items-center justify-center text-xl shadow-lg shadow-[var(--brand-shadow)]",
           "transition-transform hover:scale-105 motion-safe:active:scale-95",
         )}
-        aria-label="פתח צ'אט משמרת"
+        aria-label={t.shiftChat.openChat}
       >
         <span aria-hidden="true">💬</span>
         {chat.unreadCount > 0 && (

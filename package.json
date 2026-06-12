@@ -70,6 +70,7 @@
     "@capacitor/browser": "8",
     "@capacitor/camera": "^8.2.0",
     "@capacitor/core": "8",
+    "@capacitor/haptics": "8",
     "@capgo/capacitor-nfc": "8",
     "@clerk/clerk-js": "5.125.13",
     "@clerk/clerk-react": "^5.0.0",

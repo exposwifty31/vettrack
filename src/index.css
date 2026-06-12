@@ -163,7 +163,8 @@
   }
 
   /*
-   * Clinical 60/30/10 — cool canvas, blue brand (nav/headers/primary CTAs),
+   * Clinical 60/30/10 — cool canvas, VetTrack brand indigo/navy (matches the
+   * VT logo: navy #0b1021, indigo mark) for nav/headers/primary CTAs,
    * green reserved for action completion (scan FAB, success chips, progress).
    */
   :root[data-color-theme="clinical"] {
@@ -171,15 +172,15 @@
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
-    --primary: 221 83% 53%;
+    --primary: 243 75% 59%;
     --primary-foreground: 0 0% 100%;
     --secondary: 214 32% 95%;
     --secondary-foreground: 222 47% 11%;
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
-    --accent: 214 32% 93%;
-    --accent-foreground: 222 47% 11%;
-    --ring: 221 83% 53%;
+    --accent: 226 100% 94%;
+    --accent-foreground: 244 47% 20%;
+    --ring: 243 75% 59%;
     --ivory-bg:       248 250 252;
     --ivory-surface:  255 255 255;
     --ivory-border:   226 232 240;
@@ -187,19 +188,23 @@
     --ivory-text:     15 23 42;
     --ivory-text2:    51 65 85;
     --ivory-text3:    100 116 139;
-    --ivory-navy:     37 99 235;
-    --ivory-green:    37 99 235;
-    --ivory-greenMid: 29 78 216;
-    --ivory-greenBg:  239 246 255;
+    --ivory-navy:     11 16 33;     /* logo navy #0b1021 */
+    --ivory-green:    79 70 229;    /* indigo-600 */
+    --ivory-greenMid: 67 56 202;    /* indigo-700 */
+    --ivory-greenBg:  238 242 255;  /* indigo-50 */
     --status-ok: 142 71% 45%;
-    --brand: #2563eb;
-    --brand-deep: #1d4ed8;
-    --brand-ink: #1e3a8a;
-    --brand-soft: #eff4ff;
-    --brand-border: #c7d8ee;
-    --brand-shadow: rgba(37, 99, 235, 0.45);
-    --hero-a: #0f1e3d;
-    --hero-b: #1e3a8a;
+    /* Chrome constants (Topbar / wordmark) — must follow the theme */
+    --brand-navy: #0b1021;
+    --brand-green-bright: #a5b4fc;  /* indigo-300 — wordmark accent on navy */
+    --brand-green-mid: #6366f1;     /* indigo-500 */
+    --brand: #4f46e5;
+    --brand-deep: #4338ca;
+    --brand-ink: #312e81;
+    --brand-soft: #eef2ff;
+    --brand-border: #c7d2fe;
+    --brand-shadow: rgba(79, 70, 229, 0.45);
+    --hero-a: #0b1021;
+    --hero-b: #312e81;
     --action: #22c55e;
     --action-deep: #16a34a;
     --action-ink: #15803d;
@@ -213,12 +218,12 @@
     --foreground: 210 40% 98%;
     --card: 222 40% 10%;
     --card-foreground: 210 40% 98%;
-    --primary: 217 91% 60%;
+    --primary: 234 89% 74%;
     --primary-foreground: 0 0% 100%;
     --secondary: 217 33% 17%;
     --muted: 217 33% 14%;
     --muted-foreground: 215 20% 65%;
-    --ring: 217 91% 60%;
+    --ring: 234 89% 74%;
     --ivory-bg:       11 18 32;
     --ivory-surface:  19 28 46;
     --ivory-border:   36 49 74;
@@ -226,18 +231,22 @@
     --ivory-text:     232 237 246;
     --ivory-text2:    170 182 204;
     --ivory-text3:    107 122 150;
-    --ivory-navy:     59 130 246;
-    --ivory-green:    59 130 246;
-    --ivory-greenMid: 37 99 235;
-    --ivory-greenBg:  30 58 138;
-    --brand: #3b82f6;
-    --brand-deep: #2563eb;
-    --brand-ink: #93c5fd;
-    --brand-soft: rgba(59, 130, 246, 0.12);
-    --brand-border: rgba(59, 130, 246, 0.3);
+    --ivory-navy:     129 140 248;  /* indigo-400 — accent role on dark */
+    --ivory-green:    129 140 248;  /* indigo-400 */
+    --ivory-greenMid: 99 102 241;   /* indigo-500 */
+    --ivory-greenBg:  49 46 129;    /* indigo-900 */
+    /* Chrome constants (Topbar / wordmark) — must follow the theme */
+    --brand-navy: #0b1021;
+    --brand-green-bright: #a5b4fc;
+    --brand-green-mid: #6366f1;
+    --brand: #6366f1;
+    --brand-deep: #4f46e5;
+    --brand-ink: #c7d2fe;
+    --brand-soft: rgba(99, 102, 241, 0.12);
+    --brand-border: rgba(99, 102, 241, 0.3);
     --brand-shadow: rgba(0, 0, 0, 0.6);
-    --hero-a: #0a1326;
-    --hero-b: #16264a;
+    --hero-a: #0b1021;
+    --hero-b: #1e1b4b;
     --action: #22c55e;
     --action-deep: #16a34a;
     --action-ink: #4ade80;
@@ -251,12 +260,12 @@
     --foreground: 210 40% 98%;
     --card: 222 40% 10%;
     --card-foreground: 210 40% 98%;
-    --primary: 217 91% 60%;
+    --primary: 234 89% 74%;
     --primary-foreground: 0 0% 100%;
     --secondary: 217 33% 17%;
     --muted: 217 33% 14%;
     --muted-foreground: 215 20% 65%;
-    --ring: 217 91% 60%;
+    --ring: 234 89% 74%;
     --ivory-bg:       15 23 42;
     --ivory-surface:  30 41 59;
     --ivory-border:   51 65 85;
@@ -264,10 +273,13 @@
     --ivory-text:     248 250 252;
     --ivory-text2:    203 213 225;
     --ivory-text3:    148 163 184;
-    --ivory-navy:     37 99 235;
-    --ivory-green:    59 130 246;
-    --ivory-greenMid: 37 99 235;
-    --ivory-greenBg:  30 58 138;
+    --ivory-navy:     129 140 248;
+    --ivory-green:    129 140 248;
+    --ivory-greenMid: 99 102 241;
+    --ivory-greenBg:  49 46 129;
+    --brand-navy: #0b1021;
+    --brand-green-bright: #a5b4fc;
+    --brand-green-mid: #6366f1;
   }
 
   /* Scan / confirm uses action color (10% tier), not brand */
@@ -478,6 +490,11 @@
      Nav bar is 68px; 0.5rem (8px) gap ensures the element clears the top edge. */
   .bottom-nav-float {
     bottom: calc(68px + env(safe-area-inset-bottom) + 0.5rem);
+  }
+  /* Second floating slot: clears the bottom nav AND a 56px FAB sitting in the
+     first slot (e.g. NFC scan pill stacked above the shift-chat FAB). */
+  .bottom-nav-float-2 {
+    bottom: calc(68px + env(safe-area-inset-bottom) + 0.5rem + 56px + 0.75rem);
   }
 }
 

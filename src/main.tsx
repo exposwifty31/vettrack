@@ -209,9 +209,16 @@ if (!rootEl) {
   // web bundle never ships clerk-js.
   const nativeClerkPromise: Promise<ClerkProp> =
     clerkRuntime && isCapacitorNative()
-      ? import("@/lib/clerk-native-instance").then(
-          (m) => m.createNativeClerkInstance(PUBLISHABLE_KEY) as unknown as ClerkProp,
-        )
+      ? import("@/lib/clerk-native-instance")
+          .then((m) => m.createNativeClerkInstance(PUBLISHABLE_KEY) as unknown as ClerkProp)
+          .catch((err) => {
+            // Boot must never dead-end on a failed chunk: fall back to the
+            // hot-loaded clerk-js (cookie mode). System-browser OAuth won't
+            // work in that degraded state, but the app renders and email/
+            // password still does — and NativeClerkGate surfaces load errors.
+            console.error("[native-clerk] failed to construct native instance; falling back", err);
+            return undefined;
+          })
       : Promise.resolve(undefined);
 
   void nativeClerkPromise.then((nativeClerk) => {

@@ -49,7 +49,6 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "src/features/shift-chat/components/BroadcastCard.tsx",
   "src/features/shift-chat/components/MessageBubble.tsx",
   "src/features/shift-chat/components/ShiftChatArchive.tsx",
-  "src/features/shift-chat/components/ShiftChatFab.tsx",
   "src/features/shift-chat/components/ShiftChatPanel.tsx",
   "src/features/shift-chat/components/SystemCard.tsx",
   "src/features/shift-chat/types.ts",

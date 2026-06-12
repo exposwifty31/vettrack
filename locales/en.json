@@ -111,10 +111,9 @@
       "deleteError": "Deletion failed",
       "moveSuccess": "Moved successfully",
       "moveError": "Move failed",
-      "exportError": "Export failed. Please try again.",
+      "exportError": "Export failed",
       "checkoutError": "Equipment checkout failed",
-      "returnError": "Return failed",
-      "exportError": "Export failed"
+      "returnError": "Return failed"
     },
     "linkedInUse": "In use for: {name}",
     "recoveryBadgeStale": "Needs confirm",
@@ -2833,7 +2832,8 @@
       "ackFailed": "Failed to acknowledge message.",
       "reactFailed": "Failed to add reaction.",
       "pinFailed": "Failed to pin message."
-    }
+    },
+    "openChat": "Open shift chat"
   },
   "auditLog": {
     "actions": {

@@ -6,6 +6,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { computeAlerts } from "@/lib/utils";
 import {
+  ArrowLeft,
+  ArrowRight,
   Home,
   Package,
   Grid,
@@ -56,6 +58,7 @@ import {
   Gauge,
 } from "lucide-react";
 import { OnboardingWalkthrough } from "@/components/onboarding-walkthrough";
+import { useDirection } from "@/hooks/useDirection";
 import { NfcForegroundScan } from "@/components/nfc-foreground-scan";
 import { HelpTooltip } from "@/components/ui/help-tooltip";
 import type { RestockContainerView } from "@/types";
@@ -594,6 +597,23 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   const hasPending = pendingCount > 0;
   const hasFailed = failedCount > 0;
 
+  // Mobile back affordance: any page that isn't a bottom-nav root gets a
+  // header back button — without it sub-pages (dashboard, settings, details)
+  // have no visible exit on iOS, where there is no system back button.
+  const dir = useDirection();
+  const currentPath = location.split("?")[0] ?? location;
+  const rootPaths = useMemo(() => {
+    const roots = new Set(["/", "/home"]);
+    for (const n of bottomNavItems ?? []) roots.add(n.href.split("?")[0]!);
+    return roots;
+  }, [bottomNavItems]);
+  const showBack = !rootPaths.has(currentPath) && !navigationLocked;
+  const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
+  const handleBack = () => {
+    if (window.history.length > 1) window.history.back();
+    else navigate("/home");
+  };
+
   const handleSoundToggle = async (v: boolean) => {
     if (v) {
       await playFeedbackTone();
@@ -637,7 +657,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
       <header
         className={cn(
           "sticky top-safe border-b bg-ivory-navy backdrop-blur supports-[backdrop-filter]:bg-ivory-navy/95 z-40",
-          navigationLocked ? "border-amber-400/60" : "border-[#0a1509]",
+          navigationLocked ? "border-amber-400/60" : "border-black/40",
           "transition-colors duration-300"
         )}
       >
@@ -651,6 +671,18 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
         )}
         <UpdateBanner />
         <div className="flex h-14 items-center justify-between px-4 max-w-2xl mx-auto">
+          <div className="flex min-w-0 items-center gap-1">
+          {showBack && (
+            <button
+              type="button"
+              onClick={handleBack}
+              aria-label={t.common.back}
+              data-testid="mobile-back-button"
+              className="-ms-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white/90 transition-colors hover:bg-white/10 motion-safe:active:scale-95"
+            >
+              <BackIcon className="w-5 h-5" aria-hidden />
+            </button>
+          )}
           <Link
             href="/home"
             className="flex cursor-pointer items-center gap-2 group select-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -665,14 +697,15 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
               )}
             >
               <Stethoscope
-                className="w-4 h-4 text-[#4cde6a] transition-transform duration-300 ease-out group-hover:scale-110"
+                className="w-4 h-4 text-[var(--brand-green-bright)] transition-transform duration-300 ease-out group-hover:scale-110"
                 aria-hidden
               />
             </div>
-            <span className="text-lg font-bold tracking-tight transition-colors duration-200 text-white group-hover:text-[#4cde6a]">
-              Vet<em className="text-[#4cde6a] not-italic group-hover:text-white">Track</em>
+            <span className="text-lg font-bold tracking-tight transition-colors duration-200 text-white group-hover:text-[var(--brand-green-bright)]">
+              Vet<em className="text-[var(--brand-green-bright)] not-italic group-hover:text-white">Track</em>
             </span>
           </Link>
+          </div>
 
           <div className="flex items-center gap-1.5">
             {!isOnline && (
