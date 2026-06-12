@@ -10,10 +10,16 @@ import { resolveRequestId, apiError } from "../lib/route-utils.js";
 /*
  * PERMISSIONS MATRIX — /api/alert-acks
  * ─────────────────────────────────────────────────────
- * GET  /             student+      Read current acknowledgments
- * POST /             technician+   Mark alert as SEEN ("I've seen this")
- * PATCH /:id/resolve technician+   Mark alert as RESOLVED (intent to close)
+ * GET  /             student+            Read current acknowledgments (view-only for all)
+ * POST /             senior_technician+  Take ownership ("Who's Handling This")
+ * PATCH /:id/resolve senior_technician+  Mark RESOLVED ("Treat Now" — intent to close)
  * ─────────────────────────────────────────────────────
+ *
+ * Ownership (taking/resolving an alert) is restricted to the equipment-management
+ * tier — senior_technician and above (incl. vet, admin). Everyone down to student
+ * can still READ who is handling each alert; only authorized users can claim it.
+ * To restrict further (e.g. an explicit per-user allowlist), tighten the gate here
+ * and the matching client predicate `canOwnAlerts` in src/pages/alerts.tsx.
  *
  * Two-level model:
  *   SEEN     — user is aware; system CONTINUES alerting
@@ -60,9 +66,9 @@ router.get("/", requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/alert-acks — mark alert as SEEN ("I've seen this") — technician+ only
+// POST /api/alert-acks — take ownership ("Who's Handling This") — senior_technician+ only
 // SEEN does NOT stop escalation. System continues to remind.
-router.post("/", requireAuth, requireEffectiveRole("technician"), async (req, res) => {
+router.post("/", requireAuth, requireEffectiveRole("senior_technician"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
@@ -175,7 +181,7 @@ router.post("/", requireAuth, requireEffectiveRole("technician"), async (req, re
 
 // PATCH /api/alert-acks/:id/resolve — mark as RESOLVED (intent-only, not truth)
 // The alert-reminder scanner validates the underlying condition and may re-open.
-router.patch("/:id/resolve", requireAuth, requireEffectiveRole("technician"), async (req, res) => {
+router.patch("/:id/resolve", requireAuth, requireEffectiveRole("senior_technician"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;

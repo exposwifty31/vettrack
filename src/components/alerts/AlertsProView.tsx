@@ -25,6 +25,9 @@ interface AlertsProViewProps {
   onNavigate: (equipmentId: string) => void;
   onAck: (equipmentId: string, alertType: string) => void;
   onUnAck: (equipmentId: string, alertType: string) => void;
+  /** Ownership (take/release) is restricted to the equipment-management tier. When
+   *  false, status stays visible (who's handling) but the claim/release controls hide. */
+  canOwn: boolean;
   formatRelativeTime: (date: Date) => string;
 }
 
@@ -37,6 +40,7 @@ export function AlertsProView({
   onNavigate,
   onAck,
   onUnAck,
+  canOwn,
   formatRelativeTime,
 }: AlertsProViewProps) {
   const direction = useDirection();
@@ -149,18 +153,20 @@ export function AlertsProView({
                           {formatRelativeTime(new Date(ack.acknowledgedAt))}
                         </span>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="h-9 w-9 shrink-0"
-                        disabled={hasAckError}
-                        onClick={() => onUnAck(alert.equipmentId, alert.type)}
-                        aria-label={t.alertsPage.removeAckAria}
-                      >
-                        <X className="h-3 w-3" aria-hidden />
-                      </Button>
+                      {canOwn && (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="h-9 w-9 shrink-0"
+                          disabled={hasAckError}
+                          onClick={() => onUnAck(alert.equipmentId, alert.type)}
+                          aria-label={t.alertsPage.removeAckAria}
+                        >
+                          <X className="h-3 w-3" aria-hidden />
+                        </Button>
+                      )}
                     </div>
-                  ) : (
+                  ) : canOwn ? (
                     <Button
                       variant="outline"
                       size="sm"
@@ -172,7 +178,7 @@ export function AlertsProView({
                       <UserCheck className="h-3.5 w-3.5 me-1.5" aria-hidden />
                       {t.alertsPage.takeOwnership}
                     </Button>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </div>

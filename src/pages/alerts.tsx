@@ -82,10 +82,18 @@ const ALERT_CONFIG: Record<
   },
 };
 
+// Ownership (take/release an alert) is restricted to the equipment-management
+// tier — senior_technician and above. Mirrors the server gate
+// `requireEffectiveRole("senior_technician")` in server/routes/alert-acks.ts.
+const ALERT_OWNERSHIP_ROLES = new Set(["admin", "vet", "senior_technician"]);
+
 export default function AlertsPage() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
-  const { userId } = useAuth();
+  const { userId, effectiveRole, role } = useAuth();
+  const canOwnAlerts = ALERT_OWNERSHIP_ROLES.has(
+    String(effectiveRole ?? role ?? "").trim().toLowerCase(),
+  );
 
   const { data: equipment, isLoading: eqLoading, isError: eqError, refetch: refetchEq } = useQuery({
     queryKey: ["/api/equipment"],
@@ -231,6 +239,7 @@ export default function AlertsPage() {
             onNavigate={(id) => navigate(`/equipment/${id}`)}
             onAck={(equipmentId, alertType) => ackMut.mutate({ equipmentId, alertType })}
             onUnAck={(equipmentId, alertType) => unAckMut.mutate({ equipmentId, alertType })}
+            canOwn={canOwnAlerts}
             formatRelativeTime={formatRelativeTime}
           />
         ) : (
@@ -305,24 +314,26 @@ export default function AlertsPage() {
                                     </span>
                                   </div>
                                 </div>
-                                <Button
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  className="w-6 h-6 text-muted-foreground hover:text-red-500 shrink-0"
-                                  disabled={hasAckError}
-                                  onClick={() =>
-                                    unAckMut.mutate({
-                                      equipmentId: alert.equipmentId,
-                                      alertType: alert.type,
-                                    })
-                                  }
-                                  data-testid={`btn-unack-${alert.equipmentId}`}
-                                  aria-label={t.alertsPage.removeAckAria}
-                                >
-                                  <X className="w-3 h-3" />
-                                </Button>
+                                {canOwnAlerts && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    className="w-6 h-6 text-muted-foreground hover:text-red-500 shrink-0"
+                                    disabled={hasAckError}
+                                    onClick={() =>
+                                      unAckMut.mutate({
+                                        equipmentId: alert.equipmentId,
+                                        alertType: alert.type,
+                                      })
+                                    }
+                                    data-testid={`btn-unack-${alert.equipmentId}`}
+                                    aria-label={t.alertsPage.removeAckAria}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                )}
                               </div>
-                            ) : (
+                            ) : canOwnAlerts ? (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -339,7 +350,7 @@ export default function AlertsPage() {
                                 <UserCheck className="w-3.5 h-3.5 mr-1.5" />
                                 {t.alertsPage.takeOwnership}
                               </Button>
-                            )}
+                            ) : null}
                           </div>
                         </Card>
                       );
