@@ -205,10 +205,7 @@ if (!rootEl) {
   createRoot(rootEl).render(
     <HelmetProvider>
       {clerkRuntime ? (
-        <ClerkProvider
-          publishableKey={clerkRuntime.publishableKey}
-          allowedRedirectOrigins={clerkRuntime.allowedRedirectOrigins}
-        >
+        <ClerkProvider {...clerkRuntime}>
           <NativeClerkGate>{appShell}</NativeClerkGate>
         </ClerkProvider>
       ) : (
