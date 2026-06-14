@@ -88,6 +88,10 @@ interface SettingsSelectProps {
   options: SettingsSelectOption[];
   onValueChange: (value: string) => void;
   "data-testid"?: string;
+  /** BCP-47 lang for rows whose text is a fixed language regardless of UI
+   *  locale (e.g. the language picker is always Hebrew). Lets screen readers
+   *  switch pronunciation engines — WCAG 3.1.2 Language of Parts. */
+  lang?: string;
 }
 
 export function SettingsSelect({
@@ -98,9 +102,10 @@ export function SettingsSelect({
   options,
   onValueChange,
   "data-testid": testId,
+  lang,
 }: SettingsSelectProps) {
   return (
-    <div className="flex items-center gap-4 px-4 py-3.5 rounded-xl bg-muted/40">
+    <div lang={lang} className="flex items-center gap-4 px-4 py-3.5 rounded-xl bg-muted/40">
       <span className="flex-shrink-0 text-muted-foreground">{icon}</span>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground leading-tight">{label}</p>
@@ -110,6 +115,10 @@ export function SettingsSelect({
       </div>
       <Select value={value} onValueChange={onValueChange}>
         <SelectTrigger
+          // The visible <p>{label}</p> is not programmatically tied to the
+          // combobox, so expose it as the trigger's accessible name (WCAG 4.1.2
+          // / Lighthouse select-name) — otherwise SRs announce only the value.
+          aria-label={label}
           className="w-auto min-w-[120px] h-9 text-xs"
           data-testid={testId}
         >

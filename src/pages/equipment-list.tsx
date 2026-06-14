@@ -511,6 +511,11 @@ export default function EquipmentListPage() {
           <div className="relative">
             <Search className="absolute start-3.5 top-3 h-4 w-4 text-muted-foreground" />
             <Input
+              id="equipment-search"
+              name="equipment-search"
+              type="search"
+              autoComplete="off"
+              aria-label={t.equipmentList.search.placeholder}
               placeholder={t.equipmentList.search.placeholder}
               className="ps-10"
               value={searchInput}

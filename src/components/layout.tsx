@@ -1314,8 +1314,11 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
 
       <main
         id="main-content"
+        tabIndex={-1}
+        // scroll-mt clears the sticky header (~57px) so the skip-link jump and
+        // any in-page #main-content anchors land below it, not under it.
         className={cn(
-          "max-w-2xl mx-auto min-w-0 px-3.5 sm:px-4 pb-nav-safe",
+          "max-w-2xl mx-auto min-w-0 px-3.5 sm:px-4 pb-nav-safe scroll-mt-20 focus:outline-none",
           settings.density === "compact" ? "py-2.5" : "py-4"
         )}
       >

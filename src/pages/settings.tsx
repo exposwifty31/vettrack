@@ -231,6 +231,7 @@ export default function SettingsPage() {
             />
             <SettingsSelect
               icon={<AlignJustify className="w-5 h-5" />}
+              lang="he"
               label="שפה"
               description="בחר שפת ממשק וכיוון טקסט"
               value={settings.locale}

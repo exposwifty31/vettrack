@@ -362,7 +362,7 @@ function CommandBoard({
       </header>
 
       {/* Body */}
-      <div className="flex-1 overflow-auto p-4 grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-4">
+      <main id="main-content" className="flex-1 overflow-auto p-4 grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-4">
 
         {/* Left: ADRing + ReadinessMix */}
         <div className="flex flex-col gap-4 items-center lg:w-64 shrink-0">
@@ -437,7 +437,7 @@ function CommandBoard({
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

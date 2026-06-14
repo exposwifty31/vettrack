@@ -193,7 +193,9 @@
     --ivory-borderMd: 55 69 55;     /* #374537 — mid-weight border */
     --ivory-text:     236 233 224;  /* #ece9e0 — warm light primary text */
     --ivory-text2:    168 196 173;  /* #a8c4ad — secondary text */
-    --ivory-text3:    98 128 104;   /* #628068 — muted/label text */
+    /* Lightened #628068 (3.94:1, failed AA) → #7da188 = 6.01:1 on the dark
+       forest bg/surface; stays muted vs --ivory-text2 (#a8c4ad, 9.16:1). */
+    --ivory-text3:    125 161 136;  /* #7da188 — muted/label text (AA on dark) */
     --ivory-navy:     10 21 9;      /* #0a1509 — header bar (stays very dark) */
     --ivory-green:    58 150 80;    /* #3a9650 — primary green on dark bg */
     --ivory-greenMid: 45 155 66;    /* #2d9b42 — mid green */
@@ -342,6 +344,16 @@
   *::before,
   *::after {
     box-sizing: border-box;
+  }
+  /* Site-wide keyboard focus fallback. :where() keeps this at zero specificity
+     so any element that defines its own focus-visible ring/outline utility
+     still wins (no double indicators) — this only catches interactive
+     elements that would otherwise show nothing (header logo, icon buttons…).
+     :focus-visible means mouse users are unaffected. */
+  :where(a, button, input, select, textarea, summary, [role="button"], [role="link"], [role="tab"], [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
   }
   input,
   select,
