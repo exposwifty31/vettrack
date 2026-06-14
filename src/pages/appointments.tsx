@@ -641,7 +641,7 @@ export default function AppointmentsPage() {
                     className="h-8 px-3 text-xs"
                     onClick={() => openQuickBooking(new Date())}
                   >
-                    <Plus className="w-3.5 h-3.5 mr-1" />
+                    <Plus className="w-3.5 h-3.5 me-1" />
                     {t.appointmentsPage.createTask}
                   </Button>
                 ) : undefined}
@@ -841,7 +841,7 @@ export default function AppointmentsPage() {
                       className="h-8 px-3 text-xs"
                       onClick={() => openQuickBooking(new Date())}
                     >
-                      <Plus className="w-3.5 h-3.5 mr-1" />
+                      <Plus className="w-3.5 h-3.5 me-1" />
                       {t.appointmentsPage.createTask}
                     </Button>
                   ) : undefined}
@@ -1042,7 +1042,7 @@ export default function AppointmentsPage() {
                     className="h-8 px-3 text-xs"
                     onClick={() => openQuickBooking(new Date())}
                   >
-                    <Plus className="w-3.5 h-3.5 mr-1" />
+                    <Plus className="w-3.5 h-3.5 me-1" />
                     {t.appointmentsPage.createTask}
                   </Button>
                 ) : undefined}
@@ -1101,11 +1101,11 @@ export default function AppointmentsPage() {
           </CardHeader>
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 items-end">
             <div className="min-w-0">
-              <label htmlFor={`${bookingFormId}-filter-day`} className="text-xs text-muted-foreground block text-right mb-1">{t.appointmentsPage.dayLabel}</label>
+              <label htmlFor={`${bookingFormId}-filter-day`} className="text-xs text-muted-foreground block text-end mb-1">{t.appointmentsPage.dayLabel}</label>
               <Input id={`${bookingFormId}-filter-day`} dir="ltr" className="text-left w-full max-w-full" type="date" value={day} onChange={(e) => setDay(e.target.value)} />
             </div>
             <div className="min-w-0">
-              <label htmlFor={`${bookingFormId}-filter-tech`} className="text-xs text-muted-foreground block text-right mb-1">{t.appointmentsPage.technicianFilter}</label>
+              <label htmlFor={`${bookingFormId}-filter-tech`} className="text-xs text-muted-foreground block text-end mb-1">{t.appointmentsPage.technicianFilter}</label>
               <select
                 id={`${bookingFormId}-filter-tech`}
                 dir="ltr"
@@ -1122,19 +1122,19 @@ export default function AppointmentsPage() {
               </select>
             </div>
             <div className="min-w-0">
-              <label className="text-xs text-muted-foreground block text-right mb-1">{t.appointmentsPage.hours}</label>
+              <label className="text-xs text-muted-foreground block text-end mb-1">{t.appointmentsPage.hours}</label>
               <div dir="ltr" className="h-10 w-full px-3 rounded-md border flex items-center justify-start text-sm whitespace-nowrap">
                 {String(DAY_START_HOUR).padStart(2, "0")}:00 – {String(DAY_END_HOUR).padStart(2, "0")}:00
               </div>
             </div>
             <div className="min-w-0">
-              <label className="text-xs text-muted-foreground block text-right mb-1">{t.appointmentsPage.interval}</label>
+              <label className="text-xs text-muted-foreground block text-end mb-1">{t.appointmentsPage.interval}</label>
               <div dir="ltr" className="h-10 w-full px-3 rounded-md border flex items-center text-sm">{t.appointmentsPage.minutesShort(SLOT_MINUTES)}</div>
             </div>
             {canCreateTask && (
               <div className="col-span-1 sm:col-span-2">
                 <Button className="w-full" onClick={() => openQuickBooking(new Date())}>
-                  <Plus className="w-4 h-4 mr-1" />
+                  <Plus className="w-4 h-4 me-1" />
                   {t.appointmentsPage.quickTask}
                 </Button>
               </div>
@@ -1176,8 +1176,8 @@ export default function AppointmentsPage() {
                       const hour = DAY_START_HOUR + idx;
                       const y = idx * 60 * PIXELS_PER_MINUTE;
                       return (
-                        <div key={hour} className="absolute left-0 right-0 border-t border-dashed border-border/70" style={{ top: y }}>
-                          <span className="absolute -top-2 left-2 text-[10px] text-muted-foreground bg-background px-1">
+                        <div key={hour} className="absolute inset-x-0 border-t border-dashed border-border/70" style={{ top: y }}>
+                          <span className="absolute -top-2 start-2 text-[10px] text-muted-foreground bg-background px-1">
                             {String(hour).padStart(2, "0")}:00
                           </span>
                         </div>
@@ -1200,7 +1200,7 @@ export default function AppointmentsPage() {
                                     openQuickBooking(slot);
                                   }
                                 }}
-                                className={`absolute left-0 right-0 border-t pointer-events-none ${
+                                className={`absolute inset-x-0 border-t pointer-events-none ${
                                   available ? "focus:bg-emerald-50/80" : "bg-muted/40"
                                 }`}
                                 style={{ top, height: SLOT_MINUTES * PIXELS_PER_MINUTE }}
@@ -1242,7 +1242,7 @@ export default function AppointmentsPage() {
                       return (
                       <div
                         key={appointment.id}
-                        className={`absolute left-16 sm:left-24 right-3 rounded-lg border shadow-sm p-2 ${STATUS_COLORS[appointment.status]}`}
+                        className={`absolute start-16 sm:start-24 end-3 rounded-lg border shadow-sm p-2 ${STATUS_COLORS[appointment.status]}`}
                         style={{ top: top + 1, height }}
                       >
                         <div className="flex flex-wrap items-start justify-between gap-2">
@@ -1332,7 +1332,7 @@ export default function AppointmentsPage() {
                                 className="h-8 px-3 text-xs"
                                 onClick={() => openQuickBooking(new Date())}
                               >
-                                <Plus className="w-3.5 h-3.5 mr-1" />
+                                <Plus className="w-3.5 h-3.5 me-1" />
                                 {t.appointmentsPage.createTask}
                               </Button>
                             ) : undefined}

@@ -333,7 +333,7 @@ function FoldersSection() {
             }}
             data-testid="btn-create-folder"
           >
-            <Plus className="w-4 h-4 mr-1" />
+            <Plus className="w-4 h-4 me-1" />
             New
           </Button>
         </div>
@@ -458,7 +458,7 @@ function FoldersSection() {
               data-testid="btn-save-folder"
             >
               {(createMut.isPending || updateMut.isPending) && (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="w-4 h-4 me-2 animate-spin" />
               )}
               {editFolder ? t.adminPage.update : t.adminPage.create}
             </Button>
@@ -546,7 +546,7 @@ function PendingUsersSection() {
                         disabled={updateStatusMut.isPending}
                         data-testid={`btn-reject-user-${user.id}`}
                       >
-                        <XCircle className="w-3.5 h-3.5 mr-1" />
+                        <XCircle className="w-3.5 h-3.5 me-1" />
                         {t.adminPage.reject}
                       </Button>
                     </AlertDialogTrigger>
@@ -584,7 +584,7 @@ function PendingUsersSection() {
                     disabled={updateStatusMut.isPending}
                     data-testid={`btn-approve-user-${user.id}`}
                   >
-                    <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                    <CheckCircle className="w-3.5 h-3.5 me-1" />
                     {t.adminPage.approve}
                   </Button>
                 </div>
@@ -856,7 +856,7 @@ function UsersSection() {
                             disabled={updateStatusMut.isPending}
                             data-testid={`btn-reject-user-${user.id}`}
                           >
-                            <XCircle className="w-3 h-3 mr-1" />
+                            <XCircle className="w-3 h-3 me-1" />
                             {t.adminPage.reject}
                           </Button>
                         </AlertDialogTrigger>
@@ -897,7 +897,7 @@ function UsersSection() {
                         disabled={updateStatusMut.isPending}
                         data-testid={`btn-approve-user-${user.id}`}
                       >
-                        <CheckCircle className="w-3 h-3 mr-1" />
+                        <CheckCircle className="w-3 h-3 me-1" />
                         {t.adminPage.approve}
                       </Button>
                     </div>
@@ -1043,7 +1043,7 @@ function UsersSection() {
                   data-testid="btn-load-more-users"
                 >
                   {isFetchingMoreUsers ? (
-                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" />טוען...</>
+                    <><Loader2 className="w-4 h-4 me-1 animate-spin" />טוען...</>
                   ) : (
                     t.adminPage.loadMore
                   )}
@@ -1091,7 +1091,7 @@ function UsersSection() {
               disabled={updateRoleMut.isPending}
             >
               {updateRoleMut.isPending ? (
-                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                <Loader2 className="w-4 h-4 me-1 animate-spin" />
               ) : null}
               {t.adminPage.changeRoleConfirm}
             </AlertDialogAction>
@@ -1135,7 +1135,7 @@ function UsersSection() {
               disabled={updateStatusMut.isPending}
             >
               {updateStatusMut.isPending ? (
-                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                <Loader2 className="w-4 h-4 me-1 animate-spin" />
               ) : null}
               {t.adminPage.blockUserConfirm}
             </AlertDialogAction>
@@ -1661,7 +1661,7 @@ function SupportSection() {
                 data-testid="btn-update-ticket"
               >
                 {updateMut.isPending && (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 me-2 animate-spin" />
                 )}
                 Save
               </Button>

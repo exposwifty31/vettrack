@@ -234,7 +234,7 @@ export function CsvImportDialog({ open, onOpenChange }: Props) {
                 <p className="text-xs text-muted-foreground">Download the CSV template with the correct column headers.</p>
               </div>
               <Button variant="outline" size="sm" onClick={downloadTemplate} data-testid="btn-download-template">
-                <Download className="w-4 h-4 mr-1.5" />
+                <Download className="w-4 h-4 me-1.5" />
                 Template
               </Button>
             </div>
@@ -250,7 +250,7 @@ export function CsvImportDialog({ open, onOpenChange }: Props) {
               </p>
               {step === "preview" && (
                 <Button variant="ghost" size="sm" onClick={() => { setStep("upload"); setCsvText(""); setPreview([]); setFileName(""); }}>
-                  <X className="w-4 h-4 mr-1" />
+                  <X className="w-4 h-4 me-1" />
                   Change file
                 </Button>
               )}
@@ -362,7 +362,7 @@ export function CsvImportDialog({ open, onOpenChange }: Props) {
           )}
           {step === "importing" && (
             <Button disabled>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Loader2 className="w-4 h-4 me-2 animate-spin" />
               Importing…
             </Button>
           )}

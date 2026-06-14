@@ -282,7 +282,7 @@ export default function LandingPage() {
                           )}
                         >
                           <div className="w-16 h-16 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-200">
-                            <Play className="w-7 h-7 ml-1" />
+                            <Play className="w-7 h-7 ms-1" />
                           </div>
                         </div>
                       </button>

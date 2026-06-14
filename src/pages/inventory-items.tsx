@@ -183,7 +183,7 @@ export default function InventoryItemsPage() {
           </div>
           {isAdmin && (
             <Button size="sm" onClick={openCreate}>
-              <Plus className="h-4 w-4 mr-1" />
+              <Plus className="h-4 w-4 me-1" />
               {p.newItem}
             </Button>
           )}
@@ -215,14 +215,14 @@ export default function InventoryItemsPage() {
                   <button
                     type="button"
                     onClick={() => toggleCategory(category)}
-                    className="w-full flex items-center gap-2 px-4 py-2 bg-muted/50 hover:bg-muted/50 text-sm font-medium text-left transition-colors"
+                    className="w-full flex items-center gap-2 px-4 py-2 bg-muted/50 hover:bg-muted/50 text-sm font-medium text-start transition-colors"
                   >
                     {isExpanded
                       ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                       : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     }
                     <span>{category}</span>
-                    <span className="ml-auto text-xs text-muted-foreground font-normal">{items.length}</span>
+                    <span className="ms-auto text-xs text-muted-foreground font-normal">{items.length}</span>
                   </button>
 
                   {/* Items within category */}

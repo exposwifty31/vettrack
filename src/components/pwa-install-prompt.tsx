@@ -61,7 +61,7 @@ export function PwaInstallPrompt() {
           <button
             onClick={() => setAndroidDismissed(true)}
             aria-label="Dismiss install banner"
-            className="text-muted-foreground hover:text-foreground shrink-0 -mt-1 -mr-1 p-1"
+            className="text-muted-foreground hover:text-foreground shrink-0 -mt-1 -me-1 p-1"
           >
             <X className="w-4 h-4" />
           </button>
@@ -100,7 +100,7 @@ export function PwaInstallPrompt() {
             <button
               onClick={dismissIosGuidance}
               aria-label="Dismiss"
-              className="text-muted-foreground hover:text-foreground shrink-0 p-1.5 -mt-1 -mr-1"
+              className="text-muted-foreground hover:text-foreground shrink-0 p-1.5 -mt-1 -me-1"
             >
               <X className="w-4 h-4" />
             </button>

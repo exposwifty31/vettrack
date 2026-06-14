@@ -102,7 +102,7 @@ export default function CodeBlueHistoryPage() {
             <div key={s.id} className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden">
               <button
                 type="button"
-                className="w-full p-4 flex items-center gap-4 text-right hover:bg-zinc-800/50 transition-colors"
+                className="w-full p-4 flex items-center gap-4 text-end hover:bg-zinc-800/50 transition-colors"
                 onClick={() => setExpandedId(expanded ? null : s.id)}
               >
                 <div className="flex-1 min-w-0">

@@ -258,7 +258,7 @@ export default function AlertsPage() {
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${config.badgeClass}`}>
                       {config.badgeLabel}
                     </span>
-                    <span className="text-xs text-muted-foreground ml-auto">
+                    <span className="text-xs text-muted-foreground ms-auto">
                       {t.alerts.itemCount(items.length)}
                     </span>
                   </div>
@@ -347,7 +347,7 @@ export default function AlertsPage() {
                                 }
                                 data-testid={`btn-ack-${alert.equipmentId}`}
                               >
-                                <UserCheck className="w-3.5 h-3.5 mr-1.5" />
+                                <UserCheck className="w-3.5 h-3.5 me-1.5" />
                                 {t.alertsPage.takeOwnership}
                               </Button>
                             ) : null}

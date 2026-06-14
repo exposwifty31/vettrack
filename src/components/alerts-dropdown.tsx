@@ -36,14 +36,14 @@ export function AlertsDropdown({ alerts, alertCount, badgeAnimating }: AlertsDro
     <div className="relative" ref={panelRef}>
       <Button
         variant="ghost"
-        size="icon-sm"
-        className="relative text-[#8ab89a] hover:text-white hover:bg-white/10"
+        size="icon"
+        className="relative min-h-[44px] min-w-[44px] text-[var(--brand-green-bright)] hover:text-white hover:bg-white/10"
         aria-label={t.layout.alertsDropdown.toggleAria(alertCount)}
         aria-expanded={open}
         data-testid="alert-bell"
         onClick={() => setOpen((o) => !o)}
       >
-        <Bell className="w-4 h-4" aria-hidden />
+        <Bell className="w-5 h-5" aria-hidden />
         {alertCount > 0 && (
           <>
             <span

@@ -203,7 +203,7 @@ export default function CrashCartCheckPage() {
                 onClick={() => setAdminSheetOpen(true)}
                 data-testid="crash-cart-customize"
               >
-                <Settings className="h-4 w-4 ml-1" aria-hidden />
+                <Settings className="h-4 w-4 ms-1" aria-hidden />
                 {t.crashCart.customizeButton}
               </Button>
             ) : (
@@ -229,7 +229,7 @@ export default function CrashCartCheckPage() {
                 aria-pressed={!!checked[item.id]}
                 onClick={() => toggle(item.id)}
                 className={cn(
-                  "flex items-center gap-3 text-right p-2 rounded-lg border transition-colors",
+                  "flex items-center gap-3 text-end p-2 rounded-lg border transition-colors",
                   checked[item.id]
                     ? "border-green-500/40 bg-green-500/10 text-green-300"
                     : "border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-zinc-600",

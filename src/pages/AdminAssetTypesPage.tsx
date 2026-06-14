@@ -96,7 +96,7 @@ function AdminAssetTypesContent() {
                   <button
                     key={at.id}
                     onClick={() => setSelectedTypeId(at.id === selectedTypeId ? null : at.id)}
-                    className={`w-full text-left px-3 py-2 rounded border text-sm transition-colors ${
+                    className={`w-full text-start px-3 py-2 rounded border text-sm transition-colors ${
                       at.id === selectedTypeId
                         ? "border-primary bg-primary/5 font-medium"
                         : "border-border hover:bg-muted"

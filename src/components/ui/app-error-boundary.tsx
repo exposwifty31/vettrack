@@ -31,7 +31,7 @@ function RecoveryActions({ onRetry }: { onRetry: () => void }) {
           onRetry();
         }}
       >
-        <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+        <RefreshCw className="w-3.5 h-3.5 me-1.5" />
         {t.errorCard.retry}
       </Button>
       <Button size="sm" onClick={() => safeReloadPage()}>

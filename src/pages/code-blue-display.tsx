@@ -69,10 +69,10 @@ export default function CodeBlueDisplay() {
     <div
       className="relative min-h-screen bg-zinc-950 text-white flex flex-col"
       dir="rtl"
-      style={{ borderTop: session ? "4px solid #dc2626" : "4px solid #27272a" }}
+      style={{ borderTop: session ? "4px solid var(--destructive)" : "4px solid var(--border)" }}
     >
       {/* Connection indicator */}
-      <div className="absolute top-2 left-2">
+      <div className="absolute top-2 start-2">
         {pollQ.isError
           ? <WifiOff className="h-4 w-4 text-red-400" />
           : <Wifi className="h-4 w-4 text-green-500/50" />
@@ -104,7 +104,7 @@ export default function CodeBlueDisplay() {
                 </div>
               )}
             </div>
-            <div className="text-right text-sm text-zinc-400 flex items-center gap-2">
+            <div className="text-end text-sm text-zinc-400 flex items-center gap-2">
               <Shield className="h-4 w-4 text-blue-400" />
               {session.managerUserName}
             </div>

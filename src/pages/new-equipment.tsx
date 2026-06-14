@@ -562,9 +562,9 @@ export default function NewEquipmentPage() {
             data-testid="btn-save"
           >
             {isPending ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden />
+              <Loader2 className="w-4 h-4 me-2 animate-spin" aria-hidden />
             ) : (
-              <Save className="w-4 h-4 mr-2" aria-hidden />
+              <Save className="w-4 h-4 me-2" aria-hidden />
             )}
             {isPending
               ? isEditing ? "Saving changes…" : "Saving equipment…"

@@ -737,7 +737,7 @@ export default function InventoryPage() {
                       style={{ width: `${progressPct}%` }}
                     />
                   </div>
-                  <span className="text-xs tabular-nums text-muted-foreground w-8 text-right shrink-0">
+                  <span className="text-xs tabular-nums text-muted-foreground w-8 text-end shrink-0">
                     {progressPct}%
                   </span>
                 </div>
@@ -897,7 +897,7 @@ export default function InventoryPage() {
                               </button>
                             )}
 
-                            <span className="text-xs text-muted-foreground w-8 pl-0.5 shrink-0">
+                            <span className="text-xs text-muted-foreground w-8 ps-0.5 shrink-0">
                               /{line.expected}
                             </span>
 
@@ -1005,7 +1005,7 @@ export default function InventoryPage() {
       )}
 
       {/* Fixed floating dispense button — always visible for authenticated users */}
-      <div className="fixed left-0 right-0 flex justify-center px-4 z-40 pointer-events-none" style={{ bottom: "calc(5rem + env(safe-area-inset-bottom, 0px))" }}>
+      <div className="fixed inset-x-0 flex justify-center px-4 z-40 pointer-events-none" style={{ bottom: "calc(5rem + env(safe-area-inset-bottom, 0px))" }}>
         <button
           onClick={handleOpenDispense}
           className="pointer-events-auto flex items-center gap-2 bg-primary text-primary-foreground font-bold rounded-full px-6 py-3 shadow-lg min-h-[52px] motion-safe:active:scale-95 transition-transform"

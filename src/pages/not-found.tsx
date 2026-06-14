@@ -20,7 +20,7 @@ export default function NotFoundPage() {
         <p className="text-muted-foreground">הדף שחיפשת אינו קיים.</p>
         <Link href="/home">
           <Button data-testid="btn-go-home">
-            <Home className="w-4 h-4 ml-2" />
+            <Home className="w-4 h-4 ms-2" />
             לדף הבית
           </Button>
         </Link>

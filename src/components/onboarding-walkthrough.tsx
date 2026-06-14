@@ -110,7 +110,7 @@ export function OnboardingWalkthrough() {
           </div>
           <button
             onClick={dismiss}
-            className="w-11 h-11 flex items-center justify-center -mr-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            className="w-11 h-11 flex items-center justify-center -me-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
             aria-label="Skip walkthrough"
             data-testid="btn-onboarding-dismiss"
           >

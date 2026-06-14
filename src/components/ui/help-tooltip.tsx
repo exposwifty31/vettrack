@@ -26,9 +26,9 @@ export function HelpTooltip({ content, side = "bottom", className = "" }: HelpTo
     side === "top"
       ? "bottom-full mb-2 left-1/2 -translate-x-1/2"
       : side === "left"
-      ? "right-full mr-2 top-0"
+      ? "end-full me-2 top-0"
       : side === "right"
-      ? "left-full ml-2 top-0"
+      ? "start-full ms-2 top-0"
       : "top-full mt-2 left-1/2 -translate-x-1/2";
 
   return (

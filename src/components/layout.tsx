@@ -698,7 +698,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
             )}
 
             {isOnline && isSyncing && (
-              <div className="flex items-center gap-1 text-xs text-[#8ab89a] bg-white/[0.08] border border-white/10 rounded-full px-2.5 py-1">
+              <div className="flex items-center gap-1 text-xs text-[var(--brand-green-bright)] bg-white/[0.08] border border-white/10 rounded-full px-2.5 py-1">
                 <RefreshCw className="w-3 h-3 animate-spin" />
                 <span>{lh.syncing}</span>
               </div>
@@ -722,7 +722,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
             {isOnline && hasPending && !isSyncing && (
               <button
                 onClick={triggerSync}
-                className="flex items-center gap-1 text-xs text-[#8ab89a] bg-white/[0.08] border border-white/10 rounded-full px-2.5 py-1 hover:bg-white/15 transition-colors"
+                className="flex items-center gap-1 text-xs text-[var(--brand-green-bright)] bg-white/[0.08] border border-white/10 rounded-full px-2.5 py-1 hover:bg-white/15 transition-colors"
                 title={lh.pendingTitle(pendingCount)}
                 data-testid="sync-pending-indicator"
               >
@@ -746,14 +746,14 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
               <Button
                 variant="ghost"
                 size="icon-sm"
-                className="relative text-[#8ab89a] hover:text-white hover:bg-white/10"
+                className="relative text-[var(--brand-green-bright)] hover:text-white hover:bg-white/10"
                 onClick={() => setSyncQueueOpen(true)}
                 title={t.layout.sync.viewQueue}
                 aria-label={t.layout.sync.viewQueue}
                 data-testid="sync-queue-badge"
               >
                 <CloudOff className="w-4 h-4" aria-hidden="true" />
-                <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-amber-400 text-white text-[9px] rounded-full flex items-center justify-center font-bold">
+                <span className="absolute -top-0.5 -end-0.5 w-3.5 h-3.5 bg-amber-400 text-white text-[9px] rounded-full flex items-center justify-center font-bold">
                   {(pendingCount + failedCount) > 9 ? "9+" : pendingCount + failedCount}
                 </span>
               </Button>
@@ -788,7 +788,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                 }}
                 aria-label={t.common.quickSettings}
                 data-testid="quick-settings-toggle"
-                className="text-[#8ab89a] hover:text-white hover:bg-white/10"
+                className="text-[var(--brand-green-bright)] hover:text-white hover:bg-white/10"
               >
                 <Settings className="w-4 h-4" />
               </Button>
@@ -950,13 +950,13 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                         "flex items-center justify-between gap-2 py-2.5 rounded-xl transition-all duration-150 min-h-[44px] w-full",
                         "relative overflow-hidden",
                         isActive
-                          ? "bg-ivory-greenBg text-ivory-green font-semibold pl-4 pr-3"
-                          : "text-ivory-text hover:bg-ivory-border/40 active:bg-ivory-border/60 pl-3 hover:pl-4 pr-3"
+                          ? "bg-ivory-greenBg text-ivory-green font-semibold ps-4 pe-3"
+                          : "text-ivory-text hover:bg-ivory-border/40 active:bg-ivory-border/60 ps-3 hover:ps-4 pe-3"
                       )}
                     >
                       {isActive && (
                         <span
-                          className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-ivory-green pointer-events-none"
+                          className="absolute start-0 top-2 bottom-2 w-0.5 rounded-full bg-ivory-green pointer-events-none"
                           style={{ animation: "accentGrow 200ms ease-out forwards", transformOrigin: "top" }}
                           aria-hidden
                         />
@@ -1007,13 +1007,13 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                             "flex items-center justify-between gap-2 py-2.5 rounded-xl transition-all duration-150 min-h-[44px] w-full",
                             "relative overflow-hidden",
                             isActive
-                              ? "bg-ivory-greenBg text-ivory-green font-semibold pl-4 pr-3"
-                              : "text-ivory-text hover:bg-ivory-border/40 active:bg-ivory-border/60 pl-3 hover:pl-4 pr-3",
+                              ? "bg-ivory-greenBg text-ivory-green font-semibold ps-4 pe-3"
+                              : "text-ivory-text hover:bg-ivory-border/40 active:bg-ivory-border/60 ps-3 hover:ps-4 pe-3",
                           )}
                         >
                           {isActive && (
                             <span
-                              className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-ivory-green pointer-events-none"
+                              className="absolute start-0 top-2 bottom-2 w-0.5 rounded-full bg-ivory-green pointer-events-none"
                               style={{ animation: "accentGrow 200ms ease-out forwards", transformOrigin: "top" }}
                               aria-hidden
                             />
@@ -1059,13 +1059,13 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                         "flex items-center justify-between gap-2 py-2.5 rounded-xl transition-all duration-150 min-h-[44px] w-full",
                         "relative overflow-hidden",
                         isActive
-                          ? "bg-ivory-greenBg text-ivory-green font-semibold pl-4 pr-3"
-                          : "text-ivory-text hover:bg-ivory-border/40 active:bg-ivory-border/60 pl-3 hover:pl-4 pr-3"
+                          ? "bg-ivory-greenBg text-ivory-green font-semibold ps-4 pe-3"
+                          : "text-ivory-text hover:bg-ivory-border/40 active:bg-ivory-border/60 ps-3 hover:ps-4 pe-3"
                       )}
                     >
                       {isActive && (
                         <span
-                          className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-ivory-green pointer-events-none"
+                          className="absolute start-0 top-2 bottom-2 w-0.5 rounded-full bg-ivory-green pointer-events-none"
                           style={{ animation: "accentGrow 200ms ease-out forwards", transformOrigin: "top" }}
                           aria-hidden
                         />
@@ -1110,13 +1110,13 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                           "flex items-center justify-between gap-2 py-2.5 rounded-xl transition-all duration-150 min-h-[44px] w-full",
                           "relative overflow-hidden",
                           isActive
-                            ? "bg-primary/8 text-primary font-semibold pl-4 pr-3"
-                            : "text-foreground hover:bg-muted/70 active:bg-muted pl-3 hover:pl-4 pr-3"
+                            ? "bg-primary/8 text-primary font-semibold ps-4 pe-3"
+                            : "text-foreground hover:bg-muted/70 active:bg-muted ps-3 hover:ps-4 pe-3"
                         )}
                       >
                         {isActive && (
                           <span
-                            className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-ivory-green pointer-events-none"
+                            className="absolute start-0 top-2 bottom-2 w-0.5 rounded-full bg-ivory-green pointer-events-none"
                             style={{ animation: "accentGrow 200ms ease-out forwards", transformOrigin: "top" }}
                             aria-hidden
                           />
@@ -1153,13 +1153,13 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                         "flex items-center justify-between gap-2 py-2.5 rounded-xl transition-all duration-150 min-h-[44px] w-full",
                         "relative overflow-hidden",
                         isActive
-                          ? "bg-ivory-greenBg text-ivory-green font-semibold pl-4 pr-3"
-                          : "text-ivory-text hover:bg-ivory-border/40 active:bg-ivory-border/60 pl-3 hover:pl-4 pr-3"
+                          ? "bg-ivory-greenBg text-ivory-green font-semibold ps-4 pe-3"
+                          : "text-ivory-text hover:bg-ivory-border/40 active:bg-ivory-border/60 ps-3 hover:ps-4 pe-3"
                       )}
                     >
                       {isActive && (
                         <span
-                          className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-ivory-green pointer-events-none"
+                          className="absolute start-0 top-2 bottom-2 w-0.5 rounded-full bg-ivory-green pointer-events-none"
                           style={{ animation: "accentGrow 200ms ease-out forwards", transformOrigin: "top" }}
                           aria-hidden
                         />
@@ -1191,7 +1191,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                 className={cn(
                   "w-full cursor-pointer text-left min-h-[44px] relative overflow-hidden",
                   "opacity-0 [animation:navItemFade_160ms_ease-out_forwards] rounded-xl",
-                  "text-ivory-text hover:bg-ivory-border/40 active:bg-ivory-border/60 pl-3 hover:pl-4 pr-3",
+                  "text-ivory-text hover:bg-ivory-border/40 active:bg-ivory-border/60 ps-3 hover:ps-4 pe-3",
                   "flex items-center gap-3 transition-all duration-150 py-2.5"
                 )}
                 style={{

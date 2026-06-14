@@ -56,7 +56,7 @@ function ManagerPicker({ onSelect }: { onSelect: (id: string, name: string) => v
           key={m.id}
           type="button"
           onClick={() => onSelect(m.id, m.name)}
-          className="p-2 rounded border border-zinc-700 bg-zinc-800 text-sm text-zinc-200 text-right hover:bg-zinc-700"
+          className="p-2 rounded border border-zinc-700 bg-zinc-800 text-sm text-zinc-200 text-end hover:bg-zinc-700"
         >
           {m.name} ({m.role === "admin" ? t.codeBlue.role.admin : t.codeBlue.role.vet})
         </button>
@@ -156,7 +156,7 @@ function PreCheckGate({
               type="button"
               onClick={() => toggle(item.key)}
               className={cn(
-                "flex items-center gap-3 p-2 rounded border text-sm text-right transition-colors",
+                "flex items-center gap-3 p-2 rounded border text-sm text-end transition-colors",
                 checked[item.key]
                   ? "border-green-500/40 bg-green-500/10 text-green-300"
                   : "border-zinc-700 bg-zinc-800 text-zinc-300",
@@ -210,7 +210,7 @@ function OutcomeModal({ onClose }: { onClose: (outcome: string) => void }) {
               type="button"
               onClick={() => onClose(o.value)}
               className={cn(
-                "p-3 rounded-lg border text-sm font-semibold transition-colors text-right",
+                "p-3 rounded-lg border text-sm font-semibold transition-colors text-end",
                 o.value === "died"
                   ? "border-red-800 bg-red-950/50 text-red-300 hover:bg-red-900/50"
                   : "border-zinc-700 bg-zinc-800 text-zinc-200 hover:bg-zinc-700",
@@ -252,7 +252,7 @@ function EquipmentPicker({ onSelect, onClose }: { onSelect: (item: EquipmentItem
               key={item.id}
               type="button"
               onClick={() => { onSelect(item); onClose(); }}
-              className="p-3 rounded-lg border border-zinc-700 bg-zinc-800 text-sm text-zinc-200 text-right hover:bg-zinc-700"
+              className="p-3 rounded-lg border border-zinc-700 bg-zinc-800 text-sm text-zinc-200 text-end hover:bg-zinc-700"
             >
               {item.name}
             </button>
@@ -305,7 +305,7 @@ function ActiveSession() {
   if (!session) return null;
 
   return (
-    <div className="flex flex-col h-screen-safe bg-zinc-950 text-white overflow-hidden" dir="rtl" style={{ borderTop: "3px solid #dc2626" }}>
+    <div className="flex flex-col h-screen-safe bg-zinc-950 text-white overflow-hidden" dir="rtl" style={{ borderTop: "3px solid var(--destructive)" }}>
       <div className="flex-shrink-0 bg-zinc-900 border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {/* Leave the live view without ending the session (it persists for the
@@ -384,7 +384,7 @@ function ActiveSession() {
         <div className="text-xs text-zinc-500 mt-2">
           {t.codeBlue.elapsedSinceStart}
           {equipmentLogCount > 0 && (
-            <span className="text-amber-400/90 mr-2"> · {t.codeBlue.equipmentLogCount(equipmentLogCount)}</span>
+            <span className="text-amber-400/90 me-2"> · {t.codeBlue.equipmentLogCount(equipmentLogCount)}</span>
           )}
         </div>
       </div>

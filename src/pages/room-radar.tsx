@@ -337,7 +337,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
                 <MoveRight className="w-3 h-3" />
                 {t.roomRadarPage.moveButton}
               </button>
-              <Link href={`/equipment/${eq.id}`} className="ml-auto">
+              <Link href={`/equipment/${eq.id}`} className="ms-auto">
                 <div className="p-2 rounded-lg hover:bg-muted transition-colors">
                   <ChevronRight className="w-4 h-4 text-muted-foreground" />
                 </div>
@@ -525,9 +525,9 @@ export default function RoomRadarPage() {
                 disabled={verifyState === "verifying" || roomEquipment.length === 0}
               >
                 {verifyState === "verifying" ? (
-                  <><Loader2 className="w-4 h-4 animate-spin mr-2" />Verifying…</>
+                  <><Loader2 className="w-4 h-4 animate-spin me-2" />Verifying…</>
                 ) : (
-                  <><ShieldCheck className="w-4 h-4 mr-2" />{t.roomRadarPage.nfcConfirmInventory}</>
+                  <><ShieldCheck className="w-4 h-4 me-2" />{t.roomRadarPage.nfcConfirmInventory}</>
                 )}
               </Button>
               <button
@@ -545,7 +545,7 @@ export default function RoomRadarPage() {
         {/* Back + Header */}
         <div className="pt-1">
           <Link href="/rooms">
-            <button className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3 -ml-1">
+            <button className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3 -ms-1">
               <ArrowLeft className="w-4 h-4" />
               {t.roomRadarPage.allRooms}
             </button>

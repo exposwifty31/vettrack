@@ -164,9 +164,9 @@ export default function MyEquipmentPage() {
                 data-testid="btn-return-all"
               >
                 {returningAll ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 me-2 animate-spin" />
                 ) : (
-                  <LogOut className="w-4 h-4 mr-2" />
+                  <LogOut className="w-4 h-4 me-2" />
                 )}
                 Return All ({items.length})
               </Button>
@@ -287,7 +287,7 @@ export default function MyEquipmentPage() {
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         ) : (
                           <>
-                            <LogOut className="w-3.5 h-3.5 mr-1" />
+                            <LogOut className="w-3.5 h-3.5 me-1" />
                             Return
                           </>
                         )}

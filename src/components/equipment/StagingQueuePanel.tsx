@@ -102,7 +102,7 @@ export function StagingQueuePanel({ equipment, currentUserId }: StagingQueuePane
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-5 text-xs px-1.5 ml-auto text-destructive"
+                className="h-5 text-xs px-1.5 ms-auto text-destructive"
                 onClick={() => cancelMut.mutate(claim.id)}
                 disabled={cancelMut.isPending}
               >

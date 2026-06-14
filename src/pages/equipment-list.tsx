@@ -438,7 +438,7 @@ export default function EquipmentListPage() {
               onClick={() => setIsScannerOpen(true)}
               data-testid="btn-scan-qr"
             >
-              <QrCode className="w-4 h-4 mr-1" />
+              <QrCode className="w-4 h-4 me-1" />
               {t.equipmentTruth.scanFabLabel}
             </Button>
             {isAdmin && (
@@ -449,7 +449,7 @@ export default function EquipmentListPage() {
                 onClick={() => setImportOpen(true)}
                 data-testid="btn-import-csv"
               >
-                <Upload className="w-4 h-4 mr-1" />
+                <Upload className="w-4 h-4 me-1" />
                 Import CSV
               </Button>
             )}
@@ -477,16 +477,16 @@ export default function EquipmentListPage() {
                 data-testid="btn-export-excel"
               >
                 {isExporting ? (
-                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                  <Loader2 className="w-4 h-4 me-1 animate-spin" />
                 ) : (
-                  <Download className="w-4 h-4 mr-1" />
+                  <Download className="w-4 h-4 me-1" />
                 )}
                 Export Excel
               </Button>
             )}
             <Link href="/equipment/new">
               <Button size="sm" className="h-11 text-xs" data-testid="btn-add">
-                <Plus className="w-4 h-4 mr-1" />
+                <Plus className="w-4 h-4 me-1" />
                 Add
               </Button>
             </Link>
@@ -691,9 +691,9 @@ export default function EquipmentListPage() {
             data-testid="btn-select-mode"
           >
             {selectMode ? (
-              <Square className="w-4 h-4 mr-1" />
+              <Square className="w-4 h-4 me-1" />
             ) : (
-              <CheckSquare className="w-4 h-4 mr-1" />
+              <CheckSquare className="w-4 h-4 me-1" />
             )}
             {selectMode ? t.equipmentList.actions.cancel : t.equipmentList.actions.select}
           </Button>
@@ -711,7 +711,7 @@ export default function EquipmentListPage() {
               <span className="text-xs text-muted-foreground">
                 {selected.size} selected
               </span>
-              <div className="flex gap-2 ml-auto">
+              <div className="flex gap-2 ms-auto">
                 <Select
                   onValueChange={(folderId) => {
                     if (bulkMoveMut.isPending || bulkDeleteMut.isPending) return;
@@ -724,9 +724,9 @@ export default function EquipmentListPage() {
                 >
                   <SelectTrigger className="h-11 text-xs" disabled={bulkMoveMut.isPending || bulkDeleteMut.isPending}>
                     {bulkMoveMut.isPending ? (
-                      <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                      <Loader2 className="w-3.5 h-3.5 me-1 animate-spin" />
                     ) : (
-                      <FolderInput className="w-3.5 h-3.5 mr-1" />
+                      <FolderInput className="w-3.5 h-3.5 me-1" />
                     )}
                     {bulkMoveMut.isPending ? t.equipmentList.actions.working : t.equipmentList.actions.move}
                   </SelectTrigger>
@@ -750,9 +750,9 @@ export default function EquipmentListPage() {
                         data-testid="btn-bulk-delete"
                       >
                         {bulkDeleteMut.isPending ? (
-                          <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                          <Loader2 className="w-3.5 h-3.5 me-1 animate-spin" />
                         ) : (
-                          <Trash2 className="w-3.5 h-3.5 mr-1" />
+                          <Trash2 className="w-3.5 h-3.5 me-1" />
                         )}
                         {bulkDeleteMut.isPending ? t.equipmentList.actions.working : t.equipmentList.actions.delete}
                       </Button>
@@ -785,10 +785,10 @@ export default function EquipmentListPage() {
         <p className="text-xs text-muted-foreground -mt-2">
           {displayList.length} of {totalCount || equipment.length} items
           {!isLoading && !isVirtualized && totalPages > 1 && (
-            <span className="ml-1">· page {safePage} of {totalPages}</span>
+            <span className="ms-1">· page {safePage} of {totalPages}</span>
           )}
           {locationFilter !== "all" && (
-            <span className="ml-1">· <button onClick={() => setLocationFilter("all")} className="underline">Clear room filter</button></span>
+            <span className="ms-1">· <button onClick={() => setLocationFilter("all")} className="underline">Clear room filter</button></span>
           )}
         </p>
 
@@ -834,7 +834,7 @@ export default function EquipmentListPage() {
                 ) : (
                   <Link href="/equipment/new">
                     <Button size="sm" className="h-11 text-xs">
-                      <Plus className="w-4 h-4 mr-1" />
+                      <Plus className="w-4 h-4 me-1" />
                       Add Equipment
                     </Button>
                   </Link>

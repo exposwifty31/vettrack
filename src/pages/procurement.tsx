@@ -185,7 +185,7 @@ export default function ProcurementPage() {
           </div>
           {isAdmin && (
             <Button size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" />
+              <Plus className="h-4 w-4 me-1" />
               {p.newPo}
             </Button>
           )}
@@ -251,7 +251,7 @@ export default function ProcurementPage() {
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border shrink-0 ${STATUS_BADGE[order.status]}`}>
                       {p[`status_${order.status}` as keyof typeof p] ?? order.status}
                     </span>
-                    <div className="flex flex-wrap gap-1 ml-auto">
+                    <div className="flex flex-wrap gap-1 ms-auto">
                       {isAdmin && order.status === "draft" && (
                         <Button
                           size="sm"
@@ -260,7 +260,7 @@ export default function ProcurementPage() {
                           onClick={(e) => { e.stopPropagation(); submitMut.mutate(order.id); }}
                           disabled={submitMut.isPending}
                         >
-                          <Send className="h-3 w-3 mr-1" />
+                          <Send className="h-3 w-3 me-1" />
                           {p.submit}
                         </Button>
                       )}
@@ -271,7 +271,7 @@ export default function ProcurementPage() {
                           className="h-7 px-2 text-xs"
                           onClick={(e) => { e.stopPropagation(); openReceive(order); }}
                         >
-                          <PackageCheck className="h-3 w-3 mr-1" />
+                          <PackageCheck className="h-3 w-3 me-1" />
                           {p.receive}
                         </Button>
                       )}
@@ -299,7 +299,7 @@ export default function ProcurementPage() {
                       <table className="w-full text-xs mt-2">
                         <thead>
                           <tr className="text-muted-foreground">
-                            <th className="text-left py-1 font-medium">{p.lineItem}</th>
+                            <th className="text-start py-1 font-medium">{p.lineItem}</th>
                             <th className="text-right py-1 font-medium">{p.lineOrdered}</th>
                             <th className="text-right py-1 font-medium">{p.lineReceived}</th>
                           </tr>
@@ -308,8 +308,8 @@ export default function ProcurementPage() {
                           {(order.lines ?? []).map((line: PurchaseOrderLine) => (
                             <tr key={line.id}>
                               <td className="py-1">{line.itemLabel ?? line.itemId}</td>
-                              <td className="py-1 text-right">{line.quantityOrdered}</td>
-                              <td className={`py-1 text-right ${line.quantityReceived >= line.quantityOrdered ? "text-emerald-600 font-medium" : ""}`}>
+                              <td className="py-1 text-end">{line.quantityOrdered}</td>
+                              <td className={`py-1 text-end ${line.quantityReceived >= line.quantityOrdered ? "text-emerald-600 font-medium" : ""}`}>
                                 {line.quantityReceived}
                               </td>
                             </tr>

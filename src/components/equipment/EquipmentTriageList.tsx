@@ -3,11 +3,12 @@ import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/utils";
 import { SectionList } from "@/components/ui/section-list";
-import { StatusBadge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import {
   equipmentTriageTier,
   TRIAGE_ORDER,
   type EquipmentTriageTier,
+  normalizeStatus,
 } from "@/lib/design-tokens";
 import type { Equipment } from "@/types";
 import { ChevronRight, ChevronLeft } from "lucide-react";
@@ -80,7 +81,7 @@ export function EquipmentTriageList({ items, className }: EquipmentTriageListPro
                 </p>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1">
-                <StatusBadge status={eq.status} />
+                <StatusBadge kind={normalizeStatus(eq.status)} />
                 {updated && (
                   <span className="font-num text-[10px] text-ivory-text3">
                     {formatRelativeTime(updated)}

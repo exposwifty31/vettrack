@@ -167,10 +167,10 @@ export default function QrPrintPage() {
 
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute start-3.5 top-3 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder={t.qrPrintPage.searchPlaceholder}
-            className="pl-10"
+            className="ps-10"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
