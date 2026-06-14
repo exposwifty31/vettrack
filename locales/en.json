@@ -53,7 +53,10 @@
       "mine": "Mine",
       "operationalControlSection": "Operational control",
       "operationalCommandCenter": "ER command center",
-      "erConcealmentStaffHint": "The full clinic app is hidden while ER mode is on. Ask an operations lead to turn off ER mode to restore the usual navigation."
+      "erConcealmentStaffHint": "The full clinic app is hidden while ER mode is on. Ask an operations lead to turn off ER mode to restore the usual navigation.",
+      "operationsSection": "Operations",
+      "managementSection": "Management",
+      "systemSection": "System"
     },
     "settings": {
       "darkMode": "Dark mode",
@@ -1499,7 +1502,6 @@
     "tabUsers": "Users",
     "tabSupport": "Support",
     "tabLogs": "Logs",
-    "tabShifts": "Shifts",
     "foldersTitle": "Folders",
     "pendingUsersTitle": "Pending users",
     "usersTitle": "Users",
@@ -1709,7 +1711,8 @@
     "tasks": "Tasks",
     "activePatients": "Active Patients",
     "wardDisplay": "Ward Display",
-    "medicationHub": "Medication Hub"
+    "medicationHub": "Medication Hub",
+    "restockSwitchContainerWarning": "Finish the restock before scanning another container."
   },
   "conflictModal": {
     "title": "Sync Conflicts",
@@ -2805,7 +2808,8 @@
       "invalidContainerTag": "Invalid NFC tag for container",
       "invalidInventoryItemTag": "Invalid NFC tag for inventory item",
       "restockSessionRequired": "Open a restock session before scanning item tags",
-      "scanFailed": "Inventory scan failed"
+      "scanFailed": "Inventory scan failed",
+      "noActiveRestockSession": "No active restock session found"
     }
   },
   "errors": {

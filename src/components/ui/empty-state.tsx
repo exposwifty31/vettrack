@@ -10,6 +10,12 @@ interface EmptyStateProps {
   iconBg?: string;
   iconColor?: string;
   borderColor?: string;
+  /**
+   * Heading level for the message. Defaults to "h2" so the empty state slots
+   * directly under a page's <h1> without skipping a level (WCAG 1.3.1 heading
+   * order). Pass "h3" when the empty state lives beneath an existing <h2>.
+   */
+  headingLevel?: "h2" | "h3";
 }
 
 export function EmptyState({
@@ -20,6 +26,7 @@ export function EmptyState({
   iconBg = "bg-gradient-to-br from-primary/10 to-muted/60 ring-1 ring-border/50",
   iconColor = "text-primary",
   borderColor,
+  headingLevel: Heading = "h2",
 }: EmptyStateProps) {
   return (
     <Card
@@ -38,7 +45,7 @@ export function EmptyState({
         >
           <Icon className={cn("w-8 h-8", iconColor)} />
         </div>
-        <h3 className="font-semibold text-lg tracking-tight text-foreground">{message}</h3>
+        <Heading className="font-semibold text-lg tracking-tight text-foreground">{message}</Heading>
         {subMessage && (
           <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">{subMessage}</p>
         )}

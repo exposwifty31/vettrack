@@ -420,6 +420,7 @@ const translations = {
       invalidInventoryItemTag: d.nfc.error.invalidInventoryItemTag,
       restockSessionRequired: d.nfc.error.restockSessionRequired,
       scanFailed: d.nfc.error.scanFailed,
+      noActiveRestockSession: d.nfc.error.noActiveRestockSession,
     },
   },
 

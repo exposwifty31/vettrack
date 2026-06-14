@@ -53,7 +53,10 @@
       "mine": "שלי",
       "operationalControlSection": "בקרה תפעולית",
       "operationalCommandCenter": "מרכז פיקוד חירום",
-      "erConcealmentStaffHint": "בזמן מצב חירום הממשק המלא מוסתר. בקש ממנהל תפעול לכבות את מצב החירום כדי לשחזר את הניווט הרגיל."
+      "erConcealmentStaffHint": "בזמן מצב חירום הממשק המלא מוסתר. בקש ממנהל תפעול לכבות את מצב החירום כדי לשחזר את הניווט הרגיל.",
+      "operationsSection": "תפעול",
+      "managementSection": "ניהול",
+      "systemSection": "מערכת"
     },
     "settings": {
       "darkMode": "מצב לילה",
@@ -1499,7 +1502,6 @@
     "tabUsers": "משתמשים",
     "tabSupport": "תמיכה",
     "tabLogs": "לוגים",
-    "tabShifts": "משמרות",
     "foldersTitle": "תיקיות",
     "pendingUsersTitle": "ממתינים משתמשים",
     "usersTitle": "משתמשים",
@@ -1709,7 +1711,8 @@
     "tasks": "משימות",
     "activePatients": "מטופלים פעילים",
     "wardDisplay": "תצוגת מחלקה",
-    "medicationHub": "מרכז תרופות"
+    "medicationHub": "מרכז תרופות",
+    "restockSwitchContainerWarning": "סיים את המילוי מחדש לפני סריקת מכל אחר."
   },
   "conflictModal": {
     "title": "התנגשויות סנכרון",
@@ -2805,7 +2808,8 @@
       "invalidContainerTag": "תווית NFC לא חוקית עבור מכל",
       "invalidInventoryItemTag": "תווית NFC לא חוקית עבור פריט מלאי",
       "restockSessionRequired": "פתח סשן מילוי מחדש לפני סריקת תוויות פריטים",
-      "scanFailed": "סריקת מלאי נכשלה"
+      "scanFailed": "סריקת מלאי נכשלה",
+      "noActiveRestockSession": "לא נמצא סשן מילוי מחדש פעיל"
     }
   },
   "errors": {

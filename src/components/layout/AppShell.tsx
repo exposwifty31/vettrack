@@ -2,7 +2,6 @@
 // Desktop (lg+): Topbar + NAV sidebar (PageShell).
 // Mobile: sticky header + bottom-nav (Layout).
 import { useIsDesktop } from "@/hooks/use-is-desktop";
-import { useAuth } from "@/hooks/use-auth";
 import { PageShell } from "@/components/layout/PageShell";
 import { Layout } from "@/components/layout";
 import type { SidebarItem } from "@/components/layout/IconSidebar";
@@ -38,8 +37,12 @@ export function AppShell({
   title,
 }: AppShellProps) {
   const isDesktop = useIsDesktop();
-  const { isAdmin } = useAuth();
-  const bottomNavItems: NavNode[] = NAV.filter((n) => !n.adminOnly || isAdmin);
+  // Bottom bar = three destinations either side of the center scan FAB:
+  // Today · Equipment · [Scan] · Emergency · Menu. Board, Rooms, Alerts and the
+  // rest live in the slide-out menu (Alerts count is badged on the Menu icon).
+  // The scan FAB and Menu button are appended by Layout, not by NAV.
+  const BOTTOM_NAV_IDS = ["today", "equipment", "emergency"];
+  const bottomNavItems: NavNode[] = NAV.filter((n) => BOTTOM_NAV_IDS.includes(n.id));
 
   if (isDesktop) {
     return <PageShell sidebarItems={sidebarItems}>{children}</PageShell>;

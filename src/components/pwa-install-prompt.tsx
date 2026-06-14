@@ -52,14 +52,14 @@ export function PwaInstallPrompt() {
                   await promptInstall();
                   setAndroidDismissed(true);
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold"
+                className="inline-flex items-center justify-center gap-1.5 px-4 min-h-[44px] rounded-lg bg-primary text-primary-foreground text-sm font-semibold"
               >
-                <Download className="w-3.5 h-3.5" />
+                <Download className="w-4 h-4" />
                 Install
               </button>
               <button
                 onClick={() => setAndroidDismissed(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary text-secondary-foreground text-xs font-medium"
+                className="inline-flex items-center justify-center gap-1.5 px-4 min-h-[44px] rounded-lg bg-secondary text-secondary-foreground text-sm font-medium"
               >
                 Not now
               </button>
@@ -68,9 +68,9 @@ export function PwaInstallPrompt() {
           <button
             onClick={() => setAndroidDismissed(true)}
             aria-label="Dismiss install banner"
-            className="text-muted-foreground hover:text-foreground shrink-0 -mt-1 -me-1 p-1"
+            className="flex items-center justify-center min-w-[44px] min-h-[44px] -mt-2 -me-2 text-muted-foreground hover:text-foreground shrink-0"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
       </div>
@@ -107,9 +107,9 @@ export function PwaInstallPrompt() {
             <button
               onClick={dismissIosGuidance}
               aria-label="Dismiss"
-              className="text-muted-foreground hover:text-foreground shrink-0 p-1.5 -mt-1 -me-1"
+              className="flex items-center justify-center min-w-[44px] min-h-[44px] -mt-2 -me-2 text-muted-foreground hover:text-foreground shrink-0"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 

@@ -57,6 +57,9 @@ export interface TStructure {
       operationalControlSection: string;
       operationalCommandCenter: string;
       erConcealmentStaffHint: string;
+      operationsSection: string;
+      managementSection: string;
+      systemSection: string;
     };
     settings: {
       darkMode: string;
@@ -1712,6 +1715,7 @@ export interface TStructure {
     activePatients: string;
     wardDisplay: string;
     medicationHub: string;
+    restockSwitchContainerWarning: string;
   };
   conflictModal: {
     title: string;
@@ -2808,6 +2812,7 @@ export interface TStructure {
       invalidInventoryItemTag: string;
       restockSessionRequired: string;
       scanFailed: string;
+      noActiveRestockSession: string;
     };
   };
   errors: {
