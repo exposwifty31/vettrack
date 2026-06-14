@@ -469,7 +469,7 @@ export default function RoomRadarPage() {
   const pageContent = (
     <>
       <Helmet>
-        <title>{room ? `${room.name} — Asset Radar` : "Asset Radar"} — VetTrack</title>
+        <title>{room ? `${room.name} — ${t.roomsListPage.title}` : t.roomsListPage.title} — VetTrack</title>
       </Helmet>
 
       {/* NFC Room Reset Overlay — triggered by ?verify=true deep link */}
