@@ -1099,7 +1099,7 @@ export default function AppointmentsPage() {
               {t.appointmentsPage.taskControls}
             </CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 items-end">
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 items-end">
             <div className="min-w-0">
               <label htmlFor={`${bookingFormId}-filter-day`} className="text-xs text-muted-foreground block text-right mb-1">{t.appointmentsPage.dayLabel}</label>
               <Input id={`${bookingFormId}-filter-day`} dir="ltr" className="text-left w-full max-w-full" type="date" value={day} onChange={(e) => setDay(e.target.value)} />
@@ -1111,7 +1111,7 @@ export default function AppointmentsPage() {
                 dir="ltr"
                 value={selectedVetId}
                 onChange={(e) => setSelectedVetId(e.target.value)}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-left"
+                className="h-10 w-full min-w-0 max-w-full rounded-md border border-input bg-background px-3 text-sm text-left truncate"
               >
                 <option value="">{t.appointmentsPage.allTechnicians}</option>
                 {(metaQuery.data?.vets ?? []).map((vet) => (
@@ -1132,7 +1132,7 @@ export default function AppointmentsPage() {
               <div dir="ltr" className="h-10 w-full px-3 rounded-md border flex items-center text-sm">{t.appointmentsPage.minutesShort(SLOT_MINUTES)}</div>
             </div>
             {canCreateTask && (
-              <div className="col-span-2 lg:col-span-1">
+              <div className="col-span-1 sm:col-span-2">
                 <Button className="w-full" onClick={() => openQuickBooking(new Date())}>
                   <Plus className="w-4 h-4 mr-1" />
                   {t.appointmentsPage.quickTask}

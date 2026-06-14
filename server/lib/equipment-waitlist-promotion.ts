@@ -1,12 +1,12 @@
 import { and, eq } from "drizzle-orm";
-import { db, equipment, users } from "../db.js";
+import { db, equipment } from "../db.js";
 import { enqueueNotificationJob as _enqueueNotificationJob, type PushPriority } from "./queue.js";
 import { promoteEquipmentWaitlistIfEligible as _promoteEquipmentWaitlistIfEligible } from "../services/equipment-waitlist.service.js";
 import type { EquipmentWaitlistRow } from "../db.js";
 import { EQUIPMENT_WAITLIST_RESERVATION_TTL_MINUTES } from "../../shared/equipment-waitlist.js";
 import { getLocaleDictionaries } from "../../lib/i18n/loader.js";
 import { interpolate, translate } from "../../lib/i18n/index.js";
-import type { Locale } from "../../lib/i18n/types.js";
+import { resolveUserLocale } from "./resolve-user-locale.js";
 
 export async function _getEquipmentName(equipmentId: string, clinicId: string) {
   return db
@@ -22,16 +22,6 @@ export const equipmentWaitlistPromotionDeps = {
   getEquipmentName: _getEquipmentName,
   enqueueNotificationJob: _enqueueNotificationJob,
 };
-
-async function resolveUserLocale(clinicId: string, userId: string): Promise<Locale> {
-  const [row] = await db
-    .select({ preferredLocale: users.preferredLocale })
-    .from(users)
-    .where(and(eq(users.id, userId), eq(users.clinicId, clinicId)))
-    .limit(1);
-  const loc = row?.preferredLocale;
-  return loc === "en" || loc === "he" ? loc : "he";
-}
 
 export async function notifyWaitlistPromoted(
   clinicId: string,

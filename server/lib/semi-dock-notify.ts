@@ -7,7 +7,7 @@ import { logAudit } from "./audit.js";
 import { incrementMetric } from "./metrics.js";
 import { sendPushToUser } from "./push.js";
 
-export const SEMI_DOCK_ALERT_TYPE = "semi_dock_return" as const;
+const SEMI_DOCK_ALERT_TYPE = "semi_dock_return" as const;
 const SYSTEM_USER_ID = "system:rfid";
 const SYSTEM_USER_EMAIL = "rfid@vettrack.system";
 
@@ -32,7 +32,7 @@ export function isEquipmentHomeRoom(newRoomId: string, homeRoomIds: ReadonlySet<
 
 type DbLike = Pick<typeof db, "select" | "insert">;
 
-export async function wasSemiDockNotifiedSinceCheckout(
+async function wasSemiDockNotifiedSinceCheckout(
   clinicId: string,
   equipmentId: string,
   checkedOutAt: Date,
@@ -53,7 +53,7 @@ export async function wasSemiDockNotifiedSinceCheckout(
   return Boolean(row);
 }
 
-export async function markSemiDockNotified(
+async function markSemiDockNotified(
   clinicId: string,
   equipmentId: string,
   conn: DbLike = db,
@@ -70,7 +70,7 @@ export async function markSemiDockNotified(
   });
 }
 
-export function semiDockPushCopy(): { title: string; body: string } {
+function semiDockPushCopy(): { title: string; body: string } {
   const dict = loadLocale("he");
   const title = resolveI18nKey(dict, "semiDock.pushTitle") ?? "Equipment returned to home room";
   const body = resolveI18nKey(dict, "semiDock.pushBody") ?? "If you finished using the device, return it to the charging station.";
@@ -94,7 +94,7 @@ export interface SemiDockNotifyCandidate {
  * serializes concurrent deliveries for the same equipment so the push fires once.
  * Returns false (without running `deliver`) when a notify was already sent since checkout.
  */
-export async function claimSemiDockNotifySlot(
+async function claimSemiDockNotifySlot(
   clinicId: string,
   equipmentId: string,
   checkedOutAt: Date,

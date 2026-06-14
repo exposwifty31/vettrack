@@ -10,7 +10,7 @@ export type SeenResult =
   | { ok: false; error: "NOT_FOUND" };
 
 /** Updates equipment last-seen timestamp (no patient linking). */
-export async function processEquipmentSeenInTx(params: {
+async function processEquipmentSeenInTx(params: {
   tx: DbTx;
   clinicId: string;
   equipmentId: string;

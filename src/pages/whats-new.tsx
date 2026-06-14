@@ -1,5 +1,5 @@
 import { Helmet } from "react-helmet-async";
-import { Layout } from "@/components/layout";
+import { AppShell } from "@/components/layout/AppShell";
 import { t } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -74,7 +74,7 @@ export default function WhatsNewPage() {
   ];
 
   return (
-    <Layout>
+    <AppShell title={t.whatsNew.title}>
       <Helmet>
         <title>{t.whatsNew.title}</title>
       </Helmet>
@@ -131,6 +131,6 @@ export default function WhatsNewPage() {
           </section>
         ))}
       </div>
-    </Layout>
+    </AppShell>
   );
 }

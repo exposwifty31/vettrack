@@ -565,14 +565,12 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     () => ({
       home: location === "/home" || location === "/" || location === "",
       equipment: matchesRouteFamily(location, ["/equipment"]),
-      recap: location.startsWith("/recap"),
     }),
     [location],
   );
 
   const legacyActiveTabIndex = useMemo(() => {
     if (menuOpen) return 4;
-    if (bottomNavActive.recap) return 3;
     if (bottomNavActive.equipment) return 1;
     if (bottomNavActive.home) return 0;
     return -1;
@@ -1354,28 +1352,6 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                   {scannerUIOpen ? lh.bottomScanClose : lh.bottomScan}
                 </span>
               </div>
-
-              <Link
-                href="/recap"
-                className="flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] transition-opacity duration-150 motion-safe:active:opacity-80 motion-reduce:active:opacity-100 rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface cursor-pointer"
-                data-testid="bottom-nav-recap"
-              >
-                <Sparkles
-                  className={cn(
-                    "w-6 h-6 transition-all duration-200",
-                    bottomNavActive.recap ? "text-ivory-green scale-110" : "text-ivory-text3 scale-100",
-                  )}
-                  aria-hidden
-                />
-                <span
-                  className={cn(
-                    "text-[10px] font-semibold leading-tight text-center max-w-[4.5rem] truncate px-0.5",
-                    bottomNavActive.recap ? "text-ivory-green" : "text-ivory-text3",
-                  )}
-                >
-                  {lh.bottomRecap}
-                </span>
-              </Link>
 
               <button
                 type="button"

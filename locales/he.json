@@ -67,7 +67,7 @@
     },
     "alertsDropdown": {
       "toggleAria": "התראות ({count})",
-      "activeCount": "{count} פעילות",
+      "activeCount": "{count} התראות פעילות",
       "empty": "אין התראות פעילות כרגע.",
       "seeAll": "כל ההתראות"
     },
@@ -343,6 +343,20 @@
       "no_authoritative_location": "אין סריקה או שיוך חדר עדכני",
       "equipment_not_found": "רשומת הציוד חסרה",
       "no_active_custodian": "אין משמורת פעילה במערכת"
+    },
+    "citationTypes": {
+      "scan": "סריקה",
+      "transfer": "העברה / לקיחה",
+      "room": "שיוך חדר",
+      "rfid": "RFID",
+      "equipment": "פרטי ציוד",
+      "dock": "עגינה",
+      "return": "החזרה",
+      "custody_docked": "מצב עגינה",
+      "custody_returned": "מצב החזרה",
+      "custody_untracked": "ללא מעקב",
+      "staging": "תור שימוש",
+      "waitlist": "רשימת המתנה"
     }
   },
   "equipmentIntelligence": {
@@ -456,7 +470,9 @@
     "recoveryBadgeCheckedOutLong": "מושאל זמן רב",
     "recoveryAttentionCalloutStale": "אשר שהציוד עדיין כאן ובמצב תקין.",
     "recoveryAttentionCalloutVeryStale": "הציוד לא אומת זמן רב — בדוק מיקום וסטטוס.",
-    "recoveryAttentionCalloutCheckedOutLong": "מושאל זמן רב — אשר אחריות או החזר כשסיימת."
+    "recoveryAttentionCalloutCheckedOutLong": "מושאל זמן רב — אשר אחריות או החזר כשסיימת.",
+    "loadFailed": "טעינת פרטי הציוד נכשלה. נסה שנית.",
+    "loadFailedHint": "בדוק את החיבור ומשוך לרענון."
   },
   "adminPilotCoverage": {
     "title": "כיסוי פיילוט",
@@ -566,6 +582,12 @@
     },
     "errors": {
       "loadFailed": "טעינת ההתראות נכשלה. נסה שוב."
+    },
+    "details": {
+      "issue": "תקלה פעילה — טרם טופלה",
+      "overdue": "{days, plural, one{יום אחד} two{יומיים} many{# ימים} other{# ימים}} באיחור",
+      "sterilization_due": "לא עוקר ביותר מ-7 ימים",
+      "inactive": "ללא סריקה ביותר מ-14 ימים"
     }
   },
   "shiftSummary": {
@@ -881,9 +903,7 @@
     "colorThemeDescription": "יער — ירוק מותג; קליני — כחול לניווט, ירוק רק לפעולות",
     "colorThemeForest": "יער (מותג)",
     "colorThemeClinical": "קליני",
-    "colorThemeDark": "כהה",
     "haptics": "רטט (הפטיקה)",
-    "hapticsDescription": "רטט בסריקה ואישור (PWA באנדרואיד)",
     "darkMode": "מצב לילה",
     "darkModeDescription": "מפחית עומס על העיניים בתאורה חלשה",
     "displaySize": "גודל תצוגה",
@@ -979,7 +999,7 @@
     "daysAgo": "לפני {days} ימים",
     "title": "התראות",
     "metaDescription": "התראות ציוד פעילות לפי חומרה: תקלות קריטיות, תחזוקה באיחור, תזכורות חיטוי וציוד לא פעיל.",
-    "activeCount": "{count} פעילות",
+    "activeCount": "{count} התראות פעילות",
     "ackLoadFailed": "טעינת סטטוסי טיפול נכשלה. אפשר לצפות בהתראות, אך פעולות טיפול מושבתות זמנית.",
     "browseEquipment": "דפדף בציוד",
     "inProgressSince": "בטיפול מאז",
@@ -1037,7 +1057,6 @@
     "methodologyNote": "ההפרשים מכוונים כך שאחוז חיובי = שיפור (טריאז' מהיר יותר, שלמות גבוהה יותר, לכידה כספית חזקה יותר)."
   },
   "myEquipmentPage": {
-    "scanQr": "סרוק QR",
     "shiftSummary": "סיכום משמרת",
     "browseEquipment": "דפדף בציוד",
     "recoveryBadgeStale": "דורש אימות",
@@ -1361,7 +1380,9 @@
   },
   "roomsListPage": {
     "createRoomFailed": "יצירת החדר נכשלה",
-    "title": "רדאר ציוד",
+    "title": "חדרים",
+    "subtitle": "{count, plural, one{חדר אחד} two{שני חדרים} many{# חדרים} other{# חדרים}} · לחץ לפרטים",
+    "subtitleEmpty": "מלאי ציוד לפי חדר",
     "emptyRooms": "אין חדרים עדיין",
     "createFirstRoomHint": "צור את החדר הראשון כדי לארגן ציוד לפי מיקום.",
     "createRoomDialogTitle": "יצירת חדר",
@@ -1612,7 +1633,6 @@
     "pilotPulseEverConfirmed": "אושרו אי פעם",
     "pilotPulseConfirmedToday": "היום",
     "pilotPulseNeverConfirmed": "לא אושרו מעולם",
-    "pilotSettings": "הגדרות פיילוט",
     "pilotStaleThresholdLabel": "סף ישנות",
     "pilotStaleThresholdHint": "פריטים שלא אושרו בתוך חלון זה מסומנים כישנים.",
     "pilotStaleThresholdSaved": "הסף עודכן",
@@ -2318,7 +2338,7 @@
       "overdue": "{count} באיחור — סקור עכשיו",
       "startNow": "המשימה הבאה מוכנה — התחל עכשיו",
       "overloaded": "עומס גבוה — סקור משימות דחופות",
-      "pickFromQueue": "התור פתוח — בחר משימה"
+      "pickFromQueue": "משימות ממתינות לטיפול"
     },
     "statusAction": {
       "viewQueue": "צפה בתור",
@@ -3049,7 +3069,11 @@
     "setupRequired": "נדרשת הגדרת asset type",
     "procedureBindNotReadyWarning": "ציוד זה אינו מוכן לפריסה — האם להמשיך?",
     "procedureBound": "הציוד קושר לאשפוז",
-    "procedureReleased": "הציוד שוחרר מהפרוצדורה"
+    "procedureReleased": "הציוד שוחרר מהפרוצדורה",
+    "bundleGateReason": {
+      "CUSTODY_CHAIN_BROKEN": "שרשרת המשמורת שבורה — הציוד אינו מעוקב",
+      "CONDITIONS_NOT_MET": "תנאי הפריסה לא מתקיימים"
+    }
   },
   "equipmentNfc": {
     "toggleCheckedOut": "{name} נלקח לשימוש",
@@ -3062,7 +3086,17 @@
     "writeSuccess": "תגית NFC נכתבה",
     "writeFailed": "כתיבת תגית NFC נכשלה",
     "writeUnsupported": "כתיבת NFC אינה נתמכת במכשיר זה",
-    "writeTag": "כתוב תגית NFC ל-checkout"
+    "writeTag": "כתוב תגית NFC ל-checkout",
+    "alreadyToggledRecently": "בוצעה פעולה לאחרונה — המתן רגע.",
+    "toggling": "מעביר {{name}}…"
+  },
+  "nfcEntry": {
+    "openingEquipment": "פותח ציוד…",
+    "signInFirst": "יש להתחבר תחילה ואז לסרוק שוב."
+  },
+  "staleCheckout": {
+    "pushTitle": "ציוד עדיין בשימוש",
+    "pushBody": "המכשיר הזה בשימוש כבר זמן מה. אם סיימת, אנא החזר אותו."
   },
   "semiDock": {
     "pushTitle": "זוהה מכשיר בחדר הבית",

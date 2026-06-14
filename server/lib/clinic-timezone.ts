@@ -3,7 +3,7 @@ import { fromZonedTime } from "date-fns-tz";
 import { and, eq } from "drizzle-orm";
 import { clinics, db } from "../db.js";
 
-export const DEFAULT_CLINIC_TIMEZONE = "Asia/Jerusalem";
+const DEFAULT_CLINIC_TIMEZONE = "Asia/Jerusalem";
 
 const ISO_DAY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 

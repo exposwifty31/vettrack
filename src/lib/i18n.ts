@@ -167,6 +167,7 @@ const translations = {
     confirmInRoomDone: (roomName: string) => tr(d.equipmentTruth.confirmInRoomDone, { roomName }),
     roomSweepDone: (roomName: string, count: number) =>
       tr(d.equipmentTruth.roomSweepDone, { roomName, count }),
+    citationTypes: d.equipmentTruth.citationTypes,
   },
 
   shiftHandoverPage: {
@@ -209,6 +210,8 @@ const translations = {
     localStateSyncFailed: d.equipmentDetail.localStateSyncFailed,
     openSyncQueue: d.equipmentDetail.openSyncQueue,
     backToList: d.equipmentDetail.backToList,
+    loadFailed: d.equipmentDetail.loadFailed,
+    loadFailedHint: d.equipmentDetail.loadFailedHint,
     notFound: d.equipmentDetail.notFound,
     sendWhatsApp: d.equipmentDetail.sendWhatsApp,
     printQrButton: d.equipmentDetail.printQrButton,
@@ -316,6 +319,12 @@ const translations = {
     toast: d.alerts.toast,
     empty: d.alerts.empty,
     errors: d.alerts.errors,
+    details: {
+      issue: d.alerts.details.issue,
+      overdue: (days: number) => tr(d.alerts.details.overdue, { days }),
+      sterilization_due: d.alerts.details.sterilization_due,
+      inactive: d.alerts.details.inactive,
+    },
   },
 
   shiftSummary: d.shiftSummary,
@@ -426,6 +435,13 @@ const translations = {
     writeFailed: d.equipmentNfc.writeFailed,
     writeUnsupported: d.equipmentNfc.writeUnsupported,
     writeTag: d.equipmentNfc.writeTag,
+    alreadyToggledRecently: d.equipmentNfc.alreadyToggledRecently,
+    toggling: (name: string) => tr(d.equipmentNfc.toggling, { name }),
+  },
+
+  nfcEntry: {
+    openingEquipment: d.nfcEntry.openingEquipment,
+    signInFirst: d.nfcEntry.signInFirst,
   },
 
   admin: {
@@ -581,7 +597,10 @@ const translations = {
     filterHint: (shown: number, total: number) => tr(d.roomRadarPage.filterHint, { shown, total }),
   },
 
-  roomsListPage: d.roomsListPage,
+  roomsListPage: {
+    ...d.roomsListPage,
+    subtitle: (count: number) => tr(d.roomsListPage.subtitle, { count }),
+  },
 
   managementDashboardPage: d.managementDashboardPage,
 
@@ -951,6 +970,7 @@ const translations = {
     procedureBindNotReadyWarning: d.operationalState.procedureBindNotReadyWarning,
     procedureBound: d.operationalState.procedureBound,
     procedureReleased: d.operationalState.procedureReleased,
+    bundleGateReason: d.operationalState.bundleGateReason,
   },
 
   dockReturn: {

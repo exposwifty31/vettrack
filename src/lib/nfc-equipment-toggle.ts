@@ -32,6 +32,32 @@ export function wasNfcToggleFiredRecently(equipmentId: string): boolean {
   }
 }
 
+// Logged-out NFC scan toast guard. Mirrors the toggle guard but with a FIXED key — the sign-in
+// toast is global (not per-equipment). D6: an 8s sessionStorage time-window that RE-ARMS, so a
+// later logged-out scan (sign in → sign out → re-tap on a long-lived native process) re-explains
+// instead of silently redirecting forever.
+const NFC_SIGNIN_TOAST_GUARD_KEY = "vt_nfc_signin_toast_shown";
+const NFC_SIGNIN_TOAST_TTL_MS = 8_000;
+
+export function markNfcSignInToastShown(): void {
+  try {
+    sessionStorage.setItem(NFC_SIGNIN_TOAST_GUARD_KEY, String(Date.now()));
+  } catch {
+    /* sessionStorage unavailable */
+  }
+}
+
+export function wasNfcSignInToastShownRecently(): boolean {
+  try {
+    const raw = sessionStorage.getItem(NFC_SIGNIN_TOAST_GUARD_KEY);
+    if (!raw) return false;
+    const ts = Number(raw);
+    return Number.isFinite(ts) && Date.now() - ts < NFC_SIGNIN_TOAST_TTL_MS;
+  } catch {
+    return false;
+  }
+}
+
 export async function runEquipmentQuickToggle(
   equipmentId: string,
   equipmentName: string,

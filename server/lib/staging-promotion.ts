@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db, equipment, stagingQueue } from "../db.js";
 import { enqueueNotificationJob as _enqueueNotificationJob, type PushPriority } from "./queue.js";
 
-export async function _findNextClaim(equipmentId: string, clinicId: string) {
+async function _findNextClaim(equipmentId: string, clinicId: string) {
   return db
     .select({
       id: stagingQueue.id,
@@ -25,7 +25,7 @@ export async function _findNextClaim(equipmentId: string, clinicId: string) {
     .then((r) => r[0] ?? null);
 }
 
-export async function _getEquipmentName(equipmentId: string, clinicId: string) {
+async function _getEquipmentName(equipmentId: string, clinicId: string) {
   return db
     .select({ name: equipment.name })
     .from(equipment)

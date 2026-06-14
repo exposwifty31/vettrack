@@ -1,8 +1,5 @@
 import type { JobsOptions } from "bullmq";
-import {
-  INTEGRATION_QUEUE_LEGACY_NAME,
-  integrationQueueNameForClinic,
-} from "../../queues/integration-shards.js";
+import { integrationQueueNameForClinic } from "../../queues/integration-shards.js";
 import {
   type IntegrationSyncJobData,
   type IntegrationSyncJobType,
@@ -24,6 +21,10 @@ import {
   type ChargeAlertJobPayload,
 } from "../../queues/charge-alert.queue.js";
 import {
+  STALE_CHECKOUT_SWEEP_JOB_NAME,
+  STALE_CHECKOUT_SWEEP_QUEUE_NAME,
+} from "../../workers/staleCheckoutSweepWorker.js";
+import {
   resolveBullmqJobName,
   type AnyJobDefinition,
   type JobDefinition,
@@ -36,12 +37,13 @@ export const EXPIRY_CHECK_JOB_NAME = "check-expiry";
 export const STALE_CHECKIN_SWEEP_QUEUE_NAME = "stale-checkin-sweep";
 export const STALE_CHECKIN_SWEEP_JOB_NAME = "sweep-stale-checkins";
 
-/** Matches {@link STALE_TASK_OWNERSHIP_SWEEP_DEDUP_WINDOW_MS} in staleTaskOwnershipSweep.queue.ts */
-export const STALE_TASK_OWNERSHIP_SWEEP_DEDUP_WINDOW_MS = 60_000;
+const STALE_TASK_OWNERSHIP_SWEEP_DEDUP_WINDOW_MS = 60_000;
 
 export type ExpiryCheckJobPayload = Record<string, never>;
 
 export type StaleCheckInSweepJobPayload = Record<string, never>;
+
+export type StaleCheckoutSweepJobPayload = Record<string, never>;
 
 export type PayloadForStaticKind = {
   "check-plug": ChargeAlertJobPayload;
@@ -49,6 +51,7 @@ export type PayloadForStaticKind = {
   "stale-task-ownership-sweep": StaleTaskOwnershipSweepJobData;
   "check-expiry": ExpiryCheckJobPayload;
   "sweep-stale-checkins": StaleCheckInSweepJobPayload;
+  "sweep-stale-checkouts": StaleCheckoutSweepJobPayload;
 };
 
 /** Producer uses per-add opts only (no queue defaultJobOptions); attempts follow BullMQ default (1). */
@@ -108,12 +111,24 @@ const staleCheckInSweepDefinition: JobDefinition<StaleCheckInSweepJobPayload> = 
   removeOnFail: 100,
 };
 
+const staleCheckoutSweepDefinition: JobDefinition<StaleCheckoutSweepJobPayload> = {
+  kind: STALE_CHECKOUT_SWEEP_JOB_NAME,
+  queue: STALE_CHECKOUT_SWEEP_QUEUE_NAME,
+  bullmqJobName: STALE_CHECKOUT_SWEEP_JOB_NAME,
+  workerConcurrency: 1,
+  attempts: 3,
+  backoff: { type: "exponential", delay: 2000 },
+  removeOnComplete: 50,
+  removeOnFail: 100,
+};
+
 export const staticJobDefinitions = [
   chargeAlertDefinition,
   taskOwnershipBackfillDefinition,
   staleTaskOwnershipSweepDefinition,
   expiryCheckDefinition,
   staleCheckInSweepDefinition,
+  staleCheckoutSweepDefinition,
 ] as const;
 
 /** Integration enqueue metadata (dynamic job.name, shard queue per clinic). */
@@ -246,4 +261,4 @@ export type {
   IntegrationSyncDirection,
 };
 
-export { INTEGRATION_QUEUE_LEGACY_NAME, STALE_TASK_OWNERSHIP_SWEEP_QUEUE_NAME };
+export { STALE_TASK_OWNERSHIP_SWEEP_QUEUE_NAME };

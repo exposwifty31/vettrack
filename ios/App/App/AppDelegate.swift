@@ -6,8 +6,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
 
+    // Quick-action / Control scan shortcut type. Mirrors UIApplicationShortcutItems in Info.plist
+    // and the Control's vettrack://scan target.
+    private static let scanShortcutType = "uk.vettrack.app.scan"
+    // Set at cold launch when the app is started BY the scan shortcut; consumed once the Capacitor
+    // bridge is loaded in applicationDidBecomeActive.
+    private var pendingScanShortcut = false
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // COLD launch via a Home Screen quick action: the shortcut is not a URL, so getLaunchUrl()
+        // cannot capture it. Flag it and replay a synthesized vettrack://scan open once the bridge is
+        // ready (see fireScanWhenBridgeReady).
+        if let shortcut = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem,
+           shortcut.type == AppDelegate.scanShortcutType {
+            pendingScanShortcut = true
+        }
         return true
     }
 
@@ -27,6 +40,49 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func applicationDidBecomeActive(_ application: UIApplication) {
         // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
+        // Drain a cold-launch scan shortcut (no-op if none is pending).
+        fireScanWhenBridgeReady()
+    }
+
+    // WARM launch: app already running when the quick action is triggered. The bridge is loaded, so
+    // synthesize a single vettrack://scan open through the same ApplicationDelegateProxy path that
+    // already delivers Universal Links and OAuth callbacks; the JS deep-link router handles it.
+    func application(
+        _ application: UIApplication,
+        performActionFor shortcutItem: UIApplicationShortcutItem,
+        completionHandler: @escaping (Bool) -> Void
+    ) {
+        guard shortcutItem.type == AppDelegate.scanShortcutType,
+              let url = URL(string: "vettrack://scan") else {
+            completionHandler(false)
+            return
+        }
+        _ = ApplicationDelegateProxy.shared.application(application, open: url, options: [:])
+        completionHandler(true)
+    }
+
+    // The Capacitor bridge is loaded once the storyboard root VC (CAPBridgeViewController) has a
+    // non-nil bridge. D4: the exit condition is bridge-loaded, NOT the proxy return value —
+    // @capacitor/app fires appUrlOpen with retainUntilConsumed:true, so the synthesized open is
+    // queued and replayed to the router's JS listener whenever it registers. Bounded retry (~5s).
+    private func bridgeIsLoaded() -> Bool {
+        return (window?.rootViewController as? CAPBridgeViewController)?.bridge != nil
+    }
+
+    private func fireScanWhenBridgeReady(attempt: Int = 0) {
+        guard pendingScanShortcut else { return }
+        let maxAttempts = 20 // ~5s at 250ms — generous cold-start headroom
+        guard bridgeIsLoaded() else {
+            if attempt < maxAttempts {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                    self?.fireScanWhenBridgeReady(attempt: attempt + 1)
+                }
+            }
+            return
+        }
+        guard let url = URL(string: "vettrack://scan") else { return }
+        pendingScanShortcut = false
+        _ = ApplicationDelegateProxy.shared.application(UIApplication.shared, open: url, options: [:])
     }
 
     func applicationWillTerminate(_ application: UIApplication) {

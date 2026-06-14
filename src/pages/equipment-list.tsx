@@ -217,9 +217,8 @@ export default function EquipmentListPage() {
   function setFolderFilter(val: string) { updateParams({ folder: val }); }
   function setLocationFilter(val: string) { updateParams({ location: val }); }
 
-  // Load all equipment in a single large-page request.
-  // LARGE_DATASET_PAGE_SIZE (1000) matches the server-side EQUIPMENT_MAX_PAGE_SIZE cap,
-  // ensuring the full dataset is always present for client-side filtering and virtualization.
+  // Server-side pagination: fetches one page at a time via usePaginatedEquipment (pageSize = SERVER_PAGE_SIZE, 100).
+  // Client-side filters (q, status, folder, location) apply to loaded pages; list virtualizes when row count exceeds VIRTUALIZATION_THRESHOLD.
   const {
     data: equipmentPage,
     isLoading: isQueryLoading,

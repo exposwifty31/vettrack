@@ -1,9 +1,9 @@
-import { t, formatDateTimeByLocale } from "@/lib/i18n";
+import { t, formatDateTimeByLocale, formatDateByLocale } from "@/lib/i18n";
 import { useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
-import { computeAlerts } from "@/lib/utils";
+import { computeAlerts, cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,10 @@ import {
   MapPin,
   ClipboardCheck,
   ArrowUpRight,
+  Flame,
+  Share2,
 } from "lucide-react";
+import { useEnterOnce } from "@/hooks/use-enter-once";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
@@ -35,7 +38,9 @@ interface ShiftSummarySheetProps {
 }
 
 export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
-  const { email: userEmail, userId } = useAuth();
+  const { email: userEmail, userId, name } = useAuth();
+  const firstName = name?.split(" ")[0] || t.homePage.fallbackName;
+  const enterOnce = useEnterOnce("shift-summary-sheet");
   const sheetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -87,6 +92,55 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
     retry: false,
     refetchOnWindowFocus: false,
   });
+
+  const { data: pulse } = useQuery({
+    queryKey: ["/api/home/dashboard"],
+    queryFn: () => api.home.dashboard(),
+    enabled: open && !!userId,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: taskDashboard } = useQuery({
+    queryKey: ["/api/tasks/dashboard", userId ?? ""],
+    queryFn: () => api.tasks.dashboard(),
+    enabled: open && !!userId,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const tasksDone = pulse?.tasksCompletedToday ?? 0;
+  const tasksOpen = (taskDashboard?.counts.today ?? 0) + (taskDashboard?.counts.overdue ?? 0);
+  const tasksTotal = tasksDone + tasksOpen;
+  const scansToday = pulse?.scansToday ?? 0;
+  const streak = pulse?.streak ?? 0;
+  const heroPct = tasksTotal > 0 ? Math.round((tasksDone / tasksTotal) * 100) : null;
+
+  const shareText = useMemo(() => {
+    const date = formatDateByLocale(new Date(), { weekday: "long", day: "numeric", month: "short" });
+    const lines: (string | null)[] = [
+      t.shiftRecap.shareHeadline(firstName, date),
+      heroPct !== null ? t.shiftRecap.shareProgress(heroPct) : null,
+      t.shiftRecap.shareTasks(tasksDone, tasksTotal),
+      t.shiftRecap.shareScans(scansToday),
+      streak > 0 ? t.shiftRecap.shareStreak(streak) : null,
+      t.shiftRecap.shareFooter,
+    ];
+    return lines.filter(Boolean).join("\n");
+  }, [firstName, heroPct, tasksDone, tasksTotal, scansToday, streak]);
+
+  const handleShare = async () => {
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ text: shareText, title: t.shiftRecap.shareTitle });
+        return;
+      }
+      await safeClipboardWriteText(shareText);
+      toast.success(t.shiftRecap.copySuccess);
+    } catch {
+      toast.error(t.shiftRecap.copyError);
+    }
+  };
 
   const isLoading = myLoading || eqLoading || actLoading;
   const isError = myError || eqError || actError;
@@ -307,6 +361,55 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
             </div>
           ) : (
             <>
+              {/* Streak + today stats */}
+              {streak > 0 && (
+                <div
+                  className={cn(
+                    "flex items-center gap-3 rounded-2xl border border-primary/15 bg-primary/5 p-4",
+                    enterOnce && "motion-safe:animate-[badgePop_0.6s_ease-out_both]",
+                  )}
+                  data-testid="shift-summary-streak"
+                >
+                  <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary text-xl font-bold tabular-nums text-primary-foreground">
+                    {streak}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="inline-flex items-center gap-1 text-[10.5px] font-bold uppercase tracking-[0.14em] text-primary">
+                      <Flame className="h-3.5 w-3.5" aria-hidden />
+                      {t.homePage.streakLabel(streak)}
+                    </p>
+                    <p className="mt-0.5 text-sm font-semibold">{t.homePage.streakTitle}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* 3-stat grid */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-2xl bg-muted/60 px-3 py-3 text-center">
+                  <p className="text-2xl font-bold tabular-nums whitespace-nowrap">
+                    {heroPct !== null ? `${heroPct}%` : "—"}
+                  </p>
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t.shiftRecap.statProgress}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-muted/60 px-3 py-3 text-center">
+                  <p className="text-2xl font-bold tabular-nums whitespace-nowrap">
+                    {tasksDone}
+                    <span className="text-base font-semibold text-muted-foreground">/{tasksTotal || "—"}</span>
+                  </p>
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t.shiftRecap.statTasks}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-muted/60 px-3 py-3 text-center">
+                  <p className="text-2xl font-bold tabular-nums whitespace-nowrap">{scansToday}</p>
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t.shiftRecap.statScans}
+                  </p>
+                </div>
+              </div>
+
               {/* Currently checked out */}
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
@@ -473,6 +576,15 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
           >
             <FileText className="w-4 h-4" />
             {t.shiftSummaryPage.downloadPdf}
+          </Button>
+          <Button
+            className="flex-1 gap-2"
+            onClick={() => void handleShare()}
+            disabled={isLoading}
+            data-testid="btn-share-shift-summary"
+          >
+            <Share2 className="w-4 h-4" />
+            {t.shiftRecap.shareCta}
           </Button>
         </div>
       </div>

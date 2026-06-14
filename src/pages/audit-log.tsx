@@ -252,7 +252,7 @@ export function SharedAuditLogsPanel({
           <CardContent className={compact ? "pt-4" : undefined}>
             <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4 sm:items-end">
               {/* Staff name filter */}
-              <div className="flex flex-col gap-1.5 sm:min-w-[160px]">
+              <div className="flex flex-col gap-1.5 w-full sm:w-auto sm:min-w-[160px]">
                 <Label className="text-xs">{t.adminPage.logFilterStaff}</Label>
                 <div className="relative">
                   <User className="absolute start-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
@@ -267,7 +267,7 @@ export function SharedAuditLogsPanel({
               </div>
 
               {/* Action type */}
-              <div className="flex flex-col gap-1.5 sm:min-w-[180px]">
+              <div className="flex flex-col gap-1.5 w-full sm:w-auto sm:min-w-[180px]">
                 <Label className="text-xs">{t.adminPage.logFilterAction}</Label>
                 <Select value={actionType || "all"} onValueChange={(v) => setActionType(v === "all" ? "" : v)}>
                   <SelectTrigger className="h-8 text-sm">
@@ -289,7 +289,7 @@ export function SharedAuditLogsPanel({
                   type="date"
                   value={from}
                   onChange={(e) => setFrom(e.target.value)}
-                  className="h-8 text-sm w-full"
+                  className="h-8 text-sm w-full max-w-full box-border"
                 />
               </div>
 
@@ -299,7 +299,7 @@ export function SharedAuditLogsPanel({
                   type="date"
                   value={to}
                   onChange={(e) => setTo(e.target.value)}
-                  className="h-8 text-sm w-full"
+                  className="h-8 text-sm w-full max-w-full box-border"
                 />
               </div>
 

@@ -18,6 +18,7 @@ import type {
   BulkResult,
   DeletedEquipment,
   QuickScanToggleResult,
+  QuickScanToggleAction,
 } from "@/types";
 import type { EquipmentWaitlistSnapshot } from "../../../shared/equipment-waitlist.js";
 import type { EquipmentTruthResponse } from "../../../shared/equipment-truth.js";
@@ -296,81 +297,44 @@ export const equipmentApi = {
         { offlineType: "delete" }
       ),
     /**
-     * NFC / deep-link toggle — online-only, uses full V1 checkout/return routes
-     * (custodyState, usageState, realtime, waitlist). Does not call POST /api/equipment/scan.
+     * NFC / deep-link toggle — online-only single POST /toggle.
      */
     quickToggle: async (equipmentId: string): Promise<QuickScanToggleResult> => {
-      const me = getCurrentUserId();
-      let eq: Equipment;
       try {
-        eq = await request<Equipment>(`/api/equipment/${equipmentId}`);
-      } catch (err) {
-        if (isNetworkError(err)) {
-          throw err;
-        }
-        throw err;
-      }
+        const result = await request<{
+          equipment: Equipment;
+          action: QuickScanToggleAction;
+          scanLogId: string;
+          undoToken: string;
+          checkedOutByEmail?: string;
+        }>(`/api/equipment/${equipmentId}/toggle`, {
+          method: "POST",
+          body: JSON.stringify({ isPluggedIn: true }),
+        });
 
-      if (eq.checkedOutById && eq.checkedOutById !== me) {
-        return {
-          equipment: eq,
-          action: "blocked",
-          scanLogId: "",
-          undoToken: "",
-          checkedOutByEmail: eq.checkedOutByEmail ?? undefined,
-        };
-      }
-
-      const shouldReturn = eq.checkedOutById === me;
-
-      try {
-        if (shouldReturn) {
-          const result = await request<{ equipment: Equipment; undoToken: string }>(
-            `/api/equipment/${equipmentId}/return`,
-            {
-              method: "POST",
-              body: JSON.stringify({ isPluggedIn: true }),
-            },
-          );
-          await updateCachedEquipment(equipmentId, result.equipment).catch(() => {});
-          return {
-            equipment: result.equipment,
-            action: "return",
-            scanLogId: "",
-            undoToken: result.undoToken ?? "",
-          };
-        }
-
-        const result = await request<{ equipment: Equipment; undoToken: string }>(
-          `/api/equipment/${equipmentId}/checkout`,
-          {
-            method: "POST",
-            body: JSON.stringify({}),
-          },
-        );
         await updateCachedEquipment(equipmentId, result.equipment).catch(() => {});
+
         return {
           equipment: result.equipment,
-          action: "checkout",
-          scanLogId: "",
+          action: result.action,
+          scanLogId: result.scanLogId ?? "",
           undoToken: result.undoToken ?? "",
+          checkedOutByEmail: result.checkedOutByEmail,
         };
       } catch (err) {
         if (isNetworkError(err)) {
           throw err;
         }
         if (err instanceof ApiError && err.status === 409) {
-          const email =
-            (typeof err.payload.checkedOutByEmail === "string" && err.payload.checkedOutByEmail) ||
-            eq.checkedOutByEmail ||
-            undefined;
-          return {
-            equipment: eq,
-            action: "blocked",
-            scanLogId: "",
-            undoToken: "",
-            checkedOutByEmail: email,
-          };
+          const code =
+            typeof err.payload.code === "string"
+              ? err.payload.code
+              : typeof err.payload.reason === "string"
+                ? err.payload.reason
+                : "";
+          if (code === "VERSION_CONFLICT" || code === "CONFLICT") {
+            throw err;
+          }
         }
         throw err;
       }

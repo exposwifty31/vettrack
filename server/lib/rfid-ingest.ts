@@ -281,14 +281,3 @@ export async function ingestRfidBatch(
 
   return result;
 }
-
-/** Test helper: whether a room has at least one dock row (equipment-storage). */
-export async function isDockRoom(clinicId: string, roomId: string | null): Promise<boolean> {
-  if (!roomId) return false;
-  const [row] = await db
-    .select({ id: docks.id })
-    .from(docks)
-    .where(and(eq(docks.clinicId, clinicId), eq(docks.roomId, roomId)))
-    .limit(1);
-  return !!row;
-}

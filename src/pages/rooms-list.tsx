@@ -280,7 +280,7 @@ export default function RoomsListPage() {
               />
             </div>
             <p className="text-sm text-muted-foreground">
-              {rooms ? `${rooms.length} room${rooms.length !== 1 ? "s" : ""} · tap a card to inspect` : "Room-by-room inventory"}
+              {rooms ? t.roomsListPage.subtitle(rooms.length) : t.roomsListPage.subtitleEmpty}
             </p>
           </div>
           {isAdmin && (

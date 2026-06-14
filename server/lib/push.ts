@@ -100,7 +100,7 @@ export interface PushSendResult {
   invalidOrGoneCount: number;
 }
 
-export function mergePushStats(a: PushSendResult, b: PushSendResult): PushSendResult {
+function mergePushStats(a: PushSendResult, b: PushSendResult): PushSendResult {
   return {
     deliveredAny: a.deliveredAny || b.deliveredAny,
     transientFailures: a.transientFailures + b.transientFailures,
@@ -254,7 +254,7 @@ async function emitNotificationFailedOutbox(clinicId: string, payload: Record<st
 }
 
 /** Single terminal event for a deferred multi-send notification request. */
-export async function finalizeNotificationRequestOutbox(
+async function finalizeNotificationRequestOutbox(
   clinicId: string,
   requestedOutboxId: number,
   stats: PushSendResult,
@@ -706,7 +706,7 @@ const PUSH_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 let pushCleanupSchedulerStarted = false;
 
 /** Remove subscriptions for soft-deleted or removed users (table hygiene; 410/404 cleanup happens on send). */
-export async function cleanupStalePushSubscriptions(): Promise<void> {
+async function cleanupStalePushSubscriptions(): Promise<void> {
   const result = await pool.query(`
     DELETE FROM vt_push_subscriptions
     WHERE user_id IN (SELECT id FROM vt_users WHERE deleted_at IS NOT NULL)

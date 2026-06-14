@@ -9,11 +9,8 @@ import { resolveCurrentRole } from "../lib/role-resolution.js";
 import { resolveRequestLocale } from "../../lib/i18n/middleware.js";
 import { normalizeLocale } from "../../lib/i18n/loader.js";
 import { buildAccessDeniedBody, recordAccessDenied } from "../lib/access-denied.js";
-
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
+import { isAdminEmail } from "../lib/admin-email-allowlist.js";
+import { incrementMetric } from "../lib/metrics.js";
 
 export type UserRole = "admin" | "vet" | "technician" | "senior_technician" | "student";
 type LegacyUserRole = UserRole | "viewer";
@@ -377,13 +374,19 @@ export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
       clerkEmail = clerkUser.emailAddresses?.[0]?.emailAddress ?? "";
       clerkName = `${clerkUser.firstName ?? ""} ${clerkUser.lastName ?? ""}`.trim();
     } catch (err) {
-      console.warn("[auth] Unable to enrich Clerk profile; continuing with session claims only", err);
+      console.error("[auth] Clerk profile enrichment failed for new-user bootstrap", { clerkUserId, err });
+      incrementMetric("auth_clerk_profile_fetch_failed");
+      return {
+        ok: false,
+        status: 503,
+        body: buildAccessDeniedBody("AUTH_PROFILE_UNAVAILABLE", "Unable to verify account profile; please retry sign-in"),
+      };
     }
   }
 
-  const isAdminEmail = clerkEmail && ADMIN_EMAILS.includes(clerkEmail.toLowerCase());
-  const defaultStatus = isAdminEmail ? "active" : "pending";
-  const defaultRole: UserRole = isAdminEmail ? "admin" : "technician";
+  const adminEmail = clerkEmail ? isAdminEmail(clerkEmail) : false;
+  const defaultStatus = adminEmail ? "active" : "pending";
+  const defaultRole: UserRole = adminEmail ? "admin" : "technician";
 
   // Guarantee the clinic row exists before inserting the user. A new Clerk
   // organization has no matching vt_clinics row until this fires; without it
@@ -415,28 +418,6 @@ export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
       },
     })
     .returning();
-
-  // TODO(HIGH): ADMIN_EMAILS promotion runs on every authenticated request. A user whose
-  // role was explicitly demoted via the DB will be re-promoted on the next request if their
-  // email remains in ADMIN_EMAILS. To override, remove the email from ADMIN_EMAILS first,
-  // then demote in the DB — order matters. Consider moving this check to a startup-time
-  // seed/bootstrap pass rather than per-request promotion to remove the per-request DB write
-  // and the inability to override via the UI alone.
-  if (ADMIN_EMAILS.length > 0 && ADMIN_EMAILS.includes(user.email.toLowerCase())) {
-    if (user.role !== "admin") {
-      [user] = await db
-        .update(users)
-        .set({ role: "admin", status: "active" })
-        .where(eq(users.id, user.id))
-        .returning();
-    } else if (user.status !== "active") {
-      [user] = await db
-        .update(users)
-        .set({ status: "active" })
-        .where(eq(users.id, user.id))
-        .returning();
-    }
-  }
 
   if (user.deletedAt) {
     return { ok: false, status: 403, body: { error: "ACCESS_DENIED", reason: "ACCOUNT_DELETED", message: "Your account has been removed." } };
@@ -717,37 +698,6 @@ export function requireAdmin(
   next();
 }
 
-export function requireRole(minRole: UserRole) {
-  return function (req: Request, res: Response, next: NextFunction) {
-    const requestId = resolveRequestId(req, res);
-    if (!req.authUser) {
-      return res.status(401).json(
-        buildApiErrorBody({
-          code: "UNAUTHORIZED",
-          reason: "MISSING_AUTH_USER",
-          message: "Unauthorized",
-          requestId,
-        }),
-      );
-    }
-    const userLevel = ROLE_HIERARCHY[req.authUser.role] ?? 0;
-    const requiredLevel = ROLE_HIERARCHY[minRole] ?? 0;
-    if (userLevel < requiredLevel) {
-      recordAccessDenied({
-        req,
-        source: "requireRole",
-        statusCode: 403,
-        reason: "INSUFFICIENT_ROLE",
-        message: "Insufficient permissions",
-      });
-      return res.status(403).json({
-        ...buildAccessDeniedBody("INSUFFICIENT_ROLE", "Insufficient permissions"),
-        requestId,
-      });
-    }
-    next();
-  };
-}
 
 const CLINICAL_ROLES = new Set(["admin", "vet", "senior_technician", "technician"]);
 

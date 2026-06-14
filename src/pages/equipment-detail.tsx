@@ -1,4 +1,6 @@
 import { t } from "@/lib/i18n";
+import { formatBundleGateReason } from "@/lib/equipment-truth-display";
+// TODO(arch): God-file split — see docs/architecture/equipment-god-files-split-plan.md (item 9 handoff; no implementation here).
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useParams, useLocation, useSearch } from "wouter";
@@ -105,6 +107,7 @@ import {
 import { useSettings } from "@/hooks/use-settings";
 import { useNfcSupported } from "@/hooks/use-nfc-supported";
 import { writeNfcUrl } from "@/lib/nfc-platform";
+import { UNIVERSAL_LINK_ORIGIN } from "@/lib/equipment-id";
 import { playCriticalAlertTone } from "@/lib/sounds";
 import { haptics } from "@/lib/haptics";
 import { safeStorageSetItem } from "@/lib/safe-browser";
@@ -181,6 +184,7 @@ export default function EquipmentDetailPage() {
   const [scanHistoryRange, setScanHistoryRange] = useState<"today" | "7d" | "all">("today");
   const [detailTab, setDetailTab] = useState("details");
   const [toolsSheetOpen, setToolsSheetOpen] = useState(false);
+  const [isNfcToggling, setIsNfcToggling] = useState(false);
 
   const [moveRoomOpen, setMoveRoomOpen] = useState(false);
   const [reportIssueOpen, setReportIssueOpen] = useState(false);
@@ -327,19 +331,44 @@ export default function EquipmentDetailPage() {
     refetchOnWindowFocus: false,
   });
 
+  // Re-arm the per-mount toggle guard on a warm re-scan. The deep-link router appends a fresh
+  // &nfcTs=<epoch> on every scan, so a new nfcTs means "the user scanned again" → reset the ref
+  // BEFORE the toggle effect reads it. Declaration order is load-bearing (B2): React runs effects
+  // in source order, so this MUST stay immediately above the toggle effect — below it, the toggle
+  // effect would early-return on the stale `true` ref and silently drop the re-scan. The `if (nfcTs)`
+  // guard prevents the post-toggle URL strip (nfcTs→absent) from spuriously re-arming; the 8s
+  // wasNfcToggleFiredRecently sessionStorage window remains the real dedupe.
+  const nfcTs = new URLSearchParams(searchStr).get("nfcTs");
+  useEffect(() => {
+    if (nfcTs) nfcDeepLinkToggleRef.current = false;
+  }, [nfcTs]);
+
   useEffect(() => {
     const params = new URLSearchParams(searchStr);
     if (params.get("nfcAction") !== "toggle" || !id || !equipment || !userId) return;
     if (nfcDeepLinkToggleRef.current) return;
     nfcDeepLinkToggleRef.current = true;
-    if (!wasNfcToggleFiredRecently(id)) {
-      markNfcToggleFired(id);
-      void runEquipmentQuickToggle(id, equipment.name, queryClient).catch(() => {
-        toast.error(t.equipmentNfc.onlineRequired);
-      });
-    }
     navigate(`/equipment/${id}`, { replace: true });
+    if (wasNfcToggleFiredRecently(id)) {
+      toast.info(t.equipmentNfc.alreadyToggledRecently);
+      toast.dismiss("nfc-open");
+      return;
+    }
+    markNfcToggleFired(id);
+    setIsNfcToggling(true);
+    void runEquipmentQuickToggle(id, equipment.name, queryClient)
+      .catch(() => {
+        toast.error(t.equipmentNfc.onlineRequired);
+      })
+      .finally(() => {
+        setIsNfcToggling(false);
+        toast.dismiss("nfc-open");
+      });
   }, [searchStr, id, equipment, userId, queryClient, navigate]);
+
+  useEffect(() => {
+    if (isError || (!isLoading && !equipment)) toast.dismiss("nfc-open");
+  }, [isError, isLoading, equipment]);
 
   const {
     data: scanLogsPages,
@@ -810,7 +839,10 @@ export default function EquipmentDetailPage() {
       toast.error(t.equipmentNfc.writeUnsupported);
       return;
     }
-    const url = `${window.location.origin}/equipment/${equipmentId}?nfcAction=toggle&source=nfc`;
+    // MANDATORY hardcode (D5): the native WebView origin is capacitor://localhost (bundled app),
+    // so window.location.origin would write a non-Universal-Link URL. UNIVERSAL_LINK_ORIGIN is the
+    // single source of truth shared with the deep-link router's hostname check.
+    const url = `${UNIVERSAL_LINK_ORIGIN}/equipment/${equipmentId}?nfcAction=toggle&source=nfc`;
     try {
       await writeNfcUrl(url);
       haptics.scanSuccess();
@@ -821,8 +853,14 @@ export default function EquipmentDetailPage() {
     }
   }
 
+  const isNfcEntry = new URLSearchParams(searchStr).get("nfcAction") === "toggle";
+
   if (isLoading) {
-    return <EquipmentDetailSkeleton />;
+    return (
+      <EquipmentDetailSkeleton
+        statusLabel={isNfcEntry ? t.nfcEntry.openingEquipment : undefined}
+      />
+    );
   }
 
   if (isError) {
@@ -830,8 +868,8 @@ export default function EquipmentDetailPage() {
       <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
         <AlertTriangle className="w-10 h-10 text-destructive opacity-60" />
         <div>
-          <p className="font-semibold text-foreground">טעינת הציוד נכשלה</p>
-          <p className="text-sm text-muted-foreground mt-1">בדוק את החיבור ונסה שוב</p>
+          <p className="font-semibold text-foreground">{t.equipmentDetail.loadFailed}</p>
+          <p className="text-sm text-muted-foreground mt-1">{t.equipmentDetail.loadFailedHint}</p>
         </div>
         <div className="flex gap-2">
           <Button
@@ -1043,6 +1081,17 @@ export default function EquipmentDetailPage() {
 
         {/* Quick Action Bar — ICU-moment: 1–2 large, instantly tappable actions */}
         <div className="flex flex-col gap-2" data-testid="quick-action-bar">
+          {isNfcToggling && (
+            <div
+              className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground"
+              role="status"
+              aria-live="polite"
+              data-testid="nfc-toggle-in-flight"
+            >
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
+              <span>{t.equipmentNfc.toggling(equipment.name)}</span>
+            </div>
+          )}
           {showReservationBanner && waitlistQ.data?.reservationExpiresAt && (
             <ReservationBanner
               equipmentId={equipment.id}
@@ -1366,7 +1415,7 @@ export default function EquipmentDetailPage() {
                 !deployabilityQ.data.bundleGate.ok &&
                 deployabilityQ.data.bundleGate.reason && (
                   <p className="text-xs text-muted-foreground">
-                    {deployabilityQ.data.bundleGate.reason}
+                    {formatBundleGateReason(deployabilityQ.data.bundleGate.reason)}
                   </p>
                 )}
 

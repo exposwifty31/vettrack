@@ -347,6 +347,20 @@ export interface TStructure {
       equipment_not_found: string;
       no_active_custodian: string;
     };
+    citationTypes: {
+      scan: string;
+      transfer: string;
+      room: string;
+      rfid: string;
+      equipment: string;
+      dock: string;
+      return: string;
+      custody_docked: string;
+      custody_returned: string;
+      custody_untracked: string;
+      staging: string;
+      waitlist: string;
+    };
   };
   equipmentIntelligence: {
     subtitle: string;
@@ -460,6 +474,8 @@ export interface TStructure {
     recoveryAttentionCalloutStale: string;
     recoveryAttentionCalloutVeryStale: string;
     recoveryAttentionCalloutCheckedOutLong: string;
+    loadFailed: string;
+    loadFailedHint: string;
   };
   adminPilotCoverage: {
     title: string;
@@ -569,6 +585,12 @@ export interface TStructure {
     };
     errors: {
       loadFailed: string;
+    };
+    details: {
+      issue: string;
+      overdue: string;
+      sterilization_due: string;
+      inactive: string;
     };
   };
   shiftSummary: {
@@ -884,9 +906,7 @@ export interface TStructure {
     colorThemeDescription: string;
     colorThemeForest: string;
     colorThemeClinical: string;
-    colorThemeDark: string;
     haptics: string;
-    hapticsDescription: string;
     darkMode: string;
     darkModeDescription: string;
     displaySize: string;
@@ -1040,7 +1060,6 @@ export interface TStructure {
     methodologyNote: string;
   };
   myEquipmentPage: {
-    scanQr: string;
     shiftSummary: string;
     browseEquipment: string;
     recoveryBadgeStale: string;
@@ -1365,6 +1384,8 @@ export interface TStructure {
   roomsListPage: {
     createRoomFailed: string;
     title: string;
+    subtitle: string;
+    subtitleEmpty: string;
     emptyRooms: string;
     createFirstRoomHint: string;
     createRoomDialogTitle: string;
@@ -1614,7 +1635,6 @@ export interface TStructure {
     pilotPulseEverConfirmed: string;
     pilotPulseConfirmedToday: string;
     pilotPulseNeverConfirmed: string;
-    pilotSettings: string;
     pilotStaleThresholdLabel: string;
     pilotStaleThresholdHint: string;
     pilotStaleThresholdSaved: string;
@@ -1648,7 +1668,6 @@ export interface TStructure {
     restockNavLockedToast: string;
     navLockActiveAria: string;
     bottomRooms: string;
-    bottomRecap: string;
     bottomMenu: string;
     skipToMainContent: string;
     radar: string;
@@ -3052,6 +3071,10 @@ export interface TStructure {
     procedureBindNotReadyWarning: string;
     procedureBound: string;
     procedureReleased: string;
+    bundleGateReason: {
+      CUSTODY_CHAIN_BROKEN: string;
+      CONDITIONS_NOT_MET: string;
+    };
   };
   equipmentNfc: {
     toggleCheckedOut: string;
@@ -3065,6 +3088,16 @@ export interface TStructure {
     writeFailed: string;
     writeUnsupported: string;
     writeTag: string;
+    alreadyToggledRecently: string;
+    toggling: string;
+  };
+  nfcEntry: {
+    openingEquipment: string;
+    signInFirst: string;
+  };
+  staleCheckout: {
+    pushTitle: string;
+    pushBody: string;
   };
   semiDock: {
     pushTitle: string;

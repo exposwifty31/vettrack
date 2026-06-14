@@ -2,8 +2,6 @@ import type { AuditDbExecutor } from "./audit.js";
 import { db, eventOutbox } from "../db.js";
 import { REALTIME_PAYLOAD_VERSION } from "./realtime-outbox-version.js";
 
-export { REALTIME_PAYLOAD_VERSION };
-
 export type RealtimeEventLevel = "INFO" | "WARNING" | "CRITICAL";
 export type RealtimeEventCategory = "TASK" | "PATIENT" | "INVENTORY" | "ALERT" | "SYSTEM";
 

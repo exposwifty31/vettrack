@@ -4,7 +4,7 @@ import { Router } from "express";
 import { randomUUID } from "crypto";
 import multer from "multer";
 import { z } from "zod";
-import { db, equipment, equipmentReturns, folders, rooms, scanLogs, transferLogs, undoTokens, users, stagingQueue, assetTypeConditions, unitConditionStates } from "../db.js";
+import { db, equipment, equipmentReturns, folders, rooms, scanLogs, transferLogs, undoTokens, users, stagingQueue } from "../db.js";
 import { eq, inArray, desc, asc, and, or, ilike, lt, gte, sql, isNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
@@ -13,23 +13,24 @@ import { checkDedupe, sendPushToAll, shouldSendPilotEnglishEquipmentPush } from 
 import { invalidateAnalyticsCache } from "../lib/analytics-cache.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { trackSyncSuccess, trackSyncFail } from "../lib/sync-metrics.js";
-import { scheduleSmartReturnReminder, cancelSmartReturnReminder } from "../lib/role-notification-scheduler.js";
 import { recordEquipmentSeen } from "../lib/equipment-seen.js";
-import { computeBundleReadinessGate } from "../services/equipment-operational-state.service.js";
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
 import { apiError as apiErrorI18n } from "../lib/apiError.js";
-import { enqueueChargeAlertJob } from "../jobs/charge-alert-enqueue.js";
-import { promoteStagingQueueNext } from "../lib/staging-promotion.js";
-import { notifyWaitlistPromoted } from "../lib/equipment-waitlist-promotion.js";
 import {
-  assertCheckoutAllowedForWaitlist,
-  EquipmentWaitlistError,
-  fulfillWaitlistOnCheckout,
-  getActiveNotifiedUserId,
-  promoteNextWaitlistInTx,
-} from "../services/equipment-waitlist.service.js";
-import type { EquipmentWaitlistRow } from "../db.js";
+  assertWaitlistCheckoutAllowed,
+  CheckoutConflictError,
+  CheckoutPreconditionError,
+  CustodyReturnVersionConflictError,
+  evaluateCheckoutV1Preconditions,
+  finalizeCheckoutSideEffects,
+  finalizeReturnSideEffects,
+  performEquipmentCheckout,
+  performEquipmentReturn,
+  quickScanEquipmentCustody,
+  toggleEquipmentCustody,
+} from "../services/equipment-custody-toggle.service.js";
+import { EquipmentWaitlistError } from "../services/equipment-waitlist.service.js";
 import { mountEquipmentWaitlistRoutes } from "./equipment-waitlist.js";
 import { EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS } from "../lib/equipment-replay-idempotency.js";
 import { equipmentReplayIdempotency } from "../middleware/equipment-replay-idempotency.js";
@@ -52,7 +53,10 @@ import { postEquipmentImportHandler } from "./equipment/handlers/post-equipment-
 import { postEquipmentBulkDeleteHandler } from "./equipment/handlers/post-equipment-bulk-delete.js";
 import { postEquipmentCreateHandler } from "./equipment/handlers/post-equipment-create.js";
 import { patchEquipmentHandler } from "./equipment/handlers/patch-equipment.js";
-import type { EquipmentPreviousState } from "./equipment/equipment-undo-tokens.js";
+import {
+  insertEquipmentUndoToken,
+  snapshotEquipmentState,
+} from "./equipment/equipment-undo-tokens.js";
 
 const EQUIPMENT_STATUS_VALUES = [
   "ok",
@@ -146,6 +150,11 @@ export const equipmentReturnBodySchema = z.object({
   plugInDeadlineMinutes: z.number().int().min(1).max(PLUG_IN_DEADLINE_MAX_MINUTES).optional(),
 }).strict();
 
+/** Optional body for POST /:id/toggle — NFC quick custody flip. */
+const equipmentToggleBodySchema = z.object({
+  isPluggedIn: z.boolean().optional(),
+}).strict();
+
 const revertSchema = z.object({
   undoToken: z.string().min(1, "undoToken is required"),
 });
@@ -207,64 +216,14 @@ const upload = multer({
 
 const router = Router();
 
-const _parsedUndoTtl = parseInt(process.env.UNDO_TTL_MS ?? "", 10);
-const UNDO_TTL_MS = Number.isFinite(_parsedUndoTtl) && _parsedUndoTtl > 0 ? _parsedUndoTtl : 90_000;
 const FIELD_MAX_LENGTH = 500;
 
 type EquipmentRow = typeof equipment.$inferSelect;
-
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export async function cleanExpiredUndoTokens(): Promise<void> {
   try {
     await db.delete(undoTokens).where(lt(undoTokens.expiresAt, new Date()));
   } catch {
-  }
-}
-
-async function insertUndoToken(
-  tx: Tx,
-  params: {
-    clinicId: string;
-    equipmentId: string;
-    actorId: string;
-    scanLogId: string;
-    previousState: EquipmentPreviousState;
-  }
-): Promise<string> {
-  const tokenId = randomUUID();
-  const expiresAt = new Date(Date.now() + UNDO_TTL_MS);
-  await tx.insert(undoTokens).values({
-    id: tokenId,
-    clinicId: params.clinicId,
-    equipmentId: params.equipmentId,
-    actorId: params.actorId,
-    scanLogId: params.scanLogId,
-    previousState: JSON.stringify(params.previousState),
-    expiresAt,
-  });
-  return tokenId;
-}
-
-function snapshotState(row: EquipmentRow): EquipmentPreviousState {
-  return {
-    status: row.status,
-    lastSeen: row.lastSeen,
-    lastStatus: row.lastStatus,
-    lastMaintenanceDate: row.lastMaintenanceDate,
-    lastSterilizationDate: row.lastSterilizationDate,
-    checkedOutById: row.checkedOutById,
-    checkedOutByEmail: row.checkedOutByEmail,
-    checkedOutAt: row.checkedOutAt,
-    checkedOutLocation: row.checkedOutLocation,
-  };
-}
-
-class CheckoutConflictError extends Error {
-  checkedOutByEmail: string;
-  constructor(email: string) {
-    super("CHECKOUT_CONFLICT");
-    this.checkedOutByEmail = email;
   }
 }
 
@@ -334,115 +293,16 @@ router.post("/scan", requireAuth, checkoutLimiter, requireEffectiveRole("student
   try {
     const clinicId = req.clinicId!;
     const { equipmentId } = req.body as z.infer<typeof quickScanBodySchema>;
-    const now = new Date();
 
-    // Object ref avoids TypeScript narrowing `action` to its initial literal
-    // through control flow analysis across the async transaction callback.
-    const scan = { action: "checkout" as "checkout" | "return" | "blocked" };
-    let updatedEquipment: EquipmentRow | null = null;
-    let scanLogId = "";
-    let undoToken = "";
-
-    await db.transaction(async (tx) => {
-      const [existing] = await tx
-        .select()
-        .from(equipment)
-        .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, equipmentId), isNull(equipment.deletedAt)))
-        .limit(1);
-
-      if (!existing) return;
-
-      if (existing.checkedOutById && existing.checkedOutById !== req.authUser!.id) {
-        scan.action = "blocked";
-        updatedEquipment = existing;
-        return;
-      }
-
-      if (!existing.checkedOutById) {
-        scan.action = "checkout";
-        const [updatedRow] = await tx
-          .update(equipment)
-          .set({
-            checkedOutById: req.authUser!.id,
-            checkedOutByEmail: req.authUser!.email,
-            checkedOutAt: now,
-            checkedOutLocation: null,
-            lastSeen: now,
-            lastStatus: existing.status,
-          })
-          .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, equipmentId)))
-          .returning();
-        updatedEquipment = updatedRow;
-        const logId = randomUUID();
-        await tx.insert(scanLogs).values({
-          id: logId,
-          clinicId,
-          equipmentId,
-          userId: req.authUser!.id,
-          userEmail: req.authUser!.email,
-          status: existing.status,
-          note: "Quick scan — checked out",
-          timestamp: now,
-        });
-        undoToken = await insertUndoToken(tx, {
-          clinicId,
-          equipmentId,
-          actorId: req.authUser!.id,
-          scanLogId: logId,
-          previousState: snapshotState(existing),
-        });
-        scanLogId = logId;
-      } else {
-        scan.action = "return";
-        const [updatedRow] = await tx
-          .update(equipment)
-          .set({
-            checkedOutById: null,
-            checkedOutByEmail: null,
-            checkedOutAt: null,
-            checkedOutLocation: null,
-            status: "ok",
-            lastSeen: now,
-            lastStatus: "ok",
-          })
-          .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, equipmentId)))
-          .returning();
-        updatedEquipment = updatedRow;
-        const logId = randomUUID();
-        await tx.insert(scanLogs).values({
-          id: logId,
-          clinicId,
-          equipmentId,
-          userId: req.authUser!.id,
-          userEmail: req.authUser!.email,
-          status: "ok",
-          note: "Quick scan — returned",
-          timestamp: now,
-        });
-        undoToken = await insertUndoToken(tx, {
-          clinicId,
-          equipmentId,
-          actorId: req.authUser!.id,
-          scanLogId: logId,
-          previousState: snapshotState(existing),
-        });
-        await tx.insert(equipmentReturns).values({
-          id: randomUUID(),
-          clinicId,
-          equipmentId,
-          returnedById: req.authUser!.id,
-          returnedByEmail: req.authUser!.email,
-          returnedAt: now,
-          isPluggedIn: true,
-          plugInDeadlineMinutes: 30,
-          plugInAlertSentAt: null,
-          chargeAlertJobId: null,
-        });
-        scanLogId = logId;
-      }
+    const result = await quickScanEquipmentCustody({
+      clinicId,
+      equipmentId,
+      actor: { id: req.authUser!.id, email: req.authUser!.email },
+      actorRole: resolveAuditActorRole(req) ?? undefined,
+      isPluggedIn: true,
     });
 
-    if (!updatedEquipment) {
+    if (result.kind === "not_found") {
       return res.status(404).json(
         apiError({
           code: "NOT_FOUND",
@@ -453,8 +313,7 @@ router.post("/scan", requireAuth, checkoutLimiter, requireEffectiveRole("student
       );
     }
 
-    if (scan.action === "blocked") {
-      const held = updatedEquipment as EquipmentRow;
+    if (result.kind === "blocked") {
       return res.status(409).json({
         ...apiError({
           code: "CONFLICT",
@@ -462,27 +321,40 @@ router.post("/scan", requireAuth, checkoutLimiter, requireEffectiveRole("student
           message: "Equipment is currently checked out by another user",
           requestId,
         }),
-        checkedOutByEmail: held.checkedOutByEmail,
+        checkedOutByEmail: result.checkedOutByEmail,
       });
     }
 
-    const u = updatedEquipment as EquipmentRow;
-
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
-      clinicId,
-      actionType: scan.action === "checkout" ? "equipment_checked_out" : "equipment_returned",
-      performedBy: req.authUser!.id,
-      performedByEmail: req.authUser!.email,
-      targetId: equipmentId,
-      targetType: "equipment",
-      metadata: { name: u.name, via: "quick_scan" },
-    });
-
     invalidateAnalyticsCache(clinicId);
     trackSyncSuccess();
-    res.json({ equipment: updatedEquipment, action: scan.action, scanLogId, undoToken });
+    res.json({
+      equipment: result.equipment,
+      action: result.kind,
+      scanLogId: result.scanLogId,
+      undoToken: result.undoToken,
+    });
   } catch (err) {
+    if (err instanceof CheckoutConflictError) {
+      return res.status(409).json({
+        ...apiError({
+          code: "CONFLICT",
+          reason: "EQUIPMENT_ALREADY_CHECKED_OUT",
+          message: "Equipment is currently checked out by another user",
+          requestId,
+        }),
+        checkedOutByEmail: err.checkedOutByEmail,
+      });
+    }
+    if (err instanceof CustodyReturnVersionConflictError) {
+      return res.status(409).json(
+        apiError({
+          code: "CONFLICT",
+          reason: "CUSTODY_RETURN_VERSION_CONFLICT",
+          message: "Concurrent update — please retry",
+          requestId,
+        }),
+      );
+    }
     console.error(err);
     trackSyncFail();
     res.status(500).json(
@@ -495,6 +367,112 @@ router.post("/scan", requireAuth, checkoutLimiter, requireEffectiveRole("student
     );
   }
 });
+
+// POST /api/equipment/:id/toggle — NFC quick custody flip (online-only client)
+router.post(
+  "/:id/toggle",
+  requireAuth,
+  checkoutLimiter,
+  requireEffectiveRole("student"),
+  validateUuid("id"),
+  validateBody(equipmentToggleBodySchema),
+  equipmentReplayIdempotency(EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.toggle),
+  async (req, res) => {
+    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    try {
+      const clinicId = req.clinicId!;
+      const { isPluggedIn } = req.body as z.infer<typeof equipmentToggleBodySchema>;
+
+      const result = await toggleEquipmentCustody({
+        clinicId,
+        equipmentId: req.params.id,
+        actor: { id: req.authUser!.id, email: req.authUser!.email },
+        isPluggedIn: isPluggedIn ?? true,
+        actorRole: resolveAuditActorRole(req) ?? undefined,
+      });
+
+      if (result.kind === "not_found") {
+        return res.status(404).json(
+          apiError({
+            code: "NOT_FOUND",
+            reason: "EQUIPMENT_NOT_FOUND",
+            message: "Equipment not found",
+            requestId,
+          }),
+        );
+      }
+
+      if (result.kind === "blocked") {
+        return res.json({
+          equipment: result.equipment,
+          action: "blocked",
+          scanLogId: "",
+          undoToken: "",
+          checkedOutByEmail: result.checkedOutByEmail,
+        });
+      }
+
+      return res.json({
+        equipment: result.equipment,
+        action: result.kind,
+        scanLogId: result.scanLogId,
+        undoToken: result.undoToken,
+      });
+    } catch (err) {
+      if (err instanceof CheckoutPreconditionError) {
+        if (err.code === "STAGING_CONFLICT") {
+          return res.status(409).json({
+            code: err.code,
+            error: "You are not the top priority claim holder",
+            queue: err.extra?.queue,
+          });
+        }
+        if (err.code === "BUNDLE_INCOMPLETE") {
+          return res.status(422).json({ code: err.code, ...err.extra });
+        }
+        return res.status(err.httpStatus).json({
+          code: err.code,
+          error:
+            typeof err.extra?.error === "string"
+              ? err.extra.error
+              : err.message,
+          ...err.extra,
+        });
+      }
+      if (err instanceof CheckoutConflictError) {
+        return res.status(409).json({
+          code: "VERSION_CONFLICT",
+          error: "Version conflict, please retry",
+          checkedOutByEmail: err.checkedOutByEmail,
+        });
+      }
+      if (err instanceof EquipmentWaitlistError) {
+        const status = err.code === "WAITLIST_RESERVATION_HELD_BY_OTHER" ? 409 : 422;
+        return apiErrorI18n(req, res, `equipmentWaitlist.${err.code}`, undefined, status);
+      }
+      if (err instanceof CustodyReturnVersionConflictError) {
+        return res.status(409).json(
+          apiError({
+            code: "CONFLICT",
+            reason: "VERSION_CONFLICT",
+            message: "Equipment was updated concurrently; please retry",
+            requestId,
+          }),
+        );
+      }
+      console.error(err);
+      trackSyncFail();
+      return res.status(500).json(
+        apiError({
+          code: "INTERNAL_ERROR",
+          reason: "EQUIPMENT_TOGGLE_FAILED",
+          message: "Toggle failed",
+          requestId,
+        }),
+      );
+    }
+  },
+);
 
 // POST /api/equipment/:id/checkout
 router.post(
@@ -514,11 +492,9 @@ router.post(
     const clientTimestamp = parseInt(req.headers["x-client-timestamp"] as string || "0", 10);
 
     let updated: EquipmentRow | null = null;
-    let reminderBaseTime: Date | null = null;
     let undoToken = "";
 
     // ── Operational State V1 pre-checks (A–F) ──────────────────────────
-    const checkoutStart = Date.now();
     let v1StageClaimId: string | null = null;
     let v1NewUsageState: "in_use" | "emergency_use" = "in_use";
 
@@ -612,207 +588,69 @@ router.post(
         return res.json({ equipment: freshEq, undoToken: "" });
       }
 
-      // D. staged + top-claim-holder
-      if (snap.usageState === "staged") {
-        const claims = await db
-          .select()
-          .from(stagingQueue)
-          .where(and(eq(stagingQueue.equipmentId, snap.id), eq(stagingQueue.clinicId, clinicId), eq(stagingQueue.status, "active")))
-          .orderBy(
-            sql`CASE ${stagingQueue.clinicalPriority} WHEN 'emergency' THEN 3 WHEN 'urgent' THEN 2 WHEN 'routine' THEN 1 ELSE 0 END DESC`,
-            stagingQueue.stagedAt,
-          );
-
-        const topClaim = claims[0];
-        if (!topClaim || topClaim.requestedById !== req.authUser!.id) {
-          return res.status(409).json({ code: "STAGING_CONFLICT", error: "You are not the top priority claim holder", queue: claims });
-        }
-
-        const allConditions = snap.assetTypeId
-          ? await db.select().from(assetTypeConditions).where(eq(assetTypeConditions.assetTypeId, snap.assetTypeId))
-          : [];
-        const condStates = snap.assetTypeId
-          ? await db.select().from(unitConditionStates).where(eq(unitConditionStates.equipmentId, snap.id))
-          : [];
-        const gateResult = computeBundleReadinessGate(snap, condStates, allConditions, new Date());
-        if (!gateResult.ok) {
-          void recordOperationalMetric({ clinicId, equipmentId: snap.id, userId: req.authUser!.id, eventType: "bundle_failed", metadata: { reason: gateResult.reason, failedConditions: gateResult.failedConditions, staleConditions: gateResult.staleConditions, unknownConditions: gateResult.unknownConditions } });
-          return res.status(422).json({ code: "BUNDLE_INCOMPLETE", ...gateResult });
-        }
-
-        v1StageClaimId = topClaim.id;
-      } else if (snap.usageState === "available") {
-        // E. available — bundle gate only when asset type defines conditions
-        if (snap.assetTypeId) {
-          const allConditions = await db
-            .select()
-            .from(assetTypeConditions)
-            .where(eq(assetTypeConditions.assetTypeId, snap.assetTypeId));
-          const condStates = await db
-            .select()
-            .from(unitConditionStates)
-            .where(eq(unitConditionStates.equipmentId, snap.id));
-          const gateResult = computeBundleReadinessGate(snap, condStates, allConditions, new Date());
-          if (!gateResult.ok) {
-            void recordOperationalMetric({ clinicId, equipmentId: snap.id, userId: req.authUser!.id, eventType: "bundle_failed", metadata: { reason: gateResult.reason, failedConditions: gateResult.failedConditions, staleConditions: gateResult.staleConditions, unknownConditions: gateResult.unknownConditions } });
-            return res.status(422).json({ code: "BUNDLE_INCOMPLETE", ...gateResult });
+      // D–F. standard checkout pre-checks (via shared service)
+      try {
+        const preCheck = await evaluateCheckoutV1Preconditions(
+          clinicId,
+          req.params.id,
+          req.authUser!.id,
+          snap,
+        );
+        v1StageClaimId = preCheck.v1StageClaimId;
+        v1NewUsageState = preCheck.v1NewUsageState;
+      } catch (err) {
+        if (err instanceof CheckoutPreconditionError) {
+          if (err.code === "STAGING_CONFLICT") {
+            return res.status(409).json({
+              code: err.code,
+              error: "You are not the top priority claim holder",
+              queue: err.extra?.queue,
+            });
           }
-        } else if (!["returned", "docked"].includes(snap.custodyState)) {
-          return res.status(422).json({
-            code: "EQUIPMENT_UNAVAILABLE",
-            error: `Equipment custody state ${snap.custodyState} blocks checkout`,
-          });
+          if (err.code === "BUNDLE_INCOMPLETE") {
+            return res.status(422).json({ code: err.code, ...err.extra });
+          }
+          if (err.code === "EQUIPMENT_UNAVAILABLE") {
+            return res.status(422).json({
+              code: err.code,
+              error:
+                typeof err.extra?.error === "string"
+                  ? err.extra.error
+                  : "Equipment unavailable",
+            });
+          }
         }
-      } else {
-        // F. any other usageState
-        return res.status(422).json({ code: "EQUIPMENT_UNAVAILABLE", error: `Equipment usage state ${snap.usageState} blocks checkout` });
+        throw err;
       }
     }
 
     // ─────────────────────────────────────────────────────────────────
 
-    const preCheckoutNotifiedUserId = await getActiveNotifiedUserId(clinicId, req.params.id);
-    if (
-      !isEmergency &&
-      preCheckoutNotifiedUserId &&
-      preCheckoutNotifiedUserId !== req.authUser!.id
-    ) {
-      return apiErrorI18n(
-        req,
-        res,
-        "equipmentWaitlist.WAITLIST_RESERVATION_HELD_BY_OTHER",
-        undefined,
-        409,
-      );
+    if (!isEmergency) {
+      try {
+        await assertWaitlistCheckoutAllowed(clinicId, req.params.id, req.authUser!.id);
+      } catch (err) {
+        if (err instanceof EquipmentWaitlistError) {
+          const status = err.code === "WAITLIST_RESERVATION_HELD_BY_OTHER" ? 409 : 422;
+          return apiErrorI18n(req, res, `equipmentWaitlist.${err.code}`, undefined, status);
+        }
+        throw err;
+      }
     }
 
-    await db.transaction(async (tx) => {
-      const [existing] = await tx
-        .select()
-        .from(equipment)
-        .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id), isNull(equipment.deletedAt)))
-        .limit(1);
-
-      if (!existing) return;
-
-      const checkoutTime = clientTimestamp ? new Date(clientTimestamp) : new Date();
-      reminderBaseTime = checkoutTime;
-
-      const checkoutSet = {
-        checkedOutById: req.authUser!.id,
-        checkedOutByEmail: req.authUser!.email,
-        checkedOutAt: checkoutTime,
-        checkedOutLocation: location ?? null,
-        lastSeen: checkoutTime,
-        lastStatus: existing.status,
-        // V1 operational state additions
-        custodyState: "checked_out" as const,
-        custodyStateSince: checkoutTime,
-        usageState: v1NewUsageState,
-        usageStateSince: checkoutTime,
-        version: sql`${equipment.version} + 1`,
-      };
-
-      let updatedRow: EquipmentRow | undefined;
-
-      if (!existing.checkedOutById) {
-        [updatedRow] = await tx
-          .update(equipment)
-          .set(checkoutSet)
-          .where(
-            and(
-              eq(equipment.clinicId, clinicId),
-              eq(equipment.id, req.params.id),
-              isNull(equipment.checkedOutById),
-            ),
-          )
-          .returning();
-
-        if (!updatedRow) {
-          const [winner] = await tx
-            .select()
-            .from(equipment)
-            .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id)))
-            .limit(1);
-          throw new CheckoutConflictError(winner?.checkedOutByEmail ?? "unknown");
-        }
-      } else {
-        const existingTimestamp = existing.checkedOutAt
-          ? new Date(existing.checkedOutAt).getTime()
-          : 0;
-        if (!clientTimestamp || clientTimestamp <= existingTimestamp) {
-          throw new CheckoutConflictError(existing.checkedOutByEmail ?? "unknown");
-        }
-
-        const overrideWhere =
-          existing.checkedOutAt == null
-            ? and(
-                eq(equipment.clinicId, clinicId),
-                eq(equipment.id, req.params.id),
-                isNull(equipment.checkedOutAt),
-              )
-            : and(
-                eq(equipment.clinicId, clinicId),
-                eq(equipment.id, req.params.id),
-                eq(equipment.checkedOutAt, existing.checkedOutAt),
-              );
-
-        [updatedRow] = await tx
-          .update(equipment)
-          .set(checkoutSet)
-          .where(overrideWhere)
-          .returning();
-
-        if (!updatedRow) {
-          throw new CheckoutConflictError(existing.checkedOutByEmail ?? "unknown");
-        }
-      }
-
-      updated = updatedRow;
-      const checkoutLogId = randomUUID();
-
-      await tx.insert(scanLogs).values({
-        id: checkoutLogId,
+    const txResult = await db.transaction(async (tx) =>
+      performEquipmentCheckout(tx, {
         clinicId,
         equipmentId: req.params.id,
-        userId: req.authUser!.id,
-        userEmail: req.authUser!.email,
-        status: existing.status,
-        note: `Checked out${location ? ` — ${location}` : ""}`,
-        timestamp: checkoutTime,
-      });
+        actor: { id: req.authUser!.id, email: req.authUser!.email },
+        location,
+        clientTimestamp,
+        v1StageClaimId,
+        v1NewUsageState,
+      }),
+    );
 
-      undoToken = await insertUndoToken(tx, {
-        clinicId,
-        equipmentId: req.params.id,
-        actorId: req.authUser!.id,
-        scanLogId: checkoutLogId,
-        previousState: snapshotState(existing),
-      });
-
-      // V1: fulfill staging claim if path D
-      if (v1StageClaimId) {
-        await tx
-          .update(stagingQueue)
-          .set({ status: "fulfilled", updatedAt: checkoutTime })
-          .where(and(eq(stagingQueue.id, v1StageClaimId), eq(stagingQueue.equipmentId, req.params.id)));
-      }
-
-      await fulfillWaitlistOnCheckout(tx, clinicId, req.params.id, req.authUser!.id, checkoutTime);
-
-      // V1: realtime event
-      await insertRealtimeDomainEvent(tx, {
-          clinicId,
-          type: "EQUIPMENT_CUSTODY_STATE_CHANGED",
-          payload: { equipmentId: req.params.id, custodyState: "checked_out", usageState: v1NewUsageState },
-        });
-    });
-
-    if (v1StageClaimId) {
-      void promoteStagingQueueNext(req.params.id, clinicId);
-    }
-
-    if (!updated) {
+    if (!txResult) {
       return res.status(404).json(
         apiError({
           code: "NOT_FOUND",
@@ -823,40 +661,21 @@ router.post(
       );
     }
 
-    const u = updated as EquipmentRow;
+    updated = txResult.updated;
+    undoToken = txResult.undoToken;
 
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
+    await finalizeCheckoutSideEffects({
       clinicId,
-      actionType: "equipment_checked_out",
-      performedBy: req.authUser!.id,
-      performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
-      targetType: "equipment",
-      metadata: { name: u.name, location: req.body?.location ?? null },
+      equipmentId: req.params.id,
+      actor: { id: req.authUser!.id, email: req.authUser!.email },
+      actorRole: resolveAuditActorRole(req) ?? undefined,
+      equipment: txResult.updated,
+      location,
+      reminderBaseTime: txResult.reminderBaseTime,
+      v1StageClaimId,
     });
 
-    invalidateAnalyticsCache(clinicId);
-    trackSyncSuccess();
     res.json({ equipment: updated, undoToken });
-
-    void scheduleSmartReturnReminder({
-      clinicId,
-      equipmentId: u.id,
-      equipmentName: u.name,
-      expectedReturnMinutes: u.expectedReturnMinutes,
-      userId: req.authUser!.id,
-      checkedOutAt: reminderBaseTime ?? u.checkedOutAt,
-    });
-
-    if (shouldSendPilotEnglishEquipmentPush() && !checkDedupe(u.id, "checkout")) {
-      sendPushToAll(clinicId, {
-        title: "Equipment Checked Out",
-        body: `${u.name} checked out${req.body?.location ? ` — ${req.body.location}` : ""}`,
-        tag: `checkout:${u.id}`,
-        url: `/equipment/${u.id}`,
-      });
-    }
   } catch (err) {
     if (err instanceof CheckoutConflictError) {
       return res.status(409).json({
@@ -903,132 +722,16 @@ router.post(
     const clientTimestamp = parseInt(req.headers["x-client-timestamp"] as string || "0", 10);
     const { isPluggedIn, plugInDeadlineMinutes } = req.body as z.infer<typeof equipmentReturnBodySchema>;
 
-    let updated: EquipmentRow | null = null;
-    let undoToken = "";
-    let alreadyReturned = false;
-    let didTransitionCustody = false;
-    let waitlistPromotedOnReturn: EquipmentWaitlistRow | null = null;
-
-    await db.transaction(async (tx) => {
-      const [existing] = await tx
-        .select()
-        .from(equipment)
-        .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id), isNull(equipment.deletedAt)))
-        .limit(1);
-
-      if (!existing) return;
-
-      if (!existing.checkedOutById) {
-        const existingTimestamp = existing.lastSeen ? new Date(existing.lastSeen).getTime() : 0;
-        if (clientTimestamp && clientTimestamp <= existingTimestamp) {
-          alreadyReturned = true;
-          updated = existing;
-          return;
-        }
-      }
-
-      const returnTime = clientTimestamp ? new Date(clientTimestamp) : new Date();
-      const transitionCustody = existing.custodyState === "checked_out";
-      if (transitionCustody) didTransitionCustody = true;
-
-      let hasActiveClaims = false;
-      if (transitionCustody) {
-        const [activeClaims] = await tx
-          .select({ count: sql<number>`count(*)` })
-          .from(stagingQueue)
-          .where(and(
-            eq(stagingQueue.equipmentId, req.params.id),
-            eq(stagingQueue.clinicId, clinicId),
-            eq(stagingQueue.status, "active"),
-          ));
-        hasActiveClaims = Number(activeClaims?.count ?? 0) > 0;
-      }
-
-      const returnSet = {
-        checkedOutById: null,
-        checkedOutByEmail: null,
-        checkedOutAt: null,
-        checkedOutLocation: null,
-        status: "ok" as const,
-        lastSeen: returnTime,
-        lastStatus: "ok" as const,
-        ...(transitionCustody
-          ? {
-              custodyState: "returned" as const,
-              custodyStateSince: returnTime,
-              readinessState: "unknown" as const,
-              readinessStateSince: returnTime,
-              usageState: hasActiveClaims ? ("staged" as const) : ("available" as const),
-              usageStateSince: returnTime,
-              version: sql`${equipment.version} + 1`,
-            }
-          : {}),
-      };
-
-      const returnWhere = transitionCustody
-        ? and(
-            eq(equipment.clinicId, clinicId),
-            eq(equipment.id, req.params.id),
-            eq(equipment.custodyState, "checked_out"),
-            eq(equipment.version, existing.version),
-          )
-        : and(eq(equipment.clinicId, clinicId), eq(equipment.id, req.params.id));
-
-      const [updatedRow] = await tx
-        .update(equipment)
-        .set(returnSet)
-        .where(returnWhere)
-        .returning();
-
-      if (!updatedRow) {
-        if (transitionCustody) {
-          throw new Error("CUSTODY_RETURN_VERSION_CONFLICT");
-        }
-        throw new Error("EQUIPMENT_RETURN_UPDATE_FAILED");
-      }
-
-      updated = updatedRow;
-      const returnLogId = randomUUID();
-
-      await tx.insert(scanLogs).values({
-        id: returnLogId,
+    const txResult = await db.transaction(async (tx) =>
+      performEquipmentReturn(tx, {
         clinicId,
         equipmentId: req.params.id,
-        userId: req.authUser!.id,
-        userEmail: req.authUser!.email,
-        status: "ok",
-        note: "Returned — available",
-        timestamp: returnTime,
-      });
+        actor: { id: req.authUser!.id, email: req.authUser!.email },
+        clientTimestamp,
+      }),
+    );
 
-      undoToken = await insertUndoToken(tx, {
-        clinicId,
-        equipmentId: req.params.id,
-        actorId: req.authUser!.id,
-        scanLogId: returnLogId,
-        previousState: snapshotState(existing),
-      });
-
-      if (transitionCustody) {
-        await insertRealtimeDomainEvent(tx, {
-          clinicId,
-          type: "EQUIPMENT_CUSTODY_STATE_CHANGED",
-          payload: { equipmentId: req.params.id, custodyState: "returned", hasActiveClaims },
-        });
-        waitlistPromotedOnReturn = await promoteNextWaitlistInTx(
-          tx,
-          clinicId,
-          req.params.id,
-          returnTime,
-        );
-      }
-    });
-
-    if (waitlistPromotedOnReturn) {
-      void notifyWaitlistPromoted(clinicId, req.params.id, waitlistPromotedOnReturn);
-    }
-
-    if (!updated) {
+    if (!txResult) {
       return res.status(404).json(
         apiError({
           code: "NOT_FOUND",
@@ -1038,84 +741,33 @@ router.post(
         }),
       );
     }
-    if (alreadyReturned) {
+
+    if (txResult.alreadyReturned) {
       return res.json({
-        equipment: updated,
+        equipment: txResult.updated,
         undoToken: "",
         returnRecord: null,
       });
     }
 
-    const u = updated as EquipmentRow;
-
-    let returnRecord: (typeof equipmentReturns.$inferSelect) | null = null;
-    if (isPluggedIn === false) {
-      const deadlineMinutes = plugInDeadlineMinutes ?? PLUG_IN_DEADLINE_DEFAULT_MINUTES;
-      const returnId = randomUUID();
-      const chargeAlertJobId = await enqueueChargeAlertJob({
-        returnId,
-        clinicId,
-        equipmentId: req.params.id,
-        plugInDeadlineMinutes: deadlineMinutes,
-      });
-      const [created] = await db
-        .insert(equipmentReturns)
-        .values({
-          id: returnId,
-          clinicId,
-          equipmentId: req.params.id,
-          returnedById: req.authUser!.id,
-          returnedByEmail: req.authUser!.email,
-          returnedAt: new Date(),
-          isPluggedIn: false,
-          plugInDeadlineMinutes: deadlineMinutes,
-          plugInAlertSentAt: null,
-          chargeAlertJobId,
-        })
-        .returning();
-      returnRecord = created ?? null;
-    }
-
-    logAudit({
-      actorRole: resolveAuditActorRole(req),
+    const returnRecord = await finalizeReturnSideEffects({
       clinicId,
-      actionType: "equipment_returned",
-      performedBy: req.authUser!.id,
-      performedByEmail: req.authUser!.email,
-      targetId: req.params.id,
-      targetType: "equipment",
-      metadata: {
-        name: u.name,
-        ...(returnRecord
-          ? {
-              returnId: returnRecord.id,
-              isPluggedIn: returnRecord.isPluggedIn,
-              plugInDeadlineMinutes: returnRecord.plugInDeadlineMinutes,
-            }
-          : {}),
-      },
+      equipmentId: req.params.id,
+      actor: { id: req.authUser!.id, email: req.authUser!.email },
+      actorRole: resolveAuditActorRole(req) ?? undefined,
+      equipment: txResult.updated,
+      isPluggedIn,
+      plugInDeadlineMinutes,
+      waitlistPromotedOnReturn: txResult.waitlistPromotedOnReturn,
     });
 
-    invalidateAnalyticsCache(clinicId);
-    trackSyncSuccess();
     res.json({
-      equipment: updated,
-      undoToken,
+      equipment: txResult.updated,
+      undoToken: txResult.undoToken,
       returnRecord,
     });
-
-    await cancelSmartReturnReminder(clinicId, u.id, req.authUser!.id);
-
-    if (shouldSendPilotEnglishEquipmentPush() && !checkDedupe(u.id, "return")) {
-      sendPushToAll(clinicId, {
-        title: "Equipment Returned",
-        body: `${u.name} has been returned and is available`,
-        tag: `return:${u.id}`,
-        url: `/equipment/${u.id}`,
-      });
-    }
   } catch (err) {
-    if (err instanceof Error && err.message === "CUSTODY_RETURN_VERSION_CONFLICT") {
+    if (err instanceof CustodyReturnVersionConflictError) {
       trackSyncFail();
       return res.status(409).json(
         apiError({
@@ -1271,12 +923,12 @@ router.post(
 
       scanLog = log;
 
-      undoToken = await insertUndoToken(tx, {
+      undoToken = await insertEquipmentUndoToken(tx, {
         clinicId,
         equipmentId: req.params.id,
         actorId: req.authUser!.id,
         scanLogId: log.id,
-        previousState: snapshotState(existing),
+        previousState: snapshotEquipmentState(existing),
       });
     });
 

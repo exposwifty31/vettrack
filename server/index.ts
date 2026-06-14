@@ -287,6 +287,25 @@ app.use("/api", sessionContextMiddleware);
 
 registerApiRoutes(app);
 
+// Apple App Site Association — enables iOS Universal Links for applinks:vettrack.uk.
+// Registered unconditionally (so dev also serves it) and BEFORE the production static/
+// catch-all block so it wins over the SPA `app.get("*")`. Must be application/json and
+// must NOT redirect — Apple's CDN fetches /.well-known/apple-app-site-association directly.
+app.get("/.well-known/apple-app-site-association", (_req, res) => {
+  res.setHeader("Content-Type", "application/json; charset=UTF-8");
+  res.setHeader("Cache-Control", "no-cache");
+  res.json({
+    applinks: {
+      details: [
+        {
+          appIDs: ["87F5G378M6.uk.vettrack.app"],
+          components: [{ "/": "/equipment/*", comment: "Equipment checkout/return deep links" }],
+        },
+      ],
+    },
+  });
+});
+
 if (process.env.NODE_ENV === "production" || process.env.PLAYWRIGHT_E2E === "true") {
   // Vite content-hashed assets: safe to cache indefinitely (new content = new URL).
   app.use(

@@ -1,6 +1,13 @@
-import { db, undoTokens } from "../../db.js";
+import { randomUUID } from "crypto";
+import { db, equipment, undoTokens } from "../../db.js";
 import { and, eq, sql } from "drizzle-orm";
 import type { AuditDbExecutor } from "../../lib/audit.js";
+
+type EquipmentRow = typeof equipment.$inferSelect;
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+const _parsedUndoTtl = parseInt(process.env.UNDO_TTL_MS ?? "", 10);
+const UNDO_TTL_MS = Number.isFinite(_parsedUndoTtl) && _parsedUndoTtl > 0 ? _parsedUndoTtl : 90_000;
 
 export interface EquipmentPreviousState {
   status: string;
@@ -15,6 +22,44 @@ export interface EquipmentPreviousState {
 }
 
 type DbExecutor = AuditDbExecutor | typeof db;
+
+export function snapshotEquipmentState(row: EquipmentRow): EquipmentPreviousState {
+  return {
+    status: row.status,
+    lastSeen: row.lastSeen,
+    lastStatus: row.lastStatus,
+    lastMaintenanceDate: row.lastMaintenanceDate,
+    lastSterilizationDate: row.lastSterilizationDate,
+    checkedOutById: row.checkedOutById,
+    checkedOutByEmail: row.checkedOutByEmail,
+    checkedOutAt: row.checkedOutAt,
+    checkedOutLocation: row.checkedOutLocation,
+  };
+}
+
+export async function insertEquipmentUndoToken(
+  tx: Tx,
+  params: {
+    clinicId: string;
+    equipmentId: string;
+    actorId: string;
+    scanLogId: string;
+    previousState: EquipmentPreviousState;
+  },
+): Promise<string> {
+  const tokenId = randomUUID();
+  const expiresAt = new Date(Date.now() + UNDO_TTL_MS);
+  await tx.insert(undoTokens).values({
+    id: tokenId,
+    clinicId: params.clinicId,
+    equipmentId: params.equipmentId,
+    actorId: params.actorId,
+    scanLogId: params.scanLogId,
+    previousState: JSON.stringify(params.previousState),
+    expiresAt,
+  });
+  return tokenId;
+}
 
 /**
  * Atomically marks an undo token consumed. Pass the transaction client from

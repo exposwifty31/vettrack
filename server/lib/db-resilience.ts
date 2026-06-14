@@ -21,7 +21,7 @@ const DEFAULT_RETRIES = Number.parseInt(process.env.DB_OP_RETRIES ?? "2", 10) ||
 const DEFAULT_BASE_DELAY_MS = Number.parseInt(process.env.DB_OP_RETRY_BASE_MS ?? "250", 10) || 250;
 const DEFAULT_MAX_DELAY_MS = Number.parseInt(process.env.DB_OP_RETRY_MAX_MS ?? "3000", 10) || 3000;
 
-export function isTransientDbError(error: unknown): boolean {
+function isTransientDbError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const candidate = error as { code?: string; errno?: string; message?: string };
   const code = candidate.code ?? candidate.errno;

@@ -67,7 +67,7 @@
     },
     "alertsDropdown": {
       "toggleAria": "Alerts ({count})",
-      "activeCount": "{count} active",
+      "activeCount": "{count} active alerts",
       "empty": "No active alerts right now.",
       "seeAll": "See all alerts"
     },
@@ -343,6 +343,20 @@
       "no_authoritative_location": "No recent scan or room assignment",
       "equipment_not_found": "Equipment record missing",
       "no_active_custodian": "No active checkout on file"
+    },
+    "citationTypes": {
+      "scan": "Scan",
+      "transfer": "Transfer / checkout",
+      "room": "Room assignment",
+      "rfid": "RFID",
+      "equipment": "Equipment record",
+      "dock": "Dock",
+      "return": "Return",
+      "custody_docked": "Docked state",
+      "custody_returned": "Returned state",
+      "custody_untracked": "Untracked",
+      "staging": "Staging queue",
+      "waitlist": "Waitlist"
     }
   },
   "equipmentIntelligence": {
@@ -456,7 +470,9 @@
     "recoveryBadgeCheckedOutLong": "Checked out long",
     "recoveryAttentionCalloutStale": "Confirm this asset is still here and in good condition.",
     "recoveryAttentionCalloutVeryStale": "This asset has not been confirmed in a long time — verify location and status.",
-    "recoveryAttentionCalloutCheckedOutLong": "Checked out for an extended period — confirm custody or return when done."
+    "recoveryAttentionCalloutCheckedOutLong": "Checked out for an extended period — confirm custody or return when done.",
+    "loadFailed": "Failed to load equipment details. Try again.",
+    "loadFailedHint": "Check your connection and pull to refresh."
   },
   "adminPilotCoverage": {
     "title": "Pilot Coverage",
@@ -566,6 +582,12 @@
     },
     "errors": {
       "loadFailed": "Failed to load alerts. Try again."
+    },
+    "details": {
+      "issue": "Active issue — not yet resolved",
+      "overdue": "{days, plural, one{1 day} other{# days}} overdue",
+      "sterilization_due": "Not sterilized in 7+ days",
+      "inactive": "No scan in 14+ days"
     }
   },
   "shiftSummary": {
@@ -881,9 +903,7 @@
     "colorThemeDescription": "Forest uses brand green; Clinical uses blue navigation with green for actions only",
     "colorThemeForest": "Forest (brand)",
     "colorThemeClinical": "Clinical",
-    "colorThemeDark": "Dark",
     "haptics": "Haptic feedback",
-    "hapticsDescription": "Vibration on scan and confirm (Android PWA)",
     "darkMode": "Dark mode",
     "darkModeDescription": "Reduces eye strain in low light",
     "displaySize": "Display size",
@@ -979,7 +999,7 @@
     "daysAgo": "{days} days ago",
     "title": "Alerts",
     "metaDescription": "Active equipment alerts by severity: critical issues, overdue maintenance, sterilization reminders, and inactive equipment.",
-    "activeCount": "{count} active",
+    "activeCount": "{count} active alerts",
     "ackLoadFailed": "Failed to load acknowledgment statuses. You can view alerts, but acknowledgment actions are temporarily disabled.",
     "browseEquipment": "Browse equipment",
     "inProgressSince": "In progress since",
@@ -1037,7 +1057,6 @@
     "methodologyNote": "Deltas are oriented so positive percentages indicate improvement (faster triage, higher integrity, stronger revenue capture)."
   },
   "myEquipmentPage": {
-    "scanQr": "Scan QR",
     "shiftSummary": "Shift summary",
     "browseEquipment": "Browse equipment",
     "recoveryBadgeStale": "Needs confirm",
@@ -1362,6 +1381,8 @@
   "roomsListPage": {
     "createRoomFailed": "Failed to create room",
     "title": "Asset radar",
+    "subtitle": "{count, plural, one{1 room} other{# rooms}} · tap to inspect",
+    "subtitleEmpty": "Room-by-room inventory",
     "emptyRooms": "No rooms yet",
     "createFirstRoomHint": "Create the first room to organize equipment by location.",
     "createRoomDialogTitle": "Create room",
@@ -1612,7 +1633,6 @@
     "pilotPulseEverConfirmed": "ever confirmed",
     "pilotPulseConfirmedToday": "today",
     "pilotPulseNeverConfirmed": "never confirmed",
-    "pilotSettings": "Pilot Settings",
     "pilotStaleThresholdLabel": "Stale threshold",
     "pilotStaleThresholdHint": "Items not confirmed within this window are marked stale.",
     "pilotStaleThresholdSaved": "Threshold updated",
@@ -3049,7 +3069,11 @@
     "setupRequired": "Asset type setup required",
     "procedureBindNotReadyWarning": "This equipment is not ready for deployment — continue anyway?",
     "procedureBound": "Equipment bound to hospitalization",
-    "procedureReleased": "Equipment released from procedure"
+    "procedureReleased": "Equipment released from procedure",
+    "bundleGateReason": {
+      "CUSTODY_CHAIN_BROKEN": "Custody chain broken — equipment untracked",
+      "CONDITIONS_NOT_MET": "Deployment conditions not met"
+    }
   },
   "equipmentNfc": {
     "toggleCheckedOut": "{name} checked out",
@@ -3062,7 +3086,17 @@
     "writeSuccess": "NFC tag programmed",
     "writeFailed": "Could not write NFC tag",
     "writeUnsupported": "NFC write is not supported on this device",
-    "writeTag": "Write NFC checkout tag"
+    "writeTag": "Write NFC checkout tag",
+    "alreadyToggledRecently": "Already toggled recently — please wait a moment.",
+    "toggling": "Toggling {{name}}…"
+  },
+  "nfcEntry": {
+    "openingEquipment": "Opening equipment…",
+    "signInFirst": "Sign in first, then re-scan the tag."
+  },
+  "staleCheckout": {
+    "pushTitle": "Equipment still checked out",
+    "pushBody": "This device has been checked out a while. If you're done, please return it."
   },
   "semiDock": {
     "pushTitle": "Device detected in home room",

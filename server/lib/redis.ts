@@ -318,7 +318,7 @@ export async function cacheDel(key: string): Promise<void> {
   }
 }
 
-export function assertSafeRedisCommand(command: string): void {
+function assertSafeRedisCommand(command: string): void {
   const upper = command.trim().toUpperCase();
   if (!ALLOWED_REDIS_COMMANDS.has(upper)) {
     throw new Error(`Redis command not allowed: ${upper}`);
@@ -344,7 +344,7 @@ function assertSafeRedisCommandArgs(command: string, args: (string | number)[]):
   }
 }
 
-export async function runRedisCommand(command: string, ...args: (string | number)[]): Promise<unknown> {
+async function runRedisCommand(command: string, ...args: (string | number)[]): Promise<unknown> {
   const r = await getRedis();
   if (!r) {
     recordRedisFallback("runRedisCommand");
@@ -363,7 +363,7 @@ export async function runRedisCommand(command: string, ...args: (string | number
   }
 }
 
-export async function scanKeys(matchPattern: string, count = 100): Promise<string[]> {
+async function scanKeys(matchPattern: string, count = 100): Promise<string[]> {
   const r = await getRedis();
   if (!r) {
     recordRedisFallback("scanKeys");
@@ -431,7 +431,7 @@ export async function safeRedisSetex(key: string, ttlSec: number, value: string)
   }
 }
 
-export async function safeRedisDel(key: string): Promise<void> {
+async function safeRedisDel(key: string): Promise<void> {
   return cacheDel(key);
 }
 
@@ -461,7 +461,7 @@ export async function incrementRateLimit(
   }
 }
 
-export async function cacheGetOrSet<T>(
+async function cacheGetOrSet<T>(
   key: string,
   ttlSec: number,
   fetcher: () => Promise<T>,
@@ -511,7 +511,7 @@ export async function cacheGetOrSet<T>(
   return value;
 }
 
-export async function redisHealthCheck(): Promise<boolean> {
+async function redisHealthCheck(): Promise<boolean> {
   const r = await getRedis();
   if (!r) {
     recordRedisFallback("redisHealthCheck");

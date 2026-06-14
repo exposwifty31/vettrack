@@ -11,8 +11,8 @@ import { safeStorageGetItem, safeStorageSetItem } from "@/lib/safe-browser";
 export type Density = "compact" | "comfortable";
 export type TimeFormat = "12h" | "24h";
 export type DateFormat = "MM/DD/YYYY" | "DD/MM/YYYY" | "YYYY-MM-DD";
-/** Forest = brand green; Clinical = 60/30/10; Dark = clinical dark palette. */
-export type ColorTheme = "forest" | "clinical" | "dark";
+/** Forest = brand green; Clinical = 60/30/10. */
+export type ColorTheme = "forest" | "clinical";
 
 export interface Settings {
   locale: Locale;
@@ -60,11 +60,7 @@ function loadSettings(): Settings {
       delete parsed.language;
     }
     if (!isSupportedLocale(parsed.locale)) parsed.locale = getStoredLocale();
-    if (
-      parsed.colorTheme !== "forest" &&
-      parsed.colorTheme !== "clinical" &&
-      parsed.colorTheme !== "dark"
-    ) {
+    if (parsed.colorTheme !== "forest" && parsed.colorTheme !== "clinical") {
       parsed.colorTheme = "clinical";
     }
     if (typeof parsed.hapticsEnabled !== "boolean") {
@@ -87,7 +83,7 @@ function applySettings(settings: Settings) {
   const html = document.documentElement;
   const list = html?.classList;
   if (!list) return;
-  const useDarkClass = settings.colorTheme === "dark" || settings.darkMode;
+  const useDarkClass = settings.darkMode;
   if (useDarkClass) {
     list?.add("dark");
   } else {

@@ -3,6 +3,7 @@ import { twMerge } from "tailwind-merge";
 import { formatDistanceToNow, format, isAfter, subDays } from "date-fns";
 import type { Equipment, Alert, AlertType, AlertSeverity, EquipmentStatus } from "@/types";
 import { ALERT_SEVERITY } from "@/types";
+import { formatAlertDetail } from "@/lib/alert-display";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -84,7 +85,7 @@ export function computeAlerts(equipment: Equipment[]): Alert[] {
         severity: ALERT_SEVERITY["issue"],
         equipmentId: eq.id,
         equipmentName: eq.name,
-        detail: "Reported issue not resolved",
+        detail: formatAlertDetail("issue"),
       });
     } else if (isOverdue(eq)) {
       const dueDate = new Date(eq.lastMaintenanceDate!);
@@ -97,7 +98,7 @@ export function computeAlerts(equipment: Equipment[]): Alert[] {
         severity: ALERT_SEVERITY["overdue"],
         equipmentId: eq.id,
         equipmentName: eq.name,
-        detail: `${daysOverdue} day${daysOverdue !== 1 ? "s" : ""} overdue`,
+        detail: formatAlertDetail("overdue", daysOverdue),
         daysOverdue,
       });
     } else if (isSterilizationDue(eq)) {
@@ -106,7 +107,7 @@ export function computeAlerts(equipment: Equipment[]): Alert[] {
         severity: ALERT_SEVERITY["sterilization_due"],
         equipmentId: eq.id,
         equipmentName: eq.name,
-        detail: "Not sterilized in 7+ days",
+        detail: formatAlertDetail("sterilization_due"),
       });
     } else if (isInactive(eq)) {
       alerts.push({
@@ -114,7 +115,7 @@ export function computeAlerts(equipment: Equipment[]): Alert[] {
         severity: ALERT_SEVERITY["inactive"],
         equipmentId: eq.id,
         equipmentName: eq.name,
-        detail: "No scan in 14+ days",
+        detail: formatAlertDetail("inactive"),
       });
     }
   }

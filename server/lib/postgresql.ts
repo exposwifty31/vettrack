@@ -2,13 +2,6 @@
  * PostgreSQL configuration for VetTrack.
  * Connection string: set `DATABASE_URL`, or optionally `POSTGRES_URL` (used if set).
  */
-export const POSTGRESQL_DIALECT = "postgresql" as const;
-
-/** Engine identifier + helpers for imports that should reference PostgreSQL explicitly. */
-export const POSTGRESQL = {
-  dialect: POSTGRESQL_DIALECT,
-} as const;
-
 export function isPostgresqlConfigured(): boolean {
   return Boolean(
     process.env.POSTGRES_URL?.trim() || process.env.DATABASE_URL?.trim(),

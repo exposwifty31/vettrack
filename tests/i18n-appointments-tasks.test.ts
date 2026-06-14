@@ -96,7 +96,7 @@ describe("Phase 6 PR 6.8 — empty-state and status-hint keys resolve", () => {
   it("statusHint Hebrew + interpolation", () => {
     expect(heDict.appointmentsPage.statusHint.startNow).toBe("המשימה הבאה מוכנה — התחל עכשיו");
     expect(heDict.appointmentsPage.statusHint.overloaded).toBe("עומס גבוה — סקור משימות דחופות");
-    expect(heDict.appointmentsPage.statusHint.pickFromQueue).toBe("התור פתוח — בחר משימה");
+    expect(heDict.appointmentsPage.statusHint.pickFromQueue).toBe("משימות ממתינות לטיפול");
     // The accessor `t.appointmentsPage.statusHint.overdue(count)` should
     // render English "{count} overdue — review now" or Hebrew equivalent.
     // (Locale is set per test process, asserting raw template here.)

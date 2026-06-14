@@ -35,10 +35,8 @@ import {
   Loader2,
   CheckCircle2,
   ClipboardCheck,
-  QrCode,
 } from "lucide-react";
 import { toast } from "sonner";
-import { QrScanner } from "@/components/qr-scanner";
 import { ReturnPlugDialog } from "@/components/return-plug-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { haptics } from "@/lib/haptics";
@@ -63,7 +61,6 @@ export default function MyEquipmentPage() {
   const queryClient = useQueryClient();
   const [returningAll, setReturningAll] = useState(false);
   const [shiftSummaryOpen, setShiftSummaryOpen] = useState(false);
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [pendingReturnEquipmentId, setPendingReturnEquipmentId] = useState<string | null>(null);
 
   const { data: items, isLoading, isError, refetch } = useQuery({
@@ -137,16 +134,6 @@ export default function MyEquipmentPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-xs h-11 bg-card border-border/60 text-muted-foreground hover:text-foreground"
-              onClick={() => setIsScannerOpen(true)}
-              data-testid="btn-scan-qr-my-eq"
-            >
-              <QrCode className="w-3.5 h-3.5" />
-              {t.myEquipmentPage.scanQr}
-            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -325,9 +312,6 @@ export default function MyEquipmentPage() {
         onClose={() => setShiftSummaryOpen(false)}
       />
 
-      {isScannerOpen && (
-        <QrScanner onClose={() => setIsScannerOpen(false)} />
-      )}
       <ReturnPlugDialog
         open={Boolean(pendingReturnEquipmentId)}
         onOpenChange={(open) => {

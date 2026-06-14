@@ -39,3 +39,16 @@ export function formatCitationObservedAt(iso: string): string {
     return iso;
   }
 }
+
+/** Maps a bundleGate reason code to localized user-facing copy. */
+export function formatBundleGateReason(reason: string | null | undefined): string {
+  if (!reason) return "";
+  const reasons = t.operationalState.bundleGateReason as Record<string, string>;
+  return reasons[reason] ?? reason.replace(/_/g, " ").toLowerCase();
+}
+
+/** Maps a citation type token to a localized label. */
+export function formatCitationType(type: string): string {
+  const types = t.equipmentTruth.citationTypes as Record<string, string>;
+  return types[type] ?? type;
+}

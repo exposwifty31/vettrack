@@ -9,7 +9,8 @@ export type AccessDeniedReason =
   | "INSUFFICIENT_ROLE"
   | "ACCOUNT_PENDING_APPROVAL"
   | "ACCOUNT_BLOCKED"
-  | "ACCOUNT_DELETED";
+  | "ACCOUNT_DELETED"
+  | "AUTH_PROFILE_UNAVAILABLE";
 
 type AccessDeniedMetricMap = Record<AccessDeniedReason, number>;
 
@@ -31,6 +32,7 @@ const accessDeniedMetrics: AccessDeniedMetricMap = {
   ACCOUNT_PENDING_APPROVAL: 0,
   ACCOUNT_BLOCKED: 0,
   ACCOUNT_DELETED: 0,
+  AUTH_PROFILE_UNAVAILABLE: 0,
 };
 
 const emptyAccessDeniedMetrics = (): AccessDeniedMetricMap => ({
@@ -42,6 +44,7 @@ const emptyAccessDeniedMetrics = (): AccessDeniedMetricMap => ({
   ACCOUNT_PENDING_APPROVAL: 0,
   ACCOUNT_BLOCKED: 0,
   ACCOUNT_DELETED: 0,
+  AUTH_PROFILE_UNAVAILABLE: 0,
 });
 
 const minuteBuckets = new Map<number, AccessDeniedMetricMap>();
@@ -61,20 +64,6 @@ function pruneMinuteBuckets(nowMs = Date.now()): void {
 }
 
 export function buildAccessDeniedBody(reason: AccessDeniedReason, message: string, requestId?: string): {
-  code: "ACCESS_DENIED";
-  error: "ACCESS_DENIED";
-  reason: AccessDeniedReason;
-  message: string;
-  requestId?: string;
-} {
-  return buildAccessDeniedBodyWithRequestId(reason, message, requestId);
-}
-
-export function buildAccessDeniedBodyWithRequestId(
-  reason: AccessDeniedReason,
-  message: string,
-  requestId?: string,
-): {
   code: "ACCESS_DENIED";
   error: "ACCESS_DENIED";
   reason: AccessDeniedReason;

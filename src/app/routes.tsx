@@ -12,7 +12,6 @@ const CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
 // --- Always-available pages ---
 const HomePage = lazy(() => import("@/pages/home"));
-const ShiftRecapPage = lazy(() => import("@/pages/shift-recap"));
 const LandingPage = lazy(() => import("@/pages/landing"));
 const SignUpPage = lazy(() => import("@/pages/signup"));
 const SignInPage = lazy(() => import("@/pages/signin"));
@@ -91,7 +90,6 @@ export function AppRoutes() {
 
         {/* --- Today & shifts --- */}
         <Route path="/home"><AuthGuard><HomePage /></AuthGuard></Route>
-        <Route path="/recap"><AuthGuard><ShiftRecapPage /></AuthGuard></Route>
 
         {/* --- Equipment & board (canonical: /equipment, /equipment/tasks, /equipment/board) --- */}
         <Route path="/equipment"><AuthGuard><EquipmentPage /></AuthGuard></Route>

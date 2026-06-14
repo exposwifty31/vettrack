@@ -125,7 +125,7 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: "node",
       setupFiles: ["./tests/vitest-setup.ts"],
-      include: ["tests/**/*.test.{ts,js}", "src/**/*.test.{tsx,ts}"],
+      include: ["tests/**/*.test.{ts,tsx,js}", "src/**/*.test.{tsx,ts}"],
       exclude: [
         "**/node_modules/**",
         "tests/restock.service.test.ts",

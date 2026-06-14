@@ -4,7 +4,7 @@ import { createHash } from "crypto";
  * Stable hash of the request body for idempotent replay detection (dispense and similar).
  * Shared by `container-dispense-idempotency` middleware and the dispense route transaction.
  */
-export function stableStringify(value: unknown): string {
+function stableStringify(value: unknown): string {
   if (value === null || typeof value !== "object") {
     return JSON.stringify(value);
   }

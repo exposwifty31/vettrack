@@ -101,6 +101,7 @@ async function main(): Promise<void> {
       checkedOutByEmail: null,
       checkedOutAt: null,
       checkedOutLocation: null,
+      usuallyFoundHere: "מחלקה א׳ — ארון הציוד",
     })
     .onConflictDoNothing();
 

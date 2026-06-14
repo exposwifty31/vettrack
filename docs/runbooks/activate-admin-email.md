@@ -1,6 +1,6 @@
 # Runbook — Activate admin by email
 
-Use when a user sees **“החשבון ממתין לאישור הנהלת ביה״ח”** / account pending approval on production.
+Use when a user sees **"החשבון ממתין לאישור הנהלת ביה״ח"** / account pending approval on production.
 
 ## Option A — `ADMIN_EMAILS` (recommended for owners)
 
@@ -11,7 +11,8 @@ Use when a user sees **“החשבון ממתין לאישור הנהלת ביה
    ```
    If other admins already exist, append: `existing@clinic.com,danerez5@gmail.com`
 3. **Redeploy** the service (variable change triggers deploy).
-4. User **signs out** and signs in again — auth promotes them to `admin` + `active` on login.
+4. **New users only:** after redeploy, the user's **first sign-in** creates their `vt_users` row with `role: admin` and `status: active` (insert-time promotion).
+5. **Existing users:** adding an email to `ADMIN_EMAILS` does **not** promote on login — use Option B or Option C below.
 
 ## Option B — Direct DB promote (immediate, no redeploy)
 
@@ -30,6 +31,19 @@ Then sign out / sign in on [vettrack.uk](https://vettrack.uk).
 
 An active **admin** can approve in the app: **Admin** → **Pending users** → Approve.
 
+## Demotion
+
+To demote an env-admin:
+
+1. Remove their email from **`ADMIN_EMAILS`** and redeploy.
+2. Demote in the admin UI or via DB/script.
+
+Order matters — removing from `ADMIN_EMAILS` first prevents insert-time promotion for new accounts; demotion in the DB/UI removes existing admin access.
+
+## Dev bypass
+
+`ADMIN_EMAILS` does **not** affect dev-bypass auth (`DEV_USER` in `server/middleware/auth.ts` when `CLERK_SECRET_KEY` is unset).
+
 ## Verify
 
 ```bash
@@ -37,3 +51,5 @@ curl -sS https://vettrack.uk/api/healthz
 ```
 
 User should reach the dashboard after sign-in (not the pending screen).
+
+See also: `docs/architecture/admin-emails-policy.md`

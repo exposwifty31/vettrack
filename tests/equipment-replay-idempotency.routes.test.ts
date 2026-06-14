@@ -11,6 +11,8 @@ describe("equipment routes — replay idempotency wiring", () => {
     expect(routeSource).toContain("equipmentReplayIdempotency");
     expect(routeSource).toContain("EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.checkout");
     expect(routeSource).toContain("EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.return");
+    expect(routeSource).toContain("EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.toggle");
+    expect(routeSource).toContain('"/:id/toggle"');
     expect(routeSource).toContain("EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.scan");
     expect(routeSource).toContain("EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.seen");
     expect(routeSource).toContain("EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS.create");

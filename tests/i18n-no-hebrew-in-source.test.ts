@@ -56,7 +56,6 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "src/pages/admin.tsx",
   "src/pages/analytics.tsx",
   "src/pages/display.tsx",
-  "src/pages/equipment-detail.tsx",
   "src/pages/equipment-list.tsx",
   "src/pages/new-equipment.tsx",
   "src/pages/not-found.tsx",

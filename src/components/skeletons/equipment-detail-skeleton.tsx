@@ -1,9 +1,20 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Layout } from "@/components/layout";
+import { Loader2 } from "lucide-react";
 
-export function EquipmentDetailSkeleton() {
+export function EquipmentDetailSkeleton({ statusLabel }: { statusLabel?: string }) {
   return (
     <Layout>
+      {statusLabel ? (
+        <div
+          className="mb-4 flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground"
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
+          <span>{statusLabel}</span>
+        </div>
+      ) : null}
       <div className="flex flex-col gap-4 pb-24">
         {/* Back button + title */}
         <div className="flex items-center gap-3">

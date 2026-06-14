@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { extractEquipmentId } from "@/lib/equipment-id";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
@@ -83,24 +84,12 @@ function trackSupportsTorch(track: MediaStreamTrack): boolean {
   return caps?.torch !== undefined;
 }
 
-export function extractEquipmentId(raw: string): string | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  try {
-    const url = new URL(trimmed);
-    const parts = url.pathname.split("/");
-    const idx = parts.indexOf("equipment");
-    if (idx >= 0 && parts[idx + 1]) {
-      return parts[idx + 1];
-    }
-    return null;
-  } catch {
-    if (!trimmed.includes(" ") && trimmed.length > 0) {
-      return trimmed;
-    }
-    return null;
-  }
-}
+// Single source of truth lives in @/lib/equipment-id (pure, zero heavy imports) so the
+// dynamically-imported deep-link-router chunk never drags html5-qrcode into native startup.
+// Imported above for this file's own scanner uses; re-exported here so existing importers of
+// "@/components/qr-scanner" (nfc-foreground-scan)
+// keep resolving the symbol.
+export { extractEquipmentId };
 
 // Stop all active camera tracks by pulling them from the existing video element.
 // Avoids requesting a new getUserMedia stream just to tear down the old one.

@@ -81,6 +81,9 @@ function AppBootstrap() {
       void primeNfcSupportCache().catch(() => {
         // NFC probe is best-effort; QR/manual entry remains available.
       });
+      // Universal Link / Control / quick-action deep links converge here. Dynamic import keeps
+      // the router (and its @capacitor/app dep) out of the web bundle.
+      void import("@/lib/deep-link-router").then((m) => m.initDeepLinkRouter());
       return;
     }
     if (!isServiceWorkerSupported()) return;

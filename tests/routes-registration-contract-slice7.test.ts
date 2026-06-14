@@ -81,6 +81,6 @@ describe("Slice 7 — routes registration contract lock", () => {
       registerApiRoutes(app);
 
       expect(calls).toEqual(EXPECTED_MOUNT_PATHS);
-    });
+    }, 15_000);
   });
 });

@@ -9,7 +9,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DeployabilityBadge } from "@/components/equipment/DeployabilityBadge";
 import { EquipmentConfirmInRoomSheet } from "@/components/equipment/EquipmentConfirmInRoomSheet";
 import {
+  formatBundleGateReason,
   formatCitationObservedAt,
+  formatCitationType,
   formatTruthLocationSummary,
   formatTruthUnknown,
 } from "@/lib/equipment-truth-display";
@@ -151,7 +153,7 @@ export function EquipmentTruthCard({
 
           {gateReason && (
             <p className="text-xs text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/50 rounded-lg px-3 py-2 border border-amber-200/80">
-              {gateReason}
+              {formatBundleGateReason(gateReason)}
             </p>
           )}
 
@@ -206,7 +208,7 @@ export function EquipmentTruthCard({
                   {truth.citations.map((c) => (
                     <li key={`${c.type}:${c.id}`} className="text-xs flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                       <Badge variant="outline" className="text-[10px] shrink-0">
-                        {c.type}
+                        {formatCitationType(c.type)}
                       </Badge>
                       <span className="font-medium">{c.label}</span>
                       <span className="text-muted-foreground">

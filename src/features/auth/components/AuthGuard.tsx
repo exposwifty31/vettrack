@@ -1,8 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Redirect, useLocation } from "wouter";
+import { Redirect, useLocation, useSearch } from "wouter";
 import { Loader2, ShieldAlert, Clock } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { type AccessDeniedReason, useAuth } from "@/hooks/use-auth";
+import { markNfcSignInToastShown, wasNfcSignInToastShownRecently } from "@/lib/nfc-equipment-toggle";
 import { t } from "@/lib/i18n";
 
 /**
@@ -23,6 +25,7 @@ function buildDevTimeoutDiagnostics(): string[] {
 export function AuthGuard({ children }: { children: ReactNode }) {
   const [loadTimedOut, setLoadTimedOut] = useState(false);
   const [location, navigate] = useLocation();
+  const search = useSearch();
   const { isLoaded, isSignedIn, status, accessDeniedReason, signOut, refreshAuth } = useAuth();
 
   const accessDeniedReasonText: Record<Exclude<AccessDeniedReason, null>, string> = {
@@ -47,11 +50,33 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(timer);
   }, [isLoaded]);
 
+  // Logged-out NFC scan (B1): the deep-link router always navigates to
+  // /equipment/<id>?nfcAction=toggle&nfcTs=…; once auth resolves to logged-out we explain why the
+  // tap did nothing. The toast MUST live in an effect (not the render body) — calling toast.* during
+  // render mutates sonner's Toaster store mid-render of a different component (React warning + illegal
+  // render-phase side effect). The render-phase <Redirect to="/signin"/> below stays unchanged.
+  useEffect(() => {
+    if (!isLoaded || isSignedIn) return;
+    if (new URLSearchParams(search).get("nfcAction") !== "toggle") return;
+    if (wasNfcSignInToastShownRecently()) return; // D6: 8s window, RE-ARMS
+    markNfcSignInToastShown();
+    toast.dismiss("nfc-open");
+    toast.error(t.nfcEntry.signInFirst);
+  }, [isLoaded, isSignedIn, search]);
+
   if (!isLoaded) {
+    const isNfcEntry = new URLSearchParams(search).get("nfcAction") === "toggle";
     if (!loadTimedOut) {
       return (
-        <div className="flex h-screen items-center justify-center">
-          <Loader2 className="animate-spin" />
+        <div
+          className="flex h-screen flex-col items-center justify-center gap-3"
+          role="status"
+          aria-label={isNfcEntry ? t.nfcEntry.openingEquipment : t.common.loading}
+        >
+          <Loader2 className="animate-spin" aria-hidden="true" />
+          <p className="text-sm text-muted-foreground">
+            {isNfcEntry ? t.nfcEntry.openingEquipment : t.common.loading}
+          </p>
         </div>
       );
     }

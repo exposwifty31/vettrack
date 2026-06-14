@@ -316,15 +316,13 @@ describe("Slice 4.2 — Mobile RTL overflow fix", () => {
     expect(appointments).not.toContain("md:grid-cols-5");
   });
 
-  it("Task Controls CardContent uses flex-wrap for safe mobile wrapping", () => {
-    expect(appointments).toContain("flex flex-wrap gap-x-6 gap-y-3 items-end");
+  it("Task Controls CardContent uses responsive grid for mobile-safe layout", () => {
+    // grid-cols-1 on xs, sm:grid-cols-2 on small screens — single-column start is safer than 2
+    expect(appointments).toContain("grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 items-end");
   });
 
-  it("Date input wrapper uses min-w-40 to allow flex wrapping", () => {
-    expect(appointments).toContain("flex-1 min-w-40");
-  });
-
-  it("Date input has max-w-full to prevent overflow past card boundary", () => {
+  it("Date input wrapper uses min-w-0 and max-w-full to prevent overflow", () => {
+    expect(appointments).toContain("min-w-0");
     expect(appointments).toContain("max-w-full");
   });
 });

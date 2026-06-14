@@ -9,6 +9,11 @@ import { equipmentReturnBodySchema } from "../server/routes/equipment.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const routeSource = fs.readFileSync(path.join(__dirname, "..", "server", "routes", "equipment.ts"), "utf8");
+const custodyServiceSource = fs.readFileSync(
+  path.join(__dirname, "..", "server", "services", "equipment-custody-toggle.service.ts"),
+  "utf8",
+);
+const equipmentMutationSource = `${routeSource}\n${custodyServiceSource}`;
 const equipmentApiSource = fs.readFileSync(
   path.join(__dirname, "..", "src", "lib", "api", "equipment.ts"),
   "utf8",
@@ -31,7 +36,7 @@ describe("equipment return body schema", () => {
 
 describe("equipment return custody + charge tracking contracts", () => {
   it("rolls back when V1 custody transition cannot apply (version conflict)", () => {
-    expect(routeSource).toContain("CUSTODY_RETURN_VERSION_CONFLICT");
+    expect(equipmentMutationSource).toContain("CUSTODY_RETURN_VERSION_CONFLICT");
     expect(routeSource).toContain('reason: "VERSION_CONFLICT"');
   });
 
@@ -39,8 +44,12 @@ describe("equipment return custody + charge tracking contracts", () => {
     const returnRouteStart = routeSource.indexOf("// POST /api/equipment/:id/return");
     const returnRouteEnd = routeSource.indexOf("// POST /api/equipment/:id/seen");
     const returnRouteBody = routeSource.slice(returnRouteStart, returnRouteEnd);
-    const eventIdx = returnRouteBody.indexOf("EQUIPMENT_CUSTODY_STATE_CHANGED");
-    const transitionIdx = returnRouteBody.indexOf("if (transitionCustody)");
+    const serviceReturnBlock = custodyServiceSource.slice(
+      custodyServiceSource.indexOf("export async function performEquipmentReturn"),
+    );
+    const combined = `${returnRouteBody}\n${serviceReturnBlock}`;
+    const eventIdx = combined.indexOf("EQUIPMENT_CUSTODY_STATE_CHANGED");
+    const transitionIdx = combined.indexOf("if (transitionCustody)");
     expect(eventIdx).toBeGreaterThan(-1);
     expect(transitionIdx).toBeGreaterThan(-1);
     expect(transitionIdx).toBeLessThan(eventIdx);
@@ -56,17 +65,17 @@ describe("equipment return custody + charge tracking contracts", () => {
     const returnRouteStart = routeSource.indexOf("// POST /api/equipment/:id/return");
     const returnRouteEnd = routeSource.indexOf("// POST /api/equipment/:id/seen");
     const returnRouteBody = routeSource.slice(returnRouteStart, returnRouteEnd);
-    expect(returnRouteBody).toContain("alreadyReturned = true");
+    expect(equipmentMutationSource).toContain("alreadyReturned: true");
 
-    const branchStart = returnRouteBody.indexOf("if (alreadyReturned)");
+    const branchStart = returnRouteBody.indexOf("if (txResult.alreadyReturned)");
     expect(branchStart).toBeGreaterThan(-1);
     const afterBranch = returnRouteBody.slice(branchStart);
-    const branchEnd = afterBranch.indexOf("const u = updated");
+    const branchEnd = afterBranch.indexOf("const returnRecord = await finalizeReturnSideEffects");
     expect(branchEnd).toBeGreaterThan(-1);
     const alreadyReturnedBranch = afterBranch.slice(0, branchEnd);
 
     expect(alreadyReturnedBranch).toMatch(
-      /return res\.json\(\s*\{[\s\S]*equipment:\s*updated/,
+      /return res\.json\(\s*\{[\s\S]*equipment:\s*txResult\.updated/,
     );
     expect(alreadyReturnedBranch).toContain('undoToken: ""');
     expect(alreadyReturnedBranch).toContain("returnRecord: null");

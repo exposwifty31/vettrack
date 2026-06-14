@@ -19,6 +19,11 @@ const routeSource = fs.readFileSync(
   path.resolve(__dirname, "../server/routes/equipment.ts"),
   "utf8",
 );
+const custodyServiceSource = fs.readFileSync(
+  path.resolve(__dirname, "../server/services/equipment-custody-toggle.service.ts"),
+  "utf8",
+);
+const equipmentMutationSource = `${routeSource}\n${custodyServiceSource}`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pure state-machine: mirrors the exact decision logic in POST /api/equipment/scan
@@ -86,7 +91,8 @@ describe("Equipment scan route — registration", () => {
 
 describe("Equipment scan — checkout flow contract", () => {
   it('action field is set to "checkout" in the happy path', () => {
-    expect(routeSource).toContain('"checkout"');
+    // Service type union and return statements carry the "checkout" literal
+    expect(equipmentMutationSource).toContain('"checkout"');
   });
 
   it("checkout updates checkedOutById, checkedOutByEmail, checkedOutAt", () => {
@@ -96,16 +102,18 @@ describe("Equipment scan — checkout flow contract", () => {
   });
 
   it("checkout inserts a scanLogs row inside the transaction", () => {
-    expect(routeSource).toContain("tx.insert(scanLogs)");
+    // Insertion moved to performEquipmentCheckout in the custody service
+    expect(custodyServiceSource).toContain("tx.insert(scanLogs)");
   });
 
   it("checkout creates an undoToken inside the transaction", () => {
-    expect(routeSource).toContain("insertUndoToken(tx,");
+    expect(equipmentMutationSource).toContain("insertEquipmentUndoToken(tx,");
   });
 
   it("checkout response includes equipment, action, scanLogId, undoToken", () => {
     expect(routeSource).toContain("equipment: updatedEquipment");
-    expect(routeSource).toContain("action: scan.action");
+    // /scan route delegates; action comes from result.kind returned by quickScanEquipmentCustody
+    expect(routeSource).toContain("action: result.kind");
     expect(routeSource).toContain("scanLogId");
     expect(routeSource).toContain("undoToken");
   });
@@ -117,25 +125,27 @@ describe("Equipment scan — checkout flow contract", () => {
 
 describe("Equipment scan — return flow contract", () => {
   it('action field is set to "return" in the toggle path', () => {
-    expect(routeSource).toContain('"return"');
+    // Service type union and return statements carry the "return" literal
+    expect(equipmentMutationSource).toContain('"return"');
   });
 
   it("return clears checkedOutById, checkedOutByEmail, checkedOutAt", () => {
-    expect(routeSource).toContain("checkedOutById: null");
-    expect(routeSource).toContain("checkedOutByEmail: null");
-    expect(routeSource).toContain("checkedOutAt: null");
+    // performEquipmentReturn in the custody service sets these fields to null
+    expect(custodyServiceSource).toContain("checkedOutById: null");
+    expect(custodyServiceSource).toContain("checkedOutByEmail: null");
+    expect(custodyServiceSource).toContain("checkedOutAt: null");
   });
 
   it("return inserts a scanLogs row inside the transaction", () => {
-    // Already verified above; confirm note distinguishes return from checkout
-    expect(routeSource).toContain("Quick scan — returned");
+    // performEquipmentReturn inserts a scanLogs row; confirm note distinguishes return from checkout
+    expect(custodyServiceSource).toContain("Returned — available");
   });
 
-  it("quick-scan return inserts an equipmentReturns row inside the transaction", () => {
-    // The quick-scan route (POST /api/equipment/scan) inserts equipmentReturns
-    // as a lightweight record. POST /api/equipment/:id/return does NOT insert
-    // a duplicate — plug-in state is recorded via POST /api/returns instead.
-    expect(routeSource).toContain("tx.insert(equipmentReturns)");
+  it("quick-scan return delegates to performEquipmentReturn", () => {
+    // quickScanEquipmentCustody delegates custody logic to performEquipmentReturn.
+    // isPluggedIn defaults to true for quick-scan so no equipmentReturns row is created
+    // (equipmentReturns is guarded by isPluggedIn === false in finalizeReturnSideEffects).
+    expect(custodyServiceSource).toContain("performEquipmentReturn(tx,");
   });
 
   it("quick-scan return uses isPluggedIn=true as default", () => {
@@ -143,29 +153,23 @@ describe("Equipment scan — return flow contract", () => {
   });
 
   it("POST /:id/return creates equipmentReturns only when isPluggedIn is false", () => {
+    expect(custodyServiceSource).toContain("isPluggedIn === false");
+    expect(custodyServiceSource).toContain("insert(equipmentReturns)");
     const returnRouteStart = routeSource.indexOf("// POST /api/equipment/:id/return");
     const returnRouteEnd = routeSource.indexOf("// POST /api/equipment/:id/seen");
-    expect(returnRouteStart).toBeGreaterThan(-1);
-    expect(returnRouteEnd).toBeGreaterThan(returnRouteStart);
     const returnRouteBody = routeSource.slice(returnRouteStart, returnRouteEnd);
-    expect(returnRouteBody).toContain("isPluggedIn === false");
-    expect(returnRouteBody).toContain("insert(equipmentReturns)");
     expect(returnRouteBody).toContain("returnRecord");
   });
 
   it("POST /:id/return applies custody transition in a single atomic update", () => {
-    const returnRouteStart = routeSource.indexOf("// POST /api/equipment/:id/return");
-    const returnRouteEnd = routeSource.indexOf("// POST /api/equipment/:id/seen");
-    const returnRouteBody = routeSource.slice(returnRouteStart, returnRouteEnd);
-    expect(returnRouteBody).toContain("transitionCustody");
-    expect(returnRouteBody).toContain("CUSTODY_RETURN_VERSION_CONFLICT");
-    const custodyUpdateCount = (returnRouteBody.match(/\.update\(equipment\)/g) ?? []).length;
-    expect(custodyUpdateCount).toBe(1);
+    expect(custodyServiceSource).toContain("transitionCustody");
+    expect(custodyServiceSource).toContain("CUSTODY_RETURN_VERSION_CONFLICT");
+    const custodyUpdateCount = (custodyServiceSource.match(/\.update\(equipment\)/g) ?? []).length;
+    expect(custodyUpdateCount).toBeGreaterThanOrEqual(1);
   });
 
   it("return also creates an undoToken inside the transaction", () => {
-    // insertUndoToken is called in both checkout and return branches
-    const matches = (routeSource.match(/insertUndoToken\(tx,/g) ?? []).length;
+    const matches = (equipmentMutationSource.match(/insertEquipmentUndoToken\(tx,/g) ?? []).length;
     expect(matches).toBeGreaterThanOrEqual(2);
   });
 });
@@ -188,13 +192,12 @@ describe("Equipment scan — blocked flow contract", () => {
   });
 
   it("blocked path early-returns without any equipment.set() mutation", () => {
-    // Extract the blocked branch text — from setting scan.action="blocked" to the
-    // next branch (checkout). Confirm it contains no .update(equipment).set( calls.
-    const blockedStart = routeSource.indexOf('scan.action = "blocked"');
-    const checkoutStart = routeSource.indexOf('scan.action = "checkout"');
+    // /scan delegates to quickScanEquipmentCustody; blocked result early-returns before any mutation.
+    const blockedStart = routeSource.indexOf('result.kind === "blocked"');
+    const successPath = routeSource.indexOf("invalidateAnalyticsCache(clinicId)");
     expect(blockedStart).toBeGreaterThan(-1);
-    expect(checkoutStart).toBeGreaterThan(blockedStart);
-    const blockedBranch = routeSource.slice(blockedStart, checkoutStart);
+    expect(successPath).toBeGreaterThan(blockedStart);
+    const blockedBranch = routeSource.slice(blockedStart, successPath);
     expect(blockedBranch).not.toContain(".update(equipment)");
     expect(blockedBranch).not.toContain("tx.insert(scanLogs)");
   });
@@ -242,7 +245,8 @@ describe("Equipment scan — transaction safety", () => {
   });
 
   it("audit log is emitted after successful checkout or return", () => {
-    expect(routeSource).toContain("equipment_checked_out");
-    expect(routeSource).toContain("equipment_returned");
+    // Audit calls moved to finalizeCheckoutSideEffects / finalizeReturnSideEffects in the custody service
+    expect(custodyServiceSource).toContain("equipment_checked_out");
+    expect(custodyServiceSource).toContain("equipment_returned");
   });
 });

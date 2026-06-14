@@ -35,6 +35,7 @@ export const EQUIPMENT_REPLAY_IDEMPOTENCY_ENDPOINTS = {
   delete: "DELETE /api/equipment/:id",
   checkout: "POST /api/equipment/:id/checkout",
   return: "POST /api/equipment/:id/return",
+  toggle: "POST /api/equipment/:id/toggle",
   seen: "POST /api/equipment/:id/seen",
   scan: "POST /api/equipment/:id/scan",
 } as const;

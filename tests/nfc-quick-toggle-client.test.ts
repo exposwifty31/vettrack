@@ -15,10 +15,12 @@ describe("NFC quick toggle client", () => {
   const api = readFileSync(join(process.cwd(), "src/lib/api/equipment.ts"), "utf8");
   const nfcLib = readFileSync(join(process.cwd(), "src/lib/nfc-equipment-toggle.ts"), "utf8");
 
-  it("routes quickToggle through checkout/return (not legacy POST /scan)", () => {
+  it("routes quickToggle through POST /toggle only (not GET or legacy /scan)", () => {
     const quickToggleBlock = api.match(/quickToggle: async[\s\S]*?\n    },/)?.[0] ?? "";
-    expect(quickToggleBlock).toContain("/api/equipment/${equipmentId}/checkout");
-    expect(quickToggleBlock).toContain("/api/equipment/${equipmentId}/return");
+    expect(quickToggleBlock).toContain("/api/equipment/${equipmentId}/toggle");
+    expect(quickToggleBlock).not.toContain("/api/equipment/${equipmentId}/checkout");
+    expect(quickToggleBlock).not.toContain("/api/equipment/${equipmentId}/return");
+    expect(quickToggleBlock).not.toMatch(/request<Equipment>\(`\/api\/equipment\/\$\{equipmentId\}`\)/);
     expect(quickToggleBlock).not.toContain('"/api/equipment/scan"');
     expect(quickToggleBlock.includes("addPendingSync")).toBe(false);
   });

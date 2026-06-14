@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { extractEquipmentId } from "@/components/qr-scanner";
+import { extractEquipmentId } from "@/lib/equipment-id";
 import { t } from "@/lib/i18n";
 import { toast } from "sonner";
 import { haptics } from "@/lib/haptics";
@@ -111,7 +111,7 @@ export function NfcForegroundScan() {
         type="button"
         size="sm"
         variant={enabled ? "default" : "outline"}
-        className="shadow-md gap-1.5 h-10"
+        className="shadow-md gap-1.5 min-h-11 min-w-11 h-11"
         onClick={() => {
           if (enabled) stopScan();
           else void startScan();

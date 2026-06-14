@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/layout/AppShell";
+import { ShiftSummarySheet } from "@/components/shift-summary-sheet";
 import { SettingsSectionHeader, SettingsToggle, SettingsSelect } from "@/components/settings-controls";
 import { useSettings } from "@/hooks/use-settings";
 import { useAuth } from "@/hooks/use-auth";
@@ -32,16 +33,18 @@ import {
   AlignJustify,
   Send,
   ListChecks,
+  ClipboardCheck,
 } from "lucide-react";
 import { Link } from "wouter";
 import { playFeedbackTone, playMuteTone } from "@/lib/sounds";
 import { toast } from "sonner";
 import { t } from "@/lib/i18n";
 import type { ShiftRole, UserRole } from "@/types";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { safeReloadPage } from "@/lib/safe-browser";
 
 export default function SettingsPage() {
+  const [shiftSummaryOpen, setShiftSummaryOpen] = useState(false);
   const { settings, update, reset } = useSettings();
   const { name, email, signOut, effectiveRole, role, isLoaded, isSignedIn } = useAuth();
   const push = usePushNotifications();
@@ -192,16 +195,10 @@ export default function SettingsPage() {
               options={[
                 { value: "forest", label: t.settingsPage.colorThemeForest },
                 { value: "clinical", label: t.settingsPage.colorThemeClinical },
-                { value: "dark", label: t.settingsPage.colorThemeDark },
               ]}
               onValueChange={(v) => {
-                const colorTheme = v as "forest" | "clinical" | "dark";
-                // The theme picker is authoritative over light/dark: "dark" implies
-                // dark mode; choosing "clinical"/"forest" clears it. Without the reset,
-                // switching away from "dark" left darkMode stuck on, and
-                // `.dark[data-color-theme="clinical"]` is a near-clone of the dark
-                // theme — so Clinical rendered identical to Dark.
-                update({ colorTheme, darkMode: colorTheme === "dark" });
+                const colorTheme = v as "forest" | "clinical";
+                update({ colorTheme });
               }}
               data-testid="settings-color-theme"
             />
@@ -216,7 +213,6 @@ export default function SettingsPage() {
             <SettingsToggle
               icon={<AlignJustify className="w-5 h-5" />}
               label={t.settingsPage.haptics}
-              description={t.settingsPage.hapticsDescription}
               checked={settings.hapticsEnabled}
               onCheckedChange={(v) => update({ hapticsEnabled: v })}
               data-testid="settings-haptics"
@@ -498,17 +494,30 @@ export default function SettingsPage() {
                 {email && <p className="text-xs text-muted-foreground">{email}</p>}
               </div>
             )}
-            <Button
-              variant="outline"
-              className="gap-2 w-full sm:w-auto border-border/60 text-muted-foreground hover:text-foreground"
-              onClick={handleLogout}
-              data-testid="settings-logout"
-            >
-              <LogOut className="w-4 h-4" />
-              {t.settingsPage.logout}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                className="gap-2 border-border/60 text-muted-foreground hover:text-foreground"
+                onClick={() => setShiftSummaryOpen(true)}
+                data-testid="settings-shift-summary"
+              >
+                <ClipboardCheck className="w-4 h-4" />
+                {t.myEquipmentPage.shiftSummary}
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-2 border-border/60 text-muted-foreground hover:text-foreground"
+                onClick={handleLogout}
+                data-testid="settings-logout"
+              >
+                <LogOut className="w-4 h-4" />
+                {t.settingsPage.logout}
+              </Button>
+            </div>
           </div>
         </section>
+
+        <ShiftSummarySheet open={shiftSummaryOpen} onClose={() => setShiftSummaryOpen(false)} />
 
         {isAdminContext && (
           <section className="space-y-2">

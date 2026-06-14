@@ -288,7 +288,10 @@ type MetricName =
   | "rfid_event_room_changed"
   | "semi_dock_notified"
   | "semi_dock_skipped_deduped"
-  | "dock_return_nfc_confirmed";
+  | "stale_checkout_nudged"
+  | "stale_checkout_skipped"
+  | "dock_return_nfc_confirmed"
+  | "auth_clerk_profile_fetch_failed";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -918,7 +921,10 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   rfid_event_room_changed: 0,
   semi_dock_notified: 0,
   semi_dock_skipped_deduped: 0,
+  stale_checkout_nudged: 0,
+  stale_checkout_skipped: 0,
   dock_return_nfc_confirmed: 0,
+  auth_clerk_profile_fetch_failed: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };

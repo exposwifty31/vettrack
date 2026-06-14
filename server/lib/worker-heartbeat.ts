@@ -1,8 +1,8 @@
 import { getRedis } from "./redis.js";
 
-export const WORKER_HEARTBEAT_KEY = "vettrack:worker:heartbeat";
-export const WORKER_HEARTBEAT_TTL_SEC = 120;
-export const WORKER_HEARTBEAT_INTERVAL_MS = 30_000;
+const WORKER_HEARTBEAT_KEY = "vettrack:worker:heartbeat";
+const WORKER_HEARTBEAT_TTL_SEC = 120;
+const WORKER_HEARTBEAT_INTERVAL_MS = 30_000;
 
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -27,7 +27,7 @@ export function startWorkerHeartbeat(source = "worker"): void {
   }, WORKER_HEARTBEAT_INTERVAL_MS);
 }
 
-export function stopWorkerHeartbeatForTests(): void {
+function stopWorkerHeartbeatForTests(): void {
   if (heartbeatTimer) {
     clearInterval(heartbeatTimer);
     heartbeatTimer = null;
