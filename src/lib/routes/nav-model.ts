@@ -25,8 +25,9 @@ export const NAV: NavNode[] = [
     ],
   },
   { id: "board",  labelKey: "nav.board",  href: "/equipment/board", icon: "Grid" }, // aliases /display
-  { id: "alerts", labelKey: "nav.alerts", href: "/alerts",          icon: "Bell" },
-  { id: "rooms",  labelKey: "nav.rooms",  href: "/rooms",           icon: "MapPin" },
+  { id: "alerts",    labelKey: "nav.alerts",    href: "/alerts",     icon: "Bell" },
+  { id: "rooms",     labelKey: "nav.rooms",     href: "/rooms",      icon: "MapPin" },
+  { id: "emergency", labelKey: "nav.emergency", href: "/code-blue",  icon: "Siren" },
   {
     id: "admin",
     labelKey: "nav.admin",

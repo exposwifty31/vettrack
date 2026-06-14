@@ -23,5 +23,6 @@
     }
   },
   "include": ["src", "lib"],
+  "exclude": ["src/design-system-entry.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

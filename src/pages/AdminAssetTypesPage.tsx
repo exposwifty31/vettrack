@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
-import { Layout } from "@/components/layout";
+import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,7 +64,7 @@ function AdminAssetTypesContent() {
   if (typesQ.error instanceof ApiError && typesQ.error.status === 501) return null;
 
   return (
-    <Layout title={t.operationalState.setupRequired}>
+    <AppShell title={t.operationalState.setupRequired}>
       <Helmet>
         <title>Asset Types</title>
       </Helmet>
@@ -166,6 +166,6 @@ function AdminAssetTypesContent() {
           </Card>
         )}
       </div>
-    </Layout>
+    </AppShell>
   );
 }

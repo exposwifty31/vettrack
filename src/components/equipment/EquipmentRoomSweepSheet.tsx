@@ -51,7 +51,7 @@ export function EquipmentRoomSweepSheet({ open, onOpenChange }: EquipmentRoomSwe
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[80vh] overflow-y-auto">
+      <SheetContent side="bottom" className="rounded-t-2xl max-h-[80vh] overflow-y-auto z-[70]" overlayClassName="z-[69]">
         <SheetHeader>
           <SheetTitle>{t.equipmentTruth.roomSweepTitle}</SheetTitle>
           <SheetDescription>{t.equipmentTruth.roomSweepDesc}</SheetDescription>

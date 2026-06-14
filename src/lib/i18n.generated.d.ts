@@ -25,6 +25,7 @@ export interface TStructure {
     justNow: string;
     sterilization: string;
     closeNavigationMenu: string;
+    tryAgain: string;
     openNavigationMenu: string;
     breadcrumb: string;
     quickSettings: string;
@@ -1668,6 +1669,7 @@ export interface TStructure {
     restockNavLockedToast: string;
     navLockActiveAria: string;
     bottomRooms: string;
+    bottomRecap: string;
     bottomMenu: string;
     skipToMainContent: string;
     radar: string;
@@ -3219,6 +3221,7 @@ export interface TStructure {
     adminMetrics: string;
     adminTypes: string;
     adminShifts: string;
+    emergency: string;
   };
   phoneSignIn: {
     title: string;

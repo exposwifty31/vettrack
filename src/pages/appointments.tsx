@@ -28,7 +28,8 @@ import { toastSuccess } from "@/lib/ui-toast";
 const DAY_START_HOUR = 8;
 const DAY_END_HOUR = 20;
 const SLOT_MINUTES = 15;
-const PIXELS_PER_MINUTE = 1.2;
+const MIN_SLOT_HEIGHT_PX = 44;
+const PIXELS_PER_MINUTE = Math.max(1.2, MIN_SLOT_HEIGHT_PX / SLOT_MINUTES);
 const HOUR_ROW_HEIGHT = 60;
 const DASHBOARD_REFETCH_MS = 45_000;
 

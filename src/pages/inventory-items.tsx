@@ -3,7 +3,7 @@ import { t } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
-import { Layout } from "@/components/layout";
+import { AppShell } from "@/components/layout/AppShell";
 import { ErrorCard } from "@/components/ui/error-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -172,7 +172,7 @@ export default function InventoryItemsPage() {
   }
 
   return (
-    <Layout>
+    <AppShell>
       <Helmet><title>{p.title} — VetTrack</title></Helmet>
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
@@ -368,6 +368,6 @@ export default function InventoryItemsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Layout>
+    </AppShell>
   );
 }

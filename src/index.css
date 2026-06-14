@@ -121,6 +121,26 @@
     --status-steril-bg: #eff6ff;
     --status-steril-fg: #1e40af;
     --status-steril-border: #93c5fd;
+
+    /* ── Emergency surface — replaces all zinc-* in code-blue and crash-cart ── */
+    --emergency-bg:         12 12 12;
+    --emergency-surface:    24 24 27;
+    --emergency-border:     63 63 70;
+    --emergency-border-md:  82 82 91;
+    --emergency-text:       244 244 245;
+    --emergency-text2:      161 161 170;
+    --emergency-accent:     239 68 68;
+    --emergency-accent-soft:127 29 29;
+    --emergency-amber:      251 191 36;
+
+    /* ── Offline / degraded connectivity ── */
+    --offline-bg:           254 243 199;
+    --offline-border:       217 119 6;
+    --offline-text:         120 53 15;
+
+    /* ── Shift active state ── */
+    --shift-active:         22 163 74;
+    --shift-inactive:       122 138 126;
   }
 
   .dark {

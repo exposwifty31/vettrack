@@ -1,5 +1,7 @@
 import { t, formatDateTimeByLocale, formatDateByLocale } from "@/lib/i18n";
 import { useEffect, useMemo, useRef } from "react";
+import { toPng } from "html-to-image";
+import { ShiftShareCard } from "@/components/ShiftShareCard";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
@@ -42,6 +44,7 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
   const firstName = name?.split(" ")[0] || t.homePage.fallbackName;
   const enterOnce = useEnterOnce("shift-summary-sheet");
   const sheetRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -130,6 +133,23 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
   }, [firstName, heroPct, tasksDone, tasksTotal, scansToday, streak]);
 
   const handleShare = async () => {
+    // Try PNG card share first (iOS native share sheet with image)
+    if (cardRef.current && typeof navigator !== "undefined" && typeof navigator.canShare === "function") {
+      try {
+        const dataUrl = await toPng(cardRef.current, { pixelRatio: 2, cacheBust: true });
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        const file = new File([blob], "vettrack-shift.png", { type: "image/png" });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: t.shiftRecap.shareTitle });
+          return;
+        }
+      } catch (e) {
+        if (e instanceof Error && e.name === "AbortError") return;
+        // Fall through to text share
+      }
+    }
+    // Text fallback
     try {
       if (typeof navigator !== "undefined" && navigator.share) {
         await navigator.share({ text: shareText, title: t.shiftRecap.shareTitle });
@@ -258,7 +278,7 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
     }
   }
 
-  function handleDownloadPdf() {
+  async function handleDownloadPdf() {
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const margin = 14;
     const pageHeight = 297;
@@ -298,6 +318,24 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
     }
 
     const filename = `vettrack-shift-summary-${format(new Date(), "yyyy-MM-dd")}.pdf`;
+
+    // On iOS WebView, doc.save() never triggers a file download.
+    // Use the native share sheet with a File blob when supported.
+    if (typeof navigator !== "undefined" && typeof navigator.canShare === "function") {
+      try {
+        const blob = doc.output("blob");
+        const file = new File([blob], filename, { type: "application/pdf" });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: "VetTrack Shift Summary" });
+          toast.success(t.shiftSummaryPage.reportDownloaded);
+          return;
+        }
+      } catch (e) {
+        if (e instanceof Error && e.name === "AbortError") return;
+        // canShare/share threw unexpectedly — fall through to doc.save()
+      }
+    }
+
     doc.save(filename);
     toast.success(t.shiftSummaryPage.reportDownloaded);
   }
@@ -588,6 +626,19 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
           </Button>
         </div>
       </div>
+      {/* Off-screen capture target for PNG share */}
+      <ShiftShareCard
+        ref={cardRef}
+        data={{
+          name: firstName,
+          date: formatDateByLocale(new Date(), { weekday: "long", day: "numeric", month: "short" }),
+          tasksDone,
+          tasksTotal,
+          scansToday,
+          streak,
+          heroPct,
+        }}
+      />
     </>
   );
 }

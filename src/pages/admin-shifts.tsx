@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Upload, CheckCircle2, AlertTriangle, History } from "lucide-react";
-import { Layout } from "@/components/layout";
+import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,14 +68,14 @@ export default function AdminShiftsPage() {
 
   if (!isAdmin) {
     return (
-      <Layout title={t.adminShiftsPage.title}>
+      <AppShell title={t.adminShiftsPage.title}>
         <div className="py-10 text-center text-sm text-muted-foreground">{t.adminPage.cancel}</div>
-      </Layout>
+      </AppShell>
     );
   }
 
   return (
-    <Layout title={t.adminShiftsPage.title}>
+    <AppShell title={t.adminShiftsPage.title}>
       <div className="flex flex-col gap-4 pb-24 animate-fade-in">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{t.adminShiftsPage.title}</h1>
@@ -286,6 +286,6 @@ export default function AdminShiftsPage() {
           </CardContent>
         </Card>
       </div>
-    </Layout>
+    </AppShell>
   );
 }

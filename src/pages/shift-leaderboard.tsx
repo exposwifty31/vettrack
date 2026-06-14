@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
-import { Layout } from "@/components/layout";
+import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -42,9 +42,9 @@ export default function ShiftLeaderboardPage() {
 
   if (!isAdmin) {
     return (
-      <Layout>
+      <AppShell>
         <div className="p-8 text-center text-muted-foreground">נדרשת גישת מנהל</div>
-      </Layout>
+      </AppShell>
     );
   }
 
@@ -58,7 +58,7 @@ export default function ShiftLeaderboardPage() {
     .sort((a, b) => b.avgScansPerShift - a.avgScansPerShift);
 
   return (
-    <Layout>
+    <AppShell>
       <Helmet>
         <title>לוח מובילים — סריקות משמרת — VetTrack</title>
       </Helmet>
@@ -193,6 +193,6 @@ export default function ShiftLeaderboardPage() {
           </div>
         )}
       </div>
-    </Layout>
+    </AppShell>
   );
 }

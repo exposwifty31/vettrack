@@ -261,7 +261,7 @@ export default function RoomsListPage() {
   const pageContent = (
     <>
       <Helmet>
-        <title>{t.qrPrintPage.titleFull}</title>
+        <title>{t.roomsListPage.title} — VetTrack</title>
         <meta name="description" content="Room-by-room equipment inventory. Verify all items in a room with one tap." />
       </Helmet>
 

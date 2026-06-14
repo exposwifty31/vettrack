@@ -116,7 +116,7 @@ interface LayoutProps {
 }
 
 const BOTTOM_NAV_ICON_MAP: Record<string, React.ElementType> = {
-  Home, Package, Grid, Bell, MapPin, Settings,
+  Home, Package, Grid, Bell, MapPin, Settings, Siren,
 };
 
 function navLabel(key: string): string {
@@ -455,7 +455,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
       : []),
     {
       href: CANONICAL_HREFS.locations,
-      label: t.layout.nav.locations,
+      label: t.nav.rooms,
       icon: <Radar className="w-5 h-5" />,
     },
     {

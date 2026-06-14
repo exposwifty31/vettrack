@@ -63,13 +63,13 @@ export default function SignUpPage() {
               </ClerkFailed>
               <ClerkLoaded>
                 <div className="w-full min-h-[24rem] flex flex-col items-center justify-start">
-                  {IS_NATIVE ? <NativeSocialButtons mode="signUp" /> : null}
                   <SignUp
                     routing="hash"
                     signInUrl="/signin"
                     fallbackRedirectUrl="/"
                     appearance={IS_NATIVE ? clerkAppearanceNative : clerkAppearance}
                   />
+                  {IS_NATIVE ? <NativeSocialButtons mode="signUp" /> : null}
                 </div>
               </ClerkLoaded>
             </div>
