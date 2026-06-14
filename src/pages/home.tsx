@@ -1,7 +1,7 @@
 import { t, formatDateByLocale } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useSearch } from "wouter";
+import { Link, useSearch, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
 import { AppShell } from "@/components/layout/AppShell";
@@ -9,7 +9,6 @@ import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { ErrorCard } from "@/components/ui/error-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingSection } from "@/components/ui/loading-section";
-import { ShiftSummarySheet } from "@/components/shift-summary-sheet";
 import { computeAlerts, formatRelativeTime } from "@/lib/utils";
 import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
 import { useAuth } from "@/hooks/use-auth";
@@ -60,8 +59,8 @@ export default function HomePage() {
   const queryClient = useQueryClient();
   const direction = useDirection();
   const Chevron = direction === "rtl" ? ChevronLeft : ChevronRight;
+  const [, navigate] = useLocation();
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [shiftSummaryOpen, setShiftSummaryOpen] = useState(false);
   const [activeCodeBlueId, setActiveCodeBlueId] = useState<string | null>(null);
   const searchStr = useSearch();
   const enterOnce = useEnterOnce("home");
@@ -197,7 +196,7 @@ export default function HomePage() {
           </div>
           <button
             type="button"
-            onClick={() => setShiftSummaryOpen(true)}
+            onClick={() => navigate("/handoff")}
             aria-label={t.home.shiftSummary}
             data-testid="btn-shift-summary"
             className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-ivory-border bg-ivory-surface text-ivory-text2 shadow-sm transition-all hover:border-primary/30 hover:text-foreground motion-safe:active:scale-95"
@@ -304,11 +303,7 @@ export default function HomePage() {
         </div>
 
         {/* Next up — the thumb-zone hero */}
-        <section className={cn("relative overflow-hidden rounded-[20px] border border-ivory-border bg-ivory-surface p-4 shadow-card", rise)}>
-          <span
-            className="absolute inset-y-3.5 start-0 w-[3px] rounded-full bg-gradient-to-b from-[var(--brand)] to-[var(--brand-deep)]"
-            aria-hidden
-          />
+        <section className={cn("rounded-[20px] border border-ivory-border border-s-[3px] border-s-[var(--brand)] bg-ivory-surface p-4 shadow-card", rise)}>
           <div className="ps-2.5">
             <div className="mb-1.5 flex items-center justify-between gap-2.5">
               <span className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-brand">
@@ -467,7 +462,6 @@ export default function HomePage() {
 
       {scannerOpen && <QrScanner onClose={() => setScannerOpen(false)} />}
 
-      <ShiftSummarySheet open={shiftSummaryOpen} onClose={() => setShiftSummaryOpen(false)} />
     </>
   );
 

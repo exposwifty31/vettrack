@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
-import { Layout } from "@/components/layout";
+import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,7 +54,7 @@ function AdminDocksContent() {
   if (docksQ.error instanceof ApiError && docksQ.error.status === 501) return null;
 
   return (
-    <Layout title="Docks">
+    <AppShell title="Docks">
       <Helmet>
         <title>Docks</title>
       </Helmet>
@@ -119,6 +119,6 @@ function AdminDocksContent() {
           </CardContent>
         </Card>
       </div>
-    </Layout>
+    </AppShell>
   );
 }

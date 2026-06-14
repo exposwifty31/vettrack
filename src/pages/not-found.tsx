@@ -1,13 +1,13 @@
 import { Link } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
-import { Layout } from "@/components/layout";
+import { AppShell } from "@/components/layout/AppShell";
 import { Home, Frown } from "lucide-react";
 import { t } from "@/lib/i18n";
 
 export default function NotFoundPage() {
   return (
-    <Layout>
+    <AppShell>
       <Helmet>
         <title>{t.notFoundPage.title}</title>
         <meta name="description" content="The page you are looking for does not exist. Return to the VetTrack dashboard." />
@@ -25,6 +25,6 @@ export default function NotFoundPage() {
           </Button>
         </Link>
       </div>
-    </Layout>
+    </AppShell>
   );
 }

@@ -1,17 +1,24 @@
 import { useState } from "react";
 import { X, Download, Share2, PlusSquare } from "lucide-react";
+import { useLocation } from "wouter";
 import { usePwaInstall } from "@/hooks/use-pwa-install";
+
+const EMERGENCY_ROUTES = ["/code-blue", "/crash-cart"];
 
 // Shows for eligible users who haven't installed the app:
 //   • Android / Chrome  → native "Add to Home Screen" prompt
 //   • iOS Safari        → step-by-step guidance (re-shown every 7 days)
 // Hidden when already running as an installed PWA.
 export function PwaInstallPrompt() {
+  const [location] = useLocation();
   const { isStandalone, isIos, canInstall, promptInstall, iosGuidanceDismissed, dismissIosGuidance } =
     usePwaInstall();
 
   // Session-level dismiss for the Android/Chrome banner (native prompt handles persistence).
   const [androidDismissed, setAndroidDismissed] = useState(false);
+
+  // Never interrupt emergency flows with promotional UI.
+  if (EMERGENCY_ROUTES.some((r) => location.startsWith(r))) return null;
 
   // Already installed — show nothing.
   if (isStandalone) return null;

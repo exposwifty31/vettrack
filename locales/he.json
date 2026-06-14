@@ -22,6 +22,7 @@
     "justNow": "עכשיו",
     "sterilization": "חיטוי",
     "closeNavigationMenu": "סגור תפריט ניווט",
+    "tryAgain": "נסה שוב",
     "openNavigationMenu": "פתח תפריט ניווט",
     "breadcrumb": "פירורי לחם",
     "quickSettings": "הגדרות מהירות",
@@ -3217,7 +3218,8 @@
     "adminOps": "לוח תפעול",
     "adminMetrics": "מדדים",
     "adminTypes": "סוגי נכסים",
-    "adminShifts": "משמרות"
+    "adminShifts": "משמרות",
+    "emergency": "חירום"
   },
   "phoneSignIn": {
     "title": "התחברות עם טלפון",

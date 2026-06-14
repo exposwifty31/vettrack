@@ -22,6 +22,7 @@
     "justNow": "Just now",
     "sterilization": "Sterilization",
     "closeNavigationMenu": "Close navigation menu",
+    "tryAgain": "Try again",
     "openNavigationMenu": "Open navigation menu",
     "breadcrumb": "Breadcrumb",
     "quickSettings": "Quick settings",
@@ -3217,7 +3218,8 @@
     "adminOps": "Ops dashboard",
     "adminMetrics": "Metrics",
     "adminTypes": "Asset types",
-    "adminShifts": "Shifts"
+    "adminShifts": "Shifts",
+    "emergency": "Emergency"
   },
   "phoneSignIn": {
     "title": "Phone Sign In",

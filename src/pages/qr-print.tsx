@@ -3,7 +3,7 @@ import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
-import { Layout } from "@/components/layout";
+import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -136,7 +136,7 @@ export default function QrPrintPage() {
   };
 
   return (
-    <Layout>
+    <AppShell>
       <Helmet>
         <title>{t.qrPrintPage.titleFull}</title>
         <meta name="description" content="Generate and print QR code labels for veterinary equipment. Select items, preview QR codes, and print sheets for physical labeling." />
@@ -327,6 +327,6 @@ export default function QrPrintPage() {
           </div>
         )}
       </div>
-    </Layout>
+    </AppShell>
   );
 }

@@ -32,6 +32,7 @@ const CodeBlueDisplay = lazy(() => import("@/pages/code-blue-display"));
 const CrashCartCheckPage = lazy(() => import("@/pages/crash-cart"));
 const CodeBlueHistoryPage = lazy(() => import("@/pages/code-blue-history"));
 const WardDisplayPage = lazy(() => import("@/pages/display"));
+const HandoffPage = lazy(() => import("@/pages/handoff"));
 const NotFoundPage = lazy(() => import("@/pages/not-found"));
 
 // --- Platform pages ---
@@ -120,6 +121,7 @@ export function AppRoutes() {
         <Route path="/code-blue"><AuthGuard><CodeBluePage /></AuthGuard></Route>
         <Route path="/code-blue/display"><AuthGuard><CodeBlueDisplay /></AuthGuard></Route>
         <Route path="/crash-cart"><AuthGuard><CrashCartCheckPage /></AuthGuard></Route>
+        <Route path="/handoff"><AuthGuard><HandoffPage /></AuthGuard></Route>
         <Route path="/admin/code-blue-history"><AuthGuard><CodeBlueHistoryPage /></AuthGuard></Route>
         {/* Legacy aliases */}
         <Route path="/emergency-equipment-log"><AuthGuard><CodeBluePage /></AuthGuard></Route>

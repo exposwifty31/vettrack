@@ -1,0 +1,1229 @@
+▗ ▗   ▖ ▖  Claude Code v2.1.177
+           Sonnet 4.6 · Claude Pro
+  ▘▘ ▝▝    ~/vettrack
+
+✻ Conversation compacted (ctrl+o for history)
+
+
+  Read 3 files (ctrl+o to expand)
+  ⎿  Read tests/i18n-no-hebrew-in-source.test.ts (124 lines)
+  ⎿  Read migrations/153_dev_seed_hebrew_floor_notes.sql (7 lines)
+  ⎿  Read scripts/seed-dev.ts (124 lines)
+  ⎿  Referenced file src/pages/rooms-list.tsx
+  ⎿  Read src/lib/utils.ts (207 lines)
+
+⏺ Now I have all three files. Let me make the B1, B2, and B3 edits in parallel.
+
+⏺ Update(src/pages/appointments.tsx)
+  ⎿  File must be read first
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ Update(src/pages/appointments.tsx)
+  ⎿  Added 1 line, removed 1 line
+      1099                {t.appointmentsPage.taskControls}
+      1100              </CardTitle>
+      1101            </CardHeader>
+      1102 -          <CardContent className="grid grid-cols-2 lg:grid-co
+           -ls-5 gap-3 sm:gap-4 items-end">                              
+      1102 +          <CardContent className="grid grid-cols-1 sm:grid-co
+           +ls-2 gap-3 sm:gap-4 items-end">                              
+      1103              <div className="min-w-0">
+      1104                <label htmlFor={`${bookingFormId}-filter-day`} 
+            className="text-xs text-muted-foreground block text-right mb-
+            1">{t.appointmentsPage.dayLabel}</label>
+      1105                <Input id={`${bookingFormId}-filter-day`} dir="
+            ltr" className="text-left w-full max-w-full" type="date" valu
+            e={day} onChange={(e) => setDay(e.target.value)} />
+
+⏺ Now fix the select and button span:
+
+⏺ Update(src/pages/appointments.tsx)
+  ⎿  Added 1 line, removed 1 line
+      1111                  dir="ltr"
+      1112                  value={selectedVetId}
+      1113                  onChange={(e) => setSelectedVetId(e.target.va
+            lue)}
+      1114 -                className="h-10 w-full rounded-md border bord
+           -er-input bg-background px-3 text-sm text-left"               
+      1114 +                className="h-10 w-full min-w-0 max-w-full rou
+           +nded-md border border-input bg-background px-3 text-sm text-l
+           +eft truncate"                                                
+      1115                >
+      1116                  <option value="">{t.appointmentsPage.allTechn
+            icians}</option>
+      1117                  {(metaQuery.data?.vets ?? []).map((vet) => (
+
+⏺ Update(src/pages/appointments.tsx)
+  ⎿  Added 1 line, removed 1 line
+      1132                <div dir="ltr" className="h-10 w-full px-3 roun
+            ded-md border flex items-center text-sm">{t.appointmentsPage.
+            minutesShort(SLOT_MINUTES)}</div>
+      1133              </div>
+      1134              {canCreateTask && (
+      1135 -              <div className="col-span-2 lg:col-span-1">     
+      1135 +              <div className="col-span-1 sm:col-span-2">     
+      1136                  <Button className="w-full" onClick={() => ope
+            nQuickBooking(new Date())}>
+      1137                    <Plus className="w-4 h-4 mr-1" />
+      1138                    {t.appointmentsPage.quickTask}
+
+⏺ Now B2 — shift-leaderboard.tsx. Wrap the table in an overflow-x-auto container
+  and add min-w-[520px] to the table:
+
+⏺ Update(src/pages/shift-leaderboard.tsx)
+  ⎿  Added 2 lines, removed 1 line
+      139          )}
+      140  
+      141          {sorted.length > 0 && (
+      142 +          <div className="overflow-x-auto">                   
+      143            <div className="rounded-xl border overflow-hidden">
+      143 -            <table className="w-full text-sm">                
+      144 +            <table className="w-full text-sm table-fixed min-w
+          +-[520px]">                                                    
+      145                <thead>
+      146                  <tr className="bg-muted/50 text-muted-foregrou
+           nd text-xs uppercase tracking-wide border-b">
+      147                    <th className="px-4 py-2 text-right font-med
+           ium">#</th>
+
+⏺ Now close the extra wrapper div after the table's closing div:
+
+⏺ Update(src/pages/shift-leaderboard.tsx)
+  ⎿  Added 1 line
+      190                </tbody>
+      191              </table>
+      192            </div>
+      193 +          </div>                                              
+      194          )}
+      195        </div>
+      196      </Layout>
+
+⏺ Now B3 — audit-log.tsx. Add w-full to the staff input and select trigger, and
+  max-w-full to date inputs:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/pages/audit-log.tsx)
+  ⎿  Added 1 line, removed 1 line
+      252            <CardContent className={compact ? "pt-4" : undefined
+           }>
+      253              <div className="flex flex-col sm:flex-row sm:flex-
+           wrap gap-3 sm:gap-4 sm:items-end">
+      254                {/* Staff name filter */}
+      255 -              <div className="flex flex-col gap-1.5 sm:min-w-[
+          -160px]">                                                      
+      255 +              <div className="flex flex-col gap-1.5 w-full sm:
+          +w-auto sm:min-w-[160px]">                                     
+      256                  <Label className="text-xs">{t.adminPage.logFil
+           terStaff}</Label>
+      257                  <div className="relative">
+      258                    <User className="absolute start-2.5 top-1/2 
+           -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+
+⏺ Update(src/pages/audit-log.tsx)
+  ⎿  Added 1 line, removed 1 line
+      267                </div>
+      268  
+      269                {/* Action type */}
+      270 -              <div className="flex flex-col gap-1.5 sm:min-w-[
+          -180px]">                                                      
+      270 +              <div className="flex flex-col gap-1.5 w-full sm:
+          +w-auto sm:min-w-[180px]">                                     
+      271                  <Label className="text-xs">{t.adminPage.logFil
+           terAction}</Label>
+      272                  <Select value={actionType || "all"} onValueCha
+           nge={(v) => setActionType(v === "all" ? "" : v)}>
+      273                    <SelectTrigger className="h-8 text-sm">
+
+⏺ Update(src/pages/audit-log.tsx)
+  ⎿  Added 1 line, removed 1 line
+      289                    type="date"
+      290                    value={from}
+      291                    onChange={(e) => setFrom(e.target.value)}
+      292 -                  className="h-8 text-sm w-full"              
+      292 +                  className="h-8 text-sm w-full max-w-full box
+          +-border"                                                      
+      293                  />
+      294                </div>
+      295  
+
+⏺ Update(src/pages/audit-log.tsx)
+  ⎿  Added 1 line, removed 1 line
+      299                    type="date"
+      300                    value={to}
+      301                    onChange={(e) => setTo(e.target.value)}
+      302 -                  className="h-8 text-sm w-full"              
+      302 +                  className="h-8 text-sm w-full max-w-full box
+          +-border"                                                      
+      303                  />
+      304                </div>
+      305  
+
+⏺ Now run typecheck:
+
+⏺ Bash(npx tsc --noEmit 2>&1 | head -40)  ⎿  src/lib/i18n.ts(213,35): error TS2339: Property 'loadFailed' does not
+     exist on type '{ serialNumber: string; model: string; manufacturer: st
+     ring; purchaseDate: string; location: string; maintenanceInterval: str
+     … +18 lines (ctrl+o to expand)
+  ⎿  (timeout 1m)
+
+⏺ Same 4 pre-existing NFC errors — no new errors from Group B. Group B is clean.
+
+  Now Group C in order: C7 → C1 → C3 → C8 → C2 → C5 → C6. Let me look up what
+  each task is.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ I need to recover the Group C item details from the original plan. Let me
+  search the transcript:
+
+  Searched memories (ctrl+o to expand)
+
+⏺ Bash(python3 -c "
+      import json, sys…)
+  ⎿  (No output)
+
+⏺ Bash(python3 -c "
+      import json…)
+  ⎿  Total lines: 417
+     Line 0: type=last-prompt, keys=['type', 'leafUuid', 'sessionId']
+     Line 1: type=mode, keys=['type', 'mode', 'sessionId']
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(python3 -c "
+      import json…)
+  ⎿  (No output)
+
+⏺ Bash(python3 -c "
+      import json…)
+  ⎿  0: last-prompt
+     1: mode
+     2: permission-mode
+     … +17 lines (ctrl+o to expand)
+
+⏺ Bash(python3 -c "
+      import json…)
+  ⎿  (No output)
+
+⏺ Bash(python3 -c "
+      import json…)
+  ⎿  Line 6: {"parentUuid":"b682dbb0-5db6-44a0-86eb-206dd0aff806","isSidech
+     ain":false,"promptId":"7139ef2b-f069-4a54-a5f7-ecb31298ace7","type":"u
+     ser","message":{"role":"user","content":"Sorry — I implemented when yo
+     … +136 lines (ctrl+o to expand)
+
+⏺ Bash(python3 -c "
+      import json…)
+  ⎿   inputs `w-full max-w-full box-border` |
+
+     ---
+     … +61 lines (ctrl+o to expand)
+
+⏺ Now I have the full plan. Starting C7: rename the pickFromQueue translation
+  value.
+
+  Searched for 1 pattern, read 2 files (ctrl+o to expand)
+
+⏺ Update(locales/he.json)
+  ⎿  Added 1 line, removed 1 line
+      2340        "overdue": "{count} באיחור — סקור עכשיו",
+      2341        "startNow": "המשימה הבאה מוכנה — התחל עכשיו",
+      2342        "overloaded": "עומס גבוה — סקור משימות דחופות",
+      2343 -      "pickFromQueue": "התור פתוח — בחר משימה"               
+      2343 +      "pickFromQueue": "משימות ממתינות לטיפול"               
+      2344      },
+      2345      "statusAction": {
+      2346        "viewQueue": "צפה בתור",
+
+⏺ Update(tests/i18n-appointments-tasks.test.ts)
+  ⎿  Added 1 line, removed 1 line
+       96    it("statusHint Hebrew + interpolation", () => {
+       97      expect(heDict.appointmentsPage.statusHint.startNow).toBe("
+           המשימה הבאה מוכנה — התחל עכשיו");
+       98      expect(heDict.appointmentsPage.statusHint.overloaded).toBe
+           ("עומס גבוה — סקור משימות דחופות");
+       99 -    expect(heDict.appointmentsPage.statusHint.pickFromQueue).t
+          -oBe("התור פתוח — בחר משימה");                                 
+       99 +    expect(heDict.appointmentsPage.statusHint.pickFromQueue).t
+          +oBe("משימות ממתינות לטיפול");                                 
+      100      // The accessor `t.appointmentsPage.statusHint.overdue(cou
+           nt)` should
+      101      // render English "{count} overdue — review now" or Hebrew
+            equivalent.
+      102      // (Locale is set per test process, asserting raw template
+            here.)
+
+⏺ C7 done. Now C1: Remove header QR button + scanner wiring from
+  my-equipment.tsx if only used there.
+
+  Searched for 7 patterns, read 4 files (ctrl+o to expand)
+
+⏺ Now I'll remove the QR button, scanner wiring, locale key, and type from all
+  the files:
+
+⏺ Update(locales/he.json)  ⎿  Removed 1 line
+      1057      "methodologyNote": "ההפרשים מכוונים כך שאחוז חיובי = שיפו
+            ר (טריאז' מהיר יותר, שלמות גבוהה יותר, לכידה כספית חזקה יותר)
+            ."
+      1058    },
+      1059    "myEquipmentPage": {
+      1060 -    "scanQr": "סרוק QR",                                     
+      1060      "shiftSummary": "סיכום משמרת",
+      1061      "browseEquipment": "דפדף בציוד",
+      1062      "recoveryBadgeStale": "דורש אימות",
+
+⏺ Update(locales/en.json)
+  ⎿  Removed 1 line
+      1057      "methodologyNote": "Deltas are oriented so positive perce
+            ntages indicate improvement (faster triage, higher integrity,
+             stronger revenue capture)."
+      1058    },
+      1059    "myEquipmentPage": {
+      1060 -    "scanQr": "Scan QR",                                     
+      1060      "shiftSummary": "Shift summary",
+      1061      "browseEquipment": "Browse equipment",
+      1062      "recoveryBadgeStale": "Needs confirm",
+
+⏺ Update(src/lib/i18n.generated.d.ts)
+  ⎿  Removed 1 line
+      1042      methodologyNote: string;
+      1043    };
+      1044    myEquipmentPage: {
+      1045 -    scanQr: string;                                          
+      1045      shiftSummary: string;
+      1046      browseEquipment: string;
+      1047      recoveryBadgeStale: string;
+
+⏺ Now remove from my-equipment.tsx:
+
+⏺ Update(src/pages/my-equipment.tsx)
+  ⎿  Removed 2 lines
+      35    Loader2,
+      36    CheckCircle2,
+      37    ClipboardCheck,
+      38 -  QrCode,                                                      
+      38  } from "lucide-react";
+      39  import { toast } from "sonner";
+      41 -import { QrScanner } from "@/components/qr-scanner";           
+      40  import { ReturnPlugDialog } from "@/components/return-plug-dial
+          og";
+      41  import { useAuth } from "@/hooks/use-auth";
+      42  import { haptics } from "@/lib/haptics";
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/pages/my-equipment.tsx)
+  ⎿  Removed 1 line
+      61    const queryClient = useQueryClient();
+      62    const [returningAll, setReturningAll] = useState(false);
+      63    const [shiftSummaryOpen, setShiftSummaryOpen] = useState(fals
+          e);
+      64 -  const [isScannerOpen, setIsScannerOpen] = useState(false);   
+      64    const [pendingReturnEquipmentId, setPendingReturnEquipmentId]
+           = useState<string | null>(null);
+      65  
+      66    const { data: items, isLoading, isError, refetch } = useQuery
+          ({
+
+⏺ Now remove the QR button from the header:
+
+⏺ Update(src/pages/my-equipment.tsx)
+  ⎿  Removed 10 lines
+      138                variant="outline"
+      139                size="sm"
+      140                className="gap-1.5 text-xs h-11 bg-card border-b
+           order/60 text-muted-foreground hover:text-foreground"
+      141 -              onClick={() => setIsScannerOpen(true)}          
+      142 -              data-testid="btn-scan-qr-my-eq"                 
+      143 -            >                                                 
+      144 -              <QrCode className="w-3.5 h-3.5" />              
+      145 -              {t.myEquipmentPage.scanQr}                      
+      146 -            </Button>                                         
+      147 -            <Button                                           
+      148 -              variant="outline"                               
+      149 -              size="sm"                                       
+      150 -              className="gap-1.5 text-xs h-11 bg-card border-b
+          -order/60 text-muted-foreground hover:text-foreground"         
+      141                onClick={() => setShiftSummaryOpen(true)}
+      142                data-testid="btn-shift-summary-my-eq"
+      143              >
+
+⏺ Now remove the QrScanner render:
+
+⏺ Update(src/pages/my-equipment.tsx)
+  ⎿  Removed 3 lines
+      312          onClose={() => setShiftSummaryOpen(false)}
+      313        />
+      314  
+      315 -      {isScannerOpen && (                                     
+      316 -        <QrScanner onClose={() => setIsScannerOpen(false)} /> 
+      317 -      )}                                                      
+      315        <ReturnPlugDialog
+      316          open={Boolean(pendingReturnEquipmentId)}
+      317          onOpenChange={(open) => {
+
+⏺ C1 done. Now C3: Remove "כהה" / dark from the color palette in settings.tsx
+  only — keep the night-mode toggle.
+
+  Searched for 3 patterns, read 2 files (ctrl+o to expand)
+
+⏺ Now apply the C3 changes across all files:
+
+⏺ Update(src/hooks/use-settings.tsx)
+  ⎿  Added 2 lines, removed 2 lines
+      11  export type Density = "compact" | "comfortable";
+      12  export type TimeFormat = "12h" | "24h";
+      13  export type DateFormat = "MM/DD/YYYY" | "DD/MM/YYYY" | "YYYY-MM
+          -DD";
+      14 -/** Forest = brand green; Clinical = 60/30/10; Dark = clinical 
+         -dark palette. */                                               
+      15 -export type ColorTheme = "forest" | "clinical" | "dark";       
+      14 +/** Forest = brand green; Clinical = 60/30/10. */              
+      15 +export type ColorTheme = "forest" | "clinical";                
+      16  
+      17  export interface Settings {
+      18    locale: Locale;
+
+⏺ Update(src/hooks/use-settings.tsx)
+  ⎿  Added 1 line, removed 5 lines
+      60        delete parsed.language;
+      61      }
+      62      if (!isSupportedLocale(parsed.locale)) parsed.locale = getS
+          toredLocale();
+      63 -    if (                                                       
+      64 -      parsed.colorTheme !== "forest" &&                        
+      65 -      parsed.colorTheme !== "clinical" &&                      
+      66 -      parsed.colorTheme !== "dark"                             
+      67 -    ) {                                                        
+      63 +    if (parsed.colorTheme !== "forest" && parsed.colorTheme !==
+         + "clinical") {                                                 
+      64        parsed.colorTheme = "clinical";
+      65      }
+      66      if (typeof parsed.hapticsEnabled !== "boolean") {
+
+⏺ Update(src/hooks/use-settings.tsx)
+  ⎿  Added 1 line, removed 1 line
+      83    const html = document.documentElement;
+      84    const list = html?.classList;
+      85    if (!list) return;
+      86 -  const useDarkClass = settings.colorTheme === "dark" || settin
+         -gs.darkMode;                                                   
+      86 +  const useDarkClass = settings.darkMode;                      
+      87    if (useDarkClass) {
+      88      list?.add("dark");
+      89    } else {
+
+⏺ Update(src/pages/settings.tsx)
+  ⎿  Added 2 lines, removed 8 lines
+      192                options={[
+      193                  { value: "forest", label: t.settingsPage.color
+           ThemeForest },
+      194                  { value: "clinical", label: t.settingsPage.col
+           orThemeClinical },
+      195 -                { value: "dark", label: t.settingsPage.colorTh
+          -emeDark },                                                    
+      195                ]}
+      196                onValueChange={(v) => {
+      198 -                const colorTheme = v as "forest" | "clinical" 
+          -| "dark";                                                     
+      199 -                // The theme picker is authoritative over ligh
+          -t/dark: "dark" implies                                        
+      200 -                // dark mode; choosing "clinical"/"forest" cle
+          -ars it. Without the reset,                                    
+      201 -                // switching away from "dark" left darkMode st
+          -uck on, and                                                   
+      202 -                // `.dark[data-color-theme="clinical"]` is a n
+          -ear-clone of the dark                                         
+      203 -                // theme — so Clinical rendered identical to D
+          -ark.                                                          
+      204 -                update({ colorTheme, darkMode: colorTheme === 
+          -"dark" });                                                    
+      197 +                const colorTheme = v as "forest" | "clinical";
+      198 +                update({ colorTheme });                       
+      199                }}
+      200                data-testid="settings-color-theme"
+      201              />
+
+⏺ Now remove colorThemeDark from locales and generated types:
+
+  Searched for 1 pattern, read 2 files (ctrl+o to expand)
+
+⏺ Update(locales/he.json)
+  ⎿  Removed 1 line
+      901      "colorThemeDescription": "יער — ירוק מותג; קליני — כחול לנ
+           יווט, ירוק רק לפעולות",
+      902      "colorThemeForest": "יער (מותג)",
+      903      "colorThemeClinical": "קליני",
+      904 -    "colorThemeDark": "כהה",                                  
+      904      "haptics": "רטט (הפטיקה)",
+      905      "hapticsDescription": "רטט בסריקה ואישור (PWA באנדרואיד)",
+      906      "darkMode": "מצב לילה",
+
+⏺ Update(locales/en.json)
+  ⎿  Removed 1 line
+      901      "colorThemeDescription": "Forest uses brand green; Clinica
+           l uses blue navigation with green for actions only",
+      902      "colorThemeForest": "Forest (brand)",
+      903      "colorThemeClinical": "Clinical",
+      904 -    "colorThemeDark": "Dark",                                 
+      904      "haptics": "Haptic feedback",
+      905      "hapticsDescription": "Vibration on scan and confirm (Andr
+           oid PWA)",
+      906      "darkMode": "Dark mode",
+
+⏺ Update(src/lib/i18n.generated.d.ts)
+  ⎿  Removed 1 line
+      886      colorThemeDescription: string;
+      887      colorThemeForest: string;
+      888      colorThemeClinical: string;
+      889 -    colorThemeDark: string;                                   
+      889      haptics: string;
+      890      hapticsDescription: string;
+      891      darkMode: string;
+
+⏺ C3 done. Now C8: Remove haptics description text — keep label + toggle.
+
+  Read 1 file (ctrl+o to expand)
+⏺ Update(src/pages/settings.tsx)
+  ⎿  Removed 1 line
+      210              <SettingsToggle
+      211                icon={<AlignJustify className="w-5 h-5" />}
+      212                label={t.settingsPage.haptics}
+      213 -              description={t.settingsPage.hapticsDescription} 
+      213                checked={settings.hapticsEnabled}
+      214                onCheckedChange={(v) => update({ hapticsEnabled:
+            v })}
+      215                data-testid="settings-haptics"
+
+⏺ Now remove the hapticsDescription locale key from both files and the generated
+  type:
+
+⏺ Update(locales/he.json)
+  ⎿  Removed 1 line
+      902      "colorThemeForest": "יער (מותג)",
+      903      "colorThemeClinical": "קליני",
+      904      "haptics": "רטט (הפטיקה)",
+      905 -    "hapticsDescription": "רטט בסריקה ואישור (PWA באנדרואיד)",
+      905      "darkMode": "מצב לילה",
+      906      "darkModeDescription": "מפחית עומס על העיניים בתאורה חלשה"
+           ,
+      907      "displaySize": "גודל תצוגה",
+
+⏺ Update(locales/en.json)
+  ⎿  Removed 1 line
+      902      "colorThemeForest": "Forest (brand)",
+      903      "colorThemeClinical": "Clinical",
+      904      "haptics": "Haptic feedback",
+      905 -    "hapticsDescription": "Vibration on scan and confirm (Andr
+          -oid PWA)",                                                    
+      905      "darkMode": "Dark mode",
+      906      "darkModeDescription": "Reduces eye strain in low light",
+      907      "displaySize": "Display size",
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Update(src/lib/i18n.generated.d.ts)
+  ⎿  Removed 1 line
+      887      colorThemeForest: string;
+      888      colorThemeClinical: string;
+      889      haptics: string;
+      890 -    hapticsDescription: string;                               
+      890      darkMode: string;
+      891      darkModeDescription: string;
+      892      displaySize: string;
+
+⏺ Also need to remove hapticsDescription from i18n.ts if it's wired there:
+
+  Searched for 2 patterns (ctrl+o to expand)
+
+⏺ Good — direct reference, no manual wiring needed. C8 done. Now C2: Remove
+  "הגדרות" tab + empty clinic-settings panel from admin.tsx.
+
+  Searched for 7 patterns, read 1 file (ctrl+o to expand)
+
+⏺ The "הגדרות" tab is already gone from admin.tsx. Just clean up the orphaned
+  pilotSettings locale key:
+
+⏺ Update(locales/he.json)
+  ⎿  Added 1 line
+      1632      "pilotPulseConfirmedToday": "היום",
+      1633      "pilotPulseNeverConfirmed": "לא אושרו מעולם",
+      1634      "pilotSettings": "הגדרות פיילוט",
+      1635 +    "pilotSettings": "הגדרות פיילוט",                        
+      1636      "pilotStaleThresholdLabel": "סף ישנות",
+      1637      "pilotStaleThresholdHint": "פריטים שלא אושרו בתוך חלון זה
+             מסומנים כישנים.",
+      1638      "pilotStaleThresholdSaved": "הסף עודכן",
+
+⏺ I accidentally duplicated that key. Let me fix it:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(locales/he.json)
+  ⎿  Removed 2 lines
+      1631      "pilotPulseEverConfirmed": "אושרו אי פעם",
+      1632      "pilotPulseConfirmedToday": "היום",
+      1633      "pilotPulseNeverConfirmed": "לא אושרו מעולם",
+      1634 -    "pilotSettings": "הגדרות פיילוט",                        
+      1635 -    "pilotSettings": "הגדרות פיילוט",                        
+      1634      "pilotStaleThresholdLabel": "סף ישנות",
+      1635      "pilotStaleThresholdHint": "פריטים שלא אושרו בתוך חלון זה
+             מסומנים כישנים.",
+      1636      "pilotStaleThresholdSaved": "הסף עודכן",
+
+⏺ Update(locales/en.json)
+  ⎿  Removed 1 line
+      1631      "pilotPulseEverConfirmed": "ever confirmed",
+      1632      "pilotPulseConfirmedToday": "today",
+      1633      "pilotPulseNeverConfirmed": "never confirmed",
+      1634 -    "pilotSettings": "Pilot Settings",                       
+      1634      "pilotStaleThresholdLabel": "Stale threshold",
+      1635      "pilotStaleThresholdHint": "Items not confirmed within th
+            is window are marked stale.",
+      1636      "pilotStaleThresholdSaved": "Threshold updated",
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Update(src/lib/i18n.generated.d.ts)
+  ⎿  Removed 1 line
+      1613      pilotPulseEverConfirmed: string;
+      1614      pilotPulseConfirmedToday: string;
+      1615      pilotPulseNeverConfirmed: string;
+      1616 -    pilotSettings: string;                                   
+      1616      pilotStaleThresholdLabel: string;
+      1617      pilotStaleThresholdHint: string;
+      1618      pilotStaleThresholdSaved: string;
+
+⏺ C2 done. Now C5: Ensure /whats-new uses AppShell + same bottomNavItems as
+  other pages.
+
+  Searched for 1 pattern, read 2 files, listed 1 directory (ctrl+o to expand)
+
+⏺ Now replace Layout with AppShell in whats-new.tsx:
+
+⏺ Update(src/pages/whats-new.tsx)
+  ⎿  Added 1 line, removed 1 line
+      1  import { Helmet } from "react-helmet-async";
+      2 -import { Layout } from "@/components/layout";                   
+      2 +import { AppShell } from "@/components/layout/AppShell";        
+      3  import { t } from "@/lib/i18n";
+      4  import { Badge } from "@/components/ui/badge";
+      5  import {
+
+⏺ Update(src/pages/whats-new.tsx)
+  ⎿  Added 1 line, removed 1 line
+      74    ];
+      75  
+      76    return (
+      77 -    <Layout>                                                   
+      77 +    <AppShell title={t.whatsNew.title}>                        
+      78        <Helmet>
+      79          <title>{t.whatsNew.title}</title>
+      80        </Helmet>
+⏺ Update(src/pages/whats-new.tsx)
+  ⎿  Added 1 line, removed 1 line
+      131            </section>
+      132          ))}
+      133        </div>
+      134 -    </Layout>                                                 
+      134 +    </AppShell>                                               
+      135    );
+      136  }
+
+⏺ C5 done. Now the big one — C6: Merge shift-recap into ShiftSummarySheet, add
+  settings entry point, remove /recap route and bottom-nav item.
+
+  Let me read the relevant files:
+
+  Searched for 5 patterns, read 4 files (ctrl+o to expand)
+
+⏺ Good. Now let me make all C6 changes. Starting with shift-summary-sheet.tsx:
+
+⏺ Update(src/components/shift-summary-sheet.tsx)
+  ⎿  Added 5 lines, removed 2 lines
+      1 -import { t, formatDateTimeByLocale } from "@/lib/i18n";         
+      1 +import { t, formatDateTimeByLocale, formatDateByLocale } from "@
+        +/lib/i18n";                                                     
+      2  import { useEffect, useMemo, useRef } from "react";
+      3  import { useQuery } from "@tanstack/react-query";
+      4  import { api } from "@/lib/api";
+      5  import { useAuth } from "@/hooks/use-auth";
+      6 -import { computeAlerts } from "@/lib/utils";                    
+      6 +import { computeAlerts, cn } from "@/lib/utils";                
+      7  import { formatRelativeTime } from "@/lib/utils";
+      8  import { Button } from "@/components/ui/button";
+      9  import { Badge } from "@/components/ui/badge";
+     ...
+      19    MapPin,
+      20    ClipboardCheck,
+      21    ArrowUpRight,
+      22 +  Flame,                                                       
+      23 +  Share2,                                                      
+      24  } from "lucide-react";
+      25 +import { useEnterOnce } from "@/hooks/use-enter-once";         
+      26  import { format } from "date-fns";
+      27  import { toast } from "sonner";
+      28  import { jsPDF } from "jspdf";
+
+⏺ Now add the extra queries and computed values inside the component. First let
+  me see the current state of the component function:
+
+⏺ Update(src/components/shift-summary-sheet.tsx)
+  ⎿  Added 3 lines, removed 1 line
+      38  }
+      39  
+      40  export function ShiftSummarySheet({ open, onClose }: ShiftSumma
+          rySheetProps) {
+      41 -  const { email: userEmail, userId } = useAuth();              
+      41 +  const { email: userEmail, userId, name } = useAuth();        
+      42 +  const firstName = name?.split(" ")[0] || t.homePage.fallbackN
+         +ame;                                                           
+      43 +  const enterOnce = useEnterOnce("shift-summary-sheet");       
+      44    const sheetRef = useRef<HTMLDivElement>(null);
+      45  
+      46    useEffect(() => {
+
+⏺ Now add the dashboard queries after the existing queries:
+
+⏺ Update(src/components/shift-summary-sheet.tsx)
+  ⎿  Added 49 lines
+       93      refetchOnWindowFocus: false,
+       94    });
+       95  
+       96 +  const { data: pulse } = useQuery({                          
+       97 +    queryKey: ["/api/home/dashboard"],                        
+       98 +    queryFn: () => api.home.dashboard(),                      
+       99 +    enabled: open && !!userId,                                
+      100 +    retry: false,                                             
+      101 +    refetchOnWindowFocus: false,                              
+      102 +  });                                                         
+      103 +                                                              
+      104 +  const { data: taskDashboard } = useQuery({                  
+      105 +    queryKey: ["/api/tasks/dashboard", userId ?? ""],         
+      106 +    queryFn: () => api.tasks.dashboard(),                     
+      107 +    enabled: open && !!userId,                                
+      108 +    retry: false,                                             
+      109 +    refetchOnWindowFocus: false,                              
+      110 +  });                                                         
+      111 +                                                              
+      112 +  const tasksDone = pulse?.tasksCompletedToday ?? 0;          
+      113 +  const tasksOpen = (taskDashboard?.counts.today ?? 0) + (task
+          +Dashboard?.counts.overdue ?? 0);                              
+      114 +  const tasksTotal = tasksDone + tasksOpen;                   
+      115 +  const scansToday = pulse?.scansToday ?? 0;                  
+      116 +  const streak = pulse?.streak ?? 0;                          
+      117 +  const heroPct = tasksTotal > 0 ? Math.round((tasksDone / tas
+          +ksTotal) * 100) : null;                                       
+      118 +                                                              
+      119 +  const shareText = useMemo(() => {                           
+      120 +    const date = formatDateByLocale(new Date(), { weekday: "lo
+          +ng", day: "numeric", month: "short" });                       
+      121 +    const lines: (string | null)[] = [                        
+      122 +      t.shiftRecap.shareHeadline(firstName, date),            
+      123 +      heroPct !== null ? t.shiftRecap.shareProgress(heroPct) :
+          + null,                                                        
+      124 +      t.shiftRecap.shareTasks(tasksDone, tasksTotal),         
+      125 +      t.shiftRecap.shareScans(scansToday),                    
+      126 +      streak > 0 ? t.shiftRecap.shareStreak(streak) : null,   
+      127 +      t.shiftRecap.shareFooter,                               
+      128 +    ];                                                        
+      129 +    return lines.filter(Boolean).join("\n");                  
+      130 +  }, [firstName, heroPct, tasksDone, tasksTotal, scansToday, s
+          +treak]);                                                      
+      131 +                                                              
+      132 +  const handleShare = async () => {                           
+      133 +    try {                                                     
+      134 +      if (typeof navigator !== "undefined" && navigator.share)
+          + {                                                            
+      135 +        await navigator.share({ text: shareText, title: t.shif
+          +tRecap.shareTitle });                                         
+      136 +        return;                                               
+      137 +      }                                                       
+      138 +      await safeClipboardWriteText(shareText);                
+      139 +      toast.success(t.shiftRecap.copySuccess);                
+      140 +    } catch {                                                 
+      141 +      toast.error(t.shiftRecap.copyError);                    
+      142 +    }                                                         
+      143 +  };                                                          
+      144 +                                                              
+      145    const isLoading = myLoading || eqLoading || actLoading;
+      146    const isError = myError || eqError || actError;
+      147  
+
+⏺ Now add the streak card and 3-stat grid in the scrollable content, before the
+  "Currently checked out" section:
+
+⏺ Update(src/components/shift-summary-sheet.tsx)
+  ⎿  Added 49 lines
+      361              </div>
+      362            ) : (
+      363              <>
+      364 +              {/* Streak + today stats */}                    
+      365 +              {streak > 0 && (                                
+      366 +                <div                                          
+      367 +                  className={cn(                              
+      368 +                    "flex items-center gap-3 rounded-2xl borde
+          +r border-primary/15 bg-primary/5 p-4",                        
+      369 +                    enterOnce && "motion-safe:animate-[badgePo
+          +p_0.6s_ease-out_both]",                                       
+      370 +                  )}                                          
+      371 +                  data-testid="shift-summary-streak"          
+      372 +                >                                             
+      373 +                  <div className="inline-flex h-12 w-12 shrink
+          +-0 items-center justify-center rounded-xl bg-primary text-xl f
+          +ont-bold tabular-nums text-primary-foreground">               
+      374 +                    {streak}                                  
+      375 +                  </div>                                      
+      376 +                  <div className="min-w-0 flex-1">            
+      377 +                    <p className="inline-flex items-center gap
+          +-1 text-[10.5px] font-bold uppercase tracking-[0.14em] text-pr
+          +imary">                                                       
+      378 +                      <Flame className="h-3.5 w-3.5" aria-hidd
+          +en />                                                         
+      379 +                      {t.homePage.streakLabel(streak)}        
+      380 +                    </p>                                      
+      381 +                    <p className="mt-0.5 text-sm font-semibold
+          +">{t.homePage.streakTitle}</p>                                
+      382 +                  </div>                                      
+      383 +                </div>                                        
+      384 +              )}                                              
+      385 +                                                              
+      386 +              {/* 3-stat grid */}                             
+      387 +              <div className="grid grid-cols-3 gap-2">        
+      388 +                <div className="rounded-2xl bg-muted/60 px-3 p
+          +y-3 text-center">                                             
+      389 +                  <p className="text-2xl font-bold tabular-num
+          +s whitespace-nowrap">                                         
+      390 +                    {heroPct !== null ? `${heroPct}%` : "—"}  
+      391 +                  </p>                                        
+      392 +                  <p className="mt-1 text-[10px] font-semibold
+          + uppercase tracking-wide text-muted-foreground">              
+      393 +                    {t.shiftRecap.statProgress}               
+      394 +                  </p>                                        
+      395 +                </div>                                        
+      396 +                <div className="rounded-2xl bg-muted/60 px-3 p
+          +y-3 text-center">                                             
+      397 +                  <p className="text-2xl font-bold tabular-num
+          +s whitespace-nowrap">                                         
+      398 +                    {tasksDone}                               
+      399 +                    <span className="text-base font-semibold t
+          +ext-muted-foreground">/{tasksTotal || "—"}</span>             
+      400 +                  </p>                                        
+      401 +                  <p className="mt-1 text-[10px] font-semibold
+          + uppercase tracking-wide text-muted-foreground">              
+      402 +                    {t.shiftRecap.statTasks}                  
+      403 +                  </p>                                        
+      404 +                </div>                                        
+      405 +                <div className="rounded-2xl bg-muted/60 px-3 p
+          +y-3 text-center">                                             
+      406 +                  <p className="text-2xl font-bold tabular-num
+          +s whitespace-nowrap">{scansToday}</p>                         
+      407 +                  <p className="mt-1 text-[10px] font-semibold
+          + uppercase tracking-wide text-muted-foreground">              
+      408 +                    {t.shiftRecap.statScans}                  
+      409 +                  </p>                                        
+      410 +                </div>                                        
+      411 +              </div>                                          
+      412 +                                                              
+      413                {/* Currently checked out */}
+      414                <div>
+      415                  <div className="flex items-center gap-1.5 mb-2
+           ">
+
+⏺ Now add the Share button to the footer alongside the existing Copy and PDF
+  buttons:
+
+⏺ Update(src/components/shift-summary-sheet.tsx)
+  ⎿  Added 9 lines
+      577              <FileText className="w-4 h-4" />
+      578              {t.shiftSummaryPage.downloadPdf}
+      579            </Button>
+      580 +          <Button                                             
+      581 +            className="flex-1 gap-2"                          
+      582 +            onClick={() => void handleShare()}                
+      583 +            disabled={isLoading}                              
+      584 +            data-testid="btn-share-shift-summary"             
+      585 +          >                                                   
+      586 +            <Share2 className="w-4 h-4" />                    
+      587 +            {t.shiftRecap.shareCta}                           
+      588 +          </Button>                                           
+      589          </div>
+      590        </div>
+      591      </>
+
+⏺ Now add the ShiftSummarySheet entry to settings.tsx:
+
+⏺ Update(src/pages/settings.tsx)
+  ⎿  Added 1 line
+      1  import { AppShell } from "@/components/layout/AppShell";
+      2 +import { ShiftSummarySheet } from "@/components/shift-summary-sh
+        +eet";                                                           
+      3  import { SettingsSectionHeader, SettingsToggle, SettingsSelect }
+          from "@/components/settings-controls";
+      4  import { useSettings } from "@/hooks/use-settings";
+      5  import { useAuth } from "@/hooks/use-auth";
+
+⏺ Update(src/pages/settings.tsx)
+  ⎿  Added 1 line
+      33    AlignJustify,
+      34    Send,
+      35    ListChecks,
+      36 +  ClipboardCheck,                                              
+      37  } from "lucide-react";
+      38  import { Link } from "wouter";
+      39  import { playFeedbackTone, playMuteTone } from "@/lib/sounds";
+
+⏺ Update(src/pages/settings.tsx)
+  ⎿  Added 1 line, removed 1 line
+      40  import { toast } from "sonner";
+      41  import { t } from "@/lib/i18n";
+      42  import type { ShiftRole, UserRole } from "@/types";
+      43 -import { useEffect } from "react";                             
+      43 +import { useEffect, useState } from "react";                   
+      44  import { safeReloadPage } from "@/lib/safe-browser";
+      45  
+      46  export default function SettingsPage() {
+
+⏺ Update(src/pages/settings.tsx)
+  ⎿  Added 1 line
+      44  import { safeReloadPage } from "@/lib/safe-browser";
+      45  
+      46  export default function SettingsPage() {
+      47 +  const [shiftSummaryOpen, setShiftSummaryOpen] = useState(fals
+         +e);                                                            
+      48    const { settings, update, reset } = useSettings();
+      49    const { name, email, signOut, effectiveRole, role, isLoaded, 
+          isSignedIn } = useAuth();
+      50    const push = usePushNotifications();
+
+⏺ Now add the shift summary button in the Account section, and render the sheet:
+
+⏺ Update(src/pages/settings.tsx)
+  ⎿  Added 22 lines, removed 9 lines
+      494                  {email && <p className="text-xs text-muted-for
+           eground">{email}</p>}
+      495                </div>
+      496              )}
+      497 -            <Button                                           
+      498 -              variant="outline"                               
+      499 -              className="gap-2 w-full sm:w-auto border-border/
+          -60 text-muted-foreground hover:text-foreground"               
+      500 -              onClick={handleLogout}                          
+      501 -              data-testid="settings-logout"                   
+      502 -            >                                                 
+      503 -              <LogOut className="w-4 h-4" />                  
+      504 -              {t.settingsPage.logout}                         
+      505 -            </Button>                                         
+      497 +            <div className="flex flex-wrap gap-2">            
+      498 +              <Button                                         
+      499 +                variant="outline"                             
+      500 +                className="gap-2 border-border/60 text-muted-f
+          +oreground hover:text-foreground"                              
+      501 +                onClick={() => setShiftSummaryOpen(true)}     
+      502 +                data-testid="settings-shift-summary"          
+      503 +              >                                               
+      504 +                <ClipboardCheck className="w-4 h-4" />        
+      505 +                {t.myEquipmentPage.shiftSummary}              
+      506 +              </Button>                                       
+      507 +              <Button                                         
+      508 +                variant="outline"                             
+      509 +                className="gap-2 border-border/60 text-muted-f
+          +oreground hover:text-foreground"                              
+      510 +                onClick={handleLogout}                        
+      511 +                data-testid="settings-logout"                 
+      512 +              >                                               
+      513 +                <LogOut className="w-4 h-4" />                
+      514 +                {t.settingsPage.logout}                       
+      515 +              </Button>                                       
+      516 +            </div>                                            
+      517            </div>
+      518          </section>
+      519  
+      520 +        <ShiftSummarySheet open={shiftSummaryOpen} onClose={()
+          + => setShiftSummaryOpen(false)} />                            
+      521 +                                                              
+      522          {isAdminContext && (
+      523            <section className="space-y-2">
+      524              <SettingsSectionHeader label={t.settingsPage.crash
+           CartChecklist} />
+
+⏺ Now remove the bottom-nav recap tab from layout.tsx:
+
+⏺ Update(src/components/layout.tsx)
+  ⎿  Removed 2 lines
+      565      () => ({
+      566        home: location === "/home" || location === "/" || locati
+           on === "",
+      567        equipment: matchesRouteFamily(location, ["/equipment"]),
+      568 -      recap: location.startsWith("/recap"),                   
+      568      }),
+      569      [location],
+      570    );
+      571  
+      572    const legacyActiveTabIndex = useMemo(() => {
+      573      if (menuOpen) return 4;
+      575 -    if (bottomNavActive.recap) return 3;                      
+      574      if (bottomNavActive.equipment) return 1;
+      575      if (bottomNavActive.home) return 0;
+      576      return -1;
+
+⏺ Now remove the actual recap Link from the bottom nav:
+⏺ Update(src/components/layout.tsx)
+  ⎿  Removed 22 lines
+      1353                  </span>
+      1354                </div>
+      1355  
+      1356 -              <Link                                          
+      1357 -                href="/recap"                                
+      1358 -                className="flex flex-col items-center justify
+           --end gap-0.5 pb-2 min-h-[52px] transition-opacity duration-15
+           -0 motion-safe:active:opacity-80 motion-reduce:active:opacity-
+           -100 rounded-t-lg focus-visible:outline-none focus-visible:rin
+           -g-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus
+           --visible:ring-offset-ivory-surface cursor-pointer"           
+      1359 -                data-testid="bottom-nav-recap"               
+      1360 -              >                                              
+      1361 -                <Sparkles                                    
+      1362 -                  className={cn(                             
+      1363 -                    "w-6 h-6 transition-all duration-200",   
+      1364 -                    bottomNavActive.recap ? "text-ivory-green
+           - scale-110" : "text-ivory-text3 scale-100",                  
+      1365 -                  )}                                         
+      1366 -                  aria-hidden                                
+      1367 -                />                                           
+      1368 -                <span                                        
+      1369 -                  className={cn(                             
+      1370 -                    "text-[10px] font-semibold leading-tight 
+           -text-center max-w-[4.5rem] truncate px-0.5",                 
+      1371 -                    bottomNavActive.recap ? "text-ivory-green
+           -" : "text-ivory-text3",                                      
+      1372 -                  )}                                         
+      1373 -                >                                            
+      1374 -                  {lh.bottomRecap}                           
+      1375 -                </span>                                      
+      1376 -              </Link>                                        
+      1377 -                                                             
+      1356                <button
+      1357                  type="button"
+      1358                  onClick={() => setMenuOpen((o) => !o)}
+
+⏺ Now check if Sparkles and lh.bottomRecap are used elsewhere in layout.tsx:
+
+  Searched for 2 patterns (ctrl+o to expand)
+
+⏺ Good — Sparkles is still used for whats-new menu item, and bottomRecap is now
+  gone (no more references). Now check if lh.bottomRecap exists in the layout's
+  locale and needs cleanup:
+
+  Searched for 6 patterns (ctrl+o to expand)
+
+⏺ Remove the stale bottomRecap locale key:
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ Update(locales/he.json)
+  ⎿  Removed 1 line
+      1664      "restockNavLockedToast": "סיימו את מדור המילוי לפני ניווט
+            ",
+      1665      "navLockActiveAria": "מדור מילוי פעיל — ניווט נעול",
+      1666      "bottomRooms": "רדאר חדרים",
+      1667 -    "bottomRecap": "סיכום",                                  
+      1667      "bottomMenu": "תפריט",
+      1668      "skipToMainContent": "דלג לתוכן הראשי",
+      1669      "radar": "רדאר",
+
+⏺ Update(locales/en.json)
+  ⎿  Removed 1 line
+      1664      "restockNavLockedToast": "Finish the restock session to n
+            avigate away",
+      1665      "navLockActiveAria": "Restock session active — navigation
+             is locked",
+      1666      "bottomRooms": "Rooms",
+      1667 -    "bottomRecap": "Recap",                                  
+      1667      "bottomMenu": "Menu",
+      1668      "skipToMainContent": "Skip to main content",
+      1669      "radar": "Radar",
+
+⏺ Now also update i18n.generated.d.ts to remove bottomRecap:
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Update(src/lib/i18n.generated.d.ts)
+  ⎿  Removed 1 line
+      1646      restockNavLockedToast: string;
+      1647      navLockActiveAria: string;
+      1648      bottomRooms: string;
+      1649 -    bottomRecap: string;                                     
+      1649      bottomMenu: string;
+      1650      skipToMainContent: string;
+      1651      radar: string;
+
+⏺ Now remove the /recap route from routes.tsx:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/app/routes.tsx)
+  ⎿  Removed 1 line
+      12  
+      13  // --- Always-available pages ---
+      14  const HomePage = lazy(() => import("@/pages/home"));
+      15 -const ShiftRecapPage = lazy(() => import("@/pages/shift-recap")
+         -);                                                             
+      15  const LandingPage = lazy(() => import("@/pages/landing"));
+      16  const SignUpPage = lazy(() => import("@/pages/signup"));
+      17  const SignInPage = lazy(() => import("@/pages/signin"));
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/app/routes.tsx)
+  ⎿  Removed 1 line
+      90  
+      91          {/* --- Today & shifts --- */}
+      92          <Route path="/home"><AuthGuard><HomePage /></AuthGuard>
+          </Route>
+      93 -        <Route path="/recap"><AuthGuard><ShiftRecapPage /></Aut
+         -hGuard></Route>                                                
+      93  
+      94          {/* --- Equipment & board (canonical: /equipment, /equi
+          pment/tasks, /equipment/board) --- */}
+      95          <Route path="/equipment"><AuthGuard><EquipmentPage /></
+          AuthGuard></Route>
+
+⏺ Now also remove the AssetCopilotPanel import and usage from shift-recap.tsx
+  (C4, which is superseded by C6's merge scope — the plan says C4 was superseded
+  by C6):
+
+⏺ Update(src/pages/shift-recap.tsx)
+  ⎿  Removed 2 lines
+      16  import { useIsDesktop } from "@/hooks/use-is-desktop";
+      17  import { useEnterOnce } from "@/hooks/use-enter-once";
+      18  import { cn } from "@/lib/utils";
+      19 -import { AssetCopilotPanel } from "@/components/equipment/Asset
+         -CopilotPanel";                                                 
+      20 -                                                               
+      19  export default function ShiftRecapPage() {
+      20    const { name } = useAuth();
+      21    const userId = getCurrentUserId();
+
+⏺ Update(src/pages/shift-recap.tsx)
+  ⎿  Removed 1 line
+      170                </Button>
+      171              </section>
+      172  
+      173 -            <AssetCopilotPanel />                             
+      173            </>
+      174          )}
+      175        </div>
+
+⏺ Now run typecheck to see where we stand:
+
+⏺ Bash(npx tsc --noEmit 2>&1 | head -60)
+  ⎿  src/lib/i18n.ts(213,35): error TS2339: Property 'loadFailed' does not
+     exist on type '{ serialNumber: string; model: string; manufacturer: st
+     ring; purchaseDate: string; location: string; maintenanceInterval: str
+     … +18 lines (ctrl+o to expand)
+  ⎿  (timeout 1m 30s)
+
+⏺ Only the same 4 pre-existing NFC branch errors — no new errors from any of
+  Group C. Let me now run the parity and no-hebrew tests:
+
+⏺ Bash(pnpm test -- tests/i18n-parity.test.ts
+      tests/i18n-no-hebrew-in-source.test.ts
+      tests/i18n-appointments-tasks.test.ts 2>&1 | tail -30)
+  ⎿  > vettrack@1.1.2 test /Users/dan/vettrack
+     > vitest run tests/i18n-parity.test.ts tests/i18n-no-hebrew-in-source.
+     test.ts tests/i18n-appointments-tasks.test.ts
+     … +10 lines (ctrl+o to expand)
+
+⏺ 22/22 tests pass. Group C is complete. Now Group D — settings state bug.
+
+  The plan: D1 — each dropdown likely calls update({ ...wholeSettings, field })
+  but resets density from stale closure, OR setStoredLocale/theme change
+  remounts app. Fix: patch single field; ensure locale/theme changes don't reset
+  unrelated persisted keys.
+
+  Verify: Set density → compact; change theme → density stays compact.
+
+  Searched for 9 patterns, read 4 files (ctrl+o to expand)
+⏺ The D1 settings state implementation is already correct — update() uses
+  functional setSettings((prev) => ...) that always reads the true current
+  state, all callers pass only the changed field (no stale spread), and
+  SettingsProvider sits above the <App key={...}> that remounts on locale change
+  so settings state survives locale switches. No code change needed; the
+  pattern is sound.
+
+  Let me do a final typecheck to confirm everything is clean:
+
+⏺ Bash(npx tsc --noEmit 2>&1)
+  ⎿  Error: Exit code 2
+     src/lib/i18n.ts(213,35): error TS2339: Property 'loadFailed' does not exist
+     on type '{ serialNumber: string; model: string; manufacturer: string; 
+     purchaseDate: string; location: string; maintenanceInterval: string; 
+     lastMaintenance: string; lastSterilization: string; issuePhoto: string; ...
+     47 more ...; recoveryAttentionCalloutCheckedOutLong: string; }'.
+     src/lib/i18n.ts(214,39): error TS2339: Property 'loadFailedHint' does not 
+     exist on type '{ serialNumber: string; model: string; manufacturer: string;
+     purchaseDate: string; location: string; maintenanceInterval: string; 
+     lastMaintenance: string; lastSterilization: string; issuePhoto: string; ...
+     47 more ...; recoveryAttentionCalloutCheckedOutLong: string; }'.
+     src/lib/i18n.ts(438,44): error TS2339: Property 'alreadyToggledRecently' 
+     does not exist on type '{ toggleCheckedOut: string; toggleReturned: string;
+     toggleBlocked: string; onlineRequired: string; scanReady: string; 
+     scanStartFailed: string; enableScan: string; writeSuccess: string; 
+     writeFailed: string; writeUnsupported: string; writeTag: string; }'.
+     src/lib/i18n.ts(439,51): error TS2339: Property 'toggling' does not exist 
+     on type '{ toggleCheckedOut: string; toggleReturned: string; toggleBlocked:
+     string; onlineRequired: string; scanReady: string; scanStartFailed: 
+     string; enableScan: string; writeSuccess: string; writeFailed: string; 
+     writeUnsupported: string; writeTag: string; }'.
+
+⏺ Still only the same 4 pre-existing NFC branch errors — zero new errors from
+  any of Groups B, C, or D.
+
+⏺ Bash(pnpm test -- tests/i18n-parity.test.ts
+      tests/i18n-no-hebrew-in-source.test.ts
+      tests/i18n-appointments-tasks.test.ts 2>&1 | tail -10)
+  ⎿   RUN  v4.1.5 /Users/dan/vettrack
+     … +5 lines (ctrl+o to expand)
+
+⏺ All 22 tests green. Here's a complete summary of everything done across Groups
+  B, C, and D:
+
+  ---
+  Group B — Layout/overflow
+  - B1 appointments.tsx: Controls grid grid-cols-2 lg:grid-cols-5 → grid-cols-1 
+  sm:grid-cols-2; select gets min-w-0 max-w-full truncate; button span fixed to
+  sm:col-span-2
+  - B2 shift-leaderboard.tsx: Added overflow-x-auto wrapper + table-fixed 
+  min-w-[520px] to the table
+  - B3 audit-log.tsx: Staff/action-type filter wrappers get w-full sm:w-auto;
+  date inputs get max-w-full box-border
+
+  Group C — Structural/removal
+  - C7 locales/he.json: pickFromQueue value → "משימות ממתינות לטיפול"; test
+  updated
+  - C1 my-equipment.tsx: Removed header QR scan button, isScannerOpen state,
+  QrScanner import, QrCode icon; removed myEquipmentPage.scanQr from both
+  locales + generated types
+  - C3 settings.tsx + use-settings.tsx: Removed "dark" from color palette;
+  ColorTheme type is now "forest" | "clinical"; removed colorThemeDark locale
+  key + type; dark class now driven only by darkMode toggle
+  - C8 settings.tsx: Removed hapticsDescription from haptics toggle; removed key
+  from both locales + generated types
+  - C2 Orphaned pilotSettings locale key removed from both locales + generated
+  types (admin tab was already gone)
+  - C5 whats-new.tsx: Switched from <Layout> to <AppShell> for proper desktop
+  sidebar + consistent bottom nav
+  - C6 Full merge: streak card + 3-stat grid + share button ported into
+  ShiftSummarySheet; shift summary entry added to Settings Account section;
+  /recap route and bottom-nav recap tab removed; bottomRecap locale key cleaned
+  up; AssetCopilotPanel removed from shift-recap.tsx (C4); shift-recap.tsx NOT 
+  deleted — awaiting device verification per your note
+
+  Group D — Settings state bug
+  - D1 verified correct as-is: update() uses functional setSettings((prev) => 
+  ...), all callers pass only the changed field, SettingsProvider is outside the
+  <App key={...}> remount boundary. No code change needed.
+
+✻ Baked for 29m 44s

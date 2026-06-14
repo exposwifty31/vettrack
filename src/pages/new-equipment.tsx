@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { api } from "@/lib/api";
-import { Layout } from "@/components/layout";
+import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -288,18 +288,18 @@ export default function NewEquipmentPage() {
 
   if (isEditing && editLoading) {
     return (
-      <Layout>
+      <AppShell>
         <div className="flex flex-col gap-4 pb-24">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-64 w-full rounded-2xl" />
           <Skeleton className="h-40 w-full rounded-2xl" />
         </div>
-      </Layout>
+      </AppShell>
     );
   }
 
   return (
-    <Layout>
+    <AppShell>
       <Helmet>
         <title>
           {isEditing
@@ -572,6 +572,6 @@ export default function NewEquipmentPage() {
           </Button>
         </form>
       </div>
-    </Layout>
+    </AppShell>
   );
 }

@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
-import { Layout } from "@/components/layout";
+import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -468,7 +468,7 @@ export default function AuditLogPage() {
 
   if (!isAdmin) {
     return (
-      <Layout>
+      <AppShell>
         <Helmet>
           <title>{t.adminPage.auditLogTitle} — VetTrack</title>
         </Helmet>
@@ -478,12 +478,12 @@ export default function AuditLogPage() {
           <p className="text-sm text-muted-foreground">{t.adminPage.auditLogAdminOnlyDesc}</p>
           <Button variant="ghost" onClick={() => navigate("/home")}>{t.adminPage.auditLogGoHome}</Button>
         </div>
-      </Layout>
+      </AppShell>
     );
   }
 
   return (
-    <Layout>
+    <AppShell>
       <Helmet>
         <title>{t.adminPage.auditLogTitle} — VetTrack</title>
         <meta name="description" content="Immutable audit log of all critical actions in VetTrack." />
@@ -495,6 +495,6 @@ export default function AuditLogPage() {
         </h1>
         <SharedAuditLogsPanel />
       </div>
-    </Layout>
+    </AppShell>
   );
 }

@@ -111,7 +111,7 @@ export default function CrashCartCheckPage() {
       onClick={handleBack}
       aria-label={t.common.back}
       data-testid="crash-cart-back"
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted motion-safe:active:scale-95"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted motion-safe:active:scale-95"
     >
       <ArrowRight className="h-5 w-5" aria-hidden />
     </button>
@@ -177,10 +177,10 @@ export default function CrashCartCheckPage() {
           </div>
           <div className="flex flex-col gap-1">
             {criticalPatients.map((p) => (
-              <div key={p.hospitalizationId} className="text-xs text-zinc-300 flex gap-2">
+              <div key={p.hospitalizationId} className="text-xs text-foreground flex gap-2">
                 <span className="font-medium">{p.animalName}</span>
-                <span className="text-zinc-500">{p.species}{p.weightKg ? ` · ${t.crashCart.weightKg(p.weightKg)}` : ""}</span>
-                {(p.ward || p.bay) && <span className="text-zinc-500">· {[p.ward, p.bay].filter(Boolean).join(" / ")}</span>}
+                <span className="text-muted-foreground">{p.species}{p.weightKg ? ` · ${t.crashCart.weightKg(p.weightKg)}` : ""}</span>
+                {(p.ward || p.bay) && <span className="text-muted-foreground">· {[p.ward, p.bay].filter(Boolean).join(" / ")}</span>}
               </div>
             ))}
           </div>
@@ -188,12 +188,12 @@ export default function CrashCartCheckPage() {
       )}
 
       {/* Clinic-specific checklist (admin configures; staff sees hint) */}
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/80 p-4 mb-4">
+      <div className="rounded-lg border border-border bg-muted/80 p-4 mb-4">
         <div className="flex items-start gap-3">
           <ListChecks className="h-5 w-5 text-primary shrink-0 mt-0.5" aria-hidden />
           <div className="flex-1 min-w-0 space-y-2">
-            <p className="text-sm font-semibold text-zinc-200">{t.crashCart.customizeTitle}</p>
-            <p className="text-xs text-zinc-500 leading-relaxed">{t.crashCart.customizeDescription}</p>
+            <p className="text-sm font-semibold text-foreground">{t.crashCart.customizeTitle}</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">{t.crashCart.customizeDescription}</p>
             {isAdmin ? (
               <Button
                 type="button"
@@ -215,12 +215,12 @@ export default function CrashCartCheckPage() {
 
       {/* Checklist */}
       {itemsQ.isPending ? (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 mb-4">
-          <p className="text-sm text-zinc-500">{t.crashCart.loadingItems}</p>
+        <div className="rounded-lg border border-border bg-muted p-4 mb-4">
+          <p className="text-sm text-muted-foreground">{t.crashCart.loadingItems}</p>
         </div>
       ) : !submitted ? (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 mb-4">
-          <h2 className="text-sm font-semibold text-zinc-400 mb-3">{t.crashCart.itemsToCheck}</h2>
+        <div className="rounded-lg border border-border bg-muted p-4 mb-4">
+          <h2 className="text-sm font-semibold text-muted-foreground mb-3">{t.crashCart.itemsToCheck}</h2>
           <div className="flex flex-col gap-3">
             {cartItems.map((item) => (
               <button
@@ -232,12 +232,12 @@ export default function CrashCartCheckPage() {
                   "flex items-center gap-3 text-end p-2 rounded-lg border transition-colors",
                   checked[item.id]
                     ? "border-green-500/40 bg-green-500/10 text-green-300"
-                    : "border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-zinc-600",
+                    : "border-border bg-background text-foreground hover:border-primary/40",
                 )}
               >
                 {checked[item.id]
                   ? <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
-                  : <Circle className="h-5 w-5 text-zinc-600 shrink-0" />
+                  : <Circle className="h-5 w-5 text-muted-foreground/60 shrink-0" />
                 }
                 <span className="text-sm">{item.label}</span>
               </button>
@@ -246,7 +246,7 @@ export default function CrashCartCheckPage() {
 
           {!allChecked && (
             <textarea
-              className="mt-3 w-full rounded border border-zinc-700 bg-zinc-800 p-2 text-sm text-zinc-200 placeholder-zinc-500"
+              className="mt-3 w-full rounded border border-border bg-background p-2 text-sm text-foreground placeholder-muted-foreground"
               placeholder={t.crashCart.missingItemsNotesPlaceholder}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -272,15 +272,15 @@ export default function CrashCartCheckPage() {
 
       {/* Recent history */}
       {recentChecks.length > 0 && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-          <h2 className="text-sm font-semibold text-zinc-400 mb-3 flex items-center gap-2">
+        <div className="rounded-lg border border-border bg-muted p-4">
+          <h2 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
             <Clock className="h-4 w-4" /> {t.crashCart.historyTitle}
           </h2>
           <div className="flex flex-col gap-2">
             {recentChecks.map((check) => (
-              <div key={check.id} className="flex justify-between items-center text-xs text-zinc-400">
+              <div key={check.id} className="flex justify-between items-center text-xs text-muted-foreground">
                 <span>{formatDateByLocale(check.performedAt, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
-                <span className="text-zinc-500">{check.performedByName}</span>
+                <span className="text-muted-foreground/70">{check.performedByName}</span>
                 <span className={check.allPassed ? "text-green-400" : "text-red-400"}>
                   {check.allPassed ? t.crashCart.statusOk : t.crashCart.statusMissing}
                 </span>

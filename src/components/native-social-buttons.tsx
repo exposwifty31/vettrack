@@ -67,13 +67,13 @@ export function NativeSocialButtons({ mode }: { mode: Mode }) {
       // handles navigation. Nothing else to do here.
     } catch (err) {
       const code = err instanceof Error ? err.message : "OAUTH_FAILED";
-      if (code !== "OAUTH_TIMEOUT") {
-        setError(
-          strategy === "oauth_apple"
+      setError(
+        code === "OAUTH_TIMEOUT"
+          ? "Sign-in timed out. Please try again or sign in with email below."
+          : strategy === "oauth_apple"
             ? "Apple sign-in didn't complete. Please try again."
             : "Google sign-in didn't complete. Please try again.",
-        );
-      }
+      );
     } finally {
       setBusy(null);
     }
@@ -83,6 +83,12 @@ export function NativeSocialButtons({ mode }: { mode: Mode }) {
 
   return (
     <div className="w-full flex flex-col gap-3" dir="ltr">
+      <div className="flex items-center gap-3 py-1" aria-hidden="true">
+        <span className="h-px flex-1 bg-border" />
+        <span className="text-xs text-muted-foreground">or</span>
+        <span className="h-px flex-1 bg-border" />
+      </div>
+
       <button
         type="button"
         disabled={!ready || busy !== null}
@@ -118,12 +124,6 @@ export function NativeSocialButtons({ mode }: { mode: Mode }) {
           {error}
         </p>
       ) : null}
-
-      <div className="flex items-center gap-3 py-1" aria-hidden="true">
-        <span className="h-px flex-1 bg-border" />
-        <span className="text-xs text-muted-foreground">or</span>
-        <span className="h-px flex-1 bg-border" />
-      </div>
     </div>
   );
 }

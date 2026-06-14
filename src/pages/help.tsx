@@ -1,5 +1,5 @@
 import { t } from "@/lib/i18n";
-import { Layout } from "@/components/layout";
+import { AppShell } from "@/components/layout/AppShell";
 import { Helmet } from "react-helmet-async";
 import {
   QrCode,
@@ -57,7 +57,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function HelpPage() {
   return (
-    <Layout>
+    <AppShell>
       <Helmet>
         <title>{t.helpPage.titleFull}</title>
       </Helmet>
@@ -242,6 +242,6 @@ export default function HelpPage() {
           </Link>
         </div>
       </div>
-    </Layout>
+    </AppShell>
   );
 }

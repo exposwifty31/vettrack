@@ -65,6 +65,24 @@ export default {
           err:      "#dc2626",
           info:     "#2563eb",
         },
+
+        emergency: {
+          bg:         "rgb(var(--emergency-bg) / <alpha-value>)",
+          surface:    "rgb(var(--emergency-surface) / <alpha-value>)",
+          border:     "rgb(var(--emergency-border) / <alpha-value>)",
+          borderMd:   "rgb(var(--emergency-border-md) / <alpha-value>)",
+          text:       "rgb(var(--emergency-text) / <alpha-value>)",
+          text2:      "rgb(var(--emergency-text2) / <alpha-value>)",
+          accent:     "rgb(var(--emergency-accent) / <alpha-value>)",
+          accentSoft: "rgb(var(--emergency-accent-soft) / <alpha-value>)",
+          amber:      "rgb(var(--emergency-amber) / <alpha-value>)",
+        },
+
+        offline: {
+          bg:     "rgb(var(--offline-bg) / <alpha-value>)",
+          border: "rgb(var(--offline-border) / <alpha-value>)",
+          text:   "rgb(var(--offline-text) / <alpha-value>)",
+        },
       },
       borderRadius: {
         sm: 'var(--radius-sm)',
@@ -94,6 +112,11 @@ export default {
       transitionTimingFunction: {
         enter: "cubic-bezier(0.2, 0.8, 0.2, 1)",
         reward: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      },
+      transitionDuration: {
+        instant: "var(--motion-instant)",
+        quick:   "var(--motion-quick)",
+        enter:   "var(--motion-enter)",
       },
       keyframes: {
         "accordion-down": {
