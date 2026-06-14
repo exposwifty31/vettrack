@@ -169,7 +169,7 @@ export default function AlertsPage() {
       </Helmet>
       <div className="flex flex-col gap-5 pb-24 animate-fade-in">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold leading-tight flex items-center gap-2">
+          <h1 className="vt-page-title flex items-center gap-2">
             <Bell className="w-5 h-5 text-muted-foreground" />
             {t.alertsPage.title}
           </h1>
@@ -255,7 +255,7 @@ export default function AlertsPage() {
                   <div className="flex items-center gap-2 mb-2.5">
                     <span className={`w-2 h-2 rounded-full ${config.dotColor} shrink-0`} />
                     <h2 className="text-sm font-semibold text-foreground">{config.label}</h2>
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${config.badgeClass}`}>
+                    <span className={`vt-text-2xs font-semibold px-2 py-0.5 rounded-full border ${config.badgeClass}`}>
                       {config.badgeLabel}
                     </span>
                     <span className="text-xs text-muted-foreground ms-auto">

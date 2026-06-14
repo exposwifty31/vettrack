@@ -78,7 +78,7 @@ export function AlertsProView({
           />
           <div className="relative">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--status-issue-fg)]">
+              <span className="inline-flex items-center gap-1.5 vt-text-2xs font-bold uppercase tracking-[0.14em] text-[var(--status-issue-fg)]">
                 <span className="relative flex h-2 w-2 shrink-0">
                   <span className="absolute inset-0 rounded-full bg-[var(--status-issue)]" />
                   {enterOnce && (
@@ -139,7 +139,7 @@ export function AlertsProView({
                     <p className="truncate text-[13.5px] font-semibold text-ivory-text">
                       {alert.equipmentName}
                     </p>
-                    <p className="mt-0.5 line-clamp-2 text-[11px] text-ivory-text3">{alert.detail}</p>
+                    <p className="mt-0.5 line-clamp-2 vt-text-2xs text-ivory-text3">{alert.detail}</p>
                   </div>
                   <Chevron className="mt-0.5 h-4 w-4 shrink-0 text-ivory-text3" aria-hidden />
                 </Button>
@@ -148,7 +148,7 @@ export function AlertsProView({
                     <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-2.5 py-2">
                       <div className="flex min-w-0 items-center gap-1.5">
                         <UserCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden />
-                        <span className="truncate text-[11px] text-ivory-text2">
+                        <span className="truncate vt-text-2xs text-ivory-text2">
                           {ack.acknowledgedByEmail.split("@")[0]} ·{" "}
                           {formatRelativeTime(new Date(ack.acknowledgedAt))}
                         </span>
