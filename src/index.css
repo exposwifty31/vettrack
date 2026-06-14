@@ -106,8 +106,10 @@
     --brand-shadow: rgba(26, 61, 40, 0.5);
     --hero-a: #0a1f15;
     --hero-b: #18371f;
-    --action: #16a34a;
-    --action-deep: #15803d;
+    /* Darkened to clear WCAG AA 4.5:1 with white text and as green text on
+       white (was #16a34a = 3.30:1). #15803d = 5.02:1; hover step #166534. */
+    --action: #15803d;
+    --action-deep: #166534;
     --action-ink: #1a6d38;
     --action-soft: #ecf6ee;
     --action-border: #c7e3cf;

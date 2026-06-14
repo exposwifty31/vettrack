@@ -185,7 +185,7 @@ export default function HomePage() {
         {/* Greeting — glance only */}
         <header className={cn("flex items-start justify-between gap-3 pt-3", rise)}>
           <div className="min-w-0 flex-1 space-y-1">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-foreground/5 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-ivory-text2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-foreground/5 px-2.5 py-1 vt-text-2xs font-semibold tracking-wide text-ivory-text2">
               <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
               {dateChip}
             </span>
@@ -367,7 +367,7 @@ export default function HomePage() {
         {/* Quick actions — desktop only; mobile uses bottom nav scan + menu */}
         {isDesktop && (
           <section>
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-ivory-text3">
+            <p className="mb-2 vt-text-2xs font-bold uppercase tracking-[0.18em] text-ivory-text3">
               {t.homePage.orLabel}
             </p>
             <div className="grid grid-cols-2 gap-2">
@@ -379,7 +379,7 @@ export default function HomePage() {
               >
                 <span className="min-w-0">
                   <span className="block text-[13.5px] font-bold">{t.homePage.scanEquipment}</span>
-                  <span className="mt-0.5 block text-[11px] text-white/65">{t.homePage.scanEquipmentHint}</span>
+                  <span className="mt-0.5 block vt-text-2xs text-white">{t.homePage.scanEquipmentHint}</span>
                 </span>
                 <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15">
                   <Scan className="h-[17px] w-[17px]" aria-hidden />
@@ -426,7 +426,7 @@ export default function HomePage() {
 
         {/* Today */}
         <section>
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-ivory-text3">
+          <p className="mb-2 vt-text-2xs font-bold uppercase tracking-[0.18em] text-ivory-text3">
             {t.homePage.todayLabel}
           </p>
           {activityLoading ? (
