@@ -427,8 +427,8 @@ export default function EquipmentListPage() {
         {/* Header */}
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold leading-tight">{t.equipment.title}</h1>
-            <p className="text-xs text-muted-foreground mt-0.5 truncate">{t.equipmentTruth.heroTagline}</p>
+            <h1 className="vt-page-title">{t.equipment.title}</h1>
+            <p className="vt-text-xs text-muted-foreground mt-0.5 truncate">{t.equipmentTruth.heroTagline}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Button
@@ -524,7 +524,7 @@ export default function EquipmentListPage() {
               <button
                 key={opt.value}
                 onClick={() => setStatusFilter(opt.value)}
-                className={`shrink-0 flex items-center px-3 min-h-[44px] rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${
+                className={`shrink-0 flex items-center px-3 min-h-[44px] rounded-full vt-text-xs font-medium border transition-colors whitespace-nowrap ${
                   statusFilter === opt.value
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
@@ -541,7 +541,7 @@ export default function EquipmentListPage() {
                   setRecoveryAttentionFilterActive((prev) => !prev);
                   setPage(1);
                 }}
-                className={`shrink-0 flex items-center px-3 min-h-[44px] rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${
+                className={`shrink-0 flex items-center px-3 min-h-[44px] rounded-full vt-text-xs font-medium border transition-colors whitespace-nowrap ${
                   recoveryAttentionFilterActive
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
@@ -647,7 +647,7 @@ export default function EquipmentListPage() {
             >
               <button
                 onClick={() => setLocationFilter("all")}
-                className={`shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                className={`shrink-0 flex items-center gap-1 px-3 min-h-[44px] rounded-full vt-text-xs font-medium border transition-colors ${
                   locationFilter === "all"
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
@@ -661,7 +661,7 @@ export default function EquipmentListPage() {
                 <button
                   key={loc}
                   onClick={() => setLocationFilter(loc)}
-                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${
+                  className={`shrink-0 flex items-center px-3 min-h-[44px] rounded-full vt-text-xs font-medium border transition-colors whitespace-nowrap ${
                     locationFilter === loc
                       ? "bg-primary text-primary-foreground border-primary"
                       : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
@@ -888,7 +888,7 @@ export default function EquipmentListPage() {
                   return [
                     <p
                       key={`tier-hd-${tier}`}
-                      className="text-[10px] font-bold uppercase tracking-[0.18em] text-ivory-text3 pt-1 first:pt-0"
+                      className="vt-text-2xs font-bold uppercase tracking-[0.18em] text-ivory-text3 pt-1 first:pt-0"
                     >
                       {tierLabels[tier]}
                     </p>,
@@ -1162,7 +1162,7 @@ function EquipmentItem({
                 {shouldShowRfidAttentionBadge(eq) && (
                   <button
                     type="button"
-                    className="mt-1 text-[11px] font-medium border border-amber-300 text-amber-900 dark:text-amber-200 rounded px-2 py-0.5"
+                    className="mt-1 vt-text-2xs font-medium border border-amber-300 text-amber-900 dark:text-amber-200 rounded px-2 py-0.5"
                     data-testid={`equipment-rfid-attention-${eq.id}`}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1189,19 +1189,19 @@ function EquipmentItem({
                     {formatRelativeTime(eq.lastSeen?.toString())}
                   </span>
                   {expiryState === "expired" && (
-                    <Badge variant="issue" className="px-2 py-0.5 text-[11px] font-medium">
+                    <Badge variant="issue" className="px-2 py-0.5 vt-text-2xs font-medium">
                       <CalendarX className="w-3 h-3" />
                       פג תוקף
                     </Badge>
                   )}
                   {expiryState === "expiring_soon" && (
-                    <Badge variant="maintenance" className="px-2 py-0.5 text-[11px] font-medium">
+                    <Badge variant="maintenance" className="px-2 py-0.5 vt-text-2xs font-medium">
                       <CalendarClock className="w-3 h-3" />
                       פחות מ-7 ימים
                     </Badge>
                   )}
                   {expiryState === "healthy" && (
-                    <Badge variant="ok" className="px-2 py-0.5 text-[11px] font-medium">
+                    <Badge variant="ok" className="px-2 py-0.5 vt-text-2xs font-medium">
                       <CalendarCheck className="w-3 h-3" />
                       בתוקף
                     </Badge>
@@ -1218,7 +1218,7 @@ function EquipmentItem({
                   {recoveryBadgeKey && (
                     <Badge
                       variant="outline"
-                      className="shrink-0 text-[10px] px-2 py-0.5"
+                      className="shrink-0 vt-text-2xs px-2 py-0.5"
                       data-testid={`equipment-list-recovery-badge-${eq.id}`}
                     >
                       {t.equipmentList[recoveryBadgeKey]}
