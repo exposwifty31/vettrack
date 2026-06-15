@@ -1,4 +1,4 @@
-import { createRoot } from "react-dom/client";
+import { createRoot, type Root } from "react-dom/client";
 import { ClerkProvider, type ClerkProp } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
 import App from "./App";
@@ -8,6 +8,7 @@ import "./instrument";
 import { ClerkAuthProviderInner } from "@/hooks/use-auth";
 import { SyncProvider } from "@/hooks/use-sync";
 import { SettingsProvider } from "@/hooks/use-settings";
+import { ConfirmProvider } from "@/hooks/use-confirm";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Toaster } from "sonner";
@@ -49,6 +50,13 @@ if (import.meta.env.DEV || isCapacitorNative()) {
 }
 
 const rootEl = document.getElementById("root");
+
+/** Persist across Vite HMR so we never call createRoot twice on #root. */
+declare global {
+  interface Window {
+    __VT_REACT_ROOT__?: Root;
+  }
+}
 
 function AppBootstrap() {
   const [localeVersion, setLocaleVersion] = useState(0);
@@ -171,9 +179,10 @@ if (!rootEl) {
   const appShell = (
     <QueryClientProvider client={queryClient}>
       <SettingsProvider>
-        <ClerkAuthProviderInner>
-          <AppErrorBoundary>
-            <SyncProvider>
+        <ConfirmProvider>
+          <ClerkAuthProviderInner>
+            <AppErrorBoundary>
+              <SyncProvider>
               <AppBootstrap />
               <SwUpdateBanner />
               <SyncStatusBanner />
@@ -196,9 +205,10 @@ if (!rootEl) {
                   },
                 }}
               />
-            </SyncProvider>
-          </AppErrorBoundary>
-        </ClerkAuthProviderInner>
+              </SyncProvider>
+            </AppErrorBoundary>
+          </ClerkAuthProviderInner>
+        </ConfirmProvider>
       </SettingsProvider>
     </QueryClientProvider>
   );
@@ -224,8 +234,13 @@ if (!rootEl) {
           })
       : Promise.resolve(undefined);
 
-  void nativeClerkPromise.then((nativeClerk) => {
-    createRoot(rootEl).render(
+  const renderApp = (nativeClerk?: ClerkProp) => {
+    let root = window.__VT_REACT_ROOT__;
+    if (!root) {
+      root = createRoot(rootEl);
+      window.__VT_REACT_ROOT__ = root;
+    }
+    root.render(
       <HelmetProvider>
         {clerkRuntime ? (
           <ClerkProvider {...clerkRuntime} Clerk={nativeClerk}>
@@ -234,7 +249,19 @@ if (!rootEl) {
         ) : (
           appShell
         )}
-      </HelmetProvider>
+      </HelmetProvider>,
     );
+  };
+
+  void nativeClerkPromise.then((nativeClerk) => {
+    renderApp(nativeClerk);
   });
+
+  if (import.meta.hot) {
+    import.meta.hot.accept(() => {
+      void nativeClerkPromise.then((nativeClerk) => {
+        renderApp(nativeClerk);
+      });
+    });
+  }
 }

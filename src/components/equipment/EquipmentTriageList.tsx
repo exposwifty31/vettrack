@@ -1,4 +1,6 @@
 import { Link } from "wouter";
+import { getEquipmentDisplayName } from "@/lib/equipment-display";
+import { Bdi } from "@/components/ui/bdi";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/utils";
@@ -74,7 +76,7 @@ export function EquipmentTriageList({ items, className }: EquipmentTriageListPro
             />
             <div className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2.5">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13.5px] font-semibold text-ivory-text">{eq.name}</p>
+                <p className="truncate text-[13.5px] font-semibold text-ivory-text"><Bdi>{getEquipmentDisplayName(eq)}</Bdi></p>
                 <p className="font-num mt-0.5 truncate text-[11px] text-ivory-text3">
                   {eq.serialNumber || eq.id.slice(0, 8)}
                   {eq.location ? ` · ${eq.location}` : ""}

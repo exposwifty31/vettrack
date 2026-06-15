@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { computeAlerts } from "@/lib/utils";
+import { buildAlertAckSet, countActiveAlerts } from "@/lib/alert-counts";
 import {
   ArrowLeft,
   ArrowRight,
@@ -24,6 +25,7 @@ import {
   WifiOff,
   PackageOpen,
   Clock,
+  CloudUpload,
   CalendarDays,
   XCircle,
   RefreshCw,
@@ -391,6 +393,15 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     refetchOnWindowFocus: false,
   });
 
+  const { data: alertAcks } = useQuery({
+    queryKey: ["/api/alert-acks"],
+    queryFn: api.alertAcks.list,
+    enabled: Boolean(userId),
+    staleTime: 30_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
   useEffect(() => {
     const onOnline = () => setIsOnline(true);
     const onOffline = () => setIsOnline(false);
@@ -414,7 +425,8 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   }, [quickSettingsOpen]);
 
   const alerts = equipment ? computeAlerts(equipment) : [];
-  const alertCount = alerts.length;
+  const alertAckSet = buildAlertAckSet(alertAcks);
+  const alertCount = countActiveAlerts(alerts, alertAckSet);
   const myCount = myEquipment?.length ?? 0;
 
   useEffect(() => {
@@ -825,7 +837,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                 title={lh.pendingTitle(pendingCount)}
                 data-testid="sync-pending-indicator"
               >
-                <Clock className="w-3 h-3" />
+                <CloudUpload className="w-3 h-3" />
                 <span>{lh.pendingShort(pendingCount)}</span>
               </button>
             )}

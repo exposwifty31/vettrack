@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { computeAlerts, cn } from "@/lib/utils";
+import { buildAlertAckSet } from "@/lib/alert-counts";
 import { formatRelativeTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -193,13 +194,11 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
   ) ?? [];
 
   const allAlerts = equipment ? computeAlerts(equipment) : [];
-  const acksSet = new Set(
-    (acks as AlertAcknowledgment[] | undefined)?.map((a) => `${a.equipmentId}:${a.alertType}`) ?? []
-  );
+  const acksSet = buildAlertAckSet(acks as AlertAcknowledgment[] | undefined);
   const urgentAlerts = allAlerts.filter(
     (a) =>
       (a.severity === "critical" || a.severity === "high") &&
-      !acksSet.has(`${a.equipmentId}:${a.type}`)
+      !acksSet.has(`${a.equipmentId}:${a.type}`),
   );
 
   const personalDebt = useMemo(() => {

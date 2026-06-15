@@ -12,6 +12,7 @@ export const postEquipmentCreateHandler: RequestHandler = async (req, res) => {
     const clinicId = req.clinicId!;
     const {
       name,
+      nameHe,
       serialNumber,
       model,
       manufacturer,
@@ -30,6 +31,7 @@ export const postEquipmentCreateHandler: RequestHandler = async (req, res) => {
       staffNote,
     } = req.body as {
       name: string;
+      nameHe?: string | null;
       serialNumber?: string;
       model?: string;
       manufacturer?: string;
@@ -66,6 +68,7 @@ export const postEquipmentCreateHandler: RequestHandler = async (req, res) => {
         id: randomUUID(),
         clinicId,
         name: name.trim(),
+        nameHe: nameHe?.trim() || null,
         serialNumber: serialNumber ?? null,
         model: model ?? null,
         manufacturer: manufacturer ?? null,

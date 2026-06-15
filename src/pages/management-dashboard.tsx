@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { ErrorCard } from "@/components/ui/error-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { computeDashboardData, type CriticalItem } from "@/lib/dashboard-utils";
+import { getEquipmentDisplayName } from "@/lib/equipment-display";
 import { generateMonthlyReport } from "@/lib/generate-report";
 import { isEquipmentRecoveryUiEnabled } from "@/lib/equipment-recovery-ui-flag";
 import {
@@ -296,7 +297,7 @@ export default function ManagementDashboardPage() {
                             <Link key={eq.id} href={`/equipment/${eq.id}`}>
                               <div className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40 transition-colors border-b border-border/40 last:border-0 cursor-pointer min-h-[44px]">
                                 <div className="min-w-0">
-                                  <p className="text-sm font-medium truncate">{eq.name}</p>
+                                  <p className="text-sm font-medium truncate">{getEquipmentDisplayName(eq)}</p>
                                   {eq.checkedOutLocation && (
                                     <p className="text-xs text-muted-foreground">{eq.checkedOutLocation}</p>
                                   )}

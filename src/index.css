@@ -217,7 +217,8 @@
     --secondary: 214 32% 95%;
     --secondary-foreground: 222 47% 11%;
     --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    /* L44% (was 47%) — clears WCAG AA 4.5:1 on clinical cool-white canvas (4.49:1 at 47%). */
+    --muted-foreground: 215 16% 44%;
     --accent: 226 100% 94%;
     --accent-foreground: 244 47% 20%;
     --ring: 243 75% 59%;

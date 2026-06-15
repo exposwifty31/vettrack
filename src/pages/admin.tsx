@@ -35,6 +35,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
+import { Bdi } from "@/components/ui/bdi";
+import { TruncatedText } from "@/components/ui/truncated-text";
 import {
   Shield,
   Users,
@@ -63,6 +65,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { useConfirm } from "@/hooks/use-confirm";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import type {
@@ -264,6 +267,7 @@ export default function AdminPage() {
 }
 
 function FoldersSection() {
+  const confirm = useConfirm();
   const { userId } = useAuth();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
@@ -368,36 +372,27 @@ function FoldersSection() {
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="text-destructive hover:text-destructive"
-                        data-testid={`btn-delete-folder-${f.id}`}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete "{f.name}"?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Equipment in this folder will become unfiled. This
-                          cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>{t.adminPage.cancel}</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => deleteMut.mutate(f.id)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          Yes, delete folder
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-destructive hover:text-destructive h-11 w-11"
+                    data-testid={`btn-delete-folder-${f.id}`}
+                    onClick={async () => {
+                      if (
+                        !(await confirm({
+                          title: t.adminPage.deleteFolderTitle(f.name),
+                          description: t.adminPage.deleteFolderBody,
+                          confirmLabel: t.adminPage.deleteFolderConfirm,
+                          destructive: true,
+                        }))
+                      ) {
+                        return;
+                      }
+                      deleteMut.mutate(f.id);
+                    }}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
                 </div>
               </div>
             ))}
@@ -470,6 +465,7 @@ function FoldersSection() {
 }
 
 function PendingUsersSection() {
+  const confirm = useConfirm();
   const { userId } = useAuth();
   const queryClient = useQueryClient();
 
@@ -515,7 +511,7 @@ function PendingUsersSection() {
           </div>
         ) : !pendingUsers || pendingUsers.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-6">
-            No pending users. All sign-ups have been reviewed.
+            {t.adminPage.pendingEmpty}
           </p>
         ) : (
           <div className="flex flex-col gap-2">
@@ -526,55 +522,44 @@ function PendingUsersSection() {
                 className="flex items-center justify-between p-3 bg-background rounded-xl border border-border gap-3 hover:bg-muted/50 transition-colors"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">
-                    {user.displayName || user.name || user.email}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {user.email}
-                  </p>
+                  <Bdi>
+                    <TruncatedText
+                      text={user.displayName || user.name || user.email}
+                      className="text-sm font-medium"
+                      as="p"
+                    />
+                  </Bdi>
+                  <Bdi dir="ltr">
+                    <TruncatedText text={user.email} className="text-xs text-muted-foreground" as="p" />
+                  </Bdi>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {t.adminPage.signedUp(formatDateByLocale(user.createdAt))}
                   </p>
                 </div>
                 <div className="flex gap-2 shrink-0">
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive h-11 px-2.5"
-                        disabled={updateStatusMut.isPending}
-                        data-testid={`btn-reject-user-${user.id}`}
-                      >
-                        <XCircle className="w-3.5 h-3.5 me-1" />
-                        {t.adminPage.reject}
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>
-                          {t.adminPage.rejectUserTitle(user.displayName || user.name || user.email || "")}
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                          {t.adminPage.rejectUserBody}
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>{t.adminPage.cancel}</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() =>
-                            updateStatusMut.mutate({
-                              id: user.id,
-                              status: "blocked",
-                            })
-                          }
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          {t.adminPage.rejectUserConfirm}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive h-11 px-2.5"
+                    disabled={updateStatusMut.isPending}
+                    data-testid={`btn-reject-user-${user.id}`}
+                    onClick={async () => {
+                      if (
+                        !(await confirm({
+                          title: t.adminPage.rejectUserTitle(user.displayName || user.name || user.email || ""),
+                          description: t.adminPage.rejectUserBody,
+                          confirmLabel: t.adminPage.rejectUserConfirm,
+                          destructive: true,
+                        }))
+                      ) {
+                        return;
+                      }
+                      updateStatusMut.mutate({ id: user.id, status: "blocked" });
+                    }}
+                  >
+                    <XCircle className="w-3.5 h-3.5 me-1" />
+                    {t.adminPage.reject}
+                  </Button>
                   <Button
                     size="sm"
                     className="bg-emerald-600 hover:bg-emerald-700 text-white h-11 px-2.5"
@@ -633,14 +618,14 @@ function StatusBadge({ status }: { status: string }) {
   if (status === "active") {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200">
-        Active
+        {t.adminPage.filterActive}
       </span>
     );
   }
   if (status === "blocked") {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-red-50 text-red-700 border-red-200">
-        Blocked
+        {t.adminPage.filterBlocked}
       </span>
     );
   }
@@ -654,6 +639,7 @@ function StatusBadge({ status }: { status: string }) {
 type UserStatusFilter = "all" | "pending" | "active" | "blocked";
 
 function UsersSection() {
+  const confirm = useConfirm();
   const { userId } = useAuth();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("all");
@@ -810,7 +796,7 @@ function UsersSection() {
             message={
               statusFilter === "all"
                 ? t.adminPage.noUsersYet
-                : `No ${statusFilter} users`
+                : t.adminPage.noMatchingUsers
             }
             subMessage={
               statusFilter === "all"
@@ -827,64 +813,56 @@ function UsersSection() {
                 className="flex items-start justify-between p-3 bg-card rounded-xl border border-border gap-3 hover:bg-muted/50 transition-colors"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-medium truncate">
-                      {user.displayName || user.name || user.email}
-                    </p>
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <Bdi className="min-w-0 flex-1">
+                      <TruncatedText
+                        text={user.displayName || user.name || user.email}
+                        className="text-sm font-medium"
+                        as="p"
+                      />
+                    </Bdi>
                     <RoleBadge role={user.role} />
                     {user.secondaryRole && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border border-border bg-muted text-muted-foreground">
-                        +{user.secondaryRole}
+                      <span
+                        className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border border-border bg-muted text-muted-foreground"
+                        title={t.adminPage.secondaryRoleTooltip}
+                      >
+                        +{ROLE_LABELS[user.secondaryRole as UserRole] ?? user.secondaryRole}
                       </span>
                     )}
                     <StatusBadge status={user.status} />
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {user.email}
-                  </p>
+                  <Bdi dir="ltr">
+                    <TruncatedText text={user.email} className="text-xs text-muted-foreground" as="p" />
+                  </Bdi>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {t.adminPage.joined(formatDateByLocale(user.createdAt))}
                   </p>
                   {user.status === "pending" && (
                     <div className="flex gap-2 mt-2">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive h-11 px-2 text-xs"
-                            disabled={updateStatusMut.isPending}
-                            data-testid={`btn-reject-user-${user.id}`}
-                          >
-                            <XCircle className="w-3 h-3 me-1" />
-                            {t.adminPage.reject}
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>
-                              {t.adminPage.rejectUserTitle(user.displayName || user.name || user.email || "")}
-                            </AlertDialogTitle>
-                            <AlertDialogDescription>
-                              {t.adminPage.rejectUserBody}
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>{t.adminPage.cancel}</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() =>
-                                updateStatusMut.mutate({
-                                  id: user.id,
-                                  status: "blocked",
-                                })
-                              }
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              {t.adminPage.rejectUserConfirm}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive h-11 px-2 text-xs"
+                        disabled={updateStatusMut.isPending}
+                        data-testid={`btn-reject-user-${user.id}`}
+                        onClick={async () => {
+                          if (
+                            !(await confirm({
+                              title: t.adminPage.rejectUserTitle(user.displayName || user.name || user.email || ""),
+                              description: t.adminPage.rejectUserBody,
+                              confirmLabel: t.adminPage.rejectUserConfirm,
+                              destructive: true,
+                            }))
+                          ) {
+                            return;
+                          }
+                          updateStatusMut.mutate({ id: user.id, status: "blocked" });
+                        }}
+                      >
+                        <XCircle className="w-3 h-3 me-1" />
+                        {t.adminPage.reject}
+                      </Button>
                       <Button
                         size="sm"
                         className="bg-emerald-600 hover:bg-emerald-700 text-white h-11 px-2 text-xs"
@@ -905,39 +883,29 @@ function UsersSection() {
                 </div>
                 <div className="flex flex-col gap-1.5 shrink-0">
                   <div className="flex gap-1.5 justify-end">
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 px-2 text-xs"
-                          data-testid={`btn-soft-delete-user-${user.id}`}
-                          disabled={deleteUserMut.isPending || Boolean(user.deletedAt)}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {t.adminPage.deleteUser}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>
-                            {t.adminPage.deleteUserTitle(user.displayName || user.name || user.email || "")}
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            {t.adminPage.deleteUserBody}
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>{t.adminPage.cancel}</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => deleteUserMut.mutate(user.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            {t.adminPage.deleteUserConfirm}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 px-2 text-xs"
+                      data-testid={`btn-soft-delete-user-${user.id}`}
+                      disabled={deleteUserMut.isPending || Boolean(user.deletedAt)}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (
+                          !(await confirm({
+                            title: t.adminPage.deleteUserTitle(user.displayName || user.name || user.email || ""),
+                            description: t.adminPage.deleteUserBody,
+                            confirmLabel: t.adminPage.deleteUserConfirm,
+                            destructive: true,
+                          }))
+                        ) {
+                          return;
+                        }
+                        deleteUserMut.mutate(user.id);
+                      }}
+                    >
+                      {t.adminPage.deleteUser}
+                    </Button>
                     {user.deletedAt ? (
                       <Button
                         size="sm"
@@ -1217,13 +1185,15 @@ function DeletedItemsSection() {
                   className="flex items-center justify-between p-3 bg-card rounded-xl border border-border gap-3 hover:bg-muted/50 transition-colors"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{item.name}</p>
+                    <Bdi>
+                      <TruncatedText text={item.name} className="text-sm font-medium" as="p" />
+                    </Bdi>
                     {(item.model || item.serialNumber) && (
-                      <p className="text-xs text-muted-foreground truncate">
-                        {[item.model, item.serialNumber]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </p>
+                      <TruncatedText
+                        text={[item.model, item.serialNumber].filter(Boolean).join(" · ")}
+                        className="text-xs text-muted-foreground"
+                        as="p"
+                      />
                     )}
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {t.adminPage.deletedOn(formatDateByLocale(item.deletedAt))}
@@ -1275,12 +1245,16 @@ function DeletedItemsSection() {
                   className="flex items-center justify-between p-3 bg-card rounded-xl border border-border gap-3 hover:bg-muted/50 transition-colors"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">
-                      {user.displayName || user.name || user.email}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {user.email}
-                    </p>
+                    <Bdi>
+                      <TruncatedText
+                        text={user.displayName || user.name || user.email}
+                        className="text-sm font-medium"
+                        as="p"
+                      />
+                    </Bdi>
+                    <Bdi dir="ltr">
+                      <TruncatedText text={user.email} className="text-xs text-muted-foreground" as="p" />
+                    </Bdi>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {user.deletedAt
                         ? t.adminPage.deletedOn(formatDateByLocale(user.deletedAt))
@@ -1431,10 +1405,10 @@ function SupportSection() {
                 className="flex items-start justify-between p-3 bg-muted/50 rounded-xl border border-border hover:bg-muted/50 transition-colors text-left w-full gap-3"
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{ticket.title}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {ticket.userEmail}
-                  </p>
+                  <TruncatedText text={ticket.title} className="text-sm font-medium" as="p" />
+                  <Bdi dir="ltr">
+                    <TruncatedText text={ticket.userEmail} className="text-xs text-muted-foreground" as="p" />
+                  </Bdi>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {formatDateByLocale(ticket.createdAt)}
                   </p>
@@ -1529,7 +1503,9 @@ function SupportSection() {
                   <span className="font-semibold text-muted-foreground">
                     Submitted by
                   </span>
-                  <p className="truncate">{selectedTicket.userEmail}</p>
+                  <Bdi dir="ltr">
+                    <TruncatedText text={selectedTicket.userEmail} className="text-sm" as="p" />
+                  </Bdi>
                 </div>
                 <div>
                   <span className="font-semibold text-muted-foreground">
@@ -1542,7 +1518,7 @@ function SupportSection() {
                     <span className="font-semibold text-muted-foreground">
                       Page URL
                     </span>
-                    <p className="truncate">{selectedTicket.pageUrl}</p>
+                    <TruncatedText text={selectedTicket.pageUrl} className="text-sm" as="p" />
                   </div>
                 )}
                 {selectedTicket.appVersion && (

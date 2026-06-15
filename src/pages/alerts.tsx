@@ -11,6 +11,7 @@ import { SkeletonAlertCard } from "@/components/ui/skeleton-cards";
 import { ErrorCard } from "@/components/ui/error-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { computeAlerts } from "@/lib/utils";
+import { buildAlertAckSet, countActiveAlerts } from "@/lib/alert-counts";
 import {
   AlertTriangle,
   Clock,
@@ -21,9 +22,10 @@ import {
   UserCheck,
   X,
   MapPin,
-  ChevronRight,
   Loader2,
 } from "lucide-react";
+import { TruncatedText } from "@/components/ui/truncated-text";
+import { ForwardChevron } from "@/components/ui/directional-chevron";
 import type { Alert, AlertType, AlertAcknowledgment } from "@/types";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -142,6 +144,7 @@ export default function AlertsPage() {
       acksMap.set(`${ack.equipmentId}:${ack.alertType}`, ack);
     }
   }
+  const activeAlertCount = countActiveAlerts(alerts, acksMap);
 
   const equipmentLocationMap = new Map<string, string>();
   if (equipment) {
@@ -173,9 +176,9 @@ export default function AlertsPage() {
             <Bell className="w-5 h-5 text-muted-foreground" />
             {t.alertsPage.title}
           </h1>
-          {alerts.length > 0 && (
+          {activeAlertCount > 0 && (
             <span className="text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
-              {t.alertsPage.activeCount(alerts.length)}
+              {t.alertsPage.activeCount(activeAlertCount)}
             </span>
           )}
         </div>
@@ -283,9 +286,11 @@ export default function AlertsPage() {
                               <Icon className="w-4 h-4 text-muted-foreground" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-sm truncate">
-                                {alert.equipmentName}
-                              </p>
+                              <TruncatedText
+                                text={alert.equipmentName}
+                                className="font-semibold text-sm"
+                                as="p"
+                              />
                               <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                                 {alert.detail}
                               </p>
@@ -296,7 +301,7 @@ export default function AlertsPage() {
                                 </p>
                               )}
                             </div>
-                            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
+                            <ForwardChevron className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
                           </button>
 
                           {/* Single action: acknowledge / handling status */}
@@ -306,12 +311,14 @@ export default function AlertsPage() {
                                 <div className="flex items-center gap-1.5 min-w-0">
                                   <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                                   <div className="min-w-0">
-                                    <span className="text-xs text-foreground font-medium truncate block">
-                                      {ack.acknowledgedByEmail.split("@")[0]}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground truncate block">
-                                      {t.alertsPage.inProgressSince} {formatRelativeTime(new Date(ack.acknowledgedAt))}
-                                    </span>
+                                    <TruncatedText
+                                      text={ack.acknowledgedByEmail.split("@")[0]}
+                                      className="text-xs text-foreground font-medium"
+                                    />
+                                    <TruncatedText
+                                      text={`${t.alertsPage.inProgressSince} ${formatRelativeTime(new Date(ack.acknowledgedAt))}`}
+                                      className="text-xs text-muted-foreground"
+                                    />
                                   </div>
                                 </div>
                                 {canOwnAlerts && (

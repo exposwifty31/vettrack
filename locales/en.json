@@ -17,6 +17,7 @@
     "all": "All",
     "none": "None",
     "unknown": "Unknown",
+    "never": "Never",
     "select": "Select",
     "unfiled": "Unfiled",
     "justNow": "Just now",
@@ -117,7 +118,18 @@
       "moveError": "Move failed",
       "exportError": "Export failed",
       "checkoutError": "Equipment checkout failed",
-      "returnError": "Return failed"
+      "returnError": "Return failed",
+      "returnSuccess": "Returned — {name} is now available"
+    },
+    "quickAction": {
+      "checkout": "Check out",
+      "return": "Return",
+      "viewIssue": "View issue"
+    },
+    "bulkDelete": {
+      "title": "Delete {count} items?",
+      "description": "This permanently deletes the selected equipment and all their history. This cannot be undone.",
+      "confirm": "Yes, permanently delete"
     },
     "linkedInUse": "In use for: {name}",
     "recoveryBadgeStale": "Needs confirm",
@@ -132,7 +144,20 @@
     "statInUse": "In use",
     "statUptime": "Uptime",
     "filterAll": "All",
-    "recoveryAttentionSummary": "{count} item(s) need attention"
+    "recoveryAttentionSummary": "{count} item(s) need attention",
+    "paginationCount": "{shown} of {total} items",
+    "paginationPage": "page {page} of {pages}",
+    "paginationPrevious": "Previous",
+    "paginationNext": "Next",
+    "clearRoomFilter": "Clear room filter",
+    "selection": {
+      "selectAll": "Select all",
+      "deselectAll": "Deselect all",
+      "selectedCount": "{count} selected",
+      "itemAriaLabel": "{name}, {status}",
+      "itemStatusChecked": "selected",
+      "itemStatusUnchecked": "not selected"
+    }
   },
   "shiftHandoverPage": {
     "title": "Shift End",
@@ -302,7 +327,12 @@
     "noContainers": "No containers in the system",
     "startSessionFailed": "Could not start the restock session — please try again",
     "finishSessionFailed": "Could not finish the restock — please try again",
-    "errorWithRequestId": "{message} (ref: {requestId})"
+    "errorWithRequestId": "{message} (ref: {requestId})",
+    "departments": {
+      "hospital": "Hospital",
+      "emergency": "Emergency",
+      "internalMedicine": "Internal Medicine"
+    }
   },
   "equipmentTruth": {
     "title": "Operational truth",
@@ -469,6 +499,11 @@
     "sterilizationDue": "Sterilization due (7+ days)",
     "expiryExpired": "Expired",
     "expirySoon": "Expiring soon",
+    "expiryValid": "Valid",
+    "deleteTitle": "Delete {name}?",
+    "deleteBody": "This hides the equipment from active lists (soft-delete). Audit and scan history are preserved.",
+    "deleteConfirm": "Delete",
+    "deleteAriaLabel": "Delete equipment",
     "recoveryBadgeStale": "Needs confirm",
     "recoveryBadgeVeryStale": "Very stale",
     "recoveryBadgeCheckedOutLong": "Checked out long",
@@ -500,6 +535,10 @@
       "name": {
         "placeholder": "e.g. Autoclave Unit A",
         "error": "Name is required"
+      },
+      "nameHe": {
+        "label": "Hebrew name",
+        "placeholder": "e.g. Autoclave Unit A (Hebrew)"
       },
       "serialNumber": {
         "placeholder": "SN-12345"
@@ -550,7 +589,11 @@
     },
     "actions": {
       "returnAll": "Return all"
-    }
+    },
+    "returnAllTitle": "Return all {count} items?",
+    "returnAllBody": "This will return all checked-out items and make them available for others.",
+    "returnAllConfirm": "Confirm return all",
+    "checkedOutCount": "{count} checked out"
   },
   "alerts": {
     "types": {
@@ -954,17 +997,34 @@
     "resetDescription": "Restore all settings to default values. This cannot be undone.",
     "resetButton": "Reset to default",
     "resetDialogTitle": "Reset all settings?",
+    "resetSuccess": "Settings restored to defaults",
     "account": "Account",
     "crashCartChecklist": "Crash cart checklist",
     "crashCartChecklistDescription": "Customize the daily check items to match the crash cart in your department — add, edit, or remove items.",
     "crashCartChecklistManage": "Edit checklist",
     "about": "About",
-    "logout": "Sign out"
+    "versionLabel": "Version",
+    "seeWhatsNew": "See what's new",
+    "logout": "Sign out",
+    "logoutConfirmTitle": "Sign out?",
+    "logoutConfirmDescription": "You will need to sign in again to access VetTrack.",
+    "showEmail": "Show email",
+    "hideEmail": "Hide email",
+    "pushSyncFailed": "Failed to sync notification settings",
+    "loadFailedForSession": "Settings could not be loaded for this session.",
+    "language": "Language",
+    "languageDescription": "Choose interface language and text direction",
+    "languageEn": "English",
+    "languageHe": "Hebrew",
+    "timeFormat12h": "12-hour (AM/PM)",
+    "timeFormat24h": "24-hour",
+    "sendTest": "Send test"
   },
   "adminShiftsPage": {
     "title": "Shift management",
     "subtitle": "Import shifts from EZShift and view import history",
     "uploadCsv": "Upload CSV",
+    "clearUpload": "Clear upload",
     "selectedFile": "Selected file",
     "previewReady": "Preview ready",
     "previewFailed": "Preview generation failed",
@@ -982,6 +1042,7 @@
     "issuesTitle": "Errors and skips",
     "importsHistoryTitle": "Import history",
     "noImportsYet": "No import history yet",
+    "importHistoryLoadFailed": "Failed to load import history.",
     "noPreviewYet": "No preview generated yet",
     "rowLabel": "Row {row}",
     "importedBy": "Imported by",
@@ -1031,7 +1092,43 @@
     "noIssuesReported": "No issues reported",
     "topProblemSubMessage": "Equipment with recurring issues will appear here",
     "maintenanceLabel": "Maintenance",
-    "itemsLabel": "items"
+    "itemsLabel": "items",
+    "loadFailed": "Failed to load analytics data. Try again.",
+    "shiftLeaderboardLink": "Shift scan leaderboard",
+    "noScanActivity": "No scan activity in the last 14 days",
+    "issueCountBadge": "{count} issues"
+  },
+  "monthlyReport": {
+    "title": "VetTrack Monthly Report",
+    "equipmentSummary": "Equipment Summary",
+    "available": "Available",
+    "inUse": "In Use",
+    "issues": "Issues",
+    "missing": "Missing",
+    "issuesMissingTitle": "Issues & Missing Equipment",
+    "noCriticalItems": "No critical items — all equipment accounted for.",
+    "colEquipment": "Equipment",
+    "colReason": "Reason",
+    "colLocation": "Location",
+    "colStatus": "Status",
+    "andMore": "… and {count} more items",
+    "costEstimate": "Cost Estimate",
+    "missingCostLine": "Missing equipment replacement estimate (@ $500/item):",
+    "issueCostLine": "Issue repair estimate (@ $75/item):",
+    "totalEstimated": "Total Estimated Cost:",
+    "insights": "Insights",
+    "insightOperational": "{pct}% of equipment is currently operational (available or in use).",
+    "insightMissing": "{count} item(s) flagged missing — immediate follow-up recommended.",
+    "insightAllAccounted": "All equipment accounted for — no missing items detected.",
+    "insightIssues": "{count} active issue(s) requiring attention.",
+    "footer": "VetTrack — Confidential | {total} total items | Report generated {generatedAt}",
+    "generatedLabel": "Generated:",
+    "reasonActiveIssue": "Active Issue",
+    "reasonNotSeen24h": "Not seen in 24+ hours",
+    "reasonNeverScanned": "Never scanned",
+    "statusIssue": "ISSUE",
+    "statusMissing": "MISSING",
+    "printTitle": "VetTrack monthly report"
   },
   "outcomeKpiDashboard": {
     "title": "Outcome KPI & ROI",
@@ -1093,6 +1190,8 @@
     "alertsEmpty": "No inventory alerts",
     "alertsEmptyHint": "Sterilization, maintenance, and issues appear here when something needs attention.",
     "hello": "Hey {name},",
+    "helloBeforeName": "Hey ",
+    "helloAfterName": ",",
     "shiftLine": "{time} on shift · you've got this",
     "shiftLineFallback": "Here's your shift at a glance",
     "heroKicker": "Your shift",
@@ -1397,7 +1496,18 @@
     "zoneIcu": "ICU",
     "zoneEr": "ER",
     "zoneSurgery": "Surgery",
-    "zoneOther": "Other"
+    "zoneOther": "Other",
+    "addRoom": "Add Room",
+    "badgeSynced": "Synced",
+    "badgeAudit": "Audit",
+    "badgeStale": "Stale",
+    "summaryAvailable": "Available",
+    "summaryInUse": "In Use",
+    "summaryIssues": "Issues",
+    "summarySynced": "Synced",
+    "cardItemsUnit": "items",
+    "cardAvailShort": "avail.",
+    "cardInUseShort": "in use"
   },
   "managementDashboardPage": {
     "title": "Dashboard",
@@ -1504,6 +1614,7 @@
     "tabLogs": "Logs",
     "foldersTitle": "Folders",
     "pendingUsersTitle": "Pending users",
+    "pendingEmpty": "No pending users. All sign-ups have been reviewed.",
     "usersTitle": "Users",
     "folderCreated": "Folder created",
     "folderCreateFailed": "Failed to create folder",
@@ -1511,6 +1622,9 @@
     "folderUpdateFailed": "Failed to update folder",
     "folderDeleted": "Folder deleted",
     "folderDeleteFailed": "Failed to delete folder",
+    "deleteFolderTitle": "Delete \"{name}\"?",
+    "deleteFolderBody": "Equipment in this folder will become unfiled. This cannot be undone.",
+    "deleteFolderConfirm": "Yes, delete folder",
     "editFolder": "Edit folder",
     "createFolder": "Create folder",
     "folderName": "Folder name",
@@ -1532,6 +1646,8 @@
     "filterPending": "Pending",
     "filterActive": "Active",
     "filterBlocked": "Blocked",
+    "secondaryRoleTooltip": "Secondary role",
+    "noMatchingUsers": "No matching users",
     "noUsersYet": "No users yet",
     "firstLoginUsersHint": "Users will appear here the first time they sign in.",
     "tryOtherFilterHint": "Try switching to another filter to see other users.",
@@ -2360,6 +2476,7 @@
     "urgentLoadFailed": "Could not load urgent tasks.",
     "todayLoadFailed": "Could not load today's tasks.",
     "myTasksLoadFailed": "Could not load assigned tasks.",
+    "myTasksTitle": "My tasks",
     "dayViewLoadFailed": "Could not load the day view.",
     "dayViewEmpty": "No scheduled tasks",
     "dayViewEmptyHint": "Tap a time slot or use Quick Task to schedule one.",
@@ -2654,7 +2771,8 @@
       "crashCart": "Crash cart",
       "cartReady": "Ready",
       "cartNotChecked": "Not checked",
-      "pushSent": "Push sent to all staff"
+      "pushSent": "Push sent to all staff",
+      "pushSentMinutesAgo": "{minutes} min ago"
     },
     "history": {
       "adminOnly": "Admin access only",
@@ -2872,7 +2990,22 @@
       "reactFailed": "Failed to add reaction.",
       "pinFailed": "Failed to pin message."
     },
-    "openChat": "Open shift chat"
+    "openChat": "Open shift chat",
+    "openChatUnread": "Open shift chat, {count} unread messages",
+    "panel": {
+      "title": "Shift chat",
+      "onlineCount": "{count} online",
+      "loading": "Loading...",
+      "empty": "No messages yet",
+      "filterAll": "All",
+      "typing": "{names} typing...",
+      "broadcastPrompt": "Choose a broadcast command:",
+      "placeholder": "Write a message...",
+      "markUrgentAria": "Mark as urgent",
+      "sendBroadcastAria": "Send broadcast command",
+      "sendAria": "Send",
+      "closeAria": "Close chat"
+    }
   },
   "auditLog": {
     "actions": {
@@ -2957,6 +3090,9 @@
     "missingItemsNotesPlaceholder": "Notes on missing items...",
     "saveAllOk": "✓ All items OK — save",
     "saveWithMissing": "Save (with missing items)",
+    "checkItemAria": "{label}, {status}",
+    "checkItemStatusChecked": "checked",
+    "checkItemStatusUnchecked": "not checked",
     "checkSaved": "The check was saved",
     "historyTitle": "Check history",
     "statusOk": "✓ OK",

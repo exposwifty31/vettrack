@@ -8,6 +8,7 @@ import { authFetch } from "@/lib/auth-fetch";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { clearCodeBlueSessionCache, useCodeBlueSession } from "@/hooks/useCodeBlueSession";
+import { Bdi } from "@/components/ui/bdi";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 import { toast } from "sonner";
@@ -362,11 +363,11 @@ function ActiveSession() {
 
       <div className="px-4 py-2 bg-emergency-surface/50 border-b border-emergency-surface text-xs text-emergency-text2 flex items-center gap-2">
         <Shield className="h-3.5 w-3.5 text-blue-400" />
-        {t.codeBlue.managerLabelShort} <span className="text-blue-300 font-semibold">{session.managerUserName}</span>
+        {t.codeBlue.managerLabelShort} <span className="text-blue-300 font-semibold"><Bdi>{session.managerUserName}</Bdi></span>
       </div>
 
       <div className="px-4 py-3 bg-emergency-surface/50 border-b border-emergency-surface">
-        <div className="text-[10px] font-bold tracking-widest uppercase text-emergency-text2/80 mb-2">
+        <div className="vt-text-2xs font-bold tracking-widest uppercase text-emergency-text2/80 mb-2">
           {t.codeBlue.equipmentInEvent}
         </div>
         {linkedEquipment.length > 0 ? (
@@ -461,7 +462,7 @@ function ActiveSession() {
             <div key={entry.id} className="flex gap-3 text-xs items-baseline">
               <span className="text-emergency-text2 font-mono shrink-0">{formatElapsed(entry.elapsedMs)}</span>
               <span className={cn(
-                "shrink-0 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded",
+                "shrink-0 vt-text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded",
                 entry.category === "equipment" ? "bg-amber-500/20 text-amber-300" : "bg-emergency-border text-emergency-text2",
               )}>
                 {entry.category === "equipment" ? t.codeBlue.categoryEquipment : t.codeBlue.categoryNote}

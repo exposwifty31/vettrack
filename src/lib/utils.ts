@@ -1,39 +1,58 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { formatDistanceToNow, format, isAfter, subDays } from "date-fns";
+import { he, enUS } from "date-fns/locale";
 import type { Equipment, Alert, AlertType, AlertSeverity, EquipmentStatus } from "@/types";
 import { ALERT_SEVERITY } from "@/types";
 import { formatAlertDetail } from "@/lib/alert-display";
+import { getEquipmentDisplayName } from "@/lib/equipment-display";
+import { getStoredLocale, t } from "@/lib/i18n";
+import { formatUserDate, formatUserDateTime } from "@/lib/user-datetime-format";
+import { INACTIVE_THRESHOLD_DAYS } from "../../shared/constants";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * date-fns locale matching the active app locale. Hebrew is the default; every
+ * date/relative-time string must be formatted through this so months, suffixes,
+ * and digit ordering render in the user's language (never raw English inside an
+ * RTL surface).
+ */
+function dateFnsLocale() {
+  return getStoredLocale() === "he" ? he : enUS;
+}
+
 export function formatRelativeTime(date: string | null | undefined): string {
-  if (!date) return "Never";
+  if (!date) return t.common.never;
   try {
-    return formatDistanceToNow(new Date(date), { addSuffix: true });
+    return formatDistanceToNow(new Date(date), { addSuffix: true, locale: dateFnsLocale() });
   } catch {
-    return "Unknown";
+    return t.common.unknown;
   }
 }
 
 export function formatDate(date: string | null | undefined): string {
-  if (!date) return "—";
-  try {
-    return format(new Date(date), "MMM d, yyyy");
-  } catch {
-    return "—";
-  }
+  return formatUserDate(date);
 }
 
 export function formatDateTime(date: string | null | undefined): string {
-  if (!date) return "—";
+  return formatUserDateTime(date);
+}
+
+/** Short day + month label for chart axes / compact contexts, localized (e.g. "1 Jun"). */
+export function formatMonthDay(date: string | Date): string {
   try {
-    return format(new Date(date), "MMM d, yyyy 'at' h:mm a");
+    return format(new Date(date), "d MMM", { locale: dateFnsLocale() });
   } catch {
-    return "—";
+    return String(date);
   }
+}
+
+/** Short day + month label for chart axes; `yyyy-MM-dd` buckets use local noon to avoid TZ drift. */
+export function formatChartBucketDay(isoDate: string): string {
+  return formatMonthDay(`${isoDate}T12:00:00`);
 }
 
 export function isOverdue(equipment: Equipment): boolean {
@@ -53,8 +72,8 @@ export function isSterilizationDue(equipment: Equipment): boolean {
 
 export function isInactive(equipment: Equipment): boolean {
   if (!equipment.lastSeen) return true;
-  const fourteenDaysAgo = subDays(new Date(), 14);
-  return isAfter(fourteenDaysAgo, new Date(equipment.lastSeen));
+  const cutoff = subDays(new Date(), INACTIVE_THRESHOLD_DAYS);
+  return isAfter(cutoff, new Date(equipment.lastSeen));
 }
 
 export type ExpiryBadgeState = "expired" | "expiring_soon" | "healthy";
@@ -79,12 +98,12 @@ export function computeAlerts(equipment: Equipment[]): Alert[] {
   const alerts: Alert[] = [];
 
   for (const eq of equipment) {
-    if (eq.lastStatus === "issue") {
+    if (eq.status === "issue") {
       alerts.push({
         type: "issue",
         severity: ALERT_SEVERITY["issue"],
         equipmentId: eq.id,
-        equipmentName: eq.name,
+        equipmentName: getEquipmentDisplayName(eq),
         detail: formatAlertDetail("issue"),
       });
     } else if (isOverdue(eq)) {
@@ -97,7 +116,7 @@ export function computeAlerts(equipment: Equipment[]): Alert[] {
         type: "overdue",
         severity: ALERT_SEVERITY["overdue"],
         equipmentId: eq.id,
-        equipmentName: eq.name,
+        equipmentName: getEquipmentDisplayName(eq),
         detail: formatAlertDetail("overdue", daysOverdue),
         daysOverdue,
       });
@@ -106,7 +125,7 @@ export function computeAlerts(equipment: Equipment[]): Alert[] {
         type: "sterilization_due",
         severity: ALERT_SEVERITY["sterilization_due"],
         equipmentId: eq.id,
-        equipmentName: eq.name,
+        equipmentName: getEquipmentDisplayName(eq),
         detail: formatAlertDetail("sterilization_due"),
       });
     } else if (isInactive(eq)) {
@@ -114,7 +133,7 @@ export function computeAlerts(equipment: Equipment[]): Alert[] {
         type: "inactive",
         severity: ALERT_SEVERITY["inactive"],
         equipmentId: eq.id,
-        equipmentName: eq.name,
+        equipmentName: getEquipmentDisplayName(eq),
         detail: formatAlertDetail("inactive"),
       });
     }

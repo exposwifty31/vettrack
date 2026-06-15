@@ -1,4 +1,5 @@
 import type { Equipment } from "@/types";
+import { getEquipmentDisplayName } from "@/lib/equipment-display";
 
 const MISSING_HOURS = 24;
 const MISSING_COST_DEFAULT = 500;
@@ -79,7 +80,7 @@ export function computeCriticalItems(equipment: Equipment[]): CriticalItem[] {
     if (isEquipmentIssue(eq)) {
       items.push({
         id: eq.id,
-        name: eq.name,
+        name: getEquipmentDisplayName(eq),
         reason: "Active Issue",
         location: eq.location,
         status: "issue",
@@ -87,7 +88,7 @@ export function computeCriticalItems(equipment: Equipment[]): CriticalItem[] {
     } else if (isEquipmentMissing(eq)) {
       items.push({
         id: eq.id,
-        name: eq.name,
+        name: getEquipmentDisplayName(eq),
         reason: eq.lastSeen ? "Not seen in 24+ hours" : "Never scanned",
         location: eq.location,
         status: "missing",
@@ -196,7 +197,7 @@ export function computeDashboardData(equipment: Equipment[]): DashboardData {
       issueCost += ISSUE_COST_DEFAULT;
       criticalItems.push({
         id: eq.id,
-        name: eq.name,
+        name: getEquipmentDisplayName(eq),
         reason: "Active Issue",
         location: eq.location,
         status: "issue",
@@ -205,7 +206,7 @@ export function computeDashboardData(equipment: Equipment[]): DashboardData {
       missingCost += MISSING_COST_DEFAULT;
       criticalItems.push({
         id: eq.id,
-        name: eq.name,
+        name: getEquipmentDisplayName(eq),
         reason: eq.lastSeen ? "Not seen in 24+ hours" : "Never scanned",
         location: eq.location,
         status: "missing",

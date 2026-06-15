@@ -108,6 +108,7 @@ export interface BulkVerifyRoomResult {
 export interface Equipment {
   id: string;
   name: string;
+  nameHe?: string | null;
   serialNumber?: string | null;
   model?: string | null;
   manufacturer?: string | null;
@@ -171,6 +172,7 @@ export interface Equipment {
 
 export interface CreateEquipmentRequest {
   name: string;
+  nameHe?: string | null;
   serialNumber?: string;
   model?: string;
   manufacturer?: string;
@@ -191,6 +193,7 @@ export interface CreateEquipmentRequest {
 
 export interface UpdateEquipmentRequest {
   name?: string;
+  nameHe?: string | null;
   serialNumber?: string | null;
   model?: string | null;
   manufacturer?: string | null;

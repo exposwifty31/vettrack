@@ -1,4 +1,5 @@
 import { t } from "@/lib/i18n";
+import { formatDepartmentLabel } from "@/lib/inventory-departments";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
@@ -721,7 +722,7 @@ export default function InventoryPage() {
                   {isRestocking ? p.restockingLabel(selected.name) : selected.name}
                 </span>
                 {selected.department && (
-                  <span className="text-xs font-normal opacity-60 shrink-0">{selected.department}</span>
+                  <span className="text-xs font-normal opacity-60 shrink-0">{formatDepartmentLabel(selected.department)}</span>
                 )}
               </div>
 

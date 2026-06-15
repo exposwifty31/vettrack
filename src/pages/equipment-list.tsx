@@ -1,3 +1,9 @@
+import { getEquipmentDisplayName } from "@/lib/equipment-display";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Bdi } from "@/components/ui/bdi";
+import { TruncatedText } from "@/components/ui/truncated-text";
+import { ForwardChevron, BackChevron } from "@/components/ui/directional-chevron";
+import { useConfirm } from "@/hooks/use-confirm";
 import { t } from "@/lib/i18n";
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -20,17 +26,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { STATUS_LABELS } from "@/types";
 import type { Equipment } from "@/types";
 import { equipmentTriageTier, TRIAGE_ORDER, statusToBadgeVariant, type EquipmentTriageTier } from "@/lib/design-tokens";
@@ -123,6 +118,7 @@ const PAGE_SIZE = 9;
 
 
 export default function EquipmentListPage() {
+  const confirm = useConfirm();
   const { settings } = useSettings();
   const queryClient = useQueryClient();
   const { userId, isAdmin, effectiveRole } = useAuth();
@@ -316,6 +312,7 @@ export default function EquipmentListPage() {
       const matchesSearch =
         !search ||
         eq.name.toLowerCase().includes(search.toLowerCase()) ||
+        eq.nameHe?.toLowerCase().includes(search.toLowerCase()) ||
         eq.serialNumber?.toLowerCase().includes(search.toLowerCase()) ||
         eq.model?.toLowerCase().includes(search.toLowerCase()) ||
         eq.location?.toLowerCase().includes(search.toLowerCase());
@@ -450,7 +447,7 @@ export default function EquipmentListPage() {
                 data-testid="btn-import-csv"
               >
                 <Upload className="w-4 h-4 me-1" />
-                Import CSV
+                {t.equipment.importCsv}
               </Button>
             )}
             {isAdmin && filtered.length > 0 && (
@@ -481,13 +478,13 @@ export default function EquipmentListPage() {
                 ) : (
                   <Download className="w-4 h-4 me-1" />
                 )}
-                Export Excel
+                {t.equipmentList.actions.exportExcel}
               </Button>
             )}
             <Link href="/equipment/new">
               <Button size="sm" className="h-11 text-xs" data-testid="btn-add">
                 <Plus className="w-4 h-4 me-1" />
-                Add
+                {t.home.addEquipment}
               </Button>
             </Link>
           </div>
@@ -684,7 +681,7 @@ export default function EquipmentListPage() {
         </div>
 
         {/* Bulk actions bar */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant="ghost"
             size="sm"
@@ -703,20 +700,37 @@ export default function EquipmentListPage() {
             {selectMode ? t.equipmentList.actions.cancel : t.equipmentList.actions.select}
           </Button>
 
-          {selectMode && selected.size > 0 && (
+          {selectMode && (
             <>
+              <Checkbox
+                checked={displayList.length > 0 && selected.size === displayList.length}
+                indeterminate={selected.size > 0 && selected.size < displayList.length}
+                onCheckedChange={toggleAll}
+                aria-label={
+                  selected.size === displayList.length
+                    ? t.equipmentList.selection.deselectAll
+                    : t.equipmentList.selection.selectAll
+                }
+                data-testid="checkbox-select-all"
+              />
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={toggleAll}
                 className="text-xs h-11"
               >
-                {selected.size === displayList.length ? "Deselect all" : "Select all"}
+                {selected.size === displayList.length
+                  ? t.equipmentList.selection.deselectAll
+                  : t.equipmentList.selection.selectAll}
               </Button>
-              <span className="text-xs text-muted-foreground">
-                {selected.size} selected
+              <span className="vt-text-xs text-muted-foreground">
+                {t.equipmentList.selection.selectedCount(selected.size)}
               </span>
-              <div className="flex gap-2 ms-auto">
+            </>
+          )}
+
+          {selectMode && selected.size > 0 && (
+            <div className="flex gap-2 ms-auto w-full sm:w-auto">
                 <Select
                   onValueChange={(folderId) => {
                     if (bulkMoveMut.isPending || bulkDeleteMut.isPending) return;
@@ -745,55 +759,46 @@ export default function EquipmentListPage() {
                   </SelectContent>
                 </Select>
                 {isAdmin && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="h-11 text-xs"
-                        disabled={bulkDeleteMut.isPending || bulkMoveMut.isPending}
-                        data-testid="btn-bulk-delete"
-                      >
-                        {bulkDeleteMut.isPending ? (
-                          <Loader2 className="w-3.5 h-3.5 me-1 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-3.5 h-3.5 me-1" />
-                        )}
-                        {bulkDeleteMut.isPending ? t.equipmentList.actions.working : t.equipmentList.actions.delete}
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete {selected.size} items?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This permanently deletes the selected equipment and all their history. This cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>{t.equipmentList.actions.cancel}</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => bulkDeleteMut.mutate(Array.from(selected))}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          Yes, permanently delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="h-11 text-xs"
+                    disabled={bulkDeleteMut.isPending || bulkMoveMut.isPending}
+                    data-testid="btn-bulk-delete"
+                    onClick={async () => {
+                      if (
+                        !(await confirm({
+                          title: t.equipmentList.bulkDelete.title(selected.size),
+                          description: t.equipmentList.bulkDelete.description,
+                          confirmLabel: t.equipmentList.bulkDelete.confirm,
+                          destructive: true,
+                        }))
+                      ) {
+                        return;
+                      }
+                      bulkDeleteMut.mutate(Array.from(selected));
+                    }}
+                  >
+                    {bulkDeleteMut.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 me-1 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3.5 h-3.5 me-1" />
+                    )}
+                    {bulkDeleteMut.isPending ? t.equipmentList.actions.working : t.equipmentList.actions.delete}
+                  </Button>
                 )}
               </div>
-            </>
           )}
         </div>
 
         {/* Count + page info */}
-        <p className="text-xs text-muted-foreground -mt-2">
-          {displayList.length} of {totalCount || equipment.length} items
+        <p className="vt-text-xs text-muted-foreground -mt-2">
+          {t.equipmentList.paginationCount(displayList.length, totalCount || equipment.length)}
           {!isLoading && !isVirtualized && totalPages > 1 && (
-            <span className="ms-1">· page {safePage} of {totalPages}</span>
+            <span className="ms-1">· {t.equipmentList.paginationPage(safePage, totalPages)}</span>
           )}
           {locationFilter !== "all" && (
-            <span className="ms-1">· <button onClick={() => setLocationFilter("all")} className="underline">Clear room filter</button></span>
+            <span className="ms-1">· <button onClick={() => setLocationFilter("all")} className="underline">{t.equipmentList.clearRoomFilter}</button></span>
           )}
         </p>
 
@@ -924,11 +929,11 @@ export default function EquipmentListPage() {
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               data-testid="btn-prev-page"
             >
-              <ChevronLeft className="w-4 h-4" />
-              Previous
+              <BackChevron className="w-4 h-4" />
+              {t.equipmentList.paginationPrevious}
             </Button>
-            <span className="text-sm text-muted-foreground">
-              {safePage} / {totalPages}
+            <span className="vt-text-sm text-muted-foreground">
+              {t.equipmentList.paginationPage(safePage, totalPages)}
             </span>
             <Button
               variant="outline"
@@ -938,8 +943,8 @@ export default function EquipmentListPage() {
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               data-testid="btn-next-page"
             >
-              Next
-              <ChevronRight className="w-4 h-4" />
+              {t.equipmentList.paginationNext}
+              <ForwardChevron className="w-4 h-4" />
             </Button>
           </div>
         )}
@@ -984,6 +989,7 @@ function EquipmentItem({
   const isCheckedOut = !!eq.checkedOutById;
   const checkedOutByMe = eq.checkedOutById === userId;
   const expiryState = getExpiryBadgeState(eq.expiryDate);
+  const displayName = getEquipmentDisplayName(eq);
   const recoveryBadgeKey = isEquipmentRecoveryUiEnabled
     ? resolveEquipmentListRecoveryBadgeKey(
         deriveEquipmentRecoverySnapshotFromSource(eq),
@@ -1020,7 +1026,7 @@ function EquipmentItem({
       haptics.tap();
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
-      toast.success(`Checked out — ${eq.name}`);
+      toast.success(`Checked out — ${displayName}`);
     },
     onError: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
@@ -1060,7 +1066,7 @@ function EquipmentItem({
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
       queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
-      toast.success(`Returned — ${eq.name} is now available`);
+      toast.success(t.equipmentList.toast.returnSuccess(displayName));
     },
     onError: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
@@ -1071,36 +1077,46 @@ function EquipmentItem({
   const quickAction = eq.custodyState === "returned" && eq.status === "ok"
     ? { label: t.dockReturn.submit, icon: LogIn, action: () => setDockReturnOpen(true), pending: false, className: "text-blue-700 border-blue-200 hover:bg-blue-50" }
     : !isCheckedOut && eq.status === "ok"
-    ? { label: "בשימוש", icon: LogIn, action: () => checkoutMut.mutate(), pending: checkoutMut.isPending, className: "text-emerald-700 border-emerald-200 hover:bg-emerald-50" }
+    ? { label: t.equipmentList.quickAction.checkout, icon: LogIn, action: () => checkoutMut.mutate(), pending: checkoutMut.isPending, className: "text-emerald-700 border-emerald-200 hover:bg-emerald-50" }
     : (isCheckedOut && (checkedOutByMe || isAdmin)) && eq.status === "ok"
-    ? { label: "החזר", icon: LogOut, action: () => setReturnDialogOpen(true), pending: returnMut.isPending, className: "text-primary border-primary/30 hover:bg-primary/10" }
+    ? { label: t.equipmentList.quickAction.return, icon: LogOut, action: () => setReturnDialogOpen(true), pending: returnMut.isPending, className: "text-primary border-primary/30 hover:bg-primary/10" }
     : eq.status === "issue"
-    ? { label: "צפה בבעיה", icon: AlertTriangle, action: null, href: `/equipment/${eq.id}`, pending: false, className: "text-red-600 border-red-200 hover:bg-red-50" }
+    ? { label: t.equipmentList.quickAction.viewIssue, icon: AlertTriangle, action: null, href: `/equipment/${eq.id}`, pending: false, className: "text-red-600 border-red-200 hover:bg-red-50" }
     : null;
 
   return (
     <>
     <div
       className={`flex items-center gap-2 ${selectMode ? "cursor-pointer" : ""}`}
+      role={selectMode ? "checkbox" : undefined}
+      aria-checked={selectMode ? selected : undefined}
+      aria-label={selectMode ? t.equipmentList.selection.itemAriaLabel(displayName, selected) : undefined}
+      tabIndex={selectMode ? 0 : undefined}
+      onKeyDown={
+        selectMode
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onToggleSelect();
+              }
+            }
+          : undefined
+      }
       onClick={selectMode ? onToggleSelect : undefined}
     >
       {selectMode && (
-        <div
-          className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-            selected ? "bg-primary border-primary" : "border-border"
-          }`}
-        >
-          {selected && (
-            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-            </svg>
-          )}
-        </div>
+        <Checkbox
+          checked={selected}
+          readOnly
+          tabIndex={-1}
+          aria-hidden
+          className="pointer-events-none shrink-0"
+        />
       )}
       <div className="flex-1 min-w-0">
         <Link href={`/equipment/${eq.id}`} onClick={(e) => selectMode && e.preventDefault()}>
           <Card
-            className={`bg-card border-border/60 shadow-sm transition-all hover:shadow-md active:scale-[0.99] ${selected ? "border-primary bg-primary/5" : ""}`}
+            className={`bg-card border-border/60 shadow-sm transition-all hover:shadow-md active:scale-[0.99] ${selected ? "bg-primary/5 ring-2 ring-primary/30" : ""}`}
             data-testid={`equipment-item-${eq.id}`}
           >
             {/*
@@ -1115,7 +1131,7 @@ function EquipmentItem({
               {eq.imageUrl ? (
                 <img
                   src={eq.imageUrl}
-                  alt={eq.name}
+                  alt={displayName}
                   width={40}
                   height={40}
                   loading="lazy"
@@ -1133,7 +1149,13 @@ function EquipmentItem({
               )}
               {/* Main info */}
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-base truncate leading-snug">{eq.name}</p>
+                <Bdi>
+                  <TruncatedText
+                    text={displayName}
+                    className="vt-text-lg font-bold leading-snug"
+                    as="p"
+                  />
+                </Bdi>
                 {(localSyncState === "pending_sync" || localSyncState === "conflict") && (
                   <p
                     className={cn(
@@ -1181,34 +1203,34 @@ function EquipmentItem({
                   {eq.folderName && (
                     <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
                       <FolderOpen className="w-3 h-3" />
-                      <span className="truncate max-w-[80px]">{eq.folderName}</span>
+                      <TruncatedText text={eq.folderName} className="text-xs max-w-[80px]" />
                     </span>
                   )}
                   {eq.location && !eq.folderName && (
-                    <span className="flex items-center gap-0.5 text-xs text-muted-foreground truncate max-w-[100px]">
+                    <span className="flex items-center gap-0.5 text-xs text-muted-foreground max-w-[100px] min-w-0">
                       <MapPin className="w-3 h-3 shrink-0" />
-                      {eq.location}
+                      <TruncatedText text={eq.location} className="text-xs" />
                     </span>
                   )}
-                  <span className="text-xs text-muted-foreground">
-                    {formatRelativeTime(eq.lastSeen?.toString())}
+                  <span className="vt-text-xs text-muted-foreground">
+                    <Bdi>{formatRelativeTime(eq.lastSeen?.toString())}</Bdi>
                   </span>
                   {expiryState === "expired" && (
                     <Badge variant="issue" className="px-2 py-0.5 vt-text-2xs font-medium">
                       <CalendarX className="w-3 h-3" />
-                      פג תוקף
+                      {t.equipmentDetail.expiryExpired}
                     </Badge>
                   )}
                   {expiryState === "expiring_soon" && (
                     <Badge variant="maintenance" className="px-2 py-0.5 vt-text-2xs font-medium">
                       <CalendarClock className="w-3 h-3" />
-                      פחות מ-7 ימים
+                      {t.equipmentDetail.expirySoon}
                     </Badge>
                   )}
                   {expiryState === "healthy" && (
                     <Badge variant="ok" className="px-2 py-0.5 vt-text-2xs font-medium">
                       <CalendarCheck className="w-3 h-3" />
-                      בתוקף
+                      {t.equipmentDetail.expiryValid}
                     </Badge>
                   )}
                   {eq.custodyState != null && (
@@ -1275,7 +1297,7 @@ function EquipmentItem({
                       {STATUS_LABELS[eq.status as keyof typeof STATUS_LABELS] || eq.status}
                     </Badge>
                     {!selectMode && (
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" style={{ flexShrink: 0 }} />
+                      <ForwardChevron className="w-4 h-4 text-muted-foreground" style={{ flexShrink: 0 }} />
                     )}
                   </>
                 )}

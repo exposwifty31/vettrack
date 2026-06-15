@@ -53,6 +53,16 @@ else
   [ "$O" = "True" ] && ok "allowed_origins includes capacitor://localhost" || no "allowed_origins MISSING capacitor://localhost"
 fi
 
+# --- [2.1b] API CORS for bundled Capacitor shell --------------------------------
+hdr "[2.1b] API CORS — /api/version allows capacitor://localhost"
+ACAO=$(curl -sSI -H "Origin: capacitor://localhost" "https://vettrack.uk/api/version" \
+  | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2}' | head -1)
+if [ "$ACAO" = "capacitor://localhost" ]; then
+  ok "/api/version ACAO = capacitor://localhost"
+else
+  no "/api/version ACAO = '${ACAO:-<missing>}' (deploy server fix: /api/version after CORS middleware)"
+fi
+
 # --- [2.3.8] icon: alpha-stripped, 1024 -------------------------------------
 hdr "[2.3.8] App icon"
 ICON="ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png"

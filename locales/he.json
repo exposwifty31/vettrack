@@ -17,6 +17,7 @@
     "all": "הכל",
     "none": "ללא",
     "unknown": "לא ידוע",
+    "never": "אף פעם",
     "select": "בחירה",
     "unfiled": "ללא תיקייה",
     "justNow": "עכשיו",
@@ -117,7 +118,18 @@
       "moveError": "ההעברה נכשלה",
       "exportError": "הייצוא נכשל",
       "checkoutError": "ההוצאה לשימוש נכשלה",
-      "returnError": "ההחזרה נכשלה"
+      "returnError": "ההחזרה נכשלה",
+      "returnSuccess": "הוחזר — {name} זמין כעת"
+    },
+    "quickAction": {
+      "checkout": "הוצא לשימוש",
+      "return": "החזר",
+      "viewIssue": "צפה בבעיה"
+    },
+    "bulkDelete": {
+      "title": "למחוק {count} פריטים?",
+      "description": "פעולה זו מוחקת לצמיתות את הציוד שנבחר ואת כל ההיסטוריה שלו. לא ניתן לבטל.",
+      "confirm": "כן, מחק לצמיתות"
     },
     "linkedInUse": "בשימוש אצל: {name}",
     "recoveryBadgeStale": "דורש אימות",
@@ -132,7 +144,20 @@
     "statInUse": "בשימוש",
     "statUptime": "זמינות",
     "filterAll": "הכל",
-    "recoveryAttentionSummary": "{count} פריטים דורשים תשומת לב"
+    "recoveryAttentionSummary": "{count} פריטים דורשים תשומת לב",
+    "paginationCount": "{shown} מתוך {total} פריטים",
+    "paginationPage": "עמוד {page} מתוך {pages}",
+    "paginationPrevious": "הקודם",
+    "paginationNext": "הבא",
+    "clearRoomFilter": "נקה סינון חדר",
+    "selection": {
+      "selectAll": "בחר הכל",
+      "deselectAll": "בטל בחירה",
+      "selectedCount": "{count} נבחרו",
+      "itemAriaLabel": "{name}, {status}",
+      "itemStatusChecked": "נבחר",
+      "itemStatusUnchecked": "לא נבחר"
+    }
   },
   "shiftHandoverPage": {
     "title": "סיום משמרת",
@@ -302,7 +327,12 @@
     "noContainers": "אין עגלות במערכת",
     "startSessionFailed": "לא ניתן להתחיל סשן מילוי — נסה שוב",
     "finishSessionFailed": "לא ניתן לסיים את המילוי — נסה שוב",
-    "errorWithRequestId": "{message} (קוד תמיכה: {requestId})"
+    "errorWithRequestId": "{message} (קוד תמיכה: {requestId})",
+    "departments": {
+      "hospital": "בית חולים",
+      "emergency": "מיון",
+      "internalMedicine": "רפואה פנימית"
+    }
   },
   "equipmentTruth": {
     "title": "אמת תפעולית",
@@ -469,6 +499,11 @@
     "sterilizationDue": "נדרש חיטוי (7+ ימים)",
     "expiryExpired": "פג תוקף",
     "expirySoon": "פג בקרוב",
+    "expiryValid": "בתוקף",
+    "deleteTitle": "למחוק את {name}?",
+    "deleteBody": "הציוד יוסתר מרשימות פעילות (מחיקה רכה). היסטוריית ביקורת וסריקות נשמרת.",
+    "deleteConfirm": "מחק",
+    "deleteAriaLabel": "מחק ציוד",
     "recoveryBadgeStale": "דורש אימות",
     "recoveryBadgeVeryStale": "מיושן מאוד",
     "recoveryBadgeCheckedOutLong": "מושאל זמן רב",
@@ -500,6 +535,10 @@
       "name": {
         "placeholder": "לדוגמה: אוטוקלב יחידה א׳",
         "error": "שם הוא שדה חובה"
+      },
+      "nameHe": {
+        "label": "שם (עברית)",
+        "placeholder": "לדוגמה: אוטוקלב יחידה א׳"
       },
       "serialNumber": {
         "placeholder": "SN-12345"
@@ -550,7 +589,11 @@
     },
     "actions": {
       "returnAll": "החזר הכל"
-    }
+    },
+    "returnAllTitle": "להחזיר את כל {count} הפריטים?",
+    "returnAllBody": "פעולה זו תחזיר את כל הפריטים המושאלים ותהפוך אותם לזמינים לאחרים.",
+    "returnAllConfirm": "אשר החזרת הכל",
+    "checkedOutCount": "{count} מושאלים"
   },
   "alerts": {
     "types": {
@@ -954,17 +997,34 @@
     "resetDescription": "שחזור כל ההגדרות לערכי ברירת המחדל. לא ניתן לבטל פעולה זו.",
     "resetButton": "שחזר לברירת מחדל",
     "resetDialogTitle": "לאפס את כל ההגדרות?",
+    "resetSuccess": "ההגדרות שוחזרו לברירת המחדל",
     "account": "חשבון",
     "crashCartChecklist": "רשימת בדיקת עגלת החייאה",
     "crashCartChecklistDescription": "התאם את פריטי הבדיקה היומית לעגלה במחלקה שלך — הוסף, ערוך או הסר פריטים.",
     "crashCartChecklistManage": "ערוך רשימת בדיקה",
     "about": "אודות",
-    "logout": "התנתק"
+    "versionLabel": "גרסה",
+    "seeWhatsNew": "ראה מה חדש",
+    "logout": "התנתק",
+    "logoutConfirmTitle": "להתנתק?",
+    "logoutConfirmDescription": "תצטרך להתחבר שוב כדי לגשת ל-VetTrack.",
+    "showEmail": "הצג אימייל",
+    "hideEmail": "הסתר אימייל",
+    "pushSyncFailed": "סנכרון הגדרות ההתראות נכשל",
+    "loadFailedForSession": "לא ניתן לטעון הגדרות עבור הפעלה זו.",
+    "language": "שפה",
+    "languageDescription": "בחר שפת ממשק וכיוון טקסט",
+    "languageEn": "אנגלית",
+    "languageHe": "עברית",
+    "timeFormat12h": "12 שעות (AM/PM)",
+    "timeFormat24h": "24 שעות",
+    "sendTest": "שלח בדיקה"
   },
   "adminShiftsPage": {
     "title": "ניהול משמרות",
     "subtitle": "ייבוא משמרות מ-EZShift ותצוגת היסטוריית יבוא",
     "uploadCsv": "העלה CSV",
+    "clearUpload": "נקה העלאה",
     "selectedFile": "קובץ נבחר",
     "previewReady": "תצוגה מקדימה מוכנה",
     "previewFailed": "בניית תצוגה מקדימה נכשלה",
@@ -982,6 +1042,7 @@
     "issuesTitle": "שגיאות ודילוגים",
     "importsHistoryTitle": "היסטוריית יבוא",
     "noImportsYet": "אין היסטוריית יבוא עדיין",
+    "importHistoryLoadFailed": "טעינת היסטוריית הייבוא נכשלה.",
     "noPreviewYet": "עדיין לא נוצרה תצוגה מקדימה",
     "rowLabel": "שורה {row}",
     "importedBy": "יובא על ידי",
@@ -1031,7 +1092,43 @@
     "noIssuesReported": "לא דווחו תקלות",
     "topProblemSubMessage": "ציוד עם תקלות חוזרות יופיע כאן",
     "maintenanceLabel": "תחזוקה",
-    "itemsLabel": "פריטים"
+    "itemsLabel": "פריטים",
+    "loadFailed": "טעינת הנתונים נכשלה. נסה שוב.",
+    "shiftLeaderboardLink": "לוח מובילים — סריקות משמרת",
+    "noScanActivity": "אין פעילות סריקה ב־14 הימים האחרונים",
+    "issueCountBadge": "{count} תקלות"
+  },
+  "monthlyReport": {
+    "title": "דוח חודשי VetTrack",
+    "equipmentSummary": "סיכום ציוד",
+    "available": "זמין",
+    "inUse": "בשימוש",
+    "issues": "תקלות",
+    "missing": "חסר",
+    "issuesMissingTitle": "תקלות וציוד חסר",
+    "noCriticalItems": "אין פריטים קריטיים — כל הציוד מדווח.",
+    "colEquipment": "ציוד",
+    "colReason": "סיבה",
+    "colLocation": "מיקום",
+    "colStatus": "סטטוס",
+    "andMore": "… ועוד {count} פריטים",
+    "costEstimate": "הערכת עלות",
+    "missingCostLine": "הערכת החלפת ציוד חסר (@ $500 לפריט):",
+    "issueCostLine": "הערכת תיקון תקלה (@ $75 לפריט):",
+    "totalEstimated": "סה״כ עלות משוערת:",
+    "insights": "תובנות",
+    "insightOperational": "{pct}% מהציוד תפעולי כעת (זמין או בשימוש).",
+    "insightMissing": "{count} פריטים מסומנים כחסרים — מומלץ מעקב מיידי.",
+    "insightAllAccounted": "כל הציוד מדווח — לא זוהו פריטים חסרים.",
+    "insightIssues": "{count} תקלות פעילות הדורשות טיפול.",
+    "footer": "VetTrack — סודי | {total} פריטים בסך הכל | הדוח נוצר {generatedAt}",
+    "generatedLabel": "נוצר:",
+    "reasonActiveIssue": "תקלה פעילה",
+    "reasonNotSeen24h": "לא נראה 24+ שעות",
+    "reasonNeverScanned": "מעולם לא נסרק",
+    "statusIssue": "תקלה",
+    "statusMissing": "חסר",
+    "printTitle": "דוח חודשי VetTrack"
   },
   "outcomeKpiDashboard": {
     "title": "מדדי תוצאה ו־ROI",
@@ -1093,6 +1190,8 @@
     "alertsEmpty": "אין התראות מלאי",
     "alertsEmptyHint": "הגדרות עיקור, תחזוקה ובעיות מופיעות כאן כאשר נדרשת התייחסות",
     "hello": "היי {name},",
+    "helloBeforeName": "היי ",
+    "helloAfterName": ",",
     "shiftLine": "{time} במשמרת · את עליה",
     "shiftLineFallback": "הנה המשמרת שלך במבט מהיר",
     "heroKicker": "המשמרת שלך",
@@ -1397,7 +1496,18 @@
     "zoneIcu": "טיפול נמרץ",
     "zoneEr": "חדר מיון",
     "zoneSurgery": "ניתוחים",
-    "zoneOther": "אחר"
+    "zoneOther": "אחר",
+    "addRoom": "הוסף חדר",
+    "badgeSynced": "מסונכרן",
+    "badgeAudit": "ביקורת",
+    "badgeStale": "לא עדכני",
+    "summaryAvailable": "זמין",
+    "summaryInUse": "בשימוש",
+    "summaryIssues": "תקלות",
+    "summarySynced": "מסונכרן",
+    "cardItemsUnit": "פריטים",
+    "cardAvailShort": "זמינים",
+    "cardInUseShort": "בשימוש"
   },
   "managementDashboardPage": {
     "title": "לוח בקרה",
@@ -1504,6 +1614,7 @@
     "tabLogs": "לוגים",
     "foldersTitle": "תיקיות",
     "pendingUsersTitle": "ממתינים משתמשים",
+    "pendingEmpty": "אין משתמשים ממתינים. כל ההרשמות נסקרו.",
     "usersTitle": "משתמשים",
     "folderCreated": "התיקייה נוצרה",
     "folderCreateFailed": "יצירת התיקייה נכשלה",
@@ -1511,6 +1622,9 @@
     "folderUpdateFailed": "עדכון התיקייה נכשל",
     "folderDeleted": "התיקייה נמחקה",
     "folderDeleteFailed": "מחיקת התיקייה נכשלה",
+    "deleteFolderTitle": "למחוק את \"{name}\"?",
+    "deleteFolderBody": "ציוד בתיקייה זו יועבר ללא תיקייה. לא ניתן לבטל.",
+    "deleteFolderConfirm": "כן, מחק תיקייה",
     "editFolder": "ערוך תיקייה",
     "createFolder": "צור תיקייה",
     "folderName": "שם תיקייה",
@@ -1532,6 +1646,8 @@
     "filterPending": "ממתין",
     "filterActive": "פעיל",
     "filterBlocked": "חסום",
+    "secondaryRoleTooltip": "תפקיד משני",
+    "noMatchingUsers": "אין משתמשים תואמים",
     "noUsersYet": "אין משתמשים עדיין",
     "firstLoginUsersHint": "משתמשים יופיעו כאן בפעם הראשונה שהם מתחברים.",
     "tryOtherFilterHint": "נסה לעבור לפילטר אחר כדי לראות משתמשים אחרים.",
@@ -2360,6 +2476,7 @@
     "urgentLoadFailed": "טעינת משימות דחופות נכשלה.",
     "todayLoadFailed": "לא ניתן לטעון משימות להיום.",
     "myTasksLoadFailed": "לא ניתן לטעון משימות מוקצות.",
+    "myTasksTitle": "המשימות שלי",
     "dayViewLoadFailed": "לא ניתן לטעון תצוגת היום.",
     "dayViewEmpty": "אין משימות מתוזמנות",
     "dayViewEmptyHint": "לחץ על חריץ זמן או השתמש במשימה מהירה ליצירת משימה.",
@@ -2654,7 +2771,8 @@
       "crashCart": "עגלת חירום",
       "cartReady": "זמינה",
       "cartNotChecked": "לא נבדקה",
-      "pushSent": "Push נשלח לכל הצוות"
+      "pushSent": "Push נשלח לכל הצוות",
+      "pushSentMinutesAgo": "לפני {minutes} דק׳"
     },
     "history": {
       "adminOnly": "גישה לאדמין בלבד",
@@ -2872,7 +2990,22 @@
       "reactFailed": "הוספת תגובה נכשלה.",
       "pinFailed": "הצמדת ההודעה נכשלה."
     },
-    "openChat": "פתח צ'אט משמרת"
+    "openChat": "פתח צ'אט משמרת",
+    "openChatUnread": "פתח צ'אט משמרת, {count} הודעות שלא נקראו",
+    "panel": {
+      "title": "צ׳אט משמרת",
+      "onlineCount": "{count} מחוברים",
+      "loading": "טוען...",
+      "empty": "אין הודעות עדיין",
+      "filterAll": "הכל",
+      "typing": "{names} מקליד...",
+      "broadcastPrompt": "בחר פקודת שידור:",
+      "placeholder": "כתוב הודעה...",
+      "markUrgentAria": "סמן כדחוף",
+      "sendBroadcastAria": "שלח פקודת שידור",
+      "sendAria": "שלח",
+      "closeAria": "סגור צ׳אט"
+    }
   },
   "auditLog": {
     "actions": {
@@ -2957,6 +3090,9 @@
     "missingItemsNotesPlaceholder": "הערות על פריטים חסרים...",
     "saveAllOk": "✓ כל הפריטים תקינים — שמור",
     "saveWithMissing": "שמור (עם פריטים חסרים)",
+    "checkItemAria": "{label}, {status}",
+    "checkItemStatusChecked": "מסומן",
+    "checkItemStatusUnchecked": "לא מסומן",
     "checkSaved": "הבדיקה נשמרה",
     "historyTitle": "היסטוריית בדיקות",
     "statusOk": "✓ תקין",

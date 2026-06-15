@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { restoreOfflineSession, saveOfflineSession, clearOfflineSession } from "@/lib/offline-session";
 import { authFetchUsersMe, authPostUsersSync } from "@/lib/api";
 import { setAuthStateRef, clearHaltQueue, processQueue } from "@/lib/sync-engine";
+import { maybeReportOfflineSyncTelemetry } from "@/lib/offline-sync-telemetry-reporter";
 import { isOnline, safeReloadPage } from "@/lib/safe-browser";
 
 export type UserStatus = "pending" | "active" | "blocked" | null;
@@ -225,6 +226,7 @@ function DevAuthProviderInner({ children }: { children: ReactNode }) {
         });
 
         processQueue().catch(() => {});
+        void maybeReportOfflineSyncTelemetry({ force: true });
       } catch (err) {
         if (controller.signal.aborted) return;
         console.error("Dev auth sync failed:", err);
@@ -440,6 +442,7 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
           });
 
           processQueue().catch(() => {});
+          void maybeReportOfflineSyncTelemetry({ force: true });
         } else if (res.status === 403) {
           clearHaltQueue();
           const reason = (typeof data.reason === "string" ? data.reason : null) as AccessDeniedReason;

@@ -922,7 +922,7 @@ export default function AppointmentsPage() {
             <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
               <User className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden />
               <CardTitle className="text-sm font-semibold">
-                My tasks
+                {t.appointmentsPage.myTasksTitle}
                 {dashboardQuery.data ? (
                   <span className="text-muted-foreground font-normal"> ({dashboardQuery.data.counts.myTasks})</span>
                 ) : null}
@@ -948,7 +948,7 @@ export default function AppointmentsPage() {
                       className="h-8 px-3 text-xs"
                       onClick={() => urgentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
                     >
-                      Review urgent
+                      {t.appointmentsPage.statusAction.reviewUrgent}
                     </Button>
                   )}
                 />

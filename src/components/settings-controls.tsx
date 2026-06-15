@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import {
   Select,
   SelectContent,
@@ -40,28 +40,40 @@ export function SettingsToggle({
   onCheckedChange,
   "data-testid": testId,
 }: SettingsToggleProps) {
+  const labelId = useId();
+  const descriptionId = description ? `${labelId}-desc` : undefined;
+
   return (
     <button
       role="switch"
       aria-checked={checked}
+      aria-labelledby={labelId}
+      aria-describedby={descriptionId}
       data-testid={testId}
       onClick={() => onCheckedChange(!checked)}
       className={cn(
-        "w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors text-left",
+        "w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors text-start min-h-[44px]",
         "bg-muted/40 hover:bg-muted/70 motion-safe:active:scale-[0.98]"
       )}
     >
-      <span className="flex-shrink-0 text-muted-foreground">{icon}</span>
+      <span className="flex-shrink-0 text-muted-foreground" aria-hidden>
+        {icon}
+      </span>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground leading-tight">{label}</p>
+        <p id={labelId} className="text-sm font-medium text-foreground leading-tight">
+          {label}
+        </p>
         {description && (
-          <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+          <p id={descriptionId} className="text-xs text-muted-foreground mt-0.5">
+            {description}
+          </p>
         )}
       </div>
       <div
+        aria-hidden
         className={cn(
           "relative flex-shrink-0 w-12 h-7 rounded-full transition-colors duration-200",
-          checked ? "bg-primary" : "bg-muted-foreground/30"
+          checked ? "bg-primary" : "bg-muted-foreground/40"
         )}
       >
         <span
@@ -104,22 +116,29 @@ export function SettingsSelect({
   "data-testid": testId,
   lang,
 }: SettingsSelectProps) {
+  const labelId = useId();
+  const descriptionId = description ? `${labelId}-desc` : undefined;
+
   return (
-    <div lang={lang} className="flex items-center gap-4 px-4 py-3.5 rounded-xl bg-muted/40">
-      <span className="flex-shrink-0 text-muted-foreground">{icon}</span>
+    <div lang={lang} className="flex items-center gap-4 px-4 py-3.5 rounded-xl bg-muted/40 min-h-[44px]">
+      <span className="flex-shrink-0 text-muted-foreground" aria-hidden>
+        {icon}
+      </span>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground leading-tight">{label}</p>
+        <p id={labelId} className="text-sm font-medium text-foreground leading-tight">
+          {label}
+        </p>
         {description && (
-          <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+          <p id={descriptionId} className="text-xs text-muted-foreground mt-0.5">
+            {description}
+          </p>
         )}
       </div>
       <Select value={value} onValueChange={onValueChange}>
         <SelectTrigger
-          // The visible <p>{label}</p> is not programmatically tied to the
-          // combobox, so expose it as the trigger's accessible name (WCAG 4.1.2
-          // / Lighthouse select-name) — otherwise SRs announce only the value.
-          aria-label={label}
-          className="w-auto min-w-[120px] h-9 text-xs"
+          aria-labelledby={labelId}
+          aria-describedby={descriptionId}
+          className="w-auto min-w-[120px] h-11 text-xs"
           data-testid={testId}
         >
           <SelectValue />

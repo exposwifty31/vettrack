@@ -3,9 +3,9 @@ import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { SectionList } from "@/components/ui/section-list";
 import { Button } from "@/components/ui/button";
-import { UserCheck, X, ChevronRight, ChevronLeft } from "lucide-react";
+import { ForwardChevron } from "@/components/ui/directional-chevron";
+import { UserCheck, X } from "lucide-react";
 import type { Alert, AlertAcknowledgment, AlertType } from "@/types";
-import { useDirection } from "@/hooks/useDirection";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { normalizeStatus } from "@/lib/design-tokens";
 import { useEnterOnce } from "@/hooks/use-enter-once";
@@ -43,8 +43,6 @@ export function AlertsProView({
   canOwn,
   formatRelativeTime,
 }: AlertsProViewProps) {
-  const direction = useDirection();
-  const Chevron = direction === "rtl" ? ChevronLeft : ChevronRight;
   const enterOnce = useEnterOnce("alerts");
   const rise = enterOnce ? "vt-pro-rise" : "";
 
@@ -88,7 +86,7 @@ export function AlertsProView({
                 {t.alertsPage.worstFirst}
               </span>
             </div>
-            <h2 className="text-[17px] font-bold leading-snug tracking-tight text-[var(--status-issue-fg)]">
+            <h2 className="vt-text-lg font-bold leading-snug tracking-tight text-[var(--status-issue-fg)]">
               {worst.equipmentName}
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-[var(--status-issue-fg)]/85">
@@ -104,7 +102,7 @@ export function AlertsProView({
               data-testid="btn-alerts-handle-worst"
             >
               {t.alertsPage.handleNow}
-              <Chevron className="h-4 w-4" aria-hidden />
+              <ForwardChevron className="h-4 w-4" aria-hidden />
             </Button>
           </div>
         </div>
@@ -136,12 +134,12 @@ export function AlertsProView({
                   data-testid={`alert-navigate-${alert.equipmentId}`}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13.5px] font-semibold text-ivory-text">
+                    <p className="truncate vt-text-sm font-semibold text-ivory-text">
                       {alert.equipmentName}
                     </p>
                     <p className="mt-0.5 line-clamp-2 vt-text-2xs text-ivory-text3">{alert.detail}</p>
                   </div>
-                  <Chevron className="mt-0.5 h-4 w-4 shrink-0 text-ivory-text3" aria-hidden />
+                  <ForwardChevron className="mt-0.5 h-4 w-4 shrink-0 text-ivory-text3" aria-hidden />
                 </Button>
                 <div className="mt-2">
                   {ack ? (

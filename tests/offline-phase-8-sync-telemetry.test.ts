@@ -20,6 +20,7 @@ import {
   maybeReportOfflineSyncTelemetry,
   MIN_REPORT_INTERVAL_MS,
 } from "../src/lib/offline-sync-telemetry-reporter";
+import { setAuthState } from "../src/lib/auth-store";
 
 function row(partial: Partial<PendingSync> & Pick<PendingSync, "status">): PendingSync {
   const createdAt = partial.createdAt ?? new Date("2026-05-26T12:00:00.000Z");
@@ -116,6 +117,12 @@ describe("OFF-08 maybeReportOfflineSyncTelemetry throttle", () => {
   beforeEach(() => {
     _resetOfflineSyncTelemetryReporterForTests();
     _resetOfflineSyncSessionCountersForTests();
+    setAuthState({
+      userId: "telemetry-test-user",
+      email: "telemetry@test.local",
+      name: "Telemetry Test",
+      bearerToken: null,
+    });
     vi.useFakeTimers();
   });
 

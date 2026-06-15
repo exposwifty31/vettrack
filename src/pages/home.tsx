@@ -1,3 +1,4 @@
+import { Bdi } from "@/components/ui/bdi";
 import { t, formatDateByLocale } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,9 +11,15 @@ import { ErrorCard } from "@/components/ui/error-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingSection } from "@/components/ui/loading-section";
 import { computeAlerts, formatRelativeTime } from "@/lib/utils";
+import {
+  buildAlertAckSet,
+  countActiveAlerts,
+  countCriticalAlerts,
+} from "@/lib/alert-counts";
 import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
 import { useAuth } from "@/hooks/use-auth";
-import { useDirection } from "@/hooks/useDirection";
+import { TruncatedText } from "@/components/ui/truncated-text";
+import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { QrScanner } from "@/components/qr-scanner";
 import { getCurrentUserId } from "@/lib/auth-store";
 import { subscribeKeepalive } from "@/lib/realtime";
@@ -20,8 +27,6 @@ import type { Appointment } from "@/types";
 import {
   Activity,
   AlertTriangle,
-  ChevronLeft,
-  ChevronRight,
   ClipboardCheck,
   Clock,
   Plus,
@@ -57,8 +62,6 @@ export default function HomePage() {
   const { name, refreshAuth } = useAuth();
   const userId = getCurrentUserId();
   const queryClient = useQueryClient();
-  const direction = useDirection();
-  const Chevron = direction === "rtl" ? ChevronLeft : ChevronRight;
   const [, navigate] = useLocation();
   const [scannerOpen, setScannerOpen] = useState(false);
   const [activeCodeBlueId, setActiveCodeBlueId] = useState<string | null>(null);
@@ -113,9 +116,19 @@ export default function HomePage() {
     refetchInterval: 120_000,
   });
 
+  const { data: alertAcks } = useQuery({
+    queryKey: ["/api/alert-acks"],
+    queryFn: api.alertAcks.list,
+    enabled: !!userId,
+    staleTime: 30_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
   const alerts = equipment ? computeAlerts(equipment) : [];
-  const alertCount = alerts.length;
-  const criticalCount = alerts.filter((a) => a.severity === "critical").length;
+  const alertAckSet = buildAlertAckSet(alertAcks);
+  const alertCount = countActiveAlerts(alerts, alertAckSet);
+  const criticalCount = countCriticalAlerts(alerts, alertAckSet);
   const overdueCount = taskDashboard?.counts.overdue ?? 0;
   const totalCount = equipment?.length ?? 0;
   const activePatientsCount = 0;
@@ -189,10 +202,12 @@ export default function HomePage() {
               <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
               {dateChip}
             </span>
-            <h1 className="truncate text-[28px] font-bold leading-tight tracking-tight text-ivory-text sm:text-[32px]">
-              {t.homePage.hello(firstName)}
+            <h1 className="truncate vt-page-title sm:vt-display text-ivory-text">
+              {t.homePage.helloBeforeName}
+              <Bdi>{firstName}</Bdi>
+              {t.homePage.helloAfterName}
             </h1>
-            <p className="text-sm text-ivory-text3">{shiftLine}</p>
+            <p className="vt-text-sm text-ivory-text3">{shiftLine}</p>
           </div>
           <button
             type="button"
@@ -251,7 +266,7 @@ export default function HomePage() {
             <span className="min-w-0 flex-1 ps-1">
               <span
                 className={cn(
-                  "block text-[13px] font-bold",
+                  "block vt-text-sm font-bold",
                   activeCodeBlueId || criticalCount > 0
                     ? "text-red-700 dark:text-red-300"
                     : "text-amber-700 dark:text-amber-300"
@@ -263,7 +278,7 @@ export default function HomePage() {
                   ? t.homePage.urgentCriticalAlerts(criticalCount)
                   : t.homePage.urgentOverdueTasks(overdueCount)}
               </span>
-              <span className="block text-[11px] text-ivory-text3">
+              <span className="block vt-text-xs text-ivory-text3">
                 {activeCodeBlueId
                   ? t.homePage.urgentCodeBlueHint
                   : criticalCount > 0
@@ -271,7 +286,7 @@ export default function HomePage() {
                   : t.homePage.urgentOverdueTasksHint}
               </span>
             </span>
-            <Chevron className="h-4 w-4 shrink-0 text-ivory-text3" aria-hidden />
+            <ForwardChevron className="h-4 w-4 shrink-0 text-ivory-text3" aria-hidden />
           </Link>
         )}
 
@@ -293,7 +308,7 @@ export default function HomePage() {
               {microWins.map((label) => (
                 <span
                   key={label}
-                  className="inline-flex max-w-full items-center whitespace-nowrap rounded-full border border-[var(--action-border)] bg-[var(--action-soft)] px-2.5 py-1 text-[10.5px] font-semibold text-[var(--action-ink)]"
+                  className="inline-flex max-w-full items-center whitespace-nowrap rounded-full border border-[var(--action-border)] bg-[var(--action-soft)] px-2.5 py-1 vt-text-2xs font-semibold text-[var(--action-ink)]"
                 >
                   {label}
                 </span>
@@ -306,12 +321,12 @@ export default function HomePage() {
         <section className={cn("rounded-[20px] border border-ivory-border border-s-[3px] border-s-[var(--brand)] bg-ivory-surface p-4 shadow-card", rise)}>
           <div className="ps-2.5">
             <div className="mb-1.5 flex items-center justify-between gap-2.5">
-              <span className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-brand">
+              <span className="vt-text-2xs font-bold uppercase tracking-[0.16em] text-brand">
                 {t.homePage.nextUp}
               </span>
               {nextTask && (
                 <span
-                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10.5px] font-bold tabular-nums ${
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 vt-text-2xs font-bold tabular-nums ${
                     nextOverdue
                       ? "bg-destructive/10 text-destructive"
                       : "bg-muted text-ivory-text3"
@@ -330,34 +345,34 @@ export default function HomePage() {
               </div>
             ) : nextTask ? (
               <>
-                <h2 className="mb-1 text-[17px] font-bold leading-snug tracking-tight text-ivory-text sm:text-lg">
+                <h2 className="mb-1 vt-text-lg font-bold leading-snug tracking-tight text-ivory-text">
                   {nextTitle}
                 </h2>
-                <p className="mb-3.5 text-[12.5px] text-ivory-text3">{nextBody}</p>
+                <p className="mb-3.5 vt-text-sm text-ivory-text3">{nextBody}</p>
                 <Link
                   href="/equipment/tasks"
                   data-testid="btn-next-up"
-                  className="flex h-[60px] w-full items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-deep)] text-[15px] font-bold text-white shadow-lg transition-transform motion-safe:active:scale-[0.98]"
+                  className="flex h-[60px] w-full items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-deep)] vt-text-sm font-bold text-white shadow-lg transition-transform motion-safe:active:scale-[0.98]"
                   style={{
                     boxShadow: "0 10px 22px -10px color-mix(in srgb, var(--brand) 55%, transparent)",
                   }}
                 >
                   {t.homePage.nextUpStart}
-                  <Chevron className="h-[18px] w-[18px]" aria-hidden />
+                  <ForwardChevron className="h-[18px] w-[18px]" aria-hidden />
                 </Link>
               </>
             ) : (
               <>
-                <h2 className="mb-1 text-[17px] font-bold leading-snug tracking-tight text-ivory-text sm:text-lg">
+                <h2 className="mb-1 vt-text-lg font-bold leading-snug tracking-tight text-ivory-text">
                   {t.homePage.nextUpEmpty}
                 </h2>
-                <p className="mb-3.5 text-[12.5px] text-ivory-text3">{t.homePage.nextUpEmptyBody}</p>
+                <p className="mb-3.5 vt-text-sm text-ivory-text3">{t.homePage.nextUpEmptyBody}</p>
                 <Link
                   href="/equipment/tasks"
                   className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-ivory-border bg-ivory-surface text-sm font-semibold text-ivory-text2 transition-colors hover:text-foreground motion-safe:active:scale-[0.98]"
                 >
                   {t.homePage.nextUpEmptyCta}
-                  <Chevron className="h-4 w-4" aria-hidden />
+                  <ForwardChevron className="h-4 w-4" aria-hidden />
                 </Link>
               </>
             )}
@@ -378,7 +393,7 @@ export default function HomePage() {
                 className="vt-action-green flex min-h-[76px] items-center justify-between gap-2.5 rounded-2xl p-3.5 text-start text-white transition-transform motion-safe:active:scale-[0.98]"
               >
                 <span className="min-w-0">
-                  <span className="block text-[13.5px] font-bold">{t.homePage.scanEquipment}</span>
+                  <span className="block vt-text-sm font-bold">{t.homePage.scanEquipment}</span>
                   <span className="mt-0.5 block vt-text-2xs text-white">{t.homePage.scanEquipmentHint}</span>
                 </span>
                 <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15">
@@ -392,8 +407,8 @@ export default function HomePage() {
                 className="flex min-h-[76px] items-center justify-between gap-2.5 rounded-2xl border border-ivory-border bg-ivory-surface p-3.5 text-start shadow-sm transition-colors hover:border-primary/30 motion-safe:active:scale-[0.98]"
               >
                 <span className="min-w-0">
-                  <span className="block text-[13.5px] font-bold text-ivory-text">{t.homePage.triageAlerts}</span>
-                  <span className="mt-0.5 block text-[11px] text-ivory-text3">
+                  <span className="block vt-text-sm font-bold text-ivory-text">{t.homePage.triageAlerts}</span>
+                  <span className="mt-0.5 block vt-text-xs text-ivory-text3">
                     {alertCount > 0 ? t.homePage.triageAlertsHint(alertCount) : t.homePage.triageAlertsClear}
                   </span>
                 </span>
@@ -411,8 +426,8 @@ export default function HomePage() {
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
               <Plus className="h-6 w-6 text-foreground/70" aria-hidden />
             </div>
-            <h3 className="mb-1 text-base font-bold text-ivory-text">{t.homePage.getStarted}</h3>
-            <p className="mb-4 text-sm text-ivory-text3">{t.homePage.getStartedDescription}</p>
+            <h3 className="mb-1 vt-text-lg font-bold text-ivory-text">{t.homePage.getStarted}</h3>
+            <p className="mb-4 vt-text-sm text-ivory-text3">{t.homePage.getStartedDescription}</p>
             <Link
               href="/equipment/new"
               data-testid="btn-get-started"
@@ -441,8 +456,11 @@ export default function HomePage() {
                     i === todayItems.length - 1 ? "" : "border-b border-ivory-border/60"
                   }`}
                 >
-                  <p className="min-w-0 flex-1 truncate text-[12.5px] text-ivory-text">{item.equipmentName}</p>
-                  <span className="shrink-0 text-[10.5px] tabular-nums text-ivory-text3">
+                  <TruncatedText
+                    text={item.equipmentName}
+                    className="vt-text-sm text-ivory-text flex-1"
+                  />
+                  <span className="shrink-0 vt-text-2xs tabular-nums text-ivory-text3">
                     {formatRelativeTime(item.timestamp)}
                   </span>
                 </Link>

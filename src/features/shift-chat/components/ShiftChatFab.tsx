@@ -34,7 +34,11 @@ export function ShiftChatFab() {
             "flex items-center justify-center text-xl shadow-lg shadow-[var(--brand-shadow)]",
             "transition-transform hover:scale-105 motion-safe:active:scale-95",
           )}
-          aria-label={t.shiftChat.openChat}
+          aria-label={
+            chat.unreadCount > 0
+              ? t.shiftChat.openChatUnread(chat.unreadCount > 9 ? "9+" : String(chat.unreadCount))
+              : t.shiftChat.openChat
+          }
         >
           <span aria-hidden="true">💬</span>
           {chat.unreadCount > 0 && (

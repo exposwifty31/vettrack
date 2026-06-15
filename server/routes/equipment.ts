@@ -80,6 +80,7 @@ const isoDateOnlySchema = z.string().refine((value) => {
 
 const createEquipmentSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(500),
+  nameHe: z.string().trim().max(500).optional().nullable(),
   serialNumber: z.string().max(500).optional(),
   model: z.string().max(500).optional(),
   manufacturer: z.string().max(500).optional(),
@@ -100,6 +101,7 @@ const createEquipmentSchema = z.object({
 
 const patchEquipmentSchema = z.object({
   name: z.string().min(1).max(500).optional(),
+  nameHe: z.string().trim().max(500).optional().nullable(),
   serialNumber: z.string().max(500).optional(),
   model: z.string().max(500).optional(),
   manufacturer: z.string().max(500).optional(),

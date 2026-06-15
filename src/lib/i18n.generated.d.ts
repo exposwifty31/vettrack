@@ -20,6 +20,7 @@ export interface TStructure {
     all: string;
     none: string;
     unknown: string;
+    never: string;
     select: string;
     unfiled: string;
     justNow: string;
@@ -121,6 +122,17 @@ export interface TStructure {
       exportError: string;
       checkoutError: string;
       returnError: string;
+      returnSuccess: string;
+    };
+    quickAction: {
+      checkout: string;
+      return: string;
+      viewIssue: string;
+    };
+    bulkDelete: {
+      title: string;
+      description: string;
+      confirm: string;
     };
     linkedInUse: string;
     recoveryBadgeStale: string;
@@ -136,6 +148,19 @@ export interface TStructure {
     statUptime: string;
     filterAll: string;
     recoveryAttentionSummary: string;
+    paginationCount: string;
+    paginationPage: string;
+    paginationPrevious: string;
+    paginationNext: string;
+    clearRoomFilter: string;
+    selection: {
+      selectAll: string;
+      deselectAll: string;
+      selectedCount: string;
+      itemAriaLabel: string;
+      itemStatusChecked: string;
+      itemStatusUnchecked: string;
+    };
   };
   shiftHandoverPage: {
     title: string;
@@ -306,6 +331,11 @@ export interface TStructure {
     startSessionFailed: string;
     finishSessionFailed: string;
     errorWithRequestId: string;
+    departments: {
+      hospital: string;
+      emergency: string;
+      internalMedicine: string;
+    };
   };
   equipmentTruth: {
     title: string;
@@ -472,6 +502,11 @@ export interface TStructure {
     sterilizationDue: string;
     expiryExpired: string;
     expirySoon: string;
+    expiryValid: string;
+    deleteTitle: string;
+    deleteBody: string;
+    deleteConfirm: string;
+    deleteAriaLabel: string;
     recoveryBadgeStale: string;
     recoveryBadgeVeryStale: string;
     recoveryBadgeCheckedOutLong: string;
@@ -503,6 +538,10 @@ export interface TStructure {
       name: {
         placeholder: string;
         error: string;
+      };
+      nameHe: {
+        label: string;
+        placeholder: string;
       };
       serialNumber: {
         placeholder: string;
@@ -554,6 +593,10 @@ export interface TStructure {
     actions: {
       returnAll: string;
     };
+    returnAllTitle: string;
+    returnAllBody: string;
+    returnAllConfirm: string;
+    checkedOutCount: string;
   };
   alerts: {
     types: {
@@ -957,17 +1000,34 @@ export interface TStructure {
     resetDescription: string;
     resetButton: string;
     resetDialogTitle: string;
+    resetSuccess: string;
     account: string;
     crashCartChecklist: string;
     crashCartChecklistDescription: string;
     crashCartChecklistManage: string;
     about: string;
+    versionLabel: string;
+    seeWhatsNew: string;
     logout: string;
+    logoutConfirmTitle: string;
+    logoutConfirmDescription: string;
+    showEmail: string;
+    hideEmail: string;
+    pushSyncFailed: string;
+    loadFailedForSession: string;
+    language: string;
+    languageDescription: string;
+    languageEn: string;
+    languageHe: string;
+    timeFormat12h: string;
+    timeFormat24h: string;
+    sendTest: string;
   };
   adminShiftsPage: {
     title: string;
     subtitle: string;
     uploadCsv: string;
+    clearUpload: string;
     selectedFile: string;
     previewReady: string;
     previewFailed: string;
@@ -985,6 +1045,7 @@ export interface TStructure {
     issuesTitle: string;
     importsHistoryTitle: string;
     noImportsYet: string;
+    importHistoryLoadFailed: string;
     noPreviewYet: string;
     rowLabel: string;
     importedBy: string;
@@ -1035,6 +1096,42 @@ export interface TStructure {
     topProblemSubMessage: string;
     maintenanceLabel: string;
     itemsLabel: string;
+    loadFailed: string;
+    shiftLeaderboardLink: string;
+    noScanActivity: string;
+    issueCountBadge: string;
+  };
+  monthlyReport: {
+    title: string;
+    equipmentSummary: string;
+    available: string;
+    inUse: string;
+    issues: string;
+    missing: string;
+    issuesMissingTitle: string;
+    noCriticalItems: string;
+    colEquipment: string;
+    colReason: string;
+    colLocation: string;
+    colStatus: string;
+    andMore: string;
+    costEstimate: string;
+    missingCostLine: string;
+    issueCostLine: string;
+    totalEstimated: string;
+    insights: string;
+    insightOperational: string;
+    insightMissing: string;
+    insightAllAccounted: string;
+    insightIssues: string;
+    footer: string;
+    generatedLabel: string;
+    reasonActiveIssue: string;
+    reasonNotSeen24h: string;
+    reasonNeverScanned: string;
+    statusIssue: string;
+    statusMissing: string;
+    printTitle: string;
   };
   outcomeKpiDashboard: {
     title: string;
@@ -1096,6 +1193,8 @@ export interface TStructure {
     alertsEmpty: string;
     alertsEmptyHint: string;
     hello: string;
+    helloBeforeName: string;
+    helloAfterName: string;
     shiftLine: string;
     shiftLineFallback: string;
     heroKicker: string;
@@ -1401,6 +1500,17 @@ export interface TStructure {
     zoneEr: string;
     zoneSurgery: string;
     zoneOther: string;
+    addRoom: string;
+    badgeSynced: string;
+    badgeAudit: string;
+    badgeStale: string;
+    summaryAvailable: string;
+    summaryInUse: string;
+    summaryIssues: string;
+    summarySynced: string;
+    cardItemsUnit: string;
+    cardAvailShort: string;
+    cardInUseShort: string;
   };
   managementDashboardPage: {
     title: string;
@@ -1507,6 +1617,7 @@ export interface TStructure {
     tabLogs: string;
     foldersTitle: string;
     pendingUsersTitle: string;
+    pendingEmpty: string;
     usersTitle: string;
     folderCreated: string;
     folderCreateFailed: string;
@@ -1514,6 +1625,9 @@ export interface TStructure {
     folderUpdateFailed: string;
     folderDeleted: string;
     folderDeleteFailed: string;
+    deleteFolderTitle: string;
+    deleteFolderBody: string;
+    deleteFolderConfirm: string;
     editFolder: string;
     createFolder: string;
     folderName: string;
@@ -1535,6 +1649,8 @@ export interface TStructure {
     filterPending: string;
     filterActive: string;
     filterBlocked: string;
+    secondaryRoleTooltip: string;
+    noMatchingUsers: string;
     noUsersYet: string;
     firstLoginUsersHint: string;
     tryOtherFilterHint: string;
@@ -2363,6 +2479,7 @@ export interface TStructure {
     urgentLoadFailed: string;
     todayLoadFailed: string;
     myTasksLoadFailed: string;
+    myTasksTitle: string;
     dayViewLoadFailed: string;
     dayViewEmpty: string;
     dayViewEmptyHint: string;
@@ -2658,6 +2775,7 @@ export interface TStructure {
       cartReady: string;
       cartNotChecked: string;
       pushSent: string;
+      pushSentMinutesAgo: string;
     };
     history: {
       adminOnly: string;
@@ -2876,6 +2994,21 @@ export interface TStructure {
       pinFailed: string;
     };
     openChat: string;
+    openChatUnread: string;
+    panel: {
+      title: string;
+      onlineCount: string;
+      loading: string;
+      empty: string;
+      filterAll: string;
+      typing: string;
+      broadcastPrompt: string;
+      placeholder: string;
+      markUrgentAria: string;
+      sendBroadcastAria: string;
+      sendAria: string;
+      closeAria: string;
+    };
   };
   auditLog: {
     actions: {
@@ -2960,6 +3093,9 @@ export interface TStructure {
     missingItemsNotesPlaceholder: string;
     saveAllOk: string;
     saveWithMissing: string;
+    checkItemAria: string;
+    checkItemStatusChecked: string;
+    checkItemStatusUnchecked: string;
     checkSaved: string;
     historyTitle: string;
     statusOk: string;

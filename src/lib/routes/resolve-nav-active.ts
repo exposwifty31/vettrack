@@ -9,8 +9,37 @@ for (const routes of Object.values(ROUTE_ALIAS_GROUPS)) {
   }
 }
 
+const EQUIPMENT_BOARD_ROUTES = [
+  "/equipment/board",
+  "/equipment-board",
+  "/display",
+] as const;
+
+const EMERGENCY_NAV_ROUTES = [
+  "/code-blue",
+  "/emergency-equipment-log",
+  "/emergency-equipment-wall",
+  "/code-blue/display",
+] as const;
+
+/** Equipment list hub: list, new, tasks, and detail — not the ward board. */
+function isEquipmentNavActive(location: string): boolean {
+  const path = normalizePathname(location);
+  if (matchesRouteFamily(location, EQUIPMENT_BOARD_ROUTES)) return false;
+  if (path === "/equipment") return true;
+  if (path === "/equipment/new" || path.startsWith("/equipment/tasks")) return true;
+  if (/^\/equipment\/[^/]+$/.test(path)) return true;
+  return false;
+}
+
 /** Active nav state for canonical or legacy href within the same alias family. */
 export function resolveNavItemActive(location: string, href: string): boolean {
+  if (href === "/equipment") {
+    return isEquipmentNavActive(location);
+  }
+  if (href === "/code-blue") {
+    return matchesRouteFamily(location, EMERGENCY_NAV_ROUTES);
+  }
   const aliasRoutes = HREF_TO_ALIAS_GROUP.get(href);
   if (aliasRoutes) {
     return matchesRouteFamily(location, aliasRoutes);

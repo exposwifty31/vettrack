@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorCard } from "@/components/ui/error-card";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -151,7 +152,7 @@ export default function AdminShiftsPage() {
                 }}
                 data-testid="btn-clear-shifts-upload"
               >
-                Clear upload
+                {t.adminShiftsPage.clearUpload}
               </Button>
             </div>
             {selectedFile && (
@@ -254,18 +255,10 @@ export default function AdminShiftsPage() {
                 ))}
               </div>
             ) : importsQuery.isError ? (
-                  <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-foreground">
-                <p className="text-xs text-muted-foreground">Failed to load import history.</p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-9 text-xs"
-                  onClick={() => importsQuery.refetch()}
-                  data-testid="btn-retry-import-history"
-                >
-                  Retry
-                </Button>
-              </div>
+              <ErrorCard
+                message={t.adminShiftsPage.importHistoryLoadFailed}
+                onRetry={() => importsQuery.refetch()}
+              />
             ) : !importsQuery.data || importsQuery.data.length === 0 ? (
               <p className="text-xs text-muted-foreground">{t.adminShiftsPage.noImportsYet}</p>
             ) : (
