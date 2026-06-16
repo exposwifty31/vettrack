@@ -86,3 +86,6 @@ ds-bundle/
 .design-sync/learnings/
 .design-sync/node_modules
 .design-sync/compiled.css
+
+# Xcode SwiftPM resolution (local machine noise)
+ios/**/xcshareddata/swiftpm/
