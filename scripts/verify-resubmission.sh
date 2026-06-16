@@ -82,7 +82,34 @@ hdr "[bundled shell]"
 B=$(python3 -c "import json;c=json.load(open('ios/App/App/capacitor.config.json'));print('server' not in c or not c.get('server',{}).get('url'))" 2>/dev/null)
 [ "$B" = "True" ] && ok "bundled (no server.url)" || no "capacitor.config has server.url — thin wrapper risk (4.2 + OAuth breaks)"
 ls ios/App/App/public/assets/clerk-native-instance-*.js >/dev/null 2>&1 \
-  && ok "native Clerk chunk present" || no "native Clerk chunk MISSING (rebuild + cap sync)"
+  && ok "native Clerk chunk present" || no "native Clerk chunk MISSING (run ./scripts/build-native-shell.sh)"
+
+# --- bundled auth env (pk_live + API origin — NOT dev-bypass from .env.local) ---
+hdr "[native bundle auth]"
+ASSETS="ios/App/App/public/assets"
+if [ -d "$ASSETS" ]; then
+  if ls "$ASSETS"/index-*.js >/dev/null 2>&1; then
+    grep -q 'pk_live' "$ASSETS"/index-*.js 2>/dev/null \
+      && ok "Clerk pk_live baked into bundle" \
+      || no "pk_live missing — dev-bypass shell (use ./scripts/build-native-shell.sh, not pnpm build)"
+    grep -q 'https://vettrack.uk' "$ASSETS"/index-*.js 2>/dev/null \
+      && ok "VITE_API_ORIGIN baked (vettrack.uk)" \
+      || no "vettrack.uk missing from bundle — /api will hit capacitor://localhost"
+  else
+    no "no index-*.js in $ASSETS — run ./scripts/build-native-shell.sh"
+  fi
+  SIGNIN=$(ls "$ASSETS"/signin-*.js 2>/dev/null | head -1)
+  if [ -n "${SIGNIN:-}" ]; then
+    SZ=$(wc -c < "$SIGNIN" | tr -d ' ')
+    [ "$SZ" -gt 8000 ] \
+      && ok "signin chunk ${SZ}B (Clerk UI)" \
+      || no "signin chunk ${SZ}B — likely dev-bypass (expect >8KB; rebuild with build-native-shell.sh)"
+  else
+    no "signin-*.js missing in bundled assets"
+  fi
+else
+  no "bundled assets dir missing — run ./scripts/build-native-shell.sh"
+fi
 
 # --- Control widget files ---------------------------------------------------
 hdr "[Control widget]"
