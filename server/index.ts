@@ -46,6 +46,9 @@ const { version: appVersion } = JSON.parse(readFileSync(path.join(path.dirname(f
 const isProduction = process.env.NODE_ENV === "production";
 
 const app = express();
+// App-level setting (not middleware) so it suppresses the header globally,
+// including on /api/health which is registered before the helmet chain.
+app.disable("x-powered-by");
 // Deployment runs behind a reverse proxy that sets X-Forwarded-For.
 // Trust first proxy so rate limiting derives client IPs correctly.
 app.set("trust proxy", 1);
