@@ -9,6 +9,7 @@ dist/
 .env.local*
 .env.production
 .env.production.local
+.env*.archiving
 *.log
 .DS_Store
 test-results/
@@ -70,9 +71,13 @@ desktop/cleaner/dist/
 
 # Build/store artifacts that must never be committed (Phase 1 hygiene)
 .pnpm-store/
+build/
 ios/build/
 *.xcarchive/
 build/
+
+# Native ship QA captures (local evidence; regenerate via scripts/qa-native-ship-*.sh)
+docs/mobile/qa-screenshots/
 
 # design-sync (claude.ai/design) — generated/staged artifacts (durable config under .design-sync/ IS committed)
 .ds-sync/

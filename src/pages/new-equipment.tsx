@@ -30,6 +30,7 @@ const SUBMIT_TIMEOUT_MS = 30_000;
 
 const schema = z.object({
   name: z.string().trim().min(1, t.newEquipment.fields.name.error),
+  nameHe: z.string().max(500).optional().nullable(),
   serialNumber: z.string().optional(),
   model: z.string().optional(),
   manufacturer: z.string().optional(),
@@ -89,6 +90,7 @@ export default function NewEquipmentPage() {
     const p = new URLSearchParams(searchStr);
     return {
       name: p.get("copyName") ?? "",
+      nameHe: p.get("copyNameHe") ?? "",
       model: p.get("copyModel") ?? "",
       manufacturer: p.get("copyManuf") ?? "",
       purchaseDate: p.get("copyPurchaseDate") ?? "",
@@ -130,6 +132,7 @@ export default function NewEquipmentPage() {
     mode: "onBlur",
     defaultValues: {
       name: prefill.name,
+      nameHe: prefill.nameHe || undefined,
       model: prefill.model || undefined,
       manufacturer: prefill.manufacturer || undefined,
       purchaseDate: prefill.purchaseDate || undefined,
@@ -147,6 +150,7 @@ export default function NewEquipmentPage() {
     if (isEditing && existingEquipment) {
       reset({
         name: existingEquipment.name,
+        nameHe: existingEquipment.nameHe ?? undefined,
         serialNumber: existingEquipment.serialNumber ?? undefined,
         model: existingEquipment.model ?? undefined,
         manufacturer: existingEquipment.manufacturer ?? undefined,
@@ -207,6 +211,7 @@ export default function NewEquipmentPage() {
   function buildCreatePayload(data: FormValues): CreateEquipmentPayload {
     return {
       name: data.name,
+      nameHe: normalizeOptionalString(data.nameHe ?? undefined) ?? null,
       serialNumber: normalizeOptionalString(data.serialNumber),
       model: normalizeOptionalString(data.model),
       manufacturer: normalizeOptionalString(data.manufacturer),
@@ -227,6 +232,7 @@ export default function NewEquipmentPage() {
   function buildUpdatePayload(data: FormValues): UpdateEquipmentPayload {
     return {
       name: data.name,
+      nameHe: normalizeOptionalString(data.nameHe ?? undefined) ?? null,
       serialNumber: normalizeOptionalString(data.serialNumber) ?? null,
       model: normalizeOptionalString(data.model) ?? null,
       manufacturer: normalizeOptionalString(data.manufacturer) ?? null,
@@ -355,6 +361,19 @@ export default function NewEquipmentPage() {
                 {errors.name && (
                   <p className="text-xs text-destructive">{errors.name.message}</p>
                 )}
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="nameHe" className="text-sm font-medium">
+                  {t.newEquipment.fields.nameHe.label}
+                </Label>
+                <Input
+                  id="nameHe"
+                  placeholder={t.newEquipment.fields.nameHe.placeholder}
+                  className="h-12 rounded-xl border-border/60 bg-background text-base"
+                  {...register("nameHe")}
+                  data-testid="input-name-he"
+                />
               </div>
 
               <div className="flex flex-col gap-2">

@@ -11,6 +11,7 @@ import { SkeletonAlertCard } from "@/components/ui/skeleton-cards";
 import { ErrorCard } from "@/components/ui/error-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { computeAlerts } from "@/lib/utils";
+import { buildAlertAckSet, countActiveAlerts } from "@/lib/alert-counts";
 import {
   AlertTriangle,
   Clock,
@@ -21,9 +22,10 @@ import {
   UserCheck,
   X,
   MapPin,
-  ChevronRight,
   Loader2,
 } from "lucide-react";
+import { TruncatedText } from "@/components/ui/truncated-text";
+import { ForwardChevron } from "@/components/ui/directional-chevron";
 import type { Alert, AlertType, AlertAcknowledgment } from "@/types";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -142,6 +144,7 @@ export default function AlertsPage() {
       acksMap.set(`${ack.equipmentId}:${ack.alertType}`, ack);
     }
   }
+  const activeAlertCount = countActiveAlerts(alerts, acksMap);
 
   const equipmentLocationMap = new Map<string, string>();
   if (equipment) {
@@ -167,15 +170,15 @@ export default function AlertsPage() {
         <meta name="description" content={t.alertsPage.metaDescription} />
         <link rel="canonical" href="https://vettrack.replit.app/alerts" />
       </Helmet>
-      <div className="flex flex-col gap-5 pb-24 animate-fade-in">
+      <div className="flex flex-1 flex-col gap-5 pb-24 animate-fade-in">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold leading-tight flex items-center gap-2">
+          <h1 className="vt-page-title flex items-center gap-2">
             <Bell className="w-5 h-5 text-muted-foreground" />
             {t.alertsPage.title}
           </h1>
-          {alerts.length > 0 && (
+          {activeAlertCount > 0 && (
             <span className="text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
-              {t.alertsPage.activeCount(alerts.length)}
+              {t.alertsPage.activeCount(activeAlertCount)}
             </span>
           )}
         </div>
@@ -215,23 +218,26 @@ export default function AlertsPage() {
             ))}
           </div>
         ) : hasFatalError ? null : alerts.length === 0 ? (
-          <EmptyState
-            icon={CheckCircle}
-            message={t.alerts.empty.message}
-            subMessage={t.alerts.empty.subMessage}
-            iconBg="bg-emerald-50"
-            iconColor="text-emerald-500"
-            borderColor="border-border/60"
-            action={
-              <Link href="/equipment">
-                <Button variant="outline" size="sm">
-                  {t.alertsPage.browseEquipment}
-                </Button>
-              </Link>
-            }
-          />
+          <div className="flex flex-1 flex-col justify-center py-6">
+            <EmptyState
+              icon={CheckCircle}
+              message={t.alerts.empty.message}
+              subMessage={t.alerts.empty.subMessage}
+              iconBg="bg-emerald-50"
+              iconColor="text-emerald-500"
+              borderColor="border-border/60"
+              action={
+                <Link href="/equipment">
+                  <Button variant="outline" size="sm">
+                    {t.alertsPage.browseEquipment}
+                  </Button>
+                </Link>
+              }
+            />
+          </div>
         ) : !isDesktop ? (
-          <AlertsProView
+          <div className="flex flex-1 flex-col min-h-0">
+            <AlertsProView
             alerts={alerts}
             acksMap={acksMap}
             equipmentLocationMap={equipmentLocationMap}
@@ -242,6 +248,7 @@ export default function AlertsPage() {
             canOwn={canOwnAlerts}
             formatRelativeTime={formatRelativeTime}
           />
+          </div>
         ) : (
           priorityOrder
             .filter((type) => grouped[type] && grouped[type]!.length > 0)
@@ -255,7 +262,7 @@ export default function AlertsPage() {
                   <div className="flex items-center gap-2 mb-2.5">
                     <span className={`w-2 h-2 rounded-full ${config.dotColor} shrink-0`} />
                     <h2 className="text-sm font-semibold text-foreground">{config.label}</h2>
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${config.badgeClass}`}>
+                    <span className={`vt-text-2xs font-semibold px-2 py-0.5 rounded-full border ${config.badgeClass}`}>
                       {config.badgeLabel}
                     </span>
                     <span className="text-xs text-muted-foreground ms-auto">
@@ -283,9 +290,11 @@ export default function AlertsPage() {
                               <Icon className="w-4 h-4 text-muted-foreground" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-sm truncate">
-                                {alert.equipmentName}
-                              </p>
+                              <TruncatedText
+                                text={alert.equipmentName}
+                                className="font-semibold text-sm"
+                                as="p"
+                              />
                               <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                                 {alert.detail}
                               </p>
@@ -296,7 +305,7 @@ export default function AlertsPage() {
                                 </p>
                               )}
                             </div>
-                            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
+                            <ForwardChevron className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
                           </button>
 
                           {/* Single action: acknowledge / handling status */}
@@ -306,12 +315,14 @@ export default function AlertsPage() {
                                 <div className="flex items-center gap-1.5 min-w-0">
                                   <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                                   <div className="min-w-0">
-                                    <span className="text-xs text-foreground font-medium truncate block">
-                                      {ack.acknowledgedByEmail.split("@")[0]}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground truncate block">
-                                      {t.alertsPage.inProgressSince} {formatRelativeTime(new Date(ack.acknowledgedAt))}
-                                    </span>
+                                    <TruncatedText
+                                      text={ack.acknowledgedByEmail.split("@")[0]}
+                                      className="text-xs text-foreground font-medium"
+                                    />
+                                    <TruncatedText
+                                      text={`${t.alertsPage.inProgressSince} ${formatRelativeTime(new Date(ack.acknowledgedAt))}`}
+                                      className="text-xs text-muted-foreground"
+                                    />
                                   </div>
                                 </div>
                                 {canOwnAlerts && (

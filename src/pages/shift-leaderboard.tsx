@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorCard } from "@/components/ui/error-card";
 import { useAuth } from "@/hooks/use-auth";
+import { t } from "@/lib/i18n";
 import { TrendingUp, AlertCircle, Users } from "lucide-react";
 import { Link } from "wouter";
 
@@ -43,7 +44,7 @@ export default function ShiftLeaderboardPage() {
   if (!isAdmin) {
     return (
       <AppShell>
-        <div className="p-8 text-center text-muted-foreground">נדרשת גישת מנהל</div>
+        <div className="p-8 text-center text-muted-foreground">{t.shiftLeaderboard.adminRequired}</div>
       </AppShell>
     );
   }
@@ -60,33 +61,33 @@ export default function ShiftLeaderboardPage() {
   return (
     <AppShell>
       <Helmet>
-        <title>לוח מובילים — סריקות משמרת — VetTrack</title>
+        <title>{t.shiftLeaderboard.pageTitle}</title>
       </Helmet>
 
       <div className="w-full space-y-6 motion-safe:animate-page-enter">
-        {/* כותרת */}
+        {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             <TrendingUp className="h-7 w-7 shrink-0 text-primary" aria-hidden />
-            <h1 className="truncate text-2xl font-bold tracking-tight">לוח מובילים — סריקות משמרת</h1>
+            <h1 className="truncate text-2xl font-bold tracking-tight">{t.shiftLeaderboard.title}</h1>
           </div>
           <Link href="/analytics">
             <Button variant="outline" size="sm">
-              חזרה לניתוח נתונים
+              {t.shiftLeaderboard.backToAnalytics}
             </Button>
           </Link>
         </div>
 
         <p className="text-sm text-muted-foreground max-w-2xl">
-          ספירת סריקות וממוצעים לפי משתמש על פני משמרות. משתמשים עם אפס סריקות בכל משמרת מסומנים.
+          {t.shiftLeaderboard.description}
         </p>
 
-        {/* טווח תאריכים */}
+        {/* Date range */}
         <div className="rounded-xl border bg-card p-4 shadow-sm">
           <div className="flex flex-wrap items-end gap-4">
             <div className="flex flex-col gap-1 flex-1 min-w-[7rem]">
               <label className="text-xs font-medium text-muted-foreground" htmlFor="sb-from">
-                מתאריך
+                {t.shiftLeaderboard.fromDate}
               </label>
               <input
                 id="sb-from"
@@ -98,7 +99,7 @@ export default function ShiftLeaderboardPage() {
             </div>
             <div className="flex flex-col gap-1 flex-1 min-w-[7rem]">
               <label className="text-xs font-medium text-muted-foreground" htmlFor="sb-to">
-                עד תאריך
+                {t.shiftLeaderboard.toDate}
               </label>
               <input
                 id="sb-to"
@@ -112,7 +113,7 @@ export default function ShiftLeaderboardPage() {
               onClick={() => setQueryParams({ from: fromDate, to: toDate })}
               disabled={reportQ.isFetching}
             >
-              {reportQ.isFetching ? "טוען..." : "הרץ דוח"}
+              {reportQ.isFetching ? t.shiftLeaderboard.loading : t.shiftLeaderboard.runReport}
             </Button>
           </div>
         </div>
@@ -127,14 +128,14 @@ export default function ShiftLeaderboardPage() {
         )}
 
         {reportQ.isError && (
-          <ErrorCard message="טעינת נתוני השלמת משמרת נכשלה" />
+          <ErrorCard message={t.shiftLeaderboard.loadError} />
         )}
 
         {!reportQ.isPending && !reportQ.isError && users.length === 0 && (
           <EmptyState
             icon={Users}
-            message="אין נתונים"
-            subMessage="אין משתמשים עם פעילות משמרת בתקופה שנבחרה"
+            message={t.shiftLeaderboard.emptyTitle}
+            subMessage={t.shiftLeaderboard.emptySubtitle}
           />
         )}
 
@@ -145,11 +146,11 @@ export default function ShiftLeaderboardPage() {
               <thead>
                 <tr className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wide border-b">
                   <th className="px-4 py-2 text-right font-medium">#</th>
-                  <th className="px-4 py-2 text-right font-medium">משתמש</th>
-                  <th className="px-4 py-2 text-right font-medium">משמרות</th>
-                  <th className="px-4 py-2 text-right font-medium">סריקות סה״כ</th>
-                  <th className="px-4 py-2 text-right font-medium">ממוצע / משמרת</th>
-                  <th className="px-4 py-2 text-right font-medium">ללא סריקה</th>
+                  <th className="px-4 py-2 text-right font-medium">{t.shiftLeaderboard.colUser}</th>
+                  <th className="px-4 py-2 text-right font-medium">{t.shiftLeaderboard.colShifts}</th>
+                  <th className="px-4 py-2 text-right font-medium">{t.shiftLeaderboard.colTotalScans}</th>
+                  <th className="px-4 py-2 text-right font-medium">{t.shiftLeaderboard.colAvgPerShift}</th>
+                  <th className="px-4 py-2 text-right font-medium">{t.shiftLeaderboard.colNoScan}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">

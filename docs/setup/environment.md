@@ -98,6 +98,7 @@ Omit both Clerk keys for dev-bypass mode (hardcoded admin user, no SDK required)
 
 | Variable | Description |
 |----------|-------------|
+| `VITE_API_ORIGIN` | Production API host baked into **bundled** Capacitor shell (e.g. `https://vettrack.uk`). Set in `.env`; native builds use `./scripts/build-native-shell.sh` which reads `.env` only (ignores `.env.local`). |
 | `APNS_KEY_ID` | APNs p8 key ID (10-char string) |
 | `APNS_TEAM_ID` | Apple Developer Team ID |
 | `APNS_P8_KEY` | APNs p8 private key content |

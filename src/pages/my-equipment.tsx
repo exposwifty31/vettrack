@@ -13,17 +13,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorCard } from "@/components/ui/error-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ShiftSummarySheet } from "@/components/shift-summary-sheet";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { STATUS_LABELS } from "@/types";
 import { formatRelativeTime } from "@/lib/utils";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
@@ -31,11 +20,15 @@ import {
   PackageOpen,
   MapPin,
   LogOut,
-  ChevronRight,
   Loader2,
   CheckCircle2,
   ClipboardCheck,
 } from "lucide-react";
+import { TruncatedText } from "@/components/ui/truncated-text";
+import { Bdi } from "@/components/ui/bdi";
+import { ForwardChevron } from "@/components/ui/directional-chevron";
+import { useConfirm } from "@/hooks/use-confirm";
+import { withToast } from "@/lib/toast-result";
 import { toast } from "sonner";
 import { ReturnPlugDialog } from "@/components/return-plug-dialog";
 import { useAuth } from "@/hooks/use-auth";
@@ -57,6 +50,7 @@ const MY_EQUIPMENT_SIDEBAR: SidebarItem[] = [
 ];
 
 export default function MyEquipmentPage() {
+  const confirm = useConfirm();
   const { userId } = useAuth();
   const queryClient = useQueryClient();
   const [returningAll, setReturningAll] = useState(false);
@@ -104,15 +98,31 @@ export default function MyEquipmentPage() {
 
   async function handleReturnAll() {
     if (!items || items.length === 0) return;
+    if (
+      !(await confirm({
+        title: t.myEquipment.returnAllTitle(items.length),
+        description: t.myEquipment.returnAllBody,
+        confirmLabel: t.myEquipment.returnAllConfirm,
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     setReturningAll(true);
+    const count = items.length;
     try {
-      await Promise.all(items.map((item) => api.equipment.return(item.id, { isPluggedIn: false })));
-      queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
-      toast.success(`Returned ${items.length} item${items.length !== 1 ? "s" : ""} — all equipment now available`);
-    } catch {
-      toast.error(t.myEquipment.toast.returnAllPartialError);
+      await withToast(
+        async () => {
+          await Promise.all(items.map((item) => api.equipment.return(item.id, { isPluggedIn: false })));
+          queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
+        },
+        {
+          success: t.myEquipment.toast.returnAllSuccess(count),
+          error: t.myEquipment.toast.returnAllPartialError,
+        },
+      );
     } finally {
       setReturningAll(false);
     }
@@ -125,12 +135,14 @@ export default function MyEquipmentPage() {
         <meta name="description" content="View all equipment currently checked out to you. Return individual items or use Return All for quick end-of-shift handoffs." />
         <link rel="canonical" href="https://vettrack.replit.app/my-equipment" />
       </Helmet>
-      <div className="flex flex-col gap-5 pb-24 animate-fade-in">
+      <div className="flex flex-1 flex-col gap-5 pb-24 animate-fade-in">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold leading-tight">{ t.equipment.myEquipment }</h1>
             {items && items.length > 0 && (
-              <p className="text-sm text-muted-foreground mt-0.5">{items.length} checked out</p>
+              <p className="vt-text-sm text-muted-foreground mt-0.5">
+                {t.myEquipment.checkedOutCount(items.length)}
+              </p>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -155,37 +167,20 @@ export default function MyEquipmentPage() {
         )}
 
         {items && items.length >= 2 && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full h-12 rounded-2xl border-border/60 bg-card text-foreground"
-                disabled={returningAll}
-                data-testid="btn-return-all"
-              >
-                {returningAll ? (
-                  <Loader2 className="w-4 h-4 me-2 animate-spin" />
-                ) : (
-                  <LogOut className="w-4 h-4 me-2" />
-                )}
-                Return All ({items.length})
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Return all {items.length} items?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will return all {items.length} checked-out items and make them available for others.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
-                <AlertDialogAction onClick={handleReturnAll}>
-                  Confirm
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <Button
+            variant="outline"
+            className="w-full h-12 rounded-2xl border-border/60 bg-card text-foreground"
+            disabled={returningAll}
+            data-testid="btn-return-all"
+            onClick={() => void handleReturnAll()}
+          >
+            {returningAll ? (
+              <Loader2 className="w-4 h-4 me-2 animate-spin" />
+            ) : (
+              <LogOut className="w-4 h-4 me-2" />
+            )}
+            {t.myEquipment.actions.returnAll} ({items.length})
+          </Button>
         )}
 
         {isLoading ? (
@@ -195,21 +190,23 @@ export default function MyEquipmentPage() {
             ))}
           </div>
         ) : isError ? null : !items || items.length === 0 ? (
-          <EmptyState
-            icon={CheckCircle2}
-            message={t.myEquipment.empty.message}
-            subMessage={t.myEquipment.empty.subMessage}
-            iconBg="bg-muted"
-            iconColor="text-muted-foreground"
-            borderColor="border-border/60"
-            action={
-              <Link href="/equipment">
-                <Button variant="outline" size="sm" className="h-11 text-xs">
-                  {t.myEquipmentPage.browseEquipment}
-                </Button>
-              </Link>
-            }
-          />
+          <div className="flex flex-1 flex-col justify-center py-6">
+            <EmptyState
+              icon={CheckCircle2}
+              message={t.myEquipment.empty.message}
+              subMessage={t.myEquipment.empty.subMessage}
+              iconBg="bg-muted"
+              iconColor="text-muted-foreground"
+              borderColor="border-border/60"
+              action={
+                <Link href="/equipment">
+                  <Button variant="outline" size="sm" className="h-11 text-xs">
+                    {t.myEquipmentPage.browseEquipment}
+                  </Button>
+                </Link>
+              }
+            />
+          </div>
         ) : (
           <div className="flex flex-col gap-2">
             {isEquipmentRecoveryUiEnabled &&
@@ -251,7 +248,9 @@ export default function MyEquipmentPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                        <p className="font-semibold text-sm truncate">{item.name}</p>
+                        <Bdi>
+                          <TruncatedText text={item.name} className="font-semibold text-sm" as="p" />
+                        </Bdi>
                         <Badge variant={statusToBadgeVariant(item.status)} className="shrink-0 text-[10px] px-2 py-0.5">
                           {STATUS_LABELS[item.status] || item.status}
                         </Badge>
@@ -294,7 +293,7 @@ export default function MyEquipmentPage() {
                       </Button>
                       <Link href={`/equipment/${item.id}`}>
                         <Button variant="ghost" size="icon-sm" className="min-h-[44px] min-w-[44px] text-muted-foreground hover:text-foreground hover:bg-muted">
-                          <ChevronRight className="w-4 h-4" />
+                          <ForwardChevron className="w-4 h-4" />
                         </Button>
                       </Link>
                     </div>

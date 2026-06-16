@@ -1,5 +1,8 @@
 import { t } from "@/lib/i18n";
 import { formatBundleGateReason } from "@/lib/equipment-truth-display";
+import { getEquipmentDisplayName } from "@/lib/equipment-display";
+import { Bdi } from "@/components/ui/bdi";
+import { useConfirm } from "@/hooks/use-confirm";
 // TODO(arch): God-file split — see docs/architecture/equipment-god-files-split-plan.md (item 9 handoff; no implementation here).
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
 import { useState, useRef, useEffect, useMemo } from "react";
@@ -31,7 +34,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -132,6 +134,7 @@ interface UndoState {
 }
 
 export default function EquipmentDetailPage() {
+  const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const searchStr = useSearch();
@@ -331,6 +334,11 @@ export default function EquipmentDetailPage() {
     refetchOnWindowFocus: false,
   });
 
+  const equipmentDisplayName = useMemo(
+    () => (equipment ? getEquipmentDisplayName(equipment) : ""),
+    [equipment],
+  );
+
   // Re-arm the per-mount toggle guard on a warm re-scan. The deep-link router appends a fresh
   // &nfcTs=<epoch> on every scan, so a new nfcTs means "the user scanned again" → reset the ref
   // BEFORE the toggle effect reads it. Declaration order is load-bearing (B2): React runs effects
@@ -356,7 +364,7 @@ export default function EquipmentDetailPage() {
     }
     markNfcToggleFired(id);
     setIsNfcToggling(true);
-    void runEquipmentQuickToggle(id, equipment.name, queryClient)
+    void runEquipmentQuickToggle(id, equipmentDisplayName, queryClient)
       .catch(() => {
         toast.error(t.equipmentNfc.onlineRequired);
       })
@@ -768,6 +776,7 @@ export default function EquipmentDetailPage() {
     if (!equipment) return;
     const params = new URLSearchParams();
     if (equipment.name) params.set("copyName", equipment.name);
+    if (equipment.nameHe) params.set("copyNameHe", equipment.nameHe);
     if (equipment.model) params.set("copyModel", equipment.model);
     if (equipment.manufacturer) params.set("copyManuf", equipment.manufacturer);
     if (equipment.purchaseDate) params.set("copyPurchaseDate", equipment.purchaseDate);
@@ -775,7 +784,7 @@ export default function EquipmentDetailPage() {
     if (equipment.folderId) params.set("copyFolder", equipment.folderId);
     if (equipment.maintenanceIntervalDays)
       params.set("copyMaint", String(equipment.maintenanceIntervalDays));
-    params.set("copiedFrom", equipment.name);
+    params.set("copiedFrom", equipmentDisplayName);
     navigate(`/equipment/new?${params.toString()}`);
   }
 
@@ -932,15 +941,15 @@ export default function EquipmentDetailPage() {
   const pageContent = (
     <>
       <Helmet>
-        <title>{equipment.name} — VetTrack</title>
-        <meta name="description" content={`Equipment detail for ${equipment.name}. Status: ${equipment.status}${equipment.location ? `. Location: ${equipment.location}` : ""}. Update status, check out, report issues, and view full history.`} />
+        <title>{equipmentDisplayName} — VetTrack</title>
+        <meta name="description" content={`Equipment detail for ${equipmentDisplayName}. Status: ${equipment.status}${equipment.location ? `. Location: ${equipment.location}` : ""}. Update status, check out, report issues, and view full history.`} />
         <link rel="canonical" href={`https://vettrack.replit.app/equipment/${equipment.id}`} />
       </Helmet>
       <Breadcrumb
         className="mb-1 hidden sm:flex"
         items={[
           { label: t.equipment.title, href: "/equipment" },
-          { label: equipment.name },
+          { label: equipmentDisplayName },
         ]}
       />
       <div className="flex flex-col gap-4 pb-28 animate-fade-in">
@@ -957,7 +966,7 @@ export default function EquipmentDetailPage() {
               <ArrowLeft className="w-5 h-5" aria-hidden />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold leading-tight">{equipment.name}</h1>
+              <h1 className="vt-page-title leading-tight"><Bdi>{equipmentDisplayName}</Bdi></h1>
               {equipment.folderName && (
                 <span className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                   <FolderOpen className="w-3 h-3" />
@@ -1000,36 +1009,28 @@ export default function EquipmentDetailPage() {
               <MoreHorizontal className="w-4 h-4" aria-hidden />
             </Button>
             {isAdmin && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="text-destructive hover:text-destructive"
-                    aria-label="Delete equipment"
-                    data-testid="btn-delete"
-                  >
-                    <Trash2 className="w-4 h-4" aria-hidden />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete {equipment.name}?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This hides the equipment from active lists (soft-delete). Audit and scan history are preserved.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => deleteMut.mutate()}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="text-destructive hover:text-destructive h-11 w-11"
+                aria-label={t.equipmentDetail.deleteAriaLabel}
+                data-testid="btn-delete"
+                onClick={async () => {
+                  if (
+                    !(await confirm({
+                      title: t.equipmentDetail.deleteTitle(equipmentDisplayName),
+                      description: t.equipmentDetail.deleteBody,
+                      confirmLabel: t.equipmentDetail.deleteConfirm,
+                      destructive: true,
+                    }))
+                  ) {
+                    return;
+                  }
+                  deleteMut.mutate();
+                }}
+              >
+                <Trash2 className="w-4 h-4" aria-hidden />
+              </Button>
             )}
           </div>
         </div>
@@ -1075,7 +1076,7 @@ export default function EquipmentDetailPage() {
           </div>
         )}
 
-        <EquipmentTruthCard equipmentId={equipment.id} equipmentName={equipment.name} />
+        <EquipmentTruthCard equipmentId={equipment.id} equipmentName={equipmentDisplayName} />
 
         <AssetCopilotPanel defaultEquipmentId={equipment.id} className="mt-3" />
 
@@ -1089,7 +1090,7 @@ export default function EquipmentDetailPage() {
               data-testid="nfc-toggle-in-flight"
             >
               <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
-              <span>{t.equipmentNfc.toggling(equipment.name)}</span>
+              <span>{t.equipmentNfc.toggling(equipmentDisplayName)}</span>
             </div>
           )}
           {showReservationBanner && waitlistQ.data?.reservationExpiresAt && (
@@ -1243,14 +1244,14 @@ export default function EquipmentDetailPage() {
               maxLength={200}
             />
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-amber-700/60 dark:text-amber-400/60">
+              <span className="vt-text-2xs text-amber-700/60 dark:text-amber-400/60">
                 {floorNoteText.length}/200
               </span>
               <div className="flex gap-2">
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-8 text-xs"
+                  className="h-11 text-xs"
                   onClick={() => setEditingFloorNote(false)}
                   disabled={floorNoteMut.isPending}
                 >
@@ -1258,7 +1259,7 @@ export default function EquipmentDetailPage() {
                 </Button>
                 <Button
                   size="sm"
-                  className="h-8 text-xs"
+                  className="h-11 text-xs"
                   onClick={() => floorNoteMut.mutate(floorNoteText.trim() || null)}
                   disabled={floorNoteMut.isPending}
                 >
@@ -1603,7 +1604,7 @@ export default function EquipmentDetailPage() {
       <ReturnPlugDialog
         open={returnDialogOpen}
         onOpenChange={setReturnDialogOpen}
-        equipmentName={equipment.name}
+        equipmentName={equipmentDisplayName}
         isSubmitting={returnMut.isPending}
         onConfirm={({ isPluggedIn: nextPluggedIn, plugInDeadlineMinutes: nextDeadline }) => {
           returnMut.mutate({
@@ -1618,7 +1619,7 @@ export default function EquipmentDetailPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t.equipmentDetail.updateStatusTitle}</DialogTitle>
-            <DialogDescription>Log status for: {equipment.name}</DialogDescription>
+            <DialogDescription>Log status for: {equipmentDisplayName}</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-2">
             <div className="flex flex-col gap-1.5">
@@ -1691,7 +1692,7 @@ export default function EquipmentDetailPage() {
                   <div className="relative">
                     <img
                       src={scanPhoto}
-                      alt="Issue photo"
+                      alt={t.equipmentDetail.issuePhoto}
                       className="w-full h-36 object-cover rounded-xl border-2 border-primary/30"
                     />
                     <Button
@@ -1750,7 +1751,7 @@ export default function EquipmentDetailPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t.equipmentDetail.reportIssueTitle}</DialogTitle>
-            <DialogDescription>{equipment.name}</DialogDescription>
+            <DialogDescription>{equipmentDisplayName}</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-2">
             <div className="flex flex-col gap-1.5">
@@ -1783,7 +1784,7 @@ export default function EquipmentDetailPage() {
                 <div className="relative">
                   <img
                     src={reportIssuePhoto}
-                    alt="Issue photo"
+                    alt={t.equipmentDetail.issuePhoto}
                     className="w-full h-36 object-cover rounded-xl border-2 border-primary/30"
                   />
                   <Button
@@ -1858,7 +1859,7 @@ export default function EquipmentDetailPage() {
                 <div className="flex items-start gap-3 mb-5">
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-lg leading-tight" data-testid="scan-action-equipment-name">
-                      {equipment.name}
+                      {equipmentDisplayName}
                     </p>
                     {equipment.serialNumber && (
                       <p className="text-xs text-muted-foreground mt-0.5">
@@ -1966,7 +1967,7 @@ export default function EquipmentDetailPage() {
               <div className="flex flex-col items-center gap-4 py-4 text-center">
                 <CheckCircle2 className="w-14 h-14 text-emerald-500" />
                 <p className="font-bold text-lg">Done!</p>
-                <p className="text-muted-foreground text-sm">Action completed for {equipment.name}.</p>
+                <p className="text-muted-foreground text-sm">Action completed for {equipmentDisplayName}.</p>
                 <Button
                   className="w-full gap-2"
                   onClick={() => {

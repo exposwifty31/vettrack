@@ -1,4 +1,6 @@
 import { t } from "@/lib/i18n";
+import { Bdi } from "@/components/ui/bdi";
+import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -22,7 +24,6 @@ import {
 import {
   DoorOpen,
   Plus,
-  ChevronRight,
   CheckCircle2,
   Clock,
   AlertTriangle,
@@ -41,7 +42,7 @@ function SyncBadge({ status }: { status: string }) {
     return (
       <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-300 rounded-full px-2 py-0.5 shrink-0">
         <CheckCircle2 className="w-2.5 h-2.5" />
-        Synced
+        {t.roomsListPage.badgeSynced}
       </div>
     );
   }
@@ -49,14 +50,14 @@ function SyncBadge({ status }: { status: string }) {
     return (
       <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide text-red-700 bg-red-50 border border-red-200 dark:bg-red-950/50 dark:border-red-800 dark:text-red-300 rounded-full px-2 py-0.5 shrink-0">
         <AlertTriangle className="w-2.5 h-2.5" />
-        Audit
+        {t.roomsListPage.badgeAudit}
       </div>
     );
   }
   return (
     <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide text-amber-700 bg-amber-50 border border-amber-200 dark:bg-amber-950/50 dark:border-amber-800 dark:text-amber-300 rounded-full px-2 py-0.5 shrink-0">
       <Clock className="w-2.5 h-2.5" />
-      Stale
+      {t.roomsListPage.badgeStale}
     </div>
   );
 }
@@ -132,14 +133,14 @@ function RoomCard({ room }: { room: Room }) {
 
           {/* Room name */}
           <div className="flex-1">
-            <p className="font-bold text-sm leading-snug truncate">{room.name}</p>
+            <p className="font-bold text-sm leading-snug truncate"><Bdi>{room.name}</Bdi></p>
             {room.floor ? (
               <p className="text-[11px] text-muted-foreground flex items-center gap-0.5 mt-0.5">
                 <MapPin className="w-2.5 h-2.5 shrink-0" />
                 <span className="truncate">{room.floor}</span>
               </p>
             ) : (
-              <p className="text-[11px] text-muted-foreground mt-0.5">{total} item{total !== 1 ? "s" : ""}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{total} {t.roomsListPage.cardItemsUnit}</p>
             )}
           </div>
 
@@ -148,7 +149,7 @@ function RoomCard({ room }: { room: Room }) {
             <div className="flex items-end justify-between mb-1.5">
               <div>
                 <span className="text-xl font-bold text-primary">{available}</span>
-                <span className="text-xs text-muted-foreground font-medium">/{total} avail.</span>
+                <span className="text-xs text-muted-foreground font-medium">/{total} {t.roomsListPage.cardAvailShort}</span>
               </div>
               {issues > 0 && (
                 <span className="flex items-center gap-0.5 text-[10px] font-semibold text-red-600 bg-red-50 dark:bg-red-950/50 border border-red-100 dark:border-red-800 rounded-md px-1.5 py-0.5">
@@ -165,12 +166,12 @@ function RoomCard({ room }: { room: Room }) {
               />
             </div>
             {inUse > 0 && (
-              <p className="text-[10px] text-muted-foreground mt-1">{inUse} in use</p>
+              <p className="text-[10px] text-muted-foreground mt-1">{inUse} {t.roomsListPage.cardInUseShort}</p>
             )}
           </div>
 
           <div className="flex justify-end">
-            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+            <ForwardChevron className="w-3.5 h-3.5 text-muted-foreground" />
           </div>
         </CardContent>
       </Card>
@@ -286,7 +287,7 @@ export default function RoomsListPage() {
           {isAdmin && (
             <Button size="sm" className="h-11 gap-1.5 shrink-0" onClick={() => setCreateOpen(true)}>
               <Plus className="w-4 h-4" />
-              Add Room
+              {t.roomsListPage.addRoom}
             </Button>
           )}
         </div>
@@ -296,23 +297,23 @@ export default function RoomsListPage() {
           <div className="flex gap-2 flex-wrap">
             <div className="flex items-center gap-1.5 text-xs font-semibold bg-primary/5 border border-primary/20 text-primary rounded-full px-3 py-1.5">
               <span className="font-bold text-sm">{totalAvailable}</span>
-              <span className="text-[11px]">Available</span>
+              <span className="text-[11px]">{t.roomsListPage.summaryAvailable}</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs font-semibold bg-muted border border-border text-muted-foreground rounded-full px-3 py-1.5">
               <span className="font-bold text-sm">{totalInUse}</span>
-              <span className="text-[11px]">In Use</span>
+              <span className="text-[11px]">{t.roomsListPage.summaryInUse}</span>
             </div>
             {totalIssues > 0 && (
               <div className="flex items-center gap-1.5 text-xs font-semibold bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 rounded-full px-3 py-1.5">
                 <AlertTriangle className="w-3 h-3" />
                 <span className="font-bold text-sm">{totalIssues}</span>
-                <span className="text-[11px]">Issue{totalIssues !== 1 ? "s" : ""}</span>
+                <span className="text-[11px]">{t.roomsListPage.summaryIssues}</span>
               </div>
             )}
             <div className="flex items-center gap-1.5 text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 rounded-full px-3 py-1.5">
               <CheckCircle2 className="w-3 h-3" />
               <span className="font-bold text-sm">{syncedCount}/{rooms.length}</span>
-              <span className="text-[11px]">Synced</span>
+              <span className="text-[11px]">{t.roomsListPage.summarySynced}</span>
             </div>
           </div>
         )}

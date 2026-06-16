@@ -10,15 +10,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Bell,
   Shield,
   Stethoscope,
-  Siren,
-  Users,
-  Clock,
   Smartphone,
-  RefreshCw,
-  Scan,
   MapPin,
   ShieldCheck,
   HeartPulse,
@@ -46,6 +40,18 @@ export default function WhatsNewPage() {
       date: wn.currentDate,
       highlights: [
         {
+          icon: <HeartPulse className="w-5 h-5 text-primary" />,
+          title: wn.items.clinicalDesign.title,
+          description: wn.items.clinicalDesign.description,
+          badge: { label: wn.items.clinicalDesign.badge, variant: "default" },
+        },
+        {
+          icon: <Shield className="w-5 h-5 text-primary" />,
+          title: wn.items.accessibility.title,
+          description: wn.items.accessibility.description,
+          badge: { label: wn.items.accessibility.badge, variant: "secondary" },
+        },
+        {
           icon: <Smartphone className="w-5 h-5 text-primary" />,
           title: wn.items.nativeApp.title,
           description: wn.items.nativeApp.description,
@@ -56,12 +62,6 @@ export default function WhatsNewPage() {
           title: wn.items.signIn.title,
           description: wn.items.signIn.description,
           badge: { label: wn.items.signIn.badge, variant: "default" },
-        },
-        {
-          icon: <Stethoscope className="w-5 h-5 text-primary" />,
-          title: wn.items.theme.title,
-          description: wn.items.theme.description,
-          badge: { label: wn.items.theme.badge, variant: "secondary" },
         },
         {
           icon: <MapPin className="w-5 h-5 text-primary" />,
@@ -94,7 +94,7 @@ export default function WhatsNewPage() {
                 v{release.version}
               </Badge>
               <span className="text-xs text-muted-foreground">
-                {release.date}
+                {release.date} · {wn.buildLabel}
               </span>
             </div>
 

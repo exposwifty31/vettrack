@@ -11,7 +11,7 @@ Both run `scripts/run-migrations.ts` → `server/migrate.ts`: a custom raw-SQL r
 
 ## Generating New Migrations
 
-Use Drizzle Kit to generate SQL from schema changes in `server/db.ts`:
+Edit Drizzle schema in `server/schema/*.ts` (re-exported from `server/db.ts`), then:
 
 ```
 npx drizzle-kit generate
@@ -19,7 +19,7 @@ npx drizzle-kit generate
 
 This creates a new `.sql` file in `migrations/` and updates `migrations/meta/_journal.json`. Commit both files.
 
-**Naming convention:** `NNN_description.sql` where NNN is the next sequential number. Next available: **066**.
+**Naming convention:** `NNN_description.sql` where NNN is the next sequential number. Latest applied files include `154_vt_equipment_name_he.sql` — check `migrations/` for the current tail before generating.
 
 ## The Duplicate 019 Situation
 
@@ -27,15 +27,15 @@ This creates a new `.sql` file in `migrations/` and updates `migrations/meta/_jo
 - `019_add_user_display_name.sql`
 - `019_smart_role_notifications_schema.sql`
 
-Both have been applied to production (tracked by distinct filenames in `vt_migrations`). Do **not** rename them — renaming would cause re-application. The numbering is cosmetically confusing but operationally correct.
+Both have been applied to production (tracked by distinct filenames in `vt_migrations`). Do **not** rename them — renaming would cause re-application.
 
 ## What `pnpm db:migrate` Used to Do
 
-Previously `db:migrate` ran `drizzle-kit migrate` (Drizzle's journal-based apply system). That path is retired. `drizzle-kit migrate` should not be run directly — use `pnpm migrate` or `pnpm db:migrate` instead.
+Previously `db:migrate` ran `drizzle-kit migrate`. That path is retired — use `pnpm migrate` or `pnpm db:migrate` only.
 
 ## CI
 
-The CI pipeline (`.github/workflows/ci.yml`) runs `pnpm migrate` against a test PostgreSQL instance as part of the test job.
+GitLab CI and GitHub Actions run `pnpm migrate` against test PostgreSQL before integration tests.
 
 ## Migration Runner Internals
 
@@ -45,3 +45,10 @@ The CI pipeline (`.github/workflows/ci.yml`) runs `pnpm migrate` against a test 
 3. Reads `migrations/*.sql` files sorted alphabetically, skipping already-applied filenames
 4. Runs each in a transaction; rolls back on error
 5. Releases advisory lock
+
+## Scope migrations (June 2026)
+
+- **142** — ER, patients, hospitalizations removed
+- **143** — medication tasks, formulary, pharmacy forecast removed
+
+See [`scope-change-2026.md`](./scope-change-2026.md).

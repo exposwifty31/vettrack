@@ -103,6 +103,8 @@ const translations = {
 
   status: d.status,
 
+  shiftLeaderboard: d.shiftLeaderboard,
+
   layout: {
     nav: d.layout.nav,
     settings: d.layout.settings,
@@ -137,6 +139,13 @@ const translations = {
       exportError: d.equipmentList.toast.exportError,
       checkoutError: d.equipmentList.toast.checkoutError,
       returnError: d.equipmentList.toast.returnError,
+      returnSuccess: (name: string) => tr(d.equipmentList.toast.returnSuccess, { name }),
+    },
+    quickAction: d.equipmentList.quickAction,
+    bulkDelete: {
+      title: (count: number) => tr(d.equipmentList.bulkDelete.title, { count }),
+      description: d.equipmentList.bulkDelete.description,
+      confirm: d.equipmentList.bulkDelete.confirm,
     },
     recoveryBadgeStale: d.equipmentList.recoveryBadgeStale,
     recoveryBadgeVeryStale: d.equipmentList.recoveryBadgeVeryStale,
@@ -151,6 +160,23 @@ const translations = {
     statUptime: d.equipmentList.statUptime,
     filterAll: d.equipmentList.filterAll,
     recoveryAttentionSummary: d.equipmentList.recoveryAttentionSummary,
+    paginationCount: (shown: number, total: number) => tr(d.equipmentList.paginationCount, { shown, total }),
+    paginationPage: (page: number, pages: number) => tr(d.equipmentList.paginationPage, { page, pages }),
+    paginationPrevious: d.equipmentList.paginationPrevious,
+    paginationNext: d.equipmentList.paginationNext,
+    clearRoomFilter: d.equipmentList.clearRoomFilter,
+    selection: {
+      selectAll: d.equipmentList.selection.selectAll,
+      deselectAll: d.equipmentList.selection.deselectAll,
+      selectedCount: (count: number) => tr(d.equipmentList.selection.selectedCount, { count }),
+      itemAriaLabel: (name: string, selected: boolean) =>
+        tr(d.equipmentList.selection.itemAriaLabel, {
+          name,
+          status: selected
+            ? d.equipmentList.selection.itemStatusChecked
+            : d.equipmentList.selection.itemStatusUnchecked,
+        }),
+    },
   },
 
   equipmentTruth: {
@@ -242,6 +268,11 @@ const translations = {
     sterilizationDue: d.equipmentDetail.sterilizationDue,
     expiryExpired: d.equipmentDetail.expiryExpired,
     expirySoon: d.equipmentDetail.expirySoon,
+    expiryValid: d.equipmentDetail.expiryValid,
+    deleteTitle: (name: string) => tr(d.equipmentDetail.deleteTitle, { name }),
+    deleteBody: d.equipmentDetail.deleteBody,
+    deleteConfirm: d.equipmentDetail.deleteConfirm,
+    deleteAriaLabel: d.equipmentDetail.deleteAriaLabel,
     recoveryBadgeStale: d.equipmentDetail.recoveryBadgeStale,
     recoveryBadgeVeryStale: d.equipmentDetail.recoveryBadgeVeryStale,
     recoveryBadgeCheckedOutLong: d.equipmentDetail.recoveryBadgeCheckedOutLong,
@@ -310,6 +341,10 @@ const translations = {
     empty: d.myEquipment.empty,
     errors: d.myEquipment.errors,
     actions: d.myEquipment.actions,
+    returnAllTitle: (count: number) => tr(d.myEquipment.returnAllTitle, { count }),
+    returnAllBody: d.myEquipment.returnAllBody,
+    returnAllConfirm: d.myEquipment.returnAllConfirm,
+    checkedOutCount: (count: number) => tr(d.myEquipment.checkedOutCount, { count }),
   },
 
   alerts: {
@@ -328,6 +363,12 @@ const translations = {
   },
 
   shiftSummary: d.shiftSummary,
+
+  shiftShareCard: {
+    ...d.shiftShareCard,
+    tasksCompletedOf: (done: number, total: number) =>
+      tr(d.shiftShareCard.tasksCompletedOf, { done, total }),
+  },
 
   auth: d.auth,
 
@@ -384,7 +425,11 @@ const translations = {
     selectedManager: (name: string) => tr(d.codeBlue.selectedManager, { name }),
     equipmentLogCount: (n: number) => tr(d.codeBlue.equipmentLogCount, { n }),
     startingForEquipment: (name: string) => tr(d.codeBlue.startingForEquipment, { name }),
-    overlay: { ...d.codeBlue.overlay },
+    overlay: {
+      ...d.codeBlue.overlay,
+      pushSentMinutesAgo: (minutes: number) =>
+        tr(d.codeBlue.overlay.pushSentMinutesAgo, { minutes }),
+    },
     preCheck: {
       ...d.codeBlue.preCheck,
       cartCheckedBy: (name: string) => tr(d.codeBlue.preCheck.cartCheckedBy, { name }),
@@ -420,6 +465,7 @@ const translations = {
       invalidInventoryItemTag: d.nfc.error.invalidInventoryItemTag,
       restockSessionRequired: d.nfc.error.restockSessionRequired,
       scanFailed: d.nfc.error.scanFailed,
+      noActiveRestockSession: d.nfc.error.noActiveRestockSession,
     },
   },
 
@@ -532,6 +578,17 @@ const translations = {
     ...d.analyticsPage,
     maintenanceLabelEn: d.analyticsPage.maintenanceLabel,
     itemsLabelEn: d.analyticsPage.itemsLabel,
+    issueCountBadge: (count: number) => tr(d.analyticsPage.issueCountBadge, { count }),
+  },
+
+  monthlyReport: {
+    ...d.monthlyReport,
+    andMore: (count: number) => tr(d.monthlyReport.andMore, { count }),
+    insightOperational: (pct: number) => tr(d.monthlyReport.insightOperational, { pct }),
+    insightMissing: (count: number) => tr(d.monthlyReport.insightMissing, { count }),
+    insightIssues: (count: number) => tr(d.monthlyReport.insightIssues, { count }),
+    footer: (total: number, generatedAt: string) =>
+      tr(d.monthlyReport.footer, { total, generatedAt }),
   },
 
   outcomeKpiDashboard: d.outcomeKpiDashboard,
@@ -628,6 +685,7 @@ const translations = {
     joined: (date: string) => tr(d.adminPage.joined, { date }),
     rejectUserTitle: (name: string) => tr(d.adminPage.rejectUserTitle, { name }),
     deleteUserTitle: (name: string) => tr(d.adminPage.deleteUserTitle, { name }),
+    deleteFolderTitle: (name: string) => tr(d.adminPage.deleteFolderTitle, { name }),
     deletedOn: (date: string) => tr(d.adminPage.deletedOn, { date }),
     blockUserTitle: (name: string) => tr(d.adminPage.blockUserTitle, { name }),
     formularyDeleteTitle: (name: string) => tr(d.adminPage.formularyDeleteTitle, { name }),
@@ -870,7 +928,15 @@ const translations = {
     ariaOperationalToggle: d.erOperationalControl.ariaOperationalToggle,
   },
 
-  shiftChat: d.shiftChat,
+  shiftChat: {
+    ...d.shiftChat,
+    openChatUnread: (count: string) => tr(d.shiftChat.openChatUnread, { count }),
+    panel: {
+      ...d.shiftChat.panel,
+      onlineCount: (count: number) => tr(d.shiftChat.panel.onlineCount, { count }),
+      typing: (names: string) => tr(d.shiftChat.panel.typing, { names }),
+    },
+  },
 
   auditLog: {
     actions: d.auditLog.actions as Record<string, string>,
@@ -921,6 +987,11 @@ const translations = {
     missingItemsNotesPlaceholder: d.crashCart.missingItemsNotesPlaceholder,
     saveAllOk: d.crashCart.saveAllOk,
     saveWithMissing: d.crashCart.saveWithMissing,
+    checkItemAria: (label: string, checked: boolean) =>
+      tr(d.crashCart.checkItemAria, {
+        label,
+        status: checked ? d.crashCart.checkItemStatusChecked : d.crashCart.checkItemStatusUnchecked,
+      }),
     checkSaved: d.crashCart.checkSaved,
     historyTitle: d.crashCart.historyTitle,
     statusOk: d.crashCart.statusOk,

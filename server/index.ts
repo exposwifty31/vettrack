@@ -46,6 +46,9 @@ const { version: appVersion } = JSON.parse(readFileSync(path.join(path.dirname(f
 const isProduction = process.env.NODE_ENV === "production";
 
 const app = express();
+// App-level setting (not middleware) so it suppresses the header globally,
+// including on /api/health which is registered before the helmet chain.
+app.disable("x-powered-by");
 // Deployment runs behind a reverse proxy that sets X-Forwarded-For.
 // Trust first proxy so rate limiting derives client IPs correctly.
 app.set("trust proxy", 1);
@@ -56,7 +59,8 @@ function sendHealthOk(_req: express.Request, res: express.Response) {
 }
 app.use("/api/health", healthRoutes);
 app.get("/api/healthz", sendHealthOk);
-app.get("/api/version", (_req, res) => {
+
+function sendVersionJson(_req: express.Request, res: express.Response) {
   const buildInfo = loadBuildInfo();
   const backendPilotMode = resolveBackendPilotMode();
   const frontendPilotMode = resolveFrontendPilotMode();
@@ -77,7 +81,7 @@ app.get("/api/version", (_req, res) => {
         frontendPilotMode !== null && frontendPilotMode !== backendPilotMode,
     },
   });
-});
+}
 
 function hasInvalidHeaderChars(value: string): boolean {
   return /[\r\n\0]/.test(value);
@@ -165,7 +169,7 @@ app.use(
         // `new URL("capacitor://localhost").origin` is the literal string "null"
         // — match the raw header against the fixed allowlist before normalizing.
         const rawOrigin = origin?.trim();
-        if (isProduction && rawOrigin && CAPACITOR_WEBVIEW_ORIGINS.has(rawOrigin)) {
+        if (rawOrigin && CAPACITOR_WEBVIEW_ORIGINS.has(rawOrigin)) {
           callback(null, rawOrigin);
           return;
         }
@@ -213,6 +217,8 @@ app.use(
     credentials: true,
   }),
 );
+// After CORS — native Capacitor shell and update-banner fetch this cross-origin.
+app.get("/api/version", sendVersionJson);
 app.use(
   compression({
     // SSE (GET /api/realtime/stream) must not be buffered by gzip.

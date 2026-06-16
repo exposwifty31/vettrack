@@ -103,6 +103,7 @@ export const equipment = vtTable("vt_equipment", {
   id: text("id").primaryKey(),
   clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
   name: text("name").notNull(),
+  nameHe: text("name_he"),
   serialNumber: text("serial_number"),
   model: text("model"),
   manufacturer: text("manufacturer"),

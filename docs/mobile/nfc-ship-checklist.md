@@ -6,6 +6,7 @@
 
 **Prerequisites**
 
+- [ ] `./scripts/build-native-shell.sh` run on the Mac used for archive
 - [ ] `scripts/verify-resubmission.sh` exits 0 on the Mac used for archive
 - [ ] `pnpm test -- tests/deep-link-router.test.ts tests/auth-guard-nfc-toast.test.tsx` green
 - [ ] Test account signed out unless the row requires signed-in state
@@ -18,6 +19,7 @@
 | Gate | Command / check | Result | Notes |
 |------|-----------------|--------|-------|
 | Resubmission script | `./scripts/verify-resubmission.sh` | PASS / FAIL | |
+| Native shell build | `./scripts/build-native-shell.sh` | synced | `.env` Clerk + API origin; not dev-bypass |
 | Deep-link unit tests | `pnpm test -- tests/deep-link-router.test.ts` | PASS / FAIL | |
 | AuthGuard toast tests | `pnpm test -- tests/auth-guard-nfc-toast.test.tsx` | PASS / FAIL | |
 

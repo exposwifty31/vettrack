@@ -16,6 +16,7 @@ export const patchEquipmentHandler: RequestHandler = async (req, res) => {
     const clinicId = req.clinicId!;
     const {
       name,
+      nameHe,
       serialNumber,
       model,
       manufacturer,
@@ -36,6 +37,7 @@ export const patchEquipmentHandler: RequestHandler = async (req, res) => {
       version: expectedVersion,
     } = req.body as {
       name?: string;
+      nameHe?: string | null;
       serialNumber?: string;
       model?: string;
       manufacturer?: string;
@@ -88,6 +90,7 @@ export const patchEquipmentHandler: RequestHandler = async (req, res) => {
         .update(equipment)
         .set({
           ...(name !== undefined && { name }),
+          ...(nameHe !== undefined && { nameHe: nameHe?.trim() || null }),
           ...(serialNumber !== undefined && { serialNumber }),
           ...(model !== undefined && { model }),
           ...(manufacturer !== undefined && { manufacturer }),

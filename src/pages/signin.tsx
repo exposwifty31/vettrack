@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { PhoneSignIn } from "@/components/phone-sign-in";
 import { clerkAppearance, clerkAppearanceNative } from "@/lib/clerk-appearance";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import { ClerkAuthFormShell } from "@/components/clerk-auth-form-shell";
 import { NativeSocialButtons } from "@/components/native-social-buttons";
 
 const IS_NATIVE = isCapacitorNative();
@@ -75,15 +76,17 @@ export default function SignInPage() {
                     </p>
                   </ClerkFailed>
                   <ClerkLoaded>
-                    <div className="w-full min-h-[24rem] flex flex-col items-center justify-start">
-                      <SignIn
-                        routing="hash"
-                        signUpUrl="/signup"
-                        fallbackRedirectUrl="/home"
-                        appearance={IS_NATIVE ? clerkAppearanceNative : clerkAppearance}
-                      />
-                      {IS_NATIVE ? <NativeSocialButtons mode="signIn" /> : null}
-                    </div>
+                    <ClerkAuthFormShell>
+                      <div className="w-full min-h-[24rem] flex flex-col items-center justify-start">
+                        <SignIn
+                          routing="hash"
+                          signUpUrl="/signup"
+                          fallbackRedirectUrl="/home"
+                          appearance={IS_NATIVE ? clerkAppearanceNative : clerkAppearance}
+                        />
+                        {IS_NATIVE ? <NativeSocialButtons mode="signIn" /> : null}
+                      </div>
+                    </ClerkAuthFormShell>
                   </ClerkLoaded>
                   <p className="text-xs text-muted-foreground text-center max-w-xs">
                     מתחבר עם מספר ישראלי (+972)?{" "}

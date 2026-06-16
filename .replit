@@ -90,9 +90,6 @@ externalPort = 8000
 localPort = 23643
 externalPort = 8081
 
-[postMerge]
-path = "scripts/post-merge.sh"
-timeoutMs = 120000
 
 [nix]
 channel = "stable-25_05"

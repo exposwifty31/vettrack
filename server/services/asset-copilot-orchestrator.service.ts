@@ -3,6 +3,9 @@ import {
   ASSET_COPILOT_RESOLVER_VERSION,
   type CopilotExplainResponse,
 } from "../../shared/contracts/asset-copilot.v1.js";
+import { translate } from "../../lib/i18n/index.js";
+import { loadLocale, normalizeLocale } from "../../lib/i18n/loader.js";
+import type { Locale } from "../../lib/i18n/types.js";
 import { validateCopilotAnswerSafety } from "../domain/equipment/copilot/ai-safety-validator.js";
 import type { EvidenceGraph } from "../domain/equipment/evidence/graph.types.js";
 import {
@@ -31,16 +34,39 @@ function buildSafeUnknownAnswer(equipmentId: string): CopilotAnswer {
   };
 }
 
+function formatUnknownForLocale(code: string, locale?: string): string {
+  const lc: Locale = normalizeLocale(locale);
+  const primary = loadLocale(lc);
+  const fallback = loadLocale("en");
+  const key = `equipmentTruth.unknowns.${code}`;
+  const translated = translate(primary, key, undefined, { fallbackDict: fallback, locale: lc });
+  if (translated !== key) return translated;
+  return code.replace(/_/g, " ");
+}
+
+function copilotText(
+  locale: string | undefined,
+  key: string,
+  params?: Record<string, string | number>,
+): string {
+  const lc: Locale = normalizeLocale(locale);
+  const primary = loadLocale(lc);
+  const fallback = loadLocale("en");
+  return translate(primary, key, params, { fallbackDict: fallback, locale: lc });
+}
+
 export function buildTemplateNarrative(
   answer: CopilotAnswer,
   equipmentName?: string | null,
+  locale?: string,
 ): string {
   const lines: string[] = [];
   if (equipmentName?.trim()) {
-    lines.push(`Equipment: ${equipmentName.trim()}`);
+    lines.push(copilotText(locale, "assetCopilot.equipmentLine", { name: equipmentName.trim() }));
   }
   if (answer.claims.length === 0 && answer.unknowns.length > 0) {
-    lines.push(`Status: limited evidence (${answer.unknowns.join(", ")}).`);
+    const gaps = answer.unknowns.map((code) => formatUnknownForLocale(code, locale)).join("; ");
+    lines.push(copilotText(locale, "assetCopilot.limitedEvidenceStatus", { gaps }));
     return lines.join("\n");
   }
   for (const claim of answer.claims) {
@@ -49,7 +75,8 @@ export function buildTemplateNarrative(
     lines.push(`${claim.key}: ${claim.value} (strength ${strength}, ${freshness})`);
   }
   if (answer.unknowns.length > 0) {
-    lines.push(`Gaps: ${answer.unknowns.join(", ")}`);
+    const gaps = answer.unknowns.map((code) => formatUnknownForLocale(code, locale)).join("; ");
+    lines.push(copilotText(locale, "assetCopilot.gapsLine", { gaps }));
   }
   return lines.join("\n");
 }
@@ -83,26 +110,29 @@ async function narrateWithClaude(
   });
 }
 
-export type ExplainEquipmentCopilotParams = ResolveCopilotAnswerParams;
+export type ExplainEquipmentCopilotParams = ResolveCopilotAnswerParams & {
+  locale?: string;
+};
 
 export async function explainEquipmentCopilot(
   params: ExplainEquipmentCopilotParams,
 ): Promise<CopilotExplainResponse> {
   const { answer, graph } = await resolveCopilotAnswer(params);
   const equipmentName = graph.equipment?.name ?? null;
+  const locale = params.locale;
 
   const safety = validateCopilotAnswerSafety(answer, graph);
   if (!safety.safe) {
     const safeAnswer = buildSafeUnknownAnswer(params.equipmentId);
     return {
       answer: safeAnswer,
-      narrative: buildTemplateNarrative(safeAnswer, equipmentName),
+      narrative: buildTemplateNarrative(safeAnswer, equipmentName, locale),
       llmUsed: false,
       validationFailed: true,
     };
   }
 
-  let narrative = buildTemplateNarrative(answer, equipmentName);
+  let narrative = buildTemplateNarrative(answer, equipmentName, locale);
   let llmUsed = false;
 
   if (isAssetCopilotLlmEnabled()) {

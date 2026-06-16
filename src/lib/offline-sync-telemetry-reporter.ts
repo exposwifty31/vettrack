@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { getCurrentUserId } from "./auth-store";
 import { getAllPendingSync } from "./offline-db";
 import {
   computeOfflineSyncTelemetryBuckets,
@@ -26,6 +27,7 @@ function snapshotKey(buckets: OfflineSyncTelemetryBuckets): string {
 export type OfflineSyncTelemetryPostBody = OfflineSyncTelemetryBuckets;
 
 export function reportOfflineSyncTelemetry(snapshot: OfflineSyncTelemetryPostBody): void {
+  if (!getCurrentUserId()?.trim()) return;
   void api.realtime.telemetry(snapshot).catch(() => {});
 }
 
@@ -42,6 +44,7 @@ export async function maybeReportOfflineSyncTelemetry(options?: {
   force?: boolean;
   nowMs?: number;
 }): Promise<void> {
+  if (!getCurrentUserId()?.trim()) return;
   try {
     const nowMs = options?.nowMs ?? Date.now();
     const buckets = await buildOfflineSyncTelemetrySnapshot();

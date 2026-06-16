@@ -3,9 +3,9 @@ import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { SectionList } from "@/components/ui/section-list";
 import { Button } from "@/components/ui/button";
-import { UserCheck, X, ChevronRight, ChevronLeft } from "lucide-react";
+import { ForwardChevron } from "@/components/ui/directional-chevron";
+import { UserCheck, X } from "lucide-react";
 import type { Alert, AlertAcknowledgment, AlertType } from "@/types";
-import { useDirection } from "@/hooks/useDirection";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { normalizeStatus } from "@/lib/design-tokens";
 import { useEnterOnce } from "@/hooks/use-enter-once";
@@ -43,8 +43,6 @@ export function AlertsProView({
   canOwn,
   formatRelativeTime,
 }: AlertsProViewProps) {
-  const direction = useDirection();
-  const Chevron = direction === "rtl" ? ChevronLeft : ChevronRight;
   const enterOnce = useEnterOnce("alerts");
   const rise = enterOnce ? "vt-pro-rise" : "";
 
@@ -78,7 +76,7 @@ export function AlertsProView({
           />
           <div className="relative">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--status-issue-fg)]">
+              <span className="inline-flex items-center gap-1.5 vt-text-2xs font-bold uppercase tracking-[0.14em] text-[var(--status-issue-fg)]">
                 <span className="relative flex h-2 w-2 shrink-0">
                   <span className="absolute inset-0 rounded-full bg-[var(--status-issue)]" />
                   {enterOnce && (
@@ -88,7 +86,7 @@ export function AlertsProView({
                 {t.alertsPage.worstFirst}
               </span>
             </div>
-            <h2 className="text-[17px] font-bold leading-snug tracking-tight text-[var(--status-issue-fg)]">
+            <h2 className="vt-text-lg font-bold leading-snug tracking-tight text-[var(--status-issue-fg)]">
               {worst.equipmentName}
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-[var(--status-issue-fg)]/85">
@@ -104,7 +102,7 @@ export function AlertsProView({
               data-testid="btn-alerts-handle-worst"
             >
               {t.alertsPage.handleNow}
-              <Chevron className="h-4 w-4" aria-hidden />
+              <ForwardChevron className="h-4 w-4" aria-hidden />
             </Button>
           </div>
         </div>
@@ -136,19 +134,19 @@ export function AlertsProView({
                   data-testid={`alert-navigate-${alert.equipmentId}`}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13.5px] font-semibold text-ivory-text">
+                    <p className="truncate vt-text-sm font-semibold text-ivory-text">
                       {alert.equipmentName}
                     </p>
-                    <p className="mt-0.5 line-clamp-2 text-[11px] text-ivory-text3">{alert.detail}</p>
+                    <p className="mt-0.5 line-clamp-2 vt-text-2xs text-ivory-text3">{alert.detail}</p>
                   </div>
-                  <Chevron className="mt-0.5 h-4 w-4 shrink-0 text-ivory-text3" aria-hidden />
+                  <ForwardChevron className="mt-0.5 h-4 w-4 shrink-0 text-ivory-text3" aria-hidden />
                 </Button>
                 <div className="mt-2">
                   {ack ? (
                     <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-2.5 py-2">
                       <div className="flex min-w-0 items-center gap-1.5">
                         <UserCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden />
-                        <span className="truncate text-[11px] text-ivory-text2">
+                        <span className="truncate vt-text-2xs text-ivory-text2">
                           {ack.acknowledgedByEmail.split("@")[0]} ·{" "}
                           {formatRelativeTime(new Date(ack.acknowledgedAt))}
                         </span>

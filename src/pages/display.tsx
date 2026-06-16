@@ -17,6 +17,7 @@ import { useKioskWakeLock } from "@/hooks/useKioskWakeLock";
 import { useDisplayHeartbeat } from "@/hooks/useDisplayHeartbeat";
 import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
 import { useCodeBlueKeepaliveReconciliation } from "@/hooks/useCodeBlueKeepaliveReconciliation";
+import { Bdi } from "@/components/ui/bdi";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type {
@@ -99,19 +100,19 @@ function ADRing({ pct, ready, total }: { pct: number; ready: number; total: numb
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-[28px] font-black tabular-nums text-[var(--status-ok)] leading-none">
+          <span className="vt-display font-black tabular-nums text-[var(--status-ok)] leading-none">
             {ready}
           </span>
-          <span className="text-[11px] text-ivory-text3 leading-tight">
-            {t.board?.of ?? "מתוך"} {total}
+          <span className="vt-text-xs text-ivory-text3 leading-tight">
+            {t.board.of} {total}
           </span>
         </div>
       </div>
       <div className="text-center">
-        <div className="text-[13px] font-bold text-ivory-text leading-tight">
-          {t.board?.deployableNow ?? "זמין לפריסה"}
+        <div className="vt-text-sm font-bold text-ivory-text leading-tight">
+          {t.board.deployableNow}
         </div>
-        <div className="text-[11px] text-ivory-text3">{Math.round(pct)}%</div>
+        <div className="vt-text-xs text-ivory-text3">{Math.round(pct)}%</div>
       </div>
     </div>
   );
@@ -134,8 +135,8 @@ function ReadinessMix({ overview }: { overview: EquipmentCommandBoardSnapshot["o
 
   return (
     <div className="flex-1 min-w-0">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-ivory-text3 mb-2">
-        {t.board?.readinessMix ?? "תמהיל מוכנות"}
+      <div className="vt-text-2xs font-bold uppercase tracking-widest text-ivory-text3 mb-2">
+        {t.board.readinessMix}
       </div>
       {/* Stacked bar */}
       <div className="flex h-3 rounded-full overflow-hidden mb-3 gap-px">
@@ -150,7 +151,7 @@ function ReadinessMix({ overview }: { overview: EquipmentCommandBoardSnapshot["o
       {/* Legend */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-1">
         {segments.map(({ key, count }) => (
-          <div key={key} className="flex items-center gap-1.5 text-[11px]">
+          <div key={key} className="flex items-center gap-1.5 vt-text-xs">
             <span className={cn("w-2 h-2 rounded-full shrink-0", STATUS_BAR_COLOR[key])} />
             <span className="text-ivory-text2 truncate">{statusLabel(key)}</span>
             <span className="tabular-nums text-ivory-text3 ms-auto">{count}</span>
@@ -181,15 +182,15 @@ function TypeRow({ row }: { row: EquipmentCommandBoardSnapshot["byType"][number]
   return (
     <div className="py-2 border-b border-ivory-border last:border-0">
       <div className="flex items-center gap-2 mb-1.5">
-        <span className={cn("text-[12px] font-semibold text-ivory-text truncate flex-1", belowMin && "text-[var(--status-issue)]")}>
+        <span className={cn("vt-text-xs font-semibold text-ivory-text truncate flex-1", belowMin && "text-[var(--status-issue)]")}>
           {row.typeName}
         </span>
         {belowMin && (
-          <span className="text-[10px] font-bold text-[var(--status-issue-fg)] bg-[var(--status-issue-bg)] border border-[var(--status-issue-border)] rounded px-1.5 py-0.5 shrink-0">
-            ⚠ {row.ready}/{row.minimumReady} {t.board?.ready ?? "מוכן"}
+          <span className="vt-text-2xs font-bold text-[var(--status-issue-fg)] bg-[var(--status-issue-bg)] border border-[var(--status-issue-border)] rounded px-1.5 py-0.5 shrink-0">
+            ⚠ {row.ready}/{row.minimumReady} {t.board.ready}
           </span>
         )}
-        <span className="text-[11px] tabular-nums text-ivory-text3 shrink-0">{row.ready}/{row.total}</span>
+        <span className="vt-text-xs tabular-nums text-ivory-text3 shrink-0">{row.ready}/{row.total}</span>
       </div>
       <div className="flex h-2 rounded-full overflow-hidden gap-px">
         {segments.map(({ key, count }) => (
@@ -219,14 +220,14 @@ function LocationCard({ row }: { row: EquipmentCommandBoardSnapshot["byLocation"
           : "bg-[rgb(var(--ivory-surface))] border-ivory-border",
       )}
     >
-      <div className="text-[12px] font-bold text-ivory-text truncate">{row.locationName}</div>
+      <div className="vt-text-xs font-bold text-ivory-text truncate">{row.locationName}</div>
       <div className="flex gap-2 flex-wrap">
-        <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded border", STATUS_BG.ready)}>
-          {row.ready} {t.board?.available ?? "זמין"}
+        <span className={cn("vt-text-2xs font-semibold px-1.5 py-0.5 rounded border", STATUS_BG.ready)}>
+          {row.ready} {t.board.available}
         </span>
         {row.inUse > 0 && (
-          <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded border", STATUS_BG.in_use)}>
-            {row.inUse} {t.board?.deployed ?? "בשימוש"}
+          <span className={cn("vt-text-2xs font-semibold px-1.5 py-0.5 rounded border", STATUS_BG.in_use)}>
+            {row.inUse} {t.board.deployed}
           </span>
         )}
       </div>
@@ -245,26 +246,26 @@ function UnitRow({ unit }: { unit: EquipmentBoardUnitRow }) {
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-[13px] font-semibold text-ivory-text truncate">{unit.displayName}</span>
+          <span className="vt-text-sm font-semibold text-ivory-text truncate">{unit.displayName}</span>
           {unit.typeName && (
-            <span className="text-[10px] text-ivory-text3 truncate shrink-0">{unit.typeName}</span>
+            <span className="vt-text-2xs text-ivory-text3 truncate shrink-0">{unit.typeName}</span>
           )}
         </div>
         <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
           {unit.locationName && (
-            <span className="text-[11px] text-ivory-text3">{unit.locationName}</span>
+            <span className="vt-text-xs text-ivory-text3">{unit.locationName}</span>
           )}
           {unit.custodianName && (
-            <span className="text-[11px] text-ivory-text2">{unit.custodianName}</span>
+            <span className="vt-text-xs text-ivory-text2">{unit.custodianName}</span>
           )}
           {blocking && (
-            <span className="text-[11px] text-[var(--status-issue)]">{blocking}</span>
+            <span className="vt-text-xs text-[var(--status-issue)]">{blocking}</span>
           )}
         </div>
       </div>
       <span
         className={cn(
-          "shrink-0 text-[11px] font-bold px-2 py-0.5 rounded border",
+          "shrink-0 vt-text-xs font-bold px-2 py-0.5 rounded border",
           STATUS_BG[unit.status],
         )}
       >
@@ -320,8 +321,8 @@ function CommandBoard({
         </span>
         <div className="w-px h-5 bg-white/20 shrink-0" />
 
-        <span className="text-[11px] font-bold tracking-widest uppercase text-[var(--brand-green-bright)] shrink-0">
-          {t.board?.ward ?? "המחלקה · ציוד קריטי"}
+        <span className="vt-text-xs font-bold tracking-widest uppercase text-[var(--brand-green-bright)] shrink-0">
+          {t.board.ward}
         </span>
 
         {/* Shift staff */}
@@ -329,7 +330,7 @@ function CommandBoard({
           {currentShift.map((s) => (
             <div
               key={`${s.employeeName}-${s.role}`}
-              className="flex items-center gap-1.5 bg-white/10 border border-white/20 rounded-full px-3 py-0.5 text-[11px] text-white/75"
+              className="flex items-center gap-1.5 bg-white/10 border border-white/20 rounded-full px-3 py-0.5 vt-text-xs text-white/75"
             >
               {s.employeeName}
             </div>
@@ -339,8 +340,8 @@ function CommandBoard({
         {/* LIVE badge */}
         <div className="flex items-center gap-1.5 shrink-0">
           <span className="w-2 h-2 rounded-full bg-[hsl(var(--status-ok))] motion-safe:animate-pulse" aria-hidden />
-          <span className="text-[11px] font-bold uppercase tracking-widest text-[hsl(var(--status-ok))]">
-            {t.board?.live ?? "חי"}
+          <span className="vt-text-xs font-bold uppercase tracking-widest text-[hsl(var(--status-ok))]">
+            {t.board.live}
           </span>
         </div>
 
@@ -354,7 +355,7 @@ function CommandBoard({
             }}
             aria-label={t.common.back}
             data-testid="board-exit"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white/85 transition-colors hover:bg-white/20 motion-safe:active:scale-95"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white/85 transition-colors hover:bg-white/20 motion-safe:active:scale-95"
           >
             <X className="h-4 w-4" aria-hidden />
           </button>
@@ -362,7 +363,7 @@ function CommandBoard({
       </header>
 
       {/* Body */}
-      <div className="flex-1 overflow-auto p-4 grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-4">
+      <main id="main-content" className="flex-1 overflow-auto p-4 grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-4">
 
         {/* Left: ADRing + ReadinessMix */}
         <div className="flex flex-col gap-4 items-center lg:w-64 shrink-0">
@@ -372,10 +373,10 @@ function CommandBoard({
           {/* Alerts count */}
           {board.alerts.length > 0 && (
             <div className="w-full rounded-xl border border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] px-3 py-2.5">
-              <div className="text-[11px] font-bold text-[var(--status-issue-fg)]">
-                {board.alerts.length} {t.board?.attention ?? "דורשים טיפול"}
+              <div className="vt-text-xs font-bold text-[var(--status-issue-fg)]">
+                {board.alerts.length} {t.board.attention}
               </div>
-              <div className="text-[10px] text-ivory-text3 mt-0.5">
+              <div className="vt-text-2xs text-ivory-text3 mt-0.5">
                 {board.alerts.filter((a) => a.severity === "critical").length} {t.board.critical}
               </div>
             </div>
@@ -388,7 +389,7 @@ function CommandBoard({
           {/* By Type */}
           {board.byType.length > 0 && (
             <section className="rounded-xl border border-ivory-border bg-[rgb(var(--ivory-surface))] p-4">
-              <h2 className="text-[10px] font-bold uppercase tracking-widest text-ivory-text3 mb-2">
+              <h2 className="vt-text-2xs font-bold uppercase tracking-widest text-ivory-text3 mb-2">
                 {t.board.byType}
               </h2>
               <div className="divide-y divide-ivory-border">
@@ -402,8 +403,8 @@ function CommandBoard({
           {/* By Location */}
           {board.byLocation.length > 0 && (
             <section>
-              <h2 className="text-[10px] font-bold uppercase tracking-widest text-ivory-text3 mb-2">
-                {t.board?.whereTitle ?? "מיקום הציוד"}
+              <h2 className="vt-text-2xs font-bold uppercase tracking-widest text-ivory-text3 mb-2">
+                {t.board.whereTitle}
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                 {board.byLocation.map((row) => (
@@ -416,8 +417,8 @@ function CommandBoard({
           {/* Critical Units — needs attention */}
           {needAttention.length > 0 && (
             <section className="rounded-xl border border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] p-4">
-              <h2 className="text-[10px] font-bold uppercase tracking-widest text-[var(--status-issue-fg)] mb-2">
-                {t.board?.attention ?? "דורשים טיפול"} · {needAttention.length}
+              <h2 className="vt-text-2xs font-bold uppercase tracking-widest text-[var(--status-issue-fg)] mb-2">
+                {t.board.attention} · {needAttention.length}
               </h2>
               <div>
                 {needAttention.map((u) => (
@@ -431,13 +432,13 @@ function CommandBoard({
           {needAttention.length === 0 && board.overview.ready >= board.overview.totalCritical && (
             <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
               <span className="text-4xl" aria-hidden>✓</span>
-              <p className="text-[14px] font-semibold text-[var(--status-ok)]">
+              <p className="vt-text-sm font-semibold text-[var(--status-ok)]">
                 {t.board.allCriticalReady}
               </p>
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
@@ -480,18 +481,19 @@ function CodeBlueOverlay({
     <div className="flex flex-col min-h-screen bg-[#0d0505]" dir="rtl">
       {/* Pulsing red header */}
       <div className="flex items-center gap-4 px-6 py-4 bg-red-600 motion-safe:animate-pulse flex-wrap">
-        <span className="text-2xl font-black tracking-wider text-white">⚠ CODE BLUE</span>
-        <span className="font-mono text-[22px] font-bold text-white bg-black/25 px-3 py-1 rounded tabular-nums">
+        <span className="vt-text-2xl font-black tracking-wider text-white">⚠ CODE BLUE</span>
+        <span className="font-mono vt-text-xl font-bold text-white bg-black/25 px-3 py-1 rounded tabular-nums">
           {timerStr}
         </span>
-        <span className="text-[14px] text-white/85 ms-auto">
-          מנהל הפצה: {session.managerUserName}
+        <span className="vt-text-sm text-white/85 ms-auto">
+          {t.codeBlue.managerLabelShort}{" "}
+          <Bdi>{session.managerUserName}</Bdi>
         </span>
         <div className="flex flex-wrap gap-1.5">
           {activePresence.map((p) => (
             <div
               key={p.userId}
-              className="flex items-center gap-1.5 bg-red-900/40 border border-red-600/40 rounded-full px-3 py-0.5 text-[11px] text-red-200"
+              className="flex items-center gap-1.5 bg-red-900/40 border border-red-600/40 rounded-full px-3 py-0.5 vt-text-xs text-red-200"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-red-400 motion-safe:animate-ping shrink-0" />
               {p.userName}
@@ -504,25 +506,25 @@ function CodeBlueOverlay({
       <div className="flex flex-1 divide-x divide-red-900/30 divide-x-reverse">
         {/* Column 1 — Equipment */}
         <div className="flex-1 p-5">
-          <div className="text-[10px] font-bold tracking-[.1em] uppercase text-red-700/80 mb-3">
+          <div className="vt-text-2xs font-bold tracking-[.1em] uppercase text-red-700/80 mb-3">
             {t.codeBlue.overlay.equipmentColumn}
           </div>
           {linkedEquipment.length > 0 ? (
             <div className="space-y-2">
               {linkedEquipment.map((eq) => (
-                <div key={eq.id} className="text-[16px] font-bold text-white">
-                  {eq.name}
+                <div key={eq.id} className="vt-text-body font-bold text-white">
+                  <Bdi>{eq.name}</Bdi>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-gray-500 text-[13px]">{t.codeBlue.noEquipmentInEvent}</div>
+            <div className="text-gray-500 vt-text-sm">{t.codeBlue.noEquipmentInEvent}</div>
           )}
         </div>
 
         {/* Column 2 — Event timeline */}
         <div className="flex-1 p-5">
-          <div className="text-[10px] font-bold tracking-[.1em] uppercase text-red-700/80 mb-3">
+          <div className="vt-text-2xs font-bold tracking-[.1em] uppercase text-red-700/80 mb-3">
             {t.codeBlue.overlay.timelineColumn}
           </div>
           <div className="space-y-2">
@@ -531,12 +533,12 @@ function CodeBlueOverlay({
               const es = Math.floor((entry.elapsedMs % 60_000) / 1_000);
               const entryTime = `${String(em).padStart(2, "0")}:${String(es).padStart(2, "0")}`;
               return (
-                <div key={`${entry.elapsedMs}-${entry.label}-${idx}`} className="flex gap-2 text-[12px]">
-                  <span className="text-red-500 tabular-nums min-w-[42px] text-[11px] shrink-0">
+                <div key={`${entry.elapsedMs}-${entry.label}-${idx}`} className="flex gap-2 vt-text-xs">
+                  <span className="text-red-500 tabular-nums min-w-[42px] vt-text-2xs shrink-0">
                     {entryTime}
                   </span>
                   <span className="flex-1 text-red-200">{entry.label}</span>
-                  <span className="text-gray-600 text-[10px] shrink-0">{entry.loggedByName}</span>
+                  <span className="text-gray-600 vt-text-2xs shrink-0"><Bdi>{entry.loggedByName}</Bdi></span>
                 </div>
               );
             })}
@@ -545,14 +547,14 @@ function CodeBlueOverlay({
 
         {/* Column 3 — Status */}
         <div className="w-64 shrink-0 p-5">
-          <div className="text-[10px] font-bold tracking-[.1em] uppercase text-red-700/80 mb-3">
+          <div className="vt-text-2xs font-bold tracking-[.1em] uppercase text-red-700/80 mb-3">
             {t.codeBlue.overlay.sidebarColumn}
           </div>
 
-          <div className="text-[10px] font-bold tracking-[.1em] uppercase text-red-700/80 mb-2">
+          <div className="vt-text-2xs font-bold tracking-[.1em] uppercase text-red-700/80 mb-2">
             {t.codeBlue.overlay.crashCart}
           </div>
-          <div className={`text-[12px] mb-4 ${session.preCheckPassed === false ? "text-red-400" : "text-green-400"}`}>
+          <div className={`vt-text-xs mb-4 ${session.preCheckPassed === false ? "text-red-400" : "text-green-400"}`}>
             {session.preCheckPassed === false
               ? `⚠ ${t.codeBlue.overlay.cartNotChecked}`
               : `✓ ${t.codeBlue.overlay.cartReady}`}
@@ -560,13 +562,15 @@ function CodeBlueOverlay({
 
           {minutesSincePush !== null && (
             <>
-              <div className="text-[10px] font-bold tracking-[.1em] uppercase text-red-700/80 mb-2">
+              <div className="vt-text-2xs font-bold tracking-[.1em] uppercase text-red-700/80 mb-2">
                 {t.codeBlue.display.present}
               </div>
-              <div className="text-[11px] text-gray-400">
+              <div className="vt-text-xs text-gray-400">
                 {t.codeBlue.overlay.pushSent}
                 <br />
-                <span className="text-gray-600 text-[10px]">לפני {minutesSincePush} דק׳</span>
+                <span className="text-gray-600 vt-text-2xs">
+                  {t.codeBlue.overlay.pushSentMinutesAgo(minutesSincePush)}
+                </span>
               </div>
             </>
           )}
@@ -687,18 +691,18 @@ export default function WardDisplayPage() {
       <div className="min-h-screen bg-[rgb(var(--ivory-bg))] text-ivory-text flex flex-col dark" dir="rtl">
         <div className="flex items-center gap-3 px-5 py-3 bg-[var(--brand-navy)]">
           <span className="text-sm font-bold text-white/70">{t.board.subtitle}</span>
-          <span className="text-[10px] text-amber-300 ms-auto">{t.board.fallbackBoardUnavailable}</span>
+          <span className="vt-text-2xs text-amber-300 ms-auto">{t.board.fallbackBoardUnavailable}</span>
         </div>
         <div className="flex-1 p-4 space-y-2" data-testid="ward-display-equipment-pane">
           {snapshot.equipment.map((eq) => (
             <div
               key={eq.id}
               data-testid={`ward-display-equipment-row-${eq.id}`}
-              className="rounded-lg border border-ivory-border bg-[rgb(var(--ivory-surface))] px-3 py-2.5 flex items-center gap-3"
+              className="rounded-lg border border-ivory-border bg-[rgb(var(--ivory-surface))] px-3 py-2.5 flex items-center gap-3 min-h-11"
             >
-              <span className="flex-1 text-[13px] font-semibold text-ivory-text">{eq.name}</span>
+              <span className="flex-1 vt-text-sm font-semibold text-ivory-text">{eq.name}</span>
               <span className={cn(
-                "text-[11px] font-bold px-2 py-0.5 rounded border",
+                "vt-text-xs font-bold px-2 py-0.5 rounded border",
                 eq.isDeployable ? STATUS_BG.ready : STATUS_BG.blocked,
               )}>
                 {eq.isDeployable ? t.board.deployable : t.board.notDeployable}

@@ -31,7 +31,6 @@ const SKIP_APP_USE_IDENT = new Set([
   "i18nMiddleware",
   "tenantContext",
   "sessionContextMiddleware",
-  "erModeConcealmentMiddleware",
   "clerkMiddleware",
   "compression",
 ]);
@@ -45,7 +44,6 @@ const SKIP_APP_USE_IDENT = new Set([
  *   sourceLine: number,
  *   mountSourceFile: string,
  *   mountLine: number,
- *   pilotGated: boolean,
  * }} RouteEntry */
 
 function parseArgs(argv) {
@@ -158,46 +156,12 @@ function joinPaths(mountPath, routePath) {
   return `${m}${r}`.replace(/\/+/g, "/");
 }
 
-/**
- * @param {string} source
- * @param {string} relFile
- */
-function findPilotGuardRanges(source, relFile) {
-  if (!relFile.endsWith("server/app/routes.ts")) return [];
-  /** @type {{ start: number, end: number }[]} */
-  const ranges = [];
-  const guardIdx = source.indexOf("if (!isPilotMode)");
-  if (guardIdx === -1) return ranges;
-  const braceStart = source.indexOf("{", guardIdx);
-  if (braceStart === -1) return ranges;
-  let depth = 0;
-  for (let i = braceStart; i < source.length; i++) {
-    if (source[i] === "{") depth++;
-    else if (source[i] === "}") {
-      depth--;
-      if (depth === 0) {
-        ranges.push({ start: braceStart, end: i });
-        break;
-      }
-    }
-  }
-  return ranges;
-}
-
-/**
- * @param {number} index
- * @param {{ start: number, end: number }[]} ranges
- */
-function indexInPilotGuard(index, ranges) {
-  return ranges.some((r) => index >= r.start && index <= r.end);
-}
 
 /**
  * @param {string} source
  * @param {string} mountSourceFile
  * @param {number} mountLine
  * @param {string} mountPath
- * @param {boolean} pilotGated
  * @param {Map<string, string>} importMap
  * @param {Set<string>} visited
  * @returns {RouteEntry[]}
@@ -207,7 +171,6 @@ function extractFromRouterFile(
   mountSourceFile,
   mountLine,
   mountPath,
-  pilotGated,
   importMap,
   visited,
   routeFileRel,
@@ -236,7 +199,6 @@ function extractFromRouterFile(
       sourceLine: line,
       mountSourceFile,
       mountLine,
-      pilotGated,
     });
   }
 
@@ -257,7 +219,6 @@ function extractFromRouterFile(
         mountSourceFile,
         mountLine,
         fullMount,
-        pilotGated,
         subImportMap,
         visited,
         subRel,
@@ -342,11 +303,10 @@ function extractAppUseCall(source, openParen) {
 /**
  * @param {string} source
  * @param {string} relFile
- * @returns {{ mountPath: string, routerIdent: string, line: number, pilotGated: boolean }[]}
+ * @returns {{ mountPath: string, routerIdent: string, line: number }[]}
  */
 function parseAppMounts(source, relFile) {
-  const pilotRanges = findPilotGuardRanges(source, relFile);
-  /** @type {{ mountPath: string, routerIdent: string, line: number, pilotGated: boolean }[]} */
+  /** @type {{ mountPath: string, routerIdent: string, line: number }[]} */
   const mounts = [];
 
   APP_USE_RE.lastIndex = 0;
@@ -356,12 +316,10 @@ function parseAppMounts(source, relFile) {
     const call = extractAppUseCall(source, openParen);
     if (!call) continue;
     const line = source.slice(0, m.index).split("\n").length;
-    const pilotGated = indexInPilotGuard(m.index, pilotRanges);
     mounts.push({
       mountPath: call.mountPath,
       routerIdent: call.routerIdent,
       line,
-      pilotGated,
     });
   }
   return mounts;
@@ -370,7 +328,7 @@ function parseAppMounts(source, relFile) {
 /**
  * @returns {RouteEntry[]}
  */
-function extractAllRoutes() {
+export function extractAllRoutes() {
   /** @type {RouteEntry[]} */
   const all = [];
   const files = [
@@ -404,7 +362,6 @@ function extractAllRoutes() {
           rel,
           mount.line,
           mount.mountPath,
-          mount.pilotGated,
           routerImportMap,
           visited,
           routerRel,
@@ -430,20 +387,21 @@ function extractAllRoutes() {
  * @param {RouteEntry[]} routes
  */
 function buildContract(routes) {
-  const pilotGatedCount = routes.filter((r) => r.pilotGated).length;
   return {
-    contractVersion: 1,
+    contractVersion: 2,
     generatedAt: new Date().toISOString(),
     generator: "scripts/architecture/extract-express-routes.mjs",
-    pilotRegistration: {
-      guard: "!isPilotMode",
-      sourceFile: "server/app/routes.ts",
-      description:
-        "When resolveEffectiveRuntimePilotMode() is true, mounts inside if (!isPilotMode) are not registered.",
-      gatedRouteCount: pilotGatedCount,
-    },
     routeCount: routes.length,
-    routes,
+    routes: routes.map(({ method, path: routePath, mountPath, routePath: rp, sourceFile, sourceLine, mountSourceFile, mountLine }) => ({
+      method,
+      path: routePath,
+      mountPath,
+      routePath: rp,
+      sourceFile,
+      sourceLine,
+      mountSourceFile,
+      mountLine,
+    })),
   };
 }
 
@@ -475,7 +433,7 @@ function writeContract(contract) {
   mkdirSync(path.dirname(contractPath), { recursive: true });
   writeFileSync(contractPath, `${JSON.stringify(contract, null, 2)}\n`, "utf8");
   console.log(
-    `[routes-contract] Wrote ${contract.routeCount} routes (${contract.pilotRegistration.gatedRouteCount} pilot-gated) to docs/architecture/routes-contract.json`,
+    `[routes-contract] Wrote ${contract.routeCount} routes to docs/architecture/routes-contract.json`,
   );
 }
 
@@ -485,7 +443,7 @@ function main() {
   const contract = buildContract(routes);
 
   if (opts.list) {
-    console.log(`[routes-contract] ${contract.routeCount} routes (${contract.pilotRegistration.gatedRouteCount} pilot-gated)`);
+    console.log(`[routes-contract] ${contract.routeCount} routes`);
     process.exit(0);
   }
 
@@ -526,4 +484,6 @@ function main() {
   process.exit(opts.strict ? 1 : 0);
 }
 
-main();
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}

@@ -17,6 +17,7 @@ interface AssetCopilotPanelProps {
 export function AssetCopilotPanel({ className, defaultEquipmentId }: AssetCopilotPanelProps) {
   const [equipmentId, setEquipmentId] = useState(defaultEquipmentId ?? "");
   const [result, setResult] = useState<CopilotExplainResponse | null>(null);
+  const lockedEquipmentId = defaultEquipmentId?.trim() || "";
 
   const { data: capabilities, isLoading: capsLoading } = useQuery({
     queryKey: ["/api/platform/capabilities"],
@@ -34,7 +35,7 @@ export function AssetCopilotPanel({ className, defaultEquipmentId }: AssetCopilo
   const busy = explainMutation.isPending;
 
   const handleExplain = () => {
-    const id = equipmentId.trim();
+    const id = (lockedEquipmentId || equipmentId).trim();
     if (!id || !enabled) return;
     explainMutation.mutate(id);
   };
@@ -64,19 +65,21 @@ export function AssetCopilotPanel({ className, defaultEquipmentId }: AssetCopilo
       ) : (
         <>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-            <Input
-              value={equipmentId}
-              onChange={(e) => setEquipmentId(e.target.value)}
-              placeholder={t.assetCopilot.equipmentIdPlaceholder}
-              className="min-w-0 flex-1"
-              data-testid="asset-copilot-equipment-id"
-              onKeyDown={(e) => e.key === "Enter" && handleExplain()}
-            />
+            {!lockedEquipmentId ? (
+              <Input
+                value={equipmentId}
+                onChange={(e) => setEquipmentId(e.target.value)}
+                placeholder={t.assetCopilot.equipmentIdPlaceholder}
+                className="min-w-0 flex-1"
+                data-testid="asset-copilot-equipment-id"
+                onKeyDown={(e) => e.key === "Enter" && handleExplain()}
+              />
+            ) : null}
             <Button
               type="button"
               className="shrink-0 gap-2"
               onClick={handleExplain}
-              disabled={busy || !equipmentId.trim()}
+              disabled={busy || !(lockedEquipmentId || equipmentId.trim())}
               data-testid="asset-copilot-explain"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Sparkles className="h-4 w-4" aria-hidden />}

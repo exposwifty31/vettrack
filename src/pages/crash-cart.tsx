@@ -222,26 +222,29 @@ export default function CrashCartCheckPage() {
         <div className="rounded-lg border border-border bg-muted p-4 mb-4">
           <h2 className="text-sm font-semibold text-muted-foreground mb-3">{t.crashCart.itemsToCheck}</h2>
           <div className="flex flex-col gap-3">
-            {cartItems.map((item) => (
+            {cartItems.map((item) => {
+              const isChecked = !!checked[item.id];
+              return (
               <button
                 key={item.id}
                 type="button"
-                aria-pressed={!!checked[item.id]}
+                aria-pressed={isChecked}
+                aria-label={t.crashCart.checkItemAria(item.label, isChecked)}
                 onClick={() => toggle(item.id)}
                 className={cn(
-                  "flex items-center gap-3 text-end p-2 rounded-lg border transition-colors",
-                  checked[item.id]
-                    ? "border-green-500/40 bg-green-500/10 text-green-300"
+                  "flex items-center gap-3 text-end p-3 rounded-lg border transition-colors min-h-[44px]",
+                  isChecked
+                    ? "border-green-600/50 bg-green-500/15 text-green-800 dark:text-green-300 ring-2 ring-green-500/25"
                     : "border-border bg-background text-foreground hover:border-primary/40",
                 )}
               >
-                {checked[item.id]
-                  ? <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
-                  : <Circle className="h-5 w-5 text-muted-foreground/60 shrink-0" />
+                {isChecked
+                  ? <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-500 shrink-0" aria-hidden />
+                  : <Circle className="h-6 w-6 text-muted-foreground shrink-0" aria-hidden />
                 }
-                <span className="text-sm">{item.label}</span>
+                <span className={cn("text-sm flex-1 text-start", isChecked && "font-semibold")}>{item.label}</span>
               </button>
-            ))}
+            );})}
           </div>
 
           {!allChecked && (

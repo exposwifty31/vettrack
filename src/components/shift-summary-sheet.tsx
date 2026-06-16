@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { computeAlerts, cn } from "@/lib/utils";
+import { buildAlertAckSet } from "@/lib/alert-counts";
 import { formatRelativeTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +28,6 @@ import {
 import { useEnterOnce } from "@/hooks/use-enter-once";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { jsPDF } from "jspdf";
 import type { AlertAcknowledgment } from "@/types";
 import { safeClipboardWriteText } from "@/lib/safe-browser";
 import { isEquipmentRecoveryUiEnabled } from "@/lib/equipment-recovery-ui-flag";
@@ -193,13 +193,11 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
   ) ?? [];
 
   const allAlerts = equipment ? computeAlerts(equipment) : [];
-  const acksSet = new Set(
-    (acks as AlertAcknowledgment[] | undefined)?.map((a) => `${a.equipmentId}:${a.alertType}`) ?? []
-  );
+  const acksSet = buildAlertAckSet(acks as AlertAcknowledgment[] | undefined);
   const urgentAlerts = allAlerts.filter(
     (a) =>
       (a.severity === "critical" || a.severity === "high") &&
-      !acksSet.has(`${a.equipmentId}:${a.type}`)
+      !acksSet.has(`${a.equipmentId}:${a.type}`),
   );
 
   const personalDebt = useMemo(() => {
@@ -279,6 +277,14 @@ export function ShiftSummarySheet({ open, onClose }: ShiftSummarySheetProps) {
   }
 
   async function handleDownloadPdf() {
+    let jsPDF: typeof import("jspdf")["jsPDF"];
+    try {
+      ({ jsPDF } = await import("jspdf"));
+    } catch (importErr) {
+      console.error("Failed to load jsPDF module", importErr);
+      toast.error(t.common.toast.unexpectedError);
+      return;
+    }
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const margin = 14;
     const pageHeight = 297;

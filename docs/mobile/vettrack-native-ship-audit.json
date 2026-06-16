@@ -1,0 +1,131 @@
+{
+  "type": "test-group",
+  "name": "VetTrack — Native ship checklist (demo)",
+  "description": "Maps to docs/mobile/native-ship-checklist.md. Import via Audits tab (drag file or Import). Inspect Capacitor WKWebView (Develop → Simulator → VetTrack) or vettrack.uk. Export results into checklist Notes.",
+  "setup": "function() {\n    WebInspectorAudit._vt = {\n        MIN_TAP_PX: 44,\n        tapSelector: \"button, a[href], input:not([type=\\\"hidden\\\"]), select, textarea, summary, [role=\\\"button\\\"], [role=\\\"link\\\"], [role=\\\"tab\\\"], [tabindex]:not([tabindex=\\\"-1\\\"])\"\n    };\n    WebInspectorAudit._vt.visible = function(el) {\n        if (!el || el.closest(\"[hidden], [aria-hidden=\\\"true\\\"]\"))\n            return false;\n        let r = el.getBoundingClientRect();\n        return r.width > 0 && r.height > 0;\n    };\n    WebInspectorAudit._vt.tapTargets = function() {\n        return Array.from(document.querySelectorAll(WebInspectorAudit._vt.tapSelector)).filter(WebInspectorAudit._vt.visible);\n    };\n}",
+  "tests": [
+    {
+      "type": "test-group",
+      "name": "0 — Page context",
+      "description": "Record route + shell for the checklist matrix cell.",
+      "tests": [
+        {
+          "type": "test-case",
+          "name": "url-hash-route-and-origin",
+          "description": "Copy route into native-ship-checklist Notes column.",
+          "test": "function() {\n    let route = (location.hash && location.hash.length > 1) ? location.hash.replace(/^#/, \"\") : (location.pathname + location.search);\n    return {level: \"pass\", route: route, href: location.href, origin: location.origin};\n}"
+        },
+        {
+          "type": "test-case",
+          "name": "bundled-capacitor-or-production-host",
+          "description": "Expect capacitor://localhost (sim/device) or https://vettrack.uk.",
+          "test": "function() {\n    let ok = location.protocol === \"capacitor:\" || /vettrack\\.uk$/i.test(location.hostname) || location.hostname === \"localhost\";\n    return {level: ok ? \"pass\" : \"warn\", protocol: location.protocol, hostname: location.hostname, note: ok ? \"Expected VetTrack shell\" : \"Run on Capacitor or vettrack.uk for submit gate\"};\n}"
+        },
+        {
+          "type": "test-case",
+          "name": "document-has-title",
+          "test": "function() {\n    return {level: (document.title && document.title.trim().length) ? \"pass\" : \"warn\", title: document.title || \"(empty)\"};\n}"
+        },
+        {
+          "type": "test-case",
+          "name": "viewport-meta-mobile-layout",
+          "test": "function() {\n    let vp = document.querySelector(\"meta[name=\\\"viewport\\\"]\");\n    let content = vp ? (vp.getAttribute(\"content\") || \"\") : \"\";\n    let ok = /width=device-width/i.test(content);\n    return {level: ok ? \"pass\" : \"fail\", domNodes: vp ? [vp] : [], content: content || \"(missing)\"};\n}"
+        }
+      ]
+    },
+    {
+      "type": "test-group",
+      "name": "1 — Auth & clinical UX (tier 1)",
+      "description": "Sign-in, signup, shift chat — native-ship-checklist tier 1.",
+      "tests": [
+        {
+          "type": "test-case",
+          "name": "clerk-auth-form-ltr",
+          "description": "Hebrew RTL shell must not force sentence-case on reviewer@ email.",
+          "test": "function() {\n    let root = document.getElementById(\"clerk-auth-form-root\");\n    if (!root)\n        return {level: \"warn\", note: \"Not on /signin or /signup — navigate there first or N/A\"};\n    let dir = root.getAttribute(\"dir\") || \"\";\n    let ok = dir.toLowerCase() === \"ltr\";\n    return {level: ok ? \"pass\" : \"fail\", domNodes: [root], dir: dir || \"(unset)\"};\n}"
+        },
+        {
+          "type": "test-case",
+          "name": "email-inputs-no-autocapitalize",
+          "test": "function() {\n    let inputs = Array.from(document.querySelectorAll(\"#clerk-auth-form-root input, .cl-formFieldInput input, input[name=\\\"identifier\\\"], input[type=\\\"email\\\"]\"));\n    if (!inputs.length)\n        return {level: \"warn\", note: \"No Clerk identifier inputs on this route\"};\n    let fail = inputs.filter(function(input) {\n        let cap = (input.getAttribute(\"autocapitalize\") || input.autocapitalize || \"\").toLowerCase();\n        return cap !== \"none\" && cap !== \"off\";\n    });\n    return {level: fail.length ? \"fail\" : \"pass\", domNodes: fail, checked: inputs.length};\n}"
+        },
+        {
+          "type": "test-case",
+          "name": "primary-tap-targets-44px",
+          "description": "native-ship-checklist: primary taps ≥44px.",
+          "test": "function() {\n    let min = WebInspectorAudit._vt.MIN_TAP_PX;\n    let fail = WebInspectorAudit._vt.tapTargets().filter(function(el) {\n        let r = el.getBoundingClientRect();\n        return Math.min(r.width, r.height) < min;\n    });\n    return {level: fail.length ? \"fail\" : \"pass\", domNodes: fail, minTapPx: min, failingCount: fail.length};\n}"
+        },
+        {
+          "type": "test-case",
+          "name": "shift-chat-fab-present",
+          "description": "Sign in, open /home — tier 1 shift chat row. FAB uses class bottom-nav-float.",
+          "test": "function() {\n    let fab = document.querySelector(\"button.bottom-nav-float\");\n    if (!fab)\n        return {level: \"warn\", note: \"Shift chat FAB not found — sign in, eligible role, not on /signin\"};\n    let r = fab.getBoundingClientRect();\n    let ok = Math.min(r.width, r.height) >= WebInspectorAudit._vt.MIN_TAP_PX;\n    return {level: ok ? \"pass\" : \"fail\", domNodes: [fab], width: Math.round(r.width), height: Math.round(r.height)};\n}"
+        }
+      ]
+    },
+    {
+      "type": "test-group",
+      "name": "2 — WCAG 2.2 AA hints (manual sign-off)",
+      "description": "Automated hints only — still manual-sign WCAG per checklist row.",
+      "supports": 1,
+      "tests": [
+        {
+          "type": "test-case",
+          "name": "single-main-landmark",
+          "supports": 1,
+          "test": "function() {\n    let mains = WebInspectorAudit.Accessibility.getElementsByComputedRole(\"main\");\n    return {level: mains.length <= 1 ? \"pass\" : \"fail\", domNodes: mains.length > 1 ? mains : [], count: mains.length};\n}"
+        },
+        {
+          "type": "test-case",
+          "name": "buttons-have-accessible-names",
+          "supports": 1,
+          "test": "function() {\n    let buttons = WebInspectorAudit.Accessibility.getElementsByComputedRole(\"button\");\n    let fail = buttons.filter(function(btn) {\n        let p = WebInspectorAudit.Accessibility.getComputedProperties(btn);\n        return !p || !p.label || !String(p.label).trim();\n    });\n    return {level: fail.length ? \"fail\" : \"pass\", domNodes: fail, failingCount: fail.length};\n}"
+        },
+        {
+          "type": "test-case",
+          "name": "images-have-alt",
+          "test": "function() {\n    let imgs = Array.from(document.querySelectorAll(\"img\")).filter(WebInspectorAudit._vt.visible);\n    let fail = imgs.filter(function(img) { return img.getAttribute(\"alt\") === null; });\n    return {level: fail.length ? \"fail\" : \"pass\", domNodes: fail, imagesChecked: imgs.length};\n}"
+        },
+        {
+          "type": "test-case",
+          "name": "form-inputs-have-labels",
+          "test": "function() {\n    let inputs = Array.from(document.querySelectorAll(\"input:not([type=\\\"hidden\\\"]):not([type=\\\"submit\\\"]):not([type=\\\"button\\\"]), select, textarea\")).filter(WebInspectorAudit._vt.visible);\n    let fail = [];\n    inputs.forEach(function(input) {\n        let id = input.id;\n        let labelled = (id && document.querySelector(\"label[for=\\\"\" + CSS.escape(id) + \"\\\"]\")) || input.closest(\"label\") || input.getAttribute(\"aria-label\") || input.getAttribute(\"aria-labelledby\");\n        if (!labelled)\n            fail.push(input);\n    });\n    return {level: fail.length ? \"fail\" : \"pass\", domNodes: fail, failingCount: fail.length};\n}"
+        },
+        {
+          "type": "test-case",
+          "name": "dialogs-have-accessible-names",
+          "supports": 1,
+          "test": "function() {\n    let dialogs = WebInspectorAudit.Accessibility.getElementsByComputedRole(\"dialog\");\n    let fail = dialogs.filter(function(d) {\n        let p = WebInspectorAudit.Accessibility.getComputedProperties(d);\n        return !p || !p.label || !String(p.label).trim();\n    });\n    return {level: fail.length ? \"fail\" : \"pass\", domNodes: fail, dialogCount: dialogs.length};\n}"
+        },
+        {
+          "type": "test-case",
+          "name": "invalid-aria-hidden-values",
+          "test": "function() {\n    let fail = Array.from(document.querySelectorAll(\"[aria-hidden]:not([aria-hidden=\\\"true\\\"]):not([aria-hidden=\\\"false\\\"])\"));\n    return {level: fail.length ? \"fail\" : \"pass\", domNodes: fail};\n}"
+        },
+        {
+          "type": "test-case",
+          "name": "page-language-declared",
+          "test": "function() {\n    let lang = document.documentElement.getAttribute(\"lang\");\n    return {level: (lang && lang.trim().length) ? \"pass\" : \"warn\", lang: lang || \"(unset)\"};\n}"
+        }
+      ]
+    },
+    {
+      "type": "test-group",
+      "name": "3 — Design polish signals",
+      "description": "Heuristic overflow/clipping checks — not a substitute for human review.",
+      "tests": [
+        {
+          "type": "test-case",
+          "name": "no-horizontal-document-scroll",
+          "test": "function() {\n    let overflow = document.documentElement.scrollWidth > window.innerWidth + 2;\n    return {level: overflow ? \"warn\" : \"pass\", scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth};\n}"
+        },
+        {
+          "type": "test-case",
+          "name": "h1-not-severely-clipped",
+          "description": "Flags h1 with near-zero height — safe-area or header overlap.",
+          "test": "function() {\n    let h1s = Array.from(document.querySelectorAll(\"h1\")).filter(WebInspectorAudit._vt.visible);\n    let fail = h1s.filter(function(h) { return h.getBoundingClientRect().height < 8; });\n    return {level: fail.length ? \"fail\" : \"pass\", domNodes: fail, h1Count: h1s.length};\n}"
+        }
+      ]
+    }
+  ]
+}

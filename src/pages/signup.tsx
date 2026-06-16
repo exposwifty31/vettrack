@@ -7,6 +7,7 @@ import { ClerkFailed, ClerkLoaded, ClerkLoading, SignUp } from "@clerk/clerk-rea
 import { useAuth } from "@/hooks/use-auth";
 import { clerkAppearance, clerkAppearanceNative } from "@/lib/clerk-appearance";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import { ClerkAuthFormShell } from "@/components/clerk-auth-form-shell";
 import { NativeSocialButtons } from "@/components/native-social-buttons";
 
 const IS_NATIVE = isCapacitorNative();
@@ -62,15 +63,17 @@ export default function SignUpPage() {
                 </p>
               </ClerkFailed>
               <ClerkLoaded>
-                <div className="w-full min-h-[24rem] flex flex-col items-center justify-start">
-                  <SignUp
-                    routing="hash"
-                    signInUrl="/signin"
-                    fallbackRedirectUrl="/"
-                    appearance={IS_NATIVE ? clerkAppearanceNative : clerkAppearance}
-                  />
-                  {IS_NATIVE ? <NativeSocialButtons mode="signUp" /> : null}
-                </div>
+                <ClerkAuthFormShell>
+                  <div className="w-full min-h-[24rem] flex flex-col items-center justify-start">
+                    <SignUp
+                      routing="hash"
+                      signInUrl="/signin"
+                      fallbackRedirectUrl="/"
+                      appearance={IS_NATIVE ? clerkAppearanceNative : clerkAppearance}
+                    />
+                    {IS_NATIVE ? <NativeSocialButtons mode="signUp" /> : null}
+                  </div>
+                </ClerkAuthFormShell>
               </ClerkLoaded>
             </div>
           ) : (

@@ -17,6 +17,7 @@
     "all": "All",
     "none": "None",
     "unknown": "Unknown",
+    "never": "Never",
     "select": "Select",
     "unfiled": "Unfiled",
     "justNow": "Just now",
@@ -53,7 +54,10 @@
       "mine": "Mine",
       "operationalControlSection": "Operational control",
       "operationalCommandCenter": "ER command center",
-      "erConcealmentStaffHint": "The full clinic app is hidden while ER mode is on. Ask an operations lead to turn off ER mode to restore the usual navigation."
+      "erConcealmentStaffHint": "The full clinic app is hidden while ER mode is on. Ask an operations lead to turn off ER mode to restore the usual navigation.",
+      "operationsSection": "Operations",
+      "managementSection": "Management",
+      "systemSection": "System"
     },
     "settings": {
       "darkMode": "Dark mode",
@@ -114,7 +118,18 @@
       "moveError": "Move failed",
       "exportError": "Export failed",
       "checkoutError": "Equipment checkout failed",
-      "returnError": "Return failed"
+      "returnError": "Return failed",
+      "returnSuccess": "Returned — {name} is now available"
+    },
+    "quickAction": {
+      "checkout": "Check out",
+      "return": "Return",
+      "viewIssue": "View issue"
+    },
+    "bulkDelete": {
+      "title": "Delete {count} items?",
+      "description": "This permanently deletes the selected equipment and all their history. This cannot be undone.",
+      "confirm": "Yes, permanently delete"
     },
     "linkedInUse": "In use for: {name}",
     "recoveryBadgeStale": "Needs confirm",
@@ -129,7 +144,20 @@
     "statInUse": "In use",
     "statUptime": "Uptime",
     "filterAll": "All",
-    "recoveryAttentionSummary": "{count} item(s) need attention"
+    "recoveryAttentionSummary": "{count} item(s) need attention",
+    "paginationCount": "{shown} of {total} items",
+    "paginationPage": "page {page} of {pages}",
+    "paginationPrevious": "Previous",
+    "paginationNext": "Next",
+    "clearRoomFilter": "Clear room filter",
+    "selection": {
+      "selectAll": "Select all",
+      "deselectAll": "Deselect all",
+      "selectedCount": "{count} selected",
+      "itemAriaLabel": "{name}, {status}",
+      "itemStatusChecked": "selected",
+      "itemStatusUnchecked": "not selected"
+    }
   },
   "shiftHandoverPage": {
     "title": "Shift End",
@@ -299,7 +327,12 @@
     "noContainers": "No containers in the system",
     "startSessionFailed": "Could not start the restock session — please try again",
     "finishSessionFailed": "Could not finish the restock — please try again",
-    "errorWithRequestId": "{message} (ref: {requestId})"
+    "errorWithRequestId": "{message} (ref: {requestId})",
+    "departments": {
+      "hospital": "Hospital",
+      "emergency": "Emergency",
+      "internalMedicine": "Internal Medicine"
+    }
   },
   "equipmentTruth": {
     "title": "Operational truth",
@@ -343,7 +376,8 @@
     "unknowns": {
       "no_authoritative_location": "No recent scan or room assignment",
       "equipment_not_found": "Equipment record missing",
-      "no_active_custodian": "No active checkout on file"
+      "no_active_custodian": "No active checkout on file",
+      "insufficient_validated_evidence": "Not enough verified scan or custody evidence yet"
     },
     "citationTypes": {
       "scan": "Scan",
@@ -466,6 +500,11 @@
     "sterilizationDue": "Sterilization due (7+ days)",
     "expiryExpired": "Expired",
     "expirySoon": "Expiring soon",
+    "expiryValid": "Valid",
+    "deleteTitle": "Delete {name}?",
+    "deleteBody": "This hides the equipment from active lists (soft-delete). Audit and scan history are preserved.",
+    "deleteConfirm": "Delete",
+    "deleteAriaLabel": "Delete equipment",
     "recoveryBadgeStale": "Needs confirm",
     "recoveryBadgeVeryStale": "Very stale",
     "recoveryBadgeCheckedOutLong": "Checked out long",
@@ -497,6 +536,10 @@
       "name": {
         "placeholder": "e.g. Autoclave Unit A",
         "error": "Name is required"
+      },
+      "nameHe": {
+        "label": "Hebrew name",
+        "placeholder": "e.g. Autoclave Unit A (Hebrew)"
       },
       "serialNumber": {
         "placeholder": "SN-12345"
@@ -547,7 +590,11 @@
     },
     "actions": {
       "returnAll": "Return all"
-    }
+    },
+    "returnAllTitle": "Return all {count} items?",
+    "returnAllBody": "This will return all checked-out items and make them available for others.",
+    "returnAllConfirm": "Confirm return all",
+    "checkedOutCount": "{count} checked out"
   },
   "alerts": {
     "types": {
@@ -590,6 +637,18 @@
       "sterilization_due": "Not sterilized in 7+ days",
       "inactive": "No scan in 14+ days"
     }
+  },
+  "shiftShareCard": {
+    "title": "Shift Summary",
+    "heroTasksDone": "tasks done",
+    "tasksCompletedOf": "{done} of {total} tasks completed",
+    "scansToday": "Scans Today",
+    "equipmentScans": "equipment scans",
+    "streak": "Streak",
+    "daysInRow": "days in a row",
+    "startStreak": "start your streak",
+    "tasksCompleted": "Tasks Completed",
+    "footer": "VetTrack · Shift Report"
   },
   "shiftSummary": {
     "sections": {
@@ -951,17 +1010,34 @@
     "resetDescription": "Restore all settings to default values. This cannot be undone.",
     "resetButton": "Reset to default",
     "resetDialogTitle": "Reset all settings?",
+    "resetSuccess": "Settings restored to defaults",
     "account": "Account",
     "crashCartChecklist": "Crash cart checklist",
     "crashCartChecklistDescription": "Customize the daily check items to match the crash cart in your department — add, edit, or remove items.",
     "crashCartChecklistManage": "Edit checklist",
     "about": "About",
-    "logout": "Sign out"
+    "versionLabel": "Version",
+    "seeWhatsNew": "See what's new",
+    "logout": "Sign out",
+    "logoutConfirmTitle": "Sign out?",
+    "logoutConfirmDescription": "You will need to sign in again to access VetTrack.",
+    "showEmail": "Show email",
+    "hideEmail": "Hide email",
+    "pushSyncFailed": "Failed to sync notification settings",
+    "loadFailedForSession": "Settings could not be loaded for this session.",
+    "language": "Language",
+    "languageDescription": "Choose interface language and text direction",
+    "languageEn": "English",
+    "languageHe": "Hebrew",
+    "timeFormat12h": "12-hour (AM/PM)",
+    "timeFormat24h": "24-hour",
+    "sendTest": "Send test"
   },
   "adminShiftsPage": {
     "title": "Shift management",
     "subtitle": "Import shifts from EZShift and view import history",
     "uploadCsv": "Upload CSV",
+    "clearUpload": "Clear upload",
     "selectedFile": "Selected file",
     "previewReady": "Preview ready",
     "previewFailed": "Preview generation failed",
@@ -979,6 +1055,7 @@
     "issuesTitle": "Errors and skips",
     "importsHistoryTitle": "Import history",
     "noImportsYet": "No import history yet",
+    "importHistoryLoadFailed": "Failed to load import history.",
     "noPreviewYet": "No preview generated yet",
     "rowLabel": "Row {row}",
     "importedBy": "Imported by",
@@ -1028,7 +1105,43 @@
     "noIssuesReported": "No issues reported",
     "topProblemSubMessage": "Equipment with recurring issues will appear here",
     "maintenanceLabel": "Maintenance",
-    "itemsLabel": "items"
+    "itemsLabel": "items",
+    "loadFailed": "Failed to load analytics data. Try again.",
+    "shiftLeaderboardLink": "Shift scan leaderboard",
+    "noScanActivity": "No scan activity in the last 14 days",
+    "issueCountBadge": "{count} issues"
+  },
+  "monthlyReport": {
+    "title": "VetTrack Monthly Report",
+    "equipmentSummary": "Equipment Summary",
+    "available": "Available",
+    "inUse": "In Use",
+    "issues": "Issues",
+    "missing": "Missing",
+    "issuesMissingTitle": "Issues & Missing Equipment",
+    "noCriticalItems": "No critical items — all equipment accounted for.",
+    "colEquipment": "Equipment",
+    "colReason": "Reason",
+    "colLocation": "Location",
+    "colStatus": "Status",
+    "andMore": "… and {count} more items",
+    "costEstimate": "Cost Estimate",
+    "missingCostLine": "Missing equipment replacement estimate (@ $500/item):",
+    "issueCostLine": "Issue repair estimate (@ $75/item):",
+    "totalEstimated": "Total Estimated Cost:",
+    "insights": "Insights",
+    "insightOperational": "{pct}% of equipment is currently operational (available or in use).",
+    "insightMissing": "{count} item(s) flagged missing — immediate follow-up recommended.",
+    "insightAllAccounted": "All equipment accounted for — no missing items detected.",
+    "insightIssues": "{count} active issue(s) requiring attention.",
+    "footer": "VetTrack — Confidential | {total} total items | Report generated {generatedAt}",
+    "generatedLabel": "Generated:",
+    "reasonActiveIssue": "Active Issue",
+    "reasonNotSeen24h": "Not seen in 24+ hours",
+    "reasonNeverScanned": "Never scanned",
+    "statusIssue": "ISSUE",
+    "statusMissing": "MISSING",
+    "printTitle": "VetTrack monthly report"
   },
   "outcomeKpiDashboard": {
     "title": "Outcome KPI & ROI",
@@ -1090,6 +1203,8 @@
     "alertsEmpty": "No inventory alerts",
     "alertsEmptyHint": "Sterilization, maintenance, and issues appear here when something needs attention.",
     "hello": "Hey {name},",
+    "helloBeforeName": "Hey ",
+    "helloAfterName": ",",
     "shiftLine": "{time} on shift · you've got this",
     "shiftLineFallback": "Here's your shift at a glance",
     "heroKicker": "Your shift",
@@ -1137,7 +1252,10 @@
     "equipmentIdPlaceholder": "Equipment ID or scan result",
     "explainCta": "Explain",
     "disabledHint": "Asset Copilot is not enabled for this clinic. Ask your admin to turn on ENABLE_ASSET_COPILOT.",
-    "error": "Could not load Copilot answer. Check the equipment ID and try again."
+    "error": "Could not load Copilot answer. Check the equipment ID and try again.",
+    "equipmentLine": "Equipment: {name}",
+    "limitedEvidenceStatus": "Status: limited evidence ({gaps}).",
+    "gapsLine": "Gaps: {gaps}."
   },
   "shiftRecap": {
     "pageTitle": "Shift recap — VetTrack",
@@ -1394,7 +1512,18 @@
     "zoneIcu": "ICU",
     "zoneEr": "ER",
     "zoneSurgery": "Surgery",
-    "zoneOther": "Other"
+    "zoneOther": "Other",
+    "addRoom": "Add Room",
+    "badgeSynced": "Synced",
+    "badgeAudit": "Audit",
+    "badgeStale": "Stale",
+    "summaryAvailable": "Available",
+    "summaryInUse": "In Use",
+    "summaryIssues": "Issues",
+    "summarySynced": "Synced",
+    "cardItemsUnit": "items",
+    "cardAvailShort": "avail.",
+    "cardInUseShort": "in use"
   },
   "managementDashboardPage": {
     "title": "Dashboard",
@@ -1499,9 +1628,9 @@
     "tabUsers": "Users",
     "tabSupport": "Support",
     "tabLogs": "Logs",
-    "tabShifts": "Shifts",
     "foldersTitle": "Folders",
     "pendingUsersTitle": "Pending users",
+    "pendingEmpty": "No pending users. All sign-ups have been reviewed.",
     "usersTitle": "Users",
     "folderCreated": "Folder created",
     "folderCreateFailed": "Failed to create folder",
@@ -1509,6 +1638,9 @@
     "folderUpdateFailed": "Failed to update folder",
     "folderDeleted": "Folder deleted",
     "folderDeleteFailed": "Failed to delete folder",
+    "deleteFolderTitle": "Delete \"{name}\"?",
+    "deleteFolderBody": "Equipment in this folder will become unfiled. This cannot be undone.",
+    "deleteFolderConfirm": "Yes, delete folder",
     "editFolder": "Edit folder",
     "createFolder": "Create folder",
     "folderName": "Folder name",
@@ -1530,6 +1662,8 @@
     "filterPending": "Pending",
     "filterActive": "Active",
     "filterBlocked": "Blocked",
+    "secondaryRoleTooltip": "Secondary role",
+    "noMatchingUsers": "No matching users",
     "noUsersYet": "No users yet",
     "firstLoginUsersHint": "Users will appear here the first time they sign in.",
     "tryOtherFilterHint": "Try switching to another filter to see other users.",
@@ -1709,7 +1843,8 @@
     "tasks": "Tasks",
     "activePatients": "Active Patients",
     "wardDisplay": "Ward Display",
-    "medicationHub": "Medication Hub"
+    "medicationHub": "Medication Hub",
+    "restockSwitchContainerWarning": "Finish the restock before scanning another container."
   },
   "conflictModal": {
     "title": "Sync Conflicts",
@@ -2357,6 +2492,7 @@
     "urgentLoadFailed": "Could not load urgent tasks.",
     "todayLoadFailed": "Could not load today's tasks.",
     "myTasksLoadFailed": "Could not load assigned tasks.",
+    "myTasksTitle": "My tasks",
     "dayViewLoadFailed": "Could not load the day view.",
     "dayViewEmpty": "No scheduled tasks",
     "dayViewEmptyHint": "Tap a time slot or use Quick Task to schedule one.",
@@ -2651,7 +2787,8 @@
       "crashCart": "Crash cart",
       "cartReady": "Ready",
       "cartNotChecked": "Not checked",
-      "pushSent": "Push sent to all staff"
+      "pushSent": "Push sent to all staff",
+      "pushSentMinutesAgo": "{minutes} min ago"
     },
     "history": {
       "adminOnly": "Admin access only",
@@ -2805,7 +2942,8 @@
       "invalidContainerTag": "Invalid NFC tag for container",
       "invalidInventoryItemTag": "Invalid NFC tag for inventory item",
       "restockSessionRequired": "Open a restock session before scanning item tags",
-      "scanFailed": "Inventory scan failed"
+      "scanFailed": "Inventory scan failed",
+      "noActiveRestockSession": "No active restock session found"
     }
   },
   "errors": {
@@ -2868,7 +3006,23 @@
       "reactFailed": "Failed to add reaction.",
       "pinFailed": "Failed to pin message."
     },
-    "openChat": "Open shift chat"
+    "openChat": "Open shift chat",
+    "openChatUnread": "Open shift chat, {count} unread messages",
+    "panel": {
+      "title": "Shift chat",
+      "description": "Live messages and broadcasts for the current shift.",
+      "onlineCount": "{count} online",
+      "loading": "Loading...",
+      "empty": "No messages yet",
+      "filterAll": "All",
+      "typing": "{names} typing...",
+      "broadcastPrompt": "Choose a broadcast command:",
+      "placeholder": "Write a message...",
+      "markUrgentAria": "Mark as urgent",
+      "sendBroadcastAria": "Send broadcast command",
+      "sendAria": "Send",
+      "closeAria": "Close chat"
+    }
   },
   "auditLog": {
     "actions": {
@@ -2953,6 +3107,9 @@
     "missingItemsNotesPlaceholder": "Notes on missing items...",
     "saveAllOk": "✓ All items OK — save",
     "saveWithMissing": "Save (with missing items)",
+    "checkItemAria": "{label}, {status}",
+    "checkItemStatusChecked": "checked",
+    "checkItemStatusUnchecked": "not checked",
     "checkSaved": "The check was saved",
     "historyTitle": "Check history",
     "statusOk": "✓ OK",
@@ -3283,29 +3440,54 @@
     "heading": "What's New",
     "description": "The latest features and improvements in VetTrack.",
     "configureAlerts": "Configure alerts in Settings",
-    "currentVersion": "1.1.2",
+    "currentVersion": "1.0.1",
     "currentDate": "June 2026",
+    "buildLabel": "Build 13",
     "items": {
+      "clinicalDesign": {
+        "title": "Clinical design system refresh",
+        "description": "Refreshed typography, contrast, and 44px touch targets across equipment, Today, alerts, and Code Blue — built for bedside use on phones and tablets.",
+        "badge": "New"
+      },
+      "accessibility": {
+        "title": "Accessibility improvements",
+        "description": "Skip-to-content link, visible focus rings, form labels, and WCAG AA contrast on emergency and alert surfaces.",
+        "badge": "Improved"
+      },
       "nativeApp": {
-        "title": "Native iOS & Android app",
-        "description": "VetTrack now runs as a native mobile app with built-in NFC scanning, camera capture, and haptic feedback — alongside the offline-capable web app.",
+        "title": "Native iOS app",
+        "description": "VetTrack runs as a bundled Capacitor app on iOS with NFC scanning, camera capture, haptic feedback, and offline-capable sync.",
         "badge": "New"
       },
       "signIn": {
         "title": "Sign in with Apple & Google",
-        "description": "Social sign-in now opens in the system browser for a secure, one-tap login on mobile, in addition to email and password.",
+        "description": "Social sign-in opens in the system browser for secure one-tap login on mobile, in addition to email and password.",
         "badge": "New"
-      },
-      "theme": {
-        "title": "Refreshed look & themes",
-        "description": "A new brand look across the app, with distinct Clinical, Forest, and Dark themes that apply consistently on every screen.",
-        "badge": "Improved"
       },
       "navigation": {
         "title": "Easier navigation",
-        "description": "A back button is now available on every screen, the header stays fixed while you scroll, and the Equipment Command Room has a clear exit.",
+        "description": "Back button on every screen, fixed header while scrolling, and a clear exit from the Equipment Command Board.",
         "badge": "Improved"
       }
     }
+  },
+  "shiftLeaderboard": {
+    "title": "Shift scan leaderboard",
+    "pageTitle": "Shift scan leaderboard — VetTrack",
+    "description": "Scan counts and averages per user across shifts. Users with zero scans in any shift are flagged.",
+    "backToAnalytics": "Back to analytics",
+    "adminRequired": "Admin access required",
+    "fromDate": "From date",
+    "toDate": "To date",
+    "loading": "Loading…",
+    "runReport": "Run report",
+    "loadError": "Failed to load shift completion data",
+    "emptyTitle": "No data",
+    "emptySubtitle": "No users with shift activity in the selected period",
+    "colUser": "User",
+    "colShifts": "Shifts",
+    "colTotalScans": "Total scans",
+    "colAvgPerShift": "Avg / shift",
+    "colNoScan": "No scan"
   }
 }

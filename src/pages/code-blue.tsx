@@ -8,8 +8,10 @@ import { authFetch } from "@/lib/auth-fetch";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { clearCodeBlueSessionCache, useCodeBlueSession } from "@/hooks/useCodeBlueSession";
+import { Bdi } from "@/components/ui/bdi";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
+import { useDirection } from "@/hooks/useDirection";
 import { toast } from "sonner";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -50,7 +52,7 @@ function ManagerPicker({ onSelect }: { onSelect: (id: string, name: string) => v
 
   return (
     <div className="flex flex-col gap-2">
-      {managersQ.isPending && <p className="text-xs text-emergency-text2/60">{t.codeBlue.loadingManagers}</p>}
+      {managersQ.isPending && <p className="text-xs text-emergency-text2/80">{t.codeBlue.loadingManagers}</p>}
       {managersQ.data?.map((m) => (
         <button
           key={m.id}
@@ -79,6 +81,7 @@ function PreCheckGate({
 }) {
   const { userId, role, name } = useAuth();
   const [, navigate] = useLocation();
+  const dir = useDirection();
   const isEligibleManager = role === "vet" || role === "admin";
   const QUICK_CHECK_ITEMS = [
     { key: "unitReady", label: t.codeBlue.preCheck.unitReady },
@@ -102,7 +105,7 @@ function PreCheckGate({
   };
 
   return (
-    <div className="flex flex-col h-screen-safe bg-emergency-bg max-w-md mx-auto overflow-hidden" dir="rtl">
+    <div className="flex flex-col h-screen-safe bg-emergency-bg w-full max-w-md md:max-w-xl lg:max-w-2xl mx-auto overflow-hidden" dir={dir}>
       <div className="flex-shrink-0 px-4 pt-4 pb-3">
       {/* Leave before starting — accidental entry must never trap the user. */}
       <button
@@ -116,8 +119,8 @@ function PreCheckGate({
         {t.common.back}
       </button>
       <div className="flex items-center gap-2 text-red-400">
-        <AlertTriangle className="h-6 w-6" />
-        <h1 className="text-xl font-bold">{t.codeBlue.openTitle}</h1>
+        <AlertTriangle className="h-6 w-6 shrink-0" aria-hidden />
+        <h1 className="text-xl font-bold text-red-400">{t.codeBlue.openTitle}</h1>
       </div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 pb-4">
@@ -130,9 +133,9 @@ function PreCheckGate({
 
       <div className="rounded-lg border border-emergency-border bg-emergency-surface p-4 mb-4">
         <h2 className="text-sm font-semibold text-emergency-text2 mb-3 flex items-center gap-2">
-          <Shield className="h-4 w-4" /> {t.codeBlue.managerLabel}
+          <Shield className="h-4 w-4 shrink-0" aria-hidden /> {t.codeBlue.managerLabel}
         </h2>
-        <p className="text-xs text-emergency-text2/60 mb-3">{t.codeBlue.managerInstruction}</p>
+        <p className="text-xs text-emergency-text2/80 mb-3">{t.codeBlue.managerInstruction}</p>
         {isEligibleManager ? (
           <div className="rounded border border-emergency-borderMd bg-emergency-border px-3 py-2 text-sm text-emergency-text">
             {name} {t.codeBlue.you}
@@ -156,14 +159,15 @@ function PreCheckGate({
               type="button"
               onClick={() => toggle(item.key)}
               className={cn(
-                "flex items-center gap-3 p-2 min-h-[44px] rounded border text-sm text-end transition-colors",
+                "flex items-center gap-3 p-2 min-h-[44px] rounded border text-sm transition-colors",
+                dir === "rtl" ? "text-end" : "text-start",
                 checked[item.key]
                   ? "border-green-500/40 bg-green-500/10 text-green-300"
                   : "border-emergency-border bg-emergency-border text-emergency-text",
               )}
             >
               <span className={cn("h-4 w-4 rounded-full border-2 shrink-0", checked[item.key] ? "border-green-500 bg-green-500" : "border-emergency-text2/60")} />
-              {item.label}
+              <span className="flex-1 min-w-0 [writing-mode:horizontal-tb]">{item.label}</span>
             </button>
           ))}
         </div>
@@ -179,7 +183,7 @@ function PreCheckGate({
       {!allChecked && (
         <button
           type="button"
-          className="w-full mt-2 min-h-[44px] text-xs text-emergency-text2/60 hover:text-emergency-text2"
+          className="w-full mt-2 min-h-[44px] text-xs text-emergency-text2/80 hover:text-emergency-text2"
           onClick={() => handleStart(false)}
         >
           {t.codeBlue.proceedWithoutFullCheck}
@@ -193,6 +197,7 @@ function PreCheckGate({
 // ─── Outcome modal ───────────────────────────────────────────────────────────
 
 function OutcomeModal({ onClose }: { onClose: (outcome: string) => void }) {
+  const dir = useDirection();
   const OUTCOMES = [
     { value: "rosc", label: t.codeBlue.outcome.rosc },
     { value: "transferred", label: t.codeBlue.outcome.transferred },
@@ -200,7 +205,7 @@ function OutcomeModal({ onClose }: { onClose: (outcome: string) => void }) {
     { value: "died", label: t.codeBlue.outcome.died },
   ];
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 p-4" dir="rtl">
+    <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 p-4" dir={dir}>
       <div className="w-full max-w-md bg-emergency-surface rounded-t-2xl border border-emergency-border p-4">
         <h2 className="text-base font-bold text-white mb-4 text-center">{t.codeBlue.selectOutcome}</h2>
         <div className="flex flex-col gap-2">
@@ -220,7 +225,7 @@ function OutcomeModal({ onClose }: { onClose: (outcome: string) => void }) {
             </button>
           ))}
         </div>
-        <button type="button" className="w-full mt-3 min-h-[44px] text-xs text-emergency-text2/60" onClick={() => onClose("")}>{t.common.cancel}</button>
+        <button type="button" className="w-full mt-3 min-h-[44px] text-xs text-emergency-text2/80" onClick={() => onClose("")}>{t.common.cancel}</button>
       </div>
     </div>
   );
@@ -232,6 +237,7 @@ interface EquipmentItem { id: string; name: string; }
 
 function EquipmentPicker({ onSelect, onClose }: { onSelect: (item: EquipmentItem) => void; onClose: () => void }) {
   const { userId } = useAuth();
+  const dir = useDirection();
   const equipQ = useQuery<EquipmentItem[]>({
     queryKey: ["/api/equipment", "active"],
     queryFn: async () => {
@@ -243,7 +249,7 @@ function EquipmentPicker({ onSelect, onClose }: { onSelect: (item: EquipmentItem
     enabled: !!userId,
   });
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 p-4" dir="rtl">
+    <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 p-4" dir={dir}>
       <div className="w-full max-w-md bg-emergency-surface rounded-t-2xl border border-emergency-border p-4">
         <h2 className="text-base font-bold text-white mb-4">{t.codeBlue.selectEquipment}</h2>
         <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
@@ -257,9 +263,9 @@ function EquipmentPicker({ onSelect, onClose }: { onSelect: (item: EquipmentItem
               {item.name}
             </button>
           ))}
-          {equipQ.data?.length === 0 && <p className="text-emergency-text2/60 text-sm">{t.codeBlue.noEquipmentAvailable}</p>}
+          {equipQ.data?.length === 0 && <p className="text-emergency-text2 text-sm">{t.codeBlue.noEquipmentAvailable}</p>}
         </div>
-        <button type="button" className="w-full mt-3 min-h-[44px] text-xs text-emergency-text2/60" onClick={onClose}>{t.common.cancel}</button>
+        <button type="button" className="w-full mt-3 min-h-[44px] text-xs text-emergency-text2/80" onClick={onClose}>{t.common.cancel}</button>
       </div>
     </div>
   );
@@ -269,6 +275,7 @@ function EquipmentPicker({ onSelect, onClose }: { onSelect: (item: EquipmentItem
 
 function ActiveSession() {
   const { userId } = useAuth();
+  const dir = useDirection();
   const { session, logEntries, presence, cartStatus, linkedEquipment, logEntry } = useCodeBlueSession();
   const elapsed = useElapsed(session?.startedAt ?? null);
   const [showOutcomeModal, setShowOutcomeModal] = useState(false);
@@ -313,7 +320,7 @@ function ActiveSession() {
   if (!session) return null;
 
   return (
-    <div className="flex flex-col h-screen-safe bg-emergency-bg text-white overflow-hidden" dir="rtl" style={{ borderTop: "3px solid var(--destructive)" }}>
+    <div className="flex flex-col h-screen-safe bg-emergency-bg text-white overflow-hidden" dir={dir} style={{ borderTop: "3px solid var(--destructive)" }}>
       <div className="flex-shrink-0 bg-emergency-surface border-b border-emergency-surface px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {/* Leave the live view without ending the session (it persists for the
@@ -362,11 +369,11 @@ function ActiveSession() {
 
       <div className="px-4 py-2 bg-emergency-surface/50 border-b border-emergency-surface text-xs text-emergency-text2 flex items-center gap-2">
         <Shield className="h-3.5 w-3.5 text-blue-400" />
-        {t.codeBlue.managerLabelShort} <span className="text-blue-300 font-semibold">{session.managerUserName}</span>
+        {t.codeBlue.managerLabelShort} <span className="text-blue-300 font-semibold"><Bdi>{session.managerUserName}</Bdi></span>
       </div>
 
       <div className="px-4 py-3 bg-emergency-surface/50 border-b border-emergency-surface">
-        <div className="text-[10px] font-bold tracking-widest uppercase text-emergency-text2/60 mb-2">
+        <div className="vt-text-2xs font-bold tracking-widest uppercase text-emergency-text2/80 mb-2">
           {t.codeBlue.equipmentInEvent}
         </div>
         {linkedEquipment.length > 0 ? (
@@ -381,7 +388,7 @@ function ActiveSession() {
             ))}
           </div>
         ) : (
-          <p className="text-xs text-emergency-text2/60">{t.codeBlue.noEquipmentInEvent}</p>
+          <p className="text-xs text-emergency-text2/80">{t.codeBlue.noEquipmentInEvent}</p>
         )}
       </div>
 
@@ -389,7 +396,7 @@ function ActiveSession() {
         <div className="text-5xl font-black tracking-widest text-white font-mono leading-none">
           {formatElapsed(elapsed)}
         </div>
-        <div className="text-xs text-emergency-text2/60 mt-2">
+        <div className="text-xs text-emergency-text2/80 mt-2">
           {t.codeBlue.elapsedSinceStart}
           {equipmentLogCount > 0 && (
             <span className="text-amber-400/90 me-2"> · {t.codeBlue.equipmentLogCount(equipmentLogCount)}</span>
@@ -398,7 +405,7 @@ function ActiveSession() {
       </div>
 
       <div className="p-4 border-b border-emergency-surface">
-        <div className="text-xs text-emergency-text2/60 tracking-widest uppercase mb-3">{t.codeBlue.quickLog}</div>
+        <div className="text-xs text-emergency-text2/80 tracking-widest uppercase mb-3">{t.codeBlue.quickLog}</div>
         <button
           type="button"
           onClick={() => setShowEquipPicker(true)}
@@ -430,7 +437,7 @@ function ActiveSession() {
             value={noteDraft}
             onChange={(e) => setNoteDraft(e.target.value)}
             placeholder={t.codeBlue.notePlaceholder}
-            className="flex-1 rounded-lg border border-emergency-border bg-emergency-surface px-3 py-2 text-sm text-emergency-text placeholder:text-emergency-text2/40"
+            className="flex-1 rounded-lg border border-emergency-border bg-emergency-surface px-3 py-2 text-sm text-emergency-text placeholder:text-emergency-text2/80"
             maxLength={200}
             onKeyDown={(e) => { if (e.key === "Enter") submitNote(); }}
           />
@@ -455,13 +462,13 @@ function ActiveSession() {
       )}
 
       <div className="p-4 border-b border-emergency-surface">
-        <div className="text-xs text-emergency-text2/60 tracking-widest uppercase mb-3">{t.codeBlue.timeline}</div>
+        <div className="text-xs text-emergency-text2 tracking-widest uppercase mb-3">{t.codeBlue.timeline}</div>
         <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
           {[...logEntries].reverse().map((entry) => (
             <div key={entry.id} className="flex gap-3 text-xs items-baseline">
-              <span className="text-emergency-text2/40 font-mono shrink-0">{formatElapsed(entry.elapsedMs)}</span>
+              <span className="text-emergency-text2 font-mono shrink-0">{formatElapsed(entry.elapsedMs)}</span>
               <span className={cn(
-                "shrink-0 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded",
+                "shrink-0 vt-text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded",
                 entry.category === "equipment" ? "bg-amber-500/20 text-amber-300" : "bg-emergency-border text-emergency-text2",
               )}>
                 {entry.category === "equipment" ? t.codeBlue.categoryEquipment : t.codeBlue.categoryNote}
@@ -471,7 +478,7 @@ function ActiveSession() {
             </div>
           ))}
           {logEntries.length === 0 && (
-            <p className="text-xs text-emergency-text2/40">{t.codeBlue.noEventsYet}</p>
+            <p className="text-xs text-emergency-text2">{t.codeBlue.noEventsYet}</p>
           )}
         </div>
       </div>
@@ -485,7 +492,7 @@ function ActiveSession() {
             {t.codeBlue.endEventChooseOutcome}
           </Button>
         ) : (
-          <div className="rounded-lg bg-emergency-surface border border-emergency-border p-4 text-center text-emergency-text2/40 text-xs">
+          <div className="rounded-lg bg-emergency-surface border border-emergency-border p-4 text-center text-emergency-text2 text-xs">
             {t.codeBlue.managerOnlyHint}
           </div>
         )}

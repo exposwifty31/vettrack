@@ -4,18 +4,11 @@ import { SettingsSectionHeader, SettingsToggle, SettingsSelect } from "@/compone
 import { useSettings } from "@/hooks/use-settings";
 import { useAuth } from "@/hooks/use-auth";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { useConfirm } from "@/hooks/use-confirm";
+import { withToast } from "@/lib/toast-result";
 import { Button } from "@/components/ui/button";
+import { Bdi } from "@/components/ui/bdi";
+import { maskEmail } from "@/lib/mask-email";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorCard } from "@/components/ui/error-card";
 import {
@@ -27,10 +20,17 @@ import {
   BellOff,
   Clock,
   Calendar,
+  CalendarClock,
   RotateCcw,
   LogOut,
   Sun,
-  AlignJustify,
+  Palette,
+  Vibrate,
+  LayoutGrid,
+  Languages,
+  PackageCheck,
+  Users,
+  AlertTriangle,
   Send,
   ListChecks,
   ClipboardCheck,
@@ -44,7 +44,9 @@ import { useEffect, useState } from "react";
 import { safeReloadPage } from "@/lib/safe-browser";
 
 export default function SettingsPage() {
+  const confirm = useConfirm();
   const [shiftSummaryOpen, setShiftSummaryOpen] = useState(false);
+  const [emailRevealed, setEmailRevealed] = useState(false);
   const { settings, update, reset } = useSettings();
   const { name, email, signOut, effectiveRole, role, isLoaded, isSignedIn } = useAuth();
   const push = usePushNotifications();
@@ -70,12 +72,22 @@ export default function SettingsPage() {
     update(effectivePatch);
     if (push.subscribed) {
       push.updateSettings(effectivePatch).catch(() => {
-        toast.error("סנכרון הגדרות ההתראות נכשל");
+        toast.error(t.settingsPage.pushSyncFailed);
       });
     }
   };
 
   const handleLogout = async () => {
+    if (
+      !(await confirm({
+        title: t.settingsPage.logoutConfirmTitle,
+        description: t.settingsPage.logoutConfirmDescription,
+        confirmLabel: t.settingsPage.logout,
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     await signOut();
   };
 
@@ -88,7 +100,7 @@ export default function SettingsPage() {
     update({ soundEnabled: v });
     if (push.subscribed) {
       push.updateSettings({ soundEnabled: v }).catch(() => {
-        toast.error("סנכרון הגדרות ההתראות נכשל");
+        toast.error(t.settingsPage.pushSyncFailed);
       });
     }
   };
@@ -104,7 +116,7 @@ export default function SettingsPage() {
     update({ criticalAlertsSound: v });
     if (push.subscribed) {
       push.updateSettings({ alertsEnabled: v }).catch(() => {
-        toast.error("סנכרון הגדרות ההתראות נכשל");
+        toast.error(t.settingsPage.pushSyncFailed);
       });
     }
   };
@@ -167,7 +179,7 @@ export default function SettingsPage() {
     const errorContent = (
       <div className="w-full max-w-full overflow-x-hidden space-y-3 pb-8">
         <ErrorCard
-          message="לא ניתן לטעון הגדרות עבור הפעלה זו."
+          message={t.settingsPage.loadFailedForSession}
           onRetry={() => safeReloadPage()}
         />
       </div>
@@ -179,8 +191,8 @@ export default function SettingsPage() {
     <>
       <div className="w-full max-w-full overflow-x-hidden space-y-6 pb-8 animate-fade-in">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">{t.settingsPage.title}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{t.settingsPage.subtitle}</p>
+          <h1 className="vt-page-title text-foreground">{t.settingsPage.title}</h1>
+          <p className="vt-text-sm text-muted-foreground mt-1">{t.settingsPage.subtitle}</p>
         </div>
 
         {/* Display */}
@@ -188,7 +200,7 @@ export default function SettingsPage() {
           <SettingsSectionHeader label={t.settingsPage.display} />
           <div className="space-y-2">
             <SettingsSelect
-              icon={<Sun className="w-5 h-5" />}
+              icon={<Palette className="w-5 h-5" />}
               label={t.settingsPage.colorTheme}
               description={t.settingsPage.colorThemeDescription}
               value={settings.colorTheme}
@@ -211,14 +223,14 @@ export default function SettingsPage() {
               data-testid="settings-dark-mode"
             />
             <SettingsToggle
-              icon={<AlignJustify className="w-5 h-5" />}
+              icon={<Vibrate className="w-5 h-5" />}
               label={t.settingsPage.haptics}
               checked={settings.hapticsEnabled}
               onCheckedChange={(v) => update({ hapticsEnabled: v })}
               data-testid="settings-haptics"
             />
             <SettingsSelect
-              icon={<AlignJustify className="w-5 h-5" />}
+              icon={<LayoutGrid className="w-5 h-5" />}
               label={t.settingsPage.displaySize}
               description={t.settingsPage.displaySizeDescription}
               value={settings.density}
@@ -230,13 +242,14 @@ export default function SettingsPage() {
               data-testid="settings-density"
             />
             <SettingsSelect
-              icon={<AlignJustify className="w-5 h-5" />}
-              label="שפה"
-              description="בחר שפת ממשק וכיוון טקסט"
+              icon={<Languages className="w-5 h-5" />}
+              lang="he"
+              label={t.settingsPage.language}
+              description={t.settingsPage.languageDescription}
               value={settings.locale}
               options={[
-                { value: "en", label: "אנגלית" },
-                { value: "he", label: "עברית" },
+                { value: "en", label: t.settingsPage.languageEn },
+                { value: "he", label: t.settingsPage.languageHe },
               ]}
               onValueChange={(v) => update({ locale: v as "en" | "he" })}
               data-testid="settings-locale"
@@ -313,7 +326,7 @@ export default function SettingsPage() {
                       else toast.error(push.error || t.settingsPage.testFailed);
                     }}
                   >
-                    שלח בדיקה
+                    {t.settingsPage.sendTest}
                   </Button>
                 </div>
               )}
@@ -326,7 +339,7 @@ export default function SettingsPage() {
 
                   {!isSeniorContext && (isTechnicianContext || isAdminContext) && (
                     <SettingsToggle
-                      icon={<BellRing className="w-5 h-5" />}
+                      icon={<PackageCheck className="w-5 h-5" />}
                       label={t.settingsPage.techReturnReminders}
                       description={t.settingsPage.techReturnRemindersDescription}
                       checked={settings.technicianReturnRemindersEnabled}
@@ -343,7 +356,7 @@ export default function SettingsPage() {
                   {isSeniorContext && (
                     <>
                       <SettingsToggle
-                        icon={<BellRing className="w-5 h-5" />}
+                        icon={<ClipboardCheck className="w-5 h-5" />}
                         label={t.settingsPage.seniorOwnReminders}
                         description={t.settingsPage.seniorOwnRemindersDescription}
                         checked={settings.seniorOwnReturnRemindersEnabled}
@@ -356,7 +369,7 @@ export default function SettingsPage() {
                         data-testid="settings-senior-own-reminders"
                       />
                       <SettingsToggle
-                        icon={<Bell className="w-5 h-5" />}
+                        icon={<Users className="w-5 h-5" />}
                         label={t.settingsPage.seniorTeamAlerts}
                         description={t.settingsPage.seniorTeamAlertsDescription}
                         checked={settings.seniorTeamOverdueAlertsEnabled}
@@ -373,7 +386,7 @@ export default function SettingsPage() {
 
                   {isAdminContext && (
                     <SettingsToggle
-                      icon={<Clock className="w-5 h-5" />}
+                      icon={<CalendarClock className="w-5 h-5" />}
                       label={t.settingsPage.adminHourlySummary}
                       description={t.settingsPage.adminHourlySummaryDescription}
                       checked={settings.adminHourlySummaryEnabled}
@@ -405,7 +418,7 @@ export default function SettingsPage() {
               data-testid="settings-sound"
             />
             <SettingsToggle
-              icon={<BellRing className="w-5 h-5" />}
+              icon={<AlertTriangle className="w-5 h-5" />}
               label={t.settingsPage.criticalAlerts}
               description={t.settingsPage.criticalAlertsDescription}
               checked={settings.criticalAlertsSound}
@@ -425,8 +438,8 @@ export default function SettingsPage() {
               description={t.settingsPage.timeFormatDescription}
               value={settings.timeFormat}
               options={[
-                { value: "12h", label: "12 שעות (AM/PM)" },
-                { value: "24h", label: "24 שעות" },
+                { value: "12h", label: t.settingsPage.timeFormat12h },
+                { value: "24h", label: t.settingsPage.timeFormat24h },
               ]}
               onValueChange={(v) => update({ timeFormat: v as "12h" | "24h" })}
               data-testid="settings-time-format"
@@ -455,32 +468,33 @@ export default function SettingsPage() {
             <p className="text-xs text-muted-foreground mb-3">
               {t.settingsPage.resetDescription}
             </p>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2 border-border/60 h-11 text-xs" data-testid="settings-reset-btn">
-                  <RotateCcw className="w-4 h-4" />
-                  {t.settingsPage.resetButton}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>{t.settingsPage.resetDialogTitle}</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {t.settingsPage.resetDescription}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={reset}
-                    className="bg-destructive hover:bg-destructive/90"
-                    data-testid="settings-reset-confirm"
-                  >
-                    {t.settingsPage.resetButton}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 border-border/60 h-11 text-xs"
+              data-testid="settings-reset-btn"
+              onClick={async () => {
+                if (
+                  !(await confirm({
+                    title: t.settingsPage.resetDialogTitle,
+                    description: t.settingsPage.resetDescription,
+                    confirmLabel: t.settingsPage.resetButton,
+                    destructive: true,
+                  }))
+                ) {
+                  return;
+                }
+                await withToast(
+                  async () => {
+                    reset();
+                  },
+                  { success: t.settingsPage.resetSuccess },
+                );
+              }}
+            >
+              <RotateCcw className="w-4 h-4" />
+              {t.settingsPage.resetButton}
+            </Button>
           </div>
         </section>
 
@@ -491,7 +505,22 @@ export default function SettingsPage() {
             {(name || email) && (
               <div>
                 {name && <p className="text-sm font-medium text-foreground">{name}</p>}
-                {email && <p className="text-xs text-muted-foreground">{email}</p>}
+                {email && (
+                  <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                    <p className="text-xs text-muted-foreground">
+                      <Bdi dir="ltr">{emailRevealed ? email : maskEmail(email)}</Bdi>
+                    </p>
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="h-auto p-0 text-xs text-muted-foreground"
+                      onClick={() => setEmailRevealed((v) => !v)}
+                      data-testid="settings-email-reveal"
+                    >
+                      {emailRevealed ? t.settingsPage.hideEmail : t.settingsPage.showEmail}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
             <div className="flex flex-wrap gap-2">
@@ -506,7 +535,7 @@ export default function SettingsPage() {
               </Button>
               <Button
                 variant="outline"
-                className="gap-2 border-border/60 text-muted-foreground hover:text-foreground"
+                className="gap-2 border-border/60 text-muted-foreground hover:text-foreground h-11"
                 onClick={handleLogout}
                 data-testid="settings-logout"
               >
@@ -540,14 +569,14 @@ export default function SettingsPage() {
           <div className="rounded-xl bg-card border border-border/60 px-4 py-4 space-y-1">
             <p className="text-sm font-medium text-foreground">VetTrack</p>
             <p className="text-xs text-muted-foreground">
-              Version <span data-testid="app-version">{__APP_VERSION__}</span>
+              {t.settingsPage.versionLabel} <span data-testid="app-version">{__APP_VERSION__}</span>
             </p>
             <a
               href="/whats-new"
               className="text-xs text-primary underline-offset-2 hover:underline"
               data-testid="changelog-link"
             >
-              See what&apos;s new
+              {t.settingsPage.seeWhatsNew}
             </a>
           </div>
         </section>

@@ -59,6 +59,7 @@ router.post(
         clinicId,
         equipmentId,
         viewerUserId: req.authUser?.id,
+        locale: req.locale,
       });
 
       if (result.answer.unknowns.includes("equipment_not_found")) {

@@ -2,7 +2,7 @@ import { t } from "@/lib/i18n";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Html5Qrcode, Html5QrcodeScannerState } from "html5-qrcode";
+import type { Html5Qrcode } from "html5-qrcode";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -317,6 +317,19 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
   const startScanner = useCallback(async () => {
     setPhase("init");
 
+    // Heavy scanning lib (html5-qrcode) is loaded on demand so it stays out of
+    // the eager route chunk on every page that mounts <QrScanner /> while closed.
+    let Html5Qrcode: typeof import("html5-qrcode")["Html5Qrcode"];
+    let Html5QrcodeScannerState: typeof import("html5-qrcode")["Html5QrcodeScannerState"];
+    try {
+      ({ Html5Qrcode, Html5QrcodeScannerState } = await import("html5-qrcode"));
+    } catch (importErr) {
+      console.error("Failed to load html5-qrcode module", importErr);
+      setManualCode("");
+      setPhase("manual");
+      return;
+    }
+
     if (initTimeoutRef.current) clearTimeout(initTimeoutRef.current);
     initTimeoutRef.current = setTimeout(async () => {
       initTimeoutRef.current = null;
@@ -553,7 +566,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          {(phase === "scanning" || phase === "init" || phase === "resolving") && (
+          {(phase === "init" || phase === "resolving") && (
             <Button
               variant="ghost"
               size="sm"

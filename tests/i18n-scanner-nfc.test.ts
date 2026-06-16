@@ -112,12 +112,12 @@ describe("Phase 6 PR 6.6 — source files no longer contain the migrated literal
     expect(layoutSource).not.toContain("סריקת מלאי נכשלה");
   });
 
-  it("layout.tsx STILL contains the unmigrated Hebrew literals (out of §15 PR 6.6 scope)", () => {
-    // The plan §15 PR 6.6 enumerates exactly four NFC literals in
-    // layout.tsx (lines 288, 313, 318, 345). The remaining Hebrew
-    // toasts on lines 297 and 324 stay for a future migration PR per
-    // §23.2 strict scope.
-    expect(layoutSource).toContain("סיים את המילוי מחדש");
-    expect(layoutSource).toContain("לא נמצא סשן מילוי מחדש פעיל");
+  it("layout.tsx no longer contains the two previously-deferred restock toast literals", () => {
+    // §15 PR 6.6 migrated four NFC literals and deferred these two restock
+    // toasts to a later PR. That migration is now complete: both render via
+    // i18n (lh.restockSwitchContainerWarning / t.nfc.error.noActiveRestockSession),
+    // so the literals must no longer appear in source.
+    expect(layoutSource).not.toContain("סיים את המילוי מחדש");
+    expect(layoutSource).not.toContain("לא נמצא סשן מילוי מחדש פעיל");
   });
 });

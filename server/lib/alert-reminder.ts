@@ -1,5 +1,6 @@
 import { db, alertAcks, clinics, equipment } from "../db.js";
 import { eq, isNull, and, lte, isNotNull, inArray } from "drizzle-orm";
+import { INACTIVE_THRESHOLD_DAYS } from "../../shared/constants.js";
 import { sendPushToUser } from "./push.js";
 import { postSystemMessage } from "./shift-chat-presence.js";
 
@@ -36,7 +37,7 @@ function isAlertStillActive(alertType: string, eq_row: {
 
   if (alertType === "inactive") {
     const lastSeen = eq_row.lastSeen ? new Date(eq_row.lastSeen).getTime() : 0;
-    const INACTIVE_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000;
+    const INACTIVE_THRESHOLD_MS = INACTIVE_THRESHOLD_DAYS * 24 * 60 * 60 * 1000;
     return now - lastSeen > INACTIVE_THRESHOLD_MS;
   }
 

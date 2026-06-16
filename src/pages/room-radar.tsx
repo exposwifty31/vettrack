@@ -1,4 +1,7 @@
 import { t } from "@/lib/i18n";
+import { getEquipmentDisplayName } from "@/lib/equipment-display";
+import { Bdi } from "@/components/ui/bdi";
+import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { useState, useEffect, useRef } from "react";
 import { useParams, useSearch } from "wouter";
 import { ApiError } from "@/lib/api";
@@ -19,7 +22,6 @@ import {
   Clock,
   AlertTriangle,
   Package,
-  ChevronRight,
   ChevronDown,
   ChevronUp,
   Loader2,
@@ -115,6 +117,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
   const isCheckedOut = !!eq.checkedOutById;
   const checkedOutByMe = eq.checkedOutById === userId;
   const statusVariant = statusToBadgeVariant(eq.status);
+  const displayName = getEquipmentDisplayName(eq);
 
   const confirmMut = useMutation({
     mutationFn: () => api.equipment.scan(eq.id, { status: "ok" }),
@@ -147,7 +150,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
-      toast.success(`${t.roomRadarPage.checkoutSuccess} — ${eq.name}`);
+      toast.success(`${t.roomRadarPage.checkoutSuccess} — ${displayName}`);
     },
     onError: () => toast.error(t.roomRadarPage.checkoutError),
     onSettled: () => { busyRef.current = false; },
@@ -160,7 +163,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
       queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
-      toast.success(`${t.roomRadarPage.returnSuccess} — ${eq.name}`);
+      toast.success(`${t.roomRadarPage.returnSuccess} — ${displayName}`);
     },
     onError: () => toast.error(t.roomRadarPage.returnError),
     onSettled: () => { busyRef.current = false; },
@@ -217,7 +220,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
               {eq.imageUrl ? (
                 <img
                   src={eq.imageUrl}
-                  alt={eq.name}
+                  alt={displayName}
                   width={40}
                   height={40}
                   loading="lazy"
@@ -233,7 +236,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
               <div className="flex-1 min-w-0">
                 <Link href={`/equipment/${eq.id}`}>
                   <p className="font-bold text-base truncate leading-snug hover:text-primary transition-colors">
-                    {eq.name}
+                    <Bdi>{displayName}</Bdi>
                   </p>
                 </Link>
                 {eq.linkedAnimalName && (
@@ -332,14 +335,14 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
               <button
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMoveOpen(true); }}
                 className="flex items-center gap-1 px-3 py-2 rounded-xl border border-border text-[11px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors min-h-[44px]"
-                title={`${t.roomRadarPage.moveButton} ${eq.name}`}
+                title={`${t.roomRadarPage.moveButton} ${displayName}`}
               >
                 <MoveRight className="w-3 h-3" />
                 {t.roomRadarPage.moveButton}
               </button>
               <Link href={`/equipment/${eq.id}`} className="ms-auto">
                 <div className="p-2 rounded-lg hover:bg-muted transition-colors">
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  <ForwardChevron className="w-4 h-4 text-muted-foreground" />
                 </div>
               </Link>
             </div>

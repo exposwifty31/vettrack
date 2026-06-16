@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
+import { TruncatedText } from "@/components/ui/truncated-text";
 import {
   BarChart,
   Bar,
@@ -35,7 +35,7 @@ import {
   Trophy,
   TrendingUp,
 } from "lucide-react";
-import { format } from "date-fns";
+import { formatChartBucketDay } from "@/lib/utils";
 import { Link } from "wouter";
 
 const STATUS_COLORS_HEX = {
@@ -57,24 +57,20 @@ export default function AnalyticsPage() {
 
   const pieData = analytics
     ? [
-        { name: "OK", value: analytics.statusBreakdown.ok, color: STATUS_COLORS_HEX.ok },
-        { name: "Issue", value: analytics.statusBreakdown.issue, color: STATUS_COLORS_HEX.issue },
+        { name: t.status.ok, value: analytics.statusBreakdown.ok, color: STATUS_COLORS_HEX.ok },
+        { name: t.status.issue, value: analytics.statusBreakdown.issue, color: STATUS_COLORS_HEX.issue },
         { name: t.analyticsPage.maintenance, value: analytics.statusBreakdown.maintenance, color: STATUS_COLORS_HEX.maintenance },
-        { name: "Sterilized", value: analytics.statusBreakdown.sterilized, color: STATUS_COLORS_HEX.sterilized },
+        { name: t.status.sterilized, value: analytics.statusBreakdown.sterilized, color: STATUS_COLORS_HEX.sterilized },
       ].filter((d) => d.value > 0)
     : [];
 
   const chartData = analytics?.scanActivity
-    ? analytics.scanActivity.slice(-14).map((d) => {
-        let dateLabel = d.date;
-        try {
-          dateLabel = format(new Date(d.date), "MMM d");
-        } catch {
-          // keep raw date string if parsing fails
-        }
-        return { date: dateLabel, scans: d.count };
-      })
+    ? analytics.scanActivity.slice(-14).map((d) => ({
+        date: formatChartBucketDay(d.date),
+        scans: d.count,
+      }))
     : [];
+  const hasScanActivity = chartData.some((d) => d.scans > 0);
 
   const pageContent = (
     <>
@@ -89,14 +85,14 @@ export default function AnalyticsPage() {
           <Link href="/analytics/shift-leaderboard">
             <span className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-3 py-1.5 text-xs font-medium shadow-sm hover:bg-muted/50 transition-colors cursor-pointer">
               <TrendingUp className="h-3.5 w-3.5 text-primary" />
-              לוח מובילים — סריקות משמרת
+              {t.analyticsPage.shiftLeaderboardLink}
             </span>
           </Link>
         </div>
 
         {isError && (
           <ErrorCard
-            message="טעינת הנתונים נכשלה. נסה שוב."
+            message={t.analyticsPage.loadFailed}
             onRetry={() => refetch()}
           />
         )}
@@ -192,7 +188,7 @@ export default function AnalyticsPage() {
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number) => [`${value} items`, ""]}
+                    formatter={(value: number) => [`${value} ${t.analyticsPage.itemsLabel}`, ""]}
                     contentStyle={{ borderRadius: "12px", border: "1px solid #e5e7eb", fontSize: "12px" }}
                   />
                   <Legend
@@ -220,7 +216,7 @@ export default function AnalyticsPage() {
           <CardContent className="px-4 pb-4">
             {isLoading ? (
               <Skeleton className="h-44 rounded-xl" />
-            ) : chartData.length > 0 ? (
+            ) : hasScanActivity ? (
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} />
@@ -233,9 +229,11 @@ export default function AnalyticsPage() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-center text-muted-foreground py-8 text-sm">
-                No scan activity yet
-              </p>
+              <EmptyState
+                icon={Activity}
+                message={t.analyticsPage.noScanActivity}
+                headingLevel="h3"
+              />
             )}
           </CardContent>
         </Card>
@@ -266,10 +264,10 @@ export default function AnalyticsPage() {
                         <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground shrink-0">
                           {i + 1}
                         </span>
-                        <span className="text-sm font-medium truncate">{item.name}</span>
+                        <TruncatedText text={item.name} className="text-sm font-medium min-w-0" />
                       </div>
                       <span className="text-xs text-muted-foreground shrink-0 bg-muted px-2.5 py-1 rounded-full">
-                        {item.issueCount} issues
+                        {t.analyticsPage.issueCountBadge(item.issueCount)}
                       </span>
                     </div>
                   ))}

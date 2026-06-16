@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { RequestHandler } from "express";
 import { db, equipment, folders, rooms, users } from "../../../db.js";
 import { and, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
@@ -20,6 +21,16 @@ const EQUIPMENT_STATUS_VALUES = [
 
 const EQUIPMENT_DEFAULT_PAGE_SIZE = 100;
 const EQUIPMENT_MAX_PAGE_SIZE = 1000;
+
+function buildEquipmentListEtag(parts: Record<string, string | number | null | undefined>): string {
+  const digest = createHash("sha256").update(JSON.stringify(parts)).digest("hex").slice(0, 16);
+  return `W/"eq-${digest}"`;
+}
+
+function etagTimestamp(value: Date | string | null | undefined): string | null {
+  if (value == null) return null;
+  return value instanceof Date ? value.toISOString() : String(value);
+}
 
 /** GET /api/equipment — paginated list */
 export const getEquipmentListHandler: RequestHandler = async (req, res) => {
@@ -124,14 +135,49 @@ export const getEquipmentListHandler: RequestHandler = async (req, res) => {
       // Stable sort key for pagination so pages do not duplicate/drop rows on equal createdAt.
       .orderBy(desc(equipment.createdAt), desc(equipment.id));
 
-    const [{ total }] = await db
-      .select({ total: sql<number>`count(*)::int` })
+    const [aggregate] = await db
+      .select({
+        total: sql<number>`count(*)::int`,
+        maxVersion: sql<number>`coalesce(max(${equipment.version}), 0)::int`,
+        maxCreatedAt: sql<Date | null>`max(${equipment.createdAt})`,
+        maxLastSeen: sql<Date | null>`max(${equipment.lastSeen})`,
+      })
       .from(equipment)
       .where(whereClause);
+
+    const total = aggregate?.total ?? 0;
+    const etag = buildEquipmentListEtag({
+      clinicId,
+      q,
+      status,
+      folder,
+      location,
+      page,
+      limit,
+      total,
+      maxVersion: aggregate?.maxVersion ?? 0,
+      maxCreatedAt: etagTimestamp(aggregate?.maxCreatedAt),
+      maxLastSeen: etagTimestamp(aggregate?.maxLastSeen),
+    });
+
+    const ifNoneMatch = req.headers["if-none-match"];
+    if (ifNoneMatch && ifNoneMatch === etag) {
+      res.setHeader("ETag", etag);
+      res.status(304).end();
+      return;
+    }
+
     const items = await baseQuery.limit(limit).offset(offset);
+    // Manual weak ETag — setHeader before res.json() prevents Express auto-etag on the body.
+    res.setHeader("ETag", etag);
     res.json({ items, total, page, pageSize: limit, hasMore: offset + items.length < total });
   } catch (err) {
-    console.error(err);
+    console.error("[equipment-list] EQUIPMENT_LIST_FAILED", {
+      requestId,
+      clinicId: req.clinicId,
+      err,
+    });
+    if (res.headersSent) return;
     res.status(500).json(
       apiError({
         code: "INTERNAL_ERROR",

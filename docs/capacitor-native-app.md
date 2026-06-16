@@ -1,78 +1,165 @@
-# VetTrack native app (Capacitor — Equipment Hero phase 5)
+# VetTrack native app (Capacitor)
 
-The iOS/Android shell wraps the same React app and enables **native NFC** on iPhones and iPads (Safari does not expose Web NFC).
+The iOS/Android shell wraps the same React app and enables **native NFC** (Safari PWA cannot use Web NFC on iOS).
+
+**Operator docs (read in order):**
+
+| Doc | When |
+|-----|------|
+| This file | Build, install, env pitfalls |
+| [native-ship-checklist.md](./mobile/native-ship-checklist.md) | Pre-submit route/device matrix |
+| [native-mobile-implementation-manual.md](./mobile/native-mobile-implementation-manual.md) | Skills + burn-down workflow |
+| [RESUBMISSION_RUNBOOK.md](../RESUBMISSION_RUNBOOK.md) | Clerk, archive, App Review |
+| [nfc-ship-checklist.md](./mobile/nfc-ship-checklist.md) | NFC / deep-link device evidence |
+
+---
+
+## Architecture (current)
+
+| Mode | Config | Use |
+|------|--------|-----|
+| **Bundled shell (ship)** | No `server.url` in `capacitor.config.json` | TestFlight / App Store — offline-capable web assets in `ios/App/App/public` |
+| **Remote WebView (dev only)** | `CAPACITOR_SERVER_URL=https://vettrack.uk` | Staging smoke — **never archive** (Guideline 4.2 + OAuth breaks) |
+
+Bundled shell details:
+
+- WebView origin: `capacitor://localhost`
+- API: absolute URLs via `VITE_API_ORIGIN` (e.g. `https://vettrack.uk`) — see `src/lib/api-origin.ts`
+- Auth: Clerk baked via `VITE_CLERK_PUBLISHABLE_KEY`; native OAuth uses system browser (`src/lib/native-oauth.ts`)
+- iOS safe areas: `contentInset: "never"` — CSS owns insets (`viewport-fit=cover`)
+
+---
 
 ## Prerequisites
 
-- Node 22+ and `pnpm install`
-- **Xcode** (macOS) for iOS builds
-- **Android Studio** for Android builds
+- Node 22+ · `pnpm install`
+- **Xcode** (macOS) for iOS
+- **Android Studio** for Android
 - Apple Developer account for NFC entitlements on iOS
 
-## Build the web bundle
+---
+
+## Build bundled shell (TestFlight / simulator)
+
+**Do not use `pnpm build && cap sync` for native archives.** Vite loads `.env.local` first, which blanks Clerk for local web dev and produces a **dev-bypass** native app.
+
+Use the native shell script — reads **`.env` only** for `VITE_CLERK_PUBLISHABLE_KEY` and `VITE_API_ORIGIN`:
 
 ```bash
-pnpm build
+./scripts/build-native-shell.sh              # vite build + cap sync ios
+./scripts/build-native-shell.sh --android
+./scripts/build-native-shell.sh --all
 ```
 
-Output: `dist/public` (configured as `webDir` in `capacitor.config.ts`).
-
-## Sync native projects
+Or via pnpm:
 
 ```bash
-pnpm cap:sync
+pnpm cap:build:native          # same as build-native-shell.sh --ios
+pnpm cap:build:native:android
 ```
 
-Runs `pnpm build` then `npx cap sync` (copies web assets into `ios/` and `android/`).
-
-## Run on device / simulator
+Required in **`.env`** (not `.env.local`):
 
 ```bash
-pnpm cap:open:ios
-# or
-pnpm cap:open:android
+VITE_CLERK_PUBLISHABLE_KEY=pk_live_…
+VITE_API_ORIGIN=https://vettrack.uk
 ```
 
-Then run from Xcode or Android Studio.
-
-## Live server mode (optional)
-
-Point the WebView at production or staging without rebundling:
+Pre-archive verification:
 
 ```bash
-CAPACITOR_SERVER_URL=https://vettrack.uk pnpm cap:sync
+./scripts/verify-resubmission.sh   # includes pk_live + vettrack.uk bundle checks
 ```
 
-Use only over HTTPS in production. Cleartext is allowed only for `http://` dev URLs.
+---
 
-## iOS NFC setup (required once per app ID)
+## Install on iOS Simulator
 
-1. In Xcode → target → **Signing & Capabilities**, add **Near Field Communication Tag Reading**.
-2. In `ios/App/App/Info.plist`, ensure:
-
-```xml
-<key>NFCReaderUsageDescription</key>
-<string>VetTrack reads NFC tags to identify equipment at the dock and bedside.</string>
+```bash
+./scripts/install-ios-sim.sh              # iPad (A16) — default for checklist matrix
+./scripts/install-ios-sim.sh --iphone     # iPhone 16 Pro
+./scripts/install-ios-sim.sh --udid <UDID>
+./scripts/install-ios-sim.sh --skip-build # reuse last cap sync
 ```
 
-3. For dock tags that are not NDEF-formatted, add the **TAG** format to the NFC entitlements array (`com.apple.developer.nfc.readersession.formats`).
+Or: `pnpm cap:install:ios-sim`
+
+---
+
+## Archive for TestFlight (human steps)
+
+After `./scripts/build-native-shell.sh` and `./scripts/verify-resubmission.sh`:
+
+1. `pnpm cap:open:ios`
+2. Bump `CURRENT_PROJECT_VERSION` in Xcode
+3. Product → Archive → Upload to App Store Connect
+
+Full checklist: [RESUBMISSION_RUNBOOK.md](../RESUBMISSION_RUNBOOK.md) §C–§F.
+
+---
+
+## Local web dev vs native (env split)
+
+| Surface | Env files | Auth |
+|---------|-----------|------|
+| `pnpm dev` (browser) | `.env.local` blanks Clerk | dev-bypass → `:3001` |
+| Bundled Capacitor | `.env` via `build-native-shell.sh` | production Clerk + `vettrack.uk` API |
+
+`.env.local` exists so live Clerk keys in `.env` do not break localhost. It must **never** drive a native archive build.
+
+---
+
+## Remote WebView (optional, not for submit)
+
+Point the WebView at production without rebundling (staging only):
+
+```bash
+CAPACITOR_SERVER_URL=https://vettrack.uk pnpm cap:sync:remote
+```
+
+---
+
+## iOS NFC (one-time per app ID)
+
+1. Xcode → target → **Signing & Capabilities** → **Near Field Communication Tag Reading**
+2. `ios/App/App/Info.plist` — `NFCReaderUsageDescription`
+3. For non-NDEF tags, add **TAG** to `com.apple.developer.nfc.readersession.formats`
+
+See [nfc.md](./mobile/nfc.md) for scan/write contracts.
+
+---
 
 ## Android
 
-`android/app/src/main/AndroidManifest.xml` must include `android.permission.NFC` (added by `cap sync` when the plugin is installed).
+`android.permission.NFC` is added by `cap sync` when `@capgo/capacitor-nfc` is installed.
 
-## Behaviour vs PWA
-
-| Surface | Safari PWA | Capacitor app |
-|--------|------------|---------------|
-| QR scan | Yes | Yes |
-| Equipment NFC toggle / dock / write tag | No | Yes (native plugin) |
-| Service worker | Yes | Skipped in native shell |
-| Clerk sign-in | Browser | In-app WebView (production host) |
+---
 
 ## Code map
 
-- `capacitor.config.ts` — app id, webDir, optional `CAPACITOR_SERVER_URL`
-- `src/lib/capacitor-runtime.ts` — `isCapacitorNative()`
-- `src/lib/nfc-platform.ts` — Web NFC + `@capgo/capacitor-nfc` bridge
-- `src/hooks/use-nfc-supported.ts` — UI capability probe
+| File | Role |
+|------|------|
+| `capacitor.config.ts` | App id, `webDir`, optional `CAPACITOR_SERVER_URL` |
+| `scripts/build-native-shell.sh` | Production bundled build + sync |
+| `scripts/install-ios-sim.sh` | Simulator build + install |
+| `scripts/verify-resubmission.sh` | Pre-archive gates (Clerk, CORS, bundle auth) |
+| `src/lib/api-origin.ts` | `VITE_API_ORIGIN` for bundled shell only |
+| `src/lib/capacitor-runtime.ts` | `isCapacitorNative()` |
+| `src/lib/native-oauth.ts` | System-browser OAuth for Apple/Google |
+| `src/lib/nfc-platform.ts` | Web NFC + `@capgo/capacitor-nfc` |
+
+---
+
+## Quick reference
+
+```bash
+# Correct native iteration loop
+./scripts/build-native-shell.sh
+./scripts/install-ios-sim.sh
+# … test on device/sim …
+./scripts/verify-resubmission.sh
+pnpm cap:open:ios   # Archive
+
+# Wrong for TestFlight (may ship dev-bypass)
+pnpm build && npx cap sync ios
+```

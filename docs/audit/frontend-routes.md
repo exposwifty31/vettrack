@@ -1,151 +1,107 @@
 # VetTrack — Frontend Route Inventory
 
-All routes from `src/app/routes.tsx`. All page components are lazy-loaded via `React.lazy()`. Generated 2026-06-09.
+All routes from `src/app/routes.tsx`. Page components are lazy-loaded via `React.lazy()` unless noted.
+
+Generated 2026-06-16.
 
 ---
 
-## Public (no auth)
+## Public
 
 | Path | Component | Notes |
 |------|-----------|-------|
-| `/` | `RootRoute` | Root redirect: authenticated → `/home`; new signup → post-signup flow; otherwise → `/landing` |
-| `/landing` | `LandingPage` | Public marketing landing |
-| `/signin/*?` | `SignInPage` | Clerk sign-in |
-| `/signup/*?` | `SignUpPage` | Clerk sign-up |
+| `/` | `RootRoute` | AuthGuard |
 
----
-
-## Home & Shifts
+## Equipment (canonical)
 
 | Path | Component | Notes |
 |------|-----------|-------|
-| `/home` | `HomePage` | Home dashboard with urgent banner (Code Blue > critical alert > overdue) |
-| `/recap` | `ShiftRecapPage` | Shift recap/handover summary |
+| `/equipment` | `AuthGuard` | AuthGuard |
+| `/equipment/new` | `AuthGuard` | AuthGuard |
+| `/equipment/tasks` | `AuthGuard` | AuthGuard |
+| `/equipment/board` | `AuthGuard` | AuthGuard |
+| `/equipment/:id/edit` | `AuthGuard` | AuthGuard |
+| `/equipment/:id/qr` | `AuthGuard` | AuthGuard |
+| `/equipment/:id` | `AuthGuard` | AuthGuard |
+| `/alerts` | `AuthGuard` | AuthGuard |
+| `/my-equipment` | `AuthGuard` | AuthGuard |
+| `/rooms` | `AuthGuard` | AuthGuard |
+| `/rooms/:id` | `AuthGuard` | AuthGuard |
+| `/locations` | `AuthGuard` | AuthGuard |
+| `/locations/:id` | `AuthGuard` | AuthGuard |
+| `/print` | `AuthGuard` | AuthGuard |
 
----
-
-## Equipment (canonical paths)
-
-| Path | Component | Notes |
-|------|-----------|-------|
-| `/equipment` | `EquipmentPage` | Equipment list, search, filter, QR scan |
-| `/equipment/new` | `NewEquipmentPage` | Create new equipment |
-| `/equipment/tasks` | `AppointmentsPage` | Unified task model (canonical; T2.3) |
-| `/equipment/board` | `WardDisplayPage` | Ward display board (canonical; T2.3) |
-| `/equipment/:id` | `EquipmentDetailPage` | Equipment detail |
-| `/equipment/:id/edit` | `NewEquipmentPage` | Edit equipment |
-| `/equipment/:id/qr` | `EquipmentQrPrintPage` | QR code print |
-| `/my-equipment` | `MyEquipmentPage` | My equipment (checked-out to me) |
-| `/alerts` | `AlertsPage` | Active alerts dashboard |
-| `/rooms` | `RoomsListPage` | Rooms/locations list |
-| `/rooms/:id` | `RoomRadarPage` | Room radar view |
-| `/locations` | `RoomsListPage` | Alias for `/rooms` |
-| `/locations/:id` | `RoomRadarPage` | Alias for `/rooms/:id` |
-| `/print` | `QrPrintPage` | Bulk QR print |
-
-### Legacy equipment redirects
-
-| Old path | Redirects to |
-|----------|-------------|
-| `/appointments` | `/equipment/tasks` |
-| `/equipment-tasks` | `/equipment/tasks` |
-| `/display` | `/equipment/board` |
-| `/equipment-board` | `/equipment/board` |
-| `/scan` | `/equipment?scan=1` |
-| `/equipment/scan` | `/equipment?scan=1` |
-| `/equipment/maintenance` | `/equipment?status=maintenance` |
-| `/equipment/intelligence` | `/equipment` |
-
----
-
-## Emergency & Safety
+## Legacy equipment redirects
 
 | Path | Component | Notes |
 |------|-----------|-------|
-| `/code-blue` | `CodeBluePage` | Code Blue session start/management |
-| `/code-blue/display` | `CodeBlueDisplay` | Code Blue live display |
-| `/crash-cart` | `CrashCartCheckPage` | Crash cart verification |
-| `/admin/code-blue-history` | `CodeBlueHistoryPage` | Code Blue session history |
+| `/appointments` | Redirect | → `/equipment/tasks` |
+| `/equipment-tasks` | Redirect | → `/equipment/tasks` |
+| `/display` | Redirect | → `/equipment/board` |
+| `/equipment-board` | Redirect | → `/equipment/board` |
+| `/scan` | Redirect | → `/equipment?scan=1` |
+| `/equipment/scan` | Redirect | → `/equipment?scan=1` |
+| `/equipment/maintenance` | Redirect | → `/equipment?status=maintenance` |
+| `/equipment/intelligence` | Redirect | → `/equipment` |
 
-### Legacy emergency aliases (still active)
-
-| Old path | Resolves to |
-|----------|------------|
-| `/emergency-equipment-log` | `CodeBluePage` |
-| `/emergency-equipment-wall` | `CodeBlueDisplay` |
-| `/critical-kit-check` | `CrashCartCheckPage` |
-| `/emergency-equipment-history` | `CodeBlueHistoryPage` |
-
----
-
-## Admin & Settings
+## Emergency & safety
 
 | Path | Component | Notes |
 |------|-----------|-------|
-| `/admin` | `AdminPage` | Admin home |
-| `/admin/shifts` | `AdminShiftsPage` | Shift management |
-| `/admin/ops-dashboard` | `AdminOpsDashboardPage` | Operations dashboard |
-| `/admin/asset-types` | `AdminAssetTypesPage` | Asset type config |
-| `/admin/docks` | `AdminDocksPage` | Dock configuration |
-| `/admin/metrics` | `OperationalMetricsDashboardPage` | Operational metrics |
-| `/settings` | `SettingsPage` | User settings |
-| `/help` | `HelpPage` | Help / documentation |
-| `/stability` | `StabilityDashboardPage` | Stability dashboard |
-| `/audit-log` | `AuditLogPage` | Audit log viewer |
-| `/admin/medication-integrity` | → `/admin` | Redirect (deprecated route) |
+| `/code-blue` | `AuthGuard` | AuthGuard |
+| `/code-blue/display` | `AuthGuard` | AuthGuard |
+| `/crash-cart` | `AuthGuard` | AuthGuard |
+| `/handoff` | `AuthGuard` | AuthGuard |
+| `/admin/code-blue-history` | `AuthGuard` | AuthGuard |
+| `/emergency-equipment-log` | `AuthGuard` | AuthGuard |
+| `/emergency-equipment-wall` | `AuthGuard` | AuthGuard |
+| `/critical-kit-check` | `AuthGuard` | AuthGuard |
+| `/emergency-equipment-history` | `AuthGuard` | AuthGuard |
 
----
-
-## Platform & Analytics
+## Admin & settings
 
 | Path | Component | Notes |
 |------|-----------|-------|
-| `/inventory` | `InventoryPage` | Inventory dashboard |
-| `/inventory-items` | `InventoryItemsPage` | Inventory item management |
-| `/procurement` | `ProcurementPage` | Purchase orders |
-| `/analytics/outcome-kpi` | `OutcomeKpiDashboardPage` | Outcome KPI dashboard |
-| `/analytics/shift-leaderboard` | `ShiftLeaderboardPage` | Shift leaderboard |
-| `/analytics` | `AnalyticsPage` | Analytics overview |
-| `/dashboard` | `ManagementDashboardPage` | Management dashboard |
-| `/whats-new` | `WhatsNewPage` | Changelog / what's new |
-| `/shift-chat/:shiftId` | `ShiftChatArchive` | Shift chat archive |
-| `/app-tour` | `AppTourPage` | Guided app tour |
+| `/admin/code-blue-history` | `AuthGuard` | AuthGuard |
+| `/admin` | `AuthGuard` | AuthGuard |
+| `/admin/shifts` | `AuthGuard` | AuthGuard |
+| `/admin/asset-types` | `AuthGuard` | AuthGuard |
+| `/admin/docks` | `AuthGuard` | AuthGuard |
+| `/admin/metrics` | `AuthGuard` | AuthGuard |
+| `/settings` | `AuthGuard` | AuthGuard |
+| `/help` | `AuthGuard` | AuthGuard |
+| `/audit-log` | `AuthGuard` | AuthGuard |
+| `/admin/medication-integrity` | Redirect | → `/admin` |
 
-### Legacy platform redirects
+## Platform & analytics
 
-| Old path | Redirects to |
-|----------|-------------|
-| `/meds` | `/equipment/tasks` |
-| `/pharmacy-forecast` | `/equipment/tasks` |
-| `/patients` | `/equipment` |
-| `/patients/:id` | `/equipment` |
-| `/pending` | `/equipment` |
-| `/billing` | `/equipment` |
-| `/billing/:rest*` | `/equipment` |
-| `/er` | `/equipment` |
-| `/er/:rest*` | `/equipment` |
-| `/shift-handover` | `/equipment` |
-| `/pending-emergencies` | `/equipment` |
+| Path | Component | Notes |
+|------|-----------|-------|
+| `/inventory` | `AuthGuard` | AuthGuard |
+| `/inventory-items` | `AuthGuard` | AuthGuard |
+| `/procurement` | `AuthGuard` | AuthGuard |
+| `/analytics/shift-leaderboard` | `AuthGuard` | AuthGuard |
+| `/analytics` | `AuthGuard` | AuthGuard |
+| `/dashboard` | `AuthGuard` | AuthGuard |
+| `/whats-new` | `AuthGuard` | AuthGuard |
+| `/shift-chat/:shiftId` | `AuthGuard` | AuthGuard |
 
----
+## Legacy redirects (removed pages)
 
-## 404
-
-| Path | Component |
-|------|-----------|
-| `*` | `NotFoundPage` |
-
----
-
-## Summary
-
-| Category | Live routes | Redirects |
-|----------|------------|-----------|
-| Public | 4 | — |
-| Home/Shifts | 2 | — |
-| Equipment | 14 | 8 |
-| Emergency | 4 | 4 |
-| Admin/Settings | 11 | 1 |
-| Platform | 10 | 11 |
-| 404 | 1 | — |
-| **Total** | **46** | **24** |
+| Path | Component | Notes |
+|------|-----------|-------|
+| `/admin/medication-integrity` | Redirect | → `/admin` |
+| `/analytics/outcome-kpi` | Redirect | → `/analytics` |
+| `/stability` | Redirect | → `/home` |
+| `/app-tour` | Redirect | → `/home` |
+| `/meds` | Redirect | → `/equipment/tasks` |
+| `/pharmacy-forecast` | Redirect | → `/equipment/tasks` |
+| `/patients` | Redirect | → `/equipment` |
+| `/patients/:id` | Redirect | → `/equipment` |
+| `/pending` | Redirect | → `/equipment` |
+| `/billing` | Redirect | → `/equipment` |
+| `/billing/:rest*` | Redirect | → `/equipment` |
+| `/er` | Redirect | → `/equipment` |
+| `/er/:rest*` | Redirect | → `/equipment` |
+| `/shift-handover` | Redirect | → `/equipment` |
+| `/pending-emergencies` | Redirect | → `/equipment` |

@@ -17,7 +17,7 @@
      * map to the Ivory palette so existing shadcn-style components track PageShell/mobile
      * Ivory chrome without per-file class rewrites. HSL triplets feed hsl(var(--name)).
      */
-    --background: 45 25% 94%;
+    --background: 210 20% 98%;
     --foreground: 127 21% 8%;
     --card: 0 0% 100%;
     --card-foreground: 127 21% 8%;
@@ -25,28 +25,44 @@
     --popover-foreground: 127 21% 8%;
     --primary: 130 42% 20%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 125 32% 93%;
-    --secondary-foreground: 129 15% 25%;
-    --muted: 42 18% 91%;
-    --muted-foreground: 135 6% 51%;
-    --accent: 122 28% 90%;
-    --accent-foreground: 129 15% 25%;
+    --secondary: 210 18% 95%;
+    --secondary-foreground: 215 22% 20%;
+    --muted: 210 18% 95%;
+    /* L36% (was 40%) — clears WCAG AA 4.5:1 for muted body text on the
+       cool near-white background; previous value measured 4.48:1. */
+    --muted-foreground: 215 15% 36%;
+    --accent: 210 18% 94%;
+    --accent-foreground: 215 22% 20%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 40 12% 81%;
-    --input: 40 12% 81%;
+    --border: 214 14% 87%;
+    --input: 214 14% 87%;
     --ring: 130 42% 20%;
-    --radius: 0.75rem;
+    --radius: 0.625rem;
     /* ── Radius ramp — each step as an explicit CSS variable ── */
-    --radius-sm:   0.5rem;        /* 8px  */
-    --radius-md:   0.625rem;      /* 10px */
-    --radius-xl:   1rem;          /* 16px */
-    --radius-2xl:  1.25rem;       /* 20px */
+    --radius-sm:   0.375rem;      /* 6px  — tight inputs, badges */
+    --radius-md:   0.5rem;        /* 8px  — buttons, smaller cards */
+    --radius-xl:   0.75rem;       /* 12px — panels, larger surfaces */
+    --radius-2xl:  1rem;          /* 16px — sheets, modals */
     --radius-pill: 9999px;
-    /* ── Shadows ── */
-    --shadow-card:       0 1px 2px 0 rgb(15 23 42 / 0.05), 0 8px 24px -16px rgb(15 23 42 / 0.24);
-    --shadow-card-hover: 0 2px 4px 0 rgb(15 23 42 / 0.06), 0 14px 30px -14px rgb(15 23 42 / 0.28);
-    --shadow-surface:    0 0 0 1px rgb(148 163 184 / 0.08), 0 10px 30px -18px rgb(15 23 42 / 0.28);
+    /* ── Typographic scale — mobile-first, 16px base (no iOS input zoom) ──
+       Modular ~1.22 ratio. RTL-agnostic (sizes only, no direction). Adopt via
+       the .vt-text-* utilities or var() directly; do not hardcode px sizes. */
+    --text-2xs:  0.6875rem;   /* 11px — dense meta, nav labels */
+    --text-xs:   0.75rem;     /* 12px — captions, helper text */
+    --text-sm:   0.875rem;    /* 14px — secondary body, labels */
+    --text-base: 1rem;        /* 16px — body default */
+    --text-lg:   1.125rem;    /* 18px — emphasized body, card titles */
+    --text-xl:   1.375rem;    /* 22px — section headings */
+    --text-2xl:  1.75rem;     /* 28px — page titles */
+    --text-3xl:  2.1875rem;   /* 35px — hero numerals / display */
+    --leading-tight:  1.2;    /* headings */
+    --leading-snug:   1.35;   /* titles, short copy */
+    --leading-normal: 1.55;   /* body prose */
+    /* ── Shadows — precise, not floaty ── */
+    --shadow-card:       0 1px 3px 0 rgb(15 23 42 / 0.08), 0 1px 2px -1px rgb(15 23 42 / 0.06);
+    --shadow-card-hover: 0 4px 8px -2px rgb(15 23 42 / 0.10), 0 2px 4px -1px rgb(15 23 42 / 0.06);
+    --shadow-surface:    0 0 0 1px rgb(148 163 184 / 0.12), 0 4px 16px -8px rgb(15 23 42 / 0.16);
     /* ── Brand extended palette ── */
     --brand-navy:          #16291c;
     --brand-green-bright:  #6fd389;
@@ -61,17 +77,17 @@
     --sab: env(safe-area-inset-bottom);
 
     /* ── Ivory design system tokens (RGB channels for Tailwind opacity support) ── */
-    --ivory-bg:       243 241 235;  /* #f3f1eb */
+    --ivory-bg:       246 247 251;  /* cool near-white — precise, clinical */
     --ivory-surface:  255 255 255;  /* #ffffff */
-    --ivory-border:   212 208 200;  /* #d4d0c8 */
-    --ivory-borderMd: 184 180 170;  /* #b8b4aa */
-    --ivory-text:     17 26 18;     /* #111a12 */
-    --ivory-text2:    53 72 56;     /* #354838 */
-    --ivory-text3:    122 138 126;  /* #7a8a7e */
-    --ivory-navy:     15 31 17;     /* #0f1f11 */
+    --ivory-border:   216 220 230;  /* cool neutral border */
+    --ivory-borderMd: 188 194 212;  /* medium cool border */
+    --ivory-text:     17 26 18;     /* #111a12 — dark forest ink */
+    --ivory-text2:    46 57 77;     /* cool secondary — slate, not green-tinted */
+    --ivory-text3:    90 104 132;   /* cooler muted, WCAG AA against near-white */
+    --ivory-navy:     13 25 14;     /* #0d190e — deeper forest, sharper contrast with new bg */
     --ivory-green:    30 74 37;     /* #1e4a25 */
     --ivory-greenMid: 30 122 50;    /* #1e7a32 */
-    --ivory-greenBg:  230 242 231;  /* #e6f2e7 */
+    --ivory-greenBg:  233 244 234;  /* slightly cooler green tint */
     --ivory-ok:       #16a34a;
     --ivory-warn:     #d97706;
     --ivory-err:      #dc2626;
@@ -90,12 +106,14 @@
     --brand-shadow: rgba(26, 61, 40, 0.5);
     --hero-a: #0a1f15;
     --hero-b: #18371f;
-    --action: #16a34a;
-    --action-deep: #15803d;
+    /* Darkened to clear WCAG AA 4.5:1 with white text and as green text on
+       white (was #16a34a = 3.30:1). #15803d = 5.02:1; hover step #166534. */
+    --action: #15803d;
+    --action-deep: #166534;
     --action-ink: #1a6d38;
     --action-soft: #ecf6ee;
     --action-border: #c7e3cf;
-    --nav-bg: hsl(0 0% 100% / 0.96);
+    --nav-bg: hsl(210 20% 99% / 0.96);
 
     --font-num: "DM Mono", "IBM Plex Mono", ui-monospace, monospace;
 
@@ -175,7 +193,9 @@
     --ivory-borderMd: 55 69 55;     /* #374537 — mid-weight border */
     --ivory-text:     236 233 224;  /* #ece9e0 — warm light primary text */
     --ivory-text2:    168 196 173;  /* #a8c4ad — secondary text */
-    --ivory-text3:    98 128 104;   /* #628068 — muted/label text */
+    /* Lightened #628068 (3.94:1, failed AA) → #7da188 = 6.01:1 on the dark
+       forest bg/surface; stays muted vs --ivory-text2 (#a8c4ad, 9.16:1). */
+    --ivory-text3:    125 161 136;  /* #7da188 — muted/label text (AA on dark) */
     --ivory-navy:     10 21 9;      /* #0a1509 — header bar (stays very dark) */
     --ivory-green:    58 150 80;    /* #3a9650 — primary green on dark bg */
     --ivory-greenMid: 45 155 66;    /* #2d9b42 — mid green */
@@ -197,7 +217,8 @@
     --secondary: 214 32% 95%;
     --secondary-foreground: 222 47% 11%;
     --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    /* L44% (was 47%) — clears WCAG AA 4.5:1 on clinical cool-white canvas (4.49:1 at 47%). */
+    --muted-foreground: 215 16% 44%;
     --accent: 226 100% 94%;
     --accent-foreground: 244 47% 20%;
     --ring: 243 75% 59%;
@@ -324,6 +345,16 @@
   *::before,
   *::after {
     box-sizing: border-box;
+  }
+  /* Site-wide keyboard focus fallback. :where() keeps this at zero specificity
+     so any element that defines its own focus-visible ring/outline utility
+     still wins (no double indicators) — this only catches interactive
+     elements that would otherwise show nothing (header logo, icon buttons…).
+     :focus-visible means mouse users are unaffected. */
+  :where(a, button, input, select, textarea, summary, [role="button"], [role="link"], [role="tab"], [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
   }
   input,
   select,
@@ -471,6 +502,17 @@
  */
 
 @layer utilities {
+  /* ── Semantic type utilities (size + leading paired) ──
+     Adopt these on touched surfaces instead of ad-hoc text-[Npx]. */
+  .vt-text-2xs   { font-size: var(--text-2xs);  line-height: var(--leading-snug); }
+  .vt-text-xs    { font-size: var(--text-xs);   line-height: var(--leading-snug); }
+  .vt-text-sm    { font-size: var(--text-sm);   line-height: var(--leading-normal); }
+  .vt-text-body  { font-size: var(--text-base); line-height: var(--leading-normal); }
+  .vt-text-lg    { font-size: var(--text-lg);   line-height: var(--leading-snug); }
+  .vt-title      { font-size: var(--text-xl);   line-height: var(--leading-snug); font-weight: 600; letter-spacing: -0.01em; }
+  .vt-page-title { font-size: var(--text-2xl);  line-height: var(--leading-tight); font-weight: 700; letter-spacing: -0.02em; }
+  .vt-display    { font-size: var(--text-3xl);  line-height: var(--leading-tight); font-weight: 700; letter-spacing: -0.02em; }
+
   .font-num {
     font-family: var(--font-num);
     font-feature-settings: "zero" 1;

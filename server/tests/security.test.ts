@@ -51,6 +51,23 @@ async function testCorsRejected() {
   }
 }
 
+// ─── Test 1b: CORS allows Capacitor bundled-shell origin on /api/version ─────
+async function testCapacitorVersionCors() {
+  console.log("\n[1b] CORS — capacitor://localhost on GET /api/version");
+  const res = await get("/api/version", {
+    headers: { Origin: "capacitor://localhost" },
+  });
+  const acao = res.headers.get("Access-Control-Allow-Origin");
+  if (res.status === 200 && acao === "capacitor://localhost") {
+    ok("/api/version echoes capacitor://localhost ACAO");
+  } else {
+    fail(
+      "Capacitor origin not allowed on /api/version",
+      `status=${res.status} ACAO=${acao ?? "<missing>"}`,
+    );
+  }
+}
+
 // ─── Test 2: Rate limiter — global 100/min ───────────────────────────────────
 async function testGlobalRateLimit() {
   console.log("\n[2] Rate Limit — global 100 req/min (burst 105)");
@@ -313,6 +330,7 @@ async function run() {
 
   // Role gate tests MUST run before burst tests (burst exhausts global rate limiter)
   await testCorsRejected();
+  await testCapacitorVersionCors();
   await testAlertAckViewerDenied();
   await testAlertAckAdminAllowed();
   await testWhatsAppViewerDenied();

@@ -15,7 +15,7 @@ Use this as **Custom Instructions**, **Project knowledge**, or paste the summary
 1. **Multi-tenancy:** Nearly all data is scoped by **`clinicId`**. Every new query must filter by the authenticated clinic; never leak rows across clinics.
 2. **Naming:** **English only** for identifiers, files, types, and APIs. **Hebrew (and other locale strings)** belong in UI/copy via the app's i18n catalogs in `locales/*.json`—not hardcoded in source. User-facing copy uses **Tasks / משימות**; the `vt_appointments` table, `/api/appointments` route, and `appointmentsPage.*` i18n key namespace are intentionally **not** renamed (Phase 6 §17).
 3. **Scope:** Implement **only what was asked**. No drive-by refactors, no unrelated files, no extra docs unless requested.
-4. **Schema-first:** Database changes live in **`server/db.ts`** (Drizzle). After schema edits, run `npx drizzle-kit generate` and commit the resulting SQL — do not invent a parallel schema location.
+4. **Schema-first:** Tables live in **`server/schema/*.ts`** (re-exported from `server/db.ts`). After schema edits, run `npx drizzle-kit generate` and commit SQL.
 5. **API surface:** Prefer **`src/lib/api.ts`** for client-server contracts; keep **`src/types/`** aligned with API shapes when adding endpoints.
 6. **Workers:** Background jobs live under **`server/workers/`** and schedulers/bootstrapping are wired from **`server/app/start-schedulers.ts`** (verify imports when adding queues).
 7. **Offline:** IndexedDB changes require **Dexie version bumps + migrations** in the Dexie setup—do not silently extend tables without a migration path. **Code Blue mutations are never queued offline** — they fail loud and increment a bounded counter (`src/lib/offline-emergency-block.ts`).
@@ -28,7 +28,7 @@ Use this as **Custom Instructions**, **Project knowledge**, or paste the summary
 
 | Area | Location |
 |------|-----------|
-| Drizzle schema | `server/db.ts` |
+| Drizzle schema | `server/schema/*.ts` + `server/db.ts` |
 | Express bootstrap & middleware | `server/index.ts` |
 | API route registration | `server/app/routes.ts` (all `/api/*` routers mounted here) |
 | Background worker / scheduler registration | `server/app/start-schedulers.ts` |
@@ -112,7 +112,7 @@ $env:DATABASE_URL="postgres://..."; $env:PORT="3001"; pnpm dev
 
 ## Out of date elsewhere — trust the code
 
-`replit.md` and `docs/superpowers/**` are historical snapshots and may describe earlier architectures (e.g. polling-based realtime, optimistic Code Blue termination). When in doubt, the source of truth is the code (`server/app/routes.ts`, `server/index.ts`, `server/db.ts`, `src/lib/realtime.ts`, `public/sw.js`) and the canonical docs (`README.md`, `CLAUDE.md`, `CONTEXT.md`).
+When in doubt, source of truth is the code (`server/app/routes.ts`, `server/schema/`, `src/lib/realtime.ts`, `public/sw.js`) and canonical docs (`README.md`, `CLAUDE.md`, `CONTEXT.md`, [`docs/scope-change-2026.md`](docs/scope-change-2026.md)).
 
 ---
 

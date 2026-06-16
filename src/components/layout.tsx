@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { computeAlerts } from "@/lib/utils";
+import { buildAlertAckSet, countActiveAlerts } from "@/lib/alert-counts";
 import {
   ArrowLeft,
   ArrowRight,
@@ -24,6 +25,7 @@ import {
   WifiOff,
   PackageOpen,
   Clock,
+  CloudUpload,
   CalendarDays,
   XCircle,
   RefreshCw,
@@ -130,6 +132,13 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   const QUICK_SETTINGS_MARGIN = 8;
 
   const [location, navigate] = useLocation();
+  const currentPath = location.split("?")[0] ?? location;
+
+  // Capacitor / mobile: wouter does not reset scroll — menu routes can open mid-page
+  // with the title clipped under the sticky header.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [currentPath]);
 
   const isNavItemActive = (href: string) => resolveNavItemActive(location, href);
 
@@ -296,7 +305,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
           const parsed = JSON.parse(rawActive) as { containerId?: string };
           if (parsed.containerId && parsed.containerId !== containerId) {
             haptics.warning();
-            toast.warning("סיים את המילוי מחדש לפני סריקת מכל אחר.");
+            toast.warning(lh.restockSwitchContainerWarning);
             return;
           }
         } catch {
@@ -323,7 +332,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
       try {
         const parsed = JSON.parse(raw) as { sessionId?: string; containerId?: string };
         if (!parsed.sessionId) {
-          toast.error("לא נמצא סשן מילוי מחדש פעיל");
+          toast.error(t.nfc.error.noActiveRestockSession);
           return;
         }
         const cachedView = qc.getQueryData<RestockContainerView>(["/api/restock/container-items", parsed.containerId]);
@@ -391,6 +400,15 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     refetchOnWindowFocus: false,
   });
 
+  const { data: alertAcks } = useQuery({
+    queryKey: ["/api/alert-acks"],
+    queryFn: api.alertAcks.list,
+    enabled: Boolean(userId),
+    staleTime: 30_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
   useEffect(() => {
     const onOnline = () => setIsOnline(true);
     const onOffline = () => setIsOnline(false);
@@ -414,7 +432,8 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   }, [quickSettingsOpen]);
 
   const alerts = equipment ? computeAlerts(equipment) : [];
-  const alertCount = alerts.length;
+  const alertAckSet = buildAlertAckSet(alertAcks);
+  const alertCount = countActiveAlerts(alerts, alertAckSet);
   const myCount = myEquipment?.length ?? 0;
 
   useEffect(() => {
@@ -576,8 +595,107 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     return -1;
   }, [bottomNavActive, menuOpen]);
 
-  const bottomNavPillIndex = useLegacyBottomNav ? legacyActiveTabIndex : activeTabIndex;
-  const bottomNavColCount = useLegacyBottomNav ? 5 : (bottomNavItems?.length ?? 5) + 1;
+  // NAV-driven bottom bar splits its items around a center scan FAB:
+  // [first half] · [Scan FAB] · [second half] · [Menu].
+  const navCenterSplit = bottomNavItems ? Math.ceil(bottomNavItems.length / 2) : 0;
+  // Columns = items + scan FAB + menu (NAV-driven); legacy is a fixed 5.
+  const bottomNavColCount = useLegacyBottomNav ? 5 : (bottomNavItems?.length ?? 0) + 2;
+  // Map the active destination (or open menu) to its visual column, accounting
+  // for the FAB column that sits between the two item halves.
+  const bottomNavPillIndex = useMemo(() => {
+    if (useLegacyBottomNav) return legacyActiveTabIndex;
+    if (!bottomNavItems) return -1;
+    if (menuOpen) return bottomNavColCount - 1; // menu is the last column
+    if (activeTabIndex < 0) return -1;
+    return activeTabIndex < navCenterSplit ? activeTabIndex : activeTabIndex + 1;
+  }, [useLegacyBottomNav, legacyActiveTabIndex, bottomNavItems, menuOpen, bottomNavColCount, activeTabIndex, navCenterSplit]);
+
+  const renderBottomNavTab = (n: NavNode) => {
+    const Icon = BOTTOM_NAV_ICON_MAP[n.icon];
+    const isActive = resolveNavItemActive(location, n.href);
+    return (
+      <Link
+        key={n.id}
+        href={n.href}
+        className="flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] transition-opacity duration-150 motion-safe:active:opacity-80 motion-reduce:active:opacity-100 rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface cursor-pointer"
+        data-testid={`bottom-nav-${n.id}`}
+      >
+        {Icon && (
+          <Icon
+            className={cn(
+              "w-6 h-6 transition-all duration-200",
+              isActive ? "text-ivory-green scale-110" : "text-ivory-text3 scale-100",
+            )}
+            aria-hidden
+          />
+        )}
+        <span
+          className={cn(
+            "vt-text-2xs font-semibold leading-tight text-center max-w-[4.5rem] truncate",
+            isActive ? "text-ivory-green" : "text-ivory-text3",
+          )}
+        >
+          {navLabel(n.labelKey)}
+        </span>
+      </Link>
+    );
+  };
+
+  // Center scan FAB — the equipment-first primary action, raised into the thumb
+  // zone. Shared by the legacy and NAV-driven bottom-bar renderers.
+  const renderScanFab = () => (
+    <div className="flex flex-col items-center justify-end pb-1 relative">
+      {!scannerUIOpen && !navigationLocked && (
+        <span
+          className="absolute top-[-24px] w-[3.75rem] h-[3.75rem] rounded-2xl bg-ivory-green/20 pointer-events-none"
+          style={{ animation: "scanAmbient 2.8s ease-in-out infinite" }}
+          aria-hidden
+        />
+      )}
+      <button
+        type="button"
+        onClick={handleScanButtonClick}
+        className={cn(
+          "-mt-6 mb-0.5 flex h-[3.75rem] w-[3.75rem] shrink-0 items-center justify-center rounded-2xl",
+          "ring-4 ring-background dark:ring-background",
+          "active:scale-[0.93] motion-reduce:active:scale-100 transition-all duration-200 ease-out",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          "cursor-pointer",
+          scannerUIOpen
+            ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 hover:bg-emerald-600"
+            : navigationLocked
+              ? "bg-amber-500 text-white shadow-lg shadow-amber-500/35 hover:bg-amber-600"
+              : "vt-scan-fab bg-ivory-green text-white shadow-lg shadow-ivory-green/30 hover:bg-ivory-greenMid",
+        )}
+        aria-label={scannerUIOpen ? lh.closeScannerAria : lh.bottomScan}
+        data-testid="bottom-nav-scan"
+      >
+        {scannerUIOpen ? (
+          <X className="w-8 h-8 transition-transform duration-150" aria-hidden />
+        ) : (
+          <QrCode
+            className={cn(
+              "w-8 h-8 transition-transform duration-150",
+              navigationLocked && "[animation:scanAmbient_1.4s_ease-in-out_infinite]",
+            )}
+            aria-hidden
+          />
+        )}
+      </button>
+      <span
+        className={cn(
+          "vt-text-2xs font-bold leading-tight text-center transition-colors duration-200",
+          scannerUIOpen
+            ? "text-emerald-600"
+            : navigationLocked
+              ? "text-amber-600"
+              : "text-ivory-text2",
+        )}
+      >
+        {scannerUIOpen ? lh.bottomScanClose : lh.bottomScan}
+      </span>
+    </div>
+  );
 
   const hasPending = pendingCount > 0;
   const hasFailed = failedCount > 0;
@@ -586,7 +704,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   // header back button — without it sub-pages (dashboard, settings, details)
   // have no visible exit on iOS, where there is no system back button.
   const dir = useDirection();
-  const currentPath = location.split("?")[0] ?? location;
+  // currentPath defined above (scroll-to-top on route change).
   // Every page except home gets the back affordance — iOS has no system back
   // button, and section roots (rooms, admin, …) need an exit too.
   const showBack = currentPath !== "/" && currentPath !== "/home" && !navigationLocked;
@@ -726,7 +844,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                 title={lh.pendingTitle(pendingCount)}
                 data-testid="sync-pending-indicator"
               >
-                <Clock className="w-3 h-3" />
+                <CloudUpload className="w-3 h-3" />
                 <span>{lh.pendingShort(pendingCount)}</span>
               </button>
             )}
@@ -930,7 +1048,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
             </div>
             <div className="px-4 py-3">
             <nav className="vt-header-menu flex flex-col gap-1">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-ivory-text3 px-3 pt-1 pb-0.5">Operations</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-ivory-text3 px-3 pt-1 pb-0.5">{t.layout.nav.operationsSection}</p>
               {operationMenuItems.map((item, index) => {
                 const isActive = isNavItemActive(item.href);
                 return (
@@ -1038,7 +1156,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
 
               {managementMenuItems.length > 0 ? (
                 <>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-ivory-text3 px-3 pt-2 pb-0.5">Management</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-ivory-text3 px-3 pt-2 pb-0.5">{t.layout.nav.managementSection}</p>
               {managementMenuItems.map((item, index) => {
                 const isActive = isNavItemActive(item.href);
                 const stagger = operationMenuItems.length + operationalControlMenuItems.length + index;
@@ -1090,7 +1208,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
 
               {systemMenuItems.length > 0 ? (
                 <>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-ivory-text3 px-3 pt-2 pb-0.5">System</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-ivory-text3 px-3 pt-2 pb-0.5">{t.layout.nav.systemSection}</p>
               {systemMenuItems.map((item, index) => {
                 const isActive = isNavItemActive(item.href);
                 const stagger =
@@ -1215,8 +1333,12 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
 
       <main
         id="main-content"
+        tabIndex={-1}
+        // scroll-mt clears the sticky header (~57px) so the skip-link jump and
+        // any in-page #main-content anchors land below it, not under it.
         className={cn(
-          "max-w-2xl mx-auto min-w-0 px-3.5 sm:px-4 pb-nav-safe",
+          "max-w-2xl mx-auto min-w-0 px-3.5 sm:px-4 pb-nav-safe scroll-mt-20 focus:outline-none flex flex-col",
+          "min-h-[calc(100dvh-3.5rem-env(safe-area-inset-top,0px))]",
           settings.density === "compact" ? "py-2.5" : "py-4"
         )}
       >
@@ -1235,14 +1357,8 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
         aria-label={lh.bottomMenu}
       >
         <div
-          className={cn(
-            "relative grid max-w-2xl mx-auto items-end min-h-[68px] px-0.5 pt-1",
-            useLegacyBottomNav
-              ? "grid-cols-5"
-              : bottomNavItems!.length >= 6
-                ? "grid-cols-7"
-                : "grid-cols-6",
-          )}
+          className="relative grid max-w-2xl mx-auto items-end min-h-[68px] px-0.5 pt-1"
+          style={{ gridTemplateColumns: `repeat(${bottomNavColCount}, minmax(0, 1fr))` }}
         >
           {bottomNavPillIndex >= 0 && (
             <div
@@ -1299,59 +1415,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                 </span>
               </Link>
 
-              <div className="flex flex-col items-center justify-end pb-1 relative">
-                {!scannerUIOpen && !navigationLocked && (
-                  <span
-                    className="absolute top-[-24px] w-[3.75rem] h-[3.75rem] rounded-2xl bg-ivory-green/20 pointer-events-none"
-                    style={{ animation: "scanAmbient 2.8s ease-in-out infinite" }}
-                    aria-hidden
-                  />
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleScanButtonClick}
-                  className={cn(
-                    "-mt-6 mb-0.5 flex h-[3.75rem] w-[3.75rem] shrink-0 items-center justify-center rounded-2xl",
-                    "ring-4 ring-background dark:ring-background",
-                    "active:scale-[0.93] motion-reduce:active:scale-100 transition-all duration-200 ease-out",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                    "cursor-pointer",
-                    scannerUIOpen
-                      ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 hover:bg-emerald-600"
-                      : navigationLocked
-                        ? "bg-amber-500 text-white shadow-lg shadow-amber-500/35 hover:bg-amber-600"
-                        : "vt-scan-fab bg-ivory-green text-white shadow-lg shadow-ivory-green/30 hover:bg-ivory-greenMid",
-                  )}
-                  aria-label={scannerUIOpen ? lh.closeScannerAria : lh.bottomScan}
-                  data-testid="bottom-nav-scan"
-                >
-                  {scannerUIOpen ? (
-                    <X className="w-8 h-8 transition-transform duration-150" aria-hidden />
-                  ) : (
-                    <QrCode
-                      className={cn(
-                        "w-8 h-8 transition-transform duration-150",
-                        navigationLocked && "[animation:scanAmbient_1.4s_ease-in-out_infinite]",
-                      )}
-                      aria-hidden
-                    />
-                  )}
-                </button>
-
-                <span
-                  className={cn(
-                    "text-[10px] font-bold leading-tight text-center transition-colors duration-200",
-                    scannerUIOpen
-                      ? "text-emerald-600"
-                      : navigationLocked
-                        ? "text-amber-600"
-                        : "text-ivory-text2",
-                  )}
-                >
-                  {scannerUIOpen ? lh.bottomScanClose : lh.bottomScan}
-                </span>
-              </div>
+              {renderScanFab()}
 
               <button
                 type="button"
@@ -1364,7 +1428,13 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                   navigationLocked && "opacity-40",
                 )}
                 aria-expanded={menuOpen}
-                aria-label={menuOpen ? t.common.closeNavigationMenu : lh.bottomMenu}
+                aria-label={
+                menuOpen
+                  ? t.common.closeNavigationMenu
+                  : alertCount > 0
+                    ? `${lh.bottomMenu} · ${t.layout.alertsDropdown.activeCount(alertCount)}`
+                    : lh.bottomMenu
+              }
                 data-testid="bottom-nav-menu"
               >
                 {menuOpen ? (
@@ -1384,36 +1454,11 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
               </button>
             </>
           ) : (
-            bottomNavItems!.map((n) => {
-              const Icon = BOTTOM_NAV_ICON_MAP[n.icon];
-              const isActive = resolveNavItemActive(location, n.href);
-              return (
-                <Link
-                  key={n.id}
-                  href={n.href}
-                  className="flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] transition-opacity duration-150 motion-safe:active:opacity-80 motion-reduce:active:opacity-100 rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface cursor-pointer"
-                  data-testid={`bottom-nav-${n.id}`}
-                >
-                  {Icon && (
-                    <Icon
-                      className={cn(
-                        "w-6 h-6 transition-all duration-200",
-                        isActive ? "text-ivory-green scale-110" : "text-ivory-text3 scale-100",
-                      )}
-                      aria-hidden
-                    />
-                  )}
-                  <span
-                    className={cn(
-                      "text-[10px] font-semibold leading-tight text-center max-w-[4.5rem] truncate",
-                      isActive ? "text-ivory-green" : "text-ivory-text3",
-                    )}
-                  >
-                    {navLabel(n.labelKey)}
-                  </span>
-                </Link>
-              );
-            })
+            <>
+              {bottomNavItems!.slice(0, navCenterSplit).map(renderBottomNavTab)}
+              {renderScanFab()}
+              {bottomNavItems!.slice(navCenterSplit).map(renderBottomNavTab)}
+            </>
           )}
           {!useLegacyBottomNav && (
             <button
@@ -1427,7 +1472,13 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                 navigationLocked && "opacity-40",
               )}
               aria-expanded={menuOpen}
-              aria-label={menuOpen ? t.common.closeNavigationMenu : lh.bottomMenu}
+              aria-label={
+                menuOpen
+                  ? t.common.closeNavigationMenu
+                  : alertCount > 0
+                    ? `${lh.bottomMenu} · ${t.layout.alertsDropdown.activeCount(alertCount)}`
+                    : lh.bottomMenu
+              }
               data-testid="bottom-nav-menu"
             >
               {menuOpen ? (
@@ -1436,12 +1487,23 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                   aria-hidden
                 />
               ) : (
-                <Menu
-                  className={cn("w-6 h-6 transition-all duration-200", "text-ivory-text3 scale-100")}
-                  aria-hidden
-                />
+                <span className="relative">
+                  <Menu
+                    className={cn("w-6 h-6 transition-all duration-200", "text-ivory-text3 scale-100")}
+                    aria-hidden
+                  />
+                  {alertCount > 0 && (
+                    <Badge
+                      variant="issue"
+                      aria-hidden
+                      className="absolute -top-1.5 -end-2 h-4 min-w-4 px-1 vt-text-2xs font-bold pointer-events-none"
+                    >
+                      {alertCount > 99 ? "99+" : alertCount}
+                    </Badge>
+                  )}
+                </span>
               )}
-              <span className={cn("text-[10px] font-semibold", menuOpen ? "text-ivory-green" : "text-ivory-text3")}>
+              <span className={cn("vt-text-2xs font-semibold", menuOpen ? "text-ivory-green" : "text-ivory-text3")}>
                 {lh.bottomMenu}
               </span>
             </button>
