@@ -42,6 +42,9 @@ vi.mock("../src/lib/offline-db", async (importOriginal) => {
 vi.mock("../src/lib/safe-browser", () => ({ isOnline: () => true }));
 vi.mock("../src/lib/auth-store", () => ({
   getAuthHeaders: () => ({ Authorization: "Bearer sync-tel-test" }),
+  getCurrentUserId: () => "sync-tel-test-user",
+  getCurrentClinicId: () => "sync-tel-test-clinic",
+  getStoredBearerToken: () => "sync-tel-test-jwt",
 }));
 vi.mock("../src/lib/offline-session", () => ({ clearOfflineSession: vi.fn() }));
 vi.mock("../src/lib/offline-sync-telemetry-reporter", () => ({

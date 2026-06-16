@@ -7,7 +7,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { t } from "@/lib/i18n";
 
 const QUERY_KEY = ["/api/shift-chat/messages"] as const;
-const POLL_INTERVAL_MS = 3_000;
+const POLL_INTERVAL_OPEN_MS = 3_000;
+const POLL_INTERVAL_CLOSED_MS = 15_000;
 const TYPING_DEBOUNCE_MS = 1_500;
 
 export function useShiftChat(isOpen: boolean) {
@@ -21,7 +22,7 @@ export function useShiftChat(isOpen: boolean) {
     queryKey: QUERY_KEY,
     queryFn: () => shiftChatApi.getMessages(afterRef.current),
     enabled: !!userId,
-    refetchInterval: isOpen ? POLL_INTERVAL_MS : false,
+    refetchInterval: isOpen ? POLL_INTERVAL_OPEN_MS : POLL_INTERVAL_CLOSED_MS,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
     staleTime: 0,
@@ -41,21 +42,24 @@ export function useShiftChat(isOpen: boolean) {
   const [allMessages, setAllMessages] = useState<ShiftMessage[]>([]);
 
   useEffect(() => {
-    if (!data?.messages?.length) return;
+    if (!isOpen || !data?.messages?.length) return;
     setAllMessages((prev) => {
       const existingIds = new Set(prev.map((m) => m.id));
       const newOnes = data.messages.filter((m) => !existingIds.has(m.id));
       return newOnes.length > 0 ? [...prev, ...newOnes] : prev;
     });
-  }, [data?.messages]);
+  }, [data?.messages, isOpen]);
 
-  // Reset messages when panel closes (so next open loads fresh)
+  // Full history on open; keep afterRef when closed so unread polls stay incremental.
   useEffect(() => {
-    if (!isOpen) {
-      setAllMessages([]);
+    if (isOpen) {
       afterRef.current = undefined;
+      setAllMessages([]);
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    } else {
+      setAllMessages([]);
     }
-  }, [isOpen]);
+  }, [isOpen, queryClient]);
 
   // ── Unread count ───────────────────────────────────────────────────────────
   const lastOpenRef  = useRef<number>(0);

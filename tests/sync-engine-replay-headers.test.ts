@@ -42,6 +42,17 @@ vi.mock("../src/lib/safe-browser", () => ({
 
 vi.mock("../src/lib/auth-store", () => ({
   getAuthHeaders: vi.fn(() => ({ Authorization: "Bearer replay-test-jwt" })),
+  getCurrentUserId: vi.fn(() => "replay-test-user"),
+  getCurrentClinicId: vi.fn(() => "replay-test-clinic"),
+  getStoredBearerToken: vi.fn(() => "replay-test-jwt"),
+}));
+
+vi.mock("../src/lib/offline-sync-telemetry-reporter", () => ({
+  maybeReportOfflineSyncTelemetry: vi.fn().mockResolvedValue(undefined),
+  MIN_REPORT_INTERVAL_MS: 60_000,
+}));
+vi.mock("../src/lib/offline-phase9-post-sync-flag", () => ({
+  isOfflinePhase9PostSyncReconciliationEnabled: false,
 }));
 
 vi.mock("../src/lib/conflict-store", () => ({

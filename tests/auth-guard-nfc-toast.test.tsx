@@ -20,31 +20,40 @@ vi.mock("@/hooks/use-auth", () => ({
   useAuth: vi.fn(),
 }));
 
-vi.mock("@/lib/i18n", () => ({
-  t: {
-    nfcEntry: {
-      signInFirst: "Sign in first, then re-scan the tag.",
-      openingEquipment: "Opening equipment…",
-    },
-    common: {
-      loading: "Loading...",
-    },
-    auth: {
-      guard: {
-        reasons: {},
-        loadingApp: "Loading…",
-        pendingTitle: "Pending",
-        pendingBody: "Pending body",
-        blockedTitle: "Blocked",
-        blockedBody: "Blocked body",
-        accessDeniedTitle: "Denied",
-        accessDeniedBody: "Denied body",
-        retry: "Retry",
-        signOut: "Sign out",
+vi.mock("@/lib/i18n", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/i18n")>();
+  return {
+    ...actual,
+    t: {
+      ...actual.t,
+      nfcEntry: {
+        ...actual.t.nfcEntry,
+        signInFirst: "Sign in first, then re-scan the tag.",
+        openingEquipment: "Opening equipment…",
+      },
+      common: {
+        ...actual.t.common,
+        loading: "Loading...",
+      },
+      auth: {
+        ...actual.t.auth,
+        guard: {
+          ...actual.t.auth.guard,
+          reasons: {},
+          loadingApp: "Loading…",
+          pendingTitle: "Pending",
+          pendingBody: "Pending body",
+          blockedTitle: "Blocked",
+          blockedBody: "Blocked body",
+          accessDeniedTitle: "Denied",
+          accessDeniedBody: "Denied body",
+          retry: "Retry",
+          signOut: "Sign out",
+        },
       },
     },
-  },
-}));
+  };
+});
 
 import { useAuth } from "@/hooks/use-auth";
 import { AuthGuard } from "@/features/auth/components/AuthGuard";

@@ -2,7 +2,7 @@
  * BullMQ worker: notifications queue + overdue reminder scheduler.
  * Run as a separate process: pnpm run worker:notifications
  */
-import "dotenv/config";
+import "../lib/env-bootstrap.js";
 
 import crypto from "crypto";
 import { Worker } from "bullmq";

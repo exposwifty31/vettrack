@@ -30,6 +30,7 @@ vi.mock("../src/lib/offline-db", async (importOriginal) => {
 vi.mock("../src/lib/safe-browser", () => ({ isOnline: () => true }));
 vi.mock("../src/lib/auth-store", () => ({
   getAuthHeaders: () => ({ Authorization: "Bearer off-05-test" }),
+  getCurrentUserId: () => "off-05-test-user",
 }));
 vi.mock("../src/lib/offline-session", () => ({ clearOfflineSession: vi.fn() }));
 vi.mock("sonner", () => ({

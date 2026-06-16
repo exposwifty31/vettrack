@@ -182,10 +182,13 @@ export async function evaluateAlerts(options?: {
 
   const checker = options?.dataIntegrityChecker ?? fetchDataIntegrityHealth;
   const dataIntegrity = await getDataIntegrityHealth(checker);
+  // Match /health/data-integrity: orphan FK rows are reported in totals but do not
+  // alone mark status degraded (historical/dev noise). Alert on tenant-isolation failures.
   const corruptionFound =
+    dataIntegrity.status === "degraded" ||
+    dataIntegrity.status === "error" ||
     dataIntegrity.totals.nullClinicIdRows > 0 ||
-    dataIntegrity.totals.crossTenantMismatches > 0 ||
-    dataIntegrity.totals.orphanRelations > 0;
+    dataIntegrity.totals.crossTenantMismatches > 0;
 
   if (corruptionFound) {
     sendAlert("DATA_CORRUPTION", {

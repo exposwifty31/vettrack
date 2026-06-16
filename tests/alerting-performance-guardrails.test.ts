@@ -81,6 +81,23 @@ describe("Data Corruption Alert", () => {
     expect(snapshot.counts.DATA_CORRUPTION).toBe(1);
   });
 
+  it("should not alert when only orphanRelations are present (status ok)", async () => {
+    resetAlertEngineForTests();
+    resetAccessDeniedMetricsWindow();
+
+    await evaluateAlerts({
+      thresholds: { accessDeniedPerMinute: 9999 },
+      dataIntegrityChecker: async () => ({
+        status: "ok",
+        totals: { nullClinicIdRows: 0, crossTenantMismatches: 0, orphanRelations: 3540 },
+      }),
+    });
+
+    const snapshot = getAlertEngineSnapshot();
+    expect(snapshot.counts.DATA_CORRUPTION).toBe(0);
+    expect(snapshot.isDegraded).toBe(false);
+  });
+
   it("should mark system degraded for critical corruption", async () => {
     resetAlertEngineForTests();
     resetAccessDeniedMetricsWindow();
