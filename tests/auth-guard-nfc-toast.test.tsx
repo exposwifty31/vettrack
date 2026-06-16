@@ -21,6 +21,8 @@ vi.mock("@/hooks/use-auth", () => ({
 }));
 
 vi.mock("@/lib/i18n", () => ({
+  getStoredLocale: () => "en",
+  isSupportedLocale: (locale: string) => locale === "en" || locale === "he",
   t: {
     nfcEntry: {
       signInFirst: "Sign in first, then re-scan the tag.",

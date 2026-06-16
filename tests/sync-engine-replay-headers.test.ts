@@ -42,6 +42,7 @@ vi.mock("../src/lib/safe-browser", () => ({
 
 vi.mock("../src/lib/auth-store", () => ({
   getAuthHeaders: vi.fn(() => ({ Authorization: "Bearer replay-test-jwt" })),
+  getCurrentUserId: () => "",
 }));
 
 vi.mock("../src/lib/conflict-store", () => ({
