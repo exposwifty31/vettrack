@@ -1,4 +1,4 @@
-# Nightly staging workday simulation â non-blocking, never production.
+# Nightly staging workday simulation - non-blocking, never production.
 name: Workday simulation (staging nightly)
 
 on:
@@ -18,7 +18,7 @@ jobs:
     # Never block merges; skip if secrets missing
     continue-on-error: true
     # Scheduled runs fire on the default branch, so `github.ref` is never
-    # `refs/heads/staging` for a cron trigger â gate by event name instead.
+    # `refs/heads/staging` for a cron trigger - gate by event name instead.
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
 
     env:
@@ -32,13 +32,13 @@ jobs:
       - name: Skip without staging secrets
         if: env.TEST_BASE_URL == ''
         run: |
-          echo "TEST_BASE_URL_STAGING not configured â skipping workday simulation"
+          echo "TEST_BASE_URL_STAGING not configured - skipping workday simulation"
           exit 0
 
       - name: Verify staging branch exists
         run: |
           if ! git ls-remote --exit-code --heads https://github.com/${{ github.repository }}.git staging > /dev/null 2>&1; then
-            echo "staging branch does not exist — skipping workday simulation"
+            echo "staging branch does not exist - skipping workday simulation"
             exit 0
           fi
 

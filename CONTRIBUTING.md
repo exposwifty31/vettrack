@@ -5,71 +5,41 @@ Operational reference for engineers and agents working on VetTrack. Read
 covers process: branches, release flow, test execution, and ops-sensitive
 configuration that is easy to get wrong.
 
-## GitLab-first development (active)
+## Development workflow
 
-GitHub is temporarily unavailable. **Use GitLab as the primary remote:**
+**Maintenance mode:** see [`docs/MAINTENANCE_MODE.md`](docs/MAINTENANCE_MODE.md). Expo/RN work belongs in [`exposwifty31/literate-dollop`](https://github.com/exposwifty31/literate-dollop).
 
-- Remote: `https://gitlab.com/dboy3156/vettrack`
-- Full workflow: **`docs/GITLAB_DEVELOPMENT.md`**
-- CI: `.gitlab-ci.yml` (not `.github/workflows/` — preserved for GitHub return)
-- **Do not push directly to `main`.** Open merge requests (MRs) instead.
-- **Do not change Railway** or production deployment settings during the outage.
+**Git remote:** `origin` → GitLab (`gitlab.com/dboy31561/vettrack`) when pushing is active. See [`docs/GITLAB_DEVELOPMENT.md`](docs/GITLAB_DEVELOPMENT.md).
 
-### MR instead of PR
+**CI:** remote merge gates may be suspended — run local checks below before merge. Do not push directly to `main` when MR workflow is active.
 
-| GitHub (paused) | GitLab (active) |
-|-----------------|-----------------|
-| `gh pr create` | GitLab UI, `glab mr create`, or MCP `create_merge_request` |
-| Pull request | Merge request (MR) |
-| Actions run on PR | CI runs on MR targeting `main` or `staging` |
-| Squash merge | Squash merge (same rule for red intermediate commits) |
+**Do not change Railway** or production deployment settings without explicit approval.
 
-Verify per-commit CI before merge (GitLab):
+### Merge requests (when GitLab CI is active)
 
 ```bash
-glab mr view <iid> --web   # open MR
-# In GitLab UI: MR → Pipelines → view commit pipelines
-# Squash-merge required if any intermediate commit failed CI
+git push -u origin feat/my-change
+# Open MR targeting main — see docs/GITLAB_DEVELOPMENT.md
 ```
+
+When CI resumes, required checks include typecheck, vitest, architecture gates, and Playwright shards. Squash-merge if intermediate commits in the MR left CI red and the final head is green.
 
 ## Branches: `main` vs `staging`
 
-- **`staging`** — integration branch. Feature work and audit-remediation MRs
-  branch from and merge into `staging`. GitLab CI (`.gitlab-ci.yml`) runs
-  on merge requests targeting `staging` and on pushes to it.
-- **`main`** — release branch. `main` is what deploys. The Release Gate
-  (`release-gate:*` jobs in `.gitlab-ci.yml`) and the Railway deploy jobs are
-  gated to `main`.
-- **Promotion** — changes flow `staging → main` via a deliberate, reviewed
-  merge. Scheduled workflows (e.g. `workday-simulation-nightly.yml`) only
-  fire from the **default branch (`main`)** — a workflow file that lives only
-  on `staging` will never run on its cron until promoted to `main`.
+- **`staging`** — integration branch. Feature work may branch from and merge into `staging`. CI runs on PRs targeting `staging` and on pushes to it.
+- **`main`** — release branch. Railway deploy jobs run on `main` push when `RAILWAY_USE_CLI_DEPLOY` is enabled.
+- **Promotion** — `staging → main` via reviewed merge. Scheduled workflows fire from the **default branch (`main`)** only.
 
-### Multi-step remediation MRs
+### Multi-step remediation PRs
 
-If intermediate commits in an MR left CI red (because a later commit in the same MR fixes them), the MR MUST be squash-merged. Do not preserve red commits on `staging` history — bisect must remain meaningful.
-
-How to verify before merge (GitLab):
-
-```bash
-glab mr view <iid> --web
-# Review pipeline status per commit in the MR Commits tab
-```
-
-If any intermediate commit shows a failed pipeline, squash-merge is required.
+If intermediate commits left CI red (fixed by a later commit in the same PR), squash-merge. Do not preserve red commits on `staging` / `main`.
 
 ## Release flow
 
-1. MRs merge into `staging`; `.gitlab-ci.yml` enforces `tsc` (frontend + server),
-   the frontend build, migrations, and the full `vitest` suite.
+1. MRs merge into `staging` when that branch exists; CI enforces `tsc`, build, migrations, vitest, architecture gates, Playwright when remote CI is active.
 2. `staging → main` promotion merge.
-3. On push to `main`, CI runs the same gate and — when
-   `RAILWAY_USE_CLI_DEPLOY` is enabled — the deploy pre-flight + Railway
-   deploy jobs.
-4. **Release gate** is a **manual** pipeline run (CI/CD → Run pipeline on `main`).
-   It is not automatic; trigger it before a release. The automatic typecheck +
-   full suite on `main` is owned by the main CI jobs (de-duplicated from
-   release-gate — see PR-05 / DP-04).
+3. On push to `main`, CI runs the same gate and — when `RAILWAY_USE_CLI_DEPLOY` is enabled — deploy pre-flight + Railway deploy.
+4. **Release gate** is manual: Actions → **Release Gate** → **Run workflow**. Trigger before a pilot/demo release.
 
 ## Running tests
 
@@ -77,6 +47,7 @@ If any intermediate commit shows a failed pipeline, squash-merge is required.
 pnpm test                 # vitest — unit + integration (default scope)
 npx tsc --noEmit          # frontend typecheck — run after every change
 npx tsc --noEmit --project tsconfig.server-check.json   # server typecheck
+bash scripts/ci/contracts-gate.sh   # @vettrack/contracts + emergency parity
 ```
 
 ### Test groups excluded from `pnpm test` by default
@@ -101,8 +72,8 @@ server as part of release validation.
 
 ## Deployment & infrastructure config
 
-- **`RAILWAY_USE_CLI_DEPLOY`** — GitLab CI/CD variable. When `true`, the
-  `deploy:preflight` and `deploy:railway` jobs in `.gitlab-ci.yml` run on push
+- **`RAILWAY_USE_CLI_DEPLOY`** — GitHub repository variable. When `true`, the
+  `deploy-check` and `deploy` jobs in `.github/workflows/ci.yml` run on push
   to `main`; when unset/false they are skipped (the merge gate tolerates
   skipped deploy jobs).
 - **Redis is required in production.** Redis is optional in dev (queues log
