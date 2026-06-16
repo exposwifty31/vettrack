@@ -638,6 +638,18 @@
       "inactive": "No scan in 14+ days"
     }
   },
+  "shiftShareCard": {
+    "title": "Shift Summary",
+    "heroTasksDone": "tasks done",
+    "tasksCompletedOf": "{done} of {total} tasks completed",
+    "scansToday": "Scans Today",
+    "equipmentScans": "equipment scans",
+    "streak": "Streak",
+    "daysInRow": "days in a row",
+    "startStreak": "start your streak",
+    "tasksCompleted": "Tasks Completed",
+    "footer": "VetTrack · Shift Report"
+  },
   "shiftSummary": {
     "sections": {
       "checkedOut": "Currently in use:",

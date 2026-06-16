@@ -641,6 +641,18 @@ export interface TStructure {
       inactive: string;
     };
   };
+  shiftShareCard: {
+    title: string;
+    heroTasksDone: string;
+    tasksCompletedOf: string;
+    scansToday: string;
+    equipmentScans: string;
+    streak: string;
+    daysInRow: string;
+    startStreak: string;
+    tasksCompleted: string;
+    footer: string;
+  };
   shiftSummary: {
     sections: {
       checkedOut: string;

@@ -364,6 +364,12 @@ const translations = {
 
   shiftSummary: d.shiftSummary,
 
+  shiftShareCard: {
+    ...d.shiftShareCard,
+    tasksCompletedOf: (done: number, total: number) =>
+      tr(d.shiftShareCard.tasksCompletedOf, { done, total }),
+  },
+
   auth: d.auth,
 
   home: d.home,

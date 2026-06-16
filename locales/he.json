@@ -638,6 +638,18 @@
       "inactive": "ללא סריקה ביותר מ-14 ימים"
     }
   },
+  "shiftShareCard": {
+    "title": "סיכום משמרת",
+    "heroTasksDone": "משימות הושלמו",
+    "tasksCompletedOf": "{done} מתוך {total} משימות הושלמו",
+    "scansToday": "סריקות היום",
+    "equipmentScans": "סריקות ציוד",
+    "streak": "רצף",
+    "daysInRow": "ימים ברצף",
+    "startStreak": "התחילו רצף",
+    "tasksCompleted": "משימות שהושלמו",
+    "footer": "VetTrack · דוח משמרת"
+  },
   "shiftSummary": {
     "sections": {
       "checkedOut": "בשימוש כרגע:",
