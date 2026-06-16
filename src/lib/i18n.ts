@@ -103,6 +103,8 @@ const translations = {
 
   status: d.status,
 
+  shiftLeaderboard: d.shiftLeaderboard,
+
   layout: {
     nav: d.layout.nav,
     settings: d.layout.settings,

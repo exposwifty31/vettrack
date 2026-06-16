@@ -1692,7 +1692,7 @@ export default function EquipmentDetailPage() {
                   <div className="relative">
                     <img
                       src={scanPhoto}
-                      alt="Issue photo"
+                      alt={t.equipmentDetail.issuePhoto}
                       className="w-full h-36 object-cover rounded-xl border-2 border-primary/30"
                     />
                     <Button
@@ -1784,7 +1784,7 @@ export default function EquipmentDetailPage() {
                 <div className="relative">
                   <img
                     src={reportIssuePhoto}
-                    alt="Issue photo"
+                    alt={t.equipmentDetail.issuePhoto}
                     className="w-full h-36 object-cover rounded-xl border-2 border-primary/30"
                   />
                   <Button

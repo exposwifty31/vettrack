@@ -11,6 +11,7 @@ import { clearCodeBlueSessionCache, useCodeBlueSession } from "@/hooks/useCodeBl
 import { Bdi } from "@/components/ui/bdi";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
+import { useDirection } from "@/hooks/useDirection";
 import { toast } from "sonner";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -80,6 +81,7 @@ function PreCheckGate({
 }) {
   const { userId, role, name } = useAuth();
   const [, navigate] = useLocation();
+  const dir = useDirection();
   const isEligibleManager = role === "vet" || role === "admin";
   const QUICK_CHECK_ITEMS = [
     { key: "unitReady", label: t.codeBlue.preCheck.unitReady },
@@ -103,7 +105,7 @@ function PreCheckGate({
   };
 
   return (
-    <div className="flex flex-col h-screen-safe bg-emergency-bg max-w-md mx-auto overflow-hidden" dir="rtl">
+    <div className="flex flex-col h-screen-safe bg-emergency-bg w-full max-w-md md:max-w-xl lg:max-w-2xl mx-auto overflow-hidden" dir={dir}>
       <div className="flex-shrink-0 px-4 pt-4 pb-3">
       {/* Leave before starting — accidental entry must never trap the user. */}
       <button
@@ -117,8 +119,8 @@ function PreCheckGate({
         {t.common.back}
       </button>
       <div className="flex items-center gap-2 text-red-400">
-        <AlertTriangle className="h-6 w-6" />
-        <h1 className="text-xl font-bold">{t.codeBlue.openTitle}</h1>
+        <AlertTriangle className="h-6 w-6 shrink-0" aria-hidden />
+        <h1 className="text-xl font-bold text-red-400">{t.codeBlue.openTitle}</h1>
       </div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 pb-4">
@@ -131,7 +133,7 @@ function PreCheckGate({
 
       <div className="rounded-lg border border-emergency-border bg-emergency-surface p-4 mb-4">
         <h2 className="text-sm font-semibold text-emergency-text2 mb-3 flex items-center gap-2">
-          <Shield className="h-4 w-4" /> {t.codeBlue.managerLabel}
+          <Shield className="h-4 w-4 shrink-0" aria-hidden /> {t.codeBlue.managerLabel}
         </h2>
         <p className="text-xs text-emergency-text2/80 mb-3">{t.codeBlue.managerInstruction}</p>
         {isEligibleManager ? (
@@ -157,14 +159,15 @@ function PreCheckGate({
               type="button"
               onClick={() => toggle(item.key)}
               className={cn(
-                "flex items-center gap-3 p-2 min-h-[44px] rounded border text-sm text-end transition-colors",
+                "flex items-center gap-3 p-2 min-h-[44px] rounded border text-sm transition-colors",
+                dir === "rtl" ? "text-end" : "text-start",
                 checked[item.key]
                   ? "border-green-500/40 bg-green-500/10 text-green-300"
                   : "border-emergency-border bg-emergency-border text-emergency-text",
               )}
             >
               <span className={cn("h-4 w-4 rounded-full border-2 shrink-0", checked[item.key] ? "border-green-500 bg-green-500" : "border-emergency-text2/60")} />
-              {item.label}
+              <span className="flex-1 min-w-0 [writing-mode:horizontal-tb]">{item.label}</span>
             </button>
           ))}
         </div>
@@ -194,6 +197,7 @@ function PreCheckGate({
 // ─── Outcome modal ───────────────────────────────────────────────────────────
 
 function OutcomeModal({ onClose }: { onClose: (outcome: string) => void }) {
+  const dir = useDirection();
   const OUTCOMES = [
     { value: "rosc", label: t.codeBlue.outcome.rosc },
     { value: "transferred", label: t.codeBlue.outcome.transferred },
@@ -201,7 +205,7 @@ function OutcomeModal({ onClose }: { onClose: (outcome: string) => void }) {
     { value: "died", label: t.codeBlue.outcome.died },
   ];
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 p-4" dir="rtl">
+    <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 p-4" dir={dir}>
       <div className="w-full max-w-md bg-emergency-surface rounded-t-2xl border border-emergency-border p-4">
         <h2 className="text-base font-bold text-white mb-4 text-center">{t.codeBlue.selectOutcome}</h2>
         <div className="flex flex-col gap-2">
@@ -233,6 +237,7 @@ interface EquipmentItem { id: string; name: string; }
 
 function EquipmentPicker({ onSelect, onClose }: { onSelect: (item: EquipmentItem) => void; onClose: () => void }) {
   const { userId } = useAuth();
+  const dir = useDirection();
   const equipQ = useQuery<EquipmentItem[]>({
     queryKey: ["/api/equipment", "active"],
     queryFn: async () => {
@@ -244,7 +249,7 @@ function EquipmentPicker({ onSelect, onClose }: { onSelect: (item: EquipmentItem
     enabled: !!userId,
   });
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 p-4" dir="rtl">
+    <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 p-4" dir={dir}>
       <div className="w-full max-w-md bg-emergency-surface rounded-t-2xl border border-emergency-border p-4">
         <h2 className="text-base font-bold text-white mb-4">{t.codeBlue.selectEquipment}</h2>
         <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
@@ -270,6 +275,7 @@ function EquipmentPicker({ onSelect, onClose }: { onSelect: (item: EquipmentItem
 
 function ActiveSession() {
   const { userId } = useAuth();
+  const dir = useDirection();
   const { session, logEntries, presence, cartStatus, linkedEquipment, logEntry } = useCodeBlueSession();
   const elapsed = useElapsed(session?.startedAt ?? null);
   const [showOutcomeModal, setShowOutcomeModal] = useState(false);
@@ -314,7 +320,7 @@ function ActiveSession() {
   if (!session) return null;
 
   return (
-    <div className="flex flex-col h-screen-safe bg-emergency-bg text-white overflow-hidden" dir="rtl" style={{ borderTop: "3px solid var(--destructive)" }}>
+    <div className="flex flex-col h-screen-safe bg-emergency-bg text-white overflow-hidden" dir={dir} style={{ borderTop: "3px solid var(--destructive)" }}>
       <div className="flex-shrink-0 bg-emergency-surface border-b border-emergency-surface px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {/* Leave the live view without ending the session (it persists for the

@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from "react";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import type { useShiftChat } from "../hooks/useShiftChat";
@@ -127,10 +127,11 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
         overlayClassName="z-[65]"
         className="z-[65] h-[85dvh] max-h-[92dvh] p-0 flex flex-col rounded-t-2xl"
       >
+        <SheetDescription className="sr-only">{t.shiftChat.panel.description}</SheetDescription>
         <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-green-500 rounded-full shadow-[0_0_6px_theme(colors.green.500)]" />
-            <span className="font-bold text-sm">{t.shiftChat.panel.title}</span>
+            <SheetTitle className="font-bold text-sm">{t.shiftChat.panel.title}</SheetTitle>
             <span className="text-xs text-muted-foreground">
               {t.shiftChat.panel.onlineCount(chat.onlineUserIds.length)}
             </span>

@@ -376,7 +376,8 @@
     "unknowns": {
       "no_authoritative_location": "אין סריקה או שיוך חדר עדכני",
       "equipment_not_found": "רשומת הציוד חסרה",
-      "no_active_custodian": "אין משמורת פעילה במערכת"
+      "no_active_custodian": "אין משמורת פעילה במערכת",
+      "insufficient_validated_evidence": "אין עדיין מספיק ראיות סריקה או משמורת מאומתות"
     },
     "citationTypes": {
       "scan": "סריקה",
@@ -1239,7 +1240,10 @@
     "equipmentIdPlaceholder": "מזהה ציוד או תוצאת סריקה",
     "explainCta": "הסבר",
     "disabledHint": "Asset Copilot לא מופעל במרפאה זו. בקש מהמנהל להפעיל ENABLE_ASSET_COPILOT.",
-    "error": "לא ניתן לטעון תשובת Copilot. בדוק את מזהה הציוד ונסה שוב."
+    "error": "לא ניתן לטעון תשובת Copilot. בדוק את מזהה הציוד ונסה שוב.",
+    "equipmentLine": "ציוד: {name}",
+    "limitedEvidenceStatus": "מצב: ראיות מוגבלות ({gaps}).",
+    "gapsLine": "פערים: {gaps}."
   },
   "shiftRecap": {
     "pageTitle": "סיכום משמרת — VetTrack",
@@ -2994,6 +2998,7 @@
     "openChatUnread": "פתח צ'אט משמרת, {count} הודעות שלא נקראו",
     "panel": {
       "title": "צ׳אט משמרת",
+      "description": "הודעות ושידורים בזמן אמת למשמרת הנוכחית.",
       "onlineCount": "{count} מחוברים",
       "loading": "טוען...",
       "empty": "אין הודעות עדיין",
@@ -3423,29 +3428,54 @@
     "heading": "מה חדש",
     "description": "התכונות והשיפורים האחרונים ב-VetTrack.",
     "configureAlerts": "הגדר התראות בהגדרות",
-    "currentVersion": "1.1.2",
+    "currentVersion": "1.0.1",
     "currentDate": "יוני 2026",
+    "buildLabel": "בילד 13",
     "items": {
+      "clinicalDesign": {
+        "title": "רענון מערכת העיצוב הקליני",
+        "description": "טיפוגרפיה, ניגודיות ויעדי מגע של 44px מחודשים בציוד, Today, התראות ו-Code Blue — מותאם לעבודה ליד המיטה בטלפון ובטאבלט.",
+        "badge": "חדש"
+      },
+      "accessibility": {
+        "title": "שיפורי נגישות",
+        "description": "קישור דילוג לתוכן, טבעות פוקוס נראות, תוויות טפסים וניגודיות WCAG AA במסכי חירום והתראות.",
+        "badge": "שופר"
+      },
       "nativeApp": {
-        "title": "אפליקציה נייטיב ל-iOS ו-Android",
-        "description": "VetTrack פועלת כעת כאפליקציה ניידת נייטיב עם סריקת NFC מובנית, צילום במצלמה ומשוב הפטי — לצד אפליקציית הווב הזמינה גם במצב לא מקוון.",
+        "title": "אפליקציית iOS נייטיב",
+        "description": "VetTrack פועלת כאפליקציית Capacitor ב-iOS עם סריקת NFC, מצלמה, משוב הפטי וסנכרון במצב לא מקוון.",
         "badge": "חדש"
       },
       "signIn": {
         "title": "כניסה עם Apple ו-Google",
-        "description": "כניסה חברתית נפתחת כעת בדפדפן המערכת לכניסה מאובטחת בנגיעה אחת בנייד, בנוסף לכניסה עם אימייל וסיסמה.",
+        "description": "כניסה חברתית נפתחת בדפדפן המערכת לכניסה מאובטחת בנגיעה אחת בנייד, בנוסף לאימייל וסיסמה.",
         "badge": "חדש"
-      },
-      "theme": {
-        "title": "מראה וערכות נושא מחודשים",
-        "description": "מראה מותג חדש לאורך האפליקציה, עם ערכות Clinical, Forest ו-Dark נבדלות שמוחלות באופן עקבי בכל מסך.",
-        "badge": "שופר"
       },
       "navigation": {
         "title": "ניווט קל יותר",
-        "description": "כפתור חזרה זמין כעת בכל מסך, הכותרת נשארת קבועה בעת גלילה, ולחדר הבקרה של הציוד יש יציאה ברורה.",
+        "description": "כפתור חזרה בכל מסך, כותרת קבועה בגלילה ויציאה ברורה מלוח הבקרה של הציוד.",
         "badge": "שופר"
       }
     }
+  },
+  "shiftLeaderboard": {
+    "title": "לוח מובילים — סריקות משמרת",
+    "pageTitle": "לוח מובילים — סריקות משמרת — VetTrack",
+    "description": "ספירת סריקות וממוצעים לפי משתמש על פני משמרות. משתמשים עם אפס סריקות בכל משמרת מסומנים.",
+    "backToAnalytics": "חזרה לניתוח נתונים",
+    "adminRequired": "נדרשת גישת מנהל",
+    "fromDate": "מתאריך",
+    "toDate": "עד תאריך",
+    "loading": "טוען…",
+    "runReport": "הרץ דוח",
+    "loadError": "טעינת נתוני השלמת משמרת נכשלה",
+    "emptyTitle": "אין נתונים",
+    "emptySubtitle": "אין משתמשים עם פעילות משמרת בתקופה שנבחרה",
+    "colUser": "משתמש",
+    "colShifts": "משמרות",
+    "colTotalScans": "סריקות סה״כ",
+    "colAvgPerShift": "ממוצע / משמרת",
+    "colNoScan": "ללא סריקה"
   }
 }

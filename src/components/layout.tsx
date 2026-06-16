@@ -132,6 +132,13 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   const QUICK_SETTINGS_MARGIN = 8;
 
   const [location, navigate] = useLocation();
+  const currentPath = location.split("?")[0] ?? location;
+
+  // Capacitor / mobile: wouter does not reset scroll — menu routes can open mid-page
+  // with the title clipped under the sticky header.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [currentPath]);
 
   const isNavItemActive = (href: string) => resolveNavItemActive(location, href);
 
@@ -697,7 +704,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   // header back button — without it sub-pages (dashboard, settings, details)
   // have no visible exit on iOS, where there is no system back button.
   const dir = useDirection();
-  const currentPath = location.split("?")[0] ?? location;
+  // currentPath defined above (scroll-to-top on route change).
   // Every page except home gets the back affordance — iOS has no system back
   // button, and section roots (rooms, admin, …) need an exit too.
   const showBack = currentPath !== "/" && currentPath !== "/home" && !navigationLocked;
@@ -1330,7 +1337,8 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
         // scroll-mt clears the sticky header (~57px) so the skip-link jump and
         // any in-page #main-content anchors land below it, not under it.
         className={cn(
-          "max-w-2xl mx-auto min-w-0 px-3.5 sm:px-4 pb-nav-safe scroll-mt-20 focus:outline-none",
+          "max-w-2xl mx-auto min-w-0 px-3.5 sm:px-4 pb-nav-safe scroll-mt-20 focus:outline-none flex flex-col",
+          "min-h-[calc(100dvh-3.5rem-env(safe-area-inset-top,0px))]",
           settings.density === "compact" ? "py-2.5" : "py-4"
         )}
       >

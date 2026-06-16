@@ -61,9 +61,25 @@ describe("asset copilot orchestrator", () => {
   });
 
   it("buildTemplateNarrative includes claim lines", () => {
-    const text = buildTemplateNarrative(SAMPLE_ANSWER, "Pump 217");
+    const text = buildTemplateNarrative(SAMPLE_ANSWER, "Pump 217", "en");
     expect(text).toContain("Pump 217");
     expect(text).toContain("location: Room 4");
+  });
+
+  it("buildTemplateNarrative maps unknown codes to staff-facing copy", () => {
+    const text = buildTemplateNarrative(
+      {
+        resolverVersion: ASSET_COPILOT_RESOLVER_VERSION,
+        equipmentId: "eq-1",
+        claims: [],
+        unknowns: ["insufficient_validated_evidence"],
+        citations: [],
+      },
+      "Glucometer — ICU",
+      "en",
+    );
+    expect(text).not.toContain("insufficient_validated_evidence");
+    expect(text).toContain("Not enough verified scan or custody evidence yet");
   });
 
   it("explainEquipmentCopilot returns template narrative when LLM disabled", async () => {

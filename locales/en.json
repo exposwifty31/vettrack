@@ -376,7 +376,8 @@
     "unknowns": {
       "no_authoritative_location": "No recent scan or room assignment",
       "equipment_not_found": "Equipment record missing",
-      "no_active_custodian": "No active checkout on file"
+      "no_active_custodian": "No active checkout on file",
+      "insufficient_validated_evidence": "Not enough verified scan or custody evidence yet"
     },
     "citationTypes": {
       "scan": "Scan",
@@ -1239,7 +1240,10 @@
     "equipmentIdPlaceholder": "Equipment ID or scan result",
     "explainCta": "Explain",
     "disabledHint": "Asset Copilot is not enabled for this clinic. Ask your admin to turn on ENABLE_ASSET_COPILOT.",
-    "error": "Could not load Copilot answer. Check the equipment ID and try again."
+    "error": "Could not load Copilot answer. Check the equipment ID and try again.",
+    "equipmentLine": "Equipment: {name}",
+    "limitedEvidenceStatus": "Status: limited evidence ({gaps}).",
+    "gapsLine": "Gaps: {gaps}."
   },
   "shiftRecap": {
     "pageTitle": "Shift recap — VetTrack",
@@ -2994,6 +2998,7 @@
     "openChatUnread": "Open shift chat, {count} unread messages",
     "panel": {
       "title": "Shift chat",
+      "description": "Live messages and broadcasts for the current shift.",
       "onlineCount": "{count} online",
       "loading": "Loading...",
       "empty": "No messages yet",
@@ -3423,29 +3428,54 @@
     "heading": "What's New",
     "description": "The latest features and improvements in VetTrack.",
     "configureAlerts": "Configure alerts in Settings",
-    "currentVersion": "1.1.2",
+    "currentVersion": "1.0.1",
     "currentDate": "June 2026",
+    "buildLabel": "Build 13",
     "items": {
+      "clinicalDesign": {
+        "title": "Clinical design system refresh",
+        "description": "Refreshed typography, contrast, and 44px touch targets across equipment, Today, alerts, and Code Blue — built for bedside use on phones and tablets.",
+        "badge": "New"
+      },
+      "accessibility": {
+        "title": "Accessibility improvements",
+        "description": "Skip-to-content link, visible focus rings, form labels, and WCAG AA contrast on emergency and alert surfaces.",
+        "badge": "Improved"
+      },
       "nativeApp": {
-        "title": "Native iOS & Android app",
-        "description": "VetTrack now runs as a native mobile app with built-in NFC scanning, camera capture, and haptic feedback — alongside the offline-capable web app.",
+        "title": "Native iOS app",
+        "description": "VetTrack runs as a bundled Capacitor app on iOS with NFC scanning, camera capture, haptic feedback, and offline-capable sync.",
         "badge": "New"
       },
       "signIn": {
         "title": "Sign in with Apple & Google",
-        "description": "Social sign-in now opens in the system browser for a secure, one-tap login on mobile, in addition to email and password.",
+        "description": "Social sign-in opens in the system browser for secure one-tap login on mobile, in addition to email and password.",
         "badge": "New"
-      },
-      "theme": {
-        "title": "Refreshed look & themes",
-        "description": "A new brand look across the app, with distinct Clinical, Forest, and Dark themes that apply consistently on every screen.",
-        "badge": "Improved"
       },
       "navigation": {
         "title": "Easier navigation",
-        "description": "A back button is now available on every screen, the header stays fixed while you scroll, and the Equipment Command Room has a clear exit.",
+        "description": "Back button on every screen, fixed header while scrolling, and a clear exit from the Equipment Command Board.",
         "badge": "Improved"
       }
     }
+  },
+  "shiftLeaderboard": {
+    "title": "Shift scan leaderboard",
+    "pageTitle": "Shift scan leaderboard — VetTrack",
+    "description": "Scan counts and averages per user across shifts. Users with zero scans in any shift are flagged.",
+    "backToAnalytics": "Back to analytics",
+    "adminRequired": "Admin access required",
+    "fromDate": "From date",
+    "toDate": "To date",
+    "loading": "Loading…",
+    "runReport": "Run report",
+    "loadError": "Failed to load shift completion data",
+    "emptyTitle": "No data",
+    "emptySubtitle": "No users with shift activity in the selected period",
+    "colUser": "User",
+    "colShifts": "Shifts",
+    "colTotalScans": "Total scans",
+    "colAvgPerShift": "Avg / shift",
+    "colNoScan": "No scan"
   }
 }

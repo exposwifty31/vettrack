@@ -42,7 +42,7 @@ export function ShiftChatFab() {
         >
           <span aria-hidden="true">💬</span>
           {chat.unreadCount > 0 && (
-            <span aria-hidden="true" className="absolute -top-1 -end-1 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-background">
+            <span aria-hidden="true" className="absolute -top-1 -end-1 bg-red-700 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-background">
               {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
             </span>
           )}

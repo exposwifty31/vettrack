@@ -422,9 +422,9 @@ export default function EquipmentListPage() {
       </Helmet>
       <div className="flex flex-col gap-4 pb-24 animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
-            <h1 className="vt-page-title">{t.equipment.title}</h1>
+            <h1 className="vt-page-title whitespace-nowrap">{t.equipment.title}</h1>
             <p className="vt-text-xs text-muted-foreground mt-0.5 truncate">{t.equipmentTruth.heroTagline}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">

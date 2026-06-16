@@ -135,7 +135,7 @@ export default function MyEquipmentPage() {
         <meta name="description" content="View all equipment currently checked out to you. Return individual items or use Return All for quick end-of-shift handoffs." />
         <link rel="canonical" href="https://vettrack.replit.app/my-equipment" />
       </Helmet>
-      <div className="flex flex-col gap-5 pb-24 animate-fade-in">
+      <div className="flex flex-1 flex-col gap-5 pb-24 animate-fade-in">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold leading-tight">{ t.equipment.myEquipment }</h1>
@@ -190,21 +190,23 @@ export default function MyEquipmentPage() {
             ))}
           </div>
         ) : isError ? null : !items || items.length === 0 ? (
-          <EmptyState
-            icon={CheckCircle2}
-            message={t.myEquipment.empty.message}
-            subMessage={t.myEquipment.empty.subMessage}
-            iconBg="bg-muted"
-            iconColor="text-muted-foreground"
-            borderColor="border-border/60"
-            action={
-              <Link href="/equipment">
-                <Button variant="outline" size="sm" className="h-11 text-xs">
-                  {t.myEquipmentPage.browseEquipment}
-                </Button>
-              </Link>
-            }
-          />
+          <div className="flex flex-1 flex-col justify-center py-6">
+            <EmptyState
+              icon={CheckCircle2}
+              message={t.myEquipment.empty.message}
+              subMessage={t.myEquipment.empty.subMessage}
+              iconBg="bg-muted"
+              iconColor="text-muted-foreground"
+              borderColor="border-border/60"
+              action={
+                <Link href="/equipment">
+                  <Button variant="outline" size="sm" className="h-11 text-xs">
+                    {t.myEquipmentPage.browseEquipment}
+                  </Button>
+                </Link>
+              }
+            />
+          </div>
         ) : (
           <div className="flex flex-col gap-2">
             {isEquipmentRecoveryUiEnabled &&

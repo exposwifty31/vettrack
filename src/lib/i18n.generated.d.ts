@@ -380,6 +380,7 @@ export interface TStructure {
       no_authoritative_location: string;
       equipment_not_found: string;
       no_active_custodian: string;
+      insufficient_validated_evidence: string;
     };
     citationTypes: {
       scan: string;
@@ -1243,6 +1244,9 @@ export interface TStructure {
     explainCta: string;
     disabledHint: string;
     error: string;
+    equipmentLine: string;
+    limitedEvidenceStatus: string;
+    gapsLine: string;
   };
   shiftRecap: {
     pageTitle: string;
@@ -2997,6 +3001,7 @@ export interface TStructure {
     openChatUnread: string;
     panel: {
       title: string;
+      description: string;
       onlineCount: string;
       loading: string;
       empty: string;
@@ -3428,7 +3433,18 @@ export interface TStructure {
     configureAlerts: string;
     currentVersion: string;
     currentDate: string;
+    buildLabel: string;
     items: {
+      clinicalDesign: {
+        title: string;
+        description: string;
+        badge: string;
+      };
+      accessibility: {
+        title: string;
+        description: string;
+        badge: string;
+      };
       nativeApp: {
         title: string;
         description: string;
@@ -3439,16 +3455,30 @@ export interface TStructure {
         description: string;
         badge: string;
       };
-      theme: {
-        title: string;
-        description: string;
-        badge: string;
-      };
       navigation: {
         title: string;
         description: string;
         badge: string;
       };
     };
+  };
+  shiftLeaderboard: {
+    title: string;
+    pageTitle: string;
+    description: string;
+    backToAnalytics: string;
+    adminRequired: string;
+    fromDate: string;
+    toDate: string;
+    loading: string;
+    runReport: string;
+    loadError: string;
+    emptyTitle: string;
+    emptySubtitle: string;
+    colUser: string;
+    colShifts: string;
+    colTotalScans: string;
+    colAvgPerShift: string;
+    colNoScan: string;
   };
 }

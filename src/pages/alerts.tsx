@@ -170,7 +170,7 @@ export default function AlertsPage() {
         <meta name="description" content={t.alertsPage.metaDescription} />
         <link rel="canonical" href="https://vettrack.replit.app/alerts" />
       </Helmet>
-      <div className="flex flex-col gap-5 pb-24 animate-fade-in">
+      <div className="flex flex-1 flex-col gap-5 pb-24 animate-fade-in">
         <div className="flex items-center justify-between">
           <h1 className="vt-page-title flex items-center gap-2">
             <Bell className="w-5 h-5 text-muted-foreground" />
@@ -218,23 +218,26 @@ export default function AlertsPage() {
             ))}
           </div>
         ) : hasFatalError ? null : alerts.length === 0 ? (
-          <EmptyState
-            icon={CheckCircle}
-            message={t.alerts.empty.message}
-            subMessage={t.alerts.empty.subMessage}
-            iconBg="bg-emerald-50"
-            iconColor="text-emerald-500"
-            borderColor="border-border/60"
-            action={
-              <Link href="/equipment">
-                <Button variant="outline" size="sm">
-                  {t.alertsPage.browseEquipment}
-                </Button>
-              </Link>
-            }
-          />
+          <div className="flex flex-1 flex-col justify-center py-6">
+            <EmptyState
+              icon={CheckCircle}
+              message={t.alerts.empty.message}
+              subMessage={t.alerts.empty.subMessage}
+              iconBg="bg-emerald-50"
+              iconColor="text-emerald-500"
+              borderColor="border-border/60"
+              action={
+                <Link href="/equipment">
+                  <Button variant="outline" size="sm">
+                    {t.alertsPage.browseEquipment}
+                  </Button>
+                </Link>
+              }
+            />
+          </div>
         ) : !isDesktop ? (
-          <AlertsProView
+          <div className="flex flex-1 flex-col min-h-0">
+            <AlertsProView
             alerts={alerts}
             acksMap={acksMap}
             equipmentLocationMap={equipmentLocationMap}
@@ -245,6 +248,7 @@ export default function AlertsPage() {
             canOwn={canOwnAlerts}
             formatRelativeTime={formatRelativeTime}
           />
+          </div>
         ) : (
           priorityOrder
             .filter((type) => grouped[type] && grouped[type]!.length > 0)
