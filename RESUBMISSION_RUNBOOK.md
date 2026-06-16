@@ -72,9 +72,14 @@ ls ios/App/App/public/assets/clerk-native-instance-*.js >/dev/null 2>&1 && echo 
 If you changed any frontend code, rebuild + re-sync BEFORE archiving:
 ```bash
 cd /Users/dan/vettrack
-# .env must hold prod VITE_CLERK_PUBLISHABLE_KEY (pk_live_…) + VITE_API_ORIGIN=https://vettrack.uk
-pnpm build
-env -u CAPACITOR_SERVER_URL npx cap sync ios   # NEVER pass CAPACITOR_SERVER_URL — that makes a thin web wrapper (4.2 risk + OAuth breaks)
+./scripts/build-native-shell.sh
+# Reads VITE_CLERK_PUBLISHABLE_KEY + VITE_API_ORIGIN from .env only (.env.local is ignored).
+# NEVER pass CAPACITOR_SERVER_URL — that makes a thin web wrapper (4.2 risk + OAuth breaks).
+```
+
+Simulator smoke before archive:
+```bash
+./scripts/install-ios-sim.sh
 ```
 
 ## D. Archive in Xcode (the part only a human can do)

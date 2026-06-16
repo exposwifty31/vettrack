@@ -58,16 +58,18 @@ src/              React frontend
   lib/            api.ts, offline-db.ts (Dexie), sync-engine.ts, i18n.ts
 server/
   index.ts        Express entry — imports env-bootstrap FIRST, then registers routes
-  db.ts           Drizzle schema — ALL table definitions live here
+  db.ts           Drizzle pool + re-exports from schema/
+  schema/         pgTable definitions (core, equipment, inventory, tasks, ops, er, integrations)
   migrate.ts      Migration runner (exports runMigrations())
   app/
-    routes.ts     Registers all ~49 API route modules
+    routes.ts     Registers ~44 API route modules
     start-schedulers.ts  Starts all BullMQ workers + background schedulers
   routes/         One file per API resource
-  services/       Domain services (appointments, medication-tasks, inventory, restock, dispense, er…)
+  services/       Domain services (appointments, equipment, waitlist, inventory, restock, dispense, code-blue…)
   lib/            Business logic (billing, alerts, push, forecast, audit, queues, realtime/event-publisher, code-blue-keepalive, authority…)
   lib/authority/enforcement/ Evaluator families (stale, oprole, task-assignment, stale-task-ownership, code-blue-manager, clinical-invariant); each ships `off | shadow | enforce`
-  workers/        BullMQ job workers (expiry, charge-alert, inventory-deduction, integration, admission-fanout, stale-check-in sweep, task-ownership backfill/sweep)
+  jobs/runtime.ts BullMQ job runtime (charge-alert, expiry-check, stale-checkin-sweep)
+  workers/        Worker implementations + in-process equipment/waitlist schedulers
   integrations/   External PMS adapter layer (webhook inbound/outbound, sync jobs)
   middleware/     auth.ts, rate-limiters.ts, tenant-context.ts, validate.ts, authority.ts
 lib/              i18n utilities shared by frontend and backend (typed `t`, parity check, internal-key strip)
@@ -105,34 +107,23 @@ Resolved at startup by `server/lib/auth-mode.ts`:
 
 `req.authUser` (set by `server/middleware/auth.ts`) is always populated before route handlers. **Role is always read from `vt_users.role` in the DB**, never from JWT claims.
 
-Role hierarchy (numeric for comparison): `admin=40 · vet=30 · senior_technician=25 · technician=20 · student=10`
+Role hierarchy (numeric for comparison): `admin=40 · vet=30 · senior_technician=25 · lead_technician=22 · vet_tech=20 · technician=20 · student=10`
 
 ### Database schema
 
-All tables prefixed `vt_`. Schema is the single source of truth in `server/db.ts`.
+All tables prefixed `vt_`. Table definitions live in `server/schema/*.ts` (re-exported from `server/db.ts`). Generated inventory: `docs/audit/db.md` (`pnpm docs:audit`).
 
-**Core:** `vt_users`, `vt_clinics`, `vt_animals`, `vt_owners`  
-**Equipment:** `vt_equipment`, `vt_rooms`, `vt_scan_logs`, `vt_return_logs`  
-**Scheduling:** `vt_appointments` (unified task model — `taskType = "medication"` for meds), `vt_shifts`, `vt_shift_sessions`  
-**Authority / safety:** `vt_clinical_check_ins`, `vt_task_ownership_confirm_queue`, `vt_event_outbox`  
-**Inventory & Billing:** `vt_items`, `vt_containers`, `vt_billing_ledger`, `vt_billing_items`, `vt_inventory_jobs`  
-**Procurement:** `vt_purchase_orders`, `vt_po_lines`  
-**Hospitalization:** `vt_hospitalizations`, `vt_code_blue_sessions`, `vt_code_blue_log_entries`, `vt_code_blue_events` (legacy archive)  
-**Comms:** `vt_push_subscriptions`, `vt_scheduled_notifications`  
-**Observability:** `vt_audit_logs`, `vt_bulk_audit_log`  
-**Config:** `vt_server_config`, `vt_formulary`, `vt_support_tickets`, `vt_integration_configs`
+**Core:** `vt_clinics`, `vt_users`  
+**Equipment:** `vt_equipment`, `vt_rooms`, `vt_docks`, `vt_equipment_waitlist`, `vt_staging_queue`, `vt_scan_logs`, …  
+**Tasks:** `vt_appointments` (unified task model; UI route `/equipment/tasks`)  
+**Emergency:** `vt_code_blue_sessions`, `vt_code_blue_log_entries`, `vt_crash_cart_*`  
+**Inventory:** `vt_containers`, `vt_items`, `vt_dispense_events`, `vt_restock_*`, `vt_purchase_orders`  
+**Ops:** `vt_shifts`, `vt_shift_sessions`, `vt_event_outbox`, `vt_clinical_check_ins`, `vt_audit_logs`  
+**Integrations:** `vt_integration_configs`, sync log/conflict tables  
 
-After editing `server/db.ts`, run `npx drizzle-kit generate` to produce the next migration file and commit it. The runtime applies pending migrations from `migrations/` via `runMigrations()` at startup (and `pnpm db:migrate` runs the same path on demand); generation is the manual step.
+**Removed (migrations 142–143):** ER/patient/hospitalization tables, medication tasks, drug formulary, pharmacy forecast. See `docs/scope-change-2026.md`.
 
-### Medication execution flow
-
-1. Technician starts task → acknowledges ownership
-2. UI records dosage execution (volume calculated)
-3. `completeTask` commits task completion + billing atomically in one transaction, then inserts a `vt_inventory_jobs` row
-4. `inventory-deduction.worker.ts` claims and processes deduction jobs
-5. A 10-minute recovery scheduler re-enqueues stale/failed jobs
-
-This async pattern means billing and inventory may be briefly inconsistent after `completeTask` returns.
+After editing schema files, run `npx drizzle-kit generate` → commit SQL → `pnpm db:migrate`.
 
 ### Realtime (Phase 9)
 
@@ -177,12 +168,10 @@ All workers and recurring schedulers are registered in `server/app/start-schedul
 
 | Worker / scheduler | Trigger |
 |--------|---------|
-| `expiryCheckWorker` | Daily cron 08:00 |
-| `chargeAlertWorker` | Delayed job on return with `isPluggedIn=false` |
-| `inventory-deduction.worker` | After `completeTask` (plus 10-minute recovery sweep) |
+| `expiryCheckWorker` (job runtime) | Daily cron 08:00 |
+| `chargeAlertWorker` (job runtime) | Delayed job on return with `isPluggedIn=false` |
 | `integration.worker` | Integration sync events |
-| `admission-fanout.worker` | New-patient routing fan-out |
-| `staleCheckInSweepWorker` | Clinical check-in TTL sweep |
+| `staleCheckInSweepWorker` (job runtime) | Clinical check-in TTL sweep |
 | `staleTaskOwnershipSweepWorker` | Task-ownership TTL sweep (shadow + enforcement) |
 | `taskOwnershipBackfill.worker` | One-shot ownership backfill |
 | `notification.worker` | Push fan-out |
@@ -216,7 +205,7 @@ Use `logAudit()` from `server/lib/audit.ts` for all critical actions. It is fire
 
 - Global body XSS sanitization via `xss` library
 - Helmet CSP, HSTS, X-Frame-Options
-- Rate limiting: 100 req/min global, 10/min scan actions, 20/min checkout/return
+- Rate limiting: 100 req/min global (GLOBAL_API_LIMITER_MAX_PER_MINUTE), 10/min scan actions, 20/min checkout/return
 - Integration credentials encrypted with AES-256-GCM in `vt_server_config` when `DB_CONFIG_ENCRYPTION_KEY` is set
 
 ### Operational doctrine (what NOT to do)
@@ -242,7 +231,7 @@ E2E tests use Playwright: `pnpm test:signup` (requires Chromium). The Phase 9 dr
 
 ### Adding a new feature (checklist)
 
-1. Schema change in `server/db.ts` → `npx drizzle-kit generate` → commit the generated SQL (the runtime applies it at startup; `pnpm db:migrate` runs the same path on demand).
+1. Schema change in `server/schema/*.ts` (via `server/db.ts`) → `npx drizzle-kit generate` → commit the generated SQL (the runtime applies it at startup; `pnpm db:migrate` runs the same path on demand).
 2. Route file in `server/routes/` → register in `server/app/routes.ts`.
 3. If adding a BullMQ worker / scheduler → register in `server/app/start-schedulers.ts`.
 4. API function in `src/lib/api.ts` + type in `src/types/`.

@@ -27,6 +27,6 @@
 
 ## Related paths
 
-- Spec: `docs/superpowers/specs/2026-04-27-ward-display-design.md`
+- Invariants: `docs/architecture/offline-realtime-invariants.md`
 - Example large clinical surface: `src/pages/display.tsx`
 - Shared primitives: `src/components/ui/`

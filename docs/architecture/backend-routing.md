@@ -2,70 +2,38 @@
 
 ## Route contract (G5, warn mode)
 
-Generated snapshot: `docs/architecture/routes-contract.json` (method, full mounted path, source file/line, `pilotGated` when registered inside `if (!isPilotMode)` in `server/app/routes.ts`).
+Generated snapshot: `docs/architecture/routes-contract.json` (method, full mounted path, source file/line).
 
 ```bash
 pnpm routes:contract                              # warn on drift vs contract
 pnpm routes:contract -- --write-contract          # refresh baseline after intentional route changes
+pnpm docs:audit                                   # regenerate docs/audit/routes.md
 ```
 
 ## Registration (source of truth)
 
 - **Mount registry:** `server/app/routes.ts` → `registerApiRoutes()`
-- **Route modules:** `server/routes/*.ts` (55 files)
-- **Also mounted from index:** `webhooks`, `integrations/webhooks/inbound`, `rfid`
+- **Route modules:** `server/routes/*.ts` (~44 modules)
+- **Also mounted from index:** `webhooks`, inbound integration webhooks, `rfid`
 
-Approximate count: **~49 API routers** under `/api/*` plus health/webhooks.
-
-## Pilot mode gating
-
-`resolveEffectiveRuntimePilotMode()` controls a block of mounts (analytics, shifts, appointments, tasks, containers, billing, etc.). Equipment, Code Blue, ER, realtime, admin outbox, formulary, and forecast stay registered.
-
-**Refactor rule:** splitting `routes.ts` must preserve exact paths and the `if (!isPilotMode)` block semantics.
+Pilot mode gating was **removed** — all registered routes mount unconditionally.
 
 ## Middleware stack (order-sensitive)
 
 See [tenant-enforcement.md](./tenant-enforcement.md). Protected routes use `requireAuth` (and often `requireRole` / `requireEffectiveRole`).
 
-## Current anti-pattern
-
-Many route files import `../db` directly and embed business logic:
-
-| File | ~Lines | Direct `db.*` in route |
-|------|-------:|------------------------|
-| `equipment.ts` | 2,938 | Yes (18+) |
-| `equipment-operational-state.ts` | 764 | Yes (27+) |
-| `containers.ts` | 1,277 | Yes |
-| `billing.ts` | 1,018 | Yes |
-
-**Target per domain:**
-
-```
-server/routes/domains/<domain>/
-  <domain>.router.ts      # app.METHOD paths only
-  <domain>.handlers.ts    # req/res adaptation
-  <domain>.validation.ts  # zod/schemas
-```
-
-Services/repositories called from handlers — not from router wiring file.
-
 ## Workers & schedulers
 
-- **Workers:** `server/workers/*.ts` — must be started in `server/app/start-schedulers.ts`
-- **BullMQ job IDs / queue names:** contracts (e.g. `plug-check-${returnId}`) — do not rename during route modularization
+- **Job runtime:** `server/jobs/runtime.ts` — BullMQ workers (charge-alert, expiry-check, stale-checkin-sweep, …)
+- **In-process schedulers:** `server/app/start-schedulers.ts` — outbox publisher, equipment waitlist TTL, Code Blue reconciliation, integration workers, etc.
+- **CLI notification worker:** `pnpm worker` → `server/workers/notification.worker.ts`
+
+New workers must be registered in `start-schedulers.ts` (or job runtime definitions) in the same PR.
 
 ## Integrations (reference)
 
-`server/integrations/` already separates adapters, webhooks, rollout, and `repository.ts` patterns — use as a template for new repository extractions.
+`server/integrations/` separates adapters, webhooks, and repository patterns — use as template for new external systems.
 
-## Safe first backend extractions
+## Asset Copilot
 
-1. Group-only refactor of `registerApiRoutes` (no path changes)
-2. ADR-002 service split (no route path changes)
-3. Handler extraction from a single domain router (equipment last or in phases)
-
-## Verification per route change
-
-- `npx tsc --noEmit`
-- Ripgrep route paths unchanged: `rg 'app\.(get|post|patch|put|delete)\(' server/routes/...`
-- Live-server tests if available for that resource (`tests/*-api.test.js`)
+`POST /api/equipment/:id/copilot/explain` — nested on equipment router via `equipment-copilot.ts`.

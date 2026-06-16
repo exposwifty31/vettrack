@@ -156,7 +156,7 @@ Full matrix: [equipment-inline-mutations-inventory.md](./equipment-inline-mutati
 
 **Planning / audit PRs:** #570 (inventory), #586 (6h plan), #580 (F9 merge audit), #591 (6h merged status).
 
-**Incidental on `main`:** P2.4/F9 pilot billing (`10f0e463` + `4f36d6ca`) reached `main` via #577; documented in [pilot-mode README](../pilot-mode/README.md) — **keep both commits**; opt-in `PILOT_SUPPRESS_DEFAULT_BILLING=true`.
+**Incidental on `main`:** P2.4/F9 pilot billing (`10f0e463` + `4f36d6ca`) reached `main` via #577 — **keep both commits**; opt-in `PILOT_SUPPRESS_DEFAULT_BILLING=true`. Pilot-mode docs removed June 2026 — see [scope-change-2026.md](../scope-change-2026.md).
 
 ### Left (6i+ — optional, behavior-neutral)
 
@@ -168,7 +168,7 @@ Full matrix: [equipment-inline-mutations-inventory.md](./equipment-inline-mutati
 | **Barrel removal** | Drop `index.ts` re-exports when knip clean | Medium | Last |
 
 Inventory & rules: [src-types-split-plan.md](./src-types-split-plan.md).  
-6h implementation notes: [slice-6h-er-display-types-plan.md](./slice-6h-er-display-types-plan.md).
+6h implementation notes: merged on `main` (plan doc removed with scope change 2026).
 
 **Explicit non-goals for 6i+:** no type renames; no runtime changes; no forced migration of `useCodeBlueSession` hook-local types.
 
@@ -210,7 +210,7 @@ Repeat pattern: extract API module → optional handler/service splits → prese
 
 ## Equipment pilot mode (P2 / P3) — separate track
 
-**Not part of Slice 6 numbering.** Docs: [docs/pilot-mode/README.md](../pilot-mode/README.md).
+**Not part of Slice 6 numbering.** Pilot mode decommissioned June 2026 — see [scope-change-2026.md](../scope-change-2026.md).
 
 ### Done (all steps shipped on `main`)
 
@@ -311,10 +311,9 @@ Priority depends on team goal; all are **independent** tracks.
 | [asset-copilot-implementation-plan.md](./asset-copilot-implementation-plan.md) | Asset Copilot milestones M0–M4 (draft) |
 | [adr-003-asset-copilot-evidence-resolver.md](./adr-003-asset-copilot-evidence-resolver.md) | Resolver placement ADR |
 | [src-types-split-plan.md](./src-types-split-plan.md) | Slice 6 inventory, cycles, naming traps |
-| [slice-6h-er-display-types-plan.md](./slice-6h-er-display-types-plan.md) | ER/display/Code Blue extraction (merged) |
 | [equipment-inline-mutations-inventory.md](./equipment-inline-mutations-inventory.md) | Paused equipment writes |
 | [slice-4-stabilization-report.md](../validation/slice-4-stabilization-report.md) | Slice 4 verification record |
-| [pilot-mode/README.md](../pilot-mode/README.md) | Pilot env flags & PR audit |
+| [scope-change-2026.md](../scope-change-2026.md) | Equipment-first scope; pilot mode removed |
 | [domain-boundaries.md](./domain-boundaries.md) | Domain map |
 | [adr-002-appointments-service-split.md](./adr-002-appointments-service-split.md) | Slice 2 design |
 | [baseline-cycles.json](./baseline-cycles.json) | Madge cycle baseline |

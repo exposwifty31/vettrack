@@ -4,17 +4,16 @@
 
 | Concern | Where to look |
 |--------|----------------|
-| Domain language (ER wedge) | `CONTEXT.md` |
-| Schema & tables | `server/db.ts`, `migrations/` |
+| Domain language | `CONTEXT.md`, `docs/scope-change-2026.md` |
+| Schema & tables | `server/schema/*.ts`, `migrations/` |
 | REST routes | `server/routes/`, registration `server/app/routes.ts` |
 | External PMS / adapters | `server/integrations/` |
 | Audit logging | `server/lib/audit.ts` |
 | Auth / clinic context | `server/middleware/auth.ts`, `server/lib/auth-mode.ts` |
-| Background jobs | `server/workers/`, `server/app/start-schedulers.ts` |
+| Background jobs | `server/jobs/runtime.ts`, `server/workers/`, `server/app/start-schedulers.ts` |
 | Offline client | `src/lib/offline-db.ts`, `src/lib/sync-engine.ts` |
-| Ward + Code Blue UI behavior | `docs/superpowers/specs/2026-04-27-ward-display-design.md`, Code Blue routes under `server/routes/` |
-| Asset Radar / rooms | `replit.md` (Asset Radar section), `src/` rooms pages |
-| ER Mode / allowlist | `shared/er-mode-access.ts`, `server/lib/er-mode.ts`, `src/features/er/components/ErModeGuard.tsx` |
+| Ward + Code Blue UI | `docs/architecture/offline-realtime-invariants.md`, `server/routes/code-blue.ts` |
+| Equipment / rooms | `src/pages/equipment*.tsx`, `server/routes/equipment.ts` |
 
 ## Clinical–financial sync — review prompts
 
@@ -34,8 +33,7 @@
 
 ## ER Mode — review prompts
 
-- Is every **critical** route/API pair represented so ER deployments do not Concealment-404 essential care flows?
-- Do optional services (analytics, heavy reports) fail **without** taking down checkout, meds, or billing handlers?
+_Removed with migration 142 — ER Mode allowlist no longer applies._
 
 ## PowerShell — manual commands (repo root)
 
@@ -55,13 +53,13 @@ if ($env:DATABASE_URL) {
 }
 ```
 
-Apply migrations before relying on DB-heavy tests. Vitest **excludes** some paths by default (e.g. certain DB and live-server tests); see `vite.config.ts` `test.exclude`. When changing **ER Allowlist** / **Concealment 404** rules, run or extend tests that cover `shared/er-mode-access.ts` and `server/middleware/er-mode-concealment.ts`.
+Apply migrations before relying on DB-heavy tests. Vitest **excludes** some paths by default (e.g. certain DB and live-server tests); see `vite.config.ts` `test.exclude`.
 
 ## Risk label rubric (enhanced)
 
-- **P0/P1**: Critical feature path (meds, billing, Code Blue, core ER) **missing** from `shared/er-mode-access.ts`, risking functional lockout during ER Mode; wrong dose path, wrong patient/clinic, missing audit on controlled action, duplicate billing.
+- **P0/P1**: Wrong clinic scope, missing audit on controlled action, duplicate billing, Code Blue offline mutation allowed, broken equipment checkout/return.
 - **P1**: Schema or migration changes that break **backward compatibility** with `src/lib/offline-db.ts` / sync payloads for clients already in the field.
-- **P2**: Non-allowlisted or peripheral UI that hurts performance or clarity in high-stress flows; degraded UX with recovery path.
+- **P2**: Degraded UX with recovery path in high-stress flows.
 - **P3/P4**: Hygiene, logging noise, docs-only gaps.
 
-When unsure, **bias to P1** for anything touching medications, billing, identity, or ER allowlist coverage.
+When unsure, **bias to P1** for anything touching billing, identity, equipment state, or Code Blue.

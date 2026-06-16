@@ -23,18 +23,15 @@ VetTrack uses a two-number version: `MARKETING_VERSION` (user-visible, e.g. `1.2
 ## Pre-release checklist
 
 ```bash
-# 1. Ensure all tests pass
+# 1. Tests + typecheck
 pnpm test
 npx tsc --noEmit
 
-# 2. Run release gate (manual pipeline trigger in GitLab)
-# Go to GitLab → CI/CD → Pipelines → Run pipeline on main
+# 2. Production bundled native shell (NOT plain pnpm build — see docs/capacitor-native-app.md)
+./scripts/build-native-shell.sh
 
-# 3. Build production web bundle
-pnpm build
-
-# 4. Sync native projects
-npx cap sync
+# 3. Pre-archive gates
+./scripts/verify-resubmission.sh
 ```
 
 ---

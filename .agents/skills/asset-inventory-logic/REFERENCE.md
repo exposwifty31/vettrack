@@ -2,13 +2,13 @@
 
 ## Documentation
 
-- **Architecture & Asset Radar**: `replit.md` (search “Asset Radar”, equipment, rooms).
+- **Architecture & equipment**: `CONTEXT.md`, `docs/scope-change-2026.md`, equipment routes under `server/routes/equipment.ts`.
 - **Offline stores**: `src/lib/offline-db.ts` — equipment cache, pending queue entries.
 - **Sync**: `src/lib/sync-engine.ts` — retries, ordering, failure surfacing.
 
 ## Database (authoritative)
 
-Defined in `server/db.ts` (prefix `vt_`):
+Defined in `server/schema/` (prefix `vt_`):
 
 | Area | Typical tables |
 |------|----------------|

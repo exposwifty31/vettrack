@@ -121,7 +121,7 @@ Manual trigger on `staging` branch. Runs full staging E2E smoke + walkthrough te
 
 `mobile:ios-integrity` and `mobile:android-integrity` were **removed** from `.gitlab-ci.yml` (see `ARTIFACTS.md`) after repeated CI failures and missing macOS/Android runner provisioning. They are **not active** in the current pipeline.
 
-Capacitor integrity checks (`npx cap sync`, native project file verification) are manual pre-release steps today. Full iOS/Android store builds require a macOS/Android Studio runner and are not yet automated in CI. See [`docs/mobile/release.md`](../mobile/release.md) for manual build instructions.
+Capacitor integrity checks (`./scripts/build-native-shell.sh`, `./scripts/verify-resubmission.sh`) are manual pre-release steps today. Full iOS/Android store builds require a macOS/Android Studio runner and are not yet automated in CI. See [`docs/capacitor-native-app.md`](../capacitor-native-app.md) and [`docs/mobile/release.md`](../mobile/release.md).
 
 ---
 

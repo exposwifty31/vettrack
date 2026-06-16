@@ -14,6 +14,10 @@
     "dev:ci": "concurrently -k -p \"[{name}]\" -n \"api,web\" -c \"cyan,teal\" \"pnpm dev:api\" \"pnpm dev:web\"",
     "dev": "concurrently -k -p \"[{name}]\" -n \"api,web\" -c \"cyan,teal\" \"cross-env PORT=3001 tsx watch server/index.ts\" \"vite --port 5000 --host\"",
     "build": "vite build",
+    "cap:build:native": "bash scripts/build-native-shell.sh --ios",
+    "cap:build:native:android": "bash scripts/build-native-shell.sh --android",
+    "cap:build:native:all": "bash scripts/build-native-shell.sh --all",
+    "cap:install:ios-sim": "bash scripts/install-ios-sim.sh",
     "cap:sync": "pnpm build && npx cap sync",
     "cap:sync:remote": "CAPACITOR_SERVER_URL=https://vettrack.uk pnpm cap:sync",
     "cap:open:ios": "npx cap open ios",
@@ -22,7 +26,6 @@
     "worker": "tsx server/workers/notification.worker.ts",
     "worker:notifications": "tsx server/workers/notification.worker.ts",
     "validate:prod": "tsx scripts/validate-prod.ts",
-    "sync:formulary": "tsx scripts/sync-formulary-seed-all-clinics.ts",
     "auth:preflight": "tsx scripts/auth-preflight.ts",
     "auth:user-status": "tsx scripts/dev-user-status.ts",
     "test": "vitest run",
@@ -62,7 +65,11 @@
     "staging:seed": "tsx scripts/staging/seed.ts",
     "staging:cleanup": "tsx scripts/staging/cleanup.ts",
     "test:staging:e2e": "playwright test --config=playwright.staging.config.ts tests/staging-auth-smoke.spec.ts tests/staging-code-blue-gating.spec.ts --reporter=list",
-    "test:staging:walkthrough": "playwright test --config=playwright.staging.config.ts tests/staging-walkthrough.spec.ts --reporter=list"
+    "test:staging:walkthrough": "playwright test --config=playwright.staging.config.ts tests/staging-walkthrough.spec.ts --reporter=list",
+    "docs:audit": "node scripts/docs/generate-audit-inventories.mjs",
+    "deck:seed": "tsx scripts/seed-investor-deck-demo.ts",
+    "deck:capture": "tsx scripts/capture-investor-deck-screenshots.ts",
+    "deck:verify-assets": "tsx scripts/verify-investor-deck-assets.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1037.0",
