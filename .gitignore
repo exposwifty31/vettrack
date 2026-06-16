@@ -6,7 +6,7 @@ node_modules
 dist
 dist/
 .env
-.env.local
+.env.local*
 .env.production
 .env.production.local
 *.log
@@ -72,6 +72,7 @@ desktop/cleaner/dist/
 .pnpm-store/
 ios/build/
 *.xcarchive/
+build/
 
 # design-sync (claude.ai/design) — generated/staged artifacts (durable config under .design-sync/ IS committed)
 .ds-sync/
