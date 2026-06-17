@@ -36,6 +36,7 @@ import { startBackgroundSchedulers } from "./app/start-schedulers.js";
 import { ensureClinicPhase2Defaults } from "./lib/ensure-clinic-phase2-defaults.js";
 import healthRoutes from "./routes/health.js";
 import { resolveAuthModeFromEnv, describeAuthMode } from "./lib/auth-mode.js";
+import { resolveClerkAuthorizedParties } from "./lib/clerk-authorized-parties.js";
 import {
   loadBuildInfo,
   resolveBackendPilotMode,
@@ -282,7 +283,11 @@ if (authModeResolution.mode === "clerk") {
   if (!process.env.CLERK_PUBLISHABLE_KEY?.trim() && process.env.VITE_CLERK_PUBLISHABLE_KEY?.trim()) {
     process.env.CLERK_PUBLISHABLE_KEY = process.env.VITE_CLERK_PUBLISHABLE_KEY;
   }
-  app.use(clerkMiddleware());
+  app.use(
+    clerkMiddleware({
+      authorizedParties: resolveClerkAuthorizedParties(isProduction),
+    }),
+  );
 }
 
 // Global API limiter runs before route-specific limiters.
