@@ -9,6 +9,7 @@ Capacitor v8 shell for iOS and Android. Production ships a **bundled** web asset
 | Doc | Purpose |
 |-----|---------|
 | [native-ship-checklist.md](./native-ship-checklist.md) | Pre-submission checklist |
+| [../legal-pages.md](../legal-pages.md) | Privacy / terms / support pages (**gap — required before store URLs**) |
 | [native-ship-audit-workflow.md](./native-ship-audit-workflow.md) | **Human** (Safari/Chrome audit) vs **Agent** (fix → Railway → archive) split + prompts |
 | [native-ship-master-prompt.md](./native-ship-master-prompt.md) | **Full copy-paste prompt** for Cursor (Phases 0–7) |
 | [nfc-ship-checklist.md](./nfc-ship-checklist.md) | NFC readiness |

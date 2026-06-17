@@ -1015,6 +1015,10 @@
     "crashCartChecklist": "Crash cart checklist",
     "crashCartChecklistDescription": "Customize the daily check items to match the crash cart in your department — add, edit, or remove items.",
     "crashCartChecklistManage": "Edit checklist",
+    "legal": "Legal",
+    "privacyPolicy": "Privacy policy",
+    "termsOfUse": "Terms of use",
+    "support": "Support",
     "about": "About",
     "versionLabel": "Version",
     "seeWhatsNew": "See what's new",
@@ -3503,5 +3507,168 @@
     "colTotalScans": "Total scans",
     "colAvgPerShift": "Avg / shift",
     "colNoScan": "No scan"
+  },
+  "legalFooter": {
+    "ariaLabel": "Legal links",
+    "privacyPolicy": "Privacy policy",
+    "termsOfUse": "Terms of use",
+    "support": "Support"
+  },
+  "legalPage": {
+    "backLink": "Back",
+    "backToSignIn": "Back to sign in",
+    "lastUpdatedLabel": "Last updated"
+  },
+  "privacyPage": {
+    "title": "Privacy Policy",
+    "pageTitle": "Privacy Policy — VetTrack",
+    "metaDescription": "How VetTrack collects, uses, and protects personal data for veterinary hospital staff.",
+    "lastUpdatedDate": "17 June 2026",
+    "sections": {
+      "overview": {
+        "title": "Overview",
+        "body": "VetTrack provides operational software for veterinary hospitals — equipment tracking, tasks, inventory, and emergency coordination. This policy explains what personal data we process when you use the VetTrack web app, progressive web app (PWA), or native mobile apps, and how we protect it.\n\nVetTrack is intended for hospital staff authorized by your clinic. It is not directed at children."
+      },
+      "controller": {
+        "title": "Who is responsible for your data",
+        "body": "Your veterinary hospital (clinic) is the primary controller of operational and clinical workflow data created in VetTrack. VetTrack Ltd operates the platform and processes data on the clinic's behalf as a service provider.\n\nFor privacy questions about your account or to exercise your rights, contact privacy@vettrack.uk. For product support, contact support@vettrack.uk."
+      },
+      "collect": {
+        "title": "Information we collect",
+        "body": "Account and identity: name, email address, phone number (when used for sign-in), profile image (if provided), role, clinic membership, and language preference. Authentication is provided by Clerk; Sign in with Apple is available on iOS.\n\nOperational activity: equipment check-outs and returns, scan events, room verification, tasks, inventory actions, Code Blue session participation, shift context, audit log entries tied to your user ID, and support tickets you submit.\n\nDevice and technical data: device push notification tokens (if you enable notifications), app version, bounded operational telemetry counters (no free-form labels), error and performance diagnostics when error reporting is enabled, and offline sync queue metadata stored locally on your device.\n\nDevice permissions: camera (issue photos and QR scanning), NFC (equipment and room tags), filesystem (attachments), and notifications — only when you grant permission on your device."
+      },
+      "use": {
+        "title": "How we use information",
+        "body": "We use personal data to authenticate you, enforce clinic-scoped access controls, operate equipment and hospital workflows, deliver notifications you opt into, maintain audit trails required for hospital operations, improve reliability and security, and comply with law.\n\nWe do not sell personal data. We do not use hospital operational data for unrelated advertising."
+      },
+      "processors": {
+        "title": "Service providers",
+        "body": "We use trusted subprocessors to run VetTrack, including hosting and database providers, Clerk (authentication), Apple (Sign in with Apple token lifecycle), error monitoring when enabled, and email or notification delivery infrastructure. Each processor is bound by contract to protect data and process it only for providing the service.\n\nYour clinic may configure integrations with external practice-management systems; data shared through those integrations is governed by your clinic's agreements with those vendors."
+      },
+      "retention": {
+        "title": "Retention",
+        "body": "We retain account and operational records for as long as your clinic uses VetTrack and as needed for legitimate hospital operations, security, and legal obligations. Audit logs may be retained according to your clinic's policy.\n\nWhen you delete your account, we erase or anonymize personal identifiers as described in our account deletion flow. Some aggregated or de-identified records may remain where they no longer identify you."
+      },
+      "security": {
+        "title": "Security",
+        "body": "VetTrack uses industry-standard safeguards including encrypted transport (HTTPS), role-based access control, clinic-scoped data isolation, encrypted storage for sensitive integration credentials when configured, and monitoring for abuse.\n\nNo system is perfectly secure. Report suspected incidents to privacy@vettrack.uk."
+      },
+      "rights": {
+        "title": "Your rights",
+        "body": "Depending on your location, you may have rights to access, correct, delete, restrict, or export personal data, and to object to certain processing. Clinics in Israel and the United Kingdom may have additional local requirements.\n\nContact privacy@vettrack.uk to submit a request. We may need to verify your identity and coordinate with your clinic administrator where the clinic is the data controller."
+      },
+      "deletion": {
+        "title": "Account deletion",
+        "body": "You can delete your account in the app: Settings → Danger zone → Delete account. Deletion permanently removes or anonymizes your personal data, revokes Sign in with Apple tokens when linked, and signs you out everywhere. Demo or review accounts may be protected from self-deletion.\n\nDeleting your VetTrack account does not automatically cancel an App Store subscription — manage billing in your Apple ID settings."
+      },
+      "children": {
+        "title": "Children",
+        "body": "VetTrack is a professional tool for authorized hospital staff. We do not knowingly collect personal data from children under 13. If you believe a child has created an account, contact privacy@vettrack.uk."
+      },
+      "changes": {
+        "title": "Changes to this policy",
+        "body": "We may update this policy when our practices or legal requirements change. We will post the revised version at this URL and update the \"Last updated\" date. Material changes may also be communicated through the app or by email where appropriate."
+      },
+      "contact": {
+        "title": "Contact",
+        "body": "Privacy: privacy@vettrack.uk\nSupport: support@vettrack.uk\nWebsite: https://vettrack.uk"
+      }
+    }
+  },
+  "termsPage": {
+    "title": "Terms of Use",
+    "pageTitle": "Terms of Use — VetTrack",
+    "metaDescription": "Terms governing use of the VetTrack veterinary hospital operations platform.",
+    "lastUpdatedDate": "17 June 2026",
+    "sections": {
+      "overview": {
+        "title": "Overview",
+        "body": "These Terms of Use (\"Terms\") govern access to and use of VetTrack — the web app, progressive web app (PWA), and native mobile applications — operated by VetTrack Ltd (\"we\", \"us\").\n\nBy creating an account or using VetTrack, you agree to these Terms. If you do not agree, do not use the service."
+      },
+      "acceptance": {
+        "title": "Agreement",
+        "body": "Your clinic authorizes staff access to VetTrack. You represent that you are an authorized employee, contractor, or student of a clinic that has contracted for the service, and that you use VetTrack only for legitimate hospital operations.\n\nWe may update these Terms. Continued use after the \"Last updated\" date constitutes acceptance of the revised Terms."
+      },
+      "eligibility": {
+        "title": "Eligibility",
+        "body": "VetTrack is a professional tool for adults authorized by a participating veterinary hospital. You must be at least 18 years old (or the age of majority in your jurisdiction) to use the service.\n\nAccounts are provisioned or approved by your clinic administrator. We may suspend access for users who are no longer authorized by their clinic."
+      },
+      "account": {
+        "title": "Your account",
+        "body": "You are responsible for safeguarding your sign-in credentials and for all activity under your account. Notify your clinic administrator and support@vettrack.uk immediately if you suspect unauthorized access.\n\nYou may delete your own account in Settings → Danger zone → Delete account, subject to clinic policy and applicable law. See our Privacy Policy for how personal data is handled."
+      },
+      "acceptableUse": {
+        "title": "Acceptable use",
+        "body": "You agree to use VetTrack only for lawful hospital operations and in accordance with your clinic's policies. You must not:\n\n• Access data outside your authorized clinic scope\n• Attempt to probe, scan, or compromise the service or other users' accounts\n• Upload malicious code or interfere with service availability\n• Misrepresent equipment status, audit records, or emergency session data\n• Reverse engineer the service except where permitted by law"
+      },
+      "clinicalDisclaimer": {
+        "title": "Clinical and operational disclaimer",
+        "body": "VetTrack is an operations platform — not a medical device, electronic medical record, or diagnostic system. Equipment status, inventory counts, and emergency coordination features support hospital workflows but do not replace professional clinical judgment.\n\nYour clinic remains responsible for patient care decisions, regulatory compliance, and verification of operational data."
+      },
+      "intellectualProperty": {
+        "title": "Intellectual property",
+        "body": "VetTrack, its software, branding, and documentation are owned by VetTrack Ltd or its licensors. We grant you a limited, non-exclusive, non-transferable license to use the service for your clinic's internal operations during your authorized access period.\n\nOperational data created by your clinic in VetTrack belongs to your clinic, subject to our Privacy Policy and data processing terms."
+      },
+      "availability": {
+        "title": "Service availability",
+        "body": "We aim for high availability but do not guarantee uninterrupted access. Planned maintenance, network outages, device offline mode, and third-party service failures may affect the service.\n\nOffline features queue changes locally and sync when connectivity returns. Emergency mutations require online execution — see in-app guidance for Code Blue workflows."
+      },
+      "liability": {
+        "title": "Limitation of liability",
+        "body": "To the maximum extent permitted by law, VetTrack Ltd is not liable for indirect, incidental, special, or consequential damages arising from use of the service, including loss of data, revenue, or clinical outcomes.\n\nOur total liability for any claim relating to the service is limited to the fees paid by your clinic for VetTrack in the twelve months before the claim, or £100 if no fees apply, whichever is greater.\n\nNothing in these Terms excludes liability that cannot be excluded under applicable law."
+      },
+      "termination": {
+        "title": "Suspension and termination",
+        "body": "We may suspend or terminate access for violation of these Terms, security risk, or at your clinic's request. Your clinic may deactivate users at any time.\n\nUpon termination, your right to use VetTrack ends. Provisions that by nature should survive (including liability limits, intellectual property, and governing law) remain in effect."
+      },
+      "governingLaw": {
+        "title": "Governing law",
+        "body": "These Terms are governed by the laws of England and Wales, without regard to conflict-of-law principles. Courts in England shall have exclusive jurisdiction, except where mandatory consumer or employment protections in your jurisdiction provide otherwise."
+      },
+      "changes": {
+        "title": "Changes",
+        "body": "We may revise these Terms when our service or legal requirements change. The current version is always available at this URL with an updated \"Last updated\" date."
+      },
+      "contact": {
+        "title": "Contact",
+        "body": "Legal and terms questions: support@vettrack.uk\nPrivacy: privacy@vettrack.uk\nWebsite: https://vettrack.uk"
+      }
+    }
+  },
+  "supportPage": {
+    "title": "Support",
+    "pageTitle": "Support — VetTrack",
+    "metaDescription": "Get help with VetTrack — account access, technical issues, and App Store support.",
+    "lastUpdatedDate": "17 June 2026",
+    "sections": {
+      "overview": {
+        "title": "How we can help",
+        "body": "VetTrack support assists authorized hospital staff and clinic administrators with account access, technical problems, and questions about using the platform.\n\nFor in-app feature guidance while signed in, open Help from the menu. This page is for account, access, and product support that does not require signing in."
+      },
+      "contact": {
+        "title": "Contact us",
+        "body": "Email: support@vettrack.uk\n\nInclude your clinic name, the email on your VetTrack account, device type (web, iOS, Android), and a short description of the issue. Screenshots help us resolve problems faster.\n\nWe aim to respond within two business days. Urgent hospital operational issues should also be escalated through your clinic's internal IT or admin contact."
+      },
+      "accountAccess": {
+        "title": "Account and access",
+        "body": "New staff accounts are typically created or approved by your clinic administrator. If you cannot sign in:\n\n• Confirm you are using the email or phone number registered with your clinic\n• Try password reset from the sign-in screen (Clerk)\n• On iOS, Sign in with Apple and Google are available when enabled by your clinic\n• Contact your clinic admin if your account is pending approval or blocked\n\nIf your clinic admin cannot resolve the issue, email support@vettrack.uk from your work address."
+      },
+      "technicalIssues": {
+        "title": "Technical issues",
+        "body": "Before contacting support, try:\n\n• Refreshing the page or force-closing and reopening the app\n• Checking network connectivity (VetTrack works offline for many workflows; emergency actions require online access)\n• Updating to the latest app version from the App Store\n• Clearing browser cache if the web app shows a blank screen after an update\n\nFor persistent sync failures, note the time, action you attempted, and any error message shown in the sync queue (cloud icon in the header)."
+      },
+      "nativeApp": {
+        "title": "iOS and Android apps",
+        "body": "The VetTrack native apps are distributed through the Apple App Store (bundle ID uk.vettrack.app). Billing, subscriptions, and refunds are managed by Apple — we cannot process App Store payments directly.\n\nFor App Review or TestFlight access issues, your clinic administrator should provide the credentials listed in App Store Connect review notes."
+      },
+      "privacyAndDeletion": {
+        "title": "Privacy and account deletion",
+        "body": "Privacy questions: privacy@vettrack.uk — see our Privacy Policy at https://vettrack.uk/privacy\n\nTo delete your account: sign in → Settings → Danger zone → Delete account. Deletion is permanent and removes personal data as described in the Privacy Policy.\n\nDeleting your VetTrack account does not cancel App Store subscriptions — manage those in iOS Settings → Apple ID → Subscriptions."
+      },
+      "emergencyNote": {
+        "title": "Code Blue and emergencies",
+        "body": "VetTrack coordinates Code Blue sessions and emergency equipment workflows but is not an emergency dispatch or medical triage service.\n\nFor life-threatening situations, follow your hospital's emergency protocols first. If Code Blue features fail during an active session, use your clinic's offline backup procedures and contact support@vettrack.uk after the incident with timestamps for investigation."
+      }
+    }
   }
 }

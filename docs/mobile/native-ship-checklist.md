@@ -26,6 +26,7 @@
 
 | Gate | Command / check | Result | Notes |
 |------|-----------------|--------|-------|
+| Legal pages | Browser: `/privacy`, `/terms`, `/support` | PASS (after deploy) | Public routes ship policy, terms, and support copy — verify on production before store URLs. See [../legal-pages.md](../legal-pages.md). |
 | Resubmission script | `./scripts/verify-resubmission.sh` | PASS | **16/16 gates (2026-06-16)** — demo login `complete`, Clerk OAuth, CORS, icon, build 12, bundled shell, `vettrack.uk` baked in bundle, widgets, AASA. (First run showed 15/16: stale `dist/public` missing `vettrack.uk`; cleared by rebuilding the bundled shell — see below.) |
 | Demo login | `RESUBMISSION_RUNBOOK.md` §C curl | `LOGIN: complete` | Demo account sign-in verified on device (2026-06-15); re-confirmed by gate script (2026-06-16) |
 | Bundled shell | `./scripts/build-native-shell.sh` | synced | Rebuilt + `cap sync ios` (2026-06-16) — bakes `VITE_API_ORIGIN=https://vettrack.uk` from `.env` only (ignores empty `.env.local` override); no `server.url` in `ios/App/App/capacitor.config.json` |

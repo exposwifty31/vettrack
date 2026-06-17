@@ -1018,6 +1018,10 @@ export interface TStructure {
     crashCartChecklist: string;
     crashCartChecklistDescription: string;
     crashCartChecklistManage: string;
+    legal: string;
+    privacyPolicy: string;
+    termsOfUse: string;
+    support: string;
     about: string;
     versionLabel: string;
     seeWhatsNew: string;
@@ -3506,5 +3510,168 @@ export interface TStructure {
     colTotalScans: string;
     colAvgPerShift: string;
     colNoScan: string;
+  };
+  legalFooter: {
+    ariaLabel: string;
+    privacyPolicy: string;
+    termsOfUse: string;
+    support: string;
+  };
+  legalPage: {
+    backLink: string;
+    backToSignIn: string;
+    lastUpdatedLabel: string;
+  };
+  privacyPage: {
+    title: string;
+    pageTitle: string;
+    metaDescription: string;
+    lastUpdatedDate: string;
+    sections: {
+      overview: {
+        title: string;
+        body: string;
+      };
+      controller: {
+        title: string;
+        body: string;
+      };
+      collect: {
+        title: string;
+        body: string;
+      };
+      use: {
+        title: string;
+        body: string;
+      };
+      processors: {
+        title: string;
+        body: string;
+      };
+      retention: {
+        title: string;
+        body: string;
+      };
+      security: {
+        title: string;
+        body: string;
+      };
+      rights: {
+        title: string;
+        body: string;
+      };
+      deletion: {
+        title: string;
+        body: string;
+      };
+      children: {
+        title: string;
+        body: string;
+      };
+      changes: {
+        title: string;
+        body: string;
+      };
+      contact: {
+        title: string;
+        body: string;
+      };
+    };
+  };
+  termsPage: {
+    title: string;
+    pageTitle: string;
+    metaDescription: string;
+    lastUpdatedDate: string;
+    sections: {
+      overview: {
+        title: string;
+        body: string;
+      };
+      acceptance: {
+        title: string;
+        body: string;
+      };
+      eligibility: {
+        title: string;
+        body: string;
+      };
+      account: {
+        title: string;
+        body: string;
+      };
+      acceptableUse: {
+        title: string;
+        body: string;
+      };
+      clinicalDisclaimer: {
+        title: string;
+        body: string;
+      };
+      intellectualProperty: {
+        title: string;
+        body: string;
+      };
+      availability: {
+        title: string;
+        body: string;
+      };
+      liability: {
+        title: string;
+        body: string;
+      };
+      termination: {
+        title: string;
+        body: string;
+      };
+      governingLaw: {
+        title: string;
+        body: string;
+      };
+      changes: {
+        title: string;
+        body: string;
+      };
+      contact: {
+        title: string;
+        body: string;
+      };
+    };
+  };
+  supportPage: {
+    title: string;
+    pageTitle: string;
+    metaDescription: string;
+    lastUpdatedDate: string;
+    sections: {
+      overview: {
+        title: string;
+        body: string;
+      };
+      contact: {
+        title: string;
+        body: string;
+      };
+      accountAccess: {
+        title: string;
+        body: string;
+      };
+      technicalIssues: {
+        title: string;
+        body: string;
+      };
+      nativeApp: {
+        title: string;
+        body: string;
+      };
+      privacyAndDeletion: {
+        title: string;
+        body: string;
+      };
+      emergencyNote: {
+        title: string;
+        body: string;
+      };
+    };
   };
 }

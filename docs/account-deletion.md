@@ -1,5 +1,7 @@
 # In-App Account Deletion (App Store Guideline 5.1.1(v))
 
+> **Related gap:** a public [Privacy Policy page](./legal-pages.md) is **not implemented** (`/privacy` → 404). Account deletion should be described in that policy once it ships.
+
 VetTrack offers account creation (including Sign in with Apple), so Apple requires
 an in-app flow that **deletes** the account and personal data — deactivation is not
 sufficient — and, because Sign in with Apple is offered, the app must **revoke** the

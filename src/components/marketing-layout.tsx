@@ -109,6 +109,15 @@ export function MarketingLayout({ children, showAppCta, showAuthCta }: Marketing
             <Link href="/equipment" className="hover:text-foreground transition-colors">
               {lp.footerEquipment}
             </Link>
+            <Link href="/privacy" className="hover:text-foreground transition-colors">
+              {t.legalFooter.privacyPolicy}
+            </Link>
+            <Link href="/terms" className="hover:text-foreground transition-colors">
+              {t.legalFooter.termsOfUse}
+            </Link>
+            <Link href="/support" className="hover:text-foreground transition-colors">
+              {t.legalFooter.support}
+            </Link>
           </nav>
         </div>
       </footer>

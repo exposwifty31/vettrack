@@ -27,6 +27,7 @@
 - **Clerk (production instance `clerk.vettrack.uk`):** redirect URLs, allowed origins, Apple+Google OAuth, demo account, Client Trust — all configured (verify in §C).
 - **Build number:** `CURRENT_PROJECT_VERSION = 4`, `MARKETING_VERSION = 1.0`. Ready to archive as **1.0 (4)**.
 - **Synced shell:** `npx cap sync ios` already run from HEAD. `dist/public` == `ios/App/App/public`.
+- **Legal pages:** `/privacy`, `/terms`, and `/support` are implemented — verify all three on production after deploy before setting App Store / Play Console URLs. See `docs/legal-pages.md`.
 
 ## C. PRE-ARCHIVE VERIFICATION — run these every time before archiving
 

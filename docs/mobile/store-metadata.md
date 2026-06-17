@@ -175,17 +175,17 @@ To review:
 
 ---
 
-## Privacy policy URL
+## Legal URLs (App Store Connect / Play Console)
 
-`https://vettrack.uk/privacy`
+> **Status: NOT IMPLEMENTED (2026-06-17).** URLs below are **reserved** for store listings. Production currently serves the SPA shell then client-side **404** — no policy text. See [../legal-pages.md](../legal-pages.md) before submission.
 
-## Terms of use URL
+| Field | Reserved URL | Live? |
+|-------|--------------|-------|
+| Privacy policy | `https://vettrack.uk/privacy` | **Yes** (after deploy) |
+| Terms of use | `https://vettrack.uk/terms` | **Yes** (after deploy) |
+| Support | `https://vettrack.uk/support` | **Yes** (after deploy) |
 
-`https://vettrack.uk/terms`
-
-## Support URL
-
-`https://vettrack.uk/support`
+Verify all three URLs in a browser without login after production deploy, then enter them in App Store Connect and Google Play Console.
 
 ---
 

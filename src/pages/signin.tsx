@@ -9,6 +9,7 @@ import { clerkAppearance, clerkAppearanceNative } from "@/lib/clerk-appearance";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { ClerkAuthFormShell } from "@/components/clerk-auth-form-shell";
 import { NativeSocialButtons } from "@/components/native-social-buttons";
+import { LegalFooterLinks } from "@/components/legal-footer-links";
 
 const IS_NATIVE = isCapacitorNative();
 
@@ -116,7 +117,8 @@ export default function SignInPage() {
             </div>
           )}
 
-          <div className="text-center mt-6">
+          <div className="text-center mt-6 space-y-3">
+            <LegalFooterLinks />
             <Link
               href="/"
               className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
