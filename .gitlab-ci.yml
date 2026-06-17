@@ -244,7 +244,7 @@ ci:merge-gate:
     - export VITE_CLERK_PUBLISHABLE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-pk_test_ci_dummy_publishable_key}"
     - NODE_ENV=production pnpm build
     - pnpm migrate
-    - pnpm dev:api > /tmp/vettrack-playwright.log 2>&1 &
+    - pnpm start:playwright-api > /tmp/vettrack-playwright.log 2>&1 &
     - |
       for i in $(seq 1 60); do
         if wget -q -O /dev/null http://127.0.0.1:3001/api/healthz 2>/dev/null; then
@@ -481,7 +481,7 @@ e2e-simulation:nightly:
     - export VITE_CLERK_PUBLISHABLE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-pk_test_ci_dummy_publishable_key}"
     - NODE_ENV=production pnpm build
     - pnpm migrate
-    - pnpm dev:api > /tmp/vettrack-simulation.log 2>&1 &
+    - pnpm start:playwright-api > /tmp/vettrack-simulation.log 2>&1 &
     - |
       for i in $(seq 1 60); do
         if wget -q -O /dev/null http://127.0.0.1:3001/api/healthz 2>/dev/null; then
