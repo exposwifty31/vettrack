@@ -38,6 +38,9 @@ node-version_
 tsx
 vettrack@*
 
+# Accidental nested `git clone` inside the repo root
+/vettrack/
+
 # Extracted third-party bundles (not part of this repo)
 superpowers-main/
 superpowers-main.zip
