@@ -22,6 +22,7 @@ import { createSign } from "crypto";
 const APPLE_AUTH_BASE = "https://appleid.apple.com";
 /** Apple caps client_secret `exp` at 6 months (15777000s). Stay well under. */
 const CLIENT_SECRET_TTL_SECONDS = 150 * 24 * 60 * 60; // 150 days
+const APPLE_HTTP_TIMEOUT_MS = 10_000;
 
 export interface AppleAuthConfig {
   teamId: string;
@@ -125,6 +126,7 @@ export async function exchangeAppleAuthorizationCode(
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
+      signal: AbortSignal.timeout(APPLE_HTTP_TIMEOUT_MS),
     });
   } catch (err) {
     throw new AppleAuthError(`Apple token exchange request failed: ${String(err)}`);
@@ -180,6 +182,7 @@ export async function revokeAppleToken(
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
+      signal: AbortSignal.timeout(APPLE_HTTP_TIMEOUT_MS),
     });
   } catch (err) {
     throw new AppleAuthError(`Apple revoke request failed: ${String(err)}`);

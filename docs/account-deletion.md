@@ -56,14 +56,13 @@ capture the Apple `authorizationCode` at sign-in, exchange it at
 
 Revocation is gated on all four being present (otherwise it cleanly no-ops):
 
-| Variable            | Purpose                                                  |
-| ------------------- | -------------------------------------------------------- |
-| `APPLE_TEAM_ID`     | JWT `iss` (10-char Team ID / App ID Prefix)              |
-| `APPLE_KEY_ID`      | JWT header `kid` (Sign in with Apple key)                |
-| `APPLE_CLIENT_ID`   | JWT `sub` + revoke `client_id` (Services ID / bundle ID) |
-| `APPLE_PRIVATE_KEY` | `.p8` contents (literal `\n` escapes tolerated)          |
-
-`DB_CONFIG_ENCRYPTION_KEY` should be set so stored refresh tokens are encrypted.
+| Variable                    | Purpose                                                                 |
+| --------------------------- | ----------------------------------------------------------------------- |
+| `APPLE_TEAM_ID`             | JWT `iss` (10-char Team ID / App ID Prefix)                             |
+| `APPLE_KEY_ID`              | JWT header `kid` (Sign in with Apple key)                               |
+| `APPLE_CLIENT_ID`           | JWT `sub` + revoke `client_id` (Services ID / bundle ID)                |
+| `APPLE_PRIVATE_KEY`         | `.p8` contents (literal `\n` escapes tolerated)                         |
+| `DB_CONFIG_ENCRYPTION_KEY`  | **Required in production** — AES-256-GCM encrypts stored refresh tokens; without it tokens are stored in plaintext |
 
 ## App Store resubmission checklist
 

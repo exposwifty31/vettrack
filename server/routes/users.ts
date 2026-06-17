@@ -1179,19 +1179,9 @@ router.post("/apple-link", requireAuth, authSensitiveLimiter, validateBody(apple
 router.delete("/delete-account", requireAuth, authSensitiveLimiter, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
-    if (!req.authUser) {
-      return res.status(401).json(
-        apiError({
-          code: "UNAUTHORIZED",
-          reason: "MISSING_AUTH_USER",
-          message: "Unauthorized",
-          requestId,
-        }),
-      );
-    }
-
-    invalidateForUser(req.authUser.clinicId, req.authUser.id);
-    const result = await deleteOwnAccount(req.authUser);
+    const actor = req.authUser!;
+    invalidateForUser(actor.clinicId, actor.id);
+    const result = await deleteOwnAccount(actor);
 
     return res.status(200).json({ success: true, ...result });
   } catch (err) {

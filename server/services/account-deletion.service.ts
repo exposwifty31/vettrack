@@ -109,7 +109,7 @@ async function eraseUserData(clinicId: string, userId: string, actorId: string):
 async function deleteClerkUser(clerkId: string): Promise<boolean> {
   if (!process.env.CLERK_SECRET_KEY?.trim()) return false;
   // Dev-bypass identities are synthetic and not present in Clerk.
-  if (clerkId.startsWith("dev-")) return false;
+  if (!clerkId.trim() || clerkId.startsWith("dev-")) return false;
   try {
     await clerkClient.users.deleteUser(clerkId);
     return true;

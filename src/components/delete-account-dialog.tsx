@@ -6,7 +6,7 @@
  * revokes the user's Sign in with Apple token, erases their data, and deletes the
  * Clerk user), then signs out and redirects to the signed-out state.
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
   const { signOut } = useAuth();
   const [confirmText, setConfirmText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const deleteInFlightRef = useRef(false);
 
   const confirmWord = t.settingsPage.deleteAccountConfirmWord;
   const canConfirm = confirmText.trim() === confirmWord && !submitting;
@@ -43,7 +44,8 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
   }
 
   async function handleDelete() {
-    if (!canConfirm) return;
+    if (!canConfirm || deleteInFlightRef.current) return;
+    deleteInFlightRef.current = true;
     setSubmitting(true);
     try {
       await deleteOwnAccount();
@@ -51,6 +53,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
       // signOut clears local session and redirects to the signed-out state.
       await signOut();
     } catch {
+      deleteInFlightRef.current = false;
       setSubmitting(false);
       toast.error(t.settingsPage.deleteAccountFailed);
     }

@@ -83,11 +83,15 @@ describe("isAppleRevocationConfigured", () => {
 });
 
 describe("exchangeAppleAuthorizationCode", () => {
+  const original = { ...process.env };
   beforeEach(() => {
     process.env.APPLE_TEAM_ID = config.teamId;
     process.env.APPLE_KEY_ID = config.keyId;
     process.env.APPLE_CLIENT_ID = config.clientId;
     process.env.APPLE_PRIVATE_KEY = config.privateKey;
+  });
+  afterEach(() => {
+    process.env = { ...original };
   });
 
   it("returns the refresh token and posts the expected form to Apple", async () => {
@@ -126,11 +130,15 @@ describe("exchangeAppleAuthorizationCode", () => {
 });
 
 describe("revokeAppleToken", () => {
+  const original = { ...process.env };
   beforeEach(() => {
     process.env.APPLE_TEAM_ID = config.teamId;
     process.env.APPLE_KEY_ID = config.keyId;
     process.env.APPLE_CLIENT_ID = config.clientId;
     process.env.APPLE_PRIVATE_KEY = config.privateKey;
+  });
+  afterEach(() => {
+    process.env = { ...original };
   });
 
   it("resolves on HTTP 200 (empty body) and sends the token + hint", async () => {
