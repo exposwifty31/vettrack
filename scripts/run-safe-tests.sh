@@ -91,7 +91,7 @@ if [[ "${PLAYWRIGHT_E2E:-}" == "1" ]]; then
 
   echo "--- Playwright safe E2E (requires API at ${TEST_BASE_URL}) ---"
   if ! curl -fsS "${TEST_BASE_URL}/api/healthz" > /dev/null 2>&1; then
-    fail "API not reachable at ${TEST_BASE_URL}/api/healthz — start server (pnpm dev:api) or unset PLAYWRIGHT_E2E"
+    fail "API not reachable at ${TEST_BASE_URL}/api/healthz — start server (pnpm start:playwright-api) or unset PLAYWRIGHT_E2E"
   fi
 
   # Same allowlist as CI (playwright.config.ts PW_SUITE=ci)

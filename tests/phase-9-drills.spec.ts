@@ -155,25 +155,18 @@ test("drill 2 — sw_update_conflict + sw-update-available banner on simulated s
   // the two and dispatches "sw-update-available" only when they differ —
   // this is the production banner-gating path.
   const eventFired = await page.evaluate(() => {
-    return new Promise<boolean>((resolve) => {
-      const timeout = setTimeout(() => resolve(false), 3000);
-      window.addEventListener(
-        "sw-update-available",
-        () => {
-          clearTimeout(timeout);
-          resolve(true);
-        },
-        { once: true },
-      );
-      // Directly dispatch via window.dispatchEvent — the production path
-      // from src/main.tsx + src/lib/realtime.ts.noteBuildTagMismatchOnce
-      // uses the same event name. We're verifying the wiring works.
-      window.dispatchEvent(
-        new CustomEvent("sw-update-available", {
-          detail: { worker: null, buildTag: "9.9.9-fake-tag" },
-        }),
-      );
-    });
+    let fired = false;
+    const handler = () => {
+      fired = true;
+    };
+    window.addEventListener("sw-update-available", handler, { once: true });
+    window.dispatchEvent(
+      new CustomEvent("sw-update-available", {
+        detail: { worker: null, buildTag: "9.9.9-fake-tag" },
+      }),
+    );
+    window.removeEventListener("sw-update-available", handler);
+    return fired;
   });
 
   expect(eventFired, "sw-update-available event did not fire").toBe(true);

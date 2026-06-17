@@ -51,6 +51,7 @@ jobs:
       DATABASE_URL: postgres://vettrack:vettrack@127.0.0.1:5432/vettrack_test
       SESSION_SECRET: ci-test-secret-that-is-long-enough-32chars
       PORT: 3001
+      PLAYWRIGHT_E2E: "true"
 
     steps:
       - name: ⬇️ Checkout
@@ -75,19 +76,16 @@ jobs:
 
       - name: 🏗️ Build frontend
         run: |
-          export VITE_CLERK_PUBLISHABLE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-pk_test_ci_dummy_publishable_key}"
+          unset VITE_CLERK_PUBLISHABLE_KEY
           pnpm build
         env:
           NODE_ENV: production
-          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
 
       - name: 🗄️ Database migrations
         run: pnpm migrate
 
       - name: 🚀 Start app for Playwright
-        run: pnpm dev:api > /tmp/vettrack-simulation.log 2>&1 &
-        env:
-          PLAYWRIGHT_E2E: "true"
+        run: pnpm start:playwright-api > /tmp/vettrack-simulation.log 2>&1 &
 
       - name: ⏳ Wait for API readiness
         run: |

@@ -4,6 +4,7 @@ import {
   CHECKOUT_LIMITER_MAX_PER_MINUTE,
   rateLimitUserKey,
   SCAN_LIMITER_MAX_PER_MINUTE,
+  shouldSkipPerIpApiThrottles,
   WRITE_LIMITER_MAX_PER_MINUTE,
 } from "../server/middleware/rate-limiters.js";
 
@@ -36,5 +37,30 @@ describe("F2: rate limiter per-user keys", () => {
     expect(SCAN_LIMITER_MAX_PER_MINUTE).toBeGreaterThanOrEqual(100);
     expect(CHECKOUT_LIMITER_MAX_PER_MINUTE).toBeGreaterThanOrEqual(100);
     expect(WRITE_LIMITER_MAX_PER_MINUTE).toBeGreaterThanOrEqual(100);
+  });
+
+  it("F2: per-IP throttles skip under vitest, TEST_MODE, and Playwright E2E", () => {
+    const env = process.env;
+    try {
+      delete process.env.NODE_ENV;
+      delete process.env.TEST_MODE;
+      delete process.env.PLAYWRIGHT_E2E;
+      expect(shouldSkipPerIpApiThrottles()).toBe(false);
+
+      process.env.NODE_ENV = "test";
+      expect(shouldSkipPerIpApiThrottles()).toBe(true);
+      delete process.env.NODE_ENV;
+
+      process.env.TEST_MODE = "true";
+      expect(shouldSkipPerIpApiThrottles()).toBe(true);
+      delete process.env.TEST_MODE;
+
+      process.env.PLAYWRIGHT_E2E = "true";
+      expect(shouldSkipPerIpApiThrottles()).toBe(true);
+    } finally {
+      process.env.NODE_ENV = env.NODE_ENV;
+      process.env.TEST_MODE = env.TEST_MODE;
+      process.env.PLAYWRIGHT_E2E = env.PLAYWRIGHT_E2E;
+    }
   });
 });
