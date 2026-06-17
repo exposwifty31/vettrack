@@ -241,7 +241,7 @@ ci:merge-gate:
     - !reference [.playwright_branch_rules, rules]
   script:
     - pnpm exec playwright install --with-deps chromium
-    - export VITE_CLERK_PUBLISHABLE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-pk_test_ci_dummy_publishable_key}"
+    - unset VITE_CLERK_PUBLISHABLE_KEY
     - NODE_ENV=production pnpm build
     - pnpm migrate
     - pnpm start:playwright-api > /tmp/vettrack-playwright.log 2>&1 &
@@ -478,7 +478,7 @@ e2e-simulation:nightly:
 
   script:
     - pnpm exec playwright install --with-deps chromium
-    - export VITE_CLERK_PUBLISHABLE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-pk_test_ci_dummy_publishable_key}"
+    - unset VITE_CLERK_PUBLISHABLE_KEY
     - NODE_ENV=production pnpm build
     - pnpm migrate
     - pnpm start:playwright-api > /tmp/vettrack-simulation.log 2>&1 &

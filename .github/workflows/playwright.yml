@@ -74,11 +74,11 @@ jobs:
 
       - name: 🏗️ Build frontend
         run: |
-          export VITE_CLERK_PUBLISHABLE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-pk_test_ci_dummy_publishable_key}"
+          # Dev-bypass auth for E2E: omit Clerk key (empty GitHub secret still sets the var).
+          unset VITE_CLERK_PUBLISHABLE_KEY
           pnpm build
         env:
           NODE_ENV: production
-          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
 
       - name: 🗄️ Database migrations
         run: pnpm migrate
