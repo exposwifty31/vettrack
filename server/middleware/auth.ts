@@ -11,6 +11,7 @@ import { normalizeLocale } from "../../lib/i18n/loader.js";
 import { buildAccessDeniedBody, recordAccessDenied } from "../lib/access-denied.js";
 import { isAdminEmail } from "../lib/admin-email-allowlist.js";
 import { incrementMetric } from "../lib/metrics.js";
+import { resolveAuthModeFromEnv } from "../lib/auth-mode.js";
 
 export type UserRole = "admin" | "vet" | "technician" | "senior_technician" | "student";
 type LegacyUserRole = UserRole | "viewer";
@@ -250,7 +251,7 @@ export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
     return { ok: true, user: { ...DEV_USER, role: "admin" } };
   }
 
-  const isDevBypass = isDevelopment && !hasClerkSecret;
+  const isDevBypass = isDevelopment && resolveAuthModeFromEnv().mode === "dev-bypass";
 
   if (isDevBypass) {
     const overrideRole = req.headers["x-dev-role-override"] as LegacyUserRole | undefined;
@@ -271,7 +272,7 @@ export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
   let clerkOrgId: string | null | undefined;
   let sessionClaims: Record<string, unknown> | undefined;
   try {
-    const auth = getAuth(req);
+    const auth = getAuth(req, { acceptsToken: "any" });
     clerkUserId = auth.userId;
     clerkOrgId = auth.orgId;
     sessionClaims = auth.sessionClaims as Record<string, unknown> | undefined;

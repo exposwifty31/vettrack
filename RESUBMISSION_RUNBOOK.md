@@ -1,9 +1,9 @@
 # VetTrack — App Store Resubmission Runbook (A–Z)
 
 **Audience:** a future Claude session (or Dan) executing the resubmission cold.
-**Goal:** get VetTrack **1.0 (4)** through App Review after the 1.0 (3) rejection
-(Submission `9f5acacc-9abd-449c-b297-1834d568a84b`).
-**Last verified:** 2026-06-17, production includes account deletion (PR #1) + native Apple token link.
+**Goal:** get VetTrack **1.0.1 (20)** through App Review after the **5.1.1(v)** rejection on build 15
+(Submission `a0758d36-14b9-49c0-bf20-eb337ffcb8c6`).
+**Last verified:** 2026-06-17, production includes account deletion + native Apple token link; locales/Xcode aligned to build **20**.
 
 > Secrets: this file never contains the live Clerk key. Export it from Railway first:
 > `export CLERK_SECRET_KEY=$(cd /Users/dan/.vt-deploy 2>/dev/null && railway variables --json 2>/dev/null | python3 -c "import json,sys;print(json.load(sys.stdin)['CLERK_SECRET_KEY'])")`
@@ -25,7 +25,7 @@
 - **Code:** account deletion + Playwright CI fixes merged to `github/main` (PR #1). Local `main` synced. Deploy to Railway before App Review (§K).
 - **Production web** (`https://vettrack.uk`): serving the current bundle. The iOS shell is a **bundled app** (no `server.url`) — it does NOT depend on production for the frontend, but the API + Clerk it calls are production.
 - **Clerk (production instance `clerk.vettrack.uk`):** redirect URLs, allowed origins, Apple+Google OAuth, demo account, Client Trust — all configured (verify in §C).
-- **Build number:** `CURRENT_PROJECT_VERSION = 4`, `MARKETING_VERSION = 1.0`. Ready to archive as **1.0 (4)**.
+- **Build number:** `CURRENT_PROJECT_VERSION = 20`, `MARKETING_VERSION = 1.0.1`. Ready to archive as **1.0.1 (20)**.
 - **Synced shell:** `npx cap sync ios` already run from HEAD. `dist/public` == `ios/App/App/public`.
 - **Legal pages:** `/privacy`, `/terms`, and `/support` are implemented — verify all three on production after deploy before setting App Store / Play Console URLs. See `docs/legal-pages.md`.
 
@@ -63,7 +63,7 @@ sips -g hasAlpha -g pixelWidth ios/App/App/Assets.xcassets/AppIcon.appiconset/Ap
 
 # Build number must be >= 4
 grep -m1 CURRENT_PROJECT_VERSION ios/App/App.xcodeproj/project.pbxproj
-#   EXPECT: CURRENT_PROJECT_VERSION = 4
+#   EXPECT: CURRENT_PROJECT_VERSION = 20
 
 # Shell is a BUNDLED app (no server.url) and carries the native OAuth transport
 python3 -c "import json;c=json.load(open('ios/App/App/capacitor.config.json'));print('BUNDLED:', 'server' not in c or not c.get('server',{}).get('url'))"
@@ -96,7 +96,7 @@ Simulator smoke before archive:
 ## E. Resubmit in App Store Connect
 
 1. Open the app → the **1.0** version (or create version 1.0 if needed).
-2. **Build** → select the freshly uploaded **1.0 (4)**.
+2. **Build** → select the freshly uploaded **1.0.1 (20)**.
 3. **App Review Information**:
    - Sign-In required: **Yes**.
    - Username: `reviewer@vettrack.uk`  Password: `VetTrack2026!`

@@ -35,7 +35,12 @@ import { mountRfidRoutes } from "./lib/mount-rfid-routes.js";
 import { startBackgroundSchedulers } from "./app/start-schedulers.js";
 import { ensureClinicPhase2Defaults } from "./lib/ensure-clinic-phase2-defaults.js";
 import healthRoutes from "./routes/health.js";
-import { resolveAuthModeFromEnv, describeAuthMode } from "./lib/auth-mode.js";
+import {
+  resolveAuthModeFromEnv,
+  describeAuthMode,
+  isProductionRuntime,
+  shouldMountClerkMiddleware,
+} from "./lib/auth-mode.js";
 import { resolveClerkAuthorizedParties } from "./lib/clerk-authorized-parties.js";
 import {
   loadBuildInfo,
@@ -44,7 +49,7 @@ import {
 } from "./lib/build-info.js";
 
 const { version: appVersion } = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "../package.json"), "utf-8")) as { version?: string };
-const isProduction = process.env.NODE_ENV === "production";
+const isProduction = isProductionRuntime();
 
 const app = express();
 // App-level setting (not middleware) so it suppresses the header globally,
@@ -269,17 +274,15 @@ app.use((req, _res, next) => {
   next();
 });
 
-// Always mount official Clerk middleware at app level when Clerk auth is enabled.
-// In dev bypass mode (no secret), requireAuth falls back to local dev identity.
+// Mount Clerk middleware whenever resolveAuthUser will call getAuth(req).
 const authModeResolution = resolveAuthModeFromEnv();
+const mountClerkMiddleware = shouldMountClerkMiddleware();
 
-// Secret-free startup banner so operators and agents can confirm the server
-// auth mode without reading env files. Logged once at boot (non-production).
-if (!isProduction) {
-  console.log(`[auth-mode] server ${describeAuthMode(authModeResolution)}`);
-}
+console.log(
+  `[auth-mode] server ${describeAuthMode(authModeResolution)} clerkMiddleware=${mountClerkMiddleware ? "mounted" : "skipped"}`,
+);
 
-if (authModeResolution.mode === "clerk") {
+if (mountClerkMiddleware) {
   if (!process.env.CLERK_PUBLISHABLE_KEY?.trim() && process.env.VITE_CLERK_PUBLISHABLE_KEY?.trim()) {
     process.env.CLERK_PUBLISHABLE_KEY = process.env.VITE_CLERK_PUBLISHABLE_KEY;
   }

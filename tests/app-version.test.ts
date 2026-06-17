@@ -45,7 +45,7 @@ describe("app-version", () => {
 
   it("resolveDisplayAppVersion uses native marketing version in Capacitor", async () => {
     vi.mocked(isCapacitorNative).mockReturnValue(true);
-    vi.mocked(App.getInfo).mockResolvedValue({ version: "1.0.1", build: "16", id: "uk.vettrack.app", name: "VetTrack" });
+    vi.mocked(App.getInfo).mockResolvedValue({ version: "1.0.1", build: "18", id: "uk.vettrack.app", name: "VetTrack" });
     await expect(resolveDisplayAppVersion()).resolves.toBe("1.0.1");
   });
 

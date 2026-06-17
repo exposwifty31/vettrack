@@ -30,13 +30,11 @@ import { clearPostSignupLandingFlag } from "@/lib/post-signup-landing";
 const CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
 function SectionTitle({
-  kicker,
   title,
   subtitle,
   className,
   id,
 }: {
-  kicker?: string;
   title: string;
   subtitle: string;
   className?: string;
@@ -44,9 +42,6 @@ function SectionTitle({
 }) {
   return (
     <div className={cn("text-center max-w-3xl mx-auto mb-12 md:mb-16", className)}>
-      {kicker ? (
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-3">{kicker}</p>
-      ) : null}
       <h2
         id={id}
         className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight text-balance mb-4"
@@ -104,14 +99,13 @@ export default function LandingPage() {
   ];
 
   const howSteps: {
-    n: "01" | "02" | "03";
     title: string;
     body: string;
     icon: typeof QrCode;
   }[] = [
-    { n: "01", title: lp.how1Title, body: lp.how1Body, icon: QrCode },
-    { n: "02", title: lp.how2Title, body: lp.how2Body, icon: Scan },
-    { n: "03", title: lp.how3Title, body: lp.how3Body, icon: FileDown },
+    { title: lp.how1Title, body: lp.how1Body, icon: QrCode },
+    { title: lp.how2Title, body: lp.how2Body, icon: Scan },
+    { title: lp.how3Title, body: lp.how3Body, icon: FileDown },
   ];
 
   return (
@@ -337,7 +331,6 @@ export default function LandingPage() {
           <section className="py-12 md:py-20 px-4 sm:px-6" aria-labelledby="platform-heading">
             <div className="max-w-6xl mx-auto">
               <SectionTitle
-                kicker={lp.bentoKicker}
                 id="platform-heading"
                 title={lp.bentoTitle}
                 subtitle={lp.bentoSubtitle}
@@ -346,11 +339,11 @@ export default function LandingPage() {
               <div className="grid grid-cols-1 md:grid-cols-6 gap-4 md:gap-5">
                 <article
                   className={cn(
-                    "md:col-span-3 rounded-3xl border border-border/70 bg-gradient-to-br from-card to-card/50 p-6 sm:p-8",
+                    "md:col-span-3 rounded-2xl border border-border/70 bg-gradient-to-br from-card to-card/50 p-6 sm:p-8",
                     "shadow-sm hover:shadow-md transition-shadow duration-300"
                   )}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-5">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-5">
                     <QrCode className="w-6 h-6 text-primary" />
                   </div>
                   <h3 className="text-xl font-bold text-foreground mb-2">{lp.bento1Title}</h3>
@@ -358,11 +351,11 @@ export default function LandingPage() {
                 </article>
                 <article
                   className={cn(
-                    "md:col-span-3 rounded-3xl border border-border/70 bg-gradient-to-br from-card to-card/50 p-6 sm:p-8",
+                    "md:col-span-3 rounded-2xl border border-border/70 bg-gradient-to-br from-card to-card/50 p-6 sm:p-8",
                     "shadow-sm hover:shadow-md transition-shadow duration-300"
                   )}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-5">
+                  <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mb-5">
                     <WifiOff className="w-6 h-6 text-amber-600 dark:text-amber-400" />
                   </div>
                   <h3 className="text-xl font-bold text-foreground mb-2">{lp.bento2Title}</h3>
@@ -413,7 +406,6 @@ export default function LandingPage() {
           >
             <div className="max-w-6xl mx-auto">
               <SectionTitle
-                kicker={lp.howKicker}
                 id="how-heading"
                 title={lp.howTitle}
                 subtitle={lp.howSubtitle}
@@ -426,7 +418,7 @@ export default function LandingPage() {
                 {howSteps.map((step) => {
                   const Icon = step.icon;
                   return (
-                    <div key={step.n} className="relative z-[1] flex flex-col items-center text-center">
+                    <div key={step.title} className="relative z-[1] flex flex-col items-center text-center">
                       <div
                         className={cn(
                           "w-16 h-16 rounded-2xl flex items-center justify-center mb-5 shadow-lg",
@@ -435,9 +427,6 @@ export default function LandingPage() {
                       >
                         <Icon className="w-7 h-7" />
                       </div>
-                      <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-1">
-                        {t.landingPage.howStepLabel(step.n)}
-                      </h3>
                       <p className="text-lg font-bold text-foreground mb-2">{step.title}</p>
                       <p className="text-sm text-muted-foreground leading-relaxed max-w-sm">
                         {step.body}
@@ -498,16 +487,11 @@ export default function LandingPage() {
           </section>
 
           <section
-            className="relative py-20 md:py-28 px-4 sm:px-6 text-primary-foreground overflow-hidden"
+            className="relative py-20 md:py-28 px-4 sm:px-6 text-primary-foreground overflow-hidden bg-primary"
             aria-labelledby="final-cta"
           >
-            <div className="absolute inset-0 bg-primary" aria-hidden />
             <div
-              className="absolute inset-0 opacity-40"
-              style={{
-                background:
-                  "radial-gradient(800px 400px at 20% 20%, white 0%, transparent 50%), radial-gradient(600px 300px at 80% 80%, hsl(200 100% 70% / 0.3) 0%, transparent 55%)",
-              }}
+              className="absolute inset-0 opacity-30 bg-[radial-gradient(ellipse_80%_50%_at_20%_0%,_white,_transparent)]"
               aria-hidden
             />
             <div className="relative max-w-3xl mx-auto text-center z-[1]">

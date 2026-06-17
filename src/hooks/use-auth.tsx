@@ -10,6 +10,11 @@ import { authFetchUsersMe, authPostUsersSync } from "@/lib/api";
 import { setAuthStateRef, clearHaltQueue, processQueue } from "@/lib/sync-engine";
 import { maybeReportOfflineSyncTelemetry } from "@/lib/offline-sync-telemetry-reporter";
 import { isOnline, safeReloadPage } from "@/lib/safe-browser";
+import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import {
+  resolveNativeClerkSessionToken,
+  summarizeClerkToken,
+} from "@/lib/native-clerk-session-token";
 
 export type UserStatus = "pending" | "active" | "blocked" | null;
 export type AccessDeniedReason =
@@ -308,13 +313,16 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     setClerkTokenGetter(async () => {
+      if (isCapacitorNative()) {
+        return resolveNativeClerkSessionToken((opts) => getTokenRef.current(opts));
+      }
       const token = await getTokenRef.current();
       return typeof token === "string" ? token : null;
     });
     return () => {
       setClerkTokenGetter(null);
     };
-  }, [getToken, isSignedIn]);
+  }, [isSignedIn]);
 
   useEffect(() => {
     stateRef.current = state;
@@ -366,8 +374,13 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
 
     async function syncSession() {
       setState((s) => (s.isLoaded && !s.isSignedIn ? { ...s, isLoaded: false } : s));
-      const rawToken = await getTokenRef.current();
-      const token = typeof rawToken === "string" ? rawToken.trim() : "";
+      let token = "";
+      if (isCapacitorNative()) {
+        token = await resolveNativeClerkSessionToken((opts) => getTokenRef.current(opts));
+      } else {
+        const raw = await getTokenRef.current();
+        token = typeof raw === "string" ? raw.trim() : "";
+      }
       const email = user?.primaryEmailAddress?.emailAddress || "";
       const name = `${user?.firstName || ""} ${user?.lastName || ""}`.trim();
       const clerkId = user?.id || "";
@@ -398,7 +411,7 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
         }
 
         const data = await res.json().catch(() => ({} as Partial<SyncedUserResponse>));
-        
+
         if (res.ok) {
           const dbUserId = typeof data.id === "string" ? data.id : "";
           const role = (data.role ?? "technician") as UserRole;
@@ -472,7 +485,11 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
         } else if (res.status === 401) {
           // Clerk reports signed-in, but backend rejected auth token/session.
           // Clear Clerk session so <SignIn> cannot auto-redirect to /home (H1 loop).
-          console.error("Auth sync unauthorized:", data);
+          console.error("Auth sync unauthorized:", {
+            status: res.status,
+            reason: data.reason ?? data.error ?? null,
+            token: summarizeClerkToken(token),
+          });
           clearHaltQueue();
           setCurrentClinicId();
           setAuthState({ userId: "", email: "", name: "", bearerToken: null });

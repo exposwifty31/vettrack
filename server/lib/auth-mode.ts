@@ -67,3 +67,23 @@ export function resolveAuthModeFromEnv(env: NodeJS.ProcessEnv = process.env): Au
 export function describeAuthMode(resolution: AuthModeResolution): string {
   return `mode=${resolution.mode} reason=${resolution.reason} env=${resolution.nodeEnv} hasSecret=${resolution.hasSecret} hasPublishable=${resolution.hasPublishable}`;
 }
+
+/** True when NODE_ENV=production or Railway production environment is active. */
+export function isProductionRuntime(env: NodeJS.ProcessEnv = process.env): boolean {
+  const nodeEnv = (env.NODE_ENV ?? "development").trim();
+  if (nodeEnv === "production") return true;
+  return (env.RAILWAY_ENVIRONMENT ?? "").trim() === "production";
+}
+
+/**
+ * Mount Clerk middleware whenever resolveAuthUser will call getAuth(req).
+ * CLERK_ENABLED=false skips auth-mode "clerk" but production still has a secret
+ * and must not call getAuth without clerkMiddleware (native Bearer bootstrap).
+ */
+export function shouldMountClerkMiddleware(env: NodeJS.ProcessEnv = process.env): boolean {
+  const resolution = resolveAuthModeFromEnv(env);
+  if (resolution.mode === "clerk") return true;
+  const hasSecret = Boolean(env.CLERK_SECRET_KEY?.trim());
+  if (!hasSecret) return false;
+  return isProductionRuntime(env);
+}

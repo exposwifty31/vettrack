@@ -26,4 +26,12 @@ describe("resolveClerkAuthorizedParties", () => {
     expect(parties).toContain("http://localhost:5000");
     expect(parties).toContain("http://localhost:3001");
   });
+
+  it("does not double-prefix www when ALLOWED_ORIGIN already has www", () => {
+    process.env.ALLOWED_ORIGIN = "https://www.vettrack.uk";
+    const parties = resolveClerkAuthorizedParties(true);
+    expect(parties).toContain("https://www.vettrack.uk");
+    expect(parties).toContain("https://vettrack.uk");
+    expect(parties).not.toContain("https://www.www.vettrack.uk");
+  });
 });

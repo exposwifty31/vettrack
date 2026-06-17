@@ -68,6 +68,7 @@ import {
   cacheRooms,
 } from "./offline-db";
 import { equipmentApi, requestWithOfflineFallback, type EquipmentPage } from "./api/equipment";
+import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import {
   request,
   ApiError,
@@ -146,10 +147,19 @@ function bootstrapFetchWithTimeout(url: string, init: RequestInit): Promise<Resp
  * fetchWithTimeout to avoid the authFetch userId guard that fires before the
  * server response has populated authStore.userId.
  */
+function bootstrapCredentials(init: RequestInit): RequestCredentials {
+  const headers = mergeRequestHeaders(init);
+  const hasBearer = typeof headers.Authorization === "string" && /^Bearer\s+\S+/i.test(headers.Authorization);
+  if (hasBearer && isCapacitorNative()) {
+    return "omit";
+  }
+  return "include";
+}
+
 export async function authFetchUsersMe(init: RequestInit = {}): Promise<Response> {
   return bootstrapFetchWithTimeout(
     "/api/users/me",
-    { credentials: "include", ...init, headers: mergeRequestHeaders(init) },
+    { credentials: bootstrapCredentials(init), ...init, headers: mergeRequestHeaders(init) },
   );
 }
 
@@ -161,7 +171,7 @@ export async function authPostUsersSync(
   return bootstrapFetchWithTimeout(
     "/api/users/sync",
     {
-      credentials: "include",
+      credentials: bootstrapCredentials({ ...init, body: payload }),
       method: "POST",
       ...init,
       headers: mergeRequestHeaders({ ...init, body: payload }),

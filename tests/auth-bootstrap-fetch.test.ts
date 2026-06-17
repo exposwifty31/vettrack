@@ -101,4 +101,23 @@ describe("use-auth session bootstrap wiring", () => {
     const syncBody = useAuthSrc.slice(syncStart, syncEnd > syncStart ? syncEnd : undefined);
     expect(syncBody).not.toMatch(/status:\s*"pending"/);
   });
+
+  it("syncSession resolves a native session JWT before bootstrap on Capacitor", () => {
+    expect(useAuthSrc).toContain("resolveNativeClerkSessionToken");
+    expect(useAuthSrc).toContain("isCapacitorNative()");
+  });
+});
+
+describe("clerkMiddleware authorized parties", () => {
+  const serverIndex = fs.readFileSync(path.join(ROOT, "server/index.ts"), "utf8");
+
+  it("allows Capacitor shell origins during Clerk JWT verification", () => {
+    expect(serverIndex).toContain("authorizedParties: resolveClerkAuthorizedParties(isProduction)");
+    expect(serverIndex).toContain('from "./lib/clerk-authorized-parties.js"');
+  });
+
+  it("mounts clerkMiddleware via shouldMountClerkMiddleware (Railway production safety)", () => {
+    expect(serverIndex).toContain("shouldMountClerkMiddleware");
+    expect(serverIndex).toContain("clerkMiddleware=");
+  });
 });

@@ -3460,7 +3460,7 @@
     "configureAlerts": "Configure alerts in Settings",
     "currentVersion": "1.0.1",
     "currentDate": "June 2026",
-    "buildLabel": "Build 16",
+    "buildLabel": "Build 20",
     "items": {
       "clinicalDesign": {
         "title": "Clinical design system refresh",

@@ -24,6 +24,20 @@ function normalizeOrigin(value: string | undefined): string | null {
   }
 }
 
+/** Bare ↔ `www.` alternate for the same origin; null when parsing fails or unchanged. */
+function alternateWwwOrigin(origin: string): string | null {
+  try {
+    const url = new URL(origin);
+    url.hostname = url.hostname.startsWith("www.")
+      ? url.hostname.slice(4)
+      : `www.${url.hostname}`;
+    const alternate = url.origin;
+    return alternate === origin ? null : alternate;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Build the authorized-parties allowlist for the resolved environment.
  *
@@ -37,7 +51,10 @@ export function resolveClerkAuthorizedParties(isProduction: boolean): string[] {
   const allowedOrigin = normalizeOrigin(process.env.ALLOWED_ORIGIN);
   if (allowedOrigin) {
     parties.add(allowedOrigin);
-    parties.add(allowedOrigin.replace("://", "://www."));
+    const wwwAlternate = alternateWwwOrigin(allowedOrigin);
+    if (wwwAlternate) {
+      parties.add(wwwAlternate);
+    }
   }
 
   if (!isProduction) {

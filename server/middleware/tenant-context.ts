@@ -31,7 +31,7 @@ export async function tenantContext(req: Request, res: Response, next: NextFunct
   let clerkUserId: string | undefined;
   const fromClerk = (() => {
     try {
-      const auth = getAuth(req);
+      const auth = getAuth(req, { acceptsToken: "any" });
       clerkUserId = auth.userId ?? undefined;
       return auth.orgId ?? undefined;
     } catch {

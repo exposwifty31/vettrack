@@ -30,7 +30,7 @@
 | Resubmission script | `./scripts/verify-resubmission.sh` | PASS | **16/16 gates (2026-06-16)** — demo login `complete`, Clerk OAuth, CORS, icon, build 12, bundled shell, `vettrack.uk` baked in bundle, widgets, AASA. (First run showed 15/16: stale `dist/public` missing `vettrack.uk`; cleared by rebuilding the bundled shell — see below.) |
 | Demo login | `RESUBMISSION_RUNBOOK.md` §C curl | `LOGIN: complete` | Demo account sign-in verified on device (2026-06-15); re-confirmed by gate script (2026-06-16) |
 | Bundled shell | `./scripts/build-native-shell.sh` | synced | Rebuilt + `cap sync ios` (2026-06-16) — bakes `VITE_API_ORIGIN=https://vettrack.uk` from `.env` only (ignores empty `.env.local` override); no `server.url` in `ios/App/App/capacitor.config.json` |
-| Build number | Xcode `CURRENT_PROJECT_VERSION` | 16 | Bump per upload |
+| Build number | Xcode `CURRENT_PROJECT_VERSION` | 20 | Bump per upload |
 | Simulator smoke | `./scripts/install-ios-sim.sh` | PASS | iPad (A16) sim: BUILD SUCCEEDED, app launches, boots to `/signin` with live Clerk card (Apple/Google/demo `0501234567`, "Secured by Clerk") — confirms bundled auth reaches real backend, not a blank shell (2026-06-16) |
 
 ---
@@ -182,7 +182,7 @@ Also run `docs/mobile/nfc-ship-checklist.md` device rows before submission (NFC 
 **Gate status (2026-06-16):**
 - `./scripts/verify-resubmission.sh` — **16/16 PASS**
 - Demo login — `LOGIN: complete`
-- Bundled shell build 12, `MARKETING_VERSION` **1.0.1**, What's New locale **1.0.1 · Build 12**
+- Bundled shell build **20**, `MARKETING_VERSION` **1.0.1**, What's New locale **1.0.1 · Build 20**
 - Route matrix — **iPad P complete**; **iPhone P tier 1–4 largely PASS** (screenshot-audited); landscape columns spot-checked (portrait-letterbox on iPhone); 5 iPhone P menu routes + signup remain for human spot-check
 - NFC device matrix (`nfc-ship-checklist.md`) — **not run** on physical TestFlight hardware this session
 

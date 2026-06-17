@@ -2,7 +2,8 @@ import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { setPostSignupLandingFlag } from "@/lib/post-signup-landing";
 import { Helmet } from "react-helmet-async";
-import { Loader2, QrCode } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { VetTrackMark } from "@/components/vettrack-mark";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignUp } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
 import { clerkAppearance, clerkAppearanceNative } from "@/lib/clerk-appearance";
@@ -40,11 +41,9 @@ export default function SignUpPage() {
           <div className="text-center mb-8">
             <Link
               href="/"
-              className="inline-flex items-center gap-2 mb-6 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="inline-flex items-center gap-2.5 mb-6 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-                <QrCode className="w-5 h-5 text-primary-foreground" />
-              </div>
+              <VetTrackMark size={40} />
               <span className="text-2xl font-bold text-foreground">VetTrack</span>
             </Link>
             <h1 className="text-2xl font-bold text-foreground mb-2">יצירת חשבון</h1>
@@ -65,14 +64,14 @@ export default function SignUpPage() {
               </ClerkFailed>
               <ClerkLoaded>
                 <ClerkAuthFormShell>
-                  <div className="w-full min-h-[24rem] flex flex-col items-center justify-start">
+                  <div className="w-full min-h-[24rem] flex flex-col items-center justify-start gap-4">
+                    {IS_NATIVE ? <NativeSocialButtons mode="signUp" /> : null}
                     <SignUp
                       routing="hash"
                       signInUrl="/signin"
                       fallbackRedirectUrl="/"
                       appearance={IS_NATIVE ? clerkAppearanceNative : clerkAppearance}
                     />
-                    {IS_NATIVE ? <NativeSocialButtons mode="signUp" /> : null}
                   </div>
                 </ClerkAuthFormShell>
               </ClerkLoaded>

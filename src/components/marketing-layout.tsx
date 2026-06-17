@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { Link } from "wouter";
-import { QrCode, LayoutDashboard, ArrowRight } from "lucide-react";
+import { LayoutDashboard, ArrowRight } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { VetTrackMark } from "@/components/vettrack-mark";
 
 type MarketingLayoutProps = {
   children: ReactNode;
@@ -37,14 +38,9 @@ export function MarketingLayout({ children, showAppCta, showAuthCta }: Marketing
             href="/"
             className="flex items-center gap-2.5 group select-none rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
           >
-            <div
-              className={cn(
-                "w-9 h-9 md:w-10 md:h-10 rounded-2xl flex items-center justify-center",
-                "bg-primary text-primary-foreground shadow-md shadow-primary/20",
-                "transition-transform duration-200 group-hover:scale-105 motion-reduce:group-hover:scale-100"
-              )}
-            >
-              <QrCode className="w-[1.1rem] h-[1.1rem] md:w-5 md:h-5" aria-hidden />
+            <div className="transition-transform duration-200 group-hover:scale-105 motion-reduce:group-hover:scale-100">
+              <VetTrackMark size={36} className="md:hidden" />
+              <VetTrackMark size={40} className="hidden md:block" />
             </div>
             <div className="leading-tight">
               <span className="block text-lg md:text-xl font-bold tracking-tight">{t.common.appName}</span>
@@ -91,9 +87,7 @@ export function MarketingLayout({ children, showAppCta, showAuthCta }: Marketing
       <footer className="border-t border-border/60 bg-background py-10 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-6">
           <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">
-              <QrCode className="w-4 h-4" aria-hidden />
-            </div>
+            <VetTrackMark size={36} />
             <div>
               <p className="font-bold text-foreground">{t.common.appName}</p>
               <p className="text-sm text-muted-foreground max-w-sm">{lp.footerTagline}</p>

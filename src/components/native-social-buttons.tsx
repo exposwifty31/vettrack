@@ -15,10 +15,10 @@ import { useState } from "react";
 import { useSignIn, useSignUp } from "@clerk/clerk-react";
 import { Apple, Loader2 } from "lucide-react";
 import {
+  startNativeAppleOAuth,
   startNativeOAuth,
   type NativeOAuthStrategy,
 } from "@/lib/native-oauth";
-import { linkNativeAppleAuthorizationCodeAfterSignIn } from "@/lib/native-apple-link";
 
 function GoogleGlyph() {
   return (
@@ -58,15 +58,19 @@ export function NativeSocialButtons({ mode }: { mode: Mode }) {
     setError(null);
     setBusy(strategy);
     try {
-      await startNativeOAuth({
-        strategy,
-        signIn: signIn as never,
-        signUp: signUp as never,
-        setActive: setActive as never,
-      });
       if (strategy === "oauth_apple") {
-        // Non-blocking: capture Apple's authorizationCode for deletion-time revocation.
-        void linkNativeAppleAuthorizationCodeAfterSignIn();
+        await startNativeAppleOAuth({
+          signIn: signIn as never,
+          signUp: signUp as never,
+          setActive: setActive as never,
+        });
+      } else {
+        await startNativeOAuth({
+          strategy,
+          signIn: signIn as never,
+          signUp: signUp as never,
+          setActive: setActive as never,
+        });
       }
     } catch (err) {
       const code = err instanceof Error ? err.message : "OAUTH_FAILED";

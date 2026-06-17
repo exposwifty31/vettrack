@@ -31,6 +31,11 @@
  */
 import { App } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
+import {
+  linkCapturedAppleAuthorizationCode,
+  requestNativeAppleCredential,
+} from "@/lib/native-apple-link";
+import { warmNativeClerkSessionToken } from "@/lib/native-clerk-session-token";
 
 /*
  * Minimal structural types for the Clerk resources we touch. We intentionally do
@@ -43,11 +48,15 @@ interface OAuthVerification {
   status?: string | null;
   externalVerificationRedirectURL?: URL | null;
 }
+type SignInCreateParams =
+  | { strategy: string; redirectUrl: string }
+  | { strategy: "oauth_token_apple"; token: string };
+
 interface SignInResource {
   status?: string | null;
   createdSessionId?: string | null;
   firstFactorVerification?: OAuthVerification;
-  create(params: { strategy: string; redirectUrl: string }): Promise<unknown>;
+  create(params: SignInCreateParams): Promise<unknown>;
   reload(params?: { rotatingTokenNonce: string }): Promise<unknown>;
 }
 interface SignUpResource {
@@ -105,6 +114,63 @@ function waitForCallbackUrl(timeoutMs = 120_000): Promise<string> {
   });
 }
 
+async function completeNativeClerkSession(
+  signIn: SignInResource,
+  signUp: SignUpResource,
+  setActive: SetActive,
+  authorizationCode: string | null,
+): Promise<void> {
+  if (signIn.status === "complete" && signIn.createdSessionId) {
+    await setActive({ session: signIn.createdSessionId });
+    await warmNativeClerkSessionToken();
+    await linkCapturedAppleAuthorizationCode(authorizationCode);
+    return;
+  }
+
+  const transferable = signIn.firstFactorVerification?.status === "transferable";
+  if (transferable) {
+    await signUp.create({ transfer: true });
+    if (signUp.status === "complete" && signUp.createdSessionId) {
+      await setActive({ session: signUp.createdSessionId });
+      await warmNativeClerkSessionToken();
+      await linkCapturedAppleAuthorizationCode(authorizationCode);
+      return;
+    }
+    throw new Error(`OAUTH_SIGNUP_INCOMPLETE_${signUp.status ?? "unknown"}`);
+  }
+
+  throw new Error(`OAUTH_SIGNIN_INCOMPLETE_${signIn.status ?? "unknown"}`);
+}
+
+/**
+ * Native Sign in with Apple for Capacitor iOS.
+ *
+ * Uses ASAuthorizationController (via the Capacitor plugin) to obtain Apple's
+ * identity token and single-use authorization code in one prompt, then
+ * completes Clerk auth with `oauth_token_apple`. The authorization code is
+ * linked for account-deletion revocation — it is not available from the
+ * system-browser OAuth path.
+ */
+export async function startNativeAppleOAuth({
+  signIn,
+  signUp,
+  setActive,
+}: Omit<StartArgs, "strategy">): Promise<void> {
+  const credential = await requestNativeAppleCredential();
+
+  await signIn.create({
+    strategy: "oauth_token_apple",
+    token: credential.identityToken,
+  });
+
+  await completeNativeClerkSession(
+    signIn,
+    signUp,
+    setActive,
+    credential.authorizationCode,
+  );
+}
+
 /**
  * Drive a full native OAuth round-trip for `strategy`, completing either a
  * sign-in (existing user) or a transferred sign-up (new user — the reviewer's
@@ -150,24 +216,5 @@ export async function startNativeOAuth({
     nonce ? ({ rotatingTokenNonce: nonce } as { rotatingTokenNonce: string }) : undefined,
   );
 
-  // 6a. Existing user → sign-in is complete.
-  if (signIn.status === "complete" && signIn.createdSessionId) {
-    await setActive({ session: signIn.createdSessionId });
-    return;
-  }
-
-  // 6b. New user → Clerk marks the verification "transferable"; create the
-  //     account by transferring the OAuth identity into a sign-up.
-  const transferable =
-    signIn.firstFactorVerification?.status === "transferable";
-  if (transferable) {
-    await signUp.create({ transfer: true });
-    if (signUp.status === "complete" && signUp.createdSessionId) {
-      await setActive({ session: signUp.createdSessionId });
-      return;
-    }
-    throw new Error(`OAUTH_SIGNUP_INCOMPLETE_${signUp.status ?? "unknown"}`);
-  }
-
-  throw new Error(`OAUTH_SIGNIN_INCOMPLETE_${signIn.status ?? "unknown"}`);
+  await completeNativeClerkSession(signIn, signUp, setActive, null);
 }

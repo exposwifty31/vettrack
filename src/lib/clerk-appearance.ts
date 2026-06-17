@@ -8,15 +8,17 @@
  */
 export const clerkAppearance = {
   variables: {
-    colorPrimary: "hsl(221 83% 53%)",
-    colorText: "hsl(220 15% 20%)",
-    colorTextSecondary: "hsl(220 10% 50%)",
+    colorPrimary: "#15803d",
+    colorText: "hsl(127, 21%, 8%)",
+    colorTextSecondary: "hsl(215, 15%, 36%)",
     colorBackground: "hsl(0 0% 100%)",
     colorInputBackground: "hsl(0 0% 100%)",
     borderRadius: "1rem",
   },
   elements: {
     rootBox: "w-full",
+    logoBox: "hidden",
+    logoImage: "hidden",
     card: "rounded-2xl border border-border shadow-sm",
     headerTitle: "text-foreground",
     headerSubtitle: "text-muted-foreground",
