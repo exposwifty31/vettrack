@@ -1,5 +1,7 @@
 # In-App Account Deletion (App Store Guideline 5.1.1(v))
 
+> **Related gap:** a public [Privacy Policy page](./legal-pages.md) is **not implemented** (`/privacy` → 404). Account deletion should be described in that policy once it ships.
+
 VetTrack offers account creation (including Sign in with Apple), so Apple requires
 an in-app flow that **deletes** the account and personal data — deactivation is not
 sufficient — and, because Sign in with Apple is offered, the app must **revoke** the
@@ -44,13 +46,18 @@ capture the Apple `authorizationCode` at sign-in, exchange it at
 - Apple ES256 client-secret signing + exchange/revoke: `server/lib/apple-auth.ts`
   (signed with Node's built-in `crypto`, no extra JWT dependency).
 
-> Capturing the `authorizationCode` requires the native Sign in with Apple credential
-> (the Capacitor Apple plugin). The current native flow runs Clerk web OAuth in the
-> system browser and does not surface the code. Wire the native plugin's
-> `authorizationCode` into `linkAppleAuthorizationCode()` to complete the pipeline.
-> Until then, deletion still erases the account and deletes the Clerk user; Apple's
-> manual fallback (revoke under iOS Settings → Apple ID, plus the credential-revoked
-> notification) satisfies the requirement.
+> Capturing the `authorizationCode` uses `@capacitor-community/apple-sign-in` on
+> native iOS after a successful Apple OAuth sign-in (`src/lib/native-apple-link.ts`,
+> called from `src/components/native-social-buttons.tsx`). Failures are non-fatal.
+> Set `APPLE_CLIENT_ID` to the **bundle ID** (`uk.vettrack.app`) so token exchange
+> matches the native authorization code. Deletion still erases the account and
+> deletes the Clerk user when no token is stored; Apple's manual fallback (revoke
+> under iOS Settings → Apple ID) satisfies the requirement in that case.
+
+## Protected demo accounts
+
+`reviewer@vettrack.uk` (App Review demo) cannot self-delete. Override the list
+with comma-separated `ACCOUNT_DELETION_PROTECTED_EMAILS` on Railway.
 
 ## Configuration (Railway)
 

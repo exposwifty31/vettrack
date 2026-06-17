@@ -21,6 +21,7 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { t } from "@/lib/i18n";
 import { deleteOwnAccount } from "@/lib/api";
+import { ApiError } from "@/lib/request-core";
 import { useAuth } from "@/hooks/use-auth";
 
 interface DeleteAccountDialogProps {
@@ -52,10 +53,16 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
       toast.success(t.settingsPage.deleteAccountSuccess);
       // signOut clears local session and redirects to the signed-out state.
       await signOut();
-    } catch {
+    } catch (err) {
       deleteInFlightRef.current = false;
       setSubmitting(false);
-      toast.error(t.settingsPage.deleteAccountFailed);
+      const protectedAccount =
+        err instanceof ApiError &&
+        typeof err.payload.reason === "string" &&
+        err.payload.reason === "ACCOUNT_DELETION_PROTECTED";
+      toast.error(
+        protectedAccount ? t.settingsPage.deleteAccountProtected : t.settingsPage.deleteAccountFailed,
+      );
     }
   }
 

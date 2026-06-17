@@ -25,6 +25,7 @@ If you see new warnings, note them in the PR (or update baselines per [governanc
 ## Testing
 
 - [ ] `pnpm architecture:gates` (if `server/` or `src/` changed)
+- [ ] `bash scripts/ci/contracts-gate.sh` (if `@vettrack/contracts` dep or `shared/emergency-surfaces.manifest.ts` changed)
 - [ ] `npx tsc --noEmit`
 - [ ] `pnpm test` (or note why not run)
 

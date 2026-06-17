@@ -15,6 +15,9 @@ const HomePage = lazy(() => import("@/pages/home"));
 const LandingPage = lazy(() => import("@/pages/landing"));
 const SignUpPage = lazy(() => import("@/pages/signup"));
 const SignInPage = lazy(() => import("@/pages/signin"));
+const PrivacyPolicyPage = lazy(() => import("@/pages/privacy-policy"));
+const TermsOfUsePage = lazy(() => import("@/pages/terms-of-use"));
+const SupportPage = lazy(() => import("@/pages/support"));
 const EquipmentPage = lazy(() => import("@/pages/equipment-list"));
 const EquipmentDetailPage = lazy(() => import("@/pages/equipment-detail"));
 const NewEquipmentPage = lazy(() => import("@/pages/new-equipment"));
@@ -88,6 +91,9 @@ export function AppRoutes() {
         <Route path="/landing" component={LandingPage} />
         <Route path="/signin/*?" component={SignInPage} />
         <Route path="/signup/*?" component={SignUpPage} />
+        <Route path="/privacy" component={PrivacyPolicyPage} />
+        <Route path="/terms" component={TermsOfUsePage} />
+        <Route path="/support" component={SupportPage} />
 
         {/* --- Today & shifts --- */}
         <Route path="/home"><AuthGuard><HomePage /></AuthGuard></Route>

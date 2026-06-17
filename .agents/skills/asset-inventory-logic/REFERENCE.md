@@ -21,7 +21,8 @@ Every query in production paths must filter **`clinicId`** (see enterprise secur
 
 ## Workers & jobs
 
-- Inventory deduction runs asynchronously after medication completion; equipment NFC flows may enqueue related jobs—check `server/workers/` and schedulers in `server/app/start-schedulers.ts`.
+- **Inventory deduction worker** (`server/workers/inventory-deduction.worker.ts`) is a **no-op stub** post-143 — do not document async billing/inventory coupling from medication completion (see `docs/scope-change-2026.md`).
+- Equipment-related schedulers (waitlist reservation, condition staleness, charge alerts, etc.) register in `server/app/start-schedulers.ts` and `server/jobs/runtime.ts`.
 
 ## Verification script prerequisites
 

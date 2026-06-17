@@ -66,9 +66,10 @@
 | Skill | Path | Upstream | Adopt when |
 |-------|------|----------|------------|
 | **publish-mobile-app** | `.agents/skills/publish-mobile-app/SKILL.md` | [logesh-kumar/publish-mobile-app](https://github.com/logesh-kumar/publish-mobile-app) | Task 0.3 App Review / `fix-rejection` |
-| **expo** (VKirill) | `.agents/skills/expo/SKILL.md` | [antigravity-for-claude-code/skills/expo](https://github.com/VKirill/antigravity-for-claude-code/tree/HEAD/skills/expo) | Horizon 1 EAS + dev client + NFC plugin |
 
-**Forked (2026-06-15):** `.agents/skills/publish-mobile-app/` · `.agents/skills/expo/` — see each skill's `FORK.md` for security review + VetTrack overrides. Do not edit marketplace originals in place.
+**Expo / RN (Horizon 1+):** use [`exposwifty31/literate-dollop`](https://github.com/exposwifty31/literate-dollop) — `.agents/skills/expo/` lives there, not in this maintenance repo.
+
+**Forked (2026-06-15):** `.agents/skills/publish-mobile-app/` — see `FORK.md` for security review. Do not edit marketplace originals in place.
 
 ---
 
@@ -175,35 +176,36 @@ See [capacitor-native-app.md](../capacitor-native-app.md) for env split and simu
 
 ---
 
-## Horizon 1 — Monorepo + RN scaffold (evenings only during H0)
+## Horizon 1 — Expo monorepo (literate-dollop only)
 
 **Do not** block Capacitor checklist for this. **Do not** start Horizon 2+ until Capacitor approved.
 
-| Task | Work | Skills |
-|------|------|--------|
-| 1.1 | `pnpm-workspace.yaml`, `packages/mobile`, `packages/shared-client` | **code-project-architect**, **executing-plans** |
-| 1.2 | Expo tabs template, iOS + Android, `expo-dev-client`, bundle `uk.vettrack.app` | **mobile-design**, forked **expo** skill |
-| 1.3 | Extract `@vettrack/shared-client`; **web + RN import in same PR** | **clinical-enterprise-integrity** (sync constants), **tdd** |
-| 1.4 | `react-native-nfc-manager` config plugin; device smoke test | forked **expo** skill |
+All Horizon 1+ work runs in [`exposwifty31/literate-dollop`](https://github.com/exposwifty31/literate-dollop) (`packages/contracts`, `apps/expo`, `.agents/skills/expo/`). This repo does not host `packages/mobile`.
 
-**Validation:**
+| Task | Work | Where |
+|------|------|--------|
+| 1.1 | pnpm workspace, `packages/contracts`, `apps/expo` | literate-dollop |
+| 1.2 | Expo Router, `expo-dev-client`, bundle `uk.vettrack.expo` | literate-dollop |
+| 1.3 | `@vettrack/contracts` wired into Expo app | literate-dollop |
+| 1.4 | NFC config plugin spike (Phase 2+) | literate-dollop |
+
+**Validation (in literate-dollop clone):**
 
 ```bash
+cd ~/literate-dollop
 pnpm install
-npx tsc --noEmit
-cd packages/mobile && npx expo run:ios --device   # NFC on hardware
-cd packages/mobile && npx expo run:android --device
+bash scripts/ci/contracts-gate.sh   # after CI scaffold
 ```
 
 ---
 
-## Horizon 2 — RN auth + API
+## Horizon 2 — RN auth + API (literate-dollop)
 
-| Task | Work | Skills |
+| Task | Work | Where |
 |------|------|--------|
-| 2.1 | `@clerk/clerk-expo`, `vettrack://`, production Clerk | **enterprise-security-multi-tenancy**, forked **expo** |
-| 2.2 | Port `request-core.ts`; `EXPO_PUBLIC_API_ORIGIN`; test clinic only | **api-design**, **tdd** |
-| 2.3 | Auth gates (pending/blocked); role from `/api/users/me` | **enterprise-security-multi-tenancy** |
+| 2.1 | `@clerk/clerk-expo`, `vettrack://`, production Clerk | literate-dollop |
+| 2.2 | API client + `EXPO_PUBLIC_API_ORIGIN`; test clinic only | literate-dollop |
+| 2.3 | Auth gates (pending/blocked); role from `/api/users/me` | literate-dollop |
 
 **RN dev rule:** production API + production Clerk + **dedicated test clinic/user** — no dev-bypass on RN.
 

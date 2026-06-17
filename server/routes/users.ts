@@ -15,7 +15,7 @@ import {
   exchangeAppleAuthorizationCode,
   isAppleRevocationConfigured,
 } from "../lib/apple-auth.js";
-import { deleteOwnAccount } from "../services/account-deletion.service.js";
+import { deleteOwnAccount, AccountDeletionProtectedError } from "../services/account-deletion.service.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { resolveCurrentRole } from "../lib/role-resolution.js";
 import { resolveAuthority } from "../lib/authority.js";
@@ -1185,6 +1185,16 @@ router.delete("/delete-account", requireAuth, authSensitiveLimiter, async (req, 
 
     return res.status(200).json({ success: true, ...result });
   } catch (err) {
+    if (err instanceof AccountDeletionProtectedError) {
+      return res.status(403).json(
+        apiError({
+          code: "FORBIDDEN",
+          reason: "ACCOUNT_DELETION_PROTECTED",
+          message: "This account cannot be deleted through the app.",
+          requestId,
+        }),
+      );
+    }
     console.error("users:delete-account", err);
     return res.status(500).json(
       apiError({

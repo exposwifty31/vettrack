@@ -18,6 +18,7 @@ import {
   startNativeOAuth,
   type NativeOAuthStrategy,
 } from "@/lib/native-oauth";
+import { linkNativeAppleAuthorizationCodeAfterSignIn } from "@/lib/native-apple-link";
 
 function GoogleGlyph() {
   return (
@@ -63,8 +64,10 @@ export function NativeSocialButtons({ mode }: { mode: Mode }) {
         signUp: signUp as never,
         setActive: setActive as never,
       });
-      // On success Clerk's session becomes active; the auth provider/route guard
-      // handles navigation. Nothing else to do here.
+      if (strategy === "oauth_apple") {
+        // Non-blocking: capture Apple's authorizationCode for deletion-time revocation.
+        void linkNativeAppleAuthorizationCodeAfterSignIn();
+      }
     } catch (err) {
       const code = err instanceof Error ? err.message : "OAUTH_FAILED";
       setError(

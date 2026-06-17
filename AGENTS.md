@@ -11,7 +11,7 @@ Persistent guidance for Cursor lives under `.cursor/rules/*.mdc` and root `.curs
 **Codex PR reviews:** Address every **chatgpt-codex-connector** inline comment before merge.
 
 ### Architecture
-VetTrack is a single full-stack app: React 18 + Vite frontend (port 5000) and Express + TypeScript backend (port 3001), backed by PostgreSQL. **Canonical references:** `README.md`, `CLAUDE.md`, `CONTEXT.md`, [`docs/README.md`](docs/README.md). **Scope change (June 2026):** [`docs/scope-change-2026.md`](docs/scope-change-2026.md).
+VetTrack is a single full-stack app: React 18 + Vite frontend (port 5000) and Express + TypeScript backend (port 3001), backed by PostgreSQL. **Canonical references:** `README.md`, `CLAUDE.md`, `CONTEXT.md`, [`docs/README.md`](docs/README.md). **Scope change (June 2026):** [`docs/scope-change-2026.md`](docs/scope-change-2026.md). **Maintenance scope:** [`docs/MAINTENANCE_MODE.md`](docs/MAINTENANCE_MODE.md) — Capacitor + monolith here; Expo/RN in [`exposwifty31/literate-dollop`](https://github.com/exposwifty31/literate-dollop).
 
 ### Prerequisites
 - **Node.js >=22.12.0** (`.nvmrc` specifies 22.14.0)

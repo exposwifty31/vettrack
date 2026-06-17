@@ -27,6 +27,8 @@ Entry point for engineers, operators, and agents working on VetTrack.
 | [mobile/README.md](./mobile/README.md) | Capacitor ship path index |
 | [capacitor-native-app.md](./capacitor-native-app.md) | Build and run native shell |
 | [../RESUBMISSION_RUNBOOK.md](../RESUBMISSION_RUNBOOK.md) | App Store resubmission gates |
+| [legal-pages.md](./legal-pages.md) | **Privacy / terms / support — not implemented** |
+| [account-deletion.md](./account-deletion.md) | In-app account deletion (5.1.1(v)) |
 
 ## Architecture & audits
 

@@ -589,6 +589,45 @@ export default function SettingsPage() {
           </section>
         )}
 
+        {/* Legal */}
+        <section className="space-y-2">
+          <SettingsSectionHeader label={t.settingsPage.legal} />
+          <div className="rounded-xl bg-card border border-border/60 px-4 py-4">
+            <div className="flex flex-wrap gap-2">
+              <Link href="/privacy">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-border/60 text-muted-foreground hover:text-foreground h-11"
+                  data-testid="settings-privacy-policy"
+                >
+                  {t.settingsPage.privacyPolicy}
+                </Button>
+              </Link>
+              <Link href="/terms">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-border/60 text-muted-foreground hover:text-foreground h-11"
+                  data-testid="settings-terms-of-use"
+                >
+                  {t.settingsPage.termsOfUse}
+                </Button>
+              </Link>
+              <Link href="/support">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-border/60 text-muted-foreground hover:text-foreground h-11"
+                  data-testid="settings-support"
+                >
+                  {t.settingsPage.support}
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </section>
+
         {/* About */}
         <section className="space-y-2">
           <SettingsSectionHeader label={t.settingsPage.about} />

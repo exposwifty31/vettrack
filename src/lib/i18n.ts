@@ -1152,6 +1152,16 @@ const translations = {
 
   board: d.board,
 
+  legalFooter: d.legalFooter,
+
+  legalPage: d.legalPage,
+
+  privacyPage: d.privacyPage,
+
+  termsPage: d.termsPage,
+
+  supportPage: d.supportPage,
+
   whatsNew: d.whatsNew,
 
 } as const;

@@ -1,21 +1,50 @@
-# GitHub Actions troubleshooting
+# CI workflow troubleshooting
 
-## `startup_failure` with workflow path `BuildFailed`
+Valid workflow files live under `.github/workflows/*.yml` (GitHub) and `.gitlab-ci.yml` (GitLab). See [`docs/devops/ci-cd.md`](../../docs/devops/ci-cd.md).
 
-If Actions shows **Startup failure**, **0s**, empty workflow name, and path `BuildFailed`, the repo has a **stale workflow registration** (usually from a file committed at the repository root named `BuildFailed` instead of under `.github/workflows/`).
+Remote CI may be suspended — reproduce failures locally:
 
-Valid workflows live only under `.github/workflows/*.yml`.
+```bash
+bash scripts/ci/contracts-gate.sh
+npx tsc --noEmit
+pnpm exec tsc --noEmit --project tsconfig.server-check.json
+pnpm migrate && pnpm test
+```
 
-### Fix (repo admin — required once per repo)
+## Workflow name shows as file path, 0 jobs, instant failure
 
-GitHub has a **deleted** workflow registered at path `BuildFailed` (workflow id `285976531`). It is not in git; it still hooks `push` / `pull_request` and fails with **startup_failure** before **CI — VetTrack** can run.
+The runner failed to parse workflow YAML. Common causes:
 
-1. Open [Actions](https://github.com/dboy3156/VetTrack/actions) → left sidebar **All workflows**.
-2. Find the nameless or **BuildFailed** workflow (state may show deleted) → **⋯** → **Disable workflow**.
-3. On the PR, use **Re-run all jobs** or push a new commit.
+1. **Mojibake in comments** — smart quotes or double-encoded UTF-8 (e.g. `â` instead of `-`). Use ASCII-only in workflow files.
+2. **Invalid YAML syntax** — indentation, unquoted colons in strings.
 
-Until that workflow is disabled, PR checks may show only `startup_failure` (0s) and not **CI — VetTrack**.
+Fix the file, push, and confirm the human-readable `name:` field appears in the CI UI when remotes are active.
 
-### Feature-branch CI (after ghost is disabled)
+## Stale workflow registration (`BuildFailed`)
 
-`ci.yml` also runs on `push` to `cursor/**` branches and supports `workflow_dispatch` for manual runs.
+A **stale workflow registration** may exist at path `BuildFailed` (not in git). It hooks `push` / `pull_request` and fails before the main CI workflow runs.
+
+When GitHub Actions is active: open **Actions → All workflows**, find **BuildFailed** → disable workflow, then re-run or push a new commit.
+
+## Required checks (when branch protection is enabled)
+
+Typical required jobs:
+
+- CI merge gate (tests + architecture gates)
+- Playwright E2E (both shards)
+
+Do **not** require nightly workflows (flake-detection, e2e-simulation, workday-simulation) or manual release-gate.
+
+## Feature-branch CI
+
+`ci.yml` runs on PR/push to `main`/`staging`, `push` to `cursor/**`, and `workflow_dispatch` when GitHub Actions is enabled.
+
+## Contracts package
+
+`architecture-gates` runs `scripts/ci/contracts-gate.sh` (`@vettrack/contracts` typecheck + emergency surface parity test). Run locally:
+
+```bash
+bash scripts/ci/contracts-gate.sh
+```
+
+After literate-dollop PR1, contracts are consumed from `exposwifty31/literate-dollop` — see [`docs/MAINTENANCE_MODE.md`](../../docs/MAINTENANCE_MODE.md).

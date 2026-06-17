@@ -3,7 +3,7 @@
 **Audience:** a future Claude session (or Dan) executing the resubmission cold.
 **Goal:** get VetTrack **1.0 (4)** through App Review after the 1.0 (3) rejection
 (Submission `9f5acacc-9abd-449c-b297-1834d568a84b`).
-**Last verified:** 2026-06-12, production build `dffa7385` (buildTag `1.1.2-mqarwzsp`).
+**Last verified:** 2026-06-17, production includes account deletion (PR #1) + native Apple token link.
 
 > Secrets: this file never contains the live Clerk key. Export it from Railway first:
 > `export CLERK_SECRET_KEY=$(cd /Users/dan/.vt-deploy 2>/dev/null && railway variables --json 2>/dev/null | python3 -c "import json,sys;print(json.load(sys.stdin)['CLERK_SECRET_KEY'])")`
@@ -18,14 +18,16 @@
 | **2.3.8** | Placeholder app icons | Default Capacitor icon shipped | Single universal **1024×1024** VT brand icon, **alpha-stripped** (`hasAlpha: no`) at `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png` |
 | **2.1(a)** | Error registering a new account with Apple | In-WebView Clerk OAuth + a chain of 5 deeper causes (see §F) | System-browser OAuth + native Clerk transport. Apple **and** Google device-confirmed |
 | **2.1** | Demo account login failed | Clerk **Client Trust** challenged the password login on a new device (no MFA → email-code wall the reviewer couldn't pass); also wrong password on the account | Client Trust reverted; password set via Backend API; account promoted to admin + English locale |
+| **5.1.1(v)** | In-app account deletion required (Sign in with Apple) | No delete flow; Apple token revocation not wired | Settings → Danger zone → Delete account; native Apple `authorizationCode` linked after sign-in; demo account protected from self-deletion |
 
 ## B. Current state (what is already done)
 
-- **Code:** all fixes are committed locally on `main`. **16 commits are unpushed** (`1c52f248` … `dffa7385`) because GitLab access is blocked. Production runs them via **direct Railway deploy**, NOT CI.
+- **Code:** account deletion + Playwright CI fixes merged to `github/main` (PR #1). Local `main` synced. Deploy to Railway before App Review (§K).
 - **Production web** (`https://vettrack.uk`): serving the current bundle. The iOS shell is a **bundled app** (no `server.url`) — it does NOT depend on production for the frontend, but the API + Clerk it calls are production.
 - **Clerk (production instance `clerk.vettrack.uk`):** redirect URLs, allowed origins, Apple+Google OAuth, demo account, Client Trust — all configured (verify in §C).
 - **Build number:** `CURRENT_PROJECT_VERSION = 4`, `MARKETING_VERSION = 1.0`. Ready to archive as **1.0 (4)**.
 - **Synced shell:** `npx cap sync ios` already run from HEAD. `dist/public` == `ios/App/App/public`.
+- **Legal pages:** `/privacy`, `/terms`, and `/support` are implemented — verify all three on production after deploy before setting App Store / Play Console URLs. See `docs/legal-pages.md`.
 
 ## C. PRE-ARCHIVE VERIFICATION — run these every time before archiving
 
@@ -98,7 +100,7 @@ Simulator smoke before archive:
 3. **App Review Information**:
    - Sign-In required: **Yes**.
    - Username: `reviewer@vettrack.uk`  Password: `VetTrack2026!`
-   - Notes: *"Sign in with Apple/Google open in the system browser per Apple's guidelines. A demo email/password account with full admin access is provided above. The app is a native Capacitor app; all features work offline-capable."*
+   - Notes: *"Sign in with Apple/Google open in the system browser per Apple's guidelines. A demo email/password account with full admin access is provided above. The demo account cannot be deleted (protected for review). To test account deletion, sign in with a personal Apple ID, then Settings → Danger zone → Delete account. The app is a native Capacitor app; all features work offline-capable."*
 4. **Confirm Client Trust is permanently off** (§G) before submitting.
 5. **Add for Review → Submit**.
 
@@ -138,3 +140,51 @@ The Apple-sign-up error had a stack of causes, each hiding the next. All are loa
 - Push the 16 commits to origin the moment GitLab unblocks (`git push origin main`).
 - Fix the Railway Worker start command permanently in the dashboard (Custom Start Command = `pnpm worker`) and correct the `NODE_ENV` variable (currently the literal string `PORT 8080`; should be `production`).
 - Deferred UX items (not App-Review-blocking): Tasks-page card spacing (needs populated-data repro) and the Shift-Chat keyboard/bottom-sheet issue (needs device repro; likely add `@capacitor/keyboard`).
+
+## K. Account deletion + Apple revocation (Guideline 5.1.1(v))
+
+Full spec: [`docs/account-deletion.md`](docs/account-deletion.md).
+
+### Railway variables (required for Apple token revocation)
+
+Set on service **VetTrack** in project `pacific-flow` (all four required; `DB_CONFIG_ENCRYPTION_KEY` already present):
+
+| Variable | Value |
+|---|---|
+| `APPLE_TEAM_ID` | 10-char Apple Team ID |
+| `APPLE_KEY_ID` | Sign in with Apple key ID |
+| `APPLE_CLIENT_ID` | `uk.vettrack.app` (bundle ID — matches native authorization code) |
+| `APPLE_PRIVATE_KEY` | `.p8` contents (use `\n` for newlines in Railway UI) |
+
+After setting vars, redeploy. Migration `155_apple_oauth_tokens` runs at startup.
+
+### Pre-submit checks
+
+```bash
+# Demo account must NOT be deletable (403 ACCOUNT_DELETION_PROTECTED)
+curl -s -o /dev/null -w "%{http_code}" -X DELETE "https://vettrack.uk/api/users/delete-account" \
+  -H "Authorization: Bearer <reviewer-session-jwt>"
+# EXPECT: 403
+```
+
+### App Review screen recording (deletion path)
+
+Record **one continuous video** with a **personal** Apple ID (not `reviewer@vettrack.uk`):
+
+1. Sign in with Apple (native system browser flow).
+2. Settings → **Danger zone** → **Delete account**.
+3. Type `DELETE` / `מחק` → confirm → success toast → signed out.
+
+Attach the recording in App Review notes with the navigation steps above.
+
+### Native shell rebuild (when account-deletion or Apple-link code changes)
+
+```bash
+cd /Users/dan/vettrack
+pnpm install
+npx cap sync ios
+./scripts/build-native-shell.sh
+./scripts/install-ios-sim.sh   # optional smoke
+```
+
+Then archive in Xcode (§D) with an incremented build number.
