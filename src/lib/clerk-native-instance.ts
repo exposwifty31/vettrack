@@ -23,12 +23,11 @@
  * shell — the web app keeps the hot-loaded, cookie-based clerk-js unchanged.
  */
 import { Clerk } from "@clerk/clerk-js";
-
-const CLIENT_JWT_STORAGE_KEY = "__vt_clerk_client_jwt";
+import { CLERK_CLIENT_JWT_STORAGE_KEY } from "@/lib/native-clerk-session-token";
 
 function readStoredClientJwt(): string {
   try {
-    return window.localStorage.getItem(CLIENT_JWT_STORAGE_KEY) ?? "";
+    return window.localStorage.getItem(CLERK_CLIENT_JWT_STORAGE_KEY) ?? "";
   } catch {
     return "";
   }
@@ -36,7 +35,7 @@ function readStoredClientJwt(): string {
 
 function storeClientJwt(jwt: string): void {
   try {
-    window.localStorage.setItem(CLIENT_JWT_STORAGE_KEY, jwt);
+    window.localStorage.setItem(CLERK_CLIENT_JWT_STORAGE_KEY, jwt);
   } catch {
     /* storage unavailable — the next response will retry */
   }
