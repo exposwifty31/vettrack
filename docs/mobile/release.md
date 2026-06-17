@@ -49,6 +49,7 @@ npx tsc --noEmit
 1. **Bump version in Xcode:**
    - Open `ios/App/App.xcodeproj` in Xcode
    - Target → General → set `MARKETING_VERSION` and increment `CURRENT_PROJECT_VERSION`
+   - Update `whatsNew.currentVersion` and `whatsNew.buildLabel` in `locales/en.json` + `locales/he.json` to match `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`
 
 2. **Archive:**
    - Product → Archive

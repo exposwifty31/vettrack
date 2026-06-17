@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
+import { getBundledAppVersion, resolveDisplayAppVersion } from "@/lib/app-version";
 import { ShiftSummarySheet } from "@/components/shift-summary-sheet";
 import { DeleteAccountDialog } from "@/components/delete-account-dialog";
 import { SettingsSectionHeader, SettingsToggle, SettingsSelect } from "@/components/settings-controls";
@@ -42,11 +44,11 @@ import { playFeedbackTone, playMuteTone } from "@/lib/sounds";
 import { toast } from "sonner";
 import { t } from "@/lib/i18n";
 import type { ShiftRole, UserRole } from "@/types";
-import { useEffect, useState } from "react";
 import { safeReloadPage } from "@/lib/safe-browser";
 
 export default function SettingsPage() {
   const confirm = useConfirm();
+  const [displayVersion, setDisplayVersion] = useState(getBundledAppVersion());
   const [shiftSummaryOpen, setShiftSummaryOpen] = useState(false);
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [emailRevealed, setEmailRevealed] = useState(false);
@@ -141,6 +143,10 @@ export default function SettingsPage() {
     }
     await syncRoleNotificationSettings({ [key]: value });
   };
+
+  useEffect(() => {
+    void resolveDisplayAppVersion().then(setDisplayVersion);
+  }, []);
 
   useEffect(() => {
     if (isTechnicianContext) {
@@ -634,7 +640,8 @@ export default function SettingsPage() {
           <div className="rounded-xl bg-card border border-border/60 px-4 py-4 space-y-1">
             <p className="text-sm font-medium text-foreground">VetTrack</p>
             <p className="text-xs text-muted-foreground">
-              {t.settingsPage.versionLabel} <span data-testid="app-version">{__APP_VERSION__}</span>
+              {t.settingsPage.versionLabel}{" "}
+              <span data-testid="app-version">{displayVersion}</span>
             </p>
             <a
               href="/whats-new"

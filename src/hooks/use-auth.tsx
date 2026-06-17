@@ -21,6 +21,7 @@ export type AccessDeniedReason =
   | "ACCOUNT_DELETED"
   | "ACCOUNT_BLOCKED"
   | "ACCOUNT_PENDING_APPROVAL"
+  | "AUTH_SYNC_FAILED"
   | null;
 
 interface AuthState {
@@ -298,6 +299,8 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
   });
   const [authRefreshNonce, setAuthRefreshNonce] = useState(0);
   const stateRef = useRef(state);
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -305,7 +308,7 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     setClerkTokenGetter(async () => {
-      const token = await getToken();
+      const token = await getTokenRef.current();
       return typeof token === "string" ? token : null;
     });
     return () => {
@@ -344,6 +347,9 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isLoaded) return;
     if (!isSignedIn || !user) {
+      if (stateRef.current.isLoaded && !stateRef.current.isSignedIn) {
+        return;
+      }
       clearHaltQueue();
       setCurrentClinicId();
       setAuthState({ userId: "", email: "", name: "", bearerToken: null });
@@ -356,8 +362,11 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    const syncAbort = new AbortController();
+
     async function syncSession() {
-      const rawToken = await getToken();
+      setState((s) => (s.isLoaded && !s.isSignedIn ? { ...s, isLoaded: false } : s));
+      const rawToken = await getTokenRef.current();
       const token = typeof rawToken === "string" ? rawToken.trim() : "";
       const email = user?.primaryEmailAddress?.emailAddress || "";
       const name = `${user?.firstName || ""} ${user?.lastName || ""}`.trim();
@@ -373,19 +382,18 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
         "Content-Type": "application/json",
         ...(isValidJwt(token) ? { "Authorization": `Bearer ${token}` } : {}),
       };
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => syncAbort.abort(), 10000);
 
       try {
         // 1. Try fetching the existing user
-        let res = await authFetchUsersMe({ headers, signal: controller.signal });
+        let res = await authFetchUsersMe({ headers, signal: syncAbort.signal });
 
         // 2. Sync/provision only when user is missing/unauthorized.
         // Avoid calling /sync on transient failures such as 429.
         if (!res.ok && (res.status === 401 || res.status === 404)) {
           res = await authPostUsersSync(
             { clerkId, email, name },
-            { headers, signal: controller.signal },
+            { headers, signal: syncAbort.signal },
           );
         }
 
@@ -463,8 +471,7 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
           }));
         } else if (res.status === 401) {
           // Clerk reports signed-in, but backend rejected auth token/session.
-          // Resolve to signed-out state so AuthGuard routes to /signin instead
-          // of leaving protected pages mounted in a bad auth loop.
+          // Clear Clerk session so <SignIn> cannot auto-redirect to /home (H1 loop).
           console.error("Auth sync unauthorized:", data);
           clearHaltQueue();
           setCurrentClinicId();
@@ -475,31 +482,35 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
             isLoaded: true, isSignedIn: false, isAdmin: false, isOfflineSession: false,
             canManageErMode: false,
           });
+          try {
+            await clerkSignOut({ redirectUrl: "/signin" });
+          } catch (signOutErr) {
+            console.error("Clerk sign-out after auth sync 401 failed:", signOutErr);
+          }
         } else {
-          // Resolve auth state without forcing a local sign-out.
-          // For transient errors (e.g. 429) forcing isSignedIn=false can create
-          // a redirect loop with Clerk session state.
+          // Transient server errors must not masquerade as pending approval (#379).
           console.error("Auth sync failed with unexpected status:", res.status, data);
           clearHaltQueue();
           setState((s) => ({
             ...s,
             isLoaded: true,
             isSignedIn: true,
-            status: "pending",
-            accessDeniedReason: null,
+            status: null,
+            accessDeniedReason: "AUTH_SYNC_FAILED",
             isOfflineSession: false,
             canManageErMode: false,
           }));
         }
       } catch (err) {
+        if (syncAbort.signal.aborted) return;
         console.error("Auth Sync Error:", err);
         clearHaltQueue();
         setState((s) => ({
           ...s,
           isLoaded: true,
           isSignedIn: true,
-          status: "pending",
-          accessDeniedReason: null,
+          status: null,
+          accessDeniedReason: "AUTH_SYNC_FAILED",
           isOfflineSession: false,
           canManageErMode: false,
         }));
@@ -509,7 +520,10 @@ function ClerkModeAuthProvider({ children }: { children: ReactNode }) {
     }
 
     syncSession();
-  }, [isLoaded, isSignedIn, user?.id, user?.primaryEmailAddress?.emailAddress, user?.firstName, user?.lastName, getToken, authRefreshNonce]);
+    return () => {
+      syncAbort.abort();
+    };
+  }, [isLoaded, isSignedIn, user?.id, user?.primaryEmailAddress?.emailAddress, user?.firstName, user?.lastName, authRefreshNonce, clerkSignOut]);
 
   const value = useMemo(() => ({ ...state, signOut, refreshAuth }), [state, signOut, refreshAuth]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

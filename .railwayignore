@@ -1,3 +1,13 @@
+# Dependencies and build output — Railway runs pnpm install + pnpm build (see railway.json)
+node_modules/
+dist/
+build/
+
+# Agent / IDE tooling — not part of runtime
+.claude/
+.agents/
+.cursor/
+
 # Mobile native projects — not needed for server build
 ios/
 android/

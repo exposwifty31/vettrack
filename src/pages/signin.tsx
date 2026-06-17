@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { Loader2, QrCode } from "lucide-react";
-import { ClerkFailed, ClerkLoaded, ClerkLoading, SignIn } from "@clerk/clerk-react";
+import { ClerkFailed, ClerkLoaded, ClerkLoading, SignIn, useUser } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
 import { PhoneSignIn } from "@/components/phone-sign-in";
 import { clerkAppearance, clerkAppearanceNative } from "@/lib/clerk-appearance";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { ClerkAuthFormShell } from "@/components/clerk-auth-form-shell";
+import { AuthBootstrapSpinner } from "@/components/native-clerk-gate";
 import { NativeSocialButtons } from "@/components/native-social-buttons";
 import { LegalFooterLinks } from "@/components/legal-footer-links";
 
@@ -17,6 +18,7 @@ const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as stri
 
 export default function SignInPage() {
   const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded: clerkLoaded, isSignedIn: clerkSignedIn } = useUser();
   const [, navigate] = useLocation();
   const [usePhoneFlow, setUsePhoneFlow] = useState(false);
 
@@ -25,6 +27,21 @@ export default function SignInPage() {
       navigate("/home");
     }
   }, [isLoaded, isSignedIn, navigate]);
+
+  // Clerk session exists but VetTrack context has not confirmed sign-in yet.
+  // Do NOT mount <SignIn> — it auto-redirects to fallbackRedirectUrl (/home) while
+  // AuthGuard still sees isSignedIn=false → /home ↔ /signin redirect loop.
+  if (clerkLoaded && clerkSignedIn && !isSignedIn) {
+    return (
+      <>
+        <Helmet>
+          <title>כניסה — VetTrack</title>
+          <meta name="robots" content="noindex" />
+        </Helmet>
+        <AuthBootstrapSpinner />
+      </>
+    );
+  }
 
   return (
     <>

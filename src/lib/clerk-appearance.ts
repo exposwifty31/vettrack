@@ -42,6 +42,11 @@ export const clerkAppearance = {
  */
 export const clerkAppearanceNative = {
   ...clerkAppearance,
+  // Email/password first; Clerk social buttons are hidden (native uses
+  // NativeSocialButtons + system browser). "top" + hidden social = blank card.
+  options: {
+    socialButtonsPlacement: "bottom" as const,
+  },
   elements: {
     ...clerkAppearance.elements,
     socialButtonsRoot: "hidden",

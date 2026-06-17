@@ -37,6 +37,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     ACCOUNT_DELETED: t.auth.guard.reasons.accountDeleted,
     ACCOUNT_BLOCKED: t.auth.guard.reasons.accountBlocked,
     ACCOUNT_PENDING_APPROVAL: t.auth.guard.reasons.accountPendingApproval,
+    AUTH_SYNC_FAILED: t.auth.guard.reasons.authSyncFailed,
   };
 
   useEffect(() => {
@@ -110,7 +111,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!isSignedIn) return <Redirect to="/signin" />;
+  if (!isSignedIn) return <Redirect to="/signin" replace />;
 
   if (status === "pending") return (
     <div className="flex h-screen flex-col items-center justify-center text-center p-6">
@@ -130,10 +131,14 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   );
 
   if (accessDeniedReason) {
+    const deniedTitle =
+      accessDeniedReason === "AUTH_SYNC_FAILED"
+        ? t.auth.guard.syncFailedTitle
+        : t.auth.guard.accessDeniedTitle;
     return (
       <div className="flex h-screen flex-col items-center justify-center text-center p-6 bg-destructive/5">
         <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
-        <h1 className="text-2xl font-bold text-destructive">{t.auth.guard.accessDeniedTitle}</h1>
+        <h1 className="text-2xl font-bold text-destructive">{deniedTitle}</h1>
         <p>{accessDeniedReasonText[accessDeniedReason] ?? t.auth.guard.accessDeniedDescription}</p>
         <div className="mt-4 flex gap-3">
           <Button

@@ -4,20 +4,16 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
 import { t } from "@/lib/i18n";
-import { authFetch } from "@/lib/auth-fetch";
+import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import {
+  compareVersions,
+  getBundledAppVersion,
+  resolveDisplayAppVersion,
+  resolveServerAppVersion,
+} from "@/lib/app-version";
 import { safeStorageGetItem, safeStorageSetItem } from "@/lib/safe-browser";
 
 const STORAGE_KEY = "vettrack-last-seen-version";
-
-function compareVersions(a: string, b: string): number {
-  const pa = a.split(".").map(Number);
-  const pb = b.split(".").map(Number);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
-    if (diff !== 0) return diff;
-  }
-  return 0;
-}
 
 export function UpdateBanner() {
   const { isSignedIn, userId } = useAuth();
@@ -25,16 +21,15 @@ export function UpdateBanner() {
 
   useEffect(() => {
     if (!isSignedIn || !userId) return;
-    authFetch("/api/version")
-      .then((r) => r.json())
-      .then((data: { version: string }) => {
-        const serverVersion = data.version;
-        const lastSeen = safeStorageGetItem(STORAGE_KEY);
-        if (!lastSeen || compareVersions(serverVersion, lastSeen) > 0) {
-          setBannerVersion(serverVersion);
-        }
-      })
-      .catch(() => {});
+    void (async () => {
+      const displayVersion = isCapacitorNative()
+        ? await resolveDisplayAppVersion()
+        : (await resolveServerAppVersion()) ?? getBundledAppVersion();
+      const lastSeen = safeStorageGetItem(STORAGE_KEY);
+      if (!lastSeen || compareVersions(displayVersion, lastSeen) > 0) {
+        setBannerVersion(displayVersion);
+      }
+    })();
   }, [isSignedIn, userId]);
 
   const dismiss = () => {

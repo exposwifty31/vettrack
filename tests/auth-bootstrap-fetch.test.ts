@@ -93,4 +93,12 @@ describe("use-auth session bootstrap wiring", () => {
     expect(postIdx).toBeGreaterThan(-1);
     expect(meIdx).toBeLessThan(postIdx);
   });
+
+  it("syncSession maps bootstrap failures to AUTH_SYNC_FAILED, not pending (#379)", () => {
+    expect(useAuthSrc).toContain('accessDeniedReason: "AUTH_SYNC_FAILED"');
+    const syncStart = useAuthSrc.indexOf("async function syncSession");
+    const syncEnd = useAuthSrc.indexOf("\n  }, [isLoaded, isSignedIn, user?.id", syncStart);
+    const syncBody = useAuthSrc.slice(syncStart, syncEnd > syncStart ? syncEnd : undefined);
+    expect(syncBody).not.toMatch(/status:\s*"pending"/);
+  });
 });
