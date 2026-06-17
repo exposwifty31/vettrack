@@ -170,6 +170,34 @@ export async function authPostUsersSync(
   );
 }
 
+export interface DeleteAccountResult {
+  success: boolean;
+  /** Whether the user's Sign in with Apple token was revoked at Apple. */
+  appleRevocation: "revoked" | "failed" | "skipped";
+  /** Whether the DB row was hard-deleted or kept as an anonymized tombstone. */
+  dbOutcome: "hard_deleted" | "anonymized";
+  clerkDeleted: boolean;
+}
+
+/**
+ * Permanently delete the current user's own account (App Store Guideline
+ * 5.1.1(v)). The caller must sign out and redirect on success.
+ */
+export async function deleteOwnAccount(): Promise<DeleteAccountResult> {
+  return request<DeleteAccountResult>("/api/users/delete-account", { method: "DELETE" });
+}
+
+/**
+ * Link a Sign in with Apple `authorizationCode` so the server can revoke the
+ * user's Apple tokens at deletion time. Best-effort: callers ignore failures.
+ */
+export async function linkAppleAuthorizationCode(authorizationCode: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>("/api/users/apple-link", {
+    method: "POST",
+    body: JSON.stringify({ authorizationCode }),
+  });
+}
+
 /** Success body from POST /api/containers/:id/dispense */
 export type ContainerDispenseSuccessPayload = {
   success: boolean;

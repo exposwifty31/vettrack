@@ -3,12 +3,19 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { db, users } from "../db.js";
+import { db, users, appleOauthTokens } from "../db.js";
 import { eq, sql, isNull, isNotNull, desc, and } from "drizzle-orm";
 import { requireAuth, requireAuthAny, requireAdmin } from "../middleware/auth.js";
 import { clerkClient } from "@clerk/express";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { authSensitiveLimiter } from "../middleware/rate-limiters.js";
+import { encryptConfigValue } from "../lib/config-crypto.js";
+import {
+  AppleAuthError,
+  exchangeAppleAuthorizationCode,
+  isAppleRevocationConfigured,
+} from "../lib/apple-auth.js";
+import { deleteOwnAccount } from "../services/account-deletion.service.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { resolveCurrentRole } from "../lib/role-resolution.js";
 import { resolveAuthority } from "../lib/authority.js";
@@ -1069,6 +1076,131 @@ router.post("/backfill-clerk", requireAuth, requireAdmin, authSensitiveLimiter, 
         code: "INTERNAL_ERROR",
         reason: "USERS_BACKFILL_CLERK_FAILED",
         message: "Failed to backfill users from Clerk",
+        requestId,
+      }),
+    );
+  }
+});
+
+const appleLinkSchema = z.object({
+  authorizationCode: z.string().trim().min(1, "authorizationCode is required").max(2000),
+});
+
+/**
+ * POST /api/users/apple-link
+ *
+ * Captures the single-use Apple `authorizationCode` from a Sign in with Apple
+ * sign-in, exchanges it at Apple's `/auth/token` for a refresh token, and
+ * stores it (AES-256-GCM encrypted) so account deletion can later revoke the
+ * user's tokens (App Store Guideline 5.1.1(v) + Apple's revocation requirement).
+ *
+ * Idempotent per user — re-linking replaces the stored token.
+ */
+router.post("/apple-link", requireAuth, authSensitiveLimiter, validateBody(appleLinkSchema), async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  try {
+    const clinicId = req.clinicId!;
+    const actor = req.authUser!;
+    const { authorizationCode } = req.body as z.infer<typeof appleLinkSchema>;
+
+    if (!isAppleRevocationConfigured()) {
+      return res.status(501).json(
+        apiError({
+          code: "NOT_CONFIGURED",
+          reason: "APPLE_REVOCATION_NOT_CONFIGURED",
+          message: "Apple token revocation is not configured on this server",
+          requestId,
+        }),
+      );
+    }
+
+    const { refreshToken, appleSub } = await exchangeAppleAuthorizationCode(authorizationCode);
+    const encrypted = encryptConfigValue(refreshToken);
+
+    await db
+      .insert(appleOauthTokens)
+      .values({
+        id: randomUUID(),
+        clinicId,
+        userId: actor.id,
+        refreshToken: encrypted,
+        appleSub,
+      })
+      .onConflictDoUpdate({
+        target: appleOauthTokens.userId,
+        set: { refreshToken: encrypted, appleSub, updatedAt: new Date() },
+      });
+
+    logAudit({
+      actorRole: resolveAuditActorRole(req),
+      clinicId,
+      actionType: "apple_token_linked",
+      performedBy: actor.id,
+      performedByEmail: actor.email,
+      targetId: actor.id,
+      targetType: "user",
+      metadata: { source: "apple_authorization_code_exchange" },
+    });
+
+    return res.json({ ok: true });
+  } catch (err) {
+    if (err instanceof AppleAuthError) {
+      return res.status(err.status === 501 ? 501 : 502).json(
+        apiError({
+          code: err.status === 501 ? "NOT_CONFIGURED" : "BAD_GATEWAY",
+          reason: "APPLE_TOKEN_EXCHANGE_FAILED",
+          message: "Could not link your Apple account. Please try again.",
+          requestId,
+        }),
+      );
+    }
+    console.error("users:apple-link", err);
+    return res.status(500).json(
+      apiError({
+        code: "INTERNAL_ERROR",
+        reason: "APPLE_LINK_FAILED",
+        message: "Failed to link Apple account",
+        requestId,
+      }),
+    );
+  }
+});
+
+/**
+ * DELETE /api/users/delete-account
+ *
+ * Self-service in-app account deletion (App Store Guideline 5.1.1(v)). Revokes
+ * the user's Apple token at Apple, erases their personal data (hard delete when
+ * referential integrity allows, otherwise an anonymized tombstone), and deletes
+ * the Clerk user. The client signs out and redirects on success.
+ *
+ * Always operates on the CALLER's own account — never an arbitrary id.
+ */
+router.delete("/delete-account", requireAuth, authSensitiveLimiter, async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  try {
+    if (!req.authUser) {
+      return res.status(401).json(
+        apiError({
+          code: "UNAUTHORIZED",
+          reason: "MISSING_AUTH_USER",
+          message: "Unauthorized",
+          requestId,
+        }),
+      );
+    }
+
+    invalidateForUser(req.authUser.clinicId, req.authUser.id);
+    const result = await deleteOwnAccount(req.authUser);
+
+    return res.status(200).json({ success: true, ...result });
+  } catch (err) {
+    console.error("users:delete-account", err);
+    return res.status(500).json(
+      apiError({
+        code: "INTERNAL_ERROR",
+        reason: "ACCOUNT_DELETION_FAILED",
+        message: "Deletion failed. Please try again.",
         requestId,
       }),
     );

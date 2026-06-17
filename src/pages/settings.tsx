@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { ShiftSummarySheet } from "@/components/shift-summary-sheet";
+import { DeleteAccountDialog } from "@/components/delete-account-dialog";
 import { SettingsSectionHeader, SettingsToggle, SettingsSelect } from "@/components/settings-controls";
 import { useSettings } from "@/hooks/use-settings";
 import { useAuth } from "@/hooks/use-auth";
@@ -34,6 +35,7 @@ import {
   Send,
   ListChecks,
   ClipboardCheck,
+  Trash2,
 } from "lucide-react";
 import { Link } from "wouter";
 import { playFeedbackTone, playMuteTone } from "@/lib/sounds";
@@ -46,6 +48,7 @@ import { safeReloadPage } from "@/lib/safe-browser";
 export default function SettingsPage() {
   const confirm = useConfirm();
   const [shiftSummaryOpen, setShiftSummaryOpen] = useState(false);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [emailRevealed, setEmailRevealed] = useState(false);
   const { settings, update, reset } = useSettings();
   const { name, email, signOut, effectiveRole, role, isLoaded, isSignedIn } = useAuth();
@@ -547,6 +550,29 @@ export default function SettingsPage() {
         </section>
 
         <ShiftSummarySheet open={shiftSummaryOpen} onClose={() => setShiftSummaryOpen(false)} />
+
+        {/* Danger Zone — in-app account deletion (App Store Guideline 5.1.1(v)) */}
+        <section className="space-y-2">
+          <SettingsSectionHeader label={t.settingsPage.dangerZone} />
+          <div className="rounded-xl bg-card border border-destructive/40 px-4 py-4 space-y-3">
+            <div>
+              <p className="text-sm font-medium text-foreground">{t.settingsPage.deleteAccount}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{t.settingsPage.deleteAccountDescription}</p>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="gap-2 h-11 text-xs"
+              onClick={() => setDeleteAccountOpen(true)}
+              data-testid="settings-delete-account"
+            >
+              <Trash2 className="w-4 h-4" aria-hidden />
+              {t.settingsPage.deleteAccount}
+            </Button>
+          </div>
+        </section>
+
+        <DeleteAccountDialog open={deleteAccountOpen} onOpenChange={setDeleteAccountOpen} />
 
         {isAdminContext && (
           <section className="space-y-2">
