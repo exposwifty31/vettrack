@@ -12,6 +12,11 @@ export type AuditActionType =
   | "user_status_changed"
   | "user_deleted"
   | "user_restored"
+  // Self-service account deletion (App Store Guideline 5.1.1(v)).
+  | "account_self_deleted"
+  | "apple_token_linked"
+  | "apple_token_revoked"
+  | "apple_token_revoke_failed"
   | "equipment_created"
   | "equipment_updated"
   | "equipment_deleted"

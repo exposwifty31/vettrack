@@ -11,6 +11,19 @@ export const CHECKOUT_LIMITER_MAX_PER_MINUTE = 600;
 export const WRITE_LIMITER_MAX_PER_MINUTE = 600;
 export const GLOBAL_API_LIMITER_MAX_PER_MINUTE = 100;
 
+/**
+ * Playwright CI serves the API via `pnpm dev:api` (NODE_ENV=development) so
+ * background schedulers + SSE outbox stay live. Per-IP throttles must still
+ * be relaxed for that runtime — see PLAYWRIGHT_E2E in playwright.yml.
+ */
+export function shouldSkipPerIpApiThrottles(): boolean {
+  return (
+    process.env.NODE_ENV === "test" ||
+    process.env.TEST_MODE === "true" ||
+    process.env.PLAYWRIGHT_E2E === "true"
+  );
+}
+
 /** F2 — per-user bucket when auth is present; shared-IP clinics otherwise fall back to IP. */
 export function rateLimitUserKey(req: Request): string {
   const userId = req.authUser?.id;
@@ -25,6 +38,7 @@ export const globalApiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many API requests. Please wait a moment." },
+  skip: shouldSkipPerIpApiThrottles,
 });
 
 // Scan actions — generous per-user ceiling (equipment pilot hot path).
@@ -83,8 +97,7 @@ export const rfidEventLimiter = rateLimit({
     const ip = ipKeyGenerator(req.ip ?? "127.0.0.1");
     return `${clinicId}:${ip}`;
   },
-  skip: () =>
-    process.env.NODE_ENV === "test" || process.env.TEST_MODE === "true",
+  skip: shouldSkipPerIpApiThrottles,
 });
 
 export const writeLimiter = rateLimit({
@@ -96,8 +109,5 @@ export const writeLimiter = rateLimit({
   keyGenerator: rateLimitUserKey,
   // In test/CI mode the entire Playwright suite runs from a single IP against a
   // single server process, so sequential tests exhaust the per-IP window.
-  // Skip limiting only when NODE_ENV=test or TEST_MODE=true; production is never
-  // in either of those states.
-  skip: () =>
-    process.env.NODE_ENV === "test" || process.env.TEST_MODE === "true",
+  skip: shouldSkipPerIpApiThrottles,
 });

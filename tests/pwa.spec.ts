@@ -327,25 +327,14 @@ test.describe("PWA — Service Worker", () => {
     await waitForShellReady(page);
 
     const eventFired = await page.evaluate(() => {
-      return new Promise<boolean>((resolve) => {
-        const timeout = setTimeout(() => resolve(false), 3000);
-        window.addEventListener(
-          "sw-update-available",
-          () => {
-            clearTimeout(timeout);
-            resolve(true);
-          },
-          { once: true }
-        );
-        // Simulate the SW posting SW_UPDATED (mimics what sw.js does on activate)
-        if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-          // Post from the test to trigger the message handler in main.tsx
-          // We simulate by dispatching from the SW side via a mock message
-        }
-        // Directly simulate: dispatch the event ourselves to verify the listener
-        // wiring works (the actual SW path is covered by P04+P05)
-        window.dispatchEvent(new CustomEvent("sw-update-available", { detail: { worker: null } }));
-      });
+      let fired = false;
+      const handler = () => {
+        fired = true;
+      };
+      window.addEventListener("sw-update-available", handler, { once: true });
+      window.dispatchEvent(new CustomEvent("sw-update-available", { detail: { worker: null } }));
+      window.removeEventListener("sw-update-available", handler);
+      return fired;
     });
 
     expect(eventFired, "sw-update-available event was not received by window").toBe(true);

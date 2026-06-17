@@ -29,3 +29,27 @@ export const users = vtTable("vt_users", {
   clinicRoleIdx: index("idx_vt_users_clinic_role").on(t.clinicId, t.role),
   clinicStatusIdx: index("idx_vt_users_clinic_status").on(t.clinicId, t.status),
 }));
+
+/**
+ * Sign in with Apple refresh tokens, kept so the app can call Apple's
+ * `/auth/revoke` endpoint when a user deletes their account (App Store
+ * Guideline 5.1.1(v)). The token is stored AES-256-GCM encrypted via
+ * `config-crypto` (the `enc:v1:` envelope) — never in plaintext.
+ *
+ * One row per user. The FK cascades on user hard-delete so the token is
+ * removed automatically; the account-deletion flow revokes the token at
+ * Apple BEFORE the row is gone.
+ */
+export const appleOauthTokens = vtTable("vt_apple_oauth_tokens", {
+  id: text("id").primaryKey(),
+  clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+  userId: text("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  /** AES-256-GCM encrypted Apple refresh token (`enc:v1:` envelope). */
+  refreshToken: text("refresh_token").notNull(),
+  /** Apple `sub` (stable user identifier) from the id_token, for diagnostics. */
+  appleSub: text("apple_sub"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  clinicIdx: index("idx_vt_apple_oauth_tokens_clinic").on(t.clinicId),
+}));
