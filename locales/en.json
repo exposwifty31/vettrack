@@ -1034,6 +1034,7 @@
     "deleteAccountInProgress": "Deleting your account…",
     "deleteAccountSuccess": "Your account has been deleted.",
     "deleteAccountFailed": "Could not delete your account. Please try again.",
+    "deleteAccountProtected": "This demo account cannot be deleted. Use a personal account to test deletion.",
     "showEmail": "Show email",
     "hideEmail": "Hide email",
     "pushSyncFailed": "Failed to sync notification settings",

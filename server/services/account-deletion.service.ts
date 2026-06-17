@@ -24,6 +24,32 @@ import type { AuthUser } from "../middleware/auth.js";
 
 const PG_FK_VIOLATION = "23503";
 
+/** Demo / App Review accounts that must not self-delete through the in-app flow. */
+const DEFAULT_PROTECTED_EMAILS = ["reviewer@vettrack.uk"];
+
+export class AccountDeletionProtectedError extends Error {
+  constructor() {
+    super("ACCOUNT_DELETION_PROTECTED");
+    this.name = "AccountDeletionProtectedError";
+  }
+}
+
+function protectedDeletionEmails(): string[] {
+  const raw = process.env.ACCOUNT_DELETION_PROTECTED_EMAILS?.trim();
+  if (!raw) return DEFAULT_PROTECTED_EMAILS;
+  return raw
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/** True when the email is blocked from self-service deletion (demo / review accounts). */
+export function isAccountDeletionProtected(email: string): boolean {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return false;
+  return protectedDeletionEmails().includes(normalized);
+}
+
 export type AppleRevocationOutcome = "revoked" | "failed" | "skipped";
 export type DbDeletionOutcome = "hard_deleted" | "anonymized";
 
@@ -124,6 +150,10 @@ async function deleteClerkUser(clerkId: string): Promise<boolean> {
 }
 
 export async function deleteOwnAccount(user: AuthUser): Promise<AccountDeletionResult> {
+  if (isAccountDeletionProtected(user.email)) {
+    throw new AccountDeletionProtectedError();
+  }
+
   const appleRevocation = await revokeStoredAppleToken(user.clinicId, user.id);
   const dbOutcome = await eraseUserData(user.clinicId, user.id, user.id);
   const clerkDeleted = await deleteClerkUser(user.clerkId);

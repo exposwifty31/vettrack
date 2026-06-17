@@ -1034,6 +1034,7 @@
     "deleteAccountInProgress": "מוחק את החשבון שלך…",
     "deleteAccountSuccess": "החשבון שלך נמחק.",
     "deleteAccountFailed": "לא ניתן היה למחוק את החשבון שלך. נסה שוב.",
+    "deleteAccountProtected": "לא ניתן למחוק חשבון הדגמה זה. השתמש בחשבון אישי כדי לבדוק מחיקה.",
     "showEmail": "הצג אימייל",
     "hideEmail": "הסתר אימייל",
     "pushSyncFailed": "סנכרון הגדרות ההתראות נכשל",

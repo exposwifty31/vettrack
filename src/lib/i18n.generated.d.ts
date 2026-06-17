@@ -1037,6 +1037,7 @@ export interface TStructure {
     deleteAccountInProgress: string;
     deleteAccountSuccess: string;
     deleteAccountFailed: string;
+    deleteAccountProtected: string;
     showEmail: string;
     hideEmail: string;
     pushSyncFailed: string;
