@@ -61,4 +61,26 @@ describe("native-apple-link", () => {
     await linkCapturedAppleAuthorizationCode("  code-123  ");
     expect(linkAppleAuthorizationCode).toHaveBeenCalledWith("code-123");
   });
+
+  it("linkNativeAppleRevocationAfterOAuth links code after native authorize", async () => {
+    authorize.mockResolvedValue({
+      response: {
+        identityToken: "id.jwt",
+        authorizationCode: "revoke-code",
+      },
+    });
+
+    const { linkNativeAppleRevocationAfterOAuth } = await import("@/lib/native-apple-link");
+    await linkNativeAppleRevocationAfterOAuth();
+
+    expect(linkAppleAuthorizationCode).toHaveBeenCalledWith("revoke-code");
+  });
+
+  it("linkNativeAppleRevocationAfterOAuth is non-fatal when authorize fails", async () => {
+    authorize.mockRejectedValue(new Error("AuthorizationError error 1000"));
+
+    const { linkNativeAppleRevocationAfterOAuth } = await import("@/lib/native-apple-link");
+    await expect(linkNativeAppleRevocationAfterOAuth()).resolves.toBeUndefined();
+    expect(linkAppleAuthorizationCode).not.toHaveBeenCalled();
+  });
 });

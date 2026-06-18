@@ -31,7 +31,7 @@
  */
 import { App } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
-import { linkCapturedAppleAuthorizationCode } from "@/lib/native-apple-link";
+import { linkNativeAppleRevocationAfterOAuth } from "@/lib/native-apple-link";
 import { warmNativeClerkSessionToken } from "@/lib/native-clerk-session-token";
 
 /*
@@ -112,12 +112,10 @@ async function completeNativeClerkSession(
   signIn: SignInResource,
   signUp: SignUpResource,
   setActive: SetActive,
-  authorizationCode: string | null,
 ): Promise<void> {
   if (signIn.status === "complete" && signIn.createdSessionId) {
     await setActive({ session: signIn.createdSessionId });
     await warmNativeClerkSessionToken();
-    await linkCapturedAppleAuthorizationCode(authorizationCode);
     return;
   }
 
@@ -127,7 +125,6 @@ async function completeNativeClerkSession(
     if (signUp.status === "complete" && signUp.createdSessionId) {
       await setActive({ session: signUp.createdSessionId });
       await warmNativeClerkSessionToken();
-      await linkCapturedAppleAuthorizationCode(authorizationCode);
       return;
     }
     throw new Error(`OAUTH_SIGNUP_INCOMPLETE_${signUp.status ?? "unknown"}`);
@@ -181,5 +178,12 @@ export async function startNativeOAuth({
     nonce ? ({ rotatingTokenNonce: nonce } as { rotatingTokenNonce: string }) : undefined,
   );
 
-  await completeNativeClerkSession(signIn, signUp, setActive, null);
+  await completeNativeClerkSession(signIn, signUp, setActive);
+
+  // Apple revocation code is not available from the browser OAuth callback — capture
+  // it via the native sheet after the Clerk session is active (requires auth for
+  // POST /api/users/apple-link). Non-fatal if the user dismisses or sim fails.
+  if (strategy === "oauth_apple") {
+    await linkNativeAppleRevocationAfterOAuth();
+  }
 }

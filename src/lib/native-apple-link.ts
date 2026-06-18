@@ -20,8 +20,9 @@ export type NativeAppleCredential = {
 };
 
 /**
- * Run the native Apple authorization sheet once and return the credential
- * Clerk needs (`identityToken`) plus the deletion-revocation code.
+ * Run the native Apple authorization sheet and return the credential payload.
+ * After system-browser OAuth sign-in, only `authorizationCode` is consumed
+ * (for deletion-time revocation); the identity token is not sent to Clerk.
  */
 export async function requestNativeAppleCredential(): Promise<NativeAppleCredential> {
   if (!isCapacitorNative()) {
@@ -63,6 +64,24 @@ export async function linkCapturedAppleAuthorizationCode(
     await linkAppleAuthorizationCode(code);
   } catch (err) {
     console.warn("[native-apple-link] could not link authorization code", {
+      err: err instanceof Error ? err.message : err,
+    });
+  }
+}
+
+/**
+ * After a successful Clerk Apple OAuth sign-in (system browser), prompt the native
+ * Apple sheet once to capture the single-use `authorizationCode` for server-side
+ * token exchange. Non-fatal — see `docs/account-deletion.md`.
+ */
+export async function linkNativeAppleRevocationAfterOAuth(): Promise<void> {
+  if (!isCapacitorNative()) return;
+
+  try {
+    const credential = await requestNativeAppleCredential();
+    await linkCapturedAppleAuthorizationCode(credential.authorizationCode);
+  } catch (err) {
+    console.warn("[native-apple-link] revocation capture after OAuth failed (non-fatal)", {
       err: err instanceof Error ? err.message : err,
     });
   }
