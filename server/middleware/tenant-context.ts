@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
-import { getAuth } from "@clerk/express";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, users } from "../db.js";
+import { readClerkUserSession } from "../lib/clerk-session-auth.js";
 
 export interface AuthenticatedRequest extends Request {
   clinicId: string;
@@ -31,9 +31,9 @@ export async function tenantContext(req: Request, res: Response, next: NextFunct
   let clerkUserId: string | undefined;
   const fromClerk = (() => {
     try {
-      const auth = getAuth(req, { acceptsToken: "any" });
-      clerkUserId = auth.userId ?? undefined;
-      return auth.orgId ?? undefined;
+      const session = readClerkUserSession(req);
+      clerkUserId = session?.userId;
+      return session?.orgId ?? undefined;
     } catch {
       return undefined;
     }

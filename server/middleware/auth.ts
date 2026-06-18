@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import * as Sentry from "@sentry/node";
-import { getAuth, clerkClient } from "@clerk/express";
+import { clerkClient } from "@clerk/express";
 import { clinics, db, users } from "../db.js";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -12,6 +12,7 @@ import { buildAccessDeniedBody, recordAccessDenied } from "../lib/access-denied.
 import { isAdminEmail } from "../lib/admin-email-allowlist.js";
 import { incrementMetric } from "../lib/metrics.js";
 import { resolveAuthModeFromEnv } from "../lib/auth-mode.js";
+import { readClerkUserSession } from "../lib/clerk-session-auth.js";
 
 export type UserRole = "admin" | "vet" | "technician" | "senior_technician" | "student";
 type LegacyUserRole = UserRole | "viewer";
@@ -272,10 +273,10 @@ export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
   let clerkOrgId: string | null | undefined;
   let sessionClaims: Record<string, unknown> | undefined;
   try {
-    const auth = getAuth(req, { acceptsToken: "any" });
-    clerkUserId = auth.userId;
-    clerkOrgId = auth.orgId;
-    sessionClaims = auth.sessionClaims as Record<string, unknown> | undefined;
+    const session = readClerkUserSession(req);
+    clerkUserId = session?.userId ?? null;
+    clerkOrgId = session?.orgId ?? null;
+    sessionClaims = session?.sessionClaims;
   } catch (err) {
     console.error("[auth] Failed to read auth session", err);
     return { ok: false, status: 401, body: { error: "UNAUTHORIZED", reason: "INVALID_AUTH_TOKEN", message: "Invalid authentication token" } };
