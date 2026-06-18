@@ -53,6 +53,8 @@ VITE_CLERK_PUBLISHABLE_KEY="$VITE_CLERK_PUBLISHABLE_KEY" \
   pnpm exec vite build
 
 if $SYNC_IOS; then
+  echo "== patch Capacitor SPM (apple-sign-in → swift-pm 8.x) =="
+  bash "$REPO/scripts/patch-capacitor-apple-sign-in-spm.sh"
   echo "== cap sync ios =="
   env -u CAPACITOR_SERVER_URL npx cap sync ios
 fi
