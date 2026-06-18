@@ -26,7 +26,8 @@ describe("Phase 5 P0 hardening checks (static)", () => {
   });
 
   it("Server defines production-aware CSP mode", () => {
-    expect(serverIndex).toContain("const isProduction = process.env.NODE_ENV === \"production\"");
+    expect(serverIndex).toContain("const isProduction = isProductionRuntime()");
+    expect(serverIndex).toContain("isProductionRuntime");
   });
 
   it("CSP only allows unsafe-eval outside production", () => {
