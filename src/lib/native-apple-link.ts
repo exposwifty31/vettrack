@@ -2,9 +2,8 @@
  * Native Sign in with Apple credential capture for Capacitor iOS.
  *
  * Apple issues a single-use `authorizationCode` only during the native
- * ASAuthorizationController flow. Clerk's system-browser OAuth path consumes
- * the identity token but never surfaces that code, so Apple sign-in on native
- * must start here — not via a second authorize() after browser OAuth.
+ * ASAuthorizationController flow. Clerk's system-browser OAuth path does not
+ * surface that code — use this module when linking a revocation token after sign-in.
  */
 import { SignInWithApple } from "@capacitor-community/apple-sign-in";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
