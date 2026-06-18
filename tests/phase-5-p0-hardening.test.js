@@ -34,6 +34,13 @@ describe("Phase 5 P0 hardening checks (static)", () => {
     expect(serverIndex).toContain("...(isProduction ? [] : [\"'unsafe-eval'\"])");
   });
 
+  it("CSP connect-src allows loopback only outside production", () => {
+    expect(serverIndex).toContain("...(isProduction");
+    expect(serverIndex).toContain("\"http://127.0.0.1\"");
+    expect(serverIndex).toContain("\"ws://localhost\"");
+    expect(serverIndex).not.toContain("127.0.0.1:7630");
+  });
+
   it("Health router mounted at /api/health", () => {
     expect(serverIndex).toContain("app.use(\"/api/health\", healthRoutes);");
   });
