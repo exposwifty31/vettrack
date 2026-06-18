@@ -117,8 +117,20 @@ These are not revisited by this operating model:
 
 ## References
 
+### Governance & product
+- `docs/governance/PRODUCT_DRIVEN_IMPROVEMENT_PLAN.md` — source improvement plan (P0-5 now closed); weekly rhythm table
+- `docs/governance/PRODUCT_MODEL.md` — product scope, critical paths, and frozen surfaces
+- `docs/governance/ARCHITECTURE_MAP.md` — full system architecture map
+- `docs/governance/GITHUB_GOVERNANCE.md` — branch protection, remote canon, CI gate status
+- `docs/governance/PRODUCT_ALIGNMENT_REPORT.md` — product/engineering alignment findings
+
+### Agent infrastructure
+- `.cursor/skills/product-engineering-governor/SKILL.md` — governor skill definition and audit phases
+- `.cursor/agents/product-engineering-governor.md` — governor agent configuration
+- `.cursor/skills/product-engineering-governor/code-tour-integration.md` — code tour integration guide
+
+### Mobile
 - `docs/mobile/native-ship-checklist.md` — H0 route matrix (PASS status preserved)
-- `docs/mobile/release.md` — iOS + Android build and release steps  
-- `docs/governance/PRODUCT_DRIVEN_IMPROVEMENT_PLAN.md` — source improvement plan (P0-5 now closed)
-- `docs/MAINTENANCE_MODE.md` — Capacitor freeze and H7 kill-switch rules
+- `docs/mobile/release.md` — iOS + Android build and release steps
 - `docs/mobile/native-mobile-implementation-manual.md` — H0–H7 sequencing rules
+- `docs/MAINTENANCE_MODE.md` — Capacitor freeze and H7 kill-switch rules
