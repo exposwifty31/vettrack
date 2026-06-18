@@ -16,6 +16,7 @@
     "dev:ci": "concurrently -k -p \"[{name}]\" -n \"api,web\" -c \"cyan,teal\" \"pnpm dev:api\" \"pnpm dev:web\"",
     "dev": "concurrently -k -p \"[{name}]\" -n \"api,web\" -c \"cyan,teal\" \"cross-env PORT=3001 tsx watch server/index.ts\" \"vite --port 5000 --host\"",
     "build": "vite build",
+    "cap:archive:preflight": "bash scripts/archive-from-clean-tree.sh",
     "cap:build:native": "bash scripts/build-native-shell.sh --ios",
     "cap:build:native:android": "bash scripts/build-native-shell.sh --android",
     "cap:build:native:all": "bash scripts/build-native-shell.sh --all",

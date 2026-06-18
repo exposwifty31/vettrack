@@ -71,7 +71,15 @@ git worktree add ../vettrack-ship main
 
 ### Pre-archive gate (ship lane only)
 
-Run **only** from `/Users/dan/vettrack-ship` with a **clean** `git status`:
+**Preferred — one command** (refuses dirty dev/ship trees, runs verify + build):
+
+```bash
+cd /Users/dan/vettrack
+./scripts/archive-from-clean-tree.sh
+# optional: --skip-build (verify only) | --sim-smoke | --fetch
+```
+
+Manual equivalent (only if the guard script is unavailable):
 
 ```bash
 cd /Users/dan/vettrack-ship
@@ -166,8 +174,9 @@ git worktree add ../vettrack-ship main
 |--------|--------|
 | Agent coding | `/Users/dan/vettrack` |
 | `git pull` before archive | `/Users/dan/vettrack-ship` |
-| `verify-resubmission.sh` | `REPO=/Users/dan/vettrack-ship` |
-| `build-native-shell.sh` | `REPO=/Users/dan/vettrack-ship` |
+| `archive-from-clean-tree.sh` | run from dev or ship — defaults to `vettrack-ship` |
+| `verify-resubmission.sh` | `REPO=/Users/dan/vettrack-ship` (or use guard script) |
+| `build-native-shell.sh` | `REPO=/Users/dan/vettrack-ship` (or use guard script) |
 | Xcode Archive | `vettrack-ship/ios/App/App.xcworkspace` |
 
 See also: [native-ship-master-prompt.md](./native-ship-master-prompt.md), [RESUBMISSION_RUNBOOK.md](../../RESUBMISSION_RUNBOOK.md).
