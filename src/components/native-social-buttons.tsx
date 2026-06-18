@@ -14,11 +14,7 @@
 import { useState } from "react";
 import { useSignIn, useSignUp } from "@clerk/clerk-react";
 import { Apple, Loader2 } from "lucide-react";
-import {
-  startNativeAppleOAuth,
-  startNativeOAuth,
-  type NativeOAuthStrategy,
-} from "@/lib/native-oauth";
+import { startNativeOAuth, type NativeOAuthStrategy } from "@/lib/native-oauth";
 
 function GoogleGlyph() {
   return (
@@ -58,20 +54,12 @@ export function NativeSocialButtons({ mode }: { mode: Mode }) {
     setError(null);
     setBusy(strategy);
     try {
-      if (strategy === "oauth_apple") {
-        await startNativeAppleOAuth({
-          signIn: signIn as never,
-          signUp: signUp as never,
-          setActive: setActive as never,
-        });
-      } else {
-        await startNativeOAuth({
-          strategy,
-          signIn: signIn as never,
-          signUp: signUp as never,
-          setActive: setActive as never,
-        });
-      }
+      await startNativeOAuth({
+        strategy,
+        signIn: signIn as never,
+        signUp: signUp as never,
+        setActive: setActive as never,
+      });
     } catch (err) {
       const code = err instanceof Error ? err.message : "OAUTH_FAILED";
       setError(

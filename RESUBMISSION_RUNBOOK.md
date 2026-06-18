@@ -71,10 +71,21 @@ ls ios/App/App/public/assets/clerk-native-instance-*.js >/dev/null 2>&1 && echo 
 #   EXPECT: BUNDLED: True  /  NATIVE CLERK CHUNK: present
 ```
 
-If you changed any frontend code, rebuild + re-sync BEFORE archiving:
+If you changed any frontend code, rebuild + re-sync BEFORE archiving. Use the **ship worktree**
+(`/Users/dan/vettrack-ship`, clean tree only) — not the dev lane if it has uncommitted WIP:
+
 ```bash
 cd /Users/dan/vettrack
-./scripts/build-native-shell.sh
+./scripts/archive-from-clean-tree.sh
+# Refuses dirty dev/ship trees → verify 16/16 → build-native-shell in vettrack-ship.
+# Flags: --skip-build (verify only) | --sim-smoke | --fetch
+```
+
+Manual fallback (ship lane only):
+```bash
+cd /Users/dan/vettrack-ship && git status   # must be clean
+REPO=$PWD ./scripts/verify-resubmission.sh
+REPO=$PWD ./scripts/build-native-shell.sh
 # Reads VITE_CLERK_PUBLISHABLE_KEY + VITE_API_ORIGIN from .env only (.env.local is ignored).
 # NEVER pass CAPACITOR_SERVER_URL — that makes a thin web wrapper (4.2 risk + OAuth breaks).
 ```

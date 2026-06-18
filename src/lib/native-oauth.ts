@@ -31,10 +31,7 @@
  */
 import { App } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
-import {
-  linkCapturedAppleAuthorizationCode,
-  requestNativeAppleCredential,
-} from "@/lib/native-apple-link";
+import { linkNativeAppleRevocationAfterOAuth } from "@/lib/native-apple-link";
 import { warmNativeClerkSessionToken } from "@/lib/native-clerk-session-token";
 
 /*
@@ -48,15 +45,12 @@ interface OAuthVerification {
   status?: string | null;
   externalVerificationRedirectURL?: URL | null;
 }
-type SignInCreateParams =
-  | { strategy: string; redirectUrl: string }
-  | { strategy: "oauth_token_apple"; token: string };
 
 interface SignInResource {
   status?: string | null;
   createdSessionId?: string | null;
   firstFactorVerification?: OAuthVerification;
-  create(params: SignInCreateParams): Promise<unknown>;
+  create(params: { strategy: string; redirectUrl: string }): Promise<unknown>;
   reload(params?: { rotatingTokenNonce: string }): Promise<unknown>;
 }
 interface SignUpResource {
@@ -118,12 +112,10 @@ async function completeNativeClerkSession(
   signIn: SignInResource,
   signUp: SignUpResource,
   setActive: SetActive,
-  authorizationCode: string | null,
 ): Promise<void> {
   if (signIn.status === "complete" && signIn.createdSessionId) {
     await setActive({ session: signIn.createdSessionId });
     await warmNativeClerkSessionToken();
-    await linkCapturedAppleAuthorizationCode(authorizationCode);
     return;
   }
 
@@ -133,42 +125,12 @@ async function completeNativeClerkSession(
     if (signUp.status === "complete" && signUp.createdSessionId) {
       await setActive({ session: signUp.createdSessionId });
       await warmNativeClerkSessionToken();
-      await linkCapturedAppleAuthorizationCode(authorizationCode);
       return;
     }
     throw new Error(`OAUTH_SIGNUP_INCOMPLETE_${signUp.status ?? "unknown"}`);
   }
 
   throw new Error(`OAUTH_SIGNIN_INCOMPLETE_${signIn.status ?? "unknown"}`);
-}
-
-/**
- * Native Sign in with Apple for Capacitor iOS.
- *
- * Uses ASAuthorizationController (via the Capacitor plugin) to obtain Apple's
- * identity token and single-use authorization code in one prompt, then
- * completes Clerk auth with `oauth_token_apple`. The authorization code is
- * linked for account-deletion revocation — it is not available from the
- * system-browser OAuth path.
- */
-export async function startNativeAppleOAuth({
-  signIn,
-  signUp,
-  setActive,
-}: Omit<StartArgs, "strategy">): Promise<void> {
-  const credential = await requestNativeAppleCredential();
-
-  await signIn.create({
-    strategy: "oauth_token_apple",
-    token: credential.identityToken,
-  });
-
-  await completeNativeClerkSession(
-    signIn,
-    signUp,
-    setActive,
-    credential.authorizationCode,
-  );
 }
 
 /**
@@ -216,5 +178,12 @@ export async function startNativeOAuth({
     nonce ? ({ rotatingTokenNonce: nonce } as { rotatingTokenNonce: string }) : undefined,
   );
 
-  await completeNativeClerkSession(signIn, signUp, setActive, null);
+  await completeNativeClerkSession(signIn, signUp, setActive);
+
+  // Apple revocation code is not available from the browser OAuth callback — capture
+  // it via the native sheet after the Clerk session is active (requires auth for
+  // POST /api/users/apple-link). Non-fatal if the user dismisses or sim fails.
+  if (strategy === "oauth_apple") {
+    await linkNativeAppleRevocationAfterOAuth();
+  }
 }
