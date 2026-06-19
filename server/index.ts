@@ -143,6 +143,15 @@ app.use(
           "https://*.clerk.accounts.dev",
           "https://api.clerk.dev",
           "https://clerk.dev",
+          // Local dev tools (Vite HMR, loopback debug ingest). Omit in production.
+          ...(isProduction
+            ? []
+            : [
+                "http://127.0.0.1",
+                "http://localhost",
+                "ws://127.0.0.1",
+                "ws://localhost",
+              ]),
         ],
         imgSrc: ["'self'", "data:", "https:"],
         styleSrc: [
