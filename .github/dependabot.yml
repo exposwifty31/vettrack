@@ -10,6 +10,23 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
+    # Security-critical packages are explicitly allowed to receive major-version
+    # updates so that breaking security fixes are never silently blocked.
+    # All other major bumps are suppressed to reduce upgrade churn on a solo-
+    # maintainer project — review them manually when bandwidth allows.
+    allow:
+      - dependency-name: "express"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "helmet"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "xss"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@clerk/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "express-rate-limit"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "zod"
+        update-types: ["version-update:semver-major"]
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
