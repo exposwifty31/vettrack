@@ -10,25 +10,34 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
-    # Security-critical packages are explicitly allowed to receive major-version
-    # updates so that breaking security fixes are never silently blocked.
-    # All other major bumps are suppressed to reduce upgrade churn on a solo-
-    # maintainer project — review them manually when bandwidth allows.
+    # allow acts as a whitelist. Dependabot docs: if a dependency matches both
+    # an allow and an ignore rule, ignore wins — so the allow+ignore pattern
+    # cannot carve out exceptions to a wildcard ignore. Using allow-only instead:
+    #   • minor/patch updates are opened for every package
+    #   • major updates are opened only for security-critical packages
+    #   • major updates for all other packages are silently skipped
     allow:
+      # Minor and patch updates for all npm packages
+      - dependency-name: "*"
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
+      # Major updates for security-critical packages only
       - dependency-name: "express"
         update-types: ["version-update:semver-major"]
       - dependency-name: "helmet"
         update-types: ["version-update:semver-major"]
       - dependency-name: "xss"
         update-types: ["version-update:semver-major"]
-      - dependency-name: "@clerk/*"
+      - dependency-name: "@clerk/clerk-js"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@clerk/clerk-react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@clerk/clerk-sdk-node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@clerk/express"
         update-types: ["version-update:semver-major"]
       - dependency-name: "express-rate-limit"
         update-types: ["version-update:semver-major"]
       - dependency-name: "zod"
-        update-types: ["version-update:semver-major"]
-    ignore:
-      - dependency-name: "*"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
