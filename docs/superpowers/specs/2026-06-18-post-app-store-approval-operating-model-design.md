@@ -125,9 +125,9 @@ These are not revisited by this operating model:
 - `docs/governance/PRODUCT_ALIGNMENT_REPORT.md` — product/engineering alignment findings
 
 ### Agent infrastructure
-- `.cursor/skills/product-engineering-governor/SKILL.md` — governor skill definition and audit phases
-- `.cursor/agents/product-engineering-governor.md` — governor agent configuration
-- `.cursor/skills/product-engineering-governor/code-tour-integration.md` — code tour integration guide
+- `.agents/skills/product-engineering-governor/SKILL.md` — governor skill definition and audit phases
+- `.claude/agents/product-engineering-governor.md` — governor agent configuration
+- `.agents/skills/product-engineering-governor/code-tour-integration.md` — code tour integration guide
 
 ### Mobile
 - `docs/mobile/native-ship-checklist.md` — H0 route matrix (PASS status preserved)
