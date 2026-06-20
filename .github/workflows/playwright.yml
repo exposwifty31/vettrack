@@ -110,7 +110,7 @@ jobs:
           TEST_BASE_URL: http://127.0.0.1:3001
 
       - name: 📤 Upload dev log on failure
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ failure() }}
         with:
           name: vettrack-playwright-dev-log-shard-${{ matrix.shard }}
@@ -118,7 +118,7 @@ jobs:
           retention-days: 30
 
       - name: 📊 Upload Playwright report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: playwright-report-shard-${{ matrix.shard }}
