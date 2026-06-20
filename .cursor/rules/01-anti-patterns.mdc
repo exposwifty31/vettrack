@@ -1,0 +1,200 @@
+---
+description: Patterns that produce AI-looking code — never do these
+alwaysApply: true
+---
+
+# Anti-Patterns: What AI-Generated Code Looks Like
+
+These are the tells that make reviewers immediately recognise AI-generated code. Avoid every one.
+
+---
+
+## 1. Comment Theater
+Comments explain **why**, not **what**. Never restate what the code does:
+
+```
+// BAD — restates the code
+// Loop through users and check each one
+for user in users:
+    check(user)
+
+// BAD — restates the return
+// Return the result
+return result
+
+// GOOD — explains a non-obvious constraint or decision
+// Offset by 1 because the external API uses 1-based pagination
+page = requested_page + 1
+```
+
+## 2. TODO Abandonment
+Never deliver code with unimplemented stubs:
+
+```
+// BAD — broken code shipped as if it is done
+def process_payment(amount):
+    # TODO: implement this
+    raise NotImplementedError
+
+// GOOD — implement it, or do not create the stub
+```
+
+If a function is genuinely out of scope for this task, do not create it. Placeholders are not partial progress — they are broken code.
+
+## 3. Swallowing Errors
+Never catch and ignore errors:
+
+```
+// BAD
+try:
+    send_notification(user)
+except Exception:
+    print("error")
+
+// GOOD
+try:
+    send_notification(user)
+except DeliveryError as err:
+    logger.error("Notification failed", user_id=user.id, error=err)
+    raise  # or return an explicit failure result
+```
+
+## 4. Generic Error Messages
+```
+// BAD
+raise ValueError("Invalid input")
+raise Exception("Something went wrong")
+
+// GOOD
+raise ValueError(f"Email '{email}' failed RFC 5321 validation")
+raise RuntimeError(f"User {user_id} not found in tenant {tenant_id}")
+```
+
+## 5. Defensive Theater
+Do not add null/None checks on values the type system or logic guarantees are present:
+
+```
+// BAD — user_id is required by the function signature and validated upstream
+if user_id is not None and user_id != "" and len(user_id) > 0:
+    ...
+
+// GOOD — trust the contract; guard only where the contract is genuinely uncertain
+```
+
+Only guard against null/None where the runtime or type system genuinely cannot rule it out.
+
+## 6. Premature Abstraction
+Do not build extension points for requirements that do not exist:
+
+```
+// BAD — nobody asked for this
+class NotificationStrategyFactory:
+    def create(self, strategy_type: str) -> NotificationStrategy:
+        ...
+
+class EmailNotificationStrategy(NotificationStrategy): ...
+class SMSNotificationStrategy(NotificationStrategy): ...
+
+// GOOD — for the actual requirement
+def send_email_notification(user, message): ...
+```
+
+Extract when you have three concrete cases, not zero.
+
+## 7. Scope Creep Refactoring
+When asked to fix a bug in module A, do not also:
+- Rename variables for consistency
+- Reorganise imports
+- Rewrite a function that "could be cleaner"
+- Add type annotations to unrelated functions
+
+If the existing code has a real problem, add it to `TASKS.md` and stay on task.
+
+## 8. Unnecessary Async
+```
+// BAD — no I/O, no concurrency, no reason
+async def format_name(first, last):
+    return f"{first} {last}"
+
+// GOOD
+def format_name(first, last):
+    return f"{first} {last}"
+```
+
+## 9. Context Amnesia
+Before writing a utility function, search for it. AI frequently reinvents what already exists:
+
+```
+// BAD — format_date() already exists in utils/date.py
+def format_date(dt):
+    return dt.strftime("%Y-%m-%d")
+
+// GOOD — import and use the existing one
+from utils.date import format_date
+```
+
+Read the codebase. Use what exists.
+
+## 10. Options Object Bloat
+```
+// BAD — designed for imaginary future callers
+def create_user(
+    name,
+    role=None,
+    send_welcome_email=True,
+    notify_admin=False,
+    skip_validation=False,  # 🚩
+    dry_run=False,          # 🚩
+):
+
+// GOOD — for the actual use case
+def create_user(name: str, role: UserRole) -> User:
+```
+
+## 11. Type Escape Hatches
+```
+// BAD (TypeScript) — type safety abandoned
+const data = response as any;
+const el = document.getElementById('root')!;
+
+// GOOD
+const el = document.getElementById('root');
+if (!el) throw new Error('Root element #root missing from DOM');
+```
+
+Using `any`, `!`, or `object` as a type requires an inline comment explaining why the type system cannot handle this case.
+
+## 12. Sycophantic Docstrings
+```
+// BAD — documents what is already obvious from the signature
+def get_user(user_id: str) -> User:
+    """
+    This function retrieves a user from the database.
+    It takes a user_id parameter and returns the corresponding User object.
+    If the user is not found, it raises a UserNotFoundError.
+    """
+
+// GOOD — document only what is non-obvious
+def get_user(user_id: str) -> User:
+    """Raises UserNotFoundError if soft-deleted users are requested."""
+```
+
+## 13. Hallucinated Packages
+Never import a library without verifying it is installed in the project's dependency file (`package.json`, `requirements.txt`, `go.mod`, etc.). If a package is not there, say so explicitly — do not write the import.
+
+## 14. Inconsistent Naming
+Match the naming style of the file you are editing. Do not introduce a new convention in the same module:
+- If the file uses `get_` prefix for queries, do not add a `fetch_` function
+- If the codebase uses `is_active` for booleans, do not add `active` or `has_active`
+- If existing errors are named `XxxError`, do not add `XxxException`
+
+## 15. Commented-Out Code
+```
+// BAD — graveyard of dead code
+# def old_login(user, password):
+#     return check_hash(password, user.hash)
+
+// GOOD — delete it. Git history preserves it if it's ever needed.
+```
+
+Commented-out code is not a safety net — it is noise that makes the file harder to read.
