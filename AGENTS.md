@@ -35,7 +35,7 @@ If any of these are missing or incomplete, say so before proceeding.
 - Modify code outside the scope of the current task
 - Add dependencies without noting them in your response
 - Leave TODO placeholders in delivered code
-- Write comments that describe what the code does instead of why
+- Add comments explaining what the code does instead of why
 - Use `any` or unsafe type casts without an inline explanation
 - Catch errors silently
 - Touch realtime, Code Blue, or PWA code without reading the "Frozen architecture surfaces" section in `CLAUDE.md` first
