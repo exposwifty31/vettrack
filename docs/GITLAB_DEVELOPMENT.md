@@ -1,8 +1,8 @@
-# GitLab development
+# GitLab development (legacy / secondary remote)
 
-GitLab is the primary `origin` remote for this repository. Remote CI merge gates may be **suspended** — see [`docs/MAINTENANCE_MODE.md`](MAINTENANCE_MODE.md) for local verification either way.
+> **Status (2026-06-20):** GitHub (`origin` → `github.com/exposwifty31/vettrack`) is the **canonical** remote. GitLab is a secondary mirror during migration. Use [`docs/devops/github-setup.md`](devops/github-setup.md) for primary workflow.
 
-**Canonical remote:** `https://gitlab.com/dboy31561/vettrack`
+GitLab remote: `gitlab` → `https://gitlab.com/dboy31561/vettrack`
 
 ## Quick start
 
@@ -57,7 +57,7 @@ MR template: `.gitlab/merge_request_templates/Default.md`
 
 ## GitLab CI
 
-Pipeline config: `.gitlab-ci.yml` (migrated from `.github/workflows/`).
+Pipeline config: `.gitlab-ci.yml` was removed in favour of GitHub Actions (commit `f927e5b1`). GitLab pipelines may be stale until re-synced from GitHub.
 
 | Trigger | Jobs |
 |---------|------|
@@ -91,13 +91,13 @@ GitHub Actions `release-gate.yml`).
 
 ## Git remotes
 
-- Use **`origin`** → GitLab only for this repo.
-- Do **not** add `github.com/exposwifty31/vettrack` — that GitHub repo does not exist.
+- **`origin`** → GitHub (`exposwifty31/vettrack`) — canonical
+- **`gitlab`** → GitLab mirror — push here only when GitLab CI is explicitly needed
 
 ## Related docs
 
 - [`docs/MAINTENANCE_MODE.md`](MAINTENANCE_MODE.md) — what belongs in this repo vs literate-dollop
 - `CONTRIBUTING.md` — release flow, tests, deployment variables
 - `CLAUDE.md` — architecture invariants
-- `.gitlab-ci.yml` — pipeline source of truth
+- `.github/workflows/ci.yml` — active pipeline (GitHub)
 - [`docs/devops/ci-cd.md`](devops/ci-cd.md) — workflow inventory + local parity commands

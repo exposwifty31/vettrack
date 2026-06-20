@@ -4,9 +4,9 @@
 
 ## Overview
 
-Pipeline definitions live in **`.github/workflows/`** (GitHub Actions) and **`.gitlab-ci.yml`** (GitLab CI). They are kept in sync for when remotes resume.
+Pipeline definitions live in **`.github/workflows/`** (GitHub Actions). GitLab CI (`.gitlab-ci.yml`) was removed in the GitHub-first migration (`f927e5b1`).
 
-**Status:** remote merge gates may be **suspended**. Local commands below are the pre-merge contract regardless.
+**Status:** GitHub Actions is active on `origin`. Local commands below are the pre-merge contract regardless.
 
 Troubleshooting: [`.github/workflows/TROUBLESHOOTING.md`](../../.github/workflows/TROUBLESHOOTING.md)
 
@@ -26,7 +26,7 @@ Maintenance scope: [`docs/MAINTENANCE_MODE.md`](../MAINTENANCE_MODE.md)
 | [`workday-simulation-nightly.yml`](../../.github/workflows/workday-simulation-nightly.yml) | Nightly 04:00 UTC; manual | No |
 | [`staging-e2e-manual.yml`](../../.github/workflows/staging-e2e-manual.yml) | Manual on `staging` | No |
 
-GitLab equivalents: see `.gitlab-ci.yml` stages (typecheck → build → test → integration → architecture → playwright).
+Legacy GitLab pipeline notes: [`docs/GITLAB_DEVELOPMENT.md`](../GITLAB_DEVELOPMENT.md).
 
 ---
 
@@ -97,13 +97,13 @@ See [`docs/capacitor-native-app.md`](../capacitor-native-app.md) and [`docs/mobi
 
 ## Caching
 
-`actions/setup-node` with `cache: pnpm` keyed on `pnpm-lock.yaml`. GitLab: `.pnpm_cache` in `.gitlab-ci.yml`.
+`actions/setup-node` with `cache: pnpm` keyed on `pnpm-lock.yaml`.
 
 ---
 
 ## Extending CI
 
-1. **New vitest suite** — add to `ci.yml` / `.gitlab-ci.yml` test job; keep merge gate `needs` accurate.
+1. **New vitest suite** — add to `ci.yml` test job; keep merge gate `needs` accurate.
 2. **New shared mobile contract check** — extend `scripts/ci/contracts-gate.sh`.
 3. **New nightly** — new workflow with `schedule` + `workflow_dispatch` only.
 

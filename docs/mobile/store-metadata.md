@@ -2,6 +2,10 @@
 
 Use this file as the source of truth when submitting to App Store Connect and Google Play Console.
 
+**Product scope:** Equipment-first operations platform. Medication tasks, ER/patient modules, and billing claims workflows were removed June 2026 — see [`docs/scope-change-2026.md`](../scope-change-2026.md).
+
+**Current release:** 1.0.1 (Build 20) — matches `ios/App/App.xcodeproj` and locales `whatsNew.*`.
+
 ---
 
 ## App identity
@@ -48,21 +52,22 @@ EQUIPMENT TRACKING
 • NFC and QR scan workflows for check-out and return
 • Issue reporting with photo evidence
 • Automatic expiry and maintenance reminders
+• Asset Copilot explanations for equipment status
 
-MEDICATION TASK MANAGEMENT
-• Assign, approve, and complete medication tasks
-• Dosage calculation with container stock deduction
-• End-to-end audit trail from prescription to administration
+TASKS
+• Unified task list for floor operations (appointments model)
+• Assign, track, and complete operational tasks
+• Role-based workflows for vets and technicians
 
-INVENTORY & BILLING
-• Live stock levels with automatic deductions on task completion
+INVENTORY & PROCUREMENT
+• Live stock levels for containers and items
 • Purchase orders and restock workflows
-• Per-item billing ledger with cost summaries
+• Dispense events with audit trail
 
-EMERGENCY ROOM SUPPORT
-• Code Blue session management with real-time staff coordination
+CODE BLUE & WARD BOARD
+• Code Blue emergency session coordination (online-only mutations)
 • Crash cart inventory checks
-• Offline-capable — critical actions stay available without a network
+• Ward equipment board with realtime SSE updates
 
 MULTI-CLINIC READY
 • Single app serves multiple clinics with strict data isolation
@@ -85,7 +90,7 @@ about where equipment is, who has it, and what's due next.
 ### App Store keywords (100 chars, comma-separated)
 
 ```
-veterinary,vet,equipment,hospital,NFC,tracking,medication,task,inventory,clinic,barcode
+veterinary,vet,equipment,hospital,NFC,tracking,task,inventory,clinic,barcode
 ```
 
 ### Google Play tags (up to 5 from their fixed list)
@@ -121,8 +126,8 @@ veterinary,vet,equipment,hospital,NFC,tracking,medication,task,inventory,clinic,
 
 1. Equipment radar — room grid with status indicators
 2. Equipment detail — check-out flow with NFC scan
-3. Task list — medication tasks with status chips
-4. Task execution — dosage entry and completion
+3. Task list — operational tasks with status chips
+4. Task detail — assignment and completion flow
 5. Code Blue session — emergency coordination view
 6. Inventory dashboard — stock levels and restock
 7. Home dashboard — shift summary and alerts
@@ -147,9 +152,9 @@ veterinary,vet,equipment,hospital,NFC,tracking,medication,task,inventory,clinic,
    |----------------|-------------------|----------------|
    | 1. Equipment radar | iPhone 15 Pro / Pixel 7 | Ward or equipment room grid |
    | 2. Equipment detail | same | Equipment detail → check-out / NFC flow |
-   | 3. Task list | same | `/appointments` task list |
-   | 4. Task execution | same | Active medication task → dosage entry |
-   | 5. Code Blue session | same | ER → active Code Blue session |
+   | 3. Task list | same | `/equipment/tasks` task list |
+   | 4. Task detail | same | Active task → completion flow |
+   | 5. Code Blue session | same | `/code-blue` active session |
    | 6. Inventory dashboard | same | Inventory overview |
    | 7. Home dashboard | same | `/home` shift summary |
 
@@ -170,26 +175,34 @@ To review:
    (see src/lib/nfc-platform.ts).
 3. The camera feature requires VITE_FEATURE_CAMERA=true at build time and
    device camera permission — accept when prompted or use the library picker.
-4. Code Blue (emergency) screens are accessible from the ER Dashboard menu.
+4. Code Blue (emergency) screens are accessible from the app navigation.
+   Emergency mutations require an active network connection.
 ```
 
 ---
 
 ## Legal URLs (App Store Connect / Play Console)
 
-> **Status: NOT IMPLEMENTED (2026-06-17).** URLs below are **reserved** for store listings. Production currently serves the SPA shell then client-side **404** — no policy text. See [../legal-pages.md](../legal-pages.md) before submission.
+| Field | URL | Live? |
+|-------|-----|-------|
+| Privacy policy | `https://vettrack.uk/privacy` | Verify after deploy |
+| Terms of use | `https://vettrack.uk/terms` | Verify after deploy |
+| Support | `https://vettrack.uk/support` | Verify after deploy |
 
-| Field | Reserved URL | Live? |
-|-------|--------------|-------|
-| Privacy policy | `https://vettrack.uk/privacy` | **Yes** (after deploy) |
-| Terms of use | `https://vettrack.uk/terms` | **Yes** (after deploy) |
-| Support | `https://vettrack.uk/support` | **Yes** (after deploy) |
-
-Verify all three URLs in a browser without login after production deploy, then enter them in App Store Connect and Google Play Console.
+See [../legal-pages.md](../legal-pages.md) for implementation status. Verify all three URLs in a browser without login after production deploy.
 
 ---
 
 ## Version history notes (for release notes / What's New)
+
+### 1.0.1 — Build 20 (current)
+
+```
+• Equipment-first operations: tracking, tasks, inventory, Code Blue
+• Real-time ward board and offline-capable equipment workflows
+• Hebrew and English interface
+• Stability and App Store review fixes
+```
 
 ### 1.0.0 — Initial release
 
@@ -197,8 +210,8 @@ Verify all three URLs in a browser without login after production deploy, then e
 VetTrack 1.0 — veterinary hospital operations on your phone.
 
 • Real-time equipment tracking with NFC and QR scanning
-• Medication task management with dosage calculation
+• Operational task management
 • Code Blue emergency session coordination
-• Offline-first — works without an internet connection
+• Offline-first equipment workflows
 • Hebrew and English interface
 ```

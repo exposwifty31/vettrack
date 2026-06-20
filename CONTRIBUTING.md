@@ -130,12 +130,7 @@ Rotate quarterly. Coordinate rotation across all uptime monitors before changing
 - **Role alias normalization** — incoming role aliases are normalized to the
   canonical hierarchy (`admin · vet · senior_technician · technician ·
   student`). Compare roles numerically; do not string-match raw claims.
-- **Async inventory skew** — `completeTask` commits task completion + billing
-  atomically, then enqueues a `vt_inventory_jobs` row processed by
-  `inventory-deduction.worker`. Billing and inventory can therefore be
-  briefly inconsistent immediately after `completeTask` returns; a 10-minute
-  recovery sweep re-enqueues stale/failed jobs. Tests and UIs must tolerate
-  this skew rather than assuming immediate inventory consistency.
+- **Inventory jobs (removed)** — medication tasks and async inventory deduction were removed in migration 143. `inventory-deduction.worker` is a no-op stub. Inventory dispense/restock flows are synchronous via inventory services — see [`docs/scope-change-2026.md`](docs/scope-change-2026.md).
 
 ## Per-change checklist
 

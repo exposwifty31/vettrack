@@ -87,10 +87,10 @@ if [[ ! -d "$SHIP_LANE" ]] || ! git -C "$SHIP_LANE" rev-parse --git-dir >/dev/nu
 fi
 
 # --- dev lane must not have uncommitted app source WIP ------------------------
-dev_dirty="$(git -C "$DEV_LANE" status --porcelain -- ':!gan-harness/' 2>/dev/null || true)"
+dev_dirty="$(git -C "$DEV_LANE" status --porcelain 2>/dev/null || true)"
 if [[ -n "$dev_dirty" ]]; then
   dev_count="$(printf '%s\n' "$dev_dirty" | sed '/^$/d' | wc -l | tr -d ' ')"
-  fail "dev lane dirty ($dev_count files outside gan-harness/) — commit or stash before archive bundle"
+  fail "dev lane dirty ($dev_count files) — commit or stash before archive bundle"
 fi
 
 # --- ship lane must be clean --------------------------------------------------
