@@ -184,6 +184,11 @@ jobs:
         run: node scripts/architecture/extract-express-routes.mjs --warn-only
         continue-on-error: true
 
+      # TODO: remove --no-exit-code once the dead-code baseline is established and violations are resolved
+      - name: Dead code check (knip)
+        run: pnpm knip --no-exit-code
+        continue-on-error: true
+
   deploy-check:
     name: 🚀 Deploy pre-flight
     runs-on: ubuntu-latest

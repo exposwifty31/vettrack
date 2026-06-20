@@ -19,7 +19,9 @@ VetTrack
 
 **Integration configs** live in `vt_integration_configs` (one row per clinic per adapter).  
 **Sync history** lives in `vt_integration_sync_log` (append-only audit trail).  
-**Synced records** have `external_id`, `external_source`, `external_synced_at` columns on `vt_animals`, `vt_appointments`, `vt_billing_ledger`, and `vt_items`.
+**Synced records** have `external_id`, `external_source`, `external_synced_at` columns on `vt_appointments`, `vt_billing_ledger`, and `vt_items`.
+
+> **June 2026 scope change:** Patient/animal (ER) tables — `vt_animals`, `vt_hospitalizations`, and related medication/drug-formulary tables — were removed in migrations 142–143. The `vt_animals` column family no longer exists. Do not reference patient-level sync surfaces in new adapters; see [`docs/scope-change-2026.md`](../scope-change-2026.md).
 
 ---
 
@@ -54,9 +56,8 @@ interface IntegrationAdapter {
 
   validateCredentials(credentials): Promise<{ valid: boolean; error?: string }>;
 
-  // Optional — implement only what the vendor supports
-  fetchPatients?(credentials, params: SyncParams): Promise<ExternalPatient[]>;
-  pushPatient?(credentials, patient: VetTrackPatient): Promise<ExternalSyncResult>;
+  // Optional — implement only what the vendor supports.
+  // Note: fetchPatients / pushPatient were removed (June 2026 scope change — migrations 142–143).
   fetchInventory?(credentials, params: SyncParams): Promise<ExternalInventoryItem[]>;
   fetchAppointments?(credentials, params: SyncParams): Promise<ExternalAppointment[]>;
   pushAppointment?(credentials, appt: VetTrackAppointment): Promise<ExternalSyncResult>;
@@ -108,7 +109,7 @@ Calls the adapter's `validateCredentials` against the stored credentials. Return
 
 ```
 POST /api/integrations/configs/:adapterId/sync
-Body: { "syncType": "patients", "direction": "inbound", "since": "2026-01-01T00:00:00Z" }
+Body: { "syncType": "inventory", "direction": "inbound", "since": "2026-01-01T00:00:00Z" }
 ```
 
 Enqueues a BullMQ sync job. Returns `202 { ok: true, jobId: "..." }`.
@@ -117,12 +118,12 @@ Enqueues a BullMQ sync job. Returns `202 { ok: true, jobId: "..." }`.
 
 | syncType | direction | Status |
 |----------|-----------|--------|
-| patients | inbound | ✅ Implemented |
 | inventory | inbound | ✅ Implemented |
 | appointments | inbound | ✅ Implemented |
-| patients | outbound | Queued (future) |
 | appointments | outbound | Queued (future) |
 | billing | outbound | Queued (future) |
+
+> **Removed (June 2026):** `patients` sync (`inbound` and `outbound`) was removed with the ER/animal module in migrations 142–143. Do not submit `syncType: "patients"`.
 
 ### Sync log
 

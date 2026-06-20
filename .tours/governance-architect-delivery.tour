@@ -1,0 +1,78 @@
+{
+  "title": "Governance: Architect & Delivery",
+  "description": "Four critical paths every architect or delivery engineer must understand before touching VetTrack's frozen surfaces: auth → tenant resolution, equipment checkout + audit, realtime outbox fan-out, and the ward board SSE + SW denylist.",
+  "steps": [
+    {
+      "title": "1a. Auth entry point — resolveAuthUser",
+      "description": "Every API request flows through `resolveAuthUser`. In **dev-bypass** mode (no `CLERK_SECRET_KEY`) the hardcoded `DEV_USER` is returned immediately. In production the Clerk JWT is validated and the DB row is upserted. Either way, the returned `AuthUser` carries `clinicId`, `role`, and `status`. **Role is always taken from `vt_users.role` — never from the JWT claim.**\n\nLook for the mode branch here: dev bypass first, then Clerk token validation below.",
+      "file": "server/middleware/auth.ts",
+      "line": 240
+    },
+    {
+      "title": "1b. clinicId extraction and security boundary",
+      "description": "The `clinicId` set here becomes `req.clinicId` for the lifetime of the request. In dev-bypass mode it is `DEV_USER.clinicId` (or an override header). In Clerk mode it is taken from the DB row — `vt_users.clinicId` is authoritative; Clerk org membership is advisory only.\n\nThis is the **security boundary**. Every subsequent Drizzle query must constrain the target table with `eq(<table>.clinicId, clinicId)` — joining alone is insufficient.",
+      "file": "server/middleware/auth.ts",
+      "line": 263
+    },
+    {
+      "title": "1c. sessionContextMiddleware sets req.authUser and req.clinicId",
+      "description": "After `resolveAuthUser` returns, `sessionContextMiddleware` (the exported wrapper) writes `req.authUser` and `req.clinicId`. Downstream route handlers read these values. Protected routes then call `requireAuth` or `requireRole` — those guards re-check the same resolved values and block `pending` / `blocked` accounts.",
+      "file": "server/middleware/auth.ts",
+      "line": 505
+    },
+    {
+      "title": "2a. Equipment checkout — route declaration",
+      "description": "The `POST /:id/checkout` route is the canonical equipment checkout path. It is gated by `requireAuth`, `checkoutLimiter` (20/min), `requireEffectiveRole('student')` (minimum role), UUID validation, body validation, and replay idempotency middleware — all before the handler runs.\n\nNotice that `clinicId` is the first thing extracted from the validated `req.clinicId!` inside the handler.",
+      "file": "server/routes/equipment.ts",
+      "line": 480
+    },
+    {
+      "title": "2b. clinicId-scoped DB query in checkout",
+      "description": "The equipment lookup constrains **both** `equipment.clinicId` and `equipment.id` — a textbook example of the multi-tenancy invariant. Satisfying tenant isolation via join alone would be a defect; here the target table (`vt_equipment`) is directly filtered.\n\nThe `isNull(equipment.deletedAt)` guard implements soft-delete filtering, which is the default pattern for this table family.",
+      "file": "server/routes/equipment.ts",
+      "line": 506
+    },
+    {
+      "title": "2c. logAudit on emergency checkout",
+      "description": "`logAudit` is called **fire-and-forget** (`void logAudit(...)`) on the emergency checkout path. Without a `tx` argument the call schedules an outbox insert asynchronously — do not `await` it here; a failure in the audit write must not roll back the clinical write. For writes where audit must be atomic with the domain change, pass `tx` to `logAudit`.",
+      "file": "server/routes/equipment.ts",
+      "line": 579
+    },
+    {
+      "title": "3a. insertRealtimeDomainEvent — outbox write contract",
+      "description": "`insertRealtimeDomainEvent` must be called **inside the same transaction** as the state change when loss on rollback is unacceptable. It inserts into `vt_event_outbox` with a monotonic integer primary key — that `id` becomes the SSE `id:` cursor for client replay and ordering.\n\nThe function accepts `tx` (transaction executor) or the global `db` client. When called with `db` directly it is fire-and-forget; when called inside `tx` the outbox row commits atomically with the domain row.",
+      "file": "server/lib/realtime-outbox.ts",
+      "line": 16
+    },
+    {
+      "title": "3b. outboxEmitter — the single fan-out point",
+      "description": "`outboxEmitter` is the **only** mechanism by which published outbox rows are distributed to SSE subscribers. It emits three events per row: the global `'published'` event, the `row.type` event, and the per-clinic `clinic:<clinicId>` event.\n\nDo not add a second publisher loop or poll `vt_event_outbox` from feature code. All domain realtime UX must subscribe to `outboxEmitter`.",
+      "file": "server/lib/event-publisher.ts",
+      "line": 37
+    },
+    {
+      "title": "3c. startEventOutboxPublisher — the poll loop",
+      "description": "The publisher polls at `POLL_MS = 750` ms, processes `BATCH_SIZE = 100` rows per tick, and is guarded by the `publisherStarted` flag so it can only be started once. Rows that exceed `OUTBOX_MAX_RETRY_COUNT = 50` attempts are moved to the DLQ.\n\nThis function must be called exactly once — from `server/app/start-schedulers.ts`. A second call is a no-op due to the guard, but a second import-and-start from elsewhere would break the singleton contract.",
+      "file": "server/lib/event-publisher.ts",
+      "line": 174
+    },
+    {
+      "title": "4a. SSE stream route — the ward board transport",
+      "description": "`GET /api/realtime/stream` is the single SSE connection per clinic. After auth + clinicId validation, it sets `Content-Type: text/event-stream` and subscribes to `outboxEmitter` on the `clinic:<clinicId>` channel. Each published outbox row is serialised with its `id:` field set to `vt_event_outbox.id` — this is the monotonic cursor that clients send back as `Last-Event-ID` on reconnect.\n\nThe transport is **SSE only**. Do not introduce WebSockets, long-polling, or shared workers.",
+      "file": "server/routes/realtime.ts",
+      "line": 573
+    },
+    {
+      "title": "4b. Last-Event-ID replay and reset_state on pruned cursor",
+      "description": "On reconnect with a `Last-Event-ID` header the handler checks whether that outbox row still exists for the clinic. If it does, `replayPublishedOutboxAfter` replays all missed rows. If it was pruned (outbox janitor removed it), the server emits `reset_state:last_event_pruned` and the client triggers a full snapshot resync.\n\nThis is the recovery contract: never assume a cursor is still valid; always check before replaying.",
+      "file": "server/routes/realtime.ts",
+      "line": 598
+    },
+    {
+      "title": "4c. Service worker — emergency endpoint cache denylist",
+      "description": "`EMERGENCY_BYPASS_PATHS` declares the endpoints that are unconditionally bypassed by the SW cache: display snapshot, active Code Blue sessions, and all realtime paths. Any request matching this list goes straight to the network — never read from Cache Storage, never written back.\n\nPre-existing cached entries for these paths are purged on SW `activate`. **Never add an emergency or realtime URL to any cache path.** This denylist is a frozen surface.",
+      "file": "public/sw.js",
+      "line": 38
+    }
+  ]
+}

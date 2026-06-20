@@ -2,6 +2,8 @@
 
 Use when a user sees **"החשבון ממתין לאישור הנהלת ביה״ח"** / account pending approval on production.
 
+> **Known bug (backlog P1-8):** The `ADMIN_EMAILS` promotion runs on **every authenticated request** for matching users, not only on first sign-in. This means a user whose email is in `ADMIN_EMAILS` will be re-promoted to `admin` on every request even if they were manually demoted via the UI or DB. If you demote an `ADMIN_EMAILS` user without also removing their email from the variable, the demotion will be reversed on their next request. To permanently demote such a user: (1) remove their email from `ADMIN_EMAILS`, (2) redeploy, then (3) demote via Option B or the admin UI. See §Demotion below. This per-request re-promotion is a known defect tracked as backlog item P1-8.
+
 ## Option A — `ADMIN_EMAILS` (recommended for owners)
 
 1. Railway → **VetTrack production** service → **Variables**
