@@ -2,12 +2,14 @@
 
 This repository is the **production monolith**: React web app, Express API, PostgreSQL, PWA/offline sync, and **Capacitor** native shell (iOS/Android). Active mobile strategy and Expo/RN work live elsewhere.
 
+**Current native release:** 1.0.1 (Build 20) — App Store approved. See `ios/App/App.xcodeproj/project.pbxproj` and locales `whatsNew.*`.
+
 ## In scope (this repo)
 
 - Web app (`src/`), API (`server/`), schema/migrations (`server/schema/`, `migrations/`)
-- Capacitor Build 15 ship path — see [`docs/mobile/README.md`](mobile/README.md)
+- Capacitor native ship path — see [`docs/mobile/README.md`](mobile/README.md)
 - PWA, offline Dexie sync, Code Blue / realtime frozen surfaces (`CLAUDE.md`)
-- Railway deploy when CI remotes resume
+- Railway deploy via GitHub Actions when `RAILWAY_USE_CLI_DEPLOY` is enabled
 
 ## Out of scope (other repo)
 
@@ -19,24 +21,35 @@ This repository is the **production monolith**: React web app, Express API, Post
 
 **Porting rule:** copy reference code from this repo into literate-dollop; do not delete production Capacitor paths here until Phase 6 kill-switch (future product decision).
 
+**Product scope:** ER/patient, medication tasks, and formulary were removed June 2026 — [`docs/scope-change-2026.md`](scope-change-2026.md).
+
 ## Git remotes
 
-- **`origin`** — GitLab (`gitlab.com/dboy31561/vettrack`) when pushing is active
-- **No** `github.com/exposwifty31/vettrack` — that remote must not be added
+| Remote | URL | Role |
+|--------|-----|------|
+| **`origin`** | `github.com/exposwifty31/vettrack` | **Canonical** — push PRs here |
+| **`gitlab`** | `gitlab.com/dboy31561/vettrack` | Secondary mirror (migration in progress) |
 
 ```bash
-git remote -v   # expect origin only (or GitLab + other approved remotes)
+git remote -v
+# origin  → GitHub (canonical)
+# gitlab  → GitLab (mirror)
 ```
 
-Remove a stale GitHub remote if present:
+Clone and setup: [`docs/devops/github-setup.md`](devops/github-setup.md), [`docs/setup/environment.md`](setup/environment.md).
 
-```bash
-git remote remove github
-```
+**Worktrees:**
+
+| Path | Branch | Purpose |
+|------|--------|---------|
+| `/Users/dan/vettrack` | `main-sync` | Dev lane |
+| `/Users/dan/vettrack-ship` | `main` | Ship lane (App Store releases) |
 
 ## CI status
 
-Remote merge gates (GitLab / GitHub Actions) may be **suspended**. Treat **local verification** as the contract before merge:
+**GitHub Actions** is the active CI on `origin`. Workflow definitions: `.github/workflows/`.
+
+Local verification remains the pre-merge contract:
 
 ```bash
 pnpm install
@@ -46,7 +59,7 @@ npx tsc --noEmit --project tsconfig.server-check.json
 pnpm test
 ```
 
-Workflow definitions remain in `.github/workflows/` and `.gitlab-ci.yml` for when CI resumes. See [`docs/devops/ci-cd.md`](devops/ci-cd.md).
+See [`docs/devops/ci-cd.md`](devops/ci-cd.md). Legacy GitLab workflow: [`docs/GITLAB_DEVELOPMENT.md`](GITLAB_DEVELOPMENT.md) (secondary remote only).
 
 ## Contracts package
 
@@ -61,5 +74,6 @@ After bumping the dependency, run `bash scripts/ci/contracts-gate.sh`.
 ## Related docs
 
 - [`docs/scope-change-2026.md`](scope-change-2026.md) — product scope after migrations 142–143
-- [`docs/GITLAB_DEVELOPMENT.md`](GITLAB_DEVELOPMENT.md) — MR workflow when GitLab is active
+- [`docs/governance/REPO_CLEANUP_MANIFEST.md`](governance/REPO_CLEANUP_MANIFEST.md) — repo hygiene inventory
+- [`docs/GITLAB_DEVELOPMENT.md`](GITLAB_DEVELOPMENT.md) — legacy GitLab MR workflow
 - [`CONTRIBUTING.md`](../CONTRIBUTING.md) — tests, release flow, deployment variables

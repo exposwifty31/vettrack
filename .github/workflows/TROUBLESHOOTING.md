@@ -1,8 +1,8 @@
 # CI workflow troubleshooting
 
-Valid workflow files live under `.github/workflows/*.yml` (GitHub) and `.gitlab-ci.yml` (GitLab). See [`docs/devops/ci-cd.md`](../../docs/devops/ci-cd.md).
+Valid workflow files live under `.github/workflows/*.yml` (GitHub Actions). See [`docs/devops/ci-cd.md`](../../docs/devops/ci-cd.md).
 
-Remote CI may be suspended — reproduce failures locally:
+GitHub Actions is active on `origin`. Reproduce failures locally:
 
 ```bash
 bash scripts/ci/contracts-gate.sh

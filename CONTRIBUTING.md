@@ -9,16 +9,21 @@ configuration that is easy to get wrong.
 
 **Maintenance mode:** see [`docs/MAINTENANCE_MODE.md`](docs/MAINTENANCE_MODE.md). Expo/RN work belongs in [`exposwifty31/literate-dollop`](https://github.com/exposwifty31/literate-dollop).
 
-**Git remote:** `origin` → GitLab (`gitlab.com/dboy31561/vettrack`) when pushing is active. See [`docs/GITLAB_DEVELOPMENT.md`](docs/GITLAB_DEVELOPMENT.md).
+**Git remote:** `origin` → GitHub (`github.com/exposwifty31/vettrack`). GitLab (`gitlab.com/dboy31561/vettrack`) is configured as the `gitlab` remote. Push to `origin` (GitHub) for canonical history; push to `gitlab` when GitLab CI is active. See [`docs/GITLAB_DEVELOPMENT.md`](docs/GITLAB_DEVELOPMENT.md).
 
 **CI:** remote merge gates may be suspended — run local checks below before merge. Do not push directly to `main` when MR workflow is active.
 
 **Do not change Railway** or production deployment settings without explicit approval.
 
-### Merge requests (when GitLab CI is active)
+### Merge requests / pull requests
 
 ```bash
+# GitHub (canonical remote — always push here):
 git push -u origin feat/my-change
+# Open PR on github.com/exposwifty31/vettrack targeting main
+
+# GitLab (when GitLab CI is active):
+git push -u gitlab feat/my-change
 # Open MR targeting main — see docs/GITLAB_DEVELOPMENT.md
 ```
 
@@ -125,12 +130,7 @@ Rotate quarterly. Coordinate rotation across all uptime monitors before changing
 - **Role alias normalization** — incoming role aliases are normalized to the
   canonical hierarchy (`admin · vet · senior_technician · technician ·
   student`). Compare roles numerically; do not string-match raw claims.
-- **Async inventory skew** — `completeTask` commits task completion + billing
-  atomically, then enqueues a `vt_inventory_jobs` row processed by
-  `inventory-deduction.worker`. Billing and inventory can therefore be
-  briefly inconsistent immediately after `completeTask` returns; a 10-minute
-  recovery sweep re-enqueues stale/failed jobs. Tests and UIs must tolerate
-  this skew rather than assuming immediate inventory consistency.
+- **Inventory jobs (removed)** — medication tasks and async inventory deduction were removed in migration 143. `inventory-deduction.worker` is a no-op stub. Inventory dispense/restock flows are synchronous via inventory services — see [`docs/scope-change-2026.md`](docs/scope-change-2026.md).
 
 ## Per-change checklist
 

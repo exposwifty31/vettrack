@@ -19,7 +19,7 @@
     "paths": {
       "*": ["./*"],
       "@/*": ["./src/*"],
-      "@assets/*": ["./attached_assets/*"]
+      "@assets/*": ["./docs/archive/2026/attached_assets/*"]
     }
   },
   "include": ["src", "lib"],

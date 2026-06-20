@@ -17,12 +17,17 @@
 
 ## Local setup (dev-bypass auth)
 
-1. **Clone and install**
+1. **Clone and install** (GitHub — canonical remote)
+
    ```bash
-   git clone git@gitlab.com:dboy31561/vettrack.git
+   git clone https://github.com/exposwifty31/vettrack.git
    cd vettrack
    pnpm install
    ```
+
+   SSH alternative: `git clone git@github.com:exposwifty31/vettrack.git`
+
+   GitLab mirror (secondary): `git clone git@gitlab.com:dboy31561/vettrack.git` — add `origin` → GitHub if cloning from GitLab.
 
 2. **Create `.env`** (minimal — no Clerk keys needed)
    ```
@@ -108,24 +113,29 @@ Omit both Clerk keys for dev-bypass mode (hardcoded admin user, no SDK required)
 
 ## CI setup
 
-GitLab CI uses Docker image `node:20-alpine` for most jobs. Required CI/CD variables (set in GitLab → Settings → CI/CD → Variables):
+**GitHub Actions** (`.github/workflows/ci.yml`) is the active CI on `origin`. Postgres service is defined in-workflow for test jobs.
+
+Required GitHub repository **secrets** (Settings → Secrets and variables → Actions) for deploy jobs when `RAILWAY_USE_CLI_DEPLOY=true`:
 
 ```
-DATABASE_URL          postgresql://vettrack:vettrack@postgres:5432/vettrack_test
-SESSION_SECRET        <long random string>
-CLERK_SECRET_KEY      sk_test_...
-VITE_CLERK_PUBLISHABLE_KEY  pk_test_...
-ALLOWED_ORIGIN        https://vettrack.uk
-DB_CONFIG_ENCRYPTION_KEY    <32-byte hex>
-CLERK_WEBHOOK_SECRET  whsec_...
-DATA_INTEGRITY_HEALTH_TOKEN  <token>
-RAILWAY_TOKEN         (deploy only)
-RAILWAY_SERVICE       (deploy only)
+DATABASE_URL
+REDIS_URL
+SESSION_SECRET
+CLERK_SECRET_KEY
+VITE_CLERK_PUBLISHABLE_KEY
+ALLOWED_ORIGIN
+DB_CONFIG_ENCRYPTION_KEY
+CLERK_WEBHOOK_SECRET
+DATA_INTEGRITY_HEALTH_TOKEN
+RAILWAY_TOKEN          (deploy only)
+RAILWAY_SERVICE        (deploy only)
 ```
 
-Pipeline stages: `typecheck → build → test → integration → architecture → deploy → playwright → release-gate`
+Pipeline jobs: Tests & typecheck → Integration ops → Architecture gates → Merge gate (deploy jobs optional).
 
-See [`docs/devops/ci-cd.md`](../devops/ci-cd.md) for full CI architecture.
+See [`docs/devops/ci-cd.md`](../devops/ci-cd.md) and [`docs/devops/github-setup.md`](../devops/github-setup.md).
+
+Legacy GitLab CI variables: see [`docs/GITLAB_DEVELOPMENT.md`](../GITLAB_DEVELOPMENT.md) if using the `gitlab` remote mirror.
 
 ---
 

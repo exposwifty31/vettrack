@@ -1,0 +1,25 @@
+# CODEOWNERS — VetTrack
+# Each pattern maps to the GitHub user(s) required to review changes.
+# Rules are evaluated bottom-up; last match wins.
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything not explicitly listed
+*                                           @exposwifty31
+
+# Auth and tenancy critical path
+server/middleware/auth.ts                   @exposwifty31
+
+# Primary domain monolith — equipment routes
+server/routes/equipment.ts                  @exposwifty31
+
+# Database schema migrations — requires deliberate review
+migrations/                                 @exposwifty31
+
+# Code Blue safety invariant — offline emergency classifier
+src/lib/offline-emergency-block.ts          @exposwifty31
+
+# CI gate changes — workflows must be reviewed carefully
+.github/workflows/                          @exposwifty31
+
+# CODEOWNERS itself
+.github/CODEOWNERS                          @exposwifty31

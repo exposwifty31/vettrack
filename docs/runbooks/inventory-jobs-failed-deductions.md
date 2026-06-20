@@ -1,8 +1,10 @@
 # Runbook — Failed medication inventory jobs
 
+> **Deprecated (2026-06):** Medication tasks and `vt_inventory_jobs` async deduction were removed in migration 143. This runbook is retained for historical reference only. See [`docs/scope-change-2026.md`](../scope-change-2026.md).
+
 **Audience:** Clinic admin, pharmacy lead, engineering on-call  
-**UI:** `/billing/inventory-jobs` (admin role)  
-**Table:** `vt_inventory_jobs`
+**UI:** `/billing/inventory-jobs` (removed — redirects to `/equipment`)  
+**Table:** `vt_inventory_jobs` (dropped)
 
 ---
 

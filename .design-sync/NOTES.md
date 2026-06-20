@@ -13,7 +13,7 @@ runs in a non-standard configuration. Read this before re-syncing.
   ```
   DS_SRC_GLOB="/Users/dan/vettrack/src/**/*.ts,/Users/dan/vettrack/src/**/*.tsx"
   DS_TS_BASEURL="/Users/dan/vettrack"
-  DS_TS_PATHS='{"@/*":["./src/*"],"@assets/*":["./attached_assets/*"],"*":["./*"]}'
+  DS_TS_PATHS='{"@/*":["./src/*"],"@assets/*":["./docs/archive/2026/attached_assets/*"],"*":["./*"]}'
   ```
   These are consumed by patches in `.ds-sync/lib/dts.mjs` (see "Staged-script
   patches" below). Without them, every `.d.ts` collapses to `[key: string]: unknown`.
