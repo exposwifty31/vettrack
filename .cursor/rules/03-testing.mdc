@@ -1,0 +1,97 @@
+---
+description: Testing requirements — what counts as tested and what does not
+alwaysApply: true
+---
+
+# Testing Requirements
+
+## The Rule
+Every task that produces code must also produce or update tests. "I'll add tests later" is not acceptable. A feature without tests is not done.
+
+---
+
+## What Counts as a Test
+A valid test must:
+- Have a name that reads as a sentence describing expected behaviour: `"returns 401 when token is expired"`
+- Test one behaviour per case
+- Make a real assertion on the outcome — not just "it ran without throwing"
+- Cover at least one failure path, not only the happy path
+
+## What Does Not Count
+- An assertion that always passes: `assert True`
+- A test that only checks a function was called, with no assertion on what it returned
+- A test that imports and runs code but asserts nothing
+- A commented-out test
+
+---
+
+## Required Coverage by Change Type
+
+| Change type | Minimum required |
+|-------------|-----------------|
+| New function | Unit tests for all branches: success + all failure modes |
+| Bug fix | Regression test that would have caught the original bug |
+| New API endpoint | Tests for 2xx success, 4xx client error, 5xx server error |
+| New UI component | Render test + at least one interaction test |
+| Database migration | Test both the migration up and the rollback |
+| Deleted code | Delete its tests too — dead test files are actively misleading |
+| Refactor (no behaviour change) | Existing tests must still pass — no new tests needed unless coverage gaps are found |
+
+---
+
+## Test Structure: AAA
+
+Arrange, Act, Assert. One block each. Keep them readable:
+
+```
+def test_login_fails_with_wrong_password():
+    # Arrange
+    user = create_test_user(password="correct")
+
+    # Act
+    result = auth_service.login(user.email, "wrong")
+
+    # Assert
+    assert result.ok is False
+    assert result.error == "INVALID_CREDENTIALS"
+```
+
+No test should require reading other tests to understand what it does.
+
+---
+
+## What to Test vs What Not to Test
+
+**Test:**
+- Business logic and state transitions
+- Validation rules
+- Error handling branches
+- Permission and access control checks
+- Data transformations
+- Integration between two modules you own
+
+**Do not test:**
+- Third-party library internals
+- Simple getters and setters with no logic
+- Framework lifecycle hooks (unless they contain your logic)
+- Logging calls
+
+---
+
+## Naming and Location
+
+- Unit tests: co-located with the module (`foo.py` → `test_foo.py` or `foo.test.ts`)
+- Integration tests: in `tests/integration/` or `src/tests/integration/`
+- End-to-end tests: in `e2e/` or `tests/e2e/`
+- Test helpers and fixtures: in `tests/helpers/` or `tests/fixtures/`
+- Test names: `test_[what]_[condition]_[expected outcome]` or a plain sentence — pick one style and use it consistently
+
+---
+
+## Before Marking a Task Complete
+
+Run the full test suite. Do not mark done if:
+- Any tests are failing — even tests unrelated to your change
+- You added tests but have not run them
+- The build or type-check fails
+- A test file exists for the module you changed and you did not read it

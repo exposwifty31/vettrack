@@ -1,0 +1,89 @@
+---
+description: Required development phases — do not skip steps
+alwaysApply: true
+---
+
+# Development Workflow
+
+Every task goes through these phases in order. Skipping phases produces low-quality output that wastes more time than the shortcut saved.
+
+---
+
+## Phase 1: Orient
+
+Before touching any file:
+
+1. Read `PLAN.md` — understand the current goal and what is out of scope
+2. Read `TASKS.md` — find the specific task and its acceptance criteria
+3. Read every file you plan to modify
+4. Search for usages of anything you plan to rename or change
+5. Read the related tests — understand what is currently verified
+
+If you do not know what a function does, read it. Do not infer from the name.
+
+---
+
+## Phase 2: Clarify
+
+If any of these are unclear before writing code:
+- The acceptance criteria for the task
+- Which files are in scope
+- Whether to follow an existing pattern or replace it
+- Performance, security, or compatibility constraints
+
+Ask **one specific question** and wait. Do not ask open-ended questions.
+
+**Do not ask:** "What would you like me to do?"
+**Do ask:** "Should the retry logic go in the service layer or the caller — the existing pattern puts it in the caller, but this case seems different because X?"
+
+---
+
+## Phase 3: Plan
+
+For any change touching more than one function or file, write a short implementation plan in your response before writing code:
+
+```
+## Plan
+1. Add X field to the Y type in path/to/types.ts
+2. Update function A in path/to/service.ts to populate it
+3. Update function B to validate it on read
+4. Add test cases for the new validation in path/to/service.test.ts
+
+Out of scope: Z, W
+```
+
+Wait for approval before writing code. If the user says "go ahead" immediately, proceed.
+
+---
+
+## Phase 4: Implement
+
+- Change the minimum number of lines required
+- Match the code style of the file you are in — do not standardise
+- Search before creating — grep for utilities before writing a new one
+- Write tests alongside the implementation, not after
+
+---
+
+## Phase 5: Verify
+
+After implementing, before declaring done:
+
+1. List the exact verification commands: `npm test`, `go test ./...`, `pytest`, etc.
+2. Run them if you have tool access
+3. List every file changed with a one-line description of the change
+4. Confirm no unintended side effects — check all call sites of anything you changed
+
+Do not say "done" while tests are failing, even if the failure appears unrelated.
+
+---
+
+## Phase 6: Update Documentation
+
+After a successful task, update:
+- `TASKS.md` — mark complete; note any deviation from the plan
+- `PLAN.md` — update if the approach changed
+- `docs/DECISIONS.md` — if a non-obvious architectural choice was made during implementation
+- Inline comments — only if the code is genuinely non-obvious
+
+Do not write documentation for its own sake.
