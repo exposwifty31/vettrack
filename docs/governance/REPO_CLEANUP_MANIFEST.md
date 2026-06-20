@@ -110,8 +110,8 @@
 
 | Path | Branch | Status |
 |------|--------|--------|
-| `/Users/dan/vettrack` | `main-sync` | Active dev lane |
-| `/Users/dan/vettrack-ship` | `main` | Ship lane — **do not touch** |
+| `<vettrack-dev>` | `main-sync` | Active dev lane |
+| `<vettrack-ship>` | `main` | Ship lane — **do not touch** |
 | `.claude/worktrees/*` (5) | agent branches | **Pruned** this cleanup |
 
 ### Local branches — DEFER deletion (unmerged commits)
@@ -154,7 +154,7 @@
 
 - No local branch deletion  
 - No force-push  
-- No changes under `/Users/dan/vettrack-ship`  
+- No changes under `<vettrack-ship>`  
 - No database migrations  
 
 ---

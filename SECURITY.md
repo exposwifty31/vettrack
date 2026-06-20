@@ -15,7 +15,7 @@ Only the current production release of VetTrack receives security fixes.
 
 If you discover a security vulnerability in VetTrack, please disclose it responsibly:
 
-- **Email:** security@vettrack.uk _(verify this address before use — placeholder pending confirmation)_
+- **Email:** security@vettrack.uk
 - **Response time:** We aim to acknowledge reports within 48 hours and provide a resolution timeline within 7 days.
 
 ### What to include
