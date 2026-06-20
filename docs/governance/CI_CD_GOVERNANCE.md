@@ -139,7 +139,7 @@ Mirrors GitHub with **more granular stages**: `typecheck` → `build` → `test`
 
 ### Production path
 
-```
+```text
 push main
   → (if vars.RAILWAY_USE_CLI_DEPLOY == 'true' AND secrets set)
       deploy.sh --check

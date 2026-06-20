@@ -96,11 +96,11 @@ Identify where engineering time is lost, bugs originate, and onboarding or maint
 
 | Step | Friction | Eng. cost | Notes |
 |------|----------|-----------|-------|
-| PostgreSQL 16 + user/db | **M** first time | Cloud agents need sudo/pg commands |
-| `PORT=3001` + `pnpm dev` | **S** | Documented; `predev` helps |
-| Clerk vs dev-bypass | **M** when task needs real auth | Browser Clerk errors without keys |
-| Redis optional | **S** | Workers log disabled — surprises in queue features |
-| Migrations at boot | **S** | Failure blocks schedulers — good but abrupt |
+| PostgreSQL 16 + user/db | **M** first time | **Medium** | Cloud agents need sudo/pg commands |
+| `PORT=3001` + `pnpm dev` | **S** | **Low** | Documented; `predev` helps |
+| Clerk vs dev-bypass | **M** when task needs real auth | **Medium** | Browser Clerk errors without keys |
+| Redis optional | **S** | **Low** | Workers log disabled — surprises in queue features |
+| Migrations at boot | **S** | **Low** | Failure blocks schedulers — good but abrupt |
 
 **Reference:** `docs/cloud-agent-starter-skill.md`, `AGENTS.md`
 

@@ -3,8 +3,8 @@
 **Generated:** 2026-06-20  
 **Production anchor:** iOS `MARKETING_VERSION=1.0.1`, `CURRENT_PROJECT_VERSION=20`; locales `whatsNew.currentVersion=1.0.1`, `buildLabel=Build 20`  
 **Product scope:** [`docs/scope-change-2026.md`](../scope-change-2026.md) (migrations 142–143)  
-**Ship lane:** `/Users/dan/vettrack-ship` → `main` (do not modify)  
-**Dev lane:** `/Users/dan/vettrack` → `main-sync`  
+**Ship lane:** `<vettrack-ship>` worktree → `main` (do not modify)  
+**Dev lane:** `<vettrack-dev>` worktree → `main-sync`  
 **Remotes:** `origin` → `github.com/exposwifty31/vettrack` (canonical); `gitlab` → `gitlab.com/dboy31561/vettrack` (secondary mirror)
 
 ---
@@ -163,7 +163,7 @@
 
 ### Commit (when approved)
 
-```
+```text
 chore(docs): repo cleanup manifest, archive agent artifacts, align docs to 1.0.1
 
 - Add docs/governance/REPO_CLEANUP_MANIFEST.md

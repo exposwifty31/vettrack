@@ -197,7 +197,7 @@ See [../legal-pages.md](../legal-pages.md) for implementation status. Verify all
 
 ### 1.0.1 — Build 20 (current)
 
-```
+```text
 • Equipment-first operations: tracking, tasks, inventory, Code Blue
 • Real-time ward board and offline-capable equipment workflows
 • Hebrew and English interface
@@ -206,7 +206,7 @@ See [../legal-pages.md](../legal-pages.md) for implementation status. Verify all
 
 ### 1.0.0 — Initial release
 
-```
+```text
 VetTrack 1.0 — veterinary hospital operations on your phone.
 
 • Real-time equipment tracking with NFC and QR scanning

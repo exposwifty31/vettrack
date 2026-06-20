@@ -18,6 +18,7 @@
 ## Local setup (dev-bypass auth)
 
 1. **Clone and install** (GitHub — canonical remote)
+
    ```bash
    git clone https://github.com/exposwifty31/vettrack.git
    cd vettrack
