@@ -91,6 +91,8 @@
     "@clerk/clerk-sdk-node": "^5.1.6",
     "@clerk/express": "^1.0.0",
     "@hookform/resolvers": "^3.9.0",
+    "@ionic/core": "^8.8.12",
+    "@ionic/react": "^8.8.12",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-avatar": "^1.1.11",
