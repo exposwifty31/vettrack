@@ -714,7 +714,24 @@
     "shiftSummary": "Shift summary",
     "scanQrCode": "Scan QR",
     "addEquipment": "Add equipment",
-    "browseEquipment": "Browse equipment"
+    "browseEquipment": "Browse equipment",
+    "urgent": {
+      "critical": "Critical alerts",
+      "overdue": "Overdue tasks"
+    },
+    "scan": {
+      "label": "Scan Equipment",
+      "subtitle": "Check in or out via QR"
+    },
+    "shift": {
+      "elapsed": "In shift",
+      "itemsOut": "Items out",
+      "scansToday": "Scans today",
+      "noShift": "No active shift",
+      "endShift": "End Shift",
+      "startShift": "Start Shift"
+    },
+    "offline": "You're offline — data may be outdated"
   },
   "equipment": {
     "title": "Equipment",

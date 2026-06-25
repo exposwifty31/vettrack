@@ -1,0 +1,71 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { getCurrentUserId } from "@/lib/auth-store";
+import { computeAlerts } from "@/lib/utils";
+import { buildAlertAckSet, countCriticalAlerts } from "@/lib/alert-counts";
+
+export function useTodayShift() {
+  const userId = getCurrentUserId();
+  const queryClient = useQueryClient();
+
+  const { data: pulse, isLoading: pulseLoading } = useQuery({
+    queryKey: ["/api/home/dashboard"],
+    queryFn: () => api.home.dashboard(),
+    enabled: !!userId,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchInterval: 120_000,
+  });
+
+  const { data: taskDashboard, isLoading: tasksLoading } = useQuery({
+    queryKey: ["/api/tasks/dashboard", userId ?? ""],
+    queryFn: () => api.tasks.dashboard(),
+    enabled: !!userId,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: equipment, isLoading: equipmentLoading } = useQuery({
+    queryKey: ["/api/equipment"],
+    queryFn: api.equipment.list,
+    enabled: !!userId,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: alertAcks } = useQuery({
+    queryKey: ["/api/alert-acks"],
+    queryFn: api.alertAcks.list,
+    enabled: !!userId,
+    staleTime: 30_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const isLoading = pulseLoading || tasksLoading || equipmentLoading;
+
+  const alerts = equipment ? computeAlerts(equipment) : [];
+  const alertAckSet = buildAlertAckSet(alertAcks);
+  const criticalCount = countCriticalAlerts(alerts, alertAckSet);
+  const overdueCount = taskDashboard?.counts.overdue ?? 0;
+  const itemsOutCount = equipment?.filter((e) => e.custodyState === "checked_out").length ?? 0;
+
+  function refetch() {
+    queryClient.invalidateQueries({ queryKey: ["/api/home/dashboard"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", userId ?? ""] });
+    queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+  }
+
+  return {
+    pulse,
+    taskDashboard,
+    equipment,
+    isLoading,
+    criticalCount,
+    overdueCount,
+    itemsOutCount,
+    scansToday: pulse?.scansToday ?? 0,
+    shift: pulse?.shift ?? null,
+    refetch,
+  };
+}

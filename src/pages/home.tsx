@@ -1,3 +1,5 @@
+import { useMobileShellContext } from "@/shell/mobile/MobileShellContext";
+import { TodayScreen } from "@/features/today";
 import { Bdi } from "@/components/ui/bdi";
 import { t, formatDateByLocale } from "@/lib/i18n";
 import { useEffect, useState } from "react";
@@ -59,6 +61,9 @@ function compactEta(min: number): string {
 }
 
 export default function HomePage() {
+  const inMobileShell = useMobileShellContext();
+  if (inMobileShell) return <TodayScreen />;
+
   const { name, refreshAuth } = useAuth();
   const userId = getCurrentUserId();
   const queryClient = useQueryClient();

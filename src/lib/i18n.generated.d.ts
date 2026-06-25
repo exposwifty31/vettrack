@@ -718,6 +718,23 @@ export interface TStructure {
     scanQrCode: string;
     addEquipment: string;
     browseEquipment: string;
+    urgent: {
+      critical: string;
+      overdue: string;
+    };
+    scan: {
+      label: string;
+      subtitle: string;
+    };
+    shift: {
+      elapsed: string;
+      itemsOut: string;
+      scansToday: string;
+      noShift: string;
+      endShift: string;
+      startShift: string;
+    };
+    offline: string;
   };
   equipment: {
     title: string;
