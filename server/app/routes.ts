@@ -27,6 +27,7 @@ import homeDashboardRoutes from "../routes/home-dashboard.js";
 import { createDisplayRouter } from "../routes/display.js";
 import platformCapabilitiesRoutes from "../routes/platform-capabilities.js";
 import equipmentCopilotRoutes from "../routes/equipment-copilot.js";
+import equipmentInferenceRoutes from "../routes/equipment-inference.js";
 
 // --- Safety surfaces ---
 import codeBlueRoutes from "../routes/code-blue.js";
@@ -75,6 +76,7 @@ function registerEquipmentCoreRoutes(app: express.Express) {
   // unmatched. Copilot middleware is scoped to POST /:id/copilot/explain only.
   app.use("/api/equipment", equipmentRoutes);
   app.use("/api/equipment", equipmentCopilotRoutes);
+  app.use("/api/equipment", equipmentInferenceRoutes);
   // Bare /api mounts: operational-state and operational-metrics attach to the shared
   // /api prefix. Keep them immediately after /api/equipment and before narrower paths.
   app.use("/api", equipmentOperationalStateRoutes);
