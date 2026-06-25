@@ -88,8 +88,10 @@ export interface TStructure {
     };
   };
   equipmentList: {
+    uptimeLabel: string;
     search: {
       placeholder: string;
+      clearLabel: string;
     };
     folders: {
       all: string;

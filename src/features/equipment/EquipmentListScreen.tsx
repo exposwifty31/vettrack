@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useEquipmentList } from "./hooks/use-equipment-list";
 import { useEquipmentFilters } from "./hooks/use-equipment-filters";
 import { EquipmentLargeTitle } from "./EquipmentLargeTitle";
@@ -18,6 +18,16 @@ export function EquipmentListScreen() {
   const { search, statusFilter, setSearch, setStatusFilter } = useEquipmentFilters();
   const [inputValue, setInputValue] = useState(search);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setInputValue(search);
+  }, [search]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   function handleSearchChange(value: string) {
     setInputValue(value);

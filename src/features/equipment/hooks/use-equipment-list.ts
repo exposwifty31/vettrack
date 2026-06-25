@@ -37,8 +37,8 @@ export function useEquipmentList({
       if (tier === "attention") attention++;
       else if (tier === "in_use") inUse++;
     }
-    return { total: items.length, attention, inUse };
-  }, [items]);
+    return { total: data?.total ?? items.length, attention, inUse };
+  }, [items, data]);
 
   const availabilityPct =
     stats.total > 0 ? Math.round(((stats.total - stats.attention) / stats.total) * 100) : 0;

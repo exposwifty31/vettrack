@@ -5,6 +5,7 @@ const CHIPS: { value: string; label: string }[] = [
   { value: "ok", label: t.status.ok },
   { value: "issue", label: t.status.issue },
   { value: "maintenance", label: t.status.maintenance },
+  { value: "sterilized", label: t.status.sterilized },
 ];
 
 type Props = {
@@ -30,6 +31,7 @@ export function EquipmentFilterChips({ value, onChange }: Props) {
             key={chip.value}
             type="button"
             onClick={() => onChange(chip.value)}
+            aria-pressed={active}
             style={{
               flexShrink: 0,
               height: 36,

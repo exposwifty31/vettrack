@@ -125,6 +125,7 @@ const translations = {
   },
 
   equipmentList: {
+    uptimeLabel: d.equipmentList.uptimeLabel,
     search: d.equipmentList.search,
     folders: d.equipmentList.folders,
     actions: d.equipmentList.actions,

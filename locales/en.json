@@ -85,8 +85,10 @@
     }
   },
   "equipmentList": {
+    "uptimeLabel": "uptime",
     "search": {
-      "placeholder": "Search by name, serial number, model..."
+      "placeholder": "Search by name, serial number, model...",
+      "clearLabel": "Clear search"
     },
     "folders": {
       "all": "All folders",

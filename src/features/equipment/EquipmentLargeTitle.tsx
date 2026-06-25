@@ -1,3 +1,5 @@
+import { t } from "@/lib/i18n";
+
 type Props = {
   title: string;
   count: number;
@@ -35,7 +37,6 @@ export function EquipmentLargeTitle({ title, count, availabilityPct }: Props) {
             fontFamily: "var(--font-num)",
             fontSize: "var(--text-sm)",
             color: "rgba(255,255,255,0.6)",
-            marginTop: 4,
             margin: "4px 0 0",
           }}
         >
@@ -72,7 +73,7 @@ export function EquipmentLargeTitle({ title, count, availabilityPct }: Props) {
             letterSpacing: "0.08em",
           }}
         >
-          uptime
+          {t.equipmentList.uptimeLabel}
         </span>
       </div>
     </div>

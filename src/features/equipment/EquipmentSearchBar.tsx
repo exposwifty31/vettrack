@@ -1,4 +1,5 @@
 import { Search, X } from "lucide-react";
+import { t } from "@/lib/i18n";
 
 type Props = {
   value: string;
@@ -50,7 +51,7 @@ export function EquipmentSearchBar({ value, onChange, placeholder }: Props) {
       {value && (
         <button
           type="button"
-          aria-label="Clear search"
+          aria-label={t.equipmentList.search.clearLabel}
           onClick={() => onChange("")}
           style={{
             position: "absolute",
