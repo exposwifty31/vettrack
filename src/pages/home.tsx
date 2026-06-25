@@ -62,8 +62,10 @@ function compactEta(min: number): string {
 
 export default function HomePage() {
   const inMobileShell = useMobileShellContext();
-  if (inMobileShell) return <TodayScreen />;
+  return inMobileShell ? <TodayScreen /> : <HomePageDesktop />;
+}
 
+function HomePageDesktop() {
   const { name, refreshAuth } = useAuth();
   const userId = getCurrentUserId();
   const queryClient = useQueryClient();

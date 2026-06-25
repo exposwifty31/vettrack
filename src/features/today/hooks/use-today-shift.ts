@@ -50,10 +50,12 @@ export function useTodayShift() {
   const overdueCount = taskDashboard?.counts.overdue ?? 0;
   const itemsOutCount = equipment?.filter((e) => e.custodyState === "checked_out").length ?? 0;
 
-  function refetch() {
-    queryClient.invalidateQueries({ queryKey: ["/api/home/dashboard"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", userId ?? ""] });
-    queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+  function refetch(): Promise<void> {
+    return Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["/api/home/dashboard"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", userId ?? ""] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] }),
+    ]).then(() => undefined);
   }
 
   return {

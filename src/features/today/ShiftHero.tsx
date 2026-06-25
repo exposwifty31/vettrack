@@ -14,8 +14,9 @@ function useElapsedClock(startedAt: string | undefined): string {
 
   useEffect(() => {
     if (!startedAt) return;
+    const at = startedAt;
     function tick() {
-      const ms = Date.now() - new Date(startedAt!).getTime();
+      const ms = Date.now() - new Date(at).getTime();
       const totalMin = Math.max(0, Math.floor(ms / 60_000));
       const h = Math.floor(totalMin / 60);
       const m = totalMin % 60;

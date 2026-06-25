@@ -1,10 +1,9 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTodayShift } from "./hooks/use-today-shift";
 import { ShiftHero } from "./ShiftHero";
 import { UrgentCountChips } from "./UrgentCountChips";
 import { QuickScanCard } from "./QuickScanCard";
 import { LoadingSection } from "@/components/ui/loading-section";
-import { ErrorCard } from "@/components/ui/error-card";
 import { t } from "@/lib/i18n";
 
 const PULL_THRESHOLD = 64;
@@ -16,14 +15,31 @@ export function TodayScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const startY = useRef<number | null>(null);
   const [pullDelta, setPullDelta] = useState(0);
-  const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
+  const [isOffline, setIsOffline] = useState(
+    typeof navigator !== "undefined" && !navigator.onLine,
+  );
+
+  useEffect(() => {
+    const onOnline = () => setIsOffline(false);
+    const onOffline = () => setIsOffline(true);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
 
   function onTouchStart(e: React.TouchEvent) {
-    startY.current = e.touches[0].clientY;
+    const touch = e.touches[0];
+    if (!touch) return;
+    startY.current = touch.clientY;
   }
   function onTouchMove(e: React.TouchEvent) {
     if (startY.current === null) return;
-    const delta = e.touches[0].clientY - startY.current;
+    const touch = e.touches[0];
+    if (!touch) return;
+    const delta = touch.clientY - startY.current;
     if (delta > 0) setPullDelta(Math.min(delta, PULL_THRESHOLD * 1.5));
   }
   async function onTouchEnd() {
