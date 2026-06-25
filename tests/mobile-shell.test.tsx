@@ -135,6 +135,28 @@ describe("MobileTabBar active state", () => {
     expect(screen.getByText("Alerts").closest("button")?.getAttribute("aria-current")).toBe("page");
   });
 
+  it("marks Today tab as active at root /", () => {
+    const { hook } = memoryLocation({ path: "/" });
+    render(
+      <Router hook={hook}>
+        <MobileTabBar />
+      </Router>,
+    );
+    expect(screen.getByText("Today").closest("button")?.getAttribute("aria-current")).toBe("page");
+    expect(screen.getByText("Equipment").closest("button")?.getAttribute("aria-current")).toBeNull();
+  });
+
+  it("keeps Equipment tab active at /equipment?scan=1", () => {
+    const { hook } = memoryLocation({ path: "/equipment?scan=1" });
+    render(
+      <Router hook={hook}>
+        <MobileTabBar />
+      </Router>,
+    );
+    expect(screen.getByText("Equipment").closest("button")?.getAttribute("aria-current")).toBe("page");
+    expect(screen.getByText("Today").closest("button")?.getAttribute("aria-current")).toBeNull();
+  });
+
   it("uses tab-bar-specific nav label", () => {
     const { hook } = memoryLocation({ path: "/home" });
     render(

@@ -102,7 +102,6 @@ export function MobileTabBar() {
 
       <div
         style={{ flex: 1, display: "flex", justifyContent: "center", paddingBottom: 4 }}
-        aria-hidden="true"
       >
         <ScanFab />
       </div>
