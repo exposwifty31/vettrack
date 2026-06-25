@@ -1,7 +1,9 @@
 // AppShell — single responsive entry point for all authenticated pages.
 // Desktop (lg+): Topbar + NAV sidebar (PageShell).
 // Mobile: sticky header + bottom-nav (Layout).
+// Inside MobileShell (Capacitor native): renders content only — chrome is provided by MobileShell.
 import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { useMobileShellContext } from "@/shell/mobile/MobileShellContext";
 import { PageShell } from "@/components/layout/PageShell";
 import { Layout } from "@/components/layout";
 import type { SidebarItem } from "@/components/layout/IconSidebar";
@@ -36,7 +38,10 @@ export function AppShell({
   navigationLocked,
   title,
 }: AppShellProps) {
+  const insideMobileShell = useMobileShellContext();
   const isDesktop = useIsDesktop();
+
+  if (insideMobileShell) return <>{children}</>;
   // Bottom bar = three destinations either side of the center scan FAB:
   // Today · Equipment · [Scan] · Emergency · Menu. Board, Rooms, Alerts and the
   // rest live in the slide-out menu (Alerts count is badged on the Menu icon).
