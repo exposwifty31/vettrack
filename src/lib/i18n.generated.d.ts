@@ -3398,6 +3398,8 @@ export interface TStructure {
     adminTypes: string;
     adminShifts: string;
     emergency: string;
+    more: string;
+    tabBar: string;
   };
   phoneSignIn: {
     title: string;

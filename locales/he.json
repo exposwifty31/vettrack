@@ -3394,7 +3394,9 @@
     "adminMetrics": "מדדים",
     "adminTypes": "סוגי נכסים",
     "adminShifts": "משמרות",
-    "emergency": "חירום"
+    "emergency": "חירום",
+    "more": "עוד",
+    "tabBar": "ניווט כרטיסיות"
   },
   "phoneSignIn": {
     "title": "התחברות עם טלפון",

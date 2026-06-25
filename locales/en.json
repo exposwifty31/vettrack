@@ -3394,7 +3394,9 @@
     "adminMetrics": "Metrics",
     "adminTypes": "Asset types",
     "adminShifts": "Shifts",
-    "emergency": "Emergency"
+    "emergency": "Emergency",
+    "more": "More",
+    "tabBar": "Tab navigation"
   },
   "phoneSignIn": {
     "title": "Phone Sign In",
