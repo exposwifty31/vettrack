@@ -30,6 +30,7 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
+      aria-current={active ? "page" : undefined}
       style={{
         flex: 1,
         display: "flex",
@@ -77,7 +78,7 @@ export function MobileTabBar() {
 
   return (
     <nav
-      aria-label={t.common.openNavigationMenu}
+      aria-label={t.nav.tabBar}
       style={{
         display: "flex",
         alignItems: "flex-end",

@@ -3399,6 +3399,7 @@ export interface TStructure {
     adminShifts: string;
     emergency: string;
     more: string;
+    tabBar: string;
   };
   phoneSignIn: {
     title: string;

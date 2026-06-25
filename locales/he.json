@@ -3395,7 +3395,8 @@
     "adminTypes": "סוגי נכסים",
     "adminShifts": "משמרות",
     "emergency": "חירום",
-    "more": "עוד"
+    "more": "עוד",
+    "tabBar": "ניווט כרטיסיות"
   },
   "phoneSignIn": {
     "title": "התחברות עם טלפון",

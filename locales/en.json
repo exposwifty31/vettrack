@@ -3395,7 +3395,8 @@
     "adminTypes": "Asset types",
     "adminShifts": "Shifts",
     "emergency": "Emergency",
-    "more": "More"
+    "more": "More",
+    "tabBar": "Tab navigation"
   },
   "phoneSignIn": {
     "title": "Phone Sign In",
