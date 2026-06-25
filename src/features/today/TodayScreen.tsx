@@ -4,12 +4,13 @@ import { ShiftHero } from "./ShiftHero";
 import { UrgentCountChips } from "./UrgentCountChips";
 import { QuickScanCard } from "./QuickScanCard";
 import { LoadingSection } from "@/components/ui/loading-section";
+import { ErrorCard } from "@/components/ui/error-card";
 import { t } from "@/lib/i18n";
 
 const PULL_THRESHOLD = 64;
 
 export function TodayScreen() {
-  const { isLoading, criticalCount, overdueCount, itemsOutCount, scansToday, shift, refetch } =
+  const { isLoading, isError, criticalCount, overdueCount, itemsOutCount, scansToday, shift, refetch } =
     useTodayShift();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -45,8 +46,11 @@ export function TodayScreen() {
   async function onTouchEnd() {
     if (pullDelta >= PULL_THRESHOLD && !refreshing) {
       setRefreshing(true);
-      await Promise.resolve(refetch());
-      setTimeout(() => setRefreshing(false), 600);
+      try {
+        await refetch();
+      } finally {
+        setRefreshing(false);
+      }
     }
     startY.current = null;
     setPullDelta(0);
@@ -118,6 +122,8 @@ export function TodayScreen() {
 
       {isLoading ? (
         <LoadingSection rows={4} />
+      ) : isError ? (
+        <ErrorCard message={t.errorCard.defaultMessage} onRetry={refetch} />
       ) : (
         <>
           <ShiftHero

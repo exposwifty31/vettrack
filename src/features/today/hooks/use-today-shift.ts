@@ -8,7 +8,7 @@ export function useTodayShift() {
   const userId = getCurrentUserId();
   const queryClient = useQueryClient();
 
-  const { data: pulse, isLoading: pulseLoading } = useQuery({
+  const { data: pulse, isLoading: pulseLoading, isError: pulseError } = useQuery({
     queryKey: ["/api/home/dashboard"],
     queryFn: () => api.home.dashboard(),
     enabled: !!userId,
@@ -17,7 +17,7 @@ export function useTodayShift() {
     refetchInterval: 120_000,
   });
 
-  const { data: taskDashboard, isLoading: tasksLoading } = useQuery({
+  const { data: taskDashboard, isLoading: tasksLoading, isError: tasksError } = useQuery({
     queryKey: ["/api/tasks/dashboard", userId ?? ""],
     queryFn: () => api.tasks.dashboard(),
     enabled: !!userId,
@@ -25,7 +25,7 @@ export function useTodayShift() {
     refetchOnWindowFocus: false,
   });
 
-  const { data: equipment, isLoading: equipmentLoading } = useQuery({
+  const { data: equipment, isLoading: equipmentLoading, isError: equipmentError } = useQuery({
     queryKey: ["/api/equipment"],
     queryFn: api.equipment.list,
     enabled: !!userId,
@@ -43,6 +43,7 @@ export function useTodayShift() {
   });
 
   const isLoading = pulseLoading || tasksLoading || equipmentLoading;
+  const isError = pulseError || tasksError || equipmentError;
 
   const alerts = equipment ? computeAlerts(equipment) : [];
   const alertAckSet = buildAlertAckSet(alertAcks);
@@ -55,6 +56,7 @@ export function useTodayShift() {
       queryClient.invalidateQueries({ queryKey: ["/api/home/dashboard"] }),
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", userId ?? ""] }),
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/alert-acks"] }),
     ]).then(() => undefined);
   }
 
@@ -63,6 +65,7 @@ export function useTodayShift() {
     taskDashboard,
     equipment,
     isLoading,
+    isError,
     criticalCount,
     overdueCount,
     itemsOutCount,
