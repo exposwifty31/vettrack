@@ -16,6 +16,6 @@
       "*": ["./*"]
     }
   },
-  "include": ["server/**/*.ts", "shared/**/*.ts", "lib/**/*.ts"],
+  "include": ["server/**/*.ts", "shared/**/*.ts", "shared-contracts/**/*.ts", "lib/**/*.ts"],
   "exclude": ["server/tests/**", "node_modules"]
 }
