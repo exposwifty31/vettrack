@@ -714,7 +714,24 @@
     "shiftSummary": "סיכום משמרת",
     "scanQrCode": "סרוק QR",
     "addEquipment": "הוסף ציוד",
-    "browseEquipment": "עיין בציוד"
+    "browseEquipment": "עיין בציוד",
+    "urgent": {
+      "critical": "התראות קריטיות",
+      "overdue": "משימות באיחור"
+    },
+    "scan": {
+      "label": "סרוק ציוד",
+      "subtitle": "בדוק כניסה/יציאה דרך QR"
+    },
+    "shift": {
+      "elapsed": "במשמרת",
+      "itemsOut": "פריטים בשימוש",
+      "scansToday": "סריקות היום",
+      "noShift": "אין משמרת פעילה",
+      "endShift": "סיום משמרת",
+      "startShift": "התחל משמרת"
+    },
+    "offline": "אינך מחובר — הנתונים עשויים להיות לא עדכניים"
   },
   "equipment": {
     "title": "ציוד",
