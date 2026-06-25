@@ -37,6 +37,7 @@ const CodeBlueHistoryPage = lazy(() => import("@/pages/code-blue-history"));
 const WardDisplayPage = lazy(() => import("@/pages/display"));
 const HandoffPage = lazy(() => import("@/pages/handoff"));
 const NotFoundPage = lazy(() => import("@/pages/not-found"));
+const ScanPage = lazy(() => import("@/pages/scan"));
 
 // --- Platform pages ---
 const InventoryPage = lazy(() => import("@/pages/inventory-page"));
@@ -111,7 +112,7 @@ export function AppRoutes() {
         <Route path="/equipment-tasks"><Redirect to="/equipment/tasks" replace /></Route>
         <Route path="/display"><RedirectPreserveSearch to="/equipment/board" /></Route>
         <Route path="/equipment-board"><Redirect to="/equipment/board" replace /></Route>
-        <Route path="/scan"><Redirect to="/equipment?scan=1" replace /></Route>
+        <Route path="/scan"><AuthGuard><ScanPage /></AuthGuard></Route>
         <Route path="/equipment/scan"><Redirect to="/equipment?scan=1" replace /></Route>
         <Route path="/equipment/maintenance"><Redirect to="/equipment?status=maintenance" replace /></Route>
         <Route path="/equipment/intelligence"><Redirect to="/equipment" replace /></Route>

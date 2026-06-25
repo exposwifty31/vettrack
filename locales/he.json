@@ -514,7 +514,21 @@
     "recoveryAttentionCalloutVeryStale": "הציוד לא אומת זמן רב — בדוק מיקום וסטטוס.",
     "recoveryAttentionCalloutCheckedOutLong": "מושאל זמן רב — אשר אחריות או החזר כשסיימת.",
     "loadFailed": "טעינת פרטי הציוד נכשלה. נסה שנית.",
-    "loadFailedHint": "בדוק את החיבור ומשוך לרענון."
+    "loadFailedHint": "בדוק את החיבור ומשוך לרענון.",
+    "locationCard": {
+      "title": "מיקום",
+      "unknown": "מיקום לא ידוע",
+      "lastKnown": "מיקום ידוע אחרון",
+      "confidence": {
+        "high": "ביטחון גבוה",
+        "medium": "ביטחון בינוני",
+        "low": "ביטחון נמוך",
+        "unknown": "לא ידוע"
+      }
+    },
+    "accountability": {
+      "title": "שרשרת אחריות"
+    }
   },
   "adminPilotCoverage": {
     "title": "כיסוי פיילוט",
@@ -3691,5 +3705,24 @@
         "body": "VetTrack מתאמת מפגשי Code Blue וזרימות ציוד חירום אך אינה שירות חירום רפואי או מיון.\n\nבמצבי סכנת חיים, פעל לפי פרוטוקולי החירום של בית החולים תחילה. אם תכונות Code Blue נכשלות במהלך מפגש פעיל, השתמש בנהלי גיבוי לא מקוונים של המרפאה ופנה ל-support@vettrack.uk לאחר האירוע עם חותמות זמן לחקירה."
       }
     }
+  }
+,
+  "scan": {
+    "title": "סריקת ציוד",
+    "scanPrompt": "כוון לקוד QR כלשהו כדי לצ'ק אין ולקחת אחריות",
+    "checkedInTo": "עכשיו אצלך",
+    "passToColleague": "העבר לעמית",
+    "done": "סיום",
+    "transferTitle": "העבר לעמית"
+  },
+  "more": {
+    "title": "עוד",
+    "account": "חשבון",
+    "profile": "הפרופיל שלי",
+    "language": "שפה",
+    "clinic": "מרפאה",
+    "about": "אודות VetTrack",
+    "session": "משמרת",
+    "endShift": "סיום משמרת"
   }
 }

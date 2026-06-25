@@ -26,6 +26,7 @@ const EXPECTED_MOUNT_PATHS = [
   "/health",
   "/api/equipment", // equipmentRoutes
   "/api/equipment", // equipmentCopilotRoutes
+  "/api/equipment", // equipmentInferenceRoutes
   "/api",
   "/api",
   "/api/rooms",

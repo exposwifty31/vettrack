@@ -303,6 +303,20 @@ const translations = {
       issueWhatsAppOffline: d.equipmentDetail.toast.issueWhatsAppOffline,
       reportFailed: (msg: string) => msg || d.equipmentDetail.toast.reportFailedDefault,
     },
+    locationCard: {
+      title: d.equipmentDetail.locationCard.title,
+      unknown: d.equipmentDetail.locationCard.unknown,
+      lastKnown: d.equipmentDetail.locationCard.lastKnown,
+      confidence: {
+        high: d.equipmentDetail.locationCard.confidence.high,
+        medium: d.equipmentDetail.locationCard.confidence.medium,
+        low: d.equipmentDetail.locationCard.confidence.low,
+        unknown: d.equipmentDetail.locationCard.confidence.unknown,
+      },
+    },
+    accountability: {
+      title: d.equipmentDetail.accountability.title,
+    },
   },
 
   adminPilotCoverage: {
@@ -419,6 +433,15 @@ const translations = {
       checkedOut: (name: string) => tr(d.scanner.toast.checkedOut, { name }),
       returned: (name: string) => tr(d.scanner.toast.returned, { name }),
     },
+  },
+
+  scan: {
+    title: d.scan.title,
+    scanPrompt: d.scan.scanPrompt,
+    checkedInTo: d.scan.checkedInTo,
+    passToColleague: d.scan.passToColleague,
+    done: d.scan.done,
+    transferTitle: d.scan.transferTitle,
   },
 
   codeBlue: {
@@ -1164,6 +1187,8 @@ const translations = {
   supportPage: d.supportPage,
 
   whatsNew: d.whatsNew,
+
+  more: d.more,
 
 } as const;
 

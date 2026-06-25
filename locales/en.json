@@ -514,7 +514,21 @@
     "recoveryAttentionCalloutVeryStale": "This asset has not been confirmed in a long time — verify location and status.",
     "recoveryAttentionCalloutCheckedOutLong": "Checked out for an extended period — confirm custody or return when done.",
     "loadFailed": "Failed to load equipment details. Try again.",
-    "loadFailedHint": "Check your connection and pull to refresh."
+    "loadFailedHint": "Check your connection and pull to refresh.",
+    "locationCard": {
+      "title": "Location",
+      "unknown": "Location unknown",
+      "lastKnown": "Last known location",
+      "confidence": {
+        "high": "High confidence",
+        "medium": "Medium confidence",
+        "low": "Low confidence",
+        "unknown": "Unknown"
+      }
+    },
+    "accountability": {
+      "title": "Accountability trail"
+    }
   },
   "adminPilotCoverage": {
     "title": "Pilot Coverage",
@@ -3691,5 +3705,24 @@
         "body": "VetTrack coordinates Code Blue sessions and emergency equipment workflows but is not an emergency dispatch or medical triage service.\n\nFor life-threatening situations, follow your hospital's emergency protocols first. If Code Blue features fail during an active session, use your clinic's offline backup procedures and contact support@vettrack.uk after the incident with timestamps for investigation."
       }
     }
+  },
+  "more": {
+    "title": "More",
+    "account": "Account",
+    "profile": "My Profile",
+    "language": "Language",
+    "clinic": "Clinic",
+    "about": "About VetTrack",
+    "session": "Session",
+    "endShift": "End Shift"
+  }
+,
+  "scan": {
+    "title": "Scan Equipment",
+    "scanPrompt": "Point at any QR code to check in and take accountability",
+    "checkedInTo": "Now with: You",
+    "passToColleague": "Pass to colleague",
+    "done": "Done",
+    "transferTitle": "Pass to colleague"
   }
 }

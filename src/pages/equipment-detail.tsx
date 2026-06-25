@@ -1,4 +1,6 @@
 import { t } from "@/lib/i18n";
+import { useMobileShellContext } from "@/shell/mobile/MobileShellContext";
+import { EquipmentDetailScreen } from "@/features/equipment";
 import { formatBundleGateReason } from "@/lib/equipment-truth-display";
 import { getEquipmentDisplayName } from "@/lib/equipment-display";
 import { Bdi } from "@/components/ui/bdi";
@@ -134,6 +136,17 @@ interface UndoState {
 }
 
 export default function EquipmentDetailPage() {
+  const inMobileShell = useMobileShellContext();
+  return inMobileShell ? <EquipmentDetailPageMobile /> : <EquipmentDetailPageDesktop />;
+}
+
+function EquipmentDetailPageMobile() {
+  const { id } = useParams<{ id: string }>();
+  if (!id) return null;
+  return <EquipmentDetailScreen equipmentId={id} />;
+}
+
+function EquipmentDetailPageDesktop() {
   const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
