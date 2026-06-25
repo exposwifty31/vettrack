@@ -1,3 +1,5 @@
+import { useMobileShellContext } from "@/shell/mobile/MobileShellContext";
+import { EquipmentListScreen } from "@/features/equipment";
 import { getEquipmentDisplayName } from "@/lib/equipment-display";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Bdi } from "@/components/ui/bdi";
@@ -118,6 +120,11 @@ const PAGE_SIZE = 9;
 
 
 export default function EquipmentListPage() {
+  const inMobileShell = useMobileShellContext();
+  return inMobileShell ? <EquipmentListScreen /> : <EquipmentListPageDesktop />;
+}
+
+function EquipmentListPageDesktop() {
   const confirm = useConfirm();
   const { settings } = useSettings();
   const queryClient = useQueryClient();

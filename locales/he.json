@@ -85,8 +85,10 @@
     }
   },
   "equipmentList": {
+    "uptimeLabel": "זמינות",
     "search": {
-      "placeholder": "חיפוש לפי שם, מספר סידורי, דגם..."
+      "placeholder": "חיפוש לפי שם, מספר סידורי, דגם...",
+      "clearLabel": "נקה חיפוש"
     },
     "folders": {
       "all": "כל התיקיות",
