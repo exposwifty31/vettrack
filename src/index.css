@@ -23,7 +23,7 @@
     --card-foreground: 127 21% 8%;
     --popover: 0 0% 100%;
     --popover-foreground: 127 21% 8%;
-    --primary: 130 42% 20%;
+    --primary: 234 85% 63%;
     --primary-foreground: 0 0% 100%;
     --secondary: 210 18% 95%;
     --secondary-foreground: 215 22% 20%;
@@ -37,7 +37,7 @@
     --destructive-foreground: 0 0% 100%;
     --border: 214 14% 87%;
     --input: 214 14% 87%;
-    --ring: 130 42% 20%;
+    --ring: 234 85% 63%;
     --radius: 0.625rem;
     /* ── Radius ramp — each step as an explicit CSS variable ── */
     --radius-sm:   0.375rem;      /* 6px  — tight inputs, badges */
@@ -64,9 +64,9 @@
     --shadow-card-hover: 0 4px 8px -2px rgb(15 23 42 / 0.10), 0 2px 4px -1px rgb(15 23 42 / 0.06);
     --shadow-surface:    0 0 0 1px rgb(148 163 184 / 0.12), 0 4px 16px -8px rgb(15 23 42 / 0.16);
     /* ── Brand extended palette ── */
-    --brand-navy:          #16291c;
-    --brand-green-bright:  #6fd389;
-    --brand-green-mid:     #2f9150;
+    --brand-navy:          #0b1021;
+    --brand-green-bright:  #a5b4fc;
+    --brand-green-mid:     #6366f1;
     /* ── Status info token ── */
     --status-info:         #2563eb;
     --status-ok: 142 76% 36%;
@@ -84,10 +84,10 @@
     --ivory-text:     17 26 18;     /* #111a12 — dark forest ink */
     --ivory-text2:    46 57 77;     /* cool secondary — slate, not green-tinted */
     --ivory-text3:    90 104 132;   /* cooler muted, WCAG AA against near-white */
-    --ivory-navy:     13 25 14;     /* #0d190e — deeper forest, sharper contrast with new bg */
-    --ivory-green:    30 74 37;     /* #1e4a25 */
-    --ivory-greenMid: 30 122 50;    /* #1e7a32 */
-    --ivory-greenBg:  233 244 234;  /* slightly cooler green tint */
+    --ivory-navy:     11 16 33;     /* #0b1021 — brand navy */
+    --ivory-green:    79 70 229;    /* indigo-600 */
+    --ivory-greenMid: 67 56 202;    /* indigo-700 */
+    --ivory-greenBg:  238 242 255;  /* indigo-50 */
     --ivory-ok:       #16a34a;
     --ivory-warn:     #d97706;
     --ivory-err:      #dc2626;
@@ -97,15 +97,15 @@
     --color-border-warning: #d97706;
     --color-text-warning: #92400e;
 
-    /* 60/30/10 — forest (default palette) */
-    --brand: #1a3d28;
-    --brand-deep: #0f2a18;
-    --brand-ink: #1a3d28;
-    --brand-soft: #ecf6ee;
-    --brand-border: #c7e3cf;
-    --brand-shadow: rgba(26, 61, 40, 0.5);
-    --hero-a: #0a1f15;
-    --hero-b: #18371f;
+    /* 60/30/10 — indigo (default palette) */
+    --brand: #4f46e5;
+    --brand-deep: #4338ca;
+    --brand-ink: #312e81;
+    --brand-soft: #eef2ff;
+    --brand-border: #c7d2fe;
+    --brand-shadow: rgba(79, 70, 229, 0.45);
+    --hero-a: #0b1021;
+    --hero-b: #312e81;
     /* Darkened to clear WCAG AA 4.5:1 with white text and as green text on
        white (was #16a34a = 3.30:1). #15803d = 5.02:1; hover step #166534. */
     --action: #15803d;
@@ -162,44 +162,44 @@
   }
 
   .dark {
-    /* Forest / navy dark — aligned with Ivory (--ivory-navy, green accents), not cool blue-grey */
-    --background: 128 35% 9%;
+    /* Indigo / navy dark — aligned with Ivory (--ivory-navy, indigo accents), not cool blue-grey */
+    --background: 234 47% 9%;
     --foreground: 45 20% 92%;
-    --card: 130 28% 12%;
+    --card: 234 40% 12%;
     --card-foreground: 45 18% 93%;
-    --popover: 130 28% 12%;
+    --popover: 234 40% 12%;
     --popover-foreground: 45 18% 93%;
-    --primary: 125 38% 42%;
+    --primary: 234 70% 65%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 130 22% 18%;
+    --secondary: 234 22% 18%;
     --secondary-foreground: 45 15% 88%;
-    --muted: 130 18% 16%;
+    --muted: 234 18% 16%;
     --muted-foreground: 135 8% 62%;
-    --accent: 130 25% 20%;
+    --accent: 234 25% 20%;
     --accent-foreground: 42 25% 90%;
     --destructive: 0 65% 52%;
     --destructive-foreground: 0 0% 100%;
-    --border: 130 14% 22%;
-    --input: 130 14% 24%;
-    --ring: 125 38% 45%;
+    --border: 234 14% 22%;
+    --input: 234 14% 24%;
+    --ring: 234 70% 65%;
     --color-background-warning: hsl(32 45% 22%);
     --color-border-warning: hsl(38 92% 50%);
     --color-text-warning: hsl(48 96% 88%);
 
-    /* ── Ivory tokens — dark forest/navy theme ── */
-    --ivory-bg:       13 31 14;     /* #0d1f0e — deep forest page background */
-    --ivory-surface:  17 30 18;     /* #111e12 — card/sheet surface */
-    --ivory-border:   42 53 42;     /* #2a352a — subtle border */
-    --ivory-borderMd: 55 69 55;     /* #374537 — mid-weight border */
+    /* ── Ivory tokens — dark indigo/navy theme ── */
+    --ivory-bg:       11 18 32;     /* #0b1220 — deep navy page background */
+    --ivory-surface:  19 28 46;     /* #131c2e — card/sheet surface */
+    --ivory-border:   36 49 74;     /* #24314a — subtle border */
+    --ivory-borderMd: 52 69 106;    /* #34456a — mid-weight border */
     --ivory-text:     236 233 224;  /* #ece9e0 — warm light primary text */
     --ivory-text2:    168 196 173;  /* #a8c4ad — secondary text */
     /* Lightened #628068 (3.94:1, failed AA) → #7da188 = 6.01:1 on the dark
-       forest bg/surface; stays muted vs --ivory-text2 (#a8c4ad, 9.16:1). */
+       bg/surface; stays muted vs --ivory-text2 (#a8c4ad, 9.16:1). */
     --ivory-text3:    125 161 136;  /* #7da188 — muted/label text (AA on dark) */
-    --ivory-navy:     10 21 9;      /* #0a1509 — header bar (stays very dark) */
-    --ivory-green:    58 150 80;    /* #3a9650 — primary green on dark bg */
-    --ivory-greenMid: 45 155 66;    /* #2d9b42 — mid green */
-    --ivory-greenBg:  22 42 26;     /* #162a1a — active-item tinted surface */
+    --ivory-navy:     11 16 33;     /* #0b1021 — header bar (stays very dark) */
+    --ivory-green:    129 140 248;  /* indigo-400 */
+    --ivory-greenMid: 99 102 241;   /* indigo-500 */
+    --ivory-greenBg:  30 27 100;    /* indigo-900 — active-item tinted surface */
   }
 
   /*
