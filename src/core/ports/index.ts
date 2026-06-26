@@ -41,7 +41,6 @@ export interface IEquipmentCacheEntry {
   roomId: string | null;
   location: string | null;
   lastSeen: string | null;
-  [key: string]: unknown;
 }
 
 export interface IEquipmentCache {
@@ -60,7 +59,6 @@ export interface ISyncQueueEntry {
   retries: number;
   status: string;
   clientTimestamp: number;
-  [key: string]: unknown;
 }
 
 export interface ISyncQueue {

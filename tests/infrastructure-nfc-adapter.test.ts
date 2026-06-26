@@ -37,4 +37,17 @@ describe("NfcAdapter", () => {
     expect(mockStartNfcScanSession).toHaveBeenCalledWith({ onRead, signal: undefined });
     expect(typeof session.stop).toBe("function");
   });
+
+  it("surfaces readOnce errors unchanged", async () => {
+    mockReadNfcOnce.mockRejectedValueOnce(new Error("NFC scan timed out"));
+    const { nfc } = await import("../src/infrastructure/platform/NfcAdapter");
+    await expect(nfc.readOnce({ timeoutMs: 3000 })).rejects.toThrow("NFC scan timed out");
+  });
+
+  it("surfaces startSession errors unchanged", async () => {
+    mockStartNfcScanSession.mockRejectedValueOnce(new Error("NFC not supported on this device"));
+    const onRead = vi.fn();
+    const { nfc } = await import("../src/infrastructure/platform/NfcAdapter");
+    await expect(nfc.startSession({ onRead })).rejects.toThrow("NFC not supported on this device");
+  });
 });

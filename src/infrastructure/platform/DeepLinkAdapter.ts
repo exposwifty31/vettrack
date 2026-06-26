@@ -9,17 +9,28 @@ class DeepLinkAdapter implements IDeepLinkProvider {
   onOpen(handler: (url: string) => void): () => void {
     if (!isCapacitorNative()) return () => {};
 
+    let disposed = false;
     let handle: { remove: () => Promise<void> } | null = null;
 
-    void import("@capacitor/app").then(({ App }) => {
-      void App.addListener("appUrlOpen", ({ url }) => {
-        handler(url);
-      }).then((h) => {
-        handle = h;
+    void import("@capacitor/app")
+      .then(({ App }) => {
+        if (disposed) return;
+        return App.addListener("appUrlOpen", ({ url }) => {
+          if (!disposed) handler(url);
+        }).then((h) => {
+          if (disposed) {
+            void h.remove();
+          } else {
+            handle = h;
+          }
+        });
+      })
+      .catch((err: unknown) => {
+        console.error("[DeepLinkAdapter] Failed to register appUrlOpen listener", err);
       });
-    });
 
     return () => {
+      disposed = true;
       void handle?.remove();
     };
   }

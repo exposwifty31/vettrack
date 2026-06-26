@@ -3,8 +3,7 @@ import { getPendingSync, getPendingCount, getFailedCount } from "@/lib/offline-d
 
 class SyncQueueAdapter implements ISyncQueue {
   async getPending(): Promise<ISyncQueueEntry[]> {
-    const rows = await getPendingSync();
-    return rows as unknown as ISyncQueueEntry[];
+    return getPendingSync();
   }
 
   async pendingCount(): Promise<number> {

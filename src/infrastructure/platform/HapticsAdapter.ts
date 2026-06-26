@@ -2,9 +2,21 @@ import type { IHapticsProvider } from "@/core/ports";
 
 /**
  * Capacitor Haptics adapter.
- * Silently no-ops in the browser or when the plugin is unavailable
- * — haptics are enhancement-only and must never block a user flow.
+ * Silently no-ops when the plugin is not available (browser, simulator, or plugin not installed).
+ * Unexpected errors are re-thrown so callers can observe real failures.
  */
+
+function isPluginUnavailable(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  return (
+    msg.includes("not implemented") ||
+    msg.includes("not available") ||
+    msg.includes("plugin") ||
+    msg.includes("unimplemented")
+  );
+}
+
 class HapticsAdapter implements IHapticsProvider {
   async impact(style: "light" | "medium" | "heavy"): Promise<void> {
     try {
@@ -15,8 +27,8 @@ class HapticsAdapter implements IHapticsProvider {
         heavy: ImpactStyle.Heavy,
       };
       await Haptics.impact({ style: styleMap[style] });
-    } catch {
-      // Not available in browser or simulator — safe to ignore.
+    } catch (err) {
+      if (!isPluginUnavailable(err)) throw err;
     }
   }
 
@@ -24,8 +36,8 @@ class HapticsAdapter implements IHapticsProvider {
     try {
       const { Haptics } = await import("@capacitor/haptics");
       await Haptics.selectionChanged();
-    } catch {
-      // Not available in browser or simulator — safe to ignore.
+    } catch (err) {
+      if (!isPluginUnavailable(err)) throw err;
     }
   }
 
@@ -38,8 +50,8 @@ class HapticsAdapter implements IHapticsProvider {
         error: NotificationType.Error,
       };
       await Haptics.notification({ type: typeMap[type] });
-    } catch {
-      // Not available in browser or simulator — safe to ignore.
+    } catch (err) {
+      if (!isPluginUnavailable(err)) throw err;
     }
   }
 }

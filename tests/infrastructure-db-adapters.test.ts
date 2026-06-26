@@ -23,7 +23,9 @@ describe("EquipmentCacheAdapter", () => {
   });
 
   it("getAll delegates to getCachedEquipment", async () => {
-    mockGetCachedEquipment.mockResolvedValueOnce([{ id: "e1", name: "Ventilator" }]);
+    mockGetCachedEquipment.mockResolvedValueOnce([
+      { id: "e1", name: "Ventilator", status: "ok", roomId: null, location: null, lastSeen: null, createdAt: "2024-01-01" },
+    ]);
     const { equipmentCache } = await import("../src/infrastructure/db/EquipmentCacheAdapter");
     const items = await equipmentCache.getAll();
     expect(mockGetCachedEquipment).toHaveBeenCalled();
@@ -37,10 +39,33 @@ describe("EquipmentCacheAdapter", () => {
     expect(item).toBeNull();
   });
 
+  it("getById maps entry fields when found", async () => {
+    mockGetCachedEquipmentById.mockResolvedValueOnce({
+      id: "e2", name: "Defibrillator", status: "ok", roomId: "r1", location: "Bay 2", lastSeen: "2024-01-02", createdAt: "2024-01-01",
+    });
+    const { equipmentCache } = await import("../src/infrastructure/db/EquipmentCacheAdapter");
+    const item = await equipmentCache.getById("e2");
+    expect(item).not.toBeNull();
+    expect(item!.id).toBe("e2");
+    expect(item!.roomId).toBe("r1");
+  });
+
   it("upsertMany delegates to cacheEquipment", async () => {
     const { equipmentCache } = await import("../src/infrastructure/db/EquipmentCacheAdapter");
     await equipmentCache.upsertMany([{ id: "e1", name: "Defibrillator", status: "ok", roomId: null, location: null, lastSeen: null }]);
     expect(mockCacheEquipment).toHaveBeenCalled();
+  });
+
+  it("getAll rejects when getCachedEquipment throws", async () => {
+    mockGetCachedEquipment.mockRejectedValueOnce(new Error("IndexedDB error"));
+    const { equipmentCache } = await import("../src/infrastructure/db/EquipmentCacheAdapter");
+    await expect(equipmentCache.getAll()).rejects.toThrow("IndexedDB error");
+  });
+
+  it("getById rejects when getCachedEquipmentById throws", async () => {
+    mockGetCachedEquipmentById.mockRejectedValueOnce(new Error("IndexedDB error"));
+    const { equipmentCache } = await import("../src/infrastructure/db/EquipmentCacheAdapter");
+    await expect(equipmentCache.getById("x")).rejects.toThrow("IndexedDB error");
   });
 });
 
@@ -68,5 +93,17 @@ describe("SyncQueueAdapter", () => {
     const { syncQueue } = await import("../src/infrastructure/db/SyncQueueAdapter");
     const count = await syncQueue.failedCount();
     expect(count).toBe(1);
+  });
+
+  it("getPending rejects when getPendingSync throws", async () => {
+    mockGetPendingSync.mockRejectedValueOnce(new Error("IndexedDB error"));
+    const { syncQueue } = await import("../src/infrastructure/db/SyncQueueAdapter");
+    await expect(syncQueue.getPending()).rejects.toThrow("IndexedDB error");
+  });
+
+  it("pendingCount rejects when getPendingCount throws", async () => {
+    mockGetPendingCount.mockRejectedValueOnce(new Error("IndexedDB error"));
+    const { syncQueue } = await import("../src/infrastructure/db/SyncQueueAdapter");
+    await expect(syncQueue.pendingCount()).rejects.toThrow("IndexedDB error");
   });
 });

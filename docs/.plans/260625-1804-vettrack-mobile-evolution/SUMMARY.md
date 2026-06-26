@@ -15,12 +15,13 @@
 
 ### Phase 1 — Mobile Shell
 
-- [ ] Sprint 1.1 — MobileShell + Ionic Navigation Wiring (`feat/P1-S1-mobile-shell`)
-- [ ] Sprint 1.2 — Today / Home Feature Module (`feat/P1-S2-feature-today`)
-- [ ] Sprint 1.3 — Equipment Feature Module List + Triage (`feat/P1-S3-feature-equipment-list`)
-- [ ] Sprint 1.4 — Equipment Detail Feature Module (`feat/P1-S4-feature-equipment-detail`)
-- [ ] Sprint 1.5 — Scan Feature Module (`feat/P1-S5-feature-scan`)
-- [ ] Sprint 1.6 — Alerts + Settings + More Sheet (`feat/P1-S6-feature-alerts-settings-more`)
+- [x] Sprint 1.1 — MobileShell + Ionic Navigation Wiring (`feat/P1-S1-mobile-shell`) — PR #20 merged
+- [x] Sprint 1.2 — Today / Home Feature Module (`feat/P1-S2-feature-today`) — PR #21 merged
+- [x] Sprint 1.3 — Equipment Feature Module List + Triage (`feat/P1-S3-feature-equipment-list`) — PR #22 merged
+- [x] Sprint 1.4 — Equipment Detail Feature Module — PR #23 merged
+- [x] Sprint 1.5 — Scan as Accountability Transfer — PR #23 merged
+- [x] Sprint 1.6 — Alerts + Settings + More Sheet — PR #23 merged
+- [x] Sprint 1.7 — Equipment Inference Engine — PR #23 merged
 
 ### Phase 2 — Native Experience Polish
 
