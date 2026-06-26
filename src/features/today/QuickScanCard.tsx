@@ -18,7 +18,7 @@ export function QuickScanCard() {
         gap: 12,
         padding: "12px 16px",
         borderRadius: 14,
-        background: "hsl(var(--card))",
+        background: "var(--brand)",
         border: "none",
         cursor: "pointer",
         WebkitTapHighlightColor: "transparent",
@@ -31,10 +31,10 @@ export function QuickScanCard() {
       onPointerLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
     >
       <span style={{ minWidth: 0 }}>
-        <span style={{ display: "block", fontSize: "var(--text-sm)", fontWeight: 700, color: "hsl(var(--foreground))" }}>
+        <span style={{ display: "block", fontSize: "var(--text-sm)", fontWeight: 700, color: "#fff" }}>
           {t.home.scan.label}
         </span>
-        <span style={{ display: "block", fontSize: "var(--text-xs)", color: "hsl(var(--muted-foreground))", marginTop: 2 }}>
+        <span style={{ display: "block", fontSize: "var(--text-xs)", color: "rgba(255,255,255,0.72)", marginTop: 2 }}>
           {t.home.scan.subtitle}
         </span>
       </span>
@@ -44,11 +44,11 @@ export function QuickScanCard() {
           width: 36,
           height: 36,
           borderRadius: 10,
-          background: "hsl(var(--muted))",
+          background: "rgba(255,255,255,0.15)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "hsl(var(--foreground))",
+          color: "#fff",
         }}
       >
         <Scan size={20} aria-hidden />
