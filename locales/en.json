@@ -3031,6 +3031,11 @@
     "formulary": {
       "notFound": "Formulary entry not found.",
       "internalError": "Internal error in formulary operation."
+    },
+    "inference": {
+      "idRequired": "Equipment id is required.",
+      "notFound": "Equipment not found.",
+      "unavailable": "Could not retrieve location inference."
     }
   },
   "push": {
@@ -3715,14 +3720,18 @@
     "about": "About VetTrack",
     "session": "Session",
     "endShift": "End Shift"
-  }
-,
+  },
   "scan": {
     "title": "Scan Equipment",
     "scanPrompt": "Point at any QR code to check in and take accountability",
     "checkedInTo": "Now with: You",
     "passToColleague": "Pass to colleague",
     "done": "Done",
-    "transferTitle": "Pass to colleague"
+    "transferTitle": "Pass to colleague",
+    "transfer": {
+      "searchPlaceholder": "Search staff...",
+      "loading": "Loading staff...",
+      "noUsers": "No staff found"
+    }
   }
 }

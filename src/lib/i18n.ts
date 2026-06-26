@@ -442,6 +442,11 @@ const translations = {
     passToColleague: d.scan.passToColleague,
     done: d.scan.done,
     transferTitle: d.scan.transferTitle,
+    transfer: {
+      searchPlaceholder: d.scan.transfer.searchPlaceholder,
+      loading: d.scan.transfer.loading,
+      noUsers: d.scan.transfer.noUsers,
+    },
   },
 
   codeBlue: {

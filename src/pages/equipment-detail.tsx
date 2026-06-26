@@ -142,7 +142,11 @@ export default function EquipmentDetailPage() {
 
 function EquipmentDetailPageMobile() {
   const { id } = useParams<{ id: string }>();
-  if (!id) return null;
+  const [, navigate] = useLocation();
+  if (!id) {
+    navigate("/equipment", { replace: true });
+    return null;
+  }
   return <EquipmentDetailScreen equipmentId={id} />;
 }
 

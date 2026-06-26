@@ -3035,6 +3035,11 @@ export interface TStructure {
       notFound: string;
       internalError: string;
     };
+    inference: {
+      idRequired: string;
+      notFound: string;
+      unavailable: string;
+    };
   };
   push: {
     role: {
@@ -3726,5 +3731,10 @@ export interface TStructure {
     passToColleague: string;
     done: string;
     transferTitle: string;
+    transfer: {
+      searchPlaceholder: string;
+      loading: string;
+      noUsers: string;
+    };
   };
 }

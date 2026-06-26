@@ -75,7 +75,7 @@ export function TransferSheet({ open, onClose, onTransfer }: Props) {
           </h3>
           <input
             type="search"
-            placeholder="Search..."
+            placeholder={t.scan.transfer.searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{
@@ -96,11 +96,11 @@ export function TransferSheet({ open, onClose, onTransfer }: Props) {
         <div style={{ overflowY: "auto", flex: 1, padding: "8px 0" }}>
           {isLoading ? (
             <div style={{ padding: 24, textAlign: "center", color: "var(--muted-foreground)", fontSize: "var(--text-sm)" }}>
-              Loading...
+              {t.scan.transfer.loading}
             </div>
           ) : filtered.length === 0 ? (
             <div style={{ padding: 24, textAlign: "center", color: "var(--muted-foreground)", fontSize: "var(--text-sm)" }}>
-              No users found
+              {t.scan.transfer.noUsers}
             </div>
           ) : (
             filtered.map((user: User) => (

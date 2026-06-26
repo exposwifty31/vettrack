@@ -52,7 +52,6 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "server/routes/dispense.ts", // owner: dispense (PR 6.10 target)
   "server/routes/display.ts", // owner: display
   "server/routes/equipment-copilot.ts", // owner: equipment
-  "server/routes/equipment-inference.ts", // owner: equipment (new route, i18n migration tracked)
   "server/routes/equipment-operational-state.ts", // owner: equipment-ops-v2 (V2 procedure-bind; will be i18n'd in שלב 5)
   "server/routes/equipment.ts", // owner: equipment
   "server/routes/folders.ts", // owner: equipment

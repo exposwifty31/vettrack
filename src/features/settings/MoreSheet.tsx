@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { User, Globe, Info, LogOut } from "lucide-react";
 import { SettingRow } from "./SettingRow";
@@ -11,16 +11,23 @@ type Props = {
 
 export function MoreSheet({ open, onClose }: Props) {
   const [, navigate] = useLocation();
+  const dialogRef = useRef<HTMLDivElement>(null);
   const startYRef = useRef<number | null>(null);
-  const startTranslateRef = useRef(0);
+
+  useEffect(() => {
+    if (open) dialogRef.current?.focus();
+  }, [open]);
 
   function handleBackdropClick() {
     onClose();
   }
 
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Escape") onClose();
+  }
+
   function handleDragStart(e: React.TouchEvent) {
     startYRef.current = e.touches[0]?.clientY ?? null;
-    startTranslateRef.current = 0;
   }
 
   function handleDragEnd(e: React.TouchEvent) {
@@ -50,9 +57,12 @@ export function MoreSheet({ open, onClose }: Props) {
         }}
       />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={t.more.title}
+        tabIndex={-1}
+        onKeyDown={handleKeyDown}
         onTouchStart={handleDragStart}
         onTouchEnd={handleDragEnd}
         style={{
@@ -65,6 +75,7 @@ export function MoreSheet({ open, onClose }: Props) {
           zIndex: 50,
           paddingBottom: "calc(16px + env(safe-area-inset-bottom))",
           boxShadow: "0 -4px 32px rgba(0,0,0,0.12)",
+          outline: "none",
         }}
       >
         <div style={{ display: "flex", justifyContent: "center", paddingTop: 12, paddingBottom: 4 }}>
