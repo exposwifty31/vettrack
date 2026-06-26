@@ -1,4 +1,4 @@
-import { resolvePlatformTarget } from "@/shared/platform/index";
+import { resolvePlatformTarget } from "@/shared/platform";
 
 /**
  * True when running as a Capacitor native app.
