@@ -117,7 +117,7 @@ pnpm cap:install:ios-sim
 # Install on iPhone 16 Pro simulator instead
 ./scripts/install-ios-sim.sh --iphone
 
-# Reuse the last build (skip `pnpm build && cap sync`)
+# Reuse the last build (skip `vite build` + `npx cap sync ios`)
 ./scripts/install-ios-sim.sh --skip-build
 
 # Target a specific simulator by UDID
