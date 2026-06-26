@@ -1,12 +1,9 @@
 import { createRoot, type Root } from "react-dom/client";
 import { ClerkProvider, type ClerkProp } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
-import { IonApp, setupIonicReact } from "@ionic/react";
 import App from "./App";
 import "./index.css";
 import "./instrument";
-
-setupIonicReact();
 
 import { ClerkAuthProviderInner } from "@/hooks/use-auth";
 import { SyncProvider } from "@/hooks/use-sync";
@@ -244,17 +241,15 @@ if (!rootEl) {
       window.__VT_REACT_ROOT__ = root;
     }
     root.render(
-      <IonApp>
-        <HelmetProvider>
-          {clerkRuntime ? (
-            <ClerkProvider {...clerkRuntime} Clerk={nativeClerk}>
-              <NativeClerkGate>{appShell}</NativeClerkGate>
-            </ClerkProvider>
-          ) : (
-            appShell
-          )}
-        </HelmetProvider>
-      </IonApp>,
+      <HelmetProvider>
+        {clerkRuntime ? (
+          <ClerkProvider {...clerkRuntime} Clerk={nativeClerk}>
+            <NativeClerkGate>{appShell}</NativeClerkGate>
+          </ClerkProvider>
+        ) : (
+          appShell
+        )}
+      </HelmetProvider>,
     );
   };
 

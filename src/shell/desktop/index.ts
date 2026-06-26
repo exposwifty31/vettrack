@@ -1,1 +1,3 @@
-// Desktop shell (PageShell relocation) will be added in a future sprint.
+// Desktop shell — canonical location: src/desktop/WebShell.tsx
+export { WebShell } from "@/desktop/WebShell";
+export type { WebShellProps } from "@/desktop/WebShell";

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
 import { t } from "@/lib/i18n";
-import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import { resolvePlatformTarget } from "@/shared/platform";
 import {
   compareVersions,
   getBundledAppVersion,
@@ -22,7 +22,7 @@ export function UpdateBanner() {
   useEffect(() => {
     if (!isSignedIn || !userId) return;
     void (async () => {
-      const displayVersion = isCapacitorNative()
+      const displayVersion = resolvePlatformTarget() === "native"
         ? await resolveDisplayAppVersion()
         : (await resolveServerAppVersion()) ?? getBundledAppVersion();
       const lastSeen = safeStorageGetItem(STORAGE_KEY);
