@@ -15,6 +15,7 @@
     "src/lib/forecast/**/*.ts"
   ],
   "exclude": [
-    "src/lib/forecast/approveGate.ts"
+    "src/lib/forecast/approveGate.ts",
+    "src/shared/**"
   ]
 }
