@@ -7,12 +7,12 @@ import { VetTrackMark } from "@/components/vettrack-mark";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignUp } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
 import { clerkAppearance, clerkAppearanceNative } from "@/lib/clerk-appearance";
-import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import { resolvePlatformTarget } from "@/shared/platform";
 import { ClerkAuthFormShell } from "@/components/clerk-auth-form-shell";
 import { NativeSocialButtons } from "@/components/native-social-buttons";
 import { LegalFooterLinks } from "@/components/legal-footer-links";
 
-const IS_NATIVE = isCapacitorNative();
+const IS_NATIVE = resolvePlatformTarget() === "native";
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 

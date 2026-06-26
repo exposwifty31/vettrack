@@ -7,13 +7,13 @@ import { ClerkFailed, ClerkLoaded, ClerkLoading, SignIn, useUser } from "@clerk/
 import { useAuth } from "@/hooks/use-auth";
 import { PhoneSignIn } from "@/components/phone-sign-in";
 import { clerkAppearance, clerkAppearanceNative } from "@/lib/clerk-appearance";
-import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import { resolvePlatformTarget } from "@/shared/platform";
 import { ClerkAuthFormShell } from "@/components/clerk-auth-form-shell";
 import { AuthBootstrapSpinner } from "@/components/native-clerk-gate";
 import { NativeSocialButtons } from "@/components/native-social-buttons";
 import { LegalFooterLinks } from "@/components/legal-footer-links";
 
-const IS_NATIVE = isCapacitorNative();
+const IS_NATIVE = resolvePlatformTarget() === "native";
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 

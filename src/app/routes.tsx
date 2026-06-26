@@ -5,7 +5,7 @@ import { AuthBootstrapSpinner } from "@/components/native-clerk-gate";
 import { RouteFallback } from "@/components/route-fallback";
 import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { useAuth } from "@/hooks/use-auth";
-import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import { usePlatformTarget } from "@/shared/platform";
 import { shouldShowPostSignupLanding } from "@/lib/post-signup-landing";
 
 const CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
@@ -65,14 +65,15 @@ function RedirectPreserveSearch({ to }: { to: string }) {
 /** `/` — marketing shell for guests; returning signed-in users go to `/home`; new signups see landing once (session flag). */
 function RootRoute() {
   const { isLoaded, isSignedIn, isOfflineSession } = useAuth();
+  const platform = usePlatformTarget();
 
-  // Bundled Capacitor shell: skip marketing landing — sign-in has Clerk loading/error UI.
-  if (isCapacitorNative() && CLERK_ENABLED && !isOfflineSession && !isSignedIn) {
+  // Bundled native shell: skip marketing landing — sign-in has Clerk loading/error UI.
+  if (platform === "native" && CLERK_ENABLED && !isOfflineSession && !isSignedIn) {
     return <Redirect to="/signin" replace />;
   }
 
   if (!isLoaded && !isOfflineSession) {
-    return isCapacitorNative() ? <AuthBootstrapSpinner /> : <RouteFallback />;
+    return platform === "native" ? <AuthBootstrapSpinner /> : <RouteFallback />;
   }
 
   if (isSignedIn && !shouldShowPostSignupLanding()) {
