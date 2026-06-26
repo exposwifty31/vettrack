@@ -117,11 +117,14 @@ pnpm cap:install:ios-sim
 # Install on iPhone 16 Pro simulator instead
 ./scripts/install-ios-sim.sh --iphone
 
-# Reuse the last build (skip `vite build` + `npx cap sync ios`)
+# Reuse the last build (skip rebuild + sync)
 ./scripts/install-ios-sim.sh --skip-build
 
 # Target a specific simulator by UDID
 ./scripts/install-ios-sim.sh --udid <UDID>
+
+# Build web assets and sync to iOS only (without installing on simulator)
+vite build && npx cap sync ios
 ```
 
 `xcrun simctl list devices available` lists available simulators and their UDIDs. The default UDID (`DA8D1142-E500-43D7-84C8-8678BD1B3542`) targets iPad (A16) to match the ship-checklist device matrix.
