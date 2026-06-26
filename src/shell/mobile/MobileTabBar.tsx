@@ -10,6 +10,10 @@ type TabDef = {
   icon: React.ReactNode;
 };
 
+type Props = {
+  onMorePress: () => void;
+};
+
 function isTabActive(location: string, href: string): boolean {
   if (href === "/home") return location === "/home" || location === "/";
   return location.startsWith(href.split("?")[0]);
@@ -63,7 +67,7 @@ function TabButton({
   );
 }
 
-export function MobileTabBar() {
+export function MobileTabBar({ onMorePress }: Props) {
   const [location, navigate] = useLocation();
 
   const leftTabs: TabDef[] = [
@@ -73,7 +77,6 @@ export function MobileTabBar() {
 
   const rightTabs: TabDef[] = [
     { id: "alerts", href: "/alerts", label: t.nav.alerts, icon: <Bell size={22} /> },
-    { id: "more", href: "/settings", label: t.nav.more, icon: <AlignJustify size={22} /> },
   ];
 
   return (
@@ -115,6 +118,13 @@ export function MobileTabBar() {
           onClick={() => navigate(tab.href)}
         />
       ))}
+
+      <TabButton
+        label={t.nav.more}
+        icon={<AlignJustify size={22} />}
+        active={false}
+        onClick={onMorePress}
+      />
     </nav>
   );
 }

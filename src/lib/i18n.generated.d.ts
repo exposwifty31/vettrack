@@ -518,6 +518,20 @@ export interface TStructure {
     recoveryAttentionCalloutCheckedOutLong: string;
     loadFailed: string;
     loadFailedHint: string;
+    locationCard: {
+      title: string;
+      unknown: string;
+      lastKnown: string;
+      confidence: {
+        high: string;
+        medium: string;
+        low: string;
+        unknown: string;
+      };
+    };
+    accountability: {
+      title: string;
+    };
   };
   adminPilotCoverage: {
     title: string;
@@ -3021,6 +3035,11 @@ export interface TStructure {
       notFound: string;
       internalError: string;
     };
+    inference: {
+      idRequired: string;
+      notFound: string;
+      unavailable: string;
+    };
   };
   push: {
     role: {
@@ -3693,6 +3712,29 @@ export interface TStructure {
         title: string;
         body: string;
       };
+    };
+  };
+  more: {
+    title: string;
+    account: string;
+    profile: string;
+    language: string;
+    clinic: string;
+    about: string;
+    session: string;
+    endShift: string;
+  };
+  scan: {
+    title: string;
+    scanPrompt: string;
+    checkedInTo: string;
+    passToColleague: string;
+    done: string;
+    transferTitle: string;
+    transfer: {
+      searchPlaceholder: string;
+      loading: string;
+      noUsers: string;
     };
   };
 }

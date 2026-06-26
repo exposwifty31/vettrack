@@ -1,4 +1,6 @@
 import { t } from "@/lib/i18n";
+import { useMobileShellContext } from "@/shell/mobile/MobileShellContext";
+import { AlertsScreen } from "@/features/alerts";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
@@ -90,6 +92,12 @@ const ALERT_CONFIG: Record<
 const ALERT_OWNERSHIP_ROLES = new Set(["admin", "vet", "senior_technician"]);
 
 export default function AlertsPage() {
+  const inMobileShell = useMobileShellContext();
+  if (inMobileShell) return <AlertsScreen />;
+  return <AlertsPageDesktop />;
+}
+
+function AlertsPageDesktop() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   const { userId, effectiveRole, role } = useAuth();

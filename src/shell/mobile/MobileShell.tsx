@@ -1,12 +1,15 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { MobileShellContext } from "./MobileShellContext";
 import { MobileTabBar } from "./MobileTabBar";
+import { MoreSheet } from "@/features/settings";
 
 type Props = {
   children: ReactNode;
 };
 
 export function MobileShell({ children }: Props) {
+  const [moreOpen, setMoreOpen] = useState(false);
+
   return (
     <MobileShellContext.Provider value={true}>
       <div
@@ -27,7 +30,8 @@ export function MobileShell({ children }: Props) {
         >
           {children}
         </div>
-        <MobileTabBar />
+        <MobileTabBar onMorePress={() => setMoreOpen(true)} />
+        <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
       </div>
     </MobileShellContext.Provider>
   );

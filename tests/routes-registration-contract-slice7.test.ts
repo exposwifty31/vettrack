@@ -26,6 +26,7 @@ const EXPECTED_MOUNT_PATHS = [
   "/health",
   "/api/equipment", // equipmentRoutes
   "/api/equipment", // equipmentCopilotRoutes
+  "/api/equipment", // equipmentInferenceRoutes
   "/api",
   "/api",
   "/api/rooms",
@@ -70,17 +71,37 @@ describe("Slice 7 — routes registration contract lock", () => {
 
     it("records app.use paths in registration order", async () => {
       const { registerApiRoutes } = await import("../server/app/routes.js");
-      const calls: string[] = [];
+      const calls: Array<{ path: string; router: unknown }> = [];
       const app = {
-        use(path: string, ..._routers: unknown[]) {
-          calls.push(path);
+        use(path: string, ...routers: unknown[]) {
+          calls.push({ path, router: routers[0] });
           return app;
         },
       } as unknown as Express;
 
       registerApiRoutes(app);
 
-      expect(calls).toEqual(EXPECTED_MOUNT_PATHS);
+      expect(calls.map((c) => c.path)).toEqual(EXPECTED_MOUNT_PATHS);
+    }, 15_000);
+
+    it("mounts equipmentInferenceRoutes specifically at /api/equipment", async () => {
+      const { registerApiRoutes } = await import("../server/app/routes.js");
+      const calls: Array<{ path: string; router: unknown }> = [];
+      const app = {
+        use(path: string, ...routers: unknown[]) {
+          calls.push({ path, router: routers[0] });
+          return app;
+        },
+      } as unknown as Express;
+
+      registerApiRoutes(app);
+
+      const inferenceMount = calls.find(
+        (c) =>
+          c.path === "/api/equipment" &&
+          (c.router as Record<string, unknown>)._vtRouterId === "equipment-inference",
+      );
+      expect(inferenceMount).toBeDefined();
     }, 15_000);
   });
 });
