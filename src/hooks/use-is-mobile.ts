@@ -1,9 +1,11 @@
-import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import { resolvePlatformTarget } from "@/shared/platform/index";
 
 /**
  * True when running as a Capacitor native app.
- * Sprint 1.2+ will extend this to include mobile browser viewports.
+ *
+ * @deprecated Prefer usePlatformTarget() from @/shared/platform for new code.
+ * Retained for backward compat with callers that predate the shared/platform kernel.
  */
 export function useIsMobile(): boolean {
-  return isCapacitorNative();
+  return resolvePlatformTarget() === "native";
 }
