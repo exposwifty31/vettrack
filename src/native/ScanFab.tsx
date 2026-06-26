@@ -23,8 +23,8 @@ export function ScanFab() {
       onClick={openScanner}
       className="vt-scan-fab"
       style={{
-        width: 58,
-        height: 58,
+        width: 52,
+        height: 52,
         borderRadius: "50%",
         display: "flex",
         alignItems: "center",
@@ -32,7 +32,7 @@ export function ScanFab() {
         border: "none",
         cursor: "pointer",
         flexShrink: 0,
-        marginTop: -30,
+        marginTop: -20,
         position: "relative",
         zIndex: 1,
       }}

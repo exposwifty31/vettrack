@@ -14,6 +14,8 @@ type Props = {
  * Nothing else in the tree should re-declare these concerns when
  * NativeShellContext is true.
  */
+
+
 export function NativeShell({ children }: Props) {
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -21,24 +23,34 @@ export function NativeShell({ children }: Props) {
     <NativeShellContext.Provider value={true}>
       <div
         style={{
+          position: "fixed",
+          inset: 0,
           display: "flex",
           flexDirection: "column",
-          height: "100%",
-          paddingTop: "env(safe-area-inset-top)",
           overflow: "hidden",
+          background: "hsl(var(--background))",
         }}
       >
         <div
           style={{
             flex: 1,
-            overflow: "hidden auto",
-            overscrollBehavior: "contain",
+            overflowY: "auto",
+            overflowX: "hidden",
+            WebkitOverflowScrolling: "touch",
+            overscrollBehaviorY: "contain",
           }}
         >
           {children}
         </div>
-        <NativeTabBar onMorePress={() => setMoreOpen(true)} />
-        <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
+
+        <NativeTabBar
+          onMorePress={() => setMoreOpen(true)}
+        />
+
+        <MoreSheet
+          open={moreOpen}
+          onClose={() => setMoreOpen(false)}
+        />
       </div>
     </NativeShellContext.Provider>
   );

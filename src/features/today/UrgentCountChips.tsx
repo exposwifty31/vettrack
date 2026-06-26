@@ -26,12 +26,12 @@ function UrgentChip({ icon, label, count, onClick, color }: ChipProps) {
       onClick={onClick}
       style={{
         flex: 1,
-        minHeight: 52,
+        minHeight: 44,
         display: "flex",
         alignItems: "center",
-        gap: 10,
-        padding: "10px 14px",
-        borderRadius: 14,
+        gap: 8,
+        padding: "8px 12px",
+        borderRadius: 12,
         border: `1px solid ${border}`,
         background: bg,
         cursor: "pointer",

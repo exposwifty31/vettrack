@@ -67,8 +67,10 @@ export function TodayScreen() {
         display: "flex",
         flexDirection: "column",
         gap: 12,
-        padding: "16px 16px calc(16px + env(safe-area-inset-bottom))",
-        minHeight: "100%",
+        paddingLeft: 16,
+        paddingRight: 16,
+        paddingTop: 8,
+        paddingBottom: 12,
       }}
     >
       {/* Pull-to-refresh indicator */}

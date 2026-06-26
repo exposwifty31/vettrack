@@ -11,18 +11,18 @@ export function QuickScanCard() {
       onClick={() => navigate("/equipment?scan=1")}
       style={{
         width: "100%",
-        minHeight: 64,
+        minHeight: 56,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         gap: 12,
-        padding: "14px 16px",
-        borderRadius: 16,
-        background: "linear-gradient(135deg, var(--brand) 0%, var(--brand-deep) 100%)",
+        padding: "12px 16px",
+        borderRadius: 14,
+        background: "var(--brand)",
         border: "none",
         cursor: "pointer",
         WebkitTapHighlightColor: "transparent",
-        boxShadow: "0 8px 20px -8px var(--brand-shadow)",
+        boxShadow: "none",
         transition: "transform 120ms ease",
         textAlign: "start",
       }}
@@ -41,9 +41,9 @@ export function QuickScanCard() {
       <span
         style={{
           flexShrink: 0,
-          width: 40,
-          height: 40,
-          borderRadius: 12,
+          width: 36,
+          height: 36,
+          borderRadius: 10,
           background: "rgba(255,255,255,0.15)",
           display: "flex",
           alignItems: "center",

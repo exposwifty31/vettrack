@@ -37,7 +37,7 @@ function StatPill({ label, value }: { label: string; value: string | number }) {
         style={{
           fontFamily: "var(--font-num)",
           fontSize: "var(--text-xl)",
-          fontWeight: 700,
+          fontWeight: 600,
           color: "#fff",
           lineHeight: 1,
           letterSpacing: "-0.02em",
@@ -60,12 +60,12 @@ export function ShiftHero({ shift, itemsOut, scansToday, isLoading }: Props) {
     return (
       <div
         style={{
-          borderRadius: 20,
+          borderRadius: 16,
           background: "var(--brand-ink)",
-          padding: "20px 20px 16px",
+          padding: "16px",
           display: "flex",
           flexDirection: "column",
-          gap: 16,
+          gap: 12,
         }}
       >
         <div style={{ height: 14, width: "40%", borderRadius: 8, background: "rgba(255,255,255,0.12)" }} />
@@ -84,15 +84,15 @@ export function ShiftHero({ shift, itemsOut, scansToday, isLoading }: Props) {
     return (
       <div
         style={{
-          borderRadius: 20,
+          borderRadius: 16,
           background: "var(--brand-ink)",
-          padding: "20px 20px 16px",
+          padding: "16px",
           display: "flex",
           flexDirection: "column",
           gap: 12,
         }}
       >
-        <p style={{ fontSize: "var(--text-sm)", color: "rgba(255,255,255,0.5)", margin: 0 }}>
+        <p style={{ fontSize: "var(--text-sm)", color: "rgba(255,255,255,0.6)", margin: 0 }}>
           {t.home.shift.noShift}
         </p>
         <button
@@ -119,23 +119,23 @@ export function ShiftHero({ shift, itemsOut, scansToday, isLoading }: Props) {
   return (
     <div
       style={{
-        borderRadius: 20,
+        borderRadius: 16,
         background: "var(--brand-ink)",
-        padding: "20px 20px 16px",
+        padding: "16px",
         display: "flex",
         flexDirection: "column",
-        gap: 16,
+        gap: 12,
       }}
     >
-      <p style={{ fontSize: "var(--text-2xs)", fontWeight: 700, letterSpacing: "0.12em", color: "rgba(255,255,255,0.5)", margin: 0, textTransform: "uppercase" }}>
+      <p style={{ fontSize: "var(--text-2xs)", fontWeight: 600, letterSpacing: "0.12em", color: "rgba(255,255,255,0.6)", margin: 0, textTransform: "uppercase" }}>
         {t.home.shift.elapsed}
       </p>
 
       <span
         style={{
           fontFamily: "var(--font-num)",
-          fontSize: "var(--text-3xl)",
-          fontWeight: 700,
+          fontSize: "34px",
+          fontWeight: 600,
           color: "#fff",
           letterSpacing: "-0.03em",
           lineHeight: 1,

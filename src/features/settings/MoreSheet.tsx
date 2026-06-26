@@ -70,11 +70,11 @@ export function MoreSheet({ open, onClose }: Props) {
           bottom: 0,
           left: 0,
           right: 0,
-          borderRadius: "20px 20px 0 0",
+          borderRadius: "28px 28px 0 0",
           background: "var(--background)",
           zIndex: 50,
           paddingBottom: "calc(16px + env(safe-area-inset-bottom))",
-          boxShadow: "0 -4px 32px rgba(0,0,0,0.12)",
+          boxShadow: "0 -12px 40px rgba(0,0,0,0.18)",
           outline: "none",
         }}
       >
@@ -85,7 +85,7 @@ export function MoreSheet({ open, onClose }: Props) {
           />
         </div>
 
-        <div style={{ paddingInline: 20, paddingTop: 12, paddingBottom: 4 }}>
+        <div style={{ paddingInline: 16, paddingTop: 12, paddingBottom: 4 }}>
           <p style={{ fontSize: "var(--text-2xs)", fontWeight: 600, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
             {t.more.account}
           </p>
@@ -104,7 +104,7 @@ export function MoreSheet({ open, onClose }: Props) {
 
         <div style={{ height: 1, background: "var(--border)", marginBlock: 8, marginInline: 20 }} />
 
-        <div style={{ paddingInline: 20, paddingTop: 4, paddingBottom: 4 }}>
+        <div style={{ paddingInline: 16, paddingTop: 4, paddingBottom: 4 }}>
           <p style={{ fontSize: "var(--text-2xs)", fontWeight: 600, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
             {t.more.clinic}
           </p>
@@ -117,7 +117,7 @@ export function MoreSheet({ open, onClose }: Props) {
 
         <div style={{ height: 1, background: "var(--border)", marginBlock: 8, marginInline: 20 }} />
 
-        <div style={{ paddingInline: 20, paddingTop: 4, paddingBottom: 4 }}>
+        <div style={{ paddingInline: 16, paddingTop: 4, paddingBottom: 4 }}>
           <p style={{ fontSize: "var(--text-2xs)", fontWeight: 600, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
             {t.more.session}
           </p>
