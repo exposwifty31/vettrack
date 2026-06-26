@@ -1,2 +1,6 @@
-// Infrastructure adapters barrel. Concrete implementations live in the subdirectories.
-// Import from subdirectories directly rather than this barrel for tree-shaking.
+/**
+ * Infrastructure barrel — prefer importing from subdirectories for tree-shaking.
+ * This re-exports the most-used platform singletons for convenience.
+ */
+export { haptics, nfc, deepLink } from "./platform";
+export { equipmentCache, syncQueue } from "./db";

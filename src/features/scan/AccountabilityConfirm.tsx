@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { t } from "@/lib/i18n";
+import { haptics } from "@/infrastructure/platform";
 
 type Props = {
   equipmentName: string;
@@ -10,6 +11,7 @@ export function AccountabilityConfirm({ equipmentName, onDismiss }: Props) {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
+    void haptics.notification("success");
     const id = setTimeout(() => {
       setVisible(false);
       onDismiss();

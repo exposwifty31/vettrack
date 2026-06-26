@@ -1,1 +1,2 @@
-// Dexie adapter implementations (ISyncQueue, IEquipmentCache) will be added in Sprint 2.1.
+export { equipmentCache } from "./EquipmentCacheAdapter";
+export { syncQueue } from "./SyncQueueAdapter";
