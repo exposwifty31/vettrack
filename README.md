@@ -137,7 +137,7 @@ VITE_API_ORIGIN=https://vettrack.uk
 
 ### What the script does
 
-1. Runs `scripts/build-native-shell.sh --ios` (`pnpm build` → `cap sync`) unless `--skip-build` is passed
+1. Runs `scripts/build-native-shell.sh --ios` (`vite build` → `npx cap sync ios`) unless `--skip-build` is passed
 2. Boots the target simulator
 3. Builds the Xcode scheme (`App`) in Debug for the simulator destination
 4. Installs the `.app` bundle via `xcrun simctl install`
