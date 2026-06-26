@@ -40,6 +40,6 @@ router.get("/:id/location-inference", requireAuth, async (req, res) => {
   }
 });
 
-(router as Record<string, unknown>)._vtRouterId = "equipment-inference";
+Object.assign(router, { _vtRouterId: "equipment-inference" });
 
 export default router;
