@@ -66,7 +66,7 @@ export function TodayScreen() {
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: 12,
+        gap: 20,
         paddingLeft: 16,
         paddingRight: 16,
         paddingTop: 8,

@@ -32,13 +32,13 @@ function useElapsedClock(startedAt: string | undefined): string {
 
 function StatPill({ label, value }: { label: string; value: string | number }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
       <span
         style={{
           fontFamily: "var(--font-num)",
           fontSize: "var(--text-xl)",
           fontWeight: 600,
-          color: "#fff",
+          color: "hsl(var(--foreground))",
           lineHeight: 1,
           letterSpacing: "-0.02em",
         }}
@@ -61,7 +61,7 @@ export function ShiftHero({ shift, itemsOut, scansToday, isLoading }: Props) {
       <div
         style={{
           borderRadius: 16,
-          background: "var(--brand-ink)",
+          background: "hsl(var(--card))",
           padding: "16px",
           display: "flex",
           flexDirection: "column",
@@ -70,7 +70,7 @@ export function ShiftHero({ shift, itemsOut, scansToday, isLoading }: Props) {
       >
         <div style={{ height: 14, width: "40%", borderRadius: 8, background: "rgba(255,255,255,0.12)" }} />
         <div style={{ height: 36, width: "55%", borderRadius: 8, background: "rgba(255,255,255,0.10)" }} />
-        <div style={{ display: "flex", gap: 32 }}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
           {[0, 1].map((i) => (
             <div key={i} style={{ height: 32, width: 60, borderRadius: 8, background: "rgba(255,255,255,0.08)" }} />
           ))}
@@ -85,7 +85,7 @@ export function ShiftHero({ shift, itemsOut, scansToday, isLoading }: Props) {
       <div
         style={{
           borderRadius: 16,
-          background: "var(--brand-ink)",
+          background: "hsl(var(--card))",
           padding: "16px",
           display: "flex",
           flexDirection: "column",
@@ -101,9 +101,9 @@ export function ShiftHero({ shift, itemsOut, scansToday, isLoading }: Props) {
           style={{
             minHeight: 44,
             borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.18)",
-            background: "rgba(255,255,255,0.08)",
-            color: "#fff",
+            border: "1px solid hsl(var(--border))",
+            background: "hsl(var(--muted))",
+            color: "hsl(var(--foreground))",
             fontSize: "var(--text-sm)",
             fontWeight: 600,
             cursor: "pointer",
@@ -120,7 +120,7 @@ export function ShiftHero({ shift, itemsOut, scansToday, isLoading }: Props) {
     <div
       style={{
         borderRadius: 16,
-        background: "var(--brand-ink)",
+        background: "hsl(var(--card))",
         padding: "16px",
         display: "flex",
         flexDirection: "column",
@@ -136,7 +136,7 @@ export function ShiftHero({ shift, itemsOut, scansToday, isLoading }: Props) {
           fontFamily: "var(--font-num)",
           fontSize: "34px",
           fontWeight: 600,
-          color: "#fff",
+          color: "hsl(var(--foreground))",
           letterSpacing: "-0.03em",
           lineHeight: 1,
         }}
@@ -144,7 +144,7 @@ export function ShiftHero({ shift, itemsOut, scansToday, isLoading }: Props) {
         {elapsed}
       </span>
 
-      <div style={{ display: "flex", gap: 32 }}>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
         <StatPill label={t.home.shift.itemsOut} value={itemsOut} />
         <StatPill label={t.home.shift.scansToday} value={scansToday} />
       </div>
@@ -155,18 +155,18 @@ export function ShiftHero({ shift, itemsOut, scansToday, isLoading }: Props) {
         style={{
           minHeight: 44,
           borderRadius: 12,
-          border: "1px solid rgba(255,255,255,0.18)",
-          background: "rgba(255,255,255,0.08)",
-          color: "#fff",
+          border: "1px solid hsl(var(--border))",
+          background: "hsl(var(--muted))",
+          color: "hsl(var(--foreground))",
           fontSize: "var(--text-sm)",
           fontWeight: 600,
           cursor: "pointer",
           WebkitTapHighlightColor: "transparent",
           transition: "background 150ms ease",
         }}
-        onPointerDown={(e) => ((e.currentTarget.style.background = "rgba(255,255,255,0.14)"))}
-        onPointerUp={(e) => ((e.currentTarget.style.background = "rgba(255,255,255,0.08)"))}
-        onPointerLeave={(e) => ((e.currentTarget.style.background = "rgba(255,255,255,0.08)"))}
+        onPointerDown={(e) => ((e.currentTarget.style.background = "hsl(var(--accent))"))}
+        onPointerUp={(e) => ((e.currentTarget.style.background = "hsl(var(--muted))"))}
+        onPointerLeave={(e) => ((e.currentTarget.style.background = "hsl(var(--muted))"))}
       >
         {t.home.shift.endShift}
       </button>
