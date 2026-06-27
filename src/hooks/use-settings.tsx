@@ -23,7 +23,7 @@ function applySettings(settings: Settings) {
   if (!list) return;
   const useDarkClass =
     settings.darkMode ||
-    settings.colorTheme === "dark" ||
+    
     settings.colorTheme === "clinical";
   if (useDarkClass) {
     list.add("dark");
