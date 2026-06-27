@@ -21,11 +21,14 @@ function applySettings(settings: Settings) {
   const html = document.documentElement;
   const list = html?.classList;
   if (!list) return;
-  const useDarkClass = settings.darkMode;
+  const useDarkClass =
+    settings.darkMode ||
+    settings.colorTheme === "dark" ||
+    settings.colorTheme === "clinical";
   if (useDarkClass) {
-    list?.add("dark");
+    list.add("dark");
   } else {
-    list?.remove("dark");
+    list.remove("dark");
   }
   html.setAttribute("data-density", settings.density);
   html.setAttribute("data-color-theme", settings.colorTheme);
