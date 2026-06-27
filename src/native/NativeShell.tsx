@@ -29,6 +29,7 @@ export function NativeShell({ children }: Props) {
           flexDirection: "column",
           overflow: "hidden",
           background: "hsl(var(--background))",
+          paddingTop: "env(safe-area-inset-top)",
         }}
       >
         <div

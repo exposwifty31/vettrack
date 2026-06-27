@@ -10,10 +10,10 @@ export function ScanFab() {
     if (pathname === "/equipment") {
       const params = new URLSearchParams(search);
       params.set("scan", "1");
-      navigate(`/equipment?${params.toString()}`);
+      navigate("/scan");
       return;
     }
-    navigate("/equipment?scan=1");
+    navigate("/scan");
   };
 
   return (
