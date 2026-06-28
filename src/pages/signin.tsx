@@ -13,7 +13,7 @@ import { AuthBootstrapSpinner } from "@/components/native-clerk-gate";
 import { NativeSocialButtons } from "@/components/native-social-buttons";
 import { LegalFooterLinks } from "@/components/legal-footer-links";
 
-const IS_NATIVE = resolvePlatformTarget() === "native";
+const IS_NATIVE = resolvePlatformTarget() === "mobile";
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
