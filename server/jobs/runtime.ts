@@ -194,6 +194,34 @@ async function startPilotWorker(
       name: job?.name,
       message: error.message,
     });
+
+    if (!job) return;
+    const maxAttempts = job.opts?.attempts ?? 1;
+    if (job.attemptsMade >= maxAttempts) {
+      incrementMetric("queue_jobs_dead_letter");
+      getOrCreateQueue({
+        queueName: "pilot-dlq",
+        logLabel: "pilot-dlq",
+      })
+        .then((dlq) =>
+          dlq.add("dead-letter", {
+            sourceQueue: queueName,
+            jobId: job.id,
+            jobName: job.name,
+            data: job.data,
+            failedReason: error.message,
+            attemptsMade: job.attemptsMade,
+            failedAt: new Date().toISOString(),
+          }, { removeOnComplete: false, removeOnFail: false }),
+        )
+        .catch((dlqErr) => {
+          console.error("[job-runtime] pilot-dlq enqueue failed", {
+            sourceQueue: queueName,
+            jobId: job.id,
+            message: dlqErr instanceof Error ? dlqErr.message : String(dlqErr),
+          });
+        });
+    }
   });
 
   runtimeWorkers.push({ queueName, worker, connection });

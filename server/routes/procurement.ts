@@ -214,7 +214,7 @@ router.patch("/:id/submit", requireAuth, requireAdmin, validateUuid("id"), async
     await db
       .update(purchaseOrders)
       .set({ status: "ordered", orderedAt: new Date(), updatedAt: new Date() })
-      .where(eq(purchaseOrders.id, req.params.id));
+      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id)));
 
     const [updated] = await db
       .select()
@@ -360,7 +360,7 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
       await tx
         .update(purchaseOrders)
         .set({ status: newStatus as "received" | "partial" | "ordered", updatedAt: new Date() })
-        .where(eq(purchaseOrders.id, req.params.id));
+        .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id)));
     });
 
     const [updated] = await db
@@ -449,7 +449,7 @@ router.patch("/:id/cancel", requireAuth, requireAdmin, validateUuid("id"), async
     await db
       .update(purchaseOrders)
       .set({ status: "cancelled", updatedAt: new Date() })
-      .where(eq(purchaseOrders.id, req.params.id));
+      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id)));
 
     const [updated] = await db
       .select()
