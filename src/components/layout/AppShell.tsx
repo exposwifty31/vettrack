@@ -10,6 +10,8 @@ export interface AppShellProps {
    * Desktop PageShell still accepts it; IconSidebar is NAV-driven and ignores it.
    */
   sidebarItems?: SidebarItem[];
+  /** @deprecated Ignored — page titles are handled by PageShell internally. */
+  title?: string;
 }
 
 /**
