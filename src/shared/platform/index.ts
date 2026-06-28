@@ -38,18 +38,23 @@ export function resolvePlatformTarget(): PlatformTarget {
 /**
  * Reactive hook form of resolvePlatformTarget. Re-evaluates on client-side
  * navigation (via wouter) and on viewport/pointer-device changes (via matchMedia).
+ *
+ * Only touchNarrow lives in state (driven by a media query event). The
+ * path-dependent target is derived synchronously during render to avoid a
+ * one-render stale frame when the location changes.
  */
 export function usePlatformTarget(): PlatformTarget {
   const [pathname] = useLocation();
-  const [target, setTarget] = useState<PlatformTarget>(() => resolvePlatformTarget());
+  const [touchNarrow, setTouchNarrow] = useState(() => isTouchNarrow());
 
   useEffect(() => {
-    setTarget(resolvePlatformTarget());
     const mq = window.matchMedia("(max-width: 767px) and (pointer: coarse)");
-    const handler = () => setTarget(resolvePlatformTarget());
+    const handler = () => setTouchNarrow(mq.matches);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
-  }, [pathname]);
+  }, []);
 
-  return target;
+  if (isCapacitorNative() || touchNarrow) return "mobile";
+  if (MARKETING_PATHS.has(pathname) || pathname.startsWith("/signin") || pathname.startsWith("/signup")) return "marketing";
+  return "desktop";
 }

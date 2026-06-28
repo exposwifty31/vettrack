@@ -7,7 +7,7 @@ import { VetTrackMark } from "@/components/vettrack-mark";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignUp } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
 import { clerkAppearance, clerkAppearanceNative } from "@/lib/clerk-appearance";
-import { usePlatformTarget } from "@/shared/platform";
+import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { ClerkAuthFormShell } from "@/components/clerk-auth-form-shell";
 import { NativeSocialButtons } from "@/components/native-social-buttons";
 import { LegalFooterLinks } from "@/components/legal-footer-links";
@@ -15,7 +15,7 @@ import { LegalFooterLinks } from "@/components/legal-footer-links";
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
 export default function SignUpPage() {
-  const isNative = usePlatformTarget() === "mobile";
+  const isNative = isCapacitorNative();
   const { isLoaded, isSignedIn } = useAuth();
   const [, navigate] = useLocation();
 

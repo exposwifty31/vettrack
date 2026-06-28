@@ -39,7 +39,7 @@ module.exports = {
       severity: "warn",
       from: { path: "^src/(core|shared)/" },
       to: {
-        path: "^(src/(native|desktop|features|pages|app|components)/|react|react-dom|@ionic/|@capacitor/|wouter|dexie|drizzle-orm|express)(/|$)",
+        path: "^(src/(native|desktop|features|pages|app|components)/|@ionic/|@capacitor/|react(/|$)|react-dom(/|$)|wouter(/|$)|dexie(/|$)|drizzle-orm(/|$)|express(/|$))",
       },
     },
     {

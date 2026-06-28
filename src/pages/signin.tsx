@@ -7,7 +7,7 @@ import { ClerkFailed, ClerkLoaded, ClerkLoading, SignIn, useUser } from "@clerk/
 import { useAuth } from "@/hooks/use-auth";
 import { PhoneSignIn } from "@/components/phone-sign-in";
 import { clerkAppearance, clerkAppearanceNative } from "@/lib/clerk-appearance";
-import { usePlatformTarget } from "@/shared/platform";
+import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { ClerkAuthFormShell } from "@/components/clerk-auth-form-shell";
 import { AuthBootstrapSpinner } from "@/components/native-clerk-gate";
 import { NativeSocialButtons } from "@/components/native-social-buttons";
@@ -16,7 +16,7 @@ import { LegalFooterLinks } from "@/components/legal-footer-links";
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
 export default function SignInPage() {
-  const isNative = usePlatformTarget() === "mobile";
+  const isNative = isCapacitorNative();
   const { isLoaded, isSignedIn } = useAuth();
   const { isLoaded: clerkLoaded, isSignedIn: clerkSignedIn } = useUser();
   const [, navigate] = useLocation();
