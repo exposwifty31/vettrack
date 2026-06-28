@@ -7,17 +7,16 @@ import { ClerkFailed, ClerkLoaded, ClerkLoading, SignIn, useUser } from "@clerk/
 import { useAuth } from "@/hooks/use-auth";
 import { PhoneSignIn } from "@/components/phone-sign-in";
 import { clerkAppearance, clerkAppearanceNative } from "@/lib/clerk-appearance";
-import { resolvePlatformTarget } from "@/shared/platform";
+import { usePlatformTarget } from "@/shared/platform";
 import { ClerkAuthFormShell } from "@/components/clerk-auth-form-shell";
 import { AuthBootstrapSpinner } from "@/components/native-clerk-gate";
 import { NativeSocialButtons } from "@/components/native-social-buttons";
 import { LegalFooterLinks } from "@/components/legal-footer-links";
 
-const IS_NATIVE = resolvePlatformTarget() === "mobile";
-
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
 export default function SignInPage() {
+  const isNative = usePlatformTarget() === "mobile";
   const { isLoaded, isSignedIn } = useAuth();
   const { isLoaded: clerkLoaded, isSignedIn: clerkSignedIn } = useUser();
   const [, navigate] = useLocation();
@@ -95,12 +94,12 @@ export default function SignInPage() {
                   <ClerkLoaded>
                     <ClerkAuthFormShell>
                       <div className="w-full min-h-[24rem] flex flex-col items-center justify-start gap-4">
-                        {IS_NATIVE ? <NativeSocialButtons mode="signIn" /> : null}
+                        {isNative ? <NativeSocialButtons mode="signIn" /> : null}
                         <SignIn
                           routing="hash"
                           signUpUrl="/signup"
                           fallbackRedirectUrl="/home"
-                          appearance={IS_NATIVE ? clerkAppearanceNative : clerkAppearance}
+                          appearance={isNative ? clerkAppearanceNative : clerkAppearance}
                         />
                       </div>
                     </ClerkAuthFormShell>

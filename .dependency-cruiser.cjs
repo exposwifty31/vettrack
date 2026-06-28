@@ -35,10 +35,12 @@ module.exports = {
     },
     {
       name: "R1-shared-no-frameworks",
-      comment: "src/core and src/shared must stay framework-free (no React, Capacitor, router, or ORM imports)",
+      comment: "src/core and src/shared must stay framework-free (no React, Capacitor, router, ORM, or framework-bound local-path imports)",
       severity: "warn",
       from: { path: "^src/(core|shared)/" },
-      to: { path: "^(react|react-dom|@ionic/|@capacitor/|wouter|dexie|drizzle-orm|express)(/|$)" },
+      to: {
+        path: "^(src/(native|desktop|features|pages|app|components)/|react|react-dom|@ionic/|@capacitor/|wouter|dexie|drizzle-orm|express)(/|$)",
+      },
     },
     {
       name: "R3-no-cross-shell",

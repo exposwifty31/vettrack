@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 
 /** The three runtime deployment targets. */
@@ -34,9 +36,20 @@ export function resolvePlatformTarget(): PlatformTarget {
 }
 
 /**
- * Hook form of resolvePlatformTarget. The result is stable for the lifetime
- * of the JS context — Capacitor platform never changes at runtime.
+ * Reactive hook form of resolvePlatformTarget. Re-evaluates on client-side
+ * navigation (via wouter) and on viewport/pointer-device changes (via matchMedia).
  */
 export function usePlatformTarget(): PlatformTarget {
-  return resolvePlatformTarget();
+  const [pathname] = useLocation();
+  const [target, setTarget] = useState<PlatformTarget>(() => resolvePlatformTarget());
+
+  useEffect(() => {
+    setTarget(resolvePlatformTarget());
+    const mq = window.matchMedia("(max-width: 767px) and (pointer: coarse)");
+    const handler = () => setTarget(resolvePlatformTarget());
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [pathname]);
+
+  return target;
 }

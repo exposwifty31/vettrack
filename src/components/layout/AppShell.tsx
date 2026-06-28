@@ -10,16 +10,6 @@ export interface AppShellProps {
    * Desktop PageShell still accepts it; IconSidebar is NAV-driven and ignores it.
    */
   sidebarItems?: SidebarItem[];
-  /** @deprecated Layout is retired — mobile chrome is owned by NativeShell. */
-  title?: string;
-  /** @deprecated Layout is retired — mobile scanner is owned by NativeShell ScanFab. */
-  onScan?: (patientId?: string) => void;
-  /** @deprecated Layout is retired. */
-  scannerOpen?: boolean;
-  /** @deprecated Layout is retired. */
-  onCloseScan?: () => void;
-  /** @deprecated Layout is retired. */
-  navigationLocked?: boolean;
 }
 
 /**

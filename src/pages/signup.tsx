@@ -7,16 +7,15 @@ import { VetTrackMark } from "@/components/vettrack-mark";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignUp } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
 import { clerkAppearance, clerkAppearanceNative } from "@/lib/clerk-appearance";
-import { resolvePlatformTarget } from "@/shared/platform";
+import { usePlatformTarget } from "@/shared/platform";
 import { ClerkAuthFormShell } from "@/components/clerk-auth-form-shell";
 import { NativeSocialButtons } from "@/components/native-social-buttons";
 import { LegalFooterLinks } from "@/components/legal-footer-links";
 
-const IS_NATIVE = resolvePlatformTarget() === "mobile";
-
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
 export default function SignUpPage() {
+  const isNative = usePlatformTarget() === "mobile";
   const { isLoaded, isSignedIn } = useAuth();
   const [, navigate] = useLocation();
 
@@ -65,12 +64,12 @@ export default function SignUpPage() {
               <ClerkLoaded>
                 <ClerkAuthFormShell>
                   <div className="w-full min-h-[24rem] flex flex-col items-center justify-start gap-4">
-                    {IS_NATIVE ? <NativeSocialButtons mode="signUp" /> : null}
+                    {isNative ? <NativeSocialButtons mode="signUp" /> : null}
                     <SignUp
                       routing="hash"
                       signInUrl="/signin"
                       fallbackRedirectUrl="/"
-                      appearance={IS_NATIVE ? clerkAppearanceNative : clerkAppearance}
+                      appearance={isNative ? clerkAppearanceNative : clerkAppearance}
                     />
                   </div>
                 </ClerkAuthFormShell>

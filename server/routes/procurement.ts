@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { and, eq, desc, inArray } from "drizzle-orm";
+import { and, eq, desc, inArray, notInArray } from "drizzle-orm";
 import { purchaseOrders, poLines, containerItems, inventoryLogs, inventoryItems, db } from "../db.js";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
@@ -211,18 +211,13 @@ router.patch("/:id/submit", requireAuth, requireAdmin, validateUuid("id"), async
     if (!existing) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "PO_NOT_FOUND", message: "Purchase order not found", requestId }));
     if (existing.status !== "draft") return res.status(409).json(apiError({ code: "CONFLICT", reason: "INVALID_STATUS", message: "Only draft orders can be submitted", requestId }));
 
-    await db
+    const [updated] = await db
       .update(purchaseOrders)
       .set({ status: "ordered", orderedAt: new Date(), updatedAt: new Date() })
-      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id)));
-
-    const [updated] = await db
-      .select()
-      .from(purchaseOrders)
-      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id)))
-      .limit(1);
+      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id), eq(purchaseOrders.status, "draft")))
+      .returning();
     if (!updated) {
-      return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "PO_NOT_FOUND", message: "Purchase order not found", requestId }));
+      return res.status(409).json(apiError({ code: "CONFLICT", reason: "INVALID_STATUS", message: "Only draft orders can be submitted", requestId }));
     }
     logAudit({
       actorRole: resolveAuditActorRole(req),
@@ -360,7 +355,7 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
       await tx
         .update(purchaseOrders)
         .set({ status: newStatus as "received" | "partial" | "ordered", updatedAt: new Date() })
-        .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id)));
+        .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id), notInArray(purchaseOrders.status, ["received", "cancelled"])));
     });
 
     const [updated] = await db
@@ -446,18 +441,13 @@ router.patch("/:id/cancel", requireAuth, requireAdmin, validateUuid("id"), async
       }));
     }
 
-    await db
+    const [updated] = await db
       .update(purchaseOrders)
       .set({ status: "cancelled", updatedAt: new Date() })
-      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id)));
-
-    const [updated] = await db
-      .select()
-      .from(purchaseOrders)
-      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id)))
-      .limit(1);
+      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id), notInArray(purchaseOrders.status, ["received", "cancelled"])))
+      .returning();
     if (!updated) {
-      return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "PO_NOT_FOUND", message: "Purchase order not found", requestId }));
+      return res.status(409).json(apiError({ code: "CONFLICT", reason: "CONCURRENT_MODIFICATION", message: "Order status changed concurrently", requestId }));
     }
     logAudit({
       actorRole: resolveAuditActorRole(req),

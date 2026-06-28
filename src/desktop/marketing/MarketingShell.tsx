@@ -1,6 +1,8 @@
 import { type ReactNode } from "react";
 
-type Props = { children: ReactNode };
+interface Props {
+  children: ReactNode;
+}
 
 /**
  * Chrome-free passthrough shell for public/unauthenticated routes.
