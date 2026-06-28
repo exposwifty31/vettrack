@@ -23,3 +23,11 @@ src/lib/offline-emergency-block.ts          @exposwifty31
 
 # CODEOWNERS itself
 .github/CODEOWNERS                          @exposwifty31
+
+# Six-domain ownership
+src/core/                                   @exposwifty31
+src/native/                                 @exposwifty31
+src/desktop/                                @exposwifty31
+src/shared/                                 @exposwifty31
+lib/                                        @exposwifty31
+server/workers/                             @exposwifty31
