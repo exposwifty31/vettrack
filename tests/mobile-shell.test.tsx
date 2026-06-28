@@ -87,7 +87,7 @@ describe("AppShell inside MobileShell", () => {
     expect(screen.queryByTestId("layout")).toBeNull();
   });
 
-  it("renders Layout chrome outside MobileShell", () => {
+  it("renders PageShell chrome outside MobileShell", () => {
     const { hook } = memoryLocation({ path: "/home" });
     render(
       <Router hook={hook}>
@@ -97,7 +97,7 @@ describe("AppShell inside MobileShell", () => {
       </Router>,
     );
     expect(screen.getByTestId("content")).toBeTruthy();
-    expect(screen.getByTestId("layout")).toBeTruthy();
+    expect(screen.getByTestId("page-shell")).toBeTruthy();
   });
 });
 

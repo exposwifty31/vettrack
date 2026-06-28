@@ -64,7 +64,7 @@ export async function runStaleCheckoutSweep(now = new Date()): Promise<{ scanned
     // Phase A — short eligibility transaction (holds advisory lock only while reading acks)
     type Eligibility = { clinicId: string; holderId: string; equipmentId: string; title: string; body: string };
     const eligibility = await db.transaction(async (tx): Promise<Eligibility | null> => {
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${row.id}))`);
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${row.id}, 0))`);
       const prior = await tx.select({ acknowledgedAt: alertAcks.acknowledgedAt })
         .from(alertAcks)
         .where(and(
@@ -93,7 +93,7 @@ export async function runStaleCheckoutSweep(now = new Date()): Promise<{ scanned
 
     // Phase C — short ack transaction to record the nudge (re-check cap to handle concurrent nudges)
     const didNudge = await db.transaction(async (tx): Promise<boolean> => {
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${row.id}))`);
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${row.id}, 0))`);
       const prior = await tx.select({ acknowledgedAt: alertAcks.acknowledgedAt })
         .from(alertAcks)
         .where(and(

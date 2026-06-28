@@ -34,6 +34,36 @@ module.exports = {
       to: { path: "^(server|src)/" },
     },
     {
+      name: "R1-shared-no-frameworks",
+      comment: "src/core and src/shared must stay framework-free (no React, Capacitor, router, ORM, or framework-bound local-path imports)",
+      severity: "warn",
+      from: { path: "^src/(core|shared)/" },
+      to: {
+        path: "^(src/(app|components|desktop|features|hooks|lib|native|pages)/|@ionic/|@capacitor/|react(/|$)|react-dom(/|$)|wouter(/|$)|dexie(/|$)|drizzle-orm(/|$)|express(/|$))",
+      },
+    },
+    {
+      name: "R3-no-cross-shell",
+      comment: "Native shell and desktop shell must not import each other",
+      severity: "error",
+      from: { path: "^src/native/" },
+      to: { path: "^src/desktop/" },
+    },
+    {
+      name: "R3-no-cross-shell-inverse",
+      comment: "Desktop shell must not import native shell",
+      severity: "error",
+      from: { path: "^src/desktop/" },
+      to: { path: "^src/native/" },
+    },
+    {
+      name: "R5-workers-no-client",
+      comment: "Server workers must not import frontend source or React",
+      severity: "error",
+      from: { path: "^server/workers/" },
+      to: { path: "^src/|^(react|react-dom)(/|$)" },
+    },
+    {
       name: "no-circular",
       severity: "warn",
       from: { pathNot: "^node_modules" },

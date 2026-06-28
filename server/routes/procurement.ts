@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { and, eq, desc, inArray } from "drizzle-orm";
+import { and, eq, desc, inArray, notInArray, sql } from "drizzle-orm";
 import { purchaseOrders, poLines, containerItems, inventoryLogs, inventoryItems, db } from "../db.js";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
@@ -211,18 +211,13 @@ router.patch("/:id/submit", requireAuth, requireAdmin, validateUuid("id"), async
     if (!existing) return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "PO_NOT_FOUND", message: "Purchase order not found", requestId }));
     if (existing.status !== "draft") return res.status(409).json(apiError({ code: "CONFLICT", reason: "INVALID_STATUS", message: "Only draft orders can be submitted", requestId }));
 
-    await db
+    const [updated] = await db
       .update(purchaseOrders)
       .set({ status: "ordered", orderedAt: new Date(), updatedAt: new Date() })
-      .where(eq(purchaseOrders.id, req.params.id));
-
-    const [updated] = await db
-      .select()
-      .from(purchaseOrders)
-      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id)))
-      .limit(1);
+      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id), eq(purchaseOrders.status, "draft")))
+      .returning();
     if (!updated) {
-      return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "PO_NOT_FOUND", message: "Purchase order not found", requestId }));
+      return res.status(409).json(apiError({ code: "CONFLICT", reason: "INVALID_STATUS", message: "Only draft orders can be submitted", requestId }));
     }
     logAudit({
       actorRole: resolveAuditActorRole(req),
@@ -263,61 +258,70 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
       return res.status(409).json(apiError({ code: "CONFLICT", reason: "INVALID_STATUS", message: `Cannot receive a ${existing.status} order`, requestId }));
     }
 
-    const allLines = await db.select().from(poLines).where(eq(poLines.purchaseOrderId, req.params.id));
-
     // Collect per-line delta for audit metadata
     const receiveAuditLines: Array<{ itemId: string; quantityReceivedBefore: number; quantityReceivedAfter: number; delta: number }> = [];
 
     await db.transaction(async (tx) => {
       for (const incoming of b.lines) {
-        const line = allLines.find((l) => l.id === incoming.lineId);
-        if (!line) continue;
         if (incoming.quantityReceived <= 0) continue;
 
-        const before = line.quantityReceived;
-        const after = before + incoming.quantityReceived;
+        // Lock the row and read current state — FOR UPDATE prevents concurrent
+        // over-receives and gives us the before value for the audit log.
+        const [currentLine] = await tx
+          .select({ quantityReceived: poLines.quantityReceived, quantityOrdered: poLines.quantityOrdered, itemId: poLines.itemId })
+          .from(poLines)
+          .where(and(
+            eq(poLines.id, incoming.lineId),
+            eq(poLines.clinicId, clinicId),
+            eq(poLines.purchaseOrderId, req.params.id),
+          ))
+          .limit(1)
+          .for("update");
+        if (!currentLine) continue;
 
-        // Update line received quantity
+        const remaining = currentLine.quantityOrdered - currentLine.quantityReceived;
+        if (remaining <= 0) continue; // line already fully received
+
+        const effectiveDelta = Math.min(incoming.quantityReceived, remaining);
+        const before = currentLine.quantityReceived;
+        const after = before + effectiveDelta;
+
         await tx
           .update(poLines)
-          .set({ quantityReceived: after })
-          .where(eq(poLines.id, line.id));
+          .set({ quantityReceived: sql`${poLines.quantityReceived} + ${effectiveDelta}` })
+          .where(and(
+            eq(poLines.id, incoming.lineId),
+            eq(poLines.clinicId, clinicId),
+            eq(poLines.purchaseOrderId, req.params.id),
+          ));
 
         receiveAuditLines.push({
-          itemId: line.itemId,
+          itemId: currentLine.itemId,
           quantityReceivedBefore: before,
           quantityReceivedAfter: after,
-          delta: incoming.quantityReceived,
+          delta: effectiveDelta,
         });
 
         // Upsert containerItems quantity
-        const [existingCi] = await tx
-          .select()
-          .from(containerItems)
-          .where(and(eq(containerItems.containerId, incoming.containerId), eq(containerItems.itemId, line.itemId)))
-          .limit(1);
+        const [updatedCi] = await tx
+          .update(containerItems)
+          .set({ quantity: sql`${containerItems.quantity} + ${effectiveDelta}`, updatedAt: new Date() })
+          .where(and(
+            eq(containerItems.containerId, incoming.containerId),
+            eq(containerItems.itemId, currentLine.itemId),
+            eq(containerItems.clinicId, clinicId),
+          ))
+          .returning();
 
-        if (existingCi) {
-          try {
-            await tx
-              .update(containerItems)
-              .set({ quantity: existingCi.quantity + incoming.quantityReceived, updatedAt: new Date() })
-              .where(eq(containerItems.id, existingCi.id));
-          } catch (ciErr) {
-            if (isCheckViolation(ciErr)) {
-              throw toInventoryConstraintError(ciErr);
-            }
-            throw ciErr;
-          }
-
+        if (updatedCi) {
           await tx.insert(inventoryLogs).values({
             id: randomUUID(),
             clinicId,
             containerId: incoming.containerId,
             logType: "restock",
-            quantityBefore: existingCi.quantity,
-            quantityAdded: incoming.quantityReceived,
-            quantityAfter: existingCi.quantity + incoming.quantityReceived,
+            quantityBefore: updatedCi.quantity - effectiveDelta,
+            quantityAdded: effectiveDelta,
+            quantityAfter: updatedCi.quantity,
             note: `Received via PO ${req.params.id}`,
             createdByUserId: userId,
           });
@@ -327,8 +331,8 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
               id: randomUUID(),
               clinicId,
               containerId: incoming.containerId,
-              itemId: line.itemId,
-              quantity: incoming.quantityReceived,
+              itemId: currentLine.itemId,
+              quantity: effectiveDelta,
             });
           } catch (ciErr) {
             if (isCheckViolation(ciErr)) {
@@ -343,24 +347,29 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
             containerId: incoming.containerId,
             logType: "restock",
             quantityBefore: 0,
-            quantityAdded: incoming.quantityReceived,
-            quantityAfter: incoming.quantityReceived,
+            quantityAdded: effectiveDelta,
+            quantityAfter: effectiveDelta,
             note: `Received via PO ${req.params.id}`,
             createdByUserId: userId,
           });
         }
       }
 
-      // Refresh lines and determine new PO status
-      const refreshedLines = await tx.select().from(poLines).where(eq(poLines.purchaseOrderId, req.params.id));
+      // Refresh lines and determine new PO status.
+      // "draft" is promoted to "ordered" when a receive starts; "cancelled"/"received" are
+      // rejected at the top of the handler so existing.status ∈ {draft, ordered, partial} here.
+      const refreshedLines = await tx.select().from(poLines)
+        .where(and(eq(poLines.purchaseOrderId, req.params.id), eq(poLines.clinicId, clinicId)));
       const allFullyReceived = refreshedLines.every((l) => l.quantityReceived >= l.quantityOrdered);
       const anyReceived = refreshedLines.some((l) => l.quantityReceived > 0);
-      const newStatus = allFullyReceived ? "received" : anyReceived ? "partial" : existing.status;
+      const newStatus = allFullyReceived ? "received" : anyReceived ? "partial" : existing.status === "draft" ? "ordered" : existing.status;
 
-      await tx
+      const [poAfter] = await tx
         .update(purchaseOrders)
-        .set({ status: newStatus as "received" | "partial" | "ordered", updatedAt: new Date() })
-        .where(eq(purchaseOrders.id, req.params.id));
+        .set({ status: newStatus, updatedAt: new Date() })
+        .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id), notInArray(purchaseOrders.status, ["received", "cancelled"])))
+        .returning();
+      if (!poAfter) throw new Error("CONCURRENT_MODIFICATION");
     });
 
     const [updated] = await db
@@ -434,8 +443,9 @@ router.patch("/:id/cancel", requireAuth, requireAdmin, validateUuid("id"), async
     if (existing.status === "received") return res.status(409).json(apiError({ code: "CONFLICT", reason: "ALREADY_RECEIVED", message: "Cannot cancel a received order", requestId }));
     if (existing.status === "cancelled") return res.status(409).json(apiError({ code: "CONFLICT", reason: "ALREADY_CANCELLED", message: "Order is already cancelled", requestId }));
 
-    // Fix C: block cancellation if any line has already been received
-    const allPoLines = await db.select({ quantityReceived: poLines.quantityReceived }).from(poLines).where(eq(poLines.purchaseOrderId, req.params.id));
+    // Block cancellation if any line has already been received
+    const allPoLines = await db.select({ quantityReceived: poLines.quantityReceived }).from(poLines)
+      .where(and(eq(poLines.purchaseOrderId, req.params.id), eq(poLines.clinicId, clinicId)));
     const anyReceived = allPoLines.some((l) => l.quantityReceived > 0);
     if (anyReceived) {
       return res.status(409).json(apiError({
@@ -446,18 +456,13 @@ router.patch("/:id/cancel", requireAuth, requireAdmin, validateUuid("id"), async
       }));
     }
 
-    await db
+    const [updated] = await db
       .update(purchaseOrders)
       .set({ status: "cancelled", updatedAt: new Date() })
-      .where(eq(purchaseOrders.id, req.params.id));
-
-    const [updated] = await db
-      .select()
-      .from(purchaseOrders)
-      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id)))
-      .limit(1);
+      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id), notInArray(purchaseOrders.status, ["received", "cancelled"])))
+      .returning();
     if (!updated) {
-      return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "PO_NOT_FOUND", message: "Purchase order not found", requestId }));
+      return res.status(409).json(apiError({ code: "CONFLICT", reason: "CONCURRENT_MODIFICATION", message: "Order status changed concurrently", requestId }));
     }
     logAudit({
       actorRole: resolveAuditActorRole(req),

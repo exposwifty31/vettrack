@@ -22,7 +22,7 @@ export function UpdateBanner() {
   useEffect(() => {
     if (!isSignedIn || !userId) return;
     void (async () => {
-      const displayVersion = resolvePlatformTarget() === "native"
+      const displayVersion = resolvePlatformTarget() === "mobile"
         ? await resolveDisplayAppVersion()
         : (await resolveServerAppVersion()) ?? getBundledAppVersion();
       const lastSeen = safeStorageGetItem(STORAGE_KEY);

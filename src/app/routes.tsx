@@ -68,12 +68,12 @@ function RootRoute() {
   const platform = usePlatformTarget();
 
   // Bundled native shell: skip marketing landing — sign-in has Clerk loading/error UI.
-  if (platform === "native" && CLERK_ENABLED && !isOfflineSession && !isSignedIn) {
+  if (platform === "mobile" && CLERK_ENABLED && !isOfflineSession && !isSignedIn) {
     return <Redirect to="/signin" replace />;
   }
 
   if (!isLoaded && !isOfflineSession) {
-    return platform === "native" ? <AuthBootstrapSpinner /> : <RouteFallback />;
+    return platform === "mobile" ? <AuthBootstrapSpinner /> : <RouteFallback />;
   }
 
   if (isSignedIn && !shouldShowPostSignupLanding()) {

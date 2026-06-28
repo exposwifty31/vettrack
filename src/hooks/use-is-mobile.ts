@@ -7,5 +7,5 @@ import { resolvePlatformTarget } from "@/shared/platform";
  * Retained for backward compat with callers that predate the shared/platform kernel.
  */
 export function useIsMobile(): boolean {
-  return resolvePlatformTarget() === "native";
+  return resolvePlatformTarget() === "mobile";
 }

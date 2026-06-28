@@ -491,11 +491,7 @@ function HomePageDesktop() {
   );
 
   return (
-    <AppShell
-      onScan={() => setScannerOpen(true)}
-      scannerOpen={scannerOpen}
-      onCloseScan={() => setScannerOpen(false)}
-    >
+    <AppShell>
       {pageContent}
     </AppShell>
   );

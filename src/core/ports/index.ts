@@ -66,3 +66,30 @@ export interface ISyncQueue {
   pendingCount(): Promise<number>;
   failedCount(): Promise<number>;
 }
+
+export interface StatusBarPort {
+  setStyle(style: "light" | "dark"): Promise<void>;
+  setBackgroundColor(hex: string): Promise<void>;
+  show(): Promise<void>;
+  hide(): Promise<void>;
+}
+
+export interface KeyboardPort {
+  /** Register a handler for keyboard height changes. Returns a cleanup function. */
+  onHeightChange(handler: (heightPx: number) => void): () => void;
+  hide(): Promise<void>;
+}
+
+export interface AuthSessionPort {
+  getToken(): Promise<string | null>;
+  signOut(): Promise<void>;
+  /** Register a handler invoked when the session changes. Returns a cleanup function. */
+  onSessionChange(handler: (token: string | null) => void): () => void;
+}
+
+export interface ApiClientPort {
+  get<T>(path: string, init?: RequestInit): Promise<T>;
+  post<T>(path: string, body: unknown, init?: RequestInit): Promise<T>;
+  patch<T>(path: string, body: unknown, init?: RequestInit): Promise<T>;
+  del(path: string, init?: RequestInit): Promise<void>;
+}
