@@ -14,11 +14,15 @@ export function isTouchNarrow(): boolean {
   return window.matchMedia("(max-width: 767px) and (pointer: coarse)").matches;
 }
 
+/** Single source of truth for the marketing-path predicate (used by both isMarketingPath and usePlatformTarget). */
+function isMarketingPathname(pathname: string): boolean {
+  return MARKETING_PATHS.has(pathname) || pathname.startsWith("/signin") || pathname.startsWith("/signup");
+}
+
 /** True when the current path belongs to the public/unauthenticated marketing shell. */
 export function isMarketingPath(): boolean {
   if (typeof window === "undefined") return false;
-  const path = window.location.pathname;
-  return MARKETING_PATHS.has(path) || path.startsWith("/signin") || path.startsWith("/signup");
+  return isMarketingPathname(window.location.pathname);
 }
 
 /**
@@ -55,6 +59,6 @@ export function usePlatformTarget(): PlatformTarget {
   }, []);
 
   if (isCapacitorNative() || touchNarrow) return "mobile";
-  if (MARKETING_PATHS.has(pathname) || pathname.startsWith("/signin") || pathname.startsWith("/signup")) return "marketing";
+  if (isMarketingPathname(pathname)) return "marketing";
   return "desktop";
 }

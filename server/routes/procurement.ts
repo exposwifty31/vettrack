@@ -265,34 +265,50 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
       for (const incoming of b.lines) {
         if (incoming.quantityReceived <= 0) continue;
 
-        // Atomic increment — avoids stale-read races under concurrent requests
-        const [updatedLine] = await tx
-          .update(poLines)
-          .set({ quantityReceived: sql`${poLines.quantityReceived} + ${incoming.quantityReceived}` })
+        // Lock the row and read current state — FOR UPDATE prevents concurrent
+        // over-receives and gives us the before value for the audit log.
+        const [currentLine] = await tx
+          .select({ quantityReceived: poLines.quantityReceived, quantityOrdered: poLines.quantityOrdered, itemId: poLines.itemId })
+          .from(poLines)
           .where(and(
             eq(poLines.id, incoming.lineId),
             eq(poLines.clinicId, clinicId),
             eq(poLines.purchaseOrderId, req.params.id),
           ))
-          .returning();
-        if (!updatedLine) continue;
+          .limit(1)
+          .for("update");
+        if (!currentLine) continue;
 
-        const after = updatedLine.quantityReceived;
-        const before = after - incoming.quantityReceived;
+        const remaining = currentLine.quantityOrdered - currentLine.quantityReceived;
+        if (remaining <= 0) continue; // line already fully received
+
+        const effectiveDelta = Math.min(incoming.quantityReceived, remaining);
+        const before = currentLine.quantityReceived;
+        const after = before + effectiveDelta;
+
+        await tx
+          .update(poLines)
+          .set({ quantityReceived: sql`${poLines.quantityReceived} + ${effectiveDelta}` })
+          .where(and(
+            eq(poLines.id, incoming.lineId),
+            eq(poLines.clinicId, clinicId),
+            eq(poLines.purchaseOrderId, req.params.id),
+          ));
+
         receiveAuditLines.push({
-          itemId: updatedLine.itemId,
+          itemId: currentLine.itemId,
           quantityReceivedBefore: before,
           quantityReceivedAfter: after,
-          delta: incoming.quantityReceived,
+          delta: effectiveDelta,
         });
 
-        // Upsert containerItems quantity — atomic increment avoids stale-read
+        // Upsert containerItems quantity
         const [updatedCi] = await tx
           .update(containerItems)
-          .set({ quantity: sql`${containerItems.quantity} + ${incoming.quantityReceived}`, updatedAt: new Date() })
+          .set({ quantity: sql`${containerItems.quantity} + ${effectiveDelta}`, updatedAt: new Date() })
           .where(and(
             eq(containerItems.containerId, incoming.containerId),
-            eq(containerItems.itemId, updatedLine.itemId),
+            eq(containerItems.itemId, currentLine.itemId),
             eq(containerItems.clinicId, clinicId),
           ))
           .returning();
@@ -303,8 +319,8 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
             clinicId,
             containerId: incoming.containerId,
             logType: "restock",
-            quantityBefore: updatedCi.quantity - incoming.quantityReceived,
-            quantityAdded: incoming.quantityReceived,
+            quantityBefore: updatedCi.quantity - effectiveDelta,
+            quantityAdded: effectiveDelta,
             quantityAfter: updatedCi.quantity,
             note: `Received via PO ${req.params.id}`,
             createdByUserId: userId,
@@ -315,8 +331,8 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
               id: randomUUID(),
               clinicId,
               containerId: incoming.containerId,
-              itemId: updatedLine.itemId,
-              quantity: incoming.quantityReceived,
+              itemId: currentLine.itemId,
+              quantity: effectiveDelta,
             });
           } catch (ciErr) {
             if (isCheckViolation(ciErr)) {
@@ -331,24 +347,26 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
             containerId: incoming.containerId,
             logType: "restock",
             quantityBefore: 0,
-            quantityAdded: incoming.quantityReceived,
-            quantityAfter: incoming.quantityReceived,
+            quantityAdded: effectiveDelta,
+            quantityAfter: effectiveDelta,
             note: `Received via PO ${req.params.id}`,
             createdByUserId: userId,
           });
         }
       }
 
-      // Refresh lines and determine new PO status
+      // Refresh lines and determine new PO status.
+      // "draft" is promoted to "ordered" when a receive starts; "cancelled"/"received" are
+      // rejected at the top of the handler so existing.status ∈ {draft, ordered, partial} here.
       const refreshedLines = await tx.select().from(poLines)
         .where(and(eq(poLines.purchaseOrderId, req.params.id), eq(poLines.clinicId, clinicId)));
       const allFullyReceived = refreshedLines.every((l) => l.quantityReceived >= l.quantityOrdered);
       const anyReceived = refreshedLines.some((l) => l.quantityReceived > 0);
-      const newStatus = allFullyReceived ? "received" : anyReceived ? "partial" : existing.status;
+      const newStatus = allFullyReceived ? "received" : anyReceived ? "partial" : existing.status === "draft" ? "ordered" : existing.status;
 
       const [poAfter] = await tx
         .update(purchaseOrders)
-        .set({ status: newStatus as "received" | "partial" | "ordered", updatedAt: new Date() })
+        .set({ status: newStatus, updatedAt: new Date() })
         .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id), notInArray(purchaseOrders.status, ["received", "cancelled"])))
         .returning();
       if (!poAfter) throw new Error("CONCURRENT_MODIFICATION");
