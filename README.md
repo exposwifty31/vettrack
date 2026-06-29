@@ -34,10 +34,16 @@ See [`docs/setup/environment.md`](docs/setup/environment.md) and [`docs/dev-sign
 | `pnpm start` | Start production server |
 | `pnpm worker` | Start notification worker CLI (requires Redis) |
 | `pnpm test` | Run full Vitest suite |
+| `pnpm typecheck` | Type-check frontend + server (both tsconfigs) |
 | `pnpm db:migrate` | Run pending database migrations |
 | `pnpm validate:prod` | Pre-deployment validation checks |
 | `pnpm auth:preflight` | Verify Clerk auth configuration |
 | `pnpm docs:audit` | Regenerate `docs/audit/*` route and schema inventories |
+| `pnpm i18n:check` | Verify Hebrew/English locale parity |
+| `pnpm i18n:generate-types` | Regenerate `src/lib/i18n.generated.d.ts` |
+| `pnpm tenant:lint` | Lint DB queries for missing `clinicId` filters |
+| `pnpm architecture:gates` | Run all architecture gate scripts |
+| `pnpm knip` | Find unused exports and dead code |
 | `pnpm cap:build:native` | Build bundled Capacitor iOS shell |
 | `pnpm cap:build:native:android` | Build bundled Capacitor Android shell |
 | `pnpm cap:install:ios-sim` | Build + install on iOS Simulator (iPad A16 by default) |
@@ -56,9 +62,9 @@ vettrack/
 │   ├── features/     Feature-scoped modules
 │   ├── components/   Shared UI components (shadcn primitives in components/ui/)
 │   ├── native/       Capacitor native shell (NativeShell, NativeTabBar, ScanFab)
-│   ├── desktop/      Web shell delegation (WebShell — PageShell or mobile Layout)
-│   ├── shell/        Legacy re-export layer (aliases to native/ and desktop/)
-│   ├── shared/       Platform target helpers shared across src/ (PlatformRouter, resolvePlatformTarget)
+│   ├── desktop/      WebShell delegation (PageShell) + marketing/ shell
+│   ├── shell/        Shell orchestration — WebShell, desktop/, mobile/ sub-shells
+│   ├── shared/       Platform target helpers (PlatformRouter, resolvePlatformTarget)
 │   └── hooks/        Auth, push, settings, offline sync
 ├── server/           Express API + business logic
 │   ├── app/routes.ts Route registration (~44 modules)
@@ -83,7 +89,7 @@ vettrack/
 4. **Role from DB** — `req.authUser.role` comes from `vt_users.role`, never JWT claims.
 5. **Background jobs** — `startJobRuntime()` in `server/jobs/runtime.ts` plus schedulers in `server/app/start-schedulers.ts`. Redis required in production.
 6. **Credentials at rest** — integration secrets in `vt_server_config` encrypted with AES-256-GCM when `DB_CONFIG_ENCRYPTION_KEY` is set.
-7. **Platform split** — `src/shared/platform` exposes `resolvePlatformTarget()` / `usePlatformTarget()` returning `"native" | "web"`. `PlatformRouter` is the single branch point: native → `NativeShell` (safe-area chrome, tab bar, scan FAB); web → `WebShell` (desktop `PageShell` or mobile `Layout`). Use the shared helpers for any new platform-conditional code; do not call `isCapacitorNative()` from `@/lib/capacitor-runtime` in new code.
+7. **Platform split** — `src/shared` exposes `resolvePlatformTarget()` / `usePlatformTarget()` returning `"native" | "web"`. `PlatformRouter` is the single branch point: native → `NativeShell` (safe-area chrome, tab bar, scan FAB); web → `WebShell` (desktop `PageShell`; marketing pages under `src/desktop/marketing/`). Use the shared helpers for any new platform-conditional code; do not call `isCapacitorNative()` from `@/lib/capacitor-runtime` in new code.
 
 ### Database (prefix `vt_`)
 
