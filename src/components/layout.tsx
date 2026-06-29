@@ -451,7 +451,9 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   useEffect(() => {
     if (prevCriticalCountRef.current !== null && criticalCount > prevCriticalCountRef.current) {
       haptics.warning();
-      void playCriticalAlertTone();
+      void playCriticalAlertTone().catch((err) => {
+        console.warn("[layout] playCriticalAlertTone failed", err);
+      });
     }
     prevCriticalCountRef.current = criticalCount;
   }, [criticalCount]);
@@ -727,10 +729,17 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   const handleSoundToggle = async (v: boolean) => {
     if (v) {
       update({ soundEnabled: true });
-      await playFeedbackTone();
+      await playFeedbackTone().catch((err) => {
+        console.warn("[layout] playFeedbackTone failed", err);
+      });
     } else {
-      await playMuteTone();
-      update({ soundEnabled: false });
+      try {
+        await playMuteTone();
+      } catch (err) {
+        console.warn("[layout] playMuteTone failed", err);
+      } finally {
+        update({ soundEnabled: false });
+      }
     }
   };
 
