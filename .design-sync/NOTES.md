@@ -11,8 +11,8 @@ runs in a non-standard configuration. Read this before re-syncing.
 - **No shipped `.d.ts` tree.** Prop types are extracted directly from `.tsx`
   source. This requires three env vars on every `package-build.mjs` run:
   ```
-  DS_SRC_GLOB="<repo-root>/src/**/*.ts,<repo-root>/src/**/*.tsx"
-  DS_TS_BASEURL="<repo-root>"
+  DS_SRC_GLOB="/Users/dan/vettrack-ship/src/**/*.ts,/Users/dan/vettrack-ship/src/**/*.tsx"
+  DS_TS_BASEURL="/Users/dan/vettrack-ship"
   DS_TS_PATHS='{"@/*":["./src/*"],"@assets/*":["./docs/archive/2026/attached_assets/*"],"*":["./*"]}'
   ```
   These are consumed by patches in `.ds-sync/lib/dts.mjs` (see "Staged-script
@@ -96,9 +96,8 @@ all fields (`sourceKeys`, `sourceHashes`, `bundleSha12`, etc.) to produce a usef
 diff — saving only partial content results in "anchor malformed" and forces a full
 re-upload of all 110 components instead of a targeted diff.
 
-**Repo path:** Replace `<repo-root>` in DS_SRC_GLOB / DS_TS_BASEURL with the absolute
-path to your checkout (e.g. `/Users/yourname/vettrack-ship`). The repo has been
-cloned under `vettrack-ship/`, not `vettrack/` — use the correct folder name.
+**Repo path:** The DS_SRC_GLOB / DS_TS_BASEURL env vars use `/Users/dan/vettrack-ship/`
+(not `/Users/dan/vettrack/`).
 
 ## Re-sync risks
 
