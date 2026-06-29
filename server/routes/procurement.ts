@@ -302,7 +302,7 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
           delta: effectiveDelta,
         });
 
-        // Validate the destination container belongs to this clinic.
+        // Tenant fence: prevents a line in one clinic from writing inventory into a container owned by another.
         const [targetContainer] = await tx
           .select({ id: containers.id })
           .from(containers)
@@ -329,6 +329,7 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
               quantity: sql`${containerItems.quantity} + ${effectiveDelta}`,
               updatedAt: new Date(),
             },
+            setWhere: eq(containerItems.clinicId, clinicId),
           })
           .returning();
 
@@ -343,6 +344,10 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
           note: `Received via PO ${req.params.id}`,
           createdByUserId: userId,
         });
+      }
+
+      if (receiveAuditLines.length === 0) {
+        throw new Error("NO_EFFECTIVE_DELTA");
       }
 
       // Refresh lines and determine new PO status.
@@ -412,6 +417,9 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
     }
     if (isCheckViolation(err) && handleCheckViolation(err, res)) {
       return;
+    }
+    if (err instanceof Error && err.message === "NO_EFFECTIVE_DELTA") {
+      return res.status(422).json(apiError({ code: "INVALID_INPUT", reason: "NO_EFFECTIVE_DELTA", message: "No receivable quantity applied; all lines were zero, already full, or not found", requestId }));
     }
     if (err instanceof Error && err.message === "CONCURRENT_MODIFICATION") {
       return res.status(409).json(apiError({ code: "CONFLICT", reason: "CONCURRENT_MODIFICATION", message: "Order status changed concurrently", requestId }));

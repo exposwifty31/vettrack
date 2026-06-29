@@ -60,7 +60,7 @@ module.exports = {
       name: "R5-workers-no-client",
       comment: "Server workers must not import frontend source or React",
       severity: "error",
-      from: { path: "^server/workers/" },
+      from: { path: "^server/(workers|jobs)/" },
       to: { path: "^src/|^(react|react-dom)(/|$)" },
     },
     {

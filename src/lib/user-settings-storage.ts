@@ -82,5 +82,8 @@ export function getStoredUserSettings(): UserSettings {
 }
 
 export function saveStoredUserSettings(settings: UserSettings): void {
-  safeStorageSetItem(USER_SETTINGS_STORAGE_KEY, JSON.stringify({ ...settings, _v: SETTINGS_SCHEMA_VERSION }));
+  const ok = safeStorageSetItem(USER_SETTINGS_STORAGE_KEY, JSON.stringify({ ...settings, _v: SETTINGS_SCHEMA_VERSION }));
+  if (!ok) {
+    console.error(`[user-settings] failed to persist to "${USER_SETTINGS_STORAGE_KEY}" (quota or private-mode)`);
+  }
 }
