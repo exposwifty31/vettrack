@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
 import { t } from "@/lib/i18n";
-import { resolvePlatformTarget } from "@/shared/platform";
+import { resolvePlatformTarget } from "@/app/platform";
 import {
   compareVersions,
   getBundledAppVersion,

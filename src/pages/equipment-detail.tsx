@@ -1729,7 +1729,7 @@ function EquipmentDetailPageDesktop() {
                     data-testid="btn-photo"
                   >
                     <Camera className="w-6 h-6" />
-                    <span className="text-sm font-medium">Take / Upload Photo</span>
+                    <span className="text-sm font-medium">{t.equipmentDetail.takePhoto}</span>
                   </button>
                 )}
                 <input
@@ -1821,7 +1821,7 @@ function EquipmentDetailPageDesktop() {
                   data-testid="btn-report-issue-photo"
                 >
                   <Camera className="w-6 h-6" />
-                  <span className="text-sm font-medium">Take / Upload Photo</span>
+                  <span className="text-sm font-medium">{t.equipmentDetail.takePhoto}</span>
                 </button>
               )}
               <input
@@ -1983,8 +1983,8 @@ function EquipmentDetailPageDesktop() {
             ) : (
               <div className="flex flex-col items-center gap-4 py-4 text-center">
                 <CheckCircle2 className="w-14 h-14 text-emerald-500" />
-                <p className="font-bold text-lg">Done!</p>
-                <p className="text-muted-foreground text-sm">Action completed for {equipmentDisplayName}.</p>
+                <p className="font-bold text-lg">{t.equipmentDetail.actionDone}</p>
+                <p className="text-muted-foreground text-sm">{t.equipmentDetail.actionDoneBody.replace("{name}", equipmentDisplayName)}</p>
                 <Button
                   className="w-full gap-2"
                   onClick={() => {

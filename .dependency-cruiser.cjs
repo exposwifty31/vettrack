@@ -36,7 +36,7 @@ module.exports = {
     {
       name: "R1-shared-no-frameworks",
       comment: "src/core and src/shared must stay framework-free (no React, Capacitor, router, ORM, or framework-bound local-path imports)",
-      severity: "warn",
+      severity: "error",
       from: { path: "^src/(core|shared)/" },
       to: {
         path: "^(src/(app|components|desktop|features|hooks|lib|native|pages)/|@ionic/|@capacitor/|react(/|$)|react-dom(/|$)|wouter(/|$)|dexie(/|$)|drizzle-orm(/|$)|express(/|$))",
@@ -58,10 +58,10 @@ module.exports = {
     },
     {
       name: "R5-workers-no-client",
-      comment: "Server workers must not import frontend source or React",
+      comment: "Server workers/jobs must not import frontend source, React, or browser-only packages",
       severity: "error",
-      from: { path: "^server/workers/" },
-      to: { path: "^src/|^(react|react-dom)(/|$)" },
+      from: { path: "^server/(workers|jobs)/" },
+      to: { path: "^src/|^(react|react-dom|wouter|dexie|@capacitor|@ionic)(/|$)" },
     },
     {
       name: "no-circular",

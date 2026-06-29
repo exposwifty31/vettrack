@@ -22,17 +22,19 @@ vi.mock("@/lib/i18n", () => ({
     nav: {
       today: "Today",
       equipment: "Equipment",
-      alerts: "Alerts",
-      more: "More",
+      emergency: "Emergency",
+      menu: "Menu",
       equipmentScan: "Scan",
       tabBar: "Tab navigation",
     },
     common: { openNavigationMenu: "Open navigation menu" },
   },
+  getStoredLocale: () => "he",
 }));
 
 vi.mock("@/hooks/use-is-desktop", () => ({ useIsDesktop: () => false }));
 vi.mock("@/lib/capacitor-runtime", () => ({ isCapacitorNative: () => false }));
+vi.mock("@/components/nfc-foreground-scan", () => ({ NfcForegroundScan: () => null }));
 vi.mock("@/components/layout", () => ({
   Layout: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="layout">{children}</div>
@@ -125,14 +127,15 @@ describe("MobileTabBar active state", () => {
     expect(screen.getByText("Today").closest("button")?.getAttribute("aria-current")).toBeNull();
   });
 
-  it("marks Alerts tab as active at /alerts", () => {
-    const { hook } = memoryLocation({ path: "/alerts" });
+  it("marks Emergency tab as active at /code-blue", () => {
+    const { hook } = memoryLocation({ path: "/code-blue" });
     render(
       <Router hook={hook}>
-        <MobileTabBar />
+        <MobileTabBar onMorePress={() => {}} />
       </Router>,
     );
-    expect(screen.getByText("Alerts").closest("button")?.getAttribute("aria-current")).toBe("page");
+    expect(screen.getByText("Emergency").closest("button")?.getAttribute("aria-current")).toBe("page");
+    expect(screen.getByText("Today").closest("button")?.getAttribute("aria-current")).toBeNull();
   });
 
   it("marks Today tab as active at root /", () => {

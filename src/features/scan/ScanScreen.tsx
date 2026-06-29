@@ -18,7 +18,7 @@ export function ScanScreen() {
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        background: "var(--background)",
+        background: "hsl(var(--background))",
       }}
     >
       <div
@@ -31,7 +31,7 @@ export function ScanScreen() {
           style={{
             fontSize: "var(--text-2xl)",
             fontWeight: 800,
-            color: "var(--foreground)",
+            color: "hsl(var(--foreground))",
             margin: 0,
             lineHeight: 1.2,
           }}
@@ -41,7 +41,7 @@ export function ScanScreen() {
         <p
           style={{
             fontSize: "var(--text-sm)",
-            color: "var(--muted-foreground)",
+            color: "hsl(var(--muted-foreground))",
             margin: "4px 0 0",
           }}
         >

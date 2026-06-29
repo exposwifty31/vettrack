@@ -18,7 +18,7 @@
 // site (inside `src/lib/api.ts.request()`), which keeps this module
 // dependency-free and avoids a circular import.
 
-import { safeStorageGetItem, safeStorageSetItem } from "@/lib/safe-browser";
+import { safeStorageGetItem, safeStorageSetItem } from "../lib/safe-storage";
 import {
   EMERGENCY_OFFLINE_BLOCK_MUTATIONS,
   normalizeEmergencyPathname,

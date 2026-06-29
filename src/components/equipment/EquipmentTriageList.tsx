@@ -17,7 +17,7 @@ import { ChevronRight, ChevronLeft } from "lucide-react";
 import { useDirection } from "@/hooks/useDirection";
 
 const BAR_COLOR: Record<EquipmentTriageTier, string> = {
-  attention: "var(--status-issue)",
+  attention: "hsl(var(--status-issue))",
   in_use: "var(--brand)",
   operational: "var(--action)",
 };

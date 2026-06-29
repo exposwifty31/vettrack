@@ -119,7 +119,7 @@ export function AlertsProView({
           const ackKey = `${alert.equipmentId}:${alert.type}`;
           const ack = acksMap.get(ackKey);
           const bar =
-            tone === "err" ? "var(--status-issue)" : "var(--status-maintenance)";
+            tone === "err" ? "hsl(var(--status-issue))" : "hsl(var(--status-maintenance))";
 
           return (
             <div className="flex min-h-14 items-stretch">

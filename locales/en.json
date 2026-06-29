@@ -528,7 +528,10 @@
     },
     "accountability": {
       "title": "Accountability trail"
-    }
+    },
+    "takePhoto": "Take / Upload Photo",
+    "actionDone": "Done!",
+    "actionDoneBody": "Action completed for {name}."
   },
   "adminPilotCoverage": {
     "title": "Pilot Coverage",
@@ -3434,6 +3437,21 @@
     "adminShifts": "Shifts",
     "emergency": "Emergency",
     "more": "More",
+    "menu": "Menu",
+    "myEquipment": "My Equipment",
+    "inventory": "Inventory",
+    "analytics": "Analytics",
+    "dashboard": "Dashboard",
+    "inventoryItems": "Inventory Items",
+    "procurement": "Purchase Orders",
+    "crashCart": "Crash Cart Check",
+    "qrPrint": "QR Print",
+    "whatsNew": "What's New",
+    "quickGuide": "Quick Guide",
+    "auditLog": "Audit Log",
+    "emergencyHistory": "Emergency Equipment History",
+    "settings": "Settings",
+    "reportBug": "Report a Bug",
     "tabBar": "Tab navigation"
   },
   "phoneSignIn": {
@@ -3712,14 +3730,17 @@
     }
   },
   "more": {
-    "title": "More",
+    "title": "Menu",
     "account": "Account",
     "profile": "My Profile",
     "language": "Language",
     "clinic": "Clinic",
     "about": "About VetTrack",
     "session": "Session",
-    "endShift": "End Shift"
+    "endShift": "End Shift",
+    "sectionOps": "Operations",
+    "sectionAdmin": "Admin",
+    "sectionRoutine": "Routine"
   },
   "scan": {
     "title": "Scan Equipment",

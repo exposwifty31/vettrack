@@ -15,7 +15,7 @@ export function ScanResultCard({ equipment, onDone, onPassToColleague }: Props) 
   return (
     <div
       style={{
-        background: "var(--card)",
+        background: "hsl(var(--card))",
         borderRadius: 16,
         padding: "20px 16px",
         display: "flex",
@@ -30,7 +30,7 @@ export function ScanResultCard({ equipment, onDone, onPassToColleague }: Props) 
             style={{
               fontSize: "var(--text-xl)",
               fontWeight: 700,
-              color: "var(--foreground)",
+              color: "hsl(var(--foreground))",
               margin: 0,
               lineHeight: 1.2,
             }}
@@ -42,7 +42,7 @@ export function ScanResultCard({ equipment, onDone, onPassToColleague }: Props) 
               style={{
                 fontFamily: "var(--font-num)",
                 fontSize: "var(--text-xs)",
-                color: "var(--muted-foreground)",
+                color: "hsl(var(--muted-foreground))",
                 margin: "4px 0 0",
               }}
             >
@@ -56,7 +56,7 @@ export function ScanResultCard({ equipment, onDone, onPassToColleague }: Props) 
       </div>
 
       {location && (
-        <p style={{ fontSize: "var(--text-sm)", color: "var(--muted-foreground)", margin: 0 }}>
+        <p style={{ fontSize: "var(--text-sm)", color: "hsl(var(--muted-foreground))", margin: 0 }}>
           📍 {location}
         </p>
       )}
@@ -86,9 +86,9 @@ export function ScanResultCard({ equipment, onDone, onPassToColleague }: Props) 
             flex: 1,
             height: 44,
             borderRadius: 10,
-            border: "1px solid var(--border)",
-            background: "var(--background)",
-            color: "var(--foreground)",
+            border: "1px solid hsl(var(--border))",
+            background: "hsl(var(--background))",
+            color: "hsl(var(--foreground))",
             fontSize: "var(--text-sm)",
             fontWeight: 600,
             cursor: "pointer",

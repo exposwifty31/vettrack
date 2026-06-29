@@ -4,6 +4,7 @@ import type { Locale as SharedLocale } from "../../lib/i18n/types";
 import enDict from "../../locales/en.json";
 import heDict from "../../locales/he.json";
 import { safeStorageGetItem, safeStorageSetItem } from "./safe-browser";
+import { isCapacitorNative } from "./capacitor-runtime";
 
 export type Locale = SharedLocale;
 export const LOCALE_STORAGE_KEY = "vettrack-locale";
@@ -51,6 +52,7 @@ export function getStoredLocale(): Locale {
   try {
     if (typeof window === "undefined") return "he";
     const stored = safeStorageGetItem(LOCALE_STORAGE_KEY);
+    if (!stored && isCapacitorNative()) return "he";
     return resolveClientLocale(stored);
   } catch {
     return "he";
@@ -317,6 +319,9 @@ const translations = {
     accountability: {
       title: d.equipmentDetail.accountability.title,
     },
+    takePhoto: d.equipmentDetail.takePhoto,
+    actionDone: d.equipmentDetail.actionDone,
+    actionDoneBody: d.equipmentDetail.actionDoneBody,
   },
 
   adminPilotCoverage: {

@@ -26,8 +26,8 @@ export function EquipmentMetaStrip({ equipment }: Props) {
             style={{
               fontFamily: "var(--font-num)",
               fontSize: "var(--text-xs)",
-              color: "var(--muted-foreground)",
-              background: "var(--muted)",
+              color: "hsl(var(--muted-foreground))",
+              background: "hsl(var(--muted))",
               borderRadius: 6,
               padding: "2px 8px",
             }}
@@ -41,7 +41,7 @@ export function EquipmentMetaStrip({ equipment }: Props) {
         <p
           style={{
             fontSize: "var(--text-sm)",
-            color: "var(--muted-foreground)",
+            color: "hsl(var(--muted-foreground))",
             margin: 0,
             lineHeight: 1.4,
           }}
@@ -54,7 +54,7 @@ export function EquipmentMetaStrip({ equipment }: Props) {
         <p
           style={{
             fontSize: "var(--text-xs)",
-            color: "var(--muted-foreground)",
+            color: "hsl(var(--muted-foreground))",
             margin: 0,
           }}
         >

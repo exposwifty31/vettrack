@@ -52,7 +52,7 @@ export function TransferSheet({ open, onClose, onTransfer }: Props) {
           left: 0,
           right: 0,
           zIndex: 50,
-          background: "var(--background)",
+          background: "hsl(var(--background))",
           borderRadius: "20px 20px 0 0",
           paddingBottom: "env(safe-area-inset-bottom)",
           maxHeight: "70vh",
@@ -60,13 +60,13 @@ export function TransferSheet({ open, onClose, onTransfer }: Props) {
           flexDirection: "column",
         }}
       >
-        <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid var(--border)" }}>
+        <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid hsl(var(--border))" }}>
           <div
             style={{
               width: 36,
               height: 4,
               borderRadius: 2,
-              background: "var(--muted)",
+              background: "hsl(var(--muted))",
               margin: "0 auto 12px",
             }}
           />
@@ -83,8 +83,8 @@ export function TransferSheet({ open, onClose, onTransfer }: Props) {
               width: "100%",
               height: 36,
               borderRadius: 8,
-              border: "1px solid var(--border)",
-              background: "var(--muted)",
+              border: "1px solid hsl(var(--border))",
+              background: "hsl(var(--muted))",
               padding: "0 12px",
               fontSize: "var(--text-sm)",
               outline: "none",
@@ -95,11 +95,11 @@ export function TransferSheet({ open, onClose, onTransfer }: Props) {
 
         <div style={{ overflowY: "auto", flex: 1, padding: "8px 0" }}>
           {isLoading ? (
-            <div style={{ padding: 24, textAlign: "center", color: "var(--muted-foreground)", fontSize: "var(--text-sm)" }}>
+            <div style={{ padding: 24, textAlign: "center", color: "hsl(var(--muted-foreground))", fontSize: "var(--text-sm)" }}>
               {t.scan.transfer.loading}
             </div>
           ) : filtered.length === 0 ? (
-            <div style={{ padding: 24, textAlign: "center", color: "var(--muted-foreground)", fontSize: "var(--text-sm)" }}>
+            <div style={{ padding: 24, textAlign: "center", color: "hsl(var(--muted-foreground))", fontSize: "var(--text-sm)" }}>
               {t.scan.transfer.noUsers}
             </div>
           ) : (
@@ -116,7 +116,7 @@ export function TransferSheet({ open, onClose, onTransfer }: Props) {
                   gap: 12,
                   background: "none",
                   border: "none",
-                  borderBottom: "1px solid var(--border)",
+                  borderBottom: "1px solid hsl(var(--border))",
                   cursor: "pointer",
                   textAlign: "start",
                   WebkitTapHighlightColor: "transparent",
@@ -140,10 +140,10 @@ export function TransferSheet({ open, onClose, onTransfer }: Props) {
                   {(user.displayName || user.name).charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--foreground)" }}>
+                  <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "hsl(var(--foreground))" }}>
                     {user.displayName || user.name}
                   </div>
-                  <div style={{ fontSize: "var(--text-xs)", color: "var(--muted-foreground)" }}>
+                  <div style={{ fontSize: "var(--text-xs)", color: "hsl(var(--muted-foreground))" }}>
                     {user.role}
                   </div>
                 </div>

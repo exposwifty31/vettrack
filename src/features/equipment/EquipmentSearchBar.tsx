@@ -23,7 +23,7 @@ export function EquipmentSearchBar({ value, onChange, placeholder }: Props) {
           insetInlineStart: 14,
           width: 16,
           height: 16,
-          color: "var(--muted-foreground)",
+          color: "hsl(var(--muted-foreground))",
           flexShrink: 0,
         }}
       />
@@ -38,9 +38,9 @@ export function EquipmentSearchBar({ value, onChange, placeholder }: Props) {
           width: "100%",
           height: 42,
           borderRadius: 9999,
-          border: "1px solid var(--border)",
-          background: "var(--background)",
-          color: "var(--foreground)",
+          border: "1px solid hsl(var(--border))",
+          background: "hsl(var(--background))",
+          color: "hsl(var(--foreground))",
           fontSize: "var(--text-sm)",
           paddingInlineStart: 40,
           paddingInlineEnd: value ? 40 : 16,
@@ -62,10 +62,10 @@ export function EquipmentSearchBar({ value, onChange, placeholder }: Props) {
             width: 24,
             height: 24,
             borderRadius: "50%",
-            background: "var(--muted)",
+            background: "hsl(var(--muted))",
             border: "none",
             cursor: "pointer",
-            color: "var(--muted-foreground)",
+            color: "hsl(var(--muted-foreground))",
           }}
         >
           <X style={{ width: 12, height: 12 }} aria-hidden />
