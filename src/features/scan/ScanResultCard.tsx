@@ -56,7 +56,7 @@ export function ScanResultCard({ equipment, onDone, onPassToColleague }: Props) 
       </div>
 
       {location && (
-        <p style={{ fontSize: "var(--text-sm)", color: "var(--muted-foreground)", margin: 0 }}>
+        <p style={{ fontSize: "var(--text-sm)", color: "hsl(var(--muted-foreground))", margin: 0 }}>
           📍 {location}
         </p>
       )}

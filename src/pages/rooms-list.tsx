@@ -66,7 +66,7 @@ function HealthRing({ total, recentlyVerified }: { total: number; recentlyVerifi
   if (total === 0) {
     return (
       <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 p-[2.5px]"
-        style={{ background: "var(--border)" }}
+        style={{ background: "hsl(var(--border))" }}
       >
         <div className="w-full h-full rounded-full bg-card flex items-center justify-center">
           <DoorOpen className="w-5 h-5 text-primary" />
@@ -87,7 +87,7 @@ function HealthRing({ total, recentlyVerified }: { total: number; recentlyVerifi
     <div className="relative shrink-0">
       <div
         className="w-11 h-11 rounded-full flex items-center justify-center p-[2.5px]"
-        style={{ background: `conic-gradient(${color} ${pct}%, var(--border) ${pct}%)` }}
+        style={{ background: `conic-gradient(${color} ${pct}%, hsl(var(--border)) ${pct}%)` }}
         title={`${pct}% of items verified in last 24h`}
       >
         <div className="w-full h-full rounded-full bg-card flex items-center justify-center">

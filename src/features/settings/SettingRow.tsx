@@ -27,12 +27,12 @@ export function SettingRow({ icon, label, value, destructive = false, onClick }:
         WebkitTapHighlightColor: "transparent",
         textAlign: "start",
       }}
-      onPointerDown={(e) => (e.currentTarget.style.background = "var(--muted)")}
+      onPointerDown={(e) => (e.currentTarget.style.background = "hsl(var(--muted))")}
       onPointerUp={(e) => (e.currentTarget.style.background = "transparent")}
       onPointerLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
       {icon && (
-        <span style={{ width: 20, height: 20, color: "var(--muted-foreground)", flexShrink: 0, display: "flex", alignItems: "center" }}>
+        <span style={{ width: 20, height: 20, color: "hsl(var(--muted-foreground))", flexShrink: 0, display: "flex", alignItems: "center" }}>
           {icon}
         </span>
       )}
@@ -41,20 +41,20 @@ export function SettingRow({ icon, label, value, destructive = false, onClick }:
           flex: 1,
           fontSize: "var(--text-sm)",
           fontWeight: 500,
-          color: destructive ? "var(--destructive)" : "var(--foreground)",
+          color: destructive ? "hsl(var(--destructive))" : "hsl(var(--foreground))",
         }}
       >
         {label}
       </span>
       {value && (
-        <span style={{ fontSize: "var(--text-xs)", color: "var(--muted-foreground)", marginInlineEnd: 4 }}>
+        <span style={{ fontSize: "var(--text-xs)", color: "hsl(var(--muted-foreground))", marginInlineEnd: 4 }}>
           {value}
         </span>
       )}
       <ChevronRight
         size={16}
         aria-hidden
-        style={{ color: "var(--muted-foreground)", flexShrink: 0 }}
+        style={{ color: "hsl(var(--muted-foreground))", flexShrink: 0 }}
       />
     </button>
   );
