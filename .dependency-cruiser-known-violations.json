@@ -754,10 +754,10 @@
     }
   },
   {
-    "type": "dependency",
-    "from": "src/shared/platform/PlatformRouter.tsx",
-    "to": "src/native/NativeShell.tsx",
-    "unresolvedTo": "@/native/NativeShell",
+    "type": "cycle",
+    "from": "src/hooks/use-auth.tsx",
+    "to": "src/lib/offline-sync-telemetry-reporter.ts",
+    "unresolvedTo": "@/lib/offline-sync-telemetry-reporter",
     "dependencyTypes": [
       "aliased",
       "aliased-tsconfig",
@@ -766,59 +766,47 @@
       "import"
     ],
     "rule": {
-      "severity": "error",
-      "name": "R1-shared-no-frameworks"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/shared/platform/PlatformRouter.tsx",
-    "to": "src/desktop/marketing/MarketingShell.tsx",
-    "unresolvedTo": "@/desktop/marketing/MarketingShell",
-    "dependencyTypes": [
-      "aliased",
-      "aliased-tsconfig",
-      "aliased-tsconfig-paths",
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "R1-shared-no-frameworks"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/shared/platform/index.ts",
-    "to": "src/lib/capacitor-runtime.ts",
-    "unresolvedTo": "@/lib/capacitor-runtime",
-    "dependencyTypes": [
-      "aliased",
-      "aliased-tsconfig",
-      "aliased-tsconfig-paths",
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "R1-shared-no-frameworks"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/core/use-cases/offline-emergency-block.ts",
-    "to": "src/lib/safe-browser.ts",
-    "unresolvedTo": "@/lib/safe-browser",
-    "dependencyTypes": [
-      "aliased",
-      "aliased-tsconfig",
-      "aliased-tsconfig-paths",
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "R1-shared-no-frameworks"
-    }
+      "severity": "warn",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/lib/offline-sync-telemetry-reporter.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/lib/api.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/hooks/useCodeBlueSession.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "type-import"
+        ]
+      },
+      {
+        "name": "src/hooks/use-auth.tsx",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      }
+    ]
   }
 ]

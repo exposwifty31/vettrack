@@ -1,2 +1,1 @@
-export { resolvePlatformTarget, usePlatformTarget } from "./platform/index";
-export type { PlatformTarget } from "./platform/index";
+// Platform utilities have moved to src/app/platform — import from @/app/platform directly.

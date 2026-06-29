@@ -5,7 +5,7 @@ import { AuthBootstrapSpinner } from "@/components/native-clerk-gate";
 import { RouteFallback } from "@/components/route-fallback";
 import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { useAuth } from "@/hooks/use-auth";
-import { usePlatformTarget } from "@/shared/platform";
+import { usePlatformTarget } from "@/app/platform";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { shouldShowPostSignupLanding } from "@/lib/post-signup-landing";
 
