@@ -3,11 +3,13 @@ import { ShiftActivityList } from "@/features/profile/ShiftActivityList";
 import { t } from "@/lib/i18n";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { BackChevron } from "@/components/ui/directional-chevron";
+import { AppShell } from "@/components/layout/AppShell";
 
 export default function MyProfilePage() {
   const native = isCapacitorNative();
 
   return (
+    <AppShell>
       <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "hsl(var(--background))" }}>
         {/* Header — only on native (web uses desktop shell nav) */}
         {native && (
@@ -63,5 +65,6 @@ export default function MyProfilePage() {
           <ShiftActivityList />
         </div>
       </div>
+    </AppShell>
   );
 }

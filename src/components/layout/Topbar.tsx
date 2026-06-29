@@ -6,6 +6,7 @@ import { useDirection } from "@/hooks/useDirection";
 import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
 import { NAV } from "@/lib/routes/nav-model";
 import { t } from "@/lib/i18n";
+import { getInitials } from "@/lib/user-utils";
 
 function navLabel(key: string): string {
   const k = key.startsWith("nav.") ? key.slice(4) : key;
@@ -79,17 +80,11 @@ function ShiftBadge({
 }
 
 function UserAvatar({ name }: { name: string | null }) {
-  const initials = name
-    ? name
-        .split(" ")
-        .map((p) => p[0])
-        .slice(0, 2)
-        .join("")
-        .toUpperCase()
-    : "??";
   return (
-    <div className="w-7 h-7 rounded-full bg-ivory-green flex items-center justify-center text-xs font-bold text-white select-none shrink-0">
-      {initials}
-    </div>
+    <Link href="/my-profile" aria-label={t.profile.title}>
+      <div className="w-7 h-7 rounded-full bg-ivory-green flex items-center justify-center text-xs font-bold text-white select-none shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
+        {getInitials(name)}
+      </div>
+    </Link>
   );
 }
