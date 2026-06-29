@@ -752,5 +752,73 @@
       "severity": "warn",
       "name": "no-features-to-pages-internals"
     }
+  },
+  {
+    "type": "dependency",
+    "from": "src/shared/platform/PlatformRouter.tsx",
+    "to": "src/native/NativeShell.tsx",
+    "unresolvedTo": "@/native/NativeShell",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "R1-shared-no-frameworks"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/shared/platform/PlatformRouter.tsx",
+    "to": "src/desktop/marketing/MarketingShell.tsx",
+    "unresolvedTo": "@/desktop/marketing/MarketingShell",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "R1-shared-no-frameworks"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/shared/platform/index.ts",
+    "to": "src/lib/capacitor-runtime.ts",
+    "unresolvedTo": "@/lib/capacitor-runtime",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "R1-shared-no-frameworks"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/core/use-cases/offline-emergency-block.ts",
+    "to": "src/lib/safe-browser.ts",
+    "unresolvedTo": "@/lib/safe-browser",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "R1-shared-no-frameworks"
+    }
   }
 ]
