@@ -1,5 +1,31 @@
+import { safeStorageGetItem } from "@/lib/safe-browser";
+
 interface WindowWithWebkitAudio extends Window {
   webkitAudioContext?: typeof AudioContext;
+}
+
+const SETTINGS_KEY = "vettrack-settings";
+
+function soundEnabled(): boolean {
+  try {
+    const raw = safeStorageGetItem(SETTINGS_KEY);
+    if (!raw) return true;
+    const parsed = JSON.parse(raw) as { soundEnabled?: boolean };
+    return parsed.soundEnabled !== false;
+  } catch {
+    return true;
+  }
+}
+
+function criticalSoundEnabled(): boolean {
+  try {
+    const raw = safeStorageGetItem(SETTINGS_KEY);
+    if (!raw) return true;
+    const parsed = JSON.parse(raw) as { criticalAlertsSound?: boolean };
+    return parsed.criticalAlertsSound !== false;
+  } catch {
+    return true;
+  }
 }
 
 let audioCtx: AudioContext | null = null;
@@ -26,6 +52,7 @@ function resumeContext(ctx: AudioContext): Promise<void> {
 }
 
 export async function playFeedbackTone(): Promise<void> {
+  if (!soundEnabled()) return;
   const ctx = getAudioContext();
   if (!ctx) return;
   await resumeContext(ctx);
@@ -49,6 +76,7 @@ export async function playFeedbackTone(): Promise<void> {
 }
 
 export async function playMuteTone(): Promise<void> {
+  if (!soundEnabled()) return;
   const ctx = getAudioContext();
   if (!ctx) return;
   await resumeContext(ctx);
@@ -72,6 +100,7 @@ export async function playMuteTone(): Promise<void> {
 }
 
 export async function playCriticalAlertTone(): Promise<void> {
+  if (!criticalSoundEnabled()) return;
   const ctx = getAudioContext();
   if (!ctx) return;
   await resumeContext(ctx);

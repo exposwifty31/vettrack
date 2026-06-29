@@ -19,9 +19,19 @@ const FULLSCREEN_ROUTES = ["/code-blue", "/crash-cart", "/scan", "/handoff"];
  *
  * Returns null for full-screen routes so those pages draw edge-to-edge.
  */
+function getInitials(name: string | null): string {
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join("");
+}
+
 export function NativeHeader() {
   const [location, navigate] = useLocation();
-  const { userId } = useAuth();
+  const { userId, name } = useAuth();
 
   const isFullscreen = FULLSCREEN_ROUTES.some((r) => location.startsWith(r));
 
@@ -103,6 +113,23 @@ export function NativeHeader() {
           style={iconBtn}
         >
           <Settings size={20} color="hsl(var(--foreground))" strokeWidth={1.8} />
+        </button>
+
+        <button
+          type="button"
+          aria-label={t.nav.profile}
+          onClick={() => navigate("/my-profile")}
+          style={{
+            ...iconBtn,
+            background: "hsl(var(--primary))",
+            borderRadius: "50%",
+            color: "hsl(var(--primary-foreground))",
+            fontSize: 13,
+            fontWeight: 700,
+            letterSpacing: "-0.01em",
+          }}
+        >
+          {getInitials(name)}
         </button>
 
         <button

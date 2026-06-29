@@ -3456,7 +3456,8 @@
     "auditLog": "Audit Log",
     "emergencyHistory": "Emergency Equipment History",
     "settings": "Settings",
-    "reportBug": "Report a Bug"
+    "reportBug": "Report a Bug",
+    "profile": "My Profile"
   },
   "phoneSignIn": {
     "title": "Phone Sign In",
@@ -3746,6 +3747,16 @@
     "sectionAdmin": "Admin",
     "sectionRoutine": "Routine",
     "settings": "Settings"
+  },
+  "profile": {
+    "title": "My Profile",
+    "editDisplayName": "Edit Display Name",
+    "displayNameUpdated": "Name updated",
+    "shiftActivity": "Shift Activity",
+    "noShiftActivity": "No shift activity yet",
+    "activeSession": "Active",
+    "duration": "{hours}h {minutes}m",
+    "durationMins": "{minutes}m"
   },
   "scan": {
     "title": "Scan Equipment",

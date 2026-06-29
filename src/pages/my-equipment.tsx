@@ -46,7 +46,7 @@ import {
 import { resolveMyEquipmentRecoveryBadgeKey } from "./my-equipment-recovery-labels";
 
 const MY_EQUIPMENT_SIDEBAR: SidebarItem[] = [
-  { href: "/my-equipment", icon: PackageOpen, label: "My equipment" },
+  { href: "/my-equipment", icon: PackageOpen, label: t.equipment.myEquipment },
 ];
 
 export default function MyEquipmentPage() {

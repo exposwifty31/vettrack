@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { setPostSignupLandingFlag } from "@/lib/post-signup-landing";
 import { Helmet } from "react-helmet-async";
 import { Loader2 } from "lucide-react";
 import { VetTrackMark } from "@/components/vettrack-mark";
@@ -21,7 +20,6 @@ export default function SignUpPage() {
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
-      setPostSignupLandingFlag();
       navigate("/", { replace: true });
     }
   }, [isLoaded, isSignedIn, navigate]);

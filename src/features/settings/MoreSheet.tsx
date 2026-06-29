@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import {
   LogOut, User,
-  Bell, MapPin, LayoutGrid, Settings, Clock,
+  Bell, MapPin, Settings, Clock,
   Home, Package, ListTodo, ShieldCheck, ShoppingCart,
   TrendingUp, Monitor, Box, ShoppingBag,
 } from "lucide-react";
@@ -107,7 +107,6 @@ export function MoreSheet({ open, onClose }: Props) {
         </div>
         <SettingRow icon={<Home         size={20} />} label={t.nav.today}             onClick={() => go("/home")} />
         <SettingRow icon={<Package      size={20} />} label={t.nav.equipment}         onClick={() => go("/equipment")} />
-        <SettingRow icon={<LayoutGrid   size={20} />} label={t.nav.board}             onClick={() => go("/equipment/board")} />
         <SettingRow icon={<ListTodo     size={20} />} label={t.nav.equipmentTasks}    onClick={() => go("/equipment/tasks")} />
         <SettingRow icon={<ShieldCheck  size={20} />} label={t.nav.criticalKitCheck}  onClick={() => go("/crash-cart")} />
         <SettingRow icon={<MapPin       size={20} />} label={t.nav.rooms}             onClick={() => go("/rooms")} />
@@ -141,6 +140,7 @@ export function MoreSheet({ open, onClose }: Props) {
             {t.more.account}
           </p>
         </div>
+        <SettingRow icon={<User size={20} />} label={t.more.profile} onClick={() => go("/my-profile")} />
         <SettingRow icon={<Settings size={20} />} label={t.more.settings} onClick={() => go("/settings")} />
 
         <div style={{ height: 1, background: "hsl(var(--border))", marginBlock: 8, marginInline: 20 }} />

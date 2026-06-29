@@ -1200,6 +1200,8 @@ const translations = {
 
   more: d.more,
 
+  profile: d.profile,
+
 } as const;
 
 return stripInternalKeys(translations) as typeof translations;

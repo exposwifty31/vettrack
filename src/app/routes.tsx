@@ -5,15 +5,13 @@ import { AuthBootstrapSpinner } from "@/components/native-clerk-gate";
 import { RouteFallback } from "@/components/route-fallback";
 import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { useAuth } from "@/hooks/use-auth";
-import { usePlatformTarget } from "@/app/platform";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
-import { shouldShowPostSignupLanding } from "@/lib/post-signup-landing";
+import { WebOnlyGuard } from "@/app/platform/guards/WebOnlyGuard";
 
 const CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
 // --- Always-available pages ---
 const HomePage = lazy(() => import("@/pages/home"));
-const LandingPage = lazy(() => import("@/pages/landing"));
 const SignUpPage = lazy(() => import("@/pages/signup"));
 const SignInPage = lazy(() => import("@/pages/signin"));
 const PrivacyPolicyPage = lazy(() => import("@/pages/privacy-policy"));
@@ -57,18 +55,17 @@ const ProcurementPage = lazy(() => import("@/pages/procurement"));
 const ShiftChatArchive = lazy(() =>
   import("@/features/shift-chat/components/ShiftChatArchive").then((m) => ({ default: m.ShiftChatArchive }))
 );
+const MyProfilePage = lazy(() => import("@/pages/my-profile"));
 
 function RedirectPreserveSearch({ to }: { to: string }) {
   const search = useSearch();
   return <Redirect to={`${to}${search}`} replace />;
 }
 
-/** `/` — marketing shell for guests; returning signed-in users go to `/home`; new signups see landing once (session flag). */
+/** `/` — signed-in users go to `/home`; everyone else goes to `/signin`. */
 function RootRoute() {
   const { isLoaded, isSignedIn, isOfflineSession } = useAuth();
-  const platform = usePlatformTarget();
 
-  // Bundled native shell only: skip marketing landing — sign-in has Clerk loading/error UI.
   if (isCapacitorNative() && CLERK_ENABLED && !isOfflineSession && !isSignedIn) {
     return <Redirect to="/signin" replace />;
   }
@@ -77,11 +74,11 @@ function RootRoute() {
     return isCapacitorNative() ? <AuthBootstrapSpinner /> : <RouteFallback />;
   }
 
-  if (isSignedIn && !shouldShowPostSignupLanding()) {
+  if (isSignedIn) {
     return <Redirect to="/home" />;
   }
 
-  return <LandingPage />;
+  return <Redirect to="/signin" replace />;
 }
 
 export function AppRoutes() {
@@ -91,7 +88,6 @@ export function AppRoutes() {
 
         {/* --- Auth & landing --- */}
         <Route path="/" component={RootRoute} />
-        <Route path="/landing" component={LandingPage} />
         <Route path="/signin/*?" component={SignInPage} />
         <Route path="/signup/*?" component={SignUpPage} />
         <Route path="/privacy" component={PrivacyPolicyPage} />
@@ -105,9 +101,9 @@ export function AppRoutes() {
         <Route path="/equipment"><AuthGuard><EquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/new"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/tasks"><AuthGuard><AppointmentsPage /></AuthGuard></Route>
-        <Route path="/equipment/board"><AuthGuard><WardDisplayPage /></AuthGuard></Route>
+        <Route path="/equipment/board"><AuthGuard><WebOnlyGuard><WardDisplayPage /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/equipment/:id/edit"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
-        <Route path="/equipment/:id/qr"><AuthGuard><EquipmentQrPrintPage /></AuthGuard></Route>
+        <Route path="/equipment/:id/qr"><AuthGuard><WebOnlyGuard><EquipmentQrPrintPage /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/equipment/:id"><AuthGuard><EquipmentDetailPage /></AuthGuard></Route>
         {/* Legacy aliases → canonicals */}
         <Route path="/appointments"><Redirect to="/equipment/tasks" replace /></Route>
@@ -120,15 +116,16 @@ export function AppRoutes() {
         <Route path="/equipment/intelligence"><Redirect to="/equipment" replace /></Route>
         <Route path="/alerts"><AuthGuard><AlertsPage /></AuthGuard></Route>
         <Route path="/my-equipment"><AuthGuard><MyEquipmentPage /></AuthGuard></Route>
+        <Route path="/my-profile"><AuthGuard><MyProfilePage /></AuthGuard></Route>
         <Route path="/rooms"><AuthGuard><RoomsListPage /></AuthGuard></Route>
         <Route path="/rooms/:id"><AuthGuard><RoomRadarPage /></AuthGuard></Route>
         <Route path="/locations"><AuthGuard><RoomsListPage /></AuthGuard></Route>
         <Route path="/locations/:id"><AuthGuard><RoomRadarPage /></AuthGuard></Route>
-        <Route path="/print"><AuthGuard><QrPrintPage /></AuthGuard></Route>
+        <Route path="/print"><AuthGuard><WebOnlyGuard><QrPrintPage /></WebOnlyGuard></AuthGuard></Route>
 
         {/* --- Emergency & safety --- */}
         <Route path="/code-blue"><AuthGuard><CodeBluePage /></AuthGuard></Route>
-        <Route path="/code-blue/display"><AuthGuard><CodeBlueDisplay /></AuthGuard></Route>
+        <Route path="/code-blue/display"><AuthGuard><WebOnlyGuard><CodeBlueDisplay /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/crash-cart"><AuthGuard><CrashCartCheckPage /></AuthGuard></Route>
         <Route path="/handoff"><AuthGuard><HandoffPage /></AuthGuard></Route>
         <Route path="/admin/code-blue-history"><AuthGuard><CodeBlueHistoryPage /></AuthGuard></Route>
@@ -146,18 +143,18 @@ export function AppRoutes() {
         <Route path="/admin/metrics"><AuthGuard><OperationalMetricsDashboardPage /></AuthGuard></Route>
         <Route path="/settings"><AuthGuard><SettingsPage /></AuthGuard></Route>
         <Route path="/help"><AuthGuard><HelpPage /></AuthGuard></Route>
-        <Route path="/audit-log"><AuthGuard><AuditLogPage /></AuthGuard></Route>
+        <Route path="/audit-log"><AuthGuard><WebOnlyGuard><AuditLogPage /></WebOnlyGuard></AuthGuard></Route>
         {/* Legacy admin aliases */}
         <Route path="/admin/medication-integrity"><Redirect to="/admin" replace /></Route>
 
         {/* --- Platform & analytics --- */}
         <Route path="/inventory"><AuthGuard><InventoryPage /></AuthGuard></Route>
-        <Route path="/inventory-items"><AuthGuard><InventoryItemsPage /></AuthGuard></Route>
-        <Route path="/procurement"><AuthGuard><ProcurementPage /></AuthGuard></Route>
+        <Route path="/inventory-items"><AuthGuard><WebOnlyGuard><InventoryItemsPage /></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/procurement"><AuthGuard><WebOnlyGuard><ProcurementPage /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/analytics/outcome-kpi"><Redirect to="/analytics" replace /></Route>
-        <Route path="/analytics/shift-leaderboard"><AuthGuard><ShiftLeaderboardPage /></AuthGuard></Route>
-        <Route path="/analytics"><AuthGuard><AnalyticsPage /></AuthGuard></Route>
-        <Route path="/dashboard"><AuthGuard><ManagementDashboardPage /></AuthGuard></Route>
+        <Route path="/analytics/shift-leaderboard"><AuthGuard><WebOnlyGuard><ShiftLeaderboardPage /></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/analytics"><AuthGuard><WebOnlyGuard><AnalyticsPage /></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/dashboard"><AuthGuard><WebOnlyGuard><ManagementDashboardPage /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/whats-new"><AuthGuard><WhatsNewPage /></AuthGuard></Route>
         <Route path="/shift-chat/:shiftId"><AuthGuard><ShiftChatArchive /></AuthGuard></Route>
         {/* Legacy aliases for removed pages → home (no broken nav) */}
