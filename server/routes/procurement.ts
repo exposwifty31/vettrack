@@ -2,7 +2,7 @@ import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { and, eq, desc, inArray, notInArray, sql } from "drizzle-orm";
-import { purchaseOrders, poLines, containerItems, inventoryLogs, inventoryItems, db } from "../db.js";
+import { purchaseOrders, poLines, containerItems, containers, inventoryLogs, inventoryItems, db } from "../db.js";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
@@ -302,57 +302,47 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
           delta: effectiveDelta,
         });
 
-        // Upsert containerItems quantity
-        const [updatedCi] = await tx
-          .update(containerItems)
-          .set({ quantity: sql`${containerItems.quantity} + ${effectiveDelta}`, updatedAt: new Date() })
-          .where(and(
-            eq(containerItems.containerId, incoming.containerId),
-            eq(containerItems.itemId, currentLine.itemId),
-            eq(containerItems.clinicId, clinicId),
-          ))
+        // Validate the destination container belongs to this clinic.
+        const [targetContainer] = await tx
+          .select({ id: containers.id })
+          .from(containers)
+          .where(and(eq(containers.id, incoming.containerId), eq(containers.clinicId, clinicId)))
+          .limit(1);
+        if (!targetContainer) {
+          throw Object.assign(new Error("CONTAINER_NOT_FOUND"), { containerId: incoming.containerId });
+        }
+
+        // Atomic upsert — avoids the update-then-insert race on the unique key
+        // (containerId, itemId). Returns the final row so we can derive quantityBefore.
+        const [ciRow] = await tx
+          .insert(containerItems)
+          .values({
+            id: randomUUID(),
+            clinicId,
+            containerId: incoming.containerId,
+            itemId: currentLine.itemId,
+            quantity: effectiveDelta,
+          })
+          .onConflictDoUpdate({
+            target: [containerItems.containerId, containerItems.itemId],
+            set: {
+              quantity: sql`${containerItems.quantity} + ${effectiveDelta}`,
+              updatedAt: new Date(),
+            },
+          })
           .returning();
 
-        if (updatedCi) {
-          await tx.insert(inventoryLogs).values({
-            id: randomUUID(),
-            clinicId,
-            containerId: incoming.containerId,
-            logType: "restock",
-            quantityBefore: updatedCi.quantity - effectiveDelta,
-            quantityAdded: effectiveDelta,
-            quantityAfter: updatedCi.quantity,
-            note: `Received via PO ${req.params.id}`,
-            createdByUserId: userId,
-          });
-        } else {
-          try {
-            await tx.insert(containerItems).values({
-              id: randomUUID(),
-              clinicId,
-              containerId: incoming.containerId,
-              itemId: currentLine.itemId,
-              quantity: effectiveDelta,
-            });
-          } catch (ciErr) {
-            if (isCheckViolation(ciErr)) {
-              throw toInventoryConstraintError(ciErr);
-            }
-            throw ciErr;
-          }
-
-          await tx.insert(inventoryLogs).values({
-            id: randomUUID(),
-            clinicId,
-            containerId: incoming.containerId,
-            logType: "restock",
-            quantityBefore: 0,
-            quantityAdded: effectiveDelta,
-            quantityAfter: effectiveDelta,
-            note: `Received via PO ${req.params.id}`,
-            createdByUserId: userId,
-          });
-        }
+        await tx.insert(inventoryLogs).values({
+          id: randomUUID(),
+          clinicId,
+          containerId: incoming.containerId,
+          logType: "restock",
+          quantityBefore: ciRow.quantity - effectiveDelta,
+          quantityAdded: effectiveDelta,
+          quantityAfter: ciRow.quantity,
+          note: `Received via PO ${req.params.id}`,
+          createdByUserId: userId,
+        });
       }
 
       // Refresh lines and determine new PO status.
@@ -423,6 +413,12 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
     if (isCheckViolation(err) && handleCheckViolation(err, res)) {
       return;
     }
+    if (err instanceof Error && err.message === "CONCURRENT_MODIFICATION") {
+      return res.status(409).json(apiError({ code: "CONFLICT", reason: "CONCURRENT_MODIFICATION", message: "Order status changed concurrently", requestId }));
+    }
+    if (err instanceof Error && err.message === "CONTAINER_NOT_FOUND") {
+      return res.status(422).json(apiError({ code: "INVALID_INPUT", reason: "CONTAINER_NOT_FOUND", message: "Destination container not found or does not belong to this clinic", requestId }));
+    }
     console.error(err);
     res.status(500).json(apiError({ code: "INTERNAL_ERROR", reason: "PO_RECEIVE_FAILED", message: "Failed to receive purchase order", requestId }));
   }
@@ -459,7 +455,7 @@ router.patch("/:id/cancel", requireAuth, requireAdmin, validateUuid("id"), async
     const [updated] = await db
       .update(purchaseOrders)
       .set({ status: "cancelled", updatedAt: new Date() })
-      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id), notInArray(purchaseOrders.status, ["received", "cancelled"])))
+      .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id), inArray(purchaseOrders.status, ["draft", "ordered"])))
       .returning();
     if (!updated) {
       return res.status(409).json(apiError({ code: "CONFLICT", reason: "CONCURRENT_MODIFICATION", message: "Order status changed concurrently", requestId }));

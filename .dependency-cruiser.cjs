@@ -36,7 +36,7 @@ module.exports = {
     {
       name: "R1-shared-no-frameworks",
       comment: "src/core and src/shared must stay framework-free (no React, Capacitor, router, ORM, or framework-bound local-path imports)",
-      severity: "warn",
+      severity: "error",
       from: { path: "^src/(core|shared)/" },
       to: {
         path: "^(src/(app|components|desktop|features|hooks|lib|native|pages)/|@ionic/|@capacitor/|react(/|$)|react-dom(/|$)|wouter(/|$)|dexie(/|$)|drizzle-orm(/|$)|express(/|$))",

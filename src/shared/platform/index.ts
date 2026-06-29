@@ -34,8 +34,9 @@ export function isMarketingPath(): boolean {
  *   desktop   — everything else (wide viewport, pointer device)
  */
 export function resolvePlatformTarget(): PlatformTarget {
-  if (isCapacitorNative() || isTouchNarrow()) return "mobile";
+  if (isCapacitorNative()) return "mobile";
   if (isMarketingPath()) return "marketing";
+  if (isTouchNarrow()) return "mobile";
   return "desktop";
 }
 
@@ -58,7 +59,8 @@ export function usePlatformTarget(): PlatformTarget {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  if (isCapacitorNative() || touchNarrow) return "mobile";
+  if (isCapacitorNative()) return "mobile";
   if (isMarketingPathname(pathname)) return "marketing";
+  if (touchNarrow) return "mobile";
   return "desktop";
 }

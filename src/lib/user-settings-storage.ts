@@ -74,16 +74,13 @@ export function getStoredUserSettings(): UserSettings {
     if (typeof parsed._v !== "number" && parsed.darkMode === true) {
       parsed.darkMode = false;
     }
-    return { ...DEFAULT_USER_SETTINGS, ...parsed };
+    const { _v: _storedSchemaVersion, ...storedSettings } = parsed;
+    return { ...DEFAULT_USER_SETTINGS, ...storedSettings };
   } catch {
     return DEFAULT_USER_SETTINGS;
   }
 }
 
 export function saveStoredUserSettings(settings: UserSettings): void {
-  try {
-    safeStorageSetItem(USER_SETTINGS_STORAGE_KEY, JSON.stringify({ ...settings, _v: SETTINGS_SCHEMA_VERSION }));
-  } catch {
-    // ignore quota / private-mode failures
-  }
+  safeStorageSetItem(USER_SETTINGS_STORAGE_KEY, JSON.stringify({ ...settings, _v: SETTINGS_SCHEMA_VERSION }));
 }

@@ -1821,7 +1821,7 @@ function EquipmentDetailPageDesktop() {
                   data-testid="btn-report-issue-photo"
                 >
                   <Camera className="w-6 h-6" />
-                  <span className="text-sm font-medium">Take / Upload Photo</span>
+                  <span className="text-sm font-medium">{t.equipmentDetail.takePhoto}</span>
                 </button>
               )}
               <input

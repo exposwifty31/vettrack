@@ -6,6 +6,7 @@ import { RouteFallback } from "@/components/route-fallback";
 import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { useAuth } from "@/hooks/use-auth";
 import { usePlatformTarget } from "@/shared/platform";
+import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { shouldShowPostSignupLanding } from "@/lib/post-signup-landing";
 
 const CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
@@ -67,13 +68,13 @@ function RootRoute() {
   const { isLoaded, isSignedIn, isOfflineSession } = useAuth();
   const platform = usePlatformTarget();
 
-  // Bundled native shell: skip marketing landing — sign-in has Clerk loading/error UI.
-  if (platform === "mobile" && CLERK_ENABLED && !isOfflineSession && !isSignedIn) {
+  // Bundled native shell only: skip marketing landing — sign-in has Clerk loading/error UI.
+  if (isCapacitorNative() && CLERK_ENABLED && !isOfflineSession && !isSignedIn) {
     return <Redirect to="/signin" replace />;
   }
 
   if (!isLoaded && !isOfflineSession) {
-    return platform === "mobile" ? <AuthBootstrapSpinner /> : <RouteFallback />;
+    return isCapacitorNative() ? <AuthBootstrapSpinner /> : <RouteFallback />;
   }
 
   if (isSignedIn && !shouldShowPostSignupLanding()) {

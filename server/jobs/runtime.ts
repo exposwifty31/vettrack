@@ -208,7 +208,6 @@ async function startPilotWorker(
             sourceQueue: queueName,
             jobId: job.id,
             jobName: job.name,
-            data: job.data,
             failedReason: error.message,
             attemptsMade: job.attemptsMade,
             failedAt: new Date().toISOString(),

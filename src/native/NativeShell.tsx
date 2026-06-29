@@ -45,7 +45,7 @@ export function NativeShell({ children }: Props) {
           {children}
         </div>
 
-        <NfcForegroundScan />
+        {!moreOpen && <NfcForegroundScan />}
 
         <NativeTabBar
           onMorePress={() => setMoreOpen(true)}

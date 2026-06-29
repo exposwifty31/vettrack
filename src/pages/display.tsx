@@ -339,8 +339,8 @@ function CommandBoard({
 
         {/* LIVE badge */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className="w-2 h-2 rounded-full bg-[hsl(hsl(var(--status-ok)))] motion-safe:animate-pulse" aria-hidden />
-          <span className="vt-text-xs font-bold uppercase tracking-widest text-[hsl(hsl(var(--status-ok)))]">
+          <span className="w-2 h-2 rounded-full bg-[hsl(var(--status-ok))] motion-safe:animate-pulse" aria-hidden />
+          <span className="vt-text-xs font-bold uppercase tracking-widest text-[hsl(var(--status-ok))]">
             {t.board.live}
           </span>
         </div>

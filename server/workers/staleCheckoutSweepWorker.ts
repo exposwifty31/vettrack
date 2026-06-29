@@ -62,6 +62,8 @@ export async function runStaleCheckoutSweep(now = new Date()): Promise<{ scanned
     const { title, body } = await resolveStaleCheckoutPushCopy(clinicId, holderId);
 
     // Phase A — short eligibility transaction (holds advisory lock only while reading acks)
+    // NOTE: hashtextextended is not backward-compatible with hashtext. Drain old workers
+    // before deploying this version in a rolling deploy to avoid split-brain locking.
     type Eligibility = { clinicId: string; holderId: string; equipmentId: string; title: string; body: string };
     const eligibility = await db.transaction(async (tx): Promise<Eligibility | null> => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${row.id}, 0))`);
