@@ -263,8 +263,6 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
 
     await db.transaction(async (tx) => {
       for (const incoming of b.lines) {
-        if (incoming.quantityReceived <= 0) continue;
-
         // Lock the row and read current state — FOR UPDATE prevents concurrent
         // over-receives and gives us the before value for the audit log.
         const [currentLine] = await tx
@@ -280,6 +278,9 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
         if (!currentLine) {
           throw new Error("PO_LINE_NOT_FOUND");
         }
+
+        // Skip after validation so an invalid lineId is never silently ignored.
+        if (incoming.quantityReceived <= 0) continue;
 
         const remaining = currentLine.quantityOrdered - currentLine.quantityReceived;
         if (remaining <= 0) continue; // line already fully received
@@ -334,6 +335,12 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
             setWhere: eq(containerItems.clinicId, clinicId),
           })
           .returning();
+
+        // setWhere suppresses the update when the conflicting row belongs to a
+        // different clinic — no row is returned. Treat this as a tenant violation.
+        if (!ciRow) {
+          throw Object.assign(new Error("CONTAINER_NOT_FOUND"), { containerId: incoming.containerId });
+        }
 
         await tx.insert(inventoryLogs).values({
           id: randomUUID(),

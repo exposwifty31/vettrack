@@ -61,7 +61,7 @@ module.exports = {
       comment: "Server workers/jobs must not import frontend source, React, or browser-only packages",
       severity: "error",
       from: { path: "^server/(workers|jobs)/" },
-      to: { path: "^src/|^(react|react-dom|@capacitor/|@ionic/|wouter|dexie)(/|$)" },
+      to: { path: "^src/|^(react|react-dom|wouter|dexie|@capacitor|@ionic)(/|$)" },
     },
     {
       name: "no-circular",
