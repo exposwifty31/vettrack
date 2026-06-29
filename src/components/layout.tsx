@@ -159,6 +159,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   const navLockToastDebounceRef = useRef(false);
   const prevAlertCountRef = useRef(0);
   const prevCriticalCountRef = useRef<number | null>(null);
+  const soundToggleRequestIdRef = useRef(0);
   const { isAdmin, role, userId, effectiveRole } = useAuth();
   const resolvedNavRole = String(effectiveRole ?? role ?? "").trim().toLowerCase();
   const { pendingCount, failedCount, isSyncing, justSynced, triggerSync } = useSync();
@@ -727,6 +728,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   };
 
   const handleSoundToggle = async (v: boolean) => {
+    const requestId = ++soundToggleRequestIdRef.current;
     if (v) {
       update({ soundEnabled: true });
       await playFeedbackTone().catch((err) => {
@@ -738,7 +740,9 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
       } catch (err) {
         console.warn("[layout] playMuteTone failed", err);
       } finally {
-        update({ soundEnabled: false });
+        if (soundToggleRequestIdRef.current === requestId) {
+          update({ soundEnabled: false });
+        }
       }
     }
   };
