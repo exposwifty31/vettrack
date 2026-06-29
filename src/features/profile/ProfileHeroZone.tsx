@@ -4,10 +4,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { t } from "@/lib/i18n";
 import { api } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 function getInitials(name: string | null): string {
-  if (!name) return "?";
+  if (!name?.trim()) return "?";
   return name
+    .trim()
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
@@ -16,16 +18,8 @@ function getInitials(name: string | null): string {
 }
 
 function roleLabel(role: string): string {
-  const map: Record<string, string> = {
-    admin: "Admin",
-    vet: "Vet",
-    senior_technician: "Senior Tech",
-    lead_technician: "Lead Tech",
-    vet_tech: "Vet Tech",
-    technician: "Technician",
-    student: "Student",
-  };
-  return map[role] ?? role;
+  const roles = t.profile.roles as Record<string, string>;
+  return roles[role] ?? role;
 }
 
 export function ProfileHeroZone() {
@@ -47,9 +41,11 @@ export function ProfileHeroZone() {
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
+      setEditing(false);
+    } catch {
+      toast.error(t.profile.saveError);
     } finally {
       setSaving(false);
-      setEditing(false);
     }
   }
 
@@ -90,6 +86,7 @@ export function ProfileHeroZone() {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <input
             autoFocus
+            aria-label={t.profile.editDisplayName}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") handleCancel(); }}
@@ -106,10 +103,10 @@ export function ProfileHeroZone() {
               minWidth: 140,
             }}
           />
-          <button type="button" onClick={handleSave} disabled={saving} aria-label="Save" style={iconActionBtn}>
+          <button type="button" onClick={handleSave} disabled={saving} aria-label={t.common.save} style={iconActionBtn}>
             <Check size={16} color="hsl(var(--primary))" />
           </button>
-          <button type="button" onClick={handleCancel} aria-label="Cancel" style={iconActionBtn}>
+          <button type="button" onClick={handleCancel} aria-label={t.common.cancel} style={iconActionBtn}>
             <X size={16} color="hsl(var(--muted-foreground))" />
           </button>
         </div>

@@ -3738,11 +3738,22 @@
     "title": "הפרופיל שלי",
     "editDisplayName": "ערוך שם תצוגה",
     "displayNameUpdated": "השם עודכן",
+    "saveError": "לא ניתן לעדכן את השם. נסה שוב.",
     "shiftActivity": "פעילות משמרות",
     "noShiftActivity": "אין פעילות משמרות עדיין",
+    "shiftActivityError": "לא ניתן לטעון פעילות משמרות.",
     "activeSession": "פעיל",
     "duration": "{hours}ש׳ {minutes}ד׳",
-    "durationMins": "{minutes}ד׳"
+    "durationMins": "{minutes}ד׳",
+    "roles": {
+      "admin": "מנהל",
+      "vet": "וטרינר",
+      "senior_technician": "טכנאי בכיר",
+      "lead_technician": "טכנאי ראשי",
+      "vet_tech": "טכנאי וטרינרי",
+      "technician": "טכנאי",
+      "student": "סטודנט"
+    }
   },
   "scan": {
     "title": "סריקת ציוד",

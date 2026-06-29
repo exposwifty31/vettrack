@@ -20,8 +20,9 @@ const FULLSCREEN_ROUTES = ["/code-blue", "/crash-cart", "/scan", "/handoff"];
  * Returns null for full-screen routes so those pages draw edge-to-edge.
  */
 function getInitials(name: string | null): string {
-  if (!name) return "?";
+  if (!name?.trim()) return "?";
   return name
+    .trim()
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)

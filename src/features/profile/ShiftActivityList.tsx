@@ -24,7 +24,7 @@ function formatTime(iso: string): string {
 export function ShiftActivityList() {
   const { userId } = useAuth();
 
-  const { data: sessions, isLoading } = useQuery<ShiftActivityItem[]>({
+  const { data: sessions, isLoading, isError, refetch } = useQuery<ShiftActivityItem[]>({
     queryKey: ["/api/users/me/shift-activity"],
     queryFn: api.users.shiftActivity,
     enabled: !!userId,
@@ -60,7 +60,30 @@ export function ShiftActivityList() {
         </div>
       )}
 
-      {!isLoading && (!sessions || sessions.length === 0) && (
+      {!isLoading && isError && (
+        <div style={{ paddingInline: 20, paddingBlock: 24, textAlign: "center" }}>
+          <p style={{ fontSize: 14, color: "hsl(var(--destructive))", margin: 0 }}>
+            {t.profile.shiftActivityError}
+          </p>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            style={{
+              marginTop: 8,
+              fontSize: 13,
+              color: "hsl(var(--primary))",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            {t.common.tryAgain}
+          </button>
+        </div>
+      )}
+
+      {!isLoading && !isError && (!sessions || sessions.length === 0) && (
         <div style={{ paddingInline: 20, paddingBlock: 24, textAlign: "center" }}>
           <p style={{ fontSize: 14, color: "hsl(var(--muted-foreground))", margin: 0 }}>
             {t.profile.noShiftActivity}
@@ -68,7 +91,7 @@ export function ShiftActivityList() {
         </div>
       )}
 
-      {!isLoading && sessions && sessions.length > 0 && (
+      {!isLoading && !isError && sessions && sessions.length > 0 && (
         <div style={{ paddingInline: 16, paddingBottom: 24 }}>
           {sessions.map((session) => (
             <SessionRow key={session.id} session={session} />

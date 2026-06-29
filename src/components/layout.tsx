@@ -158,7 +158,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   const [dispenseContainerId, setDispenseContainerId] = useState<string | null>(null);
   const navLockToastDebounceRef = useRef(false);
   const prevAlertCountRef = useRef(0);
-  const prevCriticalCountRef = useRef(0);
+  const prevCriticalCountRef = useRef<number | null>(null);
   const { isAdmin, role, userId, effectiveRole } = useAuth();
   const resolvedNavRole = String(effectiveRole ?? role ?? "").trim().toLowerCase();
   const { pendingCount, failedCount, isSyncing, justSynced, triggerSync } = useSync();
@@ -449,7 +449,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   }, [alertCount]);
 
   useEffect(() => {
-    if (criticalCount > prevCriticalCountRef.current) {
+    if (prevCriticalCountRef.current !== null && criticalCount > prevCriticalCountRef.current) {
       haptics.warning();
       void playCriticalAlertTone();
     }

@@ -77,7 +77,7 @@ export default function CrashCartCheckPage() {
   });
 
   const submit = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ wasAllChecked: _wasAllChecked }: { wasAllChecked: boolean }) => {
       const items = cartItems.map((i) => ({ key: i.key, label: i.label, checked: !!checked[i.id] }));
       const res = await authFetch("/api/crash-cart/checks", {
         method: "POST",
@@ -87,10 +87,10 @@ export default function CrashCartCheckPage() {
       if (!res.ok) throw new Error("submit failed");
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, { wasAllChecked }) => {
       setSubmitted(true);
       queryClient.invalidateQueries({ queryKey: ["/api/crash-cart/checks/latest"] });
-      if (allChecked) haptics.scanSuccess();
+      if (wasAllChecked) haptics.scanSuccess();
     },
     onError: () => {
       toast.error(t.crashCart.saveError);
@@ -265,7 +265,7 @@ export default function CrashCartCheckPage() {
           <Button
             className="mt-4 w-full"
             variant={allChecked ? "default" : "outline"}
-            onClick={() => submit.mutate()}
+            onClick={() => submit.mutate({ wasAllChecked: allChecked })}
             disabled={submit.isPending || cartItems.length === 0}
           >
             {allChecked ? t.crashCart.saveAllOk : t.crashCart.saveWithMissing}

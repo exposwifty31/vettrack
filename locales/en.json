@@ -3752,11 +3752,22 @@
     "title": "My Profile",
     "editDisplayName": "Edit Display Name",
     "displayNameUpdated": "Name updated",
+    "saveError": "Could not update name. Please try again.",
     "shiftActivity": "Shift Activity",
     "noShiftActivity": "No shift activity yet",
+    "shiftActivityError": "Could not load shift activity.",
     "activeSession": "Active",
     "duration": "{hours}h {minutes}m",
-    "durationMins": "{minutes}m"
+    "durationMins": "{minutes}m",
+    "roles": {
+      "admin": "Admin",
+      "vet": "Vet",
+      "senior_technician": "Senior Tech",
+      "lead_technician": "Lead Tech",
+      "vet_tech": "Vet Tech",
+      "technician": "Technician",
+      "student": "Student"
+    }
   },
   "scan": {
     "title": "Scan Equipment",

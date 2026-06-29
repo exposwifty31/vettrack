@@ -59,12 +59,8 @@ import type {
 import type { OutcomeKpiRoiResponse } from "../../shared/er-types.js";
 import type { AuthoritySnapshot } from "../../shared/authority.js";
 
-export type ShiftActivityItem = {
-  id: string;
-  startedAt: string;
-  endedAt: string | null;
-  note: string | null;
-};
+import type { ShiftActivityItem } from "@/types";
+export type { ShiftActivityItem };
 
 import { getStoredLocale, t } from "@/lib/i18n";
 import { toast } from "sonner";

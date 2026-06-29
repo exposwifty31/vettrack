@@ -75,7 +75,7 @@ function RootRoute() {
   }
 
   if (isSignedIn) {
-    return <Redirect to="/home" />;
+    return <Redirect to="/home" replace />;
   }
 
   return <Redirect to="/signin" replace />;
@@ -131,7 +131,7 @@ export function AppRoutes() {
         <Route path="/admin/code-blue-history"><AuthGuard><CodeBlueHistoryPage /></AuthGuard></Route>
         {/* Legacy aliases */}
         <Route path="/emergency-equipment-log"><AuthGuard><CodeBluePage /></AuthGuard></Route>
-        <Route path="/emergency-equipment-wall"><AuthGuard><CodeBlueDisplay /></AuthGuard></Route>
+        <Route path="/emergency-equipment-wall"><AuthGuard><WebOnlyGuard><CodeBlueDisplay /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/critical-kit-check"><AuthGuard><CrashCartCheckPage /></AuthGuard></Route>
         <Route path="/emergency-equipment-history"><AuthGuard><CodeBlueHistoryPage /></AuthGuard></Route>
 

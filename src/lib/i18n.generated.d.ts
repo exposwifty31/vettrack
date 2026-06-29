@@ -3755,11 +3755,22 @@ export interface TStructure {
     title: string;
     editDisplayName: string;
     displayNameUpdated: string;
+    saveError: string;
     shiftActivity: string;
     noShiftActivity: string;
+    shiftActivityError: string;
     activeSession: string;
     duration: string;
     durationMins: string;
+    roles: {
+      admin: string;
+      vet: string;
+      senior_technician: string;
+      lead_technician: string;
+      vet_tech: string;
+      technician: string;
+      student: string;
+    };
   };
   scan: {
     title: string;

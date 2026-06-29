@@ -2,11 +2,9 @@ import { ProfileHeroZone } from "@/features/profile/ProfileHeroZone";
 import { ShiftActivityList } from "@/features/profile/ShiftActivityList";
 import { t } from "@/lib/i18n";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
-import { useLocation } from "wouter";
 import { BackChevron } from "@/components/ui/directional-chevron";
 
 export default function MyProfilePage() {
-  const [, navigate] = useLocation();
   const native = isCapacitorNative();
 
   return (
@@ -14,6 +12,7 @@ export default function MyProfilePage() {
         {/* Header — only on native (web uses desktop shell nav) */}
         {native && (
           <div style={{
+            position: "relative",
             display: "flex",
             alignItems: "center",
             paddingInline: 8,
@@ -27,8 +26,8 @@ export default function MyProfilePage() {
           }}>
             <button
               type="button"
-              onClick={() => navigate(-1 as unknown as string)}
-              aria-label="Back"
+              onClick={() => { window.history.back(); }}
+              aria-label={t.common.back}
               style={{
                 width: 36,
                 height: 36,

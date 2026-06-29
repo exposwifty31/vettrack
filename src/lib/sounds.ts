@@ -12,7 +12,8 @@ function soundEnabled(): boolean {
     if (!raw) return true;
     const parsed = JSON.parse(raw) as { soundEnabled?: boolean };
     return parsed.soundEnabled !== false;
-  } catch {
+  } catch (err) {
+    console.warn("[sounds] failed to parse settings:", err);
     return true;
   }
 }
@@ -21,9 +22,10 @@ function criticalSoundEnabled(): boolean {
   try {
     const raw = safeStorageGetItem(SETTINGS_KEY);
     if (!raw) return true;
-    const parsed = JSON.parse(raw) as { criticalAlertsSound?: boolean };
-    return parsed.criticalAlertsSound !== false;
-  } catch {
+    const parsed = JSON.parse(raw) as { soundEnabled?: boolean; criticalAlertsSound?: boolean };
+    return parsed.soundEnabled !== false && parsed.criticalAlertsSound !== false;
+  } catch (err) {
+    console.warn("[sounds] failed to parse settings:", err);
     return true;
   }
 }

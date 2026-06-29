@@ -1,4 +1,5 @@
 export * from "./platform.js";
+export * from "./users.js";
 export type { HospitalizationStatus } from "./patients.js";
 export * from "./equipment.js";
 export * from "./tasks.js";
