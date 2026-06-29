@@ -701,10 +701,13 @@ export default function WardDisplayPage() {
               className="rounded-lg border border-ivory-border bg-[rgb(var(--ivory-surface))] px-3 py-2.5 flex items-center gap-3 min-h-11"
             >
               <span className="flex-1 vt-text-sm font-semibold text-ivory-text">{eq.name}</span>
-              <span className={cn(
-                "vt-text-xs font-bold px-2 py-0.5 rounded border",
-                eq.isDeployable ? STATUS_BG.ready : STATUS_BG.blocked,
-              )}>
+              <span
+                data-testid={`ward-display-equipment-deployable-${eq.id}`}
+                className={cn(
+                  "vt-text-xs font-bold px-2 py-0.5 rounded border",
+                  eq.isDeployable ? STATUS_BG.ready : STATUS_BG.blocked,
+                )}
+              >
                 {eq.isDeployable ? t.board.deployable : t.board.notDeployable}
               </span>
             </div>

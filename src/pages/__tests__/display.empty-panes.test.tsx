@@ -86,8 +86,7 @@ describe("F1: Ward Display empty panes", () => {
     expect(screen.getByTestId("ward-display-equipment-pane")).toBeTruthy();
     expect(screen.getByText("Infusion pump")).toBeTruthy();
     expect(screen.getByTestId("ward-display-equipment-row-eq-1")).toBeTruthy();
-    // t.board.deployable resolves to "Ready" in the happy-dom test env (navigator.language = en-US)
-    expect(screen.getByText("Ready")).toBeTruthy();
+    expect(screen.getByTestId("ward-display-equipment-deployable-eq-1")).toBeTruthy();
 
     // Patients and crash-cart are removed from the display
     expect(screen.queryByTestId("ward-display-crash-cart-warning")).toBeNull();

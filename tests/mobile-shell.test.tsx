@@ -46,6 +46,7 @@ vi.mock("@/components/layout/PageShell", () => ({
   ),
 }));
 vi.mock("@/lib/routes/nav-model", () => ({ NAV: [] }));
+vi.mock("@/native/NativeHeader", () => ({ NativeHeader: () => null }));
 
 afterEach(() => cleanup());
 

@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { computeAlerts } from "@/lib/utils";
 import { buildAlertAckSet, countActiveAlerts } from "@/lib/alert-counts";
+import { t } from "@/lib/i18n";
 
 /** Routes that own their own top chrome — hide the shared header for these. */
 const FULLSCREEN_ROUTES = ["/code-blue", "/crash-cart", "/scan", "/handoff"];
@@ -97,7 +98,7 @@ export function NativeHeader() {
       <div style={{ display: "flex", gap: 4, marginInlineStart: "auto" }}>
         <button
           type="button"
-          aria-label="הגדרות"
+          aria-label={t.nav.settings}
           onClick={() => navigate("/settings")}
           style={iconBtn}
         >
@@ -106,14 +107,14 @@ export function NativeHeader() {
 
         <button
           type="button"
-          aria-label="התראות"
+          aria-label={t.nav.alerts}
           onClick={() => navigate("/alerts")}
           style={{ ...iconBtn, position: "relative" }}
         >
           <Bell size={20} color="hsl(var(--foreground))" strokeWidth={1.8} />
           {alertCount > 0 && (
             <span
-              aria-label={`${alertCount} התראות`}
+              aria-label={`${alertCount} ${t.nav.alerts}`}
               style={{
                 position: "absolute",
                 top: 2,
