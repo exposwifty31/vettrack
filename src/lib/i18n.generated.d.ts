@@ -3442,6 +3442,11 @@ export interface TStructure {
     more: string;
     menu: string;
     myEquipment: string;
+    tabBar: string;
+    operationsSection: string;
+    managementSection: string;
+    criticalKitCheck: string;
+    mine: string;
     inventory: string;
     analytics: string;
     dashboard: string;
@@ -3455,7 +3460,7 @@ export interface TStructure {
     emergencyHistory: string;
     settings: string;
     reportBug: string;
-    tabBar: string;
+    profile: string;
   };
   phoneSignIn: {
     title: string;
@@ -3744,6 +3749,28 @@ export interface TStructure {
     sectionOps: string;
     sectionAdmin: string;
     sectionRoutine: string;
+    settings: string;
+  };
+  profile: {
+    title: string;
+    editDisplayName: string;
+    displayNameUpdated: string;
+    saveError: string;
+    shiftActivity: string;
+    noShiftActivity: string;
+    shiftActivityError: string;
+    activeSession: string;
+    duration: string;
+    durationMins: string;
+    roles: {
+      admin: string;
+      vet: string;
+      senior_technician: string;
+      lead_technician: string;
+      vet_tech: string;
+      technician: string;
+      student: string;
+    };
   };
   scan: {
     title: string;

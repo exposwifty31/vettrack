@@ -11,6 +11,7 @@ import { api } from "@/lib/api";
 import { t, formatDateByLocale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { haptics } from "@/lib/haptics";
 import { CrashCartAdminSheet } from "@/components/crash-cart-admin-sheet";
 import type { CrashCartItem } from "@/types";
 
@@ -76,7 +77,7 @@ export default function CrashCartCheckPage() {
   });
 
   const submit = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ wasAllChecked: _wasAllChecked }: { wasAllChecked: boolean }) => {
       const items = cartItems.map((i) => ({ key: i.key, label: i.label, checked: !!checked[i.id] }));
       const res = await authFetch("/api/crash-cart/checks", {
         method: "POST",
@@ -86,16 +87,20 @@ export default function CrashCartCheckPage() {
       if (!res.ok) throw new Error("submit failed");
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, { wasAllChecked }) => {
       setSubmitted(true);
       queryClient.invalidateQueries({ queryKey: ["/api/crash-cart/checks/latest"] });
+      if (wasAllChecked) haptics.scanSuccess();
     },
     onError: () => {
       toast.error(t.crashCart.saveError);
     },
   });
 
-  const toggle = (id: string) => setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  const toggle = (id: string) => {
+    haptics.tap();
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const criticalPatients = latestQ.data?.criticalPatients ?? [];
   const recentChecks = latestQ.data?.recentChecks ?? [];
@@ -127,7 +132,7 @@ export default function CrashCartCheckPage() {
   }
 
   return (
-    <div className="flex flex-col bg-background overflow-hidden" dir="rtl" style={{ height: "100%", paddingTop: "env(safe-area-inset-top)" }}>
+    <div className="flex flex-col bg-background overflow-hidden" dir="rtl" style={{ height: "100%", paddingTop: "calc(env(safe-area-inset-top) + 16px)" }}>
       <div className="flex-shrink-0 flex items-center gap-2 px-4 py-3 border-b border-border">
         {backButton}
         <CheckCircle2 className="h-6 w-6 text-green-500" />
@@ -260,7 +265,7 @@ export default function CrashCartCheckPage() {
           <Button
             className="mt-4 w-full"
             variant={allChecked ? "default" : "outline"}
-            onClick={() => submit.mutate()}
+            onClick={() => submit.mutate({ wasAllChecked: allChecked })}
             disabled={submit.isPending || cartItems.length === 0}
           >
             {allChecked ? t.crashCart.saveAllOk : t.crashCart.saveWithMissing}

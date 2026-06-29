@@ -11,8 +11,8 @@ runs in a non-standard configuration. Read this before re-syncing.
 - **No shipped `.d.ts` tree.** Prop types are extracted directly from `.tsx`
   source. This requires three env vars on every `package-build.mjs` run:
   ```
-  DS_SRC_GLOB="/Users/dan/vettrack/src/**/*.ts,/Users/dan/vettrack/src/**/*.tsx"
-  DS_TS_BASEURL="/Users/dan/vettrack"
+  DS_SRC_GLOB="<repo-root>/src/**/*.ts,<repo-root>/src/**/*.tsx"
+  DS_TS_BASEURL="<repo-root>"
   DS_TS_PATHS='{"@/*":["./src/*"],"@assets/*":["./docs/archive/2026/attached_assets/*"],"*":["./*"]}'
   ```
   These are consumed by patches in `.ds-sync/lib/dts.mjs` (see "Staged-script
@@ -86,6 +86,25 @@ doesn't have — so direct staged-script edits are the working approach.)
 
 1. `pnpm build` → copy `dist/public/assets/index-*.css` → `.design-sync/compiled.css`
 2. Re-stage `.ds-sync/` and re-apply the two staged-script patches above
-3. Run `package-build.mjs` with the three `DS_*` env vars set
+3. Run `resync.mjs --remote .design-sync/.cache/remote-sync.json` with the three `DS_*` env vars set
 4. Validate (turn on render check if possible)
-5. Re-sync uploads incrementally via `resync.mjs --remote` against the project anchor
+5. Upload per atomic path (re-sync)
+
+**Important:** Save the full `_ds_sync.json` content from `DesignSync(get_file)` to
+`.design-sync/.cache/remote-sync.json` before running the driver. The driver needs
+all fields (`sourceKeys`, `sourceHashes`, `bundleSha12`, etc.) to produce a useful
+diff — saving only partial content results in "anchor malformed" and forces a full
+re-upload of all 110 components instead of a targeted diff.
+
+**Repo path:** Replace `<repo-root>` in DS_SRC_GLOB / DS_TS_BASEURL with the absolute
+path to your checkout (e.g. `/Users/yourname/vettrack-ship`). The repo has been
+cloned under `vettrack-ship/`, not `vettrack/` — use the correct folder name.
+
+## Re-sync risks
+
+- **compiled.css goes stale** — any commit touching `src/index.css` or Tailwind
+  config requires `pnpm build` + CSS re-copy before re-syncing.
+- **Previews are floor cards only** — no authored `.design-sync/previews/` files;
+  all 110 components render as typographic name blocks.
+- **Staged-script patches are lost on fresh `.ds-sync/`** — must re-apply both
+  patches every time `.ds-sync/` is regenerated.

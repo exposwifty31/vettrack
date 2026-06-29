@@ -58,6 +58,10 @@ import type {
 } from "@/types";
 import type { OutcomeKpiRoiResponse } from "../../shared/er-types.js";
 import type { AuthoritySnapshot } from "../../shared/authority.js";
+
+import type { ShiftActivityItem } from "@/types";
+export type { ShiftActivityItem };
+
 import { getStoredLocale, t } from "@/lib/i18n";
 import { toast } from "sonner";
 import {
@@ -383,6 +387,12 @@ export const api = {
       resolvedAt?: string;
       authority?: AuthoritySnapshot;
     }>("/api/users/me"),
+    shiftActivity: () => request<ShiftActivityItem[]>("/api/users/me/shift-activity"),
+    updateDisplayName: (id: string, displayName: string) =>
+      request<User>(`/api/users/${id}/display_name`, {
+        method: "PATCH",
+        body: JSON.stringify({ display_name: displayName }),
+      }),
   },
   storage: {
     requestUploadUrl: (data: UploadUrlRequest) =>

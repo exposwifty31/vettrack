@@ -1,5 +1,16 @@
+import { getStoredUserSettings } from "@/lib/user-settings-storage";
+
 interface WindowWithWebkitAudio extends Window {
   webkitAudioContext?: typeof AudioContext;
+}
+
+function soundEnabled(): boolean {
+  return getStoredUserSettings().soundEnabled;
+}
+
+function criticalSoundEnabled(): boolean {
+  const s = getStoredUserSettings();
+  return s.soundEnabled && s.criticalAlertsSound;
 }
 
 let audioCtx: AudioContext | null = null;
@@ -26,6 +37,7 @@ function resumeContext(ctx: AudioContext): Promise<void> {
 }
 
 export async function playFeedbackTone(): Promise<void> {
+  if (!soundEnabled()) return;
   const ctx = getAudioContext();
   if (!ctx) return;
   await resumeContext(ctx);
@@ -49,6 +61,7 @@ export async function playFeedbackTone(): Promise<void> {
 }
 
 export async function playMuteTone(): Promise<void> {
+  if (!soundEnabled()) return;
   const ctx = getAudioContext();
   if (!ctx) return;
   await resumeContext(ctx);
@@ -72,6 +85,7 @@ export async function playMuteTone(): Promise<void> {
 }
 
 export async function playCriticalAlertTone(): Promise<void> {
+  if (!criticalSoundEnabled()) return;
   const ctx = getAudioContext();
   if (!ctx) return;
   await resumeContext(ctx);

@@ -3456,7 +3456,8 @@
     "auditLog": "יומן ביקורות",
     "emergencyHistory": "היסטוריית ציוד חירום",
     "settings": "הגדרות",
-    "reportBug": "דווח על בעיה"
+    "reportBug": "דווח על בעיה",
+    "profile": "הפרופיל שלי"
   },
   "phoneSignIn": {
     "title": "התחברות עם טלפון",
@@ -3731,6 +3732,27 @@
         "title": "Code Blue וחירום",
         "body": "VetTrack מתאמת מפגשי Code Blue וזרימות ציוד חירום אך אינה שירות חירום רפואי או מיון.\n\nבמצבי סכנת חיים, פעל לפי פרוטוקולי החירום של בית החולים תחילה. אם תכונות Code Blue נכשלות במהלך מפגש פעיל, השתמש בנהלי גיבוי לא מקוונים של המרפאה ופנה ל-support@vettrack.uk לאחר האירוע עם חותמות זמן לחקירה."
       }
+    }
+  },
+  "profile": {
+    "title": "הפרופיל שלי",
+    "editDisplayName": "ערוך שם תצוגה",
+    "displayNameUpdated": "השם עודכן",
+    "saveError": "לא ניתן לעדכן את השם. נסה שוב.",
+    "shiftActivity": "פעילות משמרות",
+    "noShiftActivity": "אין פעילות משמרות עדיין",
+    "shiftActivityError": "לא ניתן לטעון פעילות משמרות.",
+    "activeSession": "פעיל",
+    "duration": "{hours}ש׳ {minutes}ד׳",
+    "durationMins": "{minutes}ד׳",
+    "roles": {
+      "admin": "מנהל",
+      "vet": "וטרינר",
+      "senior_technician": "טכנאי בכיר",
+      "lead_technician": "טכנאי ראשי",
+      "vet_tech": "טכנאי וטרינרי",
+      "technician": "טכנאי",
+      "student": "סטודנט"
     }
   },
   "scan": {

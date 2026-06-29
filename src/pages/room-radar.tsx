@@ -1,7 +1,7 @@
 import { t } from "@/lib/i18n";
 import { getEquipmentDisplayName } from "@/lib/equipment-display";
 import { Bdi } from "@/components/ui/bdi";
-import { ForwardChevron } from "@/components/ui/directional-chevron";
+import { BackChevron, ForwardChevron } from "@/components/ui/directional-chevron";
 import { useState, useEffect, useRef } from "react";
 import { useParams, useSearch } from "wouter";
 import { ApiError } from "@/lib/api";
@@ -549,7 +549,7 @@ export default function RoomRadarPage() {
         <div className="pt-1">
           <Link href="/rooms">
             <button className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3 -ms-1">
-              <ArrowLeft className="w-4 h-4" />
+              <BackChevron className="w-4 h-4" />
               {t.roomRadarPage.allRooms}
             </button>
           </Link>
@@ -573,7 +573,7 @@ export default function RoomRadarPage() {
               <p className="text-sm text-muted-foreground">{t.roomRadarPage.roomLoadErrorDesc}</p>
               <Link href="/rooms">
                 <Button variant="outline" size="sm" className="gap-2 mt-1">
-                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <BackChevron className="w-3.5 h-3.5" />
                   {t.roomRadarPage.backToRooms}
                 </Button>
               </Link>

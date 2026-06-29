@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 import { useDirection } from "@/hooks/useDirection";
 import { toast } from "sonner";
+import { haptics } from "@/lib/haptics";
+import { playCriticalAlertTone } from "@/lib/sounds";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -393,7 +395,7 @@ function ActiveSession() {
       </div>
 
       <div className="px-4 py-5 bg-emergency-surface border-b border-emergency-surface">
-        <div className="text-5xl font-black tracking-widest text-white font-mono leading-none">
+        <div className="text-5xl font-black tracking-widest text-white font-num leading-none">
           {formatElapsed(elapsed)}
         </div>
         <div className="text-xs text-emergency-text2/80 mt-2">
@@ -418,14 +420,14 @@ function ActiveSession() {
         <div className="grid grid-cols-2 gap-2 mb-3">
           <button
             type="button"
-            onClick={() => logEntry({ label: t.codeBlue.presetUnitDeployed, category: "equipment" })}
+            onClick={() => { haptics.scanSuccess(); logEntry({ label: t.codeBlue.presetUnitDeployed, category: "equipment" }); }}
             className="bg-emergency-border hover:bg-emergency-border border border-emergency-borderMd rounded-lg p-3 min-h-[44px] text-center text-xs font-semibold text-emergency-text"
           >
             {t.codeBlue.presetUnitDeployed}
           </button>
           <button
             type="button"
-            onClick={() => logEntry({ label: t.codeBlue.presetUnitReturned, category: "equipment" })}
+            onClick={() => { haptics.scanSuccess(); logEntry({ label: t.codeBlue.presetUnitReturned, category: "equipment" }); }}
             className="bg-emergency-border hover:bg-emergency-border border border-emergency-borderMd rounded-lg p-3 min-h-[44px] text-center text-xs font-semibold text-emergency-text"
           >
             {t.codeBlue.presetUnitReturned}
@@ -536,6 +538,8 @@ export default function CodeBluePage() {
         preCheckPassed,
         ...(initEquipmentId ? { equipmentId: initEquipmentId } : {}),
       });
+      haptics.error();
+      void playCriticalAlertTone();
     } catch (err) {
       if (err instanceof ApiError) {
         toast.error(

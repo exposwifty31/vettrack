@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { computeAlerts } from "@/lib/utils";
-import { buildAlertAckSet, countActiveAlerts } from "@/lib/alert-counts";
+import { buildAlertAckSet, countActiveAlerts, countCriticalAlerts } from "@/lib/alert-counts";
 import {
   ArrowLeft,
   ArrowRight,
@@ -72,7 +72,7 @@ import { QrScanner } from "@/components/qr-scanner";
 import { useSettings } from "@/hooks/use-settings";
 import { toast } from "sonner";
 import { SettingsToggle, SettingsSelect } from "@/components/settings-controls";
-import { playFeedbackTone, playMuteTone } from "@/lib/sounds";
+import { playFeedbackTone, playMuteTone, playCriticalAlertTone } from "@/lib/sounds";
 import { ReportIssueDialog } from "@/components/report-issue-dialog";
 import { SyncQueueSheet } from "@/components/sync-queue-sheet";
 import { AlertsDropdown } from "@/components/alerts-dropdown";
@@ -158,6 +158,8 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   const [dispenseContainerId, setDispenseContainerId] = useState<string | null>(null);
   const navLockToastDebounceRef = useRef(false);
   const prevAlertCountRef = useRef(0);
+  const prevCriticalCountRef = useRef<number | null>(null);
+  const soundToggleRequestIdRef = useRef(0);
   const { isAdmin, role, userId, effectiveRole } = useAuth();
   const resolvedNavRole = String(effectiveRole ?? role ?? "").trim().toLowerCase();
   const { pendingCount, failedCount, isSyncing, justSynced, triggerSync } = useSync();
@@ -434,6 +436,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   const alerts = equipment ? computeAlerts(equipment) : [];
   const alertAckSet = buildAlertAckSet(alertAcks);
   const alertCount = countActiveAlerts(alerts, alertAckSet);
+  const criticalCount = countCriticalAlerts(alerts, alertAckSet);
   const myCount = myEquipment?.length ?? 0;
 
   useEffect(() => {
@@ -445,6 +448,16 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     }
     prevAlertCountRef.current = alertCount;
   }, [alertCount]);
+
+  useEffect(() => {
+    if (prevCriticalCountRef.current !== null && criticalCount > prevCriticalCountRef.current) {
+      haptics.warning();
+      void playCriticalAlertTone().catch((err) => {
+        console.warn("[layout] playCriticalAlertTone failed", err);
+      });
+    }
+    prevCriticalCountRef.current = criticalCount;
+  }, [criticalCount]);
 
   const canAccessCodeBlue = isAdmin || role === "vet" || role === "senior_technician" || role === "technician";
 
@@ -715,12 +728,23 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   };
 
   const handleSoundToggle = async (v: boolean) => {
+    const requestId = ++soundToggleRequestIdRef.current;
     if (v) {
-      await playFeedbackTone();
+      update({ soundEnabled: true });
+      await playFeedbackTone().catch((err) => {
+        console.warn("[layout] playFeedbackTone failed", err);
+      });
     } else {
-      await playMuteTone();
+      try {
+        await playMuteTone();
+      } catch (err) {
+        console.warn("[layout] playMuteTone failed", err);
+      } finally {
+        if (soundToggleRequestIdRef.current === requestId) {
+          update({ soundEnabled: false });
+        }
+      }
     }
-    update({ soundEnabled: v });
   };
 
   const handleCriticalAlertsToggle = async (v: boolean) => {

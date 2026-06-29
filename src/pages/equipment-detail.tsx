@@ -42,6 +42,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { STATUS_LABELS } from "@/types";
 import type { EquipmentStatus, Equipment } from "@/types";
+import { BackChevron } from "@/components/ui/directional-chevron";
 import {
   ArrowLeft,
   Scan,
@@ -980,7 +981,7 @@ function EquipmentDetailPageDesktop() {
               data-testid="btn-back"
               aria-label="Back to equipment list"
             >
-              <ArrowLeft className="w-5 h-5" aria-hidden />
+              <BackChevron className="w-5 h-5" aria-hidden />
             </Button>
             <div>
               <h1 className="vt-page-title leading-tight"><Bdi>{equipmentDisplayName}</Bdi></h1>

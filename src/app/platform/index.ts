@@ -6,7 +6,7 @@ import { isCapacitorNative } from "@/lib/capacitor-runtime";
 export type PlatformTarget = "mobile" | "desktop" | "marketing";
 
 /** Public routes that belong to the marketing shell (no app chrome). */
-const MARKETING_PATHS = new Set(["/", "/landing", "/signin", "/signup", "/privacy", "/terms", "/support"]);
+const MARKETING_PATHS = new Set(["/signin", "/signup", "/privacy", "/terms", "/support"]);
 
 /** True for narrow touch viewports: covers installed PWA + mobile Safari. */
 export function isTouchNarrow(): boolean {
