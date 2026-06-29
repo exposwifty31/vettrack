@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { NativeShellContext } from "./NativeShellContext";
 import { NativeTabBar } from "./NativeTabBar";
 import { MoreSheet } from "@/features/settings";
+import { NfcForegroundScan } from "@/components/nfc-foreground-scan";
 
 type Props = {
   children: ReactNode;
@@ -43,6 +44,8 @@ export function NativeShell({ children }: Props) {
         >
           {children}
         </div>
+
+        <NfcForegroundScan />
 
         <NativeTabBar
           onMorePress={() => setMoreOpen(true)}
