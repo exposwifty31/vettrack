@@ -17,7 +17,7 @@ export function EquipmentAccountabilityTimeline({ logs }: Props) {
         style={{
           fontSize: "var(--text-xs)",
           fontWeight: 600,
-          color: "var(--muted-foreground)",
+          color: "hsl(var(--muted-foreground))",
           textTransform: "uppercase",
           letterSpacing: "0.07em",
           margin: "0 0 12px",
@@ -61,7 +61,7 @@ export function EquipmentAccountabilityTimeline({ logs }: Props) {
                   style={{
                     width: 1,
                     flex: 1,
-                    background: "var(--border)",
+                    background: "hsl(var(--border))",
                     marginTop: 4,
                     marginBottom: 4,
                   }}
@@ -73,7 +73,7 @@ export function EquipmentAccountabilityTimeline({ logs }: Props) {
               <p
                 style={{
                   fontSize: "var(--text-sm)",
-                  color: "var(--foreground)",
+                  color: "hsl(var(--foreground))",
                   margin: 0,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -86,7 +86,7 @@ export function EquipmentAccountabilityTimeline({ logs }: Props) {
                 <p
                   style={{
                     fontSize: "var(--text-xs)",
-                    color: "var(--muted-foreground)",
+                    color: "hsl(var(--muted-foreground))",
                     margin: "2px 0 0",
                   }}
                 >
@@ -96,7 +96,7 @@ export function EquipmentAccountabilityTimeline({ logs }: Props) {
               <p
                 style={{
                   fontSize: "var(--text-xs)",
-                  color: "var(--muted-foreground)",
+                  color: "hsl(var(--muted-foreground))",
                   margin: "2px 0 0",
                 }}
               >

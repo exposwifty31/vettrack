@@ -29,11 +29,11 @@ import type { EquipmentBoardUnitRow, EquipmentReadinessStatus } from "../../shar
 // ── Status colour tokens ────────────────────────────────────────────────────
 
 const STATUS_COLOR: Record<EquipmentReadinessStatus, string> = {
-  ready:    "text-[var(--status-ok)]",
-  in_use:   "text-[var(--status-sterilized)]",
-  blocked:  "text-[var(--status-issue)]",
-  stale:    "text-[var(--status-maintenance)]",
-  overdue:  "text-[var(--status-issue)]",
+  ready:    "text-[hsl(var(--status-ok))]",
+  in_use:   "text-[hsl(var(--status-sterilized))]",
+  blocked:  "text-[hsl(var(--status-issue))]",
+  stale:    "text-[hsl(var(--status-maintenance))]",
+  overdue:  "text-[hsl(var(--status-issue))]",
   unknown:  "text-ivory-text3",
 };
 
@@ -47,11 +47,11 @@ const STATUS_BG: Record<EquipmentReadinessStatus, string> = {
 };
 
 const STATUS_BAR_COLOR: Record<EquipmentReadinessStatus, string> = {
-  ready:   "bg-[var(--status-ok)]",
-  in_use:  "bg-[var(--status-sterilized)]",
-  blocked: "bg-[var(--status-issue)]",
-  stale:   "bg-[var(--status-maintenance)]",
-  overdue: "bg-[var(--status-issue)]",
+  ready:   "bg-[hsl(var(--status-ok))]",
+  in_use:  "bg-[hsl(var(--status-sterilized))]",
+  blocked: "bg-[hsl(var(--status-issue))]",
+  stale:   "bg-[hsl(var(--status-maintenance))]",
+  overdue: "bg-[hsl(var(--status-issue))]",
   unknown: "bg-ivory-text3",
 };
 
@@ -84,14 +84,14 @@ function ADRing({ pct, ready, total }: { pct: number; ready: number; total: numb
           <circle
             cx={size / 2} cy={size / 2} r={r}
             fill="none"
-            stroke="var(--muted)"
+            stroke="hsl(var(--muted))"
             strokeWidth={stroke}
           />
           {/* Progress */}
           <circle
             cx={size / 2} cy={size / 2} r={r}
             fill="none"
-            stroke="var(--status-ok)"
+            stroke="hsl(var(--status-ok))"
             strokeWidth={stroke}
             strokeLinecap="round"
             strokeDasharray={circ}
@@ -100,7 +100,7 @@ function ADRing({ pct, ready, total }: { pct: number; ready: number; total: numb
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="vt-display font-black tabular-nums text-[var(--status-ok)] leading-none">
+          <span className="vt-display font-black tabular-nums text-[hsl(var(--status-ok))] leading-none">
             {ready}
           </span>
           <span className="vt-text-xs text-ivory-text3 leading-tight">
@@ -182,7 +182,7 @@ function TypeRow({ row }: { row: EquipmentCommandBoardSnapshot["byType"][number]
   return (
     <div className="py-2 border-b border-ivory-border last:border-0">
       <div className="flex items-center gap-2 mb-1.5">
-        <span className={cn("vt-text-xs font-semibold text-ivory-text truncate flex-1", belowMin && "text-[var(--status-issue)]")}>
+        <span className={cn("vt-text-xs font-semibold text-ivory-text truncate flex-1", belowMin && "text-[hsl(var(--status-issue))]")}>
           {row.typeName}
         </span>
         {belowMin && (
@@ -259,7 +259,7 @@ function UnitRow({ unit }: { unit: EquipmentBoardUnitRow }) {
             <span className="vt-text-xs text-ivory-text2">{unit.custodianName}</span>
           )}
           {blocking && (
-            <span className="vt-text-xs text-[var(--status-issue)]">{blocking}</span>
+            <span className="vt-text-xs text-[hsl(var(--status-issue))]">{blocking}</span>
           )}
         </div>
       </div>
@@ -339,8 +339,8 @@ function CommandBoard({
 
         {/* LIVE badge */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className="w-2 h-2 rounded-full bg-[hsl(var(--status-ok))] motion-safe:animate-pulse" aria-hidden />
-          <span className="vt-text-xs font-bold uppercase tracking-widest text-[hsl(var(--status-ok))]">
+          <span className="w-2 h-2 rounded-full bg-[hsl(hsl(var(--status-ok)))] motion-safe:animate-pulse" aria-hidden />
+          <span className="vt-text-xs font-bold uppercase tracking-widest text-[hsl(hsl(var(--status-ok)))]">
             {t.board.live}
           </span>
         </div>
@@ -432,7 +432,7 @@ function CommandBoard({
           {needAttention.length === 0 && board.overview.ready >= board.overview.totalCritical && (
             <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
               <span className="text-4xl" aria-hidden>✓</span>
-              <p className="vt-text-sm font-semibold text-[var(--status-ok)]">
+              <p className="vt-text-sm font-semibold text-[hsl(var(--status-ok))]">
                 {t.board.allCriticalReady}
               </p>
             </div>

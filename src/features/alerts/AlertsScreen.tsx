@@ -60,7 +60,7 @@ export function AlertsScreen() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            color: "var(--muted-foreground)",
+            color: "hsl(var(--muted-foreground))",
             fontSize: "var(--text-xs)",
             transition: pullDelta === 0 ? "height 200ms ease" : undefined,
           }}
@@ -74,7 +74,7 @@ export function AlertsScreen() {
           style={{
             fontSize: "var(--text-2xl)",
             fontWeight: 800,
-            color: "var(--foreground)",
+            color: "hsl(var(--foreground))",
             letterSpacing: "-0.02em",
             margin: 0,
           }}
@@ -97,7 +97,7 @@ export function AlertsScreen() {
             justifyContent: "center",
             gap: 8,
             padding: "32px 16px",
-            color: "var(--muted-foreground)",
+            color: "hsl(var(--muted-foreground))",
             textAlign: "center",
           }}
         >

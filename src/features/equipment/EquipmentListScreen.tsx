@@ -79,7 +79,7 @@ export function EquipmentListScreen() {
             justifyContent: "center",
             flex: 1,
             padding: "32px 0",
-            color: "var(--muted-foreground)",
+            color: "hsl(var(--muted-foreground))",
             fontSize: "var(--text-sm)",
           }}
         >

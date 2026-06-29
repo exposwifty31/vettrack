@@ -82,7 +82,7 @@ export function EquipmentDetailScreen({ equipmentId }: Props) {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            color: "var(--muted-foreground)",
+            color: "hsl(var(--muted-foreground))",
             fontSize: "var(--text-xs)",
             transition: "height 80ms ease",
           }}
@@ -101,7 +101,7 @@ export function EquipmentDetailScreen({ equipmentId }: Props) {
             style={{
               fontSize: "var(--text-2xl)",
               fontWeight: 800,
-              color: "var(--foreground)",
+              color: "hsl(var(--foreground))",
               letterSpacing: "-0.02em",
               lineHeight: 1.1,
               margin: 0,

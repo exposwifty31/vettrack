@@ -46,7 +46,7 @@ export function AlertRow({ alert }: Props) {
           style={{
             fontSize: "var(--text-sm)",
             fontWeight: 600,
-            color: "var(--foreground)",
+            color: "hsl(var(--foreground))",
             overflow: "hidden",
             display: "-webkit-box",
             WebkitLineClamp: 1,
@@ -58,7 +58,7 @@ export function AlertRow({ alert }: Props) {
         <div
           style={{
             fontSize: "var(--text-xs)",
-            color: "var(--muted-foreground)",
+            color: "hsl(var(--muted-foreground))",
             overflow: "hidden",
             display: "-webkit-box",
             WebkitLineClamp: 2,
