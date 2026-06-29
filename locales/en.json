@@ -528,7 +528,10 @@
     },
     "accountability": {
       "title": "Accountability trail"
-    }
+    },
+    "takePhoto": "Take / Upload Photo",
+    "actionDone": "Done!",
+    "actionDoneBody": "Action completed for {name}."
   },
   "adminPilotCoverage": {
     "title": "Pilot Coverage",

@@ -319,6 +319,9 @@ const translations = {
     accountability: {
       title: d.equipmentDetail.accountability.title,
     },
+    takePhoto: d.equipmentDetail.takePhoto,
+    actionDone: d.equipmentDetail.actionDone,
+    actionDoneBody: d.equipmentDetail.actionDoneBody,
   },
 
   adminPilotCoverage: {

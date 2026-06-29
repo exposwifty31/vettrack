@@ -528,7 +528,10 @@
     },
     "accountability": {
       "title": "שרשרת אחריות"
-    }
+    },
+    "takePhoto": "צלם / העלה תמונה",
+    "actionDone": "בוצע!",
+    "actionDoneBody": "הפעולה הושלמה עבור {name}."
   },
   "adminPilotCoverage": {
     "title": "כיסוי פיילוט",

@@ -532,6 +532,9 @@ export interface TStructure {
     accountability: {
       title: string;
     };
+    takePhoto: string;
+    actionDone: string;
+    actionDoneBody: string;
   };
   adminPilotCoverage: {
     title: string;
@@ -3437,6 +3440,21 @@ export interface TStructure {
     adminShifts: string;
     emergency: string;
     more: string;
+    menu: string;
+    myEquipment: string;
+    inventory: string;
+    analytics: string;
+    dashboard: string;
+    inventoryItems: string;
+    procurement: string;
+    crashCart: string;
+    qrPrint: string;
+    whatsNew: string;
+    quickGuide: string;
+    auditLog: string;
+    emergencyHistory: string;
+    settings: string;
+    reportBug: string;
     tabBar: string;
   };
   phoneSignIn: {
@@ -3723,6 +3741,9 @@ export interface TStructure {
     about: string;
     session: string;
     endShift: string;
+    sectionOps: string;
+    sectionAdmin: string;
+    sectionRoutine: string;
   };
   scan: {
     title: string;
