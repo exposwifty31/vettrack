@@ -1,33 +1,16 @@
-import { safeStorageGetItem } from "@/lib/safe-browser";
+import { getStoredUserSettings } from "@/lib/user-settings-storage";
 
 interface WindowWithWebkitAudio extends Window {
   webkitAudioContext?: typeof AudioContext;
 }
 
-const SETTINGS_KEY = "vettrack-settings";
-
 function soundEnabled(): boolean {
-  try {
-    const raw = safeStorageGetItem(SETTINGS_KEY);
-    if (!raw) return true;
-    const parsed = JSON.parse(raw) as { soundEnabled?: boolean };
-    return parsed.soundEnabled !== false;
-  } catch (err) {
-    console.warn("[sounds] failed to parse settings:", err);
-    return true;
-  }
+  return getStoredUserSettings().soundEnabled;
 }
 
 function criticalSoundEnabled(): boolean {
-  try {
-    const raw = safeStorageGetItem(SETTINGS_KEY);
-    if (!raw) return true;
-    const parsed = JSON.parse(raw) as { soundEnabled?: boolean; criticalAlertsSound?: boolean };
-    return parsed.soundEnabled !== false && parsed.criticalAlertsSound !== false;
-  } catch (err) {
-    console.warn("[sounds] failed to parse settings:", err);
-    return true;
-  }
+  const s = getStoredUserSettings();
+  return s.soundEnabled && s.criticalAlertsSound;
 }
 
 let audioCtx: AudioContext | null = null;

@@ -25,7 +25,7 @@ export function ShiftActivityList() {
   const { userId } = useAuth();
 
   const { data: sessions, isLoading, isError, refetch } = useQuery<ShiftActivityItem[]>({
-    queryKey: ["/api/users/me/shift-activity"],
+    queryKey: ["/api/users/me/shift-activity", userId],
     queryFn: api.users.shiftActivity,
     enabled: !!userId,
     staleTime: 60_000,

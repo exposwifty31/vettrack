@@ -5,7 +5,7 @@
  */
 import type { AuthoritySnapshot } from "../../shared/authority.js";
 
-export type UserRole = "admin" | "vet" | "technician" | "senior_technician" | "student";
+export type UserRole = "admin" | "vet" | "technician" | "senior_technician" | "lead_technician" | "vet_tech" | "student";
 export type ShiftRole = "technician" | "senior_technician" | "admin";
 
 export type UserStatus = "pending" | "active" | "blocked";

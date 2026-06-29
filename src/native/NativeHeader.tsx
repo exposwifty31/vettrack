@@ -6,29 +6,10 @@ import { useAuth } from "@/hooks/use-auth";
 import { computeAlerts } from "@/lib/utils";
 import { buildAlertAckSet, countActiveAlerts } from "@/lib/alert-counts";
 import { t } from "@/lib/i18n";
+import { getInitials } from "@/lib/user-utils";
 
 /** Routes that own their own top chrome — hide the shared header for these. */
 const FULLSCREEN_ROUTES = ["/code-blue", "/crash-cart", "/scan", "/handoff"];
-
-/**
- * Persistent native navigation header.
- *
- * Height = env(safe-area-inset-top) + 44px so the blurred background
- * extends behind the status bar while the icon buttons and wordmark sit
- * within the 44px nav-bar zone below it.
- *
- * Returns null for full-screen routes so those pages draw edge-to-edge.
- */
-function getInitials(name: string | null): string {
-  if (!name?.trim()) return "?";
-  return name
-    .trim()
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join("");
-}
 
 export function NativeHeader() {
   const [location, navigate] = useLocation();

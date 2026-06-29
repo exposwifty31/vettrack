@@ -5,21 +5,11 @@ import { t } from "@/lib/i18n";
 import { api } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { getInitials } from "@/lib/user-utils";
+import type { UserRole } from "@/types/platform";
 
-function getInitials(name: string | null): string {
-  if (!name?.trim()) return "?";
-  return name
-    .trim()
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join("");
-}
-
-function roleLabel(role: string): string {
-  const roles = t.profile.roles as Record<string, string>;
-  return roles[role] ?? role;
+function roleLabel(role: UserRole): string {
+  return t.profile.roles[role];
 }
 
 export function ProfileHeroZone() {
