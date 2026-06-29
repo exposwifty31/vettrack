@@ -47,12 +47,16 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   brightness: 100,
 };
 
+// Incremented when settings schema changes in a way that requires migration.
+// Stored alongside settings as `_v`. Absent → schema v0 (pre-migration build).
+const SETTINGS_SCHEMA_VERSION = 1;
+
 /** Sync read of persisted user settings (safe outside React). */
 export function getStoredUserSettings(): UserSettings {
   try {
     const raw = safeStorageGetItem(USER_SETTINGS_STORAGE_KEY);
     if (!raw) return DEFAULT_USER_SETTINGS;
-    const parsed = JSON.parse(raw) as Partial<UserSettings> & { language?: string };
+    const parsed = JSON.parse(raw) as Partial<UserSettings> & { language?: string; _v?: number };
     if ("language" in parsed) {
       parsed.locale = isSupportedLocale(parsed.language) ? parsed.language : getStoredLocale();
       delete parsed.language;
@@ -64,6 +68,12 @@ export function getStoredUserSettings(): UserSettings {
     if (typeof parsed.hapticsEnabled !== "boolean") {
       parsed.hapticsEnabled = true;
     }
+    // Migration v0 → v1: darkMode:true stored by an earlier build (e.g. Build 14) is
+    // treated as not user-set and reset to false. Prevents dark-on-dark black voids on
+    // fresh simulator installs that inherited production localStorage.
+    if (typeof parsed._v !== "number" && parsed.darkMode === true) {
+      parsed.darkMode = false;
+    }
     return { ...DEFAULT_USER_SETTINGS, ...parsed };
   } catch {
     return DEFAULT_USER_SETTINGS;
@@ -72,7 +82,7 @@ export function getStoredUserSettings(): UserSettings {
 
 export function saveStoredUserSettings(settings: UserSettings): void {
   try {
-    safeStorageSetItem(USER_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    safeStorageSetItem(USER_SETTINGS_STORAGE_KEY, JSON.stringify({ ...settings, _v: SETTINGS_SCHEMA_VERSION }));
   } catch {
     // ignore quota / private-mode failures
   }

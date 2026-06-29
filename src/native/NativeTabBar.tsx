@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { Home, Package, Bell, AlignJustify } from "lucide-react";
+import { Home, Package, Siren, AlignJustify } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { ScanFab } from "./ScanFab";
 
@@ -69,7 +69,7 @@ function TabButton({
 
 /**
  * Sole tab-bar owner for the native shell.
- * Renders: Today · Equipment · [ScanFab] · Alerts · More.
+ * Renders: Today · Equipment · [ScanFab] · Emergency · Menu.
  */
 export function NativeTabBar({ onMorePress }: Props) {
   const [location, navigate] = useLocation();
@@ -80,7 +80,7 @@ export function NativeTabBar({ onMorePress }: Props) {
   ];
 
   const rightTabs: TabDef[] = [
-    { id: "alerts", href: "/alerts", label: t.nav.alerts, icon: <Bell size={22} /> },
+    { id: "emergency", href: "/code-blue", label: t.nav.emergency, icon: <Siren size={22} /> },
   ];
 
   return (
@@ -124,7 +124,7 @@ export function NativeTabBar({ onMorePress }: Props) {
       ))}
 
       <TabButton
-        label={t.nav.more}
+        label={t.nav.menu}
         icon={<AlignJustify size={22} />}
         active={false}
         onClick={onMorePress}

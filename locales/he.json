@@ -3434,6 +3434,21 @@
     "adminShifts": "משמרות",
     "emergency": "חירום",
     "more": "עוד",
+    "menu": "תפריט",
+    "myEquipment": "שלי",
+    "inventory": "מלאי ומתכלים",
+    "analytics": "ניתוח נתונים",
+    "dashboard": "לוח בקרה",
+    "inventoryItems": "פריטי מלאי",
+    "procurement": "הזמנות רכש",
+    "crashCart": "בדיקת ערכת קריטית",
+    "qrPrint": "הדפסת QR",
+    "whatsNew": "מה חדש",
+    "quickGuide": "מדריך מהיר",
+    "auditLog": "יומן ביקורות",
+    "emergencyHistory": "היסטוריית ציוד חירום",
+    "settings": "הגדרות",
+    "reportBug": "דווח על בעיה",
     "tabBar": "ניווט כרטיסיות"
   },
   "phoneSignIn": {
@@ -3725,13 +3740,16 @@
     }
   },
   "more": {
-    "title": "עוד",
+    "title": "תפריט",
     "account": "חשבון",
     "profile": "הפרופיל שלי",
     "language": "שפה",
     "clinic": "מרפאה",
     "about": "אודות VetTrack",
     "session": "משמרת",
-    "endShift": "סיום משמרת"
+    "endShift": "סיום משמרת",
+    "sectionOps": "תפעול",
+    "sectionAdmin": "ניהול",
+    "sectionRoutine": "שגרה"
   }
 }
