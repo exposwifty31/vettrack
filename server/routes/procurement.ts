@@ -277,7 +277,9 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
           ))
           .limit(1)
           .for("update");
-        if (!currentLine) continue;
+        if (!currentLine) {
+          throw new Error("PO_LINE_NOT_FOUND");
+        }
 
         const remaining = currentLine.quantityOrdered - currentLine.quantityReceived;
         if (remaining <= 0) continue; // line already fully received
@@ -350,6 +352,13 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
         throw new Error("NO_EFFECTIVE_DELTA");
       }
 
+      // Serialize concurrent receives: lock the parent PO before re-reading lines
+      // so two simultaneous partial receives can't both snapshot a stale set and
+      // each compute "partial", leaving the order stuck after all lines are full.
+      await tx.select({ id: purchaseOrders.id }).from(purchaseOrders)
+        .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id)))
+        .for("update");
+
       // Refresh lines and determine new PO status.
       // "draft" is promoted to "ordered" when a receive starts; "cancelled"/"received" are
       // rejected at the top of the handler so existing.status ∈ {draft, ordered, partial} here.
@@ -417,6 +426,9 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
     }
     if (isCheckViolation(err) && handleCheckViolation(err, res)) {
       return;
+    }
+    if (err instanceof Error && err.message === "PO_LINE_NOT_FOUND") {
+      return res.status(422).json(apiError({ code: "INVALID_INPUT", reason: "PO_LINE_NOT_FOUND", message: "Purchase order line not found for this order and clinic", requestId }));
     }
     if (err instanceof Error && err.message === "NO_EFFECTIVE_DELTA") {
       return res.status(422).json(apiError({ code: "INVALID_INPUT", reason: "NO_EFFECTIVE_DELTA", message: "No receivable quantity applied; all lines were zero, already full, or not found", requestId }));

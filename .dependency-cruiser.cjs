@@ -58,10 +58,10 @@ module.exports = {
     },
     {
       name: "R5-workers-no-client",
-      comment: "Server workers must not import frontend source or React",
+      comment: "Server workers/jobs must not import frontend source, React, or browser-only packages",
       severity: "error",
       from: { path: "^server/(workers|jobs)/" },
-      to: { path: "^src/|^(react|react-dom)(/|$)" },
+      to: { path: "^src/|^(react|react-dom|@capacitor/|@ionic/|wouter|dexie)(/|$)" },
     },
     {
       name: "no-circular",
