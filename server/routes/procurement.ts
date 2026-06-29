@@ -262,6 +262,14 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
     const receiveAuditLines: Array<{ itemId: string; quantityReceivedBefore: number; quantityReceivedAfter: number; delta: number }> = [];
 
     await db.transaction(async (tx) => {
+      // Lock the parent PO first to serialize concurrent receives.
+      // Per-line FOR UPDATE locks taken inside the loop are acquired in b.lines
+      // order; two requests with the same lines in different order would deadlock.
+      // Holding the PO lock throughout ensures only one receive proceeds at a time.
+      await tx.select({ id: purchaseOrders.id }).from(purchaseOrders)
+        .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id)))
+        .for("update");
+
       for (const incoming of b.lines) {
         // Lock the row and read current state — FOR UPDATE prevents concurrent
         // over-receives and gives us the before value for the audit log.
@@ -358,13 +366,6 @@ router.patch("/:id/receive", requireAuth, requireEffectiveRole("technician"), va
       if (receiveAuditLines.length === 0) {
         throw new Error("NO_EFFECTIVE_DELTA");
       }
-
-      // Serialize concurrent receives: lock the parent PO before re-reading lines
-      // so two simultaneous partial receives can't both snapshot a stale set and
-      // each compute "partial", leaving the order stuck after all lines are full.
-      await tx.select({ id: purchaseOrders.id }).from(purchaseOrders)
-        .where(and(eq(purchaseOrders.clinicId, clinicId), eq(purchaseOrders.id, req.params.id)))
-        .for("update");
 
       // Refresh lines and determine new PO status.
       // "draft" is promoted to "ordered" when a receive starts; "cancelled"/"received" are
