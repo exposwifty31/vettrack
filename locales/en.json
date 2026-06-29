@@ -3439,11 +3439,16 @@
     "more": "More",
     "menu": "Menu",
     "myEquipment": "My Equipment",
+    "tabBar": "Tab navigation",
+    "operationsSection": "Operations",
+    "managementSection": "Management",
+    "criticalKitCheck": "Critical Kit Check",
+    "mine": "My Equipment",
     "inventory": "Inventory",
     "analytics": "Analytics",
     "dashboard": "Dashboard",
     "inventoryItems": "Inventory Items",
-    "procurement": "Purchase Orders",
+    "procurement": "Procurement",
     "crashCart": "Crash Cart Check",
     "qrPrint": "QR Print",
     "whatsNew": "What's New",
@@ -3451,8 +3456,7 @@
     "auditLog": "Audit Log",
     "emergencyHistory": "Emergency Equipment History",
     "settings": "Settings",
-    "reportBug": "Report a Bug",
-    "tabBar": "Tab navigation"
+    "reportBug": "Report a Bug"
   },
   "phoneSignIn": {
     "title": "Phone Sign In",
@@ -3740,7 +3744,8 @@
     "endShift": "End Shift",
     "sectionOps": "Operations",
     "sectionAdmin": "Admin",
-    "sectionRoutine": "Routine"
+    "sectionRoutine": "Routine",
+    "settings": "Settings"
   },
   "scan": {
     "title": "Scan Equipment",

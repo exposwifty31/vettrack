@@ -944,3 +944,16 @@ nav,
     transition: none;
   }
 }
+
+/* MoreSheet slide-up entrance */
+@keyframes sheet-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes sheet-slide-up {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+}

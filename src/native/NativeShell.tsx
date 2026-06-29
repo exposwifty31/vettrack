@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { NativeShellContext } from "./NativeShellContext";
 import { NativeTabBar } from "./NativeTabBar";
+import { NativeHeader } from "./NativeHeader";
 import { MoreSheet } from "@/features/settings";
 import { NfcForegroundScan } from "@/components/nfc-foreground-scan";
 
@@ -12,11 +13,15 @@ type Props = {
  * Sole chrome owner for the Capacitor native platform.
  *
  * Owns: safe-area insets · scroll container · tab bar · more sheet.
- * Nothing else in the tree should re-declare these concerns when
- * NativeShellContext is true.
+ *
+ * Safe-area strategy:
+ *   - Top: NativeHeader owns env(safe-area-inset-top) as part of its own
+ *     height (calc(44px + SAT)). The outer shell has NO top padding so that
+ *     fullscreen routes (code-blue, crash-cart, scan) can draw edge-to-edge
+ *     behind the status bar. Each fullscreen page adds its own paddingTop
+ *     to protect interactive content.
+ *   - Bottom: NativeTabBar adds paddingBottom via env(safe-area-inset-bottom).
  */
-
-
 export function NativeShell({ children }: Props) {
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -30,9 +35,11 @@ export function NativeShell({ children }: Props) {
           flexDirection: "column",
           overflow: "hidden",
           background: "hsl(var(--background))",
-          paddingTop: "env(safe-area-inset-top)",
+          // NO paddingTop here — NativeHeader owns the top safe area.
         }}
       >
+        <NativeHeader />
+
         <div
           style={{
             flex: 1,

@@ -1,16 +1,16 @@
 import { useState, useCallback } from "react";
+import { useLocation } from "wouter";
 import { QrScanner } from "@/components/qr-scanner";
 import { AccountabilityConfirm } from "./AccountabilityConfirm";
 import { t } from "@/lib/i18n";
 
 export function ScanScreen() {
+  const [, navigate] = useLocation();
   const [confirmedName, setConfirmedName] = useState<string | null>(null);
 
   const handleClose = useCallback(() => {
-    // QrScanner calls onClose after navigating to the equipment page.
-    // We briefly show the accountability confirmation before the route
-    // transition completes. The banner auto-dismisses after 3 seconds.
-  }, []);
+    navigate("/home");
+  }, [navigate]);
 
   return (
     <div

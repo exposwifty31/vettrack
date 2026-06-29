@@ -52,7 +52,7 @@ export function getStoredLocale(): Locale {
   try {
     if (typeof window === "undefined") return "he";
     const stored = safeStorageGetItem(LOCALE_STORAGE_KEY);
-    if (!stored && isCapacitorNative()) return "he";
+    if (!stored) return "he"; // Default to Hebrew in native context
     return resolveClientLocale(stored);
   } catch {
     return "he";

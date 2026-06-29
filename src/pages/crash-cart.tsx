@@ -127,7 +127,7 @@ export default function CrashCartCheckPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen-safe bg-background max-w-2xl mx-auto overflow-hidden" dir="rtl">
+    <div className="flex flex-col bg-background overflow-hidden" dir="rtl" style={{ height: "100%", paddingTop: "env(safe-area-inset-top)" }}>
       <div className="flex-shrink-0 flex items-center gap-2 px-4 py-3 border-b border-border">
         {backButton}
         <CheckCircle2 className="h-6 w-6 text-green-500" />

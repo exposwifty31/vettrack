@@ -1,43 +1,54 @@
 import { useLocation } from "wouter";
-import { Scan } from "lucide-react";
+import { QrCode } from "lucide-react";
 import { t } from "@/lib/i18n";
 
 export function ScanFab() {
-  const [location, navigate] = useLocation();
-
-  const openScanner = () => {
-    const [pathname, search = ""] = location.split("?");
-    if (pathname === "/equipment") {
-      const params = new URLSearchParams(search);
-      params.set("scan", "1");
-      navigate("/scan");
-      return;
-    }
-    navigate("/scan");
-  };
+  const [, navigate] = useLocation();
 
   return (
     <button
       type="button"
       aria-label={t.nav.equipmentScan}
-      onClick={openScanner}
-      className="vt-scan-fab"
+      onClick={() => navigate("/scan")}
       style={{
-        width: 52,
-        height: 52,
-        borderRadius: "50%",
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center",
+        gap: 4,
         border: "none",
+        background: "transparent",
         cursor: "pointer",
-        flexShrink: 0,
-        marginTop: -20,
-        position: "relative",
-        zIndex: 1,
+        WebkitTapHighlightColor: "transparent",
+        paddingInline: 8,
+        paddingTop: 4,
+        marginTop: -22,
       }}
     >
-      <Scan size={24} strokeWidth={2} />
+      <span
+        style={{
+          width: 60,
+          height: 60,
+          borderRadius: 16,
+          background: "hsl(var(--primary))",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: "0 6px 22px -6px hsl(var(--primary) / 0.55)",
+          flexShrink: 0,
+        }}
+      >
+        <QrCode size={28} color="white" strokeWidth={2} />
+      </span>
+      <span
+        style={{
+          fontSize: "var(--text-2xs)",
+          fontWeight: 600,
+          color: "hsl(var(--muted-foreground))",
+          lineHeight: 1,
+        }}
+      >
+        {t.nav.equipmentScan}
+      </span>
     </button>
   );
 }

@@ -32,7 +32,7 @@ export const USER_SETTINGS_STORAGE_KEY = "vettrack-settings";
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
   locale: getStoredLocale(),
-  colorTheme: "clinical",
+  colorTheme: "forest",
   darkMode: false,
   hapticsEnabled: true,
   density: "comfortable",

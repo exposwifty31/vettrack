@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { Home, Package, Siren, AlignJustify } from "lucide-react";
+import { Home, Package, Activity, AlignJustify } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { ScanFab } from "./ScanFab";
 
@@ -80,7 +80,7 @@ export function NativeTabBar({ onMorePress }: Props) {
   ];
 
   const rightTabs: TabDef[] = [
-    { id: "emergency", href: "/code-blue", label: t.nav.emergency, icon: <Siren size={22} /> },
+    { id: "emergency", href: "/code-blue", label: t.nav.emergency, icon: <Activity size={22} /> },
   ];
 
   return (

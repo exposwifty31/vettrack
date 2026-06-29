@@ -21,10 +21,7 @@ function applySettings(settings: Settings) {
   const html = document.documentElement;
   const list = html?.classList;
   if (!list) return;
-  const useDarkClass =
-    settings.darkMode ||
-    
-    settings.colorTheme === "clinical";
+  const useDarkClass = settings.darkMode;
   if (useDarkClass) {
     list.add("dark");
   } else {
