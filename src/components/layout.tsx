@@ -725,11 +725,12 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   };
 
   const handleSoundToggle = async (v: boolean) => {
-    update({ soundEnabled: v });
     if (v) {
+      update({ soundEnabled: true });
       await playFeedbackTone();
     } else {
       await playMuteTone();
+      update({ soundEnabled: false });
     }
   };
 
