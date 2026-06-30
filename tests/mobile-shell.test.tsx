@@ -6,6 +6,14 @@
  *   1. MobileShell sets MobileShellContext to true for its subtree.
  *   2. AppShell renders children only (no Layout chrome) when MobileShellContext is true.
  *   3. MobileTabBar marks the active tab with aria-current="page" based on location.
+ *
+ * Isolation note: the tab components read wouter's location. We drive them with
+ * an in-memory `memoryLocation` hook, but under the shared happy-dom worker the
+ * browser URL (`window.location`) can otherwise be left at "/" by a prior test,
+ * which makes the Today tab (active on "/") spuriously win and the Equipment tab
+ * resolve to inactive. `renderAt()` pins BOTH the injected hook and the document
+ * URL to the test's path, and `afterEach` resets the URL so this file neither
+ * leaks nor inherits location state.
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
@@ -49,7 +57,21 @@ vi.mock("@/components/layout/PageShell", () => ({
 vi.mock("@/lib/routes/nav-model", () => ({ NAV: [] }));
 vi.mock("@/native/NativeHeader", () => ({ NativeHeader: () => null }));
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  // Reset the document URL so location state never leaks between tests/files.
+  window.history.replaceState(null, "", "/");
+});
+
+/**
+ * Render `ui` at `path`, pinning both the wouter memory hook and the document
+ * URL so the active-tab assertions are deterministic regardless of test order.
+ */
+function renderAt(path: string, ui: React.ReactElement) {
+  window.history.replaceState(null, "", path);
+  const { hook } = memoryLocation({ path });
+  return render(<Router hook={hook}>{ui}</Router>);
+}
 
 function ContextReadout() {
   const value = useMobileShellContext();
@@ -63,13 +85,11 @@ describe("MobileShellContext", () => {
   });
 
   it("is true inside MobileShell", () => {
-    const { hook } = memoryLocation({ path: "/home" });
-    render(
-      <Router hook={hook}>
-        <MobileShell>
-          <ContextReadout />
-        </MobileShell>
-      </Router>,
+    renderAt(
+      "/home",
+      <MobileShell>
+        <ContextReadout />
+      </MobileShell>,
     );
     expect(screen.getByTestId("ctx").textContent).toBe("true");
   });
@@ -77,28 +97,24 @@ describe("MobileShellContext", () => {
 
 describe("AppShell inside MobileShell", () => {
   it("renders children without Layout chrome when MobileShellContext is active", () => {
-    const { hook } = memoryLocation({ path: "/home" });
-    render(
-      <Router hook={hook}>
-        <MobileShell>
-          <AppShell>
-            <span data-testid="content">page content</span>
-          </AppShell>
-        </MobileShell>
-      </Router>,
+    renderAt(
+      "/home",
+      <MobileShell>
+        <AppShell>
+          <span data-testid="content">page content</span>
+        </AppShell>
+      </MobileShell>,
     );
     expect(screen.getByTestId("content")).toBeTruthy();
     expect(screen.queryByTestId("layout")).toBeNull();
   });
 
   it("renders PageShell chrome outside MobileShell", () => {
-    const { hook } = memoryLocation({ path: "/home" });
-    render(
-      <Router hook={hook}>
-        <AppShell>
-          <span data-testid="content">page content</span>
-        </AppShell>
-      </Router>,
+    renderAt(
+      "/home",
+      <AppShell>
+        <span data-testid="content">page content</span>
+      </AppShell>,
     );
     expect(screen.getByTestId("content")).toBeTruthy();
     expect(screen.getByTestId("page-shell")).toBeTruthy();
@@ -107,113 +123,63 @@ describe("AppShell inside MobileShell", () => {
 
 describe("MobileTabBar active state", () => {
   it("marks Today tab as active at /home", () => {
-    const { hook } = memoryLocation({ path: "/home" });
-    render(
-      <Router hook={hook}>
-        <MobileTabBar />
-      </Router>,
-    );
+    renderAt("/home", <MobileTabBar onMorePress={() => {}} />);
     const todayBtn = screen.getByText("Today").closest("button");
     expect(todayBtn?.getAttribute("aria-current")).toBe("page");
     expect(screen.getByText("Equipment").closest("button")?.getAttribute("aria-current")).toBeNull();
   });
 
   it("marks Equipment tab as active at /equipment", () => {
-    const { hook } = memoryLocation({ path: "/equipment" });
-    render(
-      <Router hook={hook}>
-        <MobileTabBar />
-      </Router>,
-    );
+    renderAt("/equipment", <MobileTabBar onMorePress={() => {}} />);
     expect(screen.getByText("Equipment").closest("button")?.getAttribute("aria-current")).toBe("page");
     expect(screen.getByText("Today").closest("button")?.getAttribute("aria-current")).toBeNull();
   });
 
   it("marks Emergency tab as active at /code-blue", () => {
-    const { hook } = memoryLocation({ path: "/code-blue" });
-    render(
-      <Router hook={hook}>
-        <MobileTabBar onMorePress={() => {}} />
-      </Router>,
-    );
+    renderAt("/code-blue", <MobileTabBar onMorePress={() => {}} />);
     expect(screen.getByText("Emergency").closest("button")?.getAttribute("aria-current")).toBe("page");
     expect(screen.getByText("Today").closest("button")?.getAttribute("aria-current")).toBeNull();
   });
 
   it("marks Today tab as active at root /", () => {
-    const { hook } = memoryLocation({ path: "/" });
-    render(
-      <Router hook={hook}>
-        <MobileTabBar />
-      </Router>,
-    );
+    renderAt("/", <MobileTabBar onMorePress={() => {}} />);
     expect(screen.getByText("Today").closest("button")?.getAttribute("aria-current")).toBe("page");
     expect(screen.getByText("Equipment").closest("button")?.getAttribute("aria-current")).toBeNull();
   });
 
   it("keeps Equipment tab active at /equipment?scan=1", () => {
-    const { hook } = memoryLocation({ path: "/equipment?scan=1" });
-    render(
-      <Router hook={hook}>
-        <MobileTabBar />
-      </Router>,
-    );
+    renderAt("/equipment?scan=1", <MobileTabBar onMorePress={() => {}} />);
     expect(screen.getByText("Equipment").closest("button")?.getAttribute("aria-current")).toBe("page");
     expect(screen.getByText("Today").closest("button")?.getAttribute("aria-current")).toBeNull();
   });
 
   it("uses tab-bar-specific nav label", () => {
-    const { hook } = memoryLocation({ path: "/home" });
-    render(
-      <Router hook={hook}>
-        <MobileTabBar />
-      </Router>,
-    );
+    renderAt("/home", <MobileTabBar onMorePress={() => {}} />);
     expect(screen.getByRole("navigation", { name: "Tab navigation" })).toBeTruthy();
   });
 });
 
 describe("NativeTabSidebar active state", () => {
   it("marks Today tab as active at /home", () => {
-    const { hook } = memoryLocation({ path: "/home" });
-    render(
-      <Router hook={hook}>
-        <NativeTabSidebar onMorePress={() => {}} />
-      </Router>,
-    );
+    renderAt("/home", <NativeTabSidebar onMorePress={() => {}} />);
     const todayBtn = screen.getByText("Today").closest("button");
     expect(todayBtn?.getAttribute("aria-current")).toBe("page");
     expect(screen.getByText("Equipment").closest("button")?.getAttribute("aria-current")).toBeNull();
   });
 
   it("marks Today tab as active at root /", () => {
-    const { hook } = memoryLocation({ path: "/" });
-    render(
-      <Router hook={hook}>
-        <NativeTabSidebar onMorePress={() => {}} />
-      </Router>,
-    );
+    renderAt("/", <NativeTabSidebar onMorePress={() => {}} />);
     expect(screen.getByText("Today").closest("button")?.getAttribute("aria-current")).toBe("page");
   });
 
   it("marks Equipment tab as active at /equipment?scan=1", () => {
-    const { hook } = memoryLocation({ path: "/equipment?scan=1" });
-    render(
-      <Router hook={hook}>
-        <NativeTabSidebar onMorePress={() => {}} />
-      </Router>,
-    );
+    renderAt("/equipment?scan=1", <NativeTabSidebar onMorePress={() => {}} />);
     expect(screen.getByText("Equipment").closest("button")?.getAttribute("aria-current")).toBe("page");
     expect(screen.getByText("Today").closest("button")?.getAttribute("aria-current")).toBeNull();
   });
 
   it("renders sidebar navigation landmark", () => {
-    const { hook } = memoryLocation({ path: "/home" });
-    render(
-      <Router hook={hook}>
-        <NativeTabSidebar onMorePress={() => {}} />
-      </Router>,
-    );
+    renderAt("/home", <NativeTabSidebar onMorePress={() => {}} />);
     expect(screen.getByRole("navigation", { name: "Tab navigation" })).toBeTruthy();
   });
 });
