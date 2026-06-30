@@ -1,0 +1,115 @@
+{
+  "type": "test-group",
+  "name": "VetTrack PWA Audit",
+  "description": "Health checks for VetTrack: service worker, emergency cache bypass, offline sync queue, realtime cursor, API reachability, and browser storage. Import into Safari Web Inspector → Audit tab.",
+  "supports": 3,
+  "tests": [
+    {
+      "type": "test-group",
+      "name": "Service Worker",
+      "description": "Verifies SW registration state and build-tag cache hygiene.",
+      "tests": [
+        {
+          "type": "test-case",
+          "name": "SW registered and activated",
+          "description": "Service worker must be registered and activated before the app can serve offline.",
+          "test": "async function() { if (!('serviceWorker' in navigator)) { return { level: 'unsupported', description: 'ServiceWorker API not available in this context' }; } var reg = await navigator.serviceWorker.getRegistration().catch(function() { return null; }); if (!reg) { return { level: 'fail', description: 'No SW registration found — offline mode will not work' }; } var sw = reg.active || reg.installing || reg.waiting; if (!sw) { return { level: 'fail', description: 'SW object missing from registration' }; } if (sw.state !== 'activated') { return { level: 'warning', description: 'SW state is ' + sw.state + ' (expected activated) — SW may still be installing' }; } return { level: 'pass', description: 'SW activated — scope: ' + reg.scope }; }"
+        },
+        {
+          "type": "test-case",
+          "name": "Exactly one vettrack-* cache (no orphaned stale caches)",
+          "description": "On activate the SW purges all previous caches. Multiple vettrack-* caches mean cleanup did not run and stale assets may be served. Zero means SW has not installed yet.",
+          "test": "async function() { if (!('caches' in window)) { return { level: 'unsupported', description: 'Cache Storage API not available' }; } var all = await caches.keys(); var vt = all.filter(function(n) { return n.indexOf('vettrack-') === 0; }); if (vt.length === 0) { return { level: 'warning', description: 'No vettrack-* cache found. SW may not have installed yet. All caches: ' + (all.join(', ') || 'none') }; } if (vt.length > 1) { return { level: 'fail', description: 'Multiple vettrack-* caches exist — stale caches were NOT purged on activate: ' + vt.join(', ') }; } var buildTag = vt[0].slice('vettrack-'.length); return { level: 'pass', description: 'Single active cache: ' + vt[0] + ' (build tag: ' + buildTag + ')' }; }"
+        }
+      ]
+    },
+    {
+      "type": "test-group",
+      "name": "Emergency Cache Bypass",
+      "description": "Six API paths must never appear in Cache Storage. They carry live emergency state and must always hit the network.",
+      "tests": [
+        {
+          "type": "test-case",
+          "name": "No emergency paths in any cache",
+          "description": "Scans all Cache Storage caches for /api/display/snapshot, /api/code-blue/sessions/active, and four /api/realtime/* paths. A match is a critical regression.",
+          "test": "async function() { if (!('caches' in window)) { return { level: 'unsupported', description: 'Cache Storage API not available' }; } var bypass = ['/api/display/snapshot', '/api/code-blue/sessions/active', '/api/realtime/stream', '/api/realtime/replay', '/api/realtime/outbox-head', '/api/realtime/telemetry']; var cacheNames = await caches.keys(); var violations = []; for (var i = 0; i < cacheNames.length; i++) { var c = await caches.open(cacheNames[i]); for (var j = 0; j < bypass.length; j++) { var url = new URL(bypass[j], location.origin).href; var m = await c.match(url); if (m) { violations.push(cacheNames[i] + ' has ' + bypass[j]); } } } if (violations.length > 0) { return { level: 'fail', description: 'CRITICAL — emergency paths found in cache (bypass denylist broken): ' + violations.join('; ') }; } return { level: 'pass', description: 'All 6 emergency bypass paths absent from Cache Storage (' + cacheNames.length + ' cache(s) scanned)' }; }"
+        }
+      ]
+    },
+    {
+      "type": "test-group",
+      "name": "IndexedDB (VetTrackDB)",
+      "description": "Checks Dexie offline database schema version and pending-sync queue health.",
+      "tests": [
+        {
+          "type": "test-case",
+          "name": "VetTrackDB at schema version 6 with all stores",
+          "description": "The Dexie offline database must be at version 6 with five object stores: equipment, scanLogs, folders, rooms, pendingSync.",
+          "test": "async function() { return new Promise(function(resolve) { var aborted = false; var req = indexedDB.open('VetTrackDB'); req.onupgradeneeded = function(e) { aborted = true; e.target.transaction.abort(); resolve({ level: 'warning', description: 'VetTrackDB does not exist yet — app has not fully loaded or has never run offline' }); }; req.onerror = function() { if (!aborted) { resolve({ level: 'fail', description: 'Could not open VetTrackDB: ' + (req.error ? req.error.message : 'unknown error') }); } }; req.onsuccess = function() { var db = req.result; var v = db.version; var stores = Array.prototype.slice.call(db.objectStoreNames); db.close(); var expected = ['equipment', 'scanLogs', 'folders', 'rooms', 'pendingSync']; var missing = expected.filter(function(s) { return stores.indexOf(s) === -1; }); if (missing.length > 0) { return resolve({ level: 'fail', description: 'Missing object stores: ' + missing.join(', ') + '. Found: ' + stores.join(', ') }); } if (v < 6) { return resolve({ level: 'warning', description: 'DB version ' + v + ' (expected 6) — migration may be pending' }); } resolve({ level: 'pass', description: 'Version ' + v + ', stores: ' + stores.join(', ') }); }; }); }"
+        },
+        {
+          "type": "test-case",
+          "name": "Offline sync queue — no dead or failed rows",
+          "description": "Rows in dead, failed, or conflict state indicate sync failures. A pending/processing backlog > 5 is also flagged as a warning.",
+          "test": "async function() { return new Promise(function(resolve) { var aborted = false; var req = indexedDB.open('VetTrackDB'); req.onupgradeneeded = function(e) { aborted = true; e.target.transaction.abort(); resolve({ level: 'warning', description: 'VetTrackDB not initialised yet — skipping queue check' }); }; req.onerror = function() { if (!aborted) { resolve({ level: 'fail', description: 'Cannot open VetTrackDB: ' + (req.error ? req.error.message : 'unknown') }); } }; req.onsuccess = function() { var db = req.result; if (!db.objectStoreNames.contains('pendingSync')) { db.close(); return resolve({ level: 'warning', description: 'pendingSync object store not found in VetTrackDB' }); } var tx = db.transaction('pendingSync', 'readonly'); var getAllReq = tx.objectStore('pendingSync').getAll(); getAllReq.onerror = function() { db.close(); resolve({ level: 'fail', description: 'Could not read pendingSync store' }); }; getAllReq.onsuccess = function() { db.close(); var rows = getAllReq.result || []; var counts = { pending: 0, processing: 0, synced: 0, failed: 0, dead: 0, conflict: 0 }; rows.forEach(function(r) { var s = r.status || 'unknown'; if (counts.hasOwnProperty(s)) { counts[s]++; } }); var stuck = counts.pending + counts.processing; var bad = counts.failed + counts.dead + counts.conflict; var summary = 'total=' + rows.length + ' | pending=' + stuck + ' | failed=' + counts.failed + ' | dead=' + counts.dead + ' | conflict=' + counts.conflict; if (bad > 0) { return resolve({ level: 'warning', description: 'Sync queue has terminal rows — ' + summary }); } if (stuck > 5) { return resolve({ level: 'warning', description: 'Large pending backlog — ' + summary }); } resolve({ level: 'pass', description: 'Queue healthy — ' + summary }); }; }; }); }"
+        }
+      ]
+    },
+    {
+      "type": "test-group",
+      "name": "API Health",
+      "description": "Network reachability checks against the VetTrack Express backend.",
+      "tests": [
+        {
+          "type": "test-case",
+          "name": "/api/health/live responds 200 ok",
+          "description": "Liveness probe — the Express server must be reachable and return { status: 'ok' }.",
+          "test": "async function() { try { var r = await fetch(location.origin + '/api/health/live', { cache: 'no-store', credentials: 'include' }); var j = null; try { j = await r.json(); } catch(e) {} if (r.ok && j && j.status === 'ok') { return { level: 'pass', description: 'HTTP 200 — status: ok' }; } return { level: 'fail', description: 'Unexpected response: HTTP ' + r.status + ', body: ' + JSON.stringify(j) }; } catch(e) { return { level: 'fail', description: 'Fetch error — server may be unreachable: ' + String(e) }; } }"
+        },
+        {
+          "type": "test-case",
+          "name": "/api/realtime/outbox-head reachable",
+          "description": "The realtime outbox cursor endpoint must respond. HTTP 401 = server up but not authenticated; anything else is a server problem.",
+          "test": "async function() { try { var r = await fetch(location.origin + '/api/realtime/outbox-head', { cache: 'no-store', credentials: 'include' }); if (r.status === 401) { return { level: 'warning', description: 'HTTP 401 — endpoint reachable but requires authentication. Sign in and re-run.' }; } var j = null; try { j = await r.json(); } catch(e) {} if (r.ok && j && typeof j.maxPublishedId === 'number') { return { level: 'pass', description: 'Reachable — maxPublishedId: ' + j.maxPublishedId }; } return { level: 'fail', description: 'Unexpected: HTTP ' + r.status + ', body: ' + JSON.stringify(j) }; } catch(e) { return { level: 'fail', description: 'Fetch error: ' + String(e) }; } }"
+        },
+        {
+          "type": "test-case",
+          "name": "Realtime cursor lag is small",
+          "description": "Compares the localStorage cursor (vt_realtime_last_outbox_id) against the server maxPublishedId. Lag > 100 events suggests the SSE stream fell behind.",
+          "test": "async function() { var raw = localStorage.getItem('vt_realtime_last_outbox_id'); if (raw === null) { return { level: 'warning', description: 'No cursor in localStorage (key: vt_realtime_last_outbox_id) — SSE has not connected yet or this is a fresh tab' }; } var clientCursor = Number(raw); if (!isFinite(clientCursor)) { return { level: 'fail', description: 'Cursor value is not a number: ' + JSON.stringify(raw) }; } try { var r = await fetch(location.origin + '/api/realtime/outbox-head', { cache: 'no-store', credentials: 'include' }); if (!r.ok) { return { level: 'warning', description: 'Cannot reach outbox-head (HTTP ' + r.status + ') — cursor lag check skipped' }; } var j = await r.json(); var serverMax = j.maxPublishedId; var lag = serverMax - clientCursor; if (lag < 0) { return { level: 'warning', description: 'Client cursor (' + clientCursor + ') ahead of server (' + serverMax + ') — possible cursor corruption or tab re-use' }; } if (lag > 100) { return { level: 'warning', description: 'Lag: ' + lag + ' events behind (client=' + clientCursor + ', server=' + serverMax + ') — SSE may have stalled' }; } return { level: 'pass', description: 'Lag: ' + lag + ' events (client=' + clientCursor + ', server=' + serverMax + ')' }; } catch(e) { return { level: 'warning', description: 'Could not reach outbox-head: ' + String(e) }; } }"
+        }
+      ]
+    },
+    {
+      "type": "test-group",
+      "name": "Storage & Browser APIs",
+      "description": "Checks localStorage keys, sessionStorage guard states, and browser API availability.",
+      "tests": [
+        {
+          "type": "test-case",
+          "name": "BroadcastChannel supported",
+          "description": "VetTrack uses BroadcastChannel('vt_realtime_outbox_cursor') for cross-tab SSE cursor sharing. Unsupported means tabs cannot share realtime state.",
+          "test": "async function() { if (typeof BroadcastChannel === 'undefined') { return { level: 'unsupported', description: 'BroadcastChannel is not supported — cross-tab realtime cursor sharing will not work' }; } try { var bc = new BroadcastChannel('vt_realtime_outbox_cursor'); bc.close(); return { level: 'pass', description: 'BroadcastChannel(vt_realtime_outbox_cursor) opened and closed successfully' }; } catch(e) { return { level: 'fail', description: 'BroadcastChannel creation failed: ' + String(e) }; } }"
+        },
+        {
+          "type": "test-case",
+          "name": "Locale configured",
+          "description": "vettrack-locale in localStorage should be 'he' or 'en'. If absent the app falls back to the browser default.",
+          "test": "async function() { var locale = localStorage.getItem('vettrack-locale'); if (locale === null) { return { level: 'warning', description: 'No locale stored (key: vettrack-locale) — app will use browser default: ' + (navigator.language || 'unknown') }; } if (locale !== 'he' && locale !== 'en') { return { level: 'warning', description: 'Unexpected locale value: ' + JSON.stringify(locale) + ' (expected he or en)' }; } return { level: 'pass', description: 'Locale: ' + locale }; }"
+        },
+        {
+          "type": "test-case",
+          "name": "Chunk recovery guard is clear",
+          "description": "vt_chunk_recovery_guard is set during a ChunkLoadError recovery reload. If it persists the app looped on a bundle chunk error this session.",
+          "test": "async function() { var val = sessionStorage.getItem('vt_chunk_recovery_guard'); if (val === '1') { return { level: 'warning', description: 'Chunk recovery guard is set — a ChunkLoadError triggered a reload this session. Check the console for dynamic import failures.' }; } return { level: 'pass', description: 'Chunk recovery guard absent (no ChunkLoadError this session)' }; }"
+        },
+        {
+          "type": "test-case",
+          "name": "Offline emergency buffer is empty",
+          "description": "vt_offline_emergency_buffer_v1 is a tab-scoped sessionStorage buffer that should always be empty — offline Code Blue mutations are blocked, not queued.",
+          "test": "async function() { var raw = sessionStorage.getItem('vt_offline_emergency_buffer_v1'); if (raw === null) { return { level: 'pass', description: 'Key absent — expected when no offline emergency block has occurred this session' }; } var parsed; try { parsed = JSON.parse(raw); } catch(e) { return { level: 'fail', description: 'Key present but not valid JSON: ' + raw.slice(0, 80) }; } var len = Array.isArray(parsed) ? parsed.length : 'unknown'; if (len !== 0) { return { level: 'warning', description: 'Emergency buffer has ' + len + ' entries — this tab attempted offline Code Blue mutations that were blocked' }; } return { level: 'pass', description: 'Emergency buffer key present and empty' }; }"
+        }
+      ]
+    }
+  ]
+}

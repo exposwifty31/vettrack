@@ -76,7 +76,7 @@ export function NativeTabBar({ onMorePress }: Props) {
 
   const leftTabs: TabDef[] = [
     { id: "today", href: "/home", label: t.nav.today, icon: <Home size={22} /> },
-    { id: "equipment", href: "/equipment", label: t.nav.equipment, icon: <Package size={22} /> },
+    { id: "equipment", href: "/my-equipment", label: t.nav.equipment, icon: <Package size={22} /> },
   ];
 
   const rightTabs: TabDef[] = [

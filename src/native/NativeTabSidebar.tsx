@@ -69,7 +69,7 @@ export function NativeTabSidebar({ onMorePress }: Props) {
 
   const navItems: NavItem[] = [
     { id: "today",     href: "/home",      label: t.nav.today,     icon: <Home size={20} /> },
-    { id: "equipment", href: "/equipment", label: t.nav.equipment, icon: <Package size={20} /> },
+    { id: "equipment", href: "/my-equipment", label: t.nav.equipment, icon: <Package size={20} /> },
     { id: "scan",      href: "/scan",      label: t.nav.equipmentScan, icon: <QrCode size={20} /> },
     { id: "emergency", href: "/code-blue", label: t.nav.emergency, icon: <Activity size={20} /> },
   ];

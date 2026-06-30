@@ -98,7 +98,7 @@ export function AppRoutes() {
         <Route path="/home"><AuthGuard><HomePage /></AuthGuard></Route>
 
         {/* --- Equipment & board (canonical: /equipment, /equipment/tasks, /equipment/board) --- */}
-        <Route path="/equipment"><AuthGuard><EquipmentPage /></AuthGuard></Route>
+        <Route path="/equipment"><AuthGuard><WebOnlyGuard fallback="/my-equipment"><EquipmentPage /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/equipment/new"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/tasks"><AuthGuard><AppointmentsPage /></AuthGuard></Route>
         <Route path="/equipment/board"><AuthGuard><WebOnlyGuard><WardDisplayPage /></WebOnlyGuard></AuthGuard></Route>
