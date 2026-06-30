@@ -73,6 +73,7 @@ function renderAt(path: string, ui: React.ReactElement) {
   return render(<Router hook={hook}>{ui}</Router>);
 }
 
+/** Renders the current MobileShellContext value as text for assertions. */
 function ContextReadout() {
   const value = useMobileShellContext();
   return <span data-testid="ctx">{String(value)}</span>;
