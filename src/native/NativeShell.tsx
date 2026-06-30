@@ -1,9 +1,23 @@
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { NativeShellContext } from "./NativeShellContext";
 import { NativeTabBar } from "./NativeTabBar";
+import { NativeTabSidebar } from "./NativeTabSidebar";
 import { NativeHeader } from "./NativeHeader";
 import { MoreSheet } from "@/features/settings";
 import { NfcForegroundScan } from "@/components/nfc-foreground-scan";
+
+function useIsTablet(): boolean {
+  const [isTablet, setIsTablet] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const handler = () => setIsTablet(mq.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isTablet;
+}
 
 type Props = {
   children: ReactNode;
@@ -24,6 +38,55 @@ type Props = {
  */
 export function NativeShell({ children }: Props) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const isTablet = useIsTablet();
+
+  if (isTablet) {
+    return (
+      <NativeShellContext.Provider value={true}>
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            display: "flex",
+            flexDirection: "row",
+            overflow: "hidden",
+            background: "hsl(var(--background))",
+            paddingTop: "env(safe-area-inset-top)",
+          }}
+        >
+          <NativeTabSidebar onMorePress={() => setMoreOpen(true)} />
+
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                overflowX: "hidden",
+                WebkitOverflowScrolling: "touch",
+                overscrollBehaviorY: "contain",
+              }}
+            >
+              {children}
+            </div>
+          </div>
+
+          {!moreOpen && <NfcForegroundScan />}
+
+          <MoreSheet
+            open={moreOpen}
+            onClose={() => setMoreOpen(false)}
+          />
+        </div>
+      </NativeShellContext.Provider>
+    );
+  }
 
   return (
     <NativeShellContext.Provider value={true}>

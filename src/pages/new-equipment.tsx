@@ -465,7 +465,7 @@ export default function NewEquipmentPage() {
                 <Label htmlFor="usuallyFoundHere" className="text-sm font-medium">Floor note</Label>
                 <Textarea
                   id="usuallyFoundHere"
-                  placeholder="e.g. Usually near ICU prep alcove beside oxygen tanks"
+                  placeholder={t.newEquipment.fields.usuallyFoundHere.placeholder}
                   className="min-h-[72px] rounded-xl border-border/60 bg-background text-base resize-none"
                   maxLength={200}
                   {...register("usuallyFoundHere")}
@@ -479,7 +479,7 @@ export default function NewEquipmentPage() {
                 <Label htmlFor="searchAlias" className="text-sm font-medium">Also known as</Label>
                 <Input
                   id="searchAlias"
-                  placeholder="e.g. good FAST, parvo pump, doppler probe"
+                  placeholder={t.newEquipment.fields.searchAlias.placeholder}
                   className="h-12 rounded-xl border-border/60 bg-background text-base"
                   maxLength={200}
                   {...register("searchAlias")}
@@ -493,7 +493,7 @@ export default function NewEquipmentPage() {
                 <Label htmlFor="staffNote" className="text-sm font-medium">Staff note</Label>
                 <Textarea
                   id="staffNote"
-                  placeholder="e.g. Probe loses contact on right side"
+                  placeholder={t.newEquipment.fields.staffNote.placeholder}
                   className="min-h-[72px] rounded-xl border-border/60 bg-background text-base resize-none"
                   maxLength={500}
                   {...register("staffNote")}
@@ -540,7 +540,7 @@ export default function NewEquipmentPage() {
                 <Input
                   id="maintenanceIntervalDays"
                   type="number"
-                  placeholder="e.g. 30"
+                  placeholder={t.newEquipment.fields.maintenanceIntervalDays.placeholder}
                   min={1}
                   className="h-12 rounded-xl border-border/60 bg-background text-base"
                   {...register("maintenanceIntervalDays")}

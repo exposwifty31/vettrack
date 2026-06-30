@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { ShiftMessage } from "../types";
+import { t } from "@/lib/i18n";
 
 const escapeHtml = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -95,8 +96,8 @@ export function MessageBubble({ message, currentUserId, onReact, onPin, canPin }
           {canPin && (
             <button
               onClick={onPin}
-              className="text-xs opacity-30 hover:opacity-100 transition-opacity ml-1"
-              title="Pin message"
+              className="text-xs opacity-30 hover:opacity-100 transition-opacity ms-1"
+              title={t.shiftChat.panel.pinAria}
             >
               📌
             </button>

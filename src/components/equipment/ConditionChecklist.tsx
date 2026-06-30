@@ -82,7 +82,7 @@ export function ConditionChecklist({ conditions, existingStates, value, onChange
             </div>
             {entry?.verified && (
               <Input
-                placeholder="Notes (optional)"
+                placeholder={t.conditionChecklist.notesPlaceholder}
                 value={entry.notes ?? ""}
                 onChange={(e) => update(cond.id, { notes: e.target.value })}
                 className="text-sm h-7"

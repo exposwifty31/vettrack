@@ -76,7 +76,7 @@ function AdminAssetTypesContent() {
           <CardContent className="space-y-4">
             <div className="flex gap-2">
               <Input
-                placeholder="Type name"
+                placeholder={t.adminAssetTypesPage.typePlaceholder}
                 value={newTypeName}
                 onChange={(e) => setNewTypeName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && newTypeName.trim() && createTypeMut.mutate()}
@@ -118,7 +118,7 @@ function AdminAssetTypesContent() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-3 gap-2">
                 <Input
-                  placeholder="Condition name"
+                  placeholder={t.adminAssetTypesPage.conditionNamePlaceholder}
                   value={newCondName}
                   onChange={(e) => setNewCondName(e.target.value)}
                   className="col-span-1"
@@ -135,7 +135,7 @@ function AdminAssetTypesContent() {
                 <div className="flex gap-1">
                   <Input
                     type="number"
-                    placeholder="Stale (min)"
+                    placeholder={t.adminAssetTypesPage.staleMinPlaceholder}
                     value={newCondStale}
                     onChange={(e) => setNewCondStale(e.target.value)}
                     className="w-24"

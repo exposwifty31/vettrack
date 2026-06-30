@@ -414,7 +414,7 @@ export default function RoomsListPage() {
                 id="room-name"
                 value={roomName}
                 onChange={(e) => setRoomName(e.target.value)}
-                placeholder="e.g. Surgery A"
+                placeholder={t.roomsListPage.roomNamePlaceholder}
                 autoFocus
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
               />
@@ -425,7 +425,7 @@ export default function RoomsListPage() {
                 id="room-floor"
                 value={roomFloor}
                 onChange={(e) => setRoomFloor(e.target.value)}
-                placeholder="e.g. Level 2"
+                placeholder={t.roomsListPage.roomFloorPlaceholder}
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
               />
             </div>

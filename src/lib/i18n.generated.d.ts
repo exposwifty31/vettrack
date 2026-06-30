@@ -35,6 +35,7 @@ export interface TStructure {
       savedSuccess: string;
       unexpectedError: string;
     };
+    help: string;
   };
   status: {
     ok: string;
@@ -338,6 +339,8 @@ export interface TStructure {
       emergency: string;
       internalMedicine: string;
     };
+    skuPlaceholder: string;
+    categoryPlaceholder: string;
   };
   equipmentTruth: {
     title: string;
@@ -535,6 +538,9 @@ export interface TStructure {
     takePhoto: string;
     actionDone: string;
     actionDoneBody: string;
+    ariaEdit: string;
+    ariaDuplicate: string;
+    ariaEditFloorNote: string;
   };
   adminPilotCoverage: {
     title: string;
@@ -583,6 +589,18 @@ export interface TStructure {
         label: string;
         placeholder: string;
         description: string;
+      };
+      usuallyFoundHere: {
+        placeholder: string;
+      };
+      searchAlias: {
+        placeholder: string;
+      };
+      staffNote: {
+        placeholder: string;
+      };
+      maintenanceIntervalDays: {
+        placeholder: string;
       };
     };
     saveChanges: string;
@@ -1581,6 +1599,8 @@ export interface TStructure {
     cardItemsUnit: string;
     cardAvailShort: string;
     cardInUseShort: string;
+    roomNamePlaceholder: string;
+    roomFloorPlaceholder: string;
   };
   managementDashboardPage: {
     title: string;
@@ -3084,6 +3104,7 @@ export interface TStructure {
       sendBroadcastAria: string;
       sendAria: string;
       closeAria: string;
+      pinAria: string;
     };
   };
   auditLog: {
@@ -3784,5 +3805,21 @@ export interface TStructure {
       loading: string;
       noUsers: string;
     };
+  };
+  adminDocks: {
+    namePlaceholder: string;
+    descriptionPlaceholder: string;
+    roomPlaceholder: string;
+  };
+  adminAssetTypesPage: {
+    typePlaceholder: string;
+    conditionNamePlaceholder: string;
+    staleMinPlaceholder: string;
+  };
+  conditionChecklist: {
+    notesPlaceholder: string;
+  };
+  crashCartAdmin: {
+    itemNamePlaceholder: string;
   };
 }

@@ -979,7 +979,7 @@ function EquipmentDetailPageDesktop() {
               size="icon-sm"
               onClick={() => navigate("/equipment")}
               data-testid="btn-back"
-              aria-label="Back to equipment list"
+              aria-label={t.equipmentDetail.backToList}
             >
               <BackChevron className="w-5 h-5" aria-hidden />
             </Button>
@@ -1000,7 +1000,7 @@ function EquipmentDetailPageDesktop() {
                 size="icon-sm"
                 onClick={handleDuplicate}
                 title={t.equipmentDetail.toast.duplicateEquipment}
-                aria-label="Duplicate equipment"
+                aria-label={t.equipmentDetail.ariaDuplicate}
                 data-testid="btn-duplicate"
               >
                 <Copy className="w-4 h-4" aria-hidden />
@@ -1011,7 +1011,7 @@ function EquipmentDetailPageDesktop() {
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => navigate(`/equipment/${id}/edit`)}
-                aria-label="Edit equipment"
+                aria-label={t.equipmentDetail.ariaEdit}
                 data-testid="btn-edit"
               >
                 <Pencil className="w-4 h-4" aria-hidden />
@@ -1300,7 +1300,7 @@ function EquipmentDetailPageDesktop() {
               <button
                 onClick={() => { setFloorNoteText(equipment.usuallyFoundHere ?? ""); setEditingFloorNote(true); }}
                 className="shrink-0 text-amber-500 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-200"
-                aria-label="Edit floor note"
+                aria-label={t.equipmentDetail.ariaEditFloorNote}
               >
                 <Pencil className="h-3.5 w-3.5" />
               </button>
@@ -1779,7 +1779,7 @@ function EquipmentDetailPageDesktop() {
               </Label>
               <Textarea
                 id="report-issue-note"
-                placeholder="Describe the issue clearly..."
+                placeholder={t.equipmentDetail.describeIssue}
                 value={reportIssueNote}
                 onChange={(e) => {
                   setReportIssueNote(e.target.value);

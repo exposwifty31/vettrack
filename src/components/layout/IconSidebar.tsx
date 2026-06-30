@@ -53,7 +53,7 @@ export function IconSidebar() {
         const Icon = ICON_MAP[n.icon];
         if (!Icon) return null;
         return (
-          <Link key={n.id} href={n.href}>
+          <Link key={n.id} href={n.href} aria-label={navLabel(n.labelKey)}>
             <span
               title={navLabel(n.labelKey)}
               className={cn(

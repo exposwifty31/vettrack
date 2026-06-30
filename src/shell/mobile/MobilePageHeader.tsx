@@ -1,4 +1,5 @@
-import { ChevronLeft } from "lucide-react";
+import { BackChevron } from "@/components/ui/directional-chevron";
+import { t } from "@/lib/i18n";
 
 type Props = {
   title: string;
@@ -26,10 +27,10 @@ export function MobilePageHeader({ title, onBack }: Props) {
         <button
           type="button"
           onClick={onBack}
-          aria-label="Back"
+          aria-label={t.common.back}
           style={{
-            width: 40,
-            height: 40,
+            width: 48,
+            height: 48,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -42,7 +43,7 @@ export function MobilePageHeader({ title, onBack }: Props) {
             flexShrink: 0,
           }}
         >
-          <ChevronLeft size={24} />
+          <BackChevron size={24} />
         </button>
       ) : (
         <div style={{ width: 44, flexShrink: 0 }} />

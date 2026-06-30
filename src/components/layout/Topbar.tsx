@@ -48,7 +48,7 @@ export function Topbar() {
             className={cn(
               "text-sm font-medium px-2.5 py-1 rounded-[4px] whitespace-nowrap transition-colors duration-100",
               activeHref === n.href
-                ? "bg-[var(--brand-green-mid)] text-white font-semibold"
+                ? "bg-indigo-600 text-white font-semibold"
                 : "text-white/60 hover:text-white/85"
             )}
           >

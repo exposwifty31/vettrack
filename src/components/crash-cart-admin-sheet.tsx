@@ -192,7 +192,7 @@ export function CrashCartAdminSheet({ open, onOpenChange }: Props) {
                 value={form.key}
                 onChange={(e) => setForm((f) => ({ ...f, key: e.target.value.toLowerCase().replace(/\s+/g, "_") }))}
                 disabled={!!editTarget}
-                placeholder="epinephrine"
+                placeholder={t.crashCartAdmin.itemNamePlaceholder}
                 dir="ltr"
               />
             </div>
