@@ -72,7 +72,7 @@ denylist**, and **authority `off|shadow|enforce` envelope** are frozen contracts
 |---|---|---|
 | **Equipment** | Asset CRUD, custody/checkout/return, waitlist + reservation, operational-state lifecycle, RFID/scan location inference, ward/equipment display board, Asset Copilot (evidence-graph explanations) | `routes/equipment*.ts`, `routes/rooms.ts`, `routes/returns.ts`, `routes/display.ts`, `services/equipment-*.ts`, `domain/equipment/**` |
 | **Code Blue / safety** | Emergency sessions (online-only, server-confirmed), presence, crash-cart checks, reconciliation scanner | `routes/code-blue.ts`, `routes/crash-cart.ts`, `lib/code-blue-*.ts` |
-| **Authority & enforcement** | Effective clinical authority + per-clinic evaluator families (`off|shadow|enforce`) with Strategy-A safety net | `lib/authority.ts`, `lib/authority/enforcement/*`, `middleware/authority.ts` |
+| **Authority & enforcement** | Effective clinical authority + per-clinic evaluator families (`off \| shadow \| enforce`) with Strategy-A safety net | `lib/authority.ts`, `lib/authority/enforcement/*`, `middleware/authority.ts` |
 | **Inventory / dispense** | Containers, items, dispense (idempotent), restock, procurement/POs, shadow-inventory reconciliation | `routes/{containers,dispense,restock,inventory-items,procurement}.ts`, `services/*.ts` |
 | **Tasks & shifts** | Unified task model, task intelligence/automation/recall, shifts, clinical check-in, shift chat, alerts | `routes/{tasks,appointments,shifts,clinical-check-in,shift-chat,alert-acks}.ts` |
 | **Integrations** | External PMS adapters, HMAC inbound webhooks, canonical mapping, conflict engine, rollout/resilience, health dashboard | `server/integrations/**`, `routes/integrations.ts` |
@@ -85,7 +85,7 @@ denylist**, and **authority `off|shadow|enforce` envelope** are frozen contracts
 ## Execution flow
 
 **Server startup** (`server/index.ts`):
-`env-bootstrap` (loads `.env.local`→`.env`→OS env) → Sentry init → `validateEnv()` → build
+`env-bootstrap` (loads `.env.local` then `.env`; OS env always wins) → Sentry init → `validateEnv()` → build
 Express app → health routes (bypass middleware) → security/CORS/compression → raw-body
 webhook mounts (Clerk svix, integration HMAC, RFID) → `express.json()` + global XSS
 sanitizer → conditional Clerk middleware → `/api` rate-limit → i18n → tenant → session →
@@ -126,14 +126,17 @@ NODE_ENV=development
 
 ## Configuration
 
-- **Env precedence:** `.env.local` → `.env` → OS env (loaded by `server/lib/env-bootstrap.ts`). Full reference: `.env.example`.
+- **Env precedence** (highest → lowest): OS env (`process.env`) → `.env.local` → `.env`. `dotenv` never overwrites an already-set variable, so OS/Railway/CI values win (`server/lib/env-bootstrap.ts`). Full reference: `.env.example`.
 - **Auth mode** (resolved at startup by `server/lib/auth-mode.ts`):
   - *dev-bypass* — no Clerk keys → hardcoded `DEV_USER` (admin, `clinicId = dev-clinic-default`)
   - *clerk* — `CLERK_SECRET_KEY` present → full Clerk JWT validation
 - **Role hierarchy** (numeric): `admin=40 · vet=30 · senior_technician=25 · lead_technician=22 · vet_tech=20 · technician=20 · student=10`. Always sourced from `vt_users.role`.
-- **Required production env vars:** `DATABASE_URL`, `REDIS_URL`, `SESSION_SECRET`,
-  `CLERK_SECRET_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`, `ALLOWED_ORIGIN`, `CLERK_WEBHOOK_SECRET`,
-  `DB_CONFIG_ENCRYPTION_KEY` (AES-256-GCM for integration creds in `vt_server_config`).
+- **Required production env vars** (enforced at startup by `server/lib/envValidation.ts`):
+  `DATABASE_URL` (or `POSTGRES_URL`), `REDIS_URL`, `SESSION_SECRET`, `CLERK_SECRET_KEY`,
+  `VITE_CLERK_PUBLISHABLE_KEY`, `ALLOWED_ORIGIN`, `CLERK_WEBHOOK_SECRET`,
+  `DB_CONFIG_ENCRYPTION_KEY` (AES-256-GCM for integration creds in `vt_server_config`),
+  `DATA_INTEGRITY_HEALTH_TOKEN`, `DB_SSL_REJECT_UNAUTHORIZED`, `S3_ACCESS_KEY_ID`,
+  `S3_SECRET_ACCESS_KEY`.
 - **Feature/rollout flags** via `server/lib/feature-flags.ts` and `integrations/feature-flags.ts`.
 
 ---
