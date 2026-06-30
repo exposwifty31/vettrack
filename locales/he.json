@@ -41,7 +41,9 @@
     "sterilized": "עבר חיטוי",
     "all": "כל הסטטוסים",
     "info": "מידע",
-    "neutral": "לא ידוע"
+    "neutral": "לא ידוע",
+    "stale": "ישן",
+    "unknown": "לא ידוע"
   },
   "layout": {
     "nav": {

@@ -41,7 +41,9 @@
     "sterilized": "Sterilized",
     "all": "All statuses",
     "info": "Info",
-    "neutral": "Unknown"
+    "neutral": "Unknown",
+    "stale": "Stale",
+    "unknown": "Unknown"
   },
   "layout": {
     "nav": {

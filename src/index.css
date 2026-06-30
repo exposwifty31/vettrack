@@ -139,6 +139,13 @@
     --status-steril-bg: #eff6ff;
     --status-steril-fg: #1e40af;
     --status-steril-border: #93c5fd;
+    /* S1-D15-001 · stale + unknown as first-class status kinds */
+    --status-stale-bg: #fff7ed;
+    --status-stale-fg: #c2410c;
+    --status-stale-border: #fb923c;
+    --status-unknown-bg: #f9fafb;
+    --status-unknown-fg: #374151;
+    --status-unknown-border: #d1d5db;
 
     /* ── Emergency surface — replaces all zinc-* in code-blue and crash-cart ── */
     --emergency-bg:         12 12 12;

@@ -13,12 +13,14 @@ const KIND: Record<
   StatusKind,
   { bg: string; fg: string; bd: string; dot: string }
 > = {
-  ok:          { bg: "var(--status-ok-bg)",     fg: "var(--status-ok-fg)",     bd: "var(--status-ok-border)",     dot: "hsl(var(--status-ok))" },
-  issue:       { bg: "var(--status-issue-bg)",  fg: "var(--status-issue-fg)",  bd: "var(--status-issue-border)",  dot: "hsl(var(--status-issue))" },
-  maintenance: { bg: "var(--status-maint-bg)",  fg: "var(--status-maint-fg)",  bd: "var(--status-maint-border)",  dot: "hsl(var(--status-maintenance))" },
-  sterilized:  { bg: "var(--status-steril-bg)", fg: "var(--status-steril-fg)", bd: "var(--status-steril-border)", dot: "hsl(var(--status-sterilized))" },
-  info:        { bg: "var(--status-steril-bg)", fg: "var(--status-steril-fg)", bd: "var(--status-steril-border)", dot: "var(--status-info)" },
-  neutral:     { bg: "hsl(var(--muted))",       fg: "hsl(var(--muted-foreground))", bd: "rgb(var(--ivory-border))", dot: "rgb(var(--ivory-text3))" },
+  ok:          { bg: "var(--status-ok-bg)",      fg: "var(--status-ok-fg)",      bd: "var(--status-ok-border)",      dot: "hsl(var(--status-ok))" },
+  issue:       { bg: "var(--status-issue-bg)",   fg: "var(--status-issue-fg)",   bd: "var(--status-issue-border)",   dot: "hsl(var(--status-issue))" },
+  maintenance: { bg: "var(--status-maint-bg)",   fg: "var(--status-maint-fg)",   bd: "var(--status-maint-border)",   dot: "hsl(var(--status-maintenance))" },
+  sterilized:  { bg: "var(--status-steril-bg)",  fg: "var(--status-steril-fg)",  bd: "var(--status-steril-border)",  dot: "hsl(var(--status-sterilized))" },
+  info:        { bg: "var(--status-steril-bg)",  fg: "var(--status-steril-fg)",  bd: "var(--status-steril-border)",  dot: "var(--status-info)" },
+  neutral:     { bg: "hsl(var(--muted))",        fg: "hsl(var(--muted-foreground))", bd: "rgb(var(--ivory-border))", dot: "rgb(var(--ivory-text3))" },
+  stale:       { bg: "var(--status-stale-bg)",   fg: "var(--status-stale-fg)",   bd: "var(--status-stale-border)",   dot: "var(--status-stale-fg)" },
+  unknown:     { bg: "var(--status-unknown-bg)",  fg: "var(--status-unknown-fg)",  bd: "var(--status-unknown-border)",  dot: "var(--status-unknown-fg)" },
 };
 
 // Repository reality override: uses t.status.* accessor pattern
@@ -30,6 +32,8 @@ const STATUS_LABELS: Record<StatusKind, () => string> = {
   sterilized:  () => t.status.sterilized,
   info:        () => (t.status as Record<string, string>)["info"] ?? "Info",
   neutral:     () => (t.status as Record<string, string>)["neutral"] ?? "Unknown",
+  stale:       () => (t.status as Record<string, string>)["stale"] ?? "Stale",
+  unknown:     () => (t.status as Record<string, string>)["unknown"] ?? "Unknown",
 };
 
 export interface StatusBadgeProps
