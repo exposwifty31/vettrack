@@ -166,6 +166,14 @@
     /* ── Shift active state ── */
     --shift-active:         22 163 74;
     --shift-inactive:       122 138 126;
+
+    /* S1-D1-003 · on-ink token family — for text/stroke on dark (brand-ink) surfaces */
+    --on-ink:               #ffffff;
+    --on-ink-strong:        rgba(255, 255, 255, 0.82);
+    --on-ink-muted:         rgba(255, 255, 255, 0.55);
+    --on-ink-subtle:        rgba(255, 255, 255, 0.50);
+    --ink-sheen:            rgba(255, 255, 255, 0.10);
+    --ink-divider:          rgba(255, 255, 255, 0.12);
   }
 
   .dark {
@@ -358,9 +366,10 @@
      still wins (no double indicators) — this only catches interactive
      elements that would otherwise show nothing (header logo, icon buttons…).
      :focus-visible means mouse users are unaffected. */
+  /* S2-D8-001 · double-ring focus: surface halo + brand ring, works on any bg */
   :where(a, button, input, select, textarea, summary, [role="button"], [role="link"], [role="tab"], [tabindex]:not([tabindex="-1"])):focus-visible {
-    outline: 2px solid hsl(var(--ring));
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring));
     border-radius: var(--radius-sm);
   }
   input,
