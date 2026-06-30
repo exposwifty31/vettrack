@@ -321,7 +321,10 @@ const translations = {
     },
     takePhoto: d.equipmentDetail.takePhoto,
     actionDone: d.equipmentDetail.actionDone,
-    actionDoneBody: d.equipmentDetail.actionDoneBody,
+    actionDoneBody: (name: string) => tr(d.equipmentDetail.actionDoneBody, { name }),
+    ariaEdit: d.equipmentDetail.ariaEdit,
+    ariaDuplicate: d.equipmentDetail.ariaDuplicate,
+    ariaEditFloorNote: d.equipmentDetail.ariaEditFloorNote,
   },
 
   adminPilotCoverage: {
@@ -1201,6 +1204,14 @@ const translations = {
   more: d.more,
 
   profile: d.profile,
+
+  adminDocks: d.adminDocks,
+
+  adminAssetTypesPage: d.adminAssetTypesPage,
+
+  conditionChecklist: d.conditionChecklist,
+
+  crashCartAdmin: d.crashCartAdmin,
 
 } as const;
 

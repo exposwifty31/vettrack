@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { HelpCircle } from "lucide-react";
+import { t } from "@/lib/i18n";
 
 interface HelpTooltipProps {
   content: string;
@@ -41,7 +42,7 @@ export function HelpTooltip({ content, side = "bottom", className = "" }: HelpTo
           setOpen((o) => !o);
         }}
         className="w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted transition-colors"
-        aria-label="Help"
+        aria-label={t.common.help}
         aria-expanded={open}
       >
         <HelpCircle className="w-3.5 h-3.5" />

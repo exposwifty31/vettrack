@@ -34,7 +34,7 @@ export function SectionList<T>({
             <div
               className="sticky top-0 z-[20] -mx-0.5 bg-background/95 px-0.5 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-ivory-text3 backdrop-blur-sm"
               role="heading"
-              aria-level={3}
+              aria-level={2}
             >
               {section.label}
             </div>

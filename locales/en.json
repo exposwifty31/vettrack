@@ -31,7 +31,8 @@
     "toast": {
       "savedSuccess": "Saved",
       "unexpectedError": "Something went wrong."
-    }
+    },
+    "help": "Help"
   },
   "status": {
     "ok": "Ready",
@@ -334,7 +335,9 @@
       "hospital": "Hospital",
       "emergency": "Emergency",
       "internalMedicine": "Internal Medicine"
-    }
+    },
+    "skuPlaceholder": "e.g. IV_16G_CATHETER",
+    "categoryPlaceholder": "Select category…"
   },
   "equipmentTruth": {
     "title": "Operational truth",
@@ -531,7 +534,10 @@
     },
     "takePhoto": "Take / Upload Photo",
     "actionDone": "Done!",
-    "actionDoneBody": "Action completed for {name}."
+    "actionDoneBody": "Action completed for {name}.",
+    "ariaEdit": "Edit equipment",
+    "ariaDuplicate": "Duplicate equipment",
+    "ariaEditFloorNote": "Edit floor note"
   },
   "adminPilotCoverage": {
     "title": "Pilot Coverage",
@@ -580,6 +586,18 @@
         "label": "Expected return time (minutes)",
         "placeholder": "e.g. 45",
         "description": "Required for smart role-based return reminders."
+      },
+      "usuallyFoundHere": {
+        "placeholder": "e.g. Usually near ICU prep alcove beside oxygen tanks"
+      },
+      "searchAlias": {
+        "placeholder": "e.g. good FAST, parvo pump, doppler probe"
+      },
+      "staffNote": {
+        "placeholder": "e.g. Probe loses contact on right side"
+      },
+      "maintenanceIntervalDays": {
+        "placeholder": "e.g. 30"
       }
     },
     "saveChanges": "Save changes",
@@ -1577,7 +1595,9 @@
     "summarySynced": "Synced",
     "cardItemsUnit": "items",
     "cardAvailShort": "avail.",
-    "cardInUseShort": "in use"
+    "cardInUseShort": "in use",
+    "roomNamePlaceholder": "e.g. Surgery A",
+    "roomFloorPlaceholder": "e.g. Level 2"
   },
   "managementDashboardPage": {
     "title": "Dashboard",
@@ -2770,7 +2790,7 @@
   },
   "codeBlue": {
     "openTitle": "OPEN CODE BLUE",
-    "openButton": "⚠ Open CODE BLUE",
+    "openButton": "⚠ OPEN CODE BLUE",
     "proceedWithoutFullCheck": "Continue without full check",
     "managerLabel": "Distribution manager",
     "managerLabelShort": "Distribution manager:",
@@ -3080,7 +3100,8 @@
       "markUrgentAria": "Mark as urgent",
       "sendBroadcastAria": "Send broadcast command",
       "sendAria": "Send",
-      "closeAria": "Close chat"
+      "closeAria": "Close chat",
+      "pinAria": "Pin message"
     }
   },
   "auditLog": {
@@ -3781,5 +3802,21 @@
       "loading": "Loading staff...",
       "noUsers": "No staff found"
     }
+  },
+  "adminDocks": {
+    "namePlaceholder": "Dock name",
+    "descriptionPlaceholder": "Description (optional)",
+    "roomPlaceholder": "Room (optional)"
+  },
+  "adminAssetTypesPage": {
+    "typePlaceholder": "Type name",
+    "conditionNamePlaceholder": "Condition name",
+    "staleMinPlaceholder": "Stale (min)"
+  },
+  "conditionChecklist": {
+    "notesPlaceholder": "Notes (optional)"
+  },
+  "crashCartAdmin": {
+    "itemNamePlaceholder": "e.g. epinephrine"
   }
 }

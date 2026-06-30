@@ -15,6 +15,7 @@ import { memoryLocation } from "wouter/memory-location";
 import { MobileShellContext, useMobileShellContext } from "@/shell/mobile/MobileShellContext";
 import { MobileShell } from "@/shell/mobile/MobileShell";
 import { MobileTabBar } from "@/shell/mobile/MobileTabBar";
+import { NativeTabSidebar } from "@/native/NativeTabSidebar";
 import { AppShell } from "@/components/layout/AppShell";
 
 vi.mock("@/lib/i18n", () => ({
@@ -166,6 +167,51 @@ describe("MobileTabBar active state", () => {
     render(
       <Router hook={hook}>
         <MobileTabBar />
+      </Router>,
+    );
+    expect(screen.getByRole("navigation", { name: "Tab navigation" })).toBeTruthy();
+  });
+});
+
+describe("NativeTabSidebar active state", () => {
+  it("marks Today tab as active at /home", () => {
+    const { hook } = memoryLocation({ path: "/home" });
+    render(
+      <Router hook={hook}>
+        <NativeTabSidebar onMorePress={() => {}} />
+      </Router>,
+    );
+    const todayBtn = screen.getByText("Today").closest("button");
+    expect(todayBtn?.getAttribute("aria-current")).toBe("page");
+    expect(screen.getByText("Equipment").closest("button")?.getAttribute("aria-current")).toBeNull();
+  });
+
+  it("marks Today tab as active at root /", () => {
+    const { hook } = memoryLocation({ path: "/" });
+    render(
+      <Router hook={hook}>
+        <NativeTabSidebar onMorePress={() => {}} />
+      </Router>,
+    );
+    expect(screen.getByText("Today").closest("button")?.getAttribute("aria-current")).toBe("page");
+  });
+
+  it("marks Equipment tab as active at /equipment?scan=1", () => {
+    const { hook } = memoryLocation({ path: "/equipment?scan=1" });
+    render(
+      <Router hook={hook}>
+        <NativeTabSidebar onMorePress={() => {}} />
+      </Router>,
+    );
+    expect(screen.getByText("Equipment").closest("button")?.getAttribute("aria-current")).toBe("page");
+    expect(screen.getByText("Today").closest("button")?.getAttribute("aria-current")).toBeNull();
+  });
+
+  it("renders sidebar navigation landmark", () => {
+    const { hook } = memoryLocation({ path: "/home" });
+    render(
+      <Router hook={hook}>
+        <NativeTabSidebar onMorePress={() => {}} />
       </Router>,
     );
     expect(screen.getByRole("navigation", { name: "Tab navigation" })).toBeTruthy();

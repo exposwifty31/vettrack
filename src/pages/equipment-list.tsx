@@ -488,12 +488,12 @@ function EquipmentListPageDesktop() {
                 {t.equipmentList.actions.exportExcel}
               </Button>
             )}
-            <Link href="/equipment/new">
-              <Button size="sm" className="h-11 text-xs" data-testid="btn-add">
+            <Button size="sm" className="h-11 text-xs" data-testid="btn-add" asChild>
+              <Link href="/equipment/new">
                 <Plus className="w-4 h-4 me-1" />
                 {t.home.addEquipment}
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
         </div>
 
@@ -1121,11 +1121,17 @@ function EquipmentItem({
         />
       )}
       <div className="flex-1 min-w-0">
-        <Link href={`/equipment/${eq.id}`} onClick={(e) => selectMode && e.preventDefault()}>
           <Card
-            className={`bg-card border-border/60 shadow-sm transition-all hover:shadow-md active:scale-[0.99] ${selected ? "bg-primary/5 ring-2 ring-primary/30" : ""}`}
+            className={`relative bg-card border-border/60 shadow-sm transition-all hover:shadow-md active:scale-[0.99] ${selected ? "bg-primary/5 ring-2 ring-primary/30" : ""}`}
             data-testid={`equipment-item-${eq.id}`}
           >
+            {!selectMode && (
+              <Link
+                href={`/equipment/${eq.id}`}
+                aria-label={`${displayName} — ${eq.status}${eq.location ? `, ${eq.location}` : ""}`}
+                className="absolute inset-0 rounded-[inherit] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:outline-none z-0"
+              />
+            )}
             {/*
               aspectRatio "5/4" — card always reserves its space before data arrives.
               minHeight 72 — floor so tiny-content cards stay tap-friendly.
@@ -1269,9 +1275,9 @@ function EquipmentItem({
                 {!selectMode && quickAction ? (
                   quickAction.action ? (
                     <button
-                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); quickAction.action!(); }}
+                      onClick={(e) => { e.stopPropagation(); quickAction.action!(); }}
                       disabled={quickAction.pending}
-                      className={`flex items-center gap-1.5 px-3 rounded-lg border text-xs font-semibold min-h-[44px] transition-colors ${quickAction.className}`}
+                      className={`relative z-10 flex items-center gap-1.5 px-3 rounded-lg border text-xs font-semibold min-h-[44px] transition-colors ${quickAction.className}`}
                       style={{ flexShrink: 0 }}
                       data-testid={`quick-action-${eq.id}`}
                     >
@@ -1283,15 +1289,15 @@ function EquipmentItem({
                       <span>{quickAction.label}</span>
                     </button>
                   ) : (
-                    <Link href={quickAction.href!} onClick={(e) => e.stopPropagation()}>
-                      <button
-                        className={`flex items-center gap-1.5 px-3 rounded-lg border text-xs font-semibold min-h-[44px] transition-colors ${quickAction.className}`}
-                        style={{ flexShrink: 0 }}
-                        data-testid={`quick-action-${eq.id}`}
-                      >
-                        <quickAction.icon className="w-3.5 h-3.5" />
-                        <span>{quickAction.label}</span>
-                      </button>
+                    <Link
+                      href={quickAction.href!}
+                      onClick={(e) => e.stopPropagation()}
+                      className={`relative z-10 flex items-center gap-1.5 px-3 rounded-lg border text-xs font-semibold min-h-[44px] transition-colors ${quickAction.className}`}
+                      style={{ flexShrink: 0 }}
+                      data-testid={`quick-action-${eq.id}`}
+                    >
+                      <quickAction.icon className="w-3.5 h-3.5" />
+                      <span>{quickAction.label}</span>
                     </Link>
                   )
                 ) : (
@@ -1311,7 +1317,6 @@ function EquipmentItem({
               </div>
             </CardContent>
           </Card>
-        </Link>
       </div>
     </div>
     <ReturnPlugDialog

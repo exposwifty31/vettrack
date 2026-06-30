@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { t } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -68,20 +69,20 @@ function AdminDocksContent() {
               <label htmlFor="dock-name" className="sr-only">Dock name</label>
               <Input
                 id="dock-name"
-                placeholder="Dock name"
+                placeholder={t.adminDocks.namePlaceholder}
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
               />
               <label htmlFor="dock-desc" className="sr-only">Description</label>
               <Input
                 id="dock-desc"
-                placeholder="Description (optional)"
+                placeholder={t.adminDocks.descriptionPlaceholder}
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}
               />
               <Select value={newRoomId || "__none__"} onValueChange={(v) => setNewRoomId(v === "__none__" ? "" : v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Room (optional)" />
+                  <SelectValue placeholder={t.adminDocks.roomPlaceholder} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">No room</SelectItem>

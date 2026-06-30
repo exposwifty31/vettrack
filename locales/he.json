@@ -31,7 +31,8 @@
     "toast": {
       "savedSuccess": "נשמר",
       "unexpectedError": "משהו השתבש."
-    }
+    },
+    "help": "עזרה"
   },
   "status": {
     "ok": "תקין",
@@ -334,7 +335,9 @@
       "hospital": "בית חולים",
       "emergency": "מיון",
       "internalMedicine": "רפואה פנימית"
-    }
+    },
+    "skuPlaceholder": "לדוגמה: IV_16G_CATHETER",
+    "categoryPlaceholder": "בחר קטגוריה…"
   },
   "equipmentTruth": {
     "title": "אמת תפעולית",
@@ -531,7 +534,10 @@
     },
     "takePhoto": "צלם / העלה תמונה",
     "actionDone": "בוצע!",
-    "actionDoneBody": "הפעולה הושלמה עבור {name}."
+    "actionDoneBody": "הפעולה הושלמה עבור {name}.",
+    "ariaEdit": "ערוך ציוד",
+    "ariaDuplicate": "שכפל ציוד",
+    "ariaEditFloorNote": "ערוך הערת קומה"
   },
   "adminPilotCoverage": {
     "title": "כיסוי פיילוט",
@@ -580,6 +586,18 @@
         "label": "זמן שימוש צפוי (דקות)",
         "placeholder": "לדוגמה: 45",
         "description": "נדרש לתזכורות החזרה חכמות לפי תפקיד."
+      },
+      "usuallyFoundHere": {
+        "placeholder": "לדוגמה: ליד מכונת החמצן ביחידה לטיפול נמרץ"
+      },
+      "searchAlias": {
+        "placeholder": "לדוגמה: אולטרסאונד, דופלר, פרבו"
+      },
+      "staffNote": {
+        "placeholder": "לדוגמה: החיישן מאבד מגע מצד ימין"
+      },
+      "maintenanceIntervalDays": {
+        "placeholder": "לדוגמה: 30"
       }
     },
     "saveChanges": "שמור שינויים",
@@ -1577,7 +1595,9 @@
     "summarySynced": "מסונכרן",
     "cardItemsUnit": "פריטים",
     "cardAvailShort": "זמינים",
-    "cardInUseShort": "בשימוש"
+    "cardInUseShort": "בשימוש",
+    "roomNamePlaceholder": "לדוגמה: חדר ניתוח א'",
+    "roomFloorPlaceholder": "לדוגמה: קומה 2"
   },
   "managementDashboardPage": {
     "title": "לוח בקרה",
@@ -3080,7 +3100,8 @@
       "markUrgentAria": "סמן כדחוף",
       "sendBroadcastAria": "שלח פקודת שידור",
       "sendAria": "שלח",
-      "closeAria": "סגור צ׳אט"
+      "closeAria": "סגור צ׳אט",
+      "pinAria": "הצמד הודעה"
     }
   },
   "auditLog": {
@@ -3781,5 +3802,21 @@
     "sectionAdmin": "ניהול",
     "sectionRoutine": "שגרה",
     "settings": "הגדרות"
+  },
+  "adminDocks": {
+    "namePlaceholder": "שם עגינה",
+    "descriptionPlaceholder": "תיאור (אופציונלי)",
+    "roomPlaceholder": "חדר (אופציונלי)"
+  },
+  "adminAssetTypesPage": {
+    "typePlaceholder": "שם סוג",
+    "conditionNamePlaceholder": "שם מצב",
+    "staleMinPlaceholder": "מיושן (דק׳)"
+  },
+  "conditionChecklist": {
+    "notesPlaceholder": "הערות (אופציונלי)"
+  },
+  "crashCartAdmin": {
+    "itemNamePlaceholder": "לדוגמה: אפינפרין"
   }
 }

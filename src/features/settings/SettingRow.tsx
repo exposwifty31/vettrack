@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ChevronRight } from "lucide-react";
+import { ForwardChevron } from "@/components/ui/directional-chevron";
 
 type Props = {
   icon?: ReactNode;
@@ -51,7 +51,7 @@ export function SettingRow({ icon, label, value, destructive = false, onClick }:
           {value}
         </span>
       )}
-      <ChevronRight
+      <ForwardChevron
         size={16}
         aria-hidden
         style={{ color: "hsl(var(--muted-foreground))", flexShrink: 0 }}

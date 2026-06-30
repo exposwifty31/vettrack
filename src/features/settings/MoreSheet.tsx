@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import {
   LogOut, User,
@@ -43,6 +43,16 @@ export function MoreSheet({ open, onClose }: Props) {
   const { isAdmin } = useAuth();
   const dialogRef = useRef<HTMLDivElement>(null);
   const startYRef = useRef<number | null>(null);
+  const [isTablet, setIsTablet] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const handler = () => setIsTablet(mq.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   useEffect(() => {
     if (open) dialogRef.current?.focus();
@@ -76,9 +86,25 @@ export function MoreSheet({ open, onClose }: Props) {
         aria-label={t.more.title}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
-        onTouchStart={handleDragStart}
-        onTouchEnd={handleDragEnd}
-        style={{
+        onTouchStart={isTablet ? undefined : handleDragStart}
+        onTouchEnd={isTablet ? undefined : handleDragEnd}
+        style={isTablet ? {
+          position: "fixed",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          width: 380,
+          maxWidth: "90vw",
+          maxHeight: "85vh",
+          borderRadius: 20,
+          background: "hsl(var(--background))",
+          zIndex: 50,
+          paddingBottom: 16,
+          boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+          outline: "none",
+          overflowY: "auto",
+          animation: "fadeIn 180ms ease both",
+        } : {
           position: "fixed",
           bottom: 0,
           left: 0,

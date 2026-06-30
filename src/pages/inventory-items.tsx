@@ -283,7 +283,7 @@ export default function InventoryItemsPage() {
                 value={form.code}
                 onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
                 disabled={!!editTarget}
-                placeholder="IV_16G_CATHETER"
+                placeholder={t.inventoryPage.skuPlaceholder}
               />
             </div>
             <div className="space-y-1">
@@ -301,7 +301,7 @@ export default function InventoryItemsPage() {
                 onValueChange={(v) => setForm((f) => ({ ...f, category: v === "__none__" ? "" : v }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select category…" />
+                  <SelectValue placeholder={t.inventoryPage.categoryPlaceholder} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">— None —</SelectItem>

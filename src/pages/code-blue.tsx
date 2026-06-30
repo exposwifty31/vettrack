@@ -185,7 +185,7 @@ function PreCheckGate({
       {!allChecked && (
         <button
           type="button"
-          className="w-full mt-2 min-h-[44px] text-xs text-emergency-text2/80 hover:text-emergency-text2"
+          className="w-full mt-2 min-h-[44px] rounded-lg border border-emergency-border/50 text-xs text-emergency-text2/80 hover:text-emergency-text2 hover:bg-emergency-border/30 transition-colors"
           onClick={() => handleStart(false)}
         >
           {t.codeBlue.proceedWithoutFullCheck}

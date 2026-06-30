@@ -17,13 +17,12 @@ import {
 } from "@/components/ui/select";
 import {
   Shield,
-  ChevronLeft,
-  ChevronRight,
   ClipboardList,
   AlertTriangle,
   RefreshCw,
   User,
 } from "lucide-react";
+import { BackChevron, ForwardChevron } from "@/components/ui/directional-chevron";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { format } from "date-fns";
@@ -406,7 +405,7 @@ export function SharedAuditLogsPanel({
             className="gap-1 h-11 text-xs"
             data-testid="btn-prev-client-page"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <BackChevron className="w-4 h-4" />
             {t.adminPage.auditLogPrevious}
           </Button>
           <span className="text-sm text-muted-foreground">
@@ -421,7 +420,7 @@ export function SharedAuditLogsPanel({
             data-testid="btn-next-client-page"
           >
             {t.adminPage.auditLogNext}
-            <ChevronRight className="w-4 h-4" />
+            <ForwardChevron className="w-4 h-4" />
           </Button>
         </div>
       )}
@@ -439,7 +438,7 @@ export function SharedAuditLogsPanel({
             }}
             className="gap-1 h-11 text-xs"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <BackChevron className="w-4 h-4" />
             {t.adminPage.auditLogLoadEarlier}
           </Button>
           <span className="text-xs text-muted-foreground">{t.adminPage.auditLogBatch(serverPage)}</span>
@@ -454,7 +453,7 @@ export function SharedAuditLogsPanel({
             className="gap-1 h-11 text-xs"
           >
             {t.adminPage.auditLogLoadMore}
-            <ChevronRight className="w-4 h-4" />
+            <ForwardChevron className="w-4 h-4" />
           </Button>
         </div>
       )}

@@ -99,8 +99,8 @@ export default {
       },
       fontFamily: {
         sans: [
-          "Plus Jakarta Sans",
           "Heebo",
+          "Plus Jakarta Sans",
           "Noto Sans Hebrew",
           "Rubik",
           "system-ui",

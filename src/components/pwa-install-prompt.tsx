@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X, Download, Share2, PlusSquare } from "lucide-react";
 import { useLocation } from "wouter";
 import { usePwaInstall } from "@/hooks/use-pwa-install";
+import { t } from "@/lib/i18n";
 
 const EMERGENCY_ROUTES = ["/code-blue", "/crash-cart"];
 
@@ -26,8 +27,7 @@ export function PwaInstallPrompt() {
   // ── Android / Chrome install banner ──────────────────────────────────────
   if (canInstall && !androidDismissed) {
     return (
-      <div
-        role="banner"
+      <aside
         aria-label="Install VetTrack"
         data-testid="pwa-install-banner"
         className="fixed bottom-0 inset-x-0 z-50"
@@ -39,7 +39,7 @@ export function PwaInstallPrompt() {
             alt=""
             className="w-12 h-12 rounded-xl shrink-0"
           />
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0" dir="ltr">
             <p className="font-semibold text-sm text-foreground leading-snug">
               Install VetTrack
             </p>
@@ -67,13 +67,13 @@ export function PwaInstallPrompt() {
           </div>
           <button
             onClick={() => setAndroidDismissed(true)}
-            aria-label="Dismiss install banner"
+            aria-label={t.common.close}
             className="flex items-center justify-center min-w-[44px] min-h-[44px] -mt-2 -me-2 text-muted-foreground hover:text-foreground shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
-      </div>
+      </aside>
     );
   }
 
@@ -81,8 +81,7 @@ export function PwaInstallPrompt() {
   // Re-shown every 7 days so staff who dismiss it early can still find it.
   if (isIos && !iosGuidanceDismissed) {
     return (
-      <div
-        role="banner"
+      <aside
         aria-label="Add VetTrack to Home Screen"
         data-testid="pwa-ios-guidance"
         className="fixed bottom-0 inset-x-0 z-50"
@@ -96,7 +95,7 @@ export function PwaInstallPrompt() {
               alt=""
               className="w-10 h-10 rounded-xl shrink-0"
             />
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0" dir="ltr">
               <p className="font-semibold text-sm text-foreground leading-tight">
                 Install VetTrack
               </p>
@@ -106,15 +105,15 @@ export function PwaInstallPrompt() {
             </div>
             <button
               onClick={dismissIosGuidance}
-              aria-label="Dismiss"
+              aria-label={t.common.close}
               className="flex items-center justify-center min-w-[44px] min-h-[44px] -mt-2 -me-2 text-muted-foreground hover:text-foreground shrink-0"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Steps */}
-          <div className="bg-muted/50 rounded-xl px-3 py-2.5 space-y-2">
+          {/* Steps — iOS UI element names are always shown in English on device */}
+          <div className="bg-muted/50 rounded-xl px-3 py-2.5 space-y-2" dir="ltr">
             <div className="flex items-center gap-2.5 text-xs text-foreground">
               <span className="flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground font-bold shrink-0 text-[10px]">
                 1
@@ -137,7 +136,7 @@ export function PwaInstallPrompt() {
             </div>
           </div>
         </div>
-      </div>
+      </aside>
     );
   }
 
