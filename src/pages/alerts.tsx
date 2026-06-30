@@ -168,6 +168,12 @@ function AlertsPageDesktop() {
     grouped[alert.type]!.push(alert);
   }
 
+  // Spec: Urgent → Warning → Info severity tiers
+  const SEVERITY_TIERS: { label: string; types: AlertType[]; color: string }[] = [
+    { label: "Urgent",  types: ["issue"] as AlertType[],                              color: "var(--status-issue-fg)" },
+    { label: "Warning", types: ["overdue", "sterilization_due"] as AlertType[],      color: "var(--status-overdue-fg)" },
+    { label: "Info",    types: ["inactive"] as AlertType[],                          color: "hsl(var(--muted-foreground))" },
+  ];
   const priorityOrder: AlertType[] = ["issue", "overdue", "sterilization_due", "inactive"];
 
   const isDesktop = useIsDesktop();
@@ -258,9 +264,16 @@ function AlertsPageDesktop() {
           />
           </div>
         ) : (
-          priorityOrder
-            .filter((type) => grouped[type] && grouped[type]!.length > 0)
-            .map((type) => {
+          SEVERITY_TIERS.map((tier) => {
+            const tierTypes = tier.types.filter((type) => grouped[type] && grouped[type]!.length > 0);
+            if (tierTypes.length === 0) return null;
+            return (
+              <div key={tier.label} className="flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: tier.color }} />
+                  <span className="text-xs font-bold uppercase tracking-wide" style={{ color: tier.color }}>{tier.label}</span>
+                </div>
+                {tierTypes.flatMap((type) => {
               const config = ALERT_CONFIG[type];
               const Icon = config.icon;
               const items = grouped[type]!;
@@ -377,7 +390,10 @@ function AlertsPageDesktop() {
                   </div>
                 </div>
               );
-            })
+            })}
+              </div>
+            );
+          })
         )}
       </div>
     </>

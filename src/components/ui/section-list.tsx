@@ -32,7 +32,8 @@ export function SectionList<T>({
         section.items.length === 0 ? null : (
           <div key={section.key} className="mb-3 last:mb-0">
             <div
-              className="sticky top-0 z-[20] -mx-0.5 bg-background/95 px-0.5 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-ivory-text3 backdrop-blur-sm"
+              className="sticky top-0 z-[20] -mx-0.5 px-0.5 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-ivory-text3"
+              style={{ background: "var(--bar-bg)", backdropFilter: "blur(var(--bar-blur))", WebkitBackdropFilter: "blur(var(--bar-blur))" }}
               role="heading"
               aria-level={2}
             >

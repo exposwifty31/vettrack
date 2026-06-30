@@ -682,7 +682,7 @@ export default function InventoryPage() {
 
         {/* Tab strip */}
         {containersQ.data && containersQ.data.length > 0 && (
-          <div className="sticky top-2 z-20 rounded-2xl border border-border/70 bg-background/95 backdrop-blur px-2 py-2 shadow-sm">
+          <div className="sticky top-2 z-20 rounded-2xl border border-border/70 bg-[var(--bar-bg)] backdrop-blur-[var(--bar-blur)] px-2 py-2 shadow-sm">
             <div className="flex gap-2 overflow-x-auto no-scrollbar">
               {containersQ.data.map((container: InventoryContainer) => (
                 <button
@@ -956,7 +956,7 @@ export default function InventoryPage() {
 
               {/* Finish button */}
               {isRestocking && (
-                <div className="p-4 border-t sticky bottom-0 bg-card/95 backdrop-blur">
+                <div className="p-4 border-t sticky bottom-0 bg-[var(--bar-bg)] backdrop-blur-[var(--bar-blur)]">
                   <Button
                     type="button"
                     className="w-full min-h-[48px] rounded-xl text-base font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow"
