@@ -98,6 +98,7 @@ export function MessageBubble({ message, currentUserId, onReact, onPin, canPin }
               onClick={onPin}
               className="text-xs opacity-30 hover:opacity-100 transition-opacity ms-1"
               title={t.shiftChat.panel.pinAria}
+              aria-label={t.shiftChat.panel.pinAria}
             >
               📌
             </button>

@@ -27,8 +27,7 @@ export function PwaInstallPrompt() {
   // ── Android / Chrome install banner ──────────────────────────────────────
   if (canInstall && !androidDismissed) {
     return (
-      <div
-        role="complementary"
+      <aside
         aria-label="Install VetTrack"
         data-testid="pwa-install-banner"
         className="fixed bottom-0 inset-x-0 z-50"
@@ -74,7 +73,7 @@ export function PwaInstallPrompt() {
             <X className="w-5 h-5" />
           </button>
         </div>
-      </div>
+      </aside>
     );
   }
 
@@ -82,8 +81,7 @@ export function PwaInstallPrompt() {
   // Re-shown every 7 days so staff who dismiss it early can still find it.
   if (isIos && !iosGuidanceDismissed) {
     return (
-      <div
-        role="complementary"
+      <aside
         aria-label="Add VetTrack to Home Screen"
         data-testid="pwa-ios-guidance"
         className="fixed bottom-0 inset-x-0 z-50"
@@ -138,7 +136,7 @@ export function PwaInstallPrompt() {
             </div>
           </div>
         </div>
-      </div>
+      </aside>
     );
   }
 

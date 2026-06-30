@@ -30,7 +30,7 @@ export function PageShell({ sidebarItems, children }: PageShellProps) {
       <Topbar />
       <div className="flex flex-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-hidden">
         <Sidebar sidebarItems={sidebarItems} />
-        <main id="page-main" className="flex-1 min-h-0 min-w-0 px-5 sm:px-6 pt-3 pb-5 overflow-x-hidden overflow-y-auto overscroll-contain bg-ivory-bg text-ivory-text">
+        <main id="page-main" tabIndex={-1} className="flex-1 min-h-0 min-w-0 px-5 sm:px-6 pt-3 pb-5 overflow-x-hidden overflow-y-auto overscroll-contain bg-ivory-bg text-ivory-text">
           {children}
         </main>
       </div>

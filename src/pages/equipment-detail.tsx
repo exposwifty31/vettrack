@@ -1985,7 +1985,7 @@ function EquipmentDetailPageDesktop() {
               <div className="flex flex-col items-center gap-4 py-4 text-center">
                 <CheckCircle2 className="w-14 h-14 text-emerald-500" />
                 <p className="font-bold text-lg">{t.equipmentDetail.actionDone}</p>
-                <p className="text-muted-foreground text-sm">{t.equipmentDetail.actionDoneBody.replace("{name}", equipmentDisplayName)}</p>
+                <p className="text-muted-foreground text-sm">{t.equipmentDetail.actionDoneBody(equipmentDisplayName)}</p>
                 <Button
                   className="w-full gap-2"
                   onClick={() => {

@@ -46,7 +46,7 @@ export function MobilePageHeader({ title, onBack }: Props) {
           <BackChevron size={24} />
         </button>
       ) : (
-        <div style={{ width: 44, flexShrink: 0 }} />
+        <div style={{ width: 48, flexShrink: 0 }} />
       )}
       <span
         style={{

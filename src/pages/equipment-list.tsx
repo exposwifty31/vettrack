@@ -1128,7 +1128,7 @@ function EquipmentItem({
             {!selectMode && (
               <Link
                 href={`/equipment/${eq.id}`}
-                aria-label={displayName}
+                aria-label={`${displayName} — ${eq.status}${eq.location ? `, ${eq.location}` : ""}`}
                 className="absolute inset-0 rounded-[inherit] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:outline-none z-0"
               />
             )}
