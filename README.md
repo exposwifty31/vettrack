@@ -24,7 +24,7 @@ the operating doctrine and frozen-surface contracts see **[`CLAUDE.md`](CLAUDE.m
 | **Frontend** | React 18 · Vite 7 · TypeScript · wouter routing · TanStack Query · Zustand · Tailwind/shadcn · RTL (Hebrew default) · PWA/offline-first (Dexie + service worker) |
 | **Backend** | Express 4 · TypeScript · Drizzle ORM 0.45 · PostgreSQL (`pg`) · Server-Sent Events realtime |
 | **Jobs** | BullMQ 5 + Redis (ioredis) — workers & schedulers; Redis optional in dev, required in prod |
-| **Auth** | Clerk (production) or dev-bypass (no keys → hardcoded admin) |
+| **Auth** | Clerk (required in production) or dev-bypass (non-production only — no Clerk secret, or explicit `CLERK_ENABLED=false`) |
 | **Native** | Capacitor 8 (`ios/`, `android/`) wrapping the built web bundle |
 | **Observability** | Sentry (`@sentry/node`, `@sentry/react`) |
 | **Deploy** | Railway (`railway.json`, `Dockerfile`, `nixpacks.toml`) |
@@ -128,8 +128,8 @@ NODE_ENV=development
 
 - **Env precedence** (highest → lowest): OS env (`process.env`) → `.env.local` → `.env`. `dotenv` never overwrites an already-set variable, so OS/Railway/CI values win (`server/lib/env-bootstrap.ts`). Full reference: `.env.example`.
 - **Auth mode** (resolved at startup by `server/lib/auth-mode.ts`):
-  - *dev-bypass* — no Clerk keys → hardcoded `DEV_USER` (admin, `clinicId = dev-clinic-default`)
-  - *clerk* — `CLERK_SECRET_KEY` present → full Clerk JWT validation
+  - *dev-bypass* — **non-production `NODE_ENV` only**, when no `CLERK_SECRET_KEY` is set (or `CLERK_ENABLED=false` is the explicit override) → hardcoded `DEV_USER` (admin, `clinicId = dev-clinic-default`). In production this path is gated off (`server/middleware/auth.ts`) and `validateEnv()` requires Clerk, so omitting keys does not silently enable the bypass.
+  - *clerk* — `CLERK_SECRET_KEY` present (and `CLERK_ENABLED !== "false"`) → full Clerk JWT validation
 - **Role hierarchy** (numeric): `admin=40 · vet=30 · senior_technician=25 · lead_technician=22 · vet_tech=20 · technician=20 · student=10`. Always sourced from `vt_users.role`.
 - **Required production env vars** (enforced at startup by `server/lib/envValidation.ts`):
   `DATABASE_URL` (or `POSTGRES_URL`), `REDIS_URL`, `SESSION_SECRET`, `CLERK_SECRET_KEY`,
