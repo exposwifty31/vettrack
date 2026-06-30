@@ -43,7 +43,9 @@
     "info": "Info",
     "neutral": "Unknown",
     "stale": "Stale",
-    "unknown": "Unknown"
+    "unknown": "Unknown",
+    "in_use": "In use",
+    "overdue": "Overdue"
   },
   "layout": {
     "nav": {

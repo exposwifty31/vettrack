@@ -29,29 +29,29 @@ import type { EquipmentBoardUnitRow, EquipmentReadinessStatus } from "../../shar
 // ── Status colour tokens ────────────────────────────────────────────────────
 
 const STATUS_COLOR: Record<EquipmentReadinessStatus, string> = {
-  ready:    "text-[hsl(var(--status-ok))]",
-  in_use:   "text-[hsl(var(--status-sterilized))]",
-  blocked:  "text-[hsl(var(--status-issue))]",
-  stale:    "text-[hsl(var(--status-maintenance))]",
-  overdue:  "text-[hsl(var(--status-issue))]",
-  unknown:  "text-ivory-text3",
+  ready:   "text-[hsl(var(--status-ok))]",
+  in_use:  "text-[var(--status-in-use-fg)]",
+  blocked: "text-[hsl(var(--status-issue))]",
+  stale:   "text-[var(--status-stale-fg)]",
+  overdue: "text-[var(--status-overdue-fg)]",
+  unknown: "text-ivory-text3",
 };
 
 const STATUS_BG: Record<EquipmentReadinessStatus, string> = {
-  ready:   "bg-[var(--status-ok-bg)]   border-[var(--status-ok-border)]   text-[var(--status-ok-fg)]",
-  in_use:  "bg-[var(--status-steril-bg)] border-[var(--status-steril-border)] text-[var(--status-steril-fg)]",
-  blocked: "bg-[var(--status-issue-bg)] border-[var(--status-issue-border)] text-[var(--status-issue-fg)]",
-  stale:   "bg-[var(--status-maint-bg)] border-[var(--status-maint-border)] text-[var(--status-maint-fg)]",
-  overdue: "bg-[var(--status-issue-bg)] border-[var(--status-issue-border)] text-[var(--status-issue-fg)]",
+  ready:   "bg-[var(--status-ok-bg)]      border-[var(--status-ok-border)]      text-[var(--status-ok-fg)]",
+  in_use:  "bg-[var(--status-in-use-bg)]  border-[var(--status-in-use-border)]  text-[var(--status-in-use-fg)]",
+  blocked: "bg-[var(--status-issue-bg)]   border-[var(--status-issue-border)]   text-[var(--status-issue-fg)]",
+  stale:   "bg-[var(--status-stale-bg)]   border-[var(--status-stale-border)]   text-[var(--status-stale-fg)]",
+  overdue: "bg-[var(--status-overdue-bg)] border-[var(--status-overdue-border)] text-[var(--status-overdue-fg)]",
   unknown: "bg-muted border-ivory-border text-ivory-text3",
 };
 
 const STATUS_BAR_COLOR: Record<EquipmentReadinessStatus, string> = {
   ready:   "bg-[hsl(var(--status-ok))]",
-  in_use:  "bg-[hsl(var(--status-sterilized))]",
+  in_use:  "bg-[var(--status-in-use-fg)]",
   blocked: "bg-[hsl(var(--status-issue))]",
-  stale:   "bg-[hsl(var(--status-maintenance))]",
-  overdue: "bg-[hsl(var(--status-issue))]",
+  stale:   "bg-[var(--status-stale-fg)]",
+  overdue: "bg-[var(--status-overdue-fg)]",
   unknown: "bg-ivory-text3",
 };
 
@@ -671,9 +671,27 @@ export default function WardDisplayPage() {
     publishCodeBlueSeenGossip(localCbId);
   }, [snapshotLoaded, localCbId]);
 
+  // D-F · Ward Display is web + expanded only. Compact / medium → guard route.
+  const isExpanded = typeof window !== "undefined" && window.innerWidth >= 1024;
+  if (!isExpanded) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-8 text-center bg-background dark">
+        <p className="text-lg font-semibold text-foreground">
+          Command Center
+        </p>
+        <p className="text-sm text-muted-foreground max-w-[34ch]">
+          The ward Command Center is built for a large, always-on display. Open it on a wall screen or desktop.
+        </p>
+        <a href="/equipment" className="text-sm font-semibold" style={{ color: "var(--brand)" }}>
+          Go to equipment list
+        </a>
+      </div>
+    );
+  }
+
   if (!snapshot) {
     return (
-      <div className="min-h-screen bg-[rgb(var(--ivory-bg))] flex items-center justify-center dark">
+      <div className="min-h-screen flex items-center justify-center dark" style={{ background: `rgb(var(--board-bg))` }}>
         <div className="text-ivory-text3 text-sm">{t.board.loading}</div>
       </div>
     );

@@ -43,7 +43,9 @@
     "info": "מידע",
     "neutral": "לא ידוע",
     "stale": "ישן",
-    "unknown": "לא ידוע"
+    "unknown": "לא ידוע",
+    "in_use": "בשימוש",
+    "overdue": "באיחור"
   },
   "layout": {
     "nav": {

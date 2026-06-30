@@ -780,10 +780,10 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
       </a>
       <header
         className={cn(
-          "sticky top-0 header-safe-bleed border-b bg-ivory-navy backdrop-blur supports-[backdrop-filter]:bg-ivory-navy/95 z-40",
-          navigationLocked ? "border-amber-400/60" : "border-black/40",
-          "transition-colors duration-300"
+          "sticky top-0 header-safe-bleed border-b z-40 transition-colors duration-300",
+          navigationLocked ? "border-amber-400/60" : "border-[var(--hairline)]"
         )}
+        style={{ background: "var(--bar-bg)", backdropFilter: "blur(var(--bar-blur))", WebkitBackdropFilter: "blur(var(--bar-blur))" }}
       >
         {navigationLocked && (
           <div
@@ -1370,10 +1370,12 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
       </main>
 
       <nav
-        className="bottom-bar fixed bottom-0 left-0 right-0 z-[52] border-t border-ivory-border backdrop-blur-xl shadow-[0_-4px_24px_-8px_rgba(0,0,0,0.12)]"
+        className="bottom-bar fixed bottom-0 left-0 right-0 z-[52] border-t border-[var(--hairline)] shadow-[0_-4px_24px_-8px_rgba(0,0,0,0.12)]"
         style={{
-          background: "var(--nav-bg)",
-          paddingBottom: "env(safe-area-inset-bottom)",
+          background: "var(--bar-bg)",
+          backdropFilter: "blur(var(--bar-blur))",
+          WebkitBackdropFilter: "blur(var(--bar-blur))",
+          paddingBottom: "max(env(safe-area-inset-bottom), 0px)",
           willChange: "transform",
           WebkitTransform: "translateZ(0)",
           transform: "translateZ(0)",

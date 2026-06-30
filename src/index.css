@@ -115,6 +115,36 @@
     --action-border: #c7e3cf;
     --nav-bg: hsl(210 20% 99% / 0.96);
 
+    /* ── Stage 1 · sys-* Apple system color primitives (RGB channels) ── */
+    --sys-red:    255 59 48;
+    --sys-orange: 255 149 0;
+    --sys-green:  52 199 89;
+    --sys-blue:   0 122 255;
+    --sys-gray:   142 142 147;
+
+    /* ── Stage 1 · bar / material tokens ── */
+    --bar-bg:        rgba(255, 255, 255, 0.94);
+    --bar-bg-opaque: #ffffff;
+    --bar-blur:      12px;
+    --hairline:      transparent;
+    --tonal:         rgba(120, 120, 128, 0.16);
+
+    /* ── Stage 1 · elevation ── */
+    --shadow-hero:     0 1px 2px rgba(0, 0, 0, 0.06);
+    --shadow-floating: 0 8px 24px -12px rgba(0, 0, 0, 0.25);
+
+    /* ── Stage 1 · spin duration ── */
+    --dur-spin: 700ms;
+
+    /* ── Stage 4 · screen surface tokens ── */
+    --board-bg:      10 13 22;
+    --board-surface: 22 26 43;
+    --board-navy:    20 26 54;
+    --board-line:    rgba(255, 255, 255, 0.08);
+    --scan-bg:       rgb(10 10 11);
+    --cb-bg-top:     rgb(42 8 8);
+    --cb-bg-bot:     rgb(10 3 3);
+
     --font-num: "DM Mono", "IBM Plex Mono", ui-monospace, monospace;
 
     /* Motion tokens (MOTION_HAPTICS_SOUND.md) */
@@ -139,13 +169,20 @@
     --status-steril-bg: #eff6ff;
     --status-steril-fg: #1e40af;
     --status-steril-border: #93c5fd;
-    /* S1-D15-001 · stale + unknown as first-class status kinds */
-    --status-stale-bg: #fff7ed;
-    --status-stale-fg: #c2410c;
-    --status-stale-border: #fb923c;
-    --status-unknown-bg: #f9fafb;
-    --status-unknown-fg: #374151;
-    --status-unknown-border: #d1d5db;
+    /* S1-D15-001 · stale + unknown — sys-* based so dark mode adapts */
+    --status-stale-bg:     rgb(var(--sys-orange) / 0.12);
+    --status-stale-fg:     rgb(var(--sys-orange));
+    --status-stale-border: rgb(var(--sys-orange) / 0.22);
+    --status-unknown-bg:     rgb(var(--sys-gray) / 0.14);
+    --status-unknown-fg:     rgb(var(--sys-gray));
+    --status-unknown-border: rgb(var(--sys-gray) / 0.26);
+    /* Stage 4 · in_use (blue) + overdue (orange) */
+    --status-in-use-bg:     rgb(var(--sys-blue) / 0.12);
+    --status-in-use-fg:     rgb(var(--sys-blue));
+    --status-in-use-border: rgb(var(--sys-blue) / 0.22);
+    --status-overdue-bg:     rgb(var(--sys-orange) / 0.12);
+    --status-overdue-fg:     rgb(var(--sys-orange));
+    --status-overdue-border: rgb(var(--sys-orange) / 0.22);
 
     /* ── Emergency surface — replaces all zinc-* in code-blue and crash-cart ── */
     --emergency-bg:         12 12 12;
@@ -167,13 +204,20 @@
     --shift-active:         22 163 74;
     --shift-inactive:       122 138 126;
 
-    /* S1-D1-003 · on-ink token family — for text/stroke on dark (brand-ink) surfaces */
-    --on-ink:               #ffffff;
-    --on-ink-strong:        rgba(255, 255, 255, 0.82);
-    --on-ink-muted:         rgba(255, 255, 255, 0.55);
-    --on-ink-subtle:        rgba(255, 255, 255, 0.50);
-    --ink-sheen:            rgba(255, 255, 255, 0.10);
-    --ink-divider:          rgba(255, 255, 255, 0.12);
+    /* S1-D1-003 · on-ink token family — complete ladder */
+    --on-ink:          #ffffff;
+    --on-ink-strong:   rgba(255, 255, 255, 0.82);
+    --on-ink-muted:    rgba(255, 255, 255, 0.55);
+    --on-ink-subtle:   rgba(255, 255, 255, 0.50);
+    --on-ink-disabled: rgba(255, 255, 255, 0.40);
+    --on-ink-bar:      rgba(255, 255, 255, 0.94);
+    --ink-sheen:       rgba(255, 255, 255, 0.10);
+    --ink-divider:     rgba(255, 255, 255, 0.12);
+    --ink-skeleton:    rgba(255, 255, 255, 0.14);
+    --ink-fill-weak:   rgba(255, 255, 255, 0.08);
+    --ink-fill:        rgba(255, 255, 255, 0.18);
+    --ink-border:      rgba(255, 255, 255, 0.28);
+    --ink-shimmer:     rgba(255, 255, 255, 0.35);
   }
 
   .dark {
@@ -215,6 +259,26 @@
     --ivory-green:    129 140 248;  /* indigo-400 */
     --ivory-greenMid: 99 102 241;   /* indigo-500 */
     --ivory-greenBg:  30 27 100;    /* indigo-900 — active-item tinted surface */
+
+    /* ── Dark overrides: sys-* + material/bar tokens ── */
+    --sys-red:    255 69 58;
+    --sys-orange: 255 159 10;
+    --sys-green:  48 209 88;
+    --sys-blue:   10 132 255;
+    --sys-gray:   152 152 157;
+    --bar-bg:        rgba(28, 28, 30, 0.94);
+    --bar-bg-opaque: #1c1c1e;
+    --hairline:      rgba(84, 84, 88, 0.6);
+    --tonal:         rgba(120, 120, 128, 0.24);
+    --shadow-hero:   0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+
+  /* S1-D10-001 / S2-D3-001 · reduce-transparency: opaque bars */
+  @media (prefers-reduced-transparency: reduce) {
+    :root, .dark {
+      --bar-bg: var(--bar-bg-opaque);
+      --bar-blur: 0px;
+    }
   }
 
   /*
@@ -490,6 +554,32 @@
   main a:focus-visible {
     @apply outline-none ring-2 ring-ring/80 ring-offset-2 ring-offset-background rounded-sm;
   }
+}
+
+/* ── Skeleton shimmer ─────────────────────────────────────────────────────── */
+/* Light-surface skeleton: tonal gray fill + translateX shimmer */
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: rgba(120, 120, 128, 0.16);
+}
+/* Dark-surface variant: on-ink fill */
+.dark .skeleton-shimmer {
+  background: var(--ink-skeleton);
+}
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  animation: vt-shimmer 1.4s infinite;
+}
+@keyframes vt-shimmer {
+  100% { transform: translateX(100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer::after { display: none; }
 }
 
 /*

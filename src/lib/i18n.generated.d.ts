@@ -47,6 +47,8 @@ export interface TStructure {
     neutral: string;
     stale: string;
     unknown: string;
+    in_use: string;
+    overdue: string;
   };
   layout: {
     nav: {
