@@ -12,13 +12,13 @@ type ChipProps = {
   label: string;
   count: number;
   onClick: () => void;
-  color: "red" | "amber";
+  kind: "issue" | "overdue";
 };
 
-function UrgentChip({ icon, label, count, onClick, color }: ChipProps) {
-  const bg = color === "red" ? "#fef2f2" : "#fffbeb";
-  const border = color === "red" ? "#fecaca" : "#fde68a";
-  const text = color === "red" ? "#991b1b" : "#78350f";
+function UrgentChip({ icon, label, count, onClick, kind }: ChipProps) {
+  const bg     = kind === "issue" ? "var(--status-issue-bg)"   : "var(--status-overdue-bg)";
+  const border = kind === "issue" ? "var(--status-issue-border)" : "var(--status-overdue-border)";
+  const text   = kind === "issue" ? "var(--status-issue-fg)"  : "var(--status-overdue-fg)";
 
   return (
     <button
@@ -69,7 +69,7 @@ export function UrgentCountChips({ criticalCount, overdueCount }: Props) {
           label={t.home.urgent.critical}
           count={criticalCount}
           onClick={() => navigate("/alerts")}
-          color="red"
+          kind="issue"
         />
       )}
       {overdueCount > 0 && (
@@ -78,7 +78,7 @@ export function UrgentCountChips({ criticalCount, overdueCount }: Props) {
           label={t.home.urgent.overdue}
           count={overdueCount}
           onClick={() => navigate("/equipment/tasks?filter=overdue")}
-          color="amber"
+          kind="overdue"
         />
       )}
     </div>

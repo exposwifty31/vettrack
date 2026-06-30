@@ -555,13 +555,13 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
   }
 
   return (
-    <div className="fixed top-0 left-0 right-0 qr-scanner-overlay-root z-[70] bg-black flex flex-col motion-safe:animate-page-enter" data-testid="qr-scanner-overlay">
+    <div className="fixed top-0 left-0 right-0 qr-scanner-overlay-root z-[70] bg-[var(--scan-bg)] flex flex-col motion-safe:animate-page-enter" data-testid="qr-scanner-overlay">
       {confirmFlash && <div className="pointer-events-none absolute inset-0 z-50 bg-emerald-400/20 animate-pulse" />}
       {/* Header */}
       <div className="relative z-10 flex items-center justify-between px-4 pb-3 bg-gradient-to-b from-black/95 to-black/65 backdrop-blur-sm" style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}>
         <div className="flex flex-col">
-          <span className="text-white font-semibold text-lg">{t.qrScanner.title}</span>
-          <span className="text-xs uppercase tracking-[0.16em] text-white/70">
+          <span className="text-[var(--on-ink)] font-semibold text-lg">{t.qrScanner.title}</span>
+          <span className="text-xs uppercase tracking-[0.16em] text-[var(--on-ink-muted)]">
             {t.qrScanner.subtitleEquipmentQr}
           </span>
         </div>
@@ -570,7 +570,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
             <Button
               variant="ghost"
               size="sm"
-              className="h-10 gap-1.5 px-2.5 text-white hover:bg-white/10"
+              className="h-10 gap-1.5 px-2.5 text-[var(--on-ink)] hover:bg-[var(--ink-sheen)]"
               onClick={() => {
                 stopScanner();
                 setPhase("manual");
@@ -585,7 +585,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
             <Button
               variant="ghost"
               size="icon-sm"
-              className="h-10 w-10 text-white hover:bg-white/10"
+              className="h-10 w-10 text-[var(--on-ink)] hover:bg-[var(--ink-sheen)]"
               onClick={toggleTorch}
               data-testid="btn-torch-toggle"
             >
@@ -599,7 +599,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
           <Button
             variant="ghost"
             size="icon-sm"
-            className="h-10 w-10 text-white hover:bg-white/10"
+            className="h-10 w-10 text-[var(--on-ink)] hover:bg-[var(--ink-sheen)]"
             onClick={onClose}
             data-testid="btn-scanner-cancel"
           >
@@ -611,7 +611,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
       {/* Camera viewport — collapsed (not display:none) during manual/result so the
           container div keeps its DOM presence for html5-qrcode re-init */}
       <div
-        className={`relative flex items-center justify-center bg-black overflow-hidden ${
+        className={`relative flex items-center justify-center bg-[var(--scan-bg)] overflow-hidden ${
           phase === "manual" || phase === "result" || phase === "first_scan_celebration"
             ? "flex-none h-0"
             : "flex-1 min-h-0"
@@ -621,8 +621,8 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
 
         {/* Loading */}
         {phase === "init" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/70">
-            <div className="flex flex-col items-center gap-3 text-white">
+          <div className="absolute inset-0 flex items-center justify-center bg-[rgba(10,10,11,0.70)]">
+            <div className="flex flex-col items-center gap-3 text-[var(--on-ink)]">
               <Loader2 className="w-10 h-10 animate-spin" />
               <p className="text-sm font-medium">{t.qrScanner.startingCamera}</p>
             </div>
@@ -631,30 +631,30 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
 
         {/* Resolving scan */}
         {phase === "resolving" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/75 backdrop-blur-sm">
-            <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/15 bg-black/70 px-6 py-5 text-white">
+          <div className="absolute inset-0 flex items-center justify-center bg-[rgba(10,10,11,0.75)] backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-[var(--ink-divider)] bg-[rgba(10,10,11,0.70)] px-6 py-5 text-[var(--on-ink)]">
               <div className="relative">
                 <Loader2 className="w-10 h-10 animate-spin text-primary" />
-                <ScanSearch className="w-4 h-4 absolute -bottom-1 -right-1 text-white/90" />
+                <ScanSearch className="w-4 h-4 absolute -bottom-1 -right-1 text-[var(--on-ink-strong)]" />
               </div>
               <p className="text-sm font-semibold">{t.qrScanner.lookingUp}</p>
-              <p className="text-xs text-white/60">{t.qrScanner.oneMoment}</p>
+              <p className="text-xs text-[var(--on-ink-muted)]">{t.qrScanner.oneMoment}</p>
             </div>
           </div>
         )}
 
         {/* Permission denied */}
         {phase === "permission_denied" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/90 p-6">
-            <div className="flex flex-col items-center gap-4 text-center text-white max-w-xs">
-              <Camera className="w-14 h-14 text-white/60" />
+          <div className="absolute inset-0 flex items-center justify-center bg-[rgba(10,10,11,0.90)] p-6">
+            <div className="flex flex-col items-center gap-4 text-center text-[var(--on-ink)] max-w-xs">
+              <Camera className="w-14 h-14 text-[var(--on-ink-muted)]" />
               <p className="font-bold text-lg">{t.qrScanner.permissionDeniedTitle}</p>
-              <p className="text-sm text-white/70">
+              <p className="text-sm text-[var(--on-ink-muted)]">
                 {t.qrScanner.permissionDeniedDesc}
               </p>
               <Button
                 variant="outline"
-                className="text-white border-white/40 bg-white/10 hover:bg-white/20 gap-2 mt-2"
+                className="text-[var(--on-ink)] border-[var(--ink-border)] bg-[var(--ink-sheen)] hover:bg-[var(--ink-fill-weak)] gap-2 mt-2"
                 onClick={() => stopScanner().then(() => setPhase("manual"))}
                 data-testid="btn-manual-entry"
               >
@@ -667,16 +667,16 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
 
         {/* No camera */}
         {phase === "no_camera" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/90 p-6">
-            <div className="flex flex-col items-center gap-4 text-center text-white max-w-xs">
-              <AlertCircle className="w-14 h-14 text-white/60" />
+          <div className="absolute inset-0 flex items-center justify-center bg-[rgba(10,10,11,0.90)] p-6">
+            <div className="flex flex-col items-center gap-4 text-center text-[var(--on-ink)] max-w-xs">
+              <AlertCircle className="w-14 h-14 text-[var(--on-ink-muted)]" />
               <p className="font-bold text-lg">{t.qrScanner.noCameraTitle}</p>
-              <p className="text-sm text-white/70">
+              <p className="text-sm text-[var(--on-ink-muted)]">
                 {t.qrScanner.noCameraDesc}
               </p>
               <Button
                 variant="outline"
-                className="text-white border-white/40 bg-white/10 hover:bg-white/20 gap-2 mt-2"
+                className="text-[var(--on-ink)] border-[var(--ink-border)] bg-[var(--ink-sheen)] hover:bg-[var(--ink-fill-weak)] gap-2 mt-2"
                 onClick={() => setPhase("manual")}
                 data-testid="btn-manual-entry-no-camera"
               >
@@ -689,11 +689,11 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
 
         {/* Generic error */}
         {phase === "error" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/90 p-6">
-            <div className="flex flex-col items-center gap-4 text-center text-white max-w-xs">
+          <div className="absolute inset-0 flex items-center justify-center bg-[rgba(10,10,11,0.90)] p-6">
+            <div className="flex flex-col items-center gap-4 text-center text-[var(--on-ink)] max-w-xs">
               <AlertCircle className="w-14 h-14 text-red-400" />
               <p className="font-bold text-lg">{t.qrScanner.cameraErrorTitle}</p>
-              <p className="text-sm text-white/70">
+              <p className="text-sm text-[var(--on-ink-muted)]">
                 {t.qrScanner.cameraErrorDesc}
               </p>
               <div className="flex flex-col gap-2 w-full mt-2">
@@ -707,7 +707,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                 </Button>
                 <Button
                   variant="outline"
-                  className="text-white border-white/40 bg-white/10 hover:bg-white/20 gap-2"
+                  className="text-[var(--on-ink)] border-[var(--ink-border)] bg-[var(--ink-sheen)] hover:bg-[var(--ink-fill-weak)] gap-2"
                   onClick={() => {
                     setManualCode("");
                     stopScanner().then(() => setPhase("manual"));
@@ -723,15 +723,15 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
 
         {/* Equipment not found */}
         {phase === "not_found" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/90 p-6">
-            <div className="flex flex-col items-center gap-4 text-center text-white max-w-xs">
+          <div className="absolute inset-0 flex items-center justify-center bg-[rgba(10,10,11,0.90)] p-6">
+            <div className="flex flex-col items-center gap-4 text-center text-[var(--on-ink)] max-w-xs">
               <Tag className="w-14 h-14 text-amber-400" />
               <p className="font-bold text-lg">{t.qrScanner.unknownTagTitle}</p>
-              <p className="text-sm text-white/70">
+              <p className="text-sm text-[var(--on-ink-muted)]">
                 {t.qrScanner.unknownTagDesc}
               </p>
               {notFoundId ? (
-                <p className="w-full max-w-full break-all rounded-lg bg-white/5 px-2 py-1.5 text-left font-mono text-xs text-white/90">
+                <p className="w-full max-w-full break-all rounded-lg bg-[var(--ink-fill-weak)] px-2 py-1.5 text-left font-mono text-xs text-[var(--on-ink-strong)]">
                   {notFoundId}
                 </p>
               ) : null}
@@ -745,7 +745,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                 </Button>
                 <Button
                   variant="outline"
-                  className="text-white border-white/40 bg-white/10 hover:bg-white/20 gap-2"
+                  className="text-[var(--on-ink)] border-[var(--ink-border)] bg-[var(--ink-sheen)] hover:bg-[var(--ink-fill-weak)] gap-2"
                   onClick={() => {
                     setManualCode("");
                     stopScanner().then(() => setPhase("manual"));
@@ -803,14 +803,14 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
       {phase === "scanning" && (
         <div className="bg-gradient-to-t from-black/95 to-black/70 px-4 pt-3 flex flex-col items-center gap-2 border-t border-white/10" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
           {showFallbackHint && (
-            <p className="text-white/60 text-xs text-center animate-fade-in">
+            <p className="text-[var(--on-ink-muted)] text-xs text-center animate-fade-in">
               {t.qrScanner.fallbackHint}
             </p>
           )}
           <Button
             variant="ghost"
             size="sm"
-            className="gap-2 text-white hover:text-white hover:bg-white/20"
+            className="gap-2 text-[var(--on-ink)] hover:text-[var(--on-ink)] hover:bg-[var(--ink-fill-weak)]"
             onClick={() => {
               stopScanner();
               setPhase("manual");
@@ -825,13 +825,13 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
 
       {/* Manual entry mode */}
       {phase === "manual" && (
-        <div className="flex max-h-[100dvh] flex-1 flex-col items-center justify-center gap-5 overflow-y-auto overscroll-contain bg-black/95 p-6">
-          <p className="text-center text-xl font-bold text-white">{t.qrScanner.manualEnterTitle}</p>
+        <div className="flex max-h-[100dvh] flex-1 flex-col items-center justify-center gap-5 overflow-y-auto overscroll-contain bg-[rgba(10,10,11,0.95)] p-6">
+          <p className="text-center text-xl font-bold text-[var(--on-ink)]">{t.qrScanner.manualEnterTitle}</p>
           <p className="max-w-md text-center text-sm text-white/65">
             {t.qrScanner.manualEnterDesc}
           </p>
           <Input
-            className="w-full max-w-md min-w-0 bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-primary"
+            className="w-full max-w-md min-w-0 bg-[var(--ink-sheen)] border-white/20 text-[var(--on-ink)] placeholder:text-white/40 focus:border-primary"
             placeholder={t.qrScanner.manualInputPlaceholder}
             aria-label={t.qrScanner.manualInputPlaceholder}
             value={manualCode}
@@ -851,7 +851,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
             </Button>
             <Button
               variant="outline"
-              className="w-full text-white border-white/20 bg-white/5 hover:bg-white/10"
+              className="w-full text-[var(--on-ink)] border-white/20 bg-[var(--ink-fill-weak)] hover:bg-[var(--ink-sheen)]"
               onClick={() => {
                 setManualCode("");
                 startScanner();
@@ -874,7 +874,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
 
       {/* Inline quick-action sheet — shown after successful QR resolve */}
       {phase === "result" && scannedEquipment && (
-        <div className="flex-1 bg-black/95 flex flex-col justify-end" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
+        <div className="flex-1 bg-[rgba(10,10,11,0.95)] flex flex-col justify-end" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
           <div
             className="bg-card rounded-t-3xl px-5 pt-5 pb-6 mx-0 w-full motion-safe:animate-in motion-safe:slide-in-from-bottom-6 motion-safe:duration-300"
             data-testid="scan-inline-sheet"

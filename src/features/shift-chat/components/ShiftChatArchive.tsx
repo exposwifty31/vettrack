@@ -33,7 +33,7 @@ export function ShiftChatArchive() {
           {new Date(data.shift.startedAt).toLocaleString("he-IL")}
           {data.shift.endedAt && ` — ${new Date(data.shift.endedAt).toLocaleString("he-IL")}`}
         </p>
-        <p className="text-xs text-muted-foreground mt-1 bg-amber-950/30 border border-amber-800/40 rounded px-2 py-1 inline-block">
+        <p className="text-xs text-muted-foreground mt-1 bg-[var(--status-stale-bg)] border border-[var(--status-stale-border)] rounded px-2 py-1 inline-block">
           קריאה בלבד
         </p>
       </div>

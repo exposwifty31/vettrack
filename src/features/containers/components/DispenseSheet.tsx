@@ -670,7 +670,7 @@ export function DispenseSheet({
             type="button"
             {...fieldProps({ disabled: emergencyLoading })}
             onClick={handleEmergencyTap}
-            className="w-full min-h-[64px] rounded-xl bg-red-600 text-white text-xl font-bold flex items-center justify-center gap-3 active:bg-red-700 disabled:opacity-70"
+            className="w-full min-h-[64px] rounded-xl bg-destructive text-destructive-foreground text-xl font-bold flex items-center justify-center gap-3 active:opacity-90 disabled:opacity-70"
           >
             {emergencyLoading ? (
               <Loader2 className="w-6 h-6 animate-spin" />

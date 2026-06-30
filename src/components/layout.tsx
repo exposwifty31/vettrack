@@ -675,10 +675,10 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           "cursor-pointer",
           scannerUIOpen
-            ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 hover:bg-emerald-600"
+            ? "bg-[var(--action)] text-[var(--on-ink)] shadow-lg shadow-[color-mix(in_srgb,var(--action)_40%,transparent)] hover:bg-[var(--action-deep)]"
             : navigationLocked
-              ? "bg-amber-500 text-white shadow-lg shadow-amber-500/35 hover:bg-amber-600"
-              : "vt-scan-fab bg-ivory-green text-white shadow-lg shadow-ivory-green/30 hover:bg-ivory-greenMid",
+              ? "bg-[var(--status-stale-fg)] text-[var(--on-ink)] shadow-lg hover:opacity-90"
+              : "vt-scan-fab bg-[var(--action)] text-[var(--on-ink)] shadow-lg shadow-ivory-green/30 hover:bg-ivory-greenMid",
         )}
         aria-label={scannerUIOpen ? lh.closeScannerAria : lh.bottomScan}
         data-testid="bottom-nav-scan"
@@ -802,7 +802,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
               onClick={handleBack}
               aria-label={t.common.back}
               data-testid="mobile-back-button"
-              className="-ms-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white/90 transition-colors hover:bg-white/10 motion-safe:active:scale-95"
+              className="-ms-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--on-ink-strong)] transition-colors hover:bg-[var(--ink-sheen)] motion-safe:active:scale-95"
             >
               <BackIcon className="w-5 h-5" aria-hidden />
             </button>
@@ -826,7 +826,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
               />
             </div>
             <span className="text-lg font-bold tracking-tight transition-colors duration-200 text-white group-hover:text-[var(--brand-green-bright)]">
-              Vet<em className="text-[var(--brand-green-bright)] not-italic group-hover:text-white">Track</em>
+              Vet<em className="text-[var(--brand-green-bright)] not-italic group-hover:text-[var(--on-ink)]">Track</em>
             </span>
           </Link>
           </div>
@@ -840,7 +840,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
             )}
 
             {isOnline && isSyncing && (
-              <div className="flex items-center gap-1 text-xs text-[var(--brand-green-bright)] bg-white/[0.08] border border-white/10 rounded-full px-2.5 py-1">
+              <div className="flex items-center gap-1 text-xs text-[var(--brand-green-bright)] bg-[var(--ink-fill-weak)] border border-[var(--ink-divider)] rounded-full px-2.5 py-1">
                 <RefreshCw className="w-3 h-3 animate-spin" />
                 <span>{lh.syncing}</span>
               </div>
@@ -864,7 +864,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
             {isOnline && hasPending && !isSyncing && (
               <button
                 onClick={triggerSync}
-                className="flex items-center gap-1 text-xs text-[var(--brand-green-bright)] bg-white/[0.08] border border-white/10 rounded-full px-2.5 py-1 hover:bg-white/15 transition-colors"
+                className="flex items-center gap-1 text-xs text-[var(--brand-green-bright)] bg-[var(--ink-fill-weak)] border border-[var(--ink-divider)] rounded-full px-2.5 py-1 hover:bg-[var(--ink-fill-weak)] transition-colors"
                 title={lh.pendingTitle(pendingCount)}
                 data-testid="sync-pending-indicator"
               >
@@ -888,14 +888,14 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
               <Button
                 variant="ghost"
                 size="icon-sm"
-                className="relative text-[var(--brand-green-bright)] hover:text-white hover:bg-white/10"
+                className="relative text-[var(--brand-green-bright)] hover:text-[var(--on-ink)] hover:bg-[var(--ink-sheen)]"
                 onClick={() => setSyncQueueOpen(true)}
                 title={t.layout.sync.viewQueue}
                 aria-label={t.layout.sync.viewQueue}
                 data-testid="sync-queue-badge"
               >
                 <CloudOff className="w-4 h-4" aria-hidden="true" />
-                <span className="absolute -top-0.5 -end-0.5 w-3.5 h-3.5 bg-amber-400 text-white text-[9px] rounded-full flex items-center justify-center font-bold">
+                <span className="absolute -top-0.5 -end-0.5 w-3.5 h-3.5 bg-[var(--status-overdue-fg)] text-[var(--on-ink)] text-[9px] rounded-full flex items-center justify-center font-bold">
                   {(pendingCount + failedCount) > 9 ? "9+" : pendingCount + failedCount}
                 </span>
               </Button>
@@ -930,7 +930,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                 }}
                 aria-label={t.common.quickSettings}
                 data-testid="quick-settings-toggle"
-                className="text-[var(--brand-green-bright)] hover:text-white hover:bg-white/10"
+                className="text-[var(--brand-green-bright)] hover:text-[var(--on-ink)] hover:bg-[var(--ink-sheen)]"
               >
                 <Settings className="w-4 h-4" />
               </Button>

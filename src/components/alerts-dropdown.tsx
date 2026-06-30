@@ -37,7 +37,7 @@ export function AlertsDropdown({ alerts, alertCount, badgeAnimating }: AlertsDro
       <Button
         variant="ghost"
         size="icon"
-        className="relative min-h-[44px] min-w-[44px] text-[var(--brand-green-bright)] hover:text-white hover:bg-white/10"
+        className="relative min-h-[44px] min-w-[44px] text-[var(--brand-green-bright)] hover:text-[var(--on-ink)] hover:bg-[var(--ink-sheen)]"
         aria-label={t.layout.alertsDropdown.toggleAria(alertCount)}
         aria-expanded={open}
         data-testid="alert-bell"
@@ -47,14 +47,14 @@ export function AlertsDropdown({ alerts, alertCount, badgeAnimating }: AlertsDro
         {alertCount > 0 && (
           <>
             <span
-              className="absolute -top-0.5 -end-0.5 w-3.5 h-3.5 rounded-full bg-red-400 pointer-events-none"
+              className="absolute -top-0.5 -end-0.5 w-3.5 h-3.5 rounded-full bg-[var(--status-issue-fg)] pointer-events-none"
               style={{ animation: "alertPing 2s ease-out infinite" }}
               aria-hidden
             />
             <span
               key={alertCount}
               className={cn(
-                "absolute -top-0.5 -end-0.5 w-3.5 h-3.5 bg-red-700 text-white text-[9px]",
+                "absolute -top-0.5 -end-0.5 w-3.5 h-3.5 text-[var(--on-ink)] text-[9px]",
                 "rounded-full flex items-center justify-center font-bold z-10",
                 badgeAnimating &&
                   "[animation:badgePop_420ms_cubic-bezier(0.68,-0.55,0.265,1.55)_forwards]",
