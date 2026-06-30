@@ -1,172 +1,276 @@
 # VetTrack
 
-Veterinary hospital operations platform — equipment tracking, waitlist, tasks, Code Blue, inventory, scheduling, and external PMS integrations for multi-clinic deployments.
+Multi-tenant **veterinary-hospital operations platform**. The current product scope is
+physical-asset operations: equipment tracking & custody, waitlist and operational-state
+lifecycle, Code Blue (emergency) workflows, crash-cart checks, inventory / dispense,
+shifts & scheduling, and external PMS integrations. It ships as an offline-first PWA and a
+Capacitor native iOS/Android shell that runs the same web bundle.
 
-**Stack:** React 18 + Vite + TypeScript · Express + Node.js · PostgreSQL + Drizzle ORM · BullMQ + Redis · Clerk auth · PWA/offline-first · Capacitor native shell · Railway deployment
+> **Scope note:** ER / patient / hospitalization / medication-formulary / pharmacy-forecast
+> features were removed in migrations 142–143 (`docs/scope-change-2026.md`). The
+> `vt_appointments` table is the **unified task model**, rendered in the UI as
+> "Tasks / משימות". Legacy routes (`/patients`, `/er`, `/billing`, `/meds`) survive only as
+> redirects to equipment surfaces.
+
+For the full reverse-engineered design see **[`ARCHITECTURE.md`](ARCHITECTURE.md)**; for
+the operating doctrine and frozen-surface contracts see **[`CLAUDE.md`](CLAUDE.md)**.
 
 ---
 
-## Quick Start (Local Development)
+## Project overview
 
-### Prerequisites
-- Node.js >= 22.12.0 (`nvm use` to match `.nvmrc`)
-- pnpm 9.15.9
-- PostgreSQL (local or hosted)
-- Redis (optional — required for BullMQ job runtime, push notifications, integration workers)
-
-### Setup
-
-```bash
-pnpm install
-cp .env.example .env        # fill in DATABASE_URL, CLERK keys, etc.
-pnpm db:migrate             # run all migrations
-pnpm dev                    # starts API on :3001 + frontend on :5000
-```
-
-See [`docs/setup/environment.md`](docs/setup/environment.md) and [`docs/dev-signin-runbook.md`](docs/dev-signin-runbook.md) for auth setup.
-
-### Available Scripts
-
-| Script | Description |
+| | |
 |---|---|
-| `pnpm dev` | Start API (:3001) + frontend (:5000) concurrently |
-| `pnpm build` | Build frontend for production |
-| `pnpm start` | Start production server |
-| `pnpm worker` | Start notification worker CLI (requires Redis) |
-| `pnpm test` | Run full Vitest suite |
-| `pnpm db:migrate` | Run pending database migrations |
-| `pnpm validate:prod` | Pre-deployment validation checks |
-| `pnpm auth:preflight` | Verify Clerk auth configuration |
-| `pnpm docs:audit` | Regenerate `docs/audit/*` route and schema inventories |
-| `pnpm cap:build:native` | Build bundled Capacitor iOS shell |
-| `pnpm cap:build:native:android` | Build bundled Capacitor Android shell |
-| `pnpm cap:install:ios-sim` | Build + install on iOS Simulator (iPad A16 by default) |
-| `pnpm cap:open:ios` | Open the Xcode workspace |
-| `pnpm deck:seed` | Seed investor-deck demo data (local Postgres) |
+| **Frontend** | React 18 · Vite 7 · TypeScript · wouter routing · TanStack Query · Zustand · Tailwind/shadcn · RTL (Hebrew default) · PWA/offline-first (Dexie + service worker) |
+| **Backend** | Express 4 · TypeScript · Drizzle ORM 0.45 · PostgreSQL (`pg`) · Server-Sent Events realtime |
+| **Jobs** | BullMQ 5 + Redis (ioredis) — workers & schedulers; Redis optional in dev, required in prod |
+| **Auth** | Clerk (required in production) or dev-bypass (non-production only — no Clerk secret, or explicit `CLERK_ENABLED=false`) |
+| **Native** | Capacitor 8 (`ios/`, `android/`) wrapping the built web bundle |
+| **Observability** | Sentry (`@sentry/node`, `@sentry/react`) |
+| **Deploy** | Railway (`railway.json`, `Dockerfile`, `nixpacks.toml`) |
+
+Runtime: Node ≥ 22.12, pnpm 9.15.9.
 
 ---
 
-## Architecture
+## Architecture summary
 
 ```
-vettrack/
-├── src/              React frontend (PWA, offline-first, RTL-capable)
-│   ├── app/          SPA routing (lazy-loaded pages via wouter)
-│   ├── pages/        Route-level page components
-│   ├── features/     Feature-scoped modules
-│   ├── components/   Shared UI components (shadcn primitives in components/ui/)
-│   ├── native/       Capacitor native shell (NativeShell, NativeTabBar, ScanFab)
-│   ├── desktop/      Web shell delegation (WebShell — PageShell or mobile Layout)
-│   ├── shell/        Legacy re-export layer (aliases to native/ and desktop/)
-│   ├── shared/       Platform target helpers shared across src/ (PlatformRouter, resolvePlatformTarget)
-│   └── hooks/        Auth, push, settings, offline sync
-├── server/           Express API + business logic
-│   ├── app/routes.ts Route registration (~44 modules)
-│   ├── routes/       One file per API resource
-│   ├── schema/       Drizzle tables (re-exported via db.ts)
-│   ├── services/     Domain services (equipment, dispense, waitlist, …)
-│   ├── jobs/         BullMQ job runtime (charge-alert, expiry, …)
-│   ├── workers/      Worker implementations + in-process schedulers
-│   └── integrations/ External PMS adapters
-├── migrations/       SQL migrations (applied at startup + pnpm db:migrate)
-├── scripts/          Dev/ops and architecture gate scripts
-└── locales/          en.json, he.json (Hebrew default)
+Clients (PWA · Capacitor native · display kiosks)
+        │  REST + SSE
+        ▼
+Express API  (server/index.ts → server/app/routes.ts, ~45 routers)
+  middleware: helmet/CSP → cors → compression → clerk → rate-limit
+              → i18n → tenantContext → sessionContext
+  ├─ routes/      one file per API resource
+  ├─ services/    domain logic (equipment, dispense, waitlist, tasks…)
+  ├─ domain/      hexagonal evidence-graph + Asset Copilot
+  ├─ lib/         authority+enforcement, realtime outbox, audit, metrics…
+  ├─ integrations/ external PMS adapters (inbound/outbound, sync, conflicts)
+  └─ workers/+jobs/+queues/  BullMQ workers & schedulers
+        │                 │                    │
+        ▼                 ▼                    ▼
+   PostgreSQL         Redis/BullMQ        External PMS
+   Drizzle, vt_*      (jobs, push,        (priza, vendor-x,
+   tables             integrations)        generic adapters)
 ```
 
-**Scope note:** ER, patients, medication formulary, and pharmacy forecast were removed in migrations 142–143. See [`docs/scope-change-2026.md`](docs/scope-change-2026.md).
+**Request lifecycle (mutation):** typed client call (`src/lib/api.ts`) → emergency-endpoint
+classifier → Express middleware chain → router → Zod validation → authority/enforcement →
+domain service → `clinicId`-scoped Drizzle write → `vt_event_outbox` row (+ fire-and-forget
+audit) → outbox publisher → SSE broadcast → client cache invalidation.
 
-### Key Architecture Rules
-
-1. **Every DB row is clinic-scoped** — every query must filter by `clinicId`. No exceptions.
-2. **Schema** — tables live in `server/schema/*.ts`; edit there then `npx drizzle-kit generate` → commit SQL → `pnpm db:migrate`.
-3. **Auth modes** — without Clerk keys, dev bypass uses a hardcoded admin user. Production requires `CLERK_SECRET_KEY` + `VITE_CLERK_PUBLISHABLE_KEY`.
-4. **Role from DB** — `req.authUser.role` comes from `vt_users.role`, never JWT claims.
-5. **Background jobs** — `startJobRuntime()` in `server/jobs/runtime.ts` plus schedulers in `server/app/start-schedulers.ts`. Redis required in production.
-6. **Credentials at rest** — integration secrets in `vt_server_config` encrypted with AES-256-GCM when `DB_CONFIG_ENCRYPTION_KEY` is set.
-7. **Platform split** — `src/shared/platform` exposes `resolvePlatformTarget()` / `usePlatformTarget()` returning `"native" | "web"`. `PlatformRouter` is the single branch point: native → `NativeShell` (safe-area chrome, tab bar, scan FAB); web → `WebShell` (desktop `PageShell` or mobile `Layout`). Use the shared helpers for any new platform-conditional code; do not call `isCapacitorNative()` from `@/lib/capacitor-runtime` in new code.
-
-### Database (prefix `vt_`)
-
-See generated inventory: [`docs/audit/db.md`](docs/audit/db.md). Core domains: clinics/users, equipment + waitlist + operational state, Code Blue, inventory/containers/dispense, appointments (tasks), shifts, integrations, event outbox, audit.
-
-> User-facing copy uses **Tasks / משימות**. The `vt_appointments` table, `/api/appointments`, and `appointmentsPage.*` i18n keys are intentionally **not renamed** — only rendered copy changed.
+Hard rules: **every query filters by `clinicId`**; **role is read from `vt_users.role`, never
+JWT**; the **realtime (SSE+outbox)**, **PWA build-tag cache**, **emergency-endpoint cache
+denylist**, and **authority `off|shadow|enforce` envelope** are frozen contracts.
 
 ---
 
-## Realtime, Code Blue, and PWA architecture
+## Core modules
 
-These surfaces are **frozen** — extend them, do not replace them. Full detail in [`CLAUDE.md`](CLAUDE.md) and [`docs/architecture/offline-realtime-invariants.md`](docs/architecture/offline-realtime-invariants.md).
-
-- **SSE** via `/api/realtime/stream` + outbox-backed ordering (`vt_event_outbox`)
-- **Code Blue** mutations require online execution; never queue offline
-- **PWA** build-tag cache versioning; emergency endpoints never cached in SW
-- **Authority evaluators** `off | shadow | enforce` per clinic; Strategy A safety net for legacy shift authority
+| Domain | What it does | Entry points |
+|---|---|---|
+| **Equipment** | Asset CRUD, custody/checkout/return, waitlist + reservation, operational-state lifecycle, RFID/scan location inference, ward/equipment display board, Asset Copilot (evidence-graph explanations) | `routes/equipment*.ts`, `routes/rooms.ts`, `routes/returns.ts`, `routes/display.ts`, `services/equipment-*.ts`, `domain/equipment/**` |
+| **Code Blue / safety** | Emergency sessions (online-only, server-confirmed), presence, crash-cart checks, reconciliation scanner | `routes/code-blue.ts`, `routes/crash-cart.ts`, `lib/code-blue-*.ts` |
+| **Authority & enforcement** | Effective clinical authority + per-clinic evaluator families (`off \| shadow \| enforce`) with Strategy-A safety net | `lib/authority.ts`, `lib/authority/enforcement/*`, `middleware/authority.ts` |
+| **Inventory / dispense** | Containers, items, dispense (idempotent), restock, procurement/POs, shadow-inventory reconciliation | `routes/{containers,dispense,restock,inventory-items,procurement}.ts`, `services/*.ts` |
+| **Tasks & shifts** | Unified task model, task intelligence/automation/recall, shifts, clinical check-in, shift chat, alerts | `routes/{tasks,appointments,shifts,clinical-check-in,shift-chat,alert-acks}.ts` |
+| **Integrations** | External PMS adapters, HMAC inbound webhooks, canonical mapping, conflict engine, rollout/resilience, health dashboard | `server/integrations/**`, `routes/integrations.ts` |
+| **Realtime** | SSE stream, outbox publisher, replay, keepalive, DLQ/janitor health | `routes/realtime.ts`, `lib/event-publisher.ts`, `lib/outbox-*.ts` |
+| **Platform/infra** | Auth mode, tenant context, i18n, rate limiting, audit, metrics, config crypto, push, uploads | `server/middleware/*`, `server/lib/*`, `routes/{users,push,uploads,support}.ts` |
+| **Frontend shell** | Provider stack, lazy route table, platform split (native vs web), offline sync, SW lifecycle | `src/main.tsx`, `src/app/routes.tsx`, `src/{native,desktop,shell}/*`, `src/lib/*` |
 
 ---
 
-## iOS Simulator
+## Execution flow
 
-> **macOS + Xcode required.** The simulator workflow is not available on Linux/CI.
+**Server startup** (`server/index.ts`):
+`env-bootstrap` (loads `.env.local` then `.env`; OS env always wins) → Sentry init → `validateEnv()` → build
+Express app → health routes (bypass middleware) → security/CORS/compression → raw-body
+webhook mounts (Clerk svix, integration HMAC, RFID) → `express.json()` + global XSS
+sanitizer → conditional Clerk middleware → `/api` rate-limit → i18n → tenant → session →
+`registerApiRoutes()` → (prod) SPA static serving → `app.listen(PORT)` →
+`runMigrations()` → `ensureClinicPhase2Defaults()` → `startBackgroundSchedulers()`.
 
-### Quick start
+**Frontend startup** (`src/main.tsx`): React root → provider stack (QueryClient, Settings,
+Confirm, Clerk auth, error boundary, Sync) → register build-tag-versioned service worker (web)
+or construct native Clerk instance (Capacitor) → `App` → wouter route table (`src/app/routes.tsx`).
+
+**Background work** (`server/app/start-schedulers.ts`, skipped in tests): outbox publisher,
+outbox janitor + DLQ scanner, job runtime (expiry/charge-alert/stale-checkin), integration
+worker + crons, task-ownership backfill/sweep, shadow inventory, Code Blue reconciliation,
+five equipment operational-state workers, emergency-dispense scanner, and push/health/watchdog
+schedulers.
+
+---
+
+## Installation
 
 ```bash
-# Build bundled web assets + sync + install on iPad A16 simulator (default)
-pnpm cap:install:ios-sim
-
-# Install on iPhone 16 Pro simulator instead
-./scripts/install-ios-sim.sh --iphone
-
-# Reuse the last build (skip rebuild + sync)
-./scripts/install-ios-sim.sh --skip-build
-
-# Target a specific simulator by UDID
-./scripts/install-ios-sim.sh --udid <UDID>
-
-# Build web assets and sync to iOS only (without installing on simulator)
-vite build && npx cap sync ios
+# Prerequisites: Node >= 22.12 (nvm use), pnpm 9.15.9, PostgreSQL, Redis (optional in dev)
+pnpm install
+cp .env.example .env          # fill DATABASE_URL etc.
+pnpm db:migrate               # apply all migrations (also runs at server startup)
+pnpm dev                      # API :3001 + Vite :5000 (predev frees the ports)
 ```
 
-`xcrun simctl list devices available` lists available simulators and their UDIDs. The default UDID (`DA8D1142-E500-43D7-84C8-8678BD1B3542`) targets iPad (A16) to match the ship-checklist device matrix.
+**Minimal dev `.env`** (omit Clerk keys to use dev-bypass auth — hardcoded admin, no Clerk SDK):
 
-### Required `.env` keys for a Clerk-enabled native build
-
-```bash
-VITE_CLERK_PUBLISHABLE_KEY=pk_live_…   # must be pk_live_, not pk_test_
-VITE_API_ORIGIN=https://vettrack.uk
+```env
+DATABASE_URL=postgres://vettrack:vettrack@localhost:5432/vettrack
+SESSION_SECRET=dev-session-secret-for-local-development
+NODE_ENV=development
 ```
-
-> Use `.env`, **not** `.env.local` — the native shell script reads `.env` only so the dev-bypass path in `.env.local` does not accidentally produce a dev-auth native build.
-
-### What the script does
-
-1. Runs `scripts/build-native-shell.sh --ios` (`vite build` → `npx cap sync ios`) unless `--skip-build` is passed
-2. Boots the target simulator
-3. Builds the Xcode scheme (`App`) in Debug for the simulator destination
-4. Installs the `.app` bundle via `xcrun simctl install`
-5. Launches the app and opens the Simulator app
-
-For Xcode GUI access run `pnpm cap:open:ios` after the sync step.
-
-Full native build and ship docs: [`docs/capacitor-native-app.md`](docs/capacitor-native-app.md) · [`docs/mobile/README.md`](docs/mobile/README.md)
 
 ---
 
-## Deployment
+## Configuration
 
-Deployed via [Railway](https://railway.app). See [`docs/devops/ci-cd.md`](docs/devops/ci-cd.md).
-
-**Required production env vars:** `DATABASE_URL`, `REDIS_URL`, `SESSION_SECRET`, `CLERK_SECRET_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`, `ALLOWED_ORIGIN`, `CLERK_WEBHOOK_SECRET`, `DB_CONFIG_ENCRYPTION_KEY`
-
-Full reference: `.env.example`
+- **Env precedence** (highest → lowest): OS env (`process.env`) → `.env.local` → `.env`. `dotenv` never overwrites an already-set variable, so OS/Railway/CI values win (`server/lib/env-bootstrap.ts`). Full reference: `.env.example`.
+- **Auth mode** (resolved at startup by `server/lib/auth-mode.ts`):
+  - *dev-bypass* — **non-production `NODE_ENV` only**, when no `CLERK_SECRET_KEY` is set (or `CLERK_ENABLED=false` is the explicit override) → hardcoded `DEV_USER` (admin, `clinicId = dev-clinic-default`). In production this path is gated off (`server/middleware/auth.ts`) and `validateEnv()` requires Clerk, so omitting keys does not silently enable the bypass.
+  - *clerk* — `CLERK_SECRET_KEY` present (and `CLERK_ENABLED !== "false"`) → full Clerk JWT validation
+- **Role hierarchy** (numeric): `admin=40 · vet=30 · senior_technician=25 · lead_technician=22 · vet_tech=20 · technician=20 · student=10`. Always sourced from `vt_users.role`.
+- **Required production env vars** (enforced at startup by `server/lib/envValidation.ts`):
+  `DATABASE_URL` (or `POSTGRES_URL`), `REDIS_URL`, `SESSION_SECRET`, `CLERK_SECRET_KEY`,
+  `VITE_CLERK_PUBLISHABLE_KEY`, `ALLOWED_ORIGIN`, `CLERK_WEBHOOK_SECRET`,
+  `DB_CONFIG_ENCRYPTION_KEY` (AES-256-GCM for integration creds in `vt_server_config`),
+  `DATA_INTEGRITY_HEALTH_TOKEN`, `DB_SSL_REJECT_UNAUTHORIZED`, `S3_ACCESS_KEY_ID`,
+  `S3_SECRET_ACCESS_KEY`.
+- **Feature/rollout flags** via `server/lib/feature-flags.ts` and `integrations/feature-flags.ts`.
 
 ---
 
-## Docs
+## Development workflow
 
-- [**Documentation index**](docs/README.md)
-- [Scope change 2026](docs/scope-change-2026.md)
-- [Mobile native](docs/mobile/README.md)
-- [Migration workflow](docs/migrations.md)
-- [Testing guide](docs/testing-guide.md)
-- [Integrations guide](docs/integrations-guide.md)
+1. **Schema change** → edit `server/schema/*.ts` → `npx drizzle-kit generate` → commit SQL → `pnpm db:migrate`.
+2. **New API route** → add `server/routes/<x>.ts` → register in `server/app/routes.ts`.
+3. **New worker/scheduler** → register in `server/app/start-schedulers.ts`.
+4. **API surface** → typed function in `src/lib/api.ts` + type in `src/types/`.
+5. **New page** → `src/pages/` + lazy `<Route>` in `src/app/routes.tsx`.
+6. **User copy** → keys in `locales/he.json` + `locales/en.json` (parity enforced); access via typed `t`.
+7. **New audit kind** → extend the closed `AuditActionType` union in `server/lib/audit.ts`.
+8. **New telemetry** → bounded enum on client + `server/routes/realtime.ts` + closed union in `server/lib/metrics.ts`.
+9. **Always** run `pnpm typecheck` (zero errors). Realtime/Code Blue/PWA changes need browser verification (Playwright drills).
+
+Architecture gates: `pnpm architecture:gates` (dependency-cruiser, madge cycles, tenant-query
+lint, route contract, query-key audit), `pnpm knip` (dead code), `pnpm i18n:check` (locale parity).
+
+---
+
+## Build / run commands
+
+| Command | Description |
+|---|---|
+| `pnpm dev` | API (:3001) + Vite (:5000) concurrently |
+| `pnpm build` | Production frontend build → `dist/public` |
+| `pnpm start` | Production server (`NODE_ENV=production`) |
+| `pnpm worker` | Standalone notification worker CLI (Redis required) |
+| `pnpm typecheck` | `tsc --noEmit` for app + server configs |
+| `pnpm test` | Vitest unit/integration suite |
+| `pnpm db:migrate` | Apply pending migrations |
+| `pnpm validate:prod` | Pre-deployment checks |
+| `pnpm auth:preflight` | Verify Clerk config + auth mode |
+| `pnpm docs:audit` | Regenerate `docs/audit/*` route & schema inventories |
+| `pnpm cap:build:native` / `:android` | Build bundled Capacitor shell |
+| `pnpm cap:install:ios-sim` | Build + install on iOS Simulator (macOS + Xcode only) |
+
+---
+
+## Testing approach
+
+- **Vitest** (`pnpm test`) — unit + integration. Several groups are excluded by default in
+  `vite.config.ts`: DB-integration tests (need `DATABASE_URL` + migrations), live-server tests
+  (need a running `:3001`), and the Phase 9 Playwright browser drills.
+- **DB / ops integration:** `pnpm test:db-integration`, `pnpm test:integration:ops`.
+- **Playwright E2E:** `pnpm test:playwright:*` (waitlist, pwa, phase9, signup, workday, ui-smoke).
+  Chromium is pre-provisioned in the cloud environment — do not run `playwright install`.
+- **Phase 9 realtime/PWA:** deterministic counter contracts in `tests/phase-9-deterministic-drills.test.ts`
+  + browser harness `tests/phase-9-drills.spec.ts`.
+- **Staging:** `pnpm test:staging:e2e`, `pnpm staging:seed`.
+
+Coverage target is 80%+ (see `.claude/rules/ecc/common/testing.md`); prefer the AAA pattern.
+
+---
+
+## External integrations
+
+- **Clerk** — auth + user webhooks (`/api/webhooks/clerk`, svix-verified raw body).
+- **PMS adapters** — `priza`, `vendor-x`, `generic-pms`, `local-sandbox` over a common `base`
+  (`server/integrations/adapters/*`). Inbound webhooks are HMAC-verified over raw body with a
+  CIDR allowlist (`/api/integration-webhooks/:adapterId`); outbound sync + conflict resolution
+  via canonical mappers and a conflict engine. Circuit breaker, rate limits, and staged rollout
+  policy live in `server/integrations/resilience/*` and `rollout/*`.
+- **Redis / BullMQ** — job runtime, push fan-out, integration sync.
+- **AWS S3** — uploads/storage (`@aws-sdk/client-s3`, multer).
+- **Web Push (VAPID)** — push notifications.
+- **Anthropic** — Asset Copilot explanations (`server/lib/anthropic-client.ts`).
+- **Sentry** — error/perf monitoring on client and server.
+
+---
+
+## Repository structure
+
+```
+src/                 React frontend (PWA, RTL, offline-first)
+  app/               wouter route table + platform guards
+  pages/             route-level page components (all lazy-loaded)
+  features/          feature modules (auth, equipment, inventory, shift-chat, …)
+  components/        shared UI (shadcn/Radix primitives in components/ui/)
+  native/ desktop/   Capacitor native shell vs web shell (selected by PlatformRouter)
+  shell/             legacy re-export aliases over native/ + desktop/
+  core/ infrastructure/  emerging hexagonal layer (entities/use-cases/ports + adapters)
+  hooks/  lib/       auth/push/settings/offline hooks · api client, offline-db, sync-engine, realtime, i18n
+server/
+  index.ts           Express entry (env-bootstrap first)
+  app/               routes.ts (route registration) + start-schedulers.ts
+  routes/            one file per API resource (~45)
+  schema/            Drizzle pgTable definitions (barrel index.ts, re-exported via db.ts)
+  services/          domain services
+  domain/            hexagonal equipment evidence-graph + Asset Copilot
+  lib/               business logic: authority/enforcement, realtime outbox, audit, metrics, push…
+  integrations/      external PMS adapter layer
+  jobs/ queues/ workers/  BullMQ runtime, queue defs, worker implementations
+  middleware/        auth, tenant-context, rate-limiters, authority, validate, idempotency
+lib/                 i18n utilities shared by frontend + backend
+locales/             en.json, he.json (Hebrew default; parity enforced)
+shared/              constants + types shared across front/back
+migrations/          158 SQL files, applied in order at startup
+scripts/             dev/ops + architecture-gate scripts
+public/sw.js         service worker (build-tag cache, emergency endpoint denylist)
+ios/ android/        Capacitor native projects
+docs/                architecture, runbooks, integrations, audit inventories
+```
+
+---
+
+## Known architectural patterns
+
+- **Multi-tenant by `clinicId`** on every table and every query.
+- **Outbox-backed SSE realtime** — monotonic cursor ordering, HTTP replay, keepalive; never
+  WebSockets/polling. Emergency endpoints are never cached.
+- **Offline-first sync engine** — Dexie cache + FIFO queue + circuit breaker; emergency
+  mutations are intercepted and fail loud (never queued).
+- **Authority `off | shadow | enforce` evaluators** per clinic, with a preserved Strategy-A
+  shift-derived fallback and fail-open carve-out.
+- **Closed unions** for audit kinds and telemetry counters (extend the union, never free-form).
+- **Container/presentational + server-state separation** on the frontend (TanStack Query for
+  server state, Zustand/URL for client state).
+- **Platform split** via `resolvePlatformTarget()`/`usePlatformTarget()` (`mobile | desktop | marketing`) →
+  `PlatformRouter` wraps mobile in `NativeShell`, desktop/marketing pass through to per-page web chrome (`src/app/platform`).
+- **Emerging hexagonal core** (`src/core` + `src/infrastructure`, `server/domain`) layered over
+  the older service/lib style — migration is partial.
+- **Architecture enforced in CI** — dependency-cruiser, madge cycle checks, tenant-query lint,
+  route-contract extraction, knip dead-code, i18n parity.
+
+---
+
+## Documentation
+
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — full module/dependency/flow reference
+- [`CLAUDE.md`](CLAUDE.md) — operating doctrine & frozen-surface contracts
+- [`docs/README.md`](docs/README.md) — documentation index
+- [`docs/scope-change-2026.md`](docs/scope-change-2026.md) — removed domains
+- [`docs/architecture/`](docs/architecture/) — ADRs, domain boundaries, offline/realtime invariants
+- [`docs/audit/db.md`](docs/audit/db.md) — generated schema inventory
+- [`docs/integrations-guide.md`](docs/integrations-guide.md), [`docs/migrations.md`](docs/migrations.md), [`docs/testing-guide.md`](docs/testing-guide.md), [`docs/mobile/README.md`](docs/mobile/README.md)

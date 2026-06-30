@@ -14,7 +14,7 @@ type NavItem = {
   onClick?: () => void;
 };
 
-function isTabActive(location: string, href: string): boolean {
+export function isTabActive(location: string, href: string): boolean {
   if (href === "/home") return location === "/home" || location === "/";
   return location.startsWith(href.split("?")[0]);
 }
