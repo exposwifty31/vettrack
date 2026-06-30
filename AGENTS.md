@@ -106,6 +106,14 @@ When conventions conflict:
 ### Cloud agent starter skill
 Use `docs/cloud-agent-starter-skill.md` as the default quickstart runbook for environment setup, auth/login modes, and test workflows by code area.
 
+### Snapshot startup caveats (read before running the app/tests)
+The Cloud VM snapshot already has PostgreSQL 16 installed, the `vettrack` role/database created and migrated/seeded, and a gitignored `.env` (minimal dev-bypass config: `DATABASE_URL`, `SESSION_SECRET`, `NODE_ENV=development`, `PORT=3001`). The update script only runs `pnpm install`, so:
+
+- **PostgreSQL is not auto-started on boot.** Start it once per session before the API/DB tests: `sudo pg_ctlcluster 16 main start` (or re-run `bash setup-vm.sh`, which is idempotent and also (re)creates the role/db). Verify with `pg_lsclusters`.
+- **Auth is dev-bypass** (no Clerk keys set) → API injects a hardcoded admin (`admin@vettrack.dev`, clinic `dev-clinic-default`). Start the app with `pnpm dev` (API `:3001` + Vite `:5000`); use `http://localhost:5000`.
+- **Redis is intentionally absent in dev.** Queue/worker logs like `REDIS_DISABLED` / `QUEUE_DISABLED_NO_REDIS` and `SYSTEM_ALERT … PUBLISH_LAG` (stale seed timestamps) are expected, not failures.
+- **Known pre-existing test failures (not env-related):** 3 cases in `tests/mobile-shell.test.tsx` (`aria-current="page"` active-tab assertions) fail on a clean checkout; the rest of `pnpm test` passes. Do not chase these as setup problems.
+
 ### Cursor project rules (IDE agents)
 Persistent guidance for Cursor lives under `.cursor/rules/*.mdc` and root `.cursorrules`. See `docs/engineering-rules-rollout.md`.
 
