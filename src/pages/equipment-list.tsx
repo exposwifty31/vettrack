@@ -107,12 +107,31 @@ import { EquipmentRoomSweepSheet } from "@/components/equipment/EquipmentRoomSwe
 const VIRTUALIZATION_THRESHOLD = 100;
 const SERVER_PAGE_SIZE = 100;
 
+// CSS var prefix per status value (matches src/index.css naming)
+const STATUS_CSS_PREFIX: Record<string, string> = {
+  ok: "ok", issue: "issue", maintenance: "maint", sterilized: "steril",
+  stale: "stale", unknown: "unknown", in_use: "in-use", overdue: "overdue",
+};
+
+function statusChipStyle(value: string): React.CSSProperties | undefined {
+  const prefix = STATUS_CSS_PREFIX[value];
+  if (!prefix) return undefined;
+  return {
+    background: `var(--status-${prefix}-bg)`,
+    color:      `var(--status-${prefix}-fg)`,
+    borderColor:`var(--status-${prefix}-border)`,
+  };
+}
+
 const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: "all", label: t.status.all },
-  { value: "ok", label: t.status.ok },
-  { value: "issue", label: t.status.issue },
+  { value: "all",         label: t.status.all },
+  { value: "ok",          label: t.status.ok },
+  { value: "in_use",      label: t.status.in_use },
+  { value: "issue",       label: t.status.issue },
+  { value: "overdue",     label: t.status.overdue },
+  { value: "stale",       label: t.status.stale },
   { value: "maintenance", label: t.status.maintenance },
-  { value: "sterilized", label: t.status.sterilized },
+  { value: "unknown",     label: t.status.unknown },
 ];
 
 // 9 cards per page — DOM never holds more than 9 <div>s regardless of dataset size.
@@ -529,20 +548,27 @@ function EquipmentListPageDesktop() {
           </div>
           {/* Status chip filters */}
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none" data-testid="status-filter-chips">
-            {STATUS_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setStatusFilter(opt.value)}
-                className={`shrink-0 flex items-center px-3 min-h-[44px] rounded-full vt-text-xs font-medium border transition-colors whitespace-nowrap ${
-                  statusFilter === opt.value
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
-                }`}
-                data-testid={`status-chip-${opt.value}`}
-              >
-                {opt.label}
-              </button>
-            ))}
+            {STATUS_OPTIONS.map((opt) => {
+              const active = statusFilter === opt.value;
+              const tinted = active && opt.value !== "all";
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => setStatusFilter(opt.value)}
+                  className={`shrink-0 flex items-center px-3 min-h-[44px] rounded-full vt-text-xs font-medium border transition-colors whitespace-nowrap ${
+                    active && !tinted
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : !active
+                      ? "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
+                      : ""
+                  }`}
+                  style={tinted ? statusChipStyle(opt.value) : undefined}
+                  data-testid={`status-chip-${opt.value}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
             {isEquipmentRecoveryUiEnabled && (
               <button
                 type="button"

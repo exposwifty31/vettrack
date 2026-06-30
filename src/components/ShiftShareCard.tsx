@@ -3,9 +3,9 @@ import { t, getStoredLocale } from "@/lib/i18n";
 
 // Fixed-size card rendered off-screen and captured with html-to-image.
 // MUST use only inline styles — Tailwind classes are not applied during capture.
-const BRAND = "#1a3d28";      // forest green
-const BRAND_LIGHT = "#2d6647"; // lighter green for accent
-const IVORY = "#f3f1eb";      // warm off-white
+const BRAND = "#15803d";      // --action (WCAG AA green)
+const BRAND_LIGHT = "#166534"; // --action-deep
+const IVORY = "#f2f2f7";      // --background (iOS grouped)
 const IVORY_BORDER = "#e2dfd7";
 const TEXT = "#1c1917";
 const TEXT2 = "#6b6560";

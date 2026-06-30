@@ -1,17 +1,19 @@
 import { useLocation } from "wouter";
-import { Home, Package, Activity, AlignJustify } from "lucide-react";
+import { Home, Package, QrCode, Activity, AlignJustify } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { ScanFab } from "./ScanFab";
 
 type TabDef = {
   id: string;
-  href: string;
+  href?: string;
   label: string;
   icon: React.ReactNode;
+  isScan?: boolean;
+  isMore?: boolean;
 };
 
 type Props = {
   onMorePress: () => void;
+  onScanPress?: () => void;
 };
 
 function isTabActive(location: string, href: string): boolean {
@@ -19,17 +21,26 @@ function isTabActive(location: string, href: string): boolean {
   return location.startsWith(href.split("?")[0]);
 }
 
+// §6.11: Scan is a flat emphasised tab, never a FAB.
 function TabButton({
   label,
   icon,
   active,
+  isScan,
   onClick,
 }: {
   label: string;
   icon: React.ReactNode;
   active: boolean;
+  isScan?: boolean;
   onClick: () => void;
 }) {
+  const color = isScan
+    ? "var(--action)"
+    : active
+    ? "var(--brand)"
+    : "hsl(var(--muted-foreground))";
+
   return (
     <button
       type="button"
@@ -40,47 +51,37 @@ function TabButton({
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        gap: 2,
+        gap: 3,
         paddingTop: 6,
         paddingBottom: 6,
         minHeight: 50,
-        minWidth: 0,
+        minWidth: 44,
         border: "none",
-        background: "transparent",
+        borderRadius: 12,
+        background: isScan ? "rgb(21 128 61 / 0.08)" : "transparent",
         cursor: "pointer",
-        color: active ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))",
-        transition: "color 150ms ease",
+        color,
+        transition: "color 120ms ease, background 120ms ease",
         WebkitTapHighlightColor: "transparent",
       }}
     >
       {icon}
-      <span
-        style={{
-          fontSize: "var(--text-2xs)",
-          fontWeight: active ? 600 : 400,
-          lineHeight: 1,
-        }}
-      >
+      <span style={{ fontSize: "var(--text-2xs)", fontWeight: isScan || active ? 600 : 400, lineHeight: 1 }}>
         {label}
       </span>
     </button>
   );
 }
 
-/**
- * Sole tab-bar owner for the native shell.
- * Renders: Today · Equipment · [ScanFab] · Emergency · Menu.
- */
-export function NativeTabBar({ onMorePress }: Props) {
+export function NativeTabBar({ onMorePress, onScanPress }: Props) {
   const [location, navigate] = useLocation();
 
-  const leftTabs: TabDef[] = [
-    { id: "today", href: "/home", label: t.nav.today, icon: <Home size={22} /> },
+  const tabs: TabDef[] = [
+    { id: "today",     href: "/home",       label: t.nav.today,     icon: <Home size={22} /> },
     { id: "equipment", href: "/my-equipment", label: t.nav.equipment, icon: <Package size={22} /> },
-  ];
-
-  const rightTabs: TabDef[] = [
-    { id: "emergency", href: "/code-blue", label: t.nav.emergency, icon: <Activity size={22} /> },
+    { id: "scan",      label: t.nav.equipmentScan, icon: <QrCode size={22} />, isScan: true },
+    { id: "emergency", href: "/code-blue",  label: t.nav.emergency, icon: <Activity size={22} /> },
+    { id: "more",      label: t.nav.menu,   icon: <AlignJustify size={22} />, isMore: true },
   ];
 
   return (
@@ -89,46 +90,29 @@ export function NativeTabBar({ onMorePress }: Props) {
       style={{
         display: "flex",
         alignItems: "center",
-        paddingBottom: "env(safe-area-inset-bottom)",
-        backgroundColor: "hsl(var(--background) / 0.96)",
-        borderTop: "0.5px solid rgba(60,60,67,0.18)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
+        gap: 4,
+        padding: `6px 8px max(env(safe-area-inset-bottom), 22px)`,
+        background: "var(--bar-bg)",
+        backdropFilter: "blur(var(--bar-blur))",
+        WebkitBackdropFilter: "blur(var(--bar-blur))",
+        borderTop: "0.5px solid var(--hairline)",
         flexShrink: 0,
       }}
     >
-      {leftTabs.map((tab) => (
+      {tabs.map((tab) => (
         <TabButton
           key={tab.id}
           label={tab.label}
           icon={tab.icon}
-          active={isTabActive(location, tab.href)}
-          onClick={() => navigate(tab.href)}
+          isScan={tab.isScan}
+          active={!!tab.href && isTabActive(location, tab.href)}
+          onClick={() => {
+            if (tab.isMore) { onMorePress(); return; }
+            if (tab.isScan) { onScanPress ? onScanPress() : navigate("/scan"); return; }
+            if (tab.href) navigate(tab.href);
+          }}
         />
       ))}
-
-      <div
-        style={{ flex: 1, display: "flex", justifyContent: "center", paddingBottom: 4 }}
-      >
-        <ScanFab />
-      </div>
-
-      {rightTabs.map((tab) => (
-        <TabButton
-          key={tab.id}
-          label={tab.label}
-          icon={tab.icon}
-          active={isTabActive(location, tab.href)}
-          onClick={() => navigate(tab.href)}
-        />
-      ))}
-
-      <TabButton
-        label={t.nav.menu}
-        icon={<AlignJustify size={22} />}
-        active={false}
-        onClick={onMorePress}
-      />
     </nav>
   );
 }
