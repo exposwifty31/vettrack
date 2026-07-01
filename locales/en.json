@@ -1318,7 +1318,22 @@
     "urgentCriticalAlerts": "{count} critical alerts",
     "urgentCriticalAlertsHint": "Equipment needs immediate attention",
     "urgentOverdueTasks": "{count} overdue",
-    "urgentOverdueTasksHint": "Tasks behind schedule — review now"
+    "urgentOverdueTasksHint": "Tasks behind schedule — review now",
+    "greetingMorning": "Good morning, {name}",
+    "greetingAfternoon": "Good afternoon, {name}",
+    "greetingEvening": "Good evening, {name}",
+    "onShift": "On shift",
+    "startedAt": "Started {time}",
+    "elapsedLabel": "Elapsed",
+    "noShiftSub": "Start your shift to begin tracking equipment and scans.",
+    "criticalLabel": "Critical",
+    "overdueLabel": "Overdue",
+    "scanEquipmentSub": "NFC or camera · tap to start",
+    "viewAll": "View all",
+    "activityScanned": "Scanned",
+    "activityMoved": "Moved",
+    "activityAdded": "Added",
+    "activityYou": "You"
   },
   "assetCopilot": {
     "title": "Asset Copilot",

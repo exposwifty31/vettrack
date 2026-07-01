@@ -651,6 +651,10 @@ const translations = {
     winScansToday: (count: number) => tr(d.homePage.winScansToday, { count }),
     urgentCriticalAlerts: (count: number) => tr(d.homePage.urgentCriticalAlerts, { count }),
     urgentOverdueTasks: (count: number) => tr(d.homePage.urgentOverdueTasks, { count }),
+    greetingMorning: (name: string) => tr(d.homePage.greetingMorning, { name }),
+    greetingAfternoon: (name: string) => tr(d.homePage.greetingAfternoon, { name }),
+    greetingEvening: (name: string) => tr(d.homePage.greetingEvening, { name }),
+    startedAt: (time: string) => tr(d.homePage.startedAt, { time }),
   },
 
   assetCopilot: d.assetCopilot,

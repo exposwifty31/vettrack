@@ -127,6 +127,7 @@
        white (was #16a34a = 3.30:1). #15803d = 5.02:1; hover step #166534. */
     /* Action / scan-confirm accent — Stage 1 teal-forest (10% tier, not brand) */
     --action: #2f6f5e;
+    --action-foreground: #ffffff;
     --action-deep: #285c4e;
     --action-ink: #2a6555;
     --action-soft: #e8f2ee;
@@ -267,6 +268,7 @@
 
     /* Action / scan accent — Stage 1 dark teal */
     --action: #4ccdaa;
+    --action-foreground: #06210f;
     --action-deep: #35b394;
     --action-ink: #4ccdaa;
     --action-soft: rgba(76, 205, 170, 0.12);
@@ -332,6 +334,7 @@
     --hero-a: #0b1021;
     --hero-b: #312e81;
     --action: #2f6f5e;
+    --action-foreground: #ffffff;
     --action-deep: #285c4e;
     --action-ink: #2a6555;
     --action-soft: #e8f2ee;
@@ -375,6 +378,7 @@
     --brand-green-bright: #a5b4fc;
     --brand-green-mid: #6366f1;
     --action: #4ccdaa;
+    --action-foreground: #06210f;
     --action-deep: #35b394;
     --action-ink: #4ccdaa;
     --action-soft: rgba(76, 205, 170, 0.12);
