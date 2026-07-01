@@ -9,13 +9,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 pnpm install
 pnpm dev                    # API on :3001 + Vite on :5000 (kills ports first via predev)
 
-# Type checking — run after every file change
-npx tsc --noEmit
+# Type checking — run after every file change (two tsconfigs: frontend + server)
+pnpm typecheck               # tsc --noEmit (frontend) && tsc -p tsconfig.server.json --noEmit (server)
+pnpm typecheck:server         # server tsconfig only
 
 # Tests
 pnpm test                   # vitest unit/integration (excludes DB/live-server tests)
 pnpm test -- --reporter=verbose  # with detail
 pnpm test -- tests/some.test.ts  # single file
+pnpm test:playwright:ci     # Playwright CI suite (Chromium)
+pnpm test:playwright:phase9 # Phase 9 realtime/PWA drills (needs running app)
+pnpm test:signup            # signup E2E flow
+
+# Architecture gates (server/schema, module boundaries, dead code)
+pnpm architecture:gates      # runs the full gate suite below in sequence
+pnpm tenant:lint:touched     # warn-only: flags queries missing clinicId filter (touched files)
+pnpm depcruise:check         # dependency-cruiser boundary check against known-violations baseline
+pnpm architecture:cycles     # import-cycle regression check
+pnpm knip                   # unused files/exports/deps
+
+# i18n
+pnpm i18n:check              # locales/en.json ⟷ locales/he.json parity
 
 # Database
 pnpm db:migrate             # apply pending migrations on demand (same path runs at server startup)
@@ -39,6 +53,14 @@ NODE_ENV=development
 Omit `CLERK_SECRET_KEY` / `VITE_CLERK_PUBLISHABLE_KEY` to use dev-bypass auth (hardcoded admin user, no Clerk SDK required).
 
 **Env precedence:** `.env.local` → `.env` → OS env. Both files loaded by `server/lib/env-bootstrap.ts` at startup.
+
+## Working Conventions
+
+- Act directly — don't narrate what you're about to do before doing it.
+- Don't add comments unless the code is genuinely non-obvious.
+- Don't refactor code outside what was asked for in the current task.
+- Don't uncomment disabled/skipped test blocks unless explicitly instructed to.
+- Commit after completing each task (still follow standard git-workflow rules: new commits, no amend/force-push/--no-verify).
 
 ## Architecture
 
@@ -223,8 +245,8 @@ Use `logAudit()` from `server/lib/audit.ts` for all critical actions. It is fire
 ### Tests
 
 `pnpm test` runs vitest. Several test groups are excluded by default in `vite.config.ts`:
-- DB integration tests (require `DATABASE_URL` + applied migrations): `tests/restock.service.test.ts`, `tests/migrations/**`, `tests/phase-2-3-medication-package-integration.test.ts`
-- Live-server tests (require dev server on :3001): `tests/charge-alert-worker.test.js`, `tests/code-blue-mode-equipment.test.js`, `tests/expiry-api.test.js`, `tests/expiry-check-worker.test.js`, `tests/returns-api.test.js`
+- DB integration tests (require `DATABASE_URL` + applied migrations): `tests/restock.service.test.ts`, `tests/migrations/**`, `tests/phase-2-3-medication-package-integration.test.ts`, `tests/equipment-operational-state.integration.test.ts`
+- Live-server tests (require dev server on :3001): `tests/charge-alert-worker.test.js`, `tests/code-blue-mode-equipment.test.js`, `tests/equipment-scan-e2e.test.js`, `tests/expiry-api.test.js`, `tests/expiry-check-worker.test.js`, `tests/returns-api.test.js`
 - Phase 9 deterministic drills: `tests/phase-9-deterministic-drills.test.ts` covers bounded-counter contracts in unit form; `tests/phase-9-drills.spec.ts` is the Playwright browser harness for the eight realtime/PWA drills.
 
 E2E tests use Playwright: `pnpm test:signup` (requires Chromium). The Phase 9 drills also use Playwright and require a running app — invoke through the dedicated `playwright.ui.config.ts` / `playwright.config.ts` runners.
@@ -244,4 +266,4 @@ E2E tests use Playwright: `pnpm test:signup` (requires Chromium). The Phase 9 dr
 
 ### Cursor project rules
 
-Claude Code and other IDE agents should respect `.cursor/rules/*.mdc`. Start from **`engineering-and-agent-principles.mdc`** (cross-cutting style, security posture, tests, workflow), then apply folder-specific rules in the same directory. Human summary of rollout and ongoing compliance: `docs/engineering-rules-rollout.md`.
+Claude Code and other IDE agents should respect `.cursor/rules/*.mdc`: `00-core-behavior.mdc` (identity + session-start protocol — read `CLAUDE.md`/`PLAN.md`/`TASKS.md` before coding), `01-anti-patterns.mdc` (tells that mark AI-generated code, e.g. comment theater), `02-workflow.mdc` (required phases, orient-first), `03-testing.mdc` (every code task ships or updates a test). All four are `alwaysApply: true`. Human summary of rollout and ongoing compliance: `docs/engineering-rules-rollout.md`.
