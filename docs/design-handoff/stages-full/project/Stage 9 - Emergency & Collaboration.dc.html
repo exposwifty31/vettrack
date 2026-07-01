@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Heebo:wght@400;500;600;700;800&display=swap">
+<style>
+  /* ============================================================
+     STAGE 9 · EMERGENCY & COLLABORATION — §18 NOTES
+     Binds the Stage 1 canonical token layer.
+     Screens: Crash Cart · Code Blue History · Shift Chat · Shift Handover.
+     S9-D1  Crash Cart uses the same 6-state chip vocabulary as Equipment,
+            not a bespoke pass/fail language.
+     S9-D2  Shift Chat broadcasts are visually distinct (indigo-bordered,
+            ack-progress bar) from ordinary messages — urgent messages get a
+            red border, never color alone.
+     S9-D3  Shift Handover is a richer, standalone summary; Stage 4's
+            Handoff screen remains the quick start/end action.
+     ============================================================ */
+  *{box-sizing:border-box}
+  html{font-size:17px}
+  body{margin:0;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-variant-numeric:tabular-nums}
+  :root{
+    --background:rgb(242 242 247); --surface:rgb(255 255 255); --surface-2:rgb(255 255 255);
+    --foreground:rgb(0 0 0); --muted-foreground:rgba(60,60,67,0.6); --border:rgba(60,60,67,0.29);
+    --hairline:transparent;
+    --brand:rgb(79 70 229); --brand-foreground:rgb(255 255 255); --brand-ink:rgb(30 27 75);
+    --action:rgb(47 111 94); --action-foreground:rgb(255 255 255);
+    --sys-red:255 59 48; --sys-orange:255 149 0; --sys-green:52 199 89; --sys-blue:0 122 255; --sys-gray:142 142 147;
+    --radius-lg:14px; --radius-xl:16px; --radius-2xl:20px; --radius-pill:999px;
+    --ease-standard:cubic-bezier(0.2,0,0,1); --dur-fast:120ms; --dur-base:200ms;
+    --font-sans:-apple-system,system-ui,"Heebo","Segoe UI",Roboto,sans-serif;
+    --font-num:"DM Mono",ui-monospace,SFMono-Regular,monospace;
+    --text-largetitle:2rem; --text-xl:1.294rem;
+    --text-base:1rem; --text-sm:0.882rem; --text-xs:0.765rem; --text-2xs:0.647rem;
+    --bar-bg:rgb(255 255 255 / 0.94); --bar-bg-opaque:rgb(255 255 255); --bar-blur:12px;
+    --tonal:rgba(120,120,128,0.16);
+    --status-ok:rgb(var(--sys-green)); --status-ok-bg:rgb(var(--sys-green) / 0.12); --status-ok-border:rgb(var(--sys-green) / 0.22); --status-ok-fg:rgb(var(--sys-green));
+    --status-issue:rgb(var(--sys-red)); --status-issue-bg:rgb(var(--sys-red) / 0.12); --status-issue-border:rgb(var(--sys-red) / 0.22); --status-issue-fg:rgb(var(--sys-red));
+    --status-stale:rgb(var(--sys-orange)); --status-stale-bg:rgb(var(--sys-orange) / 0.12); --status-stale-border:rgb(var(--sys-orange) / 0.22); --status-stale-fg:rgb(var(--sys-orange));
+    --on-ink:rgb(255 255 255); --on-ink-strong:rgb(255 255 255 / 0.82); --on-ink-muted:rgb(255 255 255 / 0.6);
+    --ink-divider:rgb(255 255 255 / 0.12); --ink-fill:rgb(255 255 255 / 0.1);
+  }
+  .dark{
+    --background:rgb(0 0 0); --surface:rgb(28 28 30); --surface-2:rgb(44 44 46);
+    --foreground:rgb(255 255 255); --muted-foreground:rgba(235,235,245,0.6); --border:rgba(84,84,88,0.6);
+    --hairline:rgba(84,84,88,0.6);
+    --brand:rgb(129 140 248); --brand-foreground:rgb(30 27 75); --brand-ink:rgb(30 27 75);
+    --action:rgb(76 205 170); --action-foreground:rgb(6 33 15);
+    --sys-red:255 69 58; --sys-orange:255 159 10; --sys-green:48 209 88; --sys-blue:10 132 255; --sys-gray:152 152 157;
+    --bar-bg:rgba(28,28,30,0.94); --bar-bg-opaque:rgb(28 28 30);
+    --tonal:rgba(120,120,128,0.24);
+  }
+  .rt{ --bar-bg:var(--bar-bg-opaque); --bar-blur:0px; }
+  a:focus-visible,button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:none;box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--brand)}
+</style>
+</helmet>
+<div class="{{ pageClass }}" style="min-height:100vh; background:var(--background); color:var(--foreground); font-family:var(--font-sans)">
+
+  <header style="position:sticky; top:0; z-index:50; background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); border-bottom:1px solid var(--border)">
+    <div style="max-width:1240px; margin:0 auto; padding:11px 20px; display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px">
+      <div style="display:flex; align-items:baseline; gap:10px; margin-right:auto"><span style="font:700 17px var(--font-sans); letter-spacing:-.02em; color:var(--brand)">VetTrack</span><span style="font:500 12px var(--font-num); color:var(--muted-foreground)">Stage 9 · Emergency &amp; Collaboration</span></div>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">Screen</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px; flex-wrap:wrap"><sc-for list="{{ screenOpts }}" as="o" hint-placeholder-count="4"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">Theme</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px"><sc-for list="{{ themeOpts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">Size</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px"><sc-for list="{{ sizeOpts }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+      <sc-if value="{{ hasVariant }}" hint-placeholder-val="{{ true }}"><div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">{{ variantTitle }}</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px; flex-wrap:wrap"><sc-for list="{{ variantOpts }}" as="o" hint-placeholder-count="4"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div></sc-if>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">Locale</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px"><sc-for list="{{ dirOpts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+    </div>
+  </header>
+
+  <div style="padding:26px 16px 70px; display:flex; justify-content:center; overflow:auto">
+    <div style="{{ frameOuter }}; display:flex; flex-direction:column; box-sizing:border-box; overflow:hidden">
+      <div dir="{{ dir }}" style="{{ screenStyle }}; flex:1; min-height:0; display:flex; flex-direction:column; background:var(--background); overflow:hidden; position:relative">
+
+        <sc-if value="{{ isCompact }}" hint-placeholder-val="{{ true }}">
+          <div style="min-height:44px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; padding-top:env(safe-area-inset-top); padding-inline:26px">
+            <span style="font:600 15px var(--font-num); color:var(--foreground)">9:41</span>
+            <div style="width:24px; height:12px; border:1px solid currentColor; border-radius:3px; padding:1.5px; opacity:.9; color:var(--foreground)"><div style="width:72%; height:100%; background:currentColor; border-radius:1px"></div></div>
+          </div>
+        </sc-if>
+
+        <div style="flex:1; min-height:0; display:flex">
+          <sc-if value="{{ hasSidebar }}" hint-placeholder-val="{{ false }}">
+            <aside style="width:220px; flex-shrink:0; background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); border-inline-end:1px solid var(--border); display:flex; flex-direction:column; padding:18px 12px">
+              <div style="padding:6px 10px 18px; font:700 18px var(--font-sans); color:var(--brand)">VetTrack</div>
+              <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="5">
+                <div style="display:flex; align-items:center; gap:11px; padding:10px 11px; border-radius:10px; background:{{ n.bg }}; color:{{ n.color }}; margin-bottom:2px">
+                  <span style="display:flex; flex-shrink:0">
+                    <sc-if value="{{ n.isToday }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/></svg></sc-if>
+                    <sc-if value="{{ n.isEquipment }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M12 22V12"/></svg></sc-if>
+                    <sc-if value="{{ n.isEmergency }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg></sc-if>
+                    <sc-if value="{{ n.isAlerts }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></sc-if>
+                  </span>
+                  <span style="font-size:14px; font-weight:{{ n.weight }}; font-family:var(--font-sans)">{{ n.label }}</span>
+                </div>
+              </sc-for>
+            </aside>
+          </sc-if>
+
+          <div style="flex:1; min-width:0; display:flex; flex-direction:column">
+            <sc-if value="{{ isExpanded }}" hint-placeholder-val="{{ false }}">
+              <div style="height:56px; flex-shrink:0; display:flex; align-items:center; gap:14px; padding:0 24px; background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); border-bottom:1px solid var(--border)"><span style="font:600 16px var(--font-sans)">{{ topbarTitle }}</span></div>
+            </sc-if>
+
+            <main style="flex:1; min-height:0; overflow:auto; padding:{{ mainPad }}; display:flex; flex-direction:column">
+              <div style="max-width:{{ contentMax }}; margin:0 auto; width:100%; display:flex; flex-direction:column; gap:{{ contentGap }}; flex:1">
+
+                <!-- ===================== CRASH CART ===================== -->
+                <sc-if value="{{ showCart }}" hint-placeholder-val="{{ true }}">
+                  <div data-screen-label="Crash Cart" style="display:flex; flex-direction:column; gap:{{ contentGap }}">
+                    <h1 style="font-size:{{ titleSize }}; font-weight:700; letter-spacing:-.02em; margin:0">{{ cartTitle }}</h1>
+                    <div style="display:flex; align-items:center; gap:13px; padding:15px 17px; border-radius:16px; background:{{ cartBannerBg }}; border:1px solid {{ cartBannerBorder }}">
+                      <span style="width:38px; height:38px; border-radius:11px; background:{{ cartBannerIconBg }}; color:var(--on-ink); display:flex; align-items:center; justify-content:center; flex-shrink:0">
+                        <sc-if value="{{ cartAllOk }}" hint-placeholder-val="{{ true }}"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></sc-if>
+                        <sc-if value="{{ cartHasMissing }}" hint-placeholder-val="{{ false }}"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.3 3.7-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.3l-8-14a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></sc-if>
+                      </span>
+                      <div style="flex:1"><p style="font:700 14.5px var(--font-sans); color:{{ cartBannerFg }}; margin:0">{{ cartBannerTitle }}</p><p style="font:500 12.5px var(--font-sans); color:var(--muted-foreground); margin:2px 0 0">{{ cartBannerSub }}</p></div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:8px"><sc-for list="{{ cartItems }}" as="it" hint-placeholder-count="6">
+                      <div style="display:flex; align-items:center; gap:12px; padding:12px 15px; border-radius:14px; background:var(--surface); border:1px solid {{ it.border }}">
+                        <span style="width:26px; height:26px; border-radius:999px; background:{{ it.dotBg }}; color:{{ it.dotIconColor }}; display:flex; align-items:center; justify-content:center; flex-shrink:0">
+                          <sc-if value="{{ it.ok }}" hint-placeholder-val="{{ true }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></sc-if>
+                          <sc-if value="{{ it.notOk }}" hint-placeholder-val="{{ false }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></sc-if>
+                        </span>
+                        <span style="flex:1; font:600 14px var(--font-sans); color:var(--foreground)">{{ it.name }}</span>
+                        <span style="font:600 12px var(--font-sans); color:{{ it.dotFg }}">{{ it.status }}</span>
+                      </div>
+                    </sc-for></div>
+                    <button style="height:50px; border:none; border-radius:15px; background:var(--brand); color:var(--brand-foreground); font:700 15px var(--font-sans); cursor:pointer">{{ cartCheckCta }}</button>
+                  </div>
+                </sc-if>
+
+                <!-- ===================== CODE BLUE HISTORY ===================== -->
+                <sc-if value="{{ showHistory }}" hint-placeholder-val="{{ false }}">
+                  <div data-screen-label="Code Blue History" style="display:flex; flex-direction:column; gap:{{ contentGap }}">
+                    <h1 style="font-size:{{ titleSize }}; font-weight:700; letter-spacing:-.02em; margin:0">{{ historyTitle }}</h1>
+                    <sc-if value="{{ historyEmpty }}" hint-placeholder-val="{{ false }}"><p style="text-align:center; padding:30px 0; color:var(--muted-foreground); font:500 14px var(--font-sans)">{{ historyEmptyLabel }}</p></sc-if>
+                    <sc-if value="{{ historyShow }}" hint-placeholder-val="{{ true }}"><div style="display:flex; flex-direction:column; gap:10px"><sc-for list="{{ sessions }}" as="s" hint-placeholder-count="4">
+                      <div style="padding:14px 17px; border-radius:16px; background:var(--surface); border:1px solid var(--hairline); display:flex; flex-direction:column; gap:6px">
+                        <div style="display:flex; align-items:center; justify-content:space-between"><span style="font:600 14px var(--font-sans); color:var(--foreground)">{{ s.date }}</span><span style="padding:3px 9px; border-radius:999px; background:var(--status-issue-bg); color:var(--status-issue-fg); font:700 10.5px var(--font-sans); text-transform:uppercase">{{ s.outcome }}</span></div>
+                        <p style="font:500 12.5px var(--font-sans); color:var(--muted-foreground); margin:0">{{ s.meta }}</p>
+                      </div>
+                    </sc-for></div></sc-if>
+                  </div>
+                </sc-if>
+
+                <!-- ===================== SHIFT CHAT ===================== -->
+                <sc-if value="{{ showChat }}" hint-placeholder-val="{{ false }}">
+                  <div data-screen-label="Shift Chat" style="display:flex; flex-direction:column; height:100%; min-height:0">
+                    <div style="flex-shrink:0; padding-bottom:12px; border-bottom:1px solid var(--border); margin-bottom:12px"><h1 style="font-size:{{ titleSize }}; font-weight:700; letter-spacing:-.02em; margin:0">{{ chatTitle }}</h1><p style="font:500 12.5px var(--font-sans); color:var(--muted-foreground); margin:4px 0 0">{{ chatSubtitle }}</p></div>
+                    <div style="flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column; gap:10px">
+                      <sc-for list="{{ chatItems }}" as="m" hint-placeholder-count="5">
+                        <sc-if value="{{ m.isBroadcast }}" hint-placeholder-val="{{ false }}">
+                          <div style="border:1.5px solid var(--brand); background:rgb(79 70 229 / 0.06); border-radius:15px; padding:13px 15px">
+                            <div style="display:flex; align-items:center; gap:7px; margin-bottom:6px"><span style="font:700 10px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--brand)">📢 {{ m.who }}</span></div>
+                            <p style="font:700 15px var(--font-sans); color:var(--foreground); margin:0">{{ m.text }}</p>
+                            <div style="height:5px; border-radius:999px; background:var(--tonal); overflow:hidden; margin-top:10px"><div style="width:{{ m.ackPct }}; height:100%; background:var(--status-ok-fg); border-radius:999px"></div></div>
+                            <p style="font:600 11px var(--font-num); color:var(--status-ok-fg); margin:5px 0 0">{{ m.ackLabel }}</p>
+                          </div>
+                        </sc-if>
+                        <sc-if value="{{ m.isUrgent }}" hint-placeholder-val="{{ false }}">
+                          <div style="border:1px solid var(--status-issue-border); background:var(--status-issue-bg); border-radius:15px; padding:12px 15px; align-self:{{ m.align }}; max-width:78%">
+                            <p style="font:700 10px var(--font-sans); letter-spacing:.05em; text-transform:uppercase; color:var(--status-issue-fg); margin:0 0 3px">{{ m.who }} · {{ chatUrgentLabel }}</p>
+                            <p style="font:500 14px var(--font-sans); color:var(--foreground); margin:0">{{ m.text }}</p>
+                          </div>
+                        </sc-if>
+                        <sc-if value="{{ m.isNormal }}" hint-placeholder-val="{{ true }}">
+                          <div style="align-self:{{ m.align }}; max-width:78%; display:flex; flex-direction:column; gap:3px; align-items:{{ m.align }}">
+                            <sc-if value="{{ m.showWho }}" hint-placeholder-val="{{ true }}"><span style="font:500 11px var(--font-sans); color:var(--muted-foreground); padding:0 4px">{{ m.who }}</span></sc-if>
+                            <div style="padding:9px 14px; border-radius:16px; background:{{ m.bubbleBg }}; color:{{ m.bubbleFg }}"><span style="font:500 14px/1.4 var(--font-sans)">{{ m.text }}</span></div>
+                          </div>
+                        </sc-if>
+                      </sc-for>
+                    </div>
+                    <div style="flex-shrink:0; margin-top:12px; display:flex; align-items:center; gap:9px; background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:8px 8px 8px 16px"><span style="flex:1; font:400 14px var(--font-sans); color:var(--muted-foreground)">{{ chatInputPlaceholder }}</span><span style="width:36px; height:36px; border-radius:999px; background:var(--brand); color:var(--brand-foreground); display:flex; align-items:center; justify-content:center; flex-shrink:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 20v-6l14-2-14-2V4l19 8z"/></svg></span></div>
+                  </div>
+                </sc-if>
+
+                <!-- ===================== SHIFT HANDOVER ===================== -->
+                <sc-if value="{{ showHandover }}" hint-placeholder-val="{{ false }}">
+                  <div data-screen-label="Shift Handover" style="display:flex; flex-direction:column; gap:{{ contentGap }}">
+                    <h1 style="font-size:{{ titleSize }}; font-weight:700; letter-spacing:-.02em; margin:0">{{ handoverTitle }}</h1>
+                    <div style="position:relative; overflow:hidden; background:var(--brand-ink); border-radius:20px; padding:18px 20px; color:var(--on-ink)">
+                      <p style="font:600 11px var(--font-sans); letter-spacing:.08em; text-transform:uppercase; color:var(--on-ink-muted); margin:0">{{ handoverWho }}</p>
+                      <div style="display:flex; gap:0; margin-top:14px"><sc-for list="{{ handoverStats }}" as="s" hint-placeholder-count="3"><div style="flex:1"><p style="font-family:var(--font-num); font-size:1.4rem; font-weight:500; color:var(--on-ink); margin:0">{{ s.value }}</p><p style="font:500 11px var(--font-sans); color:var(--on-ink-muted); margin:2px 0 0">{{ s.label }}</p></div></sc-for></div>
+                    </div>
+                    <div>
+                      <p style="font:600 11px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 10px">{{ handoverIssuesLabel }}</p>
+                      <div style="display:flex; flex-direction:column; gap:8px"><sc-for list="{{ handoverIssues }}" as="i" hint-placeholder-count="2"><div style="display:flex; align-items:center; gap:11px; padding:11px 15px; border-radius:13px; background:var(--surface); border:1px solid var(--hairline)"><span style="width:8px; height:8px; border-radius:999px; background:{{ i.dot }}; flex-shrink:0"></span><span style="flex:1; font:500 13.5px var(--font-sans); color:var(--foreground)">{{ i.text }}</span></div></sc-for></div>
+                    </div>
+                    <div>
+                      <p style="font:600 11px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 10px">{{ handoverNotesLabel }}</p>
+                      <div style="padding:14px 16px; border-radius:14px; background:var(--surface); border:1px solid var(--border); min-height:80px"><p style="font:500 13.5px/1.6 var(--font-sans); color:var(--foreground); margin:0">{{ handoverNotesText }}</p></div>
+                    </div>
+                    <button style="height:50px; border:none; border-radius:15px; background:var(--brand); color:var(--brand-foreground); font:700 15px var(--font-sans); cursor:pointer">{{ handoverConfirmCta }}</button>
+                  </div>
+                </sc-if>
+
+              </div>
+            </main>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="max-width:900px; margin:0 auto; padding:0 20px 60px; display:flex; flex-direction:column; gap:12px">
+    <div style="display:flex; align-items:flex-start; gap:10px; padding:14px 16px; border-radius:14px; background:var(--surface); border:1px solid var(--border)">
+      <p style="font:400 13px/1.55 var(--font-sans); color:var(--muted-foreground); margin:0" dir="ltr">Showing <strong style="color:var(--foreground)">{{ screenLabel }} · {{ sizeLabel }} · {{ themeLabel }} · {{ localeLabel }}</strong>. {{ infoLine }}</p>
+    </div>
+    <div style="display:flex; align-items:flex-start; gap:10px; padding:14px 16px; border-radius:14px; background:var(--brand-ink); color:var(--on-ink)" dir="ltr">
+      <span style="font:700 10px var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--on-ink-muted); flex-shrink:0; margin-top:2px">§18</span>
+      <p style="font:400 13px/1.55 var(--font-sans); color:var(--on-ink-strong); margin:0"><strong style="color:var(--on-ink)">S9-D1</strong> Crash Cart reuses the 6-state chip vocabulary, not bespoke pass/fail language. <strong style="color:var(--on-ink)">S9-D2</strong> Broadcasts are indigo-bordered with an ack-progress bar; urgent messages get a red border — never color alone. <strong style="color:var(--on-ink)">S9-D3</strong> Shift Handover is a richer standalone summary; Stage 4's Handoff stays the quick start/end action. Consumes Stage 1 tokens; Hebrew is product-default.</p>
+    </div>
+    <div style="display:flex; align-items:flex-start; gap:10px; padding:14px 16px; border-radius:14px; background:var(--surface); border:1px solid var(--border)" dir="ltr">
+      <span style="font:700 10px var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--brand); flex-shrink:0; margin-top:3px">Map</span>
+      <div style="flex:1"><p style="font:600 12px var(--font-sans); color:var(--foreground); margin:0 0 6px">Handoff coverage · full codebase</p><div style="display:flex; flex-wrap:wrap; gap:6px"><sc-for list="{{ roadmap }}" as="r" hint-placeholder-count="10"><span style="display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; background:{{ r.bg }}; border:1px solid {{ r.border }}; color:{{ r.color }}; font:600 11.5px var(--font-sans)"><span innerHTML="{{ r.mark }}"></span>{{ r.label }}</span></sc-for></div></div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { theme:'light', size:'compact', screen:'cart', dir:'ltr', variant:'data' };
+  set(k,v){ this.setState({[k]:v}); }
+  L(en,he){ return this.state.dir==='rtl' ? he : en; }
+  ic(p,o){ o=o||{}; const w=o.w||22; return `<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="${o.fill||'none'}" stroke="currentColor" stroke-width="${o.sw||1.9}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`; }
+
+  renderVals(){
+    const S=this.state;
+    const { theme, size, screen, dir } = S;
+    const locale = dir==='rtl' ? 'he' : 'en';
+    const L=(en,he)=>this.L(en,he);
+
+    const segBase="border:none;cursor:pointer;padding:6px 10px;border-radius:7px;font-family:var(--font-sans);font-size:12px;transition:all var(--dur-fast) var(--ease-standard);white-space:nowrap;";
+    const seg=(a)=>a?segBase+"font-weight:600;background:var(--surface-2);color:var(--foreground);box-shadow:0 1px 2px rgba(0,0,0,.18);":segBase+"font-weight:500;background:transparent;color:var(--muted-foreground);";
+    const themeOpts=[['light','Light'],['dark','Dark']].map(([k,l])=>({key:k,label:l,style:seg(theme===k),onClick:()=>this.set('theme',k)}));
+    const sizeOpts=[['compact','Compact'],['medium','Medium'],['expanded','Expanded']].map(([k,l])=>({key:k,label:l,style:seg(size===k),onClick:()=>this.set('size',k)}));
+    const screenDefs=[['cart','Crash Cart'],['history','Code Blue History'],['chat','Shift Chat'],['handover','Handover']];
+    const screenOpts=screenDefs.map(([k,l])=>({key:k,label:l,style:seg(screen===k),onClick:()=>this.set('screen',k)}));
+    const dirOpts=[['ltr','English'],['rtl','עברית']].map(([k,l])=>({key:k,label:l,style:seg(dir===k),onClick:()=>this.set('dir',k)}));
+
+    const variantConfigs={
+      cart:{title:'State',opts:[['data','Ready'],['missing','Missing items']]},
+      history:{title:'State',opts:[['data','Data'],['empty','Empty']]},
+    };
+    const vc=variantConfigs[screen];
+    const vkeys=vc?vc.opts.map(o=>o[0]):[];
+    let variant=S.variant; if(vc && !vkeys.includes(variant)) variant=vkeys[0];
+    const variantOpts=vc?vc.opts.map(([k,l])=>({key:k,label:l,style:seg(variant===k),onClick:()=>this.set('variant',k)})):[];
+    const hasVariant=!!vc;
+
+    const isCompact=size==='compact', isExpanded=size==='expanded', hasSidebar=!isCompact;
+    const frames={
+      compact:{outer:'width:392px;height:800px;background:#0d0d0f;border-radius:48px;padding:11px',screen:'border-radius:38px'},
+      medium:{outer:'width:900px;height:680px;background:#0d0d0f;border-radius:30px;padding:13px',screen:'border-radius:18px'},
+      expanded:{outer:'width:1200px;height:760px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:0',screen:'border-radius:0 0 16px 16px'},
+    };
+    const f=frames[size];
+
+    const navMap={cart:'emergency',history:'emergency',chat:'today',handover:'today'};
+    const activeNav=navMap[screen]||'emergency';
+    const navDefs=[
+      {key:'today',label:L('Today','היום'),icon:'<path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/>'},
+      {key:'equipment',label:L('Equipment','ציוד'),icon:'<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>',
+      icon2:''},
+      {key:'emergency',label:L('Emergency','חירום'),icon:'<path d="M3 12h4l2 6 4-14 2 8h6"/>'},
+      {key:'alerts',label:L('Alerts','התראות'),icon:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>'},
+    ];
+    const navItems=navDefs.map(n=>{const a=activeNav===n.key;return{key:n.key,label:n.label,weight:a?'600':'500',bg:a?'rgb(79 70 229 / 0.10)':'transparent',color:a?'var(--brand)':'var(--muted-foreground)',
+      isToday:n.key==='today', isEquipment:n.key==='equipment', isEmergency:n.key==='emergency', isAlerts:n.key==='alerts'};});
+
+    // ===================== CRASH CART =====================
+    const showCart=screen==='cart';
+    const cartMissing=variant==='missing';
+    const cartItemsData=[
+      {name:L('Epinephrine ×10','אדרנלין ×10'),ok:true},
+      {name:L('Defibrillator pads','פדי דפיברילטור'),ok:true},
+      {name:L('Laryngoscope','לרינגוסקופ'),ok:!cartMissing},
+      {name:L('Ambu bag','שקית אמבו'),ok:true},
+      {name:L('ET tubes (assorted)','צינורות אינטובציה'),ok:true},
+      {name:L('IV catheters','קטטרים תוך-ורידיים'),ok:!cartMissing},
+    ];
+    const cartItems=cartItemsData.map(it=>({name:it.name, ok:it.ok, notOk:!it.ok,
+      dotBg: it.ok?'var(--status-ok-fg)':'var(--status-issue-fg)', dotIconColor:'var(--on-ink)', dotFg: it.ok?'var(--status-ok-fg)':'var(--status-issue-fg)',
+      border: it.ok?'var(--hairline)':'var(--status-issue-border)', status: it.ok?L('Present','קיים'):L('Missing','חסר')}));
+    const cartAllOk = cartItemsData.every(i=>i.ok);
+    const cartHasMissing = !cartAllOk;
+    const cartBannerBg = cartAllOk?'var(--status-ok-bg)':'var(--status-issue-bg)';
+    const cartBannerBorder = cartAllOk?'var(--status-ok-border)':'var(--status-issue-border)';
+    const cartBannerFg = cartAllOk?'var(--status-ok-fg)':'var(--status-issue-fg)';
+    const cartBannerIconBg = cartAllOk?'var(--status-ok-fg)':'var(--status-issue-fg)';
+
+    // ===================== CODE BLUE HISTORY =====================
+    const showHistory=screen==='history';
+    const historyEmpty=variant==='empty';
+    const historyShow=!historyEmpty;
+    const sessions=[
+      {date:'Jun 28 · 14:12',meta:L('Duration 6m 20s · Team: Dr. Lee, Maya A., Tech Ruiz','משך 6:20 · צוות: ד״ר לי, מאיה ע., טכנאי רואיז'),outcome:L('Stabilized','יוצב')},
+      {date:'Jun 14 · 22:04',meta:L('Duration 11m 05s · Team: Dr. Singh, You','משך 11:05 · צוות: ד״ר סינג, את/ה'),outcome:L('Stabilized','יוצב')},
+      {date:'May 30 · 09:41',meta:L('Duration 4m 40s · Team: Dr. Lee, Dana K.','משך 4:40 · צוות: ד״ר לי, דנה ק.'),outcome:L('Stabilized','יוצב')},
+    ];
+
+    // ===================== SHIFT CHAT =====================
+    const showChat=screen==='chat';
+    const alignL = locale==='he' ? 'flex-end' : 'flex-start';
+    const alignR = locale==='he' ? 'flex-start' : 'flex-end';
+    const chatRaw=[
+      {kind:'broadcast', who:L('Maya Abbas','מאיה עבאס'), text:L('Restock needed — Crash Cart A','נדרש חידוש מלאי — עגלת חירום A'), ackPct:'66%', ackLabel:L('4 / 6 acknowledged','4 / 6 אישרו')},
+      {kind:'normal', who:L('Dr. Lee','ד״ר לי'), text:L('Anyone free to help with the dog in Recovery?','מישהו פנוי לעזור עם הכלב בהתאוששות?'), me:false},
+      {kind:'normal', who:L('You','את/ה'), text:L('On my way','בדרך'), me:true},
+      {kind:'urgent', who:L('Tech Ruiz','טכנאי רואיז'), text:L('Defibrillator DF-02 failed check — pulling from rotation','דפיברילטור DF-02 נכשל בבדיקה — מוציא מהמחזור')},
+      {kind:'normal', who:L('Dr. Lee','ד״ר לי'), text:L('Noted, thank you','תודה, רשום'), me:false},
+    ];
+    const chatItems=chatRaw.map((m,i)=>({
+      key:i, isBroadcast:m.kind==='broadcast', isUrgent:m.kind==='urgent', isNormal:m.kind==='normal',
+      who:m.who, text:m.text, ackPct:m.ackPct, ackLabel:m.ackLabel,
+      align: m.kind==='normal' ? (m.me?alignR:alignL) : 'stretch',
+      showWho: m.kind==='normal' && !m.me,
+      bubbleBg: m.me?'var(--brand)':'var(--tonal)', bubbleFg: m.me?'var(--brand-foreground)':'var(--foreground)',
+    }));
+
+    // ===================== SHIFT HANDOVER =====================
+    const showHandover=screen==='handover';
+    const handoverStats=[
+      {value:'48',label:L('Scans','סריקות')},
+      {value:'12',label:L('Checkouts','ניפוקים')},
+      {value:'2',label:L('Issues logged','תקלות דווחו')},
+    ];
+    const handoverIssuesData=[
+      {sys:'red',text:L('Defibrillator DF-02 — failed check, pulled from rotation','דפיברילטור DF-02 — נכשל בבדיקה, הוצא מהמחזור')},
+      {sys:'orange',text:L('Crash Cart A restocked at 16:40 — recheck in 24h','עגלת חירום A חודשה ב-16:40 — לבדוק שוב בעוד 24 שעות')},
+    ];
+    const handoverIssues=handoverIssuesData.map(i=>({dot:`rgb(var(--sys-${i.sys}))`,text:i.text}));
+
+    const done=['Tokens','Components','Today','Screens','Inventory','Equipment','Analytics','Admin'];
+    const rmDefs=[['1','Tokens'],['2','Components'],['3','Today'],['4','Screens'],['5','Inventory'],['6','Equipment'],['7','Analytics'],['8','Admin'],['9','Emergency'],['10','Access']];
+    const roadmap=rmDefs.map(([n,l])=>{
+      const isDone=+n<=8, isNow=n==='9';
+      const mark=isDone?this.ic('<path d="M20 6 9 17l-5-5"/>',{w:11,sw:2.6}):isNow?this.ic('<circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M7 12h10"/>',{w:11,sw:2.2}):'<span style="width:6px;height:6px;border-radius:999px;background:currentColor;display:block;opacity:.5"></span>';
+      return {key:n,label:'S'+n+' '+l,mark,
+        bg:isNow?'rgb(79 70 229 / 0.12)':isDone?'rgb(var(--sys-green) / 0.1)':'var(--tonal)',
+        border:isNow?'var(--brand)':isDone?'rgb(var(--sys-green) / 0.24)':'var(--border)',
+        color:isNow?'var(--brand)':isDone?'var(--status-ok-fg)':'var(--muted-foreground)'};
+    });
+
+    const infoMap={
+      cart:'Crash Cart reuses the 6-state chip vocabulary (\u00a7S9-D1): each item is present or missing, never a bespoke pass/fail. The banner rolls the whole cart up to Ready or Needs attention. Toggle State to see a missing-items cart.',
+      history:'Code Blue History lists past sessions with duration, team and outcome — read-only, feeding from the same server-timed sessions as Stage 4\u2019s live Code Blue screen.',
+      chat:'Shift Chat mixes ordinary bubbles with two distinct treatments (\u00a7S9-D2): broadcasts (indigo border + ack-progress bar showing who has acknowledged) and urgent messages (red border) — never color alone.',
+      handover:'Shift Handover is the richer end-of-shift summary (\u00a7S9-D3): shift stats, logged issues carried to the next tech, and free-text notes, distinct from Stage 4\u2019s quick start/end Handoff action.',
+    };
+
+    return {
+      pageClass: theme==='dark'?'dark':'', dir,
+      themeOpts, sizeOpts, screenOpts, dirOpts, hasVariant, variantTitle: vc?vc.title:'', variantOpts,
+      frameOuter:f.outer, screenStyle:f.screen,
+      isCompact, hasSidebar, isExpanded, navItems,
+      topbarTitle:L('Emergency','חירום'),
+      mainPad: isCompact?'8px 16px 20px':(isExpanded?'24px 32px':'20px 24px'),
+      contentMax: isExpanded?'760px':(hasSidebar?'640px':'none'),
+      contentGap: isCompact?'16px':'20px',
+      titleSize: isCompact?'1.6rem':'1.5rem',
+
+      showCart, cartItems, cartAllOk, cartHasMissing, cartBannerBg, cartBannerBorder, cartBannerFg, cartBannerIconBg,
+      cartTitle:L('Crash Cart Check','בדיקת עגלת חירום'),
+      cartBannerTitle: cartAllOk?L('Ready for use','מוכן לשימוש'):L('Needs attention','דורש טיפול'),
+      cartBannerSub: cartAllOk?L('All items present, last checked 08:00','כל הפריטים קיימים, נבדק לאחרונה 08:00'):L('2 items missing — restock before next shift','2 פריטים חסרים — חדשו מלאי לפני המשמרת הבאה'),
+      cartCheckCta:L('Mark as checked','סימון כנבדק'),
+
+      showHistory, historyEmpty, historyShow, sessions, historyTitle:L('Code Blue History','היסטוריית קוד כחול'), historyEmptyLabel:L('No Code Blue sessions recorded','לא נרשמו אירועי קוד כחול'),
+
+      showChat, chatItems, chatTitle:L('Shift Chat','צ׳אט משמרת'), chatSubtitle:L('Day shift · 8 on duty','משמרת יום · 8 בתפקיד'),
+      chatUrgentLabel:L('URGENT','דחוף'), chatInputPlaceholder:L('Message the shift…','הודעה למשמרת…'),
+
+      showHandover, handoverStats, handoverIssues,
+      handoverTitle:L('Shift Handover','העברת משמרת'), handoverWho:L('Maya Abbas · Day shift · 06:30–14:30','מאיה עבאס · משמרת יום · 06:30–14:30'),
+      handoverIssuesLabel:L('Carried to next shift','הועבר למשמרת הבאה'),
+      handoverNotesLabel:L('Notes','הערות'), handoverNotesText:L('Recovery ward quiet after 12:00. Dr. Lee wants a follow-up scan on the dog in Kennel 4 before evening rounds.','מחלקת ההתאוששות שקטה אחרי 12:00. ד״ר לי מבקש סריקת מעקב לכלב בכלוב 4 לפני הסיבוב הערב.'),
+      handoverConfirmCta:L('Confirm handover','אישור העברת משמרת'),
+
+      screenLabel:(screenDefs.find(d=>d[0]===screen)||[0,'Crash Cart'])[1], sizeLabel: size.charAt(0).toUpperCase()+size.slice(1),
+      themeLabel: theme==='dark'?'Dark':'Light', localeLabel: locale==='he'?'עברית · RTL':'English · LTR',
+      infoLine: infoMap[screen], roadmap,
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap">
+<style>
+  *{box-sizing:border-box}
+  html{font-size:17px}
+  body{margin:0;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-variant-numeric:tabular-nums}
+  :root{
+    --background:#F2F2F7; --surface:#FFFFFF; --surface-2:#FFFFFF; --surface-hover:#F7F6F3; --surface-active:#EFEDE8;
+    --foreground:#000000; --muted-foreground:rgba(60,60,67,0.6); --border:rgba(60,60,67,0.29);
+    --hairline:transparent;
+    --brand:#4F46E5; --brand-foreground:#FFFFFF; --brand-ink:#1E1B4B;
+    --action:#2F6F5E; --action-foreground:#FFFFFF;
+    --sys-red:255 59 48; --sys-orange:255 149 0; --sys-green:52 199 89; --sys-blue:0 122 255; --sys-gray:142 142 147;
+    --radius-sm:10px; --radius-md:12px; --radius-lg:14px; --radius-xl:16px; --radius-2xl:20px; --radius-pill:999px;
+    --ease-standard:cubic-bezier(0.2,0,0,1); --dur-fast:120ms; --dur-base:200ms; --dur-slow:320ms;
+    --dynamic-scale:1;
+    --font-sans:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;
+    --font-num:"DM Mono",ui-monospace,SFMono-Regular,monospace;
+    --display:calc(2.353rem * var(--dynamic-scale));
+    --text-largetitle:calc(2rem * var(--dynamic-scale));
+    --text-xl:calc(1.294rem * var(--dynamic-scale));
+    --text-lg:calc(1.176rem * var(--dynamic-scale));
+    --text-base:calc(1rem * var(--dynamic-scale));
+    --text-sm:calc(0.882rem * var(--dynamic-scale));
+    --text-xs:calc(0.765rem * var(--dynamic-scale));
+    --text-2xs:calc(0.647rem * var(--dynamic-scale));
+    --bar-bg:var(--on-ink-bar); --bar-bg-opaque:#FFFFFF; --bar-blur:12px;
+    --shadow-hero:0 1px 2px rgba(0,0,0,0.06); --shadow-floating:0 8px 24px -12px rgba(0,0,0,0.25);
+    /* S1-D20-001 · elevation ladder (Phase 10 design review — see design-system-updates §29) */
+    --shadow-card:0 1px 2px rgba(0,0,0,0.045), 0 1px 1px rgba(0,0,0,0.03); --shadow-panel:0 2px 10px rgba(0,0,0,0.09), 0 1px 2px rgba(0,0,0,0.05); --shadow-modal:0 12px 32px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.08); --shadow-overlay:0 24px 64px rgba(0,0,0,0.28), 0 4px 12px rgba(0,0,0,0.12);
+    --inline-margin:var(--space-7); --content-gap:var(--space-7); --max-content:720px; --target-min:44px;
+    /* S1-D1-002 · 4px spacing scale */
+    --space-1:2px; --space-2:4px; --space-3:8px; --space-4:12px; --space-5:16px; --space-6:20px; --space-7:24px; --space-8:32px; --space-9:40px; --space-10:48px; --space-11:64px; --space-12:80px; --space-13:96px;
+    /* S1-D1-001 · brand/primary unified */
+    --primary:var(--brand); --primary-foreground:var(--brand-foreground);
+    /* S1-D1-003 · on-ink color tokens (no raw white) */
+    --on-ink:#FFFFFF; --on-ink-strong:rgba(255,255,255,0.82); --on-ink-muted:rgba(255,255,255,0.6); --on-ink-subtle:rgba(255,255,255,0.5); --on-ink-disabled:rgba(255,255,255,0.4); --on-ink-bar:rgba(255,255,255,0.94); --ink-sheen:rgba(255,255,255,0.10); --ink-divider:rgba(255,255,255,0.12); --ink-skeleton:rgba(255,255,255,0.14); --ink-fill-weak:rgba(255,255,255,0.08); --ink-fill:rgba(255,255,255,0.18); --ink-border:rgba(255,255,255,0.28); --ink-shimmer:rgba(255,255,255,0.35); --muted:rgba(120,120,128,0.16);
+    /* S1-D15-004 · implementation aliases */
+    --brand-navy:var(--brand-ink); --brand-green-bright:rgb(var(--sys-green));
+    /* S1-D15-004 · ivory alias family → primitives (warm-neutral brand layer) */
+    --ivory-bg:var(--background);
+    --ivory-surface:var(--surface);
+    --ivory-panel:var(--surface-2);
+    --ivory-hover:var(--surface-hover);
+    --ivory-active:var(--surface-active);
+    --ivory-border:var(--border);
+    --ivory-text:var(--foreground);
+    --ivory-text2:var(--muted-foreground);
+    --ivory-text3:rgba(60,60,67,0.4);
+    --ivory-navy:var(--brand-ink);
+    --ivory-green:var(--action);
+    --ivory-greenBg:rgb(var(--sys-green) / 0.12);
+    /* S1-D15-002 · status-* alias map → --sys-* primitives */
+    --status-ok:rgb(var(--sys-green)); --status-ok-bg:rgb(var(--sys-green) / 0.12); --status-ok-border:rgb(var(--sys-green) / 0.22); --status-ok-fg:rgb(var(--sys-green));
+    --status-issue:rgb(var(--sys-red)); --status-issue-bg:rgb(var(--sys-red) / 0.12); --status-issue-border:rgb(var(--sys-red) / 0.22); --status-issue-fg:rgb(var(--sys-red));
+    --status-maintenance:rgb(var(--sys-orange)); --status-maintenance-bg:rgb(var(--sys-orange) / 0.12); --status-maintenance-border:rgb(var(--sys-orange) / 0.22); --status-maintenance-fg:rgb(var(--sys-orange));
+    --status-sterilized:rgb(var(--sys-blue)); --status-sterilized-bg:rgb(var(--sys-blue) / 0.12); --status-sterilized-border:rgb(var(--sys-blue) / 0.22); --status-sterilized-fg:rgb(var(--sys-blue));
+    /* S1-D15-001 · 6-state enum: add stale + unknown as first-class */
+    --status-stale:rgb(var(--sys-orange));
+    --status-stale-bg:rgb(var(--sys-orange) / 0.12);
+    --status-stale-border:rgb(var(--sys-orange) / 0.22);
+    --status-stale-fg:rgb(var(--sys-orange));
+    --status-unknown:rgb(var(--sys-gray));
+    --status-unknown-bg:rgb(var(--sys-gray) / 0.14);
+    --status-unknown-border:rgb(var(--sys-gray) / 0.26);
+    --status-unknown-fg:rgb(var(--sys-gray));
+    /* S1-D10-001 */
+    --dur-spin:700ms;
+  }
+  .dark{
+    --background:#000000; --surface:#1C1C1E; --surface-2:#2C2C2E; --surface-hover:#333336; --surface-active:#3A3A3D;
+    --foreground:#FFFFFF; --muted-foreground:rgba(235,235,245,0.6); --border:rgba(84,84,88,0.6);
+    --hairline:rgba(84,84,88,0.6);
+    --brand:#818CF8; --brand-foreground:#1E1B4B; --brand-ink:#1E1B4B;
+    --action:#4CCDAA; --action-foreground:#06210F;
+    --sys-red:255 69 58; --sys-orange:255 159 10; --sys-green:48 209 88; --sys-blue:10 132 255; --sys-gray:152 152 157;
+    --bar-bg:rgba(28,28,30,0.94); --bar-bg-opaque:#1C1C1E;
+    --shadow-hero:0 1px 2px rgba(0,0,0,0.5);
+    --shadow-card:0 1px 2px rgba(0,0,0,0.5), 0 1px 1px rgba(0,0,0,0.4); --shadow-panel:0 2px 10px rgba(0,0,0,0.55), 0 1px 2px rgba(0,0,0,0.4); --shadow-modal:0 12px 32px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4); --shadow-overlay:0 24px 64px rgba(0,0,0,0.7), 0 4px 12px rgba(0,0,0,0.5);
+    --on-ink:#FFFFFF; --on-ink-strong:rgba(255,255,255,0.82); --on-ink-muted:rgba(255,255,255,0.6); --on-ink-subtle:rgba(255,255,255,0.5); --on-ink-disabled:rgba(255,255,255,0.4); --on-ink-bar:rgba(255,255,255,0.94); --ink-sheen:rgba(255,255,255,0.10); --ink-divider:rgba(255,255,255,0.12); --ink-skeleton:rgba(255,255,255,0.14); --ink-fill-weak:rgba(255,255,255,0.08); --ink-fill:rgba(255,255,255,0.18); --ink-border:rgba(255,255,255,0.28); --ink-shimmer:rgba(255,255,255,0.35);
+    --primary:var(--brand); --muted:rgba(120,120,128,0.24);
+  }
+  .rt{ --bar-bg:var(--bar-bg-opaque); --bar-blur:0px; }
+  /* S1-D10-001 · reduce-transparency wired to OS feature */
+  @media (prefers-reduced-transparency: reduce){ :root, .dark{ --bar-bg:var(--bar-bg-opaque); --bar-blur:0px; } }
+  .page[data-size="compact"]{ --inline-margin:var(--space-5); --content-gap:var(--space-6); --max-content:430px; --target-min:44px; }
+  .page[data-size="medium"]{ --inline-margin:var(--space-7); --content-gap:var(--space-7); --max-content:720px; --target-min:44px; }
+  .page[data-size="expanded"]{ --inline-margin:var(--space-8); --content-gap:var(--space-7); --max-content:1120px; --target-min:36px; }
+  @keyframes vt-ping{0%{transform:scale(1);opacity:.7}70%{transform:scale(2.6);opacity:0}100%{opacity:0}}
+  @keyframes vt-travel{0%{transform:translateX(0)}100%{transform:translateX(calc(100% - 30px))}}
+  /* S1-D15-003 · vt-* type utilities → --display / --text-* tokens (consumed by specimens + map below) */
+  .vt-display{font-size:var(--display)}
+  .vt-text-2xl{font-size:var(--text-largetitle)}
+  .vt-text-xl{font-size:var(--text-xl)}
+  .vt-text-lg{font-size:var(--text-lg)}
+  .vt-text-body{font-size:var(--text-base)}
+  .vt-text-sm{font-size:var(--text-sm)}
+  .vt-text-xs{font-size:var(--text-xs)}
+  .vt-text-2xs{font-size:var(--text-2xs)}
+  @media (prefers-reduced-motion: reduce){
+    *{animation:none !important}
+    .press-demo{transition:none !important; transform:none !important}
+  }
+</style>
+</helmet>
+<div class="{{ rootClass }}" data-size="{{ size }}" style="{{ rootStyle }}; min-height:100vh; background:var(--background); color:var(--foreground); font-family:var(--font-sans); transition:background var(--dur-base) var(--ease-standard), color var(--dur-base) var(--ease-standard)">
+
+  <header style="position:sticky; top:0; z-index:30; background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); -webkit-backdrop-filter:blur(var(--bar-blur)); border-bottom:1px solid var(--border)">
+    <div style="max-width:var(--max-content); margin:0 auto; padding:var(--space-4) var(--inline-margin); display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-5) var(--space-6); transition:max-width var(--dur-base) var(--ease-standard)">
+      <div style="display:flex; align-items:baseline; gap:var(--space-4); margin-right:auto">
+        <span style="font:700 17px var(--font-sans); letter-spacing:-.02em; color:var(--brand)">VetTrack</span>
+        <span style="font:500 12px var(--font-num); color:var(--muted-foreground)">Stage 1 · Tokens</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:var(--space-3);">
+        <span style="font:600 10px var(--font-sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted-foreground)">Theme</span>
+        <div style="display:flex; gap:var(--space-2); padding:var(--space-2); background:rgba(120,120,128,0.16); border-radius:9px">
+          <sc-for list="{{ themeOpts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:var(--space-3);">
+        <span style="font:600 10px var(--font-sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted-foreground)">Size</span>
+        <div style="display:flex; gap:var(--space-2); padding:var(--space-2); background:rgba(120,120,128,0.16); border-radius:9px">
+          <sc-for list="{{ sizeOpts }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main style="max-width:var(--max-content); margin:0 auto; padding:var(--space-8) var(--inline-margin) var(--space-13); display:flex; flex-direction:column; gap:var(--content-gap); transition:max-width var(--dur-base) var(--ease-standard)">
+
+    <section>
+      <p style="font:600 11px/1.3 var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--brand); margin:0 0 var(--space-4);">Design Handoff · Foundations</p>
+      <h1 style="font-size:var(--text-largetitle); font-weight:700; letter-spacing:-.02em; line-height:1.1; margin:0; color:var(--foreground)">Token Style Guide</h1>
+      <p style="font-size:var(--text-base); line-height:1.5; color:var(--muted-foreground); margin:var(--space-4) 0 0; max-width:62ch">Every value here is a CSS custom property defined for <code style="font:500 13px var(--font-num); color:var(--foreground)">:root</code> (light) and <code style="font:500 13px var(--font-num); color:var(--foreground)">.dark</code>. Nothing downstream is hardcoded — components and screens consume these names only. Text uses the system font stack; all numerals use a tabular face <span style="font-family:var(--font-num)">(0123456789)</span>.</p>
+      <div style="display:flex; flex-wrap:wrap; gap:var(--space-3); margin-top:var(--space-6);">
+        <span style="display:inline-flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-4); background:var(--surface); border:1px solid var(--border); border-radius:999px; font:500 13px var(--font-sans); color:var(--foreground)"><span style="width:8px; height:8px; border-radius:999px; background:var(--brand)"></span>Theme: {{ themeLabel }}</span>
+        <span style="display:inline-flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-4); background:var(--surface); border:1px solid var(--border); border-radius:999px; font:500 13px var(--font-sans); color:var(--foreground)"><span style="width:8px; height:8px; border-radius:999px; background:rgb(var(--sys-blue))"></span>Size class: {{ sizeLabel }}</span>
+        <span style="display:inline-flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-4); background:var(--surface); border:1px solid var(--border); border-radius:999px; font:500 13px var(--font-num); color:var(--foreground)">Dynamic Type {{ scaleLabel }}</span>
+      </div>
+    </section>
+
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:var(--space-7);">
+      <p style="font:600 11px/1.3 var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 var(--space-3);">01 · Color</p>
+      <h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0; color:var(--foreground)">Neutrals &amp; surfaces</h2>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:var(--space-3) 0 0; max-width:60ch">Apple grouped model — depth comes from layering surfaces over the canvas, not shadow. Five steps now, not two: panel, hover and active read as distinct tiers even before Section 05's shadow ladder kicks in. Each swatch is the live token; light / dark values are listed.</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:var(--space-5); margin-top:var(--space-6);">
+        <sc-for list="{{ neutralTokens }}" as="t" hint-placeholder-count="6">
+          <div>
+            <div style="height:60px; border-radius:12px; border:1px solid var(--border); background:{{ t.bg }}; display:flex; align-items:center; justify-content:center; overflow:hidden">
+              <sc-if value="{{ t.sample }}" hint-placeholder-val="Ag"><span style="font:600 24px var(--font-sans); color:{{ t.fg }}">{{ t.sample }}</span></sc-if>
+              <sc-if value="{{ t.lines }}" hint-placeholder-val="{{ true }}"><div style="width:64%; display:flex; flex-direction:column; gap:var(--space-3);"><div style="height:1px; background:var(--border)"></div><div style="height:1px; background:var(--border)"></div><div style="height:1px; background:var(--border)"></div></div></sc-if>
+            </div>
+            <p style="font:500 12px var(--font-num); color:var(--foreground); margin:var(--space-3) 0 var(--space-2);">{{ t.name }}</p>
+            <p style="font:400 11px/1.5 var(--font-num); color:var(--muted-foreground); margin:0">{{ t.light }}<br>{{ t.dark }}</p>
+            <p style="font:400 12px/1.4 var(--font-sans); color:var(--muted-foreground); margin:var(--space-2) 0 0">{{ t.usage }}</p>
+          </div>
+        </sc-for>
+      </div>
+
+      <h3 style="font:600 17px var(--font-sans); margin:var(--space-8) 0 0; color:var(--foreground)">Brand</h3>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:var(--space-3) 0 0; max-width:60ch">Indigo primary (the shipped VetTrack mark), navy-indigo hero ink, and a reserved green for scan / confirm actions. <code style="font:500 12px var(--font-num); color:var(--foreground)">--brand</code> and <code style="font:500 12px var(--font-num); color:var(--foreground)">--primary</code> are one value.</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:var(--space-5); margin-top:var(--space-5);">
+        <sc-for list="{{ brandTokens }}" as="t" hint-placeholder-count="4">
+          <div>
+            <div style="height:60px; border-radius:12px; border:1px solid var(--border); background:{{ t.bg }}; display:flex; align-items:center; justify-content:center"><span style="font:700 22px var(--font-sans); color:{{ t.fg }}">{{ t.sample }}</span></div>
+            <p style="font:500 12px var(--font-num); color:var(--foreground); margin:var(--space-3) 0 var(--space-2);">{{ t.name }}</p>
+            <p style="font:400 11px/1.5 var(--font-num); color:var(--muted-foreground); margin:0">{{ t.light }}<br>{{ t.dark }}</p>
+            <p style="font:400 12px/1.4 var(--font-sans); color:var(--muted-foreground); margin:var(--space-2) 0 0">{{ t.usage }}</p>
+          </div>
+        </sc-for>
+      </div>
+
+      <h3 style="font:600 17px var(--font-sans); margin:var(--space-8) 0 0; color:var(--foreground)">Status — color + icon + text</h3>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:var(--space-3) 0 0; max-width:60ch">Apple system colors mapped to clinical meanings. Status is never color alone — each carries an icon and a label. Surface tint = <code style="font:500 12px var(--font-num); color:var(--foreground)">rgb(token / 0.12)</code>, border <code style="font:500 12px var(--font-num); color:var(--foreground)">/ 0.22</code>.</p>
+      <p style="font-size:13px; line-height:1.6; color:var(--muted-foreground); margin:var(--space-3) 0 0; max-width:64ch">Display label → canonical enum (§13): <code style="font:500 12px var(--font-num); color:var(--foreground)">Available→ready</code> · <code style="font:500 12px var(--font-num); color:var(--foreground)">In&nbsp;use→in_use</code> · <code style="font:500 12px var(--font-num); color:var(--foreground)">Failed&nbsp;check / Maintenance→blocked</code> · <code style="font:500 12px var(--font-num); color:var(--foreground)">Overdue→overdue</code> · <code style="font:500 12px var(--font-num); color:var(--foreground)">Stale→stale</code> · <code style="font:500 12px var(--font-num); color:var(--foreground)">Unknown→unknown</code>. Seven specimens collapse to the six-name enum.</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:var(--space-5); margin-top:var(--space-5);">
+
+        <div style="border:1px solid var(--border); border-radius:14px; padding:var(--space-5); background:var(--surface)">
+          <div style="display:flex; align-items:center; gap:var(--space-4);"><span style="width:34px; height:34px; border-radius:10px; background:rgb(var(--sys-red)); color:var(--on-ink); display:flex; align-items:center; justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m10.3 3.7-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.3l-8-14a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span><div><p style="font:600 15px var(--font-sans); margin:0; color:var(--foreground)">Critical</p><p style="font:500 11px var(--font-num); margin:var(--space-1) 0 0; color:var(--muted-foreground)">--sys-red</p></div></div>
+          <div style="margin-top:var(--space-4); display:inline-flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-4); border-radius:10px; background:rgb(var(--sys-red) / 0.12); border:1px solid rgb(var(--sys-red) / 0.22)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--sys-red))" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="m10.3 3.7-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.3l-8-14a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span style="font:600 13px var(--font-sans); color:rgb(var(--sys-red))">Failed check</span></div>
+        </div>
+
+        <div style="border:1px solid var(--border); border-radius:14px; padding:var(--space-5); background:var(--surface)">
+          <div style="display:flex; align-items:center; gap:var(--space-4);"><span style="width:34px; height:34px; border-radius:10px; background:rgb(var(--sys-orange)); color:var(--on-ink); display:flex; align-items:center; justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><div><p style="font:600 15px var(--font-sans); margin:0; color:var(--foreground)">Overdue</p><p style="font:500 11px var(--font-num); margin:var(--space-1) 0 0; color:var(--muted-foreground)">--sys-orange</p></div></div>
+          <div style="margin-top:var(--space-4); display:inline-flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-4); border-radius:10px; background:rgb(var(--sys-orange) / 0.12); border:1px solid rgb(var(--sys-orange) / 0.22)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--sys-orange))" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span style="font:600 13px var(--font-sans); color:rgb(var(--sys-orange))">2h overdue</span></div>
+        </div>
+
+        <div style="border:1px solid var(--border); border-radius:14px; padding:var(--space-5); background:var(--surface)">
+          <div style="display:flex; align-items:center; gap:var(--space-4);"><span style="width:34px; height:34px; border-radius:10px; background:rgb(var(--sys-green)); color:var(--on-ink); display:flex; align-items:center; justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3.8-7.3"/><path d="m9 11 3 3 8-8"/></svg></span><div><p style="font:600 15px var(--font-sans); margin:0; color:var(--foreground)">Available</p><p style="font:500 11px var(--font-num); margin:var(--space-1) 0 0; color:var(--muted-foreground)">--sys-green</p></div></div>
+          <div style="margin-top:var(--space-4); display:inline-flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-4); border-radius:10px; background:rgb(var(--sys-green) / 0.12); border:1px solid rgb(var(--sys-green) / 0.22)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--sys-green))" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3.8-7.3"/><path d="m9 11 3 3 8-8"/></svg><span style="font:600 13px var(--font-sans); color:rgb(var(--sys-green))">Ready</span></div>
+        </div>
+
+        <div style="border:1px solid var(--border); border-radius:14px; padding:var(--space-5); background:var(--surface)">
+          <div style="display:flex; align-items:center; gap:var(--space-4);"><span style="width:34px; height:34px; border-radius:10px; background:rgb(var(--sys-blue)); color:var(--on-ink); display:flex; align-items:center; justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg></span><div><p style="font:600 15px var(--font-sans); margin:0; color:var(--foreground)">In use</p><p style="font:500 11px var(--font-num); margin:var(--space-1) 0 0; color:var(--muted-foreground)">--sys-blue</p></div></div>
+          <div style="margin-top:var(--space-4); display:inline-flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-4); border-radius:10px; background:rgb(var(--sys-blue) / 0.12); border:1px solid rgb(var(--sys-blue) / 0.22)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--sys-blue))" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg><span style="font:600 13px var(--font-sans); color:rgb(var(--sys-blue))">With Dr. Lee</span></div>
+        </div>
+
+        <div style="border:1px solid var(--border); border-radius:14px; padding:var(--space-5); background:var(--surface)">
+          <div style="display:flex; align-items:center; gap:var(--space-4);"><span style="width:34px; height:34px; border-radius:10px; background:rgb(var(--sys-gray)); color:var(--on-ink); display:flex; align-items:center; justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.6 5.6L3 18l3 3 6.1-6.1a4 4 0 0 0 5.6-5.6l-2.3 2.3-2.5-.4-.4-2.5z"/></svg></span><div><p style="font:600 15px var(--font-sans); margin:0; color:var(--foreground)">Maintenance</p><p style="font:500 11px var(--font-num); margin:var(--space-1) 0 0; color:var(--muted-foreground)">--sys-gray</p></div></div>
+          <div style="margin-top:var(--space-4); display:inline-flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-4); border-radius:10px; background:rgb(var(--sys-gray) / 0.14); border:1px solid rgb(var(--sys-gray) / 0.26)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--sys-gray))" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.6 5.6L3 18l3 3 6.1-6.1a4 4 0 0 0 5.6-5.6l-2.3 2.3-2.5-.4-.4-2.5z"/></svg><span style="font:600 13px var(--font-sans); color:rgb(var(--sys-gray))">Due Jul 12</span></div>
+        </div>
+
+        <div style="border:1px solid var(--border); border-radius:14px; padding:var(--space-5); background:var(--surface)">
+          <div style="display:flex; align-items:center; gap:var(--space-4);"><span style="width:34px; height:34px; border-radius:10px; background:rgb(var(--status-stale)); color:var(--on-ink); display:flex; align-items:center; justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/></svg></span><div><p style="font:600 15px var(--font-sans); margin:0; color:var(--foreground)">Stale</p><p style="font:500 11px var(--font-num); margin:var(--space-1) 0 0; color:var(--muted-foreground)">--status-stale</p></div></div>
+          <div style="margin-top:var(--space-4); display:inline-flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-4); border-radius:10px; background:var(--status-stale-bg); border:1px solid var(--status-stale-border)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--status-stale))" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/></svg><span style="font:600 13px var(--font-sans); color:rgb(var(--status-stale))">Stale 6m ago</span></div>
+        </div>
+
+        <div style="border:1px solid var(--border); border-radius:14px; padding:var(--space-5); background:var(--surface)">
+          <div style="display:flex; align-items:center; gap:var(--space-4);"><span style="width:34px; height:34px; border-radius:10px; background:rgb(var(--status-unknown)); color:var(--on-ink); display:flex; align-items:center; justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9a2.5 2.5 0 0 1 4.4 1.5c0 1.6-2 2-2 3"/><path d="M12 17h.01"/></svg></span><div><p style="font:600 15px var(--font-sans); margin:0; color:var(--foreground)">Unknown</p><p style="font:500 11px var(--font-num); margin:var(--space-1) 0 0; color:var(--muted-foreground)">--status-unknown</p></div></div>
+          <div style="margin-top:var(--space-4); display:inline-flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-4); border-radius:10px; background:var(--status-unknown-bg); border:1px solid var(--status-unknown-border)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--status-unknown))" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9a2.5 2.5 0 0 1 4.4 1.5c0 1.6-2 2-2 3"/><path d="M12 17h.01"/></svg><span style="font:600 13px var(--font-sans); color:rgb(var(--status-unknown))">Unconfirmed</span></div>
+        </div>
+
+      </div>
+    </section>
+
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:var(--space-7);">
+      <p style="font:600 11px/1.3 var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 var(--space-3);">02 · Typography</p>
+      <h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0; color:var(--foreground)">Type scale &amp; Dynamic Type</h2>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:var(--space-3) 0 0; max-width:60ch">Base 17px = 1rem, multiplied by <code style="font:500 12px var(--font-num); color:var(--foreground)">--dynamic-scale</code>. Drag to preview Dynamic Type — every specimen reflows live.</p>
+      <div style="display:flex; align-items:center; gap:var(--space-5); margin-top:var(--space-5); padding:var(--space-5) var(--space-5); background:var(--background); border-radius:14px; border:1px solid var(--border)">
+        <span style="font:600 11px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); white-space:nowrap">Dynamic Type</span>
+        <input type="range" min="0.8" max="1.6" step="0.05" value="{{ scale }}" onInput="{{ onScale }}" style="flex:1; accent-color:var(--brand); height:24px" />
+        <span style="font:500 14px var(--font-num); color:var(--foreground); min-width:54px; text-align:right">{{ scaleLabel }}</span>
+      </div>
+      <div style="margin-top:var(--space-3); display:flex; flex-direction:column">
+        <sc-for list="{{ typeRows }}" as="r" hint-placeholder-count="8">
+          <div style="display:flex; align-items:baseline; gap:var(--space-6); padding:var(--space-5) 0; border-top:1px solid var(--border); flex-wrap:wrap">
+            <div style="min-width:188px; flex-shrink:0">
+              <p style="font:500 12px var(--font-num); color:var(--foreground); margin:0">{{ r.name }}</p>
+              <p style="font:400 11px var(--font-num); color:var(--muted-foreground); margin:var(--space-1) 0 0">{{ r.meta }}</p>
+            </div>
+            <span class="{{ r.cls }}" style="font-weight:{{ r.weight }}; font-family:{{ r.family }}; text-transform:{{ r.transform }}; letter-spacing:{{ r.tracking }}; color:var(--foreground); line-height:1.1">{{ r.sample }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="margin-top:var(--space-6); border-top:1px solid var(--border); padding-top:var(--space-5);">
+        <p style="font:600 10px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 var(--space-4);">Utility → token map</p>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:var(--space-3);">
+          <sc-for list="{{ typeMap }}" as="m" hint-placeholder-count="8">
+            <div style="display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-4); border:1px solid var(--border); border-radius:10px">
+              <code style="font:500 12px var(--font-num); color:var(--brand)">{{ m.u }}</code>
+              <span style="color:var(--muted-foreground)">→</span>
+              <code style="font:500 12px var(--font-num); color:var(--foreground)">{{ m.tok }}</code>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <section style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:var(--content-gap)">
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:var(--space-7);">
+        <p style="font:600 11px/1.3 var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 var(--space-3);">03 · Spacing</p>
+        <h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0; color:var(--foreground)">4px base scale</h2>
+        <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:var(--space-3) 0 var(--space-5);">Every gap, pad and margin steps on this ramp.</p>
+        <div style="display:flex; flex-direction:column; gap:var(--space-3);">
+          <sc-for list="{{ spaceTokens }}" as="s" hint-placeholder-count="11">
+            <div style="display:flex; align-items:center; gap:var(--space-5);">
+              <span style="font:500 11px var(--font-num); color:var(--muted-foreground); width:84px; flex-shrink:0">{{ s.name }}</span>
+              <span style="height:14px; border-radius:4px; background:var(--brand); width:{{ s.css }}; flex-shrink:0"></span>
+              <span style="font:500 11px var(--font-num); color:var(--foreground)">{{ s.px }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:var(--space-7);">
+        <p style="font:600 11px/1.3 var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 var(--space-3);">04 · Radii</p>
+        <h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0; color:var(--foreground)">Corner ramp</h2>
+        <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:var(--space-3) 0 var(--space-5);">Continuous-corner feel where the renderer allows.</p>
+        <div style="display:flex; flex-wrap:wrap; gap:var(--space-5);">
+          <sc-for list="{{ radiiTokens }}" as="r" hint-placeholder-count="6">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:var(--space-3);">
+              <div style="width:60px; height:60px; background:var(--surface-2); border:1px solid var(--border); border-radius:{{ r.css }}"></div>
+              <span style="font:500 11px var(--font-num); color:var(--foreground)">{{ r.label }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:var(--space-7);">
+      <p style="font:600 11px/1.3 var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 var(--space-3);">05 · Elevation &amp; materials</p>
+      <h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0; color:var(--foreground)">A five-level depth ladder</h2>
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-4); margin-top:var(--space-3);">
+        <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0; max-width:56ch">Design review flagged that surfaces read as background → card → card → card — too little separation between a resting card and something actually interrupting the user. Shadow now grows with stakes, not decoration: <code style="font:500 12px var(--font-num); color:var(--foreground)">--shadow-card</code> stays barely-there, while panels, modals and emergency overlays each step up in blur, spread and opacity. The real app maps onto this ladder 1:1 — Phase 10 in <code style="font:500 12px var(--font-num); color:var(--foreground)">design-system-updates/</code>.</p>
+        <div style="display:flex; gap:var(--space-2); padding:var(--space-2); background:rgba(120,120,128,0.16); border-radius:9px">
+          <sc-for list="{{ rtOpts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:var(--space-5); margin-top:var(--space-6);">
+
+        <div>
+          <div style="background:var(--background); border:1px solid var(--border); border-radius:16px; min-height:120px; display:flex; align-items:center; justify-content:center">
+            <span style="font:600 11px var(--font-num); letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground)">Canvas</span>
+          </div>
+          <p style="font:600 13px var(--font-sans); color:var(--foreground); margin:var(--space-3) 0 0">0 · Background</p>
+          <p style="font:500 11px var(--font-num); color:var(--muted-foreground); margin:var(--space-2) 0 0">--background · no shadow</p>
+        </div>
+
+        <div>
+          <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; padding:var(--space-6); min-height:120px; box-shadow:var(--shadow-card)">
+            <p style="font:600 15px var(--font-sans); color:var(--foreground); margin:0">Card</p>
+            <p style="font:400 13px/1.5 var(--font-sans); color:var(--muted-foreground); margin:var(--space-3) 0 0">Resting content. Barely-there shadow, hairline border in dark.</p>
+          </div>
+          <p style="font:600 13px var(--font-sans); color:var(--foreground); margin:var(--space-3) 0 0">1 · Cards</p>
+          <p style="font:500 11px var(--font-num); color:var(--muted-foreground); margin:var(--space-2) 0 0">--shadow-card</p>
+        </div>
+
+        <div>
+          <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:16px; padding:var(--space-6); min-height:120px; box-shadow:var(--shadow-panel)">
+            <p style="font:600 15px var(--font-sans); color:var(--foreground); margin:0">Panel</p>
+            <p style="font:400 13px/1.5 var(--font-sans); color:var(--muted-foreground); margin:var(--space-3) 0 0">Dropdowns, popovers, tooltips. Dismissable, no scrim.</p>
+          </div>
+          <p style="font:600 13px var(--font-sans); color:var(--foreground); margin:var(--space-3) 0 0">2 · Active panels</p>
+          <p style="font:500 11px var(--font-num); color:var(--muted-foreground); margin:var(--space-2) 0 0">--shadow-panel</p>
+        </div>
+
+        <div>
+          <div style="position:relative; background:var(--surface); border:1px solid var(--hairline); border-radius:18px; padding:var(--space-6); min-height:120px; box-shadow:var(--shadow-modal)">
+            <p style="font:600 15px var(--font-sans); color:var(--foreground); margin:0">Sheet / Modal</p>
+            <p style="font:400 13px/1.5 var(--font-sans); color:var(--muted-foreground); margin:var(--space-3) 0 0">Owns a scrim. Blocks the page until resolved.</p>
+          </div>
+          <p style="font:600 13px var(--font-sans); color:var(--foreground); margin:var(--space-3) 0 0">3 · Sheets &amp; modals</p>
+          <p style="font:500 11px var(--font-num); color:var(--muted-foreground); margin:var(--space-2) 0 0">--shadow-modal</p>
+        </div>
+
+        <div>
+          <div style="position:relative; background:var(--surface); border:1px solid rgb(var(--sys-red) / 0.35); border-radius:18px; padding:var(--space-6); min-height:120px">
+            <span style="display:inline-flex; align-items:center; gap:var(--space-2); font:700 10px var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:rgb(var(--sys-red))"><span style="width:6px; height:6px; border-radius:999px; background:rgb(var(--sys-red))"></span>Emergency</span>
+            <p style="font:400 13px/1.5 var(--font-sans); color:var(--muted-foreground); margin:var(--space-3) 0 0">Above everything. Interrupts even an open sheet.</p>
+          </div>
+          <p style="font:600 13px var(--font-sans); color:var(--foreground); margin:var(--space-3) 0 0">4 · Emergency overlays</p>
+          <p style="font:500 11px var(--font-num); color:var(--muted-foreground); margin:var(--space-2) 0 0">--shadow-overlay</p>
+        </div>
+
+      </div>
+
+      <h3 style="font:600 17px var(--font-sans); margin:var(--space-8) 0 0; color:var(--foreground)">Card rhythm &amp; soft surface <span style="font:500 11px var(--font-num); color:var(--muted-foreground); text-transform:none; letter-spacing:normal">· Phase 21 (§40)</span></h3>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:var(--space-3) 0 0; max-width:64ch">Review: cards read as "assembled," uniform 16px padding everywhere, and depth relies on shadow alone. Two fixes, both reconciled onto this page's own token ramp rather than new one-offs: an explicit internal rhythm (not four equal gaps), and a border + inset highlight in place of a shadow for resting cards — Apple Health / Linear depth. Real app aligned in Phase 21, <code style="font:500 12px var(--font-num); color:var(--foreground)">design-system-updates/</code> §40-D5/§40-D7.</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:var(--space-6); margin-top:var(--space-5);">
+        <div>
+          <div style="display:flex; flex-direction:column; gap:var(--space-3);">
+            <div style="display:flex; align-items:center; gap:var(--space-5);"><span style="font:500 11px var(--font-num); color:var(--muted-foreground); width:110px; flex-shrink:0">header-bottom</span><span style="height:14px; border-radius:4px; background:var(--brand); width:12px; flex-shrink:0"></span><span style="font:500 11px var(--font-num); color:var(--foreground)">12px</span></div>
+            <div style="display:flex; align-items:center; gap:var(--space-5);"><span style="font:500 11px var(--font-num); color:var(--muted-foreground); width:110px; flex-shrink:0">status/content gap</span><span style="height:14px; border-radius:4px; background:var(--brand); width:20px; flex-shrink:0"></span><span style="font:500 11px var(--font-num); color:var(--foreground)">20px</span></div>
+            <div style="display:flex; align-items:center; gap:var(--space-5);"><span style="font:500 11px var(--font-num); color:var(--muted-foreground); width:110px; flex-shrink:0">stacked body</span><span style="height:14px; border-radius:4px; background:var(--brand); width:24px; flex-shrink:0"></span><span style="font:500 11px var(--font-num); color:var(--foreground)">24px</span></div>
+            <div style="display:flex; align-items:center; gap:var(--space-5);"><span style="font:500 11px var(--font-num); color:var(--muted-foreground); width:110px; flex-shrink:0">footer-gap</span><span style="height:14px; border-radius:4px; background:var(--brand); width:16px; flex-shrink:0"></span><span style="font:500 11px var(--font-num); color:var(--foreground)">16px</span></div>
+          </div>
+          <p style="font:500 11px var(--font-num); color:var(--muted-foreground); margin:var(--space-4) 0 0">CardHeader pb-3 · CardContent space-y-5 · CardFooter unchanged</p>
+        </div>
+        <div>
+          <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:var(--space-6); min-height:110px; box-shadow:inset 0 1px 0 0 rgba(255,255,255,0.8)">
+            <p style="font:600 15px var(--font-sans); color:var(--foreground); margin:0">Resting card</p>
+            <p style="font:400 13px/1.5 var(--font-sans); color:var(--muted-foreground); margin:var(--space-3) 0 0">Border + a 1px inset top highlight — no drop shadow. Reserve real shadow (--shadow-card) for cards that are actually interactive.</p>
+          </div>
+          <p style="font:500 11px var(--font-num); color:var(--muted-foreground); margin:var(--space-3) 0 0">--card-inset-highlight · border-border</p>
+        </div>
+      </div>
+
+      <h3 style="font:600 17px var(--font-sans); margin:var(--space-8) 0 0; color:var(--foreground)">Materials</h3>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:var(--space-3) 0 0; max-width:60ch">Three textures ride on top of the ladder rather than replacing it: a soft sheen on the hero surface, a translucent blur on bars, and the inset highlight above.</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:var(--space-5); margin-top:var(--space-5);">
+
+        <div>
+          <div style="position:relative; overflow:hidden; background:radial-gradient(130% 90% at 0% 0%, var(--ink-sheen), transparent 60%), var(--brand-ink); border-radius:20px; padding:var(--space-6); min-height:120px; box-shadow:var(--shadow-hero)">
+            <div style="display:flex; align-items:center; justify-content:space-between"><span style="display:inline-flex; align-items:center; gap:var(--space-3); font:600 10px var(--font-sans); letter-spacing:.12em; text-transform:uppercase; color:var(--on-ink-strong)"><span style="position:relative; width:8px; height:8px"><span style="position:absolute; inset:0; border-radius:999px; background:rgb(var(--sys-green))"></span><span style="position:absolute; inset:0; border-radius:999px; background:rgb(var(--sys-green)); animation:vt-ping 1.8s var(--ease-standard) infinite"></span></span>On shift</span><span style="font:500 11px var(--font-num); color:var(--on-ink-muted)">7:30 AM</span></div>
+            <p style="font-family:var(--font-num); font-size:34px; font-weight:500; color:var(--on-ink); margin:var(--space-3) 0 0; letter-spacing:-.01em">04:32</p>
+          </div>
+          <p style="font:500 11px var(--font-num); color:var(--muted-foreground); margin:var(--space-3) 0 0">--brand-ink · sheen · --shadow-hero</p>
+        </div>
+
+        <div>
+          <div style="position:relative; border-radius:16px; overflow:hidden; min-height:120px; background:repeating-linear-gradient(135deg, var(--brand) 0 22px, var(--action) 22px 44px)">
+            <div style="position:absolute; left:0; right:0; bottom:0; background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); -webkit-backdrop-filter:blur(var(--bar-blur)); border-top:1px solid var(--border); padding:var(--space-4) var(--space-5); display:flex; align-items:center; gap:var(--space-4);"><span style="width:9px; height:9px; border-radius:999px; background:var(--brand)"></span><span style="font:600 13px var(--font-sans); color:var(--foreground)">Translucent bar</span></div>
+          </div>
+          <p style="font:500 11px var(--font-num); color:var(--muted-foreground); margin:var(--space-3) 0 0">--bar-bg · blur(--bar-blur)</p>
+        </div>
+
+        <div>
+          <div style="min-height:120px; display:flex; align-items:center; justify-content:center; background:var(--background); border-radius:16px; border:1px solid var(--border)">
+            <div style="display:inline-flex; align-items:center; gap:var(--space-3); background:var(--surface-2); border:1px solid var(--border); border-radius:14px; padding:var(--space-4) var(--space-5); box-shadow:var(--shadow-floating)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--sys-green))" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span style="font:600 13px var(--font-sans); color:var(--foreground)">Scan saved</span></div>
+          </div>
+          <p style="font:500 11px var(--font-num); color:var(--muted-foreground); margin:var(--space-3) 0 0">--shadow-floating (toast only)</p>
+        </div>
+
+      </div>
+    </section>
+
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:var(--space-7);">
+      <p style="font:600 11px/1.3 var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 var(--space-3);">06 · Motion</p>
+      <h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0; color:var(--foreground)">Press, duration &amp; easing</h2>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:var(--space-3) 0 var(--space-6); max-width:60ch">Calm, system-native motion. All transforms and loops drop to instant under Reduce Motion.</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:var(--space-6);">
+
+        <div style="border:1px solid var(--border); border-radius:14px; padding:var(--space-5);">
+          <p style="font:600 13px var(--font-sans); color:var(--foreground); margin:0 0 var(--space-4);">Press feedback</p>
+          <button class="press-demo" onMouseDown="{{ onPressDown }}" onMouseUp="{{ onPressUp }}" onMouseLeave="{{ onPressUp }}" onTouchStart="{{ onPressDown }}" onTouchEnd="{{ onPressUp }}" style="width:100%; border:none; cursor:pointer; background:var(--brand); color:var(--brand-foreground); border-radius:14px; padding:var(--space-5); font:700 15px var(--font-sans); transform:{{ pressTransform }}; opacity:{{ pressOpacity }}; transition:transform var(--dur-fast) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard)">Press me</button>
+          <p style="font:500 11px var(--font-num); color:var(--muted-foreground); margin:var(--space-4) 0 0">scale(0.97) · 120ms</p>
+        </div>
+
+        <div style="border:1px solid var(--border); border-radius:14px; padding:var(--space-5);">
+          <p style="font:600 13px var(--font-sans); color:var(--foreground); margin:0 0 var(--space-4);">Durations</p>
+          <div style="display:flex; flex-direction:column; gap:var(--space-4);">
+            <div><div style="display:flex; justify-content:space-between; margin-bottom:var(--space-2);"><span style="font:500 11px var(--font-num); color:var(--foreground)">--dur-fast</span><span style="font:500 11px var(--font-num); color:var(--muted-foreground)">120ms</span></div><div style="height:8px; background:var(--background); border-radius:999px; overflow:hidden"><div style="width:30px; height:100%; border-radius:999px; background:var(--brand); animation:vt-travel var(--dur-fast) var(--ease-standard) infinite alternate"></div></div></div>
+            <div><div style="display:flex; justify-content:space-between; margin-bottom:var(--space-2);"><span style="font:500 11px var(--font-num); color:var(--foreground)">--dur-base</span><span style="font:500 11px var(--font-num); color:var(--muted-foreground)">200ms</span></div><div style="height:8px; background:var(--background); border-radius:999px; overflow:hidden"><div style="width:30px; height:100%; border-radius:999px; background:var(--brand); animation:vt-travel var(--dur-base) var(--ease-standard) infinite alternate"></div></div></div>
+            <div><div style="display:flex; justify-content:space-between; margin-bottom:var(--space-2);"><span style="font:500 11px var(--font-num); color:var(--foreground)">--dur-slow</span><span style="font:500 11px var(--font-num); color:var(--muted-foreground)">320ms</span></div><div style="height:8px; background:var(--background); border-radius:999px; overflow:hidden"><div style="width:30px; height:100%; border-radius:999px; background:var(--brand); animation:vt-travel var(--dur-slow) var(--ease-standard) infinite alternate"></div></div></div>
+          </div>
+        </div>
+
+        <div style="border:1px solid var(--border); border-radius:14px; padding:var(--space-5);">
+          <p style="font:600 13px var(--font-sans); color:var(--foreground); margin:0 0 var(--space-4);">Easing</p>
+          <svg width="100%" height="96" viewBox="0 0 120 100" preserveAspectRatio="none" style="display:block"><line x1="0" y1="100" x2="120" y2="100" stroke="var(--border)" stroke-width="1"/><line x1="0" y1="0" x2="0" y2="100" stroke="var(--border)" stroke-width="1"/><path d="M0 100 C24 100 0 0 120 0" fill="none" stroke="var(--brand)" stroke-width="2.5" stroke-linecap="round"/></svg>
+          <p style="font:500 11px var(--font-num); color:var(--muted-foreground); margin:var(--space-4) 0 0">cubic-bezier(0.2, 0, 0, 1)</p>
+        </div>
+
+      </div>
+    </section>
+
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:var(--space-7);">
+      <p style="font:600 11px/1.3 var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 var(--space-3);">07 · Layout</p>
+      <h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0; color:var(--foreground)">Size-class tokens</h2>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:var(--space-3) 0 var(--space-6); max-width:60ch">The active row reflows this whole page — margins, gap and max-width are driven by the Size toggle above.</p>
+      <div style="display:flex; flex-direction:column; gap:var(--space-4);">
+        <sc-for list="{{ sizeRows }}" as="r" hint-placeholder-count="3">
+          <div style="display:grid; grid-template-columns:120px 1fr; gap:var(--space-5); align-items:center; padding:var(--space-5) var(--space-5); border-radius:14px; background:{{ r.bg }}; border:1px solid {{ r.border }}">
+            <div style="display:flex; align-items:center; gap:var(--space-3);"><span style="width:8px; height:8px; border-radius:999px; background:{{ r.dot }}"></span><span style="font:600 14px var(--font-sans); color:var(--foreground)">{{ r.label }}</span></div>
+            <div style="display:flex; flex-wrap:wrap; gap:var(--space-3) var(--space-6); font:500 12px var(--font-num); color:var(--muted-foreground)"><span>margin {{ r.margin }}</span><span>gap {{ r.gap }}</span><span>max {{ r.maxw }}</span><span>target {{ r.target }}</span><span style="color:var(--foreground)">{{ r.nav }}</span></div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="background:var(--brand-ink); border-radius:20px; padding:var(--space-7); color:var(--on-ink); box-shadow:var(--shadow-hero)">
+      <p style="font:600 11px/1.3 var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--on-ink-muted); margin:0 0 var(--space-3);">Open questions · §13</p>
+      <h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0; color:var(--on-ink)">Decisions &amp; flags</h2>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:var(--space-6); margin-top:var(--space-6);">
+        <div>
+          <p style="font:600 12px var(--font-sans); letter-spacing:.04em; text-transform:uppercase; color:rgb(var(--sys-green)); margin:0 0 var(--space-4);">Resolved</p>
+          <ul style="margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:var(--space-4);">
+            <li style="font:400 13px/1.45 var(--font-sans); color:var(--on-ink-strong)"><strong style="color:var(--on-ink)">§13.2 Brand</strong> — indigo #4F46E5 / #818CF8 (shipped mark), <code style="font-family:var(--font-num); font-size:12px">--brand</code> = <code style="font-family:var(--font-num); font-size:12px">--primary</code>; navy-indigo hero ink; green #15803D reserved for scan/action.</li>
+            <li style="font:400 13px/1.45 var(--font-sans); color:var(--on-ink-strong)"><strong style="color:var(--on-ink)">§13.1 Scan</strong> — unified to <code style="font-family:var(--font-num); font-size:12px">/scan</code>.</li>
+            <li style="font:400 13px/1.45 var(--font-sans); color:var(--on-ink-strong)"><strong style="color:var(--on-ink)">§13.6 Numerals</strong> — DM Mono, tabular figures.</li>
+            <li style="font:400 13px/1.45 var(--font-sans); color:var(--on-ink-strong)"><strong style="color:var(--on-ink)">Model</strong> — Apple grouped neutrals + system status colors mapped to clinical meanings.</li>
+            <li style="font:400 13px/1.45 var(--font-sans); color:var(--on-ink-strong)"><strong style="color:var(--on-ink)">Elevation</strong> — design review flagged flat depth hierarchy; adopted a 5-level ladder (background → card → panel → modal → emergency). Real app aligned to match in design-system-updates Phase 10 (§29).</li>
+            <li style="font:400 13px/1.45 var(--font-sans); color:var(--on-ink-strong)"><strong style="color:var(--on-ink)">Surface system</strong> — ivory ramp grows from 2 steps to 5 (bg/surface/panel/hover/active); real app aligned in Phase 11 (§30). Brand-color half of the same review is <em>not yet resolved</em> — real primary is indigo (matches the logo), not the forest green the review assumed; asked rather than guessed.</li>
+            <li style="font:400 13px/1.45 var(--font-sans); color:var(--on-ink-strong)"><strong style="color:var(--on-ink)">Phase 21 batch</strong> — 15-item polish review (section headers, card rhythm, soft surfaces, stat cards, status dots, tables, empty states, search inputs, context chips, staff/room cards, clinical timeline). Several items were already substantially shipped (accent rails = the criticality system below, soft surfaces = the shadow-less card above); rest verified against real source and built for real. Full per-item log in design-system-updates §40.</li>
+          </ul>
+        </div>
+        <div>
+          <p style="font:600 12px var(--font-sans); letter-spacing:.04em; text-transform:uppercase; color:rgb(var(--sys-orange)); margin:0 0 var(--space-4);">Added tokens (flagged)</p>
+          <ul style="margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:var(--space-3);">
+            <li style="font:500 12px/1.4 var(--font-num); color:var(--on-ink-strong)">--action / --action-foreground</li>
+            <li style="font:500 12px/1.4 var(--font-num); color:var(--on-ink-strong)">--sys-gray (maintenance)</li>
+            <li style="font:500 12px/1.4 var(--font-num); color:var(--on-ink-strong)">--space-1 … --space-11</li>
+            <li style="font:500 12px/1.4 var(--font-num); color:var(--on-ink-strong)">--hairline · --bar-bg · --bar-blur</li>
+            <li style="font:500 12px/1.4 var(--font-num); color:var(--on-ink-strong)">--shadow-hero · --shadow-floating · --shadow-card · --shadow-panel · --shadow-modal · --shadow-overlay</li>
+            <li style="font:500 12px/1.4 var(--font-num); color:var(--on-ink-strong)">--surface-hover · --surface-active (+ --ivory-panel alias onto --surface-2)</li>
+          </ul>
+        </div>
+        <div>
+          <p style="font:600 12px var(--font-sans); letter-spacing:.04em; text-transform:uppercase; color:rgb(var(--sys-blue)); margin:0 0 var(--space-4);">Interim decisions · pending sign-off</p>
+          <ul style="margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:var(--space-4);">
+            <li style="font:400 13px/1.45 var(--font-sans); color:var(--on-ink-strong)"><strong style="color:var(--on-ink)">Taxonomy</strong> — adopted the 6-state enum (ready · in_use · blocked · stale · overdue · unknown) as canonical. Mapping: available→ready, in use→in_use, overdue→overdue, critical/flagged→blocked + leading accent bar, maintenance→blocked/readiness.</li>
+            <li style="font:400 13px/1.45 var(--font-sans); color:var(--on-ink-strong)"><strong style="color:var(--on-ink)">Token names</strong> — <code style="font-family:var(--font-num); font-size:12px">--sys-*</code> are primitives; <code style="font-family:var(--font-num); font-size:12px">--status-*</code> emitted as aliases.</li>
+            <li style="font:400 13px/1.45 var(--font-sans); color:var(--on-ink-strong)"><strong style="color:var(--on-ink)">D-E · DS-bundle binding</strong> — declined-by-design for Stage 1 &amp; Stage 2: these files <em>declare</em> the canonical token layer, so they do not bind the <code style="font-family:var(--font-num); font-size:12px">_ds_bundle</code>. Logged so re-audit won't re-flag.</li>
+            <li style="font:400 13px/1.45 var(--font-sans); color:var(--on-ink-strong)"><strong style="color:var(--on-ink)">Ward Display</strong> — dark-only + web/expanded-only (§0.1) exemption; no compact/medium board.</li>
+            <li style="font:400 13px/1.45 var(--font-sans); color:var(--on-ink-strong)"><strong style="color:var(--on-ink)">§13.2/§13.3/§13.7</strong> — brand hex, Today title, recent-activity source, compliance regime all pending confirmation.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <footer style="text-align:center; padding:var(--space-3) 0">
+      <p style="font:500 13px var(--font-sans); color:var(--muted-foreground); margin:0">Stage 1 complete — token foundations for light + dark. Reply <strong style="color:var(--foreground)">next</strong> for Stage 2 · Core components.</p>
+    </footer>
+
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { theme: 'light', size: 'medium', scale: 1, pressed: false, rt: false };
+
+  set(k, v) { this.setState({ [k]: v }); }
+
+  renderVals() {
+    const { theme, size, scale, pressed, rt } = this.state;
+
+    const segBase = "flex:1;border:none;cursor:pointer;padding:var(--space-3) var(--space-4);border-radius:7px;font-family:var(--font-sans);font-size:13px;transition:all var(--dur-fast) var(--ease-standard);white-space:nowrap;";
+    const seg = (active) => active
+      ? segBase + "font-weight:600;background:var(--surface-2);color:var(--foreground);box-shadow:0 1px 2px rgba(0,0,0,.18);"
+      : segBase + "font-weight:500;background:transparent;color:var(--muted-foreground);";
+
+    const themeOpts = [['light', 'Light'], ['dark', 'Dark']].map(([k, l]) => ({
+      key: k, label: l, style: seg(theme === k), onClick: () => this.set('theme', k)
+    }));
+    const sizeOpts = [['compact', 'Compact'], ['medium', 'Medium'], ['expanded', 'Expanded']].map(([k, l]) => ({
+      key: k, label: l, style: seg(size === k), onClick: () => this.set('size', k)
+    }));
+    const rtOpts = [[false, 'Translucent'], [true, 'Opaque']].map(([k, l]) => ({
+      key: String(k), label: l, style: seg(rt === k), onClick: () => this.set('rt', k)
+    }));
+
+    const neutralTokens = [
+      { name: '--background', light: '#F2F2F7', dark: '#000000', usage: 'App canvas (grouped)', bg: 'var(--background)', sample: '', fg: '', lines: false },
+      { name: '--surface', light: '#FFFFFF', dark: '#1C1C1E', usage: 'Cards, rows', bg: 'var(--surface)', sample: '', fg: '', lines: false },
+      { name: '--surface-2', light: '#FFFFFF', dark: '#2C2C2E', usage: 'Raised / nested', bg: 'var(--surface-2)', sample: '', fg: '', lines: false },
+      { name: '--foreground', light: '#000000', dark: '#FFFFFF', usage: 'Primary text', bg: 'var(--surface)', sample: 'Ag', fg: 'var(--foreground)', lines: false },
+      { name: '--muted-foreground', light: 'rgba(60,60,67,.6)', dark: 'rgba(235,235,245,.6)', usage: 'Secondary text', bg: 'var(--surface)', sample: 'Ag', fg: 'var(--muted-foreground)', lines: false },
+      { name: '--border', light: 'rgba(60,60,67,.29)', dark: 'rgba(84,84,88,.6)', usage: 'Hairlines / separators', bg: 'var(--surface)', sample: '', fg: '', lines: true },
+      { name: '--ivory-panel', light: '#FFFFFF', dark: '#2C2C2E', usage: 'Nested / inset panels (aliases --surface-2)', bg: 'var(--surface-2)', sample: '', fg: '', lines: false },
+      { name: '--ivory-hover', light: '#F7F6F3', dark: '#333336', usage: 'Row / card hover', bg: 'var(--surface-hover)', sample: '', fg: '', lines: false },
+      { name: '--ivory-active', light: '#EFEDE8', dark: '#3A3A3D', usage: 'Row / card pressed, selected', bg: 'var(--surface-active)', sample: '', fg: '', lines: false },
+    ];
+
+    const brandTokens = [
+      { name: '--brand / --primary', light: '#4F46E5', dark: '#818CF8', usage: 'Primary actions, active nav', bg: 'var(--brand)', sample: 'Aa', fg: 'var(--brand-foreground)' },
+      { name: '--brand-foreground', light: '#FFFFFF', dark: '#1E1B4B', usage: 'Ink on brand fills', bg: 'var(--surface)', sample: 'Aa', fg: 'var(--brand)' },
+      { name: '--brand-ink', light: '#1E1B4B', dark: '#1E1B4B', usage: 'Dark hero surface', bg: 'var(--brand-ink)', sample: 'Aa', fg: '#FFFFFF' },
+      { name: '--action ⚑', light: '#2F6F5E', dark: '#4CCDAA', usage: 'Scan / confirm action — richer emerald forest (§31)', bg: 'var(--action)', sample: 'Aa', fg: 'var(--action-foreground)' },
+    ];
+
+    const typeRows = [
+      { name: '--display', cls: 'vt-display', meta: '40px · 2.353rem · 600', cssSize: 'var(--display)', weight: 600, family: 'var(--font-num)', transform: 'none', tracking: '-0.01em', sample: '04:32' },
+      { name: '--text-largetitle', cls: 'vt-text-2xl', meta: '34px · Large Title · 700', cssSize: 'var(--text-largetitle)', weight: 700, family: 'var(--font-sans)', transform: 'none', tracking: '-0.02em', sample: 'Good morning, Maya' },
+      { name: '--text-xl', cls: 'vt-text-xl', meta: '22px · Title 2 · 600', cssSize: 'var(--text-xl)', weight: 600, family: 'var(--font-sans)', transform: 'none', tracking: '-0.01em', sample: 'Equipment overview' },
+      { name: '--text-lg', cls: 'vt-text-lg', meta: '20px · Title 3 · 700', cssSize: 'var(--text-lg)', weight: 700, family: 'var(--font-sans)', transform: 'none', tracking: 'normal', sample: '12 items out' },
+      { name: '--text-base', cls: 'vt-text-body', meta: '17px · Body · 400 / 600', cssSize: 'var(--text-base)', weight: 400, family: 'var(--font-sans)', transform: 'none', tracking: 'normal', sample: 'Infusion pump · Bay 3' },
+      { name: '--text-sm', cls: 'vt-text-sm', meta: '15px · Subhead · 500', cssSize: 'var(--text-sm)', weight: 500, family: 'var(--font-sans)', transform: 'none', tracking: 'normal', sample: 'Last scanned 14:02' },
+      { name: '--text-xs', cls: 'vt-text-xs', meta: '13px · Footnote · 500', cssSize: 'var(--text-xs)', weight: 500, family: 'var(--font-sans)', transform: 'none', tracking: 'normal', sample: 'Synced just now' },
+      { name: '--text-2xs', cls: 'vt-text-2xs', meta: '11px · Caption 2 · 600 · +0.1em', cssSize: 'var(--text-2xs)', weight: 600, family: 'var(--font-sans)', transform: 'uppercase', tracking: '0.1em', sample: 'On shift' },
+    ];
+
+    const typeMap = [
+      { u: '.vt-display', tok: '--display' },
+      { u: '.vt-text-2xl', tok: '--text-largetitle' },
+      { u: '.vt-text-xl', tok: '--text-xl' },
+      { u: '.vt-text-lg', tok: '--text-lg' },
+      { u: '.vt-text-body', tok: '--text-base' },
+      { u: '.vt-text-sm', tok: '--text-sm' },
+      { u: '.vt-text-xs', tok: '--text-xs' },
+      { u: '.vt-text-2xs', tok: '--text-2xs' },
+    ];
+
+    const spaceTokens = [
+      ['--space-1', 2], ['--space-2', 4], ['--space-3', 8], ['--space-4', 12], ['--space-5', 16],
+      ['--space-6', 20], ['--space-7', 24], ['--space-8', 32], ['--space-9', 40], ['--space-10', 48], ['--space-11', 64],
+      ['--space-12', 80], ['--space-13', 96]
+    ].map(([name, px]) => ({ name, px: px + 'px', css: px + 'px' }));
+
+    const radiiTokens = [
+      ['--radius-sm', '10px', '10'], ['--radius-md', '12px', '12'], ['--radius-lg', '14px', '14'],
+      ['--radius-xl', '16px', '16'], ['--radius-2xl', '20px', '20'], ['--radius-pill', '999px', 'pill']
+    ].map(([name, css, n]) => ({ name, css, label: n }));
+
+    const sizeMeta = {
+      compact:  { label: 'Compact', margin: '16', gap: '20', maxw: 'full', target: '44pt', nav: 'Bottom tab bar', dot: 'rgb(var(--sys-blue))' },
+      medium:   { label: 'Medium', margin: '24', gap: '24', maxw: '720', target: '44pt', nav: 'Sidebar 220', dot: 'rgb(var(--sys-green))' },
+      expanded: { label: 'Expanded', margin: '32', gap: '24', maxw: '1120', target: 'var(--space-9)', nav: 'Sidebar + utility bar', dot: 'var(--brand)' },
+    };
+    const sizeRows = ['compact', 'medium', 'expanded'].map(k => {
+      const m = sizeMeta[k]; const active = size === k;
+      return { ...m, bg: active ? 'var(--background)' : 'transparent', border: active ? 'var(--brand)' : 'var(--border)' };
+    });
+
+    return {
+      rootClass: 'page' + (theme === 'dark' ? ' dark' : '') + (rt ? ' rt' : ''),
+      rootStyle: '--dynamic-scale:' + scale,
+      size,
+      themeLabel: theme === 'dark' ? 'Dark' : 'Light',
+      sizeLabel: sizeMeta[size].label,
+      scaleLabel: scale.toFixed(2) + '×',
+      scale,
+      onScale: (e) => this.setState({ scale: parseFloat(e.target.value) }),
+      themeOpts, sizeOpts, rtOpts,
+      neutralTokens, brandTokens, typeRows, typeMap, spaceTokens, radiiTokens, sizeRows,
+      pressTransform: pressed ? 'scale(0.97)' : 'scale(1)',
+      pressOpacity: pressed ? '0.92' : '1',
+      onPressDown: () => this.set('pressed', true),
+      onPressUp: () => this.set('pressed', false),
+    };
+  }
+}
+</script>
+</body>
+</html>

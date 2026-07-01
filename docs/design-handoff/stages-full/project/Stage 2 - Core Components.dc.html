@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap">
+<style>
+  *{box-sizing:border-box}
+  html{font-size:17px}
+  body{margin:0;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-variant-numeric:tabular-nums}
+  :root{
+    --background:#F2F2F7; --surface:#FFFFFF; --surface-2:#FFFFFF;
+    --foreground:#000000; --muted-foreground:rgba(60,60,67,0.6); --border:rgba(60,60,67,0.29);
+    --hairline:transparent;
+    --brand:#4F46E5; --brand-foreground:#FFFFFF; --brand-ink:#1E1B4B;
+    --action:#2F6F5E; --action-foreground:#FFFFFF;
+    --sys-red:255 59 48; --sys-orange:255 149 0; --sys-green:52 199 89; --sys-blue:0 122 255; --sys-gray:142 142 147;
+    --radius-sm:10px; --radius-md:12px; --radius-lg:14px; --radius-xl:16px; --radius-2xl:20px; --radius-pill:999px;
+    --ease-standard:cubic-bezier(0.2,0,0,1); --dur-fast:120ms; --dur-base:200ms; --dur-slow:320ms; --dur-spin:700ms;
+    --primary:var(--brand); --primary-foreground:var(--brand-foreground);
+    --on-ink:#FFFFFF; --on-ink-strong:rgba(255,255,255,0.82); --on-ink-muted:rgba(255,255,255,0.6); --on-ink-subtle:rgba(255,255,255,0.5); --on-ink-disabled:rgba(255,255,255,0.4); --on-ink-bar:rgba(255,255,255,0.94); --ink-sheen:rgba(255,255,255,0.10); --ink-divider:rgba(255,255,255,0.12); --ink-skeleton:rgba(255,255,255,0.14); --ink-fill-weak:rgba(255,255,255,0.08); --ink-fill:rgba(255,255,255,0.18); --ink-border:rgba(255,255,255,0.28); --ink-shimmer:rgba(255,255,255,0.35);
+    --space-1:2px; --space-2:4px; --space-3:8px; --space-4:12px; --space-5:16px; --space-6:20px; --space-7:24px; --space-8:32px; --space-9:40px; --space-10:48px; --space-11:64px;
+    --brand-navy:var(--brand-ink); --brand-green-bright:rgb(var(--sys-green));
+    --status-ok:rgb(var(--sys-green)); --status-ok-bg:rgb(var(--sys-green) / 0.12); --status-ok-border:rgb(var(--sys-green) / 0.22); --status-ok-fg:rgb(var(--sys-green));
+    --status-issue:rgb(var(--sys-red)); --status-issue-bg:rgb(var(--sys-red) / 0.12); --status-issue-border:rgb(var(--sys-red) / 0.22); --status-issue-fg:rgb(var(--sys-red));
+    --status-maintenance:rgb(var(--sys-orange)); --status-maintenance-bg:rgb(var(--sys-orange) / 0.12); --status-maintenance-border:rgb(var(--sys-orange) / 0.22); --status-maintenance-fg:rgb(var(--sys-orange));
+    --status-sterilized:rgb(var(--sys-blue)); --status-sterilized-bg:rgb(var(--sys-blue) / 0.12); --status-sterilized-border:rgb(var(--sys-blue) / 0.22); --status-sterilized-fg:rgb(var(--sys-blue));
+    --status-stale:rgb(var(--sys-orange)); --status-stale-bg:rgb(var(--sys-orange) / 0.12); --status-stale-border:rgb(var(--sys-orange) / 0.22); --status-stale-fg:rgb(var(--sys-orange));
+    --status-unknown:rgb(var(--sys-gray)); --status-unknown-bg:rgb(var(--sys-gray) / 0.14); --status-unknown-border:rgb(var(--sys-gray) / 0.26); --status-unknown-fg:rgb(var(--sys-gray));
+    --dynamic-scale:1;
+    --font-sans:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;
+    --font-num:"DM Mono",ui-monospace,SFMono-Regular,monospace;
+    --display:calc(2.353rem * var(--dynamic-scale)); --text-largetitle:calc(2rem * var(--dynamic-scale));
+    --text-xl:calc(1.294rem * var(--dynamic-scale)); --text-lg:calc(1.176rem * var(--dynamic-scale));
+    --text-base:calc(1rem * var(--dynamic-scale)); --text-sm:calc(0.882rem * var(--dynamic-scale));
+    --text-xs:calc(0.765rem * var(--dynamic-scale)); --text-2xs:calc(0.647rem * var(--dynamic-scale));
+    --bar-bg:var(--on-ink-bar); --bar-bg-opaque:#FFFFFF; --bar-blur:12px;
+    --shadow-hero:0 1px 2px rgba(0,0,0,0.06); --shadow-floating:0 8px 24px -12px rgba(0,0,0,0.25);
+    --inline-margin:24px; --content-gap:24px; --max-content:720px; --target-min:44px;
+    --tonal:rgba(120,120,128,0.16); --tonal-strong:rgba(120,120,128,0.24);
+  }
+  .dark{
+    --background:#000000; --surface:#1C1C1E; --surface-2:#2C2C2E;
+    --foreground:#FFFFFF; --muted-foreground:rgba(235,235,245,0.6); --border:rgba(84,84,88,0.6);
+    --hairline:rgba(84,84,88,0.6);
+    --brand:#818CF8; --brand-foreground:#1E1B4B; --brand-ink:#1E1B4B;
+    --action:#4CCDAA; --action-foreground:#06210F;
+    --sys-red:255 69 58; --sys-orange:255 159 10; --sys-green:48 209 88; --sys-blue:10 132 255; --sys-gray:152 152 157;
+    --bar-bg:rgba(28,28,30,0.94); --bar-bg-opaque:#1C1C1E; --shadow-hero:0 1px 2px rgba(0,0,0,0.5);
+    --on-ink:#FFFFFF; --on-ink-strong:rgba(255,255,255,0.82); --on-ink-muted:rgba(255,255,255,0.6); --on-ink-subtle:rgba(255,255,255,0.5); --on-ink-disabled:rgba(255,255,255,0.4); --on-ink-bar:rgba(255,255,255,0.94); --ink-sheen:rgba(255,255,255,0.10); --ink-divider:rgba(255,255,255,0.12); --ink-skeleton:rgba(255,255,255,0.14); --ink-fill-weak:rgba(255,255,255,0.08); --ink-fill:rgba(255,255,255,0.18); --ink-border:rgba(255,255,255,0.28); --ink-shimmer:rgba(255,255,255,0.35); --primary:var(--brand);
+    --tonal:rgba(120,120,128,0.24); --tonal-strong:rgba(120,120,128,0.36);
+  }
+  .rt{ --bar-bg:var(--bar-bg-opaque); --bar-blur:0px; }
+  .page[data-size="compact"]{ --inline-margin:16px; --content-gap:20px; --max-content:430px; }
+  .page[data-size="medium"]{ --inline-margin:24px; --content-gap:24px; --max-content:720px; }
+  .page[data-size="expanded"]{ --inline-margin:32px; --content-gap:24px; --max-content:1120px; }
+  @keyframes vt-ping{0%{transform:scale(1);opacity:.7}70%{transform:scale(2.6);opacity:0}100%{opacity:0}}
+  @keyframes vt-spin{to{transform:rotate(360deg)}}
+  @keyframes vt-shimmer{100%{transform:translateX(100%)}}
+  .sk{position:relative; overflow:hidden; background:rgba(120,120,128,0.16)}
+  .dark .sk{background:var(--ink-sheen)}
+  .sk::after{content:""; position:absolute; inset:0; transform:translateX(-100%); background:linear-gradient(90deg, transparent, var(--ink-shimmer), transparent); animation:vt-shimmer 1.4s infinite}
+  .dark .sk::after{background:linear-gradient(90deg, transparent, var(--ink-fill-weak), transparent)}
+  @media (prefers-reduced-motion: reduce){ *{animation:none !important} .sk::after{display:none} }
+  /* S2-D8-001 · focus-visible ring on every interactive element */
+  a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,[tabindex]:focus-visible,[role="button"]:focus-visible{outline:none;box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--brand)}
+  /* S2-D3-001 · reduce-transparency opaque bars */
+  @media (prefers-reduced-transparency: reduce){ :root,.dark{ --bar-bg:var(--bar-bg-opaque); --bar-blur:0px; } }
+</style>
+</helmet>
+<div class="{{ rootClass }}" data-size="{{ size }}" dir="{{ dir }}" style="{{ rootStyle }}; min-height:100vh; background:var(--background); color:var(--foreground); font-family:var(--font-sans); transition:background var(--dur-base) var(--ease-standard), color var(--dur-base) var(--ease-standard)">
+
+  <header style="position:sticky; top:0; z-index:40; background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); -webkit-backdrop-filter:blur(var(--bar-blur)); border-bottom:1px solid var(--border)">
+    <div style="max-width:var(--max-content); margin:0 auto; padding:12px var(--inline-margin); display:flex; flex-wrap:wrap; align-items:center; gap:14px 20px">
+      <div style="display:flex; align-items:baseline; gap:10px; margin-right:auto">
+        <span style="font:700 17px var(--font-sans); letter-spacing:-.02em; color:var(--brand)">VetTrack</span>
+        <span style="font:500 12px var(--font-num); color:var(--muted-foreground)">Stage 2 · Components</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:7px">
+        <span style="font:600 10px var(--font-sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted-foreground)">Theme</span>
+        <div style="display:flex; gap:4px; padding:3px; background:var(--tonal); border-radius:9px">
+          <sc-for list="{{ themeOpts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:7px">
+        <span style="font:600 10px var(--font-sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted-foreground)">Size</span>
+        <div style="display:flex; gap:4px; padding:3px; background:var(--tonal); border-radius:9px">
+          <sc-for list="{{ sizeOpts }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:7px">
+        <span style="font:600 10px var(--font-sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted-foreground)">Locale</span>
+        <div style="display:flex; gap:4px; padding:3px; background:var(--tonal); border-radius:9px">
+          <sc-for list="{{ localeOpts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:7px">
+        <span style="font:600 10px var(--font-sans); letter-spacing:.08em; text-transform:uppercase; color:var(--muted-foreground)">Platform</span>
+        <div style="display:flex; gap:4px; padding:3px; background:var(--tonal); border-radius:9px">
+          <sc-for list="{{ platformOpts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main style="max-width:var(--max-content); margin:0 auto; padding:32px var(--inline-margin) 140px; display:flex; flex-direction:column; gap:var(--content-gap)">
+
+    <section>
+      <p style="font:600 11px/1.3 var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--brand); margin:0 0 10px">Design Handoff · Component Library</p>
+      <h1 style="font-size:var(--text-largetitle); font-weight:700; letter-spacing:-.02em; line-height:1.1; margin:0">Core components</h1>
+      <p style="font-size:var(--text-base); line-height:1.5; color:var(--muted-foreground); margin:12px 0 0; max-width:64ch">Every component built strictly from the Stage 1 token layer, shown across its variants and the five interactive states — <strong style="color:var(--foreground)">default · pressed · focus-visible · disabled · loading</strong>. Toggle theme and size above; touch targets stay ≥44pt on touch size classes.</p>
+    </section>
+
+    <!-- PRESSABLE -->
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+      <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.1</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">Pressable</h2></div>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 18px; max-width:60ch">Interaction primitive under every tappable surface. Press → <code style="font:500 12px var(--font-num); color:var(--foreground)">scale(0.97)</code> over <code style="font:500 12px var(--font-num); color:var(--foreground)">--dur-fast</code>. Real <code style="font:500 12px var(--font-num); color:var(--foreground)">&lt;button&gt;</code>, focus-visible ring, reduced-motion safe. Press the tile, or tab to it for the ring.</p>
+      <div style="display:flex; gap:18px; flex-wrap:wrap; align-items:center">
+        <button onMouseDown="{{ press.down }}" onMouseUp="{{ press.up }}" onMouseLeave="{{ press.up }}" onTouchStart="{{ press.down }}" onTouchEnd="{{ press.up }}" style="width:140px; height:96px; border:1px solid var(--border); background:var(--surface-2); border-radius:16px; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--foreground); transform:{{ press.transform }}; transition:transform var(--dur-fast) var(--ease-standard)" style-focus="outline:none; box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--brand)">
+          <svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11 3 3 8-8"/><path d="M21 12a9 9 0 1 1-3.8-7.3"/></svg>
+          <span style="font:600 13px var(--font-sans)">{{ press.label }}</span>
+        </button>
+        <div style="font:400 13px/1.6 var(--font-sans); color:var(--muted-foreground); max-width:32ch"><code style="font:500 12px var(--font-num); color:var(--foreground)">touch-action:manipulation</code>, no tap-highlight. Optional opacity 0.85 on tonal surfaces. Focus ring = 2px <code style="font:500 12px var(--font-num); color:var(--foreground)">--brand</code>, 2px offset.</div>
+      </div>
+    </section>
+
+    <!-- BUTTON -->
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+      <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.2</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">Button</h2></div>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 18px; max-width:60ch">Four fills × five states. Radius 14, weight 700. Loading keeps the button width and swaps the label for a spinner.</p>
+
+      <div style="overflow-x:auto; margin:0 -4px">
+        <div style="min-width:560px; padding:0 4px">
+          <div style="display:grid; grid-template-columns:130px repeat(5,1fr); gap:10px; align-items:center; padding-bottom:10px">
+            <span></span>
+            <sc-for list="{{ stateHeaders }}" as="h" hint-placeholder-count="5"><span style="font:600 10px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); text-align:center">{{ h }}</span></sc-for>
+          </div>
+          <sc-for list="{{ buttonMatrix }}" as="row" hint-placeholder-count="4">
+            <div style="display:grid; grid-template-columns:130px repeat(5,1fr); gap:10px; align-items:center; padding:7px 0">
+              <span style="font:600 13px var(--font-sans); color:var(--foreground)">{{ row.label }}</span>
+              <sc-for list="{{ row.cells }}" as="c" hint-placeholder-count="5">
+                <button disabled="{{ c.disabled }}" style="{{ c.style }}">
+                  <sc-if value="{{ c.loading }}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" style="animation:vt-spin var(--dur-spin) linear infinite"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.6" stroke-opacity="0.3"/><path d="M12 3a9 9 0 0 1 9 9" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></sc-if>
+                  <sc-if value="{{ c.showLabel }}" hint-placeholder-val="{{ true }}">Check out</sc-if>
+                </button>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="margin-top:22px; border-top:1px solid var(--border); padding-top:18px">
+        <p style="font:600 10px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 12px">Sizes · touch min 44</p>
+        <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap">
+          <div style="display:flex; flex-direction:column; align-items:center; gap:7px"><button style="height:36px; padding:0 16px; border:none; border-radius:14px; background:var(--brand); color:var(--brand-foreground); font:700 14px var(--font-sans); cursor:pointer">Check out</button><span style="font:500 11px var(--font-num); color:var(--muted-foreground)">sm · 36</span></div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:7px"><button style="height:44px; padding:0 18px; border:none; border-radius:14px; background:var(--brand); color:var(--brand-foreground); font:700 15px var(--font-sans); cursor:pointer">Check out</button><span style="font:500 11px var(--font-num); color:var(--muted-foreground)">md · 44 default</span></div>
+          <div style="display:flex; flex-direction:column; align-items:center; gap:7px"><button style="height:56px; padding:0 24px; border:none; border-radius:14px; background:var(--brand); color:var(--brand-foreground); font:700 17px var(--font-sans); cursor:pointer">Check out</button><span style="font:500 11px var(--font-num); color:var(--muted-foreground)">lg · 56</span></div>
+        </div>
+      </div>
+
+      <div style="margin-top:18px; background:var(--brand-ink); border-radius:16px; padding:18px; display:flex; align-items:center; gap:16px; flex-wrap:wrap">
+        <span style="font:600 10px var(--font-sans); letter-spacing:.08em; text-transform:uppercase; color:var(--on-ink-muted)">Ghost · on hero</span>
+        <button style="height:44px; padding:0 20px; border:1px solid var(--ink-border); border-radius:14px; background:var(--ink-fill-weak); color:var(--on-ink); font:700 15px var(--font-sans); cursor:pointer">End shift</button>
+        <button style="height:44px; padding:0 20px; border:1px solid var(--ink-border); border-radius:14px; background:var(--ink-fill-weak); color:var(--on-ink-disabled); font:700 15px var(--font-sans)">End shift</button>
+        <span style="font:400 12px var(--font-sans); color:var(--on-ink-subtle)">default · disabled</span>
+      </div>
+    </section>
+
+    <!-- CARD -->
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+      <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.3</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">Card / Surface</h2></div>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 18px; max-width:64ch">Surface over canvas, no shadow in light — a 1px inset top highlight instead (Phase 21, review item 6: "soft surface separation," Apple Health / Linear depth). Internal rhythm is explicit, not four equal 16px gaps: header 12, stacked content 20, footer 16 (item 4). Criticality is a rail, not a box (item 2).</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; background:var(--background); padding:18px; border-radius:16px">
+        <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; padding:16px 18px 18px; box-shadow:inset 0 1px 0 0 rgba(255,255,255,0.8)">
+          <p style="font:600 16px var(--font-sans); margin:0">Plain card</p>
+          <p style="font:400 14px/1.5 var(--font-sans); color:var(--muted-foreground); margin:12px 0 0">Last serviced 3 days ago · docked in Recovery.</p>
+        </div>
+        <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; overflow:hidden">
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 18px 12px"><p style="font:600 16px var(--font-sans); margin:0">With header</p><button style="border:none; background:none; color:var(--brand); font:600 14px var(--font-sans); cursor:pointer">Edit</button></div>
+          <div style="padding:0 18px"><p style="font:400 14px/1.5 var(--font-sans); color:var(--muted-foreground); margin:0">Header carries a title and a trailing text action.</p></div>
+          <div style="padding:16px 18px; margin-top:4px; display:flex; gap:10px"><button style="height:36px; padding:0 16px; border:none; border-radius:12px; background:var(--brand); color:var(--brand-foreground); font:700 14px var(--font-sans); cursor:pointer">Save</button><button style="height:36px; padding:0 16px; border:none; border-radius:12px; background:var(--tonal); color:var(--foreground); font:700 14px var(--font-sans); cursor:pointer">Cancel</button></div>
+        </div>
+        <div style="background:rgb(var(--sys-orange) / 0.08); border-inline-start:4px solid rgb(var(--sys-orange)); border-radius:16px; padding:18px">
+          <p style="font:700 16px var(--font-sans); margin:0; color:var(--foreground)">Sterilization cycle pending</p>
+          <p style="font:400 14px/1.5 var(--font-sans); color:var(--muted-foreground); margin:8px 0 0">Attention rail — amber tint, no shadow.</p>
+        </div>
+        <div style="background:var(--surface); border-inline-start:4px solid rgb(var(--sys-red)); border-radius:16px; padding:18px; box-shadow:var(--shadow-floating)">
+          <p style="font:700 16px var(--font-sans); margin:0; color:var(--foreground)">Crash cart unavailable</p>
+          <p style="font:400 14px/1.5 var(--font-sans); color:var(--muted-foreground); margin:8px 0 0">Critical rail — no tint, elevated shadow instead.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATUSCHIP + BADGE -->
+    <section style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:var(--content-gap)">
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+        <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.6</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">StatusChip</h2></div>
+        <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 16px; max-width:48ch">Tappable urgent count per status. Hidden at 0. All six taxonomy states, identical treatment; each chip carries <code style="font:500 12px var(--font-num); color:var(--foreground)">aria-label="{count} {label}"</code>.</p>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px">
+          <sc-for list="{{ statusChips }}" as="c" hint-placeholder-count="6">
+            <button aria-label="{{ c.aria }}" style="display:flex; align-items:center; gap:11px; width:100%; min-height:60px; padding:12px 14px; border-radius:14px; border:1px solid {{ c.border }}; background:{{ c.bg }}; cursor:pointer">
+              <span style="width:34px; height:34px; border-radius:10px; background:{{ c.solid }}; color:var(--on-ink); display:flex; align-items:center; justify-content:center; flex-shrink:0" innerHTML="{{ c.icon }}"></span>
+              <span style="display:flex; flex-direction:column; align-items:flex-start; line-height:1.15"><span style="font:700 20px var(--font-num); color:{{ c.fg }}">{{ c.count }}</span><span style="font:600 11px var(--font-sans); letter-spacing:.04em; text-transform:uppercase; color:{{ c.fg }}">{{ c.label }}</span></span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+        <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.12</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">Badge</h2></div>
+        <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 18px; max-width:48ch">Count overlay, min 16², 99+ cap, top-inline-end of host. Shown across all six status tones.</p>
+        <div style="display:flex; gap:20px; align-items:center; flex-wrap:wrap">
+          <sc-for list="{{ statusBadges }}" as="b" hint-placeholder-count="6">
+            <div style="position:relative; width:44px; height:44px; border-radius:12px; background:var(--tonal); display:flex; align-items:center; justify-content:center; color:var(--foreground)" title="{{ b.label }}">
+              <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+              <span style="position:absolute; top:-5px; inset-inline-end:-5px; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:{{ b.solid }}; color:var(--on-ink); font:700 11px var(--font-num); display:flex; align-items:center; justify-content:center; border:2px solid var(--surface)">{{ b.count }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <!-- PRIMARYACTIONCARD -->
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+      <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.7</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">PrimaryActionCard · QuickScan</h2></div>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 18px; max-width:60ch">Full-width scan entry. Uses <code style="font:500 12px var(--font-num); color:var(--foreground)">--action</code> green — the one reserved action color — routes to <code style="font:500 12px var(--font-num); color:var(--foreground)">/scan</code>. Press scale 0.98.</p>
+      <button aria-label="Scan equipment" style="display:flex; align-items:center; gap:14px; width:100%; min-height:60px; padding:14px 16px; border:none; border-radius:16px; background:var(--action); cursor:pointer; text-align:start" style-focus="outline:none; box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--action)">
+        <span style="display:flex; flex-direction:column"><span style="font:700 15px var(--font-sans); color:var(--action-foreground)">Scan equipment</span><span style="font:500 13px var(--font-sans); color:var(--on-ink-strong)">NFC or camera · tap to start</span></span>
+        <span style="margin-inline-start:auto; width:40px; height:40px; border-radius:12px; background:var(--ink-fill); display:flex; align-items:center; justify-content:center; flex-shrink:0"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--on-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg></span>
+      </button>
+    </section>
+
+    <!-- APPBAR -->
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+      <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.8</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">AppBar / Header</h2></div>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 18px; max-width:60ch">Translucent material. Icon buttons are 44² hit areas. Bell carries a badge. Native large-title and web utility-bar shown.</p>
+      <div style="display:flex; flex-direction:column; gap:16px">
+        <div style="border-radius:16px; overflow:hidden; border:1px solid var(--border)">
+          <div style="background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); -webkit-backdrop-filter:blur(var(--bar-blur)); padding:10px 14px; display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--border)">
+            <button aria-label="Back" style="width:44px; height:44px; border:none; background:none; border-radius:12px; display:flex; align-items:center; justify-content:center; color:var(--brand); cursor:pointer"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+            <span style="margin:0 auto; font:600 17px var(--font-sans)">Equipment</span>
+            <button aria-label="Alerts, 3 unread" style="position:relative; width:44px; height:44px; border:none; background:none; border-radius:12px; display:flex; align-items:center; justify-content:center; color:var(--foreground); cursor:pointer"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span style="position:absolute; top:6px; inset-inline-end:7px; min-width:16px; height:16px; padding:0 4px; border-radius:8px; background:rgb(var(--sys-red)); color:var(--on-ink); font:700 10px var(--font-num); display:flex; align-items:center; justify-content:center; border:2px solid var(--bar-bg-opaque)">3</span></button>
+            <button aria-label="Settings" style="width:44px; height:44px; border:none; background:none; border-radius:12px; display:flex; align-items:center; justify-content:center; color:var(--foreground); cursor:pointer"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+            <div style="width:34px; height:34px; border-radius:999px; background:var(--brand); color:var(--brand-foreground); display:flex; align-items:center; justify-content:center; font:700 13px var(--font-sans); margin-inline-start:2px">MA</div>
+          </div>
+          <div style="padding:6px 16px 16px; background:var(--background)"><h3 style="font-size:var(--text-largetitle); font-weight:700; letter-spacing:-.02em; margin:8px 0 0">Good morning, Maya</h3><p style="font:500 14px var(--font-sans); color:var(--muted-foreground); margin:4px 0 0">Monday, June 30</p></div>
+        </div>
+
+        <div style="border-radius:16px; overflow:hidden; border:1px solid var(--border)">
+          <div style="background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); -webkit-backdrop-filter:blur(var(--bar-blur)); padding:12px 16px; display:flex; align-items:center; gap:14px">
+            <span style="font:700 16px var(--font-sans); color:var(--brand)">VetTrack</span>
+            <span style="font:600 15px var(--font-sans)">Equipment</span>
+            <div style="margin-inline-start:auto; display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:0 16px; height:48px; min-width:220px; box-shadow:0 0 0 4px rgb(79 70 229 / 0.10)"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span style="font:400 13px var(--font-sans); color:var(--muted-foreground)">Search equipment</span><kbd style="margin-inline-start:auto; font:500 11px var(--font-num); color:var(--muted-foreground); background:var(--tonal); border-radius:5px; padding:1px 6px">/</kbd></div>
+            <button aria-label="Alerts" style="position:relative; width:36px; height:36px; border:none; background:var(--tonal); border-radius:10px; display:flex; align-items:center; justify-content:center; color:var(--foreground); cursor:pointer"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
+            <div style="width:32px; height:32px; border-radius:999px; background:var(--brand); color:var(--brand-foreground); display:flex; align-items:center; justify-content:center; font:700 12px var(--font-sans)">MA</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TABBAR + SIDEBAR -->
+    <section style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:var(--content-gap)">
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+        <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.9</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">TabBar</h2></div>
+        <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 16px; max-width:48ch">Compact nav. Active icon fills + brand tint. Scan is a flat emphasized tab — never a FAB (§6.11). Tap to switch.</p>
+        <div style="background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); -webkit-backdrop-filter:blur(var(--bar-blur)); border:1px solid var(--border); border-radius:16px; padding:8px 6px; display:flex; justify-content:space-between">
+          <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+            <button onClick="{{ t.onClick }}" style="flex:1; min-height:50px; border:none; background:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; position:relative; border-radius:12px; {{ t.scanBg }}">
+              <span style="color:{{ t.color }}" innerHTML="{{ t.icon }}"></span>
+              <span style="font-size:11px; font-weight:{{ t.weight }}; color:{{ t.color }}; font-family:var(--font-sans)">{{ t.label }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <p style="font:400 12px/1.5 var(--font-sans); color:var(--muted-foreground); margin:12px 0 0">Active: <strong style="color:var(--foreground)">{{ activeTabLabel }}</strong> · idle items use <code style="font:500 11px var(--font-num); color:var(--foreground)">--muted-foreground</code>.</p>
+      </div>
+
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+        <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.10</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">Sidebar</h2></div>
+        <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 16px; max-width:48ch">Medium/expanded nav. Active = brand/10% pill. Web adds hover. Rail collapses to 72.</p>
+        <div style="display:flex; gap:14px">
+          <div style="width:188px; background:var(--bar-bg); border:1px solid var(--border); border-radius:16px; padding:12px 10px; display:flex; flex-direction:column; gap:3px">
+            <div style="padding:6px 10px 12px; font:700 16px var(--font-sans); color:var(--brand)">VetTrack</div>
+            <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="5">
+              <div style="display:flex; align-items:center; gap:11px; padding:9px 11px; border-radius:10px; background:{{ n.bg }}; color:{{ n.color }}; cursor:pointer">
+                <span style="display:flex" innerHTML="{{ n.icon }}"></span><span style="font-size:14px; font-weight:{{ n.weight }}; font-family:var(--font-sans)">{{ n.label }}</span>
+              </div>
+            </sc-for>
+            <div style="margin-top:auto; padding-top:10px"><div style="display:flex; align-items:center; gap:11px; padding:9px 11px; border-radius:10px; color:var(--muted-foreground); cursor:pointer"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg><span style="font:500 14px var(--font-sans)">More</span></div></div>
+          </div>
+          <div style="width:64px; background:var(--bar-bg); border:1px solid var(--border); border-radius:16px; padding:12px 8px; display:flex; flex-direction:column; gap:6px; align-items:center">
+            <div style="width:34px; height:34px; border-radius:9px; background:var(--brand); color:var(--brand-foreground); display:flex; align-items:center; justify-content:center; font:700 13px var(--font-sans); margin-bottom:6px">V</div>
+            <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="5">
+              <div style="width:44px; height:44px; border-radius:11px; background:{{ n.bg }}; color:{{ n.color }}; display:flex; align-items:center; justify-content:center; cursor:pointer" innerHTML="{{ n.icon }}"></div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BANNER -->
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+      <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.13</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">Banner</h2></div>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 18px; max-width:60ch">Inline status. Offline = neutral/info, plus error and syncing tones. <code style="font:500 12px var(--font-num); color:var(--foreground)">role="alert"</code>.</p>
+      <div style="display:flex; flex-direction:column; gap:12px">
+        <div style="display:flex; align-items:center; gap:11px; padding:10px 14px; border-radius:12px; background:var(--tonal); color:var(--foreground)"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 14 0"/><path d="m2 8.8 1.8 1.5"/><path d="M22 8.8 20.2 10.3"/><path d="m2 2 20 20"/></svg><span style="font:600 14px var(--font-sans)">You're offline — showing cached data. Changes will sync.</span></div>
+        <div style="display:flex; align-items:center; gap:11px; padding:10px 14px; border-radius:12px; background:rgb(var(--sys-red) / 0.12); border:1px solid rgb(var(--sys-red) / 0.22); color:rgb(var(--sys-red))"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg><span style="font:600 14px var(--font-sans)">Couldn't reach the server. Tap to retry.</span></div>
+        <div style="display:flex; align-items:center; gap:11px; padding:10px 14px; border-radius:12px; background:rgb(var(--sys-green) / 0.12); border:1px solid rgb(var(--sys-green) / 0.22); color:rgb(var(--sys-green))"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" style="animation:vt-spin var(--dur-spin) linear infinite"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-opacity="0.3"/><path d="M12 3a9 9 0 0 1 9 9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg><span style="font:600 14px var(--font-sans)">Syncing 4 queued changes…</span></div>
+      </div>
+    </section>
+
+    <!-- LISTROW -->
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+      <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.18</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">ListRow · Equipment</h2></div>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 18px; max-width:64ch">Status dot + label + meta + trailing. Status is color + icon + text. Selected gets a brand bar + tint; hover now a real state, not just decoration (Phase 21, review item 7 — hover the rows below). Header row is 11px/600/uppercase/tracked. Min-height 56 (touch) / 44 (mouse).</p>
+      <div style="border:1px solid var(--border); border-radius:16px; overflow:hidden; background:var(--surface)">
+        <div style="padding:9px 14px; font:600 11px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); border-bottom:1px solid var(--border); background:var(--background)">Equipment</div>
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+          <div style-hover="background:var(--tonal)" style="display:flex; align-items:center; gap:12px; min-height:var(--target-min); padding:12px 14px; border-bottom:1px solid var(--border); position:relative; background:{{ r.bg }}; transition:background var(--dur-fast) var(--ease-standard)">
+            <sc-if value="{{ r.accent }}" hint-placeholder-val="{{ false }}"><span style="position:absolute; inset-inline-start:0; top:0; bottom:0; width:3px; background:{{ r.accentColor }}"></span></sc-if>
+            <span style="width:10px; height:10px; border-radius:999px; background:{{ r.dotColor }}; flex-shrink:0"></span>
+            <div style="min-width:0; flex:1">
+              <p style="font:600 16px var(--font-sans); margin:0; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ r.name }}</p>
+              <p style="font:500 13px var(--font-sans); margin:2px 0 0; color:var(--muted-foreground)"><span style="font-family:var(--font-num)">{{ r.tag }}</span> · {{ r.loc }}</p>
+              <p style="display:inline-flex; align-items:center; gap:5px; margin:4px 0 0; font:600 12px var(--font-sans); color:{{ r.dotColor }}"><span style="display:flex" innerHTML="{{ r.statusIcon }}"></span>{{ r.statusText }}</p>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; flex-shrink:0"><span style="font:500 12px var(--font-num); color:var(--muted-foreground)">{{ r.trailing }}</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.5"><path d="m9 18 6-6-6-6"/></svg></div>
+          </div>
+        </sc-for>
+        <div style="display:flex; align-items:center; gap:12px; padding:12px 14px"><span class="sk" style="width:10px; height:10px; border-radius:999px"></span><div style="flex:1"><div class="sk" style="width:55%; height:13px; border-radius:6px"></div><div class="sk" style="width:38%; height:10px; border-radius:5px; margin-top:7px"></div></div></div>
+      </div>
+      <p style="font:400 12px/1.5 var(--font-sans); color:var(--muted-foreground); margin:12px 0 0">Touch reveals swipe actions (check in/out · flag); mouse reveals hover actions + right-click menu. Last row = loading skeleton.</p>
+    </section>
+
+    <!-- SKELETON -->
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+      <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.14</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">Skeleton</h2></div>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 18px; max-width:60ch">Shapes match the final layout to prevent shift. Subtle shimmer, disabled under Reduce Motion.</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px">
+        <div style="background:var(--brand-ink); border-radius:20px; padding:18px"><div class="sk" style="width:90px; height:12px; border-radius:6px; background:var(--ink-skeleton)"></div><div class="sk" style="width:120px; height:34px; border-radius:8px; margin-top:14px; background:var(--ink-skeleton)"></div><div style="display:flex; gap:24px; margin-top:18px"><div class="sk" style="width:60px; height:28px; border-radius:7px; background:var(--ink-skeleton)"></div><div class="sk" style="width:60px; height:28px; border-radius:7px; background:var(--ink-skeleton)"></div></div></div>
+        <div style="border:1px solid var(--border); border-radius:16px; padding:16px"><div style="display:flex; gap:12px; align-items:center"><div class="sk" style="width:34px; height:34px; border-radius:10px"></div><div style="flex:1"><div class="sk" style="width:60%; height:13px; border-radius:6px"></div><div class="sk" style="width:40%; height:10px; border-radius:5px; margin-top:8px"></div></div></div><div class="sk" style="width:100%; height:38px; border-radius:12px; margin-top:16px"></div></div>
+      </div>
+    </section>
+
+    <!-- EMPTYSTATE + SHEET -->
+    <section style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:var(--content-gap)">
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+        <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.17</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">EmptyState</h2></div>
+        <div style="margin-top:14px; border:1px dashed var(--border); border-radius:16px; padding:32px 24px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px">
+          <div style="width:64px; height:64px; border-radius:16px; background:rgb(var(--sys-blue) / 0.12); display:flex; align-items:center; justify-content:center"><svg aria-hidden="true" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--sys-blue))" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></div>
+          <p style="font:600 17px var(--font-sans); margin:0">No equipment yet</p>
+          <p style="font:400 14px/1.5 var(--font-sans); color:var(--muted-foreground); margin:0; max-width:30ch">Scan an item to add it, or ask an admin to provision your unit.</p>
+          <button style="margin-top:24px; height:44px; padding:0 20px; border:none; border-radius:14px; background:var(--action); color:var(--action-foreground); font:700 15px var(--font-sans); cursor:pointer">Scan to add</button>
+        </div>
+      </div>
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+        <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.16</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">Sheet</h2></div>
+        <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 14px; max-width:42ch">iOS sheet: grabber, detents, rounded top, dim scrim, drag-to-dismiss. Tap to open.</p>
+        <button aria-label="Open settings sheet" onClick="{{ sheet.open }}" style="height:44px; padding:0 18px; border:none; border-radius:14px; background:var(--tonal); color:var(--foreground); font:700 15px var(--font-sans); cursor:pointer">Open sheet</button>
+        <div style="position:relative; height:230px; margin-top:16px; border:1px solid var(--border); border-radius:16px; overflow:hidden; background:var(--background)">
+          <div style="position:absolute; inset:0; background:rgba(0,0,0,0.4); opacity:{{ sheet.scrimOpacity }}; transition:opacity var(--dur-slow) var(--ease-standard); pointer-events:{{ sheet.pointer }}" onClick="{{ sheet.close }}"></div>
+          <div style="position:absolute; inset-inline:0; bottom:0; background:var(--surface-2); border-radius:20px 20px 0 0; padding:10px 18px 18px; transform:translateY({{ sheet.translate }}); transition:transform var(--dur-slow) var(--ease-standard); border-top:1px solid var(--border)">
+            <div style="width:36px; height:5px; border-radius:999px; background:var(--border); margin:0 auto 14px"></div>
+            <p style="font:600 17px var(--font-sans); margin:0">Settings</p>
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--border); margin-top:6px"><span style="font:400 15px var(--font-sans)">Theme</span><span style="font:500 14px var(--font-sans); color:var(--muted-foreground)">System ›</span></div>
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 0"><span style="font:400 15px var(--font-sans)">Notifications</span><span style="font:500 14px var(--font-sans); color:var(--muted-foreground)">On ›</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PULL TO REFRESH -->
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+      <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.15</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">PullToRefresh</h2></div>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 16px; max-width:60ch">Touch only. Threshold 64px; indicator grows 0→28 and rotates 0→180°, then spins. Hidden on mouse/desktop.</p>
+      <div style="display:flex; gap:24px; align-items:flex-end; flex-wrap:wrap">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:8px"><div style="width:48px; height:24px; display:flex; align-items:center; justify-content:center; overflow:hidden"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.4"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></div><span style="font:500 11px var(--font-num); color:var(--muted-foreground)">pull 0–63</span></div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:8px"><div style="width:48px; height:28px; display:flex; align-items:center; justify-content:center"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(180deg)"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></div><span style="font:500 11px var(--font-num); color:var(--brand)">release ≥64</span></div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:8px"><div style="width:48px; height:28px; display:flex; align-items:center; justify-content:center"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" style="animation:vt-spin var(--dur-spin) linear infinite"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--brand)" stroke-width="2.6" stroke-opacity="0.3"/><path d="M12 3a9 9 0 0 1 9 9" fill="none" stroke="var(--brand)" stroke-width="2.6" stroke-linecap="round"/></svg></div><span style="font:500 11px var(--font-num); color:var(--muted-foreground)">refreshing</span></div>
+      </div>
+    </section>
+
+    <!-- INTERACTION STATES LEDGER -->
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+      <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.5</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">Interaction states</h2></div>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 18px; max-width:62ch">Beyond Button, every interactive component carries the full ladder — <strong style="color:var(--foreground)">default · pressed · focus-visible · disabled · loading</strong>.</p>
+      <div style="overflow-x:auto; margin:0 -4px">
+        <div style="min-width:620px; padding:0 4px">
+          <div style="display:grid; grid-template-columns:150px repeat(5,1fr); gap:10px; align-items:center; padding-bottom:10px">
+            <span></span>
+            <sc-for list="{{ ledgerHeaders }}" as="h" hint-placeholder-count="5"><span style="font:600 10px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); text-align:center">{{ h }}</span></sc-for>
+          </div>
+          <sc-for list="{{ compLedgers }}" as="row" hint-placeholder-count="5">
+            <div style="display:grid; grid-template-columns:150px repeat(5,1fr); gap:10px; align-items:center; padding:8px 0; border-top:1px solid var(--border)">
+              <span style="font:600 13px var(--font-sans); color:var(--foreground)">{{ row.name }}</span>
+              <sc-for list="{{ row.cells }}" as="c" hint-placeholder-count="5">
+                <div style="display:flex; justify-content:center">
+                  <button disabled="{{ c.disabledFlag }}" style="{{ c.style }}">
+                    <sc-if value="{{ c.loading }}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" style="animation:vt-spin var(--dur-spin) linear infinite"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.6" stroke-opacity="0.3"/><path d="M12 3a9 9 0 0 1 9 9" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></sc-if>
+                    <sc-if value="{{ c.showLabel }}" hint-placeholder-val="{{ true }}">{{ c.lab }}</sc-if>
+                  </button>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <!-- DETAIL STATUS STRIP -->
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+      <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.19</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">Detail status strip</h2></div>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 16px; max-width:60ch">Equipment-detail header surface. Prominent current status, then the full six-state legend with the active state lit and the rest dimmed.</p>
+      <div style="border:1px solid var(--border); border-radius:16px; overflow:hidden">
+        <div style="display:flex; align-items:center; gap:12px; padding:16px 18px; background:{{ detailToneBg }}; border-bottom:1px solid {{ detailToneBorder }}">
+          <span style="width:40px; height:40px; border-radius:11px; background:{{ detailToneSolid }}; color:var(--on-ink); display:flex; align-items:center; justify-content:center; flex-shrink:0" innerHTML="{{ detailIcon }}"></span>
+          <div style="min-width:0; flex:1"><p style="font:600 16px var(--font-sans); margin:0; color:var(--foreground)">{{ detailTitle }}</p><p style="font:500 13px var(--font-sans); margin:2px 0 0; color:var(--muted-foreground)">{{ detailMeta }}</p></div>
+          <span style="display:inline-flex; align-items:center; gap:6px; padding:6px 11px; border-radius:999px; background:var(--surface); border:1px solid {{ detailToneBorder }}; font:700 12px var(--font-sans); color:{{ detailToneFg }}; flex-shrink:0; white-space:nowrap">{{ detailStatus }}</span>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; padding:14px 18px">
+          <sc-for list="{{ statusStrip }}" as="s" hint-placeholder-count="6">
+            <span style="display:inline-flex; align-items:center; gap:7px; padding:7px 11px; border-radius:999px; border:1px solid {{ s.border }}; background:{{ s.bg }}; opacity:{{ s.dim }}; font:600 12px var(--font-sans); color:{{ s.fg }}"><span style="display:flex" innerHTML="{{ s.icon }}"></span>{{ s.label }}</span>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <!-- PWA INSTALL + PUSH OPT-IN (WEB-ONLY, CAPACITOR-GATED) -->
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+      <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.20</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">PWA install &amp; push opt-in</h2></div>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 18px; max-width:64ch">Web-only surfaces, gated on <code style="font:500 12px var(--font-num); color:var(--foreground)">!Capacitor.isNativePlatform()</code>. Flip <strong style="color:var(--foreground)">Platform → Native</strong> in the header to watch both suppress.</p>
+      <sc-if value="{{ showWebPrompts }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px">
+          <div style="border:1px solid var(--border); border-radius:16px; padding:18px; display:flex; flex-direction:column; gap:10px">
+            <div style="display:flex; align-items:center; gap:12px">
+              <span style="width:40px; height:40px; border-radius:11px; background:rgb(var(--sys-blue) / 0.12); color:rgb(var(--sys-blue)); display:flex; align-items:center; justify-content:center; flex-shrink:0"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M5 21h14"/></svg></span>
+              <span style="display:inline-flex; align-items:center; padding:3px 9px; border-radius:999px; background:var(--tonal); font:600 10px var(--font-sans); letter-spacing:.05em; text-transform:uppercase; color:var(--muted-foreground)">{{ webOnly }}</span>
+            </div>
+            <p style="font:700 16px var(--font-sans); margin:0; color:var(--foreground)">{{ install.title }}</p>
+            <p style="font:400 14px/1.5 var(--font-sans); color:var(--muted-foreground); margin:0">{{ install.body }}</p>
+            <div style="display:flex; gap:10px; margin-top:4px; flex-wrap:wrap"><button style="height:44px; padding:0 18px; border:none; border-radius:14px; background:var(--brand); color:var(--brand-foreground); font:700 14px var(--font-sans); cursor:pointer">{{ install.cta }}</button><button style="height:44px; padding:0 16px; border:none; border-radius:14px; background:var(--tonal); color:var(--foreground); font:700 14px var(--font-sans); cursor:pointer">{{ install.dismiss }}</button></div>
+          </div>
+          <div style="border:1px solid var(--border); border-radius:16px; padding:18px; display:flex; flex-direction:column; gap:10px">
+            <div style="display:flex; align-items:center; gap:12px">
+              <span style="width:40px; height:40px; border-radius:11px; background:rgb(var(--sys-orange) / 0.12); color:rgb(var(--sys-orange)); display:flex; align-items:center; justify-content:center; flex-shrink:0"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span>
+              <span style="display:inline-flex; align-items:center; padding:3px 9px; border-radius:999px; background:var(--tonal); font:600 10px var(--font-sans); letter-spacing:.05em; text-transform:uppercase; color:var(--muted-foreground)">{{ webOnly }}</span>
+            </div>
+            <p style="font:700 16px var(--font-sans); margin:0; color:var(--foreground)">{{ push.title }}</p>
+            <p style="font:400 14px/1.5 var(--font-sans); color:var(--muted-foreground); margin:0">{{ push.body }}</p>
+            <div style="display:flex; gap:10px; margin-top:4px; flex-wrap:wrap"><button style="height:44px; padding:0 18px; border:none; border-radius:14px; background:var(--brand); color:var(--brand-foreground); font:700 14px var(--font-sans); cursor:pointer">{{ push.cta }}</button><button style="height:44px; padding:0 16px; border:none; border-radius:14px; background:var(--tonal); color:var(--foreground); font:700 14px var(--font-sans); cursor:pointer">{{ push.dismiss }}</button></div>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isNative }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex; align-items:center; gap:12px; padding:16px 18px; border:1px dashed var(--border); border-radius:16px; background:var(--background)">
+          <span style="width:40px; height:40px; border-radius:11px; background:var(--tonal); color:var(--muted-foreground); display:flex; align-items:center; justify-content:center; flex-shrink:0"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M11 18h2"/></svg></span>
+          <p style="font:500 14px/1.5 var(--font-sans); color:var(--muted-foreground); margin:0">{{ nativeNote }}</p>
+        </div>
+      </sc-if>
+    </section>
+
+    <!-- PERMISSION PRIMING + DENIED -->
+    <section style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:var(--content-gap)">
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+        <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.21</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">Permission priming</h2></div>
+        <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 14px; max-width:48ch">Rationale shown <em>before</em> the OS prompt — never the cold system dialog.</p>
+        <div style="border:1px solid var(--border); border-radius:16px; padding:22px 20px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px">
+          <span style="display:inline-flex; align-items:center; padding:3px 10px; border-radius:999px; background:rgb(var(--sys-blue) / 0.12); font:600 10px var(--font-sans); letter-spacing:.05em; text-transform:uppercase; color:rgb(var(--sys-blue))">{{ priming.tag }}</span>
+          <div style="width:56px; height:56px; border-radius:16px; background:rgb(var(--sys-blue) / 0.12); display:flex; align-items:center; justify-content:center"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--sys-blue))" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3.5"/></svg></div>
+          <p style="font:600 17px var(--font-sans); margin:0">{{ priming.title }}</p>
+          <p style="font:400 14px/1.5 var(--font-sans); color:var(--muted-foreground); margin:0; max-width:34ch">{{ priming.body }}</p>
+          <div style="display:flex; gap:10px; margin-top:6px; flex-wrap:wrap; justify-content:center"><button style="height:44px; padding:0 20px; border:none; border-radius:14px; background:var(--brand); color:var(--brand-foreground); font:700 15px var(--font-sans); cursor:pointer">{{ priming.cta }}</button><button style="height:44px; padding:0 16px; border:none; border-radius:14px; background:var(--tonal); color:var(--foreground); font:700 15px var(--font-sans); cursor:pointer">{{ priming.dismiss }}</button></div>
+        </div>
+      </div>
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+        <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.22</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">Permission denied · EmptyState</h2></div>
+        <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 14px; max-width:48ch">When access is off: explain, route to Settings, and offer a manual fallback.</p>
+        <div style="border:1px dashed var(--border); border-radius:16px; padding:24px 20px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px">
+          <span style="display:inline-flex; align-items:center; padding:3px 10px; border-radius:999px; background:rgb(var(--sys-red) / 0.12); font:600 10px var(--font-sans); letter-spacing:.05em; text-transform:uppercase; color:rgb(var(--sys-red))">{{ denied.tag }}</span>
+          <div style="width:56px; height:56px; border-radius:16px; background:rgb(var(--sys-red) / 0.12); display:flex; align-items:center; justify-content:center"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--sys-red))" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m2 2 20 20"/><path d="M9.5 4h5L17 7h3a2 2 0 0 1 2 2v9a2 2 0 0 1-.4 1.2"/><path d="M6.5 6.5 4 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h13"/><path d="M9.9 9.9a3.5 3.5 0 0 0 4.2 4.2"/></svg></div>
+          <p style="font:600 17px var(--font-sans); margin:0">{{ denied.title }}</p>
+          <p style="font:400 14px/1.5 var(--font-sans); color:var(--muted-foreground); margin:0; max-width:34ch">{{ denied.body }}</p>
+          <div style="display:flex; gap:10px; margin-top:6px; flex-wrap:wrap; justify-content:center"><button style="height:44px; padding:0 20px; border:none; border-radius:14px; background:var(--brand); color:var(--brand-foreground); font:700 15px var(--font-sans); cursor:pointer">{{ denied.settings }}</button><button style="height:44px; padding:0 16px; border:none; border-radius:14px; background:var(--tonal); color:var(--foreground); font:700 15px var(--font-sans); cursor:pointer">{{ denied.fallback }}</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHASE 21 · SECTION HEADER -->
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+      <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.23</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">Section header <span style="font:500 11px var(--font-num); color:var(--muted-foreground)">· Phase 21</span></h2></div>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 18px; max-width:60ch">Title + count + subtitle + hairline, for any list/operational screen — was a bare heading with no shared pattern (review item 1). Title 20/700, meta 13/font-num, subtitle 15.</p>
+      <div>
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px">
+          <h3 style="font:700 20px var(--font-sans); letter-spacing:-.02em; margin:0; color:var(--foreground)">Equipment</h3>
+          <span style="font:600 13px var(--font-num); color:var(--muted-foreground)">124 active</span>
+        </div>
+        <p style="font:400 15px var(--font-sans); color:var(--muted-foreground); margin:4px 0 0">Manage rooms, equipment and utilization</p>
+        <div style="margin-top:14px; border-bottom:1px solid var(--border)"></div>
+      </div>
+    </section>
+
+    <!-- PHASE 21 · STAT TILE + CONTEXT CHIP -->
+    <section style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:var(--content-gap)">
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+        <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.24</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">Stat tile <span style="font:500 11px var(--font-num); color:var(--muted-foreground)">· Phase 21</span></h2></div>
+        <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 16px; max-width:48ch">Was value-first with a bare "+12%" (review item 5). Icon+label now leads, min-height 120, change reads as a sentence.</p>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px">
+          <sc-for list="{{ statTiles }}" as="s" hint-placeholder-count="3">
+            <div style="min-height:120px; display:flex; flex-direction:column; justify-content:space-between; border:1px solid var(--border); border-radius:14px; padding:16px; background:var(--surface); box-shadow:inset 0 1px 0 0 rgba(255,255,255,0.8)">
+              <span style="display:inline-flex; align-items:center; gap:6px; font:600 13px var(--font-sans); color:var(--muted-foreground)"><span style="display:flex" innerHTML="{{ s.icon }}"></span>{{ s.label }}</span>
+              <span style="font:700 34px/1 var(--font-num); letter-spacing:-.02em; color:var(--foreground); margin-top:8px">{{ s.value }}</span>
+              <span style="font:500 13px var(--font-num); margin-top:8px; color:{{ s.changeColor }}">{{ s.change }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+        <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.25</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">Context chip <span style="font:500 11px var(--font-num); color:var(--muted-foreground)">· Phase 21</span></h2></div>
+        <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 16px; max-width:48ch">Small clinical metadata pills (review item 11) — h-5/11px/uppercase. Its own primitive, not a StatusChip/Badge variant (different sizing family — see design-system-updates §40-D12).</p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+          <span style="display:inline-flex; align-items:center; height:20px; padding:0 8px; border-radius:999px; background:var(--background); font:600 11px var(--font-sans); letter-spacing:.04em; text-transform:uppercase; color:var(--muted-foreground)">ICU</span>
+          <span style="display:inline-flex; align-items:center; height:20px; padding:0 8px; border-radius:999px; background:var(--background); font:600 11px var(--font-sans); letter-spacing:.04em; text-transform:uppercase; color:var(--muted-foreground)">Ventilator</span>
+          <span style="display:inline-flex; align-items:center; height:20px; padding:0 8px; border-radius:999px; background:var(--background); font:600 11px var(--font-sans); letter-spacing:.04em; text-transform:uppercase; color:var(--muted-foreground)">Critical care</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHASE 21 · STAFF CARD + ROOM CARD -->
+    <section style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:var(--content-gap)">
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+        <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.26</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">Staff card <span style="font:500 11px var(--font-num); color:var(--muted-foreground)">· Phase 21</span></h2></div>
+        <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 16px; max-width:44ch">"Visual ownership" for staff/technician rows (review item 13) — initials avatar + on-shift dot + role badge.</p>
+        <div style="display:flex; align-items:center; gap:12px; border:1px solid var(--border); border-radius:14px; padding:12px">
+          <span style="position:relative; flex-shrink:0">
+            <span style="width:40px; height:40px; border-radius:999px; background:rgb(var(--sys-blue) / 0.12); color:rgb(var(--sys-blue)); display:flex; align-items:center; justify-content:center; font:700 14px var(--font-sans)">SC</span>
+            <span style="position:absolute; bottom:-1px; inset-inline-end:-1px; width:11px; height:11px; border-radius:999px; background:rgb(var(--sys-green)); border:2px solid var(--surface)"></span>
+          </span>
+          <div style="min-width:0">
+            <p style="font:600 14px var(--font-sans); margin:0; color:var(--foreground)">Sarah Chen</p>
+            <span style="display:inline-flex; align-items:center; gap:6px; margin-top:3px; padding:2px 8px; border-radius:999px; background:rgb(var(--sys-green) / 0.12); border:1px solid rgb(var(--sys-green) / 0.22); font:600 11px var(--font-sans); color:rgb(var(--sys-green))"><span style="width:6px; height:6px; border-radius:999px; background:currentColor"></span>Lead Technician</span>
+            <p style="font:500 12px var(--font-sans); margin:4px 0 0; color:var(--muted-foreground)">On shift</p>
+          </div>
+        </div>
+      </div>
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+        <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.27</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">Room card <span style="font:500 11px var(--font-num); color:var(--muted-foreground)">· Phase 21</span></h2></div>
+        <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 16px; max-width:46ch">Readiness summary (review item 14) — status line + a linear bar (was a ring; mirrors the app's own room cards elsewhere, §40-D15) + device/staff counts.</p>
+        <div style="border:1px solid var(--border); border-radius:16px; padding:16px; max-width:260px">
+          <p style="font:700 13px var(--font-sans); margin:0; color:var(--foreground)">ROOM 4</p>
+          <p style="font:500 12px var(--font-sans); margin:4px 0 0; color:var(--muted-foreground)">Ready for procedure</p>
+          <div style="display:flex; align-items:center; gap:8px; margin-top:12px">
+            <div style="height:6px; flex:1; border-radius:999px; background:rgb(var(--sys-green) / 0.15); overflow:hidden"><div style="height:100%; width:92%; border-radius:999px; background:rgb(var(--sys-green))"></div></div>
+            <span style="font:700 12px var(--font-num); color:var(--foreground)">92%</span>
+          </div>
+          <p style="font:500 12px var(--font-sans); margin:10px 0 0; color:var(--muted-foreground)">3 devices · 2 staff</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHASE 21 · CLINICAL TIMELINE -->
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px">
+      <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px"><span style="font:600 11px var(--font-num); color:var(--brand)">6.28</span><h2 style="font:600 22px/1.2 var(--font-sans); letter-spacing:-.01em; margin:0">Clinical timeline <span style="font:500 11px var(--font-num); color:var(--muted-foreground)">· Phase 21</span></h2></div>
+      <p style="font-size:15px; line-height:1.5; color:var(--muted-foreground); margin:0 0 18px; max-width:60ch">Equipment history as dot + connecting line, not a stack of separately-carded rows (review item 15) — matches Stage 6's own Accountability timeline; now a real, reusable primitive (design-system-updates §40-D16).</p>
+      <div style="display:flex; flex-direction:column; max-width:340px">
+        <sc-for list="{{ timelineDemo }}" as="tl" hint-placeholder-count="3">
+          <div style="display:flex; gap:12px">
+            <div style="display:flex; flex-direction:column; align-items:center; flex-shrink:0; width:18px">
+              <span style="margin-top:6px; width:{{ tl.size }}; height:{{ tl.size }}; border-radius:999px; background:{{ tl.fill }}; border:2px solid {{ tl.color }}; flex-shrink:0"></span>
+              <sc-if value="{{ tl.hasLine }}" hint-placeholder-val="{{ true }}"><span style="margin-top:4px; width:1px; flex:1; min-height:24px; background:var(--border)"></span></sc-if>
+            </div>
+            <div style="min-width:0; flex:1; padding-bottom:{{ tl.pad }}">
+              <p style="font:600 13px var(--font-sans); margin:0; color:var(--foreground)">{{ tl.title }}</p>
+              <p style="font:400 12px var(--font-sans); margin:2px 0 0; color:var(--muted-foreground)">{{ tl.meta }}</p>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <footer style="text-align:center; padding:8px 0">
+      <p style="font:500 13px var(--font-sans); color:var(--muted-foreground); margin:0">Stage 2 complete — full component library, every state, light + dark, plus Phase 21's 15-item polish batch (6.23–6.28). Reply <strong style="color:var(--foreground)">next</strong> for Stage 3 · Today screen.</p>
+    </footer>
+
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { theme: 'light', size: 'medium', pressed: false, activeTab: 'today', activeNav: 'equipment', sheetOpen: false, lang: 'en', platform: 'web' };
+  set(k, v) { this.setState({ [k]: v }); }
+
+  ic(paths, opts) {
+    const w = (opts && opts.w) || 22;
+    return `<svg aria-hidden="true" width="${w}" height="${w}" viewBox="0 0 24 24" fill="${opts&&opts.fill?opts.fill:'none'}" stroke="currentColor" stroke-width="${opts&&opts.sw?opts.sw:1.9}" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+  }
+
+  renderVals() {
+    const { theme, size, pressed, activeTab, activeNav, sheetOpen } = this.state;
+    const segBase = "flex:1;border:none;cursor:pointer;padding:7px 13px;border-radius:7px;font-family:var(--font-sans);font-size:13px;transition:all var(--dur-fast) var(--ease-standard);white-space:nowrap;";
+    const seg = (a) => a ? segBase + "font-weight:600;background:var(--surface-2);color:var(--foreground);box-shadow:0 1px 2px rgba(0,0,0,.18);" : segBase + "font-weight:500;background:transparent;color:var(--muted-foreground);";
+    const themeOpts = [['light','Light'],['dark','Dark']].map(([k,l])=>({key:k,label:l,style:seg(theme===k),onClick:()=>this.set('theme',k)}));
+    const sizeOpts = [['compact','Compact'],['medium','Medium'],['expanded','Expanded']].map(([k,l])=>({key:k,label:l,style:seg(size===k),onClick:()=>this.set('size',k)}));
+
+    // ---- Locale (he + en parity) · copy routed through t.* ----
+    const activeLocale = this.state.lang === 'he' ? 'he' : 'en';
+    const dir = activeLocale === 'he' ? 'rtl' : 'ltr';
+    const TR = {
+      en: {
+        statusLabels:{ ready:'Ready', in_use:'In use', blocked:'Blocked', overdue:'Overdue', stale:'Stale', unknown:'Unknown' },
+        detailTitle:'Infusion pump · IV-204', detailMeta:'Bay 3 · last scanned 14:02', detailStatus:'Blocked · failed check',
+        install:{ title:'Install VetTrack', body:'Add VetTrack to your home screen for full-screen, offline-ready access.', cta:'Install app', dismiss:'Not now' },
+        push:{ title:'Turn on alerts', body:'Get notified the moment equipment fails a check or goes overdue.', cta:'Enable notifications', dismiss:'Maybe later' },
+        priming:{ tag:'Before the OS prompt', title:'Allow camera access', body:'VetTrack uses the camera only to scan equipment tags. Nothing is recorded or uploaded.', cta:'Continue', dismiss:'Not now' },
+        denied:{ tag:'Permission denied', title:'Camera access is off', body:'Scanning needs the camera. Turn it on in Settings, or add equipment by typing its tag.', settings:'Open Settings', fallback:'Enter tag manually' },
+        webOnly:'Web only · suppressed in the native app', nativeNote:'Native build — install & permission prompts are handled by the OS, so these web surfaces are hidden.',
+      },
+      he: {
+        statusLabels:{ ready:'מוכן', in_use:'בשימוש', blocked:'חסום', overdue:'באיחור', stale:'לא עדכני', unknown:'לא ידוע' },
+        detailTitle:'משאבת עירוי · IV-204', detailMeta:'עמדה 3 · נסרק לאחרונה 14:02', detailStatus:'חסום · נכשל בבדיקה',
+        install:{ title:'התקנת VetTrack', body:'הוסיפו את VetTrack למסך הבית לגישה במסך מלא וללא חיבור.', cta:'התקנת האפליקציה', dismiss:'לא עכשיו' },
+        push:{ title:'הפעלת התראות', body:'קבלו התראה ברגע שציוד נכשל בבדיקה או מתעכב.', cta:'הפעלת התראות', dismiss:'אולי מאוחר יותר' },
+        priming:{ tag:'לפני בקשת מערכת ההפעלה', title:'אישור גישה למצלמה', body:'VetTrack משתמשת במצלמה רק לסריקת תגי ציוד. שום דבר אינו מוקלט או מועלה.', cta:'המשך', dismiss:'לא עכשיו' },
+        denied:{ tag:'ההרשאה נדחתה', title:'הגישה למצלמה כבויה', body:'הסריקה דורשת מצלמה. הפעילו אותה בהגדרות, או הוסיפו ציוד על ידי הקלדת התג.', settings:'פתיחת הגדרות', fallback:'הזנת תג ידנית' },
+        webOnly:'אינטרנט בלבד · מוסתר באפליקציה הנייטיב', nativeNote:'גרסת נייטיב — התקנה והרשאות מטופלות על ידי מערכת ההפעלה, לכן משטחי האינטרנט האלה מוסתרים.',
+      },
+    };
+    const t = TR[activeLocale];
+    const localeOpts = [['en','English'],['he','עברית']].map(([k,l])=>({key:k,label:l,style:seg(activeLocale===k),onClick:()=>this.set('lang',k)}));
+    const platformOpts = [['web','Web'],['native','Native']].map(([k,l])=>({key:k,label:l,style:seg(this.state.platform===k),onClick:()=>this.set('platform',k)}));
+
+    // ---- Capacitor platform gate — web-only PWA/push surfaces suppressed on native ----
+    const Capacitor = { isNativePlatform: () => this.state.platform === 'native', getPlatform: () => this.state.platform === 'native' ? 'ios' : 'web' };
+    const isNative = Capacitor.isNativePlatform();
+    const showWebPrompts = !Capacitor.isNativePlatform();
+
+    // ---- 6-state status taxonomy (token-pure, no var(--on-ink)) ----
+    const ICONS = {
+      ready:'<path d="M21 12a9 9 0 1 1-3.8-7.3"/><path d="m9 11 3 3 8-8"/>',
+      in_use:'<path d="M7 17 17 7"/><path d="M8 7h9v9"/>',
+      blocked:'<path d="m10.3 3.7-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.3l-8-14a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+      overdue:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+      stale:'<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/>',
+      unknown:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9a2.5 2.5 0 0 1 4.4 1.5c0 1.6-2 2-2 3"/><path d="M12 17h.01"/>',
+    };
+    const STONE = { ready:'ok', in_use:'sterilized', blocked:'issue', overdue:'maintenance', stale:'stale', unknown:'unknown' };
+    const stoneVars = (k)=>({ solid:'var(--status-'+STONE[k]+')', bg:'var(--status-'+STONE[k]+'-bg)', border:'var(--status-'+STONE[k]+'-border)', fg:'var(--status-'+STONE[k]+'-fg)' });
+    const ORDER = ['ready','in_use','blocked','overdue','stale','unknown'];
+    const statusModel = ORDER.map(k=>({ key:k, label:t.statusLabels[k], ...stoneVars(k), icon:this.ic(ICONS[k],{w:16,sw:2}) }));
+    const chipCounts = { ready:9, in_use:5, blocked:3, overdue:7, stale:2, unknown:1 };
+    const statusChips = statusModel.map(s=>({ ...s, count:String(chipCounts[s.key]), aria: chipCounts[s.key] + ' ' + s.label }));
+    const badgeCounts = { ready:'4', in_use:'12', blocked:'3', overdue:'7', stale:'2', unknown:'99+' };
+    const statusBadges = statusModel.map(s=>({ ...s, count:badgeCounts[s.key] }));
+    const detailState = 'blocked';
+    const statusStrip = statusModel.map(s=>({ ...s, dim: s.key===detailState ? '1' : '0.5' }));
+    const detailTone = stoneVars(detailState);
+
+    // ---- Interaction-state ledgers: default · pressed · focus-visible · disabled · loading ----
+    const ledgerHeaders = ['Default','Pressed','Focus','Disabled','Loading'];
+    const compDefs = [
+      { name:'StatusChip', ring:'rgb(var(--sys-red))', fill:'background:var(--status-issue-bg);color:var(--status-issue-fg);border:1px solid var(--status-issue-border);' },
+      { name:'PrimaryActionCard', ring:'var(--action)', fill:'background:var(--action);color:var(--action-foreground);border:1px solid transparent;' },
+      { name:'TabBar item', ring:'var(--brand)', fill:'background:var(--tonal);color:var(--brand);border:1px solid transparent;' },
+      { name:'ListRow', ring:'var(--brand)', fill:'background:var(--surface-2);color:var(--foreground);border:1px solid var(--border);' },
+      { name:'Sheet trigger', ring:'var(--brand)', fill:'background:var(--tonal);color:var(--foreground);border:1px solid transparent;' },
+    ];
+    const compLedgers = compDefs.map(c=>({ name:c.name, cells: ledgerHeaders.map(lab=>{
+      let st = 'height:40px;min-width:84px;padding:0 12px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;gap:6px;font:600 12px var(--font-sans);cursor:pointer;white-space:nowrap;transition:transform var(--dur-fast) var(--ease-standard);' + c.fill;
+      if (lab==='Pressed') st += 'transform:scale(0.97);';
+      if (lab==='Focus') st += 'box-shadow:0 0 0 2px var(--surface),0 0 0 4px ' + c.ring + ';';
+      if (lab==='Disabled') st += 'opacity:0.4;cursor:not-allowed;';
+      return { lab, style:st, loading: lab==='Loading', disabledFlag: lab==='Disabled', showLabel: lab!=='Loading' };
+    }) }));
+
+    // Button matrix
+    const btnBase = "height:44px;padding:0 14px;border:none;border-radius:14px;font:700 14px var(--font-sans);display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;width:100%;transition:transform var(--dur-fast) var(--ease-standard),opacity var(--dur-fast) var(--ease-standard);white-space:nowrap;";
+    const variants = [
+      { key:'primary', label:'Primary', fill:'background:var(--brand);color:var(--brand-foreground);', ring:'var(--brand)' },
+      { key:'secondary', label:'Secondary', fill:'background:var(--tonal);color:var(--foreground);', ring:'var(--brand)' },
+      { key:'destructive', label:'Destructive', fill:'background:rgb(var(--sys-red));color:var(--on-ink);', ring:'rgb(var(--sys-red))' },
+      { key:'action', label:'Action', fill:'background:var(--action);color:var(--action-foreground);', ring:'var(--action)' },
+    ];
+    const states = ['default','pressed','focus-visible','disabled','loading'];
+    const stateHeaders = ['Default','Pressed','Focus','Disabled','Loading'];
+    const buttonMatrix = variants.map(v => ({
+      label: v.label,
+      cells: states.map(s => {
+        let st = btnBase + v.fill;
+        if (s==='pressed') st += 'transform:scale(0.97);';
+        if (s==='focus-visible') st += 'box-shadow:0 0 0 2px var(--surface),0 0 0 4px '+v.ring+';';
+        if (s==='disabled') st += 'opacity:0.4;cursor:not-allowed;';
+        return { key:v.key+s, style:st, loading:s==='loading', showLabel:s!=='loading', disabled:s==='disabled' };
+      })
+    }));
+
+    const badgeDemo = ['3','12','99+'];
+
+    // ---- Phase 21 · Stat tile + Clinical timeline demo data ----
+    const TONE_COLOR = { ok:'rgb(var(--sys-green))', issue:'rgb(var(--sys-red))', neutral:'var(--muted-foreground)' };
+    const statTileDefs = [
+      { label:'Equipment', value:'234', change:'+12.4% this month', tone:'ok', icon:'<path d="M7 17 17 7"/><path d="M7 7h10v10"/>' },
+      { label:'Utilization', value:'78%', change:'+4.1% this month', tone:'ok', icon:'<path d="M7 17 17 7"/><path d="M7 7h10v10"/>' },
+      { label:'Overdue', value:'3', change:'-2 this month', tone:'issue', icon:'<path d="M17 7 7 17"/><path d="M17 17H7V7"/>' },
+    ];
+    const statTiles = statTileDefs.map(s => ({ ...s, changeColor: TONE_COLOR[s.tone], icon: this.ic(s.icon, { w:14, sw:2.2 }) }));
+
+    const timelineDefs = [
+      { title:'Docked', meta:'Recovery · 10:50', current:true, tone:'ok' },
+      { title:'Moved', meta:'Imaging → Recovery · 10:36', current:false, tone:'neutral' },
+      { title:'Scanned', meta:'Routine confirmation · 10:34', current:false, tone:'neutral' },
+    ];
+    const timelineDemo = timelineDefs.map((tl, i) => ({
+      title: tl.title, meta: tl.meta,
+      color: TONE_COLOR[tl.tone] || 'var(--muted-foreground)',
+      fill: tl.current ? (TONE_COLOR[tl.tone] || 'var(--muted-foreground)') : 'transparent',
+      size: tl.current ? '10px' : '8px',
+      hasLine: i < timelineDefs.length - 1,
+      pad: i < timelineDefs.length - 1 ? '16px' : '0',
+    }));
+
+    // Tabs
+    const tabDefs = [
+      { key:'today', label:'Today', icon:'<path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/>' },
+      { key:'equipment', label:'Equipment', icon:'<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>' },
+      { key:'scan', label:'Scan', icon:'<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/>' },
+      { key:'emergency', label:'Emergency', icon:'<path d="M3 12h4l2 6 4-14 2 8h6"/>' },
+      { key:'more', label:'More', icon:'<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>' },
+    ];
+    const tabLabels = {};
+    const tabs = tabDefs.map(t => {
+      const active = activeTab === t.key;
+      const isScan = t.key === 'scan';
+      tabLabels[t.key] = t.label;
+      const color = active ? (isScan ? 'var(--action)' : 'var(--brand)') : 'var(--muted-foreground)';
+      return {
+        key: t.key, label: t.label, color, weight: active ? '600' : '500',
+        scanBg: isScan ? (active ? 'background:rgb(21 128 61 / 0.12);' : 'background:rgb(21 128 61 / 0.06);') : '',
+        icon: this.ic(t.icon, { w:22, sw: active ? 2.2 : 1.9, fill: active && t.key!=='more' && t.key!=='emergency' && t.key!=='scan' ? 'currentColor' : 'none' }),
+        onClick: () => this.set('activeTab', t.key),
+      };
+    });
+
+    // Sidebar nav
+    const navDefs = [
+      { key:'today', label:'Today', icon:'<path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/>' },
+      { key:'equipment', label:'Equipment', icon:'<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>' },
+      { key:'scan', label:'Scan', icon:'<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/>' },
+      { key:'alerts', label:'Alerts', icon:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>' },
+      { key:'emergency', label:'Emergency', icon:'<path d="M3 12h4l2 6 4-14 2 8h6"/>' },
+    ];
+    const navItems = navDefs.map(n => {
+      const active = activeNav === n.key;
+      return { key:n.key, label:n.label, weight: active?'600':'500',
+        bg: active ? 'rgb(79 70 229 / 0.10)' : 'transparent',
+        color: active ? 'var(--brand)' : 'var(--muted-foreground)',
+        icon: this.ic(n.icon, { w:20, sw: active?2.1:1.8 }) };
+    });
+
+    // ListRow data
+    // ListRow data — all 6 enum states
+    const rowMeta = [
+      { name:'Vital monitor', tag:'VM-118', loc:'Recovery', s:'ready', detail:'ready', trailing:'09:12' },
+      { name:'Infusion pump', tag:'IV-204', loc:'Bay 3', s:'in_use', detail:'with Dr. Lee', trailing:'14:02', selected:true },
+      { name:'Portable X-ray', tag:'XR-07', loc:'Imaging', s:'overdue', detail:'2h overdue', trailing:'11:40' },
+      { name:'Defibrillator', tag:'DF-02', loc:'Crash cart A', s:'blocked', detail:'failed check', trailing:'08:55' },
+      { name:'Ultrasound', tag:'US-3', loc:'Imaging', s:'stale', detail:'last seen 6d ago', trailing:'—' },
+      { name:'Anesthesia unit', tag:'AN-11', loc:'Service', s:'unknown', detail:'unconfirmed', trailing:'—' },
+    ];
+    const rows = rowMeta.map(r=>{
+      const v = stoneVars(r.s);
+      return { name:r.name, tag:r.tag, loc:r.loc, trailing:r.trailing,
+        dotColor:v.solid, statusText: t.statusLabels[r.s] + ' · ' + r.detail,
+        statusIcon:this.ic(ICONS[r.s],{w:13,sw:2.2}),
+        accent: r.s==='blocked' || !!r.selected,
+        accentColor: r.selected ? 'var(--brand)' : v.solid,
+        bg: r.selected ? 'rgb(79 70 229 / 0.08)' : 'var(--surface)' };
+    });
+
+    return {
+      rootClass: 'page' + (theme==='dark'?' dark':''),
+      rootStyle: '',
+      size, themeOpts, sizeOpts, localeOpts, platformOpts, dir,
+      stateHeaders, buttonMatrix, badgeDemo,
+      statTiles, timelineDemo,
+      statusChips, statusBadges, statusModel, statusStrip,
+      detailTitle: t.detailTitle, detailMeta: t.detailMeta, detailStatus: t.detailStatus,
+      detailToneBg: detailTone.bg, detailToneBorder: detailTone.border, detailToneSolid: detailTone.solid, detailToneFg: detailTone.fg,
+      detailIcon: this.ic(ICONS[detailState],{w:20,sw:2}),
+      ledgerHeaders, compLedgers,
+      isNative, showWebPrompts,
+      install: t.install, push: t.push, priming: t.priming, denied: t.denied, webOnly: t.webOnly, nativeNote: t.nativeNote,
+      tabs, activeTabLabel: tabLabels[activeTab], navItems, rows,
+      press: {
+        transform: pressed ? 'scale(0.97)' : 'scale(1)',
+        label: pressed ? 'Pressed' : 'Press / Tab',
+        down: () => this.set('pressed', true),
+        up: () => this.set('pressed', false),
+      },
+      sheet: {
+        open: () => this.set('sheetOpen', true),
+        close: () => this.set('sheetOpen', false),
+        translate: sheetOpen ? '0%' : '100%',
+        scrimOpacity: sheetOpen ? '1' : '0',
+        pointer: sheetOpen ? 'auto' : 'none',
+      },
+    };
+  }
+}
+</script>
+</body>
+</html>

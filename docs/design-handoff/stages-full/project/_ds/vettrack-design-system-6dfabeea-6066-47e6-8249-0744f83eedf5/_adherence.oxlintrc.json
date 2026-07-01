@@ -1,0 +1,1100 @@
+{
+  "plugins": [
+    "react",
+    "import"
+  ],
+  "rules": {
+    "react/forbid-elements": [
+      "warn",
+      {
+        "forbid": []
+      }
+    ],
+    "no-restricted-imports": [
+      "warn",
+      {
+        "patterns": [
+          {
+            "group": [
+              "cmd/**",
+              "components/alerts/AlertCard/**",
+              "components/alerts/AlertsProView/**",
+              "components/equipment/AssetCopilotPanel/**",
+              "components/equipment/ConditionChecklist/**",
+              "components/equipment/DeployabilityBadge/**",
+              "components/equipment/DockReturnFlow/**",
+              "components/equipment/EquipmentConfirmInRoomSheet/**",
+              "components/equipment/EquipmentDetailActivityTab/**",
+              "components/equipment/EquipmentDetailStatusStrip/**",
+              "components/equipment/EquipmentDetailToolsSheet/**",
+              "components/equipment/EquipmentHeroCoverageStrip/**",
+              "components/equipment/EquipmentRoomSweepSheet/**",
+              "components/equipment/EquipmentStatStrip/**",
+              "components/equipment/EquipmentTriageList/**",
+              "components/equipment/EquipmentTruthCard/**",
+              "components/equipment/OperationalMetricsDashboard/**",
+              "components/equipment/ReservationBanner/**",
+              "components/equipment/StagingQueuePanel/**",
+              "components/equipment/WaitlistPanel/**",
+              "components/general/AlertDialog/**",
+              "components/general/AlertDialogAction/**",
+              "components/general/AlertDialogCancel/**",
+              "components/general/AlertDialogContent/**",
+              "components/general/AlertDialogDescription/**",
+              "components/general/AlertDialogFooter/**",
+              "components/general/AlertDialogHeader/**",
+              "components/general/AlertDialogOverlay/**",
+              "components/general/AlertDialogPortal/**",
+              "components/general/AlertDialogTitle/**",
+              "components/general/AlertDialogTrigger/**",
+              "components/general/AlertsDropdown/**",
+              "components/general/AppErrorBoundary/**",
+              "components/general/AuditRowSkeleton/**",
+              "components/general/Badge/**",
+              "components/general/Button/**",
+              "components/general/Card/**",
+              "components/general/CardContent/**",
+              "components/general/CardDescription/**",
+              "components/general/CardFooter/**",
+              "components/general/CardHeader/**",
+              "components/general/CardTitle/**",
+              "components/general/Checkbox/**",
+              "components/general/CrashCartAdminSheet/**",
+              "components/general/CsvImportDialog/**",
+              "components/general/Dialog/**",
+              "components/general/DialogClose/**",
+              "components/general/DialogContent/**",
+              "components/general/DialogDescription/**",
+              "components/general/DialogFooter/**",
+              "components/general/DialogHeader/**",
+              "components/general/DialogTitle/**",
+              "components/general/DialogTrigger/**",
+              "components/general/EmptyState/**",
+              "components/general/ErrorCard/**",
+              "components/general/FirstScanCelebration/**",
+              "components/general/HelpTooltip/**",
+              "components/general/Input/**",
+              "components/general/Label/**",
+              "components/general/LoadingSection/**",
+              "components/general/MoveRoomSheet/**",
+              "components/general/OnboardingWalkthrough/**",
+              "components/general/PageErrorBoundary/**",
+              "components/general/ReportIssueDialog/**",
+              "components/general/ReturnPlugDialog/**",
+              "components/general/RouteFallback/**",
+              "components/general/SectionList/**",
+              "components/general/Select/**",
+              "components/general/SelectContent/**",
+              "components/general/SelectGroup/**",
+              "components/general/SelectItem/**",
+              "components/general/SelectLabel/**",
+              "components/general/SelectSeparator/**",
+              "components/general/SelectTrigger/**",
+              "components/general/SelectValue/**",
+              "components/general/SettingsSectionHeader/**",
+              "components/general/SettingsSelect/**",
+              "components/general/SettingsToggle/**",
+              "components/general/Sheet/**",
+              "components/general/SheetClose/**",
+              "components/general/SheetContent/**",
+              "components/general/SheetDescription/**",
+              "components/general/SheetFooter/**",
+              "components/general/SheetHeader/**",
+              "components/general/SheetTitle/**",
+              "components/general/SheetTrigger/**",
+              "components/general/ShiftSummarySheet/**",
+              "components/general/Skeleton/**",
+              "components/general/SkeletonAlertCard/**",
+              "components/general/SkeletonEquipmentCard/**",
+              "components/general/StatusBadge/**",
+              "components/general/SwUpdateBanner/**",
+              "components/general/SyncQueueSheet/**",
+              "components/general/SyncStatusBanner/**",
+              "components/general/Tabs/**",
+              "components/general/TabsContent/**",
+              "components/general/TabsList/**",
+              "components/general/TabsTrigger/**",
+              "components/general/Textarea/**",
+              "components/general/UpdateBanner/**",
+              "components/general/VirtualizedEquipmentList/**",
+              "components/home/ShiftProgressHero/**",
+              "components/layout/AppShell/**",
+              "components/layout/Breadcrumb/**",
+              "components/layout/IconSidebar/**",
+              "components/layout/PageShell/**",
+              "components/layout/Sidebar/**",
+              "components/layout/SidebarDivider/**",
+              "components/layout/Topbar/**",
+              "components/skeletons/EquipmentDetailSkeleton/**",
+              "components/skeletons/EquipmentListSkeleton/**",
+              "design-canvas.jsx",
+              "starters/**",
+              "tweaks-panel.jsx",
+              "ui_kits/_shared/**",
+              "ui_kits/app/**",
+              "ui_kits/marketing/**",
+              "variants/**"
+            ],
+            "message": "Import design-system components from 'index.js', not component internals."
+          }
+        ]
+      }
+    ],
+    "no-restricted-syntax": [
+      "warn",
+      {
+        "selector": "Literal[value=/#[0-9a-fA-F]{3,8}\\b/]",
+        "message": "Raw hex color — use a design-system color token via var()."
+      },
+      {
+        "selector": "Literal[value=/\\b\\d+px\\b/]",
+        "message": "Raw px value — use a design-system spacing token via var()."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='AlertCard'] > JSXAttribute > JSXIdentifier[name!=/^(?:icon|title|tone|key|ref|className|style|children)$/]",
+        "message": "<AlertCard> doesn't accept that prop. Declared props: icon, title, tone."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='AlertCard'] > JSXAttribute[name.name='tone'] > Literal[value!=/^(?:err|warn|ok)$/]",
+        "message": "<AlertCard> tone must be one of 'err' | 'warn' | 'ok'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='AlertsDropdown'] > JSXAttribute > JSXIdentifier[name!=/^(?:alerts|alertCount|badgeAnimating|key|ref|className|style|children)$/]",
+        "message": "<AlertsDropdown> doesn't accept that prop. Declared props: alerts, alertCount, badgeAnimating."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='AlertsProView'] > JSXAttribute > JSXIdentifier[name!=/^(?:alerts|acksMap|equipmentLocationMap|hasAckError|onNavigate|onAck|onUnAck|canOwn|formatRelativeTime|key|ref|className|style|children)$/]",
+        "message": "<AlertsProView> doesn't accept that prop. Declared props: alerts, acksMap, equipmentLocationMap, hasAckError, onNavigate, onAck, onUnAck, canOwn, formatRelativeTime."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='AppShell'] > JSXAttribute > JSXIdentifier[name!=/^(?:children|sidebarItems|title|key|ref|className|style|children)$/]",
+        "message": "<AppShell> doesn't accept that prop. Declared props: children, sidebarItems, title."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='AssetCopilotPanel'] > JSXAttribute > JSXIdentifier[name!=/^(?:className|defaultEquipmentId|key|ref|className|style|children)$/]",
+        "message": "<AssetCopilotPanel> doesn't accept that prop. Declared props: className, defaultEquipmentId."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Badge'] > JSXAttribute > JSXIdentifier[name!=/^(?:className|id|style|variant|children|key|ref|className|style|children)$/]",
+        "message": "<Badge> doesn't accept that prop. Declared props: className, id, style, variant, children."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Badge'] > JSXAttribute[name.name='variant'] > Literal[value!=/^(?:ok|default|secondary|destructive|outline|issue|maintenance|sterilized)$/]",
+        "message": "<Badge> variant must be one of 'ok' | 'default' | 'secondary' | 'destructive' | 'outline' | 'issue' | 'maintenance' | 'sterilized'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Breadcrumb'] > JSXAttribute > JSXIdentifier[name!=/^(?:items|className|key|ref|className|style|children)$/]",
+        "message": "<Breadcrumb> doesn't accept that prop. Declared props: items, className."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Button'] > JSXAttribute > JSXIdentifier[name!=/^(?:asChild|className|id|style|children|size|variant|key|ref|className|style|children)$/]",
+        "message": "<Button> doesn't accept that prop. Declared props: asChild, className, id, style, children, size, variant."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Button'] > JSXAttribute[name.name='size'] > Literal[value!=/^(?:default|sm|lg|xl|icon|icon-sm)$/]",
+        "message": "<Button> size must be one of 'default' | 'sm' | 'lg' | 'xl' | 'icon' | 'icon-sm'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Button'] > JSXAttribute[name.name='variant'] > Literal[value!=/^(?:link|default|secondary|destructive|outline|ghost|teal)$/]",
+        "message": "<Button> variant must be one of 'link' | 'default' | 'secondary' | 'destructive' | 'outline' | 'ghost' | 'teal'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Checkbox'] > JSXAttribute > JSXIdentifier[name!=/^(?:checked|indeterminate|onCheckedChange|className|id|style|children|key|ref|className|style|children)$/]",
+        "message": "<Checkbox> doesn't accept that prop. Declared props: checked, indeterminate, onCheckedChange, className, id, style, children."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='ConditionChecklist'] > JSXAttribute > JSXIdentifier[name!=/^(?:conditions|existingStates|value|onChange|key|ref|className|style|children)$/]",
+        "message": "<ConditionChecklist> doesn't accept that prop. Declared props: conditions, existingStates, value, onChange."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='DeployabilityBadge'] > JSXAttribute > JSXIdentifier[name!=/^(?:compact|custodyState|readinessState|usageState|fullDeployable|key|ref|className|style|children)$/]",
+        "message": "<DeployabilityBadge> doesn't accept that prop. Declared props: compact, custodyState, readinessState, usageState, fullDeployable."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='DeployabilityBadge'] > JSXAttribute[name.name='custodyState'] > Literal[value!=/^(?:docked|checked_out|untracked|returned)$/]",
+        "message": "<DeployabilityBadge> custodyState must be one of 'docked' | 'checked_out' | 'untracked' | 'returned'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='DeployabilityBadge'] > JSXAttribute[name.name='readinessState'] > Literal[value!=/^(?:ready|not_ready|unknown)$/]",
+        "message": "<DeployabilityBadge> readinessState must be one of 'ready' | 'not_ready' | 'unknown'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='DeployabilityBadge'] > JSXAttribute[name.name='usageState'] > Literal[value!=/^(?:available|staged|in_use|emergency_use|procedure_bound)$/]",
+        "message": "<DeployabilityBadge> usageState must be one of 'available' | 'staged' | 'in_use' | 'emergency_use' | 'procedure_bound'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='DockReturnFlow'] > JSXAttribute > JSXIdentifier[name!=/^(?:equipment|open|onClose|onSuccess|key|ref|className|style|children)$/]",
+        "message": "<DockReturnFlow> doesn't accept that prop. Declared props: equipment, open, onClose, onSuccess."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='EmptyState'] > JSXAttribute > JSXIdentifier[name!=/^(?:icon|message|subMessage|action|iconBg|iconColor|borderColor|headingLevel|key|ref|className|style|children)$/]",
+        "message": "<EmptyState> doesn't accept that prop. Declared props: icon, message, subMessage, action, iconBg, iconColor, borderColor, headingLevel."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='EmptyState'] > JSXAttribute[name.name='headingLevel'] > Literal[value!=/^(?:h2|h3)$/]",
+        "message": "<EmptyState> headingLevel must be one of 'h2' | 'h3'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='EquipmentConfirmInRoomSheet'] > JSXAttribute > JSXIdentifier[name!=/^(?:equipmentId|equipmentName|open|onOpenChange|onConfirmed|key|ref|className|style|children)$/]",
+        "message": "<EquipmentConfirmInRoomSheet> doesn't accept that prop. Declared props: equipmentId, equipmentName, open, onOpenChange, onConfirmed."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='EquipmentDetailActivityTab'] > JSXAttribute > JSXIdentifier[name!=/^(?:scanLogs|transfers|logsLoading|transfersLoading|hasOlderLogs|isFetchingOlderLogs|onLoadOlder|key|ref|className|style|children)$/]",
+        "message": "<EquipmentDetailActivityTab> doesn't accept that prop. Declared props: scanLogs, transfers, logsLoading, transfersLoading, hasOlderLogs, isFetchingOlderLogs, onLoadOlder."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='EquipmentDetailStatusStrip'] > JSXAttribute > JSXIdentifier[name!=/^(?:equipment|recoveryCalloutKey|recoveryBadgeKey|undoCountdown|undoWindowSec|showOperationalState|overdue|sterilizationDue|onRfidAttention|key|ref|className|style|children)$/]",
+        "message": "<EquipmentDetailStatusStrip> doesn't accept that prop. Declared props: equipment, recoveryCalloutKey, recoveryBadgeKey, undoCountdown, undoWindowSec, showOperationalState, overdue, sterilizationDue, onRfidAttention."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='EquipmentDetailStatusStrip'] > JSXAttribute[name.name='recoveryCalloutKey'] > Literal[value!=/^(?:recoveryAttentionCalloutStale|recoveryAttentionCalloutVeryStale|recoveryAttentionCalloutCheckedOutLong)$/]",
+        "message": "<EquipmentDetailStatusStrip> recoveryCalloutKey must be one of 'recoveryAttentionCalloutStale' | 'recoveryAttentionCalloutVeryStale' | 'recoveryAttentionCalloutCheckedOutLong'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='EquipmentDetailStatusStrip'] > JSXAttribute[name.name='recoveryBadgeKey'] > Literal[value!=/^(?:recoveryBadgeStale|recoveryBadgeVeryStale|recoveryBadgeCheckedOutLong)$/]",
+        "message": "<EquipmentDetailStatusStrip> recoveryBadgeKey must be one of 'recoveryBadgeStale' | 'recoveryBadgeVeryStale' | 'recoveryBadgeCheckedOutLong'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='EquipmentDetailToolsSheet'] > JSXAttribute > JSXIdentifier[name!=/^(?:equipment|equipmentId|open|onOpenChange|onPrintQr|onWriteNfc|showWhatsApp|showWriteNfc|key|ref|className|style|children)$/]",
+        "message": "<EquipmentDetailToolsSheet> doesn't accept that prop. Declared props: equipment, equipmentId, open, onOpenChange, onPrintQr, onWriteNfc, showWhatsApp, showWriteNfc."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='EquipmentHeroCoverageStrip'] > JSXAttribute > JSXIdentifier[name!=/^(?:recoveryAttentionCount|onFilterNeedsAttention|onOpenRoomSweep|recoveryFilterActive|showRoomSweep|key|ref|className|style|children)$/]",
+        "message": "<EquipmentHeroCoverageStrip> doesn't accept that prop. Declared props: recoveryAttentionCount, onFilterNeedsAttention, onOpenRoomSweep, recoveryFilterActive, showRoomSweep."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='EquipmentListSkeleton'] > JSXAttribute > JSXIdentifier[name!=/^(?:count|key|ref|className|style|children)$/]",
+        "message": "<EquipmentListSkeleton> doesn't accept that prop. Declared props: count."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='EquipmentRoomSweepSheet'] > JSXAttribute > JSXIdentifier[name!=/^(?:open|onOpenChange|key|ref|className|style|children)$/]",
+        "message": "<EquipmentRoomSweepSheet> doesn't accept that prop. Declared props: open, onOpenChange."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='EquipmentStatStrip'] > JSXAttribute > JSXIdentifier[name!=/^(?:total|attention|inUse|className|key|ref|className|style|children)$/]",
+        "message": "<EquipmentStatStrip> doesn't accept that prop. Declared props: total, attention, inUse, className."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='EquipmentTriageList'] > JSXAttribute > JSXIdentifier[name!=/^(?:items|className|key|ref|className|style|children)$/]",
+        "message": "<EquipmentTriageList> doesn't accept that prop. Declared props: items, className."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='EquipmentTruthCard'] > JSXAttribute > JSXIdentifier[name!=/^(?:equipmentId|equipmentName|enabled|className|key|ref|className|style|children)$/]",
+        "message": "<EquipmentTruthCard> doesn't accept that prop. Declared props: equipmentId, equipmentName, enabled, className."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='ErrorCard'] > JSXAttribute > JSXIdentifier[name!=/^(?:message|onRetry|key|ref|className|style|children)$/]",
+        "message": "<ErrorCard> doesn't accept that prop. Declared props: message, onRetry."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='FirstScanCelebration'] > JSXAttribute > JSXIdentifier[name!=/^(?:open|onContinue|key|ref|className|style|children)$/]",
+        "message": "<FirstScanCelebration> doesn't accept that prop. Declared props: open, onContinue."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='HelpTooltip'] > JSXAttribute > JSXIdentifier[name!=/^(?:content|side|className|key|ref|className|style|children)$/]",
+        "message": "<HelpTooltip> doesn't accept that prop. Declared props: content, side, className."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='HelpTooltip'] > JSXAttribute[name.name='side'] > Literal[value!=/^(?:top|bottom|left|right)$/]",
+        "message": "<HelpTooltip> side must be one of 'top' | 'bottom' | 'left' | 'right'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Input'] > JSXAttribute > JSXIdentifier[name!=/^(?:className|id|style|children|key|ref|className|style|children)$/]",
+        "message": "<Input> doesn't accept that prop. Declared props: className, id, style, children."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='LoadingSection'] > JSXAttribute > JSXIdentifier[name!=/^(?:rows|label|className|key|ref|className|style|children)$/]",
+        "message": "<LoadingSection> doesn't accept that prop. Declared props: rows, label, className."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='MoveRoomSheet'] > JSXAttribute > JSXIdentifier[name!=/^(?:equipment|open|onOpenChange|onMoved|key|ref|className|style|children)$/]",
+        "message": "<MoveRoomSheet> doesn't accept that prop. Declared props: equipment, open, onOpenChange, onMoved."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='PageShell'] > JSXAttribute > JSXIdentifier[name!=/^(?:sidebarItems|children|key|ref|className|style|children)$/]",
+        "message": "<PageShell> doesn't accept that prop. Declared props: sidebarItems, children."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='ReportIssueDialog'] > JSXAttribute > JSXIdentifier[name!=/^(?:open|onOpenChange|key|ref|className|style|children)$/]",
+        "message": "<ReportIssueDialog> doesn't accept that prop. Declared props: open, onOpenChange."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='ReservationBanner'] > JSXAttribute > JSXIdentifier[name!=/^(?:equipmentId|expiresAt|onCheckout|checkoutPending|showNextInLine|key|ref|className|style|children)$/]",
+        "message": "<ReservationBanner> doesn't accept that prop. Declared props: equipmentId, expiresAt, onCheckout, checkoutPending, showNextInLine."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='ReturnPlugDialog'] > JSXAttribute > JSXIdentifier[name!=/^(?:open|equipmentName|pending|isSubmitting|defaultDeadlineMinutes|onOpenChange|onConfirm|key|ref|className|style|children)$/]",
+        "message": "<ReturnPlugDialog> doesn't accept that prop. Declared props: open, equipmentName, pending, isSubmitting, defaultDeadlineMinutes, onOpenChange, onConfirm."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='SectionList'] > JSXAttribute > JSXIdentifier[name!=/^(?:sections|renderItem|empty|className|key|ref|className|style|children)$/]",
+        "message": "<SectionList> doesn't accept that prop. Declared props: sections, renderItem, empty, className."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='SettingsSectionHeader'] > JSXAttribute > JSXIdentifier[name!=/^(?:label|className|key|ref|className|style|children)$/]",
+        "message": "<SettingsSectionHeader> doesn't accept that prop. Declared props: label, className."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='SettingsSelect'] > JSXAttribute > JSXIdentifier[name!=/^(?:icon|label|description|value|options|onValueChange|lang|key|ref|className|style|children)$/]",
+        "message": "<SettingsSelect> doesn't accept that prop. Declared props: icon, label, description, value, options, onValueChange, lang."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='SettingsToggle'] > JSXAttribute > JSXIdentifier[name!=/^(?:icon|label|description|checked|onCheckedChange|key|ref|className|style|children)$/]",
+        "message": "<SettingsToggle> doesn't accept that prop. Declared props: icon, label, description, checked, onCheckedChange."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='SheetContent'] > JSXAttribute > JSXIdentifier[name!=/^(?:hideCloseButton|overlayClassName|className|id|style|children|asChild|forceMount|side|key|ref|className|style|children)$/]",
+        "message": "<SheetContent> doesn't accept that prop. Declared props: hideCloseButton, overlayClassName, className, id, style, children, asChild, forceMount, side."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='SheetContent'] > JSXAttribute[name.name='side'] > Literal[value!=/^(?:top|bottom|left|right)$/]",
+        "message": "<SheetContent> side must be one of 'top' | 'bottom' | 'left' | 'right'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='ShiftProgressHero'] > JSXAttribute > JSXIdentifier[name!=/^(?:progressPct|progressLabel|stats|className|animateRing|key|ref|className|style|children)$/]",
+        "message": "<ShiftProgressHero> doesn't accept that prop. Declared props: progressPct, progressLabel, stats, className, animateRing."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='ShiftSummarySheet'] > JSXAttribute > JSXIdentifier[name!=/^(?:open|onClose|key|ref|className|style|children)$/]",
+        "message": "<ShiftSummarySheet> doesn't accept that prop. Declared props: open, onClose."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Sidebar'] > JSXAttribute > JSXIdentifier[name!=/^(?:sidebarItems|key|ref|className|style|children)$/]",
+        "message": "<Sidebar> doesn't accept that prop. Declared props: sidebarItems."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='StagingQueuePanel'] > JSXAttribute > JSXIdentifier[name!=/^(?:equipment|currentUserId|key|ref|className|style|children)$/]",
+        "message": "<StagingQueuePanel> doesn't accept that prop. Declared props: equipment, currentUserId."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='StatusBadge'] > JSXAttribute > JSXIdentifier[name!=/^(?:kind|label|className|id|style|children|key|ref|className|style|children)$/]",
+        "message": "<StatusBadge> doesn't accept that prop. Declared props: kind, label, className, id, style, children."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='StatusBadge'] > JSXAttribute[name.name='kind'] > Literal[value!=/^(?:ok|issue|maintenance|sterilized|info|neutral)$/]",
+        "message": "<StatusBadge> kind must be one of 'ok' | 'issue' | 'maintenance' | 'sterilized' | 'info' | 'neutral'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='SyncQueueSheet'] > JSXAttribute > JSXIdentifier[name!=/^(?:open|onClose|key|ref|className|style|children)$/]",
+        "message": "<SyncQueueSheet> doesn't accept that prop. Declared props: open, onClose."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Textarea'] > JSXAttribute > JSXIdentifier[name!=/^(?:className|id|style|children|key|ref|className|style|children)$/]",
+        "message": "<Textarea> doesn't accept that prop. Declared props: className, id, style, children."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='VirtualizedEquipmentList'] > JSXAttribute > JSXIdentifier[name!=/^(?:items|height|width|itemHeight|renderItem|key|ref|className|style|children)$/]",
+        "message": "<VirtualizedEquipmentList> doesn't accept that prop. Declared props: items, height, width, itemHeight, renderItem."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='WaitlistPanel'] > JSXAttribute > JSXIdentifier[name!=/^(?:equipment|currentUserId|snapshot|key|ref|className|style|children)$/]",
+        "message": "<WaitlistPanel> doesn't accept that prop. Declared props: equipment, currentUserId, snapshot."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/index.js"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ],
+  "x-omelette": {
+    "components": {
+      "AlertCard": {
+        "replaces": []
+      },
+      "AlertDialog": {
+        "replaces": []
+      },
+      "AlertDialogAction": {
+        "replaces": []
+      },
+      "AlertDialogCancel": {
+        "replaces": []
+      },
+      "AlertDialogContent": {
+        "replaces": []
+      },
+      "AlertDialogDescription": {
+        "replaces": []
+      },
+      "AlertDialogFooter": {
+        "replaces": []
+      },
+      "AlertDialogHeader": {
+        "replaces": []
+      },
+      "AlertDialogOverlay": {
+        "replaces": []
+      },
+      "AlertDialogPortal": {
+        "replaces": []
+      },
+      "AlertDialogTitle": {
+        "replaces": []
+      },
+      "AlertDialogTrigger": {
+        "replaces": []
+      },
+      "AlertsDropdown": {
+        "replaces": []
+      },
+      "AlertsProView": {
+        "replaces": []
+      },
+      "AppErrorBoundary": {
+        "replaces": []
+      },
+      "AppShell": {
+        "replaces": []
+      },
+      "AssetCopilotPanel": {
+        "replaces": []
+      },
+      "AuditRowSkeleton": {
+        "replaces": []
+      },
+      "Badge": {
+        "replaces": []
+      },
+      "Breadcrumb": {
+        "replaces": []
+      },
+      "Button": {
+        "replaces": []
+      },
+      "Card": {
+        "replaces": []
+      },
+      "CardContent": {
+        "replaces": []
+      },
+      "CardDescription": {
+        "replaces": []
+      },
+      "CardFooter": {
+        "replaces": []
+      },
+      "CardHeader": {
+        "replaces": []
+      },
+      "CardTitle": {
+        "replaces": []
+      },
+      "Checkbox": {
+        "replaces": []
+      },
+      "ConditionChecklist": {
+        "replaces": []
+      },
+      "CrashCartAdminSheet": {
+        "replaces": []
+      },
+      "CsvImportDialog": {
+        "replaces": []
+      },
+      "DeployabilityBadge": {
+        "replaces": []
+      },
+      "Dialog": {
+        "replaces": []
+      },
+      "DialogClose": {
+        "replaces": []
+      },
+      "DialogContent": {
+        "replaces": []
+      },
+      "DialogDescription": {
+        "replaces": []
+      },
+      "DialogFooter": {
+        "replaces": []
+      },
+      "DialogHeader": {
+        "replaces": []
+      },
+      "DialogTitle": {
+        "replaces": []
+      },
+      "DialogTrigger": {
+        "replaces": []
+      },
+      "DockReturnFlow": {
+        "replaces": []
+      },
+      "EmptyState": {
+        "replaces": []
+      },
+      "EquipmentConfirmInRoomSheet": {
+        "replaces": []
+      },
+      "EquipmentDetailActivityTab": {
+        "replaces": []
+      },
+      "EquipmentDetailSkeleton": {
+        "replaces": []
+      },
+      "EquipmentDetailStatusStrip": {
+        "replaces": []
+      },
+      "EquipmentDetailToolsSheet": {
+        "replaces": []
+      },
+      "EquipmentHeroCoverageStrip": {
+        "replaces": []
+      },
+      "EquipmentListSkeleton": {
+        "replaces": []
+      },
+      "EquipmentRoomSweepSheet": {
+        "replaces": []
+      },
+      "EquipmentStatStrip": {
+        "replaces": []
+      },
+      "EquipmentTriageList": {
+        "replaces": []
+      },
+      "EquipmentTruthCard": {
+        "replaces": []
+      },
+      "ErrorCard": {
+        "replaces": []
+      },
+      "FirstScanCelebration": {
+        "replaces": []
+      },
+      "HelpTooltip": {
+        "replaces": []
+      },
+      "IconSidebar": {
+        "replaces": []
+      },
+      "Input": {
+        "replaces": []
+      },
+      "Label": {
+        "replaces": []
+      },
+      "LoadingSection": {
+        "replaces": []
+      },
+      "MoveRoomSheet": {
+        "replaces": []
+      },
+      "OnboardingWalkthrough": {
+        "replaces": []
+      },
+      "OperationalMetricsDashboard": {
+        "replaces": []
+      },
+      "PageErrorBoundary": {
+        "replaces": []
+      },
+      "PageShell": {
+        "replaces": []
+      },
+      "ReportIssueDialog": {
+        "replaces": []
+      },
+      "ReservationBanner": {
+        "replaces": []
+      },
+      "ReturnPlugDialog": {
+        "replaces": []
+      },
+      "RouteFallback": {
+        "replaces": []
+      },
+      "SectionList": {
+        "replaces": []
+      },
+      "Select": {
+        "replaces": []
+      },
+      "SelectContent": {
+        "replaces": []
+      },
+      "SelectGroup": {
+        "replaces": []
+      },
+      "SelectItem": {
+        "replaces": []
+      },
+      "SelectLabel": {
+        "replaces": []
+      },
+      "SelectSeparator": {
+        "replaces": []
+      },
+      "SelectTrigger": {
+        "replaces": []
+      },
+      "SelectValue": {
+        "replaces": []
+      },
+      "SettingsSectionHeader": {
+        "replaces": []
+      },
+      "SettingsSelect": {
+        "replaces": []
+      },
+      "SettingsToggle": {
+        "replaces": []
+      },
+      "Sheet": {
+        "replaces": []
+      },
+      "SheetClose": {
+        "replaces": []
+      },
+      "SheetContent": {
+        "replaces": []
+      },
+      "SheetDescription": {
+        "replaces": []
+      },
+      "SheetFooter": {
+        "replaces": []
+      },
+      "SheetHeader": {
+        "replaces": []
+      },
+      "SheetTitle": {
+        "replaces": []
+      },
+      "SheetTrigger": {
+        "replaces": []
+      },
+      "ShiftProgressHero": {
+        "replaces": []
+      },
+      "ShiftSummarySheet": {
+        "replaces": []
+      },
+      "Sidebar": {
+        "replaces": []
+      },
+      "SidebarDivider": {
+        "replaces": []
+      },
+      "Skeleton": {
+        "replaces": []
+      },
+      "SkeletonAlertCard": {
+        "replaces": []
+      },
+      "SkeletonEquipmentCard": {
+        "replaces": []
+      },
+      "StagingQueuePanel": {
+        "replaces": []
+      },
+      "StatusBadge": {
+        "replaces": []
+      },
+      "SwUpdateBanner": {
+        "replaces": []
+      },
+      "SyncQueueSheet": {
+        "replaces": []
+      },
+      "SyncStatusBanner": {
+        "replaces": []
+      },
+      "Tabs": {
+        "replaces": []
+      },
+      "TabsContent": {
+        "replaces": []
+      },
+      "TabsList": {
+        "replaces": []
+      },
+      "TabsTrigger": {
+        "replaces": []
+      },
+      "Textarea": {
+        "replaces": []
+      },
+      "Topbar": {
+        "replaces": []
+      },
+      "UpdateBanner": {
+        "replaces": []
+      },
+      "VirtualizedEquipmentList": {
+        "replaces": []
+      },
+      "WaitlistPanel": {
+        "replaces": []
+      }
+    },
+    "tokens": [
+      "--accent",
+      "--accent-foreground",
+      "--action",
+      "--action-border",
+      "--action-deep",
+      "--action-ink",
+      "--action-soft",
+      "--background",
+      "--border",
+      "--brand",
+      "--brand-border",
+      "--brand-deep",
+      "--brand-green-bright",
+      "--brand-green-mid",
+      "--brand-ink",
+      "--brand-navy",
+      "--brand-shadow",
+      "--brand-soft",
+      "--card",
+      "--card-foreground",
+      "--color-background-warning",
+      "--color-border-warning",
+      "--color-text-warning",
+      "--destructive",
+      "--destructive-foreground",
+      "--ease-enter",
+      "--ease-reward",
+      "--emergency-accent",
+      "--emergency-accent-soft",
+      "--emergency-amber",
+      "--emergency-bg",
+      "--emergency-border",
+      "--emergency-border-md",
+      "--emergency-surface",
+      "--emergency-text",
+      "--emergency-text2",
+      "--font-num",
+      "--foreground",
+      "--hero-a",
+      "--hero-b",
+      "--input",
+      "--ivory-bg",
+      "--ivory-border",
+      "--ivory-borderMd",
+      "--ivory-err",
+      "--ivory-green",
+      "--ivory-greenBg",
+      "--ivory-greenMid",
+      "--ivory-info",
+      "--ivory-navy",
+      "--ivory-ok",
+      "--ivory-surface",
+      "--ivory-text",
+      "--ivory-text2",
+      "--ivory-text3",
+      "--ivory-warn",
+      "--leading-normal",
+      "--leading-snug",
+      "--leading-tight",
+      "--motion-celebrate",
+      "--motion-enter",
+      "--motion-instant",
+      "--motion-pill",
+      "--motion-quick",
+      "--muted",
+      "--muted-foreground",
+      "--nav-bg",
+      "--offline-bg",
+      "--offline-border",
+      "--offline-text",
+      "--popover",
+      "--popover-foreground",
+      "--primary",
+      "--primary-foreground",
+      "--radius",
+      "--radius-2xl",
+      "--radius-md",
+      "--radius-pill",
+      "--radius-sm",
+      "--radius-xl",
+      "--ring",
+      "--sab",
+      "--sat",
+      "--secondary",
+      "--secondary-foreground",
+      "--shadow-card",
+      "--shadow-card-hover",
+      "--shadow-surface",
+      "--shift-active",
+      "--shift-inactive",
+      "--status-info",
+      "--status-issue",
+      "--status-issue-bg",
+      "--status-issue-border",
+      "--status-issue-fg",
+      "--status-maint-bg",
+      "--status-maint-border",
+      "--status-maint-fg",
+      "--status-maintenance",
+      "--status-ok",
+      "--status-ok-bg",
+      "--status-ok-border",
+      "--status-ok-fg",
+      "--status-steril-bg",
+      "--status-steril-border",
+      "--status-steril-fg",
+      "--status-sterilized",
+      "--text-2xl",
+      "--text-2xs",
+      "--text-3xl",
+      "--text-base",
+      "--text-lg",
+      "--text-sm",
+      "--text-xl",
+      "--text-xs",
+      "--tw-backdrop-blur",
+      "--tw-backdrop-brightness",
+      "--tw-backdrop-contrast",
+      "--tw-backdrop-grayscale",
+      "--tw-backdrop-hue-rotate",
+      "--tw-backdrop-invert",
+      "--tw-backdrop-opacity",
+      "--tw-backdrop-saturate",
+      "--tw-backdrop-sepia",
+      "--tw-bg-opacity",
+      "--tw-blur",
+      "--tw-border-opacity",
+      "--tw-border-spacing-x",
+      "--tw-border-spacing-y",
+      "--tw-brightness",
+      "--tw-contain-layout",
+      "--tw-contain-paint",
+      "--tw-contain-size",
+      "--tw-contain-style",
+      "--tw-contrast",
+      "--tw-drop-shadow",
+      "--tw-enter-opacity",
+      "--tw-enter-rotate",
+      "--tw-enter-scale",
+      "--tw-enter-translate-x",
+      "--tw-enter-translate-y",
+      "--tw-gradient-from",
+      "--tw-gradient-from-position",
+      "--tw-gradient-stops",
+      "--tw-gradient-to",
+      "--tw-gradient-to-position",
+      "--tw-gradient-via-position",
+      "--tw-grayscale",
+      "--tw-hue-rotate",
+      "--tw-invert",
+      "--tw-numeric-figure",
+      "--tw-numeric-fraction",
+      "--tw-numeric-spacing",
+      "--tw-ordinal",
+      "--tw-pan-x",
+      "--tw-pan-y",
+      "--tw-pinch-zoom",
+      "--tw-ring-color",
+      "--tw-ring-inset",
+      "--tw-ring-offset-color",
+      "--tw-ring-offset-shadow",
+      "--tw-ring-offset-width",
+      "--tw-ring-shadow",
+      "--tw-rotate",
+      "--tw-saturate",
+      "--tw-scale-x",
+      "--tw-scale-y",
+      "--tw-scroll-snap-strictness",
+      "--tw-sepia",
+      "--tw-shadow",
+      "--tw-shadow-color",
+      "--tw-shadow-colored",
+      "--tw-skew-x",
+      "--tw-skew-y",
+      "--tw-slashed-zero",
+      "--tw-text-opacity",
+      "--tw-translate-x",
+      "--tw-translate-y"
+    ],
+    "tokenKinds": {
+      "--tw-border-spacing-x": "spacing",
+      "--tw-border-spacing-y": "spacing",
+      "--tw-translate-x": "spacing",
+      "--tw-translate-y": "spacing",
+      "--tw-rotate": "other",
+      "--tw-skew-x": "other",
+      "--tw-skew-y": "other",
+      "--tw-scale-x": "other",
+      "--tw-scale-y": "other",
+      "--tw-pan-x": "other",
+      "--tw-pan-y": "other",
+      "--tw-pinch-zoom": "other",
+      "--tw-scroll-snap-strictness": "other",
+      "--tw-gradient-from-position": "other",
+      "--tw-gradient-via-position": "other",
+      "--tw-gradient-to-position": "other",
+      "--tw-ordinal": "other",
+      "--tw-slashed-zero": "other",
+      "--tw-numeric-figure": "other",
+      "--tw-numeric-spacing": "spacing",
+      "--tw-numeric-fraction": "other",
+      "--tw-ring-inset": "spacing",
+      "--tw-ring-offset-width": "spacing",
+      "--tw-ring-offset-color": "color",
+      "--tw-ring-color": "color",
+      "--tw-ring-offset-shadow": "shadow",
+      "--tw-ring-shadow": "shadow",
+      "--tw-shadow": "shadow",
+      "--tw-shadow-colored": "shadow",
+      "--tw-blur": "other",
+      "--tw-brightness": "other",
+      "--tw-contrast": "other",
+      "--tw-grayscale": "other",
+      "--tw-hue-rotate": "other",
+      "--tw-invert": "other",
+      "--tw-saturate": "other",
+      "--tw-sepia": "other",
+      "--tw-drop-shadow": "shadow",
+      "--tw-backdrop-blur": "other",
+      "--tw-backdrop-brightness": "other",
+      "--tw-backdrop-contrast": "other",
+      "--tw-backdrop-grayscale": "other",
+      "--tw-backdrop-hue-rotate": "other",
+      "--tw-backdrop-invert": "other",
+      "--tw-backdrop-opacity": "other",
+      "--tw-backdrop-saturate": "other",
+      "--tw-backdrop-sepia": "other",
+      "--tw-contain-size": "spacing",
+      "--tw-contain-layout": "other",
+      "--tw-contain-paint": "other",
+      "--tw-contain-style": "other",
+      "--background": "other",
+      "--foreground": "other",
+      "--card": "other",
+      "--card-foreground": "other",
+      "--popover": "other",
+      "--popover-foreground": "other",
+      "--primary": "other",
+      "--primary-foreground": "other",
+      "--secondary": "other",
+      "--secondary-foreground": "other",
+      "--muted": "other",
+      "--muted-foreground": "other",
+      "--accent": "other",
+      "--accent-foreground": "other",
+      "--destructive": "other",
+      "--destructive-foreground": "other",
+      "--border": "other",
+      "--input": "other",
+      "--ring": "other",
+      "--radius": "radius",
+      "--radius-sm": "radius",
+      "--radius-md": "radius",
+      "--radius-xl": "radius",
+      "--radius-2xl": "radius",
+      "--radius-pill": "radius",
+      "--text-2xs": "font",
+      "--text-xs": "font",
+      "--text-sm": "font",
+      "--text-base": "font",
+      "--text-lg": "font",
+      "--text-xl": "font",
+      "--text-2xl": "font",
+      "--text-3xl": "font",
+      "--leading-tight": "font",
+      "--leading-snug": "font",
+      "--leading-normal": "font",
+      "--shadow-card": "shadow",
+      "--shadow-card-hover": "shadow",
+      "--shadow-surface": "shadow",
+      "--brand-navy": "color",
+      "--brand-green-bright": "color",
+      "--brand-green-mid": "color",
+      "--status-info": "color",
+      "--status-ok": "other",
+      "--status-issue": "other",
+      "--status-maintenance": "other",
+      "--status-sterilized": "other",
+      "--sat": "color",
+      "--sab": "color",
+      "--ivory-bg": "color",
+      "--ivory-surface": "color",
+      "--ivory-border": "other",
+      "--ivory-borderMd": "other",
+      "--ivory-text": "font",
+      "--ivory-text2": "other",
+      "--ivory-text3": "other",
+      "--ivory-navy": "other",
+      "--ivory-green": "other",
+      "--ivory-greenMid": "other",
+      "--ivory-greenBg": "other",
+      "--ivory-ok": "color",
+      "--ivory-warn": "color",
+      "--ivory-err": "color",
+      "--ivory-info": "color",
+      "--color-background-warning": "color",
+      "--color-border-warning": "color",
+      "--color-text-warning": "font",
+      "--brand": "color",
+      "--brand-deep": "color",
+      "--brand-ink": "color",
+      "--brand-soft": "color",
+      "--brand-border": "color",
+      "--brand-shadow": "shadow",
+      "--hero-a": "color",
+      "--hero-b": "color",
+      "--action": "color",
+      "--action-deep": "color",
+      "--action-ink": "color",
+      "--action-soft": "color",
+      "--action-border": "color",
+      "--nav-bg": "color",
+      "--font-num": "font",
+      "--motion-instant": "other",
+      "--motion-quick": "other",
+      "--motion-enter": "other",
+      "--motion-celebrate": "other",
+      "--motion-pill": "other",
+      "--ease-enter": "other",
+      "--ease-reward": "other",
+      "--status-ok-bg": "color",
+      "--status-ok-fg": "color",
+      "--status-ok-border": "color",
+      "--status-issue-bg": "color",
+      "--status-issue-fg": "color",
+      "--status-issue-border": "color",
+      "--status-maint-bg": "color",
+      "--status-maint-fg": "color",
+      "--status-maint-border": "color",
+      "--status-steril-bg": "color",
+      "--status-steril-fg": "color",
+      "--status-steril-border": "color",
+      "--emergency-bg": "color",
+      "--emergency-surface": "color",
+      "--emergency-border": "other",
+      "--emergency-border-md": "other",
+      "--emergency-text": "font",
+      "--emergency-text2": "other",
+      "--emergency-accent": "other",
+      "--emergency-accent-soft": "other",
+      "--emergency-amber": "other",
+      "--offline-bg": "color",
+      "--offline-border": "other",
+      "--offline-text": "font",
+      "--shift-active": "other",
+      "--shift-inactive": "other",
+      "--tw-border-opacity": "other",
+      "--tw-bg-opacity": "color",
+      "--tw-gradient-from": "color",
+      "--tw-gradient-to": "color",
+      "--tw-gradient-stops": "color",
+      "--tw-text-opacity": "font",
+      "--tw-shadow-color": "shadow",
+      "--tw-enter-opacity": "color",
+      "--tw-enter-scale": "color",
+      "--tw-enter-rotate": "color",
+      "--tw-enter-translate-x": "color",
+      "--tw-enter-translate-y": "color"
+    },
+    "fontFamilies": []
+  }
+}

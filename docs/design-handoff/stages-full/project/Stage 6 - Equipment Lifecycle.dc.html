@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Heebo:wght@400;500;600;700;800&display=swap">
+<style>
+  /* ============================================================
+     STAGE 6 · EQUIPMENT LIFECYCLE & LOCATION — §15 NOTES
+     Binds the Stage 1 canonical token layer.
+     Screens: Equipment Detail (full) · Add/Edit · Room Radar · Rooms · My Equipment · QR Print.
+     S6-D1  Location confidence ladder (high · medium · low · unknown) drives
+            color, whether an accountable person renders, and the reasoning
+            copy — this is the location-inference system, distinct from the
+            6-state equipment-status enum.
+     S6-D2  Add/Edit reuses the same field chrome as the detail "at a glance"
+            facts — no separate form design system.
+     S6-D3  Room Radar (facility-wide readiness) and Rooms (lightweight index)
+            read the same room object — one data model, two views.
+     ============================================================ */
+  *{box-sizing:border-box}
+  html{font-size:17px}
+  body{margin:0;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-variant-numeric:tabular-nums}
+  :root{
+    --background:rgb(242 242 247); --surface:rgb(255 255 255); --surface-2:rgb(255 255 255);
+    --foreground:rgb(0 0 0); --muted-foreground:rgba(60,60,67,0.6); --border:rgba(60,60,67,0.29);
+    --hairline:transparent;
+    --brand:rgb(79 70 229); --brand-foreground:rgb(255 255 255); --brand-ink:rgb(30 27 75);
+    --action:rgb(47 111 94); --action-foreground:rgb(255 255 255);
+    --sys-red:255 59 48; --sys-orange:255 149 0; --sys-green:52 199 89; --sys-blue:0 122 255; --sys-gray:142 142 147;
+    --radius-sm:10px; --radius-md:12px; --radius-lg:14px; --radius-xl:16px; --radius-2xl:20px; --radius-pill:999px;
+    --ease-standard:cubic-bezier(0.2,0,0,1); --dur-fast:120ms; --dur-base:200ms; --dur-slow:320ms; --dur-spin:700ms;
+    --font-sans:-apple-system,system-ui,"Heebo","Segoe UI",Roboto,sans-serif;
+    --font-num:"DM Mono",ui-monospace,SFMono-Regular,monospace;
+    --display:2.353rem; --text-largetitle:2rem; --text-xl:1.294rem; --text-lg:1.176rem;
+    --text-base:1rem; --text-sm:0.882rem; --text-xs:0.765rem; --text-2xs:0.647rem;
+    --bar-bg:rgb(255 255 255 / 0.94); --bar-bg-opaque:rgb(255 255 255); --bar-blur:12px;
+    --shadow-hero:0 1px 2px rgba(0,0,0,0.06); --shadow-floating:0 8px 24px -12px rgba(0,0,0,0.25);
+    --tonal:rgba(120,120,128,0.16);
+    --primary:var(--brand); --primary-foreground:var(--brand-foreground); --brand-navy:var(--brand-ink);
+    --status-ok:rgb(var(--sys-green)); --status-ok-bg:rgb(var(--sys-green) / 0.12); --status-ok-border:rgb(var(--sys-green) / 0.22); --status-ok-fg:rgb(var(--sys-green));
+    --status-in-use:rgb(var(--sys-blue)); --status-in-use-bg:rgb(var(--sys-blue) / 0.12); --status-in-use-border:rgb(var(--sys-blue) / 0.22); --status-in-use-fg:rgb(var(--sys-blue));
+    --status-issue:rgb(var(--sys-red)); --status-issue-bg:rgb(var(--sys-red) / 0.12); --status-issue-border:rgb(var(--sys-red) / 0.22); --status-issue-fg:rgb(var(--sys-red));
+    --status-stale:rgb(var(--sys-orange)); --status-stale-bg:rgb(var(--sys-orange) / 0.12); --status-stale-border:rgb(var(--sys-orange) / 0.22); --status-stale-fg:rgb(var(--sys-orange));
+    --status-overdue:rgb(var(--sys-orange)); --status-overdue-bg:rgb(var(--sys-orange) / 0.12); --status-overdue-border:rgb(var(--sys-orange) / 0.22); --status-overdue-fg:rgb(var(--sys-orange));
+    --status-unknown:rgb(var(--sys-gray)); --status-unknown-bg:rgb(var(--sys-gray) / 0.14); --status-unknown-border:rgb(var(--sys-gray) / 0.26); --status-unknown-fg:rgb(var(--sys-gray));
+    --on-ink:rgb(255 255 255); --on-ink-strong:rgb(255 255 255 / 0.82); --on-ink-muted:rgb(255 255 255 / 0.6); --on-ink-subtle:rgb(255 255 255 / 0.5); --on-ink-disabled:rgb(255 255 255 / 0.4); --on-ink-dim:rgb(255 255 255 / 0.7); --on-ink-hi:rgb(255 255 255 / 0.9);
+    --ink-sheen:rgb(255 255 255 / 0.1); --ink-divider:rgb(255 255 255 / 0.12); --ink-skeleton:rgb(255 255 255 / 0.14); --ink-fill-faint:rgb(255 255 255 / 0.04); --ink-fill-weak:rgb(255 255 255 / 0.08); --ink-fill:rgb(255 255 255 / 0.1); --ink-fill-15:rgb(255 255 255 / 0.15); --ink-fill-strong:rgb(255 255 255 / 0.18); --ink-border-soft:rgb(255 255 255 / 0.2); --ink-border:rgb(255 255 255 / 0.28); --ink-border-strong:rgb(255 255 255 / 0.3); --ink-shimmer:rgb(255 255 255 / 0.28);
+  }
+  .dark{
+    --background:rgb(0 0 0); --surface:rgb(28 28 30); --surface-2:rgb(44 44 46);
+    --foreground:rgb(255 255 255); --muted-foreground:rgba(235,235,245,0.6); --border:rgba(84,84,88,0.6);
+    --hairline:rgba(84,84,88,0.6);
+    --brand:rgb(129 140 248); --brand-foreground:rgb(30 27 75); --brand-ink:rgb(30 27 75);
+    --action:rgb(76 205 170); --action-foreground:rgb(6 33 15);
+    --sys-red:255 69 58; --sys-orange:255 159 10; --sys-green:48 209 88; --sys-blue:10 132 255; --sys-gray:152 152 157;
+    --bar-bg:rgba(28,28,30,0.94); --bar-bg-opaque:rgb(28 28 30); --shadow-hero:0 1px 2px rgba(0,0,0,0.5);
+    --tonal:rgba(120,120,128,0.24);
+  }
+  .rt{ --bar-bg:var(--bar-bg-opaque); --bar-blur:0px; }
+  @media (prefers-reduced-transparency: reduce){ :root,.dark{ --bar-bg:var(--bar-bg-opaque); --bar-blur:0px; } }
+  a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,[tabindex]:focus-visible,[role="button"]:focus-visible{outline:none;box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--brand)}
+  @keyframes vt-ping{0%{transform:scale(1);opacity:.7}70%{transform:scale(2.4);opacity:0}100%{opacity:0}}
+  @keyframes vt-spin{to{transform:rotate(360deg)}}
+  @keyframes vt-shimmer{100%{transform:translateX(100%)}}
+  .skd{position:relative; overflow:hidden; background:rgba(120,120,128,0.16)}
+  .dark .skd{background:var(--ink-sheen)}
+  .skd::after{content:""; position:absolute; inset:0; transform:translateX(-100%); background:linear-gradient(90deg,transparent,var(--ink-shimmer),transparent); animation:vt-shimmer 1.4s infinite}
+  @media (prefers-reduced-motion: reduce){ *{animation:none !important} .skd::after{display:none} }
+</style>
+</helmet>
+<div class="{{ pageClass }}" style="min-height:100vh; background:var(--background); color:var(--foreground); font-family:var(--font-sans); transition:background var(--dur-base) var(--ease-standard)">
+
+  <header style="position:sticky; top:0; z-index:50; background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); -webkit-backdrop-filter:blur(var(--bar-blur)); border-bottom:1px solid var(--border)">
+    <div style="max-width:1240px; margin:0 auto; padding:11px 20px; display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px">
+      <div style="display:flex; align-items:baseline; gap:10px; margin-right:auto"><span style="font:700 17px var(--font-sans); letter-spacing:-.02em; color:var(--brand)">VetTrack</span><span style="font:500 12px var(--font-num); color:var(--muted-foreground)">Stage 6 · Equipment Lifecycle</span></div>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">Screen</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px; flex-wrap:wrap"><sc-for list="{{ screenOpts }}" as="o" hint-placeholder-count="6"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">Theme</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px"><sc-for list="{{ themeOpts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">Size</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px"><sc-for list="{{ sizeOpts }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+      <sc-if value="{{ hasVariant }}" hint-placeholder-val="{{ true }}"><div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">{{ variantTitle }}</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px; flex-wrap:wrap"><sc-for list="{{ variantOpts }}" as="o" hint-placeholder-count="5"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div></sc-if>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">Locale</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px"><sc-for list="{{ dirOpts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+    </div>
+  </header>
+
+  <div style="padding:26px 16px 70px; display:flex; justify-content:center; overflow:auto">
+    <div style="{{ frameOuter }}; display:flex; flex-direction:column; box-sizing:border-box; overflow:hidden">
+
+      <sc-if value="{{ browserChrome }}" hint-placeholder-val="{{ false }}">
+        <div style="height:38px; background:var(--surface-2); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; padding:0 14px; flex-shrink:0"><span style="width:11px; height:11px; border-radius:999px; background:#FF5F57"></span><span style="width:11px; height:11px; border-radius:999px; background:#FEBC2E"></span><span style="width:11px; height:11px; border-radius:999px; background:#28C840"></span><div style="margin-inline-start:14px; flex:1; max-width:340px; height:24px; border-radius:7px; background:var(--background); border:1px solid var(--border); display:flex; align-items:center; gap:7px; padding:0 10px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span style="font:400 12px var(--font-num); color:var(--muted-foreground)" dir="ltr">vettrack.app{{ routePath }}</span></div></div>
+      </sc-if>
+
+      <div dir="{{ dir }}" style="{{ screenStyle }}; flex:1; min-height:0; display:flex; flex-direction:column; background:var(--background); overflow:hidden; position:relative">
+
+        <sc-if value="{{ isCompact }}" hint-placeholder-val="{{ true }}">
+          <div style="min-height:44px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; padding-top:env(safe-area-inset-top); padding-inline:26px; background:var(--background)">
+            <span style="font:600 15px var(--font-num); color:var(--foreground)">9:41</span>
+            <div style="display:flex; align-items:center; gap:6px; color:var(--foreground)"><svg width="17" height="12" viewBox="0 0 18 12" fill="currentColor" aria-hidden="true"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="5" y="4.5" width="3" height="7.5" rx="1"/><rect x="10" y="2" width="3" height="10" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1" opacity="0.4"/></svg><div style="width:24px; height:12px; border:1px solid currentColor; border-radius:3px; padding:1.5px; opacity:.9"><div style="width:72%; height:100%; background:currentColor; border-radius:1px"></div></div></div>
+          </div>
+        </sc-if>
+
+        <div style="flex:1; min-height:0; display:flex">
+
+          <sc-if value="{{ hasSidebar }}" hint-placeholder-val="{{ false }}">
+            <aside style="width:220px; flex-shrink:0; background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); -webkit-backdrop-filter:blur(var(--bar-blur)); border-inline-end:1px solid var(--border); display:flex; flex-direction:column; padding:18px 12px">
+              <div style="padding:6px 10px 18px; font:700 18px var(--font-sans); color:var(--brand)">VetTrack</div>
+              <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="5">
+  <div style="display:flex; align-items:center; gap:11px; padding:10px 11px; border-radius:10px; background:{{ n.bg }}; color:{{ n.color }}; margin-bottom:2px">
+    <span style="display:flex; flex-shrink:0">
+      <sc-if value="{{ n.isToday }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ n.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/></svg></sc-if>
+      <sc-if value="{{ n.isEquipment }}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ n.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></sc-if>
+      <sc-if value="{{ n.isInventory }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ n.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9h18"/><path d="M3 15h18"/><rect x="3" y="4" width="18" height="16" rx="2"/></svg></sc-if>
+      <sc-if value="{{ n.isRooms }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ n.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-6h6v6"/></svg></sc-if>
+      <sc-if value="{{ n.isAnalytics }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ n.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></sc-if>
+      <sc-if value="{{ n.isAdmin }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ n.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 3 7v6c0 5 4 8 9 9 5-1 9-4 9-9V7z"/></svg></sc-if>
+      <sc-if value="{{ n.isAlerts }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ n.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></sc-if>
+    </span>
+    <span style="font-size:14px; font-weight:{{ n.weight }}; font-family:var(--font-sans)">{{ n.label }}</span>
+  </div>
+</sc-for>
+              <div style="margin-top:auto; display:flex; align-items:center; gap:11px; padding:10px 11px; border-radius:10px; color:var(--muted-foreground)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg><span style="font:500 14px var(--font-sans)">{{ moreLabel }}</span></div>
+            </aside>
+          </sc-if>
+
+          <div style="flex:1; min-width:0; display:flex; flex-direction:column">
+
+            <sc-if value="{{ isExpanded }}" hint-placeholder-val="{{ false }}">
+              <div style="height:56px; flex-shrink:0; display:flex; align-items:center; gap:14px; padding:0 24px; background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); -webkit-backdrop-filter:blur(var(--bar-blur)); border-bottom:1px solid var(--border)">
+                <span style="font:600 16px var(--font-sans)">{{ topbarTitle }}</span>
+                <div style="margin-inline-start:auto; display:flex; align-items:center; gap:8px; background:var(--background); border:1px solid var(--border); border-radius:10px; padding:7px 12px; min-width:220px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span style="font:400 13px var(--font-sans); color:var(--muted-foreground)">{{ searchPlaceholder }}</span></div>
+                <div style="width:32px; height:32px; border-radius:999px; background:var(--brand); color:var(--brand-foreground); display:flex; align-items:center; justify-content:center; font:700 12px var(--font-sans)">MA</div>
+              </div>
+            </sc-if>
+
+            <main style="flex:1; min-height:0; overflow:auto; padding:{{ mainPad }}">
+              <div style="max-width:{{ contentMax }}; margin:0 auto; display:flex; flex-direction:column; gap:{{ contentGap }}">
+
+                <!-- ===================== EQUIPMENT DETAIL ===================== -->
+                <sc-if value="{{ showDetail }}" hint-placeholder-val="{{ true }}">
+                  <div data-screen-label="Equipment Detail" style="display:flex; flex-direction:column; gap:{{ contentGap }}">
+
+                    <div style="display:flex; align-items:center; gap:12px">
+                      <button aria-label="{{ backLabel }}" style="width:38px; height:38px; border:none; border-radius:11px; background:var(--tonal); color:var(--foreground); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0"><svg style="transform:{{ chevronT }}" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+                      <div style="flex:1; min-width:0; display:flex; align-items:center; gap:10px; flex-wrap:wrap"><h1 style="font-size:{{ detailTitleSize }}; font-weight:700; letter-spacing:-.02em; margin:0; line-height:1.1">{{ eqName }}</h1><span style="flex-shrink:0; display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:999px; background:{{ eqStatusBg }}; color:{{ eqStatusFg }}; font:600 11.5px var(--font-sans); white-space:nowrap"><span innerHTML="{{ eqStatusIcon }}"></span>{{ eqStatusLabel }}</span></div>
+                    </div>
+                    <p style="font:600 11px var(--font-sans); letter-spacing:.04em; text-transform:uppercase; color:var(--muted-foreground); margin:-10px 0 0">{{ eqMeta }}</p>
+
+                    <sc-if value="{{ detailLoading }}" hint-placeholder-val="{{ false }}">
+                      <div class="skd" style="width:100%; height:150px; border-radius:20px"></div>
+                      <div style="display:grid; grid-template-columns:{{ factCols }}; gap:10px"><sc-for list="{{ loadingFacts }}" as="lf" hint-placeholder-count="4"><div class="skd" style="height:64px; border-radius:14px"></div></sc-for></div>
+                      <div class="skd" style="width:100%; height:180px; border-radius:20px"></div>
+                    </sc-if>
+
+                    <sc-if value="{{ detailShowContent }}" hint-placeholder-val="{{ true }}">
+
+                      <!-- LOCATION CONFIDENCE CARD -->
+                      <div style="position:relative; overflow:hidden; background:radial-gradient(130% 90% at 0% 0%, var(--ink-sheen), transparent 60%), var(--brand-ink); border-radius:20px; padding:18px 20px; color:var(--on-ink); box-shadow:var(--shadow-hero)">
+                        <div style="display:flex; align-items:center; justify-content:space-between"><span style="font:600 11px var(--font-sans); letter-spacing:.09em; text-transform:uppercase; color:var(--on-ink-muted)">{{ locCardTitle }}</span><div style="display:flex; align-items:center; gap:6px"><span style="width:8px; height:8px; border-radius:999px; background:{{ confColor }}; flex-shrink:0"></span><span style="font:600 12px var(--font-sans); color:{{ confColor }}">{{ confLabel }}</span></div></div>
+                        <p style="font-size:1.35rem; font-weight:700; color:var(--on-ink); margin:12px 0 0; line-height:1.2">{{ inferredLocation }}</p>
+                        <p style="font:400 13.5px/1.5 var(--font-sans); color:var(--on-ink-dim); margin:5px 0 0; max-width:42ch">{{ reasoning }}</p>
+                        <sc-if value="{{ showAccountable }}" hint-placeholder-val="{{ false }}">
+                          <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--ink-divider); display:flex; align-items:center; gap:10px">
+                            <div style="width:30px; height:30px; border-radius:999px; background:var(--ink-fill); display:flex; align-items:center; justify-content:center; font:700 13px var(--font-sans); color:var(--on-ink); flex-shrink:0">{{ accInitials }}</div>
+                            <div style="min-width:0; flex:1"><p style="font:600 13.5px var(--font-sans); color:var(--on-ink); margin:0">{{ accName }}</p><p style="font:500 12px var(--font-sans); color:var(--on-ink-muted); margin:1px 0 0">{{ accRoom }}</p></div>
+                            <span style="font:500 11.5px var(--font-num); color:var(--on-ink-subtle); flex-shrink:0">{{ accTime }}</span>
+                          </div>
+                        </sc-if>
+                      </div>
+
+                      <!-- SERVICE SCHEDULE -->
+                      <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:18px; padding:16px 18px">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px"><span style="font:600 14px var(--font-sans)">{{ serviceLabel }}</span><button style="height:32px; padding:0 12px; border:none; border-radius:9px; background:var(--tonal); color:var(--foreground); font:600 12px var(--font-sans); cursor:pointer">{{ markServicedLabel }}</button></div>
+                        <div style="height:8px; border-radius:999px; background:var(--tonal); overflow:hidden"><div style="width:{{ servicePct }}; height:100%; background:var(--status-ok-fg); border-radius:999px"></div></div>
+                        <div style="display:flex; justify-content:space-between; margin-top:8px; font:500 12px var(--font-num); color:var(--muted-foreground)"><span>{{ serviceStart }}</span><span>{{ serviceEnd }}</span></div>
+                        <p style="font:500 12.5px var(--font-sans); color:var(--muted-foreground); margin:8px 0 0">{{ serviceNote }}</p>
+                      </div>
+
+                      <!-- AT A GLANCE -->
+                      <div>
+                        <p style="font:600 11px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 10px">{{ glanceLabel }}</p>
+                        <div style="display:grid; grid-template-columns:{{ factCols }}; gap:10px"><sc-for list="{{ facts }}" as="fct" hint-placeholder-count="4"><div style="background:var(--surface); border:1px solid var(--hairline); border-radius:14px; padding:12px 14px"><p style="font:600 10px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); margin:0">{{ fct.label }}</p><p style="font:600 14px var(--font-sans); color:var(--foreground); margin:4px 0 0">{{ fct.value }}</p></div></sc-for></div>
+                      </div>
+
+                      <!-- ACCOUNTABILITY TIMELINE -->
+                      <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:18px; padding:18px 20px">
+                        <p style="font:600 11px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 14px">{{ timelineLabel }}</p>
+                        <sc-for list="{{ timeline }}" as="tl" hint-placeholder-count="3">
+                          <div style="display:flex; gap:12px">
+                            <div style="display:flex; flex-direction:column; align-items:center; flex-shrink:0; width:18px"><div style="width:8px; height:8px; border-radius:999px; background:var(--brand); margin-top:4px; flex-shrink:0"></div><sc-if value="{{ tl.hasLine }}" hint-placeholder-val="{{ true }}"><div style="width:1px; flex:1; background:var(--border); margin:4px 0"></div></sc-if></div>
+                            <div style="padding-bottom:{{ tl.pad }}; min-width:0; flex:1"><p style="font:600 13.5px var(--font-sans); color:var(--foreground); margin:0">{{ tl.who }}</p><p style="font:500 12px var(--font-sans); color:var(--muted-foreground); margin:2px 0 0">{{ tl.what }}</p><p style="font:500 11.5px var(--font-num); color:var(--muted-foreground); margin:2px 0 0">{{ tl.when }}</p></div>
+                          </div>
+                        </sc-for>
+                      </div>
+
+                      <!-- ACTIONS -->
+                      <div style="display:flex; gap:10px"><button style="flex:1; height:50px; border:none; border-radius:14px; background:var(--brand); color:var(--brand-foreground); font:700 15px var(--font-sans); cursor:pointer">{{ primaryAction }}</button><button style="height:50px; padding:0 18px; border:1px solid var(--border); border-radius:14px; background:var(--surface); color:var(--foreground); font:700 14px var(--font-sans); cursor:pointer">{{ flagAction }}</button></div>
+                      <button style="align-self:center; border:none; background:none; color:var(--status-issue-fg); font:600 13px var(--font-sans); cursor:pointer; padding:4px">{{ reportMissingAction }}</button>
+
+                    </sc-if>
+                  </div>
+                </sc-if>
+
+                <!-- ===================== ADD/EDIT EQUIPMENT ===================== -->
+                <sc-if value="{{ showForm }}" hint-placeholder-val="{{ false }}">
+                  <div data-screen-label="Add/Edit Equipment" style="display:flex; flex-direction:column; gap:{{ contentGap }}">
+                    <h1 style="font-size:{{ detailTitleSize }}; font-weight:700; letter-spacing:-.02em; margin:0">{{ formTitle }}</h1>
+                    <div style="display:flex; align-items:center; gap:14px; padding:14px; border:2px dashed var(--border); border-radius:16px">
+                      <div style="width:56px; height:56px; border-radius:14px; background:var(--tonal); display:flex; align-items:center; justify-content:center; flex-shrink:0; color:var(--muted-foreground)"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3.2"/><path d="M8 5l1.5-2h5L16 5"/></svg></div>
+                      <div><p style="font:600 14px var(--font-sans); color:var(--foreground); margin:0">{{ formPhotoLabel }}</p><p style="font:500 12px var(--font-sans); color:var(--muted-foreground); margin:2px 0 0">{{ formPhotoSub }}</p></div>
+                    </div>
+                    <div>
+                      <p style="font:600 11px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 10px">{{ formBasicLabel }}</p>
+                      <div style="display:flex; flex-direction:column; gap:10px">
+                        <div style="background:var(--surface); border:1px solid var(--border); border-radius:13px; padding:11px 14px"><p style="font:600 10px var(--font-sans); letter-spacing:.05em; text-transform:uppercase; color:var(--muted-foreground); margin:0">{{ formNameLabel }}</p><p style="font:500 15px var(--font-sans); color:{{ formNameColor }}; margin:4px 0 0">{{ formNameValue }}</p></div>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap"><sc-for list="{{ formCategories }}" as="cat" hint-placeholder-count="6"><button onClick="{{ cat.onClick }}" style="{{ cat.style }}">{{ cat.label }}</button></sc-for></div>
+                        <div style="display:grid; grid-template-columns:{{ factCols2 }}; gap:10px">
+                          <div style="background:var(--surface); border:1px solid var(--border); border-radius:13px; padding:11px 14px"><p style="font:600 10px var(--font-sans); letter-spacing:.05em; text-transform:uppercase; color:var(--muted-foreground); margin:0">{{ formSerialLabel }}</p><p style="font:500 14px var(--font-num); color:{{ formNameColor }}; margin:4px 0 0">{{ formSerialValue }}</p></div>
+                          <div style="background:var(--surface); border:1px solid var(--border); border-radius:13px; padding:11px 14px"><p style="font:600 10px var(--font-sans); letter-spacing:.05em; text-transform:uppercase; color:var(--muted-foreground); margin:0">{{ formManufLabel }}</p><p style="font:500 14px var(--font-sans); color:{{ formNameColor }}; margin:4px 0 0">{{ formManufValue }}</p></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <p style="font:600 11px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 10px">{{ formLocationLabel }}</p>
+                      <div style="display:grid; grid-template-columns:{{ factCols2 }}; gap:10px">
+                        <div style="background:var(--surface); border:1px solid var(--border); border-radius:13px; padding:11px 14px; display:flex; align-items:center; justify-content:space-between"><div><p style="font:600 10px var(--font-sans); letter-spacing:.05em; text-transform:uppercase; color:var(--muted-foreground); margin:0">{{ formRoomLabel }}</p><p style="font:500 14px var(--font-sans); color:{{ formNameColor }}; margin:4px 0 0">{{ formRoomValue }}</p></div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+                        <div style="background:var(--surface); border:1px solid var(--border); border-radius:13px; padding:11px 14px; display:flex; align-items:center; justify-content:space-between"><div><p style="font:600 10px var(--font-sans); letter-spacing:.05em; text-transform:uppercase; color:var(--muted-foreground); margin:0">{{ formFolderLabel }}</p><p style="font:500 14px var(--font-sans); color:{{ formNameColor }}; margin:4px 0 0">{{ formFolderValue }}</p></div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+                      </div>
+                    </div>
+                    <div>
+                      <p style="font:600 11px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 10px">{{ formStatusLabel }}</p>
+                      <div style="display:flex; gap:8px; flex-wrap:wrap"><sc-for list="{{ formStatuses }}" as="st" hint-placeholder-count="3"><button onClick="{{ st.onClick }}" style="{{ st.style }}">{{ st.label }}</button></sc-for></div>
+                    </div>
+                    <div style="position:sticky; bottom:0; background:var(--background); padding-top:6px; display:flex; gap:10px"><button style="flex:1; height:48px; border:1px solid var(--border); border-radius:14px; background:var(--surface); color:var(--foreground); font:700 15px var(--font-sans); cursor:pointer">{{ formCancelLabel }}</button><button style="flex:1; height:48px; border:none; border-radius:14px; background:var(--brand); color:var(--brand-foreground); font:700 15px var(--font-sans); cursor:pointer">{{ formSaveLabel }}</button></div>
+                  </div>
+                </sc-if>
+
+                <!-- ===================== ROOMS LIST ===================== -->
+                <sc-if value="{{ showRooms }}" hint-placeholder-val="{{ false }}">
+                  <div data-screen-label="Rooms" style="display:flex; flex-direction:column; gap:{{ contentGap }}">
+                    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:12px"><div><h1 style="font-size:{{ detailTitleSize }}; font-weight:700; letter-spacing:-.02em; margin:0">{{ roomsTitle }}</h1><p style="font:500 14px var(--font-sans); color:var(--muted-foreground); margin:5px 0 0">{{ roomsSubtitle }}</p></div><button style="height:38px; padding:0 14px; border:none; border-radius:11px; background:var(--brand); color:var(--brand-foreground); font:700 13px var(--font-sans); cursor:pointer; flex-shrink:0">{{ roomsAddLabel }}</button></div>
+                    <sc-if value="{{ roomsEmpty }}" hint-placeholder-val="{{ false }}">
+                      <div style="border:1px dashed var(--border); border-radius:20px; padding:44px 24px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:12px"><div style="width:56px; height:56px; border-radius:16px; background:var(--tonal); display:flex; align-items:center; justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-6h6v6"/></svg></div><p style="font:600 17px var(--font-sans); margin:0">{{ roomsEmptyTitle }}</p><p style="font:400 14px/1.5 var(--font-sans); color:var(--muted-foreground); margin:0; max-width:32ch">{{ roomsEmptySub }}</p></div>
+                    </sc-if>
+                    <sc-if value="{{ roomsShowList }}" hint-placeholder-val="{{ true }}">
+                      <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:18px; overflow:hidden"><sc-for list="{{ roomsList }}" as="rm" hint-placeholder-count="6"><div style="display:flex; align-items:center; gap:12px; padding:13px 16px; border-top:1px solid var(--border)"><span style="width:9px; height:9px; border-radius:999px; background:{{ rm.dot }}; flex-shrink:0"></span><div style="flex:1; min-width:0"><p style="font:600 14.5px var(--font-sans); color:var(--foreground); margin:0">{{ rm.name }}</p><p style="font:500 12.5px var(--font-sans); color:var(--muted-foreground); margin:2px 0 0">{{ rm.meta }}</p></div><svg style="transform:{{ chevronT }}; flex-shrink:0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div></sc-for></div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+
+                <!-- ===================== MY EQUIPMENT ===================== -->
+                <sc-if value="{{ showMine }}" hint-placeholder-val="{{ false }}">
+                  <div data-screen-label="My Equipment" style="display:flex; flex-direction:column; gap:{{ contentGap }}">
+                    <div><h1 style="font-size:{{ detailTitleSize }}; font-weight:700; letter-spacing:-.02em; margin:0">{{ mineTitle }}</h1><p style="font:500 14px var(--font-sans); color:var(--muted-foreground); margin:5px 0 0">{{ mineSubtitle }}</p></div>
+                    <sc-if value="{{ mineOverdueBanner }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex; align-items:center; gap:12px; padding:13px 15px; border-radius:14px; background:var(--status-issue-bg); border:1px solid var(--status-issue-border)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--status-issue-fg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><p style="flex:1; font:600 13.5px var(--font-sans); color:var(--status-issue-fg); margin:0">{{ mineOverdueText }}</p></div>
+                    </sc-if>
+                    <sc-if value="{{ mineLoading }}" hint-placeholder-val="{{ false }}"><div style="display:flex; flex-direction:column; gap:10px"><sc-for list="{{ loadingFacts }}" as="lf" hint-placeholder-count="3"><div class="skd" style="height:74px; border-radius:16px"></div></sc-for></div></sc-if>
+                    <sc-if value="{{ mineEmpty }}" hint-placeholder-val="{{ false }}">
+                      <div style="border:1px dashed var(--border); border-radius:20px; padding:44px 24px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:12px"><div style="width:56px; height:56px; border-radius:16px; background:var(--status-ok-bg); display:flex; align-items:center; justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--status-ok-fg)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></div><p style="font:600 17px var(--font-sans); margin:0">{{ mineEmptyTitle }}</p><p style="font:400 14px/1.5 var(--font-sans); color:var(--muted-foreground); margin:0; max-width:32ch">{{ mineEmptySub }}</p></div>
+                    </sc-if>
+                    <sc-if value="{{ mineShowList }}" hint-placeholder-val="{{ true }}">
+                      <div style="display:flex; flex-direction:column; gap:10px"><sc-for list="{{ mineItems }}" as="m" hint-placeholder-count="3">
+                        <div style="display:flex; align-items:center; gap:13px; padding:14px 16px; border-radius:16px; background:var(--surface); border:1px solid {{ m.cardBorder }}">
+                          <div style="flex:1; min-width:0"><p style="font:600 14.5px var(--font-sans); color:var(--foreground); margin:0">{{ m.name }}</p><p style="font:500 12.5px var(--font-sans); color:{{ m.metaColor }}; margin:3px 0 0">{{ m.meta }}</p></div>
+                          <button style="flex-shrink:0; height:38px; padding:0 14px; border:1px solid {{ m.btnBorder }}; border-radius:11px; background:{{ m.btnBg }}; color:{{ m.btnColor }}; font:700 12.5px var(--font-sans); cursor:pointer">{{ m.btnLabel }}</button>
+                        </div>
+                      </sc-for></div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+
+                <!-- ===================== ROOM RADAR ===================== -->
+                <sc-if value="{{ showRadar }}" hint-placeholder-val="{{ false }}">
+                  <div data-screen-label="Room Radar" style="display:flex; flex-direction:column; gap:{{ contentGap }}">
+                    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:12px"><div><h1 style="font-size:{{ detailTitleSize }}; font-weight:700; letter-spacing:-.02em; margin:0">{{ radarTitle }}</h1><p style="font:500 14px var(--font-sans); color:var(--muted-foreground); margin:5px 0 0">{{ radarSubtitle }}</p></div><div style="text-align:end; flex-shrink:0"><p style="font-family:var(--font-num); font-size:var(--text-xl); font-weight:500; color:{{ radarPctColor }}; margin:0; line-height:1">{{ radarPct }}%</p><p style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground); margin:3px 0 0">{{ radarPctLabel }}</p></div></div>
+                    <sc-if value="{{ radarOffline }}" hint-placeholder-val="{{ false }}"><div role="alert" style="display:flex; align-items:center; gap:11px; padding:10px 14px; border-radius:12px; background:var(--tonal); color:var(--foreground)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 14 0"/><path d="m2 8.8 1.8 1.5"/><path d="M22 8.8 20.2 10.3"/><path d="m2 2 20 20"/></svg><span style="font:600 13.5px var(--font-sans)">{{ radarOfflineBanner }}</span></div></sc-if>
+                    <sc-if value="{{ radarLoading }}" hint-placeholder-val="{{ false }}"><div style="display:grid; grid-template-columns:{{ radarCols }}; gap:12px"><sc-for list="{{ radarSkeletons }}" as="s" hint-placeholder-count="9"><div class="skd" style="height:110px; border-radius:16px"></div></sc-for></div></sc-if>
+                    <sc-if value="{{ radarShowGrid }}" hint-placeholder-val="{{ true }}">
+                      <div style="display:grid; grid-template-columns:{{ radarCols }}; gap:12px"><sc-for list="{{ radarRooms }}" as="rm" hint-placeholder-count="9">
+                        <div style="border:1px solid {{ rm.cardBorder }}; background:var(--surface); border-radius:16px; padding:14px">
+                          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px"><span style="font:700 13px var(--font-sans); text-transform:uppercase; letter-spacing:.02em; color:var(--foreground)">{{ rm.name }}</span><sc-if value="{{ rm.hasAttention }}" hint-placeholder-val="{{ false }}"><span style="flex-shrink:0; padding:3px 9px; border-radius:999px; background:var(--status-issue-bg); color:var(--status-issue-fg); font:600 10px var(--font-sans)">{{ rm.attentionText }}</span></sc-if></div>
+                          <p style="font:500 12px var(--font-sans); color:var(--muted-foreground); margin:4px 0 0">{{ rm.statusLine }}</p>
+                          <div style="display:flex; align-items:center; gap:8px; margin-top:11px"><div style="height:6px; flex:1; border-radius:999px; background:var(--tonal); overflow:hidden"><div style="height:100%; width:{{ rm.pct }}%; border-radius:999px; background:{{ rm.ringColor }}"></div></div><span style="font:700 12px var(--font-num); color:var(--foreground); flex-shrink:0">{{ rm.pct }}%</span></div>
+                          <p style="font:500 12px var(--font-sans); color:var(--muted-foreground); margin:9px 0 0">{{ rm.count }}</p>
+                        </div>
+                      </sc-for></div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+
+                <!-- ===================== QR PRINT ===================== -->
+                <sc-if value="{{ showQr }}" hint-placeholder-val="{{ false }}">
+                  <div data-screen-label="QR Print" style="display:flex; flex-direction:column; gap:{{ contentGap }}">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px"><div><h1 style="font-size:{{ detailTitleSize }}; font-weight:700; letter-spacing:-.02em; margin:0">{{ qrTitle }}</h1><p style="font:500 13px var(--font-sans); color:var(--muted-foreground); margin:4px 0 0">{{ qrSubtitle }}</p></div><button style="height:40px; padding:0 16px; border:none; border-radius:12px; background:var(--brand); color:var(--brand-foreground); font:700 13px var(--font-sans); cursor:pointer; flex-shrink:0; display:flex; align-items:center; gap:7px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>{{ qrPrintLabel }}</button></div>
+                    <div style="display:grid; grid-template-columns:{{ qrCols }}; gap:14px"><sc-for list="{{ qrLabels }}" as="q" hint-placeholder-count="6">
+                      <div style="border:1px solid var(--border); background:var(--surface); border-radius:16px; padding:16px; display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center">
+                        <div style="width:76px; height:76px; border-radius:12px; background:var(--tonal); display:flex; align-items:center; justify-content:center; color:var(--foreground)"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="3" height="3" rx="0.5"/><rect x="18" y="14" width="3" height="3" rx="0.5"/><rect x="14" y="18" width="3" height="3" rx="0.5"/><rect x="18" y="18" width="3" height="3" rx="0.5"/></svg></div>
+                        <div><p style="font:600 13.5px var(--font-sans); color:var(--foreground); margin:0">{{ q.name }}</p><p style="font:500 11.5px var(--font-num); color:var(--muted-foreground); margin:2px 0 0">{{ q.id }}</p></div>
+                      </div>
+                    </sc-for></div>
+                  </div>
+                </sc-if>
+
+              </div>
+            </main>
+
+            <sc-if value="{{ isCompact }}" hint-placeholder-val="{{ true }}">
+              <nav style="flex-shrink:0; background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); -webkit-backdrop-filter:blur(var(--bar-blur)); border-top:1px solid var(--border); padding:6px 8px max(env(safe-area-inset-bottom), 22px); display:flex; justify-content:space-between">
+                <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+  <div style="flex:1; min-height:50px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; border-radius:12px; {{ t.scanBg }}">
+    <span style="color:{{ t.color }}; display:flex">
+      <sc-if value="{{ t.isToday }}" hint-placeholder-val="{{ true }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="{{ t.fill }}" stroke="currentColor" stroke-width="{{ t.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/></svg></sc-if>
+      <sc-if value="{{ t.isEquipment }}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="{{ t.fill }}" stroke="currentColor" stroke-width="{{ t.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></sc-if>
+      <sc-if value="{{ t.isScan }}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="{{ t.fill }}" stroke="currentColor" stroke-width="{{ t.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg></sc-if>
+      <sc-if value="{{ t.isEmergency }}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="{{ t.fill }}" stroke="currentColor" stroke-width="{{ t.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg></sc-if>
+      <sc-if value="{{ t.isMore }}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="{{ t.fill }}" stroke="currentColor" stroke-width="{{ t.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></sc-if>
+    </span>
+    <span style="font-size:11px; font-weight:{{ t.weight }}; color:{{ t.color }}; font-family:var(--font-sans)">{{ t.label }}</span>
+  </div>
+</sc-for>
+              </nav>
+            </sc-if>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div style="max-width:900px; margin:0 auto; padding:0 20px 60px; display:flex; flex-direction:column; gap:12px">
+    <div style="display:flex; align-items:flex-start; gap:10px; padding:14px 16px; border-radius:14px; background:var(--surface); border:1px solid var(--border)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:1px" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01"/><path d="M11 12h1v4h1"/></svg>
+      <p style="font:400 13px/1.55 var(--font-sans); color:var(--muted-foreground); margin:0" dir="ltr">Showing <strong style="color:var(--foreground)">{{ screenLabel }} · {{ sizeLabel }} · {{ themeLabel }} · {{ localeLabel }}</strong>. {{ infoLine }}</p>
+    </div>
+    <div style="display:flex; align-items:flex-start; gap:10px; padding:14px 16px; border-radius:14px; background:var(--brand-ink); color:var(--on-ink)" dir="ltr">
+      <span style="font:700 10px var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--on-ink-muted); flex-shrink:0; margin-top:2px">§15</span>
+      <p style="font:400 13px/1.55 var(--font-sans); color:var(--on-ink-strong); margin:0"><strong style="color:var(--on-ink)">S6-D1</strong> Location confidence (high · medium · low · unknown) is a distinct ladder from the 6-state equipment enum — it drives the hero card's color, reasoning copy, and whether an accountable person renders at all. <strong style="color:var(--on-ink)">S6-D2</strong> Add/Edit reuses the detail screen's fact-tile chrome rather than inventing form components. <strong style="color:var(--on-ink)">S6-D3</strong> Room Radar and Rooms share one room object — a facility-wide view and a lightweight index, not two data models. Consumes Stage 1 tokens; Hebrew is product-default.</p>
+    </div>
+    <div style="display:flex; align-items:flex-start; gap:10px; padding:14px 16px; border-radius:14px; background:var(--surface); border:1px solid var(--border)" dir="ltr">
+      <span style="font:700 10px var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--brand); flex-shrink:0; margin-top:3px">Map</span>
+      <div style="flex:1"><p style="font:600 12px var(--font-sans); color:var(--foreground); margin:0 0 6px">Handoff coverage · full codebase</p><div style="display:flex; flex-wrap:wrap; gap:6px"><sc-for list="{{ roadmap }}" as="r" hint-placeholder-count="10">
+  <span style="display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; background:{{ r.bg }}; border:1px solid {{ r.border }}; color:{{ r.color }}; font:600 11.5px var(--font-sans)">
+    <sc-if value="{{ r.isDone }}" hint-placeholder-val="{{ true }}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></sc-if>
+    <sc-if value="{{ r.isNow }}" hint-placeholder-val="{{ false }}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M7 12h10"/></svg></sc-if>
+    <sc-if value="{{ r.isPending }}" hint-placeholder-val="{{ false }}"><span style="width:6px; height:6px; border-radius:999px; background:currentColor; display:block; opacity:.5"></span></sc-if>
+    {{ r.label }}
+  </span>
+</sc-for></div></div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { theme:'light', size:'compact', screen:'detail', dir:'ltr', variant:'high' };
+  set(k,v){ this.setState({[k]:v}); }
+  L(en,he){ return this.state.dir==='rtl' ? he : en; }
+  ic(p,o){ o=o||{}; const w=o.w||22; return `<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="${o.fill||'none'}" stroke="currentColor" stroke-width="${o.sw||1.9}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`; }
+  statusMeta(s){
+    const M={
+      ready:{sys:'green',ic:'<path d="M21 12a9 9 0 1 1-3.8-7.3"/><path d="m9 11 3 3 8-8"/>'},
+      in_use:{sys:'blue',ic:'<path d="M7 17 17 7"/><path d="M8 7h9v9"/>'},
+      blocked:{sys:'red',ic:'<path d="m10.3 3.7-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.3l-8-14a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>'},
+      stale:{sys:'orange',ic:'<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/>'},
+      overdue:{sys:'orange',ic:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'},
+      unknown:{sys:'gray',ic:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9a2.5 2.5 0 0 1 4.4 1.5c0 1.6-2 2-2 3"/><path d="M12 17h.01"/>'},
+    };
+    const m=M[s]||M.unknown; return {...m, c:`rgb(var(--sys-${m.sys}))`, bg:`rgb(var(--sys-${m.sys}) / 0.12)`};
+  }
+
+  renderVals(){
+    const S=this.state;
+    const { theme, size, screen, dir } = S;
+    const locale = dir==='rtl' ? 'he' : 'en';
+    const L=(en,he)=>this.L(en,he);
+    const chevronT = locale==='he' ? 'scaleX(-1)' : 'none';
+
+    const segBase="border:none;cursor:pointer;padding:6px 10px;border-radius:7px;font-family:var(--font-sans);font-size:12px;transition:all var(--dur-fast) var(--ease-standard);white-space:nowrap;";
+    const seg=(a)=>a?segBase+"font-weight:600;background:var(--surface-2);color:var(--foreground);box-shadow:0 1px 2px rgba(0,0,0,.18);":segBase+"font-weight:500;background:transparent;color:var(--muted-foreground);";
+    const themeOpts=[['light','Light'],['dark','Dark']].map(([k,l])=>({key:k,label:l,style:seg(theme===k),onClick:()=>this.set('theme',k)}));
+    const sizeOpts=[['compact','Compact'],['medium','Medium'],['expanded','Expanded']].map(([k,l])=>({key:k,label:l,style:seg(size===k),onClick:()=>this.set('size',k)}));
+    const screenDefs=[['detail','Detail'],['form','Add/Edit'],['radar','Room Radar'],['rooms','Rooms'],['mine','My Equipment'],['qr','QR Print']];
+    const screenOpts=screenDefs.map(([k,l])=>({key:k,label:l,style:seg(screen===k),onClick:()=>this.set('screen',k)}));
+    const dirOpts=[['ltr','English'],['rtl','עברית']].map(([k,l])=>({key:k,label:l,style:seg(dir===k),onClick:()=>this.set('dir',k)}));
+
+    const variantConfigs={
+      detail:{title:'Confidence',opts:[['high','Confident'],['medium','Likely'],['low','Low'],['unknown','Unknown'],['loading','Loading']]},
+      form:{title:'Flow',opts:[['new','New'],['edit','Edit']]},
+      radar:{title:'State',opts:[['data','Data'],['loading','Loading'],['offline','Offline']]},
+      rooms:{title:'State',opts:[['data','Data'],['empty','Empty']]},
+      mine:{title:'State',opts:[['data','Data'],['empty','Empty'],['loading','Loading']]},
+    };
+    const vc=variantConfigs[screen];
+    const vkeys=vc?vc.opts.map(o=>o[0]):[];
+    let variant=S.variant; if(vc && !vkeys.includes(variant)) variant=vkeys[0];
+    const variantOpts=vc?vc.opts.map(([k,l])=>({key:k,label:l,style:seg(variant===k),onClick:()=>this.set('variant',k)})):[];
+    const hasVariant=!!vc;
+
+    const isCompact=size==='compact', isExpanded=size==='expanded', hasSidebar=!isCompact;
+    const frames={
+      compact:{outer:'width:392px;height:800px;background:#0d0d0f;border-radius:48px;padding:11px',screen:'border-radius:38px',browser:false},
+      medium:{outer:'width:900px;height:680px;background:#0d0d0f;border-radius:30px;padding:13px',screen:'border-radius:18px',browser:false},
+      expanded:{outer:'width:1200px;height:760px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:0',screen:'border-radius:0 0 16px 16px',browser:true},
+    };
+    const f=frames[size];
+    const routes={detail:'/equipment/eq-204',form:'/equipment/new',radar:'/rooms/radar',rooms:'/rooms',mine:'/my-equipment',qr:'/equipment/qr-print'};
+
+    const navMap={detail:'equipment',form:'equipment',mine:'equipment',qr:'equipment',radar:'rooms',rooms:'rooms'};
+    const activeNav=navMap[screen]||'equipment';
+    const navDefs=[
+      {key:'today',label:L('Today','היום'),icon:'<path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/>'},
+      {key:'equipment',label:L('Equipment','ציוד'),icon:'<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>'},
+      {key:'rooms',label:L('Rooms','חדרים'),icon:'<path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-6h6v6"/>'},
+      {key:'alerts',label:L('Alerts','התראות'),icon:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>'},
+      {key:'analytics',label:L('Analytics','ניתוח'),icon:'<path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/>'},
+    ];
+    const navItems=navDefs.map(n=>{const a=activeNav===n.key;return{key:n.key,label:n.label,weight:a?'600':'500',bg:a?'rgb(79 70 229 / 0.10)':'transparent',color:a?'var(--brand)':'var(--muted-foreground)',sw:a?2.1:1.8,
+      isToday:n.key==='today', isEquipment:n.key==='equipment', isInventory:n.key==='inventory', isRooms:n.key==='rooms', isAnalytics:n.key==='analytics', isAdmin:n.key==='admin', isAlerts:n.key==='alerts'};});
+    const tabDefs=[
+      {key:'today',label:L('Today','היום'),icon:'<path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/>'},
+      {key:'equipment',label:L('Equipment','ציוד'),icon:'<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>'},
+      {key:'scan',label:L('Scan','סריקה'),icon:'<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/>'},
+      {key:'emergency',label:L('Emergency','חירום'),icon:'<path d="M3 12h4l2 6 4-14 2 8h6"/>'},
+      {key:'more',label:L('More','עוד'),icon:'<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>'},
+    ];
+    const tabActive='equipment';
+    const tabs=tabDefs.map(t=>{const a=tabActive===t.key;const sc=t.key==='scan';return{key:t.key,label:t.label,weight:a?'600':'500',color:a?'var(--brand)':(sc?'var(--action)':'var(--muted-foreground)'),scanBg:sc?'background:rgb(21 128 61 / 0.08);':'',sw:a?2.2:1.9,fill:a?'currentColor':'none',
+      isToday:t.key==='today', isEquipment:t.key==='equipment', isScan:t.key==='scan', isEmergency:t.key==='emergency', isMore:t.key==='more'};});
+
+    // ===================== EQUIPMENT DETAIL =====================
+    const showDetail = screen==='detail';
+    const detailLoading = variant==='loading';
+    const detailShowContent = !detailLoading;
+    const eqStatusM=this.statusMeta('in_use');
+    const confMetaMap={
+      high:{sys:'green', label:L('Confident','ודאי'), loc:L('With Dr. Lee · ICU-2','אצל ד״ר לי · טי״נ 2'), reason:L('Checked out by Dr. Lee · 12 min ago','נופק לד״ר לי · לפני 12 דק׳'), acc:true, name:L('Dr. Lee','ד״ר לי'), room:L('ICU-2','טי״נ 2'), time:'12m'},
+      medium:{sys:'blue', label:L('Likely','סביר'), loc:L('Recovery Room','חדר התאוששות'), reason:L('Confirmed by scan · 40 minutes ago','אושר בסריקה · לפני 40 דק׳'), acc:true, name:L('Maya A.','מאיה ע.'), room:L('Recovery','התאוששות'), time:'40m'},
+      low:{sys:'gray', label:L('Low confidence','ודאות נמוכה'), loc:L('ICU-1 (last seen)','טי״נ 1 (נראה לאחרונה)'), reason:L('Last seen via passive RFID · 2h ago','זוהה ב-RFID פסיבי · לפני שעתיים'), acc:false}, 
+      unknown:{sys:'red', label:L('Unknown','לא ידוע'), loc:L('Unknown','לא ידוע'), reason:L('No location signal available','אין אות מיקום זמין'), acc:false},
+    };
+    const cm = confMetaMap[variant] || confMetaMap.high;
+
+    const facts = variant==='unknown' ? [
+      {key:'loc',label:L('Location','מיקום'),value:'—'},
+      {key:'who',label:L('Assignee','אחראי'),value:'—'},
+      {key:'scan',label:L('Last scan','סריקה אחרונה'),value:'—'},
+      {key:'due',label:L('Due','יעד'),value:'—'},
+    ] : [
+      {key:'loc',label:L('Location','מיקום'),value:cm.loc},
+      {key:'who',label:L('Assignee','אחראי'),value:cm.acc?cm.name:L('Unassigned','ללא שיוך')},
+      {key:'scan',label:L('Last scan','סריקה אחרונה'),value:variant==='low'?L('2h ago','לפני שעתיים'):'14:02'},
+      {key:'due',label:L('Due','יעד'),value:L('in 2h','בעוד שעתיים')},
+    ];
+
+    const timelineData=[
+      {who:L('Checked out to Dr. Lee','נופק לד״ר לי'), what:L('Handed off at bedside','נמסר ליד המיטה'), when:L('Today · 14:02','היום · 14:02')},
+      {who:L('Scanned by You','נסרק על ידך'), what:L('Routine confirmation scan','סריקת אימות שגרתית'), when:L('Today · 09:12','היום · 09:12')},
+      {who:L('Serviced — passed','טופל — עבר בדיקה'), what:L('Tech Ruiz','טכנאי רואיז'), when:L('Jun 2','2 ביוני')},
+    ];
+    const timeline=timelineData.map((t,i)=>({...t, hasLine:i<timelineData.length-1, pad:i<timelineData.length-1?'16px':'0'}));
+
+    const done=['Tokens','Components','Today','Screens','Inventory'];
+    const rmDefs=[['1','Tokens'],['2','Components'],['3','Today'],['4','Screens'],['5','Inventory'],['6','Equipment'],['7','Analytics'],['8','Admin'],['9','Emergency'],['10','Access']];
+    const roadmap=rmDefs.map(([n,l])=>{
+      const isDone=+n<=5, isNow=n==='6', isPending=!isDone&&!isNow;
+      return {key:n,label:'S'+n+' '+l,isDone,isNow,isPending,
+        bg:isNow?'rgb(79 70 229 / 0.12)':isDone?'rgb(var(--sys-green) / 0.1)':'var(--tonal)',
+        border:isNow?'var(--brand)':isDone?'rgb(var(--sys-green) / 0.24)':'var(--border)',
+        color:isNow?'var(--brand)':isDone?'var(--status-ok-fg)':'var(--muted-foreground)'};
+    });
+
+    // ===================== ADD/EDIT FORM =====================
+    const showForm=screen==='form';
+    const formEdit = variant==='edit';
+    const catList=[L('Pumps','משאבות'),L('Monitors','מוניטורים'),L('Imaging','הדמיה'),L('Anesthesia','הרדמה'),L('Respiratory','נשימתי'),L('Crash cart','עגלת חירום')];
+    const chipStyle=(a)=>"flex-shrink:0;height:36px;padding:0 14px;border-radius:999px;font:600 12.5px var(--font-sans);cursor:pointer;white-space:nowrap;"+(a?"border:1px solid var(--brand);background:var(--brand);color:var(--brand-foreground);":"border:1px solid var(--border);background:var(--surface);color:var(--foreground);");
+    const activeCat = S.formCategory || (formEdit?catList[0]:null);
+    const formCategories=catList.map(c=>({key:c,label:c,onClick:()=>this.set('formCategory',c),style:chipStyle(activeCat===c)}));
+    const statusList=[[L('Ready','מוכן'),'ready'],[L('Maintenance','תחזוקה'),'maintenance'],[L('Blocked','חסום'),'blocked']];
+    const activeStatus = S.formStatus || (formEdit?'ready':null);
+    const formStatuses=statusList.map(([l,k])=>({key:k,label:l,onClick:()=>this.set('formStatus',k),style:chipStyle(activeStatus===k)}));
+    const formNameColor = formEdit ? 'var(--foreground)' : 'var(--muted-foreground)';
+
+    // ===================== ROOMS LIST =====================
+    const showRooms=screen==='rooms';
+    const roomsEmpty=showRooms&&variant==='empty';
+    const roomsData=[
+      {key:'icu1',name:L('ICU-1','טי״נ 1'),count:4,attn:1},
+      {key:'icu2',name:L('ICU-2','טי״נ 2'),count:5,attn:0},
+      {key:'recovery',name:L('Recovery','התאוששות'),count:3,attn:0},
+      {key:'imaging',name:L('Imaging','הדמיה'),count:2,attn:1},
+      {key:'surga',name:L('Surgery A','ניתוח A'),count:6,attn:0},
+      {key:'surgb',name:L('Surgery B','ניתוח B'),count:4,attn:0},
+      {key:'exam1',name:L('Exam 1','בדיקה 1'),count:2,attn:0},
+      {key:'exam2',name:L('Exam 2','בדיקה 2'),count:2,attn:0},
+      {key:'crash',name:L('Crash Cart Bay','מפרץ עגלת חירום'),count:1,attn:1},
+    ];
+    const roomsList=roomsData.map(r=>({key:r.key,name:r.name,meta:r.attn?L(r.count+' items · '+r.attn+' need attention',r.count+' פריטים · '+r.attn+' דורשים תשומת לב'):L(r.count+' items',r.count+' פריטים'),dot:r.attn?'rgb(var(--sys-orange))':'rgb(var(--sys-green))'}));
+    const roomsShowList = showRooms && !roomsEmpty;
+
+    // ===================== MY EQUIPMENT =====================
+    const showMine=screen==='mine';
+    const mineLoading=showMine&&variant==='loading';
+    const mineEmpty=showMine&&variant==='empty';
+    const mineShowList= showMine && !mineLoading && !mineEmpty;
+    const mineData=[
+      {key:'pump',name:L('Infusion Pump · IV-204','משאבת עירוי · IV-204'),since:L('Checked out 2h ago · Bay 3','נופק לפני שעתיים · עמדה 3'),overdue:false},
+      {key:'monitor',name:L('Vital Monitor · VM-118','מוניטור חיוני · VM-118'),since:L('Overdue by 1h · Recovery','באיחור שעה · התאוששות'),overdue:true},
+      {key:'us',name:L('Ultrasound · US-3','אולטרסאונד · US-3'),since:L('Checked out 20m ago · Exam 2','נופק לפני 20 דק׳ · בדיקה 2'),overdue:false},
+    ];
+    const mineItems=mineData.map(m=>({key:m.key,name:m.name,meta:m.since,metaColor:m.overdue?'var(--status-issue-fg)':'var(--muted-foreground)',
+      cardBorder:m.overdue?'var(--status-issue-border)':'var(--hairline)',
+      btnLabel:m.overdue?L('Return now','החזרה כעת'):L('Return','החזרה'),
+      btnBg:m.overdue?'var(--status-issue-fg)':'var(--surface)', btnColor:m.overdue?'var(--on-ink)':'var(--foreground)', btnBorder:m.overdue?'var(--status-issue-fg)':'var(--border)'}));
+    const mineOverdueCount = mineData.filter(m=>m.overdue).length;
+    const mineOverdueBanner = mineShowList && mineOverdueCount>0;
+
+    // ===================== ROOM RADAR =====================
+    const showRadar=screen==='radar';
+    const radarLoading=showRadar&&variant==='loading';
+    const radarOffline=showRadar&&variant==='offline';
+    const radarShowGrid = showRadar && !radarLoading;
+    const radarRoomsData=[
+      {key:'icu1',name:L('ICU-1','טי״נ 1'),count:4,pct:75,attn:1},
+      {key:'icu2',name:L('ICU-2','טי״נ 2'),count:5,pct:100,attn:0},
+      {key:'recovery',name:L('Recovery','התאוששות'),count:3,pct:100,attn:0},
+      {key:'imaging',name:L('Imaging','הדמיה'),count:2,pct:50,attn:1},
+      {key:'surga',name:L('Surgery A','ניתוח A'),count:6,pct:83,attn:1},
+      {key:'surgb',name:L('Surgery B','ניתוח B'),count:4,pct:100,attn:0},
+      {key:'exam1',name:L('Exam 1','בדיקה 1'),count:2,pct:100,attn:0},
+      {key:'exam2',name:L('Exam 2','בדיקה 2'),count:2,pct:100,attn:0},
+      {key:'crash',name:L('Crash Cart Bay','מפרץ עגלת חירום'),count:1,pct:0,attn:1},
+    ];
+    const radarRooms=radarRoomsData.map(r=>{
+      const ringColor = r.pct>=85?'rgb(var(--sys-green))':r.pct>=50?'rgb(var(--sys-orange))':'rgb(var(--sys-red))';
+      const statusLine = r.attn>0 ? L('Needs attention','דורש טיפול') : (r.pct>=85?L('Ready for procedure','מוכן לפרוצדורה'):L('Partially ready','מוכן חלקית'));
+      return {key:r.key,name:r.name,pct:r.pct,ringColor,ringDeg:(r.pct*3.6).toFixed(0)+'deg',statusLine,
+        count:L(r.count+' tracked',r.count+' במעקב'),
+        hasAttention:r.attn>0, attentionText:L(r.attn+' need attention',r.attn+' דורשים טיפול'),
+        cardBorder: r.attn>0?'var(--status-issue-border)':'var(--hairline)'};
+    });
+    const radarAvg=Math.round(radarRoomsData.reduce((s,r)=>s+r.pct,0)/radarRoomsData.length);
+    const radarPctColor = radarAvg>=85?'var(--status-ok-fg)':radarAvg>=60?'var(--status-stale-fg)':'var(--status-issue-fg)';
+    const radarCols = isCompact?'1fr':(isExpanded?'repeat(3,1fr)':'repeat(2,1fr)');
+
+    // ===================== QR PRINT =====================
+    const showQr=screen==='qr';
+    const qrData=[
+      {key:'iv204',name:L('Infusion Pump','משאבת עירוי'),id:'IV-204'},
+      {key:'vm118',name:L('Vital Monitor','מוניטור חיוני'),id:'VM-118'},
+      {key:'xr07',name:L('Portable X-ray','רנטגן נייד'),id:'XR-07'},
+      {key:'df02',name:L('Defibrillator','דפיברילטור'),id:'DF-02'},
+      {key:'an11',name:L('Anesthesia Unit','מכונת הרדמה'),id:'AN-11'},
+      {key:'us3',name:L('Ultrasound','אולטרסאונד'),id:'US-3'},
+    ];
+    const qrCols = isCompact?'repeat(2,1fr)':(isExpanded?'repeat(4,1fr)':'repeat(3,1fr)');
+
+    const topbarTitleMap={detail:L('Equipment','ציוד'),form:L('Add Equipment','הוספת ציוד'),radar:L('Room Radar','מכ״ם חדרים'),rooms:L('Rooms','חדרים'),mine:L('My Equipment','הציוד שלי'),qr:L('QR Print','הדפסת QR')};
+    const contentMaxMap={detail:isExpanded?'760px':(hasSidebar?'640px':'none'), form:isExpanded?'720px':(hasSidebar?'620px':'none'), radar:isExpanded?'1080px':(hasSidebar?'760px':'none'), rooms:isExpanded?'680px':(hasSidebar?'600px':'none'), mine:isExpanded?'680px':(hasSidebar?'600px':'none'), qr:isExpanded?'1080px':(hasSidebar?'760px':'none')};
+
+    const infoMap={
+      detail:'Equipment Detail — the location-confidence ladder (high · medium · low · unknown) drives the hero card color, reasoning copy, and whether an accountable person renders at all. Service schedule, at-a-glance facts, and a 3-event accountability timeline round out the page. Loading shows full-page skeletons. עברית renders the RTL mirror.',
+      form:'Add/Edit reuses the detail screen\u2019s fact-tile chrome — the same label-over-value pattern and radius, not a separate form design system (\u00a7S6-D2). Category and initial status are chip selects; New shows placeholders, Edit shows resolved values.',
+      radar:'Room Radar is the facility-wide readiness view — each room is a stock-style ring (% of its equipment ready) plus an attention chip when anything inside is blocked or overdue. Rooms and Room Radar read the same room object (\u00a7S6-D3).',
+      rooms:'Rooms is the lightweight index over the same room data Room Radar visualizes — a flat list for quick navigation rather than a facility overview.',
+      mine:'My Equipment — everything currently checked out to the signed-in user, with an overdue-return banner and a per-item Return action. Overdue rows get a destructive-tinted button and red meta text.',
+      qr:'QR Print lays out equipment labels for a physical print run — one card per asset with its QR placeholder, name and ID. Print triggers the browser print dialog in the shipped app.',
+    };
+
+    return {
+      pageClass: theme==='dark'?'dark':'', dir, chevronT,
+      themeOpts, sizeOpts, screenOpts, dirOpts, hasVariant, variantTitle: vc?vc.title:'', variantOpts,
+      frameOuter:f.outer, screenStyle:f.screen, browserChrome:f.browser, routePath:routes[screen],
+      isCompact, hasSidebar, isExpanded,
+      navItems, tabs, moreLabel:L('More','עוד'),
+      topbarTitle: topbarTitleMap[screen], searchPlaceholder:L('Search equipment','חיפוש ציוד'),
+      mainPad: isCompact?'8px 16px 20px':(isExpanded?'24px 32px':'20px 24px'),
+      contentMax: contentMaxMap[screen],
+      contentGap: isCompact?'16px':'20px',
+      factCols: isCompact?'repeat(2,1fr)':'repeat(4,1fr)',
+
+      showDetail, detailLoading, detailShowContent,
+      detailTitleSize: isCompact?'1.6rem':'1.5rem',
+      backLabel:L('Back','חזרה'),
+      eqName:L('Infusion Pump','משאבת עירוי'), eqMeta:L('IV-204 · Pumps · Serial PX-88213','IV-204 · משאבות · מס״ד PX-88213'),
+      eqStatusBg:eqStatusM.bg, eqStatusFg:eqStatusM.c, eqStatusIcon:this.ic(eqStatusM.ic,{w:11,sw:2.4}), eqStatusLabel:L('In use','בשימוש'),
+      loadingFacts:[1,2,3,4],
+
+      locCardTitle:L('Location','מיקום'), confColor:`rgb(var(--sys-${cm.sys}))`, confLabel:cm.label,
+      inferredLocation:cm.loc, reasoning:cm.reason, showAccountable:cm.acc,
+      accInitials:(cm.name||'').split(' ').map(w=>w[0]).join('').slice(0,2), accName:cm.name, accRoom:cm.room, accTime:cm.time,
+
+      serviceLabel:L('Service schedule','לוח שירות'), markServicedLabel:L('Mark serviced','סימון כטופל'),
+      servicePct:'64%', serviceStart:'Jun 2', serviceEnd:'Jul 12', serviceNote:L('Next service due in 12 days.','השירות הבא בעוד 12 ימים.'),
+
+      glanceLabel:L('At a glance','בקצרה'), facts,
+      timelineLabel:L('Accountability','אחריות'), timeline,
+      primaryAction:L('Check in','החזרה'), flagAction:L('Flag','דגל'), reportMissingAction:L('Report missing','דיווח על חוסר'),
+
+      showForm, formEdit, formTitle: formEdit?L('Edit Equipment','עריכת ציוד'):L('Add Equipment','הוספת ציוד'),
+      formPhotoLabel:L('Add photo','הוספת תמונה'), formPhotoSub:L('JPG or PNG, up to 5MB','JPG או PNG, עד 5MB'),
+      formBasicLabel:L('Basic info','פרטים בסיסיים'), formNameLabel:L('Name','שם'), formNameValue: formEdit?L('Infusion Pump','משאבת עירוי'):L('e.g. Infusion Pump','למשל: משאבת עירוי'), formNameColor,
+      formCategories, formSerialLabel:L('Serial number','מספר סידורי'), formSerialValue: formEdit?'PX-88213':L('Optional','אופציונלי'),
+      formManufLabel:L('Manufacturer · Model','יצרן · דגם'), formManufValue: formEdit?'Medline · IP-9':L('Optional','אופציונלי'),
+      formLocationLabel:L('Location','מיקום'), formRoomLabel:L('Room','חדר'), formRoomValue: formEdit?L('Bay 3','עמדה 3'):L('Select room','בחירת חדר'),
+      formFolderLabel:L('Folder','תיקייה'), formFolderValue: formEdit?L('Pumps','משאבות'):L('Select folder','בחירת תיקייה'),
+      formStatusLabel:L('Initial status','סטטוס התחלתי'), formStatuses,
+      formCancelLabel:L('Cancel','ביטול'), formSaveLabel: formEdit?L('Save changes','שמירת שינויים'):L('Add equipment','הוספת ציוד'),
+      factCols2: isCompact?'1fr':'1fr 1fr',
+
+      showRooms, roomsEmpty, roomsShowList, roomsList,
+      roomsTitle:L('Rooms','חדרים'), roomsSubtitle:L(roomsData.length+' rooms tracked',roomsData.length+' חדרים במעקב'), roomsAddLabel:L('+ Add room','+ הוספת חדר'),
+      roomsEmptyTitle:L('No rooms yet','אין חדרים עדיין'), roomsEmptySub:L('Add your first room to start tracking equipment by location.','הוסיפו חדר ראשון כדי להתחיל לעקוב אחר ציוד לפי מיקום.'),
+
+      showMine, mineLoading, mineEmpty, mineShowList, mineItems, mineOverdueBanner,
+      mineTitle:L('My Equipment','הציוד שלי'), mineSubtitle:L(mineData.length+' items checked out to you',mineData.length+' פריטים מנופקים לך'),
+      mineOverdueText:L(mineOverdueCount+' item overdue for return',mineOverdueCount+' פריט באיחור להחזרה'),
+      mineEmptyTitle:L('Nothing checked out','אין ציוד מנופק'), mineEmptySub:L('Equipment you check out will show up here until it is returned.','ציוד שתנפיקו יופיע כאן עד להחזרתו.'),
+
+      showRadar, radarLoading, radarOffline, radarShowGrid, radarRooms, radarCols, radarSkeletons:[1,2,3,4,5,6,7,8,9],
+      radarTitle:L('Room Radar','מכ״ם חדרים'), radarSubtitle:L('Facility-wide equipment readiness','מוכנות ציוד ברמת המתקן'),
+      radarPct:radarAvg, radarPctColor, radarPctLabel:L('Ready','מוכן'),
+      radarOfflineBanner:L("You're offline — showing cached room data.",'לא מקוון — מוצג מידע שמור על החדרים.'),
+
+      showQr, qrLabels:qrData, qrCols,
+      qrTitle:L('QR Print','הדפסת QR'), qrSubtitle:L(qrData.length+' labels ready to print',qrData.length+' תוויות מוכנות להדפסה'), qrPrintLabel:L('Print','הדפסה'),
+
+      screenLabel:(screenDefs.find(d=>d[0]===screen)||[0,'Detail'])[1], sizeLabel: size.charAt(0).toUpperCase()+size.slice(1),
+      themeLabel: theme==='dark'?'Dark':'Light', localeLabel: locale==='he'?'עברית · RTL':'English · LTR',
+      infoLine: infoMap[screen], roadmap,
+    };
+  }
+}
+</script>
+</body>
+</html>

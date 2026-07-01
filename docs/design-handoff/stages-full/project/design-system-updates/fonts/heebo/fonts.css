@@ -1,0 +1,24 @@
+/**
+ * Design System Alignment — §24 (Phase 5)
+ * Self-hosted Heebo — the DS's primary Hebrew/RTL UI face.
+ *
+ * Currently vettrack-ship/index.html loads Heebo from Google Fonts:
+ *   family=Heebo:wght@400;500;600;700
+ * This replaces that one family with a self-hosted variable font covering
+ * the FULL weight range (100–900, a strict superset of 400/500/600/700) in
+ * a single file — one request instead of a Google Fonts round-trip, works
+ * offline, no third-party dependency. Plus Jakarta Sans / IBM Plex Mono /
+ * DM Mono / Rubik are unaffected — only the Heebo segment changes.
+ *
+ * Lands at: public/fonts/heebo/ (font files) + this file imported once,
+ * e.g. from src/index.css: `@import "../public/fonts/heebo/fonts.css";`
+ * (adjust to the project's actual public-asset import convention).
+ */
+
+@font-face {
+  font-family: "Heebo";
+  src: url("./Heebo-VariableFont_wght.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}

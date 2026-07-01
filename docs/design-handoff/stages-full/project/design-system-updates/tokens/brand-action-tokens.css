@@ -1,0 +1,43 @@
+/**
+ * Design System Alignment — §31-D1/D2 (Phase 12)
+ * APPEND into src/index.css's :root block — see README §31 for full reasoning.
+ * Confirmed with the user: indigo (--primary/--brand) stays the brand color
+ * (matches the logo) — this phase only richens the real forest-green
+ * "action" accent and differentiates it from --status-ok.
+ *
+ * OLD -> NEW:
+ *   --action            #15803d -> #2f6f5e   (richer emerald forest, less "muted")
+ *   --action-deep       #166534 -> #285c4e   (same hue, darker - hover/pressed)
+ *   --action-ink        #1a6d38 -> #2a6555
+ *   --action-soft       #ecf6ee -> #e8f2ee
+ *   --action-border     #c7e3cf -> #c9ded9
+ *   --status-ok         hsl(142 76% 36%) -> hsl(142 72% 42%)  - hue held,
+ *                       brighter/lighter, so it reads as distinct from the
+ *                       new, darker, teal-leaning --action instead of nearly
+ *                       overlapping it (old values were 7pt-L apart and read
+ *                       as near-identical greens)
+ *   --status-ok-bg      #f0faf2 -> #effaf3
+ *   --status-ok-fg      #166534 -> #145d2e
+ *   --status-ok-border  #a7f3bd -> #a8e6bf
+ *
+ * Scope: default (light) :root only. `data-color-theme="clinical"` and
+ * `data-color-theme="dark"` each carry their OWN action/status-ok overrides
+ * (src/index.css lines ~251-310 — and in the clinical variant, action and
+ * status-ok are currently IDENTICAL hex values, an even stronger version of
+ * the "too similar" finding) — found, not touched this phase, see README
+ * §31-D3. The plain `.dark` CSS class has never overridden --action/
+ * --status-ok at all (same pre-existing gap Phase 10 found for shadow
+ * tokens) — also flagged, not fixed.
+ */
+
+:root {
+  --action: #2f6f5e;
+  --action-deep: #285c4e;
+  --action-ink: #2a6555;
+  --action-soft: #e8f2ee;
+  --action-border: #c9ded9;
+  --status-ok: 142 72% 42%;
+  --status-ok-bg: #effaf3;
+  --status-ok-fg: #145d2e;
+  --status-ok-border: #a8e6bf;
+}

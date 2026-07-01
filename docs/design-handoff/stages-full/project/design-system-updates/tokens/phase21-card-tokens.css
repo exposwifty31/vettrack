@@ -1,0 +1,18 @@
+/**
+ * Design System Alignment — Phase 21 (review item 6, "Soft Surface
+ * Separation" — border + inset highlight instead of box-shadow).
+ * APPEND into src/index.css's :root block (light) + .dark block.
+ *
+ * The ONLY new token this phase needs. Every other review item reconciles
+ * onto Tailwind's own spacing/color scale rather than inventing new custom
+ * properties — this codebase reserves CSS custom properties for colors/
+ * shadows/type scale, never one-off layout spacing (see card.tsx's own
+ * Phase 21 comment for why "Card Internal Rhythm" (item 4) uses plain
+ * Tailwind spacing utilities instead of a parallel set of vars).
+ */
+:root {
+  --card-inset-highlight: inset 0 1px 0 0 rgb(255 255 255 / 0.8);
+}
+.dark {
+  --card-inset-highlight: inset 0 1px 0 0 rgb(255 255 255 / 0.04);
+}

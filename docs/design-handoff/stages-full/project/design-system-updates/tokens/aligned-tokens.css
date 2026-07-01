@@ -1,0 +1,29 @@
+/**
+ * Design System Alignment — §20-D5 (Phase 1)
+ * APPEND into src/index.css's :root block (light) — see :dark note below.
+ *
+ * After reviewing Stage 1–10 against the real token set, almost everything we
+ * needed already exists and should be REUSED via mapping, not duplicated:
+ *   - Role badge colors      → mapped onto existing StatusKind palette (see
+ *                              roleToStatusKind() in design-tokens.additions.ts)
+ *   - Confidence tier colors → mapped onto existing StatusKind palette (see
+ *                              confidenceToStatusKind() in the same file)
+ *   - Chat broadcast/urgent  → reuse --primary (brand) and --status-issue as-is
+ *   - Stock taxonomy colors  → reuse --status-ok/-stale/-issue as-is
+ *
+ * The ONLY genuinely new tokens are the podium medal colors (Stage 7 Shift
+ * Leaderboard) — there is no existing "rank" concept in the real palette.
+ */
+
+:root {
+  --podium-gold: 250 204 21;      /* rgb() triplet, matches --ivory-* convention */
+  --podium-silver: 203 213 225;
+  --podium-bronze: 217 158 106;
+}
+
+/* Medal colors are rank-semantic, not light/dark semantic — same values in .dark. */
+.dark {
+  --podium-gold: 250 204 21;
+  --podium-silver: 203 213 225;
+  --podium-bronze: 217 158 106;
+}
