@@ -15,8 +15,15 @@ type Props = {
 };
 
 function isTabActive(location: string, href: string): boolean {
-  if (href === "/home") return location === "/home" || location === "/";
-  return location.startsWith(href.split("?")[0]);
+  const path = href.split("?")[0];
+  if (path === "/home") return location === "/home" || location === "/";
+  // The equipment tab navigates to /my-equipment on native, but /equipment
+  // (including the ?scan=1 scanner overlay) is the same equipment surface —
+  // keep the tab active on both.
+  if (path === "/my-equipment") {
+    return location.startsWith("/my-equipment") || location.startsWith("/equipment");
+  }
+  return location.startsWith(path);
 }
 
 function TabButton({
