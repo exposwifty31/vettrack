@@ -194,15 +194,22 @@ export default function HomePage() {
     month: "long",
   });
 
+  // On-shift is roster-derived server-side: `pulse.shift` is populated only when
+  // the caller is inside a scheduled vt_shifts window. A roster window is
+  // self-bounding, so no client-side staleness guard is needed.
+  const hasActiveShift = !!pulse?.shift;
+
   const heroState: "loading" | "noshift" | "active" =
-    pulseLoading && !pulse ? "loading" : pulse?.shift ? "active" : "noshift";
+    pulseLoading && !pulse ? "loading" : hasActiveShift ? "active" : "noshift";
 
   let elapsed = "00:00";
   let startedLabel = "";
   if (pulse?.shift) {
-    const startedMs = new Date(pulse.shift.startedAt).getTime();
-    const mins = Math.max(0, Math.round((now - startedMs) / 60_000));
-    elapsed = formatElapsed(mins);
+    const shiftMins = Math.max(
+      0,
+      Math.round((now - new Date(pulse.shift.startedAt).getTime()) / 60_000),
+    );
+    elapsed = formatElapsed(shiftMins);
     startedLabel = t.homePage.startedAt(formatClock(pulse.shift.startedAt));
   }
 

@@ -55,8 +55,8 @@ export interface TaskDashboard {
 
 /** GET /api/home/dashboard — aggregate "pulse" for the magnetic home dashboard. */
 export interface HomeDashboardPulse {
-  /** Open clinic shift session, if one is running. */
-  shift: { startedAt: string } | null;
+  /** Current roster shift (vt_shifts), if the caller is on shift now. */
+  shift: { startedAt: string; endsAt: string; role: string } | null;
   /** Consecutive most-recent days with zero overdue tasks. */
   streak: number;
   /** Tasks marked completed today. */
