@@ -136,3 +136,18 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Command: `pnpm test -- tests/mobile-shell.test.tsx` → 14/14 passed; `npx tsc --noEmit` → 0 errors.
 
 **Verdict:** VERIFIED (component fix for a genuine regression; tests unchanged and now green)
+
+## 2026-07-02 — Shift Phase 1, Increment 1: shift-adjustment request→approval backend
+
+**Claim:** Backend foundation for the request→admin-approval extension/leave-early layer: `vt_shift_adjustments` table + migration, `/api/shift-adjustments` route (create / list / approve-reject / cancel) with overnight-aware direction validation, four audit kinds, and a pure unit-tested time helper. **Additive** — no role-resolution/authority change in this increment.
+
+**Evidence:**
+- `server/schema/ops.ts` + `migrations/156_vt_shift_adjustments.sql` — applied via `pnpm db:migrate` ("✅ Applied migration: 156_vt_shift_adjustments.sql"); `psql \d vt_shift_adjustments` confirms columns (kind/status enums, base_shift snapshot, decided_by/at/note) + 3 indexes + `pending` default.
+- `server/routes/shift-adjustments.ts` registered at `/api/shift-adjustments` (`server/app/routes.ts`, contract-lock test updated 47→48 paths).
+- Runtime lifecycle (dev:api + local Postgres, user Dev Admin, roster row seeded to cover "now"): `POST` extend → **201** with correct roster snapshot (`currentEndTime` 05:35 from the seeded shift, `requestedEndTime` 08:35, `baseShiftId` linked, status `pending`); not-on-shift → **409 NOT_ON_SHIFT**; reason "x" → **400 INVALID_REASON**; wrong-direction leave_early → **400 NOT_EARLIER**; second create → **409 DUPLICATE_PENDING**; `PATCH` approve → **200** `status=approved` (decidedBy=dev-admin-001, note recorded); re-decide → **409 ALREADY_DECIDED**.
+- Audit: `vt_audit_logs` shows `shift_adjustment_requested` + `shift_adjustment_approved` (metadata.kind=extend). Discovered `vt_audit_logs` is append-only (`no_delete_audit_logs`/`no_update_audit_logs` `DO INSTEAD NOTHING` rules) — DELETEs are no-ops by design; the 4 audit kinds are members of the closed `AuditActionType` union (`server/lib/audit.ts`).
+- `server/lib/shift-adjustment-window.ts` — pure overnight-aware direction math; `tests/shift-adjustment-window.test.ts` → **11/11** (same-day + overnight extend/leave-early, incl. a midnight-crossing extension).
+- Command: `pnpm typecheck:server` → 0 errors; full `pnpm test` → **3485 passed (353 files), 0 failed**.
+- Dev-DB residue: 6 append-only `shift_adjustment%` audit rows on `dev-clinic-default` cannot be removed (by design); harmless in local dev.
+
+**Verdict:** VERIFIED (backend runtime + unit + full-suite green); role-resolution wiring is Increment 2.

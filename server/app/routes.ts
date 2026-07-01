@@ -43,6 +43,7 @@ import stabilityRoutes from "../routes/stability.js";
 // --- Platform (scheduling, inventory, clinical) ---
 import analyticsRoutes from "../routes/analytics.js";
 import shiftsRoutes from "../routes/shifts.js";
+import shiftAdjustmentsRoutes from "../routes/shift-adjustments.js";
 import appointmentsRoutes from "../routes/appointments.js";
 import tasksRoutes from "../routes/tasks.js";
 import containersRoutes from "../routes/containers.js";
@@ -111,6 +112,7 @@ function registerPlatformCapabilitiesRoutes(app: express.Express) {
 function registerPlatformRoutes(app: express.Express) {
   app.use("/api/analytics", analyticsRoutes);
   app.use("/api/shifts", shiftsRoutes);
+  app.use("/api/shift-adjustments", shiftAdjustmentsRoutes);
   app.use("/api/appointments", appointmentsRoutes);
   app.use("/api/tasks", tasksRoutes);
   app.use("/api/containers", containersRoutes);
