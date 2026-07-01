@@ -578,9 +578,6 @@
 @keyframes vt-shimmer {
   100% { transform: translateX(100%); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .skeleton-shimmer::after { display: none; }
-}
 
 /*
  * ── Global z-index layer strategy ────────────────────────────────────────────
@@ -1038,6 +1035,8 @@ nav,
   [class*="navItemFade_"] {
     opacity: 1 !important;
   }
+
+  .skeleton-shimmer::after { display: none; }
 }
 
 /* Bottom nav active-tab pill: instant jump when user prefers reduced motion */

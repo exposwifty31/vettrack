@@ -682,9 +682,9 @@ export default function WardDisplayPage() {
         <p className="text-sm text-muted-foreground max-w-[34ch]">
           The ward Command Center is built for a large, always-on display. Open it on a wall screen or desktop.
         </p>
-        <a href="/equipment" className="text-sm font-semibold" style={{ color: "var(--brand)" }}>
-          Go to equipment list
-        </a>
+        <p className="text-xs text-muted-foreground">
+          Navigate to /equipment on this device.
+        </p>
       </div>
     );
   }
