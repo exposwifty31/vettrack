@@ -48,30 +48,35 @@ Per (clinic, user, date): `effectiveStartTime?`, `effectiveEndTime`, `sourceRole
 - **Timezone fix:** standardize role-resolution + `display.ts` on the clinic timezone (Asia/Jerusalem); extract the shift-window match into **one** shared helper (byte-identical output for the existing path). *Higher-risk — authority-adjacent; gate behind tests.*
 - Verify: home agrees with the board; native shows correct on/off-shift.
 
-### Phase 1 — Override / extend layer (Approach 1)
-- Schema `vt_shift_overrides` + migration.
-- API: `POST /api/shifts/override` (extend/adjust), plus the effective-shift read.
-- `role-resolution`: consult override → roster (additive).
-- `home.tsx`: an **"extend shift"** affordance (self); manager path under admin/shifts.
-- Enforcement review + byte-identical no-override regression test.
+### Phase 1 — Shift-extension **request → admin approval** layer (decided 2026-07-02)
 
-### Phase 2 — Import hardening (needs the real EZShift export)
-- Confirm the actual export columns map to the importer; handle **start-only** shifts via a shift-type→duration mapping if EZShift omits the end.
-- Name-match safeguards: preview shows matched vs. unmatched people before confirm.
-- Timezone handling on import.
+Model (from the user): a person who needs to work past their rostered end **requests** an extension with a **required reason**; an **admin approves** it. No self-service override. Only an **approved** request extends the person's effective shift window; the **role never changes** (an extension is not a promotion).
+
+- **Schema** `vt_shift_extension_requests` (+ migration): `id`, `clinicId`, `requesterUserId`, `requesterName`, `baseShiftDate`, `baseShiftId?` (roster row being extended), `currentEndTime`, `requestedEndTime`, `reason` (required, non-empty), `status` (`pending | approved | rejected | cancelled`), `decidedByUserId?`, `decidedAt?`, `decisionNote?`, `createdAt`.
+- **API** (`server/routes/shifts.ts` or a new `shift-extensions.ts`, registered in `app/routes.ts`):
+  - `POST /api/shifts/extensions` — requester creates a `pending` request; must currently be on a roster shift; `reason` required; validated.
+  - `GET /api/shifts/extensions?status=` — admin sees all pending; a requester sees their own.
+  - `PATCH /api/shifts/extensions/:id` — **admin only** approve/reject (+ optional note). Audited.
+  - New `AuditActionType` members for request/approve/reject (closed union in `server/lib/audit.ts`).
+- **Effective-shift precedence:** approved-and-active extension `requestedEndTime` → roster `vt_shifts` end → none. `role-resolution` consults approved extensions **additively**: with no approved extension the snapshot is **byte-identical to today**. Requires the byte-identical no-extension regression test + an enforcement review before merge.
+- **Frontend:** on-shift home hero gains a **"Request extension"** affordance (sheet: new end time + reason) and shows the request's pending/approved status; the admin surface (`admin.tsx`) gains a **pending-extensions approvals list** (reason shown, approve/reject).
+- **i18n:** new `en.json`/`he.json` keys (parity enforced).
+
+### Phase 2 — Import hardening — **PARKED** (no EZShift export available)
+The user has no export file to share. The generic CSV importer (`server/routes/shifts.ts`, Hebrew header variants) stays as-is. Revisit only if/when a real `.csv/.xlsx` export appears: confirm column mapping, handle **start-only** shifts via a shift-type→duration map, add a matched/unmatched preview, and import-time timezone handling.
 
 ## Frozen-surface guardrails
 
 - `authority.ts` Strategy A stays **byte-for-byte** for existing (no-override) inputs.
 - `ClinicalRole` / `ActiveShiftRole` closed unions unchanged (lead_technician stays aliased to senior_technician).
-- The override is **additive** and, because it affects the authority-relevant window, goes through the enforcement envelope + tests.
-- The Phase 0 home rewire is presentation-only and safe.
+- An **approved extension** is **additive** and, because it affects the authority-relevant window, goes through the enforcement envelope + a **byte-identical no-extension** regression test.
+- The Phase 0 home rewire is presentation-only and safe. **Phase 0 is DONE** (`66057889`).
 
-## Open items (blockers for Phases 1–2)
+## Open items
 
-1. **The actual EZShift export file** (.csv/.xlsx) — the screenshots are the app UI, not the export columns. Needed to finalize import mapping (esp. start-only vs. explicit end).
-2. **Who may set an override** — recommend **self** (extend own current shift) **+ managers** (senior_technician+/admin extend anyone). Confirm.
-3. **On extension, keep the same role** (recommended — no role change via extension). Confirm.
+1. **EZShift export file** — none available; Phase 2 parked (see above).
+2. **Authority semantics of an approved extension** *(confirm before wiring `role-resolution`)* — recommended: an approved extension **extends the person's effective clinical-authority window** (they keep their on-shift role for the approved extra hours; role unchanged). This is the whole point — a stale roster otherwise expires authority while the person is still working. Alternative: record/audit only, no authority effect.
+3. **"End Shift" / "Start Shift" hero buttons** — in the roster-derived model there is no manual clock-in/out. Today's hero still shows Start/End Shift (→ `/handoff`), which opens the handover summary and does **not** end anything (user-reported 2026-07-02). Decide: remove the buttons, relabel to **"Handover"**, or add an explicit **leave-early** request. See investigation below / current chat.
 
 ## Verification (per phase)
 
