@@ -37,7 +37,7 @@ export function LegalDocumentShell({
       </Helmet>
 
       <div className="min-h-[100dvh] bg-gradient-to-b from-primary/5 to-background flex flex-col">
-        <header className="border-b border-border/60 bg-background/80 backdrop-blur-sm">
+        <header className="border-b border-border/60 bg-[var(--bar-bg)] backdrop-blur-[var(--bar-blur)]">
           <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
             <Link
               href="/"

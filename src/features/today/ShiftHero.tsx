@@ -38,19 +38,29 @@ function StatPill({ label, value }: { label: string; value: string | number }) {
           fontFamily: "var(--font-num)",
           fontSize: "var(--text-xl)",
           fontWeight: 600,
-          color: "#fff",
+          color: "var(--on-ink)",
           lineHeight: 1,
           letterSpacing: "-0.02em",
         }}
       >
         {value}
       </span>
-      <span style={{ fontSize: "var(--text-2xs)", color: "rgba(255,255,255,0.6)", fontWeight: 500 }}>
+      <span style={{ fontSize: "var(--text-2xs)", color: "var(--on-ink-muted)", fontWeight: 500 }}>
         {label}
       </span>
     </div>
   );
 }
+
+const heroBase: React.CSSProperties = {
+  borderRadius: 16,
+  background: "var(--brand-ink)",
+  padding: "16px",
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+  boxShadow: "var(--shadow-hero)",
+};
 
 export function ShiftHero({ shift, itemsOut, scansToday, isLoading }: Props) {
   const [, navigate] = useLocation();
@@ -58,41 +68,23 @@ export function ShiftHero({ shift, itemsOut, scansToday, isLoading }: Props) {
 
   if (isLoading) {
     return (
-      <div
-        style={{
-          borderRadius: 16,
-          background: "var(--brand-ink)",
-          padding: "16px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-        }}
-      >
-        <div style={{ height: 14, width: "40%", borderRadius: 8, background: "rgba(255,255,255,0.12)" }} />
-        <div style={{ height: 36, width: "55%", borderRadius: 8, background: "rgba(255,255,255,0.10)" }} />
+      <div style={heroBase}>
+        <div style={{ height: 14, width: "40%", borderRadius: 8, background: "var(--ink-skeleton)" }} />
+        <div style={{ height: 36, width: "55%", borderRadius: 8, background: "var(--ink-sheen)" }} />
         <div style={{ display: "flex", gap: 32 }}>
           {[0, 1].map((i) => (
-            <div key={i} style={{ height: 32, width: 60, borderRadius: 8, background: "rgba(255,255,255,0.08)" }} />
+            <div key={i} style={{ height: 32, width: 60, borderRadius: 8, background: "var(--ink-fill-weak)" }} />
           ))}
         </div>
-        <div style={{ height: 44, borderRadius: 12, background: "rgba(255,255,255,0.10)" }} />
+        <div style={{ height: 44, borderRadius: 12, background: "var(--ink-sheen)" }} />
       </div>
     );
   }
 
   if (!shift) {
     return (
-      <div
-        style={{
-          borderRadius: 16,
-          background: "var(--brand-ink)",
-          padding: "16px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-        }}
-      >
-        <p style={{ fontSize: "var(--text-sm)", color: "rgba(255,255,255,0.6)", margin: 0 }}>
+      <div style={heroBase}>
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--on-ink-muted)", margin: 0 }}>
           {t.home.shift.noShift}
         </p>
         <button
@@ -101,9 +93,9 @@ export function ShiftHero({ shift, itemsOut, scansToday, isLoading }: Props) {
           style={{
             minHeight: 44,
             borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.18)",
-            background: "rgba(255,255,255,0.08)",
-            color: "#fff",
+            border: "1px solid var(--ink-border)",
+            background: "var(--ink-fill-weak)",
+            color: "var(--on-ink)",
             fontSize: "var(--text-sm)",
             fontWeight: 600,
             cursor: "pointer",
@@ -117,17 +109,8 @@ export function ShiftHero({ shift, itemsOut, scansToday, isLoading }: Props) {
   }
 
   return (
-    <div
-      style={{
-        borderRadius: 16,
-        background: "var(--brand-ink)",
-        padding: "16px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-      }}
-    >
-      <p style={{ fontSize: "var(--text-2xs)", fontWeight: 600, letterSpacing: "0.12em", color: "rgba(255,255,255,0.6)", margin: 0, textTransform: "uppercase" }}>
+    <div style={heroBase}>
+      <p style={{ fontSize: "var(--text-2xs)", fontWeight: 600, letterSpacing: "0.12em", color: "var(--on-ink-muted)", margin: 0, textTransform: "uppercase" }}>
         {t.home.shift.elapsed}
       </p>
 
@@ -136,7 +119,7 @@ export function ShiftHero({ shift, itemsOut, scansToday, isLoading }: Props) {
           fontFamily: "var(--font-num)",
           fontSize: "34px",
           fontWeight: 600,
-          color: "#fff",
+          color: "var(--on-ink)",
           letterSpacing: "-0.03em",
           lineHeight: 1,
         }}
@@ -155,18 +138,18 @@ export function ShiftHero({ shift, itemsOut, scansToday, isLoading }: Props) {
         style={{
           minHeight: 44,
           borderRadius: 12,
-          border: "1px solid rgba(255,255,255,0.18)",
-          background: "rgba(255,255,255,0.08)",
-          color: "#fff",
+          border: "1px solid var(--ink-border)",
+          background: "var(--ink-fill-weak)",
+          color: "var(--on-ink)",
           fontSize: "var(--text-sm)",
           fontWeight: 600,
           cursor: "pointer",
           WebkitTapHighlightColor: "transparent",
           transition: "background 150ms ease",
         }}
-        onPointerDown={(e) => ((e.currentTarget.style.background = "rgba(255,255,255,0.14)"))}
-        onPointerUp={(e) => ((e.currentTarget.style.background = "rgba(255,255,255,0.08)"))}
-        onPointerLeave={(e) => ((e.currentTarget.style.background = "rgba(255,255,255,0.08)"))}
+        onPointerDown={(e) => { e.currentTarget.style.background = "var(--ink-fill)"; }}
+        onPointerUp={(e) => { e.currentTarget.style.background = "var(--ink-fill-weak)"; }}
+        onPointerLeave={(e) => { e.currentTarget.style.background = "var(--ink-fill-weak)"; }}
       >
         {t.home.shift.endShift}
       </button>

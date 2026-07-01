@@ -39,7 +39,7 @@ export function resolveDeployabilityVerdict(props: DeployabilityVerdictProps): V
     return { kind: "issue",       label: t.operationalState.readinessState.not_ready };
   }
   if (custodyState === "untracked" || readinessState === "unknown") {
-    return { kind: "neutral",     label: t.operationalState.readinessState.unknown };
+    return { kind: "unknown",     label: t.operationalState.readinessState.unknown };
   }
   return   { kind: "neutral",     label: t.operationalState.notDeployable };
 }

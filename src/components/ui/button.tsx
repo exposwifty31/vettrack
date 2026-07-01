@@ -4,25 +4,26 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold ring-offset-background transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/80 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:saturate-50 aria-[busy=true]:cursor-wait [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 motion-safe:active:scale-[0.97] motion-reduce:active:scale-100",
+  // Base: 44px min height, radius-lg (14px per spec), bold, press scale
+  "inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-[14px] text-sm font-bold ring-offset-background transition-all duration-[120ms] ease-out focus-visible:outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:saturate-50 aria-[busy=true]:cursor-wait [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 motion-safe:active:scale-[0.97] motion-safe:active:opacity-[0.92] motion-reduce:active:scale-100",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/92 shadow-sm hover:shadow-md hover:-translate-y-px motion-reduce:hover:translate-y-0",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/92 shadow-sm hover:shadow-md hover:-translate-y-px motion-reduce:hover:translate-y-0",
-        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground hover:border-border active:translate-y-0",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-transparent hover:-translate-y-px motion-reduce:hover:translate-y-0",
-        ghost: "hover:bg-accent hover:text-accent-foreground active:bg-accent/80",
-        link: "text-primary underline-offset-4 hover:underline motion-safe:active:scale-100",
-        teal: "bg-primary text-primary-foreground hover:bg-primary/92 shadow-sm hover:shadow-md hover:-translate-y-px motion-reduce:hover:translate-y-0",
+        default:     "bg-primary text-primary-foreground hover:bg-primary/92 shadow-sm",
+        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/92 shadow-sm",
+        outline:     "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        secondary:   "bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-transparent",
+        ghost:       "hover:bg-accent hover:text-accent-foreground active:bg-accent/80",
+        link:        "text-primary underline-offset-4 hover:underline motion-safe:active:scale-100",
+        action:      "bg-[var(--action)] text-[var(--on-ink)] hover:bg-[var(--action-deep)] shadow-sm",
       },
       size: {
-        default: "h-11 px-4 py-2",
-        sm: "h-9 rounded-lg px-3 text-xs",
-        lg: "h-12 rounded-xl px-6 text-base",
-        xl: "h-12 rounded-xl px-8 text-base",
-        icon: "h-11 w-11",
-        "icon-sm": "h-9 w-9 rounded-lg",
+        default:   "h-11 min-h-[44px] px-4 py-2",
+        sm:        "h-11 min-h-[44px] rounded-[10px] px-3 text-xs",
+        lg:        "h-12 min-h-[44px] rounded-[14px] px-6 text-base",
+        xl:        "h-12 min-h-[44px] rounded-[14px] px-8 text-base",
+        icon:      "h-11 w-11 min-h-[44px] min-w-[44px]",
+        "icon-sm": "h-11 w-11 min-h-[44px] min-w-[44px] rounded-[10px]",
       },
     },
     defaultVariants: {

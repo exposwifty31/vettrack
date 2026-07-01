@@ -1,5 +1,5 @@
 // src/pages/code-blue.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, useSearch } from "wouter";
 import { AlertTriangle, ArrowRight, Package, Shield, StickyNote } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -66,7 +66,7 @@ function ManagerPicker({ onSelect }: { onSelect: (id: string, name: string) => v
         </button>
       ))}
       {managersQ.data?.length === 0 && (
-        <p className="text-xs text-red-400">{t.codeBlue.noManagersAvailable}</p>
+        <p className="text-xs text-[rgb(var(--sys-red))]">{t.codeBlue.noManagersAvailable}</p>
       )}
     </div>
   );
@@ -120,9 +120,9 @@ function PreCheckGate({
         <ArrowRight className="h-4 w-4" aria-hidden />
         {t.common.back}
       </button>
-      <div className="flex items-center gap-2 text-red-400">
+      <div className="flex items-center gap-2 text-[rgb(var(--sys-red))]">
         <AlertTriangle className="h-6 w-6 shrink-0" aria-hidden />
-        <h1 className="text-xl font-bold text-red-400">{t.codeBlue.openTitle}</h1>
+        <h1 className="text-xl font-bold text-[rgb(var(--sys-red))]">{t.codeBlue.openTitle}</h1>
       </div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 pb-4">
@@ -146,7 +146,7 @@ function PreCheckGate({
           <>
             <ManagerPicker onSelect={(id, n) => { setManagerId(id); setManagerName(n); }} />
             {managerId && (
-              <div className="mt-2 text-xs text-green-400">{t.codeBlue.selectedManager(managerName)}</div>
+              <div className="mt-2 text-xs text-[rgb(var(--sys-green))]">{t.codeBlue.selectedManager(managerName)}</div>
             )}
           </>
         )}
@@ -273,6 +273,69 @@ function EquipmentPicker({ onSelect, onClose }: { onSelect: (item: EquipmentItem
   );
 }
 
+// ─── Hold-to-confirm End Code button (spec: ≥56pt, hold 800ms) ───────────────
+
+const HOLD_DURATION = 800;
+
+function HoldToConfirmButton({ onConfirm, label }: { onConfirm: () => void; label: string }) {
+  const [progress, setProgress] = useState(0);
+  const rafRef = useRef<number | null>(null);
+  const startRef = useRef<number | null>(null);
+
+  const cancel = useCallback(() => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+    startRef.current = null;
+    setProgress(0);
+  }, []);
+
+  const onDown = useCallback(() => {
+    startRef.current = Date.now();
+    const tick = () => {
+      if (startRef.current === null) return;
+      const elapsed = Date.now() - startRef.current;
+      const pct = Math.min(elapsed / HOLD_DURATION, 1);
+      setProgress(pct);
+      if (pct < 1) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        cancel();
+        onConfirm();
+      }
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  }, [cancel, onConfirm]);
+
+  // Cancel RAF on unmount to prevent setProgress/onConfirm after unmount
+  useEffect(() => cancel, [cancel]);
+
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onPointerDown={onDown}
+      onPointerUp={cancel}
+      onPointerLeave={cancel}
+      onPointerCancel={cancel}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onConfirm(); } }}
+      className="relative w-full overflow-hidden rounded-xl bg-emergency-border border border-emergency-borderMd font-bold text-emergency-text select-none"
+      style={{ minHeight: 56 }}
+    >
+      {/* fill track */}
+      <span
+        className="pointer-events-none absolute inset-0 origin-left bg-[rgb(var(--emergency-accent)/0.35)] transition-none"
+        style={{ transform: `scaleX(${progress})` }}
+        aria-hidden
+      />
+      <span className="relative z-10 flex items-center justify-center gap-2 px-4 py-3">
+        {progress > 0 && progress < 1
+          ? `${Math.round(progress * 100)}%`
+          : label}
+      </span>
+    </button>
+  );
+}
+
 // ─── Active session view ──────────────────────────────────────────────────────
 
 function ActiveSession() {
@@ -322,7 +385,7 @@ function ActiveSession() {
   if (!session) return null;
 
   return (
-    <div className="flex flex-col bg-emergency-bg text-white overflow-hidden" dir={dir} style={{ height: "100%", paddingTop: "env(safe-area-inset-top)", borderTop: "3px solid var(--destructive)" }}>
+    <div className="flex flex-col text-[var(--on-ink)] overflow-hidden" dir={dir} style={{ height: "100%", paddingTop: "env(safe-area-inset-top)", borderTop: "3px solid rgb(var(--emergency-accent))", background: `linear-gradient(180deg, var(--cb-bg-top) 0%, var(--cb-bg-bot) 100%)` }}>
       <div className="flex-shrink-0 bg-emergency-surface border-b border-emergency-surface px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {/* Leave the live view without ending the session (it persists for the
@@ -337,16 +400,16 @@ function ActiveSession() {
             <ArrowRight className="h-4 w-4" aria-hidden />
             {t.common.back}
           </button>
-          <span className="text-red-400 font-black tracking-widest text-sm flex items-center gap-2">
+          <span className="text-[rgb(var(--sys-red))] font-black tracking-widest text-sm flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" /> CODE BLUE
           </span>
         </div>
         <div className="flex gap-2 items-center">
           {presence.slice(0, 3).map((p) => (
-            <span key={p.userId} className="bg-blue-900 text-blue-300 text-xs px-2 py-0.5 rounded-full">{p.userName}</span>
+            <span key={p.userId} className="bg-[var(--status-in-use-bg)] text-[var(--status-in-use-fg)] text-xs px-2 py-0.5 rounded-full">{p.userName}</span>
           ))}
           {presence.length > 3 && (
-            <span className="bg-blue-900 text-blue-300 text-xs px-2 py-0.5 rounded-full">+{presence.length - 3}</span>
+            <span className="bg-[var(--status-in-use-bg)] text-[var(--status-in-use-fg)] text-xs px-2 py-0.5 rounded-full">+{presence.length - 3}</span>
           )}
         </div>
       </div>
@@ -356,7 +419,7 @@ function ActiveSession() {
         <div className={cn(
           "px-4 py-1.5 text-xs flex gap-2 border-b",
           cartStatus.allPassed
-            ? "bg-green-500/10 border-green-500/20 text-green-400"
+            ? "bg-green-500/10 border-green-500/20 text-[rgb(var(--sys-green))]"
             : "bg-amber-500/10 border-amber-500/20 text-amber-400",
         )}>
           {cartStatus.allPassed
@@ -370,8 +433,8 @@ function ActiveSession() {
       )}
 
       <div className="px-4 py-2 bg-emergency-surface/50 border-b border-emergency-surface text-xs text-emergency-text2 flex items-center gap-2">
-        <Shield className="h-3.5 w-3.5 text-blue-400" />
-        {t.codeBlue.managerLabelShort} <span className="text-blue-300 font-semibold"><Bdi>{session.managerUserName}</Bdi></span>
+        <Shield className="h-3.5 w-3.5 text-[var(--status-in-use-fg)]" />
+        {t.codeBlue.managerLabelShort} <span className="text-[var(--status-in-use-fg)] font-semibold"><Bdi>{session.managerUserName}</Bdi></span>
       </div>
 
       <div className="px-4 py-3 bg-emergency-surface/50 border-b border-emergency-surface">
@@ -413,22 +476,22 @@ function ActiveSession() {
           onClick={() => setShowEquipPicker(true)}
           className="w-full mb-2 bg-amber-900/50 hover:bg-amber-800/50 border border-amber-700/50 rounded-lg p-4 text-center"
         >
-          <Package className="h-6 w-6 text-amber-300 mx-auto mb-1" />
-          <div className="text-amber-100 font-bold text-sm">{t.codeBlue.linkedEquipment}</div>
-          <div className="text-amber-200/70 text-xs mt-0.5">{t.codeBlue.linkedEquipmentHint}</div>
+          <Package className="h-6 w-6 text-[var(--status-stale-fg)] mx-auto mb-1" />
+          <div className="text-[var(--status-overdue-fg)] font-bold text-sm">{t.codeBlue.linkedEquipment}</div>
+          <div className="text-[var(--on-ink-muted)] text-xs mt-0.5">{t.codeBlue.linkedEquipmentHint}</div>
         </button>
         <div className="grid grid-cols-2 gap-2 mb-3">
           <button
             type="button"
             onClick={() => { haptics.scanSuccess(); logEntry({ label: t.codeBlue.presetUnitDeployed, category: "equipment" }); }}
-            className="bg-emergency-border hover:bg-emergency-border border border-emergency-borderMd rounded-lg p-3 min-h-[44px] text-center text-xs font-semibold text-emergency-text"
+            className="bg-emergency-border hover:bg-emergency-border border border-emergency-borderMd rounded-lg p-3 min-h-[56px] text-center text-xs font-semibold text-emergency-text"
           >
             {t.codeBlue.presetUnitDeployed}
           </button>
           <button
             type="button"
             onClick={() => { haptics.scanSuccess(); logEntry({ label: t.codeBlue.presetUnitReturned, category: "equipment" }); }}
-            className="bg-emergency-border hover:bg-emergency-border border border-emergency-borderMd rounded-lg p-3 min-h-[44px] text-center text-xs font-semibold text-emergency-text"
+            className="bg-emergency-border hover:bg-emergency-border border border-emergency-borderMd rounded-lg p-3 min-h-[56px] text-center text-xs font-semibold text-emergency-text"
           >
             {t.codeBlue.presetUnitReturned}
           </button>
@@ -471,12 +534,12 @@ function ActiveSession() {
               <span className="text-emergency-text2 font-mono shrink-0">{formatElapsed(entry.elapsedMs)}</span>
               <span className={cn(
                 "shrink-0 vt-text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded",
-                entry.category === "equipment" ? "bg-amber-500/20 text-amber-300" : "bg-emergency-border text-emergency-text2",
+                entry.category === "equipment" ? "bg-amber-500/20 text-[var(--status-stale-fg)]" : "bg-emergency-border text-emergency-text2",
               )}>
                 {entry.category === "equipment" ? t.codeBlue.categoryEquipment : t.codeBlue.categoryNote}
               </span>
               <span className="text-emergency-text min-w-0 truncate">{entry.label}</span>
-              <span className="text-green-400 mr-auto shrink-0">{entry.loggedByName}</span>
+              <span className="text-[rgb(var(--sys-green))] mr-auto shrink-0">{entry.loggedByName}</span>
             </div>
           ))}
           {logEntries.length === 0 && (
@@ -487,12 +550,7 @@ function ActiveSession() {
 
       <div className="p-4">
         {isManager ? (
-          <Button
-            className="w-full bg-emergency-border hover:bg-emergency-borderMd text-white font-bold py-4"
-            onClick={() => setShowOutcomeModal(true)}
-          >
-            {t.codeBlue.endEventChooseOutcome}
-          </Button>
+          <HoldToConfirmButton onConfirm={() => setShowOutcomeModal(true)} label={t.codeBlue.endEventChooseOutcome} />
         ) : (
           <div className="rounded-lg bg-emergency-surface border border-emergency-border p-4 text-center text-emergency-text2 text-xs">
             {t.codeBlue.managerOnlyHint}

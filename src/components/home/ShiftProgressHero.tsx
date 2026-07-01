@@ -46,7 +46,7 @@ function ProgressRing({
         cy="50"
         r={r}
         fill="none"
-        stroke="rgba(255,255,255,0.12)"
+        stroke="var(--ink-divider)"
         strokeWidth="8"
       />
       <circle
@@ -79,8 +79,9 @@ export function ShiftProgressHero({
   return (
     <section
       className={cn(
-        "flex items-center gap-4 rounded-[18px] p-[18px] text-white shadow-card",
+        "flex items-center gap-4 rounded-[18px] p-[18px] shadow-card",
         "bg-gradient-to-br from-[var(--hero-a)] to-[var(--hero-b)]",
+        "text-[var(--on-ink)]",
         className,
       )}
       aria-label={progressLabel}
@@ -92,14 +93,14 @@ export function ShiftProgressHero({
         </span>
       </div>
       <div className="min-w-0 flex-1">
-        <p className="mb-3 text-[10.5px] font-bold uppercase tracking-[0.18em] text-white/50">
+        <p className="mb-3 text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--on-ink-subtle)]">
           {progressLabel}
         </p>
         <div className="flex flex-wrap gap-4">
           {stats.map((s) => (
             <div key={s.label}>
               <p className="font-num text-lg font-bold leading-none">{s.value}</p>
-              <p className="mt-0.5 text-[10px] font-medium text-white/55">{s.label}</p>
+              <p className="mt-0.5 text-[10px] font-medium text-[var(--on-ink-muted)]">{s.label}</p>
             </div>
           ))}
         </div>

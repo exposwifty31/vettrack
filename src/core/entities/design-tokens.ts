@@ -55,14 +55,23 @@ export type StatusKind =
   | "maintenance"
   | "sterilized"
   | "info"
-  | "neutral";
+  | "neutral"
+  | "stale"
+  | "unknown"
+  | "in_use"
+  | "overdue";
 
-// Fold every legacy status string into one StatusKind. Unknown → "neutral".
-const KNOWN_STATUS_KINDS = new Set<string>(["ok", "issue", "maintenance", "sterilized", "info"]);
+// Fold every legacy status string into one StatusKind. Unrecognised → "neutral".
+const KNOWN_STATUS_KINDS = new Set<string>([
+  "ok", "issue", "maintenance", "sterilized", "info", "stale", "unknown", "in_use", "overdue",
+]);
 
 export function normalizeStatus(s: string): StatusKind {
   if (s === "critical" || s === "needs_attention") return "issue";
   if (s === "due" || s === "sterilization_due") return "maintenance";
+  if (s === "available" || s === "ready") return "ok";
+  if (s === "checked_out") return "in_use";
+  if (s === "overdue") return "overdue";
   return KNOWN_STATUS_KINDS.has(s) ? (s as StatusKind) : "neutral";
 }
 
@@ -74,4 +83,8 @@ export const STATUS_LABEL_KEY: Record<StatusKind, string> = {
   sterilized: "status.sterilized",
   info: "status.info",
   neutral: "status.neutral",
+  stale: "status.stale",
+  unknown: "status.unknown",
+  in_use: "status.in_use",
+  overdue: "status.overdue",
 };

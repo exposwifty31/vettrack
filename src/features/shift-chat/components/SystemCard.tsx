@@ -11,12 +11,12 @@ const EVENT_CONFIG: Record<
 > = {
   code_blue_start: {
     icon: "🚨",
-    colorClass: "bg-red-950 border-red-800 text-red-200",
+    colorClass: "bg-[var(--status-issue-bg)] border-[var(--status-issue-border)] text-[var(--status-issue-fg)]",
     render: (p) => `Code Blue הופעל — ${p.startedBy ?? ""}`,
   },
   code_blue_end: {
     icon: "✅",
-    colorClass: "bg-green-950 border-green-800 text-green-200",
+    colorClass: "bg-[var(--status-ok-bg)] border-[var(--status-ok-border)] text-[var(--status-ok-fg)]",
     render: (p) => `Code Blue הסתיים — ${p.outcome ?? ""} · ${p.endedAt ? new Date(p.endedAt as string).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }) : ""}`,
   },
   med_critical: {
@@ -26,12 +26,12 @@ const EVENT_CONFIG: Record<
   },
   hosp_critical: {
     icon: "🏥",
-    colorClass: "bg-red-950 border-red-800 text-red-200",
+    colorClass: "bg-[var(--status-issue-bg)] border-[var(--status-issue-border)] text-[var(--status-issue-fg)]",
     render: (_p) => `חולה עבר לסטטוס קריטי`,
   },
   hosp_discharged: {
     icon: "🏥",
-    colorClass: "bg-green-950 border-green-800 text-green-200",
+    colorClass: "bg-[var(--status-ok-bg)] border-[var(--status-ok-border)] text-[var(--status-ok-fg)]",
     render: (_p) => `חולה שוחרר`,
   },
   hosp_deceased: {
@@ -41,7 +41,7 @@ const EVENT_CONFIG: Record<
   },
   equipment_overdue: {
     icon: "🔧",
-    colorClass: "bg-amber-950 border-amber-800 text-amber-200",
+    colorClass: "bg-[var(--status-stale-bg)] border-[var(--status-stale-border)] text-[var(--status-stale-fg)]",
     render: (p) => `ציוד לא הוחזר — ${p.equipmentName ?? ""} (${p.minutesOverdue ?? 60} דק׳)`,
   },
   low_stock: {
