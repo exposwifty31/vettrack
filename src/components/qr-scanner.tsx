@@ -1,5 +1,6 @@
 import { t } from "@/lib/i18n";
 import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import type { Html5Qrcode } from "html5-qrcode";
@@ -554,8 +555,13 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
     navigateToEquipment(scannedEquipment.id, "issue");
   }
 
-  return (
-    <div className="fixed top-0 left-0 right-0 qr-scanner-overlay-root z-[70] bg-black flex flex-col motion-safe:animate-page-enter" data-testid="qr-scanner-overlay">
+  // Rendered through a portal to document.body so the fixed overlay resolves
+  // against the viewport, not the NativeShell scroll container. Inside that
+  // container (-webkit-overflow-scrolling: touch) iOS scopes position:fixed to
+  // the scroller, which pushed the manual-entry footer off-screen under the tab
+  // bar. Portaling restores true full-screen behavior on every entry point.
+  return createPortal(
+    <div className="fixed inset-0 qr-scanner-overlay-root z-50 bg-black flex flex-col motion-safe:animate-page-enter" data-testid="qr-scanner-overlay">
       {confirmFlash && <div className="pointer-events-none absolute inset-0 z-50 bg-emerald-400/20 animate-pulse" />}
       {/* Header */}
       <div className="relative z-10 flex items-center justify-between px-4 pb-3 bg-gradient-to-b from-black/95 to-black/65 backdrop-blur-sm" style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}>
@@ -1021,6 +1027,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
           isSubmitting={isActing}
         />
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }
