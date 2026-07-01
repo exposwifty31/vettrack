@@ -54,7 +54,7 @@ export function AlertsDropdown({ alerts, alertCount, badgeAnimating }: AlertsDro
             <span
               key={alertCount}
               className={cn(
-                "absolute -top-0.5 -end-0.5 w-3.5 h-3.5 text-[var(--on-ink)] text-[9px]",
+                "absolute -top-0.5 -end-0.5 w-3.5 h-3.5 bg-[var(--status-issue-fg)] text-[var(--on-ink)] text-[9px]",
                 "rounded-full flex items-center justify-center font-bold z-10",
                 badgeAnimating &&
                   "[animation:badgePop_420ms_cubic-bezier(0.68,-0.55,0.265,1.55)_forwards]",

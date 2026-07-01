@@ -168,13 +168,11 @@ function AlertsPageDesktop() {
     grouped[alert.type]!.push(alert);
   }
 
-  // Spec: Urgent → Warning → Info severity tiers
   const SEVERITY_TIERS: { label: string; types: AlertType[]; color: string }[] = [
-    { label: "Urgent",  types: ["issue"] as AlertType[],                              color: "var(--status-issue-fg)" },
-    { label: "Warning", types: ["overdue", "sterilization_due"] as AlertType[],      color: "var(--status-overdue-fg)" },
-    { label: "Info",    types: ["inactive"] as AlertType[],                          color: "hsl(var(--muted-foreground))" },
+    { label: t.alertsPage.tierUrgent,  types: ["issue"],                              color: "var(--status-issue-fg)" },
+    { label: t.alertsPage.tierWarning, types: ["overdue", "sterilization_due"],       color: "var(--status-overdue-fg)" },
+    { label: t.alertsPage.tierInfo,    types: ["inactive"],                           color: "hsl(var(--muted-foreground))" },
   ];
-  const priorityOrder: AlertType[] = ["issue", "overdue", "sterilization_due", "inactive"];
 
   const isDesktop = useIsDesktop();
   const pageContent = (

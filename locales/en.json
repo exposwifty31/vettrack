@@ -1163,7 +1163,10 @@
     "handleNow": "Handle now",
     "sectionUrgent": "Urgent",
     "sectionMaintenance": "Maintenance",
-    "openSummary": "{total} open · {urgent} urgent"
+    "openSummary": "{total} open · {urgent} urgent",
+    "tierUrgent": "Urgent",
+    "tierWarning": "Warning",
+    "tierInfo": "Info"
   },
   "analyticsPage": {
     "title": "Analytics",
@@ -3539,7 +3542,9 @@
     "loading": "Loading...",
     "fallbackBoardUnavailable": "Command board data is unavailable",
     "deployable": "Ready",
-    "notDeployable": "Not ready"
+    "notDeployable": "Not ready",
+    "commandCenterTitle": "Command Center",
+    "commandCenterNarrowHint": "The ward Command Center is built for a large, always-on display. Open it on a wall screen or desktop."
   },
   "whatsNew": {
     "title": "What's New — VetTrack",

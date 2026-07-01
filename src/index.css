@@ -180,9 +180,9 @@
     --status-in-use-bg:     rgb(var(--sys-blue) / 0.12);
     --status-in-use-fg:     rgb(var(--sys-blue));
     --status-in-use-border: rgb(var(--sys-blue) / 0.22);
-    --status-overdue-bg:     rgb(var(--sys-orange) / 0.12);
-    --status-overdue-fg:     rgb(var(--sys-orange));
-    --status-overdue-border: rgb(var(--sys-orange) / 0.22);
+    --status-overdue-bg:     rgb(var(--sys-red) / 0.12);
+    --status-overdue-fg:     rgb(var(--sys-red));
+    --status-overdue-border: rgb(var(--sys-red) / 0.22);
 
     /* ── Emergency surface — replaces all zinc-* in code-blue and crash-cart ── */
     --emergency-bg:         12 12 12;
@@ -436,6 +436,14 @@
     box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring));
     border-radius: var(--radius-sm);
   }
+  /* Forced-colors / high-contrast: restore a visible outline since box-shadow is suppressed */
+  @media (forced-colors: active) {
+    :where(a, button, input, select, textarea, summary, [role="button"], [role="link"], [role="tab"], [tabindex]:not([tabindex="-1"])):focus-visible {
+      outline: 2px solid CanvasText;
+      outline-offset: 2px;
+      box-shadow: none;
+    }
+  }
   input,
   select,
   textarea {
@@ -561,7 +569,7 @@
 .skeleton-shimmer {
   position: relative;
   overflow: hidden;
-  background: rgba(120, 120, 128, 0.16);
+  background: var(--tonal);
 }
 /* Dark-surface variant: on-ink fill */
 .dark .skeleton-shimmer {

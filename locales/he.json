@@ -1163,7 +1163,10 @@
     "handleNow": "טפל עכשיו",
     "sectionUrgent": "דחוף",
     "sectionMaintenance": "תחזוקה",
-    "openSummary": "{total} פתוחות · {urgent} דחופות"
+    "openSummary": "{total} פתוחות · {urgent} דחופות",
+    "tierUrgent": "דחוף",
+    "tierWarning": "אזהרה",
+    "tierInfo": "מידע"
   },
   "analyticsPage": {
     "title": "ניתוח נתונים",
@@ -3539,7 +3542,9 @@
     "loading": "טוען...",
     "fallbackBoardUnavailable": "נתוני לוח מפקד אינם זמינים",
     "deployable": "מוכן",
-    "notDeployable": "לא מוכן"
+    "notDeployable": "לא מוכן",
+    "commandCenterTitle": "מרכז שליטה",
+    "commandCenterNarrowHint": "מרכז השליטה נועד לתצוגה גדולה ותמידית. פתחו אותו על מסך קיר או מחשב."
   },
   "whatsNew": {
     "title": "מה חדש — VetTrack",

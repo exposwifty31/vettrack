@@ -675,7 +675,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           "cursor-pointer",
           scannerUIOpen
-            ? "bg-[var(--action)] text-[var(--on-ink)] shadow-lg shadow-[color-mix(in_srgb,var(--action)_40%,transparent)] hover:bg-[var(--action-deep)]"
+            ? "bg-[var(--action)] text-[var(--on-ink)] shadow-lg shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--action)_45%,transparent)] hover:bg-[var(--action-deep)]"
             : navigationLocked
               ? "bg-[var(--status-stale-fg)] text-[var(--on-ink)] shadow-lg hover:opacity-90"
               : "vt-scan-fab bg-[var(--action)] text-[var(--on-ink)] shadow-lg shadow-ivory-green/30 hover:bg-ivory-greenMid",

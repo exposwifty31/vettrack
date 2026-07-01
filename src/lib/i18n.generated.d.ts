@@ -1167,6 +1167,9 @@ export interface TStructure {
     sectionUrgent: string;
     sectionMaintenance: string;
     openSummary: string;
+    tierUrgent: string;
+    tierWarning: string;
+    tierInfo: string;
   };
   analyticsPage: {
     title: string;
@@ -3543,6 +3546,8 @@ export interface TStructure {
     fallbackBoardUnavailable: string;
     deployable: string;
     notDeployable: string;
+    commandCenterTitle: string;
+    commandCenterNarrowHint: string;
   };
   whatsNew: {
     title: string;

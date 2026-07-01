@@ -58,7 +58,7 @@ function TabButton({
         minWidth: 44,
         border: "none",
         borderRadius: 12,
-        background: isScan ? "rgb(21 128 61 / 0.08)" : "transparent",
+        background: isScan ? "color-mix(in srgb, var(--action) 8%, transparent)" : "transparent",
         cursor: "pointer",
         color,
         transition: "color 120ms ease, background 120ms ease",

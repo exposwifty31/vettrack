@@ -131,6 +131,7 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "overdue",     label: t.status.overdue },
   { value: "stale",       label: t.status.stale },
   { value: "maintenance", label: t.status.maintenance },
+  { value: "sterilized",  label: t.status.sterilized },
   { value: "unknown",     label: t.status.unknown },
 ];
 
@@ -554,6 +555,7 @@ function EquipmentListPageDesktop() {
               return (
                 <button
                   key={opt.value}
+                  type="button"
                   onClick={() => setStatusFilter(opt.value)}
                   className={`shrink-0 flex items-center px-3 min-h-[44px] rounded-full vt-text-xs font-medium border transition-colors whitespace-nowrap ${
                     active && !tinted

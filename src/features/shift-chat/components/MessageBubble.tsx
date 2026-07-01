@@ -30,7 +30,7 @@ export function MessageBubble({ message, currentUserId, onReact, onPin, canPin }
         className={cn(
           "w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0",
           message.senderRole === "vet" ? "bg-[var(--status-in-use-bg)] text-[var(--status-in-use-fg)]" :
-          message.senderRole === "senior_technician" ? "bg-purple-950 text-purple-300" :
+          message.senderRole === "senior_technician" ? "bg-[var(--status-in-use-bg)] text-[var(--status-in-use-fg)]" :
           "bg-[var(--status-ok-bg)] text-[var(--status-ok-fg)]",
         )}
       >
@@ -52,7 +52,7 @@ export function MessageBubble({ message, currentUserId, onReact, onPin, canPin }
           )}
         >
           {message.isUrgent && (
-            <div className="text-[9px] font-bold text-red-300 tracking-wide mb-1">⚡ דחוף</div>
+            <div className="text-[9px] font-bold text-[var(--status-issue-fg)] tracking-wide mb-1">⚡ דחוף</div>
           )}
           <span
             dangerouslySetInnerHTML={{

@@ -672,18 +672,23 @@ export default function WardDisplayPage() {
   }, [snapshotLoaded, localCbId]);
 
   // D-F · Ward Display is web + expanded only. Compact / medium → guard route.
-  const isExpanded = typeof window !== "undefined" && window.innerWidth >= 1024;
+  const [isExpanded, setIsExpanded] = useState(() =>
+    typeof window !== "undefined" && window.innerWidth >= 1024
+  );
+  useEffect(() => {
+    const onResize = () => setIsExpanded(window.innerWidth >= 1024);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   if (!isExpanded) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-8 text-center bg-background dark">
         <p className="text-lg font-semibold text-foreground">
-          Command Center
+          {t.board.commandCenterTitle}
         </p>
         <p className="text-sm text-muted-foreground max-w-[34ch]">
-          The ward Command Center is built for a large, always-on display. Open it on a wall screen or desktop.
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Navigate to /equipment on this device.
+          {t.board.commandCenterNarrowHint}
         </p>
       </div>
     );

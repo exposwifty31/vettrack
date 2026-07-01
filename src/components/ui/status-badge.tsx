@@ -27,12 +27,12 @@ const STATUS_LABELS: Record<StatusKind, () => string> = {
   issue:       () => t.status.issue,
   maintenance: () => t.status.maintenance,
   sterilized:  () => t.status.sterilized,
-  info:        () => (t.status as Record<string, string>)["info"] ?? "Info",
-  neutral:     () => (t.status as Record<string, string>)["neutral"] ?? "Unknown",
-  stale:       () => (t.status as Record<string, string>)["stale"] ?? "Stale",
-  unknown:     () => (t.status as Record<string, string>)["unknown"] ?? "Unknown",
-  in_use:      () => (t.status as Record<string, string>)["in_use"] ?? "In use",
-  overdue:     () => (t.status as Record<string, string>)["overdue"] ?? "Overdue",
+  info:    () => t.status.info,
+  neutral: () => t.status.neutral,
+  stale:   () => t.status.stale,
+  unknown: () => t.status.unknown,
+  in_use:  () => t.status.in_use,
+  overdue: () => t.status.overdue,
 };
 
 export interface StatusBadgeProps

@@ -3,6 +3,7 @@ import { MobilePageHeader } from "@/shell/mobile/MobilePageHeader";
 import { AppShell } from "@/components/layout/AppShell";
 import { getBundledAppVersion } from "@/lib/app-version";
 import { Link, useLocation } from "wouter";
+import { ChevronRight } from "lucide-react";
 import { t } from "@/lib/i18n";
 
 export default function AboutPage() {
@@ -12,7 +13,7 @@ export default function AboutPage() {
 
   const content = (
     <div style={{ padding: "24px 20px", display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* Logo / wordmark */}
+      {/* Logo / wordmark — brand name is intentionally not i18n-keyed */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <span style={{ fontSize: "var(--text-2xl)", fontWeight: 600, letterSpacing: "-0.03em", color: "hsl(var(--foreground))" }}>
           Vet<em style={{ color: "var(--brand-green-bright)", fontStyle: "normal" }}>Track</em>
@@ -20,11 +21,9 @@ export default function AboutPage() {
         <span style={{ fontSize: "var(--text-sm)", color: "hsl(var(--muted-foreground))" }}>
           {t.more.about}
         </span>
-        {version && (
-          <span style={{ fontSize: "var(--text-xs)", color: "hsl(var(--muted-foreground))" }}>
-            {t.settingsPage.versionLabel} {version}
-          </span>
-        )}
+        <span style={{ fontSize: "var(--text-xs)", color: "hsl(var(--muted-foreground))" }}>
+          {t.settingsPage.versionLabel} {version}
+        </span>
       </div>
 
       {/* Links */}
@@ -51,7 +50,7 @@ export default function AboutPage() {
             }}
           >
             {label}
-            <span style={{ color: "hsl(var(--muted-foreground))", fontSize: 14 }}>›</span>
+            <ChevronRight size={16} style={{ color: "hsl(var(--muted-foreground))" }} aria-hidden />
           </Link>
         ))}
       </div>

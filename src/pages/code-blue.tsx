@@ -66,7 +66,7 @@ function ManagerPicker({ onSelect }: { onSelect: (id: string, name: string) => v
         </button>
       ))}
       {managersQ.data?.length === 0 && (
-        <p className="text-xs text-[var(--status-issue-fg)]">{t.codeBlue.noManagersAvailable}</p>
+        <p className="text-xs text-[rgb(var(--sys-red))]">{t.codeBlue.noManagersAvailable}</p>
       )}
     </div>
   );
@@ -120,9 +120,9 @@ function PreCheckGate({
         <ArrowRight className="h-4 w-4" aria-hidden />
         {t.common.back}
       </button>
-      <div className="flex items-center gap-2 text-[var(--status-issue-fg)]">
+      <div className="flex items-center gap-2 text-[rgb(var(--sys-red))]">
         <AlertTriangle className="h-6 w-6 shrink-0" aria-hidden />
-        <h1 className="text-xl font-bold text-[var(--status-issue-fg)]">{t.codeBlue.openTitle}</h1>
+        <h1 className="text-xl font-bold text-[rgb(var(--sys-red))]">{t.codeBlue.openTitle}</h1>
       </div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 pb-4">
@@ -146,7 +146,7 @@ function PreCheckGate({
           <>
             <ManagerPicker onSelect={(id, n) => { setManagerId(id); setManagerName(n); }} />
             {managerId && (
-              <div className="mt-2 text-xs text-[var(--status-ok-fg)]">{t.codeBlue.selectedManager(managerName)}</div>
+              <div className="mt-2 text-xs text-[rgb(var(--sys-green))]">{t.codeBlue.selectedManager(managerName)}</div>
             )}
           </>
         )}
@@ -306,12 +306,18 @@ function HoldToConfirmButton({ onConfirm, label }: { onConfirm: () => void; labe
     rafRef.current = requestAnimationFrame(tick);
   }, [cancel, onConfirm]);
 
+  // Cancel RAF on unmount to prevent setProgress/onConfirm after unmount
+  useEffect(() => cancel, [cancel]);
+
   return (
     <button
       type="button"
+      aria-label={label}
       onPointerDown={onDown}
       onPointerUp={cancel}
       onPointerLeave={cancel}
+      onPointerCancel={cancel}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onConfirm(); } }}
       className="relative w-full overflow-hidden rounded-xl bg-emergency-border border border-emergency-borderMd font-bold text-emergency-text select-none"
       style={{ minHeight: 56 }}
     >
@@ -394,7 +400,7 @@ function ActiveSession() {
             <ArrowRight className="h-4 w-4" aria-hidden />
             {t.common.back}
           </button>
-          <span className="text-[var(--status-issue-fg)] font-black tracking-widest text-sm flex items-center gap-2">
+          <span className="text-[rgb(var(--sys-red))] font-black tracking-widest text-sm flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" /> CODE BLUE
           </span>
         </div>
@@ -413,7 +419,7 @@ function ActiveSession() {
         <div className={cn(
           "px-4 py-1.5 text-xs flex gap-2 border-b",
           cartStatus.allPassed
-            ? "bg-green-500/10 border-green-500/20 text-[var(--status-ok-fg)]"
+            ? "bg-green-500/10 border-green-500/20 text-[rgb(var(--sys-green))]"
             : "bg-amber-500/10 border-amber-500/20 text-amber-400",
         )}>
           {cartStatus.allPassed
@@ -533,7 +539,7 @@ function ActiveSession() {
                 {entry.category === "equipment" ? t.codeBlue.categoryEquipment : t.codeBlue.categoryNote}
               </span>
               <span className="text-emergency-text min-w-0 truncate">{entry.label}</span>
-              <span className="text-[var(--status-ok-fg)] mr-auto shrink-0">{entry.loggedByName}</span>
+              <span className="text-[rgb(var(--sys-green))] mr-auto shrink-0">{entry.loggedByName}</span>
             </div>
           ))}
           {logEntries.length === 0 && (
