@@ -61,6 +61,7 @@ Omit `CLERK_SECRET_KEY` / `VITE_CLERK_PUBLISHABLE_KEY` to use dev-bypass auth (h
 - Don't refactor code outside what was asked for in the current task.
 - Don't uncomment disabled/skipped test blocks unless explicitly instructed to.
 - Commit after completing each task (still follow standard git-workflow rules: new commits, no amend/force-push/--no-verify).
+- Before reporting a task done, verify claims against real evidence (Read/grep the actual file, run the actual test/command) and record it in docs/audit/PROOF_ALIGNMENT_LOG.md — see that file for the entry format. Don't log summaries of what should be true; log what was actually checked.
 
 ## Architecture
 
