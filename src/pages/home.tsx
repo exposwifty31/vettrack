@@ -41,6 +41,18 @@ function formatClock(value: Date | string): string {
   });
 }
 
+/**
+ * Elapsed shift time as `HH:MM`, degrading to `Nd HH:MM` past 24h so a
+ * long-open (or stale) shift never overflows the hero timer.
+ */
+function formatElapsed(totalMin: number): string {
+  const m = Math.max(0, Math.round(totalMin));
+  const hh = String(Math.floor((m % 1440) / 60)).padStart(2, "0");
+  const mm = String(m % 60).padStart(2, "0");
+  const days = Math.floor(m / 1440);
+  return days > 0 ? `${t.homePage.elapsedDays(days)} ${hh}:${mm}` : `${hh}:${mm}`;
+}
+
 /** Time-of-day greeting including the user's first name. */
 function greetingFor(hour: number, name: string): string {
   if (hour < 12) return t.homePage.greetingMorning(name);
@@ -190,9 +202,7 @@ export default function HomePage() {
   if (pulse?.shift) {
     const startedMs = new Date(pulse.shift.startedAt).getTime();
     const mins = Math.max(0, Math.round((now - startedMs) / 60_000));
-    elapsed = `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(
-      mins % 60,
-    ).padStart(2, "0")}`;
+    elapsed = formatElapsed(mins);
     startedLabel = t.homePage.startedAt(formatClock(pulse.shift.startedAt));
   }
 
@@ -348,7 +358,10 @@ export default function HomePage() {
                   </span>
                 </div>
 
-                <p className="mt-3 font-num text-[2.353rem] font-medium leading-none tracking-[-0.01em] tabular-nums">
+                <p
+                  dir="ltr"
+                  className="mt-3 font-num text-[2.353rem] font-medium leading-none tracking-[-0.01em] tabular-nums rtl:text-end"
+                >
                   {elapsed}
                 </p>
                 <p

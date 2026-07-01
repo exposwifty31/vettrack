@@ -655,6 +655,7 @@ const translations = {
     greetingAfternoon: (name: string) => tr(d.homePage.greetingAfternoon, { name }),
     greetingEvening: (name: string) => tr(d.homePage.greetingEvening, { name }),
     startedAt: (time: string) => tr(d.homePage.startedAt, { time }),
+    elapsedDays: (count: number) => tr(d.homePage.elapsedDays, { count }),
   },
 
   assetCopilot: d.assetCopilot,

@@ -1325,6 +1325,7 @@
     "onShift": "On shift",
     "startedAt": "Started {time}",
     "elapsedLabel": "Elapsed",
+    "elapsedDays": "{count}d",
     "noShiftSub": "Start your shift to begin tracking equipment and scans.",
     "criticalLabel": "Critical",
     "overdueLabel": "Overdue",
