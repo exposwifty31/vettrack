@@ -46,6 +46,8 @@ export default {
           issue: "hsl(var(--status-issue))",
           maintenance: "hsl(var(--status-maintenance))",
           sterilized: "hsl(var(--status-sterilized))",
+          stale: "hsl(var(--status-stale))",
+          unknown: "hsl(var(--status-unknown))",
         },
 
         ivory: {
@@ -93,17 +95,23 @@ export default {
         pill: 'var(--radius-pill)',
       },
       boxShadow: {
+        hero: 'var(--shadow-hero)',
         card: 'var(--shadow-card)',
         'card-hover': 'var(--shadow-card-hover)',
+        panel: 'var(--shadow-panel)',
         surface: 'var(--shadow-surface)',
+        floating: 'var(--shadow-floating)',
+        modal: 'var(--shadow-modal)',
+        overlay: 'var(--shadow-overlay)',
       },
       fontFamily: {
         sans: [
+          "-apple-system",
+          "system-ui",
           "Heebo",
           "Plus Jakarta Sans",
           "Noto Sans Hebrew",
           "Rubik",
-          "system-ui",
           "sans-serif",
         ],
         mono: ["IBM Plex Mono", "ui-monospace", "monospace"],

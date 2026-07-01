@@ -39,6 +39,8 @@
     "issue": "Issue",
     "maintenance": "Maintenance",
     "sterilized": "Sterilized",
+    "stale": "Stale",
+    "unknown": "Unknown",
     "all": "All statuses",
     "info": "Info",
     "neutral": "Unknown"

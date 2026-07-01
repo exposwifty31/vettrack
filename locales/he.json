@@ -39,6 +39,8 @@
     "issue": "תקלה",
     "maintenance": "תחזוקה",
     "sterilized": "עבר חיטוי",
+    "stale": "לא עדכני",
+    "unknown": "לא ידוע",
     "all": "כל הסטטוסים",
     "info": "מידע",
     "neutral": "לא ידוע"
