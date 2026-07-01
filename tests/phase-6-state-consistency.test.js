@@ -126,8 +126,8 @@ describe("Wave 6 state consistency checks (static)", () => {
     ).toBe(true);
   });
 
-  it("Home page next-up task card shows a loading state while tasks fetch, not blank", () => {
-    expect(home.includes("tasksLoading")).toBe(true);
+  it("Home page shift hero shows a loading state while the pulse loads, not blank", () => {
+    expect(home.includes('heroState === "loading"')).toBe(true);
   });
 
   it("Home page uses shared EmptyState component for the activity empty state", () => {
