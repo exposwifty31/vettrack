@@ -13,6 +13,7 @@ import { t } from "@/lib/i18n";
 import { getInitials } from "@/lib/user-utils";
 import { AlertsDropdown } from "@/components/alerts-dropdown";
 import { TopbarSettingsMenu } from "@/components/layout/TopbarSettingsMenu";
+import { TopbarSearch } from "@/components/layout/TopbarSearch";
 
 function navLabel(key: string): string {
   const k = key.startsWith("nav.") ? key.slice(4) : key;
@@ -98,6 +99,7 @@ export function Topbar() {
 
       {/* Right controls */}
       <div className="flex items-center gap-1.5 ms-auto shrink-0">
+        <TopbarSearch />
         <ShiftBadge activeShift={activeShift} />
         {signedIn && (
           <AlertsDropdown
