@@ -64,6 +64,9 @@ export function NativeShell({ children }: Props) {
               overflow: "hidden",
             }}
           >
+            {/* Tablet header carries settings / avatar / alerts (sidebar owns the wordmark). */}
+            <NativeHeader showWordmark={false} ownSafeArea={false} />
+
             <div
               style={{
                 flex: 1,

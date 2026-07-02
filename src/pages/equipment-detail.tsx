@@ -85,6 +85,7 @@ import { statusToBadgeVariant } from "@/lib/design-tokens";
 import { toast } from "sonner";
 import { toastSuccess } from "@/lib/ui-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useActiveShift } from "@/hooks/use-active-shift";
 import { usePendingSyncForEquipment, useSyncQueue } from "@/hooks/use-sync";
 import { MoveRoomSheet } from "@/components/move-room-sheet";
 import { ReturnPlugDialog } from "@/components/return-plug-dialog";
@@ -605,6 +606,9 @@ function EquipmentDetailPageDesktop() {
     },
   });
 
+  // Off-shift: taking equipment ownership is not permitted (roster-derived).
+  const { hasActiveShift } = useActiveShift();
+
   const checkoutMut = useMutation({
     mutationFn: async () => {
       const prev = queryClient.getQueryData<Equipment>([`/api/equipment/${id}`]);
@@ -647,6 +651,15 @@ function EquipmentDetailPageDesktop() {
       toast.error(t.equipmentDetail.toast.checkoutFailed(err.message));
     },
   });
+
+  // Single choke point for every checkout affordance — blocks off-shift ownership.
+  const handleCheckout = () => {
+    if (!hasActiveShift) {
+      toast.error(t.scan.offShiftBody);
+      return;
+    }
+    checkoutMut.mutate();
+  };
 
   const returnMut = useMutation({
     mutationFn: async ({ isPluggedIn: nextPluggedIn, plugInDeadlineMinutes: nextDeadline }: { isPluggedIn: boolean; plugInDeadlineMinutes: number }) => {
@@ -1115,7 +1128,7 @@ function EquipmentDetailPageDesktop() {
             <ReservationBanner
               equipmentId={equipment.id}
               expiresAt={waitlistQ.data.reservationExpiresAt}
-              onCheckout={() => checkoutMut.mutate()}
+              onCheckout={handleCheckout}
               checkoutPending={checkoutMut.isPending}
               showNextInLine={waitlistQ.data.myPosition === 1}
             />
@@ -1135,8 +1148,8 @@ function EquipmentDetailPageDesktop() {
             <Button
               variant="outline"
               className="w-full h-12 gap-2 text-sm font-semibold rounded-2xl active:scale-[0.98] transition-all border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              onClick={() => checkoutMut.mutate()}
-              disabled={checkoutMut.isPending}
+              onClick={handleCheckout}
+              disabled={checkoutMut.isPending || !hasActiveShift}
               data-testid="btn-checkout"
             >
               {checkoutMut.isPending ? (
@@ -1917,8 +1930,8 @@ function EquipmentDetailPageDesktop() {
                     <Button
                       size="lg"
                       className="w-full gap-2.5"
-                      onClick={() => checkoutMut.mutate()}
-                      disabled={checkoutMut.isPending || returnMut.isPending}
+                      onClick={handleCheckout}
+                      disabled={checkoutMut.isPending || returnMut.isPending || !hasActiveShift}
                       data-testid="btn-scan-action-checkout"
                     >
                       {checkoutMut.isPending ? (

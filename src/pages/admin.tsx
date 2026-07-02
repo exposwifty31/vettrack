@@ -157,7 +157,7 @@ export default function AdminPage() {
         />
         <link rel="canonical" href="https://vettrack.replit.app/admin" />
       </Helmet>
-      <div className="flex flex-col gap-6 pb-24 animate-fade-in">
+      <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 pb-24 pt-3 animate-fade-in sm:px-6 lg:max-w-[1120px]">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-2xl font-bold leading-tight flex items-center gap-2">
             <Shield className="w-6 h-6 text-primary" />
@@ -228,16 +228,6 @@ export default function AdminPage() {
                 {unresolvedCount > 9 ? "9+" : unresolvedCount}
               </span>
             )}
-          </button>
-          <button
-            onClick={() => navigate("/admin/shifts")}
-            data-testid="admin-tab-shifts"
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <CalendarDays className="w-4 h-4" />
-            {t.adminPage.tabShifts}
           </button>
           <button
             onClick={() => setActiveTab("shift-requests")}

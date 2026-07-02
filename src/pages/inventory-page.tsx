@@ -628,7 +628,7 @@ export default function InventoryPage() {
         <title>{p.title} — VetTrack</title>
       </Helmet>
 
-      <div className="w-full space-y-4 pb-24 motion-safe:animate-page-enter" data-restock-allow>
+      <div className="mx-auto w-full max-w-[720px] space-y-4 px-4 pb-24 pt-3 motion-safe:animate-page-enter sm:px-6 lg:max-w-[1120px]" data-restock-allow>
 
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3">

@@ -382,6 +382,27 @@
     --nav-bg: hsl(240 24% 98% / 0.8);
   }
 
+  /* Forest (brand green) — light. Neutrals match clinical; brand family → green. */
+  :root[data-color-theme="forest"] {
+    --primary: 142 72% 29%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 142 72% 29%;
+    --ivory-green:    21 128 61;
+    --ivory-greenMid: 22 101 52;
+    --ivory-greenBg:  220 252 231;
+    --brand-green-bright: #86efac;
+    --brand-green-mid: #22c55e;
+    --brand: #15803d;
+    --brand-foreground: #ffffff;
+    --brand-deep: #166534;
+    --brand-ink: #14311f;
+    --brand-soft: #ecfdf5;
+    --brand-border: #bbf7d0;
+    --brand-shadow: rgba(21, 128, 61, 0.45);
+    --hero-a: #0b1f14;
+    --hero-b: #14532d;
+  }
+
   /* iOS dark system (Stage 1) — shared by both dark color-theme combos. */
   :root[data-color-theme="dark"],
   .dark[data-color-theme="clinical"] {
@@ -431,6 +452,27 @@
     --action-soft: rgba(76, 205, 170, 0.12);
     --action-border: rgba(76, 205, 170, 0.3);
     --nav-bg: hsl(240 2% 8% / 0.8);
+  }
+
+  /* Forest (brand green) — dark. Inherits the dark neutrals; brand family → green. */
+  .dark[data-color-theme="forest"] {
+    --primary: 142 69% 58%;
+    --primary-foreground: 142 60% 12%;
+    --ring: 142 69% 58%;
+    --ivory-green:    74 222 128;
+    --ivory-greenMid: 34 197 94;
+    --ivory-greenBg:  20 60 40;
+    --brand-green-bright: #86efac;
+    --brand-green-mid: #22c55e;
+    --brand: #22c55e;
+    --brand-foreground: #06210f;
+    --brand-deep: #16a34a;
+    --brand-ink: #0f2a1b;
+    --brand-soft: rgba(34, 197, 94, 0.12);
+    --brand-border: rgba(34, 197, 94, 0.3);
+    --brand-shadow: rgba(34, 197, 94, 0.45);
+    --hero-a: #071a10;
+    --hero-b: #0f3d24;
   }
 
   /* ── Size-class responsive layout tokens (Stage 1 §07) ──

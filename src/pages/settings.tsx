@@ -174,7 +174,7 @@ export default function SettingsPage() {
 
   if (!isLoaded) {
     const loadingContent = (
-      <div className="w-full max-w-full overflow-x-hidden space-y-3 pb-8">
+      <div className="mx-auto w-full max-w-[720px] lg:max-w-[1120px] overflow-x-hidden px-4 pt-3 sm:px-6 space-y-3 pb-8">
         <Skeleton className="h-8 w-40" />
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-24 w-full" />
@@ -186,7 +186,7 @@ export default function SettingsPage() {
 
   if (!isSignedIn) {
     const errorContent = (
-      <div className="w-full max-w-full overflow-x-hidden space-y-3 pb-8">
+      <div className="mx-auto w-full max-w-[720px] lg:max-w-[1120px] overflow-x-hidden px-4 pt-3 sm:px-6 space-y-3 pb-8">
         <ErrorCard
           message={t.settingsPage.loadFailedForSession}
           onRetry={() => safeReloadPage()}
@@ -198,7 +198,7 @@ export default function SettingsPage() {
 
   const pageContent = (
     <>
-      <div className="w-full max-w-full overflow-x-hidden space-y-6 pb-8 animate-fade-in">
+      <div className="mx-auto w-full max-w-[720px] lg:max-w-[1120px] overflow-x-hidden px-4 pt-3 sm:px-6 space-y-6 pb-8 animate-fade-in">
         <div>
           <h1 className="vt-page-title text-foreground">{t.settingsPage.title}</h1>
           <p className="vt-text-sm text-muted-foreground mt-1">{t.settingsPage.subtitle}</p>

@@ -99,7 +99,7 @@ export function AppRoutes() {
         <Route path="/home"><AuthGuard><HomePage /></AuthGuard></Route>
 
         {/* --- Equipment & board (canonical: /equipment, /equipment/tasks, /equipment/board) --- */}
-        <Route path="/equipment"><AuthGuard><WebOnlyGuard fallback="/my-equipment"><EquipmentPage /></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/equipment"><AuthGuard><EquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/new"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/tasks"><AuthGuard><AppointmentsPage /></AuthGuard></Route>
         <Route path="/equipment/board"><AuthGuard><WebOnlyGuard fallback="/my-equipment"><WardDisplayPage /></WebOnlyGuard></AuthGuard></Route>
@@ -150,8 +150,9 @@ export function AppRoutes() {
 
         {/* --- Platform & analytics --- */}
         <Route path="/inventory"><AuthGuard><InventoryPage /></AuthGuard></Route>
-        <Route path="/inventory-items/:id"><AuthGuard><WebOnlyGuard><InventoryItemDetailPage /></WebOnlyGuard></AuthGuard></Route>
-        <Route path="/inventory-items"><AuthGuard><WebOnlyGuard><InventoryItemsPage /></WebOnlyGuard></AuthGuard></Route>
+        {/* Stage 5 inventory-items + detail are responsive — reachable on native (iPad/iPhone). */}
+        <Route path="/inventory-items/:id"><AuthGuard><InventoryItemDetailPage /></AuthGuard></Route>
+        <Route path="/inventory-items"><AuthGuard><InventoryItemsPage /></AuthGuard></Route>
         <Route path="/procurement"><AuthGuard><WebOnlyGuard><ProcurementPage /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/analytics/outcome-kpi"><Redirect to="/analytics" replace /></Route>
         <Route path="/analytics/shift-leaderboard"><AuthGuard><WebOnlyGuard><ShiftLeaderboardPage /></WebOnlyGuard></AuthGuard></Route>

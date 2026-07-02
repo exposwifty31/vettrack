@@ -77,7 +77,7 @@ export default function AdminShiftsPage() {
 
   return (
     <AppShell title={t.adminShiftsPage.title}>
-      <div className="flex flex-col gap-4 pb-24 animate-fade-in">
+      <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4 px-4 pb-24 pt-3 animate-fade-in sm:px-6 lg:max-w-[1120px]">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{t.adminShiftsPage.title}</h1>
           <p className="text-sm text-muted-foreground mt-1">{t.adminShiftsPage.subtitle}</p>

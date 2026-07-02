@@ -3,7 +3,7 @@ import { Bdi } from "@/components/ui/bdi";
 import { t, formatDateByLocale, getStoredLocale } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useSearch, useLocation } from "wouter";
+import { Link, useSearch } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
 import { AppShell } from "@/components/layout/AppShell";
@@ -101,7 +101,6 @@ export default function HomePage() {
   const { name, refreshAuth } = useAuth();
   const userId = getCurrentUserId();
   const queryClient = useQueryClient();
-  const [, navigate] = useLocation();
   const [scannerOpen, setScannerOpen] = useState(false);
   const [activeCodeBlueId, setActiveCodeBlueId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -367,14 +366,6 @@ export default function HomePage() {
                 >
                   {t.homePage.noShiftSub}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => navigate("/handoff")}
-                  className="mt-2 h-12 w-full rounded-[14px] text-base font-bold transition-transform motion-safe:active:scale-[0.99]"
-                  style={{ background: "var(--on-ink)", color: "var(--brand-ink)" }}
-                >
-                  {t.home.shift.startShift}
-                </button>
               </div>
             ) : (
               <>

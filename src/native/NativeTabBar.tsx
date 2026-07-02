@@ -17,11 +17,11 @@ type Props = {
 function isTabActive(location: string, href: string): boolean {
   const path = href.split("?")[0];
   if (path === "/home") return location === "/home" || location === "/";
-  // The equipment tab navigates to /my-equipment on native, but /equipment
-  // (including the ?scan=1 scanner overlay) is the same equipment surface —
-  // keep the tab active on both.
-  if (path === "/my-equipment") {
-    return location.startsWith("/my-equipment") || location.startsWith("/equipment");
+  // Equipment tab covers the browse list and its detail/scan sub-routes, plus
+  // the personal "My equipment" view (same equipment surface, menu-reachable).
+  if (path === "/equipment") {
+    if (location.startsWith("/equipment/tasks")) return false;
+    return location.startsWith("/equipment") || location.startsWith("/my-equipment");
   }
   return location.startsWith(path);
 }
@@ -83,7 +83,7 @@ export function NativeTabBar({ onMorePress }: Props) {
 
   const leftTabs: TabDef[] = [
     { id: "today", href: "/home", label: t.nav.today, icon: <Home size={22} /> },
-    { id: "equipment", href: "/my-equipment", label: t.nav.equipment, icon: <Package size={22} /> },
+    { id: "equipment", href: "/equipment", label: t.nav.equipment, icon: <Package size={22} /> },
   ];
 
   const rightTabs: TabDef[] = [

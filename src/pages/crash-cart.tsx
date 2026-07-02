@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ErrorCard } from "@/components/ui/error-card";
 import { authFetch } from "@/lib/auth-fetch";
 import { useAuth } from "@/hooks/use-auth";
+import { useDirection } from "@/hooks/useDirection";
 import { api } from "@/lib/api";
 import { t, formatDateByLocale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ function formatRelativeTime(iso: string): string {
 
 export default function CrashCartCheckPage() {
   const { userId, isAdmin } = useAuth();
+  const dir = useDirection();
   const queryClient = useQueryClient();
   const searchStr = useSearch();
   const [, navigate] = useLocation();
@@ -124,7 +126,7 @@ export default function CrashCartCheckPage() {
 
   if (latestQ.isError) {
     return (
-      <div className="min-h-screen bg-background p-4 max-w-2xl mx-auto" dir="rtl">
+      <div className="min-h-screen bg-background p-4 max-w-2xl mx-auto" dir={dir}>
         <div className="flex items-center gap-2 mb-4">{backButton}</div>
         <ErrorCard message={t.crashCart.loadError} onRetry={() => latestQ.refetch()} />
       </div>
@@ -132,7 +134,7 @@ export default function CrashCartCheckPage() {
   }
 
   return (
-    <div className="flex flex-col bg-background overflow-hidden" dir="rtl" style={{ height: "100%", paddingTop: "calc(env(safe-area-inset-top) + 16px)" }}>
+    <div className="flex flex-col bg-background overflow-hidden" dir={dir} style={{ height: "100%", paddingTop: "calc(env(safe-area-inset-top) + 16px)" }}>
       <div className="flex-shrink-0 flex items-center gap-2 px-4 py-3 border-b border-border">
         {backButton}
         <CheckCircle2 className="h-6 w-6 text-green-500" />

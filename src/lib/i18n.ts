@@ -448,6 +448,8 @@ const translations = {
   scan: {
     title: d.scan.title,
     scanPrompt: d.scan.scanPrompt,
+    offShiftTitle: d.scan.offShiftTitle,
+    offShiftBody: d.scan.offShiftBody,
     checkedInTo: d.scan.checkedInTo,
     passToColleague: d.scan.passToColleague,
     done: d.scan.done,
