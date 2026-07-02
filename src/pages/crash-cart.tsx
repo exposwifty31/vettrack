@@ -137,7 +137,7 @@ export default function CrashCartCheckPage() {
     <div className="flex flex-col bg-background overflow-hidden" dir={dir} style={{ height: "100%", paddingTop: "calc(env(safe-area-inset-top) + 16px)" }}>
       <div className="flex-shrink-0 flex items-center gap-2 px-4 py-3 border-b border-border">
         {backButton}
-        <CheckCircle2 className="h-6 w-6 text-green-500" />
+        <CheckCircle2 className="h-6 w-6 text-[var(--status-ok-fg)]" />
         <h1 className="text-xl font-bold flex-1">{t.crashCart.title}</h1>
         {isAdmin && (
           <Button
@@ -159,8 +159,8 @@ export default function CrashCartCheckPage() {
         <div className={cn(
           "rounded-lg border p-3 mb-4 text-sm",
           latestQ.data.checkedToday
-            ? "border-green-500/30 bg-green-500/10 text-green-400"
-            : "border-amber-500/30 bg-amber-500/10 text-amber-400",
+            ? "border-[var(--status-ok-border)] bg-[var(--status-ok-bg)] text-[var(--status-ok-fg)]"
+            : "border-[var(--status-stale-border)] bg-[var(--status-stale-bg)] text-[var(--status-stale-fg)]",
         )}>
           {latestQ.data.checkedToday && latestQ.data.latest ? (
             <span>
@@ -177,8 +177,8 @@ export default function CrashCartCheckPage() {
 
       {/* High-risk patients */}
       {criticalPatients.length > 0 && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 mb-4">
-          <div className="flex items-center gap-2 mb-2 text-red-400 text-sm font-semibold">
+        <div className="rounded-lg border border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] p-3 mb-4">
+          <div className="flex items-center gap-2 mb-2 text-[var(--status-issue-fg)] text-sm font-semibold">
             <AlertTriangle className="h-4 w-4" />
             {t.crashCart.highRiskPatients(criticalPatients.length)}
           </div>
@@ -214,7 +214,7 @@ export default function CrashCartCheckPage() {
                 {t.crashCart.customizeButton}
               </Button>
             ) : (
-              <p className="text-xs text-amber-600/90 dark:text-amber-400">{t.crashCart.nonAdminHint}</p>
+              <p className="text-xs text-[var(--status-stale-fg)]">{t.crashCart.nonAdminHint}</p>
             )}
           </div>
         </div>
@@ -241,12 +241,12 @@ export default function CrashCartCheckPage() {
                 className={cn(
                   "flex items-center gap-3 text-end p-3 rounded-lg border transition-colors min-h-[44px]",
                   isChecked
-                    ? "border-green-600/50 bg-green-500/15 text-green-800 dark:text-green-300 ring-2 ring-green-500/25"
+                    ? "border-[var(--status-ok-border)] bg-[var(--status-ok-bg)] text-[var(--status-ok-fg)] ring-2 ring-[var(--status-ok-border)]"
                     : "border-border bg-background text-foreground hover:border-primary/40",
                 )}
               >
                 {isChecked
-                  ? <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-500 shrink-0" aria-hidden />
+                  ? <CheckCircle2 className="h-6 w-6 text-[var(--status-ok-fg)] shrink-0" aria-hidden />
                   : <Circle className="h-6 w-6 text-muted-foreground shrink-0" aria-hidden />
                 }
                 <span className={cn("text-sm flex-1 text-start", isChecked && "font-semibold")}>{item.label}</span>
@@ -274,7 +274,7 @@ export default function CrashCartCheckPage() {
           </Button>
         </div>
       ) : (
-        <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4 mb-4 text-center text-green-400">
+        <div className="rounded-lg border border-[var(--status-ok-border)] bg-[var(--status-ok-bg)] p-4 mb-4 text-center text-[var(--status-ok-fg)]">
           <CheckCircle2 className="h-8 w-8 mx-auto mb-2" />
           <p className="font-semibold">{t.crashCart.checkSaved}</p>
         </div>
@@ -291,7 +291,7 @@ export default function CrashCartCheckPage() {
               <div key={check.id} className="flex justify-between items-center text-xs text-muted-foreground">
                 <span>{formatDateByLocale(check.performedAt, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
                 <span className="text-muted-foreground/70">{check.performedByName}</span>
-                <span className={check.allPassed ? "text-green-400" : "text-red-400"}>
+                <span className={check.allPassed ? "text-[var(--status-ok-fg)]" : "text-[var(--status-issue-fg)]"}>
                   {check.allPassed ? t.crashCart.statusOk : t.crashCart.statusMissing}
                 </span>
               </div>

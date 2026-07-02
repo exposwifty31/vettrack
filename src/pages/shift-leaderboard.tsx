@@ -118,7 +118,7 @@ export default function ShiftLeaderboardPage() {
           </div>
         </div>
 
-        {/* תוצאות */}
+        {/* Results */}
         {reportQ.isPending && (
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -160,7 +160,7 @@ export default function ShiftLeaderboardPage() {
                     <tr
                       key={u.userId}
                       className={`hover:bg-muted/30 transition-colors ${
-                        hasZeroCapture ? "bg-amber-50/40 dark:bg-amber-950/20" : ""
+                        hasZeroCapture ? "bg-[var(--status-stale-bg)]" : ""
                       }`}
                     >
                       <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
@@ -177,7 +177,7 @@ export default function ShiftLeaderboardPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         {hasZeroCapture ? (
-                          <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 font-medium">
+                          <span className="inline-flex items-center gap-1 text-[var(--status-stale-fg)] font-medium">
                             <AlertCircle className="h-3.5 w-3.5" />
                             {u.zeroCaptureShifts}
                           </span>

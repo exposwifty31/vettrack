@@ -1079,10 +1079,10 @@ function EquipmentDetailPageDesktop() {
             className={cn(
               "rounded-xl border px-3 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between",
               equipmentLocalSyncState === "conflict"
-                ? "bg-orange-50 border-orange-200"
+                ? "bg-[var(--status-maint-bg)] border-[var(--status-maint-border)]"
                 : equipmentLocalSyncState === "sync_failed"
-                ? "bg-red-50 border-red-200"
-                : "bg-amber-50 border-amber-200",
+                ? "bg-[var(--status-issue-bg)] border-[var(--status-issue-border)]"
+                : "bg-[var(--status-stale-bg)] border-[var(--status-stale-border)]",
             )}
             data-testid="equipment-local-sync-banner"
           >
@@ -1090,10 +1090,10 @@ function EquipmentDetailPageDesktop() {
               className={cn(
                 "text-sm font-medium",
                 equipmentLocalSyncState === "conflict"
-                  ? "text-orange-900"
+                  ? "text-[var(--status-maint-fg)]"
                   : equipmentLocalSyncState === "sync_failed"
-                  ? "text-red-900"
-                  : "text-amber-900",
+                  ? "text-[var(--status-issue-fg)]"
+                  : "text-[var(--status-stale-fg)]",
               )}
             >
               {equipmentLocalSyncState === "pending_sync"
@@ -1145,7 +1145,7 @@ function EquipmentDetailPageDesktop() {
           {equipment.custodyState === "returned" && equipment.status === "ok" ? (
             <Button
               variant="outline"
-              className="w-full h-12 gap-2 text-sm font-semibold rounded-2xl active:scale-[0.98] transition-all text-blue-700 border-blue-200 hover:bg-blue-50"
+              className="w-full h-12 gap-2 text-sm font-semibold rounded-2xl active:scale-[0.98] transition-all text-[rgb(var(--sys-blue))] border-[rgb(var(--sys-blue)/0.3)] hover:bg-[rgb(var(--sys-blue)/0.08)]"
               onClick={() => setDockReturnOpen(true)}
               data-testid="btn-dock-return"
             >
@@ -1191,7 +1191,7 @@ function EquipmentDetailPageDesktop() {
           <div className={cn("grid gap-2", isStudentEquipmentRole ? "grid-cols-2" : "grid-cols-3")}>
             <Button
               variant="outline"
-              className="h-11 gap-1.5 text-sm font-medium rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 active:scale-[0.98] transition-all"
+              className="h-11 gap-1.5 text-sm font-medium rounded-xl border-[var(--status-issue-border)] text-[var(--status-issue-fg)] hover:bg-[var(--status-issue-bg)] active:scale-[0.98] transition-all"
               onClick={() => {
                 setReportIssueNote("");
                 setReportIssuePhoto(null);
@@ -1269,24 +1269,24 @@ function EquipmentDetailPageDesktop() {
         {/* Pilot: scan count — no names, aggregate only */}
         {scanLogsPages && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+            <CheckCircle2 className="h-3.5 w-3.5 text-[var(--status-ok-fg)] shrink-0" />
             <span>{t.equipmentDetail.scanCount(scanLogsPages.pages[0]?.total ?? 0)}</span>
           </div>
         )}
 
         {/* Floor note — inline editable for technician+ */}
         {editingFloorNote ? (
-          <div className="flex flex-col gap-2 rounded-xl border border-amber-200/60 bg-amber-50/60 dark:border-amber-800/30 dark:bg-amber-950/20 px-3.5 py-3">
+          <div className="flex flex-col gap-2 rounded-xl border border-[var(--status-stale-border)] bg-[var(--status-stale-bg)] px-3.5 py-3">
             <Textarea
               autoFocus
               value={floorNoteText}
               onChange={(e) => setFloorNoteText(e.target.value.slice(0, 200))}
               placeholder={t.equipmentDetail.floorNotePlaceholder}
-              className="min-h-[72px] resize-none text-xs bg-white/70 dark:bg-black/20 border-amber-200/60"
+              className="min-h-[72px] resize-none text-xs bg-white/70 dark:bg-black/20 border-[var(--status-stale-border)]"
               maxLength={200}
             />
             <div className="flex items-center justify-between">
-              <span className="vt-text-2xs text-amber-700/60 dark:text-amber-400/60">
+              <span className="vt-text-2xs text-[var(--status-stale-fg)]">
                 {floorNoteText.length}/200
               </span>
               <div className="flex gap-2">
@@ -1315,15 +1315,15 @@ function EquipmentDetailPageDesktop() {
             </div>
           </div>
         ) : equipment.usuallyFoundHere ? (
-          <div className="flex items-start gap-2.5 rounded-xl border border-amber-200/60 bg-amber-50/60 dark:border-amber-800/30 dark:bg-amber-950/20 px-3.5 py-3">
-            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
-            <p className="flex-1 text-xs leading-relaxed text-amber-800 dark:text-amber-300">
+          <div className="flex items-start gap-2.5 rounded-xl border border-[var(--status-stale-border)] bg-[var(--status-stale-bg)] px-3.5 py-3">
+            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--status-stale-fg)]" aria-hidden />
+            <p className="flex-1 text-xs leading-relaxed text-[var(--status-stale-fg)]">
               {equipment.usuallyFoundHere}
             </p>
             {!isStudentEquipmentRole && (
               <button
                 onClick={() => { setFloorNoteText(equipment.usuallyFoundHere ?? ""); setEditingFloorNote(true); }}
-                className="shrink-0 text-amber-500 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-200"
+                className="shrink-0 text-[var(--status-stale-fg)] hover:opacity-80"
                 aria-label={t.equipmentDetail.ariaEditFloorNote}
               >
                 <Pencil className="h-3.5 w-3.5" />
@@ -1334,7 +1334,7 @@ function EquipmentDetailPageDesktop() {
           !isStudentEquipmentRole && (
             <button
               onClick={() => { setFloorNoteText(""); setEditingFloorNote(true); }}
-              className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 px-1 py-0.5"
+              className="flex items-center gap-1.5 text-xs text-[var(--status-stale-fg)] hover:opacity-80 px-1 py-0.5"
             >
               <Pencil className="h-3 w-3" />
               {t.equipmentDetail.floorNoteAdd}
@@ -1521,7 +1521,7 @@ function EquipmentDetailPageDesktop() {
                   </DialogHeader>
                   <div className="space-y-3">
                     {equipment.readinessState !== "ready" && (
-                      <p className="text-sm text-amber-600 bg-amber-50 rounded p-2">
+                      <p className="text-sm text-[var(--status-stale-fg)] bg-[var(--status-stale-bg)] rounded p-2">
                         {t.operationalState.procedureBindNotReadyWarning}
                       </p>
                     )}
@@ -1682,9 +1682,9 @@ function EquipmentDetailPageDesktop() {
                     }`}
                     data-testid={`scan-status-${s}`}
                   >
-                    {s === "ok" && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
-                    {s === "issue" && <AlertTriangle className="w-4 h-4 text-red-500" />}
-                    {s === "maintenance" && <Wrench className="w-4 h-4 text-amber-500" />}
+                    {s === "ok" && <CheckCircle2 className="w-4 h-4 text-[var(--status-ok-fg)]" />}
+                    {s === "issue" && <AlertTriangle className="w-4 h-4 text-[var(--status-issue-fg)]" />}
+                    {s === "maintenance" && <Wrench className="w-4 h-4 text-[var(--status-maint-fg)]" />}
                     {s === "sterilized" && <Droplets className="w-4 h-4 text-teal-500" />}
                     {STATUS_LABELS[s]}
                   </button>
@@ -1696,7 +1696,7 @@ function EquipmentDetailPageDesktop() {
               <Label htmlFor="note">
                 Note
                 {scanStatus === "issue" && (
-                  <span className="text-red-500 ms-1">*</span>
+                  <span className="text-[var(--status-issue-fg)] ms-1">*</span>
                 )}
                 {scanStatus !== "issue" && (
                   <span className="text-muted-foreground text-xs ms-1">(optional)</span>
@@ -1716,10 +1716,10 @@ function EquipmentDetailPageDesktop() {
                 }}
                 rows={3}
                 data-testid="scan-note"
-                className={noteError ? "border-red-500 focus-visible:ring-red-500" : ""}
+                className={noteError ? "border-[var(--status-issue-border)] focus-visible:ring-[var(--status-issue-border)]" : ""}
               />
               {noteError && (
-                <p className="text-xs text-red-600 font-medium">{noteError}</p>
+                <p className="text-xs text-[var(--status-issue-fg)] font-medium">{noteError}</p>
               )}
             </div>
 
@@ -1799,7 +1799,7 @@ function EquipmentDetailPageDesktop() {
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="report-issue-note">
                 Describe the issue
-                <span className="text-red-500 ms-1">*</span>
+                <span className="text-[var(--status-issue-fg)] ms-1">*</span>
               </Label>
               <Textarea
                 id="report-issue-note"
@@ -1811,10 +1811,10 @@ function EquipmentDetailPageDesktop() {
                 }}
                 rows={3}
                 data-testid="report-issue-note"
-                className={reportIssueNoteError ? "border-red-500 focus-visible:ring-red-500" : ""}
+                className={reportIssueNoteError ? "border-[var(--status-issue-border)] focus-visible:ring-[var(--status-issue-border)]" : ""}
               />
               {reportIssueNoteError && (
-                <p className="text-xs text-red-600 font-medium">{reportIssueNoteError}</p>
+                <p className="text-xs text-[var(--status-issue-fg)] font-medium">{reportIssueNoteError}</p>
               )}
             </div>
             <div className="flex flex-col gap-1.5">
@@ -1866,7 +1866,7 @@ function EquipmentDetailPageDesktop() {
             <Button
               onClick={handleReportIssueSubmit}
               disabled={reportIssueMut.isPending}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className="bg-destructive hover:bg-destructive/90 text-white"
               data-testid="btn-confirm-report-issue"
             >
               {reportIssueMut.isPending ? (
@@ -1976,7 +1976,7 @@ function EquipmentDetailPageDesktop() {
                   )}
 
                   {isCheckedOut && !checkedOutByMe && !isAdmin && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-sm text-amber-800">
+                    <div className="bg-[var(--status-stale-bg)] border border-[var(--status-stale-border)] rounded-xl px-3 py-2.5 text-sm text-[var(--status-stale-fg)]">
                       Only the person who checked this out (or an admin) can return it.
                     </div>
                   )}
@@ -1984,7 +1984,7 @@ function EquipmentDetailPageDesktop() {
                   <Button
                     variant="outline"
                     size="lg"
-                    className="w-full gap-2.5 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                    className="w-full gap-2.5 border-[var(--status-issue-border)] text-[var(--status-issue-fg)] hover:bg-[var(--status-issue-bg)]"
                     onClick={() => {
                       setScanActionSheetOpen(false);
                       openScanDialog();
@@ -2010,7 +2010,7 @@ function EquipmentDetailPageDesktop() {
               </>
             ) : (
               <div className="flex flex-col items-center gap-4 py-4 text-center">
-                <CheckCircle2 className="w-14 h-14 text-emerald-500" />
+                <CheckCircle2 className="w-14 h-14 text-[var(--status-ok-fg)]" />
                 <p className="font-bold text-lg">{t.equipmentDetail.actionDone}</p>
                 <p className="text-muted-foreground text-sm">{t.equipmentDetail.actionDoneBody(equipmentDisplayName)}</p>
                 <Button

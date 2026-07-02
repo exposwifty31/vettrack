@@ -441,6 +441,19 @@ export interface TStructure {
     manufacturer: string;
     purchaseDate: string;
     location: string;
+    back: string;
+    atGlance: string;
+    assignee: string;
+    lastScan: string;
+    due: string;
+    unassigned: string;
+    pullToRefresh: string;
+    releaseToRefresh: string;
+    serviceSchedule: string;
+    lastServiced: string;
+    nextService: string;
+    serviceOverdue: string;
+    checkIn: string;
     maintenanceInterval: string;
     lastMaintenance: string;
     lastSterilization: string;
@@ -872,6 +885,40 @@ export interface TStructure {
         TECH_ERROR: string;
       };
     };
+    sheet: {
+      serverError: string;
+      emergencyCompleteTitle: string;
+      emergencyCompleteSubtitle: string;
+      englishNameHint: string;
+      inStock: string;
+      decrease: string;
+      increase: string;
+      assignPatientOptional: string;
+      unnamedPatient: string;
+      noPatientAssignment: string;
+      confirmEmergencyDetails: string;
+      updatedSuccess: string;
+      takenSuccess: string;
+      byLabel: string;
+      atTimeLabel: string;
+      autoClosing: string;
+      close: string;
+      emergencyRecorded: string;
+      completeAfterTreatment: string;
+      completeFromHandover: string;
+      closeForNow: string;
+      whoBelongsTitle: string;
+      whoBelongsSubtitle: string;
+      noActivePatients: string;
+      confirmTake: string;
+      back: string;
+      loading: string;
+      emergency: string;
+      orSelectItems: string;
+      noItemsInContainer: string;
+      itemsSelected: string;
+      continue: string;
+    };
   };
   syncEngine: {
     pausedTooManyErrors: string;
@@ -1186,6 +1233,7 @@ export interface TStructure {
     endTime: string;
     employeeName: string;
     role: string;
+    csvOnly: string;
   };
   alertsPage: {
     oneMinuteAgo: string;
@@ -1557,6 +1605,7 @@ export interface TStructure {
     titleFull: string;
     okTitle: string;
     subtitle: string;
+    legal: string;
   };
   pilotHomePage: {
     worthCheckingSection: string;
@@ -1927,6 +1976,8 @@ export interface TStructure {
     cursorBugFixerDispatched: string;
     cursorBugFixerFailed: string;
     cursorBugFixerNotConfigured: string;
+    secondaryRoleUpdated: string;
+    secondaryRoleUpdateFailed: string;
   };
   layoutHebrew: {
     home: string;
@@ -3168,6 +3219,29 @@ export interface TStructure {
     };
   };
   shiftChat: {
+    broadcast: {
+      iSent: string;
+      seniorTech: string;
+      received: string;
+      gotItOnWay: string;
+      fiveMin: string;
+      ackedReceipt: string;
+      snoozedReminder: string;
+    };
+    broadcastTemplates: {
+      department_close: {
+        label: string;
+        subtitle: string;
+      };
+    };
+    urgent: string;
+    archive: {
+      loading: string;
+      notFound: string;
+      title: string;
+      readOnly: string;
+      empty: string;
+    };
     errors: {
       noOpenShift: string;
       sendFailed: string;
@@ -3192,6 +3266,18 @@ export interface TStructure {
       sendAria: string;
       closeAria: string;
       pinAria: string;
+    };
+    system: {
+      codeBlueStarted: string;
+      codeBlueEnded: string;
+      codeBlueUnreconciled: string;
+      equipmentOverdue: string;
+      alertReopened: string;
+      emergencyDispenseUnresolved: string;
+      taskEscalated: string;
+      criticalPushFailed: string;
+      outboxDlqExceeded: string;
+      minutesShort: string;
     };
   };
   auditLog: {
@@ -3676,6 +3762,30 @@ export interface TStructure {
         badge: string;
       };
     };
+    gotIt: string;
+  };
+  authPage: {
+    signInMetaTitle: string;
+    signInMetaDescription: string;
+    welcomeBack: string;
+    signInSubtitle: string;
+    signInLoadError: string;
+    backToRegularSignIn: string;
+    phonePrompt: string;
+    usePhoneSignIn: string;
+    phoneFormatHint: string;
+    signUpMetaTitle: string;
+    signUpMetaDescription: string;
+    createAccount: string;
+    signUpSubtitle: string;
+    signUpLoadError: string;
+    roleLabel: string;
+    roleVetTech: string;
+    roleVeterinarian: string;
+    roleStudent: string;
+    devModeNotice: string;
+    enterDashboard: string;
+    moreAboutVetTrack: string;
   };
   shiftLeaderboard: {
     title: string;
@@ -3878,6 +3988,11 @@ export interface TStructure {
     editDisplayName: string;
     displayNameUpdated: string;
     saveError: string;
+    avatarAlt: string;
+    changePhoto: string;
+    photoUpdated: string;
+    photoUploadError: string;
+    photoTooLarge: string;
     shiftActivity: string;
     noShiftActivity: string;
     shiftActivityError: string;
@@ -3918,6 +4033,14 @@ export interface TStructure {
     typePlaceholder: string;
     conditionNamePlaceholder: string;
     staleMinPlaceholder: string;
+    title: string;
+    addButton: string;
+    readinessConditionsTitle: string;
+    assetTypeCreated: string;
+    conditionAdded: string;
+    emptyTitle: string;
+    emptySub: string;
+    selectTypeHint: string;
   };
   conditionChecklist: {
     notesPlaceholder: string;

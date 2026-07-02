@@ -6,6 +6,9 @@ import { MessageBubble } from "./MessageBubble";
 import { BroadcastCard } from "./BroadcastCard";
 import { SystemCard } from "./SystemCard";
 import { useAuth } from "@/hooks/use-auth";
+import { t, formatDateTimeByLocale } from "@/lib/i18n";
+
+const DATETIME_OPTS = { dateStyle: "medium", timeStyle: "short" } as const;
 
 interface ArchiveResponse {
   messages: ShiftMessage[];
@@ -22,19 +25,19 @@ export function ShiftChatArchive() {
     enabled: !!shiftId,
   });
 
-  if (isLoading) return <div className="p-6 text-muted-foreground text-sm">טוען...</div>;
-  if (!data) return <div className="p-6 text-muted-foreground text-sm">לא נמצא</div>;
+  if (isLoading) return <div className="p-6 text-muted-foreground text-sm">{t.shiftChat.archive.loading}</div>;
+  if (!data) return <div className="p-6 text-muted-foreground text-sm">{t.shiftChat.archive.notFound}</div>;
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-3">
       <div className="mb-4">
-        <h1 className="text-lg font-bold">ארכיון צ׳אט משמרת</h1>
+        <h1 className="text-lg font-bold">{t.shiftChat.archive.title}</h1>
         <p className="text-xs text-muted-foreground">
-          {new Date(data.shift.startedAt).toLocaleString("he-IL")}
-          {data.shift.endedAt && ` — ${new Date(data.shift.endedAt).toLocaleString("he-IL")}`}
+          {formatDateTimeByLocale(data.shift.startedAt, DATETIME_OPTS)}
+          {data.shift.endedAt && ` — ${formatDateTimeByLocale(data.shift.endedAt, DATETIME_OPTS)}`}
         </p>
-        <p className="text-xs text-muted-foreground mt-1 bg-amber-950/30 border border-amber-800/40 rounded px-2 py-1 inline-block">
-          קריאה בלבד
+        <p className="text-xs text-muted-foreground mt-1 bg-[var(--status-stale-bg)] border border-[var(--status-stale-border)] rounded px-2 py-1 inline-block">
+          {t.shiftChat.archive.readOnly}
         </p>
       </div>
       {data.messages.map((msg) => {
@@ -59,7 +62,7 @@ export function ShiftChatArchive() {
         );
       })}
       {data.messages.length === 0 && (
-        <p className="text-center text-muted-foreground text-sm">אין הודעות בארכיון</p>
+        <p className="text-center text-muted-foreground text-sm">{t.shiftChat.archive.empty}</p>
       )}
     </div>
   );

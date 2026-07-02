@@ -59,10 +59,19 @@ vi.mock("../server/middleware/rate-limiters.js", () => ({
   authSensitiveLimiter: (_req: Request, _res: Response, next: () => void) => next(),
 }));
 
-vi.mock("../server/db.js", () => ({
-  db: {},
-  users: {},
-}));
+// /me selects the profile row (avatar) directly; provide a chainable stub that
+// resolves to a null-avatar row so presignObjectUrl short-circuits to null.
+vi.mock("../server/db.js", () => {
+  const selectChain = {
+    from: () => selectChain,
+    where: () => selectChain,
+    limit: () => Promise.resolve([{ avatarUrl: null }]),
+  };
+  return {
+    db: { select: () => selectChain },
+    users: { avatarUrl: {} },
+  };
+});
 
 vi.mock("../server/services/user-sync.service.js", () => ({
   ensureUserEmail: async (u: unknown) => u,

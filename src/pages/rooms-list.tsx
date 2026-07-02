@@ -40,7 +40,7 @@ import type { CreateRoomRequest, Room } from "@/types";
 function SyncBadge({ status }: { status: string }) {
   if (status === "synced") {
     return (
-      <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-300 rounded-full px-2 py-0.5 shrink-0">
+      <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide text-[var(--status-ok-fg)] bg-[var(--status-ok-bg)] border border-[var(--status-ok-border)] rounded-full px-2 py-0.5 shrink-0">
         <CheckCircle2 className="w-2.5 h-2.5" />
         {t.roomsListPage.badgeSynced}
       </div>
@@ -48,14 +48,14 @@ function SyncBadge({ status }: { status: string }) {
   }
   if (status === "requires_audit") {
     return (
-      <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide text-red-700 bg-red-50 border border-red-200 dark:bg-red-950/50 dark:border-red-800 dark:text-red-300 rounded-full px-2 py-0.5 shrink-0">
+      <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide text-[var(--status-issue-fg)] bg-[var(--status-issue-bg)] border border-[var(--status-issue-border)] rounded-full px-2 py-0.5 shrink-0">
         <AlertTriangle className="w-2.5 h-2.5" />
         {t.roomsListPage.badgeAudit}
       </div>
     );
   }
   return (
-    <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide text-amber-700 bg-amber-50 border border-amber-200 dark:bg-amber-950/50 dark:border-amber-800 dark:text-amber-300 rounded-full px-2 py-0.5 shrink-0">
+    <div className="flex items-center gap-1 text-[10px] font-bold tracking-wide text-[var(--status-stale-fg)] bg-[var(--status-stale-bg)] border border-[var(--status-stale-border)] rounded-full px-2 py-0.5 shrink-0">
       <Clock className="w-2.5 h-2.5" />
       {t.roomsListPage.badgeStale}
     </div>
@@ -76,12 +76,12 @@ function HealthRing({ total, recentlyVerified }: { total: number; recentlyVerifi
   }
 
   const pct = Math.round((recentlyVerified / total) * 100);
-  const color = pct >= 80 ? "#22c55e" : pct >= 40 ? "#f59e0b" : "#ef4444";
+  const color = pct >= 80 ? "rgb(var(--sys-green))" : pct >= 40 ? "rgb(var(--sys-orange))" : "rgb(var(--sys-red))";
   const labelColor = pct >= 80
-    ? "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/50 dark:text-green-300 dark:border-green-800"
+    ? "bg-[var(--status-ok-bg)] text-[var(--status-ok-fg)] border-[var(--status-ok-border)]"
     : pct >= 40
-    ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/50 dark:text-amber-300 dark:border-amber-800"
-    : "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/50 dark:text-red-300 dark:border-red-800";
+    ? "bg-[var(--status-stale-bg)] text-[var(--status-stale-fg)] border-[var(--status-stale-border)]"
+    : "bg-[var(--status-issue-bg)] text-[var(--status-issue-fg)] border-[var(--status-issue-border)]";
 
   return (
     <div className="relative shrink-0">
@@ -152,7 +152,7 @@ function RoomCard({ room }: { room: Room }) {
                 <span className="text-xs text-muted-foreground font-medium">/{total} {t.roomsListPage.cardAvailShort}</span>
               </div>
               {issues > 0 && (
-                <span className="flex items-center gap-0.5 text-[10px] font-semibold text-red-600 bg-red-50 dark:bg-red-950/50 border border-red-100 dark:border-red-800 rounded-md px-1.5 py-0.5">
+                <span className="flex items-center gap-0.5 text-[10px] font-semibold text-[var(--status-issue-fg)] bg-[var(--status-issue-bg)] border border-[var(--status-issue-border)] rounded-md px-1.5 py-0.5">
                   <AlertTriangle className="w-2.5 h-2.5" />
                   {issues}
                 </span>
@@ -304,13 +304,13 @@ export default function RoomsListPage() {
               <span className="text-[11px]">{t.roomsListPage.summaryInUse}</span>
             </div>
             {totalIssues > 0 && (
-              <div className="flex items-center gap-1.5 text-xs font-semibold bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 rounded-full px-3 py-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-semibold bg-[var(--status-issue-bg)] border border-[var(--status-issue-border)] text-[var(--status-issue-fg)] rounded-full px-3 py-1.5">
                 <AlertTriangle className="w-3 h-3" />
                 <span className="font-bold text-sm">{totalIssues}</span>
                 <span className="text-[11px]">{t.roomsListPage.summaryIssues}</span>
               </div>
             )}
-            <div className="flex items-center gap-1.5 text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 rounded-full px-3 py-1.5">
+            <div className="flex items-center gap-1.5 text-xs font-semibold bg-[var(--status-ok-bg)] border border-[var(--status-ok-border)] text-[var(--status-ok-fg)] rounded-full px-3 py-1.5">
               <CheckCircle2 className="w-3 h-3" />
               <span className="font-bold text-sm">{syncedCount}/{rooms.length}</span>
               <span className="text-[11px]">{t.roomsListPage.summarySynced}</span>

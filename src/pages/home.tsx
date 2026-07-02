@@ -18,6 +18,7 @@ import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
 import { useAuth } from "@/hooks/use-auth";
 import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { QrScanner } from "@/components/qr-scanner";
+import { useScanAffordance } from "@/lib/scan-affordance";
 import { ShiftAdjustmentControls } from "@/features/shift-adjustments/ShiftAdjustmentControls";
 import { getCurrentUserId } from "@/lib/auth-store";
 import { subscribeKeepalive } from "@/lib/realtime";
@@ -108,6 +109,7 @@ export default function HomePage() {
   const enterOnce = useEnterOnce("home");
   const rise = enterOnce ? "vt-pro-rise" : "";
   const isDesktop = useIsDesktop();
+  const scanAffordance = useScanAffordance();
 
   useRealtimeReconciliation({ queryClient });
 
@@ -142,9 +144,11 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    // No scan surface on web (BUG-016) — ignore the ?scan=1 deep-link there.
+    if (scanAffordance === "none") return;
     const params = new URLSearchParams(searchStr);
     if (params.get("scan") === "1") setScannerOpen(true);
-  }, [searchStr]);
+  }, [searchStr, scanAffordance]);
 
   const {
     data: equipment,
@@ -231,10 +235,12 @@ export default function HomePage() {
   }
 
   const showChips = heroState === "active";
-  // BUG-005: the Today scan card is redundant on the native shell (the tab-bar
-  // ScanFab already offers scan on iPhone/iPad), so it only renders on desktop.
-  const showScanCard = heroState !== "loading" && isDesktop;
-  const showScanSkeleton = heroState === "loading" && isDesktop;
+  // BUG-005 / BUG-016: the Today scan card is redundant wherever a persistent
+  // scan affordance exists (the flat scan tab on iPhone) and is disallowed on
+  // web entirely. It survives only on iPad, where the platform gate resolves to
+  // "fab" — the one place a prominent Today scan CTA is not a duplicate.
+  const showScanCard = heroState !== "loading" && scanAffordance === "fab";
+  const showScanSkeleton = heroState === "loading" && scanAffordance === "fab";
   const showRecent = isDesktop && heroState === "active";
   const recentItems = (activityData?.items ?? []).slice(0, 4);
 

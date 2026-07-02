@@ -1,12 +1,18 @@
 import { useRef, useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useEquipmentDetail } from "./hooks/use-equipment-detail";
 import { EquipmentLocationCard } from "./EquipmentLocationCard";
 import { EquipmentMetaStrip } from "./EquipmentMetaStrip";
+import { EquipmentGlanceGrid } from "./EquipmentGlanceGrid";
+import { EquipmentServiceCard } from "./EquipmentServiceCard";
+import { EquipmentActions } from "./EquipmentActions";
 import { EquipmentAccountabilityTimeline } from "./EquipmentAccountabilityTimeline";
 import { LoadingSection } from "@/components/ui/loading-section";
 import { ErrorCard } from "@/components/ui/error-card";
 import { getEquipmentDisplayName } from "@/lib/equipment-display";
+import { useDirection } from "@/hooks/useDirection";
 import { t } from "@/lib/i18n";
 import { request } from "@/lib/api";
 import type { ScanLog } from "@/types";
@@ -20,6 +26,15 @@ type Props = {
 export function EquipmentDetailScreen({ equipmentId }: Props) {
   const { equipment, locationInference, isLoading, isError, refetch } =
     useEquipmentDetail(equipmentId);
+  const dir = useDirection();
+  const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
+  const [, navigate] = useLocation();
+  // Detail is normally reached from the equipment list; on a deep-link entry
+  // there is no in-app history to pop, so fall back to the list.
+  const handleBack = () => {
+    if (window.history.length > 1) window.history.back();
+    else navigate("/equipment");
+  };
 
   const logsQuery = useQuery({
     queryKey: [`/api/equipment/${equipmentId}/logs`],
@@ -75,6 +90,30 @@ export function EquipmentDetailScreen({ equipmentId }: Props) {
         minHeight: "100%",
       }}
     >
+      <button
+        type="button"
+        data-testid="btn-detail-back"
+        onClick={handleBack}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          alignSelf: "flex-start",
+          minHeight: 44,
+          border: "none",
+          background: "transparent",
+          padding: "0 4px 0 0",
+          cursor: "pointer",
+          color: "hsl(var(--primary))",
+          fontSize: "var(--text-sm)",
+          fontWeight: 600,
+          WebkitTapHighlightColor: "transparent",
+        }}
+      >
+        <BackIcon size={18} strokeWidth={2.2} aria-hidden />
+        {t.equipmentDetail.back}
+      </button>
+
       {pullDelta > 0 && (
         <div
           style={{
@@ -87,7 +126,9 @@ export function EquipmentDetailScreen({ equipmentId }: Props) {
             transition: "height 80ms ease",
           }}
         >
-          {pullDelta >= PULL_THRESHOLD ? "↑ Release to refresh" : "↓ Pull to refresh"}
+          {pullDelta >= PULL_THRESHOLD
+            ? `↑ ${t.equipmentDetail.releaseToRefresh}`
+            : `↓ ${t.equipmentDetail.pullToRefresh}`}
         </div>
       )}
 
@@ -116,9 +157,15 @@ export function EquipmentDetailScreen({ equipmentId }: Props) {
             <EquipmentLocationCard inference={locationInference} />
           )}
 
+          <EquipmentServiceCard equipment={equipment} />
+
+          <EquipmentGlanceGrid equipment={equipment} inference={locationInference} />
+
           {logsQuery.data && logsQuery.data.length > 0 && (
             <EquipmentAccountabilityTimeline logs={logsQuery.data} />
           )}
+
+          <EquipmentActions equipment={equipment} />
         </>
       ) : null}
     </div>

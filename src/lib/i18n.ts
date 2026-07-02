@@ -76,9 +76,15 @@ export function getCurrentLocale(): Locale {
   return getStoredLocale();
 }
 
-export function formatDateTimeByLocale(date: Date, options?: Intl.DateTimeFormatOptions): string {
+/**
+ * Locale-aware date+time (or time-only) formatting. Uses toLocaleString, which —
+ * unlike toLocaleDateString — accepts timeStyle / time-component options without
+ * throwing. Accepts a Date or ISO string.
+ */
+export function formatDateTimeByLocale(date: Date | string, options?: Intl.DateTimeFormatOptions): string {
   const locale = getStoredLocale();
-  return date.toLocaleString(locale, options);
+  const localeTag = locale === "he" ? "he-IL" : "en-US";
+  return new Date(date).toLocaleString(localeTag, options);
 }
 
 export function formatDateByLocale(date: Date | string, options?: Intl.DateTimeFormatOptions): string {
@@ -223,6 +229,19 @@ const translations = {
     manufacturer: d.equipmentDetail.manufacturer,
     purchaseDate: d.equipmentDetail.purchaseDate,
     location: d.equipmentDetail.location,
+    back: d.equipmentDetail.back,
+    atGlance: d.equipmentDetail.atGlance,
+    assignee: d.equipmentDetail.assignee,
+    lastScan: d.equipmentDetail.lastScan,
+    due: d.equipmentDetail.due,
+    unassigned: d.equipmentDetail.unassigned,
+    pullToRefresh: d.equipmentDetail.pullToRefresh,
+    releaseToRefresh: d.equipmentDetail.releaseToRefresh,
+    serviceSchedule: d.equipmentDetail.serviceSchedule,
+    lastServiced: d.equipmentDetail.lastServiced,
+    nextService: d.equipmentDetail.nextService,
+    serviceOverdue: d.equipmentDetail.serviceOverdue,
+    checkIn: d.equipmentDetail.checkIn,
     maintenanceInterval: d.equipmentDetail.maintenanceInterval,
     lastMaintenance: d.equipmentDetail.lastMaintenance,
     lastSterilization: d.equipmentDetail.lastSterilization,
@@ -419,6 +438,7 @@ const translations = {
   dispense: {
     errors: d.dispense.errors,
     bypass: d.dispense.bypass,
+    sheet: d.dispense.sheet,
     errorMessage: (code: string) => {
       const map = d.dispense.errors as Record<string, string>;
       return map[code] ?? map.fallback;
@@ -1218,6 +1238,8 @@ const translations = {
   supportPage: d.supportPage,
 
   whatsNew: d.whatsNew,
+
+  authPage: d.authPage,
 
   more: d.more,
 

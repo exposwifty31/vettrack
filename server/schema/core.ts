@@ -21,6 +21,7 @@ export const users = vtTable("vt_users", {
   allowedOperationalRoles: jsonb("allowed_operational_roles").notNull().default(sql`'[]'::jsonb`),
   status: varchar("status", { length: 20 }).notNull().default("active"),
   preferredLocale: varchar("preferred_locale", { length: 10 }).notNull().default("he"),
+  avatarUrl: text("avatar_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   deletedAt: timestamp("deleted_at"),
   deletedBy: text("deleted_by"),

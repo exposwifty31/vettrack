@@ -44,21 +44,10 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "server/workers/notification.worker.ts",
   "shared/doctor-operational-shift.ts",
   "src/components/sw-update-banner.tsx",
-  "src/features/containers/components/DispenseSheet.tsx",
-  "src/features/shift-chat/components/BroadcastCard.tsx",
-  "src/features/shift-chat/components/MessageBubble.tsx",
-  "src/features/shift-chat/components/ShiftChatArchive.tsx",
-  "src/features/shift-chat/components/SystemCard.tsx",
-  "src/features/shift-chat/types.ts",
-  "src/pages/admin-shifts.tsx",
-  "src/pages/admin.tsx",
   "src/pages/new-equipment.tsx",
   "src/pages/not-found.tsx",
   "src/pages/qr-print.tsx",
   "src/pages/rooms-list.tsx",
-  "src/pages/shift-leaderboard.tsx",
-  "src/pages/signin.tsx",
-  "src/pages/signup.tsx",
 ]);
 
 function walk(dir: string, root: string, acc: string[]): void {

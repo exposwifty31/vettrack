@@ -438,6 +438,19 @@
     "manufacturer": "Manufacturer",
     "purchaseDate": "Purchase date",
     "location": "Location",
+    "back": "Back",
+    "atGlance": "At a glance",
+    "assignee": "Assignee",
+    "lastScan": "Last scan",
+    "due": "Due",
+    "unassigned": "Unassigned",
+    "pullToRefresh": "Pull to refresh",
+    "releaseToRefresh": "Release to refresh",
+    "serviceSchedule": "Service schedule",
+    "lastServiced": "Last serviced",
+    "nextService": "Next service",
+    "serviceOverdue": "Overdue",
+    "checkIn": "Check in",
     "maintenanceInterval": "Maintenance interval",
     "lastMaintenance": "Last maintenance",
     "lastSterilization": "Last sterilization",
@@ -868,6 +881,40 @@
         "PROTOCOL_OVERRIDE": "Protocol override",
         "TECH_ERROR": "Tech / entry error"
       }
+    },
+    "sheet": {
+      "serverError": "Server error — try again",
+      "emergencyCompleteTitle": "Complete emergency",
+      "emergencyCompleteSubtitle": "List the items taken during the emergency",
+      "englishNameHint": "English name — translation recommended",
+      "inStock": "in stock",
+      "decrease": "Decrease",
+      "increase": "Add",
+      "assignPatientOptional": "Assign to patient (optional)",
+      "unnamedPatient": "Unnamed patient",
+      "noPatientAssignment": "No patient assignment",
+      "confirmEmergencyDetails": "Confirm emergency details",
+      "updatedSuccess": "Updated successfully",
+      "takenSuccess": "Taken successfully",
+      "byLabel": "By:",
+      "atTimeLabel": "At:",
+      "autoClosing": "Closing automatically in a few seconds...",
+      "close": "Close",
+      "emergencyRecorded": "Emergency recorded",
+      "completeAfterTreatment": "Complete details after treatment",
+      "completeFromHandover": "You can also complete it from the shift handover sheet",
+      "closeForNow": "Close for now",
+      "whoBelongsTitle": "Who is this for?",
+      "whoBelongsSubtitle": "Select a patient or leave unassigned",
+      "noActivePatients": "No active patients today",
+      "confirmTake": "Confirm take",
+      "back": "Back",
+      "loading": "Loading...",
+      "emergency": "Emergency",
+      "orSelectItems": "Or select items",
+      "noItemsInContainer": "No items in this container",
+      "itemsSelected": "items selected",
+      "continue": "Continue"
     }
   },
   "syncEngine": {
@@ -1182,7 +1229,8 @@
     "startTime": "Start time",
     "endTime": "End time",
     "employeeName": "Employee name",
-    "role": "Role"
+    "role": "Role",
+    "csvOnly": "Please select a CSV file only."
   },
   "alertsPage": {
     "oneMinuteAgo": "1 minute ago",
@@ -1553,7 +1601,8 @@
     "title": "Quick Guide",
     "titleFull": "Quick Guide — VetTrack",
     "okTitle": "OK — operational",
-    "subtitle": "Everything you need to know to use VetTrack"
+    "subtitle": "Everything you need to know to use VetTrack",
+    "legal": "Legal"
   },
   "pilotHomePage": {
     "worthCheckingSection": "Worth checking",
@@ -1923,7 +1972,9 @@
     "dispatchingCursorBugFixer": "Starting Cursor agent…",
     "cursorBugFixerDispatched": "Cursor agent started — track progress in the new tab",
     "cursorBugFixerFailed": "Could not start Cursor bug fixer",
-    "cursorBugFixerNotConfigured": "Cursor bug fixer is not fully configured on the server"
+    "cursorBugFixerNotConfigured": "Cursor bug fixer is not fully configured on the server",
+    "secondaryRoleUpdated": "Secondary role updated",
+    "secondaryRoleUpdateFailed": "Failed to update secondary role"
   },
   "layoutHebrew": {
     "home": "Home",
@@ -3165,6 +3216,29 @@
     }
   },
   "shiftChat": {
+    "broadcast": {
+      "iSent": "I sent",
+      "seniorTech": "Senior technician",
+      "received": "received",
+      "gotItOnWay": "Got it — on the way",
+      "fiveMin": "5 min",
+      "ackedReceipt": "You acknowledged receipt",
+      "snoozedReminder": "Snoozed — reminder in 5 min"
+    },
+    "broadcastTemplates": {
+      "department_close": {
+        "label": "Department close",
+        "subtitle": "All technicians — clean and organize the department"
+      }
+    },
+    "urgent": "Urgent",
+    "archive": {
+      "loading": "Loading…",
+      "notFound": "Not found",
+      "title": "Shift chat archive",
+      "readOnly": "Read only",
+      "empty": "No messages in the archive"
+    },
     "errors": {
       "noOpenShift": "No active shift. Start a shift before sending messages.",
       "sendFailed": "Failed to send message. Please try again.",
@@ -3189,6 +3263,18 @@
       "sendAria": "Send",
       "closeAria": "Close chat",
       "pinAria": "Pin message"
+    },
+    "system": {
+      "codeBlueStarted": "Code Blue activated",
+      "codeBlueEnded": "Code Blue ended",
+      "codeBlueUnreconciled": "Code Blue session not yet reconciled",
+      "equipmentOverdue": "Equipment not returned",
+      "alertReopened": "Alert re-opened",
+      "emergencyDispenseUnresolved": "Emergency dispense unresolved",
+      "taskEscalated": "Task escalated to admin",
+      "criticalPushFailed": "Critical notification failed to deliver",
+      "outboxDlqExceeded": "Events stuck — admin attention needed",
+      "minutesShort": "min"
     }
   },
   "auditLog": {
@@ -3672,7 +3758,31 @@
         "description": "Back button on every screen, fixed header while scrolling, and a clear exit from the Equipment Command Board.",
         "badge": "Improved"
       }
-    }
+    },
+    "gotIt": "Got it"
+  },
+  "authPage": {
+    "signInMetaTitle": "Sign in — VetTrack",
+    "signInMetaDescription": "Sign in to VetTrack to manage veterinary equipment, scan QR codes, and track in real time.",
+    "welcomeBack": "Welcome back",
+    "signInSubtitle": "Sign in to manage your veterinary equipment",
+    "signInLoadError": "The sign-in page failed to load. Check your connection and refresh. If the problem persists, make sure Clerk is configured for this domain and the Publishable Key matches the environment.",
+    "backToRegularSignIn": "Back to standard sign-in",
+    "phonePrompt": "Signing in with an Israeli number (+972)?",
+    "usePhoneSignIn": "Use Israeli phone sign-in",
+    "phoneFormatHint": "to enter the number in local format (for example: 0501234567).",
+    "signUpMetaTitle": "Sign up — VetTrack",
+    "signUpMetaDescription": "Create a VetTrack account to manage veterinary equipment, scan QR codes, and track in real time.",
+    "createAccount": "Create account",
+    "signUpSubtitle": "Sign up to manage your veterinary equipment",
+    "signUpLoadError": "The sign-up page failed to load. Check your connection and refresh. If the problem persists, make sure Clerk is configured for this domain and the Publishable Key matches the environment.",
+    "roleLabel": "Role",
+    "roleVetTech": "Vet Tech",
+    "roleVeterinarian": "Veterinarian",
+    "roleStudent": "Student",
+    "devModeNotice": "Development mode — no authentication required.",
+    "enterDashboard": "Enter dashboard",
+    "moreAboutVetTrack": "More about VetTrack"
   },
   "shiftLeaderboard": {
     "title": "Shift scan leaderboard",
@@ -3875,6 +3985,11 @@
     "editDisplayName": "Edit Display Name",
     "displayNameUpdated": "Name updated",
     "saveError": "Could not update name. Please try again.",
+    "avatarAlt": "Profile photo",
+    "changePhoto": "Change photo",
+    "photoUpdated": "Photo updated",
+    "photoUploadError": "Could not upload photo. Please try again.",
+    "photoTooLarge": "Image must be under 5MB.",
     "shiftActivity": "Shift Activity",
     "noShiftActivity": "No shift activity yet",
     "shiftActivityError": "Could not load shift activity.",
@@ -3914,7 +4029,15 @@
   "adminAssetTypesPage": {
     "typePlaceholder": "Type name",
     "conditionNamePlaceholder": "Condition name",
-    "staleMinPlaceholder": "Stale (min)"
+    "staleMinPlaceholder": "Stale (min)",
+    "title": "Asset Types",
+    "addButton": "Add",
+    "readinessConditionsTitle": "Readiness Conditions",
+    "assetTypeCreated": "Asset type created",
+    "conditionAdded": "Condition added",
+    "emptyTitle": "No asset types configured",
+    "emptySub": "Add your first asset type to start defining readiness conditions.",
+    "selectTypeHint": "Select an asset type to view its readiness conditions."
   },
   "conditionChecklist": {
     "notesPlaceholder": "Notes (optional)"

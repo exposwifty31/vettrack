@@ -438,6 +438,19 @@
     "manufacturer": "יצרן",
     "purchaseDate": "תאריך רכישה",
     "location": "מיקום",
+    "back": "חזרה",
+    "atGlance": "בקצרה",
+    "assignee": "אחראי",
+    "lastScan": "סריקה אחרונה",
+    "due": "יעד",
+    "unassigned": "ללא שיוך",
+    "pullToRefresh": "משכו לרענון",
+    "releaseToRefresh": "שחררו לרענון",
+    "serviceSchedule": "לוח שירות",
+    "lastServiced": "טופל לאחרונה",
+    "nextService": "השירות הבא",
+    "serviceOverdue": "באיחור",
+    "checkIn": "החזרה",
     "maintenanceInterval": "תדירות תחזוקה",
     "lastMaintenance": "תחזוקה אחרונה",
     "lastSterilization": "חיטוי אחרון",
@@ -868,6 +881,40 @@
         "PROTOCOL_OVERRIDE": "עקיפת פרוטוקול",
         "TECH_ERROR": "שגיאת טכנאי / הזנה"
       }
+    },
+    "sheet": {
+      "serverError": "שגיאה בשרת — נסה שוב",
+      "emergencyCompleteTitle": "השלמת חירום",
+      "emergencyCompleteSubtitle": "פרט את הפריטים שנלקחו בחירום",
+      "englishNameHint": "שם באנגלית — מומלץ לתרגם",
+      "inStock": "במלאי",
+      "decrease": "הפחת",
+      "increase": "הוסף",
+      "assignPatientOptional": "שייך למטופל (אופציונלי)",
+      "unnamedPatient": "מטופל ללא שם",
+      "noPatientAssignment": "ללא שיוך למטופל",
+      "confirmEmergencyDetails": "אשר פירוט חירום",
+      "updatedSuccess": "עודכן בהצלחה",
+      "takenSuccess": "נלקח בהצלחה",
+      "byLabel": "על ידי:",
+      "atTimeLabel": "בשעה:",
+      "autoClosing": "נסגר אוטומטית בעוד שניות...",
+      "close": "סגור",
+      "emergencyRecorded": "חירום נרשם",
+      "completeAfterTreatment": "השלם פירוט אחרי הטיפול",
+      "completeFromHandover": "תוכל להשלים גם מדף חפיפת משמרת",
+      "closeForNow": "סגור לעכשיו",
+      "whoBelongsTitle": "למי שייך?",
+      "whoBelongsSubtitle": "בחר מטופל או השאר ללא שיוך",
+      "noActivePatients": "אין מטופלים פעילים היום",
+      "confirmTake": "אשר לקיחה",
+      "back": "חזור",
+      "loading": "טוען...",
+      "emergency": "חירום",
+      "orSelectItems": "או בחר פריטים",
+      "noItemsInContainer": "אין פריטים במכלול זה",
+      "itemsSelected": "פריטים נבחרו",
+      "continue": "המשך"
     }
   },
   "syncEngine": {
@@ -1182,7 +1229,8 @@
     "startTime": "שעת התחלה",
     "endTime": "שעת סיום",
     "employeeName": "שם עובד",
-    "role": "תפקיד"
+    "role": "תפקיד",
+    "csvOnly": "בחר קובץ CSV בלבד."
   },
   "alertsPage": {
     "oneMinuteAgo": "לפני דקה",
@@ -1553,7 +1601,8 @@
     "title": "מדריך מהיר",
     "titleFull": "מדריך מהיר — VetTrack",
     "okTitle": "תקין — מבצעי",
-    "subtitle": "כל מה שצריך לדעת כדי להשתמש ב-VetTrack"
+    "subtitle": "כל מה שצריך לדעת כדי להשתמש ב-VetTrack",
+    "legal": "מידע משפטי"
   },
   "pilotHomePage": {
     "worthCheckingSection": "שווה לבדוק",
@@ -1923,7 +1972,9 @@
     "dispatchingCursorBugFixer": "מפעיל סוכן Cursor…",
     "cursorBugFixerDispatched": "סוכן Cursor הופעל — עקבו בלשונית החדשה",
     "cursorBugFixerFailed": "לא ניתן להפעיל את מתקן הבאגים של Cursor",
-    "cursorBugFixerNotConfigured": "מתקן הבאגים של Cursor לא מוגדר במלואו בשרת"
+    "cursorBugFixerNotConfigured": "מתקן הבאגים של Cursor לא מוגדר במלואו בשרת",
+    "secondaryRoleUpdated": "תפקיד משני עודכן",
+    "secondaryRoleUpdateFailed": "עדכון תפקיד משני נכשל"
   },
   "layoutHebrew": {
     "home": "ראשי",
@@ -3165,6 +3216,29 @@
     }
   },
   "shiftChat": {
+    "broadcast": {
+      "iSent": "שלחתי",
+      "seniorTech": "טכנאית בכירה",
+      "received": "קיבלו",
+      "gotItOnWay": "קיבלתי — בדרך",
+      "fiveMin": "5 דק׳",
+      "ackedReceipt": "אישרת קבלה",
+      "snoozedReminder": "נדחה — תזכורת בעוד 5 דקות"
+    },
+    "broadcastTemplates": {
+      "department_close": {
+        "label": "סגירת מחלקה",
+        "subtitle": "כל הטכנאים — לנקות ולסדר את המחלקה"
+      }
+    },
+    "urgent": "דחוף",
+    "archive": {
+      "loading": "טוען…",
+      "notFound": "לא נמצא",
+      "title": "ארכיון צ׳אט משמרת",
+      "readOnly": "קריאה בלבד",
+      "empty": "אין הודעות בארכיון"
+    },
     "errors": {
       "noOpenShift": "אין משמרת פעילה. פתחו משמרת לפני שליחת הודעות.",
       "sendFailed": "שליחת ההודעה נכשלה. נסו שוב.",
@@ -3189,6 +3263,18 @@
       "sendAria": "שלח",
       "closeAria": "סגור צ׳אט",
       "pinAria": "הצמד הודעה"
+    },
+    "system": {
+      "codeBlueStarted": "Code Blue הופעל",
+      "codeBlueEnded": "Code Blue הסתיים",
+      "codeBlueUnreconciled": "מפגש Code Blue טרם סוכם",
+      "equipmentOverdue": "ציוד לא הוחזר",
+      "alertReopened": "התראה נפתחה מחדש",
+      "emergencyDispenseUnresolved": "ניפוק חירום לא טופל",
+      "taskEscalated": "משימה הוסלמה למנהל",
+      "criticalPushFailed": "התראה קריטית נכשלה במסירה",
+      "outboxDlqExceeded": "אירועים תקועים — נדרשת התערבות מנהל",
+      "minutesShort": "דק׳"
     }
   },
   "auditLog": {
@@ -3672,7 +3758,31 @@
         "description": "כפתור חזרה בכל מסך, כותרת קבועה בגלילה ויציאה ברורה מלוח הבקרה של הציוד.",
         "badge": "שופר"
       }
-    }
+    },
+    "gotIt": "הבנתי"
+  },
+  "authPage": {
+    "signInMetaTitle": "כניסה — VetTrack",
+    "signInMetaDescription": "התחבר ל-VetTrack לניהול ציוד וטרינרי, סריקת QR ומעקב בזמן אמת.",
+    "welcomeBack": "ברוך שובך",
+    "signInSubtitle": "התחבר לניהול ציוד הוטרינרי שלך",
+    "signInLoadError": "דף ההתחברות לא נטען. בדוק את החיבור ורענן. אם הבעיה נמשכת, ודא ש-Clerk מוגדר לדומיין זה ושמפתח ה-Publishable Key תואם לסביבה.",
+    "backToRegularSignIn": "חזרה להתחברות רגילה",
+    "phonePrompt": "מתחבר עם מספר ישראלי (+972)?",
+    "usePhoneSignIn": "השתמש בהתחברות ממספר טלפון ישראלי",
+    "phoneFormatHint": "להזנת המספר בפורמט מקומי (לדוגמה: 0501234567).",
+    "signUpMetaTitle": "הרשמה — VetTrack",
+    "signUpMetaDescription": "צור חשבון VetTrack לניהול ציוד וטרינרי, סריקת QR ומעקב בזמן אמת.",
+    "createAccount": "יצירת חשבון",
+    "signUpSubtitle": "הירשם לניהול ציוד הוטרינרי שלך",
+    "signUpLoadError": "דף ההרשמה לא נטען. בדוק את החיבור ורענן. אם הבעיה נמשכת, ודא ש-Clerk מוגדר לדומיין זה ושמפתח ה-Publishable Key תואם לסביבה.",
+    "roleLabel": "תפקיד",
+    "roleVetTech": "טכנאי/ת וטרינרי/ת",
+    "roleVeterinarian": "וטרינר/ית",
+    "roleStudent": "סטודנט/ית",
+    "devModeNotice": "מצב פיתוח — אין צורך באימות.",
+    "enterDashboard": "כניסה ללוח הבקרה",
+    "moreAboutVetTrack": "עוד על VetTrack"
   },
   "shiftLeaderboard": {
     "title": "לוח מובילים — סריקות משמרת",
@@ -3861,6 +3971,11 @@
     "editDisplayName": "ערוך שם תצוגה",
     "displayNameUpdated": "השם עודכן",
     "saveError": "לא ניתן לעדכן את השם. נסה שוב.",
+    "avatarAlt": "תמונת פרופיל",
+    "changePhoto": "החלף תמונה",
+    "photoUpdated": "התמונה עודכנה",
+    "photoUploadError": "לא ניתן להעלות את התמונה. נסה שוב.",
+    "photoTooLarge": "התמונה חייבת להיות קטנה מ‑5MB.",
     "shiftActivity": "פעילות משמרות",
     "noShiftActivity": "אין פעילות משמרות עדיין",
     "shiftActivityError": "לא ניתן לטעון פעילות משמרות.",
@@ -3914,7 +4029,15 @@
   "adminAssetTypesPage": {
     "typePlaceholder": "שם סוג",
     "conditionNamePlaceholder": "שם מצב",
-    "staleMinPlaceholder": "מיושן (דק׳)"
+    "staleMinPlaceholder": "מיושן (דק׳)",
+    "title": "סוגי נכסים",
+    "addButton": "הוספה",
+    "readinessConditionsTitle": "תנאי מוכנות",
+    "assetTypeCreated": "סוג נכס נוצר",
+    "conditionAdded": "התנאי נוסף",
+    "emptyTitle": "לא הוגדרו סוגי נכסים",
+    "emptySub": "הוסיפו סוג נכס ראשון כדי להתחיל להגדיר תנאי מוכנות.",
+    "selectTypeHint": "בחרו סוג נכס כדי לצפות בתנאי המוכנות שלו."
   },
   "conditionChecklist": {
     "notesPlaceholder": "הערות (אופציונלי)"

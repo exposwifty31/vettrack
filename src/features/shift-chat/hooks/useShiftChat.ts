@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { shiftChatApi } from "../api";
+import { mergeSessionScoped } from "../message-scoping";
 import type { ShiftMessage, PostMessageInput } from "../types";
 import { useAuth } from "@/hooks/use-auth";
 import { t } from "@/lib/i18n";
@@ -43,11 +44,7 @@ export function useShiftChat(isOpen: boolean) {
 
   useEffect(() => {
     if (!isOpen || !data?.messages?.length) return;
-    setAllMessages((prev) => {
-      const existingIds = new Set(prev.map((m) => m.id));
-      const newOnes = data.messages.filter((m) => !existingIds.has(m.id));
-      return newOnes.length > 0 ? [...prev, ...newOnes] : prev;
-    });
+    setAllMessages((prev) => mergeSessionScoped(prev, data.messages));
   }, [data?.messages, isOpen]);
 
   // Full history on open; keep afterRef when closed so unread polls stay incremental.

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 import {
   applyLocaleDocumentAttributes,
+  getStoredLocale,
   setStoredLocale,
 } from "@/lib/i18n";
 import {
@@ -29,8 +30,15 @@ function applySettings(settings: Settings) {
   }
   html.setAttribute("data-density", settings.density);
   html.setAttribute("data-color-theme", settings.colorTheme);
-  const locale = setStoredLocale(settings.locale);
-  applyLocaleDocumentAttributes(locale);
+  // setStoredLocale dispatches "vettrack:locale-changed", and main.tsx keys
+  // <App> by that event — so it remounts the entire tree (resetting scroll).
+  // Only persist + broadcast when the locale actually changed; otherwise an
+  // unrelated toggle (e.g. Master Sound) would remount the app and jump the
+  // page. The document lang/dir attributes are cheap and always re-applied.
+  if (settings.locale !== getStoredLocale()) {
+    setStoredLocale(settings.locale);
+  }
+  applyLocaleDocumentAttributes(settings.locale);
   const brightness = Math.min(100, Math.max(30, settings.brightness ?? 100));
   const body = document.body;
   if (!body) return;

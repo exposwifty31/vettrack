@@ -130,7 +130,7 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
         <SheetDescription className="sr-only">{t.shiftChat.panel.description}</SheetDescription>
         <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full shadow-[0_0_6px_theme(colors.green.500)]" />
+            <div className="w-2 h-2 bg-[hsl(var(--status-ok))] rounded-full shadow-[0_0_6px_hsl(var(--status-ok))]" />
             <SheetTitle className="font-bold text-sm">{t.shiftChat.panel.title}</SheetTitle>
             <span className="text-xs text-muted-foreground">
               {t.shiftChat.panel.onlineCount(chat.onlineUserIds.length)}
@@ -147,9 +147,9 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
         </div>
 
         {chat.pinnedMessage && (
-          <div className="px-3 py-2 bg-amber-950/40 border-b border-amber-800/50 flex items-start gap-2 flex-shrink-0">
+          <div className="px-3 py-2 bg-[var(--status-stale-bg)] border-b border-[var(--status-stale-border)] flex items-start gap-2 flex-shrink-0">
             <span className="text-xs">📌</span>
-            <p className="text-xs text-amber-300 leading-snug line-clamp-2">
+            <p className="text-xs text-[var(--status-stale-fg)] leading-snug line-clamp-2">
               {chat.pinnedMessage.body}
             </p>
           </div>
@@ -163,7 +163,7 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
               className={cn(
                 "px-3 py-1 rounded-full text-[10px] font-semibold border whitespace-nowrap",
                 !roomFilter
-                  ? "bg-blue-900 border-blue-500 text-blue-200"
+                  ? "bg-primary/15 border-primary text-primary"
                   : "bg-muted border-border text-muted-foreground",
               )}
             >
@@ -177,7 +177,7 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
                 className={cn(
                   "px-3 py-1 rounded-full text-[10px] font-semibold border whitespace-nowrap",
                   roomFilter === tag
-                    ? "bg-blue-900 border-blue-500 text-blue-200"
+                    ? "bg-primary/15 border-primary text-primary"
                     : "bg-muted border-border text-muted-foreground",
                 )}
               >
@@ -245,19 +245,20 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
         {showBroadcast && canSendBroadcast && (
           <div className="px-3 pb-2 border-t border-border flex-shrink-0">
             <p className="text-[10px] text-muted-foreground mb-2 pt-2">{t.shiftChat.panel.broadcastPrompt}</p>
-            {(Object.entries(BROADCAST_TEMPLATES) as [BroadcastKey, { label: string; subtitle: string }][]).map(
-              ([key, template]) => (
+            {(Object.keys(BROADCAST_TEMPLATES) as BroadcastKey[]).map((key) => {
+              const template = t.shiftChat.broadcastTemplates[key];
+              return (
                 <button
                   key={key}
                   type="button"
                   onClick={() => handleBroadcast(key)}
-                  className="w-full text-right bg-indigo-950 hover:bg-indigo-900 border border-indigo-800 rounded-lg px-3 py-2 mb-1"
+                  className="w-full text-start bg-primary/10 hover:bg-primary/15 border border-primary/40 rounded-lg px-3 py-2 mb-1"
                 >
-                  <div className="text-sm font-bold text-indigo-100">{template.label}</div>
-                  <div className="text-[10px] text-indigo-300">{template.subtitle}</div>
+                  <div className="text-sm font-bold text-foreground">{template.label}</div>
+                  <div className="text-[10px] text-muted-foreground">{template.subtitle}</div>
                 </button>
-              ),
-            )}
+              );
+            })}
             <button type="button" onClick={() => setShowBroadcast(false)} className="text-xs text-muted-foreground mt-1">
               {t.common.cancel}
             </button>
@@ -272,7 +273,7 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
             <button
               type="button"
               onClick={() => setShowBroadcast((v) => !v)}
-              className="bg-indigo-950 border border-indigo-700 text-indigo-400 rounded-lg p-2 text-sm flex-shrink-0 h-11 w-11"
+              className="bg-primary/10 border border-primary/40 text-primary rounded-lg p-2 text-sm flex-shrink-0 h-11 w-11"
               aria-label={t.shiftChat.panel.sendBroadcastAria}
             >
               📢
@@ -292,7 +293,7 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
             <button
               type="button"
               onClick={() => setIsUrgent((v) => !v)}
-              className={cn("text-sm flex-shrink-0 h-11 w-11", isUrgent ? "text-red-400" : "text-muted-foreground/40")}
+              className={cn("text-sm flex-shrink-0 h-11 w-11", isUrgent ? "text-[var(--status-issue-fg)]" : "text-muted-foreground/40")}
               aria-label={t.shiftChat.panel.markUrgentAria}
             >
               ⚡

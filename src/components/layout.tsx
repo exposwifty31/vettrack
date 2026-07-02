@@ -76,6 +76,7 @@ import { playFeedbackTone, playMuteTone, playCriticalAlertTone } from "@/lib/sou
 import { ReportIssueDialog } from "@/components/report-issue-dialog";
 import { SyncQueueSheet } from "@/components/sync-queue-sheet";
 import { AlertsDropdown } from "@/components/alerts-dropdown";
+import { useScanAffordance } from "@/lib/scan-affordance";
 import { UpdateBanner } from "@/components/update-banner";
 import { haptics } from "@/lib/haptics";
 import {
@@ -144,6 +145,9 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
+  // Web must never surface scan UI (scan-affordance model, BUG-016). The raised
+  // FAB stays byte-for-byte on native (tab/fab); only "none" (web) suppresses it.
+  const scanAffordance = useScanAffordance();
   const [quickSettingsUseViewportRight, setQuickSettingsUseViewportRight] = useState(false);
   const [quickSettingsViewportTop, setQuickSettingsViewportTop] = useState(0);
   const [syncQueueOpen, setSyncQueueOpen] = useState(false);
@@ -654,9 +658,34 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     );
   };
 
-  // Center scan FAB — the equipment-first primary action, raised into the thumb
-  // zone. Shared by the legacy and NAV-driven bottom-bar renderers.
-  const renderScanFab = () => (
+  // iPhone (affordance "tab") gets a flat emphasized scan tab, not the raised FAB
+  // (scan-affordance model — "never a FAB" on phone). Same scan action + brand
+  // tint; occupies the same center grid slot so the bar layout is unchanged.
+  const renderScanTab = () => (
+    <button
+      type="button"
+      onClick={handleScanButtonClick}
+      className="flex flex-col items-center justify-end gap-0.5 pb-2 min-h-[52px] transition-opacity duration-150 motion-safe:active:opacity-80 motion-reduce:active:opacity-100 rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ivory-surface cursor-pointer"
+      aria-label={scannerUIOpen ? lh.closeScannerAria : lh.bottomScan}
+      data-testid="bottom-nav-scan"
+    >
+      {scannerUIOpen ? (
+        <X className="w-6 h-6 text-ivory-green scale-110 transition-all duration-200" aria-hidden />
+      ) : (
+        <QrCode className="w-6 h-6 text-ivory-green transition-all duration-200" aria-hidden />
+      )}
+      <span className="vt-text-2xs font-semibold leading-tight text-center max-w-[4.5rem] truncate text-ivory-green">
+        {lh.bottomScan}
+      </span>
+    </button>
+  );
+
+  // Center scan affordance — equipment-first primary action. iPad ("fab") keeps
+  // the raised FAB; iPhone ("tab") uses the flat tab above; web ("none") shows
+  // nothing. Shared by the legacy and NAV-driven bottom-bar renderers.
+  const renderScanFab = () =>
+    scanAffordance === "none" ? null :
+    scanAffordance === "tab" ? renderScanTab() : (
     <div className="flex flex-col items-center justify-end pb-1 relative">
       {!scannerUIOpen && !navigationLocked && (
         <span

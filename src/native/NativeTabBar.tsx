@@ -1,7 +1,7 @@
 import { useLocation } from "wouter";
-import { Home, Package, Activity, AlignJustify } from "lucide-react";
+import { Home, Package, Activity, AlignJustify, QrCode } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { ScanFab } from "./ScanFab";
+import { useScanAffordance } from "@/lib/scan-affordance";
 
 type TabDef = {
   id: string;
@@ -75,11 +75,16 @@ function TabButton({
 }
 
 /**
- * Sole tab-bar owner for the native shell.
- * Renders: Today · Equipment · [ScanFab] · Emergency · Menu.
+ * Sole tab-bar owner for the native phone shell.
+ * Renders: Today · Equipment · [Scan tab] · Emergency · Menu.
+ *
+ * The scan affordance is gated by the single platform helper: on native phone
+ * it is a flat scan TAB (never a raised FAB); on web it renders nothing. The
+ * iPad FAB lives in NativeTabSidebar, not here.
  */
 export function NativeTabBar({ onMorePress }: Props) {
   const [location, navigate] = useLocation();
+  const affordance = useScanAffordance();
 
   const leftTabs: TabDef[] = [
     { id: "today", href: "/home", label: t.nav.today, icon: <Home size={22} /> },
@@ -114,11 +119,14 @@ export function NativeTabBar({ onMorePress }: Props) {
         />
       ))}
 
-      <div
-        style={{ flex: 1, display: "flex", justifyContent: "center", paddingBottom: 4 }}
-      >
-        <ScanFab />
-      </div>
+      {affordance === "tab" && (
+        <TabButton
+          label={t.nav.equipmentScan}
+          icon={<QrCode size={22} />}
+          active={isTabActive(location, "/scan")}
+          onClick={() => navigate("/scan")}
+        />
+      )}
 
       {rightTabs.map((tab) => (
         <TabButton

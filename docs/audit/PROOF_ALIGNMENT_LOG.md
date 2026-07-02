@@ -417,3 +417,304 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - `apply.sh` append idempotency (13-16): one-shot reference apply script, self-documented "review the diff before committing," applied-then-reset; guarding all ~8 `cat >>` sites exceeds "minimal" for a non-executing artifact.
 
 **Verdict:** VERIFIED (node --check + bash -n on the scriptable edits; structural grep on the `.dc.html` template/JS edits; scope confirmed docs-only). `.dc.html`/reference `.tsx` are not in tsconfig/vite, so not gate-compiled — validated by parser + pattern-match against the working Stage 6.
+
+## 2026-07-02 — Stage 6 (increment 1): Equipment Detail — back header + at-a-glance grid
+
+**Claim:** Brought the mobile `EquipmentDetailScreen` toward the Stage 6 detail prototype: added an iOS back-button header row and a token-driven "At a glance" 4-tile fact grid (Location / Assignee / Last scan / Due) wired to real `Equipment` + `LocationInference` fields, and moved the pull-to-refresh copy off hardcoded English. No fabricated data — every tile falls back to "—" when its source field is absent.
+
+**Evidence:**
+- Backing fields verified real in `src/types/equipment.ts`: location (`roomName`/`checkedOutLocation` + inference), assignee (`checkedOutByEmail` + inference `accountablePerson`), last scan (`lastVerifiedAt`/`lastSeen`/inference `lastConfirmedAt`), due (`checkedOutAt` + `expectedReturnMinutes`). Service-schedule card deferred to a later increment (data exists — `lastMaintenanceDate`+`maintenanceIntervalDays` — but wanted a focused slice); actions row deferred (needs mutation wiring).
+- RED→GREEN lock test `tests/stage-6-equipment-detail-token-consistency.test.js` **8/8** (back testid + copy, EquipmentGlanceGrid + atGlance heading, `repeat(2, minmax(0, 1fr))` grid, 4 real tiles, tokens present + banned palette absent, pull-to-refresh de-hardcoded, all 8 new keys wired in the hand-listed `equipmentDetail` accessor + en/he entries).
+- i18n: 8 new `equipmentDetail.*` keys (back/atGlance/assignee/lastScan/due/unassigned/pullToRefresh/releaseToRefresh) added to en+he, wired into `src/lib/i18n.ts`, `.d.ts` regenerated. RTL: back chevron flips via `useDirection` (ArrowLeft/ArrowRight); grid uses logical `minmax`.
+- Gates: `pnpm typecheck` (fe+server) → **0**; `pnpm i18n:check` → parity OK; guard tests (i18n-no-hebrew-in-source, no-hardcoded-ui-strings, mobile-shell) → **21/21**; `pnpm build` → exit 0.
+
+**Verdict:** VERIFIED at gate level (RED→GREEN 8/8 + typecheck 0×2 + parity + guards 21/21 + build). Live browser verification (392/860/1180 · light/dark · en/he-RTL, seeded equipment) pending for the stage's end pass. Service-schedule card + actions row are the next Stage 6 detail increments.
+
+## 2026-07-02 — Stage 6 (increment 2): Equipment Detail — service-schedule card
+
+**Claim:** Added the Stage 6 service-schedule card to the mobile detail screen, derived entirely from real fields (`lastMaintenanceDate` + `maintenanceIntervalDays`). Renders only when both are present; progress bar + last/next dates + overdue chip computed from those values.
+
+**Evidence:**
+- New `EquipmentServiceCard.tsx`: gate `if (!lastMaintenanceDate || !maintenanceIntervalDays) return null;`, `pct` clamped 0–100 from elapsed/interval, bar token ok/stale/issue by pct + overdue, dates via `formatDateByLocale`. Rendered after the location card.
+- i18n: 4 new keys (serviceSchedule/lastServiced/nextService/serviceOverdue) en+he + wired in `i18n.ts`, `.d.ts` regenerated.
+- Gates: stage-6 lock **11/11** (3 new asserts: rendered, gated-on-real-data, status-HSL-token bar + no palette), typecheck **0×2**, i18n parity OK, build exit 0, guards (hebrew-in-source + no-hardcoded) pass.
+
+**Verdict:** VERIFIED at gate level. Live render (with a seeded maintenance interval) pending stage-end browser pass.
+
+## 2026-07-02 — Stage 6 (increments 5–6): facility surfaces palette→token
+
+**Claim:** Room Radar (`room-radar.tsx`, 17 palette sites) and Rooms list (`rooms-list.tsx`, 10 sites) moved off hardcoded emerald/amber/red palette onto `--status-*` / `--sys-*` tokens (readiness chips, health rings, status text, action-button color classes, error/attention banners). `my-equipment.tsx` and `new-equipment.tsx` were already palette-free (prior refactors) — no change needed.
+
+**Evidence:**
+- Both files now `grep`-clean of the banned palette (emerald/amber/zinc/indigo/slate-N, red/green/blue/gray-NN, 6-hex) → **0**. Status chips → `--status-{ok,issue,stale}-{bg,fg,border}`; rings/dots → `rgb(var(--sys-{green,orange,red,blue}))`; STATUS_BAR_COLORS `needs_attention` → `border-s-status-maintenance`, fallback → `border-s-border`.
+- RED→GREEN lock test `tests/stage-6-facility-token-consistency.test.js` **4/4** (no-palette + status-token presence, per file).
+- Gates: typecheck **0×2**, `pnpm build` exit 0, guards (i18n-no-hebrew-in-source, no-hardcoded-ui-strings) pass.
+
+**Verdict:** VERIFIED at gate level (static token sweep + lock + typecheck + build). Live dark/RTL render of the radar rings + chips pending the stage-end browser pass.
+
+## 2026-07-02 — Stage 6 (increment 7): desktop equipment-detail palette→token
+
+**Claim:** `src/pages/equipment-detail.tsx` (EquipmentDetailPageDesktop) — all 29 hardcoded palette sites (report-issue amber theming, red validation/flag/error, emerald success icons, blue dock-return button, destructive confirm) moved onto `--status-*` / `--sys-*` / `bg-destructive` tokens. `new-equipment.tsx` was already palette-free — the plan's "rebuild" was, on measurement, a token sweep + an already-clean form.
+
+**Evidence:**
+- Applied via a literal-replace script (every one of the 21 patterns matched — no WARN); file now `grep`-clean of the banned palette → **0**. Mapping: emerald→`--status-ok`, red→`--status-issue`, amber→`--status-stale` (maintenance icon→`--status-maint`), blue→`rgb(var(--sys-blue))`, destructive confirm→`bg-destructive`.
+- Lock test `tests/stage-6-facility-token-consistency.test.js` extended with a desktop describe → **6/6** (no-palette + status/sys token presence).
+- Gates: typecheck **0×2**, build exit 0, guards (i18n-no-hebrew-in-source, no-hardcoded-ui-strings) pass.
+
+**Verdict:** VERIFIED at gate level. Behavior untouched (className-only sweep). Live dark/RTL render pending stage-end browser pass.
+
+## 2026-07-02 — Stage 6 (increment 3): Equipment Detail — actions row (Check in)
+
+**Claim:** Added the mobile detail actions row's primary action — "Check in" (return) — as a real, verifiable, equipment-scoped mutation reusing the desktop's proven infrastructure. Flag + Report-missing deferred with reason (no reusable equipment-scoped issue flow; no missing endpoint).
+
+**Evidence:**
+- New `EquipmentActions.tsx`: renders "Check in" only when `isCheckedOut && (checkedOutByMe || isAdmin)` (else `return null`); `returnMut` calls `api.equipment.return(id, {isPluggedIn, plugInDeadlineMinutes})` (the identical optimistic/offline path the desktop uses) via the standalone `ReturnPlugDialog`; success → cache set + invalidate + `toast.equipmentDetail.toast.returned` (or `savedOffline` when queued); error → `returnFailed`. **Return is deliberately not shift-gated** (you can always hand equipment back — unlike checkout).
+- **Behavioral verification** `tests/equipment-actions.test.tsx` (happy-dom + RTL) **5/5**: shows for checked-out+admin; hidden when available; hidden for non-admin non-holder; shown to the holder; and click→dialog→`api.equipment.return("eq-1",{isPluggedIn:true})`→success toast. This is the real behavior check (the mobile screen needs the native shell, so it can't be driven in plain Chrome).
+- Lock test `tests/stage-6-equipment-detail-token-consistency.test.js` extended → **16/16** (rendered, real return + ReturnPlugDialog + checkIn key, holder/admin gating, no shift-gate).
+- i18n: `checkIn` (en+he) wired in the hand-listed accessor; reused existing `reportIssueTitle`/`toast.{returned,savedOffline,returnFailed}`. `.d.ts` regenerated.
+- Gates: typecheck **0×2**, i18n parity OK, build exit 0, guards pass.
+
+**Deferred (not dead-buttoned):** Flag (equipment-scoped note+photo issue flow lives only inside the desktop screen; the standalone `ReportIssueDialog` is a general support ticket, not an equipment flag) and Report-missing (no API endpoint). Documented in the component header.
+
+**Verdict:** VERIFIED — the return action is exercised end-to-end in a jsdom behavioral test against the proven API+dialog, plus static lock + typecheck + build. Stage 6 increments 1–7 all shipped.
+
+## 2026-07-02 — Stage 9 (increments 1–2): Crash Cart + Code Blue History palette→token
+
+**Claim:** Crash Cart check (`crash-cart.tsx`, 9 sites) and Code Blue History (`code-blue-history.tsx`, 22 sites) moved off hardcoded green/red/amber/zinc palette onto theme + status/sys tokens. History also stops hardcoding `dir="rtl"` — it now mirrors by locale.
+
+**Evidence:**
+- crash-cart: ready/attention banner + present/missing rows + missing-items card → `--status-{ok,issue,stale}-*`; className-only, frozen code-blue mutation/transport surfaces untouched.
+- code-blue-history: zinc dark palette → theme tokens (`bg-card`/`bg-muted`/`border-border`/`text-muted-foreground`/`text-foreground`); outcome pills → `--status-ok-fg`/`--status-issue-fg`/`rgb(var(--sys-blue))`/`--status-stale-fg`; both `dir="rtl"` → `dir={dir}` via `useDirection`, back chevron flips (ArrowLeft/ArrowRight).
+- Both `grep`-clean of banned palette → **0**. Lock test `tests/stage-9-emergency-token-consistency.test.js` **5/5** (no-palette + token presence per file + dir-by-locale). `tests/i18n-code-blue.test.ts` regression still green.
+- Gates: typecheck **0×2**, build exit 0.
+
+**Verdict:** VERIFIED at gate level (static token sweep + lock + i18n-code-blue regression + typecheck + build). Live dark/light/RTL render pending stage-end browser pass. Remaining Stage 9: shift-chat hardcoded-Hebrew (BUG-002) + quick-reply wiring (BUG-003) + stale messages (BUG-001) + standalone chat screen + richer Handover + code-blue.tsx restyle.
+
+## 2026-07-02 — Stage 9 (increment 3): shift-chat broadcast i18n (BUG-002) + BroadcastCard re-token
+
+**Claim:** Fixed the hardcoded-Hebrew-in-EN-mode bug for broadcasts (BUG-002): the `BROADCAST_TEMPLATES` data model is now keys-only, all broadcast copy lives in i18n, and `BroadcastCard` renders via `t.*` + theme tokens. `BroadcastCard.tsx` and `types.ts` removed from the Hebrew-debt allowlist.
+
+**Evidence:**
+- `types.ts`: `BROADCAST_TEMPLATES` → `{ department_close: {} }` (Hebrew label/subtitle removed). Consumers (`BroadcastCard`, `ShiftChatPanel`) resolve label/subtitle from `t.shiftChat.broadcastTemplates[key]`.
+- New i18n: `shiftChat.broadcast.{iSent,seniorTech,received,gotItOnWay,fiveMin,ackedReceipt,snoozedReminder}` + `shiftChat.broadcastTemplates.department_close.{label,subtitle}` (en+he, passthrough namespace, `.d.ts` regenerated).
+- `BroadcastCard` re-tokened: indigo→`primary`, green→`--status-ok`, red→`--status-issue` (theme-following). `ShiftChatPanel` broadcast buttons likewise + resolve copy from `t`.
+- Allowlist: `BroadcastCard.tsx` + `types.ts` removed; the guard's "no stale entries" + "every offender listed" both hold (MessageBubble/SystemCard/ShiftChatArchive remain — still have Hebrew).
+- Gates: typecheck **0×2**, i18n parity OK, `i18n-no-hebrew-in-source` **2/2**, stage-9 lock **8/8** (new BroadcastCard/types describe), `no-hardcoded-ui-strings` pass, build exit 0.
+
+**Verdict:** VERIFIED at gate level (Hebrew now impossible to regress in these two files — off the allowlist; parity + typecheck + build). Remaining Stage 9: MessageBubble/SystemCard/ShiftChatArchive Hebrew, BUG-003 quick-reply, BUG-001 stale messages, standalone chat screen, richer Handover, code-blue.tsx restyle.
+
+## 2026-07-02 — Stage 9 (increment 4): shift-chat MessageBubble + ShiftChatArchive i18n (BUG-002 cont.)
+
+**Claim:** Cleared hardcoded Hebrew + palette from `MessageBubble.tsx` and `ShiftChatArchive.tsx`; both removed from the Hebrew-debt allowlist. Only `SystemCard.tsx` remains on the chat allowlist (9 interpolated event-copies, several for removed ER/med scope — deferred to a focused pass).
+
+**Evidence:**
+- MessageBubble: `"⚡ דחוף"` → `⚡ {t.shiftChat.urgent}`; palette indigo→`primary`, role avatars blue→`sys-blue`/green→`--status-ok`, urgent red→`--status-issue`, mention/hashtag spans → `text-primary` (senior-tech `purple` kept — a deliberate role color outside the token set, not a lint target).
+- ShiftChatArchive: 5 strings → `t.shiftChat.archive.{loading,notFound,title,readOnly,empty}`; `toLocaleString("he-IL")` → `formatDateByLocale(..., {dateStyle:"medium",timeStyle:"short"})` (locale-aware); amber banner → `--status-stale-*`.
+- i18n: `shiftChat.urgent` + `shiftChat.archive.*` (en+he passthrough, `.d.ts` regenerated).
+- Both files `grep`-clean of Hebrew (0) + banned palette (0). Allowlist: removed both; guard's "no stale entries" + "every offender listed" hold (SystemCard remains).
+- Gates: typecheck **0×2**, i18n parity OK, `i18n-no-hebrew-in-source` + `no-hardcoded-ui-strings` pass (3/3), build exit 0.
+
+**Verdict:** VERIFIED at gate level. Remaining Stage 9: SystemCard event-copy i18n (+ removed-scope event cleanup), BUG-003 quick-reply, BUG-001 stale messages, standalone chat screen, richer Handover, code-blue.tsx restyle.
+
+## 2026-07-02 — Stage 9 (increment 5): SystemCard event-alignment + i18n + tokens (BUG-002 cont.)
+
+**Claim:** Rewrote `SystemCard.tsx` to match the server's actual system-event contract, cleared its hardcoded Hebrew (last shift-chat allowlist entry), and moved dark-only Tailwind palette onto `--status-*` tokens. This is both the de-Hebrew fix and a silent-gap bug fix.
+
+**Evidence (traced against server 2026-07-02):**
+- `postSystemMessage()` (`server/lib/shift-chat-presence.ts`) is the ONLY insert path for `type:"system"` messages (grep confirmed: no other `type: "system"` inserts).
+- Its callers emit exactly 9 event types: `code_blue_start`/`code_blue_end` (`routes/code-blue.ts`), `equipment_overdue`/`alert_reopened` (`lib/alert-reminder.ts`), `code_blue_unreconciled` (`lib/code-blue-reconciliation-scanner.ts`), `outbox_dlq_threshold_exceeded` (`lib/outbox-dlq-scanner.ts`), `critical_push_delivery_failed` (`workers/notification.worker.ts`), `emergency_dispense_unresolved` (`services/dispense.service.ts`), `task_escalated` (`services/task-automation.service.ts`).
+- OLD SystemCard rendered only 3 of the 9 (`code_blue_start/end`, `equipment_overdue`) — the other 6 emitted events hit `if (!config) return null` and rendered nothing (silent gap). It also carried 6 DEAD entries: `med_critical`, `hosp_critical`, `hosp_discharged`, `hosp_deceased` (ER/med scope removed in migrations 142–143) + `low_stock`/`shift_summary` (grep-confirmed never emitted).
+- NEW SystemCard: config = the 9 emitted events, each with a status `tone` (issue/ok/stale) → `TONE_CLASS` pre-formed `--status-*` vars; every label reads `t.shiftChat.system.*`; interpolated data (name, minutes, outcome, time, count) concatenated in TSX (passthrough namespace → no interpolation-fn wiring needed); time via `formatDateByLocale(..., {hour,minute})`.
+- New i18n: `shiftChat.system.{codeBlueStarted,codeBlueEnded,codeBlueUnreconciled,equipmentOverdue,alertReopened,emergencyDispenseUnresolved,taskEscalated,criticalPushFailed,outboxDlqExceeded,minutesShort}` (en+he, passthrough, `.d.ts` regenerated).
+- Allowlist: `SystemCard.tsx` removed — **the shift-chat subsystem now has zero Hebrew-debt entries.** Guard's "every offender listed" + "no stale entries" both hold.
+- RED→GREEN: added SystemCard describe to `stage-9-emergency-token-consistency.test.js` (5 asserts: no-palette, i18n-not-Hebrew, all-9-emitted-present, all-6-dead-absent, status-tone-tokens) — failed 5/5 pre-impl, pass post-impl.
+- Gates: typecheck **0×2**, i18n parity OK, `stage-9` lock **13/13**, `i18n-no-hebrew-in-source` pass, `no-hardcoded-ui-strings` pass, build exit 0.
+
+**Verdict:** VERIFIED at gate level. SystemCard is now contract-aligned (no dead config, no unrendered emitted events) and Hebrew-free. Remaining Stage 9: ShiftChatPanel palette→tokens + BUG-003 behavioral proof (next increment), BUG-001 stale messages, standalone chat screen, richer Handover, code-blue.tsx restyle.
+
+## 2026-07-02 — Stage 9 (increment 6): BUG-003 proof + ShiftChatPanel tokens
+
+**Claim:** Closed BUG-003 (broadcast quick-reply buttons "do nothing") with a behavioral test proving the ack chain fires, and tokenized the last palette in the live chat surface (`ShiftChatPanel.tsx`).
+
+**Evidence:**
+- BUG-003 root-cause trace (2026-07-02): button (`BroadcastCard` line 67/74) → `onAck(status)` → panel `ackMessage({id, status})` (`ShiftChatPanel` line 212) → `ackMutation.mutate` → `shiftChatApi.ackMessage` → `POST /api/shift-chat/messages/:id/ack` (server route exists, validates `status` enum, allows broadcast+system acks, enqueues snooze push). Chain is intact end-to-end — the current buttons DO post. The increment-3 BroadcastCard rewrite fixed it; this increment locks it.
+- New behavioral test `tests/shift-chat-broadcast-ack.test.tsx` (happy-dom + RTL, 5/5): receiver sees 2 reply buttons; primary → `onAck("acknowledged")`; secondary → `onAck("snoozed")`; buttons hidden once acked; sender sees none. Locale-robust (queries by button role/order, not copy).
+- `ShiftChatPanel.tsx` palette → tokens: online dot green→`hsl(var(--status-ok))` (+ glow), pinned banner amber→`--status-stale-*`, room-filter active blue→`primary` (×2), broadcast toggle indigo→`primary`, urgent toggle red→`--status-issue-fg`. `grep` of banned palette regex → 0 matches.
+- New lock: ShiftChatPanel describe in `stage-9-emergency-token-consistency.test.js` (no-palette + status/primary token asserts).
+- Gates: `stage-9` lock **15/15**, `shift-chat-broadcast-ack` **5/5**, `i18n-no-hebrew-in-source` pass, typecheck **0×2**, build exit 0.
+
+**Verdict:** VERIFIED. BUG-002 (shift-chat Hebrew) fully cleared across BroadcastCard/types/MessageBubble/ShiftChatArchive/SystemCard; BUG-003 proven resolved + locked. Remaining Stage 9: BUG-001 (stale messages — `useShiftChat` accumulation not reset on shift change), standalone chat screen, richer Handover, `code-blue.tsx` restyle (frozen surface).
+
+## 2026-07-02 — Stage 7 (Analytics & Management): palette→token + i18n + lock (delegated)
+
+**Claim:** Converted the Stage 7 screens off hardcoded palette onto the `--status-*`/`--sys-*` tokens (single declaration, no `dark:` fork), cleared the last Hebrew from `shift-leaderboard.tsx`, and locked it with a token test. Implemented by a delegated sub-agent; gates re-verified by the orchestrator.
+
+**Evidence (orchestrator-run, not agent-reported):**
+- `git diff --stat`: `analytics.tsx` (+/−38), `management-dashboard.tsx` (20), `shift-leaderboard.tsx` (6), allowlist (−1). New file `tests/stage-7-analytics-token-consistency.test.js`.
+- `analytics.tsx`: `STATUS_COLORS_HEX` (4×#hex) → `STATUS_COLORS` = `hsl(var(--status-{ok,issue,maintenance,sterilized}))`; Recharts `<Cell fill>`/`<Bar fill>`/grid `stroke`/axis tick `fill` → token refs; `contentStyle` border → `hsl(var(--border))`. Recharts token pattern matches shipped+verified precedent (`display.tsx:94` `stroke="hsl(var(--status-ok))"`, `TodayScreen.tsx:93` `stroke="var(--brand)"`) — `var()` resolves in SVG presentation attributes on the app's modern engines.
+- `management-dashboard.tsx`: 3 summary tiles `dark:`-forked emerald/amber/red → single-declaration `var(--status-{ok,stale,issue}-{bg,border,fg})`; all-good check → `hsl(var(--status-ok))`.
+- `shift-leaderboard.tsx`: Hebrew comment `{/* תוצאות */}` removed; zero-capture highlight → `var(--status-stale-*)`. Removed from `KNOWN_DEBT_ALLOWLIST` — both ratchet assertions hold.
+- `audit-log.tsx`: **left unchanged** — already 0 palette / 0 Hebrew, delete-free (S7-D3 preserved), semantic-token classes. Prototype chip-filters/avatar-rows deferred (churn over a working Select filter, no defect benefit).
+- Gates (orchestrator-run): `npx tsc --noEmit` → 0 errors; palette grep on the 3 pages → 0; Hebrew grep → 0; `i18n:check` → deep parity OK; `pnpm test` on `stage-7-*` + `i18n-no-hebrew-in-source` + `i18n-parity` → **16 passed**. Lock test = 3 describes / 10 asserts, RED-verified before GREEN.
+
+**Verdict:** VERIFIED at gate level. **Deferred (flagged):** shift-leaderboard podium + week/month toggle, audit-log category chips + avatar rows (additive, need new keys + data restructure); live chart/theme render pending the stage-end manual Chrome pass (392/860/1180 · light/dark · en/he).
+
+## 2026-07-02 — Stage 8 (Admin & Governance): palette→token + i18n + IA reconciliation (delegated)
+
+**Claim:** Admin surfaces moved off hardcoded palette onto `--status-*`/`--sys-*` tokens, all Hebrew extracted (admin.tsx + admin-shifts.tsx off the allowlist), S8-D1 audit-logs tab removed (destination kept reachable), and AssetTypes given the responsive 2-col + dashed-empty layout. Delegated sub-agent; gates re-verified by orchestrator.
+
+**Evidence (orchestrator-run):**
+- `git diff --stat`: admin.tsx (−net, 62 lines churned), admin-shifts.tsx (38), AdminAssetTypesPage.tsx (27), locales en+he (+11 keys each), i18n.generated.d.ts (regen), allowlist (−2). New `tests/stage-8-admin-token-consistency.test.js`.
+- Palette grep on all 3 files → **0**; Hebrew grep → **0**. admin.tsx + admin-shifts.tsx removed from `KNOWN_DEBT_ALLOWLIST` (both ratchet assertions hold).
+- **S8-D1 audit-logs tab REMOVED**, reachability confirmed by orchestrator: `/audit-log` route (`routes.tsx:147`, behind AuthGuard+WebOnlyGuard), nav entry (`layout.tsx`), home link (`home.tsx`). Orphaned `AuditLogsSection` helper + unused `ClipboardList` import deleted; no dangling refs (`SharedAuditLogsPanel` remains only in its owner `audit-log.tsx`). `grep ClipboardList admin.tsx` → 0.
+- i18n: +11 keys under existing spread roots (`adminPage` ×2, `adminShiftsPage` ×1, `adminAssetTypesPage` ×8) — no i18n.ts edit; 6 other admin strings mapped to pre-existing keys (`auditLogAdminOnly/Desc/GoHome`, `userRestored/RestoreFailed`, `common.loading`). Copy-appropriateness of the reused keys to confirm in the browser pass.
+- Gates (orchestrator-run): `npx tsc --noEmit` → 0 errors; `i18n:check` → deep parity OK; `pnpm test` stage-8 lock + i18n guards → **18 passed** (lock = 3 describes/18 asserts incl. audit-tab-absent + shift-requests-tab-present + dashed-empty + md-grid).
+
+**Verdict:** VERIFIED at gate level. **Orchestrator decision flagged — BUG-012:** the Admin "shift-requests" tab was **NOT** removed. `AdminShiftRequestsSection` (shift-adjustment approval queue, shipped in the shifts Phase-1 increments) is referenced only from admin.tsx; `/admin/shifts` is CSV *import*, not approvals — removing the tab would orphan a live feature. Kept per the reachability rule; moving approvals to a dedicated route is a separate task. **Deferred:** admin-shifts dashed dropzone + AssetTypes 2-col responsive layout need a browser/breakpoint pass; AssetTypes right-column auto-select intentionally not added (would be a data-fetch behavior change).
+
+## 2026-07-02 — Stage 10 (Access & Onboarding): palette→token + auth i18n + dismissible whats-new (delegated)
+
+**Claim:** help.tsx moved off 26 palette hits onto tokens; signin/signup Hebrew extracted to a new `authPage` namespace (both off the allowlist) with Clerk components left frozen; whats-new made version-keyed dismissible. Net-new/backend items flagged, not faked. Delegated sub-agent; gates re-verified by orchestrator.
+
+**Evidence (orchestrator-run):**
+- `git diff --stat`: help.tsx (75), signin.tsx (44), signup.tsx (34), whats-new.tsx (+38), i18n.ts (+2), locales en+he (+29 each), i18n.generated.d.ts (regen), allowlist (−2). New `tests/stage-10-access-token-consistency.test.js`.
+- Palette grep on all 4 pages → **0**; Hebrew grep → **0**. `signin.tsx`+`signup.tsx` removed from `KNOWN_DEBT_ALLOWLIST` (ratchet holds).
+- Clerk FROZEN respected: `<SignIn>`/`<SignUp>` components + auth props untouched; only app-rendered chrome (headings, role chips, helper copy) re-themed/extracted. New root `authPage` (24 keys) wired via one mapping line `authPage: d.authPage,` (`i18n.ts:1235`) — typecheck confirms `t.authPage.*` resolves.
+- whats-new S10-D3: `dismissWhatsNew(version)`/`isWhatsNewDismissed(version)` persist against `getBundledAppVersion()` in localStorage; "Got it" dismisses + routes to /home. (`isWhatsNewDismissed` is an exported seam, no auto-surface caller yet — intended reader for the re-show trigger.)
+- Gates (orchestrator-run): `npx tsc --noEmit` → 0 errors; `i18n:check` → deep parity OK; `pnpm test` stage-10 lock + i18n guards → **12 passed**.
+
+**Verdict:** VERIFIED at gate level. **Flagged (not built — auth-safety / backend):** (1) `forgot-password.tsx` standalone page — Clerk's mounted `<SignIn>` already exposes forgot-password inside the component, so the flow isn't broken; a standalone page needs Clerk reset wiring with dev-bypass-safe fallback. (2) Licenses page — no LICENSE/NOTICE manifest exists in-repo to render. (3) S10-D2 sign-up→pending-approval queue — backend (couples to Stage 8 approvals). Role-chip chrome added; Clerk submit behavior unchanged. Live theme/breakpoint render pending manual Chrome pass.
+
+## 2026-07-02 — Stage 9 (BUG-001): shift-chat stale messages across session change
+
+**Claim:** Fixed BUG-001 — the chat panel retained messages from a prior shift session. Accumulation is now scoped to the current shift session; prior-session messages drop out.
+
+**Evidence:**
+- Root cause (traced in `useShiftChat.ts`): `allMessages` merged incoming polls by id but reset only on `isOpen` toggle (lines 54–62). When the active shift rolled over mid-open, the new session's messages were *appended* to the old session's and the old ones never left.
+- Fix: extracted pure `mergeSessionScoped(prev, incoming)` → `src/features/shift-chat/message-scoping.ts` — takes the current session from the newest incoming message and filters out any accumulated message whose `shiftSessionId` differs; returns `prev` by reference when nothing changed (no needless re-render). Hook now calls it in the accumulation effect (inline merge removed).
+- Lock: `tests/shift-chat-session-scoping.test.ts` (5 asserts): same-session accumulate, id-dedupe (ref-stable), **drop-prior-session-on-new-session** (the BUG-001 core — fails against the old inline merge), empty-batch ref-stable, mixed-boundary keeps only current session.
+- Gates: `npx tsc --noEmit` → 0 errors; `pnpm test` on `shift-chat-session-scoping` + `shift-chat-broadcast-ack` → **10 passed**.
+
+**Verdict:** VERIFIED at gate level. Residual edge (noted): a brand-new session with zero messages yet won't clear the prior transcript until its first message arrives (no session signal exists outside the message stream to trigger an earlier reset); the isOpen-close/reopen reset still covers the common per-shift path. BUG-001's mid-open cross-session leak is closed.
+
+## 2026-07-02 — Stage 5 tail: DispenseSheet Hebrew → i18n (delegated)
+
+**Claim:** Extracted all 36 hardcoded Hebrew strings from the dispense sheet into `dispense.sheet.*` locale keys with zero behavior change; removed the file from the Hebrew allowlist. Delegated sub-agent; gates re-verified by orchestrator.
+
+**Evidence (orchestrator-run):**
+- `grep '[֐-׿]' src/features/containers/components/DispenseSheet.tsx` → **0**.
+- `git diff --stat`: DispenseSheet.tsx (72 lines, copy-only), locales en+he (+31 keys each), i18n.ts (+1 line `sheet: d.dispense.sheet,` at :435 — the `dispense` namespace is assembled by explicit member selection, not spread, so the member line was required), i18n.generated.d.ts (regen), allowlist (−1).
+- Frozen surface respected: only user-facing strings (JSX text, `title`/`aria-label`, one `toast.error`) changed; dispense mutation / offline-block / validation / control flow untouched. `formatTimeHHMM("he-IL")` left as-is (locale identifier, not rendered copy).
+- Gates (orchestrator-run): `npx tsc --noEmit` → 0 errors; `i18n:check` → deep parity OK; `pnpm test` `i18n-no-hebrew-in-source` + `i18n-parity` → **6 passed**. Allowlist ratchet holds.
+
+**Verdict:** VERIFIED at gate level. Copy-fidelity note: `sheet.back` kept as a dedicated key (original `חזור`, imperative) rather than reusing `common.back` (`חזרה`) to preserve exact copy.
+
+## 2026-07-02 — Cross-cutting unit 1: BUG-015 (settings re-render) + BUG-014 (settings dropdown)
+
+**Claim:** Fixed the Master-Sound page-jump at its root cause (a full-app remount triggered by any settings toggle); BUG-014 required no change (the mobile settings dropdown already shipped). Delegated sub-agent; gates re-verified by orchestrator.
+
+**Evidence (orchestrator-run):**
+- **BUG-015 root cause (traced, not guessed):** `applySettings()` in `use-settings.tsx` called `setStoredLocale(settings.locale)` on every `update()`; `setStoredLocale` unconditionally dispatches `vettrack:locale-changed`; `main.tsx` keys `<App key={locale-${localeVersion}}>` off that event → every toggle remounted the whole tree and reset scroll. Master Sound surfaced it most because its handler `await`ed an audio tone before `update()`, landing the remount in a detached continuation.
+- Fix (diff-reviewed): `use-settings.tsx` guards the broadcast — `if (settings.locale !== getStoredLocale()) setStoredLocale(...)` — lang/dir still always applied; `settings.tsx` `handleSoundToggle` no longer `async` (fires tone via `void`, commits `update()` synchronously like Dark mode); `settings-controls.tsx` `SettingsToggle` gets `type="button"` (defensive hygiene). This fixes the latent remount for ALL toggles, not just sound.
+- **BUG-014:** verified in code — the mobile top-bar gear (`layout.tsx:927`) already opens a quick-settings dropdown (Dark/Display/Sound/Critical + "All settings" → /settings), shipped `e5375709`. `openSettingsPage` is only the dropdown's "See all" link + native slide-menu item, not the gear. No redundant refactor made. `/settings` reachable.
+- Regression lock: `tests/settings-sound-toggle-no-remount.test.tsx` (5 asserts): no `vettrack:locale-changed` on mount or on soundEnabled/darkMode update; IS dispatched on real locale change; toggle button `type="button"`.
+- Gates (orchestrator-run): `npx tsc --noEmit` → 0 errors; `i18n:check` → parity OK; palette+Hebrew grep on changed files → 0; `pnpm test` regression + i18n guards → **9 passed**.
+
+**Verdict:** VERIFIED at gate level. **Needs device verification:** absence of the visible scroll/jump on a real iPhone WebView + pointer browser. **Flagged gap (separate from BUG-014):** the *desktop* web top bar (`layout/Topbar.tsx`, via WebShell) has no settings entry point at all — if a desktop settings affordance is wanted, that's a distinct additive task, not BUG-014.
+
+## 2026-07-02 — Cross-cutting unit 2: scan platform model (BUG-004/005/011/016)
+
+**Claim:** Unified the scan affordance behind one pure gate — iPhone = flat scan tab, iPad = FAB, web = none — resolving the flat-tab-vs-FAB conflict by platform context. Delegated sub-agent + one orchestrator follow-up edit; gates re-verified by orchestrator.
+
+**Evidence (orchestrator-run):**
+- New `src/lib/scan-affordance.ts`: pure `scanAffordance({isNative,isTablet}) → "tab"|"fab"|"none"` (`isNative = capacitorPlatform() !== "web"`, `isTablet = min-width:768px`) + `useScanAffordance()`. Lock `tests/scan-affordance.test.ts` (6 asserts, all combos + web-never/native-always invariants).
+- `NativeTabBar.tsx`: raised ScanFab removed from the bar → flat scan **tab** (QrCode → /scan) only when affordance `"tab"` (BUG-016 phone: nothing on web-phone). `ScanFab.tsx`: self-gating fixed FAB, `null` unless `"fab"`, token colors only. `NativeTabSidebar.tsx` (iPad): removed sidebar-only scan item, renders `<ScanFab/>` (BUG-011). `home.tsx`: scan card gate `isDesktop`→`scanAffordance === "fab"` (hidden on web+iPhone, shown iPad).
+- **Orchestrator follow-up:** gated the `?scan=1` deep-link in `home.tsx` — `if (scanAffordance === "none") return;` — so web can't open the scanner via URL (closes the BUG-016 residual the agent flagged).
+- **BUG-004 verified not regressed:** `qr-scanner.tsx` close is `h-11 w-11` (44px), `paddingTop: max(1rem, env(safe-area-inset-top))`, inside the `createPortal` overlay (5113f60e intact). No scan/camera logic touched anywhere.
+- Gates (orchestrator-run): `npx tsc --noEmit` → 0 errors; palette+Hebrew grep on all 6 changed files → 0; `i18n:check` → parity OK (reused `nav.equipmentScan`, no new keys); `pnpm test` scan lock + i18n guards → **12 passed**.
+
+**Verdict:** VERIFIED at gate level. **Needs DEVICE verification** (iPhone + iPad simulators + desktop browser): iPhone flat tab, iPad FAB placement/safe-area over the sidebar, web shows no scan, scanner-close reachability under the notch. **Deferred (flagged):** legacy `layout.tsx renderScanFab` NOT gated — it carries 11 pre-existing palette hits (would fail the changed-files gate) and is reached only transiently via `EquipmentDetailSkeleton`; its raised FAB still renders there. Recommend a dedicated de-palette+gate follow-up (or retire the Layout skeleton). iPad currently shows both FAB + Today scan card (union of the phone/web removals); tighten to FAB-only if desired.
+
+## 2026-07-02 — Cross-cutting unit 3: avatar upload (BUG-013) + top-bar avatar sizing (BUG-006)
+
+**Claim:** Built profile-picture upload reusing the existing S3 storage pattern, persisted per-user (clinic-scoped), surfaced in profile + both top bars, and right-sized the mobile avatar. Delegated sub-agent; gates + migration convention re-verified by orchestrator.
+
+**Evidence (orchestrator-run):**
+- Backend reuse: `POST /api/uploads/avatar` added to `server/routes/uploads.ts` — `requireAuth`, multer image/5MB, `PutObjectCommand` via the existing `getS3Client()`, key `avatars/{userId}-{uuid}.{ext}`, then `db.update(users).set({avatarUrl}).where(and(eq(id), eq(clinicId)))` (**clinic-scoped** — multi-tenant rule). Returns 501 `OBJECT_STORAGE_NOT_CONFIGURED` when `S3_*` unset. `GET /me` (users.ts) now returns `avatarUrl`.
+- Schema/migration: `avatarUrl text("avatar_url")` on `vt_users` (core.ts:24). **Migration convention verified:** `server/migrate.ts` applies numbered `migrations/*.sql` (tracked in `vt_migrations`), tail was 157; new `158_vt_users_avatar_url.sql` = idempotent `ALTER TABLE vt_users ADD COLUMN IF NOT EXISTS avatar_url TEXT`. (drizzle-kit generate fails in this env / is not the applied path — the numbered SQL is canonical; agent flagged, orchestrator confirmed against migrate.ts.)
+- Frontend: `api.users.uploadAvatar(file)` (FormData); `ProfileHeroZone.tsx` upload UI (img/initials, file input, preview, 5MB+type validation, invalidates `/api/users/me`); `Topbar.tsx` (desktop) + `NativeHeader.tsx` (mobile) render `avatarUrl`. **BUG-006:** NativeHeader avatar 28px→24px (font 11→10) to match the 20px Settings/Alerts glyphs; 44px hit-area preserved. (Actual components differ from the my-profile.tsx/layout.tsx hints — agent implemented against the real `ProfileHeroZone`/`Topbar`/`NativeHeader`.)
+- i18n: `profile.*` +5 keys (en+he parity), existing spread root. Lock `tests/upload-filename.test.ts` (8 asserts on `sanitizeUploadExtension`/`buildAvatarKey`).
+- Gates (orchestrator-run): `npx tsc --noEmit` (frontend) **0** + `npx tsc -p tsconfig.server.json --noEmit` (server) **0**; `i18n:check` parity OK; `pnpm test` upload-filename + i18n guards → **13 passed**.
+
+**Verdict:** VERIFIED at gate level. **BLOCKED on infra:** a Railway object-storage bucket must be provisioned + `S3_BUCKET`/`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY`/`S3_PUBLIC_URL` (+`S3_ENDPOINT`/`S3_REGION`) set — until then the route returns 501 by design (Railway MCP is unauthorized this session; provisioning is a user CLI/dashboard step). **Needs browser/device verification:** upload flow + preview + resized top-bar avatars. Pre-existing `bg-indigo-600` on Topbar.tsx:53 left untouched (out of scope).
+
+## 2026-07-02 — Avatar storage: Railway bucket provisioned + private-bucket serving (unblocks BUG-013)
+
+**Claim:** Provisioned a Railway object-storage bucket, wired its credentials onto the VetTrack service, and reworked avatar serving for Railway's private-bucket model (store key → presign on read), unblocking the BUG-013 upload path that shipped returning 501.
+
+**Evidence:**
+- **Bucket created (Railway MCP, now authorized):** `vettrack-uploads` (id `2cae2fe7-0388-47b8-ab17-c765bc4cfcb4`, region `ams` / EU West), project `pacific-flow` (`adf88531…`), environment `production`.
+- **Credentials wired as reference variables** on service `VetTrack` (`551051c2…`) via `add_reference_variable` (secret values never entered the transcript): `S3_BUCKET←${{ vettrack-uploads.BUCKET }}`, `S3_ACCESS_KEY_ID←ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY←SECRET_ACCESS_KEY`, `S3_REGION←REGION`, `S3_ENDPOINT←ENDPOINT`. Set with intent to not clobber; **not** redeployed yet (current deployed code still assumes a public URL — deploy must carry the code change below).
+- **Design finding (verified against Railway docs `/storage-buckets`):** Railway buckets are **private-only** — no public object URL. The shipped code stored `${S3_PUBLIC_URL}/${key}` and rendered it directly, which would 403. `S3_PUBLIC_URL` was therefore intentionally left unset. User chose the presigned-URL serving model (docs' recommended pattern).
+- **Code change:** new `server/lib/object-storage.ts` centralizes `getS3Client()`/`isObjectStorageConfigured()` (moved out of `uploads.ts`) + `presignObjectUrl(keyOrUrl)` (1h TTL, passes absolute URLs through, null when unconfigured). `uploads.ts` avatar handler now persists the object **key** in `vt_users.avatar_url` and returns a freshly presigned URL. `users.ts` `GET /me` presigns the stored key before returning `avatarUrl`. Frontend unchanged (still renders `avatarUrl`).
+- **Dependency:** added `@aws-sdk/s3-request-presigner@3.1037.0` (pinned to match `@aws-sdk/client-s3@3.1037.0` — the floating `@3` pulled a newer `@smithy/types` and broke the `S3Client` type; pinning resolved it).
+- **Gates:** `pnpm typecheck` (frontend **0** + server **0**); `pnpm test tests/upload-filename.test.ts` → **7 passed**; new `tests/object-storage.test.ts` → **4 passed** — including a real presign asserting the URL carries `storage.railway.app`, the object key, `X-Amz-Signature=`, and `X-Amz-Expires=3600` (offline crypto, no network).
+- **Flagged (out of scope, same latent bug):** `POST /api/uploads/fault-image` still builds `${S3_PUBLIC_URL}/${key}` — now that S3 is configured its PutObject will succeed but yield an unusable `undefined/...` URL. Needs the same store-key + presign-on-read treatment at the fault read site before fault images are relied upon.
+
+**Verdict:** VERIFIED at gate level. **Needs deploy + device verification:** deploy the new code to VetTrack (the env vars are set but the running image predates the presign change), then confirm real upload → presigned render in the app on iPhone/desktop.
+
+## 2026-07-02 — fault-image: same private-bucket fix as avatar
+
+**Claim:** Applied the avatar private-bucket treatment to `POST /api/uploads/fault-image` — drop the broken `${S3_PUBLIC_URL}/key` construction, add the 501-unconfigured guard, return a presigned URL via the shared helper.
+
+**Evidence:**
+- `uploads.ts` fault-image handler now: (1) returns 501 `OBJECT_STORAGE_NOT_CONFIGURED` when `S3_*` unset (matching /avatar); (2) after PutObject, returns `{ success, url: presignObjectUrl(key), key }` instead of `${S3_PUBLIC_URL}/${key}`. `key` is surfaced so a long-term caller can persist the key and presign on read.
+- **Verified fault-image is currently dead code:** `grep -rn "fault-image" src` → 0 hits (no client caller). The live photo path (`equipment-detail.tsx`) reads files via `FileReader.readAsDataURL` and stores base64 **data URLs** directly in `scan_logs.photo_url` — it never touches S3. So this is a correctness/future-proofing fix, not a live-path change.
+- `pnpm typecheck:server` → 0 errors.
+- **Flagged (pre-existing, out of scope):** scan/report photos are persisted as inline base64 data URLs in `scan_logs.photo_url` (rendered directly in EquipmentDetailActivityTab). If those should move to bucket storage, that's a separate migration (wire the upload → store key → presign at the equipment/scan read sites), not covered here.
+
+## 2026-07-02 — Cross-cutting unit 4: nav/profile/settings shell parity (desktop Topbar)
+
+**Claim:** Restored the alerts bell + settings entry point that the newer `PageShell`/`Topbar` web shell dropped during the shell migration (the legacy `layout.tsx` still carried them), added a desktop quick-settings dropdown mirroring the mobile `NativeHeader`, verified profile routing is already consistent across shells, and gated the legacy raised scan FAB off the web surface. Browser-verified live (light + dark).
+
+**Evidence (this session):**
+- **Audit reconciliation:** the morning stage-design-audit (workflow `wf_963a03c6`) flagged "verify PageShell topbar renders … alerts bell with red unread badge … + settings entry" (Stage 3 gap); an earlier proof entry flagged "desktop web top bar has no settings entry point." Live-verified both pre-change: `Topbar.tsx` right-controls were `ShiftBadge + UserAvatar` only — no bell, no gear; NAV model exposes `alerts` as a plain text link and **no** `/settings` anywhere in desktop nav.
+- **A (nav-chrome material tokens):** already present — `--hairline/--bar-bg/--bar-bg-opaque/--bar-blur` at `index.css:121-124` (light) / `325-327` (dark) + `@media (prefers-reduced-transparency: reduce)` opaque override at `:494-495`. No work needed (audit was ~14h stale on this).
+- **B (alerts bell):** wired the existing, already-designed `AlertsDropdown` (bell color `--brand-green-bright`, tuned for the navy bar) into `Topbar.tsx`, fed by the same `computeAlerts` + `countActiveAlerts(buildAlertAckSet())` path the legacy layout + mobile header use, plus a local badge-pop effect. Added an optional backward-compatible `buttonClassName` to `AlertsDropdown` so its 44px trigger fits the 40px (`h-10`) bar (`h-8 w-8 min-h-0 min-w-0`); legacy call site unchanged (default keeps 44px).
+- **C (settings entry point):** new `src/components/layout/TopbarSettingsMenu.tsx` — self-contained gear → quick-settings dropdown (Dark mode switch, Language toggle, My Profile, All settings → `/settings`), reusing existing `nav.*` i18n keys + `useSettings` (no new keys → parity unaffected). Kept separate from the device-verified mobile `NativeHeader` rather than refactoring it.
+- **D (profile shell/routing):** verified, no change — `/my-profile` is `AuthGuard`-routed, `AppShell`-wrapped, reachable from mobile `NativeHeader` (avatar + settings row), `MoreSheet`, desktop `Topbar` avatar, and the new gear dropdown.
+- **E (legacy scan FAB gate):** `layout.tsx` `renderScanFab` now returns `null` when `useScanAffordance() === "none"` (web) — closes the BUG-016 residual (raised FAB leaking onto web via the transient EquipmentDetailSkeleton). Native (`tab`/`fab`) stays byte-for-byte. iPhone-flat-tab-in-legacy-layout remains a documented deferral (per the Unit-2 note).
+- **Search field ('/' hint):** deferred + flagged — needs a real global-search feature; a decorative dead input would violate the anti-template rule.
+- **Gates:** `npx tsc --noEmit` → **0 errors**; targeted locks `scan-affordance` + `i18n-parity` + `i18n-no-hebrew-in-source` → **12 passed**; palette scan on new/changed lines → clean (pre-existing `bg-indigo-600` active-nav pill at `Topbar.tsx:90` left untouched, already flagged out-of-scope in the avatar unit).
+- **Browser (dev server :5000, Chrome MCP, desktop width):** Topbar renders bell (red **2** badge) + gear + avatar. Gear → quick-settings dropdown opens; **"All settings" navigates to `/settings`** and the page renders fully (Display/Push/Sound). Bell → alerts dropdown lists the 2 active alerts ("E2E Test Equipment", "QA Test Monitor") + "See all alerts"; badge count = dropdown count = 2. Toggled Dark mode → whole app + the new dropdown render correctly on `--popover` dark tokens, and the toggle did **not** remount/reload the page (BUG-015 stays fixed).
+
+**Verdict:** VERIFIED at gate + live-browser level (light + dark). **Note:** the desktop Topbar is a pointer/web surface (not shown in the native iOS shell), so no simulator pass is required for it; the legacy scan-FAB gate on real iPhone/iPad (native `tab`/`fab` unchanged) is covered by the scan-affordance unit test but not re-run on-device this session. **Deferred (flagged):** global search field; iPhone-flat-tab in the legacy layout bottom nav.
+
+## 2026-07-02 — Unit 4 follow-up: topbar equipment-search field ('/' hint)
+
+**Claim:** Implemented the design's topbar search field (Stage 3 expanded topbar — `searchPlaceholder` "Search equipment" + `/` kbd) as a real entry point to the **existing** equipment search, not a decorative input. Browser-verified end-to-end.
+
+**Evidence (this session):**
+- **Not a new backend — URL-as-state:** `src/features/equipment/hooks/use-equipment-filters.ts` derives its query from `useSearch()` → `params.get("q")`, and `/equipment` (`equipment-list.tsx`) renders the filtered list from it. Server already supports `ilike` search on equipment. So the topbar search only needs to `navigate('/equipment?q=<query>')`.
+- **New `src/components/layout/TopbarSearch.tsx`:** owns local input state only; on submit → `navigate('/equipment?q=' + encodeURIComponent(q))` (empty → `/equipment`), then blurs. Global `keydown` handler focuses it on `/` and `preventDefault()`s the slash, but bails when `activeElement` is INPUT/TEXTAREA/contentEditable so `/` stays literal while typing. Reuses `t.equipmentList.search.placeholder` (no new i18n key → parity untouched). `hidden lg:flex` per the design's expanded breakpoint. Translucent-on-navy styling (`bg-white/10`) to cohere with the bar's existing `text-white/60` treatment rather than a stark light pill.
+- **Wired into `Topbar.tsx`** as the leading item of the right-control cluster (search → shift badge → bell → gear → avatar), matching the prototype order.
+- **Gates:** `npx tsc --noEmit` → **0 errors**.
+- **Browser (dev :5000, Chrome MCP, 1456px wide, dark):** field renders in the topbar (magnifier + placeholder + `/` kbd). Typed "monitor" + Enter → URL became `/equipment?q=monitor`, the equipment page's own search bar pre-filled "monitor", and the list filtered to **"1 of 1 items — QA Test Monitor"**. Then clicked page body, pressed `/` → topbar search focused with **no literal slash inserted**; typed "vital" → appeared in the field. Both paths confirmed.
+
+**Verdict:** VERIFIED at gate + live-browser level. **Behavior note:** the topbar search is a *launcher* — it clears on submit and hands the active query to the equipment page's own search bar (which displays it). Syncing the topbar input back from `?q` when already on `/equipment` was intentionally not added (the page owns the active-query display). Desktop/pointer surface — no simulator pass required.
+
+## 2026-07-02 — Unit 4 follow-up: iPhone flat scan-tab in the legacy layout bottom nav
+
+**Claim:** Made the legacy `layout.tsx` bottom-nav scan slot affordance-aware so it no longer flashes the raised FAB on iPhone — flat emphasized scan tab on phone (`"tab"`), raised FAB on tablet (`"fab"`), nothing on web (`"none"`). Closes the last piece of the BUG-016 scan-model residue.
+
+**Evidence (this session):**
+- **Scoped the blast radius first:** `grep` for `<Layout` shows the legacy `Layout` (`src/components/layout.tsx`) is mounted in **exactly one place** — `src/components/skeletons/equipment-detail-skeleton.tsx` (the equipment-detail loading skeleton). It is not a live shell for any route; the real loaded bottom bar is `NativeTabBar` (already correct from Unit 2). So the only defect was the *loading skeleton* flashing the wrong scan affordance before the loaded page renders the right one.
+- **Fix:** added `renderScanTab()` (flat `QrCode` tab, `ivory-green` brand tint, `min-h-[52px]` matching `renderBottomNavTab`, same `handleScanButtonClick` action + `scannerUIOpen` X-swap as the FAB) and made `renderScanFab` a 3-way dispatch: `"none"` → `null`, `"tab"` → `renderScanTab()`, else (`"fab"`) → the existing raised FAB. Occupies the same center grid slot, so the 5-col bar layout is unchanged; iPhone now shows a flush flat tab instead of the raised FAB. Mirrors `NativeTabBar`'s `affordance === "tab"` branch (`QrCode` scan tab).
+- **Gates:** `layout.tsx` compiles clean — `tsc` errors are **0 in my file** (see the separate i18n.ts note below). `tests/scan-affordance.test.ts` (the decision function this consumes) → passes. 
+- **Verification ceiling (honest):** this surface is **Capacitor-native-gated** — `scanAffordance` resolves `"none"` whenever `capacitorPlatform() === "web"`, so it renders nothing in desktop Chrome *and* in a mobile-sized web context. It is therefore **not browser-verifiable**; it needs an iOS/Android simulator pass on the equipment-detail loading state. Covered here by: the pure scan-affordance unit test, typecheck, and logic review against the verified `NativeTabBar` pattern. No Layout-render test added (mounting the legacy skeleton — many hooks/queries — is disproportionate for a transient loading surface; the affordance decision is already unit-tested).
+
+**Verdict:** VERIFIED at gate level (typecheck + scan-affordance unit test + parity with NativeTabBar). **NEEDS DEVICE verification** (iPhone flat tab / iPad FAB on the equipment-detail loading skeleton) — cannot be reproduced in any web context by design.
+
+## 2026-07-02 — ⚠️ FLAG (not mine): `src/lib/i18n.ts` has a duplicate `formatDateTimeByLocale`
+
+`src/lib/i18n.ts` (modified in the working tree this session by a concurrent background job — mtime post-dates my edits; not listed dirty at my session start) declares `export function formatDateTimeByLocale` **twice** — at L79 (`date.toLocaleString(locale, options)`) and L95 (`Date | string`, localeTag + `{dateStyle:"medium",timeStyle:"short"}` defaults). This yields `tsc` **TS2323 + TS2393 ×2 = 4 errors**, the repo's only current type errors. Left untouched per the "don't stomp another agent's in-flight file" rule. The L95 version (documented, accepts `Date | string`, has defaults) looks like the intended keeper; the L79 stub looks like the leftover — but the owning job should reconcile. Flagging so a green `tsc` isn't mistakenly attributed to this unit's commits.

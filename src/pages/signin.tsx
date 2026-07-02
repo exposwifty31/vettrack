@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { Loader2 } from "lucide-react";
+import { t } from "@/lib/i18n";
 import { VetTrackMark } from "@/components/vettrack-mark";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignIn, useUser } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -35,7 +36,7 @@ export default function SignInPage() {
     return (
       <>
         <Helmet>
-          <title>כניסה — VetTrack</title>
+          <title>{t.authPage.signInMetaTitle}</title>
           <meta name="robots" content="noindex" />
         </Helmet>
         <AuthBootstrapSpinner />
@@ -46,8 +47,8 @@ export default function SignInPage() {
   return (
     <>
       <Helmet>
-        <title>כניסה — VetTrack</title>
-        <meta name="description" content="התחבר ל-VetTrack לניהול ציוד וטרינרי, סריקת QR ומעקב בזמן אמת." />
+        <title>{t.authPage.signInMetaTitle}</title>
+        <meta name="description" content={t.authPage.signInMetaDescription} />
         <link rel="canonical" href="https://vettrack.replit.app/signin" />
         <meta name="robots" content="noindex" />
       </Helmet>
@@ -62,8 +63,25 @@ export default function SignInPage() {
               <VetTrackMark size={40} />
               <span className="text-2xl font-bold text-foreground">VetTrack</span>
             </Link>
-            <h1 className="text-2xl font-bold text-foreground mb-2">ברוך שובך</h1>
-            <p className="text-sm text-muted-foreground">התחבר לניהול ציוד הוטרינרי שלך</p>
+            <h1 className="text-2xl font-bold text-foreground mb-2">{t.authPage.welcomeBack}</h1>
+            <p className="text-sm text-muted-foreground">{t.authPage.signInSubtitle}</p>
+          </div>
+
+          <div className="mb-6 flex flex-col items-center gap-2">
+            <span className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">
+              {t.authPage.roleLabel}
+            </span>
+            <div className="flex flex-wrap justify-center gap-2">
+              <span className="inline-flex h-8 items-center rounded-full border border-primary bg-primary px-3.5 text-xs font-semibold text-primary-foreground">
+                {t.authPage.roleVetTech}
+              </span>
+              <span className="inline-flex h-8 items-center rounded-full border border-border bg-card px-3.5 text-xs font-semibold text-foreground">
+                {t.authPage.roleVeterinarian}
+              </span>
+              <span className="inline-flex h-8 items-center rounded-full border border-border bg-card px-3.5 text-xs font-semibold text-foreground">
+                {t.authPage.roleStudent}
+              </span>
+            </div>
           </div>
 
           {CLERK_PUBLISHABLE_KEY ? (
@@ -76,7 +94,7 @@ export default function SignInPage() {
                     onClick={() => setUsePhoneFlow(false)}
                     className="text-xs text-muted-foreground hover:text-primary transition-colors underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
-                    → חזרה להתחברות רגילה
+                    → {t.authPage.backToRegularSignIn}
                   </button>
                 </>
               ) : (
@@ -88,7 +106,7 @@ export default function SignInPage() {
                   </ClerkLoading>
                   <ClerkFailed>
                     <p className="text-sm text-center text-destructive px-2" role="alert">
-                      דף ההתחברות לא נטען. בדוק את החיבור ורענן. אם הבעיה נמשכת, ודא ש-Clerk מוגדר לדומיין זה ושמפתח ה-Publishable Key תואם לסביבה.
+                      {t.authPage.signInLoadError}
                     </p>
                   </ClerkFailed>
                   <ClerkLoaded>
@@ -105,15 +123,15 @@ export default function SignInPage() {
                     </ClerkAuthFormShell>
                   </ClerkLoaded>
                   <p className="text-xs text-muted-foreground text-center max-w-xs">
-                    מתחבר עם מספר ישראלי (+972)?{" "}
+                    {t.authPage.phonePrompt}{" "}
                     <button
                       type="button"
                       onClick={() => setUsePhoneFlow(true)}
                       className="underline hover:text-primary transition-colors"
                     >
-                      השתמש בהתחברות ממספר טלפון ישראלי
+                      {t.authPage.usePhoneSignIn}
                     </button>{" "}
-                    להזנת המספר בפורמט מקומי (לדוגמה: 0501234567).
+                    {t.authPage.phoneFormatHint}
                   </p>
                 </>
               )}
@@ -121,13 +139,13 @@ export default function SignInPage() {
           ) : (
             <div className="bg-card border border-border rounded-2xl p-6 shadow-sm text-center">
               <p className="text-sm text-muted-foreground mb-4">
-                מצב פיתוח — אין צורך באימות.
+                {t.authPage.devModeNotice}
               </p>
               <Link
                 href="/home"
                 className="inline-flex items-center justify-center gap-2 w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-3 rounded-xl transition-colors"
               >
-                כניסה ללוח הבקרה
+                {t.authPage.enterDashboard}
               </Link>
             </div>
           )}
@@ -138,7 +156,7 @@ export default function SignInPage() {
               href="/"
               className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              → עוד על VetTrack
+              → {t.authPage.moreAboutVetTrack}
             </Link>
           </div>
         </div>

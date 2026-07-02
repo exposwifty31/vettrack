@@ -67,7 +67,7 @@ function SyncBadge({ status }: { status: string }) {
   const rr = t.roomRadarPage;
   if (status === "synced") {
     return (
-      <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-300 rounded-full px-2.5 py-1">
+      <div className="flex items-center gap-1 text-[11px] font-bold text-[var(--status-ok-fg)] bg-[var(--status-ok-bg)] border border-[var(--status-ok-border)] rounded-full px-2.5 py-1">
         <CheckCircle2 className="w-3 h-3" />
         {rr.syncedBadge}
       </div>
@@ -75,14 +75,14 @@ function SyncBadge({ status }: { status: string }) {
   }
   if (status === "requires_audit") {
     return (
-      <div className="flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 dark:bg-red-950/50 dark:border-red-800 dark:text-red-300 rounded-full px-2.5 py-1">
+      <div className="flex items-center gap-1 text-[11px] font-bold text-[var(--status-issue-fg)] bg-[var(--status-issue-bg)] border border-[var(--status-issue-border)] rounded-full px-2.5 py-1">
         <AlertTriangle className="w-3 h-3" />
         {rr.auditBadge}
       </div>
     );
   }
   return (
-    <div className="flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 dark:bg-amber-950/50 dark:border-amber-800 dark:text-amber-300 rounded-full px-2.5 py-1">
+    <div className="flex items-center gap-1 text-[11px] font-bold text-[var(--status-stale-fg)] bg-[var(--status-stale-bg)] border border-[var(--status-stale-border)] rounded-full px-2.5 py-1">
       <Clock className="w-3 h-3" />
       {rr.staleBadge}
     </div>
@@ -95,7 +95,7 @@ const STATUS_BAR_COLORS: Record<EquipmentStatus, string> = {
   maintenance: "border-s-status-maintenance",
   sterilized: "border-s-status-sterilized",
   critical: "border-s-destructive",
-  needs_attention: "border-s-orange-500",
+  needs_attention: "border-s-status-maintenance",
 };
 
 interface RadarEquipmentCardProps {
@@ -170,7 +170,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
   });
 
   const quickAction = !isCheckedOut && eq.status === "ok"
-    ? { label: t.roomRadarPage.checkoutLabel, icon: LogIn, action: () => checkoutMut.mutate(), pending: checkoutMut.isPending, cls: "text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40" }
+    ? { label: t.roomRadarPage.checkoutLabel, icon: LogIn, action: () => checkoutMut.mutate(), pending: checkoutMut.isPending, cls: "text-[var(--status-ok-fg)] border-[var(--status-ok-border)] hover:bg-[var(--status-ok-bg)]" }
     : isCheckedOut && (checkedOutByMe || isAdmin) && eq.status === "ok"
     ? { label: t.roomRadarPage.returnLabel, icon: LogOut, action: () => setReturnDialogOpen(true), pending: returnMut.isPending, cls: "text-primary border-primary/30 hover:bg-primary/10 dark:hover:bg-primary/15" }
     : null;
@@ -182,8 +182,8 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
         action: () => { if (!confirmMut.isPending) confirmMut.mutate(); },
         pending: confirmMut.isPending,
         cls: justConfirmed
-          ? "text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/20"
-          : "text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40",
+          ? "text-[var(--status-ok-fg)] border-[var(--status-ok-border)] bg-[var(--status-ok-bg)]"
+          : "text-[rgb(var(--sys-blue))] border-[rgb(var(--sys-blue))] hover:bg-[rgb(var(--sys-blue)/0.1)]",
       }
     : null;
 
@@ -208,12 +208,12 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
       <Card
         className={cn(
           "border-border/60 shadow-sm transition-all overflow-hidden",
-          justVerified && "border-emerald-300 dark:border-emerald-700 bg-emerald-50/40 dark:bg-emerald-950/20",
+          justVerified && "border-[var(--status-ok-border)] bg-[var(--status-ok-bg)]",
           tapped && "scale-[0.98]"
         )}
         data-testid={`radar-item-${eq.id}`}
       >
-        <div className={cn("flex border-s-[6px]", STATUS_BAR_COLORS[eq.status] ?? "border-s-gray-400")}>
+        <div className={cn("flex border-s-[6px]", STATUS_BAR_COLORS[eq.status] ?? "border-s-border")}>
           <CardContent className="p-3 flex-1 min-w-0">
             {/* Row 1: icon + name + badges */}
             <div className="flex items-center gap-3">
@@ -250,9 +250,9 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
                     {STATUS_LABELS[eq.status as keyof typeof STATUS_LABELS] ?? eq.status}
                   </Badge>
                   {isCheckedOut ? (
-                    <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300">{t.roomRadarPage.inUseCard}</span>
+                    <span className="text-[10px] font-semibold text-[var(--status-stale-fg)]">{t.roomRadarPage.inUseCard}</span>
                   ) : (
-                    <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">{t.roomRadarPage.availableCard}</span>
+                    <span className="text-[10px] font-semibold text-[var(--status-ok-fg)]">{t.roomRadarPage.availableCard}</span>
                   )}
                 </div>
               </div>
@@ -275,7 +275,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
               {!false && (verifiedLabel ? (
                 <span className={cn(
                   "flex items-center gap-1",
-                  justVerified ? "text-emerald-600 dark:text-emerald-400 font-semibold" : ""
+                  justVerified ? "text-[var(--status-ok-fg)] font-semibold" : ""
                 )}>
                   {justVerified && <CheckCircle2 className="w-2.5 h-2.5" />}
                   {verifiedLabel}
@@ -284,16 +284,16 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
                 <span className="text-muted-foreground/60">{t.roomRadarPage.notVerified}</span>
               ))}
               {pilotStaleness === "never" && (
-                <span className="text-red-500 font-semibold">{t.roomRadarPage.pilotNeverSeen}</span>
+                <span className="text-[var(--status-issue-fg)] font-semibold">{t.roomRadarPage.pilotNeverSeen}</span>
               )}
               {pilotStaleness === "stale" && (
-                <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                <span className="text-[var(--status-stale-fg)] font-semibold">
                   {t.roomRadarPage.pilotStale}
                   {eq.lastSeen ? ` · ${formatRelativeTime(eq.lastSeen)}` : ""}
                 </span>
               )}
               {(pilotStaleness === "recent" || justConfirmed) && (
-                <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                <span className="text-[var(--status-ok-fg)] font-semibold flex items-center gap-1">
                   {justConfirmed && <CheckCircle2 className="w-2.5 h-2.5" />}
                   {justConfirmed ? t.roomRadarPage.pilotConfirmedHere : t.roomRadarPage.pilotRecent}
                   {!justConfirmed && eq.lastSeen ? ` · ${formatRelativeTime(eq.lastSeen)}` : ""}
@@ -566,7 +566,7 @@ export default function RoomRadarPage() {
             </div>
           ) : roomError ? (
             <div className="flex flex-col gap-3 py-4">
-              <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <div className="flex items-center gap-2 text-[var(--status-issue-fg)]">
                 <AlertTriangle className="w-5 h-5 shrink-0" />
                 <p className="font-semibold text-base">{t.roomRadarPage.roomLoadError}</p>
               </div>
@@ -618,7 +618,7 @@ export default function RoomRadarPage() {
               <span className="text-[11px]">{t.roomRadarPage.inUseStat}</span>
             </div>
             {issueCount > 0 && (
-              <div className="flex items-center gap-1.5 text-xs font-semibold bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 rounded-full px-3 py-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-semibold bg-[var(--status-issue-bg)] border border-[var(--status-issue-border)] text-[var(--status-issue-fg)] rounded-full px-3 py-1.5">
                 <AlertTriangle className="w-3 h-3" />
                 <span className="font-bold">{issueCount}</span>
                 <span className="text-[11px]">{issueCount !== 1 ? t.roomRadarPage.issuesStat : t.roomRadarPage.issueStat}</span>
@@ -651,7 +651,7 @@ export default function RoomRadarPage() {
               className={cn(
                 "flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all min-h-[44px] border",
                 verifyState === "done"
-                  ? "bg-emerald-600 text-white border-emerald-600 shadow-md"
+                  ? "bg-[hsl(var(--status-ok))] text-white border-[hsl(var(--status-ok))] shadow-md"
                   : "bg-primary text-primary-foreground border-primary hover:bg-primary/90 active:scale-[0.98] shadow-sm"
               )}
             >

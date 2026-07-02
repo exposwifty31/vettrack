@@ -398,6 +398,15 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ display_name: displayName }),
       }),
+    uploadAvatar: async (file: File): Promise<{ url: string }> => {
+      const form = new FormData();
+      form.append("image", file);
+      const result = await request<{ success: boolean; url: string }>("/api/uploads/avatar", {
+        method: "POST",
+        body: form,
+      });
+      return { url: result.url };
+    },
   },
   storage: {
     requestUploadUrl: (data: UploadUrlRequest) =>

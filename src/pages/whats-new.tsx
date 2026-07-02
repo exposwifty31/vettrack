@@ -1,6 +1,9 @@
 import { Helmet } from "react-helmet-async";
+import { useLocation } from "wouter";
 import { AppShell } from "@/components/layout/AppShell";
 import { t } from "@/lib/i18n";
+import { getBundledAppVersion } from "@/lib/app-version";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -18,6 +21,29 @@ import {
   HeartPulse,
 } from "lucide-react";
 
+const WHATS_NEW_DISMISSED_KEY = "vt_whats_new_dismissed_version";
+
+/**
+ * S10-D3: What's New is a one-time sheet keyed by app version. Dismissal is
+ * persisted against the current bundle version, so it re-surfaces only after
+ * the app updates to a new version.
+ */
+export function isWhatsNewDismissed(version: string): boolean {
+  try {
+    return localStorage.getItem(WHATS_NEW_DISMISSED_KEY) === version;
+  } catch {
+    return false;
+  }
+}
+
+export function dismissWhatsNew(version: string): void {
+  try {
+    localStorage.setItem(WHATS_NEW_DISMISSED_KEY, version);
+  } catch {
+    // storage unavailable (private mode / disabled) — dismissal is best-effort
+  }
+}
+
 interface ReleaseEntry {
   version: string;
   date: string;
@@ -31,9 +57,15 @@ interface ReleaseEntry {
 
 
 export default function WhatsNewPage() {
+  const [, navigate] = useLocation();
   // Built inside the component so it re-renders in the active locale. Only the
   // current release is shown — older, outdated entries were removed.
   const wn = t.whatsNew;
+
+  const handleDismiss = () => {
+    dismissWhatsNew(getBundledAppVersion());
+    navigate("/home");
+  };
   const releases: ReleaseEntry[] = [
     {
       version: wn.currentVersion,
@@ -130,6 +162,12 @@ export default function WhatsNewPage() {
             </div>
           </section>
         ))}
+
+        <div className="pt-2">
+          <Button className="w-full h-12" onClick={handleDismiss}>
+            {t.whatsNew.gotIt}
+          </Button>
+        </div>
       </div>
     </AppShell>
   );

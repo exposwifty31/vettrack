@@ -51,7 +51,6 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  ClipboardList,
   Search,
   RefreshCw,
   RotateCcw,
@@ -75,7 +74,6 @@ import type {
   User,
   DeletedEquipment,
 } from "@/types";
-import { SharedAuditLogsPanel } from "./audit-log";
 import { AdminShiftRequestsSection } from "@/features/shift-adjustments/AdminShiftRequestsSection";
 import { t, formatDateByLocale } from "@/lib/i18n";
 import { haptics } from "@/lib/haptics";
@@ -84,7 +82,7 @@ export default function AdminPage() {
   const { isAdmin, userId } = useAuth();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<
-    "folders" | "users" | "pending" | "shift-requests" | "support" | "audit-logs" | "deleted"
+    "folders" | "users" | "pending" | "shift-requests" | "support" | "deleted"
   >("folders");
 
   const { data: supportUnresolved } = useQuery({
@@ -130,12 +128,12 @@ export default function AdminPage() {
         </Helmet>
         <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
           <Shield className="w-12 h-12 text-muted-foreground" />
-          <h1 className="text-2xl font-bold">גישת מנהל בלבד</h1>
+          <h1 className="text-2xl font-bold">{t.adminPage.auditLogAdminOnly}</h1>
           <p className="text-sm text-muted-foreground">
-            נדרשת הרשאת מנהל לצפות בדף זה.
+            {t.adminPage.auditLogAdminOnlyDesc}
           </p>
           <Button variant="ghost" onClick={() => navigate("/home")}>
-            לדף הבית
+            {t.adminPage.auditLogGoHome}
           </Button>
         </div>
       </>
@@ -193,7 +191,7 @@ export default function AdminPage() {
             <Clock className="w-4 h-4" />
             {t.adminPage.tabPending}
             {pendingCount > 0 && (
-              <span className="ms-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+              <span className="ms-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--status-stale-fg)] text-white text-[10px] font-bold">
                 {pendingCount > 9 ? "9+" : pendingCount}
               </span>
             )}
@@ -242,23 +240,10 @@ export default function AdminPage() {
             <CalendarClock className="w-4 h-4" />
             {t.shiftAdjustments.admin.tab}
             {shiftRequestCount > 0 && (
-              <span className="ms-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+              <span className="ms-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--status-stale-fg)] text-white text-[10px] font-bold">
                 {shiftRequestCount > 9 ? "9+" : shiftRequestCount}
               </span>
             )}
-          </button>
-          <button
-            onClick={() => setActiveTab("audit-logs")}
-            data-testid="admin-tab-audit-logs"
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-              activeTab === "audit-logs"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <ClipboardList className="w-4 h-4" />
-            {t.adminPage.tabLogs}
           </button>
           <button
             onClick={() => setActiveTab("deleted")}
@@ -280,7 +265,6 @@ export default function AdminPage() {
         {activeTab === "users" && <UsersSection />}
         {activeTab === "shift-requests" && <AdminShiftRequestsSection />}
         {activeTab === "support" && <SupportSection />}
-        {activeTab === "audit-logs" && <AuditLogsSection />}
         {activeTab === "deleted" && <DeletedItemsSection />}
       </div>
     </>
@@ -584,7 +568,7 @@ function PendingUsersSection() {
                   </Button>
                   <Button
                     size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-11 px-2.5"
+                    className="bg-[var(--status-ok-fg)] hover:opacity-90 text-white h-11 px-2.5"
                     onClick={() =>
                       updateStatusMut.mutate({ id: user.id, status: "active" })
                     }
@@ -608,8 +592,8 @@ type UserRole = "admin" | "vet" | "technician" | "senior_technician" | "student"
 
 const ROLE_BADGE_STYLES: Record<UserRole, string> = {
   admin: "bg-primary/10 text-primary border border-primary/30",
-  vet: "bg-secondary text-secondary-foreground border border-border",
-  technician: "bg-accent text-accent-foreground border border-border",
+  vet: "bg-[rgb(var(--sys-blue)/0.12)] text-[rgb(var(--sys-blue))] border border-[rgb(var(--sys-blue)/0.22)]",
+  technician: "bg-muted text-muted-foreground border border-border",
   senior_technician: "bg-status-ok/10 text-status-ok border border-status-ok/25",
   student: "bg-muted text-muted-foreground border border-border",
 };
@@ -639,20 +623,20 @@ function RoleBadge({ role }: { role: string }) {
 function StatusBadge({ status }: { status: string }) {
   if (status === "active") {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200">
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-[var(--status-ok-bg)] text-[var(--status-ok-fg)] border-[var(--status-ok-border)]">
         {t.adminPage.filterActive}
       </span>
     );
   }
   if (status === "blocked") {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-red-50 text-red-700 border-red-200">
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-[var(--status-issue-bg)] text-[var(--status-issue-fg)] border-[var(--status-issue-border)]">
         {t.adminPage.filterBlocked}
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-amber-50 text-amber-700 border-amber-200">
+    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-[var(--status-stale-bg)] text-[var(--status-stale-fg)] border-[var(--status-stale-border)]">
       {t.adminPage.filterPending}
     </span>
   );
@@ -719,9 +703,9 @@ function UsersSection() {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       setPendingSecondaryRole(undefined);
       setPendingSecondaryRoleUserId(null);
-      toast.success("תפקיד משני עודכן");
+      toast.success(t.adminPage.secondaryRoleUpdated);
     },
-    onError: () => toast.error("עדכון תפקיד משני נכשל"),
+    onError: () => toast.error(t.adminPage.secondaryRoleUpdateFailed),
   });
 
   const updateStatusMut = useMutation({
@@ -766,9 +750,9 @@ function UsersSection() {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users/deleted"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users/pending"] });
-      toast.success("משתמש שוחזר");
+      toast.success(t.adminPage.userRestored);
     },
-    onError: () => toast.error("שחזור משתמש נכשל"),
+    onError: () => toast.error(t.adminPage.userRestoreFailed),
   });
 
   const filterButtons: { label: string; value: UserStatusFilter }[] = [
@@ -887,7 +871,7 @@ function UsersSection() {
                       </Button>
                       <Button
                         size="sm"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white h-11 px-2 text-xs"
+                        className="bg-[var(--status-ok-fg)] hover:opacity-90 text-white h-11 px-2 text-xs"
                         onClick={() =>
                           updateStatusMut.mutate({
                             id: user.id,
@@ -1033,7 +1017,7 @@ function UsersSection() {
                   data-testid="btn-load-more-users"
                 >
                   {isFetchingMoreUsers ? (
-                    <><Loader2 className="w-4 h-4 me-1 animate-spin" />טוען...</>
+                    <><Loader2 className="w-4 h-4 me-1 animate-spin" />{t.common.loading}</>
                   ) : (
                     t.adminPage.loadMore
                   )}
@@ -1306,13 +1290,13 @@ function DeletedItemsSection() {
 
 const SEVERITY_STYLES: Record<string, string> = {
   low: "bg-primary/5 text-primary border border-primary/25",
-  medium: "bg-muted/80 text-foreground border border-amber-500/30",
+  medium: "bg-muted/80 text-foreground border border-[var(--status-stale-border)]",
   high: "bg-destructive/10 text-destructive border border-destructive/20",
 };
 
 const STATUS_STYLES: Record<string, string> = {
   open: "bg-destructive/10 text-destructive border border-destructive/20",
-  in_progress: "bg-muted/80 text-foreground border border-amber-500/30",
+  in_progress: "bg-muted/80 text-foreground border border-[var(--status-stale-border)]",
   resolved: "bg-status-ok/10 text-status-ok border border-status-ok/25",
 };
 
@@ -1670,9 +1654,3 @@ function SupportSection() {
     </Card>
   );
 }
-
-function AuditLogsSection() {
-  return <SharedAuditLogsPanel compact />;
-}
-
-
