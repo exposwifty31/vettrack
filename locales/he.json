@@ -1567,7 +1567,8 @@
     "title": "מדריך מהיר",
     "titleFull": "מדריך מהיר — VetTrack",
     "okTitle": "תקין — מבצעי",
-    "subtitle": "כל מה שצריך לדעת כדי להשתמש ב-VetTrack"
+    "subtitle": "כל מה שצריך לדעת כדי להשתמש ב-VetTrack",
+    "legal": "מידע משפטי"
   },
   "pilotHomePage": {
     "worthCheckingSection": "שווה לבדוק",
@@ -3723,7 +3724,31 @@
         "description": "כפתור חזרה בכל מסך, כותרת קבועה בגלילה ויציאה ברורה מלוח הבקרה של הציוד.",
         "badge": "שופר"
       }
-    }
+    },
+    "gotIt": "הבנתי"
+  },
+  "authPage": {
+    "signInMetaTitle": "כניסה — VetTrack",
+    "signInMetaDescription": "התחבר ל-VetTrack לניהול ציוד וטרינרי, סריקת QR ומעקב בזמן אמת.",
+    "welcomeBack": "ברוך שובך",
+    "signInSubtitle": "התחבר לניהול ציוד הוטרינרי שלך",
+    "signInLoadError": "דף ההתחברות לא נטען. בדוק את החיבור ורענן. אם הבעיה נמשכת, ודא ש-Clerk מוגדר לדומיין זה ושמפתח ה-Publishable Key תואם לסביבה.",
+    "backToRegularSignIn": "חזרה להתחברות רגילה",
+    "phonePrompt": "מתחבר עם מספר ישראלי (+972)?",
+    "usePhoneSignIn": "השתמש בהתחברות ממספר טלפון ישראלי",
+    "phoneFormatHint": "להזנת המספר בפורמט מקומי (לדוגמה: 0501234567).",
+    "signUpMetaTitle": "הרשמה — VetTrack",
+    "signUpMetaDescription": "צור חשבון VetTrack לניהול ציוד וטרינרי, סריקת QR ומעקב בזמן אמת.",
+    "createAccount": "יצירת חשבון",
+    "signUpSubtitle": "הירשם לניהול ציוד הוטרינרי שלך",
+    "signUpLoadError": "דף ההרשמה לא נטען. בדוק את החיבור ורענן. אם הבעיה נמשכת, ודא ש-Clerk מוגדר לדומיין זה ושמפתח ה-Publishable Key תואם לסביבה.",
+    "roleLabel": "תפקיד",
+    "roleVetTech": "טכנאי/ת וטרינרי/ת",
+    "roleVeterinarian": "וטרינר/ית",
+    "roleStudent": "סטודנט/ית",
+    "devModeNotice": "מצב פיתוח — אין צורך באימות.",
+    "enterDashboard": "כניסה ללוח הבקרה",
+    "moreAboutVetTrack": "עוד על VetTrack"
   },
   "shiftLeaderboard": {
     "title": "לוח מובילים — סריקות משמרת",

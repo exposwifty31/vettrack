@@ -1567,7 +1567,8 @@
     "title": "Quick Guide",
     "titleFull": "Quick Guide — VetTrack",
     "okTitle": "OK — operational",
-    "subtitle": "Everything you need to know to use VetTrack"
+    "subtitle": "Everything you need to know to use VetTrack",
+    "legal": "Legal"
   },
   "pilotHomePage": {
     "worthCheckingSection": "Worth checking",
@@ -3723,7 +3724,31 @@
         "description": "Back button on every screen, fixed header while scrolling, and a clear exit from the Equipment Command Board.",
         "badge": "Improved"
       }
-    }
+    },
+    "gotIt": "Got it"
+  },
+  "authPage": {
+    "signInMetaTitle": "Sign in — VetTrack",
+    "signInMetaDescription": "Sign in to VetTrack to manage veterinary equipment, scan QR codes, and track in real time.",
+    "welcomeBack": "Welcome back",
+    "signInSubtitle": "Sign in to manage your veterinary equipment",
+    "signInLoadError": "The sign-in page failed to load. Check your connection and refresh. If the problem persists, make sure Clerk is configured for this domain and the Publishable Key matches the environment.",
+    "backToRegularSignIn": "Back to standard sign-in",
+    "phonePrompt": "Signing in with an Israeli number (+972)?",
+    "usePhoneSignIn": "Use Israeli phone sign-in",
+    "phoneFormatHint": "to enter the number in local format (for example: 0501234567).",
+    "signUpMetaTitle": "Sign up — VetTrack",
+    "signUpMetaDescription": "Create a VetTrack account to manage veterinary equipment, scan QR codes, and track in real time.",
+    "createAccount": "Create account",
+    "signUpSubtitle": "Sign up to manage your veterinary equipment",
+    "signUpLoadError": "The sign-up page failed to load. Check your connection and refresh. If the problem persists, make sure Clerk is configured for this domain and the Publishable Key matches the environment.",
+    "roleLabel": "Role",
+    "roleVetTech": "Vet Tech",
+    "roleVeterinarian": "Veterinarian",
+    "roleStudent": "Student",
+    "devModeNotice": "Development mode — no authentication required.",
+    "enterDashboard": "Enter dashboard",
+    "moreAboutVetTrack": "More about VetTrack"
   },
   "shiftLeaderboard": {
     "title": "Shift scan leaderboard",

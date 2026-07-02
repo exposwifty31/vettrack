@@ -1571,6 +1571,7 @@ export interface TStructure {
     titleFull: string;
     okTitle: string;
     subtitle: string;
+    legal: string;
   };
   pilotHomePage: {
     worthCheckingSection: string;
@@ -3727,6 +3728,30 @@ export interface TStructure {
         badge: string;
       };
     };
+    gotIt: string;
+  };
+  authPage: {
+    signInMetaTitle: string;
+    signInMetaDescription: string;
+    welcomeBack: string;
+    signInSubtitle: string;
+    signInLoadError: string;
+    backToRegularSignIn: string;
+    phonePrompt: string;
+    usePhoneSignIn: string;
+    phoneFormatHint: string;
+    signUpMetaTitle: string;
+    signUpMetaDescription: string;
+    createAccount: string;
+    signUpSubtitle: string;
+    signUpLoadError: string;
+    roleLabel: string;
+    roleVetTech: string;
+    roleVeterinarian: string;
+    roleStudent: string;
+    devModeNotice: string;
+    enterDashboard: string;
+    moreAboutVetTrack: string;
   };
   shiftLeaderboard: {
     title: string;

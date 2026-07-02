@@ -1232,6 +1232,8 @@ const translations = {
 
   whatsNew: d.whatsNew,
 
+  authPage: d.authPage,
+
   more: d.more,
 
   profile: d.profile,

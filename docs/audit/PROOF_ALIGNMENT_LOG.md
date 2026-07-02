@@ -571,3 +571,16 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Gates (orchestrator-run): `npx tsc --noEmit` → 0 errors; `i18n:check` → deep parity OK; `pnpm test` stage-8 lock + i18n guards → **18 passed** (lock = 3 describes/18 asserts incl. audit-tab-absent + shift-requests-tab-present + dashed-empty + md-grid).
 
 **Verdict:** VERIFIED at gate level. **Orchestrator decision flagged — BUG-012:** the Admin "shift-requests" tab was **NOT** removed. `AdminShiftRequestsSection` (shift-adjustment approval queue, shipped in the shifts Phase-1 increments) is referenced only from admin.tsx; `/admin/shifts` is CSV *import*, not approvals — removing the tab would orphan a live feature. Kept per the reachability rule; moving approvals to a dedicated route is a separate task. **Deferred:** admin-shifts dashed dropzone + AssetTypes 2-col responsive layout need a browser/breakpoint pass; AssetTypes right-column auto-select intentionally not added (would be a data-fetch behavior change).
+
+## 2026-07-02 — Stage 10 (Access & Onboarding): palette→token + auth i18n + dismissible whats-new (delegated)
+
+**Claim:** help.tsx moved off 26 palette hits onto tokens; signin/signup Hebrew extracted to a new `authPage` namespace (both off the allowlist) with Clerk components left frozen; whats-new made version-keyed dismissible. Net-new/backend items flagged, not faked. Delegated sub-agent; gates re-verified by orchestrator.
+
+**Evidence (orchestrator-run):**
+- `git diff --stat`: help.tsx (75), signin.tsx (44), signup.tsx (34), whats-new.tsx (+38), i18n.ts (+2), locales en+he (+29 each), i18n.generated.d.ts (regen), allowlist (−2). New `tests/stage-10-access-token-consistency.test.js`.
+- Palette grep on all 4 pages → **0**; Hebrew grep → **0**. `signin.tsx`+`signup.tsx` removed from `KNOWN_DEBT_ALLOWLIST` (ratchet holds).
+- Clerk FROZEN respected: `<SignIn>`/`<SignUp>` components + auth props untouched; only app-rendered chrome (headings, role chips, helper copy) re-themed/extracted. New root `authPage` (24 keys) wired via one mapping line `authPage: d.authPage,` (`i18n.ts:1235`) — typecheck confirms `t.authPage.*` resolves.
+- whats-new S10-D3: `dismissWhatsNew(version)`/`isWhatsNewDismissed(version)` persist against `getBundledAppVersion()` in localStorage; "Got it" dismisses + routes to /home. (`isWhatsNewDismissed` is an exported seam, no auto-surface caller yet — intended reader for the re-show trigger.)
+- Gates (orchestrator-run): `npx tsc --noEmit` → 0 errors; `i18n:check` → deep parity OK; `pnpm test` stage-10 lock + i18n guards → **12 passed**.
+
+**Verdict:** VERIFIED at gate level. **Flagged (not built — auth-safety / backend):** (1) `forgot-password.tsx` standalone page — Clerk's mounted `<SignIn>` already exposes forgot-password inside the component, so the flow isn't broken; a standalone page needs Clerk reset wiring with dev-bypass-safe fallback. (2) Licenses page — no LICENSE/NOTICE manifest exists in-repo to render. (3) S10-D2 sign-up→pending-approval queue — backend (couples to Stage 8 approvals). Role-chip chrome added; Clerk submit behavior unchanged. Live theme/breakpoint render pending manual Chrome pass.

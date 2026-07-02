@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { LegalFooterLinks } from "@/components/legal-footer-links";
+import { getBundledAppVersion } from "@/lib/app-version";
 
 interface CheatItemProps {
   icon: React.ElementType;
@@ -78,29 +80,29 @@ export default function HelpPage() {
         <Section title={t.helpPage.dailyTasks}>
           <CheatItem
             icon={QrCode}
-            iconBg="bg-primary/10 dark:bg-primary/20"
+            iconBg="bg-primary/10"
             iconColor="text-primary"
             title={t.helpPage.scanQrTitle}
             description={t.helpPage.scanQrDescription}
           />
           <CheatItem
             icon={LogIn}
-            iconBg="bg-indigo-50 dark:bg-indigo-950/50"
-            iconColor="text-indigo-600 dark:text-indigo-400"
+            iconBg="bg-primary/10"
+            iconColor="text-primary"
             title={t.helpPage.checkoutTitle}
             description={t.helpPage.checkoutDescription}
           />
           <CheatItem
             icon={LogOut}
-            iconBg="bg-emerald-50 dark:bg-emerald-950/50"
-            iconColor="text-emerald-600 dark:text-emerald-400"
+            iconBg="bg-[var(--status-ok-bg)]"
+            iconColor="text-[var(--status-ok-fg)]"
             title={t.helpPage.returnTitle}
             description={t.helpPage.returnDescription}
           />
           <CheatItem
             icon={AlertTriangle}
-            iconBg="bg-red-50 dark:bg-red-950/50"
-            iconColor="text-red-600 dark:text-red-400"
+            iconBg="bg-[var(--status-issue-bg)]"
+            iconColor="text-[var(--status-issue-fg)]"
             title={t.helpPage.reportIssueTitle}
             description={t.helpPage.reportIssueDescription}
           />
@@ -110,29 +112,29 @@ export default function HelpPage() {
         <Section title={t.helpPage.equipmentStatus}>
           <CheatItem
             icon={CheckCircle2}
-            iconBg="bg-emerald-50 dark:bg-emerald-950/50"
-            iconColor="text-emerald-600 dark:text-emerald-400"
+            iconBg="bg-[var(--status-ok-bg)]"
+            iconColor="text-[var(--status-ok-fg)]"
             title={t.helpPage.okTitle}
             description={t.helpPage.okDescription}
           />
           <CheatItem
             icon={Droplets}
-            iconBg="bg-teal-50 dark:bg-teal-950/50"
-            iconColor="text-teal-600 dark:text-teal-400"
+            iconBg="bg-[var(--status-sterilized-bg)]"
+            iconColor="text-[var(--status-sterilized-fg)]"
             title={t.helpPage.sterilizedTitle}
             description={t.helpPage.sterilizedDescription}
           />
           <CheatItem
             icon={Wrench}
-            iconBg="bg-amber-50 dark:bg-amber-950/50"
-            iconColor="text-amber-600 dark:text-amber-400"
+            iconBg="bg-[var(--status-stale-bg)]"
+            iconColor="text-[var(--status-stale-fg)]"
             title={t.helpPage.maintenanceTitle}
             description={t.helpPage.maintenanceDescription}
           />
           <CheatItem
             icon={AlertTriangle}
-            iconBg="bg-red-50 dark:bg-red-950/50"
-            iconColor="text-red-600 dark:text-red-400"
+            iconBg="bg-[var(--status-issue-bg)]"
+            iconColor="text-[var(--status-issue-fg)]"
             title={t.helpPage.issueTitle}
             description={t.helpPage.issueDescription}
           />
@@ -149,29 +151,29 @@ export default function HelpPage() {
         <Section title={t.helpPage.assetRadar}>
           <CheatItem
             icon={Radar}
-            iconBg="bg-primary/10 dark:bg-primary/20"
+            iconBg="bg-primary/10"
             iconColor="text-primary"
             title={t.helpPage.healthRingTitle}
             description={t.helpPage.healthRingDescription}
           />
           <CheatItem
             icon={CheckCircle2}
-            iconBg="bg-emerald-50 dark:bg-emerald-950/50"
-            iconColor="text-emerald-600 dark:text-emerald-400"
+            iconBg="bg-[var(--status-ok-bg)]"
+            iconColor="text-[var(--status-ok-fg)]"
             title={t.helpPage.syncedTitle}
             description={t.helpPage.syncedDescription}
           />
           <CheatItem
             icon={Clock}
-            iconBg="bg-amber-50 dark:bg-amber-950/50"
-            iconColor="text-amber-600 dark:text-amber-400"
+            iconBg="bg-[var(--status-stale-bg)]"
+            iconColor="text-[var(--status-stale-fg)]"
             title={t.helpPage.staleTitle}
             description={t.helpPage.staleDescription}
           />
           <CheatItem
             icon={AlertTriangle}
-            iconBg="bg-red-50 dark:bg-red-950/50"
-            iconColor="text-red-600 dark:text-red-400"
+            iconBg="bg-[var(--status-issue-bg)]"
+            iconColor="text-[var(--status-issue-fg)]"
             title={t.helpPage.auditRequiredTitle}
             description={t.helpPage.auditRequiredDescription}
           />
@@ -195,22 +197,22 @@ export default function HelpPage() {
           />
           <CheatItem
             icon={CheckCircle2}
-            iconBg="bg-emerald-50 dark:bg-emerald-950/50"
-            iconColor="text-emerald-600 dark:text-emerald-400"
+            iconBg="bg-[var(--status-ok-bg)]"
+            iconColor="text-[var(--status-ok-fg)]"
             title={t.helpPage.syncedTitle}
             description={t.helpPage.syncedDescription}
           />
           <CheatItem
             icon={XCircle}
-            iconBg="bg-red-50 dark:bg-red-950/50"
-            iconColor="text-red-600 dark:text-red-400"
+            iconBg="bg-[var(--status-issue-bg)]"
+            iconColor="text-[var(--status-issue-fg)]"
             title={t.helpPage.failedTitle}
             description={t.helpPage.failedDescription}
           />
           <CheatItem
             icon={WifiOff}
-            iconBg="bg-amber-50 dark:bg-amber-950/50"
-            iconColor="text-amber-600 dark:text-amber-400"
+            iconBg="bg-[var(--status-stale-bg)]"
+            iconColor="text-[var(--status-stale-fg)]"
             title={t.helpPage.offlineTitle}
             description={t.helpPage.offlineDescription}
           />
@@ -220,19 +222,30 @@ export default function HelpPage() {
         <Section title={t.helpPage.alerts}>
           <CheatItem
             icon={BellRing}
-            iconBg="bg-red-50 dark:bg-red-950/50"
-            iconColor="text-red-600 dark:text-red-400"
+            iconBg="bg-[var(--status-issue-bg)]"
+            iconColor="text-[var(--status-issue-fg)]"
             title={t.helpPage.activeAlertsTitle}
             description={t.helpPage.activeAlertsDescription}
           />
           <CheatItem
             icon={Wifi}
-            iconBg="bg-primary/10 dark:bg-primary/20"
+            iconBg="bg-primary/10"
             iconColor="text-primary"
             title={t.helpPage.pushAlertsTitle}
             description={t.helpPage.pushAlertsDescription}
           />
         </Section>
+
+        {/* Legal */}
+        <Section title={t.helpPage.legal}>
+          <div className="py-3">
+            <LegalFooterLinks className="justify-start gap-x-5" />
+          </div>
+        </Section>
+
+        <p className="text-center text-xs text-muted-foreground font-mono">
+          VetTrack v{getBundledAppVersion()}
+        </p>
 
         <div className="text-center pt-2 pb-4">
           <Link href="/home">
