@@ -117,6 +117,13 @@ _Agents: add out-of-scope items here rather than acting on them._
 - TASK: Audit `vt_event_outbox` retention — verify janitor is not letting the table grow unbounded
 - TASK: Review Playwright Phase 9 drills — confirm all 8 drills pass against local dev server
 - TASK: Add `.cursor/rules/` vettrack-specific overrides for i18n and multi-tenancy invariants
+- TASK: Codebase relevance cleanup — delete root artifacts (`Archive.zip`, `Archive 2.zip`, `all-files.md`, `screenshot.png`, `app-tour.js`) after human approval
+- TASK: Remove dead `src/features/today/*` module (6 files; `/app-tour` redirects to `/home`; knip unused)
+- TASK: Audit `docs/design-handoff/` (240 tracked files, ~15MB) — archive externally or trim to active design refs
+- TASK: Deduplicate untracked `.agents/skills/ecc/` mirror of `.claude/skills/ecc/` (~1.7MB each); pick one canonical agent-skills path
+- TASK: Remove or wire `shared/permissions.ts` (knip unused; server uses `er-mode-permissions.ts` instead)
+- TASK: Remove or wire `server/integrations/rollout/*` + `conflicts/*` (knip unused; `vendor-x-rollout.ts` is the active path)
+- TASK: Remove stub `inventory-deduction` worker/queue chain per Removal Protocol (`docs/governance/PRODUCT_DRIVEN_IMPROVEMENT_PLAN.md`)
 
 ---
 
