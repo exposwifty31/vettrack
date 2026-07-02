@@ -28,6 +28,18 @@ describe("Stage 6 facility — rooms-list.tsx", () => {
   });
 });
 
+describe("Stage 6 — desktop equipment-detail.tsx", () => {
+  const src = read("src", "pages", "equipment-detail.tsx");
+  it("has no hardcoded palette", () => {
+    expect(BANNED.test(src)).toBe(false);
+  });
+  it("uses status/sys tokens for banners, buttons and status text", () => {
+    expect(src.includes("var(--status-issue-")).toBe(true);
+    expect(src.includes("var(--status-stale-")).toBe(true);
+    expect(src.includes("rgb(var(--sys-blue))")).toBe(true);
+  });
+});
+
 describe("Stage 6 facility — room-radar.tsx", () => {
   const src = read("src", "pages", "room-radar.tsx");
   it("has no hardcoded palette", () => {

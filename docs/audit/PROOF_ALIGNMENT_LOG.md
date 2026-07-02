@@ -451,3 +451,14 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Gates: typecheck **0×2**, `pnpm build` exit 0, guards (i18n-no-hebrew-in-source, no-hardcoded-ui-strings) pass.
 
 **Verdict:** VERIFIED at gate level (static token sweep + lock + typecheck + build). Live dark/RTL render of the radar rings + chips pending the stage-end browser pass.
+
+## 2026-07-02 — Stage 6 (increment 7): desktop equipment-detail palette→token
+
+**Claim:** `src/pages/equipment-detail.tsx` (EquipmentDetailPageDesktop) — all 29 hardcoded palette sites (report-issue amber theming, red validation/flag/error, emerald success icons, blue dock-return button, destructive confirm) moved onto `--status-*` / `--sys-*` / `bg-destructive` tokens. `new-equipment.tsx` was already palette-free — the plan's "rebuild" was, on measurement, a token sweep + an already-clean form.
+
+**Evidence:**
+- Applied via a literal-replace script (every one of the 21 patterns matched — no WARN); file now `grep`-clean of the banned palette → **0**. Mapping: emerald→`--status-ok`, red→`--status-issue`, amber→`--status-stale` (maintenance icon→`--status-maint`), blue→`rgb(var(--sys-blue))`, destructive confirm→`bg-destructive`.
+- Lock test `tests/stage-6-facility-token-consistency.test.js` extended with a desktop describe → **6/6** (no-palette + status/sys token presence).
+- Gates: typecheck **0×2**, build exit 0, guards (i18n-no-hebrew-in-source, no-hardcoded-ui-strings) pass.
+
+**Verdict:** VERIFIED at gate level. Behavior untouched (className-only sweep). Live dark/RTL render pending stage-end browser pass.
