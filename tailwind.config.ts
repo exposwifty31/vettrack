@@ -152,6 +152,11 @@ export default {
           from: { transform: "translateX(-100%)" },
           to: { transform: "translateX(0)" },
         },
+        /** Skeleton shimmer — sweeps a highlight band across a 200%-wide gradient. */
+        shimmer: {
+          from: { backgroundPosition: "200% 0" },
+          to: { backgroundPosition: "-200% 0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -160,6 +165,7 @@ export default {
         "page-enter": "page-enter 0.22s ease-out both",
         "pro-rise": "pro-rise 620ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
         "slide-in": "slide-in 0.3s ease-out",
+        shimmer: "shimmer 1.6s ease-in-out infinite",
       },
     },
   },

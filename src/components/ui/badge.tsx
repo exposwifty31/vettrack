@@ -15,6 +15,9 @@ const badgeVariants = cva(
         issue: "border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] text-[var(--status-issue-fg)]",
         maintenance: "border-[var(--status-maint-border)] bg-[var(--status-maint-bg)] text-[var(--status-maint-fg)]",
         sterilized: "border-primary/30 bg-primary/10 text-primary",
+        // Notification count overlay — circular red pill that grows for two digits.
+        count:
+          "border-transparent bg-[rgb(var(--sys-red))] text-white justify-center min-w-[18px] h-[18px] px-1 py-0 text-[11px] leading-none tabular-nums",
       },
     },
     defaultVariants: { variant: "default" },

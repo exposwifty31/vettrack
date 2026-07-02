@@ -212,3 +212,16 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Not visually verified this increment: compact/medium widths, Hebrew RTL, dark theme, and the `attention`/`critical` Card rails + Button `loading`/`action` variants in situ (no screen consumes them yet — they land when their first consuming screen is built). Recommended follow-up on device/simulator as those screens are implemented.
 
 **Verdict:** VERIFIED (RED→GREEN lock tests + typecheck + full suite 3535/0 + i18n parity + build + live computed-style + screenshot). New variants/states are structurally locked but await in-situ visual confirmation on their first consuming screen.
+
+## 2026-07-02 — Stage 2 (increment 2): Skeleton shimmer + Badge count overlay (test-driven)
+
+**Claim:** Added the remaining self-contained Stage 2 primitives that need no consuming screen. `Skeleton` now uses a reduced-motion-gated shimmer sweep (§6.14) instead of a bare pulse; `Badge` gained a `count` overlay variant (§6.12) — a self-sizing circular red pill driven by `--sys-red`. Registered a `shimmer` keyframe + animation in Tailwind. (Note: `StatusBadge` already implements the full 6-state StatusChip §6.6 with tokenized dot+label+i18n, so no change was needed there.)
+
+**Evidence:**
+- RED first: `tests/stage-2-skeleton-token-consistency.test.js` (3) + `tests/stage-2-badge-token-consistency.test.js` (2) → **5 failed / 5** before edits.
+- GREEN: `tailwind.config.ts` — added `shimmer` keyframe (`backgroundPosition 200% 0 → -200% 0`) + `shimmer: "shimmer 1.6s ease-in-out infinite"`. `src/components/ui/skeleton.tsx` — `animate-pulse` → `animate-shimmer motion-reduce:animate-none` over `bg-muted/70` with a 200%-wide highlight gradient. `src/components/ui/badge.tsx` — added `count` variant (`bg-[rgb(var(--sys-red))] text-white justify-center min-w-[18px] h-[18px] px-1 tabular-nums`).
+- Test (post-edit): both lock tests green (3 + 2); `npx tsc --noEmit` (frontend) → **0 errors**; full `pnpm test` → **359 files / 3540 passed / 0 failed** (baseline 3535 + 5 new, zero regressions — the global `animate-pulse`→shimmer swap broke nothing); `pnpm build` → built OK (the arbitrary-value gradient `rgb(130_130_130/0.18)` parses under PostCSS/Tailwind).
+- Live browser (dev server :5000, Chrome MCP): injected a Skeleton-classed element → `getComputedStyle` reported `animationName: shimmer`, `animationDuration: 1.6s`, `backgroundImage: linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(130,130,130,0.18) 50%, …)`, `backgroundSize: 200% 100%` — the shimmer sweep resolves correctly at runtime.
+- Not visually verified in situ: the Badge `count` overlay positioned over an icon, and the shimmer under an actual loading state on a real screen (both land with their consuming screens). Reduced-motion fallback verified structurally (`motion-reduce:animate-none`), not yet with an OS reduce-motion pass.
+
+**Verdict:** VERIFIED (RED→GREEN lock tests + typecheck + full suite 3540/0 + build + live computed-style of the shimmer). In-situ visual pass of count-overlay + loading shimmer deferred to their first consuming screen; StatusChip §6.6 already satisfied by existing StatusBadge.
