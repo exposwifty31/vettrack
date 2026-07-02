@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { Settings, Bell, ChevronRight, Moon, Globe, User } from "lucide-react";
+import { Settings, Bell, ChevronRight, Moon, Globe, User, AlertCircle, AlertTriangle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
@@ -27,6 +27,24 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
   const { userId, name } = useAuth();
   const { settings, update } = useSettings();
   const [openPanel, setOpenPanel] = useState<Panel>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+  // Panels are dropdowns of plain buttons (not an ARIA menu with roving focus),
+  // but they must still honor Escape-to-close and move/return focus for keyboard
+  // and screen-reader users.
+  useEffect(() => {
+    if (!openPanel) return;
+    panelRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpenPanel(null);
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [openPanel]);
 
   const isFullscreen = FULLSCREEN_ROUTES.some((r) => location.startsWith(r));
 
@@ -110,9 +128,12 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
           <button
             type="button"
             aria-label={t.nav.settings}
-            aria-haspopup="menu"
+            aria-haspopup="true"
             aria-expanded={openPanel === "settings"}
-            onClick={() => setOpenPanel((p) => (p === "settings" ? null : "settings"))}
+            onClick={(e) => {
+              triggerRef.current = e.currentTarget;
+              setOpenPanel((p) => (p === "settings" ? null : "settings"));
+            }}
             style={iconBtn}
           >
             <Settings size={20} color="hsl(var(--foreground))" strokeWidth={1.8} />
@@ -124,14 +145,17 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
             onClick={() => go("/my-profile")}
             style={iconBtn}
           >
-            {/* Visible avatar sized to match the 20px gear/bell glyphs, not the 36px hit area. */}
+            {/* Visible avatar sized to match the gear/bell glyphs, not the hit area.
+                Muted fill + hairline ring (not a saturated --primary fill) so the
+                least-frequent action doesn't out-weigh the live-badge alerts control. */}
             <span
               style={{
                 width: 28,
                 height: 28,
                 borderRadius: "50%",
-                background: "hsl(var(--primary))",
-                color: "hsl(var(--primary-foreground))",
+                background: "hsl(var(--muted))",
+                color: "hsl(var(--foreground))",
+                border: "1px solid hsl(var(--border))",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -146,16 +170,19 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
 
           <button
             type="button"
-            aria-label={t.nav.alerts}
-            aria-haspopup="menu"
+            aria-label={alertCount > 0 ? `${alertCount} ${t.nav.alerts}` : t.nav.alerts}
+            aria-haspopup="true"
             aria-expanded={openPanel === "alerts"}
-            onClick={() => setOpenPanel((p) => (p === "alerts" ? null : "alerts"))}
+            onClick={(e) => {
+              triggerRef.current = e.currentTarget;
+              setOpenPanel((p) => (p === "alerts" ? null : "alerts"));
+            }}
             style={{ ...iconBtn, position: "relative" }}
           >
             <Bell size={20} color="hsl(var(--foreground))" strokeWidth={1.8} />
             {alertCount > 0 && (
               <span
-                aria-label={`${alertCount} ${t.nav.alerts}`}
+                aria-hidden
                 style={{
                   position: "absolute",
                   top: 2,
@@ -163,7 +190,7 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
                   minWidth: 16,
                   height: 16,
                   borderRadius: 8,
-                  background: "var(--destructive)",
+                  background: "hsl(var(--destructive))",
                   color: "#fff",
                   fontSize: 10,
                   fontWeight: 700,
@@ -187,7 +214,7 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
         <>
           <div aria-hidden onClick={() => setOpenPanel(null)} style={backdropStyle} />
           {openPanel === "alerts" ? (
-            <div role="menu" aria-label={t.nav.alertsTitle} style={panelStyle}>
+            <div ref={panelRef} tabIndex={-1} aria-label={t.nav.alertsTitle} style={panelStyle}>
               <p style={panelHeaderStyle}>{t.nav.alertsTitle}</p>
               {recentAlerts.length === 0 ? (
                 <p style={emptyStyle}>{t.nav.noActiveAlerts}</p>
@@ -196,20 +223,26 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
                   <button
                     key={`${a.equipmentId}:${a.type}`}
                     type="button"
-                    role="menuitem"
                     onClick={() => go(`/equipment/${a.equipmentId}`)}
                     style={rowStyle}
                   >
-                    <span
-                      aria-hidden
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        flexShrink: 0,
-                        background: a.type === "issue" ? "rgb(var(--sys-red))" : "rgb(var(--sys-orange))",
-                      }}
-                    />
+                    {/* Distinct shape per severity, not color alone (WCAG 1.4.1):
+                        issue = round AlertCircle (red), warning = AlertTriangle (orange). */}
+                    {a.type === "issue" ? (
+                      <AlertCircle
+                        size={16}
+                        strokeWidth={2}
+                        aria-hidden
+                        style={{ flexShrink: 0, color: "rgb(var(--sys-red))" }}
+                      />
+                    ) : (
+                      <AlertTriangle
+                        size={16}
+                        strokeWidth={2}
+                        aria-hidden
+                        style={{ flexShrink: 0, color: "rgb(var(--sys-orange))" }}
+                      />
+                    )}
                     <span style={{ flex: 1, minWidth: 0, textAlign: "start" }}>
                       <span style={rowTitleStyle}>{a.equipmentName}</span>
                       {a.detail && <span style={rowSubStyle}>{a.detail}</span>}
@@ -218,18 +251,17 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
                 ))
               )}
               <div style={dividerStyle} />
-              <button type="button" role="menuitem" onClick={() => go("/alerts")} style={footerStyle}>
+              <button type="button" onClick={() => go("/alerts")} style={footerStyle}>
                 <span>{t.nav.seeAllAlerts}</span>
                 <ChevronRight size={16} style={{ opacity: 0.6 }} />
               </button>
             </div>
           ) : (
-            <div role="menu" aria-label={t.nav.quickSettings} style={panelStyle}>
+            <div ref={panelRef} tabIndex={-1} aria-label={t.nav.quickSettings} style={panelStyle}>
               <p style={panelHeaderStyle}>{t.nav.quickSettings}</p>
               <button
                 type="button"
-                role="menuitemcheckbox"
-                aria-checked={settings.darkMode}
+                aria-pressed={settings.darkMode}
                 onClick={() => update({ darkMode: !settings.darkMode })}
                 style={rowStyle}
               >
@@ -239,7 +271,6 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
               </button>
               <button
                 type="button"
-                role="menuitem"
                 onClick={() => update({ locale: settings.locale === "he" ? "en" : "he" })}
                 style={rowStyle}
               >
@@ -248,12 +279,12 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
                 <span style={valueStyle}>{settings.locale === "he" ? t.nav.langHebrewName : t.nav.langEnglishName}</span>
               </button>
               <div style={dividerStyle} />
-              <button type="button" role="menuitem" onClick={() => go("/my-profile")} style={rowStyle}>
+              <button type="button" onClick={() => go("/my-profile")} style={rowStyle}>
                 <User size={18} color="hsl(var(--foreground))" strokeWidth={1.8} />
                 <span style={{ flex: 1, textAlign: "start", fontSize: "var(--text-sm)" }}>{t.nav.profile}</span>
                 <ChevronRight size={16} style={{ opacity: 0.6 }} />
               </button>
-              <button type="button" role="menuitem" onClick={() => go("/settings")} style={footerStyle}>
+              <button type="button" onClick={() => go("/settings")} style={footerStyle}>
                 <span>{t.nav.allSettings}</span>
                 <ChevronRight size={16} style={{ opacity: 0.6 }} />
               </button>
@@ -297,8 +328,9 @@ function MiniSwitch({ on }: { on: boolean }) {
 }
 
 const iconBtn: React.CSSProperties = {
-  width: 36,
-  height: 36,
+  // 44px hit area (iOS HIG floor) inside the 44px nav bar; glyphs stay 20px.
+  width: 44,
+  height: 44,
   border: "none",
   background: "transparent",
   borderRadius: 10,
@@ -329,6 +361,7 @@ const panelStyle: React.CSSProperties = {
   boxShadow: "0 18px 48px rgba(0,0,0,0.22)",
   padding: 6,
   overflow: "hidden",
+  outline: "none",
 };
 
 const panelHeaderStyle: React.CSSProperties = {
@@ -346,7 +379,7 @@ const rowStyle: React.CSSProperties = {
   alignItems: "center",
   gap: 10,
   width: "100%",
-  minHeight: 44,
+  minHeight: 48,
   padding: "8px 10px",
   border: "none",
   background: "transparent",
@@ -394,7 +427,7 @@ const footerStyle: React.CSSProperties = {
   justifyContent: "space-between",
   gap: 8,
   width: "100%",
-  minHeight: 44,
+  minHeight: 48,
   padding: "8px 10px",
   border: "none",
   background: "transparent",

@@ -375,3 +375,24 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - i18n: added `scan.offShiftTitle/offShiftBody` (wired in `i18n.ts`, explicit namespace) + `nav.*` dropdown keys (passthrough) incl. `langHebrewName`/`langEnglishName` (fixes a hardcoded-Hebrew-in-source test failure); `.d.ts` regenerated; en/he parity maintained.
 
 **Verdict:** VERIFIED at the gate level (typecheck 0×2 + i18n parity + guard tests 20/20 + build exit 0) and via the prior on-device iPad/iPhone simulator QA pass that drove this bug list. **Known deferred:** server-side shift enforcement for `/scan` + checkout (UI-only today). Committing as "design batch 1" for CodeRabbit review.
+
+## 2026-07-02 — Design batch 1: fundamentals audit remediation
+
+**Claim:** Ran the product-design-fundamentals rubric over the whole batch-1 diff (25 files) and fixed every actionable finding.
+
+**Evidence (per finding):**
+- **C1 CRITICAL** (fixed): `NativeHeader` alert-count badge used `var(--destructive)` raw (an HSL triplet) → invalid declaration → invisible count on the near-white header. Now `hsl(var(--destructive))`. Grep confirmed it was the only raw-`var()` HSL-triplet misuse across `src/native/` + `src/features/scan/`.
+- **H2 HIGH** (fixed): `equipment-detail` off-shift checkout buttons were `disabled` AND wired to a toast that a disabled button can never fire (dead guard). Added `offShiftCheckoutNote` (reuses `t.scan.offShiftBody`, no new keys) rendered beside both checkout affordances so an off-shift tech sees the reason.
+- **H3 HIGH** (fixed): header icon hit areas 36→44px (iOS HIG floor; glyphs stay 20px, fit the 44px bar).
+- **H4 HIGH** (fixed): alert severity was color-only (red vs orange dot). Now distinct shapes — `AlertCircle` (issue) vs `AlertTriangle` (warning) — WCAG 1.4.1.
+- **M1 MEDIUM** (fixed): panels advertised `role="menu"`/`menuitem`/`menuitemcheckbox` without the ARIA menu keyboard contract. Downgraded to plain buttons in an `aria-label`led container (`aria-haspopup="true"`, toggle → `aria-pressed`), and wired Escape-to-close + focus-into-panel-on-open + focus-return-to-trigger.
+- **M3 MEDIUM** (fixed): filled `--primary` avatar out-weighed the live-badge bell (false hierarchy). Now muted fill + hairline ring.
+- **M4 MEDIUM** (fixed): panel/footer rows 44→48px to match the VetTrack touch floor.
+- **L1 LOW** (fixed): bell announced "alerts" twice (button + badge). Count folded into the button `aria-label`; badge `aria-hidden`.
+- **M2** (no change — verified coherent): Forest theme overrides every chromatic brand token; `--accent`/`--secondary`/`--muted` are neutral grays, no `--chart-*` tokens exist, `--action` is already forest-teal. No indigo leak.
+- **M5** (accepted by convention): avatar→profile is a well-established affordance; left as direct navigation.
+- **L2** (deferred to Stage 9): `crash-cart` has 10 palette usages — whole-file re-token is Stage 9's job; a lone line-140 swap would leave 9 inconsistent siblings.
+- **L3** (deferred to FAB workstream): removing the iPad sidebar Scan entry without the tablet Scan FAB (BUG-011) would regress scan access.
+- Gates: `pnpm typecheck` (fe+server) → 0 · `pnpm build` → exit 0 · guard tests (mobile-shell, i18n-no-hebrew, i18n-parity, no-hardcoded-ui-strings) → 21/21.
+
+**Verdict:** VERIFIED at gate level. On-device re-verification of the dropdown keyboard/focus behavior + 44px targets recommended on next sim pass.
