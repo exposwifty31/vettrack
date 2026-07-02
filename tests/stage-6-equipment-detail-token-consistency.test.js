@@ -20,6 +20,7 @@ const read = (...p) => fs.readFileSync(path.join(repoRoot, ...p), "utf8");
 
 const screen = read("src", "features", "equipment", "detail", "EquipmentDetailScreen.tsx");
 const grid = read("src", "features", "equipment", "detail", "EquipmentGlanceGrid.tsx");
+const service = read("src", "features", "equipment", "detail", "EquipmentServiceCard.tsx");
 const i18n = read("src", "lib", "i18n.ts");
 const en = read("locales", "en.json");
 const he = read("locales", "he.json");
@@ -51,6 +52,22 @@ describe("Stage 6 detail — at-a-glance grid", () => {
   it("consumes theme tokens, not hardcoded palette", () => {
     expect(grid.includes("hsl(var(--")).toBe(true);
     expect(BANNED.test(grid)).toBe(false);
+  });
+});
+
+describe("Stage 6 detail — service-schedule card", () => {
+  it("is rendered from the detail screen", () => {
+    expect(screen.includes("EquipmentServiceCard")).toBe(true);
+  });
+  it("gates on real maintenance data (no fabrication)", () => {
+    expect(service.includes("lastMaintenanceDate")).toBe(true);
+    expect(service.includes("maintenanceIntervalDays")).toBe(true);
+    expect(/if\s*\(!.*lastMaintenanceDate\s*\|\|\s*!.*maintenanceIntervalDays\)\s*return null/.test(service)).toBe(true);
+  });
+  it("uses status HSL tokens for the progress bar, not palette", () => {
+    expect(service.includes("hsl(var(--status-")).toBe(true);
+    expect(service.includes("t.equipmentDetail.serviceSchedule")).toBe(true);
+    expect(BANNED.test(service)).toBe(false);
   });
 });
 

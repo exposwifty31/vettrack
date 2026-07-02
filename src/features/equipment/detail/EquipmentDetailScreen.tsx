@@ -5,6 +5,7 @@ import { useEquipmentDetail } from "./hooks/use-equipment-detail";
 import { EquipmentLocationCard } from "./EquipmentLocationCard";
 import { EquipmentMetaStrip } from "./EquipmentMetaStrip";
 import { EquipmentGlanceGrid } from "./EquipmentGlanceGrid";
+import { EquipmentServiceCard } from "./EquipmentServiceCard";
 import { EquipmentAccountabilityTimeline } from "./EquipmentAccountabilityTimeline";
 import { LoadingSection } from "@/components/ui/loading-section";
 import { ErrorCard } from "@/components/ui/error-card";
@@ -146,6 +147,8 @@ export function EquipmentDetailScreen({ equipmentId }: Props) {
           {locationInference && (
             <EquipmentLocationCard inference={locationInference} />
           )}
+
+          <EquipmentServiceCard equipment={equipment} />
 
           <EquipmentGlanceGrid equipment={equipment} inference={locationInference} />
 

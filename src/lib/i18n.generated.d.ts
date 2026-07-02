@@ -449,6 +449,10 @@ export interface TStructure {
     unassigned: string;
     pullToRefresh: string;
     releaseToRefresh: string;
+    serviceSchedule: string;
+    lastServiced: string;
+    nextService: string;
+    serviceOverdue: string;
     maintenanceInterval: string;
     lastMaintenance: string;
     lastSterilization: string;

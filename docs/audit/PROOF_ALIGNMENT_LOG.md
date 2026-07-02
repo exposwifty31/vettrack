@@ -429,3 +429,14 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Gates: `pnpm typecheck` (fe+server) → **0**; `pnpm i18n:check` → parity OK; guard tests (i18n-no-hebrew-in-source, no-hardcoded-ui-strings, mobile-shell) → **21/21**; `pnpm build` → exit 0.
 
 **Verdict:** VERIFIED at gate level (RED→GREEN 8/8 + typecheck 0×2 + parity + guards 21/21 + build). Live browser verification (392/860/1180 · light/dark · en/he-RTL, seeded equipment) pending for the stage's end pass. Service-schedule card + actions row are the next Stage 6 detail increments.
+
+## 2026-07-02 — Stage 6 (increment 2): Equipment Detail — service-schedule card
+
+**Claim:** Added the Stage 6 service-schedule card to the mobile detail screen, derived entirely from real fields (`lastMaintenanceDate` + `maintenanceIntervalDays`). Renders only when both are present; progress bar + last/next dates + overdue chip computed from those values.
+
+**Evidence:**
+- New `EquipmentServiceCard.tsx`: gate `if (!lastMaintenanceDate || !maintenanceIntervalDays) return null;`, `pct` clamped 0–100 from elapsed/interval, bar token ok/stale/issue by pct + overdue, dates via `formatDateByLocale`. Rendered after the location card.
+- i18n: 4 new keys (serviceSchedule/lastServiced/nextService/serviceOverdue) en+he + wired in `i18n.ts`, `.d.ts` regenerated.
+- Gates: stage-6 lock **11/11** (3 new asserts: rendered, gated-on-real-data, status-HSL-token bar + no palette), typecheck **0×2**, i18n parity OK, build exit 0, guards (hebrew-in-source + no-hardcoded) pass.
+
+**Verdict:** VERIFIED at gate level. Live render (with a seeded maintenance interval) pending stage-end browser pass.
