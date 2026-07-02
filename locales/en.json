@@ -3178,6 +3178,21 @@
     }
   },
   "shiftChat": {
+    "broadcast": {
+      "iSent": "I sent",
+      "seniorTech": "Senior technician",
+      "received": "received",
+      "gotItOnWay": "Got it — on the way",
+      "fiveMin": "5 min",
+      "ackedReceipt": "You acknowledged receipt",
+      "snoozedReminder": "Snoozed — reminder in 5 min"
+    },
+    "broadcastTemplates": {
+      "department_close": {
+        "label": "Department close",
+        "subtitle": "All technicians — clean and organize the department"
+      }
+    },
     "errors": {
       "noOpenShift": "No active shift. Start a shift before sending messages.",
       "sendFailed": "Failed to send message. Please try again.",

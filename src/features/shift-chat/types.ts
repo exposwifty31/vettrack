@@ -48,8 +48,10 @@ export interface PostMessageInput {
   mentionedUserIds?: string[];
 }
 
+// Broadcast command registry (keys only). User-facing label/subtitle live in
+// i18n at t.shiftChat.broadcastTemplates.* — never hardcode copy here.
 export const BROADCAST_TEMPLATES = {
-  department_close: { label: "סגירת מחלקה", subtitle: "כל הטכנאים — לנקות ולסדר את המחלקה" },
+  department_close: {},
 } as const;
 
 export type BroadcastKey = keyof typeof BROADCAST_TEMPLATES;

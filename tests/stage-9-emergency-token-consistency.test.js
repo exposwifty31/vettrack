@@ -27,6 +27,22 @@ describe("Stage 9 — crash-cart.tsx", () => {
   });
 });
 
+describe("Stage 9 — shift-chat BroadcastCard (BUG-002)", () => {
+  const src = read("src", "features", "shift-chat", "components", "BroadcastCard.tsx");
+  const types = read("src", "features", "shift-chat", "types.ts");
+  it("has no hardcoded palette (indigo/green/red tokenized)", () => {
+    expect(BANNED.test(src)).toBe(false);
+  });
+  it("renders copy from i18n, not hardcoded Hebrew", () => {
+    expect(src.includes("t.shiftChat.broadcast.")).toBe(true);
+    expect(/[֐-׿]/.test(src)).toBe(false);
+  });
+  it("keeps broadcast templates as keys only (label/subtitle live in i18n)", () => {
+    expect(/[֐-׿]/.test(types)).toBe(false);
+    expect(types.includes("department_close: {}")).toBe(true);
+  });
+});
+
 describe("Stage 9 — code-blue-history.tsx", () => {
   const src = read("src", "pages", "code-blue-history.tsx");
   it("has no hardcoded palette (zinc + outcome colors tokenized)", () => {

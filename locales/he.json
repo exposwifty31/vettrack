@@ -3178,6 +3178,21 @@
     }
   },
   "shiftChat": {
+    "broadcast": {
+      "iSent": "שלחתי",
+      "seniorTech": "טכנאית בכירה",
+      "received": "קיבלו",
+      "gotItOnWay": "קיבלתי — בדרך",
+      "fiveMin": "5 דק׳",
+      "ackedReceipt": "אישרת קבלה",
+      "snoozedReminder": "נדחה — תזכורת בעוד 5 דקות"
+    },
+    "broadcastTemplates": {
+      "department_close": {
+        "label": "סגירת מחלקה",
+        "subtitle": "כל הטכנאים — לנקות ולסדר את המחלקה"
+      }
+    },
     "errors": {
       "noOpenShift": "אין משמרת פעילה. פתחו משמרת לפני שליחת הודעות.",
       "sendFailed": "שליחת ההודעה נכשלה. נסו שוב.",

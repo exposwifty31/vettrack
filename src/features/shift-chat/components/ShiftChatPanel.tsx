@@ -245,19 +245,20 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
         {showBroadcast && canSendBroadcast && (
           <div className="px-3 pb-2 border-t border-border flex-shrink-0">
             <p className="text-[10px] text-muted-foreground mb-2 pt-2">{t.shiftChat.panel.broadcastPrompt}</p>
-            {(Object.entries(BROADCAST_TEMPLATES) as [BroadcastKey, { label: string; subtitle: string }][]).map(
-              ([key, template]) => (
+            {(Object.keys(BROADCAST_TEMPLATES) as BroadcastKey[]).map((key) => {
+              const template = t.shiftChat.broadcastTemplates[key];
+              return (
                 <button
                   key={key}
                   type="button"
                   onClick={() => handleBroadcast(key)}
-                  className="w-full text-right bg-indigo-950 hover:bg-indigo-900 border border-indigo-800 rounded-lg px-3 py-2 mb-1"
+                  className="w-full text-start bg-primary/10 hover:bg-primary/15 border border-primary/40 rounded-lg px-3 py-2 mb-1"
                 >
-                  <div className="text-sm font-bold text-indigo-100">{template.label}</div>
-                  <div className="text-[10px] text-indigo-300">{template.subtitle}</div>
+                  <div className="text-sm font-bold text-foreground">{template.label}</div>
+                  <div className="text-[10px] text-muted-foreground">{template.subtitle}</div>
                 </button>
-              ),
-            )}
+              );
+            })}
             <button type="button" onClick={() => setShowBroadcast(false)} className="text-xs text-muted-foreground mt-1">
               {t.common.cancel}
             </button>

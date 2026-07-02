@@ -3181,6 +3181,21 @@ export interface TStructure {
     };
   };
   shiftChat: {
+    broadcast: {
+      iSent: string;
+      seniorTech: string;
+      received: string;
+      gotItOnWay: string;
+      fiveMin: string;
+      ackedReceipt: string;
+      snoozedReminder: string;
+    };
+    broadcastTemplates: {
+      department_close: {
+        label: string;
+        subtitle: string;
+      };
+    };
     errors: {
       noOpenShift: string;
       sendFailed: string;

@@ -489,3 +489,16 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Gates: typecheck **0×2**, build exit 0.
 
 **Verdict:** VERIFIED at gate level (static token sweep + lock + i18n-code-blue regression + typecheck + build). Live dark/light/RTL render pending stage-end browser pass. Remaining Stage 9: shift-chat hardcoded-Hebrew (BUG-002) + quick-reply wiring (BUG-003) + stale messages (BUG-001) + standalone chat screen + richer Handover + code-blue.tsx restyle.
+
+## 2026-07-02 — Stage 9 (increment 3): shift-chat broadcast i18n (BUG-002) + BroadcastCard re-token
+
+**Claim:** Fixed the hardcoded-Hebrew-in-EN-mode bug for broadcasts (BUG-002): the `BROADCAST_TEMPLATES` data model is now keys-only, all broadcast copy lives in i18n, and `BroadcastCard` renders via `t.*` + theme tokens. `BroadcastCard.tsx` and `types.ts` removed from the Hebrew-debt allowlist.
+
+**Evidence:**
+- `types.ts`: `BROADCAST_TEMPLATES` → `{ department_close: {} }` (Hebrew label/subtitle removed). Consumers (`BroadcastCard`, `ShiftChatPanel`) resolve label/subtitle from `t.shiftChat.broadcastTemplates[key]`.
+- New i18n: `shiftChat.broadcast.{iSent,seniorTech,received,gotItOnWay,fiveMin,ackedReceipt,snoozedReminder}` + `shiftChat.broadcastTemplates.department_close.{label,subtitle}` (en+he, passthrough namespace, `.d.ts` regenerated).
+- `BroadcastCard` re-tokened: indigo→`primary`, green→`--status-ok`, red→`--status-issue` (theme-following). `ShiftChatPanel` broadcast buttons likewise + resolve copy from `t`.
+- Allowlist: `BroadcastCard.tsx` + `types.ts` removed; the guard's "no stale entries" + "every offender listed" both hold (MessageBubble/SystemCard/ShiftChatArchive remain — still have Hebrew).
+- Gates: typecheck **0×2**, i18n parity OK, `i18n-no-hebrew-in-source` **2/2**, stage-9 lock **8/8** (new BroadcastCard/types describe), `no-hardcoded-ui-strings` pass, build exit 0.
+
+**Verdict:** VERIFIED at gate level (Hebrew now impossible to regress in these two files — off the allowlist; parity + typecheck + build). Remaining Stage 9: MessageBubble/SystemCard/ShiftChatArchive Hebrew, BUG-003 quick-reply, BUG-001 stale messages, standalone chat screen, richer Handover, code-blue.tsx restyle.
