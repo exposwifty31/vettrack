@@ -309,3 +309,16 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Bug found & fixed during visual verification: usage bars first rendered all-collapsed — `height:%` had no definite parent height under `items-end` (columns shrink-wrapped). Fixed by stretching columns to the `h-28` track (`h-full` + drop `items-end`, `min-h-0` on the flex bar-wrapper). Re-verified bars scale.
 
 **Verdict:** VERIFIED (RED→GREEN 42/42 + typecheck 0×2 + i18n parity + full suite 3592/0 + build + endpoint contract via curl on empty AND seeded data + live expanded/dark/he-RTL render with populated states). Par/reorder deferred (schema-blocked; not fabricated).
+
+## 2026-07-02 — Stage 5 (increment 5): item par level + reorder point (par bar + reorder cue)
+
+**Claim:** Added the item-detail prototype's signature feature with real, settable data: `par_level` + `reorder_point` columns on `vt_items` (migration 157, additive nullable), accepted by create/update, returned by the detail endpoint, set via the admin item form, and rendered on the detail screen as a token-driven par bar + "Below reorder point — N left" cue. Untracked (null) items render the plain on-hand view.
+
+**Evidence:**
+- Schema: `server/schema/inventory.ts` par_level/reorder_point; `migrations/157_vt_items_par_reorder.sql` (`ADD COLUMN IF NOT EXISTS`) applied via `pnpm db:migrate` (drizzle-kit generate is broken in this env — CJS loader can't resolve the schema barrel's `.js` ESM imports — so the SQL was authored by hand to match the numbered-file runner).
+- RED first: extended `tests/stage-5-item-detail-token-consistency.test.js` with a par/reorder describe (schema columns, server parLevel/reorderPoint, screen parLabel/belowReorder + `--status-stale` tokens) → RED before the columns/UI existed.
+- GREEN: FE tsc **0**, server tsc **0**, `pnpm i18n:check` parity OK, stage-5 lock **45/45** (3 new), `pnpm build` exit 0, full `pnpm test` → **363 files / 3595 passed / 0 failed** (baseline 3592 + 3).
+- API round-trip: `PATCH /api/inventory-items/:id` with `{parLevel:20,reorderPoint:15}` persisted and echoed back (parLevel 20, reorderPoint 15); detail endpoint returns them on the item row.
+- Live browser (dev :5000, Chrome MCP, expanded 1180px, seeded on-hand 12): hero shows "12 / On hand" + "Par 20", an amber `--status-stale` dot, a ~60% par bar (12/20) in the stale token, and the amber "Below reorder point — 12 left" banner (`--status-stale-bg`/`-fg`). Color logic verified: on-hand ≤ reorder (12 ≤ 15) → stale, as designed (empty → issue, above reorder → ok).
+
+**Verdict:** VERIFIED (RED→GREEN 45/45 + typecheck 0×2 + i18n parity + full suite 3595/0 + build + migration applied + API round-trip + live par-bar/reorder-cue render). Reorder→PO-creation button remains the one deferred piece (procurement is a separate existing screen).

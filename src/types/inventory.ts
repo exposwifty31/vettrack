@@ -76,6 +76,10 @@ export interface InventoryItem {
   category: string | null;
   isBillable: boolean;
   minimumDispenseToCapture: number;
+  /** Target on-hand across all containers (null = untracked). */
+  parLevel: number | null;
+  /** On-hand at/below this surfaces a reorder cue (null = untracked). */
+  reorderPoint: number | null;
   createdAt: string;
 }
 

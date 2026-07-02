@@ -44,6 +44,10 @@ export const inventoryItems = vtTable(
     category: text("category"),
     isBillable: boolean("is_billable").notNull().default(true),
     minimumDispenseToCapture: integer("minimum_dispense_to_capture").notNull().default(1),
+    /** Target on-hand quantity across all containers (null = untracked). */
+    parLevel: integer("par_level"),
+    /** On-hand at/below this triggers a reorder cue (null = untracked). */
+    reorderPoint: integer("reorder_point"),
     /** Soft-delete: inactive items cannot be used in new operations. */
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at").defaultNow().notNull(),

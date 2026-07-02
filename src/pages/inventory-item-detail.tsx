@@ -73,6 +73,17 @@ function DetailBody({ detail }: { detail: InventoryItemDetail }) {
   const p = t.inventoryItemDetailPage;
   const { item, onHandTotal, containers, usage7d, usage7dTotal } = detail;
   const maxUsage = Math.max(1, ...usage7d.map((u) => u.quantity));
+  const { parLevel, reorderPoint } = item;
+  const belowReorder = reorderPoint != null && onHandTotal <= reorderPoint;
+  // Literal class strings (Tailwind JIT scans source statically — no interpolation).
+  const stockColor =
+    onHandTotal === 0
+      ? "bg-[hsl(var(--status-issue))]"
+      : belowReorder
+        ? "bg-[hsl(var(--status-stale))]"
+        : "bg-[hsl(var(--status-ok))]";
+  const parFillPct =
+    parLevel && parLevel > 0 ? Math.min(100, Math.round((onHandTotal / parLevel) * 100)) : 0;
 
   const facts: Array<{ label: string; value: React.ReactNode }> = [
     { label: p.factCode, value: <span className="font-mono text-xs">{item.code}</span> },
@@ -82,6 +93,9 @@ function DetailBody({ detail }: { detail: InventoryItemDetail }) {
     { label: p.factNfc, value: item.nfcTagId ?? p.none },
     { label: p.factCreated, value: formatDateByLocale(item.createdAt, { dateStyle: "medium" }) },
   ];
+  if (reorderPoint != null) {
+    facts.splice(4, 0, { label: p.factReorderPoint, value: reorderPoint });
+  }
 
   return (
     <div className="space-y-5">
@@ -94,21 +108,36 @@ function DetailBody({ detail }: { detail: InventoryItemDetail }) {
         </div>
       </div>
 
-      {/* On-hand hero */}
+      {/* On-hand hero (par-aware) */}
       <Card>
-        <CardContent className="flex items-baseline justify-between py-5">
-          <div className="flex flex-col">
-            <span className="text-4xl font-bold tabular-nums">{onHandTotal}</span>
-            <span className="text-sm text-muted-foreground">{p.onHand}</span>
+        <CardContent className="space-y-3 py-5">
+          <div className="flex items-baseline justify-between">
+            <div className="flex flex-col">
+              <span className="text-4xl font-bold tabular-nums">{onHandTotal}</span>
+              <span className="text-sm text-muted-foreground">{p.onHand}</span>
+            </div>
+            <div className="flex flex-col items-end gap-1.5">
+              {parLevel != null && (
+                <span className="text-sm text-muted-foreground tabular-nums">{p.parLabel(parLevel)}</span>
+              )}
+              <span className={`size-3 rounded-full ${stockColor}`} aria-hidden="true" />
+            </div>
           </div>
-          <span
-            className={
-              onHandTotal > 0
-                ? "size-3 rounded-full bg-[hsl(var(--status-ok))]"
-                : "size-3 rounded-full bg-[hsl(var(--status-issue))]"
-            }
-            aria-hidden="true"
-          />
+
+          {parLevel != null && parLevel > 0 && (
+            <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--surface-active)]">
+              <div
+                className={`h-full rounded-full ${stockColor}`}
+                style={{ width: `${parFillPct}%` }}
+              />
+            </div>
+          )}
+
+          {belowReorder && (
+            <p className="rounded-lg bg-[var(--status-stale-bg)] px-3 py-2 text-sm text-[var(--status-stale-fg)]">
+              {p.belowReorder(onHandTotal)}
+            </p>
+          )}
         </CardContent>
       </Card>
 

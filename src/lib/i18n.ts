@@ -768,6 +768,8 @@ const translations = {
   inventoryItemDetailPage: {
     ...d.inventoryItemDetailPage,
     usageTotal: (count: number) => tr(d.inventoryItemDetailPage.usageTotal, { count }),
+    parLabel: (count: number) => tr(d.inventoryItemDetailPage.parLabel, { count }),
+    belowReorder: (count: number) => tr(d.inventoryItemDetailPage.belowReorder, { count }),
   },
 
   procurementPage: d.procurementPage,

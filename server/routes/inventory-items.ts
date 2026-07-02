@@ -26,6 +26,8 @@ export const createItemSchema = z.object({
   unit: z.string().min(1).max(30).optional().nullable(),
   category: z.string().max(100).optional(),
   nfcTagId: z.string().max(200).optional().nullable(),
+  parLevel: z.number().int().min(0).optional().nullable(),
+  reorderPoint: z.number().int().min(0).optional().nullable(),
 }).strict();
 
 export const updateItemSchema = z.object({
@@ -36,6 +38,8 @@ export const updateItemSchema = z.object({
   nfcTagId: z.string().max(200).optional().nullable(),
   isBillable: z.boolean().optional(),
   minimumDispenseToCapture: z.number().int().min(1).optional(),
+  parLevel: z.number().int().min(0).optional().nullable(),
+  reorderPoint: z.number().int().min(0).optional().nullable(),
 }).strict();
 
 export const addPriceSchema = z.object({
@@ -164,6 +168,8 @@ router.post("/", requireAuth, requireAdmin, validateBody(createItemSchema), asyn
       unit: b.unit?.trim() || null,
       category: b.category?.trim() || null,
       nfcTagId: b.nfcTagId?.trim() || null,
+      parLevel: b.parLevel ?? null,
+      reorderPoint: b.reorderPoint ?? null,
       isActive: true,
     });
 
@@ -223,6 +229,8 @@ router.patch("/:id", requireAuth, requireAdmin, validateUuid("id"), validateBody
     if (b.nfcTagId !== undefined) updates.nfcTagId = b.nfcTagId?.trim() || null;
     if (b.isBillable !== undefined) updates.isBillable = b.isBillable;
     if (b.minimumDispenseToCapture !== undefined) updates.minimumDispenseToCapture = b.minimumDispenseToCapture;
+    if (b.parLevel !== undefined) updates.parLevel = b.parLevel;
+    if (b.reorderPoint !== undefined) updates.reorderPoint = b.reorderPoint;
 
     await db.update(inventoryItems).set(updates).where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, req.params.id)));
     const [updated] = await db.select().from(inventoryItems).where(eq(inventoryItems.id, req.params.id)).limit(1);

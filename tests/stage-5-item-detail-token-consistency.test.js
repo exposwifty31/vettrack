@@ -61,3 +61,21 @@ describe("Stage 5 item detail — wired end to end", () => {
     expect(serverSrc.includes("clinicId")).toBe(true);
   });
 });
+
+describe("Stage 5 item detail — par level + reorder point", () => {
+  const schemaSrc = read("server/schema/inventory.ts");
+  it("schema carries par_level + reorder_point columns", () => {
+    expect(schemaSrc.includes('integer("par_level")')).toBe(true);
+    expect(schemaSrc.includes('integer("reorder_point")')).toBe(true);
+  });
+  it("create/update accept parLevel + reorderPoint", () => {
+    expect(serverSrc.includes("parLevel")).toBe(true);
+    expect(serverSrc.includes("reorderPoint")).toBe(true);
+  });
+  it("screen renders a par bar + below-reorder cue via tokens", () => {
+    expect(page.includes("parLabel")).toBe(true);
+    expect(page.includes("belowReorder")).toBe(true);
+    expect(page.includes("var(--status-stale-bg)")).toBe(true);
+    expect(page.includes("hsl(var(--status-stale))")).toBe(true);
+  });
+});

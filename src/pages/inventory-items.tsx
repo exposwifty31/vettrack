@@ -42,8 +42,15 @@ import { useAuth } from "@/hooks/use-auth";
 import { Archive, Plus, Pencil, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type FormState = { code: string; label: string; category: string; nfcTagId: string; isBillable: boolean; minimumDispenseToCapture: number };
-const BLANK: FormState = { code: "", label: "", category: "", nfcTagId: "", isBillable: true, minimumDispenseToCapture: 1 };
+type FormState = { code: string; label: string; category: string; nfcTagId: string; isBillable: boolean; minimumDispenseToCapture: number; parLevel: string; reorderPoint: string };
+const BLANK: FormState = { code: "", label: "", category: "", nfcTagId: "", isBillable: true, minimumDispenseToCapture: 1, parLevel: "", reorderPoint: "" };
+
+/** Empty string → null (untracked); otherwise a non-negative integer. */
+function parseOptCount(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (trimmed === "") return null;
+  return Math.max(0, parseInt(trimmed, 10) || 0);
+}
 
 export default function InventoryItemsPage() {
   const qc = useQueryClient();
@@ -110,7 +117,7 @@ export default function InventoryItemsPage() {
 
   function openEdit(item: InventoryItem) {
     setEditTarget(item);
-    setForm({ code: item.code, label: item.label, category: item.category ?? "", nfcTagId: item.nfcTagId ?? "", isBillable: item.isBillable, minimumDispenseToCapture: item.minimumDispenseToCapture });
+    setForm({ code: item.code, label: item.label, category: item.category ?? "", nfcTagId: item.nfcTagId ?? "", isBillable: item.isBillable, minimumDispenseToCapture: item.minimumDispenseToCapture, parLevel: item.parLevel != null ? String(item.parLevel) : "", reorderPoint: item.reorderPoint != null ? String(item.reorderPoint) : "" });
     setFormOpen(true);
   }
 
@@ -121,6 +128,8 @@ export default function InventoryItemsPage() {
         label: form.label.trim(),
         category: form.category || undefined,
         nfcTagId: form.nfcTagId.trim() || undefined,
+        parLevel: parseOptCount(form.parLevel),
+        reorderPoint: parseOptCount(form.reorderPoint),
       }),
     onSuccess: () => {
       toast.success(p.itemCreated);
@@ -142,6 +151,8 @@ export default function InventoryItemsPage() {
         nfcTagId: form.nfcTagId.trim() || null,
         isBillable: form.isBillable,
         minimumDispenseToCapture: form.minimumDispenseToCapture,
+        parLevel: parseOptCount(form.parLevel),
+        reorderPoint: parseOptCount(form.reorderPoint),
       }),
     onSuccess: () => {
       toast.success(p.itemUpdated);
@@ -346,6 +357,28 @@ export default function InventoryItemsPage() {
                 />
               </div>
             )}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>{p.fieldParLevel}</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.parLevel}
+                  placeholder={p.optionalPlaceholder}
+                  onChange={(e) => setForm((f) => ({ ...f, parLevel: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>{p.fieldReorderPoint}</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.reorderPoint}
+                  placeholder={p.optionalPlaceholder}
+                  onChange={(e) => setForm((f) => ({ ...f, reorderPoint: e.target.value }))}
+                />
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setFormOpen(false)}>{p.cancel}</Button>
