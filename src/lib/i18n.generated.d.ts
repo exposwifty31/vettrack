@@ -441,6 +441,14 @@ export interface TStructure {
     manufacturer: string;
     purchaseDate: string;
     location: string;
+    back: string;
+    atGlance: string;
+    assignee: string;
+    lastScan: string;
+    due: string;
+    unassigned: string;
+    pullToRefresh: string;
+    releaseToRefresh: string;
     maintenanceInterval: string;
     lastMaintenance: string;
     lastSterilization: string;

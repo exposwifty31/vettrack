@@ -417,3 +417,15 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - `apply.sh` append idempotency (13-16): one-shot reference apply script, self-documented "review the diff before committing," applied-then-reset; guarding all ~8 `cat >>` sites exceeds "minimal" for a non-executing artifact.
 
 **Verdict:** VERIFIED (node --check + bash -n on the scriptable edits; structural grep on the `.dc.html` template/JS edits; scope confirmed docs-only). `.dc.html`/reference `.tsx` are not in tsconfig/vite, so not gate-compiled — validated by parser + pattern-match against the working Stage 6.
+
+## 2026-07-02 — Stage 6 (increment 1): Equipment Detail — back header + at-a-glance grid
+
+**Claim:** Brought the mobile `EquipmentDetailScreen` toward the Stage 6 detail prototype: added an iOS back-button header row and a token-driven "At a glance" 4-tile fact grid (Location / Assignee / Last scan / Due) wired to real `Equipment` + `LocationInference` fields, and moved the pull-to-refresh copy off hardcoded English. No fabricated data — every tile falls back to "—" when its source field is absent.
+
+**Evidence:**
+- Backing fields verified real in `src/types/equipment.ts`: location (`roomName`/`checkedOutLocation` + inference), assignee (`checkedOutByEmail` + inference `accountablePerson`), last scan (`lastVerifiedAt`/`lastSeen`/inference `lastConfirmedAt`), due (`checkedOutAt` + `expectedReturnMinutes`). Service-schedule card deferred to a later increment (data exists — `lastMaintenanceDate`+`maintenanceIntervalDays` — but wanted a focused slice); actions row deferred (needs mutation wiring).
+- RED→GREEN lock test `tests/stage-6-equipment-detail-token-consistency.test.js` **8/8** (back testid + copy, EquipmentGlanceGrid + atGlance heading, `repeat(2, minmax(0, 1fr))` grid, 4 real tiles, tokens present + banned palette absent, pull-to-refresh de-hardcoded, all 8 new keys wired in the hand-listed `equipmentDetail` accessor + en/he entries).
+- i18n: 8 new `equipmentDetail.*` keys (back/atGlance/assignee/lastScan/due/unassigned/pullToRefresh/releaseToRefresh) added to en+he, wired into `src/lib/i18n.ts`, `.d.ts` regenerated. RTL: back chevron flips via `useDirection` (ArrowLeft/ArrowRight); grid uses logical `minmax`.
+- Gates: `pnpm typecheck` (fe+server) → **0**; `pnpm i18n:check` → parity OK; guard tests (i18n-no-hebrew-in-source, no-hardcoded-ui-strings, mobile-shell) → **21/21**; `pnpm build` → exit 0.
+
+**Verdict:** VERIFIED at gate level (RED→GREEN 8/8 + typecheck 0×2 + parity + guards 21/21 + build). Live browser verification (392/860/1180 · light/dark · en/he-RTL, seeded equipment) pending for the stage's end pass. Service-schedule card + actions row are the next Stage 6 detail increments.
