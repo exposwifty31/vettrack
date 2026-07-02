@@ -1,7 +1,9 @@
 // src/components/layout/Topbar.tsx
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { cn } from "@/lib/utils";
+import { cn, computeAlerts } from "@/lib/utils";
+import { buildAlertAckSet, countActiveAlerts } from "@/lib/alert-counts";
 import { useAuth } from "@/hooks/use-auth";
 import { useDirection } from "@/hooks/useDirection";
 import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
@@ -9,6 +11,8 @@ import { NAV } from "@/lib/routes/nav-model";
 import { api } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { getInitials } from "@/lib/user-utils";
+import { AlertsDropdown } from "@/components/alerts-dropdown";
+import { TopbarSettingsMenu } from "@/components/layout/TopbarSettingsMenu";
 
 function navLabel(key: string): string {
   const k = key.startsWith("nav.") ? key.slice(4) : key;
@@ -19,6 +23,39 @@ export function Topbar() {
   const [location] = useLocation();
   const { isAdmin, name, activeShift, userId } = useAuth();
   const dir = useDirection();
+  const signedIn = Boolean(userId);
+
+  // Alerts bell + unread badge (parity with the legacy layout topbar and the
+  // mobile NativeHeader — the shell migration to PageShell/Topbar dropped it).
+  const { data: equipment } = useQuery({
+    queryKey: ["/api/equipment"],
+    queryFn: api.equipment.list,
+    enabled: signedIn,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+  const { data: alertAcks } = useQuery({
+    queryKey: ["/api/alert-acks"],
+    queryFn: api.alertAcks.list,
+    enabled: signedIn,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const alerts = equipment ? computeAlerts(equipment) : [];
+  const alertCount = countActiveAlerts(alerts, buildAlertAckSet(alertAcks));
+
+  const [badgeAnimating, setBadgeAnimating] = useState(false);
+  const prevAlertCount = useRef(alertCount);
+  useEffect(() => {
+    if (alertCount > prevAlertCount.current) {
+      setBadgeAnimating(true);
+      const id = setTimeout(() => setBadgeAnimating(false), 450);
+      prevAlertCount.current = alertCount;
+      return () => clearTimeout(id);
+    }
+    prevAlertCount.current = alertCount;
+  }, [alertCount]);
 
   const visibleItems = NAV.filter((n) => !n.adminOnly || isAdmin);
 
@@ -60,9 +97,18 @@ export function Topbar() {
       </nav>
 
       {/* Right controls */}
-      <div className="flex items-center gap-2.5 ms-auto shrink-0">
+      <div className="flex items-center gap-1.5 ms-auto shrink-0">
         <ShiftBadge activeShift={activeShift} />
-        <UserAvatar name={name} enabled={Boolean(userId)} />
+        {signedIn && (
+          <AlertsDropdown
+            alerts={alerts}
+            alertCount={alertCount}
+            badgeAnimating={badgeAnimating}
+            buttonClassName="h-8 w-8 min-h-0 min-w-0"
+          />
+        )}
+        <TopbarSettingsMenu />
+        <UserAvatar name={name} enabled={signedIn} />
       </div>
     </header>
   );

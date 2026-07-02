@@ -76,6 +76,7 @@ import { playFeedbackTone, playMuteTone, playCriticalAlertTone } from "@/lib/sou
 import { ReportIssueDialog } from "@/components/report-issue-dialog";
 import { SyncQueueSheet } from "@/components/sync-queue-sheet";
 import { AlertsDropdown } from "@/components/alerts-dropdown";
+import { useScanAffordance } from "@/lib/scan-affordance";
 import { UpdateBanner } from "@/components/update-banner";
 import { haptics } from "@/lib/haptics";
 import {
@@ -144,6 +145,9 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
+  // Web must never surface scan UI (scan-affordance model, BUG-016). The raised
+  // FAB stays byte-for-byte on native (tab/fab); only "none" (web) suppresses it.
+  const scanAffordance = useScanAffordance();
   const [quickSettingsUseViewportRight, setQuickSettingsUseViewportRight] = useState(false);
   const [quickSettingsViewportTop, setQuickSettingsViewportTop] = useState(0);
   const [syncQueueOpen, setSyncQueueOpen] = useState(false);
@@ -656,7 +660,8 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
 
   // Center scan FAB — the equipment-first primary action, raised into the thumb
   // zone. Shared by the legacy and NAV-driven bottom-bar renderers.
-  const renderScanFab = () => (
+  const renderScanFab = () =>
+    scanAffordance === "none" ? null : (
     <div className="flex flex-col items-center justify-end pb-1 relative">
       {!scannerUIOpen && !navigationLocked && (
         <span

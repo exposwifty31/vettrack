@@ -11,9 +11,11 @@ interface AlertsDropdownProps {
   alerts: Alert[];
   alertCount: number;
   badgeAnimating: boolean;
+  /** Override the trigger button sizing so it fits a host bar shorter than 44px. */
+  buttonClassName?: string;
 }
 
-export function AlertsDropdown({ alerts, alertCount, badgeAnimating }: AlertsDropdownProps) {
+export function AlertsDropdown({ alerts, alertCount, badgeAnimating, buttonClassName }: AlertsDropdownProps) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const direction = useDirection();
@@ -37,7 +39,10 @@ export function AlertsDropdown({ alerts, alertCount, badgeAnimating }: AlertsDro
       <Button
         variant="ghost"
         size="icon"
-        className="relative min-h-[44px] min-w-[44px] text-[var(--brand-green-bright)] hover:text-white hover:bg-white/10"
+        className={cn(
+          "relative min-h-[44px] min-w-[44px] text-[var(--brand-green-bright)] hover:text-white hover:bg-white/10",
+          buttonClassName,
+        )}
         aria-label={t.layout.alertsDropdown.toggleAria(alertCount)}
         aria-expanded={open}
         data-testid="alert-bell"
