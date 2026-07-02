@@ -453,6 +453,7 @@ export interface TStructure {
     lastServiced: string;
     nextService: string;
     serviceOverdue: string;
+    checkIn: string;
     maintenanceInterval: string;
     lastMaintenance: string;
     lastSterilization: string;

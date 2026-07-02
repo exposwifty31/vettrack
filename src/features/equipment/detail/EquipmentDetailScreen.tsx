@@ -6,6 +6,7 @@ import { EquipmentLocationCard } from "./EquipmentLocationCard";
 import { EquipmentMetaStrip } from "./EquipmentMetaStrip";
 import { EquipmentGlanceGrid } from "./EquipmentGlanceGrid";
 import { EquipmentServiceCard } from "./EquipmentServiceCard";
+import { EquipmentActions } from "./EquipmentActions";
 import { EquipmentAccountabilityTimeline } from "./EquipmentAccountabilityTimeline";
 import { LoadingSection } from "@/components/ui/loading-section";
 import { ErrorCard } from "@/components/ui/error-card";
@@ -155,6 +156,8 @@ export function EquipmentDetailScreen({ equipmentId }: Props) {
           {logsQuery.data && logsQuery.data.length > 0 && (
             <EquipmentAccountabilityTimeline logs={logsQuery.data} />
           )}
+
+          <EquipmentActions equipment={equipment} />
         </>
       ) : null}
     </div>

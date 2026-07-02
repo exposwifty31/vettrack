@@ -22,6 +22,7 @@ const screen = read("src", "features", "equipment", "detail", "EquipmentDetailSc
 const grid = read("src", "features", "equipment", "detail", "EquipmentGlanceGrid.tsx");
 const service = read("src", "features", "equipment", "detail", "EquipmentServiceCard.tsx");
 const locCard = read("src", "features", "equipment", "detail", "EquipmentLocationCard.tsx");
+const actions = read("src", "features", "equipment", "detail", "EquipmentActions.tsx");
 const i18n = read("src", "lib", "i18n.ts");
 const en = read("locales", "en.json");
 const he = read("locales", "he.json");
@@ -79,6 +80,25 @@ describe("Stage 6 detail — location card confidence ladder", () => {
     expect(locCard.includes("rgb(var(--sys-gray))")).toBe(true);
     expect(locCard.includes("rgb(var(--sys-red))")).toBe(true);
     expect(/#[0-9a-fA-F]{6}/.test(locCard)).toBe(false);
+  });
+});
+
+describe("Stage 6 detail — actions (Check in)", () => {
+  it("is rendered from the detail screen", () => {
+    expect(screen.includes("EquipmentActions")).toBe(true);
+  });
+  it("wires a real return via api.equipment.return + the shared ReturnPlugDialog", () => {
+    expect(actions.includes("api.equipment.return")).toBe(true);
+    expect(actions.includes("ReturnPlugDialog")).toBe(true);
+    expect(actions.includes("t.equipmentDetail.checkIn")).toBe(true);
+  });
+  it("only offers return to the holder or an admin", () => {
+    expect(actions.includes("checkedOutByMe")).toBe(true);
+    expect(/if\s*\(!canReturn\)\s*return null/.test(actions)).toBe(true);
+  });
+  it("does NOT shift-gate return (you can always hand equipment back)", () => {
+    expect(actions.includes("hasActiveShift")).toBe(false);
+    expect(actions.includes("offShift")).toBe(false);
   });
 });
 

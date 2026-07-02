@@ -450,6 +450,7 @@
     "lastServiced": "Last serviced",
     "nextService": "Next service",
     "serviceOverdue": "Overdue",
+    "checkIn": "Check in",
     "maintenanceInterval": "Maintenance interval",
     "lastMaintenance": "Last maintenance",
     "lastSterilization": "Last sterilization",

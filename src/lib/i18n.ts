@@ -235,6 +235,7 @@ const translations = {
     lastServiced: d.equipmentDetail.lastServiced,
     nextService: d.equipmentDetail.nextService,
     serviceOverdue: d.equipmentDetail.serviceOverdue,
+    checkIn: d.equipmentDetail.checkIn,
     maintenanceInterval: d.equipmentDetail.maintenanceInterval,
     lastMaintenance: d.equipmentDetail.lastMaintenance,
     lastSterilization: d.equipmentDetail.lastSterilization,

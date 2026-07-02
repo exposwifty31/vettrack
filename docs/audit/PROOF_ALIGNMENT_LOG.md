@@ -462,3 +462,18 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Gates: typecheck **0×2**, build exit 0, guards (i18n-no-hebrew-in-source, no-hardcoded-ui-strings) pass.
 
 **Verdict:** VERIFIED at gate level. Behavior untouched (className-only sweep). Live dark/RTL render pending stage-end browser pass.
+
+## 2026-07-02 — Stage 6 (increment 3): Equipment Detail — actions row (Check in)
+
+**Claim:** Added the mobile detail actions row's primary action — "Check in" (return) — as a real, verifiable, equipment-scoped mutation reusing the desktop's proven infrastructure. Flag + Report-missing deferred with reason (no reusable equipment-scoped issue flow; no missing endpoint).
+
+**Evidence:**
+- New `EquipmentActions.tsx`: renders "Check in" only when `isCheckedOut && (checkedOutByMe || isAdmin)` (else `return null`); `returnMut` calls `api.equipment.return(id, {isPluggedIn, plugInDeadlineMinutes})` (the identical optimistic/offline path the desktop uses) via the standalone `ReturnPlugDialog`; success → cache set + invalidate + `toast.equipmentDetail.toast.returned` (or `savedOffline` when queued); error → `returnFailed`. **Return is deliberately not shift-gated** (you can always hand equipment back — unlike checkout).
+- **Behavioral verification** `tests/equipment-actions.test.tsx` (happy-dom + RTL) **5/5**: shows for checked-out+admin; hidden when available; hidden for non-admin non-holder; shown to the holder; and click→dialog→`api.equipment.return("eq-1",{isPluggedIn:true})`→success toast. This is the real behavior check (the mobile screen needs the native shell, so it can't be driven in plain Chrome).
+- Lock test `tests/stage-6-equipment-detail-token-consistency.test.js` extended → **16/16** (rendered, real return + ReturnPlugDialog + checkIn key, holder/admin gating, no shift-gate).
+- i18n: `checkIn` (en+he) wired in the hand-listed accessor; reused existing `reportIssueTitle`/`toast.{returned,savedOffline,returnFailed}`. `.d.ts` regenerated.
+- Gates: typecheck **0×2**, i18n parity OK, build exit 0, guards pass.
+
+**Deferred (not dead-buttoned):** Flag (equipment-scoped note+photo issue flow lives only inside the desktop screen; the standalone `ReportIssueDialog` is a general support ticket, not an equipment flag) and Report-missing (no API endpoint). Documented in the component header.
+
+**Verdict:** VERIFIED — the return action is exercised end-to-end in a jsdom behavioral test against the proven API+dialog, plus static lock + typecheck + build. Stage 6 increments 1–7 all shipped.
