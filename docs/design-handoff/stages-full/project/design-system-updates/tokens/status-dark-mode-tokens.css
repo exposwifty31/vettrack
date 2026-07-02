@@ -1,0 +1,30 @@
+/**
+ * Design System Alignment — §39-D1 (Phase 20)
+ * APPEND into src/index.css's .dark block.
+ *
+ * Prerequisite for §38-D3's retokenization: dozens of real call-sites hand-
+ * roll a light color PLUS a hand-picked dark: variant (e.g. "bg-emerald-50
+ * ... dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800").
+ * Retokenizing the light side to var(--status-ok-bg) etc. without giving
+ * those tokens a .dark override would silently DELETE the dark-mode
+ * treatment those components already have — the same class of gap Phase
+ * 10 flagged for shadows and Phase 12 flagged for action/status-ok, now
+ * actually fixed for the bg/fg/border status triplets specifically because
+ * real call-sites depend on it.
+ *
+ * Translucent (rgba) rather than flat hex, so the tint reads correctly
+ * over whatever dark surface it sits on (card, sheet, page canvas) — same
+ * reasoning the original hand-rolled dark: classes used (bg-emerald-950/40
+ * is already a translucent overlay, not a flat fill).
+ */
+.dark {
+  --status-ok-bg: rgba(16, 185, 129, 0.12);
+  --status-ok-fg: #6ee7b7;
+  --status-ok-border: rgba(16, 185, 129, 0.35);
+  --status-issue-bg: rgba(239, 68, 68, 0.12);
+  --status-issue-fg: #fca5a5;
+  --status-issue-border: rgba(239, 68, 68, 0.35);
+  --status-maint-bg: rgba(245, 158, 11, 0.12);
+  --status-maint-fg: #fcd34d;
+  --status-maint-border: rgba(245, 158, 11, 0.35);
+}

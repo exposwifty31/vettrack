@@ -607,7 +607,7 @@ export default function AppointmentsPage() {
 
   const pageContent = (
     <>
-      <div dir={dir} className="flex flex-col gap-4 pb-24 text-start">
+      <div dir={dir} className="mx-auto flex w-full max-w-[720px] flex-col gap-4 px-4 pb-24 pt-3 text-start sm:px-6 lg:max-w-[1120px]">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <CalendarDays className="w-6 h-6" />

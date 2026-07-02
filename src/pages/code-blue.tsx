@@ -66,7 +66,7 @@ function ManagerPicker({ onSelect }: { onSelect: (id: string, name: string) => v
         </button>
       ))}
       {managersQ.data?.length === 0 && (
-        <p className="text-xs text-red-400">{t.codeBlue.noManagersAvailable}</p>
+        <p className="text-xs text-emergency-accent">{t.codeBlue.noManagersAvailable}</p>
       )}
     </div>
   );
@@ -120,15 +120,15 @@ function PreCheckGate({
         <ArrowRight className="h-4 w-4" aria-hidden />
         {t.common.back}
       </button>
-      <div className="flex items-center gap-2 text-red-400">
+      <div className="flex items-center gap-2 text-emergency-accent">
         <AlertTriangle className="h-6 w-6 shrink-0" aria-hidden />
-        <h1 className="text-xl font-bold text-red-400">{t.codeBlue.openTitle}</h1>
+        <h1 className="text-xl font-bold text-emergency-accent">{t.codeBlue.openTitle}</h1>
       </div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 pb-4">
 
       {initialEquipmentName && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 mb-4 text-sm text-amber-200">
+        <div className="rounded-lg border border-emergency-amber/30 bg-emergency-amber/10 px-4 py-3 mb-4 text-sm text-emergency-amber">
           {t.codeBlue.startingForEquipment(initialEquipmentName)}
         </div>
       )}
@@ -146,7 +146,7 @@ function PreCheckGate({
           <>
             <ManagerPicker onSelect={(id, n) => { setManagerId(id); setManagerName(n); }} />
             {managerId && (
-              <div className="mt-2 text-xs text-green-400">{t.codeBlue.selectedManager(managerName)}</div>
+              <div className="mt-2 text-xs text-[rgb(var(--sys-green))]">{t.codeBlue.selectedManager(managerName)}</div>
             )}
           </>
         )}
@@ -164,11 +164,11 @@ function PreCheckGate({
                 "flex items-center gap-3 p-2 min-h-[44px] rounded border text-sm transition-colors",
                 dir === "rtl" ? "text-end" : "text-start",
                 checked[item.key]
-                  ? "border-green-500/40 bg-green-500/10 text-green-300"
+                  ? "border-[rgb(var(--sys-green)/0.4)] bg-[rgb(var(--sys-green)/0.1)] text-[rgb(var(--sys-green))]"
                   : "border-emergency-border bg-emergency-border text-emergency-text",
               )}
             >
-              <span className={cn("h-4 w-4 rounded-full border-2 shrink-0", checked[item.key] ? "border-green-500 bg-green-500" : "border-emergency-text2/60")} />
+              <span className={cn("h-4 w-4 rounded-full border-2 shrink-0", checked[item.key] ? "border-[rgb(var(--sys-green))] bg-[rgb(var(--sys-green))]" : "border-emergency-text2/60")} />
               <span className="flex-1 min-w-0 [writing-mode:horizontal-tb]">{item.label}</span>
             </button>
           ))}
@@ -176,7 +176,7 @@ function PreCheckGate({
       </div>
 
       <Button
-        className="w-full bg-red-700 hover:bg-red-600 text-white font-bold"
+        className="w-full bg-emergency-accent hover:bg-emergency-accent/90 text-white font-bold"
         disabled={!managerId}
         onClick={() => handleStart(allChecked)}
       >
@@ -219,7 +219,7 @@ function OutcomeModal({ onClose }: { onClose: (outcome: string) => void }) {
               className={cn(
                 "p-3 min-h-[44px] rounded-lg border text-sm font-semibold transition-colors text-end",
                 o.value === "died"
-                  ? "border-red-800 bg-red-950/50 text-red-300 hover:bg-red-900/50"
+                  ? "border-emergency-accent/50 bg-emergency-accent/15 text-emergency-accent hover:bg-emergency-accent/25"
                   : "border-emergency-border bg-emergency-border text-emergency-text hover:bg-emergency-border",
               )}
             >
@@ -337,16 +337,16 @@ function ActiveSession() {
             <ArrowRight className="h-4 w-4" aria-hidden />
             {t.common.back}
           </button>
-          <span className="text-red-400 font-black tracking-widest text-sm flex items-center gap-2">
+          <span className="text-emergency-accent font-black tracking-widest text-sm flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" /> CODE BLUE
           </span>
         </div>
         <div className="flex gap-2 items-center">
           {presence.slice(0, 3).map((p) => (
-            <span key={p.userId} className="bg-blue-900 text-blue-300 text-xs px-2 py-0.5 rounded-full">{p.userName}</span>
+            <span key={p.userId} className="bg-[hsl(var(--status-sterilized))]/20 text-[hsl(var(--status-sterilized))] text-xs px-2 py-0.5 rounded-full">{p.userName}</span>
           ))}
           {presence.length > 3 && (
-            <span className="bg-blue-900 text-blue-300 text-xs px-2 py-0.5 rounded-full">+{presence.length - 3}</span>
+            <span className="bg-[hsl(var(--status-sterilized))]/20 text-[hsl(var(--status-sterilized))] text-xs px-2 py-0.5 rounded-full">+{presence.length - 3}</span>
           )}
         </div>
       </div>
@@ -356,22 +356,22 @@ function ActiveSession() {
         <div className={cn(
           "px-4 py-1.5 text-xs flex gap-2 border-b",
           cartStatus.allPassed
-            ? "bg-green-500/10 border-green-500/20 text-green-400"
-            : "bg-amber-500/10 border-amber-500/20 text-amber-400",
+            ? "bg-[rgb(var(--sys-green)/0.1)] border-[rgb(var(--sys-green)/0.2)] text-[rgb(var(--sys-green))]"
+            : "bg-emergency-amber/10 border-emergency-amber/20 text-emergency-amber",
         )}>
           {cartStatus.allPassed
             ? t.codeBlue.preCheck.cartCheckedBy(cartStatus.performedByName)
             : t.codeBlue.preCheck.cartNotChecked}
         </div>
       ) : (
-        <div className="px-4 py-1.5 text-xs bg-amber-500/10 border-b border-amber-500/20 text-amber-400">
+        <div className="px-4 py-1.5 text-xs bg-emergency-amber/10 border-b border-emergency-amber/20 text-emergency-amber">
           {t.codeBlue.preCheck.cartNotChecked}
         </div>
       )}
 
       <div className="px-4 py-2 bg-emergency-surface/50 border-b border-emergency-surface text-xs text-emergency-text2 flex items-center gap-2">
-        <Shield className="h-3.5 w-3.5 text-blue-400" />
-        {t.codeBlue.managerLabelShort} <span className="text-blue-300 font-semibold"><Bdi>{session.managerUserName}</Bdi></span>
+        <Shield className="h-3.5 w-3.5 text-[hsl(var(--status-sterilized))]" />
+        {t.codeBlue.managerLabelShort} <span className="text-[hsl(var(--status-sterilized))] font-semibold"><Bdi>{session.managerUserName}</Bdi></span>
       </div>
 
       <div className="px-4 py-3 bg-emergency-surface/50 border-b border-emergency-surface">
@@ -383,7 +383,7 @@ function ActiveSession() {
             {linkedEquipment.map((eq) => (
               <span
                 key={eq.id}
-                className="text-xs font-semibold text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-full px-3 py-1"
+                className="text-xs font-semibold text-emergency-amber bg-emergency-amber/10 border border-emergency-amber/30 rounded-full px-3 py-1"
               >
                 {eq.name}
               </span>
@@ -401,7 +401,7 @@ function ActiveSession() {
         <div className="text-xs text-emergency-text2/80 mt-2">
           {t.codeBlue.elapsedSinceStart}
           {equipmentLogCount > 0 && (
-            <span className="text-amber-400/90 me-2"> · {t.codeBlue.equipmentLogCount(equipmentLogCount)}</span>
+            <span className="text-emergency-amber/90 me-2"> · {t.codeBlue.equipmentLogCount(equipmentLogCount)}</span>
           )}
         </div>
       </div>
@@ -411,11 +411,11 @@ function ActiveSession() {
         <button
           type="button"
           onClick={() => setShowEquipPicker(true)}
-          className="w-full mb-2 bg-amber-900/50 hover:bg-amber-800/50 border border-amber-700/50 rounded-lg p-4 text-center"
+          className="w-full mb-2 bg-emergency-amber/15 hover:bg-emergency-amber/25 border border-emergency-amber/40 rounded-lg p-4 text-center"
         >
-          <Package className="h-6 w-6 text-amber-300 mx-auto mb-1" />
-          <div className="text-amber-100 font-bold text-sm">{t.codeBlue.linkedEquipment}</div>
-          <div className="text-amber-200/70 text-xs mt-0.5">{t.codeBlue.linkedEquipmentHint}</div>
+          <Package className="h-6 w-6 text-emergency-amber mx-auto mb-1" />
+          <div className="text-emergency-amber font-bold text-sm">{t.codeBlue.linkedEquipment}</div>
+          <div className="text-emergency-amber/70 text-xs mt-0.5">{t.codeBlue.linkedEquipmentHint}</div>
         </button>
         <div className="grid grid-cols-2 gap-2 mb-3">
           <button
@@ -471,12 +471,12 @@ function ActiveSession() {
               <span className="text-emergency-text2 font-mono shrink-0">{formatElapsed(entry.elapsedMs)}</span>
               <span className={cn(
                 "shrink-0 vt-text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded",
-                entry.category === "equipment" ? "bg-amber-500/20 text-amber-300" : "bg-emergency-border text-emergency-text2",
+                entry.category === "equipment" ? "bg-emergency-amber/20 text-emergency-amber" : "bg-emergency-border text-emergency-text2",
               )}>
                 {entry.category === "equipment" ? t.codeBlue.categoryEquipment : t.codeBlue.categoryNote}
               </span>
               <span className="text-emergency-text min-w-0 truncate">{entry.label}</span>
-              <span className="text-green-400 mr-auto shrink-0">{entry.loggedByName}</span>
+              <span className="text-[rgb(var(--sys-green))] mr-auto shrink-0">{entry.loggedByName}</span>
             </div>
           ))}
           {logEntries.length === 0 && (

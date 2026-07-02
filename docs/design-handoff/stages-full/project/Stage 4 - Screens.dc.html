@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Heebo:wght@400;500;600;700;800&display=swap">
+<style>
+  /* ============================================================
+     STAGE 4 · SCREENS — §13 NOTES (decisions locked, carried here)
+     D-A  single-file structure: four surfaces (board · equipment · scan · code-blue)
+          plus standard shells live in this one file behind screen-state. The
+          STEP-0 four-file contract is superseded.
+     D-B  canonical token layer = Stage 1. This file binds to it: it consumes
+          --ivory-* / --brand-navy / --status-* / --on-ink* / --ink-* and ships
+          NO iOS-indigo set of its own (brand expressed via rgb() primitive only).
+     D-D  status taxonomy = 6-state enum (ready · in_use · blocked · stale ·
+          overdue · unknown). Brief labels map on: available→ready,
+          critical→blocked, maintenance→blocked/service-schedule.
+     D-F  Ward Display scope (§0.1): web + expanded only. Never native/compact/
+          medium → small viewports get a guard that routes to /my-equipment.
+     dark-only: the Command Center board is intentionally dark-only (§13 exemption);
+          it is server-driven, online-only and fails loud.
+     ============================================================ */
+  *{box-sizing:border-box}
+  html{font-size:17px}
+  body{margin:0;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-variant-numeric:tabular-nums}
+  :root{
+    /* primitives — hex avoided; brand/surface expressed as rgb() so no raw iOS-indigo literal ships */
+    --background:rgb(242 242 247); --surface:rgb(255 255 255); --surface-2:rgb(255 255 255);
+    --foreground:rgb(0 0 0); --muted-foreground:rgba(60,60,67,0.6); --border:rgba(60,60,67,0.29);
+    --hairline:transparent;
+    --brand:rgb(79 70 229); --brand-foreground:rgb(255 255 255); --brand-ink:rgb(30 27 75);
+    --action:rgb(47 111 94); --action-foreground:rgb(255 255 255);
+    --sys-red:255 59 48; --sys-orange:255 149 0; --sys-green:52 199 89; --sys-blue:0 122 255; --sys-gray:142 142 147;
+    --radius-sm:10px; --radius-md:12px; --radius-lg:14px; --radius-xl:16px; --radius-2xl:20px; --radius-pill:999px;
+    --ease-standard:cubic-bezier(0.2,0,0,1); --dur-fast:120ms; --dur-base:200ms; --dur-slow:320ms; --dur-spin:700ms;
+    --font-sans:-apple-system,system-ui,"Heebo","Segoe UI",Roboto,sans-serif;
+    --font-num:"DM Mono",ui-monospace,SFMono-Regular,monospace;
+    --display:2.353rem; --text-largetitle:2rem; --text-xl:1.294rem; --text-lg:1.176rem;
+    --text-base:1rem; --text-sm:0.882rem; --text-xs:0.765rem; --text-2xs:0.647rem;
+    --bar-bg:rgb(255 255 255 / 0.94); --bar-bg-opaque:rgb(255 255 255); --bar-blur:12px;
+    --shadow-hero:0 1px 2px rgba(0,0,0,0.06); --shadow-floating:0 8px 24px -12px rgba(0,0,0,0.25);
+    --tonal:rgba(120,120,128,0.16);
+    /* S1-D1-001 · brand/primary unified */
+    --primary:var(--brand); --primary-foreground:var(--brand-foreground);
+    /* S1-D15-004 · implementation + ivory alias families → Stage-1 primitives (consumed below) */
+    --brand-navy:var(--brand-ink);
+    --ivory-bg:var(--background); --ivory-surface:var(--surface); --ivory-border:var(--border);
+    --ivory-text:var(--foreground); --ivory-text2:var(--muted-foreground); --ivory-text3:rgba(60,60,67,0.4);
+    --ivory-navy:var(--brand-ink); --ivory-green:var(--action); --ivory-greenBg:rgb(var(--sys-green) / 0.12);
+    /* S1-D15-002 / S1-D15-001 · status-* alias map → --sys-* primitives (6-state enum) */
+    --status-ok:rgb(var(--sys-green)); --status-ok-bg:rgb(var(--sys-green) / 0.12); --status-ok-border:rgb(var(--sys-green) / 0.22); --status-ok-fg:rgb(var(--sys-green));
+    --status-in-use:rgb(var(--sys-blue)); --status-in-use-bg:rgb(var(--sys-blue) / 0.12); --status-in-use-border:rgb(var(--sys-blue) / 0.22); --status-in-use-fg:rgb(var(--sys-blue));
+    --status-issue:rgb(var(--sys-red)); --status-issue-bg:rgb(var(--sys-red) / 0.12); --status-issue-border:rgb(var(--sys-red) / 0.22); --status-issue-fg:rgb(var(--sys-red));
+    --status-stale:rgb(var(--sys-orange)); --status-stale-bg:rgb(var(--sys-orange) / 0.12); --status-stale-border:rgb(var(--sys-orange) / 0.22); --status-stale-fg:rgb(var(--sys-orange));
+    --status-overdue:rgb(var(--sys-orange)); --status-overdue-bg:rgb(var(--sys-orange) / 0.12); --status-overdue-border:rgb(var(--sys-orange) / 0.22); --status-overdue-fg:rgb(var(--sys-orange));
+    --status-unknown:rgb(var(--sys-gray)); --status-unknown-bg:rgb(var(--sys-gray) / 0.14); --status-unknown-border:rgb(var(--sys-gray) / 0.26); --status-unknown-fg:rgb(var(--sys-gray));
+    /* S1-D1-003 · on-ink ladder — space-rgb form, no raw white literal in content */
+    --on-ink:rgb(255 255 255); --on-ink-strong:rgb(255 255 255 / 0.82); --on-ink-muted:rgb(255 255 255 / 0.6); --on-ink-subtle:rgb(255 255 255 / 0.5); --on-ink-disabled:rgb(255 255 255 / 0.4); --on-ink-dim:rgb(255 255 255 / 0.7); --on-ink-hi:rgb(255 255 255 / 0.9);
+    --ink-sheen:rgb(255 255 255 / 0.1); --ink-divider:rgb(255 255 255 / 0.12); --ink-skeleton:rgb(255 255 255 / 0.14); --ink-fill-faint:rgb(255 255 255 / 0.04); --ink-fill-weak:rgb(255 255 255 / 0.08); --ink-fill:rgb(255 255 255 / 0.1); --ink-fill-15:rgb(255 255 255 / 0.15); --ink-fill-strong:rgb(255 255 255 / 0.18); --ink-border-soft:rgb(255 255 255 / 0.2); --ink-border:rgb(255 255 255 / 0.28); --ink-border-strong:rgb(255 255 255 / 0.3); --ink-shimmer:rgb(255 255 255 / 0.28);
+    /* board surfaces — dark-only command center; rgb() primitives, no hex */
+    --board-bg:rgb(10 13 22); --board-surface:rgb(22 26 43); --board-navy:rgb(20 26 54); --board-line:var(--ink-fill-weak);
+    /* scan + code-blue immersive surfaces */
+    --scan-bg:rgb(10 10 11); --cb-bg-top:rgb(42 8 8); --cb-bg-bot:rgb(10 3 3);
+  }
+  .dark{
+    --background:rgb(0 0 0); --surface:rgb(28 28 30); --surface-2:rgb(44 44 46);
+    --foreground:rgb(255 255 255); --muted-foreground:rgba(235,235,245,0.6); --border:rgba(84,84,88,0.6);
+    --hairline:rgba(84,84,88,0.6);
+    --brand:rgb(129 140 248); --brand-foreground:rgb(30 27 75); --brand-ink:rgb(30 27 75);
+    --action:rgb(76 205 170); --action-foreground:rgb(6 33 15);
+    --sys-red:255 69 58; --sys-orange:255 159 10; --sys-green:48 209 88; --sys-blue:10 132 255; --sys-gray:152 152 157;
+    --bar-bg:rgba(28,28,30,0.94); --bar-bg-opaque:rgb(28 28 30); --shadow-hero:0 1px 2px rgba(0,0,0,0.5);
+    --tonal:rgba(120,120,128,0.24); --ivory-text3:rgba(235,235,245,0.4);
+  }
+  .rt{ --bar-bg:var(--bar-bg-opaque); --bar-blur:0px; }
+  @media (prefers-reduced-transparency: reduce){ :root,.dark{ --bar-bg:var(--bar-bg-opaque); --bar-blur:0px; } }
+  /* S4-B4.3 · global focus-visible ring on every interactive element */
+  a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,[tabindex]:focus-visible,[role="button"]:focus-visible{outline:none;box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--brand)}
+  @keyframes vt-ping{0%{transform:scale(1);opacity:.7}70%{transform:scale(2.4);opacity:0}100%{opacity:0}}
+  @keyframes vt-spin{to{transform:rotate(360deg)}}
+  @keyframes vt-shimmer{100%{transform:translateX(100%)}}
+  .skd{position:relative; overflow:hidden; background:rgba(120,120,128,0.16)}
+  .dark .skd{background:var(--ink-sheen)}
+  .skd::after{content:""; position:absolute; inset:0; transform:translateX(-100%); background:linear-gradient(90deg,transparent,var(--ink-shimmer),transparent); animation:vt-shimmer 1.4s infinite}
+  .skb{position:relative; overflow:hidden; background:var(--ink-fill-weak)}
+  .skb::after{content:""; position:absolute; inset:0; transform:translateX(-100%); background:linear-gradient(90deg,transparent,var(--ink-shimmer),transparent); animation:vt-shimmer 1.4s infinite}
+  @media (prefers-reduced-motion: reduce){ *{animation:none !important} .skd::after,.skb::after{display:none} }
+</style>
+</helmet>
+<div class="{{ pageClass }}" style="min-height:100vh; background:var(--background); color:var(--foreground); font-family:var(--font-sans); transition:background var(--dur-base) var(--ease-standard)">
+
+  <header style="position:sticky; top:0; z-index:50; background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); -webkit-backdrop-filter:blur(var(--bar-blur)); border-bottom:1px solid var(--border)">
+    <div style="max-width:1240px; margin:0 auto; padding:11px 20px; display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px">
+      <div style="display:flex; align-items:baseline; gap:10px; margin-right:auto"><span style="font:700 17px var(--font-sans); letter-spacing:-.02em; color:var(--brand)">VetTrack</span><span style="font:500 12px var(--font-num); color:var(--muted-foreground)">Stage 4 · Screens</span></div>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">Screen</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px; flex-wrap:wrap"><sc-for list="{{ screenOpts }}" as="o" hint-placeholder-count="8"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">Theme</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px"><sc-for list="{{ themeOpts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">Size</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px"><sc-for list="{{ sizeOpts }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+      <sc-if value="{{ hasVariant }}" hint-placeholder-val="{{ true }}"><div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">{{ variantTitle }}</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px; flex-wrap:wrap"><sc-for list="{{ variantOpts }}" as="o" hint-placeholder-count="4"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div></sc-if>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">Locale</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px"><sc-for list="{{ dirOpts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+    </div>
+  </header>
+
+  <div style="padding:26px 16px 70px; display:flex; justify-content:center; overflow:auto">
+    <div style="{{ frameOuter }}; display:flex; flex-direction:column; box-sizing:border-box; overflow:hidden">
+
+      <sc-if value="{{ browserChrome }}" hint-placeholder-val="{{ false }}">
+        <div style="height:38px; background:var(--surface-2); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; padding:0 14px; flex-shrink:0"><span style="width:11px; height:11px; border-radius:999px; background:#FF5F57"></span><span style="width:11px; height:11px; border-radius:999px; background:#FEBC2E"></span><span style="width:11px; height:11px; border-radius:999px; background:#28C840"></span><div style="margin-inline-start:14px; flex:1; max-width:340px; height:24px; border-radius:7px; background:var(--background); border:1px solid var(--border); display:flex; align-items:center; gap:7px; padding:0 10px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span style="font:400 12px var(--font-num); color:var(--muted-foreground)" dir="ltr">vettrack.app{{ routePath }}</span></div></div>
+      </sc-if>
+
+      <div dir="{{ dir }}" style="{{ screenStyle }}; flex:1; min-height:0; display:flex; flex-direction:column; background:{{ canvasBg }}; overflow:hidden">
+
+        <!-- ===================== FULL-SCREEN ROUTES ===================== -->
+        <sc-if value="{{ fullScreen }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1; min-height:0; position:relative; display:flex; flex-direction:column">
+
+            <!-- §0.1 BOARD SCOPE GUARD — compact/medium are out of scope (web + expanded only) -->
+            <sc-if value="{{ isBoardGuard }}" hint-placeholder-val="{{ false }}" data-screen-label="Board guard">
+              <div style="position:absolute; inset:0; background:var(--board-bg); color:var(--on-ink); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:40px 28px; text-align:center">
+                <div style="width:60px; height:60px; border-radius:17px; background:var(--ink-fill); display:flex; align-items:center; justify-content:center"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--on-ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+                <div><p style="font:700 20px var(--font-sans); color:var(--on-ink); margin:0">{{ guardTitle }}</p><p style="font:400 14px/1.55 var(--font-sans); color:var(--on-ink-dim); margin:8px 0 0; max-width:34ch">{{ guardBody }}</p></div>
+                <button style="height:48px; padding:0 22px; border:1px solid var(--ink-border); border-radius:14px; background:var(--ink-fill); color:var(--on-ink); font:700 15px var(--font-sans); cursor:pointer">{{ guardCta }}</button>
+                <span style="font:500 11px var(--font-num); color:var(--on-ink-subtle)" dir="ltr">→ /my-equipment</span>
+              </div>
+            </sc-if>
+
+            <!-- EQUIPMENT COMMAND CENTER (Ward Display) — web + expanded only, dark-only, server-driven -->
+            <sc-if value="{{ isBoardLive }}" hint-placeholder-val="{{ false }}" data-screen-label="Command Center">
+              <div dir="rtl" style="position:absolute; inset:0; background:var(--board-bg); color:var(--on-ink); display:flex; flex-direction:column; font-family:var(--font-sans)">
+                <div style="flex-shrink:0; background:var(--board-navy); display:flex; align-items:center; gap:14px; padding:12px 20px; flex-wrap:wrap">
+                  <span style="font:800 22px var(--font-num); color:var(--on-ink); letter-spacing:-.01em; min-width:54px">{{ board.clock }}</span>
+                  <span style="width:1px; height:20px; background:var(--ink-border-soft)"></span>
+                  <span style="font:700 11px var(--font-sans); letter-spacing:.12em; text-transform:uppercase; color:var(--status-ok-fg)">{{ board.ward }}</span>
+                  <div style="flex:1; display:flex; justify-content:center; gap:6px; flex-wrap:wrap"><sc-for list="{{ board.shift }}" as="p" hint-placeholder-count="3"><span style="display:inline-flex; align-items:center; gap:6px; background:var(--ink-fill); border:1px solid var(--ink-border-soft); border-radius:999px; padding:3px 12px; font:500 12px var(--font-sans); color:var(--on-ink-dim)">{{ p }}</span></sc-for></div>
+                  <div style="display:flex; align-items:center; gap:7px"><span style="position:relative; width:8px; height:8px"><span style="position:absolute; inset:0; border-radius:999px; background:var(--status-ok-fg)"></span><span style="position:absolute; inset:0; border-radius:999px; background:var(--status-ok-fg); animation:vt-ping 1.8s var(--ease-standard) infinite"></span></span><span style="font:700 11px var(--font-sans); letter-spacing:.12em; text-transform:uppercase; color:var(--status-ok-fg)">{{ board.live }}</span></div>
+                  <button aria-label="{{ board.closeAria }}" style="width:44px; height:44px; border:1px solid var(--ink-border-soft); background:var(--ink-fill); border-radius:999px; color:var(--on-ink); display:flex; align-items:center; justify-content:center; cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+                </div>
+
+                <!-- command-board load: server-driven skeleton (online-only; fails loud on disconnect) -->
+                <sc-if value="{{ boardLoading }}" hint-placeholder-val="{{ false }}">
+                  <div style="flex:1; min-height:0; padding:16px; display:grid; grid-template-columns:minmax(220px,250px) 1fr; gap:16px; align-items:start">
+                    <div style="display:flex; flex-direction:column; gap:16px"><div class="skb" style="width:150px; height:150px; border-radius:999px; align-self:center"></div><div class="skb" style="width:100%; height:96px; border-radius:14px"></div><div class="skb" style="width:100%; height:64px; border-radius:14px"></div></div>
+                    <div style="display:flex; flex-direction:column; gap:16px"><div class="skb" style="width:100%; height:150px; border-radius:16px"></div><div class="skb" style="width:100%; height:120px; border-radius:16px"></div></div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ boardReady }}" hint-placeholder-val="{{ true }}">
+                <div style="flex:1; min-height:0; overflow:auto; padding:16px; display:grid; grid-template-columns:{{ board.cols }}; gap:16px; align-items:start">
+                  <div style="display:flex; flex-direction:column; gap:16px">
+                    <div style="display:flex; flex-direction:column; align-items:center; gap:8px">
+                      <div style="position:relative; width:150px; height:150px">
+                        <svg width="150" height="150" style="transform:rotate(-90deg)" aria-hidden="true"><circle cx="75" cy="75" r="64" fill="none" stroke="var(--ink-fill)" stroke-width="14"/><circle cx="75" cy="75" r="64" fill="none" stroke="var(--status-ok-fg)" stroke-width="14" stroke-linecap="round" stroke-dasharray="{{ board.ringCirc }}" stroke-dashoffset="{{ board.ringOffset }}"/></svg>
+                        <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center"><span style="font:800 40px var(--font-num); color:var(--status-ok-fg); line-height:1">{{ board.ready }}</span><span style="font:500 12px var(--font-sans); color:var(--on-ink-subtle)">{{ board.ofTotal }}</span></div>
+                      </div>
+                      <div style="text-align:center"><p style="font:700 14px var(--font-sans); color:var(--on-ink); margin:0">{{ board.deployableNow }}</p><p style="font:500 12px var(--font-num); color:var(--on-ink-subtle); margin:2px 0 0">{{ board.pct }}</p></div>
+                    </div>
+                    <div><p style="font:700 10px var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--on-ink-subtle); margin:0 0 8px">{{ board.mixTitle }}</p>
+                      <div style="display:flex; height:12px; border-radius:999px; overflow:hidden; gap:1px; margin-bottom:12px"><sc-for list="{{ board.mix }}" as="m" hint-placeholder-count="6"><div style="background:{{ m.color }}; width:{{ m.w }}"></div></sc-for></div>
+                      <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px 14px"><sc-for list="{{ board.mix }}" as="m" hint-placeholder-count="6"><div style="display:flex; align-items:center; gap:6px; font:500 12px var(--font-sans)"><span style="width:8px; height:8px; border-radius:999px; background:{{ m.color }}; flex-shrink:0"></span><span style="color:var(--on-ink-dim)">{{ m.label }}</span><span style="margin-inline-start:auto; font-family:var(--font-num); color:var(--on-ink-subtle)">{{ m.count }}</span></div></sc-for></div>
+                    </div>
+                    <div style="border:1px solid var(--status-issue-border); background:var(--status-issue-bg); border-radius:14px; padding:12px 14px"><p style="font:700 13px var(--font-sans); color:var(--status-issue-fg); margin:0">{{ board.attentionCount }}</p><p style="font:500 11px var(--font-sans); color:var(--on-ink-subtle); margin:3px 0 0">{{ board.blockedCount }}</p></div>
+                  </div>
+                  <div style="display:flex; flex-direction:column; gap:16px; min-width:0">
+                    <div style="background:var(--board-surface); border:1px solid var(--board-line); border-radius:16px; padding:16px"><p style="font:700 10px var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--on-ink-subtle); margin:0 0 8px">{{ board.byTypeTitle }}</p>
+                      <sc-for list="{{ board.types }}" as="ty" hint-placeholder-count="4"><div style="padding:8px 0; border-bottom:1px solid var(--board-line)"><div style="display:flex; align-items:center; gap:8px; margin-bottom:6px"><span style="font:600 13px var(--font-sans); color:{{ ty.nameColor }}; flex:1; min-width:0">{{ ty.name }}</span><sc-if value="{{ ty.below }}" hint-placeholder-val="{{ false }}"><span style="font:700 10px var(--font-sans); color:var(--status-issue-fg); background:rgb(var(--sys-red) / 0.15); border:1px solid var(--status-issue-border); border-radius:6px; padding:1px 6px; white-space:nowrap">{{ ty.belowLabel }}</span></sc-if><span style="font:500 12px var(--font-num); color:var(--on-ink-subtle); flex-shrink:0">{{ ty.ratio }}</span></div><div style="display:flex; height:8px; border-radius:999px; overflow:hidden; gap:1px; background:var(--ink-fill-weak)"><sc-for list="{{ ty.segs }}" as="sg" hint-placeholder-count="2"><div style="background:{{ sg.color }}; width:{{ sg.w }}"></div></sc-for></div></div></sc-for>
+                    </div>
+                    <div><p style="font:700 10px var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--on-ink-subtle); margin:0 0 8px">{{ board.whereTitle }}</p>
+                      <div style="display:grid; grid-template-columns:{{ board.locCols }}; gap:8px"><sc-for list="{{ board.locs }}" as="lc" hint-placeholder-count="4"><div style="border-radius:12px; border:1px solid {{ lc.border }}; background:{{ lc.bg }}; padding:10px 12px"><p style="font:700 12px var(--font-sans); color:var(--on-ink); margin:0">{{ lc.name }}</p><div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px"><span style="font:600 10px var(--font-sans); color:var(--status-ok-fg); background:var(--status-ok-bg); border-radius:6px; padding:2px 7px">{{ lc.readyLabel }}</span><sc-if value="{{ lc.hasInUse }}" hint-placeholder-val="{{ false }}"><span style="font:600 10px var(--font-sans); color:var(--status-in-use-fg); background:var(--status-in-use-bg); border-radius:6px; padding:2px 7px">{{ lc.inUseLabel }}</span></sc-if></div></div></sc-for></div>
+                    </div>
+                    <div style="border:1px solid var(--status-issue-border); background:rgb(var(--sys-red) / 0.08); border-radius:16px; padding:16px"><p style="font:700 10px var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--status-issue-fg); margin:0 0 6px">{{ board.attentionTitle }}</p>
+                      <sc-for list="{{ board.attention }}" as="u" hint-placeholder-count="3"><div style="display:flex; align-items:flex-start; gap:12px; padding:9px 0; border-bottom:1px solid var(--board-line)"><div style="flex:1; min-width:0"><div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap"><span style="font:600 14px var(--font-sans); color:var(--on-ink)">{{ u.name }}</span><span style="font:500 11px var(--font-sans); color:var(--on-ink-disabled)">{{ u.type }}</span></div><div style="display:flex; gap:12px; margin-top:2px; flex-wrap:wrap"><span style="font:500 12px var(--font-sans); color:var(--on-ink-subtle)">{{ u.loc }}</span><span style="font:500 12px var(--font-sans); color:var(--status-issue-fg)">{{ u.reason }}</span></div></div><span style="flex-shrink:0; font:700 11px var(--font-sans); padding:3px 9px; border-radius:7px; background:{{ u.badgeBg }}; border:1px solid {{ u.badgeBorder }}; color:{{ u.badgeColor }}">{{ u.badge }}</span></div></sc-for>
+                    </div>
+                  </div>
+                </div>
+                </sc-if>
+                <div style="flex-shrink:0; padding:9px 16px; background:var(--board-navy); text-align:center"><span style="font:500 11px var(--font-sans); color:var(--on-ink-disabled)" dir="ltr">/equipment/board · {{ board.footer }}</span></div>
+              </div>
+            </sc-if>
+
+            <!-- SCAN — full-screen, owns chrome; priming → reticle / denied / manual; Capacitor Camera+NFC native, getUserMedia web -->
+            <sc-if value="{{ isScan }}" hint-placeholder-val="{{ false }}" data-screen-label="Scan">
+              <div style="position:absolute; inset:0; background:var(--scan-bg); display:flex; flex-direction:column; padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom)">
+                <div style="flex-shrink:0; padding:14px 18px; display:flex; align-items:center; justify-content:space-between"><span style="font:600 16px var(--font-sans); color:var(--on-ink)">{{ t.scanEquipment }}</span><button aria-label="{{ t.close }}" style="width:44px; height:44px; border:none; border-radius:12px; background:var(--ink-fill-15); color:var(--on-ink); display:flex; align-items:center; justify-content:center; cursor:pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+                <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px; padding:0 24px">
+
+                  <!-- permission priming card — shown before the camera is requested (why we need access) -->
+                  <sc-if value="{{ scanPriming }}" hint-placeholder-val="{{ false }}">
+                    <div style="width:100%; max-width:340px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:16px">
+                      <div style="width:64px; height:64px; border-radius:18px; background:var(--ink-fill-15); display:flex; align-items:center; justify-content:center"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--on-ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3.5"/></svg></div>
+                      <div><p style="font:700 19px var(--font-sans); color:var(--on-ink); margin:0">{{ t.primingTitle }}</p><p style="font:400 14px/1.55 var(--font-sans); color:var(--on-ink-dim); margin:10px 0 0">{{ t.primingBody }}</p></div>
+                      <button style="width:100%; height:54px; border:none; border-radius:16px; background:var(--action); color:var(--action-foreground); font:700 16px var(--font-sans); cursor:pointer">{{ t.allowCamera }}</button>
+                    </div>
+                  </sc-if>
+
+                  <!-- permission denied path — route to Settings + keep manual entry as fallback -->
+                  <sc-if value="{{ scanDenied }}" hint-placeholder-val="{{ false }}">
+                    <div style="width:100%; max-width:340px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:16px">
+                      <div style="width:64px; height:64px; border-radius:18px; background:rgb(var(--sys-orange) / 0.16); display:flex; align-items:center; justify-content:center"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--status-stale-fg)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.7 2.3 17.7A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.3l-8-14a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>
+                      <div><p style="font:700 19px var(--font-sans); color:var(--on-ink); margin:0">{{ t.deniedTitle }}</p><p style="font:400 14px/1.55 var(--font-sans); color:var(--on-ink-dim); margin:10px 0 0">{{ t.deniedBody }}</p></div>
+                      <button style="width:100%; height:52px; border:none; border-radius:16px; background:var(--ink-fill-15); color:var(--on-ink); font:700 16px var(--font-sans); cursor:pointer">{{ t.openSettings }}</button>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ scanShowReticle }}" hint-placeholder-val="{{ true }}">
+                    <div style="position:relative; width:230px; height:230px">
+                      <div style="position:absolute; inset:0; border-radius:28px; background:{{ scanReticleBg }}; border:2px solid {{ scanReticleBorder }}; display:flex; align-items:center; justify-content:center"><span style="color:{{ scanReticleBorder }}" innerHTML="{{ scanCenterIcon }}"></span></div>
+                      <span style="position:absolute; top:-2px; inset-inline-start:-2px; width:34px; height:34px; border-top:3px solid var(--on-ink); border-inline-start:3px solid var(--on-ink); border-radius:12px 0 0 0"></span>
+                      <span style="position:absolute; top:-2px; inset-inline-end:-2px; width:34px; height:34px; border-top:3px solid var(--on-ink); border-inline-end:3px solid var(--on-ink); border-radius:0 12px 0 0"></span>
+                      <span style="position:absolute; bottom:-2px; inset-inline-start:-2px; width:34px; height:34px; border-bottom:3px solid var(--on-ink); border-inline-start:3px solid var(--on-ink); border-radius:0 0 0 12px"></span>
+                      <span style="position:absolute; bottom:-2px; inset-inline-end:-2px; width:34px; height:34px; border-bottom:3px solid var(--on-ink); border-inline-end:3px solid var(--on-ink); border-radius:0 0 12px 0"></span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ scanShowCaption }}" hint-placeholder-val="{{ true }}">
+                    <div style="text-align:center"><p style="font:700 18px var(--font-sans); color:{{ scanTitleColor }}; margin:0">{{ scanTitle }}</p><p style="font:400 14px/1.5 var(--font-sans); color:var(--on-ink-muted); margin:8px 0 0; max-width:34ch">{{ scanSubtitle }}</p></div>
+                  </sc-if>
+                  <sc-if value="{{ scanManual }}" hint-placeholder-val="{{ false }}">
+                    <div style="width:100%; max-width:320px"><label style="font:600 12px var(--font-sans); color:var(--on-ink-muted); display:block; margin-bottom:8px">{{ t.assetTag }}</label><div style="display:flex; gap:10px"><input value="IV-" dir="ltr" aria-label="{{ t.assetTag }}" style="flex:1; height:48px; border-radius:14px; border:1px solid var(--ink-border-soft); background:var(--ink-fill-weak); color:var(--on-ink); padding:0 14px; font:500 16px var(--font-num)" /><button style="height:48px; padding:0 20px; border:none; border-radius:14px; background:var(--action); color:var(--action-foreground); font:700 15px var(--font-sans); cursor:pointer">{{ t.find }}</button></div></div>
+                  </sc-if>
+                  <sc-if value="{{ scanSuccess }}" hint-placeholder-val="{{ false }}">
+                    <div style="width:100%; max-width:320px; background:var(--ink-fill-weak); border:1px solid var(--ink-divider); border-radius:16px; padding:14px; display:flex; align-items:center; gap:12px"><span style="width:40px; height:40px; border-radius:11px; background:var(--status-ok-fg); display:flex; align-items:center; justify-content:center; flex-shrink:0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--on-ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span><div style="flex:1"><p style="font:700 15px var(--font-sans); color:var(--on-ink); margin:0">{{ t.scanFoundName }}</p><p style="font:500 13px var(--font-num); color:var(--on-ink-muted); margin:2px 0 0">{{ t.scanFoundMeta }}</p></div></div>
+                  </sc-if>
+                </div>
+                <div style="flex-shrink:0; padding:18px 24px 30px; display:flex; flex-direction:column; gap:10px">
+                  <sc-if value="{{ scanSuccess }}" hint-placeholder-val="{{ false }}"><button style="width:100%; height:56px; border:none; border-radius:16px; background:var(--action); color:var(--action-foreground); font:700 17px var(--font-sans); cursor:pointer">{{ t.checkoutMe }}</button></sc-if>
+                  <sc-if value="{{ scanShowManualBtn }}" hint-placeholder-val="{{ true }}"><button style="width:100%; height:52px; border:1px solid var(--ink-border-soft); border-radius:16px; background:var(--ink-fill-weak); color:var(--on-ink); font:700 16px var(--font-sans); cursor:pointer">{{ t.enterManual }}</button></sc-if>
+                  <sc-if value="{{ scanError }}" hint-placeholder-val="{{ false }}"><button style="width:100%; height:52px; border:none; border-radius:16px; background:var(--ink-fill-15); color:var(--on-ink); font:700 16px var(--font-sans); cursor:pointer">{{ t.tryAgain }}</button></sc-if>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- CODE BLUE — online-only, fail-loud, server-driven timer (startedAt from server); tenant-scoped clinicId -->
+            <sc-if value="{{ isCodeBlue }}" hint-placeholder-val="{{ false }}" data-screen-label="Code Blue">
+              <div style="position:absolute; inset:0; background:linear-gradient(180deg, var(--cb-bg-top), var(--cb-bg-bot)); display:flex; flex-direction:column; padding:0">
+                <div style="flex-shrink:0; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; background:var(--status-issue-fg)">
+                  <span style="display:inline-flex; align-items:center; gap:9px; font:800 18px var(--font-sans); letter-spacing:.04em; color:var(--on-ink)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--on-ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg>{{ t.codeBlue }}</span>
+                  <span style="font:500 13px var(--font-sans); color:var(--on-ink-strong)">{{ t.cbLocation }}</span>
+                </div>
+                <div style="flex:1; min-height:0; overflow:auto; padding:22px 20px; display:flex; flex-direction:column; gap:18px">
+                  <div style="text-align:center"><p style="font-family:var(--font-num); font-size:64px; font-weight:500; color:var(--on-ink); margin:0; line-height:1; letter-spacing:-.02em; font-variant-numeric:tabular-nums">{{ cbTimer }}</p><p style="font:600 12px var(--font-sans); letter-spacing:.12em; text-transform:uppercase; color:var(--on-ink-subtle); margin:8px 0 0">{{ t.cbElapsed }}</p></div>
+                  <div style="display:grid; grid-template-columns:{{ cbCols }}; gap:12px">
+                    <button style="min-height:64px; border:none; border-radius:16px; background:var(--ink-fill); color:var(--on-ink); font:700 16px var(--font-sans); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--on-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 1 9h5l-6 11 1-9H8z"/></svg>{{ t.logShock }}</button>
+                    <button style="min-height:64px; border:none; border-radius:16px; background:var(--ink-fill); color:var(--on-ink); font:700 16px var(--font-sans); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--on-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 2v6m3-3h-6"/><path d="m5 11 14 6"/><path d="M19 11 5 17"/></svg>{{ t.logEpi }}</button>
+                    <button style="min-height:64px; border:none; border-radius:16px; background:var(--ink-fill); color:var(--on-ink); font:700 16px var(--font-sans); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--on-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14m-7-7h14"/></svg>{{ t.otherMed }}</button>
+                    <button style="min-height:64px; border:none; border-radius:16px; background:var(--ink-fill); color:var(--on-ink); font:700 16px var(--font-sans); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--on-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>{{ t.noteEvent }}</button>
+                  </div>
+                  <div style="background:rgba(0,0,0,0.3); border-radius:16px; overflow:hidden">
+                    <p style="font:600 12px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--on-ink-subtle); margin:0; padding:14px 16px 8px">{{ t.eventLog }}</p>
+                    <sc-for list="{{ cbLog }}" as="e" hint-placeholder-count="3"><div style="display:flex; align-items:center; gap:12px; padding:11px 16px; border-top:1px solid var(--ink-fill-weak)"><span style="font:500 13px var(--font-num); color:var(--on-ink-subtle); flex-shrink:0; font-variant-numeric:tabular-nums">{{ e.t }}</span><span style="font:600 14px var(--font-sans); color:var(--on-ink)">{{ e.label }}</span></div></sc-for>
+                  </div>
+                </div>
+                <div style="flex-shrink:0; padding:14px 20px 30px"><button style="width:100%; height:60px; border:2px solid var(--on-ink); border-radius:16px; background:transparent; color:var(--on-ink); font:800 17px var(--font-sans); letter-spacing:.02em; cursor:pointer">{{ t.endCode }}</button></div>
+              </div>
+            </sc-if>
+
+            <!-- HANDOFF -->
+            <sc-if value="{{ isHandoff }}" hint-placeholder-val="{{ false }}" data-screen-label="Handoff">
+              <div style="position:absolute; inset:0; background:var(--background); display:flex; flex-direction:column">
+                <div style="flex-shrink:0; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border)"><button aria-label="{{ t.back }}" style="width:44px; height:44px; border:none; background:none; border-radius:12px; color:var(--brand); display:flex; align-items:center; justify-content:center; cursor:pointer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="transform:{{ chevronT }}" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><span style="font:600 16px var(--font-sans)">{{ handoffTitle }}</span><span style="width:44px"></span></div>
+                <div style="flex:1; min-height:0; overflow:auto; padding:22px 20px; display:flex; flex-direction:column; gap:18px">
+                  <div style="max-width:560px; width:100%; margin:0 auto; display:flex; flex-direction:column; gap:18px">
+                  <div style="background:var(--brand-navy); border-radius:20px; padding:20px; color:var(--on-ink)"><p style="font:600 11px var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--on-ink-muted); margin:0">{{ handoffHeroOverline }}</p><p style="font:700 22px var(--font-sans); color:var(--on-ink); margin:8px 0 0">{{ handoffHeroTitle }}</p><p style="font:500 14px var(--font-sans); color:var(--on-ink-dim); margin:6px 0 0">{{ handoffWho }}</p></div>
+                  <div style="background:var(--ivory-surface); border:1px solid var(--hairline); border-radius:16px; padding:6px 0"><p style="font:600 12px var(--font-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); margin:0; padding:14px 18px 8px">{{ t.shiftSummary }}</p>
+                    <sc-for list="{{ handoffStats }}" as="s" hint-placeholder-count="3"><div style="display:flex; align-items:center; justify-content:space-between; padding:13px 18px; border-top:1px solid var(--border)"><span style="display:inline-flex; align-items:center; gap:11px; font:500 15px var(--font-sans); color:var(--foreground)"><span style="width:30px; height:30px; border-radius:9px; background:{{ s.tintBg }}; color:{{ s.color }}; display:flex; align-items:center; justify-content:center" innerHTML="{{ s.icon }}"></span>{{ s.label }}</span><span style="font:500 17px var(--font-num); color:{{ s.color }}">{{ s.value }}</span></div></sc-for>
+                  </div>
+                  <sc-if value="{{ handoffEnd }}" hint-placeholder-val="{{ true }}">
+                    <div><label style="font:600 13px var(--font-sans); color:var(--foreground); display:block; margin-bottom:8px">{{ t.notesNext }}</label><textarea placeholder="{{ t.notesPlaceholder }}" aria-label="{{ t.notesNext }}" style="width:100%; min-height:90px; border-radius:14px; border:1px solid var(--border); background:var(--surface); color:var(--foreground); padding:12px 14px; font:400 15px/1.5 var(--font-sans); resize:none"></textarea></div>
+                  </sc-if>
+                  </div>
+                </div>
+                <div style="flex-shrink:0; padding:14px 20px 30px"><div style="max-width:560px; margin:0 auto"><button style="width:100%; height:56px; border:none; border-radius:16px; background:{{ handoffBtnBg }}; color:{{ handoffBtnColor }}; font:700 17px var(--font-sans); cursor:pointer">{{ handoffBtnLabel }}</button><sc-if value="{{ handoffEnd }}" hint-placeholder-val="{{ true }}"><p style="font:400 12px var(--font-sans); color:var(--muted-foreground); text-align:center; margin:10px 0 0">{{ t.endShiftNote }}</p></sc-if></div></div>
+              </div>
+            </sc-if>
+
+          </div>
+        </sc-if>
+
+        <!-- ===================== EQUIPMENT ===================== -->
+        <sc-if value="{{ isEquipment }}" hint-placeholder-val="{{ true }}">
+          <div data-screen-label="Equipment" style="flex:1; min-height:0; display:flex; flex-direction:column">
+
+            <sc-if value="{{ isCompact }}" hint-placeholder-val="{{ true }}">
+              <div style="height:46px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; padding:0 26px"><span style="font:600 15px var(--font-num)">9:41</span><div style="display:flex; align-items:center; gap:6px"><svg width="17" height="12" viewBox="0 0 18 12" fill="currentColor" aria-hidden="true"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="5" y="4.5" width="3" height="7.5" rx="1"/><rect x="10" y="2" width="3" height="10" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1" opacity="0.4"/></svg><div style="width:24px; height:12px; border:1px solid currentColor; border-radius:3px; padding:1.5px"><div style="width:75%; height:100%; background:currentColor; border-radius:1px"></div></div></div></div>
+            </sc-if>
+
+            <div style="flex:1; min-height:0; display:flex">
+              <sc-if value="{{ hasSidebar }}" hint-placeholder-val="{{ false }}">
+                <aside style="width:212px; flex-shrink:0; background:var(--bar-bg); border-inline-end:1px solid var(--border); display:flex; flex-direction:column; padding:18px 12px"><div style="padding:6px 10px 18px; font:700 18px var(--font-sans); color:var(--brand)">VetTrack</div><sc-for list="{{ navItems }}" as="n" hint-placeholder-count="5">
+  <div style="display:flex; align-items:center; gap:11px; padding:10px 11px; border-radius:10px; background:{{ n.bg }}; color:{{ n.color }}; margin-bottom:2px">
+    <span style="display:flex; flex-shrink:0">
+      <sc-if value="{{ n.isToday }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ n.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/></svg></sc-if>
+      <sc-if value="{{ n.isEquipment }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ n.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></sc-if>
+      <sc-if value="{{ n.isScan }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ n.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg></sc-if>
+      <sc-if value="{{ n.isAlerts }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ n.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></sc-if>
+      <sc-if value="{{ n.isEmergency }}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ n.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg></sc-if>
+    </span>
+    <span style="font-size:14px; font-weight:{{ n.weight }}; font-family:var(--font-sans)">{{ n.label }}</span>
+  </div>
+</sc-for></aside>
+              </sc-if>
+
+              <!-- LIST PANE -->
+              <sc-if value="{{ eqShowList }}" hint-placeholder-val="{{ true }}">
+                <div style="{{ eqListPaneStyle }}; min-height:0; display:flex; flex-direction:column; background:var(--background)">
+                  <div style="flex-shrink:0; padding:14px 16px 10px; border-bottom:1px solid var(--border)">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px"><h1 style="font-size:{{ eqTitleSize }}; font-weight:700; letter-spacing:-.02em; margin:0">{{ t.equipment }}</h1><sc-if value="{{ isExpanded }}" hint-placeholder-val="{{ false }}"><button style="height:32px; padding:0 12px; border:1px solid var(--border); border-radius:9px; background:var(--surface); color:var(--muted-foreground); font:600 12px var(--font-sans); cursor:pointer; display:inline-flex; align-items:center; gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>{{ t.table }}</button></sc-if></div>
+                    <div style="margin-top:12px; display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:11px; padding:9px 12px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span style="font:400 14px var(--font-sans); color:var(--muted-foreground)">{{ t.searchEq }}</span></div>
+                    <!-- E6 · ?filter=overdue deep-link preselects the Overdue chip on entry -->
+                    <div style="margin-top:10px; display:flex; gap:7px; overflow-x:auto; padding-bottom:2px"><sc-for list="{{ eqFilters }}" as="ch" hint-placeholder-count="5"><span style="flex-shrink:0; display:inline-flex; align-items:center; gap:5px; height:32px; padding:0 12px; border-radius:999px; font:600 13px var(--font-sans); white-space:nowrap; background:{{ ch.bg }}; color:{{ ch.color }}; border:1px solid {{ ch.border }}">{{ ch.label }}<sc-if value="{{ ch.count }}" hint-placeholder-val=""><span style="font-family:var(--font-num); opacity:.7">{{ ch.count }}</span></sc-if></span></sc-for></div>
+                  </div>
+
+                  <div style="flex:1; min-height:0; overflow:auto">
+                    <sc-if value="{{ eqLoading }}" hint-placeholder-val="{{ false }}">
+                      <sc-for list="{{ eqSkeletons }}" as="s" hint-placeholder-count="6"><div style="display:flex; align-items:center; gap:12px; padding:14px 16px; border-bottom:1px solid var(--border)"><span class="skd" style="width:10px; height:10px; border-radius:999px"></span><div style="flex:1"><div class="skd" style="width:55%; height:13px; border-radius:6px"></div><div class="skd" style="width:38%; height:10px; border-radius:5px; margin-top:7px"></div></div></div></sc-for>
+                    </sc-if>
+
+                    <!-- E5 · list error + retry -->
+                    <sc-if value="{{ eqError }}" hint-placeholder-val="{{ false }}">
+                      <div style="min-height:100%; box-sizing:border-box; padding:48px 28px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:12px"><div style="width:54px; height:54px; border-radius:15px; background:var(--status-issue-bg); display:flex; align-items:center; justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--status-issue-fg)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg></div><p style="font:600 16px var(--font-sans); margin:0">{{ t.errTitle }}</p><p style="font:400 13px/1.5 var(--font-sans); color:var(--muted-foreground); margin:0; max-width:30ch">{{ t.errSub }}</p><button style="height:40px; padding:0 18px; border:none; border-radius:12px; background:var(--brand); color:var(--brand-foreground); font:700 14px var(--font-sans); cursor:pointer">{{ t.retry }}</button></div>
+                    </sc-if>
+
+                    <!-- E4a · no results for current filters -->
+                    <sc-if value="{{ eqEmpty }}" hint-placeholder-val="{{ false }}">
+                      <div style="min-height:100%; box-sizing:border-box; padding:48px 28px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:12px" data-comment-anchor="7214b45d7d-div"><div style="width:54px; height:54px; border-radius:15px; background:var(--tonal); display:flex; align-items:center; justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div><p style="font:600 16px var(--font-sans); margin:0">{{ t.emptyTitle }}</p><p style="font:400 13px/1.5 var(--font-sans); color:var(--muted-foreground); margin:0; max-width:30ch">{{ t.emptySub }}</p><button style="height:40px; padding:0 18px; border:none; border-radius:12px; background:var(--brand); color:var(--brand-foreground); font:700 14px var(--font-sans); cursor:pointer">{{ t.clearFilters }}</button></div>
+                    </sc-if>
+
+                    <!-- E4b · no equipment registered at all (distinct from no-results) -->
+                    <sc-if value="{{ eqAllEmpty }}" hint-placeholder-val="{{ false }}">
+                      <div style="min-height:100%; box-sizing:border-box; padding:48px 28px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:12px"><div style="width:54px; height:54px; border-radius:15px; background:var(--tonal); display:flex; align-items:center; justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></div><p style="font:600 16px var(--font-sans); margin:0">{{ t.noneTitle }}</p><p style="font:400 13px/1.5 var(--font-sans); color:var(--muted-foreground); margin:0; max-width:30ch">{{ t.noneSub }}</p><button style="height:40px; padding:0 18px; border:none; border-radius:12px; background:var(--brand); color:var(--brand-foreground); font:700 14px var(--font-sans); cursor:pointer">{{ t.addEquipment }}</button></div>
+                    </sc-if>
+
+                    <sc-if value="{{ eqShowRows }}" hint-placeholder-val="{{ true }}">
+                      <sc-for list="{{ eqRows }}" as="r" hint-placeholder-count="6">
+                        <div onClick="{{ r.onClick }}" style="position:relative; display:flex; align-items:flex-start; gap:11px; min-height:{{ eqRowMin }}; padding:12px 16px; border-bottom:1px solid var(--border); cursor:pointer; background:{{ r.bg }}">
+                          <sc-if value="{{ r.accent }}" hint-placeholder-val="{{ false }}"><span style="position:absolute; inset-inline-start:0; top:0; bottom:0; width:3px; background:{{ r.accentColor }}"></span></sc-if>
+                          <sc-if value="{{ eqCheckboxes }}" hint-placeholder-val="{{ false }}"><span onClick="{{ r.onCheck }}" role="checkbox" aria-label="{{ r.selectAria }}" style="width:20px; height:20px; border-radius:6px; border:1.5px solid {{ r.checkBorder }}; background:{{ r.checkBg }}; flex-shrink:0; display:flex; align-items:center; justify-content:center; margin-top:2px"><sc-if value="{{ r.checked }}" hint-placeholder-val="{{ false }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--on-ink)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></sc-if></span></sc-if>
+                          <span style="width:10px; height:10px; border-radius:999px; background:{{ r.dot }}; flex-shrink:0; margin-top:5px"></span>
+                          <div style="flex:1; min-width:0" data-comment-anchor="77743f1adb-div">
+                            <div style="display:flex; align-items:baseline; gap:10px"><p style="font:600 15px var(--font-sans); margin:0; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ r.name }}</p><span style="font:500 12px var(--font-num); color:var(--muted-foreground); flex-shrink:0">{{ r.trailing }}</span></div>
+                            <p style="font:500 12px var(--font-sans); color:var(--muted-foreground); margin:2px 0 0"><span style="font-family:var(--font-num)">{{ r.tag }}</span> · {{ r.loc }}</p>
+                            <div style="display:flex; align-items:center; gap:8px; margin:4px 0 0; flex-wrap:wrap"><span style="display:inline-flex; align-items:center; gap:5px; font:600 11px var(--font-sans); color:{{ r.dot }}"><span style="display:flex" innerHTML="{{ r.statusIcon }}"></span>{{ r.statusText }}</span><sc-if value="{{ r.pending }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex; align-items:center; gap:4px; font:600 10px var(--font-sans); color:var(--status-stale-fg)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="9"/></svg>{{ t.pending }}</span></sc-if></div>
+                          </div>
+                          <sc-if value="{{ isCompact }}" hint-placeholder-val="{{ true }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.5; flex-shrink:0; margin-top:4px; transform:{{ chevronT }}" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></sc-if>
+                        </div>
+                      </sc-for>
+                    </sc-if>
+                  </div>
+
+                  <sc-if value="{{ eqBulkBar }}" hint-placeholder-val="{{ false }}">
+                    <div style="flex-shrink:0; border-top:1px solid var(--border); background:var(--surface-2); padding:10px 14px; display:flex; align-items:center; gap:10px"><span style="font:600 13px var(--font-sans); color:var(--foreground)">{{ eqSelLabel }}</span><div style="margin-inline-start:auto; display:flex; gap:7px"><button style="height:34px; padding:0 13px; border:none; border-radius:10px; background:var(--brand); color:var(--brand-foreground); font:700 13px var(--font-sans); cursor:pointer">{{ t.checkIn }}</button><button style="height:34px; padding:0 13px; border:none; border-radius:10px; background:var(--tonal); color:var(--foreground); font:700 13px var(--font-sans); cursor:pointer">{{ t.assign }}</button><button onClick="{{ eqClearSel }}" style="height:34px; padding:0 11px; border:none; border-radius:10px; background:none; color:var(--muted-foreground); font:600 13px var(--font-sans); cursor:pointer">{{ t.clear }}</button></div></div>
+                  </sc-if>
+                </div>
+              </sc-if>
+
+              <!-- DETAIL PANE -->
+              <sc-if value="{{ eqShowDetail }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; background:var(--surface)">
+                  <sc-if value="{{ eqDetailEmpty }}" hint-placeholder-val="{{ false }}">
+                    <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:40px; text-align:center"><div style="width:56px; height:56px; border-radius:16px; background:var(--tonal); display:flex; align-items:center; justify-content:center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></div><p style="font:600 16px var(--font-sans); color:var(--muted-foreground); margin:0">{{ t.selectItem }}</p></div>
+                  </sc-if>
+
+                  <sc-if value="{{ eqDetailContent }}" hint-placeholder-val="{{ true }}">
+                    <div style="flex-shrink:0; padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; gap:14px">
+                      <sc-if value="{{ isCompact }}" hint-placeholder-val="{{ false }}"><button onClick="{{ eqBack }}" aria-label="{{ t.back }}" style="width:40px; height:40px; border:none; background:var(--tonal); border-radius:11px; color:var(--brand); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="transform:{{ chevronT }}" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button></sc-if>
+                      <div style="flex:1; min-width:0"><div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap"><h2 style="font:700 22px var(--font-sans); letter-spacing:-.01em; margin:0">{{ sel.name }}</h2><span style="display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 10px; border-radius:999px; background:{{ sel.tintBg }}; border:1px solid {{ sel.tintBorder }}; color:{{ sel.color }}; font:600 12px var(--font-sans)"><span style="display:flex" innerHTML="{{ sel.icon }}"></span>{{ sel.statusLabel }}</span></div><p style="font:500 13px var(--font-num); color:var(--muted-foreground); margin:5px 0 0">{{ sel.tag }} · {{ sel.category }}</p></div>
+                    </div>
+                    <div style="flex:1; min-height:0; overflow:auto; padding:18px 20px; display:flex; flex-direction:column; gap:18px">
+                      <div style="display:flex; gap:9px; flex-wrap:wrap"><button style="height:44px; padding:0 18px; border:none; border-radius:13px; background:var(--brand); color:var(--brand-foreground); font:700 14px var(--font-sans); cursor:pointer">{{ sel.primaryAction }}</button><button style="height:44px; padding:0 16px; border:none; border-radius:13px; background:var(--tonal); color:var(--foreground); font:700 14px var(--font-sans); cursor:pointer; display:inline-flex; align-items:center; gap:7px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></svg>{{ t.flag }}</button><button style="height:44px; padding:0 14px; border:none; border-radius:13px; background:none; color:var(--status-issue-fg); font:600 14px var(--font-sans); cursor:pointer; margin-inline-start:auto">{{ t.reportMissing }}</button></div>
+                      <div><p style="font:600 11px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 10px">{{ t.atAGlance }}</p><div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:1px; background:var(--border); border:1px solid var(--border); border-radius:14px; overflow:hidden"><sc-for list="{{ sel.facts }}" as="g" hint-placeholder-count="4"><div style="background:var(--surface); padding:12px 14px"><p style="font:500 11px var(--font-sans); color:var(--muted-foreground); margin:0">{{ g.label }}</p><p style="font:600 15px var(--font-sans); color:var(--foreground); margin:4px 0 0; font-family:{{ g.fam }}">{{ g.value }}</p></div></sc-for></div></div>
+                      <div style="background:var(--background); border-radius:14px; padding:14px 16px"><div style="display:flex; align-items:center; justify-content:space-between"><p style="font:600 14px var(--font-sans); margin:0">{{ t.serviceSchedule }}</p><button style="height:32px; padding:0 12px; border:none; border-radius:10px; background:var(--tonal); color:var(--foreground); font:700 12px var(--font-sans); cursor:pointer">{{ t.markServiced }}</button></div><div style="margin-top:12px; display:flex; align-items:center; gap:10px"><span style="font:500 12px var(--font-sans); color:var(--muted-foreground)">{{ t.maintFrom }}</span><div style="flex:1; height:6px; border-radius:999px; background:var(--tonal); overflow:hidden"><div style="width:62%; height:100%; border-radius:999px; background:var(--status-ok-fg)"></div></div><span style="font:500 12px var(--font-sans); color:var(--muted-foreground)">{{ t.maintTo }}</span></div><p style="font:400 12px var(--font-sans); color:var(--muted-foreground); margin:8px 0 0">{{ t.nextService }}</p></div>
+                      <div><p style="font:600 11px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 10px">{{ t.activity }}</p><div style="display:flex; flex-direction:column; gap:0"><sc-for list="{{ sel.activity }}" as="a" hint-placeholder-count="3"><div style="display:flex; gap:12px; padding:9px 0"><span style="width:8px; height:8px; border-radius:999px; background:{{ a.color }}; margin-top:6px; flex-shrink:0"></span><div style="flex:1"><p style="font:600 14px var(--font-sans); margin:0">{{ a.label }}</p><p style="font:500 12px var(--font-sans); color:var(--muted-foreground); margin:1px 0 0">{{ a.meta }}</p></div></div></sc-for></div></div>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-if>
+            </div>
+
+            <sc-if value="{{ isCompact }}" hint-placeholder-val="{{ true }}">
+              <nav style="flex-shrink:0; background:var(--bar-bg); border-top:1px solid var(--border); padding:6px 8px max(env(safe-area-inset-bottom), 22px); display:flex; justify-content:space-between"><sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+  <div style="flex:1; min-height:50px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; border-radius:12px; {{ t.scanBg }}">
+    <span style="color:{{ t.color }}; display:flex">
+      <sc-if value="{{ t.isToday }}" hint-placeholder-val="{{ true }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="{{ t.fill }}" stroke="currentColor" stroke-width="{{ t.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/></svg></sc-if>
+      <sc-if value="{{ t.isEquipment }}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="{{ t.fill }}" stroke="currentColor" stroke-width="{{ t.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></sc-if>
+      <sc-if value="{{ t.isScan }}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="{{ t.fill }}" stroke="currentColor" stroke-width="{{ t.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg></sc-if>
+      <sc-if value="{{ t.isEmergency }}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="{{ t.fill }}" stroke="currentColor" stroke-width="{{ t.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg></sc-if>
+      <sc-if value="{{ t.isMore }}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="{{ t.fill }}" stroke="currentColor" stroke-width="{{ t.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></sc-if>
+    </span>
+    <span style="font-size:11px; font-weight:{{ t.weight }}; color:{{ t.color }}; font-family:var(--font-sans)">{{ t.label }}</span>
+  </div>
+</sc-for></nav>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <!-- ===================== STANDARD SHELL (Alerts / Settings / Profile) ===================== -->
+        <sc-if value="{{ isStandard }}" hint-placeholder-val="{{ false }}">
+          <div data-screen-label="Standard" style="flex:1; min-height:0; display:flex; flex-direction:column">
+          <sc-if value="{{ isCompact }}" hint-placeholder-val="{{ true }}"><div style="height:46px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; padding:0 26px"><span style="font:600 15px var(--font-num)">9:41</span><div style="display:flex; align-items:center; gap:6px"><svg width="17" height="12" viewBox="0 0 18 12" fill="currentColor" aria-hidden="true"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="5" y="4.5" width="3" height="7.5" rx="1"/><rect x="10" y="2" width="3" height="10" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1" opacity="0.4"/></svg><div style="width:24px; height:12px; border:1px solid currentColor; border-radius:3px; padding:1.5px"><div style="width:75%; height:100%; background:currentColor; border-radius:1px"></div></div></div></div></sc-if>
+          <div style="flex:1; min-height:0; display:flex">
+            <sc-if value="{{ hasSidebar }}" hint-placeholder-val="{{ false }}"><aside style="width:212px; flex-shrink:0; background:var(--bar-bg); border-inline-end:1px solid var(--border); display:flex; flex-direction:column; padding:18px 12px"><div style="padding:6px 10px 18px; font:700 18px var(--font-sans); color:var(--brand)">VetTrack</div><sc-for list="{{ navItems }}" as="n" hint-placeholder-count="5">
+  <div style="display:flex; align-items:center; gap:11px; padding:10px 11px; border-radius:10px; background:{{ n.bg }}; color:{{ n.color }}; margin-bottom:2px">
+    <span style="display:flex; flex-shrink:0">
+      <sc-if value="{{ n.isToday }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ n.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/></svg></sc-if>
+      <sc-if value="{{ n.isEquipment }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ n.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></sc-if>
+      <sc-if value="{{ n.isScan }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ n.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg></sc-if>
+      <sc-if value="{{ n.isAlerts }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ n.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></sc-if>
+      <sc-if value="{{ n.isEmergency }}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ n.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg></sc-if>
+    </span>
+    <span style="font-size:14px; font-weight:{{ n.weight }}; font-family:var(--font-sans)">{{ n.label }}</span>
+  </div>
+</sc-for></aside></sc-if>
+            <main style="flex:1; min-height:0; overflow:auto">
+              <div style="max-width:{{ stdMax }}; margin:0 auto; padding:{{ stdPad }}; display:flex; flex-direction:column; gap:18px">
+
+                <!-- ALERTS -->
+                <sc-if value="{{ isAlerts }}" hint-placeholder-val="{{ false }}">
+                  <h1 style="font-size:var(--text-largetitle); font-weight:700; letter-spacing:-.02em; margin:0">{{ t.alerts }}</h1>
+                  <sc-if value="{{ alertsEmpty }}" hint-placeholder-val="{{ false }}"><div style="padding:56px 24px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:12px"><div style="width:60px; height:60px; border-radius:17px; background:var(--status-ok-bg); display:flex; align-items:center; justify-content:center"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--status-ok-fg)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3.8-7.3"/><path d="m9 11 3 3 8-8"/></svg></div><p style="font:600 18px var(--font-sans); margin:0">{{ t.allClear }}</p><p style="font:400 14px var(--font-sans); color:var(--muted-foreground); margin:0">{{ t.allClearSub }}</p></div></sc-if>
+                  <sc-if value="{{ alertsList }}" hint-placeholder-val="{{ true }}"><sc-for list="{{ alertGroups }}" as="grp" hint-placeholder-count="3"><div><p style="font:600 11px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:{{ grp.color }}; margin:0 0 9px">{{ grp.title }}</p><div style="display:flex; flex-direction:column; gap:9px"><sc-for list="{{ grp.items }}" as="al" hint-placeholder-count="2"><div style="display:flex; align-items:center; gap:12px; padding:13px 15px; border-radius:14px; background:{{ al.tintBg }}; border:1px solid {{ al.tintBorder }}"><span style="width:36px; height:36px; border-radius:10px; background:{{ al.solid }}; color:var(--on-ink); display:flex; align-items:center; justify-content:center; flex-shrink:0" innerHTML="{{ al.icon }}"></span><div style="flex:1; min-width:0"><p style="font:600 15px var(--font-sans); margin:0">{{ al.title }}</p><p style="font:500 12px var(--font-sans); color:var(--muted-foreground); margin:2px 0 0">{{ al.meta }}</p></div><button style="height:34px; padding:0 13px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--foreground); font:700 12px var(--font-sans); cursor:pointer; flex-shrink:0">{{ t.acknowledge }}</button></div></sc-for></div></div></sc-for></sc-if>
+                </sc-if>
+
+                <!-- SETTINGS -->
+                <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+                  <h1 style="font-size:var(--text-largetitle); font-weight:700; letter-spacing:-.02em; margin:0">{{ t.settings }}</h1>
+                  <sc-for list="{{ settingsSections }}" as="sec" hint-placeholder-count="3"><div><p style="font:600 11px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 9px">{{ sec.title }}</p><div style="background:var(--surface); border:1px solid var(--hairline); border-radius:14px; overflow:hidden"><sc-for list="{{ sec.rows }}" as="row" hint-placeholder-count="3"><div style="display:flex; align-items:center; gap:12px; padding:13px 15px; border-top:{{ row.border }}"><span style="width:30px; height:30px; border-radius:9px; background:{{ row.tintBg }}; color:{{ row.color }}; display:flex; align-items:center; justify-content:center; flex-shrink:0" innerHTML="{{ row.icon }}"></span><span style="flex:1; font:500 15px var(--font-sans); color:var(--foreground)">{{ row.label }}</span><sc-if value="{{ row.isToggle }}" hint-placeholder-val="{{ false }}"><span role="switch" aria-label="{{ row.label }}" style="width:46px; height:28px; border-radius:999px; background:{{ row.toggleBg }}; position:relative; flex-shrink:0; transition:background var(--dur-base)"><span style="position:absolute; top:2px; inset-inline-start:{{ row.knobX }}; width:24px; height:24px; border-radius:999px; background:var(--on-ink); box-shadow:0 1px 3px rgba(0,0,0,.3); transition:inset-inline-start var(--dur-base) var(--ease-standard)"></span></span></sc-if><sc-if value="{{ row.value }}" hint-placeholder-val=""><span style="display:inline-flex; align-items:center; gap:6px; font:500 14px var(--font-sans); color:var(--muted-foreground); flex-shrink:0">{{ row.value }}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.5; transform:{{ chevronT }}" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></sc-if></div></sc-for></div></div></sc-for>
+                </sc-if>
+
+                <!-- PROFILE -->
+                <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex; flex-direction:column; align-items:center; text-align:center; gap:12px; padding-top:10px"><div style="width:84px; height:84px; border-radius:999px; background:var(--brand); color:var(--brand-foreground); display:flex; align-items:center; justify-content:center; font:700 30px var(--font-sans)">MA</div><div><h1 style="font:700 24px var(--font-sans); letter-spacing:-.01em; margin:0">{{ t.profileName }}</h1><p style="font:500 15px var(--font-sans); color:var(--muted-foreground); margin:4px 0 0">{{ t.profileRole }}</p></div></div>
+                  <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--border); border:1px solid var(--border); border-radius:14px; overflow:hidden"><sc-for list="{{ profileStats }}" as="p" hint-placeholder-count="3"><div style="background:var(--surface); padding:16px 12px; text-align:center"><p style="font:500 22px var(--font-num); color:var(--foreground); margin:0">{{ p.value }}</p><p style="font:500 11px var(--font-sans); letter-spacing:.04em; text-transform:uppercase; color:var(--muted-foreground); margin:5px 0 0">{{ p.label }}</p></div></sc-for></div>
+                  <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:14px; overflow:hidden"><sc-for list="{{ profileRows }}" as="row" hint-placeholder-count="3"><div style="display:flex; align-items:center; gap:12px; padding:13px 15px; border-top:{{ row.border }}"><span style="flex:1; font:500 15px var(--font-sans); color:var(--foreground)">{{ row.label }}</span><span style="font:500 14px var(--font-sans); color:var(--muted-foreground)">{{ row.value }}</span></div></sc-for></div>
+                  <button style="width:100%; height:50px; border:1px solid var(--status-issue-border); border-radius:14px; background:var(--status-issue-bg); color:var(--status-issue-fg); font:700 15px var(--font-sans); cursor:pointer">{{ t.signOut }}</button>
+                </sc-if>
+
+              </div>
+            </main>
+          </div>
+          <sc-if value="{{ isCompact }}" hint-placeholder-val="{{ true }}"><nav style="flex-shrink:0; background:var(--bar-bg); border-top:1px solid var(--border); padding:6px 8px max(env(safe-area-inset-bottom), 22px); display:flex; justify-content:space-between"><sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+  <div style="flex:1; min-height:50px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; border-radius:12px; {{ t.scanBg }}">
+    <span style="color:{{ t.color }}; display:flex">
+      <sc-if value="{{ t.isToday }}" hint-placeholder-val="{{ true }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="{{ t.fill }}" stroke="currentColor" stroke-width="{{ t.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/></svg></sc-if>
+      <sc-if value="{{ t.isEquipment }}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="{{ t.fill }}" stroke="currentColor" stroke-width="{{ t.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></sc-if>
+      <sc-if value="{{ t.isScan }}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="{{ t.fill }}" stroke="currentColor" stroke-width="{{ t.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg></sc-if>
+      <sc-if value="{{ t.isEmergency }}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="{{ t.fill }}" stroke="currentColor" stroke-width="{{ t.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg></sc-if>
+      <sc-if value="{{ t.isMore }}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="{{ t.fill }}" stroke="currentColor" stroke-width="{{ t.sw }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></sc-if>
+    </span>
+    <span style="font-size:11px; font-weight:{{ t.weight }}; color:{{ t.color }}; font-family:var(--font-sans)">{{ t.label }}</span>
+  </div>
+</sc-for></nav></sc-if>
+          </div>
+        </sc-if>
+
+      </div>
+    </div>
+  </div>
+
+  <div style="max-width:760px; margin:0 auto; padding:0 20px 60px; display:flex; flex-direction:column; gap:12px">
+    <div style="display:flex; align-items:flex-start; gap:10px; padding:14px 16px; border-radius:14px; background:var(--surface); border:1px solid var(--border)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:1px" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01"/><path d="M11 12h1v4h1"/></svg><p style="font:400 13px/1.55 var(--font-sans); color:var(--muted-foreground); margin:0" dir="ltr">{{ infoLine }}</p></div>
+    <div style="display:flex; align-items:flex-start; gap:10px; padding:14px 16px; border-radius:14px; background:var(--brand-navy); color:var(--on-ink)" dir="ltr">
+      <span style="font:700 10px var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--on-ink-muted); flex-shrink:0; margin-top:2px">§13</span>
+      <p style="font:400 13px/1.55 var(--font-sans); color:var(--on-ink-strong); margin:0">Single-file build (D-A) — four surfaces behind screen-state. Binds to Stage 1 canonical token layer (D-B): consumes <code style="font-family:var(--font-num)">--ivory-* / --brand-navy / --status-* / --on-ink*</code>; ships no iOS-indigo set. Taxonomy is the 6-state enum (D-D): available→ready, critical→blocked, maintenance→blocked/service-schedule — "Service schedule" and alert-severity labels are not status keys. Command Center is dark-only and web+expanded-only (D-F, §0.1): compact/medium open a larger-display guard → <code style="font-family:var(--font-num)">/my-equipment</code>. Board &amp; Code Blue are server-driven, online-only, fail-loud, tenant-scoped (clinicId). Brand hex pending §13.2 sign-off.</p>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    theme:'light', size:'expanded', screen:'equipment', dir:'ltr',
+    variant:{ equipment:'data', scan:'priming', handoff:'end', alerts:'list', board:'live' },
+    eqSelectedId:'IV-204', eqSelected:[], eqView:'list',
+  };
+  set(k,v){ this.setState({[k]:v}); }
+  setVar(screen,v){ this.setState(s=>({ variant:{...s.variant,[screen]:v} })); }
+  ic(p,o){ const w=(o&&o.w)||22; return `<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="${o&&o.fill?o.fill:'none'}" stroke="currentColor" stroke-width="${o&&o.sw?o.sw:1.9}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`; }
+
+  // S4-B4.5 · 6-state taxonomy (ready · in_use · blocked · stale · overdue · unknown)
+  statusMeta(k){
+    const M={
+      ready:{c:'var(--status-ok-fg)',sys:'green',ic:'<path d="M21 12a9 9 0 1 1-3.8-7.3"/><path d="m9 11 3 3 8-8"/>'},
+      in_use:{c:'var(--status-in-use-fg)',sys:'blue',ic:'<path d="M7 17 17 7"/><path d="M8 7h9v9"/>'},
+      blocked:{c:'var(--status-issue-fg)',sys:'red',ic:'<path d="m10.3 3.7-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.3l-8-14a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>'},
+      stale:{c:'var(--status-stale-fg)',sys:'orange',ic:'<path d="M3 12a9 9 0 1 0 9-9 9 9 0 0 0-6.7 3"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/>'},
+      overdue:{c:'var(--status-overdue-fg)',sys:'orange',ic:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'},
+      unknown:{c:'var(--status-unknown-fg)',sys:'gray',ic:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 .3c0 1.7-2.5 2-2.5 3.7"/><path d="M12 17h.01"/>'},
+    };
+    return M[k];
+  }
+
+  renderVals(){
+    const S=this.state; const { theme, size, screen, dir } = S;
+    const locale = dir==='rtl' ? 'he' : 'en';
+    const L = (en,he) => locale==='he' ? he : en;
+    const variant = S.variant[screen];
+    // S4-B4.1 · times via Intl.DateTimeFormat(activeLocale); locale held in a variable (no literal arg)
+    const dtLocale = locale==='he' ? 'he-IL' : 'en-US';
+    const fmtClock = (d) => new Intl.DateTimeFormat(dtLocale, { hour:'2-digit', minute:'2-digit', hour12:false }).format(d);
+
+    const segBase="border:none;cursor:pointer;padding:6px 10px;border-radius:7px;font-family:var(--font-sans);font-size:12px;transition:all var(--dur-fast) var(--ease-standard);white-space:nowrap;";
+    const seg=(a)=>a?segBase+"font-weight:600;background:var(--surface-2);color:var(--foreground);box-shadow:0 1px 2px rgba(0,0,0,.18);":segBase+"font-weight:500;background:transparent;color:var(--muted-foreground);";
+    const themeOpts=[['light','Light'],['dark','Dark']].map(([k,l])=>({key:k,label:l,style:seg(theme===k),onClick:()=>this.set('theme',k)}));
+    const sizeOpts=[['compact','Compact'],['medium','Medium'],['expanded','Expanded']].map(([k,l])=>({key:k,label:l,style:seg(size===k),onClick:()=>this.set('size',k)}));
+    const screenDefs=[['equipment','Equipment'],['board','Command Center'],['scan','Scan'],['codeblue','Code Blue'],['handoff','Handoff'],['alerts','Alerts'],['settings','Settings'],['profile','Profile']];
+    const screenOpts=screenDefs.map(([k,l])=>({key:k,label:l,style:seg(screen===k),onClick:()=>this.set('screen',k)}));
+    const dirOpts=[['ltr','English'],['rtl','עברית']].map(([k,l])=>({key:k,label:l,style:seg(dir===k),onClick:()=>this.set('dir',k)}));
+
+    const variantConfigs={
+      equipment:{title:'State',opts:[['data','Data'],['loading','Loading'],['empty','No results'],['allempty','No items'],['error','Error'],['offline','Offline']]},
+      scan:{title:'State',opts:[['priming','Priming'],['scanning','Scanning'],['success','Success'],['error','Error'],['denied','Denied'],['manual','Manual']]},
+      handoff:{title:'Flow',opts:[['start','Start'],['end','End']]},
+      alerts:{title:'State',opts:[['list','Alerts'],['empty','All clear']]},
+      board:{title:'State',opts:[['live','Live'],['loading','Loading']]},
+    };
+    const vc=variantConfigs[screen];
+    const hasVariant=!!vc;
+    const variantOpts=hasVariant?vc.opts.map(([k,l])=>({key:k,label:l,style:seg(variant===k),onClick:()=>this.setVar(screen,k)})):[];
+
+    const isCompact=size==='compact'; const hasSidebar=!isCompact; const isExpanded=size==='expanded';
+    const isBoard=screen==='board';
+    // S4-B4.2 · §0.1 board scope guard — web + expanded only; compact/medium are out of scope
+    const isBoardLive = isBoard && isExpanded;
+    const isBoardGuard = isBoard && !isExpanded;
+    const boardLoading = isBoardLive && variant==='loading';
+    const boardReady = isBoardLive && !boardLoading;
+    const fullScreen=['scan','codeblue','handoff','board'].includes(screen);
+    const isEquipment=screen==='equipment';
+    const isStandard=['alerts','settings','profile'].includes(screen);
+    const isScan=screen==='scan', isCodeBlue=screen==='codeblue', isHandoff=screen==='handoff';
+    const isAlerts=screen==='alerts', isSettings=screen==='settings', isProfile=screen==='profile';
+
+    const frames={
+      compact:{outer:'width:392px;height:800px;background:#0d0d0f;border-radius:48px;padding:11px',screen:'border-radius:38px',browser:false},
+      medium:{outer:'width:900px;height:680px;background:#0d0d0f;border-radius:30px;padding:13px',screen:'border-radius:18px',browser:false},
+      expanded:{outer:'width:1200px;height:760px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:0',screen:'border-radius:0 0 16px 16px',browser:true},
+    };
+    const f=frames[size];
+    const canvasBg = fullScreen ? 'var(--scan-bg)' : 'var(--background)';
+    const routes={equipment:'/equipment',board:'/equipment/board',scan:'/scan',codeblue:'/code-blue',handoff:'/handoff',alerts:'/alerts',settings:'/settings',profile:'/my-profile'};
+    const chevronT = locale==='he' ? 'scaleX(-1)' : 'none';
+
+    const navMap={equipment:'equipment',board:'equipment',alerts:'alerts',scan:'scan'};
+    const activeNav=navMap[screen]||'more';
+    const navDefs=[
+      {key:'today',label:L('Today','היום'),icon:'<path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/>'},
+      {key:'equipment',label:L('Equipment','ציוד'),icon:'<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>'},
+      {key:'scan',label:L('Scan','סריקה'),icon:'<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/>'},
+      {key:'alerts',label:L('Alerts','התראות'),icon:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>'},
+      {key:'emergency',label:L('Emergency','חירום'),icon:'<path d="M3 12h4l2 6 4-14 2 8h6"/>'},
+    ];
+    const navItems=navDefs.map(n=>{const a=activeNav===n.key;return{key:n.key,label:n.label,weight:a?'600':'500',bg:a?'rgb(79 70 229 / 0.10)':'transparent',color:a?'var(--brand)':'var(--muted-foreground)',sw:a?2.1:1.8,
+      isToday:n.key==='today', isEquipment:n.key==='equipment', isScan:n.key==='scan', isAlerts:n.key==='alerts', isEmergency:n.key==='emergency'};});
+    const tabDefs=[
+      {key:'today',label:L('Today','היום'),icon:'<path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/>'},
+      {key:'equipment',label:L('Equipment','ציוד'),icon:'<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>'},
+      {key:'scan',label:L('Scan','סריקה'),icon:'<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/>'},
+      {key:'emergency',label:L('Emergency','חירום'),icon:'<path d="M3 12h4l2 6 4-14 2 8h6"/>'},
+      {key:'more',label:L('More','עוד'),icon:'<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>'},
+    ];
+    const tabActiveMap={equipment:'equipment',board:'equipment',scan:'scan'};
+    const tabActive=tabActiveMap[screen]||(isStandard?'more':'today');
+    const tabs=tabDefs.map(t=>{const a=tabActive===t.key;const sc=t.key==='scan';return{key:t.key,label:t.label,weight:a?'600':'500',color:a?'var(--brand)':(sc?'var(--action)':'var(--muted-foreground)'),scanBg:sc?'background:rgb(21 128 61 / 0.08);':'',sw:a?2.2:1.9,fill:a?'currentColor':'none',
+      isToday:t.key==='today', isEquipment:t.key==='equipment', isScan:t.key==='scan', isEmergency:t.key==='emergency', isMore:t.key==='more'};});
+
+    // ===== EQUIPMENT DATA — 6-state taxonomy =====
+    const items=[
+      {id:'IV-204',name:L('Infusion pump','משאבת עירוי'),cat:L('Pumps','משאבות'),status:'in_use',loc:L('Bay 3','עמדה 3'),who:L('Dr. Lee','ד״ר לי'),last:'14:02',due:L('in 2h','בעוד שעתיים'),statusText:L('In use · with Dr. Lee','בשימוש · אצל ד״ר לי')},
+      {id:'VM-118',name:L('Vital monitor','מוניטור חיוני'),cat:L('Monitors','מוניטורים'),status:'ready',loc:L('Recovery','התאוששות'),who:'—',last:'09:12',due:'—',statusText:L('Ready · cleared','מוכן · נבדק')},
+      {id:'XR-07',name:L('Portable X-ray','רנטגן נייד'),cat:L('Imaging','הדמיה'),status:'overdue',loc:L('Imaging','הדמיה'),who:L('Dr. Singh','ד״ר סינג'),last:'11:40',due:L('2h overdue','באיחור שעתיים'),statusText:L('2h overdue','באיחור שעתיים')},
+      {id:'DF-02',name:L('Defibrillator','דפיברילטור'),cat:L('Crash cart','עגלת חירום'),status:'blocked',loc:L('Crash cart A','עגלת חירום A'),who:'—',last:'08:55',due:'—',statusText:L('Blocked · failed check','חסום · נכשל בבדיקה')},
+      {id:'AN-11',name:L('Anesthesia unit','מכונת הרדמה'),cat:L('Anesthesia','הרדמה'),status:'stale',loc:L('Service','שירות'),who:'—',last:'—',due:L('Jul 12','12 ביולי'),statusText:L('Stale · re-scan needed','מידע ישן · נדרשת סריקה')},
+      {id:'US-3',name:L('Ultrasound','אולטרסאונד'),cat:L('Imaging','הדמיה'),status:'ready',loc:L('Exam 2','חדר בדיקה 2'),who:'—',last:'13:40',due:'—',statusText:L('Ready · cleared','מוכן · נבדק')},
+      {id:'VN-05',name:L('Ventilator','מכונת הנשמה'),cat:L('Respiratory','נשימתי'),status:'unknown',loc:L('ICU-1','טי״נ 1'),who:'—',last:'—',due:'—',statusText:L('Unknown · no recent scan','לא ידוע · אין סריקה')},
+    ];
+    const eqLoading=isEquipment&&variant==='loading';
+    const eqEmpty=isEquipment&&variant==='empty';
+    const eqAllEmpty=isEquipment&&variant==='allempty';
+    const eqError=isEquipment&&variant==='error';
+    const eqOffline=isEquipment&&variant==='offline';
+    const eqCheckboxes=isExpanded&&!eqLoading&&!eqEmpty&&!eqAllEmpty&&!eqError;
+    const selId=S.eqSelectedId;
+    const selObj=items.find(i=>i.id===selId)||items[0];
+    const statusLabelL={ready:L('Ready','מוכן'),in_use:L('In use','בשימוש'),blocked:L('Blocked','חסום'),stale:L('Stale','מידע ישן'),overdue:L('Overdue','באיחור'),unknown:L('Unknown','לא ידוע')};
+
+    const eqRows=items.map((it,idx)=>{
+      const m=this.statusMeta(it.status);
+      const checked=S.eqSelected.includes(it.id);
+      const isSel=it.id===selId && !isCompact;
+      return {
+        key:it.id, name:it.name, tag:it.id, loc:it.loc, trailing:it.last, statusText:it.statusText,
+        dot:m.c, statusIcon:this.ic(m.ic,{w:13,sw:2.2}),
+        accent: it.status==='blocked'||isSel, accentColor: isSel?'var(--brand)':m.c,
+        bg: isSel?'rgb(79 70 229 / 0.08)':'var(--surface)',
+        pending: eqOffline && (idx===0||idx===3),
+        checked, checkBg: checked?'var(--brand)':'transparent', checkBorder: checked?'var(--brand)':'var(--border)',
+        selectAria: L('Select ','בחירת ')+it.name,
+        onClick: ()=>{ if(isCompact){ this.setState({eqSelectedId:it.id, eqView:'detail'}); } else { this.set('eqSelectedId',it.id); } },
+        onCheck: (e)=>{ e.stopPropagation(); this.setState(st=>({ eqSelected: st.eqSelected.includes(it.id)? st.eqSelected.filter(x=>x!==it.id): [...st.eqSelected,it.id] })); },
+      };
+    });
+    const selMeta=this.statusMeta(selObj.status);
+    const primaryActionMap={in_use:L('Check in','החזרה'),ready:L('Check out','ניפוק'),overdue:L('Check in','החזרה'),blocked:L('Resolve block','טיפול בחסימה'),stale:L('Re-scan','סריקה מחדש'),unknown:L('Locate & scan','איתור וסריקה')};
+    const sel={
+      name:selObj.name, tag:selObj.id, category:selObj.cat, statusLabel:statusLabelL[selObj.status],
+      color:selMeta.c, tintBg:`rgb(var(--sys-${selMeta.sys}) / 0.12)`, tintBorder:`rgb(var(--sys-${selMeta.sys}) / 0.24)`,
+      icon:this.ic(selMeta.ic,{w:13,sw:2.2}), primaryAction:primaryActionMap[selObj.status],
+      facts:[
+        {label:L('Location','מיקום'),value:selObj.loc,fam:'var(--font-sans)'},
+        {label:L('Assignee','אחראי'),value:selObj.who,fam:'var(--font-sans)'},
+        {label:L('Last scan','סריקה אחרונה'),value:selObj.last,fam:'var(--font-num)'},
+        {label:L('Due','יעד'),value:selObj.due,fam:'var(--font-sans)'},
+      ],
+      activity:[
+        {label:L('Checked out to Dr. Lee','נופק לד״ר לי'),meta:L('Today 14:02','היום 14:02'),color:'var(--status-in-use-fg)'},
+        {label:L('Scanned by you','נסרק על ידך'),meta:L('Today 13:30','היום 13:30'),color:'var(--status-ok-fg)'},
+        {label:L('Serviced — passed','טופל — עבר'),meta:L('Jun 2 · Tech Ruiz','2 ביוני · טכנאי רואיס'),color:'var(--status-unknown-fg)'},
+      ],
+    };
+    const eqFilterDefs=[[L('All','הכל'),'',true],[L('Mine','שלי'),'3',false],[L('Ready','מוכן'),'',false],[L('Overdue','באיחור'),'2',false],[L('Blocked','חסום'),'1',false]];
+    const eqFilters=eqFilterDefs.map(([label,count,active])=>({key:label,label,count,bg:active?'var(--brand)':'var(--surface)',color:active?'var(--brand-foreground)':'var(--foreground)',border:active?'var(--brand)':'var(--border)'}));
+
+    const eqShowList = isCompact ? (S.eqView==='list') : true;
+    const eqShowDetail = isCompact ? (S.eqView==='detail') : true;
+    const eqSelCount=S.eqSelected.length;
+    const eqBulkBar = eqCheckboxes && eqSelCount>0;
+    const eqDetailEmpty = !isCompact && !selId;
+    const eqShowRows = !eqLoading && !eqEmpty && !eqAllEmpty && !eqError;
+    const eqSelLabel = L(eqSelCount+' selected', 'נבחרו '+eqSelCount);
+
+    // ===== SCAN — Capacitor Camera + NFC on native (isNativePlatform), getUserMedia camera + manual on web =====
+    // priming card requested before camera; denied → Settings deep-link + manual; haptic feedback on success/error.
+    const scanState=variant;
+    const scanPriming=scanState==='priming', scanDenied=scanState==='denied';
+    const scanShowReticle = !scanPriming && !scanDenied;
+    const scanShowCaption = scanShowReticle;
+    const scanReticleBorder = scanState==='success'?'var(--status-ok-fg)':scanState==='error'?'var(--status-issue-fg)':'var(--on-ink-hi)';
+    const scanCenterIcon = scanState==='success'? this.ic('<path d="M20 6 9 17l-5-5"/>',{w:56,sw:2.4}) : scanState==='error'? this.ic('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',{w:52,sw:2.4}) : this.ic('<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/>',{w:52,sw:1.6});
+    const scanTitleMap={scanning:L('Hold near the tag','קרבו לתגית'),success:L('Found it','נמצא'),error:L('No tag detected','לא זוהתה תגית'),manual:L('Enter tag manually','הזנת תגית ידנית')};
+    const scanSubMap={scanning:L('Point the camera at the QR code, or hold an NFC tag to the back of the device.','כוונו את המצלמה לקוד ה-QR, או קרבו תגית NFC לגב המכשיר.'),success:L('Infusion pump · IV-204 is ready to check out.','משאבת עירוי · IV-204 מוכנה לניפוק.'),error:L('Move closer and keep the tag steady, or enter the tag by hand.','התקרבו וייצבו את התגית, או הזינו אותה ידנית.'),manual:L('Type the asset tag printed on the equipment label.','הקלידו את תגית הנכס המודפסת על תווית הציוד.')};
+
+    // ===== CODE BLUE — server-driven elapsed from startedAt (online-only, fail-loud, tenant clinicId) =====
+    const cbStartedAt = new Date(2025,5,30,14,48,0);
+    const cbNow = new Date(2025,5,30,14,50,14);
+    const cbElapsedMs = cbNow - cbStartedAt;
+    const cbTimer = String(Math.floor(cbElapsedMs/60000)).padStart(2,'0')+':'+String(Math.floor(cbElapsedMs/1000)%60).padStart(2,'0');
+    const cbLog=[
+      {t:fmtClock(new Date(2025,5,30,14,50)),label:L('Shock delivered · 4 J/kg','שוק ניתן · 4 ג׳אול/ק״ג')},
+      {t:fmtClock(new Date(2025,5,30,14,49)),label:L('Epinephrine 0.01 mg/kg IV','אדרנלין 0.01 מ״ג/ק״ג תוך-ורידי')},
+      {t:fmtClock(cbStartedAt),label:L('Code started · CPR begun','קוד החל · החייאה החלה')},
+    ];
+
+    // ===== HANDOFF =====
+    const handoffEnd=variant==='end';
+    const hStat=(label,value,color,sys,icp)=>({label,value,color,tintBg:`rgb(var(--sys-${sys}) / 0.12)`,icon:this.ic(icp,{w:16,sw:2})});
+    const handoffStats=[
+      hStat(L('Items still out','פריטים שעדיין בחוץ'),'12','var(--status-in-use-fg)','blue','<path d="M7 17 17 7"/><path d="M8 7h9v9"/>'),
+      hStat(L('Overdue','באיחור'),'2','var(--status-overdue-fg)','orange','<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
+      hStat(L('Scans logged','סריקות שנרשמו'),'48','var(--status-ok-fg)','green','<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/>'),
+    ];
+
+    // ===== ALERTS — severity labels (Urgent/Warning/Info) are notification levels, not status keys =====
+    const alertsEmpty=isAlerts&&variant==='empty';
+    const mkAlert=(sys,title,meta,icp)=>({title,meta,solid:`rgb(var(--sys-${sys}))`,tintBg:`rgb(var(--sys-${sys}) / 0.12)`,tintBorder:`rgb(var(--sys-${sys}) / 0.22)`,icon:this.ic(icp,{w:18,sw:2})});
+    const alertGroups=[
+      {title:L('Urgent','דחוף'),color:'var(--status-issue-fg)',items:[mkAlert('red',L('Defibrillator failed check','דפיברילטור נכשל בבדיקה'),L('DF-02 · Crash cart A · 08:55','DF-02 · עגלת חירום A · 08:55'),'<path d="m10.3 3.7-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.3l-8-14a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>')]},
+      {title:L('Warning','אזהרה'),color:'var(--status-overdue-fg)',items:[mkAlert('orange',L('Portable X-ray overdue','רנטגן נייד באיחור'),L('XR-07 · 2h past return · 11:40','XR-07 · שעתיים מעבר להחזרה · 11:40'),'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),mkAlert('orange',L('Ventilator overdue','מכונת הנשמה באיחור'),L('VN-05 · 1h past return · 10:05','VN-05 · שעה מעבר להחזרה · 10:05'),'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>')]},
+      {title:L('Info','מידע'),color:'var(--status-in-use-fg)',items:[mkAlert('blue',L('Anesthesia unit back from service','מכונת הרדמה חזרה משירות'),L('AN-11 · ready to redeploy · 09:30','AN-11 · מוכנה לפריסה מחדש · 09:30'),'<path d="M7 17 17 7"/><path d="M8 7h9v9"/>')]},
+    ];
+
+    // ===== SETTINGS =====
+    const sRow=(label,opts={})=>({label,border:opts.first?'none':'1px solid var(--border)',tintBg:opts.sys?`rgb(var(--sys-${opts.sys}) / 0.14)`:'var(--tonal)',color:opts.sys?`rgb(var(--sys-${opts.sys}))`:'var(--foreground)',icon:this.ic(opts.icp||'<circle cx="12" cy="12" r="9"/>',{w:16,sw:2}),value:opts.value||'',isToggle:!!opts.toggle,toggleBg:opts.toggle==='on'?'var(--status-ok-fg)':'var(--tonal)',knobX:opts.toggle==='on'?'20px':'2px'});
+    const settingsSections=[
+      {title:L('Appearance','תצוגה'),rows:[sRow(L('Theme','ערכת נושא'),{first:true,icp:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',value:L('System','מערכת')}),sRow(L('Text size','גודל טקסט'),{icp:'<path d="M4 7V4h16v3M9 20h6M12 4v16"/>',value:L('Default','ברירת מחדל')})]},
+      {title:L('Language & region','שפה ואזור'),rows:[sRow(L('Language','שפה'),{first:true,icp:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18"/>',value:L('English','עברית')}),sRow(L('Right-to-left layout','פריסה מימין לשמאל'),{icp:'<path d="M3 12h18M3 6h18M3 18h12"/>',toggle:locale==='he'?'on':'off'})]},
+      {title:L('Notifications','התראות'),rows:[sRow(L('Urgent alerts','התראות דחופות'),{first:true,sys:'red',icp:'<path d="m10.3 3.7-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.3l-8-14a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',toggle:'on'}),sRow(L('Overdue reminders','תזכורות איחור'),{sys:'orange',icp:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',toggle:'on'}),sRow(L('Shift summaries','סיכומי משמרת'),{icp:'<path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5"/>',toggle:'off'})]},
+      {title:L('Account','חשבון'),rows:[sRow(L('Signed in as','מחובר כ'),{first:true,icp:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',value:L('Maya A.','מאיה ע.')})]},
+    ];
+
+    // ===== PROFILE =====
+    const profileStats=[{value:'142',label:L('Shifts','משמרות')},{value:'2.1k',label:L('Scans','סריקות')},{value:'18mo',label:L('Tenure','ותק')}];
+    const profileRows=[{label:L('Role','תפקיד'),value:L('Vet Tech · Lead','טכנאית · מובילה'),border:'none'},{label:L('Unit','יחידה'),value:L('ICU / Recovery','טי״נ / התאוששות'),border:'1px solid var(--border)'},{label:L('Last shift','משמרת אחרונה'),value:L('Jun 29','29 ביוני'),border:'1px solid var(--border)'}];
+
+    // ===== COMMAND CENTER (ward display) — 6-state mix incl. unknown =====
+    const C={green:'var(--status-ok-fg)',blue:'var(--status-in-use-fg)',red:'var(--status-issue-fg)',orange:'var(--status-stale-fg)',gray:'var(--status-unknown-fg)'};
+    const bTotal=14, bReady=9;
+    const ringCirc=2*Math.PI*64;
+    const pctW=(n,tot)=>((n/tot)*100).toFixed(2)+'%';
+    const mixDefs=[['ready',9,C.green,L('Ready','מוכן')],['in_use',2,C.blue,L('In use','בשימוש')],['blocked',1,C.red,L('Blocked','חסום')],['stale',1,C.orange,L('Stale','מידע ישן')],['overdue',1,C.orange,L('Overdue','באיחור')],['unknown',0,C.gray,L('Unknown','לא ידוע')]];
+    const boardMix=mixDefs.map(([k,count,color,label])=>({key:k,count,color,label,w:pctW(count,bTotal)}));
+    const typeDefs=[
+      {name:L('Pumps','משאבות'),ready:4,total:6,segs:[['r',4,C.green],['u',2,C.blue]]},
+      {name:L('Monitors','מוניטורים'),ready:3,total:3,segs:[['r',3,C.green]]},
+      {name:L('Imaging','הדמיה'),ready:1,total:2,below:true,min:2,segs:[['r',1,C.green],['o',1,C.red]]},
+      {name:L('Respiratory','נשימתי'),ready:2,total:3,segs:[['r',2,C.green],['s',1,C.orange]]},
+    ];
+    const boardTypes=typeDefs.map(ty=>({name:ty.name,ready:ty.ready,total:ty.total,below:!!ty.below,nameColor:ty.below?C.red:'var(--on-ink)',belowLabel:'⚠ '+ty.ready+'/'+ty.min,ratio:ty.ready+'/'+ty.total,segs:ty.segs.map(([k,n,color])=>({key:k,color,w:pctW(n,ty.total)}))}));
+    const locDefs=[
+      {name:L('ICU','טי״נ'),ready:5,inUse:1,issues:false},
+      {name:L('Recovery','התאוששות'),ready:3,inUse:0,issues:false},
+      {name:L('ER','חדר חירום'),ready:1,inUse:1,issues:false},
+      {name:L('Imaging','הדמיה'),ready:0,inUse:0,issues:true},
+    ];
+    const boardLocs=locDefs.map(l=>({name:l.name,hasInUse:l.inUse>0,readyLabel:l.ready+' '+L('ready','מוכנים'),inUseLabel:l.inUse+' '+L('in use','בשימוש'),border:l.issues?'var(--status-issue-border)':'var(--board-line)',bg:l.issues?'rgb(var(--sys-red) / 0.1)':'var(--board-surface)'}));
+    const badgeFor=(sys,label)=>({badge:label,badgeColor:`rgb(var(--sys-${sys}))`,badgeBg:`rgb(var(--sys-${sys}) / 0.15)`,badgeBorder:`rgb(var(--sys-${sys}) / 0.3)`});
+    const boardAttention=[
+      {name:L('Defibrillator','דפיברילטור'),type:L('Crash cart','עגלת חירום'),loc:L('Crash cart A','עגלת חירום A'),reason:L('Failed check','נכשל בבדיקה'),...badgeFor('red',L('Blocked','חסום'))},
+      {name:L('Portable X-ray','רנטגן נייד'),type:L('Imaging','הדמיה'),loc:L('Imaging','הדמיה'),reason:L('2h overdue','באיחור שעתיים'),...badgeFor('orange',L('Overdue','באיחור'))},
+      {name:L('Ventilator','מכונת הנשמה'),type:L('Respiratory','נשימתי'),loc:L('ICU-1','טי״נ 1'),reason:L('No recent scan','אין סריקה'),...badgeFor('gray',L('Unknown','לא ידוע'))},
+    ];
+    const board={
+      cols:'minmax(220px,250px) 1fr',
+      locCols:'repeat(auto-fill,minmax(112px,1fr))',
+      clock:fmtClock(new Date(2025,5,30,14,32)),
+      closeAria:L('Close board','סגירת לוח'),
+      ward:L('Ward','מחלקה'), live:L('Live','חי'),
+      shift:[L('Dr. Lee','ד״ר לי'),L('Maya A.','מאיה ע.'),L('Tech Ruiz','טכנאי רואיס')],
+      ready:String(bReady), ofTotal:L('of ','מתוך ')+bTotal,
+      deployableNow:L('Deployable now','זמינים כעת'), pct:Math.round(bReady/bTotal*100)+'%',
+      ringCirc:ringCirc.toFixed(1), ringOffset:(ringCirc*(1-bReady/bTotal)).toFixed(1),
+      mixTitle:L('Readiness mix','תמהיל כשירות'), mix:boardMix,
+      attentionCount:'3 '+L('need attention','דורשים טיפול'), blockedCount:'1 '+L('blocked','חסום'),
+      byTypeTitle:L('By type','לפי סוג'), types:boardTypes,
+      whereTitle:L('Where','מיקום'), locs:boardLocs,
+      attentionTitle:L('Needs attention','דורש טיפול')+' · 3', attention:boardAttention,
+      footer:L('Ward display · auto-refresh','תצוגת מחלקה · רענון אוטומטי'),
+    };
+
+    const t={
+      close:L('Close','סגירה'), back:L('Back','חזרה'),
+      guardTitle:L('Open on a larger display','פתחו בתצוגה גדולה יותר'),
+      scanEquipment:L('Scan equipment','סריקת ציוד'), assetTag:L('Asset tag','תגית נכס'), find:L('Find','חיפוש'),
+      primingTitle:L('Allow camera to scan tags','אפשרו גישה למצלמה לסריקת תגיות'),
+      primingBody:L('We use the camera to read QR labels and an NFC tag to identify equipment. Nothing is recorded — frames are processed on-device.','אנו משתמשים במצלמה לקריאת תגיות QR ובתגית NFC לזיהוי ציוד. דבר אינו מוקלט — העיבוד מתבצע במכשיר.'),
+      allowCamera:L('Allow camera','אפשר מצלמה'),
+      deniedTitle:L('Camera access is off','גישת המצלמה כבויה'),
+      deniedBody:L('Enable camera for VetTrack in Settings to scan, or enter the asset tag by hand below.','הפעילו את המצלמה עבור VetTrack בהגדרות כדי לסרוק, או הזינו את התגית ידנית למטה.'),
+      openSettings:L('Open Settings','פתיחת הגדרות'),
+      scanFoundName:L('Infusion pump','משאבת עירוי'), scanFoundMeta:'IV-204 · '+L('Bay 3','עמדה 3'),
+      checkoutMe:L('Check out to me','ניפוק אליי'), enterManual:L('Enter tag manually','הזנת תגית ידנית'), tryAgain:L('Try again','נסו שוב'),
+      codeBlue:L('CODE BLUE','קוד כחול'), cbLocation:L('Bay 3 · Canine','עמדה 3 · כלב'), cbElapsed:L('Elapsed · started ','חלף · החל ')+fmtClock(cbStartedAt),
+      logShock:L('Log shock','רישום שוק'), logEpi:L('Log epinephrine','רישום אדרנלין'), otherMed:L('Other med','תרופה אחרת'), noteEvent:L('Note event','רישום אירוע'),
+      eventLog:L('Event log','יומן אירועים'), endCode:L('End code · hold to confirm','סיום קוד · החזיקו לאישור'),
+      shiftSummary:L('Shift summary','סיכום משמרת'), notesNext:L('Notes to next shift','הערות למשמרת הבאה'), notesPlaceholder:L('Anything the night team should know…','משהו שצוות הלילה צריך לדעת…'), endShiftNote:L('Ending your shift checks in remaining items and locks the log.','סיום המשמרת מחזיר פריטים שנותרו ונועל את היומן.'),
+      equipment:L('Equipment','ציוד'), table:L('Table','טבלה'), searchEq:L('Search name, tag, location','חיפוש שם, תגית או מיקום'),
+      emptyTitle:L('No items match these filters','אין פריטים התואמים לסינון'), emptySub:L('Try removing a filter to widen your results.','נסו להסיר סינון כדי להרחיב את התוצאות.'), clearFilters:L('Clear filters','ניקוי סינון'),
+      noneTitle:L('No equipment yet','אין ציוד עדיין'), noneSub:L('Register your first asset to start tracking readiness.','רשמו את הנכס הראשון כדי להתחיל לעקוב אחר כשירות.'), addEquipment:L('Add equipment','הוספת ציוד'),
+      errTitle:L("Couldn't load equipment",'טעינת הציוד נכשלה'), errSub:L('Check your connection and try again — your data is safe.','בדקו את החיבור ונסו שוב — המידע שלך בטוח.'), retry:L('Retry','נסו שוב'),
+      pending:L('Pending','ממתין'), selectItem:L('Select an item to see details','בחרו פריט כדי לראות פרטים'),
+      flag:L('Flag','סימון'), reportMissing:L('Report missing','דיווח על חוסר'), atAGlance:L('At a glance','במבט מהיר'),
+      serviceSchedule:L('Service schedule','לוח שירות'), markServiced:L('Mark serviced','סימון כטופל'), maintFrom:L('Jun 2','2 ביוני'), maintTo:L('Jul 12','12 ביולי'), nextService:L('Next service due in 12 days.','השירות הבא בעוד 12 ימים.'), activity:L('Activity','פעילות'),
+      checkIn:L('Check in','החזרה'), assign:L('Assign','הקצאה'), clear:L('Clear','ניקוי'),
+      alerts:L('Alerts','התראות'), allClear:L('All clear','הכל תקין'), allClearSub:L('No active alerts on your unit.','אין התראות פעילות ביחידה שלך.'), acknowledge:L('Acknowledge','אישור'),
+      settings:L('Settings','הגדרות'), signOut:L('Sign out','התנתקות'),
+      profileName:L('Maya Abbas','מאיה עבאס'), profileRole:L('Vet Tech · Shift Lead','טכנאית וטרינרית · מובילת משמרת'),
+    };
+
+    const infoMap={
+      equipment:'Equipment master-detail — compact pushes to detail; medium & expanded show list + detail; expanded adds checkboxes → bulk bar and a table toggle. Status renders as color + icon + text across all 6 states (ready · in_use · blocked · stale · overdue · unknown). Switch State for loading / no-results / no-items / error / offline. ?filter=overdue deep-links the Overdue chip. Locale עברית renders the RTL Hebrew build.',
+      board:'Equipment Command Center (/equipment/board) — the always-on ward TV display: readiness gauge, 6-state readiness-mix bar, by-type & by-location breakdowns, needs-attention list. Dark-only and web+expanded-only (§0.1) — compact/medium show a larger-display guard that routes to /my-equipment. Server-driven, online-only, fail-loud; tenant-scoped by clinicId. Switch State to Loading for the command-board skeleton.',
+      scan:'Scan is full-screen and owns its chrome. Permission priming card precedes the camera request; denied routes to Settings with manual entry retained. Native uses Capacitor Camera + NFC; web uses getUserMedia camera + manual. Haptic feedback fires on success/error; env(safe-area-inset-*) respected. Cycle State: priming / scanning / success / error / denied / manual.',
+      codeblue:'Code Blue — full-screen, high-stress. Minimal chrome, ≥56pt actions, prominent tabular timer driven by the server startedAt (online-only, fail-loud), hold-to-confirm end. C6: action-grid layout kept over the equipment/timeline/status three-column — divergence logged in §13.',
+      handoff:'Handoff start/end shift with summary, notes to next shift, and a confirmation note.',
+      alerts:'Alerts grouped Urgent → Warning → Info, each color + icon + text with Acknowledge. Empty = "All clear." Severity labels are notification levels, not equipment status keys.',
+      settings:'Settings as grouped iOS-style table sections.',
+      profile:'Profile — avatar, role, shift-history stats, account rows, destructive sign-out.',
+    };
+
+    return {
+      pageClass: theme==='dark'?'dark':'', dir, chevronT,
+      themeOpts, sizeOpts, screenOpts, dirOpts, hasVariant, variantTitle: vc?vc.title:'', variantOpts,
+      frameOuter:f.outer, screenStyle:f.screen, browserChrome:f.browser && !fullScreen, canvasBg, routePath:routes[screen],
+      isCompact, hasSidebar, isExpanded, fullScreen, isEquipment, isStandard, isBoard,
+      isBoardLive, isBoardGuard, boardLoading, boardReady,
+      isScan, isCodeBlue, isHandoff, isAlerts, isSettings, isProfile,
+      navItems, tabs, t, board,
+      guardTitle:t.guardTitle, guardBody:L('The ward Command Center is built for a large, always-on display. Open it on a wall screen or desktop — on this device, head to your equipment list instead.','מרכז הבקרה של המחלקה מיועד לתצוגה גדולה וקבועה. פתחו אותו על מסך קיר או מחשב — במכשיר זה, עברו לרשימת הציוד.'), guardCta:L('Go to my equipment','למעבר לציוד שלי'),
+
+      eqListPaneStyle: hasSidebar?'width:'+(isExpanded?'372px':'320px')+'; flex-shrink:0; border-inline-end:1px solid var(--border)':'flex:1',
+      eqTitleSize: isCompact?'var(--text-largetitle)':'1.4rem',
+      eqRowMin: isExpanded?'52px':'64px',
+      eqCheckboxes, eqRows, eqFilters, eqLoading, eqEmpty, eqAllEmpty, eqError, eqSkeletons:[1,2,3,4,5,6],
+      eqShowList, eqShowDetail, eqShowRows, eqBulkBar, eqSelLabel, eqDetailEmpty,
+      eqDetailContent: !eqDetailEmpty,
+      eqClearSel:()=>this.set('eqSelected',[]), eqBack:()=>this.set('eqView','list'), sel,
+
+      scanPriming, scanDenied, scanShowReticle, scanShowCaption,
+      scanReticleBorder, scanReticleBg: scanState==='success'?'rgb(var(--sys-green) / 0.12)':scanState==='error'?'rgb(var(--sys-red) / 0.12)':'var(--ink-fill-faint)',
+      scanCenterIcon, scanTitle:scanTitleMap[scanState], scanSubtitle:scanSubMap[scanState],
+      scanTitleColor: scanState==='success'?'var(--status-ok-fg)':scanState==='error'?'var(--status-issue-fg)':'var(--on-ink)',
+      scanManual:scanState==='manual', scanSuccess:scanState==='success', scanError:scanState==='error',
+      scanShowManualBtn: scanState==='scanning'||scanState==='manual'||scanState==='denied',
+
+      cbCols: isCompact?'1fr 1fr':'1fr 1fr 1fr 1fr', cbLog, cbTimer,
+
+      handoffEnd, handoffTitle: handoffEnd?L('End shift','סיום משמרת'):L('Start shift','התחלת משמרת'),
+      handoffHeroOverline: handoffEnd?L('Ending day shift','סיום משמרת יום'):L('Starting day shift','תחילת משמרת יום'),
+      handoffHeroTitle: handoffEnd?L('04:32 on shift','04:32 במשמרת'):L('Ready when you are','מוכן כשתהיו מוכנים'),
+      handoffWho:L('Maya Abbas · Vet Tech · Day shift','מאיה עבאס · טכנאית · משמרת יום'),
+      handoffStats, handoffBtnLabel: handoffEnd?L('End shift','סיום משמרת'):L('Start shift','התחלת משמרת'),
+      handoffBtnBg: handoffEnd?'var(--status-issue-fg)':'var(--action)', handoffBtnColor:'var(--on-ink)',
+
+      alertsEmpty, alertsList: !alertsEmpty, alertGroups,
+      settingsSections, profileStats, profileRows,
+      stdMax: isCompact?'none':(isExpanded?'720px':'620px'), stdPad: isCompact?'8px 16px 24px':'24px 28px',
+      infoLine: infoMap[screen],
+    };
+  }
+}
+</script>
+</body>
+</html>

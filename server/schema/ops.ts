@@ -73,6 +73,77 @@ export const doctorShifts = vtTable(
 );
 
 export type DoctorShift = typeof doctorShifts.$inferSelect;
+
+export const shiftAdjustmentKind = pgEnum("vt_shift_adjustment_kind", [
+  "extend",
+  "leave_early",
+]);
+export const shiftAdjustmentStatus = pgEnum("vt_shift_adjustment_status", [
+  "pending",
+  "approved",
+  "rejected",
+  "cancelled",
+]);
+
+/**
+ * Shift-adjustment requests (Phase 1). A rostered person requests to work past
+ * their scheduled end (`extend`) or leave before it (`leave_early`) with a
+ * required reason; an admin approves or rejects. Only an `approved` row adjusts
+ * the effective shift window in role-resolution — additively, so the no-request
+ * path stays byte-identical. The role never changes (an adjustment is not a
+ * promotion); only the effective end time moves.
+ */
+export const shiftAdjustments = vtTable(
+  "vt_shift_adjustments",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "restrict" }),
+    requesterUserId: text("requester_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    requesterName: text("requester_name").notNull(),
+    kind: shiftAdjustmentKind("kind").notNull(),
+    baseShiftDate: date("base_shift_date", { mode: "string" }).notNull(),
+    baseShiftId: text("base_shift_id").references(() => shifts.id, {
+      onDelete: "set null",
+    }),
+    currentEndTime: time("current_end_time").notNull(),
+    requestedEndTime: time("requested_end_time").notNull(),
+    reason: text("reason").notNull(),
+    status: shiftAdjustmentStatus("status").notNull().default("pending"),
+    decidedByUserId: text("decided_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    decisionNote: text("decision_note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => ({
+    clinicStatusIdx: index("idx_vt_shift_adjustments_clinic_status").on(
+      t.clinicId,
+      t.status,
+    ),
+    clinicRequesterIdx: index("idx_vt_shift_adjustments_clinic_requester").on(
+      t.clinicId,
+      t.requesterUserId,
+    ),
+    activeLookupIdx: index("idx_vt_shift_adjustments_active_lookup").on(
+      t.clinicId,
+      t.requesterUserId,
+      t.baseShiftDate,
+      t.status,
+    ),
+  }),
+);
+
+export type ShiftAdjustment = typeof shiftAdjustments.$inferSelect;
+export type ShiftAdjustmentKind = (typeof shiftAdjustmentKind.enumValues)[number];
+export type ShiftAdjustmentStatus =
+  (typeof shiftAdjustmentStatus.enumValues)[number];
 export type NewDoctorShift = typeof doctorShifts.$inferInsert;
 
 export const serverConfig = vtTable("vt_server_config", {

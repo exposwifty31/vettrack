@@ -151,11 +151,16 @@ describe("resolveAuthUser — ADMIN_EMAILS promotion runtime", () => {
 
   const originalAdminEmails = process.env.ADMIN_EMAILS;
   const originalClerkSecret = process.env.CLERK_SECRET_KEY;
+  const originalClerkEnabled = process.env.CLERK_ENABLED;
   const originalNodeEnv = process.env.NODE_ENV;
 
   beforeAll(async () => {
     process.env.NODE_ENV = "test";
     process.env.CLERK_SECRET_KEY = "sk_test_mock_for_admin_emails_tests";
+    // .env.local sets CLERK_ENABLED=false for local dev-bypass; clear it so
+    // resolveAuthMode picks the Clerk path (the promotion runtime under test).
+    // Otherwise resolveAuthUser short-circuits into ensureDevUserRecord.
+    delete process.env.CLERK_ENABLED;
     const mod = await import("../server/middleware/auth.js");
     resolveAuthUser = mod.resolveAuthUser;
   }, 30000);
@@ -165,6 +170,8 @@ describe("resolveAuthUser — ADMIN_EMAILS promotion runtime", () => {
     else process.env.NODE_ENV = originalNodeEnv;
     if (originalClerkSecret === undefined) delete process.env.CLERK_SECRET_KEY;
     else process.env.CLERK_SECRET_KEY = originalClerkSecret;
+    if (originalClerkEnabled === undefined) delete process.env.CLERK_ENABLED;
+    else process.env.CLERK_ENABLED = originalClerkEnabled;
   });
 
   beforeEach(() => {

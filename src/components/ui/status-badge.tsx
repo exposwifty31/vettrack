@@ -17,6 +17,8 @@ const KIND: Record<
   issue:       { bg: "var(--status-issue-bg)",  fg: "var(--status-issue-fg)",  bd: "var(--status-issue-border)",  dot: "hsl(var(--status-issue))" },
   maintenance: { bg: "var(--status-maint-bg)",  fg: "var(--status-maint-fg)",  bd: "var(--status-maint-border)",  dot: "hsl(var(--status-maintenance))" },
   sterilized:  { bg: "var(--status-steril-bg)", fg: "var(--status-steril-fg)", bd: "var(--status-steril-border)", dot: "hsl(var(--status-sterilized))" },
+  stale:       { bg: "var(--status-stale-bg)",  fg: "var(--status-stale-fg)",  bd: "var(--status-stale-border)",  dot: "hsl(var(--status-stale))" },
+  unknown:     { bg: "var(--status-unknown-bg)",fg: "var(--status-unknown-fg)",bd: "var(--status-unknown-border)",dot: "hsl(var(--status-unknown))" },
   info:        { bg: "var(--status-steril-bg)", fg: "var(--status-steril-fg)", bd: "var(--status-steril-border)", dot: "var(--status-info)" },
   neutral:     { bg: "hsl(var(--muted))",       fg: "hsl(var(--muted-foreground))", bd: "rgb(var(--ivory-border))", dot: "rgb(var(--ivory-text3))" },
 };
@@ -28,6 +30,8 @@ const STATUS_LABELS: Record<StatusKind, () => string> = {
   issue:       () => t.status.issue,
   maintenance: () => t.status.maintenance,
   sterilized:  () => t.status.sterilized,
+  stale:       () => (t.status as Record<string, string>)["stale"] ?? "Stale",
+  unknown:     () => (t.status as Record<string, string>)["unknown"] ?? "Unknown",
   info:        () => (t.status as Record<string, string>)["info"] ?? "Info",
   neutral:     () => (t.status as Record<string, string>)["neutral"] ?? "Unknown",
 };

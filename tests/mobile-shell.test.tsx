@@ -32,6 +32,7 @@ vi.mock("@/lib/i18n", () => ({
     nav: {
       today: "Today",
       equipment: "Equipment",
+      mine: "My equipment",
       emergency: "Emergency",
       menu: "Menu",
       equipmentScan: "Scan",

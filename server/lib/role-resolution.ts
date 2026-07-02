@@ -1,5 +1,6 @@
-import { and, desc, eq, or, sql } from "drizzle-orm";
-import { db, shifts, users } from "../db.js";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { db, shiftAdjustments, shifts, users } from "../db.js";
+import { shiftWindowContains } from "./shift-adjustment-window.js";
 
 export type PermanentVetTrackRole = "admin" | "vet" | "technician" | "senior_technician" | "student";
 export type ShiftRole = "technician" | "senior_technician" | "admin";
@@ -54,6 +55,93 @@ function normalizeNameKey(name: string): string {
     .toLowerCase()
     .replace(/[.\-_/\\,]+/g, "")
     .replace(/\s+/g, "");
+}
+
+/**
+ * Apply approved shift-adjustments (Phase 1) to the roster shift result.
+ *
+ * ADDITIVE + FAIL-SAFE: when the caller has no userId, or no approved adjustment
+ * applies, this returns the roster `activeShift` unchanged — so the Strategy A
+ * snapshot stays byte-for-byte identical for the existing (no-adjustment) path.
+ * Any error degrades to the pure roster result (a bug here can never break core
+ * authority). The role never changes; only the effective end time moves.
+ *
+ * - leave_early: shortens an active roster shift; once `now` passes the earlier
+ *   effective end, the person is off-shift (returns null).
+ * - extend: keeps the person on-shift past their rostered end when the extended
+ *   window still covers `now`.
+ */
+async function resolveEffectiveShift(
+  input: RoleResolutionInput,
+  now: Date,
+  today: string,
+  yesterday: string,
+  activeShift: ActiveShiftSnapshot | undefined,
+): Promise<ActiveShiftSnapshot | null> {
+  const userId = input.userId?.trim();
+  if (!userId) return activeShift ?? null;
+
+  try {
+    if (activeShift) {
+      const [leaveEarly] = await db
+        .select({ requestedEndTime: shiftAdjustments.requestedEndTime })
+        .from(shiftAdjustments)
+        .where(
+          and(
+            eq(shiftAdjustments.clinicId, input.clinicId),
+            eq(shiftAdjustments.requesterUserId, userId),
+            eq(shiftAdjustments.baseShiftId, activeShift.id),
+            eq(shiftAdjustments.kind, "leave_early"),
+            eq(shiftAdjustments.status, "approved"),
+          ),
+        )
+        .orderBy(desc(shiftAdjustments.createdAt))
+        .limit(1);
+      if (!leaveEarly) return activeShift;
+      return shiftWindowContains(now, activeShift.date, activeShift.startTime, leaveEarly.requestedEndTime)
+        ? { ...activeShift, endTime: leaveEarly.requestedEndTime }
+        : null;
+    }
+
+    const extensions = await db
+      .select({
+        requestedEndTime: shiftAdjustments.requestedEndTime,
+        shiftId: shifts.id,
+        shiftDate: shifts.date,
+        startTime: shifts.startTime,
+        employeeName: shifts.employeeName,
+        role: shifts.role,
+      })
+      .from(shiftAdjustments)
+      .innerJoin(shifts, eq(shifts.id, shiftAdjustments.baseShiftId))
+      .where(
+        and(
+          eq(shiftAdjustments.clinicId, input.clinicId),
+          eq(shiftAdjustments.requesterUserId, userId),
+          eq(shiftAdjustments.kind, "extend"),
+          eq(shiftAdjustments.status, "approved"),
+          inArray(shiftAdjustments.baseShiftDate, [today, yesterday]),
+        ),
+      )
+      .orderBy(desc(shiftAdjustments.createdAt));
+
+    for (const ext of extensions) {
+      if (shiftWindowContains(now, ext.shiftDate, ext.startTime, ext.requestedEndTime)) {
+        return {
+          id: ext.shiftId,
+          date: ext.shiftDate,
+          startTime: ext.startTime,
+          endTime: ext.requestedEndTime,
+          employeeName: ext.employeeName,
+          role: ext.role,
+        };
+      }
+    }
+    return null;
+  } catch (err) {
+    console.error("role-resolution:adjustments", err);
+    return activeShift ?? null;
+  }
 }
 
 export async function resolveCurrentRole(input: RoleResolutionInput): Promise<RoleResolutionResult> {
@@ -135,7 +223,11 @@ export async function resolveCurrentRole(input: RoleResolutionInput): Promise<Ro
     .orderBy(desc(shifts.date), desc(shifts.startTime))
     .limit(1);
 
-  if (!activeShift) {
+  // Additive, fail-safe: approved shift-adjustments move the effective end.
+  // Byte-identical to the roster result when none apply.
+  const effectiveShift = await resolveEffectiveShift(input, now, today, yesterday, activeShift);
+
+  if (!effectiveShift) {
     const ROLE_LEVELS: Record<string, number> = {
       admin: 40,
       vet: 30,
@@ -161,10 +253,10 @@ export async function resolveCurrentRole(input: RoleResolutionInput): Promise<Ro
   }
 
   return {
-    effectiveRole: activeShift.role,
+    effectiveRole: effectiveShift.role,
     permanentRole: input.fallbackRole,
     source: "shift",
-    activeShift,
+    activeShift: effectiveShift,
     resolvedAt: now,
   };
 }

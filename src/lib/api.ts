@@ -31,6 +31,10 @@ import type {
   ShiftImport,
   ShiftImportPreview,
   ShiftImportResult,
+  ShiftAdjustment,
+  ShiftAdjustmentStatus,
+  ShiftAdjustmentDecision,
+  CreateShiftAdjustmentRequest,
   Appointment,
   AppointmentVetMeta,
   CreateAppointmentRequest,
@@ -44,6 +48,7 @@ import type {
   RestockContainerView,
   RestockFinishSummary,
   InventoryItem,
+  InventoryItemDetail,
   PurchaseOrder,
   DisplaySnapshot,
   CodeBlueDispense,
@@ -502,6 +507,24 @@ export const api = {
       return res.json() as Promise<ShiftImportResult>;
     },
   },
+  shiftAdjustments: {
+    list: (status?: ShiftAdjustmentStatus) =>
+      request<{ requests: ShiftAdjustment[] }>(
+        status ? `/api/shift-adjustments?status=${status}` : "/api/shift-adjustments",
+      ).then((r) => r.requests),
+    create: (data: CreateShiftAdjustmentRequest) =>
+      request<ShiftAdjustment>("/api/shift-adjustments", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    decide: (id: string, decision: ShiftAdjustmentDecision, note?: string) =>
+      request<ShiftAdjustment>(`/api/shift-adjustments/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(note ? { decision, note } : { decision }),
+      }),
+    cancel: (id: string) =>
+      request<ShiftAdjustment>(`/api/shift-adjustments/${id}/cancel`, { method: "POST" }),
+  },
   appointments: {
     list: (params: { day?: string; start?: string; end?: string; vetId?: string }) => {
       const qs = new URLSearchParams();
@@ -849,9 +872,10 @@ export const api = {
   },
   inventoryItems: {
     list: () => request<InventoryItem[]>("/api/inventory-items"),
-    create: (data: { code: string; label: string; category?: string; nfcTagId?: string | null }) =>
+    detail: (id: string) => request<InventoryItemDetail>(`/api/inventory-items/${id}/detail`),
+    create: (data: { code: string; label: string; category?: string; nfcTagId?: string | null; parLevel?: number | null; reorderPoint?: number | null }) =>
       request<InventoryItem>("/api/inventory-items", { method: "POST", body: JSON.stringify(data) }),
-    update: (id: string, data: { label?: string; category?: string | null; nfcTagId?: string | null; isBillable?: boolean; minimumDispenseToCapture?: number }) =>
+    update: (id: string, data: { label?: string; category?: string | null; nfcTagId?: string | null; isBillable?: boolean; minimumDispenseToCapture?: number; parLevel?: number | null; reorderPoint?: number | null }) =>
       request<InventoryItem>(`/api/inventory-items/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     delete: (id: string) => request<void>(`/api/inventory-items/${id}/deactivate`, { method: "PATCH" }),
   },

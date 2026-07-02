@@ -1,8 +1,15 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { and, asc, eq, isNull } from "drizzle-orm";
-import { inventoryItemPrices, inventoryItems, db, users } from "../db.js";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import {
+  inventoryItemPrices,
+  inventoryItems,
+  containers,
+  containerItems,
+  db,
+  users,
+} from "../db.js";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
@@ -19,6 +26,8 @@ export const createItemSchema = z.object({
   unit: z.string().min(1).max(30).optional().nullable(),
   category: z.string().max(100).optional(),
   nfcTagId: z.string().max(200).optional().nullable(),
+  parLevel: z.number().int().min(0).optional().nullable(),
+  reorderPoint: z.number().int().min(0).optional().nullable(),
 }).strict();
 
 export const updateItemSchema = z.object({
@@ -29,6 +38,8 @@ export const updateItemSchema = z.object({
   nfcTagId: z.string().max(200).optional().nullable(),
   isBillable: z.boolean().optional(),
   minimumDispenseToCapture: z.number().int().min(1).optional(),
+  parLevel: z.number().int().min(0).optional().nullable(),
+  reorderPoint: z.number().int().min(0).optional().nullable(),
 }).strict();
 
 export const addPriceSchema = z.object({
@@ -65,6 +76,81 @@ router.get("/", requireAuth, requireEffectiveRole("technician"), async (req, res
   }
 });
 
+// GET /api/inventory-items/:id/detail — aggregate facts, container distribution, 7-day usage
+router.get("/:id/detail", requireAuth, requireEffectiveRole("technician"), validateUuid("id"), async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  try {
+    const clinicId = req.clinicId!;
+    const id = req.params.id;
+
+    const [item] = await db
+      .select()
+      .from(inventoryItems)
+      .where(and(eq(inventoryItems.id, id), eq(inventoryItems.clinicId, clinicId)))
+      .limit(1);
+
+    if (!item) {
+      return res.status(404).json(
+        apiError({ code: "NOT_FOUND", reason: "ITEM_NOT_FOUND", message: "Inventory item not found", requestId }),
+      );
+    }
+
+    // On-hand distribution across containers (clinic-scoped), largest holdings first.
+    const distribution = await db
+      .select({
+        containerId: containerItems.containerId,
+        containerName: containers.name,
+        quantity: containerItems.quantity,
+      })
+      .from(containerItems)
+      .innerJoin(containers, eq(containers.id, containerItems.containerId))
+      .where(and(eq(containerItems.itemId, id), eq(containerItems.clinicId, clinicId)))
+      .orderBy(desc(containerItems.quantity));
+
+    const onHandTotal = distribution.reduce((sum, row) => sum + (row.quantity ?? 0), 0);
+
+    // 7-day usage: unnest the dispense-event items jsonb, sum per day, zero-filled
+    // via a server-side generate_series so buckets are timezone-consistent.
+    const usageResult = await db.execute(sql`
+      SELECT to_char(d::date, 'YYYY-MM-DD') AS day,
+             COALESCE(u.qty, 0)::int AS quantity
+      FROM generate_series(
+             date_trunc('day', now()) - interval '6 days',
+             date_trunc('day', now()),
+             interval '1 day'
+           ) AS d
+      LEFT JOIN (
+        SELECT date_trunc('day', created_at) AS day,
+               SUM((elem->>'quantity')::int) AS qty
+        FROM vt_dispense_events, jsonb_array_elements(items) AS elem
+        WHERE clinic_id = ${clinicId}
+          AND elem->>'itemId' = ${id}
+          AND status IN ('CONFIRMED', 'COMPLETED')
+          AND created_at >= date_trunc('day', now()) - interval '6 days'
+        GROUP BY 1
+      ) AS u ON u.day = d
+      ORDER BY d
+    `);
+    const usageRows =
+      (usageResult as unknown as { rows?: Array<{ day: string; quantity: number }> }).rows ?? [];
+    const usage7d = usageRows.map((r) => ({ date: r.day, quantity: Number(r.quantity) || 0 }));
+    const usage7dTotal = usage7d.reduce((sum, r) => sum + r.quantity, 0);
+
+    res.json({
+      item,
+      onHandTotal,
+      containers: distribution,
+      usage7d,
+      usage7dTotal,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json(
+      apiError({ code: "INTERNAL_ERROR", reason: "ITEM_DETAIL_FAILED", message: "Failed to load inventory item detail", requestId }),
+    );
+  }
+});
+
 // POST /api/inventory-items — create item
 router.post("/", requireAuth, requireAdmin, validateBody(createItemSchema), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -82,6 +168,8 @@ router.post("/", requireAuth, requireAdmin, validateBody(createItemSchema), asyn
       unit: b.unit?.trim() || null,
       category: b.category?.trim() || null,
       nfcTagId: b.nfcTagId?.trim() || null,
+      parLevel: b.parLevel ?? null,
+      reorderPoint: b.reorderPoint ?? null,
       isActive: true,
     });
 
@@ -141,6 +229,8 @@ router.patch("/:id", requireAuth, requireAdmin, validateUuid("id"), validateBody
     if (b.nfcTagId !== undefined) updates.nfcTagId = b.nfcTagId?.trim() || null;
     if (b.isBillable !== undefined) updates.isBillable = b.isBillable;
     if (b.minimumDispenseToCapture !== undefined) updates.minimumDispenseToCapture = b.minimumDispenseToCapture;
+    if (b.parLevel !== undefined) updates.parLevel = b.parLevel;
+    if (b.reorderPoint !== undefined) updates.reorderPoint = b.reorderPoint;
 
     await db.update(inventoryItems).set(updates).where(and(eq(inventoryItems.clinicId, clinicId), eq(inventoryItems.id, req.params.id)));
     const [updated] = await db.select().from(inventoryItems).where(eq(inventoryItems.id, req.params.id)).limit(1);

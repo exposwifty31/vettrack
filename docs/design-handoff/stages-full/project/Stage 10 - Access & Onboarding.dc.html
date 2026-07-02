@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Heebo:wght@400;500;600;700;800&display=swap">
+<style>
+  /* ============================================================
+     STAGE 10 · ACCESS & ONBOARDING — §19 NOTES
+     Binds the Stage 1 canonical token layer.
+     Screens: Sign In · Sign Up · Forgot Password · What's New · Help & Legal.
+     S10-D1  Auth screens ship centered, unframed (no sidebar/tabbar) — they
+             exist outside the authenticated app shell entirely.
+     S10-D2  Sign-up submits into the Stage 8 Pending-approval queue, not
+             instant access — the confirmation state sets that expectation.
+     S10-D3  What's New is a one-time dismissible sheet keyed by app
+             version, not a persistent nav destination.
+     S10-D4  Flagging for re-audit: the D-E decision (Stage 1 §13) scopes
+             the "no _ds_bundle" exemption to Stage 1 & 2 only (they declare
+             the token layer). Stages 3–10, including this one, do not
+             bind _ds_bundle either — this handoff is token-accurate but
+             does not compose the real VetTrack React components. Flagged
+             for the team to decide: keep as a token-accurate prototype, or
+             schedule a rebuild on the actual component bundle.
+     ============================================================ */
+  *{box-sizing:border-box}
+  html{font-size:17px}
+  body{margin:0;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-variant-numeric:tabular-nums}
+  :root{
+    --background:rgb(242 242 247); --surface:rgb(255 255 255); --surface-2:rgb(255 255 255);
+    --foreground:rgb(0 0 0); --muted-foreground:rgba(60,60,67,0.6); --border:rgba(60,60,67,0.29);
+    --hairline:transparent;
+    --brand:rgb(79 70 229); --brand-foreground:rgb(255 255 255); --brand-ink:rgb(30 27 75);
+    --sys-red:255 59 48; --sys-orange:255 149 0; --sys-green:52 199 89; --sys-blue:0 122 255; --sys-gray:142 142 147;
+    --ease-standard:cubic-bezier(0.2,0,0,1); --dur-fast:120ms; --dur-base:200ms;
+    --font-sans:-apple-system,system-ui,"Heebo","Segoe UI",Roboto,sans-serif;
+    --font-num:"DM Mono",ui-monospace,SFMono-Regular,monospace;
+    --bar-bg:rgb(255 255 255 / 0.94); --bar-bg-opaque:rgb(255 255 255); --bar-blur:12px;
+    --tonal:rgba(120,120,128,0.16);
+    --status-ok:rgb(var(--sys-green)); --status-ok-bg:rgb(var(--sys-green) / 0.12); --status-ok-fg:rgb(var(--sys-green));
+    --status-issue:rgb(var(--sys-red)); --status-issue-bg:rgb(var(--sys-red) / 0.12); --status-issue-fg:rgb(var(--sys-red));
+    --status-stale-bg:rgb(var(--sys-orange) / 0.12); --status-stale-fg:rgb(var(--sys-orange));
+    --on-ink:rgb(255 255 255); --on-ink-strong:rgb(255 255 255 / 0.82); --on-ink-muted:rgb(255 255 255 / 0.6);
+  }
+  .dark{
+    --background:rgb(0 0 0); --surface:rgb(28 28 30); --surface-2:rgb(44 44 46);
+    --foreground:rgb(255 255 255); --muted-foreground:rgba(235,235,245,0.6); --border:rgba(84,84,88,0.6);
+    --hairline:rgba(84,84,88,0.6);
+    --brand:rgb(129 140 248); --brand-foreground:rgb(30 27 75); --brand-ink:rgb(30 27 75);
+    --sys-red:255 69 58; --sys-orange:255 159 10; --sys-green:48 209 88; --sys-blue:10 132 255; --sys-gray:152 152 157;
+    --bar-bg:rgba(28,28,30,0.94); --bar-bg-opaque:rgb(28 28 30);
+    --tonal:rgba(120,120,128,0.24);
+  }
+  a:focus-visible,button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:none;box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--brand)}
+  @keyframes vt-spin{to{transform:rotate(360deg)}}
+</style>
+</helmet>
+<div class="{{ pageClass }}" style="min-height:100vh; background:var(--background); color:var(--foreground); font-family:var(--font-sans)">
+
+  <header style="position:sticky; top:0; z-index:50; background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); border-bottom:1px solid var(--border)">
+    <div style="max-width:1240px; margin:0 auto; padding:11px 20px; display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px">
+      <div style="display:flex; align-items:baseline; gap:10px; margin-right:auto"><span style="font:700 17px var(--font-sans); letter-spacing:-.02em; color:var(--brand)">VetTrack</span><span style="font:500 12px var(--font-num); color:var(--muted-foreground)">Stage 10 · Access &amp; Onboarding</span></div>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">Screen</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px; flex-wrap:wrap"><sc-for list="{{ screenOpts }}" as="o" hint-placeholder-count="5"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">Theme</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px"><sc-for list="{{ themeOpts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+      <sc-if value="{{ hasVariant }}" hint-placeholder-val="{{ true }}"><div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">{{ variantTitle }}</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px; flex-wrap:wrap"><sc-for list="{{ variantOpts }}" as="o" hint-placeholder-count="4"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div></sc-if>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">Locale</span><div style="display:flex; gap:3px; padding:3px; background:var(--tonal); border-radius:9px"><sc-for list="{{ dirOpts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+    </div>
+  </header>
+
+  <div style="padding:26px 16px 70px; display:flex; justify-content:center; overflow:auto">
+    <div style="width:392px; height:800px; background:#0d0d0f; border-radius:48px; padding:11px; box-sizing:border-box; overflow:hidden">
+      <div dir="{{ dir }}" style="border-radius:38px; flex; min-height:0; display:flex; flex-direction:column; background:var(--background); overflow:auto; position:relative; height:100%">
+
+        <div style="min-height:44px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; padding-top:env(safe-area-inset-top); padding-inline:26px">
+          <span style="font:600 15px var(--font-num); color:var(--foreground)">9:41</span>
+          <div style="width:24px; height:12px; border:1px solid currentColor; border-radius:3px; padding:1.5px; opacity:.9; color:var(--foreground)"><div style="width:72%; height:100%; background:currentColor; border-radius:1px"></div></div>
+        </div>
+
+        <div style="flex:1; display:flex; align-items:center; justify-content:center; padding:24px">
+          <div style="width:100%; max-width:340px; display:flex; flex-direction:column; gap:18px">
+
+            <!-- ===================== SIGN IN ===================== -->
+            <sc-if value="{{ showSignIn }}" hint-placeholder-val="{{ true }}">
+              <div data-screen-label="Sign In" style="display:flex; flex-direction:column; gap:18px; align-items:center; text-align:center">
+                <div style="width:56px; height:56px; border-radius:16px; background:var(--brand); color:var(--brand-foreground); display:flex; align-items:center; justify-content:center; font:700 22px var(--font-sans)">V</div>
+                <div><h1 style="font-size:1.6rem; font-weight:700; letter-spacing:-.02em; margin:0">{{ signInTitle }}</h1><p style="font:500 13.5px var(--font-sans); color:var(--muted-foreground); margin:6px 0 0">{{ signInSubtitle }}</p></div>
+                <div style="width:100%; display:flex; flex-direction:column; gap:10px; text-align:start">
+                  <div><label style="font:600 12px var(--font-sans); color:var(--muted-foreground); margin:0 0 5px; display:block">{{ emailLabel }}</label><div style="height:46px; border:1px solid {{ authErrBorder }}; border-radius:12px; background:var(--surface); display:flex; align-items:center; padding:0 14px"><span style="font:400 14px var(--font-sans); color:var(--foreground)" dir="ltr">maya@vettrack.app</span></div></div>
+                  <div><label style="font:600 12px var(--font-sans); color:var(--muted-foreground); margin:0 0 5px; display:block">{{ passwordLabel }}</label><div style="height:46px; border:1px solid {{ authErrBorder }}; border-radius:12px; background:var(--surface); display:flex; align-items:center; padding:0 14px"><span style="font:400 14px var(--font-sans); color:var(--foreground)">••••••••</span></div></div>
+                  <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}"><p style="font:600 12.5px var(--font-sans); color:var(--status-issue-fg); margin:0">{{ authErrorText }}</p></sc-if>
+                  <span style="align-self:flex-end; font:600 12.5px var(--font-sans); color:var(--brand); cursor:pointer">{{ forgotLabel }}</span>
+                </div>
+                <sc-if value="{{ authLoading }}" hint-placeholder-val="{{ false }}"><span style="width:100%; height:48px; border-radius:14px; background:var(--brand); opacity:.7; display:flex; align-items:center; justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--brand-foreground)" stroke-width="2.4" stroke-linecap="round" style="animation:vt-spin 700ms linear infinite" aria-hidden="true"><path d="M21 12a9 9 0 0 0-9-9 9 9 0 0 0-6.7 3M3 12a9 9 0 0 0 9 9 9 9 0 0 0 6.7-3"/><path d="M21 3v5h-5"/><path d="M3 21v-5h5"/></svg></span></sc-if>
+                <sc-if value="{{ authNotLoading }}" hint-placeholder-val="{{ true }}"><button style="width:100%; height:48px; border:none; border-radius:14px; background:var(--brand); color:var(--brand-foreground); font:700 15px var(--font-sans); cursor:pointer">{{ signInCta }}</button></sc-if>
+                <p style="font:500 13px var(--font-sans); color:var(--muted-foreground); margin:0">{{ noAccountText }} <span style="color:var(--brand); font-weight:700; cursor:pointer">{{ signUpLink }}</span></p>
+              </div>
+            </sc-if>
+
+            <!-- ===================== SIGN UP ===================== -->
+            <sc-if value="{{ showSignUp }}" hint-placeholder-val="{{ false }}">
+              <div data-screen-label="Sign Up" style="display:flex; flex-direction:column; gap:18px; align-items:center; text-align:center">
+                <sc-if value="{{ signUpForm }}" hint-placeholder-val="{{ true }}">
+                  <div style="width:56px; height:56px; border-radius:16px; background:var(--brand); color:var(--brand-foreground); display:flex; align-items:center; justify-content:center; font:700 22px var(--font-sans)">V</div>
+                  <div><h1 style="font-size:1.6rem; font-weight:700; letter-spacing:-.02em; margin:0">{{ signUpTitle }}</h1><p style="font:500 13.5px var(--font-sans); color:var(--muted-foreground); margin:6px 0 0">{{ signUpSubtitle }}</p></div>
+                  <div style="width:100%; display:flex; flex-direction:column; gap:10px; text-align:start">
+                    <div><label style="font:600 12px var(--font-sans); color:var(--muted-foreground); margin:0 0 5px; display:block">{{ nameLabel }}</label><div style="height:46px; border:1px solid var(--border); border-radius:12px; background:var(--surface); display:flex; align-items:center; padding:0 14px"><span style="font:400 14px var(--font-sans); color:var(--foreground)">{{ nameValue }}</span></div></div>
+                    <div><label style="font:600 12px var(--font-sans); color:var(--muted-foreground); margin:0 0 5px; display:block">{{ emailLabel }}</label><div style="height:46px; border:1px solid var(--border); border-radius:12px; background:var(--surface); display:flex; align-items:center; padding:0 14px"><span style="font:400 14px var(--font-sans); color:var(--foreground)" dir="ltr">{{ emailValue }}</span></div></div>
+                    <div><label style="font:600 12px var(--font-sans); color:var(--muted-foreground); margin:0 0 5px; display:block">{{ roleLabel }}</label><div style="display:flex; gap:7px; flex-wrap:wrap"><sc-for list="{{ roleChips }}" as="r" hint-placeholder-count="3"><button onClick="{{ r.onClick }}" style="{{ r.style }}">{{ r.label }}</button></sc-for></div></div>
+                  </div>
+                  <button style="width:100%; height:48px; border:none; border-radius:14px; background:var(--brand); color:var(--brand-foreground); font:700 15px var(--font-sans); cursor:pointer">{{ signUpCta }}</button>
+                  <p style="font:500 13px var(--font-sans); color:var(--muted-foreground); margin:0">{{ haveAccountText }} <span style="color:var(--brand); font-weight:700; cursor:pointer">{{ signInLink }}</span></p>
+                </sc-if>
+                <sc-if value="{{ signUpPending }}" hint-placeholder-val="{{ false }}">
+                  <div style="width:64px; height:64px; border-radius:999px; background:var(--status-stale-bg); display:flex; align-items:center; justify-content:center"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--status-stale-fg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+                  <h1 style="font-size:1.4rem; font-weight:700; letter-spacing:-.02em; margin:0">{{ pendingTitle }}</h1>
+                  <p style="font:500 14px/1.6 var(--font-sans); color:var(--muted-foreground); margin:0; max-width:36ch">{{ pendingSub }}</p>
+                </sc-if>
+              </div>
+            </sc-if>
+
+            <!-- ===================== FORGOT PASSWORD ===================== -->
+            <sc-if value="{{ showForgot }}" hint-placeholder-val="{{ false }}">
+              <div data-screen-label="Forgot Password" style="display:flex; flex-direction:column; gap:16px; align-items:center; text-align:center">
+                <sc-if value="{{ forgotForm }}" hint-placeholder-val="{{ true }}">
+                  <div style="width:56px; height:56px; border-radius:16px; background:var(--tonal); color:var(--foreground); display:flex; align-items:center; justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+                  <div><h1 style="font-size:1.5rem; font-weight:700; letter-spacing:-.02em; margin:0">{{ forgotTitle }}</h1><p style="font:500 13.5px/1.5 var(--font-sans); color:var(--muted-foreground); margin:6px 0 0; max-width:34ch">{{ forgotSub }}</p></div>
+                  <div style="width:100%; height:46px; border:1px solid var(--border); border-radius:12px; background:var(--surface); display:flex; align-items:center; padding:0 14px"><span style="font:400 14px var(--font-sans); color:var(--foreground)" dir="ltr">maya@vettrack.app</span></div>
+                  <button style="width:100%; height:48px; border:none; border-radius:14px; background:var(--brand); color:var(--brand-foreground); font:700 15px var(--font-sans); cursor:pointer">{{ sendResetCta }}</button>
+                </sc-if>
+                <sc-if value="{{ forgotSent }}" hint-placeholder-val="{{ false }}">
+                  <div style="width:64px; height:64px; border-radius:999px; background:var(--status-ok-bg); display:flex; align-items:center; justify-content:center"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--status-ok-fg)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></div>
+                  <h1 style="font-size:1.4rem; font-weight:700; letter-spacing:-.02em; margin:0">{{ resetSentTitle }}</h1>
+                  <p style="font:500 14px/1.6 var(--font-sans); color:var(--muted-foreground); margin:0; max-width:34ch" dir="ltr">{{ resetSentSub }}</p>
+                </sc-if>
+              </div>
+            </sc-if>
+
+            <!-- ===================== WHAT'S NEW ===================== -->
+            <sc-if value="{{ showWhatsNew }}" hint-placeholder-val="{{ false }}">
+              <div data-screen-label="What's New" style="background:var(--surface); border:1px solid var(--hairline); border-radius:22px; padding:24px; display:flex; flex-direction:column; gap:16px; box-shadow:0 -12px 40px rgba(0,0,0,0.12)">
+                <div style="display:flex; justify-content:center"><div style="width:38px; height:5px; border-radius:999px; background:var(--tonal)"></div></div>
+                <div style="text-align:center"><span style="font:700 11px var(--font-num); color:var(--brand); letter-spacing:.06em">{{ versionLabel }}</span><h1 style="font-size:1.4rem; font-weight:700; letter-spacing:-.02em; margin:6px 0 0">{{ whatsNewTitle }}</h1></div>
+                <div style="display:flex; flex-direction:column; gap:14px">
+                  <div style="display:flex; gap:13px; align-items:flex-start"><span style="width:38px; height:38px; border-radius:11px; background:rgb(79 70 229 / 0.12); color:var(--brand); display:flex; align-items:center; justify-content:center; flex-shrink:0"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg></span><div><p style="font:700 14px var(--font-sans); color:var(--foreground); margin:0">{{ wn1Title }}</p><p style="font:500 12.5px/1.5 var(--font-sans); color:var(--muted-foreground); margin:3px 0 0">{{ wn1Desc }}</p></div></div>
+                  <div style="display:flex; gap:13px; align-items:flex-start"><span style="width:38px; height:38px; border-radius:11px; background:var(--status-ok-bg); color:var(--status-ok-fg); display:flex; align-items:center; justify-content:center; flex-shrink:0"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.3 3.7-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.3l-8-14a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span><div><p style="font:700 14px var(--font-sans); color:var(--foreground); margin:0">{{ wn2Title }}</p><p style="font:500 12.5px/1.5 var(--font-sans); color:var(--muted-foreground); margin:3px 0 0">{{ wn2Desc }}</p></div></div>
+                  <div style="display:flex; gap:13px; align-items:flex-start"><span style="width:38px; height:38px; border-radius:11px; background:rgb(var(--sys-blue) / 0.12); color:rgb(var(--sys-blue)); display:flex; align-items:center; justify-content:center; flex-shrink:0"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><div><p style="font:700 14px var(--font-sans); color:var(--foreground); margin:0">{{ wn3Title }}</p><p style="font:500 12.5px/1.5 var(--font-sans); color:var(--muted-foreground); margin:3px 0 0">{{ wn3Desc }}</p></div></div>
+                </div>
+                <button style="width:100%; height:48px; border:none; border-radius:14px; background:var(--brand); color:var(--brand-foreground); font:700 15px var(--font-sans); cursor:pointer">{{ gotItCta }}</button>
+              </div>
+            </sc-if>
+
+            <!-- ===================== HELP & LEGAL ===================== -->
+            <sc-if value="{{ showHelp }}" hint-placeholder-val="{{ false }}">
+              <div data-screen-label="Help & Legal" style="display:flex; flex-direction:column; gap:16px; text-align:start; width:100%">
+                <h1 style="font-size:1.6rem; font-weight:700; letter-spacing:-.02em; margin:0">{{ helpTitle }}</h1>
+                <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; overflow:hidden"><sc-for list="{{ faqItems }}" as="f" hint-placeholder-count="4"><div style="padding:14px 16px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:10px"><span style="font:600 14px var(--font-sans); color:var(--foreground)">{{ f.q }}</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></sc-for></div>
+                <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; overflow:hidden"><sc-for list="{{ legalItems }}" as="l" hint-placeholder-count="3"><div style="padding:14px 16px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between"><span style="font:500 14px var(--font-sans); color:var(--foreground)">{{ l }}</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div></sc-for></div>
+                <p style="text-align:center; font:500 12px var(--font-num); color:var(--muted-foreground); margin:0">{{ versionFooter }}</p>
+              </div>
+            </sc-if>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="max-width:900px; margin:0 auto; padding:0 20px 60px; display:flex; flex-direction:column; gap:12px">
+    <div style="display:flex; align-items:flex-start; gap:10px; padding:14px 16px; border-radius:14px; background:var(--surface); border:1px solid var(--border)">
+      <p style="font:400 13px/1.55 var(--font-sans); color:var(--muted-foreground); margin:0" dir="ltr">Showing <strong style="color:var(--foreground)">{{ screenLabel }} · {{ themeLabel }} · {{ localeLabel }}</strong>. {{ infoLine }}</p>
+    </div>
+    <div style="display:flex; align-items:flex-start; gap:10px; padding:14px 16px; border-radius:14px; background:var(--brand-ink); color:var(--on-ink)" dir="ltr">
+      <span style="font:700 10px var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--on-ink-muted); flex-shrink:0; margin-top:2px">§19</span>
+      <p style="font:400 13px/1.55 var(--font-sans); color:var(--on-ink-strong); margin:0"><strong style="color:var(--on-ink)">S10-D1</strong> Auth screens are centered and unframed — no sidebar/tabbar, since they live outside the authenticated shell. <strong style="color:var(--on-ink)">S10-D2</strong> Sign-up submits into the Stage 8 Pending queue, not instant access. <strong style="color:var(--on-ink)">S10-D3</strong> What's New is a one-time dismissible sheet keyed by version, not a nav destination. <strong style="color:var(--on-ink)">S10-D4 (flag)</strong> the D-E exemption (Stage 1 §13) only covers Stages 1–2 — Stages 3–10 don't bind <code style="font-family:var(--font-num)">_ds_bundle</code> either, so this handoff is token-accurate but not composed from the real VetTrack component bundle. Raised for the team to decide.</p>
+    </div>
+    <div style="display:flex; align-items:flex-start; gap:10px; padding:14px 16px; border-radius:14px; background:var(--surface); border:1px solid var(--border)" dir="ltr">
+      <span style="font:700 10px var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--brand); flex-shrink:0; margin-top:3px">Map</span>
+      <div style="flex:1"><p style="font:600 12px var(--font-sans); color:var(--foreground); margin:0 0 6px">Handoff coverage · full codebase</p><div style="display:flex; flex-wrap:wrap; gap:6px"><sc-for list="{{ roadmap }}" as="r" hint-placeholder-count="10">
+  <span style="display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; background:{{ r.bg }}; border:1px solid {{ r.border }}; color:{{ r.color }}; font:600 11.5px var(--font-sans)">
+    <sc-if value="{{ r.isDone }}" hint-placeholder-val="{{ true }}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></sc-if>
+    <sc-if value="{{ r.isNow }}" hint-placeholder-val="{{ false }}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M7 12h10"/></svg></sc-if>
+    <sc-if value="{{ r.isPending }}" hint-placeholder-val="{{ false }}"><span style="width:6px; height:6px; border-radius:999px; background:currentColor; display:block; opacity:.5"></span></sc-if>
+    {{ r.label }}
+  </span>
+</sc-for></div></div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { theme:'light', screen:'signin', dir:'ltr', variant:'form' };
+  set(k,v){ this.setState({[k]:v}); }
+  L(en,he){ return this.state.dir==='rtl' ? he : en; }
+  ic(p,o){ o=o||{}; const w=o.w||22; return `<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="${o.fill||'none'}" stroke="currentColor" stroke-width="${o.sw||1.9}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`; }
+
+  renderVals(){
+    const S=this.state;
+    const { theme, screen, dir } = S;
+    const locale = dir==='rtl' ? 'he' : 'en';
+    const L=(en,he)=>this.L(en,he);
+
+    const segBase="border:none;cursor:pointer;padding:6px 10px;border-radius:7px;font-family:var(--font-sans);font-size:12px;transition:all var(--dur-fast) var(--ease-standard);white-space:nowrap;";
+    const seg=(a)=>a?segBase+"font-weight:600;background:var(--surface-2);color:var(--foreground);box-shadow:0 1px 2px rgba(0,0,0,.18);":segBase+"font-weight:500;background:transparent;color:var(--muted-foreground);";
+    const themeOpts=[['light','Light'],['dark','Dark']].map(([k,l])=>({key:k,label:l,style:seg(theme===k),onClick:()=>this.set('theme',k)}));
+    const screenDefs=[['signin','Sign In'],['signup','Sign Up'],['forgot','Forgot Password'],['whatsnew',"What's New"],['help','Help & Legal']];
+    const screenOpts=screenDefs.map(([k,l])=>({key:k,label:l,style:seg(screen===k),onClick:()=>this.set('screen',k)}));
+    const dirOpts=[['ltr','English'],['rtl','עברית']].map(([k,l])=>({key:k,label:l,style:seg(dir===k),onClick:()=>this.set('dir',k)}));
+
+    const variantConfigs={
+      signin:{title:'State',opts:[['form','Default'],['loading','Loading'],['error','Error']]},
+      signup:{title:'State',opts:[['form','Form'],['pending','Submitted']]},
+      forgot:{title:'State',opts:[['form','Form'],['sent','Sent']]},
+    };
+    const vc=variantConfigs[screen];
+    const vkeys=vc?vc.opts.map(o=>o[0]):[];
+    let variant=S.variant; if(vc && !vkeys.includes(variant)) variant=vkeys[0];
+    const variantOpts=vc?vc.opts.map(([k,l])=>({key:k,label:l,style:seg(variant===k),onClick:()=>this.set('variant',k)})):[];
+    const hasVariant=!!vc;
+
+    const showSignIn=screen==='signin', showSignUp=screen==='signup', showForgot=screen==='forgot', showWhatsNew=screen==='whatsnew', showHelp=screen==='help';
+    const authError=showSignIn&&variant==='error', authLoading=showSignIn&&variant==='loading', authNotLoading=!authLoading;
+    const signUpForm=showSignUp&&variant!=='pending', signUpPending=showSignUp&&variant==='pending';
+    const forgotForm=showForgot&&variant!=='sent', forgotSent=showForgot&&variant==='sent';
+
+    const roleList=[L('Vet Tech','טכנאי/ת וטרינרי/ת'),L('Veterinarian','וטרינר/ית'),L('Student','סטודנט/ית')];
+    const activeRole=S.role||roleList[0];
+    const chipStyle=(a)=>"flex-shrink:0;height:34px;padding:0 13px;border-radius:999px;font:600 12px var(--font-sans);cursor:pointer;white-space:nowrap;"+(a?"border:1px solid var(--brand);background:var(--brand);color:var(--brand-foreground);":"border:1px solid var(--border);background:var(--surface);color:var(--foreground);");
+    const roleChips=roleList.map(r=>({key:r,label:r,onClick:()=>this.set('role',r),style:chipStyle(activeRole===r)}));
+
+    const faqData=[L('How do I check out equipment?','איך מנפיקים ציוד?'),L('What happens if I miss a scan?','מה קורה אם מפספסים סריקה?'),L('How does location confidence work?','איך עובדת ודאות המיקום?'),L('Who approves new accounts?','מי מאשר חשבונות חדשים?')];
+    const faqItems=faqData.map(q=>({q}));
+    const legalItems=[L('Terms of Service','תנאי שימוש'),L('Privacy Policy','מדיניות פרטיות'),L('Open-source licenses','רישיונות קוד פתוח')];
+
+    const done=['Tokens','Components','Today','Screens','Inventory','Equipment','Analytics','Admin','Emergency'];
+    const rmDefs=[['1','Tokens'],['2','Components'],['3','Today'],['4','Screens'],['5','Inventory'],['6','Equipment'],['7','Analytics'],['8','Admin'],['9','Emergency'],['10','Access']];
+    const roadmap=rmDefs.map(([n,l])=>{
+      const isDone=+n<=9, isNow=n==='10', isPending=!isDone&&!isNow;
+      return {key:n,label:'S'+n+' '+l,isDone,isNow,isPending,
+        bg:isNow?'rgb(79 70 229 / 0.12)':isDone?'rgb(var(--sys-green) / 0.1)':'var(--tonal)',
+        border:isNow?'var(--brand)':isDone?'rgb(var(--sys-green) / 0.24)':'var(--border)',
+        color:isNow?'var(--brand)':isDone?'var(--status-ok-fg)':'var(--muted-foreground)'};
+    });
+
+    const infoMap={
+      signin:'Sign In — centered, unframed, no sidebar/tabbar (\u00a7S10-D1). States: default, loading (spinner button), error (red field borders + message).',
+      signup:'Sign Up collects name, email and role, then submits into the Stage 8 Pending-approval queue rather than granting instant access (\u00a7S10-D2) — the confirmation state sets that expectation up front.',
+      forgot:'Forgot Password — email entry, then a confirmation state once the reset link is sent.',
+      whatsnew:"What's New is a one-time dismissible sheet keyed by app version (\u00a7S10-D3), not a persistent nav destination — it would appear once after an update, then never again for that version.",
+      help:'Help & Legal — an FAQ list plus Terms / Privacy / Licenses, with the installed app version at the bottom.',
+    };
+
+    return {
+      pageClass: theme==='dark'?'dark':'', dir,
+      themeOpts, screenOpts, dirOpts, hasVariant, variantTitle: vc?vc.title:'', variantOpts,
+
+      showSignIn, showSignUp, showForgot, showWhatsNew, showHelp,
+      authError, authLoading, authNotLoading, authErrBorder: authError?'var(--status-issue-fg)':'var(--border)',
+      signInTitle:L('Welcome back','ברוכים השבים'), signInSubtitle:L('Sign in to VetTrack','התחברות ל-VetTrack'),
+      emailLabel:L('Email','אימייל'), passwordLabel:L('Password','סיסמה'),
+      authErrorText:L('Incorrect email or password','אימייל או סיסמה שגויים'),
+      forgotLabel:L('Forgot password?','שכחת סיסמה?'), signInCta:L('Sign in','התחברות'),
+      noAccountText:L("Don't have an account?",'אין לך חשבון?'), signUpLink:L('Sign up','הרשמה'),
+
+      signUpForm, signUpPending,
+      signUpTitle:L('Create account','יצירת חשבון'), signUpSubtitle:L('Request access to VetTrack','בקשת גישה ל-VetTrack'),
+      nameLabel:L('Full name','שם מלא'), nameValue:L('Dr. Priya Singh','ד״ר פריה סינג'), emailValue:'priya.singh@vettrack.app',
+      roleLabel:L('Role','תפקיד'), roleChips,
+      signUpCta:L('Request access','בקשת גישה'), haveAccountText:L('Already have an account?','כבר יש לך חשבון?'), signInLink:L('Sign in','התחברות'),
+      pendingTitle:L('Request submitted','הבקשה נשלחה'), pendingSub:L('An admin will review your request. You\u2019ll get an email once your account is approved.','מנהל יבדוק את הבקשה. תקבלו אימייל לאחר אישור החשבון.'),
+
+      forgotForm, forgotSent,
+      forgotTitle:L('Reset password','איפוס סיסמה'), forgotSub:L('Enter your email and we\u2019ll send a reset link.','הזינו את האימייל ונשלח קישור לאיפוס.'),
+      sendResetCta:L('Send reset link','שליחת קישור איפוס'),
+      resetSentTitle:L('Check your email','בדקו את תיבת הדואר'), resetSentSub:L('We sent a reset link to maya@vettrack.app','שלחנו קישור לאיפוס לכתובת maya@vettrack.app'),
+
+      versionLabel:'v2.4.0', whatsNewTitle:L("What's new","מה חדש"),
+      wn1Title:L('QR scanning, faster','סריקת QR מהירה יותר'), wn1Desc:L('Redesigned scanner recognizes tags from further away.','סורק מחודש מזהה תגים ממרחק גדול יותר.'),
+      wn2Title:L('Crash Cart checks','בדיקות עגלת חירום'), wn2Desc:L('Log a full crash cart check in one tap.','תיעוד בדיקת עגלת חירום מלאה בלחיצה אחת.'),
+      wn3Title:L('Shift Chat','צ׳אט משמרת'), wn3Desc:L('Message your shift and send broadcast alerts.','שלחו הודעות למשמרת והתראות לכולם.'),
+      gotItCta:L('Got it','הבנתי'),
+
+      helpTitle:L('Help & Legal','עזרה ומידע משפטי'), faqItems, legalItems, versionFooter:'VetTrack v2.4.0 (204)',
+
+      screenLabel:(screenDefs.find(d=>d[0]===screen)||[0,'Sign In'])[1],
+      themeLabel: theme==='dark'?'Dark':'Light', localeLabel: locale==='he'?'עברית · RTL':'English · LTR',
+      infoLine: infoMap[screen], roadmap,
+    };
+  }
+}
+</script>
+</body>
+</html>

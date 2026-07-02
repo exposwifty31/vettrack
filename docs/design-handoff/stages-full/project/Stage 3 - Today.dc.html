@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Heebo:wght@400;500;600;700;800&display=swap">
+<style>
+  *{box-sizing:border-box}
+  html{font-size:17px}
+  body{margin:0;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-variant-numeric:tabular-nums}
+  :root{
+    --background:#F2F2F7; --surface:#FFFFFF; --surface-2:#FFFFFF;
+    --foreground:#000000; --muted-foreground:rgba(60,60,67,0.6); --border:rgba(60,60,67,0.29);
+    --hairline:transparent;
+    --brand:#4F46E5; --brand-foreground:#FFFFFF; --brand-ink:#1E1B4B;
+    --action:#2F6F5E; --action-foreground:#FFFFFF;
+    --sys-red:255 59 48; --sys-orange:255 149 0; --sys-green:52 199 89; --sys-blue:0 122 255; --sys-gray:142 142 147;
+    --radius-sm:10px; --radius-md:12px; --radius-lg:14px; --radius-xl:16px; --radius-2xl:20px; --radius-pill:999px;
+    --ease-standard:cubic-bezier(0.2,0,0,1); --dur-fast:120ms; --dur-base:200ms; --dur-slow:320ms; --dur-spin:700ms;
+    /* S1-D1-001 · brand/primary unified */
+    --primary:var(--brand); --primary-foreground:var(--brand-foreground);
+    /* S1-D1-003 / S3-D15-001 · on-ink color ladder (no raw white) */
+    --on-ink:#FFFFFF; --on-ink-muted:rgba(255,255,255,0.55); --on-ink-strong:rgba(255,255,255,0.82); --ink-divider:rgba(255,255,255,0.12); --ink-sheen:rgba(255,255,255,0.10);
+    /* S3-MINOR-002 · skeleton tones tokenized (no raw white in content) */
+    --ink-sk:rgba(255,255,255,0.14); --ink-shimmer:rgba(255,255,255,0.28);
+    /* S1-D1-002 · 4px spacing scale */
+    --space-1:2px; --space-2:4px; --space-3:8px; --space-4:12px; --space-5:16px; --space-6:20px; --space-7:24px; --space-8:32px; --space-9:40px; --space-10:48px; --space-11:64px;
+    --brand-navy:var(--brand-ink); --brand-green-bright:rgb(var(--sys-green));
+    /* S1-D15-002 · status-* alias map → --sys-* primitives */
+    --status-ok:rgb(var(--sys-green)); --status-ok-bg:rgb(var(--sys-green) / 0.12); --status-ok-border:rgb(var(--sys-green) / 0.22); --status-ok-fg:rgb(var(--sys-green));
+    --status-issue:rgb(var(--sys-red)); --status-issue-bg:rgb(var(--sys-red) / 0.12); --status-issue-border:rgb(var(--sys-red) / 0.22); --status-issue-fg:rgb(var(--sys-red));
+    --status-maintenance:rgb(var(--sys-orange)); --status-maintenance-bg:rgb(var(--sys-orange) / 0.12); --status-maintenance-border:rgb(var(--sys-orange) / 0.22); --status-maintenance-fg:rgb(var(--sys-orange));
+    --status-sterilized:rgb(var(--sys-blue)); --status-sterilized-bg:rgb(var(--sys-blue) / 0.12); --status-sterilized-border:rgb(var(--sys-blue) / 0.22); --status-sterilized-fg:rgb(var(--sys-blue));
+    --status-stale:rgb(var(--sys-orange)); --status-unknown:rgb(var(--sys-gray));
+    --font-sans:-apple-system,system-ui,"Heebo","Segoe UI",Roboto,sans-serif;
+    --font-num:"DM Mono",ui-monospace,SFMono-Regular,monospace;
+    --display:2.353rem; --text-largetitle:2rem; --text-xl:1.294rem; --text-lg:1.176rem;
+    --text-base:1rem; --text-sm:0.882rem; --text-xs:0.765rem; --text-2xs:0.647rem;
+    --bar-bg:rgba(255,255,255,0.94); --bar-bg-opaque:#FFFFFF; --bar-blur:12px;
+    --shadow-hero:0 1px 2px rgba(0,0,0,0.06); --shadow-floating:0 8px 24px -12px rgba(0,0,0,0.25);
+    --tonal:rgba(120,120,128,0.16);
+  }
+  .dark{
+    --background:#000000; --surface:#1C1C1E; --surface-2:#2C2C2E;
+    --foreground:#FFFFFF; --muted-foreground:rgba(235,235,245,0.6); --border:rgba(84,84,88,0.6);
+    --hairline:rgba(84,84,88,0.6);
+    --brand:#818CF8; --brand-foreground:#1E1B4B; --brand-ink:#1E1B4B;
+    --action:#4CCDAA; --action-foreground:#06210F;
+    --sys-red:255 69 58; --sys-orange:255 159 10; --sys-green:48 209 88; --sys-blue:10 132 255; --sys-gray:152 152 157;
+    --bar-bg:rgba(28,28,30,0.94); --bar-bg-opaque:#1C1C1E; --shadow-hero:0 1px 2px rgba(0,0,0,0.5);
+    --primary:var(--brand);
+    --on-ink:#FFFFFF; --on-ink-muted:rgba(255,255,255,0.55); --on-ink-strong:rgba(255,255,255,0.82); --ink-divider:rgba(255,255,255,0.12); --ink-sheen:rgba(255,255,255,0.10);
+    --ink-sk:rgba(255,255,255,0.14); --ink-shimmer:rgba(255,255,255,0.28);
+    --tonal:rgba(120,120,128,0.24);
+  }
+  /* S2-D3-001 / S1-D10-001 · reduce-transparency opaque bars */
+  .rt{ --bar-bg:var(--bar-bg-opaque); --bar-blur:0px; }
+  @media (prefers-reduced-transparency: reduce){ :root,.dark{ --bar-bg:var(--bar-bg-opaque); --bar-blur:0px; } }
+  /* S2-D8-001 · focus-visible ring on every interactive element */
+  a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,[tabindex]:focus-visible,[role="button"]:focus-visible{outline:none;box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--brand)}
+  @keyframes vt-ping{0%{transform:scale(1);opacity:.7}70%{transform:scale(2.6);opacity:0}100%{opacity:0}}
+  @keyframes vt-spin{to{transform:rotate(360deg)}}
+  @keyframes vt-shimmer{100%{transform:translateX(100%)}}
+  .sk{position:relative; overflow:hidden; background:var(--ink-sk)}
+  .skd{position:relative; overflow:hidden; background:rgba(120,120,128,0.16)}
+  .dark .skd{background:var(--ink-sheen)}
+  .sk::after,.skd::after{content:""; position:absolute; inset:0; transform:translateX(-100%); background:linear-gradient(90deg,transparent,var(--ink-shimmer),transparent); animation:vt-shimmer 1.4s infinite}
+  @media (prefers-reduced-motion: reduce){ *{animation:none !important} .sk::after,.skd::after{display:none} }
+</style>
+</helmet>
+<div class="{{ pageClass }}" style="min-height:100vh; min-height:100dvh; background:var(--background); color:var(--foreground); font-family:var(--font-sans); transition:background var(--dur-base) var(--ease-standard)">
+
+  <header style="position:sticky; top:0; z-index:50; background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); -webkit-backdrop-filter:blur(var(--bar-blur)); border-bottom:1px solid var(--border)">
+    <div style="max-width:1180px; margin:0 auto; padding:12px 20px; display:flex; flex-wrap:wrap; align-items:center; gap:12px 18px">
+      <div style="display:flex; align-items:baseline; gap:10px; margin-right:auto">
+        <span style="font:700 17px var(--font-sans); letter-spacing:-.02em; color:var(--brand)">VetTrack</span>
+        <span style="font:500 12px var(--font-num); color:var(--muted-foreground)">Stage 3 · Today</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">Theme</span><div style="display:flex; gap:4px; padding:3px; background:var(--tonal); border-radius:9px"><sc-for list="{{ themeOpts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">Size</span><div style="display:flex; gap:4px; padding:3px; background:var(--tonal); border-radius:9px"><sc-for list="{{ sizeOpts }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">State</span><div style="display:flex; gap:4px; padding:3px; background:var(--tonal); border-radius:9px"><sc-for list="{{ stateOpts }}" as="o" hint-placeholder-count="5"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+      <div style="display:flex; align-items:center; gap:6px"><span style="font:600 10px var(--font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--muted-foreground)">Locale</span><div style="display:flex; gap:4px; padding:3px; background:var(--tonal); border-radius:9px"><sc-for list="{{ dirOpts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+    </div>
+  </header>
+
+  <div style="padding:28px 16px 80px; display:flex; justify-content:center; overflow:auto">
+    <div style="{{ frameOuter }}; display:flex; flex-direction:column; box-sizing:border-box; overflow:hidden">
+
+      <sc-if value="{{ browserChrome }}" hint-placeholder-val="{{ false }}">
+        <div style="height:38px; background:var(--surface-2); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; padding:0 14px; flex-shrink:0">
+          <span style="width:11px; height:11px; border-radius:999px; background:#FF5F57"></span><span style="width:11px; height:11px; border-radius:999px; background:#FEBC2E"></span><span style="width:11px; height:11px; border-radius:999px; background:#28C840"></span>
+          <div style="margin-inline-start:14px; flex:1; max-width:340px; height:24px; border-radius:7px; background:var(--background); border:1px solid var(--border); display:flex; align-items:center; gap:7px; padding:0 10px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span style="font:400 12px var(--font-num); color:var(--muted-foreground)" dir="ltr">vettrack.app/home</span></div>
+        </div>
+      </sc-if>
+
+      <div dir="{{ dir }}" data-screen-label="Today" style="{{ screenStyle }}; flex:1; min-height:0; display:flex; flex-direction:column; background:var(--background); overflow:hidden">
+
+        <sc-if value="{{ isCompact }}" hint-placeholder-val="{{ true }}">
+          <!-- S3-D13-002 · status bar honors safe-area-inset-top (44pt min) -->
+          <div style="min-height:44px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; padding-top:env(safe-area-inset-top); padding-inline:26px; background:var(--background)">
+            <span style="font:600 15px var(--font-num); color:var(--foreground)">9:41</span>
+            <div style="display:flex; align-items:center; gap:6px; color:var(--foreground)"><svg width="17" height="12" viewBox="0 0 18 12" fill="currentColor" aria-hidden="true"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="5" y="4.5" width="3" height="7.5" rx="1"/><rect x="10" y="2" width="3" height="10" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1" opacity="0.4"/></svg><svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor" aria-hidden="true"><path d="M8 2.5c2.2 0 4.2.9 5.7 2.3l1.3-1.4A10 10 0 0 0 8 .5 10 10 0 0 0 1 3.4l1.3 1.4A8 8 0 0 1 8 2.5z"/><path d="M8 6c1.1 0 2.1.4 2.9 1.2l1.3-1.4A6 6 0 0 0 8 4a6 6 0 0 0-4.2 1.8l1.3 1.4A4 4 0 0 1 8 6z"/><circle cx="8" cy="10" r="1.6"/></svg><div style="width:24px; height:12px; border:1px solid currentColor; border-radius:3px; padding:1.5px; opacity:.9"><div style="width:75%; height:100%; background:currentColor; border-radius:1px"></div></div></div>
+          </div>
+        </sc-if>
+
+        <div style="flex:1; min-height:0; display:flex">
+
+          <sc-if value="{{ hasSidebar }}" hint-placeholder-val="{{ false }}">
+            <aside style="width:220px; flex-shrink:0; background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); -webkit-backdrop-filter:blur(var(--bar-blur)); border-inline-end:1px solid var(--border); display:flex; flex-direction:column; padding:18px 12px">
+              <div style="padding:6px 10px 18px; font:700 18px var(--font-sans); color:var(--brand)">VetTrack</div>
+              <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="5"><div style="display:flex; align-items:center; gap:11px; padding:10px 11px; border-radius:10px; background:{{ n.bg }}; color:{{ n.color }}; margin-bottom:2px"><span style="display:flex" innerHTML="{{ n.icon }}"></span><span style="font-size:14px; font-weight:{{ n.weight }}; font-family:var(--font-sans)">{{ n.label }}</span></div></sc-for>
+              <div style="margin-top:auto; display:flex; align-items:center; gap:11px; padding:10px 11px; border-radius:10px; color:var(--muted-foreground)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg><span style="font:500 14px var(--font-sans)">{{ moreLabel }}</span></div>
+            </aside>
+          </sc-if>
+
+          <div style="flex:1; min-width:0; display:flex; flex-direction:column">
+
+            <sc-if value="{{ showTopBar }}" hint-placeholder-val="{{ false }}">
+              <div style="height:56px; flex-shrink:0; display:flex; align-items:center; gap:14px; padding:0 24px; background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); -webkit-backdrop-filter:blur(var(--bar-blur)); border-bottom:1px solid var(--border)">
+                <span style="font:600 16px var(--font-sans)">{{ topbarTitle }}</span>
+                <div style="margin-inline-start:auto; display:flex; align-items:center; gap:8px; background:var(--background); border:1px solid var(--border); border-radius:10px; padding:7px 12px; min-width:240px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span style="font:400 13px var(--font-sans); color:var(--muted-foreground)">{{ searchPlaceholder }}</span><kbd style="margin-inline-start:auto; font:500 11px var(--font-num); color:var(--muted-foreground); background:var(--tonal); border-radius:5px; padding:1px 6px" dir="ltr">/</kbd></div>
+                <button aria-label="{{ alertsAria }}" style="position:relative; width:36px; height:36px; border:none; background:var(--tonal); border-radius:10px; display:flex; align-items:center; justify-content:center; color:var(--foreground); cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span style="position:absolute; top:-3px; inset-inline-end:-3px; min-width:16px; height:16px; padding:0 4px; border-radius:8px; background:rgb(var(--sys-red)); color:var(--on-ink); font:700 10px var(--font-num); display:flex; align-items:center; justify-content:center; border:2px solid var(--bar-bg-opaque)">3</span></button>
+                <div style="width:32px; height:32px; border-radius:999px; background:var(--brand); color:var(--brand-foreground); display:flex; align-items:center; justify-content:center; font:700 12px var(--font-sans)">MA</div>
+              </div>
+            </sc-if>
+
+            <main style="flex:1; min-height:0; overflow:auto; padding:{{ mainPad }}">
+              <div style="max-width:{{ contentMax }}; margin:0 auto; display:flex; flex-direction:column; gap:{{ contentGap }}">
+
+                <sc-if value="{{ offlineMode }}" hint-placeholder-val="{{ false }}">
+                  <div role="alert" style="display:flex; align-items:center; gap:11px; padding:10px 14px; border-radius:12px; background:var(--tonal); color:var(--foreground)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 14 0"/><path d="m2 8.8 1.8 1.5"/><path d="M22 8.8 20.2 10.3"/><path d="m2 2 20 20"/></svg><span style="font:600 14px var(--font-sans)">{{ offlineBanner }}</span></div>
+                  <!-- S3-D7-001 · explicit sync-on-reconnect cue -->
+                  <div role="status" style="display:inline-flex; align-self:flex-start; align-items:center; gap:8px; padding:7px 13px; border-radius:999px; background:rgb(var(--sys-blue) / 0.12); color:rgb(var(--sys-blue)); font:600 12.5px var(--font-sans)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="animation:vt-spin var(--dur-spin) linear infinite" aria-hidden="true"><path d="M21 12a9 9 0 0 0-9-9 9 9 0 0 0-6.7 3M3 12a9 9 0 0 0 9 9 9 9 0 0 0 6.7-3"/><path d="M21 3v5h-5"/><path d="M3 21v-5h5"/></svg>{{ syncingCue }}</div>
+                </sc-if>
+
+                <div>
+                  <h1 style="font-size:var(--text-largetitle); font-weight:700; letter-spacing:-.02em; line-height:1.1; margin:0">{{ greeting }}</h1>
+                  <p style="font:500 15px var(--font-sans); color:var(--muted-foreground); margin:5px 0 0">{{ dateLine }}</p>
+                </div>
+
+                <sc-if value="{{ errorMode }}" hint-placeholder-val="{{ false }}">
+                  <div style="border:1px solid var(--border); border-radius:20px; padding:40px 24px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:12px; background:var(--surface)">
+                    <div style="width:56px; height:56px; border-radius:16px; background:rgb(var(--sys-red) / 0.12); display:flex; align-items:center; justify-content:center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--sys-red))" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg></div>
+                    <p style="font:600 18px var(--font-sans); margin:0">{{ errorTitle }}</p>
+                    <p style="font:400 14px/1.5 var(--font-sans); color:var(--muted-foreground); margin:0; max-width:34ch">{{ errorSub }}</p>
+                    <button style="margin-top:6px; height:44px; padding:0 22px; border:none; border-radius:14px; background:var(--brand); color:var(--brand-foreground); font:700 15px var(--font-sans); cursor:pointer">{{ retryLabel }}</button>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ showContent }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:{{ contentDisplay }}; flex-direction:column; grid-template-columns:{{ contentCols }}; gap:{{ contentGap }}; align-items:start">
+
+                    <!-- ShiftHero -->
+                    <div style="position:relative; width:100%; overflow:hidden; background:radial-gradient(130% 90% at 0% 0%, var(--ink-sheen), transparent 60%), var(--brand-ink); border-radius:20px; padding:18px; box-shadow:var(--shadow-hero); color:var(--on-ink)">
+
+                      <sc-if value="{{ heroLoading }}" hint-placeholder-val="{{ false }}">
+                        <div class="sk" style="width:96px; height:12px; border-radius:6px"></div>
+                        <div class="sk" style="width:140px; height:38px; border-radius:9px; margin-top:16px"></div>
+                        <div class="sk" style="width:60px; height:10px; border-radius:5px; margin-top:10px"></div>
+                        <div style="display:flex; gap:28px; margin-top:20px"><div class="sk" style="width:66px; height:30px; border-radius:7px"></div><div class="sk" style="width:66px; height:30px; border-radius:7px"></div></div>
+                        <div class="sk" style="width:100%; height:44px; border-radius:14px; margin-top:18px"></div>
+                      </sc-if>
+
+                      <sc-if value="{{ heroNoShift }}" hint-placeholder-val="{{ false }}">
+                        <div style="display:flex; flex-direction:column; align-items:flex-start; gap:10px; padding:8px 0 4px">
+                          <div style="width:46px; height:46px; border-radius:13px; background:var(--ink-divider); display:flex; align-items:center; justify-content:center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--on-ink)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+                          <p style="font:700 20px var(--font-sans); color:var(--on-ink); margin:6px 0 0">{{ noShiftTitle }}</p>
+                          <p style="font:400 14px/1.5 var(--font-sans); color:var(--on-ink-strong); margin:0; max-width:38ch">{{ noShiftSub }}</p>
+                          <button style="margin-top:8px; width:100%; height:48px; border:none; border-radius:14px; background:var(--on-ink); color:var(--brand-ink); font:700 16px var(--font-sans); cursor:pointer">{{ startShiftLabel }}</button>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ heroActive }}" hint-placeholder-val="{{ true }}">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px">
+                          <span style="display:inline-flex; align-items:center; gap:8px; font:600 11px var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--on-ink-strong)"><span style="position:relative; width:9px; height:9px"><span style="position:absolute; inset:0; border-radius:999px; background:rgb(var(--sys-green))"></span><span style="position:absolute; inset:0; border-radius:999px; background:rgb(var(--sys-green)); animation:vt-ping 1.8s var(--ease-standard) infinite"></span></span>{{ onShiftLabel }}</span>
+                          <span style="font:500 12px var(--font-num); color:var(--on-ink-muted)">{{ startedLabel }}</span>
+                        </div>
+                        <p style="font-family:var(--font-num); font-size:var(--display); font-weight:500; color:var(--on-ink); margin:12px 0 0; letter-spacing:-.01em; line-height:1">{{ elapsed }}</p>
+                        <p style="font:600 11px var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--on-ink-muted); margin:6px 0 0">{{ elapsedLabel }}</p>
+                        <div style="display:flex; align-items:center; gap:0; margin-top:20px">
+                          <div style="flex:1"><p style="font-family:var(--font-num); font-size:var(--text-xl); font-weight:500; color:var(--on-ink); margin:0">{{ itemsOut }}</p><p style="font:500 11px var(--font-sans); letter-spacing:.04em; text-transform:uppercase; color:var(--on-ink-muted); margin:3px 0 0">{{ itemsOutLabel }}{{ pendingNote }}</p></div>
+                          <div style="width:1px; align-self:stretch; background:var(--ink-divider); margin:0 18px"></div>
+                          <div style="flex:1"><p style="font-family:var(--font-num); font-size:var(--text-xl); font-weight:500; color:var(--on-ink); margin:0">{{ scansToday }}</p><p style="font:500 11px var(--font-sans); letter-spacing:.04em; text-transform:uppercase; color:var(--on-ink-muted); margin:3px 0 0">{{ scansTodayLabel }}</p></div>
+                        </div>
+                        <button style="margin-top:18px; width:100%; height:48px; border:1px solid var(--on-ink-muted); border-radius:14px; background:var(--ink-sheen); color:var(--on-ink); font:700 16px var(--font-sans); cursor:pointer">{{ endShiftLabel }}</button>
+                      </sc-if>
+                    </div>
+
+                    <!-- right column / stacked -->
+                    <div style="display:flex; flex-direction:column; gap:{{ contentGap }}; width:100%">
+
+                      <sc-if value="{{ showChips }}" hint-placeholder-val="{{ true }}">
+                        <div style="display:flex; gap:10px">
+                          <button aria-label="{{ criticalAria }}" style="flex:1; display:flex; align-items:center; gap:11px; min-height:60px; padding:12px 14px; border-radius:14px; border:1px solid rgb(var(--sys-red) / 0.22); background:rgb(var(--sys-red) / 0.12); cursor:pointer">
+                            <span style="width:34px; height:34px; border-radius:10px; background:rgb(var(--sys-red)); color:var(--on-ink); display:flex; align-items:center; justify-content:center; flex-shrink:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.3 3.7-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.3l-8-14a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+                            <span style="display:flex; flex-direction:column; align-items:flex-start; line-height:1.1"><span style="font:700 20px var(--font-num); color:rgb(var(--sys-red))">{{ critical }}</span><span style="font:600 11px var(--font-sans); letter-spacing:.04em; text-transform:uppercase; color:rgb(var(--sys-red) / 0.78)">{{ criticalLabel }}</span></span>
+                            <svg style="margin-inline-start:auto; opacity:.45; transform:{{ chevronT }}" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--sys-red))" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                          </button>
+                          <button aria-label="{{ overdueAria }}" style="flex:1; display:flex; align-items:center; gap:11px; min-height:60px; padding:12px 14px; border-radius:14px; border:1px solid rgb(var(--sys-orange) / 0.22); background:rgb(var(--sys-orange) / 0.12); cursor:pointer">
+                            <span style="width:34px; height:34px; border-radius:10px; background:rgb(var(--sys-orange)); color:var(--on-ink); display:flex; align-items:center; justify-content:center; flex-shrink:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+                            <span style="display:flex; flex-direction:column; align-items:flex-start; line-height:1.1"><span style="font:700 20px var(--font-num); color:rgb(var(--sys-orange))">{{ overdue }}</span><span style="font:600 11px var(--font-sans); letter-spacing:.04em; text-transform:uppercase; color:rgb(var(--sys-orange) / 0.78)">{{ overdueLabel }}</span></span>
+                            <svg style="margin-inline-start:auto; opacity:.45; transform:{{ chevronT }}" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--sys-orange))" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                          </button>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ quickLoading }}" hint-placeholder-val="{{ false }}">
+                        <div class="skd" style="width:100%; min-height:60px; border-radius:16px"></div>
+                      </sc-if>
+                      <sc-if value="{{ quickCard }}" hint-placeholder-val="{{ true }}">
+                        <button style="display:flex; align-items:center; gap:14px; width:100%; min-height:60px; padding:14px 16px; border:none; border-radius:16px; background:var(--action); cursor:pointer; text-align:start">
+                          <span style="display:flex; flex-direction:column"><span style="font:700 15px var(--font-sans); color:var(--action-foreground)">{{ scanTitle }}</span><span style="font:500 13px var(--font-sans); color:var(--on-ink-strong)">{{ scanSub }}</span></span>
+                          <span style="margin-inline-start:auto; width:40px; height:40px; border-radius:12px; background:var(--ink-sheen); display:flex; align-items:center; justify-content:center; flex-shrink:0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--on-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg></span>
+                        </button>
+                      </sc-if>
+
+                      <sc-if value="{{ showRecent }}" hint-placeholder-val="{{ false }}">
+                        <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:16px; padding:6px 0 4px">
+                          <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 18px 8px"><p style="font:600 16px var(--font-sans); margin:0">{{ recentTitle }}</p><button style="border:none; background:none; color:var(--brand); font:600 13px var(--font-sans); cursor:pointer">{{ viewAllLabel }}</button></div>
+                          <sc-for list="{{ recent }}" as="a" hint-placeholder-count="4">
+                            <div style="display:flex; align-items:center; gap:12px; padding:11px 18px; border-top:1px solid var(--border)">
+                              <span style="width:30px; height:30px; border-radius:9px; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:{{ a.tintBg }}; color:{{ a.color }}" innerHTML="{{ a.icon }}"></span>
+                              <div style="flex:1; min-width:0"><p style="font:600 14px var(--font-sans); margin:0; color:var(--foreground)">{{ a.action }} · <span style="font-weight:400; color:var(--muted-foreground)">{{ a.item }}</span></p><p style="font:500 12px var(--font-sans); color:var(--muted-foreground); margin:2px 0 0">{{ a.actor }}</p></div>
+                              <span style="font:500 12px var(--font-num); color:var(--muted-foreground); flex-shrink:0">{{ a.time }}</span>
+                            </div>
+                          </sc-for>
+                        </div>
+                      </sc-if>
+
+                    </div>
+                  </div>
+                </sc-if>
+
+              </div>
+            </main>
+
+            <sc-if value="{{ isCompact }}" hint-placeholder-val="{{ true }}">
+              <!-- S3-D13-002 · tab bar honors safe-area-inset-bottom -->
+              <nav style="flex-shrink:0; background:var(--bar-bg); backdrop-filter:blur(var(--bar-blur)); -webkit-backdrop-filter:blur(var(--bar-blur)); border-top:1px solid var(--border); padding:6px 8px max(env(safe-area-inset-bottom), 22px); display:flex; justify-content:space-between">
+                <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5"><div style="flex:1; min-height:50px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; border-radius:12px; {{ t.scanBg }}"><span style="color:{{ t.color }}" innerHTML="{{ t.icon }}"></span><span style="font-size:11px; font-weight:{{ t.weight }}; color:{{ t.color }}; font-family:var(--font-sans)">{{ t.label }}</span></div></sc-for>
+              </nav>
+            </sc-if>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="max-width:760px; margin:0 auto; padding:0 20px 60px; display:flex; flex-direction:column; gap:12px">
+    <div style="display:flex; align-items:flex-start; gap:10px; padding:14px 16px; border-radius:14px; background:var(--surface); border:1px solid var(--border)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:1px" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01"/><path d="M11 12h1v4h1"/></svg>
+      <p style="font:400 13px/1.55 var(--font-sans); color:var(--muted-foreground); margin:0" dir="ltr">Showing <strong style="color:var(--foreground)">{{ sizeLabel }} · {{ stateLabel }} · {{ themeLabel }} · {{ localeLabel }}</strong>. All product copy routed through <code style="font-family:var(--font-num)">t.*</code> (he + en parity); dates &amp; times via <code style="font-family:var(--font-num)">Intl.DateTimeFormat(activeLocale)</code>; switch Locale to עברית to render the Hebrew RTL mirror. Hero consumes <code style="font-family:var(--font-num)">--on-ink*</code> tokens; web shell uses <code style="font-family:var(--font-num)">100dvh</code>; status &amp; tab bars honor <code style="font-family:var(--font-num)">env(safe-area-inset-*)</code>; Offline adds an explicit sync-on-reconnect cue. All 30 cells (3 sizes × 5 states × 2 locales) preserved.</p>
+    </div>
+    <div style="display:flex; align-items:flex-start; gap:10px; padding:14px 16px; border-radius:14px; background:var(--brand-ink); color:var(--on-ink)" dir="ltr">
+      <span style="font:700 10px var(--font-sans); letter-spacing:.1em; text-transform:uppercase; color:var(--on-ink-muted); flex-shrink:0; margin-top:2px">§13</span>
+      <p style="font:400 13px/1.55 var(--font-sans); color:var(--on-ink-strong); margin:0">Interim decisions logged — <strong style="color:var(--on-ink)">§13.3</strong> large-title greeting pattern kept (final title pattern pending). <strong style="color:var(--on-ink)">§13.7</strong> recent-activity feed assumed plausible (data source pending). Consumes Stage 1 canonical decisions: 6-state taxonomy, <code style="font-family:var(--font-num)">--sys-*→--status-*</code> alias direction, on-ink/spacing tokens. Hebrew (he) is the product-default locale; this demo opens en for reviewer parity (pending sign-off). <strong style="color:var(--on-ink)">S3-MINOR-003</strong> greeting comma accepted (LTR-only cosmetic). <strong style="color:var(--on-ink)">S3-MINOR-004</strong> device-chrome literals (status-bar clock, notch hairlines) accepted as non-product mock chrome — excluded from token binding.</p>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { theme:'light', size:'compact', st:'active', dir:'ltr' };
+  set(k,v){ this.setState({[k]:v}); }
+  ic(p,o){ const w=(o&&o.w)||22; return `<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="${o&&o.fill?o.fill:'none'}" stroke="currentColor" stroke-width="${o&&o.sw?o.sw:1.9}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`; }
+
+  renderVals(){
+    const { theme, size, st, dir } = this.state;
+    // S3-D9-003 · locale derives from direction → RTL renders Hebrew
+    const activeLocale = dir==='rtl' ? 'he' : 'en';
+    const interp = (s,vars) => String(s).replace(/\{(\w+)\}/g, (_,k)=> (vars && vars[k]!=null) ? vars[k] : '');
+
+    // S3-D9-001 · all product copy externalized to t.* (he + en parity, Hebrew default)
+    const TR = {
+      en: {
+        greeting:{ morning:'Good morning', afternoon:'Good afternoon', evening:'Good evening' },
+        userName:'Maya',
+        onShift:'On shift', startedFmt:'Started {time}', elapsed:'Elapsed',
+        noShift:'No active shift', noShiftSub:'Start your shift to begin tracking equipment and scans.',
+        startShift:'Start shift', endShift:'End shift',
+        itemsOut:'Items out', scansToday:'Scans today', pending:'{n} pending',
+        scanTitle:'Scan equipment', scanSub:'NFC or camera · tap to start',
+        critical:'Critical', overdue:'Overdue',
+        recentTitle:'Recent activity', viewAll:'View all',
+        actions:{ checkout:'Checked out', scan:'Scanned', returned:'Returned', failed:'Failed check' },
+        actors:{ drLee:'Dr. Lee', you:'You', mayaA:'Maya A.' },
+        items:{ pump:'Infusion pump · IV-204', monitor:'Vital monitor · VM-118', ultrasound:'Ultrasound · US-3', defib:'Defibrillator · DF-02' },
+        offlineBanner:"You're offline — showing cached data. Changes will sync.",
+        syncing:'{n} changes will sync on reconnect',
+        errorTitle:"Couldn't load your shift", errorSub:'Something went wrong reaching the server. Your data is safe — try again.', retry:'Retry',
+        nav:{ today:'Today', equipment:'Equipment', scan:'Scan', alerts:'Alerts', emergency:'Emergency', more:'More' },
+        topbarTitle:'Today', search:'Search equipment', alertsAria:'Alerts · 3 unread',
+      },
+      he: {
+        greeting:{ morning:'בוקר טוב', afternoon:'צהריים טובים', evening:'ערב טוב' },
+        userName:'מאיה',
+        onShift:'במשמרת', startedFmt:'התחלה {time}', elapsed:'זמן שחלף',
+        noShift:'אין משמרת פעילה', noShiftSub:'התחילו משמרת כדי לעקוב אחר ציוד וסריקות.',
+        startShift:'התחלת משמרת', endShift:'סיום משמרת',
+        itemsOut:'פריטים בחוץ', scansToday:'סריקות היום', pending:'{n} ממתינים',
+        scanTitle:'סריקת ציוד', scanSub:'NFC או מצלמה · הקישו להתחלה',
+        critical:'קריטי', overdue:'באיחור',
+        recentTitle:'פעילות אחרונה', viewAll:'הצג הכל',
+        actions:{ checkout:'נופק', scan:'נסרק', returned:'הוחזר', failed:'נכשל בבדיקה' },
+        actors:{ drLee:'ד״ר לי', you:'על ידך', mayaA:'מאיה ע.' },
+        items:{ pump:'משאבת עירוי · IV-204', monitor:'מוניטור חיוני · VM-118', ultrasound:'אולטרסאונד · US-3', defib:'דפיברילטור · DF-02' },
+        offlineBanner:'את/ה במצב לא־מקוון — מוצג מידע שמור. השינויים יסונכרנו.',
+        syncing:'{n} שינויים יסונכרנו עם החיבור מחדש',
+        errorTitle:'לא ניתן לטעון את המשמרת', errorSub:'משהו השתבש בהגעה לשרת. המידע שלך בטוח — נסו שוב.', retry:'נסו שוב',
+        nav:{ today:'היום', equipment:'ציוד', scan:'סריקה', alerts:'התראות', emergency:'חירום', more:'עוד' },
+        topbarTitle:'היום', search:'חיפוש ציוד', alertsAria:'התראות · 3 שלא נקראו',
+      },
+    };
+    const t = TR[activeLocale];
+    const chevronT = activeLocale==='he' ? 'scaleX(-1)' : 'none';
+
+    // S3-D9-002 · dates & times via Intl.DateTimeFormat(activeLocale) — no hardcoded locale
+    const dtLocale = activeLocale==='he' ? 'he-IL' : 'en-US';
+    const now = new Date(2025, 5, 30, 11, 2, 0);     // demo "now" — Mon Jun 30 2025, 11:02
+    const startedAt = new Date(2025, 5, 30, 6, 30, 0); // shift start 06:30
+    const hr = now.getHours();
+    const partOfDay = hr < 12 ? 'morning' : hr < 18 ? 'afternoon' : 'evening';
+    const dateLine = new Intl.DateTimeFormat(dtLocale, { weekday:'long', month:'long', day:'numeric' }).format(now);
+    const startedTime = new Intl.DateTimeFormat(dtLocale, { hour:'numeric', minute:'2-digit' }).format(startedAt);
+    const mins = Math.round((now - startedAt) / 60000);
+    const elapsed = String(Math.floor(mins/60)).padStart(2,'0') + ':' + String(mins%60).padStart(2,'0');
+    const greeting = t.greeting[partOfDay] + ', ' + t.userName;
+
+    const segBase="border:none;cursor:pointer;padding:7px 11px;border-radius:7px;font-family:var(--font-sans);font-size:12.5px;transition:all var(--dur-fast) var(--ease-standard);white-space:nowrap;";
+    const seg=(a)=>a?segBase+"font-weight:600;background:var(--surface-2);color:var(--foreground);box-shadow:0 1px 2px rgba(0,0,0,.18);":segBase+"font-weight:500;background:transparent;color:var(--muted-foreground);";
+    const themeOpts=[['light','Light'],['dark','Dark']].map(([k,l])=>({key:k,label:l,style:seg(theme===k),onClick:()=>this.set('theme',k)}));
+    const sizeOpts=[['compact','Compact'],['medium','Medium'],['expanded','Expanded']].map(([k,l])=>({key:k,label:l,style:seg(size===k),onClick:()=>this.set('size',k)}));
+    const stateOpts=[['loading','Loading'],['noshift','No shift'],['active','Active'],['error','Error'],['offline','Offline']].map(([k,l])=>({key:k,label:l,style:seg(st===k),onClick:()=>this.set('st',k)}));
+    const dirOpts=[['ltr','English'],['rtl','עברית']].map(([k,l])=>({key:k,label:l,style:seg(dir===k),onClick:()=>this.set('dir',k)}));
+
+    const isCompact = size==='compact';
+    const hasSidebar = !isCompact;
+    const isExpanded = size==='expanded';
+    const errorMode = st==='error';
+    const loadingMode = st==='loading';
+    const offlineMode = st==='offline';
+    const noShiftMode = st==='noshift';
+
+    const frames = {
+      compact:  { outer:'width:392px;height:800px;background:#0d0d0f;border-radius:48px;padding:11px', screen:'border-radius:38px', browser:false },
+      medium:   { outer:'width:860px;height:680px;background:#0d0d0f;border-radius:30px;padding:13px', screen:'border-radius:18px', browser:false },
+      expanded: { outer:'width:1180px;height:760px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:0', screen:'border-radius:0 0 16px 16px', browser:true },
+    };
+    const f = frames[size];
+
+    const navDefs=[
+      {key:'today',label:t.nav.today,icon:'<path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/>'},
+      {key:'equipment',label:t.nav.equipment,icon:'<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>'},
+      {key:'scan',label:t.nav.scan,icon:'<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/>'},
+      {key:'alerts',label:t.nav.alerts,icon:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>'},
+      {key:'emergency',label:t.nav.emergency,icon:'<path d="M3 12h4l2 6 4-14 2 8h6"/>'},
+    ];
+    const navItems = navDefs.map(n=>{ const a=n.key==='today'; return {key:n.key,label:n.label,weight:a?'600':'500',bg:a?'rgb(79 70 229 / 0.10)':'transparent',color:a?'var(--brand)':'var(--muted-foreground)',icon:this.ic(n.icon,{w:20,sw:a?2.1:1.8})}; });
+
+    const tabDefs=[
+      {key:'today',label:t.nav.today,icon:'<path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10h14V10"/>'},
+      {key:'equipment',label:t.nav.equipment,icon:'<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>'},
+      {key:'scan',label:t.nav.scan,icon:'<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/>'},
+      {key:'emergency',label:t.nav.emergency,icon:'<path d="M3 12h4l2 6 4-14 2 8h6"/>'},
+      {key:'more',label:t.nav.more,icon:'<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>'},
+    ];
+    const tabs = tabDefs.map(tb=>{ const a=tb.key==='today'; const scan=tb.key==='scan';
+      return {key:tb.key,label:tb.label,weight:a?'600':'500',color:a?'var(--brand)':(scan?'var(--action)':'var(--muted-foreground)'),scanBg:scan?'background:rgb(21 128 61 / 0.08);':'',icon:this.ic(tb.icon,{w:22,sw:a?2.2:1.9,fill:a?'currentColor':'none'})}; });
+
+    const blue={color:'rgb(var(--sys-blue))',tintBg:'rgb(var(--sys-blue) / 0.12)'};
+    const green={color:'rgb(var(--sys-green))',tintBg:'rgb(var(--sys-green) / 0.12)'};
+    const red={color:'rgb(var(--sys-red))',tintBg:'rgb(var(--sys-red) / 0.12)'};
+    const recent = [
+      {action:t.actions.checkout, item:t.items.pump,       actor:t.actors.drLee, time:'14:02', ...blue,  icon:this.ic('<path d="M7 17 17 7"/><path d="M8 7h9v9"/>',{w:16,sw:2})},
+      {action:t.actions.scan,     item:t.items.monitor,    actor:t.actors.you,   time:'13:58', ...green, icon:this.ic('<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/>',{w:16,sw:2})},
+      {action:t.actions.returned, item:t.items.ultrasound, actor:t.actors.mayaA, time:'13:40', ...green, icon:this.ic('<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 5 5v3"/>',{w:16,sw:2})},
+      {action:t.actions.failed,   item:t.items.defib,      actor:t.actors.you,   time:'08:55', ...red,   icon:this.ic('<path d="m10.3 3.7-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.3l-8-14a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',{w:16,sw:2})},
+    ];
+
+    const sizeLabelMap={compact:'Compact',medium:'Medium',expanded:'Expanded'};
+    const stateLabelMap={loading:'Loading',noshift:'No shift',active:'Active',error:'Error',offline:'Offline'};
+
+    const twoCol = isExpanded && !errorMode;
+
+    return {
+      pageClass: theme==='dark'?'dark':'',
+      themeOpts, sizeOpts, stateOpts, dirOpts,
+      dir, chevronT,
+      frameOuter: f.outer, screenStyle: f.screen, browserChrome: f.browser,
+      isCompact, hasSidebar, showTopBar: isExpanded,
+      navItems, tabs, moreLabel: t.nav.more,
+      topbarTitle: t.topbarTitle, searchPlaceholder: t.search, alertsAria: t.alertsAria,
+      mainPad: isCompact ? '8px 16px 20px' : (isExpanded ? '24px 32px' : '20px 24px'),
+      contentMax: isExpanded ? '1120px' : (hasSidebar ? '720px' : 'none'),
+      contentGap: isCompact ? '20px' : '24px',
+      contentDisplay: twoCol ? 'grid' : 'flex',
+      contentCols: twoCol ? 'minmax(320px,360px) 1fr' : 'none',
+
+      offlineMode, errorMode,
+      showContent: !errorMode,
+      heroLoading: loadingMode, heroNoShift: noShiftMode, heroActive: !loadingMode && !noShiftMode,
+      showChips: !loadingMode && !noShiftMode,
+      quickLoading: loadingMode, quickCard: !loadingMode,
+      showRecent: isExpanded && !loadingMode && !noShiftMode,
+
+      greeting, dateLine,
+      startedLabel: interp(t.startedFmt, { time: startedTime }), elapsed,
+      onShiftLabel: t.onShift, elapsedLabel: t.elapsed,
+      itemsOut:'12', scansToday:'48',
+      itemsOutLabel: t.itemsOut, scansTodayLabel: t.scansToday,
+      pendingNote: offlineMode ? (' · ' + interp(t.pending, { n: 2 })) : '',
+      noShiftTitle: t.noShift, noShiftSub: t.noShiftSub, startShiftLabel: t.startShift, endShiftLabel: t.endShift,
+      scanTitle: t.scanTitle, scanSub: t.scanSub,
+      critical:'3', overdue:'7', criticalLabel: t.critical, overdueLabel: t.overdue,
+      criticalAria: '3 ' + t.critical, overdueAria: '7 ' + t.overdue,
+      recentTitle: t.recentTitle, viewAllLabel: t.viewAll, recent,
+      offlineBanner: t.offlineBanner, syncingCue: interp(t.syncing, { n: 2 }),
+      errorTitle: t.errorTitle, errorSub: t.errorSub, retryLabel: t.retry,
+
+      sizeLabel: sizeLabelMap[size], stateLabel: stateLabelMap[st],
+      themeLabel: theme==='dark'?'Dark':'Light', localeLabel: activeLocale==='he'?'עברית · RTL':'English · LTR',
+    };
+  }
+}
+</script>
+</body>
+</html>

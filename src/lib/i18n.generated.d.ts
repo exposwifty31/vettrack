@@ -42,6 +42,8 @@ export interface TStructure {
     issue: string;
     maintenance: string;
     sterilized: string;
+    stale: string;
+    unknown: string;
     all: string;
     info: string;
     neutral: string;
@@ -749,6 +751,48 @@ export interface TStructure {
       };
     };
   };
+  shiftAdjustments: {
+    requestExtension: string;
+    endShiftEarly: string;
+    pendingExtend: string;
+    pendingLeaveEarly: string;
+    approvedExtend: string;
+    approvedLeaveEarly: string;
+    cancelRequest: string;
+    sheetExtendTitle: string;
+    sheetLeaveEarlyTitle: string;
+    sheetExtendDesc: string;
+    sheetLeaveEarlyDesc: string;
+    currentEndLabel: string;
+    newEndLabel: string;
+    reasonLabel: string;
+    reasonPlaceholder: string;
+    submit: string;
+    submitting: string;
+    cancel: string;
+    createdSuccess: string;
+    cancelledSuccess: string;
+    errNotOnShift: string;
+    errInvalidReason: string;
+    errInvalidTime: string;
+    errNotAnExtension: string;
+    errNotEarlier: string;
+    errDuplicatePending: string;
+    errGeneric: string;
+    admin: {
+      tab: string;
+      title: string;
+      empty: string;
+      approve: string;
+      reject: string;
+      kindExtend: string;
+      kindLeaveEarly: string;
+      reasonLabel: string;
+      approvedToast: string;
+      rejectedToast: string;
+      decideFailed: string;
+    };
+  };
   home: {
     equipmentOverview: string;
     shiftSummary: string;
@@ -1320,6 +1364,22 @@ export interface TStructure {
     urgentCriticalAlertsHint: string;
     urgentOverdueTasks: string;
     urgentOverdueTasksHint: string;
+    greetingMorning: string;
+    greetingAfternoon: string;
+    greetingEvening: string;
+    onShift: string;
+    startedAt: string;
+    elapsedLabel: string;
+    elapsedDays: string;
+    noShiftSub: string;
+    criticalLabel: string;
+    overdueLabel: string;
+    scanEquipmentSub: string;
+    viewAll: string;
+    activityScanned: string;
+    activityMoved: string;
+    activityAdded: string;
+    activityYou: string;
   };
   assetCopilot: {
     title: string;
@@ -2113,12 +2173,39 @@ export interface TStructure {
     fieldNfcPlaceholder: string;
     fieldIsBillable: string;
     fieldMinimumDispenseToCapture: string;
+    fieldParLevel: string;
+    fieldReorderPoint: string;
+    optionalPlaceholder: string;
     deleteTitle: string;
     deleteDescription: string;
     deleteConfirm: string;
     save: string;
     saving: string;
     cancel: string;
+  };
+  inventoryItemDetailPage: {
+    title: string;
+    back: string;
+    onHand: string;
+    parLabel: string;
+    belowReorder: string;
+    factReorderPoint: string;
+    usageTitle: string;
+    usageEmpty: string;
+    usageTotal: string;
+    facts: string;
+    factCode: string;
+    factCategory: string;
+    factBillable: string;
+    factMinCapture: string;
+    factNfc: string;
+    factCreated: string;
+    inContainers: string;
+    containersEmpty: string;
+    yes: string;
+    no: string;
+    none: string;
+    loadError: string;
   };
   procurementPage: {
     title: string;
@@ -3446,6 +3533,15 @@ export interface TStructure {
   };
   nav: {
     today: string;
+    alertsTitle: string;
+    noActiveAlerts: string;
+    seeAllAlerts: string;
+    quickSettings: string;
+    allSettings: string;
+    darkMode: string;
+    language: string;
+    langHebrewName: string;
+    langEnglishName: string;
     equipment: string;
     equipmentAll: string;
     equipmentTasks: string;
@@ -3539,6 +3635,11 @@ export interface TStructure {
     fallbackBoardUnavailable: string;
     deployable: string;
     notDeployable: string;
+  };
+  webOnlyGuard: {
+    title: string;
+    description: string;
+    cta: string;
   };
   whatsNew: {
     title: string;
@@ -3796,6 +3897,8 @@ export interface TStructure {
   scan: {
     title: string;
     scanPrompt: string;
+    offShiftTitle: string;
+    offShiftBody: string;
     checkedInTo: string;
     passToColleague: string;
     done: string;

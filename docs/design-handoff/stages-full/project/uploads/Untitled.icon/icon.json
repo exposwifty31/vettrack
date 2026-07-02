@@ -1,0 +1,55 @@
+{
+  "fill" : {
+    "solid" : "display-p3:0.05490,0.07059,0.12941,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "blend-mode" : "normal",
+          "fill" : "automatic",
+          "hidden" : false,
+          "image-name" : "ChatGPT Image Jun 25, 2026, 09_42_11 PM.png",
+          "name" : "ChatGPT Image Jun 25, 2026, 09_42_11 PM",
+          "opacity" : 1,
+          "position-specializations" : [
+            {
+              "appearance" : "light",
+              "value" : {
+                "scale" : 1.12,
+                "translation-in-points" : [
+                  0,
+                  27
+                ]
+              }
+            },
+            {
+              "idiom" : "square",
+              "value" : {
+                "scale" : 1.26,
+                "translation-in-points" : [
+                  0.6299999999998818,
+                  27.9375
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

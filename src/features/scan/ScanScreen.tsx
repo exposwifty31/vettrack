@@ -1,16 +1,23 @@
 import { useState, useCallback } from "react";
 import { useLocation } from "wouter";
+import { CalendarClock } from "lucide-react";
 import { QrScanner } from "@/components/qr-scanner";
 import { AccountabilityConfirm } from "./AccountabilityConfirm";
+import { useActiveShift } from "@/hooks/use-active-shift";
 import { t } from "@/lib/i18n";
 
 export function ScanScreen() {
   const [, navigate] = useLocation();
   const [confirmedName, setConfirmedName] = useState<string | null>(null);
+  const { hasActiveShift, isLoading: shiftLoading } = useActiveShift();
 
   const handleClose = useCallback(() => {
     navigate("/home");
   }, [navigate]);
+
+  // Off-shift: scanning (and the equipment ownership it captures) is not allowed.
+  // The camera must never mount here — roster-derived authority denies it server-side too.
+  const scanBlocked = !shiftLoading && !hasActiveShift;
 
   return (
     <div
@@ -50,7 +57,59 @@ export function ScanScreen() {
       </div>
 
       <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
-        <QrScanner onClose={handleClose} />
+        {scanBlocked ? (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 14,
+              padding: "0 32px",
+              textAlign: "center",
+            }}
+          >
+            <span
+              style={{
+                display: "flex",
+                width: 64,
+                height: 64,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 18,
+                background: "var(--status-stale-bg)",
+                color: "var(--status-stale-fg)",
+              }}
+            >
+              <CalendarClock size={30} aria-hidden />
+            </span>
+            <h2
+              style={{
+                fontSize: "var(--text-lg)",
+                fontWeight: 700,
+                color: "hsl(var(--foreground))",
+                margin: 0,
+              }}
+            >
+              {t.scan.offShiftTitle}
+            </h2>
+            <p
+              style={{
+                fontSize: "var(--text-sm)",
+                lineHeight: 1.5,
+                color: "hsl(var(--muted-foreground))",
+                margin: 0,
+                maxWidth: "34ch",
+              }}
+            >
+              {t.scan.offShiftBody}
+            </p>
+          </div>
+        ) : shiftLoading ? null : (
+          <QrScanner onClose={handleClose} />
+        )}
       </div>
 
       {confirmedName && (

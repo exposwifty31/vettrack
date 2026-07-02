@@ -47,6 +47,7 @@ const EXPECTED_MOUNT_PATHS = [
   "/api/platform",
   "/api/analytics",
   "/api/shifts",
+  "/api/shift-adjustments",
   "/api/appointments",
   "/api/tasks",
   "/api/containers",

@@ -1,93 +1,157 @@
 
 import { Bdi } from "@/components/ui/bdi";
-import { t, formatDateByLocale } from "@/lib/i18n";
+import { t, formatDateByLocale, getStoredLocale } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useSearch, useLocation } from "wouter";
+import { Link, useSearch } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
 import { AppShell } from "@/components/layout/AppShell";
 import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { ErrorCard } from "@/components/ui/error-card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { LoadingSection } from "@/components/ui/loading-section";
-import { computeAlerts, formatRelativeTime } from "@/lib/utils";
-import {
-  buildAlertAckSet,
-  countActiveAlerts,
-  countCriticalAlerts,
-} from "@/lib/alert-counts";
+import { computeAlerts } from "@/lib/utils";
+import { buildAlertAckSet, countCriticalAlerts } from "@/lib/alert-counts";
 import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
 import { useAuth } from "@/hooks/use-auth";
-import { TruncatedText } from "@/components/ui/truncated-text";
 import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { QrScanner } from "@/components/qr-scanner";
+import { ShiftAdjustmentControls } from "@/features/shift-adjustments/ShiftAdjustmentControls";
 import { getCurrentUserId } from "@/lib/auth-store";
 import { subscribeKeepalive } from "@/lib/realtime";
-import type { Appointment } from "@/types";
+import type { ActivityFeedItem } from "@/types";
 import {
   Activity,
   AlertTriangle,
-  ClipboardCheck,
+  ArrowLeftRight,
   Clock,
   Plus,
-  Scan,
-  ShieldAlert,
+  ScanLine,
   Siren,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEnterOnce } from "@/hooks/use-enter-once";
-import {
-  ShiftProgressHero,
-  shiftProgressStatsFromHome,
-} from "@/components/home/ShiftProgressHero";
-import { pickNextDashboardTask } from "@/lib/task-dashboard-filters";
 
-/** Localized "5h 12m" style duration. */
-function humanizeMinutes(min: number): string {
-  const m = Math.max(0, Math.round(min));
-  if (m < 60) return t.homePage.etaMinutes(Math.max(1, m));
-  const hours = Math.floor(m / 60);
-  const rem = m % 60;
-  return rem === 0 ? t.homePage.etaHours(hours) : `${t.homePage.etaHours(hours)} ${t.homePage.etaMinutes(rem)}`;
+/** Locale-aware "6:30 AM" / "6:30" clock — toLocaleDateString drops time parts. */
+function formatClock(value: Date | string): string {
+  const localeTag = getStoredLocale() === "he" ? "he-IL" : "en-US";
+  return new Date(value).toLocaleTimeString(localeTag, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
-/** Compact eta for the Next-up pill. */
-function compactEta(min: number): string {
-  if (min <= 1) return t.homePage.etaNow;
-  if (min < 60) return t.homePage.etaMinutes(min);
-  return t.homePage.etaHours(Math.round(min / 60));
+/**
+ * Elapsed shift time as `HH:MM`, degrading to `Nd HH:MM` past 24h so a
+ * long-open (or stale) shift never overflows the hero timer.
+ */
+function formatElapsed(totalMin: number): string {
+  const m = Math.max(0, Math.round(totalMin));
+  const hh = String(Math.floor((m % 1440) / 60)).padStart(2, "0");
+  const mm = String(m % 60).padStart(2, "0");
+  const days = Math.floor(m / 1440);
+  return days > 0 ? `${t.homePage.elapsedDays(days)} ${hh}:${mm}` : `${hh}:${mm}`;
+}
+
+/** Time-of-day greeting including the user's first name. */
+function greetingFor(hour: number, name: string): string {
+  if (hour < 12) return t.homePage.greetingMorning(name);
+  if (hour < 18) return t.homePage.greetingAfternoon(name);
+  return t.homePage.greetingEvening(name);
+}
+
+type ActivityStyle = {
+  bg: string;
+  fg: string;
+  Icon: typeof ScanLine;
+  label: () => string;
+};
+
+/** Map an activity-feed row onto its Stage-3 tinted glyph + action verb. */
+function activityStyle(item: ActivityFeedItem): ActivityStyle {
+  switch (item.type) {
+    case "transfer":
+      return {
+        bg: "rgb(var(--sys-blue) / 0.12)",
+        fg: "rgb(var(--sys-blue))",
+        Icon: ArrowLeftRight,
+        label: () => t.homePage.activityMoved,
+      };
+    case "created":
+      return {
+        bg: "rgb(var(--sys-green) / 0.12)",
+        fg: "rgb(var(--sys-green))",
+        Icon: Plus,
+        label: () => t.homePage.activityAdded,
+      };
+    case "scan":
+    default:
+      return {
+        bg: "rgb(var(--sys-green) / 0.12)",
+        fg: "rgb(var(--sys-green))",
+        Icon: ScanLine,
+        label: () => t.homePage.activityScanned,
+      };
+  }
 }
 
 export default function HomePage() {
-  return <HomePageDesktop />;
-}
-
-function HomePageDesktop() {
   const { name, refreshAuth } = useAuth();
   const userId = getCurrentUserId();
   const queryClient = useQueryClient();
-  const [, navigate] = useLocation();
   const [scannerOpen, setScannerOpen] = useState(false);
   const [activeCodeBlueId, setActiveCodeBlueId] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const searchStr = useSearch();
   const enterOnce = useEnterOnce("home");
   const rise = enterOnce ? "vt-pro-rise" : "";
+  const isDesktop = useIsDesktop();
 
   useRealtimeReconciliation({ queryClient });
 
-  useEffect(() => subscribeKeepalive(({ activeCodeBlueSessionId }) => {
-    setActiveCodeBlueId(activeCodeBlueSessionId);
-  }), []);
+  useEffect(
+    () =>
+      subscribeKeepalive(({ activeCodeBlueSessionId }) => {
+        setActiveCodeBlueId(activeCodeBlueSessionId);
+      }),
+    [],
+  );
+
+  // Tick the elapsed timer at minute granularity.
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Display-only connectivity cue. Emergency mutations are never queued here —
+  // this only surfaces a "data may be outdated" banner (frozen-surface safe).
+  const [isOffline, setIsOffline] = useState(
+    typeof navigator !== "undefined" && !navigator.onLine,
+  );
+  useEffect(() => {
+    const onOnline = () => setIsOffline(false);
+    const onOffline = () => setIsOffline(true);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(searchStr);
-    if (params.get("scan") === "1") {
-      setScannerOpen(true);
-    }
+    if (params.get("scan") === "1") setScannerOpen(true);
   }, [searchStr]);
 
-  const { data: equipment, isLoading: equipmentLoading, isError: equipmentError, refetch } = useQuery({
+  const {
+    data: equipment,
+    isError: equipmentError,
+    isLoading: equipmentLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["/api/equipment"],
     queryFn: api.equipment.list,
     enabled: !!userId,
@@ -103,7 +167,7 @@ function HomePageDesktop() {
     refetchOnWindowFocus: false,
   });
 
-  const { data: taskDashboard, isLoading: tasksLoading } = useQuery({
+  const { data: taskDashboard } = useQuery({
     queryKey: ["/api/tasks/dashboard", userId ?? ""],
     queryFn: () => api.tasks.dashboard(),
     enabled: !!userId,
@@ -111,8 +175,7 @@ function HomePageDesktop() {
     refetchOnWindowFocus: false,
   });
 
-
-  const { data: pulse } = useQuery({
+  const { data: pulse, isLoading: pulseLoading } = useQuery({
     queryKey: ["/api/home/dashboard"],
     queryFn: () => api.home.dashboard(),
     enabled: !!userId,
@@ -130,61 +193,50 @@ function HomePageDesktop() {
     refetchOnWindowFocus: false,
   });
 
+  // ---- derived shift + criticality figures ----
   const alerts = equipment ? computeAlerts(equipment) : [];
-  const alertAckSet = buildAlertAckSet(alertAcks);
-  const alertCount = countActiveAlerts(alerts, alertAckSet);
-  const criticalCount = countCriticalAlerts(alerts, alertAckSet);
+  const criticalCount = countCriticalAlerts(alerts, buildAlertAckSet(alertAcks));
   const overdueCount = taskDashboard?.counts.overdue ?? 0;
   const totalCount = equipment?.length ?? 0;
-  const activePatientsCount = 0;
-
-  const tasksDone = pulse?.tasksCompletedToday ?? 0;
-  const tasksOpen = (taskDashboard?.counts.today ?? 0) + (taskDashboard?.counts.overdue ?? 0);
-  const tasksTotal = tasksDone + tasksOpen;
+  const itemsOut = equipment
+    ? equipment.filter((e) => e.custodyState === "checked_out").length
+    : 0;
   const scansDone = pulse?.scansToday ?? 0;
 
-  const heroPct = tasksTotal > 0 ? Math.round((tasksDone / tasksTotal) * 100) : null;
-  const taskProgress = tasksTotal > 0 ? tasksDone / tasksTotal : 0;
-
-  const microWins: string[] = [];
-  if (alertCount === 0 && totalCount > 0) microWins.push(t.homePage.winNoAlerts);
-  if (tasksOpen === 0 && tasksDone > 0) microWins.push(t.homePage.winTasksClear);
-  if (scansDone > 0) microWins.push(t.homePage.winScansToday(scansDone));
-
   const firstName = name?.split(" ")[0] || t.homePage.fallbackName;
-  const dateChip = formatDateByLocale(new Date(), { weekday: "short", day: "numeric", month: "short" });
+  const greeting = greetingFor(new Date().getHours(), firstName);
+  const dateLine = formatDateByLocale(new Date(), {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 
-  let shiftLine = t.homePage.shiftLineFallback;
+  // On-shift is roster-derived server-side: `pulse.shift` is populated only when
+  // the caller is inside a scheduled vt_shifts window. A roster window is
+  // self-bounding, so no client-side staleness guard is needed.
+  const hasActiveShift = !!pulse?.shift;
+
+  const heroState: "loading" | "noshift" | "active" =
+    pulseLoading && !pulse ? "loading" : hasActiveShift ? "active" : "noshift";
+
+  let elapsed = "00:00";
+  let startedLabel = "";
   if (pulse?.shift) {
-    const elapsedMin = Math.round((Date.now() - new Date(pulse.shift.startedAt).getTime()) / 60_000);
-    if (elapsedMin <= 24 * 60) {
-      shiftLine = t.homePage.shiftLine(humanizeMinutes(elapsedMin));
-    }
+    const shiftMins = Math.max(
+      0,
+      Math.round((now - new Date(pulse.shift.startedAt).getTime()) / 60_000),
+    );
+    elapsed = formatElapsed(shiftMins);
+    startedLabel = t.homePage.startedAt(formatClock(pulse.shift.startedAt));
   }
 
-  const nextTask: Appointment | null = taskDashboard
-    ? pickNextDashboardTask(taskDashboard)
-    : null;
-
-  let nextEtaMin = 0;
-  let nextOverdue = false;
-  if (nextTask) {
-    nextEtaMin = Math.round((new Date(nextTask.endTime).getTime() - Date.now()) / 60_000);
-    nextOverdue = nextEtaMin < 0;
-  }
-  const nextTitle = nextTask?.notes?.trim() || t.homePage.taskFallbackTitle;
-  const nextPill = nextOverdue ? t.homePage.etaOverdue : compactEta(nextEtaMin);
-  const nextBody = nextTask
-    ? nextOverdue
-      ? t.homePage.nextUpOverdueBy(humanizeMinutes(-nextEtaMin))
-      : t.homePage.nextUpDueIn(humanizeMinutes(nextEtaMin))
-    : "";
-
-  const activityItems = activityData?.items ?? [];
-  const todayItems = activityItems.slice(0, 6);
-
-  const isDesktop = useIsDesktop();
-  const heroPctDisplay = heroPct ?? 0;
+  const showChips = heroState === "active";
+  // BUG-005: the Today scan card is redundant on the native shell (the tab-bar
+  // ScanFab already offers scan on iPhone/iPad), so it only renders on desktop.
+  const showScanCard = heroState !== "loading" && isDesktop;
+  const showScanSkeleton = heroState === "loading" && isDesktop;
+  const showRecent = isDesktop && heroState === "active";
+  const recentItems = (activityData?.items ?? []).slice(0, 4);
 
   const pageContent = (
     <>
@@ -192,40 +244,75 @@ function HomePageDesktop() {
         <title>Dashboard — VetTrack</title>
         <meta
           name="description"
-          content="Real-time veterinary equipment dashboard. View status at a glance, scan QR codes, triage active alerts, and track checked-out equipment across your clinic."
+          content="Real-time veterinary equipment dashboard. Track your shift at a glance, scan equipment, and triage critical and overdue items across your clinic."
         />
         <link rel="canonical" href="https://vettrack.replit.app/" />
       </Helmet>
 
-      <div
-        className="vt-enter-stagger relative mx-auto flex w-full max-w-[680px] flex-col gap-3.5 px-3 pb-nav-safe pt-2 sm:px-5"
-      >
-        {/* Greeting — glance only */}
-        <header className={cn("flex items-start justify-between gap-3 pt-3", rise)}>
-          <div className="min-w-0 flex-1 space-y-1">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-foreground/5 px-2.5 py-1 vt-text-2xs font-semibold tracking-wide text-ivory-text2">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
-              {dateChip}
-            </span>
-            <h1 className="truncate vt-page-title sm:vt-display text-ivory-text">
-              {t.homePage.helloBeforeName}
-              <Bdi>{firstName}</Bdi>
-              {t.homePage.helloAfterName}
-            </h1>
-            <p className="vt-text-sm text-ivory-text3">{shiftLine}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => navigate("/handoff")}
-            aria-label={t.home.shiftSummary}
-            data-testid="btn-shift-summary"
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-ivory-border bg-ivory-surface text-ivory-text2 shadow-sm transition-all hover:border-primary/30 hover:text-foreground motion-safe:active:scale-95"
-          >
-            <ClipboardCheck className="h-[18px] w-[18px]" aria-hidden />
-          </button>
+      <div className="vt-enter-stagger mx-auto flex w-full max-w-[720px] flex-col gap-5 px-4 pb-nav-safe pt-3 sm:gap-6 sm:px-6 lg:max-w-[1120px]">
+        {/* Greeting — large-title glance */}
+        <header className={rise}>
+          <h1 className="text-[2rem] font-bold leading-[1.1] tracking-[-0.02em] text-ivory-text">
+            <Bdi>{greeting}</Bdi>
+          </h1>
+          <p className="mt-1.5 text-[15px] font-medium text-ivory-text3">
+            {dateLine}
+          </p>
         </header>
 
-        {equipmentError && (
+        {/* Offline — display-only cue; data may be stale until reconnect */}
+        {isOffline && (
+          <div
+            role="alert"
+            className="rounded-xl px-3.5 py-2.5 text-sm font-semibold"
+            style={{
+              background: "rgb(var(--offline-bg))",
+              border: "1px solid rgb(var(--offline-border))",
+              color: "rgb(var(--offline-text))",
+            }}
+          >
+            {t.home.offline}
+          </div>
+        )}
+
+        {/* Code Blue active — rare, safety-critical, kept above the fold */}
+        {activeCodeBlueId && (
+          <Link
+            href="/code-blue"
+            className="flex items-center gap-3 rounded-[14px] border px-4 py-3 shadow-card transition-transform motion-safe:active:scale-[0.99]"
+            style={{
+              borderColor: "rgb(var(--sys-red) / 0.3)",
+              background: "rgb(var(--sys-red) / 0.12)",
+            }}
+          >
+            <span
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-white"
+              style={{ background: "rgb(var(--sys-red))" }}
+            >
+              <Siren className="h-[18px] w-[18px]" aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span
+                className="block text-sm font-bold"
+                style={{ color: "rgb(var(--sys-red))" }}
+              >
+                {t.homePage.urgentCodeBlue}
+              </span>
+              <span className="block text-xs text-ivory-text3">
+                {t.homePage.urgentCodeBlueHint}
+              </span>
+            </span>
+            <ForwardChevron
+              className="h-4 w-4 shrink-0 opacity-70"
+              style={{ color: "rgb(var(--sys-red))" }}
+              aria-hidden
+            />
+          </Link>
+        )}
+
+        {/* Equipment-load failure replaces the content region (Code Blue banner
+            above stays visible — it is keepalive-driven, not equipment-driven). */}
+        {equipmentError ? (
           <ErrorCard
             message={t.equipmentList.errors.loadFailed}
             onRetry={() => {
@@ -234,196 +321,310 @@ function HomePageDesktop() {
               refetch();
             }}
           />
-        )}
-
-        {/* Urgent item — answer-first lead (Code Blue > critical alert > overdue task) */}
-        {(activeCodeBlueId || criticalCount > 0 || overdueCount > 0) && !equipmentLoading && (
-          <Link
-            href={activeCodeBlueId ? "/code-blue" : criticalCount > 0 ? "/alerts" : "/equipment/tasks"}
+        ) : (
+          <>
+        {/* Content grid — hero left, criticality + scan + recent right (desktop) */}
+        <div className="grid grid-cols-1 items-start gap-5 sm:gap-6 lg:grid-cols-[minmax(320px,360px)_1fr]">
+          {/* ON-SHIFT hero */}
+          <section
             className={cn(
-              "relative flex items-center gap-3 overflow-hidden rounded-2xl border px-4 py-3.5 shadow-card transition-opacity motion-safe:active:scale-[0.99]",
-              activeCodeBlueId
-                ? "border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/30"
-                : criticalCount > 0
-                ? "border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/30"
-                : "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/30"
+              "relative w-full overflow-hidden rounded-[20px] p-[18px] shadow-hero",
+              rise,
             )}
+            style={{
+              background:
+                "radial-gradient(130% 90% at 0% 0%, var(--ink-sheen), transparent 60%), var(--brand-ink)",
+              color: "var(--on-ink)",
+            }}
+            aria-label={t.homePage.onShift}
           >
-            <span
-              className={cn(
-                "absolute inset-y-3 start-0 w-[3px] rounded-full",
-                activeCodeBlueId || criticalCount > 0 ? "bg-red-500" : "bg-amber-500"
-              )}
-              aria-hidden
-            />
-            <span
-              className={cn(
-                "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl",
-                activeCodeBlueId || criticalCount > 0
-                  ? "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400"
-                  : "bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400"
-              )}
-            >
-              {activeCodeBlueId
-                ? <Siren className="h-4 w-4" aria-hidden />
-                : <AlertTriangle className="h-4 w-4" aria-hidden />}
-            </span>
-            <span className="min-w-0 flex-1 ps-1">
-              <span
-                className={cn(
-                  "block vt-text-sm font-bold",
-                  activeCodeBlueId || criticalCount > 0
-                    ? "text-red-700 dark:text-red-300"
-                    : "text-amber-700 dark:text-amber-300"
-                )}
-              >
-                {activeCodeBlueId
-                  ? t.homePage.urgentCodeBlue
-                  : criticalCount > 0
-                  ? t.homePage.urgentCriticalAlerts(criticalCount)
-                  : t.homePage.urgentOverdueTasks(overdueCount)}
-              </span>
-              <span className="block vt-text-xs text-ivory-text3">
-                {activeCodeBlueId
-                  ? t.homePage.urgentCodeBlueHint
-                  : criticalCount > 0
-                  ? t.homePage.urgentCriticalAlertsHint
-                  : t.homePage.urgentOverdueTasksHint}
-              </span>
-            </span>
-            <ForwardChevron className="h-4 w-4 shrink-0 text-ivory-text3" aria-hidden />
-          </Link>
-        )}
-
-        {/* V4 Pro — shift progress hero */}
-        <div className={rise}>
-          <ShiftProgressHero
-            progressPct={heroPctDisplay}
-            progressLabel={t.homePage.progressLabel}
-            stats={shiftProgressStatsFromHome({
-              tasksDone,
-              tasksTotal,
-              scansDone,
-              activePatients: activePatientsCount,
-            })}
-            animateRing={enterOnce}
-          />
-          {microWins.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {microWins.map((label) => (
-                <span
-                  key={label}
-                  className="inline-flex max-w-full items-center whitespace-nowrap rounded-full border border-[var(--action-border)] bg-[var(--action-soft)] px-2.5 py-1 vt-text-2xs font-semibold text-[var(--action-ink)]"
-                >
-                  {label}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Next up — the thumb-zone hero */}
-        <section className={cn("rounded-[20px] border border-ivory-border border-s-[3px] border-s-[var(--brand)] bg-ivory-surface p-4 shadow-card", rise)}>
-          <div className="ps-2.5">
-            <div className="mb-1.5 flex items-center justify-between gap-2.5">
-              <span className="vt-text-2xs font-bold uppercase tracking-[0.16em] text-brand">
-                {t.homePage.nextUp}
-              </span>
-              {nextTask && (
-                <span
-                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 vt-text-2xs font-bold tabular-nums ${
-                    nextOverdue
-                      ? "bg-destructive/10 text-destructive"
-                      : "bg-muted text-ivory-text3"
-                  }`}
-                >
-                  <Clock className="h-2.5 w-2.5" aria-hidden />
-                  {nextPill}
-                </span>
-              )}
-            </div>
-
-            {tasksLoading && !taskDashboard ? (
-              <div className="space-y-2 py-1">
-                <div className="h-5 w-2/3 rounded bg-muted" />
-                <div className="h-3.5 w-1/3 rounded bg-muted" />
+            {heroState === "loading" ? (
+              <div className="space-y-4">
+                <div className="h-3 w-24 rounded-md bg-white/15" />
+                <div className="h-9 w-36 rounded-lg bg-white/15" />
+                <div className="h-2.5 w-16 rounded bg-white/15" />
+                <div className="flex gap-7 pt-2">
+                  <div className="h-8 w-16 rounded-md bg-white/15" />
+                  <div className="h-8 w-16 rounded-md bg-white/15" />
+                </div>
+                <div className="h-12 w-full rounded-[14px] bg-white/15" />
               </div>
-            ) : nextTask ? (
-              <>
-                <h2 className="mb-1 vt-text-lg font-bold leading-snug tracking-tight text-ivory-text">
-                  {nextTitle}
-                </h2>
-                <p className="mb-3.5 vt-text-sm text-ivory-text3">{nextBody}</p>
-                <Link
-                  href="/equipment/tasks"
-                  data-testid="btn-next-up"
-                  className="flex h-[60px] w-full items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-deep)] vt-text-sm font-bold text-white shadow-lg transition-transform motion-safe:active:scale-[0.98]"
-                  style={{
-                    boxShadow: "0 10px 22px -10px color-mix(in srgb, var(--brand) 55%, transparent)",
-                  }}
+            ) : heroState === "noshift" ? (
+              <div className="flex flex-col items-start gap-2.5 py-2">
+                <span
+                  className="flex h-[46px] w-[46px] items-center justify-center rounded-[13px]"
+                  style={{ background: "var(--ink-divider)" }}
                 >
-                  {t.homePage.nextUpStart}
-                  <ForwardChevron className="h-[18px] w-[18px]" aria-hidden />
-                </Link>
-              </>
+                  <Clock className="h-6 w-6" aria-hidden />
+                </span>
+                <p className="mt-1.5 text-[20px] font-bold">
+                  {t.home.shift.noShift}
+                </p>
+                <p
+                  className="max-w-[38ch] text-sm leading-relaxed"
+                  style={{ color: "var(--on-ink-strong)" }}
+                >
+                  {t.homePage.noShiftSub}
+                </p>
+              </div>
             ) : (
               <>
-                <h2 className="mb-1 vt-text-lg font-bold leading-snug tracking-tight text-ivory-text">
-                  {t.homePage.nextUpEmpty}
-                </h2>
-                <p className="mb-3.5 vt-text-sm text-ivory-text3">{t.homePage.nextUpEmptyBody}</p>
-                <Link
-                  href="/equipment/tasks"
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-ivory-border bg-ivory-surface text-sm font-semibold text-ivory-text2 transition-colors hover:text-foreground motion-safe:active:scale-[0.98]"
+                <div className="flex items-center justify-between gap-2.5">
+                  <span
+                    className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em]"
+                    style={{ color: "var(--on-ink-strong)" }}
+                  >
+                    <span className="relative inline-flex h-2.5 w-2.5">
+                      <span
+                        className="absolute inset-0 rounded-full"
+                        style={{ background: "rgb(var(--sys-green))" }}
+                      />
+                      <span
+                        className="absolute inset-0 rounded-full motion-safe:animate-ping"
+                        style={{ background: "rgb(var(--sys-green))" }}
+                      />
+                    </span>
+                    {t.homePage.onShift}
+                  </span>
+                  <span
+                    className="font-num text-xs"
+                    style={{ color: "var(--on-ink-muted)" }}
+                  >
+                    {startedLabel}
+                  </span>
+                </div>
+
+                <p
+                  dir="ltr"
+                  className="mt-3 font-num text-[2.353rem] font-medium leading-none tracking-[-0.01em] tabular-nums rtl:text-end"
                 >
-                  {t.homePage.nextUpEmptyCta}
-                  <ForwardChevron className="h-4 w-4" aria-hidden />
-                </Link>
+                  {elapsed}
+                </p>
+                <p
+                  className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.1em]"
+                  style={{ color: "var(--on-ink-muted)" }}
+                >
+                  {t.homePage.elapsedLabel}
+                </p>
+
+                <div className="mt-5 flex items-stretch">
+                  <div className="flex-1">
+                    <p className="font-num text-[1.294rem] font-medium leading-none tabular-nums">
+                      {itemsOut}
+                    </p>
+                    <p
+                      className="mt-1 text-[11px] font-medium uppercase tracking-[0.04em]"
+                      style={{ color: "var(--on-ink-muted)" }}
+                    >
+                      {t.home.shift.itemsOut}
+                    </p>
+                  </div>
+                  <div
+                    className="mx-[18px] w-px self-stretch"
+                    style={{ background: "var(--ink-divider)" }}
+                    aria-hidden
+                  />
+                  <div className="flex-1">
+                    <p className="font-num text-[1.294rem] font-medium leading-none tabular-nums">
+                      {scansDone}
+                    </p>
+                    <p
+                      className="mt-1 text-[11px] font-medium uppercase tracking-[0.04em]"
+                      style={{ color: "var(--on-ink-muted)" }}
+                    >
+                      {t.home.shift.scansToday}
+                    </p>
+                  </div>
+                </div>
+
+                {pulse?.shift && (
+                  <ShiftAdjustmentControls endsAt={pulse.shift.endsAt} />
+                )}
               </>
             )}
-          </div>
-        </section>
+          </section>
 
-        {/* Quick actions — desktop only; mobile uses bottom nav scan + menu */}
-        {isDesktop && (
-          <section>
-            <p className="mb-2 vt-text-2xs font-bold uppercase tracking-[0.18em] text-ivory-text3">
-              {t.homePage.orLabel}
-            </p>
-            <div className="grid grid-cols-2 gap-2">
+          {/* Right column */}
+          <div className="flex flex-col gap-5 sm:gap-6">
+            {showChips && (
+              <div className="grid grid-cols-2 gap-2.5">
+                <Link
+                  href="/alerts"
+                  aria-label={`${criticalCount} ${t.homePage.criticalLabel}`}
+                  data-testid="chip-critical"
+                  className="flex min-h-[60px] items-center gap-3 rounded-[14px] border px-3.5 py-3 transition-transform motion-safe:active:scale-[0.99]"
+                  style={{
+                    borderColor: "rgb(var(--sys-red) / 0.22)",
+                    background: "rgb(var(--sys-red) / 0.12)",
+                  }}
+                >
+                  <span
+                    className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] text-white"
+                    style={{ background: "rgb(var(--sys-red))" }}
+                  >
+                    <AlertTriangle className="h-[18px] w-[18px]" aria-hidden />
+                  </span>
+                  <span className="flex flex-col items-start leading-tight">
+                    <span
+                      className="font-num text-[20px] font-bold tabular-nums"
+                      style={{ color: "rgb(var(--sys-red))" }}
+                    >
+                      {criticalCount}
+                    </span>
+                    <span
+                      className="text-[11px] font-semibold uppercase tracking-[0.04em]"
+                      style={{ color: "rgb(var(--sys-red) / 0.78)" }}
+                    >
+                      {t.homePage.criticalLabel}
+                    </span>
+                  </span>
+                  <ForwardChevron
+                    className="ms-auto h-[18px] w-[18px] opacity-45"
+                    style={{ color: "rgb(var(--sys-red))" }}
+                    aria-hidden
+                  />
+                </Link>
+
+                <Link
+                  href="/equipment/tasks"
+                  aria-label={`${overdueCount} ${t.homePage.overdueLabel}`}
+                  data-testid="chip-overdue"
+                  className="flex min-h-[60px] items-center gap-3 rounded-[14px] border px-3.5 py-3 transition-transform motion-safe:active:scale-[0.99]"
+                  style={{
+                    borderColor: "rgb(var(--sys-orange) / 0.22)",
+                    background: "rgb(var(--sys-orange) / 0.12)",
+                  }}
+                >
+                  <span
+                    className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] text-white"
+                    style={{ background: "rgb(var(--sys-orange))" }}
+                  >
+                    <Clock className="h-[18px] w-[18px]" aria-hidden />
+                  </span>
+                  <span className="flex flex-col items-start leading-tight">
+                    <span
+                      className="font-num text-[20px] font-bold tabular-nums"
+                      style={{ color: "rgb(var(--sys-orange))" }}
+                    >
+                      {overdueCount}
+                    </span>
+                    <span
+                      className="text-[11px] font-semibold uppercase tracking-[0.04em]"
+                      style={{ color: "rgb(var(--sys-orange) / 0.78)" }}
+                    >
+                      {t.homePage.overdueLabel}
+                    </span>
+                  </span>
+                  <ForwardChevron
+                    className="ms-auto h-[18px] w-[18px] opacity-45"
+                    style={{ color: "rgb(var(--sys-orange))" }}
+                    aria-hidden
+                  />
+                </Link>
+              </div>
+            )}
+
+            {showScanSkeleton && (
+              <Skeleton className="h-[60px] w-full rounded-[16px]" />
+            )}
+
+            {showScanCard && (
               <button
                 type="button"
                 onClick={() => setScannerOpen(true)}
                 data-testid="quick-action-scan"
-                className="vt-action-green flex min-h-[76px] items-center justify-between gap-2.5 rounded-2xl p-3.5 text-start text-white transition-transform motion-safe:active:scale-[0.98]"
+                className="flex min-h-[60px] w-full items-center gap-3.5 rounded-[16px] px-4 py-3.5 text-start transition-transform motion-safe:active:scale-[0.99]"
+                style={{ background: "var(--action)", color: "var(--action-foreground)" }}
               >
-                <span className="min-w-0">
-                  <span className="block vt-text-sm font-bold">{t.homePage.scanEquipment}</span>
-                  <span className="mt-0.5 block vt-text-2xs text-white">{t.homePage.scanEquipmentHint}</span>
-                </span>
-                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15">
-                  <Scan className="h-[17px] w-[17px]" aria-hidden />
-                </span>
-              </button>
-
-              <Link
-                href="/alerts"
-                data-testid="quick-action-alerts"
-                className="flex min-h-[76px] items-center justify-between gap-2.5 rounded-2xl border border-ivory-border bg-ivory-surface p-3.5 text-start shadow-sm transition-colors hover:border-primary/30 motion-safe:active:scale-[0.98]"
-              >
-                <span className="min-w-0">
-                  <span className="block vt-text-sm font-bold text-ivory-text">{t.homePage.triageAlerts}</span>
-                  <span className="mt-0.5 block vt-text-xs text-ivory-text3">
-                    {alertCount > 0 ? t.homePage.triageAlertsHint(alertCount) : t.homePage.triageAlertsClear}
+                <span className="flex min-w-0 flex-col">
+                  <span className="text-[15px] font-bold">
+                    {t.homePage.scanEquipment}
+                  </span>
+                  <span
+                    className="text-[13px] font-medium"
+                    style={{
+                      color:
+                        "color-mix(in srgb, var(--action-foreground) 78%, transparent)",
+                    }}
+                  >
+                    {t.homePage.scanEquipmentSub}
                   </span>
                 </span>
-                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted text-brand">
-                  <ShieldAlert className="h-[17px] w-[17px]" aria-hidden />
+                <span
+                  className="ms-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
+                  style={{
+                    background:
+                      "color-mix(in srgb, var(--action-foreground) 16%, transparent)",
+                  }}
+                >
+                  <ScanLine className="h-[22px] w-[22px]" aria-hidden />
                 </span>
-              </Link>
-            </div>
-          </section>
-        )}
+              </button>
+            )}
+
+            {showRecent && (
+              <section className="overflow-hidden rounded-[16px] border border-ivory-border bg-ivory-surface pb-1">
+                <div className="flex items-center justify-between px-[18px] pb-2 pt-3">
+                  <p className="text-[16px] font-semibold text-ivory-text">
+                    {t.homePage.recentActivity}
+                  </p>
+                  <Link
+                    href="/audit-log"
+                    className="text-[13px] font-semibold text-brand"
+                  >
+                    {t.homePage.viewAll}
+                  </Link>
+                </div>
+                {activityLoading ? (
+                  <div className="px-[18px] pb-3">
+                    <LoadingSection rows={4} />
+                  </div>
+                ) : recentItems.length > 0 ? (
+                  recentItems.map((item) => {
+                    const s = activityStyle(item);
+                    const Icon = s.Icon;
+                    return (
+                      <Link
+                        key={item.id}
+                        href={`/equipment/${item.equipmentId}`}
+                        className="flex items-center gap-3 border-t border-ivory-border px-[18px] py-2.5 transition-colors hover:bg-muted/40"
+                      >
+                        <span
+                          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px]"
+                          style={{ background: s.bg, color: s.fg }}
+                        >
+                          <Icon className="h-4 w-4" aria-hidden />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[14px] font-semibold text-ivory-text">
+                            {s.label()}{" · "}
+                            <span className="font-normal text-ivory-text3">
+                              {item.equipmentName}
+                            </span>
+                          </p>
+                          <p className="mt-0.5 truncate text-[12px] font-medium text-ivory-text3">
+                            {item.userId === userId
+                              ? t.homePage.activityYou
+                              : item.userEmail?.split("@")[0] ?? ""}
+                          </p>
+                        </div>
+                        <span className="shrink-0 font-num text-[12px] tabular-nums text-ivory-text3">
+                          {formatClock(item.timestamp)}
+                        </span>
+                      </Link>
+                    );
+                  })
+                ) : (
+                  <EmptyState
+                    icon={Activity}
+                    message={t.homePage.activityFeedEmpty}
+                    subMessage={t.homePage.activityFeedEmptyHint}
+                  />
+                )}
+              </section>
+            )}
+          </div>
+        </div>
 
         {/* Get started — brand-new clinic with no equipment yet */}
         {!equipmentLoading && totalCount === 0 && (
@@ -431,8 +632,12 @@ function HomePageDesktop() {
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
               <Plus className="h-6 w-6 text-foreground/70" aria-hidden />
             </div>
-            <h3 className="mb-1 vt-text-lg font-bold text-ivory-text">{t.homePage.getStarted}</h3>
-            <p className="mb-4 vt-text-sm text-ivory-text3">{t.homePage.getStartedDescription}</p>
+            <h3 className="mb-1 text-[1.176rem] font-bold text-ivory-text">
+              {t.homePage.getStarted}
+            </h3>
+            <p className="mb-4 text-sm text-ivory-text3">
+              {t.homePage.getStartedDescription}
+            </p>
             <Link
               href="/equipment/new"
               data-testid="btn-get-started"
@@ -443,54 +648,13 @@ function HomePageDesktop() {
             </Link>
           </div>
         )}
-
-        {/* Today */}
-        <section>
-          <p className="mb-2 vt-text-2xs font-bold uppercase tracking-[0.18em] text-ivory-text3">
-            {t.homePage.todayLabel}
-          </p>
-          {activityLoading ? (
-            <LoadingSection rows={4} />
-          ) : todayItems.length > 0 ? (
-            <div className="overflow-hidden rounded-2xl border border-ivory-border bg-ivory-surface">
-              {todayItems.map((item, i) => (
-                <Link
-                  key={item.id}
-                  href={`/equipment/${item.equipmentId}`}
-                  className={`flex items-center justify-between gap-3 px-3.5 py-2.5 transition-colors hover:bg-muted/50 ${
-                    i === todayItems.length - 1 ? "" : "border-b border-ivory-border/60"
-                  }`}
-                >
-                  <TruncatedText
-                    text={item.equipmentName}
-                    className="vt-text-sm text-ivory-text flex-1"
-                  />
-                  <span className="shrink-0 vt-text-2xs tabular-nums text-ivory-text3">
-                    {formatRelativeTime(item.timestamp)}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-ivory-border bg-ivory-surface">
-              <EmptyState
-                icon={Activity}
-                message={t.homePage.activityFeedEmpty}
-                subMessage={t.homePage.activityFeedEmptyHint}
-              />
-            </div>
-          )}
-        </section>
+          </>
+        )}
       </div>
 
       {scannerOpen && <QrScanner onClose={() => setScannerOpen(false)} />}
-
     </>
   );
 
-  return (
-    <AppShell>
-      {pageContent}
-    </AppShell>
-  );
+  return <AppShell>{pageContent}</AppShell>;
 }

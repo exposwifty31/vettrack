@@ -17,81 +17,111 @@
      * map to the Ivory palette so existing shadcn-style components track PageShell/mobile
      * Ivory chrome without per-file class rewrites. HSL triplets feed hsl(var(--name)).
      */
-    --background: 210 20% 98%;
-    --foreground: 127 21% 8%;
+    /* iOS system palette (Stage 1) — grouped background #F2F2F7, Apple labels.
+       HSL triplets feed hsl(var(--name)). */
+    --background: 240 24% 96%;
+    --foreground: 240 6% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 127 21% 8%;
+    --card-foreground: 240 6% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 127 21% 8%;
-    --primary: 234 85% 63%;
+    --popover-foreground: 240 6% 10%;
+    --primary: 243 75% 59%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 18% 95%;
-    --secondary-foreground: 215 22% 20%;
-    --muted: 210 18% 95%;
-    /* L36% (was 40%) — clears WCAG AA 4.5:1 for muted body text on the
-       cool near-white background; previous value measured 4.48:1. */
-    --muted-foreground: 215 15% 36%;
-    --accent: 210 18% 94%;
-    --accent-foreground: 215 22% 20%;
-    --destructive: 0 72% 51%;
+    --secondary: 240 11% 92%;
+    --secondary-foreground: 240 6% 10%;
+    --muted: 240 11% 92%;
+    /* Kept darker than iOS raw secondaryLabel (rgba(60,60,67,.6)) so muted body
+       text clears WCAG AA 4.5:1 on the #F2F2F7 canvas. */
+    --muted-foreground: 240 4% 44%;
+    --accent: 240 14% 90%;
+    --accent-foreground: 240 6% 10%;
+    --destructive: 4 78% 52%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 14% 87%;
-    --input: 214 14% 87%;
-    --ring: 234 85% 63%;
-    --radius: 0.625rem;
-    /* ── Radius ramp — each step as an explicit CSS variable ── */
-    --radius-sm:   0.375rem;      /* 6px  — tight inputs, badges */
-    --radius-md:   0.5rem;        /* 8px  — buttons, smaller cards */
-    --radius-xl:   0.75rem;       /* 12px — panels, larger surfaces */
-    --radius-2xl:  1rem;          /* 16px — sheets, modals */
-    --radius-pill: 9999px;
+    --border: 240 3% 78%;
+    --input: 240 3% 78%;
+    --ring: 243 75% 59%;
+    /* Apple system color primitives (RGB channels → rgb(var(--sys-x) / α)) */
+    --sys-red:    255 59 48;
+    --sys-orange: 255 149 0;
+    --sys-green:  52 199 89;
+    --sys-blue:   0 122 255;
+    --sys-gray:   142 142 147;
+    --radius: 14px;              /* base (Tailwind rounded-lg) — cards, buttons */
+    /* ── Radius ramp — iOS scale (Stage 1) ── */
+    --radius-sm:   10px;         /* tight inputs, badges */
+    --radius-md:   12px;         /* buttons, smaller cards */
+    --radius-lg:   14px;         /* design alias for base radius (cards/buttons) */
+    --radius-xl:   16px;         /* panels, larger surfaces */
+    --radius-2xl:  20px;         /* sheets, modals */
+    --radius-pill: 999px;
     /* ── Typographic scale — mobile-first, 16px base (no iOS input zoom) ──
        Modular ~1.22 ratio. RTL-agnostic (sizes only, no direction). Adopt via
        the .vt-text-* utilities or var() directly; do not hardcode px sizes. */
-    --text-2xs:  0.6875rem;   /* 11px — dense meta, nav labels */
-    --text-xs:   0.75rem;     /* 12px — captions, helper text */
-    --text-sm:   0.875rem;    /* 14px — secondary body, labels */
-    --text-base: 1rem;        /* 16px — body default */
-    --text-lg:   1.125rem;    /* 18px — emphasized body, card titles */
-    --text-xl:   1.375rem;    /* 22px — section headings */
-    --text-2xl:  1.75rem;     /* 28px — page titles */
-    --text-3xl:  2.1875rem;   /* 35px — hero numerals / display */
+    /* iOS type ramp (Stage 1) — rem on a 17px root (see html{font-size}). */
+    --text-2xs:  0.647rem;    /* ~11px — dense meta, nav labels */
+    --text-xs:   0.765rem;    /* ~13px — captions, helper text */
+    --text-sm:   0.882rem;    /* ~15px — secondary body, labels */
+    --text-base: 1rem;        /* 17px — body default */
+    --text-lg:   1.176rem;    /* ~20px — emphasized body, card titles */
+    --text-xl:   1.294rem;    /* ~22px — section headings */
+    --text-2xl:  2rem;        /* ~34px — page titles (iOS large title) */
+    --text-3xl:  2.353rem;    /* ~40px — hero numerals / display */
+    --display:         var(--text-3xl);   /* design name — hero/display numerals */
+    --text-largetitle: var(--text-2xl);   /* design name — iOS large title */
     --leading-tight:  1.2;    /* headings */
     --leading-snug:   1.35;   /* titles, short copy */
     --leading-normal: 1.55;   /* body prose */
-    /* ── Shadows — precise, not floaty ── */
-    --shadow-card:       0 1px 3px 0 rgb(15 23 42 / 0.08), 0 1px 2px -1px rgb(15 23 42 / 0.06);
-    --shadow-card-hover: 0 4px 8px -2px rgb(15 23 42 / 0.10), 0 2px 4px -1px rgb(15 23 42 / 0.06);
-    --shadow-surface:    0 0 0 1px rgb(148 163 184 / 0.12), 0 4px 16px -8px rgb(15 23 42 / 0.16);
+    /* ── Elevation ladder (Stage 1) — hero→overlay, precise not floaty ── */
+    --shadow-hero:       0 1px 2px rgba(0,0,0,0.06);
+    --shadow-card:       0 1px 2px rgba(0,0,0,0.045), 0 1px 1px rgba(0,0,0,0.03);
+    --shadow-card-hover: 0 2px 10px rgba(0,0,0,0.09), 0 1px 2px rgba(0,0,0,0.05);
+    --shadow-panel:      0 2px 10px rgba(0,0,0,0.09), 0 1px 2px rgba(0,0,0,0.05);
+    --shadow-surface:    0 2px 10px rgba(0,0,0,0.09), 0 1px 2px rgba(0,0,0,0.05);
+    --shadow-floating:   0 8px 24px -12px rgba(0,0,0,0.25);
+    --shadow-modal:      0 12px 32px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.08);
+    --shadow-overlay:    0 24px 64px rgba(0,0,0,0.28), 0 4px 12px rgba(0,0,0,0.12);
     /* ── Brand extended palette ── */
     --brand-navy:          #0b1021;
     --brand-green-bright:  #a5b4fc;
     --brand-green-mid:     #6366f1;
     /* ── Status info token ── */
     --status-info:         #2563eb;
-    --status-ok: 142 76% 36%;
-    --status-issue: 0 72% 51%;
-    --status-maintenance: 32 95% 44%;
-    --status-sterilized: 221 83% 53%;
+    /* Status hues — Apple system palette (hsl of --sys-*), Stage 1 */
+    --status-ok: 135 59% 49%;          /* sys-green */
+    --status-issue: 4 100% 59%;        /* sys-red */
+    --status-maintenance: 35 100% 50%; /* sys-orange */
+    --status-sterilized: 211 100% 50%; /* sys-blue */
+    --status-stale: 35 100% 50%;       /* sys-orange — stale custody */
+    --status-unknown: 240 2% 57%;      /* sys-gray — unknown/indeterminate */
     --sat: env(safe-area-inset-top);
     --sab: env(safe-area-inset-bottom);
 
     /* ── Ivory design system tokens (RGB channels for Tailwind opacity support) ── */
-    --ivory-bg:       246 247 251;  /* cool near-white — precise, clinical */
+    --ivory-bg:       242 242 247;  /* #F2F2F7 — iOS grouped background */
     --ivory-surface:  255 255 255;  /* #ffffff */
-    --ivory-border:   216 220 230;  /* cool neutral border */
-    --ivory-borderMd: 188 194 212;  /* medium cool border */
-    --ivory-text:     17 26 18;     /* #111a12 — dark forest ink */
-    --ivory-text2:    46 57 77;     /* cool secondary — slate, not green-tinted */
-    --ivory-text3:    90 104 132;   /* cooler muted, WCAG AA against near-white */
-    --ivory-navy:     11 16 33;     /* #0b1021 — brand navy */
-    --ivory-green:    79 70 229;    /* indigo-600 */
+    --ivory-border:   209 209 214;  /* #D1D1D6 — iOS opaque separator */
+    --ivory-borderMd: 174 174 178;  /* #AEAEB2 — mid-weight separator */
+    --ivory-text:     28 28 30;     /* #1C1C1E — iOS label */
+    --ivory-text2:    99 99 102;    /* #636366 — secondary label (AA) */
+    --ivory-text3:    142 142 147;  /* #8E8E93 — tertiary label */
+    --ivory-navy:     11 16 33;     /* #0b1021 — brand navy (chrome) */
+    --ivory-green:    79 70 229;    /* indigo-600 — active nav (brand, kept) */
     --ivory-greenMid: 67 56 202;    /* indigo-700 */
-    --ivory-greenBg:  238 242 255;  /* indigo-50 */
+    --ivory-greenBg:  238 242 255;  /* indigo-50 — active-nav tint */
     --ivory-ok:       #16a34a;
     --ivory-warn:     #d97706;
     --ivory-err:      #dc2626;
     --ivory-info:     #2563eb;
+    /* ── Surface ramp (Stage 1 §01) — resting / raised / hover / pressed fills ── */
+    --surface:        #ffffff;
+    --surface-2:      #fafafc;
+    --surface-hover:  #f7f6f3;
+    --surface-active: #efede8;
+    /* ── Translucent bar material (Stage 1 §05) — nav/topbar over content ── */
+    --hairline:       rgba(60, 60, 67, 0.18);
+    --bar-bg:         rgba(255, 255, 255, 0.8);
+    --bar-bg-opaque:  #ffffff;
+    --bar-blur:       20px;
     /* Warning semantic tokens (inline SVG / ER reconciliation triangle) */
     --color-background-warning: #fef3c7;
     --color-border-warning: #d97706;
@@ -99,8 +129,9 @@
 
     /* 60/30/10 — indigo (default palette) */
     --brand: #4f46e5;
+    --brand-foreground: #ffffff;
     --brand-deep: #4338ca;
-    --brand-ink: #312e81;
+    --brand-ink: #1e1b4b;
     --brand-soft: #eef2ff;
     --brand-border: #c7d2fe;
     --brand-shadow: rgba(79, 70, 229, 0.45);
@@ -108,11 +139,13 @@
     --hero-b: #312e81;
     /* Darkened to clear WCAG AA 4.5:1 with white text and as green text on
        white (was #16a34a = 3.30:1). #15803d = 5.02:1; hover step #166534. */
-    --action: #15803d;
-    --action-deep: #166534;
-    --action-ink: #1a6d38;
-    --action-soft: #ecf6ee;
-    --action-border: #c7e3cf;
+    /* Action / scan-confirm accent — Stage 1 teal-forest (10% tier, not brand) */
+    --action: #2f6f5e;
+    --action-foreground: #ffffff;
+    --action-deep: #285c4e;
+    --action-ink: #2a6555;
+    --action-soft: #e8f2ee;
+    --action-border: #c9ded9;
     --nav-bg: hsl(210 20% 99% / 0.96);
 
     --font-num: "DM Mono", "IBM Plex Mono", ui-monospace, monospace;
@@ -125,20 +158,41 @@
     --motion-pill: 320ms;
     --ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);
     --ease-reward: cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* Motion aliases (Stage 1 §06) — design token names + standard easing curve */
+    --dur-fast: 120ms;
+    --dur-base: 200ms;
+    --dur-slow: 320ms;
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 
-    /* Status pill fills (StatusBadge) */
-    --status-ok-bg: #f0faf2;
-    --status-ok-fg: #166534;
-    --status-ok-border: #a7f3bd;
-    --status-issue-bg: #fff1f1;
-    --status-issue-fg: #7f1d1d;
-    --status-issue-border: #fca5a5;
-    --status-maint-bg: #fffbeb;
-    --status-maint-fg: #78350f;
-    --status-maint-border: #fcd34d;
-    --status-steril-bg: #eff6ff;
-    --status-steril-fg: #1e40af;
-    --status-steril-border: #93c5fd;
+    /* Status pill fills (StatusBadge) — iOS tints over Apple --sys-*; the
+       -fg stays a darker shade of the same hue to clear WCAG AA on the tint. */
+    --status-ok-bg: rgb(52 199 89 / 0.14);
+    --status-ok-fg: #1b7a3d;
+    --status-ok-border: rgb(52 199 89 / 0.28);
+    --status-issue-bg: rgb(255 59 48 / 0.12);
+    --status-issue-fg: #c1271d;
+    --status-issue-border: rgb(255 59 48 / 0.24);
+    --status-maint-bg: rgb(255 149 0 / 0.14);
+    --status-maint-fg: #8a4b00;
+    --status-maint-border: rgb(255 149 0 / 0.28);
+    --status-steril-bg: rgb(0 122 255 / 0.12);
+    --status-steril-fg: #0a56c9;
+    --status-steril-border: rgb(0 122 255 / 0.24);
+    --status-stale-bg: rgb(255 149 0 / 0.14);
+    --status-stale-fg: #8a4b00;
+    --status-stale-border: rgb(255 149 0 / 0.28);
+    --status-unknown-bg: rgb(142 142 147 / 0.16);
+    --status-unknown-fg: #55555a;
+    --status-unknown-border: rgb(142 142 147 / 0.30);
+    /* Design canonical names for maintenance/sterilized pill fills. var()
+       resolves at the consuming element, so these inherit the dark overrides
+       of the short maint/steril tokens automatically (no rename needed). */
+    --status-maintenance-bg: var(--status-maint-bg);
+    --status-maintenance-fg: var(--status-maint-fg);
+    --status-maintenance-border: var(--status-maint-border);
+    --status-sterilized-bg: var(--status-steril-bg);
+    --status-sterilized-fg: var(--status-steril-fg);
+    --status-sterilized-border: var(--status-steril-border);
 
     /* ── Emergency surface — replaces all zinc-* in code-blue and crash-cart ── */
     --emergency-bg:         12 12 12;
@@ -159,47 +213,118 @@
     /* ── Shift active state ── */
     --shift-active:         22 163 74;
     --shift-inactive:       122 138 126;
+
+    /* ── Spacing scale (Stage 1) — 4px-based rhythm ── */
+    --space-1: 2px;  --space-2: 4px;   --space-3: 8px;   --space-4: 12px;
+    --space-5: 16px; --space-6: 20px;  --space-7: 24px;  --space-8: 32px;
+    --space-9: 40px; --space-10: 48px; --space-11: 64px; --space-12: 80px;
+    --space-13: 96px;
+    --target-min: 44px;
+
+    /* ── On-ink tokens (Stage 1) — text/fills on dark hero & chrome surfaces ── */
+    --on-ink:          #ffffff;
+    --on-ink-strong:   rgba(255,255,255,0.82);
+    --on-ink-muted:    rgba(255,255,255,0.6);
+    --on-ink-subtle:   rgba(255,255,255,0.5);
+    --on-ink-disabled: rgba(255,255,255,0.4);
+    --ink-sheen:       rgba(255,255,255,0.10);
+    --ink-divider:     rgba(255,255,255,0.12);
+    --ink-fill-weak:   rgba(255,255,255,0.08);
+    --ink-fill:        rgba(255,255,255,0.18);
+    --ink-border:      rgba(255,255,255,0.28);
+    --on-ink-bar:      rgba(255,255,255,0.14);
+    --ink-skeleton:    rgba(255,255,255,0.10);
+    --ink-shimmer:     rgba(255,255,255,0.18);
   }
 
   .dark {
-    /* Indigo / navy dark — aligned with Ivory (--ivory-navy, indigo accents), not cool blue-grey */
-    --background: 234 47% 9%;
-    --foreground: 45 20% 92%;
-    --card: 234 40% 12%;
-    --card-foreground: 45 18% 93%;
-    --popover: 234 40% 12%;
-    --popover-foreground: 45 18% 93%;
-    --primary: 234 70% 65%;
-    --primary-foreground: 234 47% 9%;
-    --secondary: 234 22% 18%;
-    --secondary-foreground: 45 15% 88%;
-    --muted: 234 18% 16%;
-    --muted-foreground: 135 8% 62%;
-    --accent: 234 25% 20%;
-    --accent-foreground: 42 25% 90%;
-    --destructive: 0 65% 52%;
+    /* iOS dark system (Stage 1) — true-black canvas, #1C1C1E surfaces, indigo brand. */
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --card: 240 2% 11%;             /* #1C1C1E */
+    --card-foreground: 0 0% 100%;
+    --popover: 240 2% 11%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 234 89% 74%;         /* #818CF8 */
+    --primary-foreground: 244 51% 20%;
+    --secondary: 240 2% 18%;        /* #2C2C2E */
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 2% 18%;
+    --muted-foreground: 240 5% 64%;
+    --accent: 240 2% 20%;           /* #333336 */
+    --accent-foreground: 0 0% 98%;
+    --destructive: 4 100% 61%;
     --destructive-foreground: 0 0% 100%;
-    --border: 234 14% 22%;
-    --input: 234 14% 24%;
-    --ring: 234 70% 65%;
+    --border: 240 3% 24%;
+    --input: 240 3% 26%;
+    --ring: 234 89% 74%;
     --color-background-warning: hsl(32 45% 22%);
     --color-border-warning: hsl(38 92% 50%);
     --color-text-warning: hsl(48 96% 88%);
 
-    /* ── Ivory tokens — dark indigo/navy theme ── */
-    --ivory-bg:       11 18 32;     /* #0b1220 — deep navy page background */
-    --ivory-surface:  19 28 46;     /* #131c2e — card/sheet surface */
-    --ivory-border:   36 49 74;     /* #24314a — subtle border */
-    --ivory-borderMd: 52 69 106;    /* #34456a — mid-weight border */
-    --ivory-text:     236 233 224;  /* #ece9e0 — warm light primary text */
-    --ivory-text2:    168 196 173;  /* #a8c4ad — secondary text */
-    /* Lightened #628068 (3.94:1, failed AA) → #7da188 = 6.01:1 on the dark
-       bg/surface; stays muted vs --ivory-text2 (#a8c4ad, 9.16:1). */
-    --ivory-text3:    125 161 136;  /* #7da188 — muted/label text (AA on dark) */
+    /* Apple system primitives — dark variants (brighter) */
+    --sys-red:    255 69 58;
+    --sys-orange: 255 159 10;
+    --sys-green:  48 209 88;
+    --sys-blue:   10 132 255;
+    --sys-gray:   152 152 157;
+
+    /* Status hues — dark */
+    --status-ok: 137 62% 50%;
+    --status-issue: 4 100% 61%;
+    --status-maintenance: 37 100% 52%;
+    --status-sterilized: 213 100% 52%;
+    --status-stale: 37 100% 52%;
+    --status-unknown: 240 3% 61%;
+
+    /* Status pill fills — dark (bright fg reads on the dark tint) */
+    --status-ok-bg: rgb(48 209 88 / 0.18);
+    --status-ok-fg: #5be07f;
+    --status-ok-border: rgb(48 209 88 / 0.32);
+    --status-issue-bg: rgb(255 69 58 / 0.18);
+    --status-issue-fg: #ff6b61;
+    --status-issue-border: rgb(255 69 58 / 0.32);
+    --status-maint-bg: rgb(255 159 10 / 0.18);
+    --status-maint-fg: #ffb340;
+    --status-maint-border: rgb(255 159 10 / 0.32);
+    --status-steril-bg: rgb(10 132 255 / 0.18);
+    --status-steril-fg: #4da3ff;
+    --status-steril-border: rgb(10 132 255 / 0.32);
+    --status-stale-bg: rgb(255 159 10 / 0.18);
+    --status-stale-fg: #ffb340;
+    --status-stale-border: rgb(255 159 10 / 0.32);
+    --status-unknown-bg: rgb(152 152 157 / 0.20);
+    --status-unknown-fg: #aeaeb3;
+    --status-unknown-border: rgb(152 152 157 / 0.34);
+
+    /* Action / scan accent — Stage 1 dark teal */
+    --action: #4ccdaa;
+    --action-foreground: #06210f;
+    --action-deep: #35b394;
+    --action-ink: #4ccdaa;
+    --action-soft: rgba(76, 205, 170, 0.12);
+    --action-border: rgba(76, 205, 170, 0.3);
+
+    /* ── Ivory tokens — iOS dark surfaces ── */
+    --ivory-bg:       0 0 0;        /* #000 — page background */
+    --ivory-surface:  28 28 30;     /* #1C1C1E — card/sheet surface */
+    --ivory-border:   58 58 60;     /* #3A3A3C — subtle border */
+    --ivory-borderMd: 84 84 88;     /* #545458 — mid-weight border */
+    --ivory-text:     255 255 255;  /* label */
+    --ivory-text2:    152 152 157;  /* secondary label */
+    --ivory-text3:    120 120 128;  /* tertiary label */
     --ivory-navy:     11 16 33;     /* #0b1021 — header bar (stays very dark) */
-    --ivory-green:    129 140 248;  /* indigo-400 */
+    --ivory-green:    129 140 248;  /* indigo-400 — active nav (brand, kept) */
     --ivory-greenMid: 99 102 241;   /* indigo-500 */
-    --ivory-greenBg:  30 27 100;    /* indigo-900 — active-item tinted surface */
+    --ivory-greenBg:  49 46 129;    /* indigo-900 — active-item tinted surface */
+    /* Surface ramp + bar material — dark */
+    --surface:        #1c1c1e;
+    --surface-2:      #242426;
+    --surface-hover:  #2a2a2c;
+    --surface-active: #313134;
+    --hairline:       rgba(84, 84, 88, 0.4);
+    --bar-bg:         rgba(28, 28, 30, 0.8);
+    --bar-bg-opaque:  #1c1c1e;
   }
 
   /*
@@ -207,120 +332,167 @@
    * VT logo: navy #0b1021, indigo mark) for nav/headers/primary CTAs,
    * green reserved for action completion (scan FAB, success chips, progress).
    */
+  /* Clinical theme now shares the Stage-1 iOS light system (mirrors :root/forest).
+     The toggle stays functional; both options render the Stage design. */
   :root[data-color-theme="clinical"] {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    --background: 240 24% 96%;
+    --foreground: 240 6% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 240 6% 10%;
     --primary: 243 75% 59%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 214 32% 95%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    /* L44% (was 47%) — clears WCAG AA 4.5:1 on clinical cool-white canvas (4.49:1 at 47%). */
-    --muted-foreground: 215 16% 44%;
-    --accent: 226 100% 94%;
-    --accent-foreground: 244 47% 20%;
+    --secondary: 240 11% 92%;
+    --secondary-foreground: 240 6% 10%;
+    --muted: 240 11% 92%;
+    --muted-foreground: 240 4% 44%;
+    --accent: 240 14% 90%;
+    --accent-foreground: 240 6% 10%;
     --ring: 243 75% 59%;
-    --ivory-bg:       248 250 252;
+    --ivory-bg:       242 242 247;
     --ivory-surface:  255 255 255;
-    --ivory-border:   226 232 240;
-    --ivory-borderMd: 203 213 225;
-    --ivory-text:     15 23 42;
-    --ivory-text2:    51 65 85;
-    --ivory-text3:    100 116 139;
-    --ivory-navy:     11 16 33;     /* logo navy #0b1021 */
-    --ivory-green:    79 70 229;    /* indigo-600 */
-    --ivory-greenMid: 67 56 202;    /* indigo-700 */
-    --ivory-greenBg:  238 242 255;  /* indigo-50 */
-    --status-ok: 142 71% 45%;
-    /* Chrome constants (Topbar / wordmark) — must follow the theme */
+    --ivory-border:   209 209 214;
+    --ivory-borderMd: 174 174 178;
+    --ivory-text:     28 28 30;
+    --ivory-text2:    99 99 102;
+    --ivory-text3:    142 142 147;
+    --ivory-navy:     11 16 33;
+    --ivory-green:    79 70 229;
+    --ivory-greenMid: 67 56 202;
+    --ivory-greenBg:  238 242 255;
+    --status-ok: 135 59% 49%;
+    /* Chrome constants (Topbar / wordmark) */
     --brand-navy: #0b1021;
-    --brand-green-bright: #a5b4fc;  /* indigo-300 — wordmark accent on navy */
-    --brand-green-mid: #6366f1;     /* indigo-500 */
+    --brand-green-bright: #a5b4fc;
+    --brand-green-mid: #6366f1;
     --brand: #4f46e5;
+    --brand-foreground: #ffffff;
     --brand-deep: #4338ca;
-    --brand-ink: #312e81;
+    --brand-ink: #1e1b4b;
     --brand-soft: #eef2ff;
     --brand-border: #c7d2fe;
     --brand-shadow: rgba(79, 70, 229, 0.45);
     --hero-a: #0b1021;
     --hero-b: #312e81;
-    --action: #22c55e;
-    --action-deep: #16a34a;
-    --action-ink: #15803d;
-    --action-soft: #ecfdf3;
-    --action-border: #bbf7d0;
-    --nav-bg: hsl(210 40% 100% / 0.96);
+    --action: #2f6f5e;
+    --action-foreground: #ffffff;
+    --action-deep: #285c4e;
+    --action-ink: #2a6555;
+    --action-soft: #e8f2ee;
+    --action-border: #c9ded9;
+    --nav-bg: hsl(240 24% 98% / 0.8);
   }
 
-  :root[data-color-theme="dark"] {
-    --background: 222 47% 7%;
-    --foreground: 210 40% 98%;
-    --card: 222 40% 10%;
-    --card-foreground: 210 40% 98%;
-    --primary: 234 89% 74%;
+  /* Forest (brand green) — light. Neutrals match clinical; brand family → green. */
+  :root[data-color-theme="forest"] {
+    --primary: 142 72% 29%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 217 33% 17%;
-    --muted: 217 33% 14%;
-    --muted-foreground: 215 20% 65%;
-    --ring: 234 89% 74%;
-    --ivory-bg:       11 18 32;
-    --ivory-surface:  19 28 46;
-    --ivory-border:   36 49 74;
-    --ivory-borderMd: 52 69 106;
-    --ivory-text:     232 237 246;
-    --ivory-text2:    170 182 204;
-    --ivory-text3:    107 122 150;
-    --ivory-navy:     129 140 248;  /* indigo-400 — accent role on dark */
-    --ivory-green:    129 140 248;  /* indigo-400 */
-    --ivory-greenMid: 99 102 241;   /* indigo-500 */
-    --ivory-greenBg:  49 46 129;    /* indigo-900 */
-    /* Chrome constants (Topbar / wordmark) — must follow the theme */
-    --brand-navy: #0b1021;
-    --brand-green-bright: #a5b4fc;
-    --brand-green-mid: #6366f1;
-    --brand: #6366f1;
-    --brand-deep: #4f46e5;
-    --brand-ink: #c7d2fe;
-    --brand-soft: rgba(99, 102, 241, 0.12);
-    --brand-border: rgba(99, 102, 241, 0.3);
-    --brand-shadow: rgba(0, 0, 0, 0.6);
-    --hero-a: #0b1021;
-    --hero-b: #1e1b4b;
-    --action: #22c55e;
-    --action-deep: #16a34a;
-    --action-ink: #4ade80;
-    --action-soft: rgba(34, 197, 94, 0.12);
-    --action-border: rgba(34, 197, 94, 0.3);
-    --nav-bg: hsl(222 40% 12% / 0.96);
+    --ring: 142 72% 29%;
+    --ivory-green:    21 128 61;
+    --ivory-greenMid: 22 101 52;
+    --ivory-greenBg:  220 252 231;
+    --brand-green-bright: #86efac;
+    --brand-green-mid: #22c55e;
+    --brand: #15803d;
+    --brand-foreground: #ffffff;
+    --brand-deep: #166534;
+    --brand-ink: #14311f;
+    --brand-soft: #ecfdf5;
+    --brand-border: #bbf7d0;
+    --brand-shadow: rgba(21, 128, 61, 0.45);
+    --hero-a: #0b1f14;
+    --hero-b: #14532d;
   }
 
+  /* iOS dark system (Stage 1) — shared by both dark color-theme combos. */
+  :root[data-color-theme="dark"],
   .dark[data-color-theme="clinical"] {
-    --background: 222 47% 7%;
-    --foreground: 210 40% 98%;
-    --card: 222 40% 10%;
-    --card-foreground: 210 40% 98%;
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --card: 240 2% 11%;
+    --card-foreground: 0 0% 100%;
+    --popover: 240 2% 11%;
+    --popover-foreground: 0 0% 100%;
     --primary: 234 89% 74%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 217 33% 17%;
-    --muted: 217 33% 14%;
-    --muted-foreground: 215 20% 65%;
+    --primary-foreground: 244 51% 20%;
+    --secondary: 240 2% 18%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 2% 18%;
+    --muted-foreground: 240 5% 64%;
+    --accent: 240 2% 20%;
+    --accent-foreground: 0 0% 98%;
+    --border: 240 3% 24%;
+    --input: 240 3% 26%;
     --ring: 234 89% 74%;
-    --ivory-bg:       15 23 42;
-    --ivory-surface:  30 41 59;
-    --ivory-border:   51 65 85;
-    --ivory-borderMd: 71 85 105;
-    --ivory-text:     248 250 252;
-    --ivory-text2:    203 213 225;
-    --ivory-text3:    148 163 184;
-    --ivory-navy:     129 140 248;
+    --status-ok: 137 62% 50%;
+    --ivory-bg:       0 0 0;
+    --ivory-surface:  28 28 30;
+    --ivory-border:   58 58 60;
+    --ivory-borderMd: 84 84 88;
+    --ivory-text:     255 255 255;
+    --ivory-text2:    152 152 157;
+    --ivory-text3:    120 120 128;
+    --ivory-navy:     11 16 33;
     --ivory-green:    129 140 248;
     --ivory-greenMid: 99 102 241;
     --ivory-greenBg:  49 46 129;
+    --surface:        #1c1c1e;
+    --surface-2:      #242426;
+    --surface-hover:  #2a2a2c;
+    --surface-active: #313134;
+    --hairline:       rgba(84, 84, 88, 0.4);
+    --bar-bg:         rgba(28, 28, 30, 0.8);
+    --bar-bg-opaque:  #1c1c1e;
     --brand-navy: #0b1021;
     --brand-green-bright: #a5b4fc;
     --brand-green-mid: #6366f1;
+    --action: #4ccdaa;
+    --action-foreground: #06210f;
+    --action-deep: #35b394;
+    --action-ink: #4ccdaa;
+    --action-soft: rgba(76, 205, 170, 0.12);
+    --action-border: rgba(76, 205, 170, 0.3);
+    --nav-bg: hsl(240 2% 8% / 0.8);
+  }
+
+  /* Forest (brand green) — dark. Inherits the dark neutrals; brand family → green. */
+  .dark[data-color-theme="forest"] {
+    --primary: 142 69% 58%;
+    --primary-foreground: 142 60% 12%;
+    --ring: 142 69% 58%;
+    --ivory-green:    74 222 128;
+    --ivory-greenMid: 34 197 94;
+    --ivory-greenBg:  20 60 40;
+    --brand-green-bright: #86efac;
+    --brand-green-mid: #22c55e;
+    --brand: #22c55e;
+    --brand-foreground: #06210f;
+    --brand-deep: #16a34a;
+    --brand-ink: #0f2a1b;
+    --brand-soft: rgba(34, 197, 94, 0.12);
+    --brand-border: rgba(34, 197, 94, 0.3);
+    --brand-shadow: rgba(34, 197, 94, 0.45);
+    --hero-a: #071a10;
+    --hero-b: #0f3d24;
+  }
+
+  /* ── Size-class responsive layout tokens (Stage 1 §07) ──
+     Adapted to the app's Tailwind breakpoints (compact / md 768 / lg 1024);
+     the app dispatches layout by breakpoint + shell, not a data-size attribute. */
+  :root {
+    --inline-margin: 16px;
+    --content-gap:   20px;
+    --max-content:   100%;
+  }
+  @media (min-width: 768px) {
+    :root { --inline-margin: 24px; --content-gap: 24px; --max-content: 720px; }
+  }
+  @media (min-width: 1024px) {
+    :root { --inline-margin: 32px; --max-content: 1120px; }
+  }
+  /* Respect reduced-transparency: swap the translucent bar for its opaque
+     equivalent and drop blur (Stage 1 §05 Materials). */
+  @media (prefers-reduced-transparency: reduce) {
+    :root, .dark { --bar-bg: var(--bar-bg-opaque); --bar-blur: 0px; }
   }
 
   /* Scan / confirm uses action color (10% tier), not brand */
@@ -390,6 +562,8 @@
     padding-right: env(safe-area-inset-right, 0px);
   }
   html {
+    /* iOS root size (Stage 1) — the rem-based type scale renders at Apple sizes. */
+    font-size: 17px;
     scroll-behavior: smooth;
     overscroll-behavior-x: none;
     overscroll-behavior-y: auto;

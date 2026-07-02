@@ -395,6 +395,8 @@ const translations = {
 
   auth: d.auth,
 
+  shiftAdjustments: d.shiftAdjustments,
+
   home: d.home,
 
   equipment: {
@@ -446,6 +448,8 @@ const translations = {
   scan: {
     title: d.scan.title,
     scanPrompt: d.scan.scanPrompt,
+    offShiftTitle: d.scan.offShiftTitle,
+    offShiftBody: d.scan.offShiftBody,
     checkedInTo: d.scan.checkedInTo,
     passToColleague: d.scan.passToColleague,
     done: d.scan.done,
@@ -651,6 +655,11 @@ const translations = {
     winScansToday: (count: number) => tr(d.homePage.winScansToday, { count }),
     urgentCriticalAlerts: (count: number) => tr(d.homePage.urgentCriticalAlerts, { count }),
     urgentOverdueTasks: (count: number) => tr(d.homePage.urgentOverdueTasks, { count }),
+    greetingMorning: (name: string) => tr(d.homePage.greetingMorning, { name }),
+    greetingAfternoon: (name: string) => tr(d.homePage.greetingAfternoon, { name }),
+    greetingEvening: (name: string) => tr(d.homePage.greetingEvening, { name }),
+    startedAt: (time: string) => tr(d.homePage.startedAt, { time }),
+    elapsedDays: (count: number) => tr(d.homePage.elapsedDays, { count }),
   },
 
   assetCopilot: d.assetCopilot,
@@ -757,6 +766,13 @@ const translations = {
   patientsPage: d.patientsPage,
 
   inventoryItemsPage: d.inventoryItemsPage,
+
+  inventoryItemDetailPage: {
+    ...d.inventoryItemDetailPage,
+    usageTotal: (count: number) => tr(d.inventoryItemDetailPage.usageTotal, { count }),
+    parLabel: (count: number) => tr(d.inventoryItemDetailPage.parLabel, { count }),
+    belowReorder: (count: number) => tr(d.inventoryItemDetailPage.belowReorder, { count }),
+  },
 
   procurementPage: d.procurementPage,
 
@@ -1188,6 +1204,8 @@ const translations = {
   nav: d.nav,
 
   board: d.board,
+
+  webOnlyGuard: d.webOnlyGuard,
 
   legalFooter: d.legalFooter,
 

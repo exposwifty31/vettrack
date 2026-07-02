@@ -318,7 +318,7 @@ export function DispenseSheet({
                           <span className="text-base font-medium break-words leading-snug">{item.label}</span>
                           {isEnglishLabel(item.label) && (
                             <span
-                              className="inline-block w-2 h-2 rounded-full bg-amber-400 mr-1 align-middle shrink-0"
+                              className="inline-block w-2 h-2 rounded-full bg-[hsl(var(--status-stale))] mr-1 align-middle shrink-0"
                               title="שם באנגלית — מומלץ לתרגם"
                             />
                           )}
@@ -428,7 +428,7 @@ export function DispenseSheet({
         <SheetContent side="bottom" dir="rtl" className="max-h-[90dvh] overflow-y-auto p-0 rounded-t-2xl">
           {renderDragHandle()}
           <div className="px-4 pb-8 flex flex-col items-center text-center space-y-4">
-            <CheckCircle className="w-20 h-20 text-green-500 mt-4" />
+            <CheckCircle className="w-20 h-20 text-[hsl(var(--status-ok))] mt-4" />
             <SheetTitle className="text-2xl font-bold">
               {successData?.isEmergency ? "עודכן בהצלחה" : "נלקח בהצלחה"}
             </SheetTitle>
@@ -469,8 +469,8 @@ export function DispenseSheet({
         <SheetContent side="bottom" dir="rtl" className="max-h-[90dvh] overflow-y-auto p-0 rounded-t-2xl">
           {renderDragHandle()}
           <div className="px-4 pb-8 flex flex-col items-center text-center space-y-4">
-            <XCircle className="w-20 h-20 text-red-500 mt-4" />
-            <SheetTitle className="text-2xl font-bold text-red-700">חירום נרשם</SheetTitle>
+            <XCircle className="w-20 h-20 text-[var(--status-issue-fg)] mt-4" />
+            <SheetTitle className="text-2xl font-bold text-[var(--status-issue-fg)]">חירום נרשם</SheetTitle>
             {successData && (
               <div className="text-sm text-muted-foreground space-y-1">
                 <p className="font-medium">{successData.takenBy.displayName} — {formatTimeHHMM(successData.takenAt)}</p>
@@ -479,7 +479,7 @@ export function DispenseSheet({
             <Button
               variant="outline"
               {...fieldProps()}
-              className="w-full min-h-[52px] rounded-xl border-red-300 text-red-700"
+              className="w-full min-h-[52px] rounded-xl border-[var(--status-issue-border)] text-[var(--status-issue-fg)]"
               onClick={() => {
                 setCompletedEventId(successData?.emergencyEventId);
                 setSheetState("emergency-complete");
@@ -670,7 +670,7 @@ export function DispenseSheet({
             type="button"
             {...fieldProps({ disabled: emergencyLoading })}
             onClick={handleEmergencyTap}
-            className="w-full min-h-[64px] rounded-xl bg-red-600 text-white text-xl font-bold flex items-center justify-center gap-3 active:bg-red-700 disabled:opacity-70"
+            className="w-full min-h-[64px] rounded-xl bg-[rgb(var(--sys-red))] text-white text-xl font-bold flex items-center justify-center gap-3 active:brightness-90 disabled:opacity-70"
           >
             {emergencyLoading ? (
               <Loader2 className="w-6 h-6 animate-spin" />
@@ -701,7 +701,7 @@ export function DispenseSheet({
                       <span className="text-base font-medium break-words leading-snug">{item.label}</span>
                       {isEnglishLabel(item.label) && (
                         <span
-                          className="inline-block w-2 h-2 rounded-full bg-amber-400 mr-1 align-middle shrink-0"
+                          className="inline-block w-2 h-2 rounded-full bg-[hsl(var(--status-stale))] mr-1 align-middle shrink-0"
                           title="שם באנגלית — מומלץ לתרגם"
                         />
                       )}

@@ -1,0 +1,34 @@
+/**
+ * Design System Alignment — §29-D1/D2 (Phase 10)
+ * APPEND into src/index.css's :root block (light) — see :dark note below.
+ * Full reasoning + component-by-component evidence: README §29.
+ *
+ * Extends the EXISTING --shadow-card / --shadow-card-hover / --shadow-surface
+ * (unchanged, not reproduced here) with the two rungs the real app was
+ * missing: a "sheets & modals" tier and an "emergency / system-critical"
+ * tier. Same idiom as the tokens they extend — layered, slate-900-tinted
+ * (rgb(15 23 42 / α)), not flat rgba(0,0,0,α) — see the "precise, not
+ * floaty" comment already in src/index.css directly above --shadow-card.
+ * The reviewer's literal shadow values were a sketch, not adopted verbatim
+ * — see README §29-D1 for why.
+ *
+ *   0 app background     → (none)
+ *   1 cards               → --shadow-card / --shadow-card-hover  (existing)
+ *   2 active panels        → --shadow-surface                     (existing)
+ *   3 sheets/modals         → --shadow-modal   (new, this file)
+ *   4 emergency overlays    → --shadow-overlay (new, this file)
+ */
+
+:root {
+  --shadow-modal:   0 0 0 1px rgb(15 23 42 / 0.04), 0 4px 12px -4px rgb(15 23 42 / 0.12), 0 12px 32px -8px rgb(15 23 42 / 0.20);
+  --shadow-overlay: 0 0 0 1px rgb(15 23 42 / 0.06), 0 8px 24px -6px rgb(15 23 42 / 0.16), 0 24px 64px -12px rgb(15 23 42 / 0.32);
+}
+
+/* .dark has no card/card-hover/surface overrides today (flagged, not fixed
+   — README §29-D3: real, but out of scope this phase). These two rungs are
+   net-new, so they get real dark values instead of inheriting light-mode
+   alpha against a dark canvas. */
+.dark {
+  --shadow-modal:   0 0 0 1px rgb(0 0 0 / 0.5), 0 4px 12px -4px rgb(0 0 0 / 0.4), 0 12px 32px -8px rgb(0 0 0 / 0.55);
+  --shadow-overlay: 0 0 0 1px rgb(0 0 0 / 0.6), 0 8px 24px -6px rgb(0 0 0 / 0.5), 0 24px 64px -12px rgb(0 0 0 / 0.65);
+}

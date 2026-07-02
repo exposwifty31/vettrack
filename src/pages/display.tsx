@@ -33,7 +33,7 @@ const STATUS_COLOR: Record<EquipmentReadinessStatus, string> = {
   in_use:   "text-[hsl(var(--status-sterilized))]",
   blocked:  "text-[hsl(var(--status-issue))]",
   stale:    "text-[hsl(var(--status-maintenance))]",
-  overdue:  "text-[hsl(var(--status-issue))]",
+  overdue:  "text-[hsl(var(--status-maintenance))]",
   unknown:  "text-ivory-text3",
 };
 
@@ -42,7 +42,7 @@ const STATUS_BG: Record<EquipmentReadinessStatus, string> = {
   in_use:  "bg-[var(--status-steril-bg)] border-[var(--status-steril-border)] text-[var(--status-steril-fg)]",
   blocked: "bg-[var(--status-issue-bg)] border-[var(--status-issue-border)] text-[var(--status-issue-fg)]",
   stale:   "bg-[var(--status-maint-bg)] border-[var(--status-maint-border)] text-[var(--status-maint-fg)]",
-  overdue: "bg-[var(--status-issue-bg)] border-[var(--status-issue-border)] text-[var(--status-issue-fg)]",
+  overdue: "bg-[var(--status-maint-bg)] border-[var(--status-maint-border)] text-[var(--status-maint-fg)]",
   unknown: "bg-muted border-ivory-border text-ivory-text3",
 };
 
@@ -51,7 +51,7 @@ const STATUS_BAR_COLOR: Record<EquipmentReadinessStatus, string> = {
   in_use:  "bg-[hsl(var(--status-sterilized))]",
   blocked: "bg-[hsl(var(--status-issue))]",
   stale:   "bg-[hsl(var(--status-maintenance))]",
-  overdue: "bg-[hsl(var(--status-issue))]",
+  overdue: "bg-[hsl(var(--status-maintenance))]",
   unknown: "bg-ivory-text3",
 };
 
@@ -439,6 +439,22 @@ function CommandBoard({
           )}
         </div>
       </main>
+
+      {/* Footer — quiet status strip: last refresh + live indicator */}
+      <footer className="shrink-0 flex items-center gap-3 border-t border-ivory-border bg-[rgb(var(--ivory-surface))] px-5 py-2">
+        <span className="vt-text-2xs uppercase tracking-widest text-ivory-text3">
+          {t.board.subtitle}
+        </span>
+        <span className="vt-text-2xs tabular-nums text-ivory-text3 ms-auto">
+          {t.board.updated} {timeStr}
+        </span>
+        <span className="flex items-center gap-1.5 shrink-0">
+          <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--status-ok))] motion-safe:animate-pulse" aria-hidden />
+          <span className="vt-text-2xs font-bold uppercase tracking-widest text-[hsl(var(--status-ok))]">
+            {t.board.live}
+          </span>
+        </span>
+      </footer>
     </div>
   );
 }
@@ -478,9 +494,9 @@ function CodeBlueOverlay({
   const displayedLogs = session.logEntries.slice(-15);
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#0d0505]" dir="rtl">
+    <div className="flex flex-col min-h-screen bg-emergency-bg" dir="rtl">
       {/* Pulsing red header */}
-      <div className="flex items-center gap-4 px-6 py-4 bg-red-600 motion-safe:animate-pulse flex-wrap">
+      <div className="flex items-center gap-4 px-6 py-4 bg-emergency-accent motion-safe:animate-pulse flex-wrap">
         <span className="vt-text-2xl font-black tracking-wider text-white">⚠ CODE BLUE</span>
         <span className="font-mono vt-text-xl font-bold text-white bg-black/25 px-3 py-1 rounded tabular-nums">
           {timerStr}
@@ -493,9 +509,9 @@ function CodeBlueOverlay({
           {activePresence.map((p) => (
             <div
               key={p.userId}
-              className="flex items-center gap-1.5 bg-red-900/40 border border-red-600/40 rounded-full px-3 py-0.5 vt-text-xs text-red-200"
+              className="flex items-center gap-1.5 bg-emergency-accent/20 border border-emergency-accent/40 rounded-full px-3 py-0.5 vt-text-xs text-emergency-text"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400 motion-safe:animate-ping shrink-0" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emergency-accent motion-safe:animate-ping shrink-0" />
               {p.userName}
             </div>
           ))}
@@ -503,10 +519,10 @@ function CodeBlueOverlay({
       </div>
 
       {/* Three-column body */}
-      <div className="flex flex-1 divide-x divide-red-900/30 divide-x-reverse">
+      <div className="flex flex-1 divide-x divide-emergency-accent/25 divide-x-reverse">
         {/* Column 1 — Equipment */}
         <div className="flex-1 p-5">
-          <div className="vt-text-2xs font-bold tracking-[.1em] uppercase text-red-700/80 mb-3">
+          <div className="vt-text-2xs font-bold tracking-[.1em] uppercase text-emergency-accent/80 mb-3">
             {t.codeBlue.overlay.equipmentColumn}
           </div>
           {linkedEquipment.length > 0 ? (
@@ -518,13 +534,13 @@ function CodeBlueOverlay({
               ))}
             </div>
           ) : (
-            <div className="text-gray-500 vt-text-sm">{t.codeBlue.noEquipmentInEvent}</div>
+            <div className="text-emergency-text2 vt-text-sm">{t.codeBlue.noEquipmentInEvent}</div>
           )}
         </div>
 
         {/* Column 2 — Event timeline */}
         <div className="flex-1 p-5">
-          <div className="vt-text-2xs font-bold tracking-[.1em] uppercase text-red-700/80 mb-3">
+          <div className="vt-text-2xs font-bold tracking-[.1em] uppercase text-emergency-accent/80 mb-3">
             {t.codeBlue.overlay.timelineColumn}
           </div>
           <div className="space-y-2">
@@ -534,11 +550,11 @@ function CodeBlueOverlay({
               const entryTime = `${String(em).padStart(2, "0")}:${String(es).padStart(2, "0")}`;
               return (
                 <div key={`${entry.elapsedMs}-${entry.label}-${idx}`} className="flex gap-2 vt-text-xs">
-                  <span className="text-red-500 tabular-nums min-w-[42px] vt-text-2xs shrink-0">
+                  <span className="text-emergency-accent tabular-nums min-w-[42px] vt-text-2xs shrink-0">
                     {entryTime}
                   </span>
-                  <span className="flex-1 text-red-200">{entry.label}</span>
-                  <span className="text-gray-600 vt-text-2xs shrink-0"><Bdi>{entry.loggedByName}</Bdi></span>
+                  <span className="flex-1 text-emergency-text">{entry.label}</span>
+                  <span className="text-emergency-text2 vt-text-2xs shrink-0"><Bdi>{entry.loggedByName}</Bdi></span>
                 </div>
               );
             })}
@@ -547,14 +563,14 @@ function CodeBlueOverlay({
 
         {/* Column 3 — Status */}
         <div className="w-64 shrink-0 p-5">
-          <div className="vt-text-2xs font-bold tracking-[.1em] uppercase text-red-700/80 mb-3">
+          <div className="vt-text-2xs font-bold tracking-[.1em] uppercase text-emergency-accent/80 mb-3">
             {t.codeBlue.overlay.sidebarColumn}
           </div>
 
-          <div className="vt-text-2xs font-bold tracking-[.1em] uppercase text-red-700/80 mb-2">
+          <div className="vt-text-2xs font-bold tracking-[.1em] uppercase text-emergency-accent/80 mb-2">
             {t.codeBlue.overlay.crashCart}
           </div>
-          <div className={`vt-text-xs mb-4 ${session.preCheckPassed === false ? "text-red-400" : "text-green-400"}`}>
+          <div className={`vt-text-xs mb-4 ${session.preCheckPassed === false ? "text-emergency-accent" : "text-[rgb(var(--sys-green))]"}`}>
             {session.preCheckPassed === false
               ? `⚠ ${t.codeBlue.overlay.cartNotChecked}`
               : `✓ ${t.codeBlue.overlay.cartReady}`}
@@ -562,13 +578,13 @@ function CodeBlueOverlay({
 
           {minutesSincePush !== null && (
             <>
-              <div className="vt-text-2xs font-bold tracking-[.1em] uppercase text-red-700/80 mb-2">
+              <div className="vt-text-2xs font-bold tracking-[.1em] uppercase text-emergency-accent/80 mb-2">
                 {t.codeBlue.display.present}
               </div>
-              <div className="vt-text-xs text-gray-400">
+              <div className="vt-text-xs text-emergency-text2">
                 {t.codeBlue.overlay.pushSent}
                 <br />
-                <span className="text-gray-600 vt-text-2xs">
+                <span className="text-emergency-text2 vt-text-2xs">
                   {t.codeBlue.overlay.pushSentMinutesAgo(minutesSincePush)}
                 </span>
               </div>
@@ -673,8 +689,35 @@ export default function WardDisplayPage() {
 
   if (!snapshot) {
     return (
-      <div className="min-h-screen bg-[rgb(var(--ivory-bg))] flex items-center justify-center dark">
-        <div className="text-ivory-text3 text-sm">{t.board.loading}</div>
+      <div
+        className="dark flex flex-col min-h-screen bg-[rgb(var(--ivory-bg))] text-ivory-text"
+        dir="rtl"
+        data-testid="board-skeleton"
+        role="status"
+        aria-live="polite"
+      >
+        <span className="sr-only">{t.board.loading}</span>
+        {/* Header bar */}
+        <div className="bg-[var(--brand-navy)] flex items-center gap-4 px-5 py-3 shrink-0">
+          <div className="h-6 w-16 rounded bg-white/15 motion-safe:animate-pulse" />
+          <div className="h-4 w-24 rounded bg-white/10 motion-safe:animate-pulse" />
+          <div className="h-4 w-14 rounded bg-white/10 ms-auto motion-safe:animate-pulse" />
+        </div>
+        {/* Body */}
+        <div className="flex-1 p-4 grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-4">
+          <div className="flex flex-col gap-4 items-center lg:w-64 shrink-0">
+            <div className="h-36 w-36 rounded-full bg-muted motion-safe:animate-pulse" />
+            <div className="h-24 w-full rounded-xl bg-muted motion-safe:animate-pulse" />
+          </div>
+          <div className="flex flex-col gap-4 min-w-0">
+            <div className="h-40 rounded-xl border border-ivory-border bg-muted motion-safe:animate-pulse" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-16 rounded-xl border border-ivory-border bg-muted motion-safe:animate-pulse" />
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -691,7 +734,7 @@ export default function WardDisplayPage() {
       <div className="min-h-screen bg-[rgb(var(--ivory-bg))] text-ivory-text flex flex-col dark" dir="rtl">
         <div className="flex items-center gap-3 px-5 py-3 bg-[var(--brand-navy)]">
           <span className="text-sm font-bold text-white/70">{t.board.subtitle}</span>
-          <span className="vt-text-2xs text-amber-300 ms-auto">{t.board.fallbackBoardUnavailable}</span>
+          <span className="vt-text-2xs text-emergency-amber ms-auto">{t.board.fallbackBoardUnavailable}</span>
         </div>
         <div className="flex-1 p-4 space-y-2" data-testid="ward-display-equipment-pane">
           {snapshot.equipment.map((eq) => (

@@ -85,6 +85,7 @@ import { statusToBadgeVariant } from "@/lib/design-tokens";
 import { toast } from "sonner";
 import { toastSuccess } from "@/lib/ui-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useActiveShift } from "@/hooks/use-active-shift";
 import { usePendingSyncForEquipment, useSyncQueue } from "@/hooks/use-sync";
 import { MoveRoomSheet } from "@/components/move-room-sheet";
 import { ReturnPlugDialog } from "@/components/return-plug-dialog";
@@ -605,6 +606,9 @@ function EquipmentDetailPageDesktop() {
     },
   });
 
+  // Off-shift: taking equipment ownership is not permitted (roster-derived).
+  const { hasActiveShift } = useActiveShift();
+
   const checkoutMut = useMutation({
     mutationFn: async () => {
       const prev = queryClient.getQueryData<Equipment>([`/api/equipment/${id}`]);
@@ -647,6 +651,23 @@ function EquipmentDetailPageDesktop() {
       toast.error(t.equipmentDetail.toast.checkoutFailed(err.message));
     },
   });
+
+  // Single choke point for every checkout affordance — blocks off-shift ownership.
+  const handleCheckout = () => {
+    if (!hasActiveShift) {
+      toast.error(t.scan.offShiftBody);
+      return;
+    }
+    checkoutMut.mutate();
+  };
+
+  // Reason shown beside the (disabled) checkout buttons so an off-shift tech knows
+  // why the action is unavailable — a disabled button can't surface the toast itself.
+  const offShiftCheckoutNote = !hasActiveShift ? (
+    <p className="px-2 text-center text-xs text-muted-foreground" data-testid="checkout-offshift-note">
+      {t.scan.offShiftBody}
+    </p>
+  ) : null;
 
   const returnMut = useMutation({
     mutationFn: async ({ isPluggedIn: nextPluggedIn, plugInDeadlineMinutes: nextDeadline }: { isPluggedIn: boolean; plugInDeadlineMinutes: number }) => {
@@ -1115,7 +1136,7 @@ function EquipmentDetailPageDesktop() {
             <ReservationBanner
               equipmentId={equipment.id}
               expiresAt={waitlistQ.data.reservationExpiresAt}
-              onCheckout={() => checkoutMut.mutate()}
+              onCheckout={handleCheckout}
               checkoutPending={checkoutMut.isPending}
               showNextInLine={waitlistQ.data.myPosition === 1}
             />
@@ -1132,20 +1153,23 @@ function EquipmentDetailPageDesktop() {
               {t.dockReturn.submit}
             </Button>
           ) : !isCheckedOut ? (
-            <Button
-              variant="outline"
-              className="w-full h-12 gap-2 text-sm font-semibold rounded-2xl active:scale-[0.98] transition-all border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              onClick={() => checkoutMut.mutate()}
-              disabled={checkoutMut.isPending}
-              data-testid="btn-checkout"
-            >
-              {checkoutMut.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <LogIn className="w-4 h-4" />
-              )}
-              In Use
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                className="w-full h-12 gap-2 text-sm font-semibold rounded-2xl active:scale-[0.98] transition-all border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                onClick={handleCheckout}
+                disabled={checkoutMut.isPending || !hasActiveShift}
+                data-testid="btn-checkout"
+              >
+                {checkoutMut.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <LogIn className="w-4 h-4" />
+                )}
+                In Use
+              </Button>
+              {offShiftCheckoutNote}
+            </>
           ) : (checkedOutByMe || isAdmin) ? (
             <Button
               className="w-full h-12 gap-2 text-sm font-semibold rounded-2xl active:scale-[0.98] transition-all shadow-sm"
@@ -1914,20 +1938,23 @@ function EquipmentDetailPageDesktop() {
                 {/* Quick action buttons */}
                 <div className="flex flex-col gap-2.5">
                   {!isCheckedOut && (
-                    <Button
-                      size="lg"
-                      className="w-full gap-2.5"
-                      onClick={() => checkoutMut.mutate()}
-                      disabled={checkoutMut.isPending || returnMut.isPending}
-                      data-testid="btn-scan-action-checkout"
-                    >
-                      {checkoutMut.isPending ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <LogIn className="w-5 h-5" />
-                      )}
-                      Check Out
-                    </Button>
+                    <>
+                      <Button
+                        size="lg"
+                        className="w-full gap-2.5"
+                        onClick={handleCheckout}
+                        disabled={checkoutMut.isPending || returnMut.isPending || !hasActiveShift}
+                        data-testid="btn-scan-action-checkout"
+                      >
+                        {checkoutMut.isPending ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <LogIn className="w-5 h-5" />
+                        )}
+                        Check Out
+                      </Button>
+                      {offShiftCheckoutNote}
+                    </>
                   )}
 
                   {isCheckedOut && (checkedOutByMe || isAdmin) && (

@@ -42,7 +42,7 @@ import { ShoppingCart, Plus, ChevronDown, ChevronUp, Trash2, Send, PackageCheck,
 const STATUS_BADGE: Record<PurchaseOrderStatus, string> = {
   draft: "bg-muted text-muted-foreground border-border",
   ordered: "bg-primary/10 text-primary border-border",
-  partial: "bg-muted/80 text-foreground border-amber-500/20",
+  partial: "bg-muted/80 text-foreground border-[var(--status-stale-border)]",
   received: "bg-status-ok/10 text-status-ok border-border",
   cancelled: "bg-destructive/10 text-destructive border-destructive/20",
 };
@@ -309,7 +309,7 @@ export default function ProcurementPage() {
                             <tr key={line.id}>
                               <td className="py-1">{line.itemLabel ?? line.itemId}</td>
                               <td className="py-1 text-end">{line.quantityOrdered}</td>
-                              <td className={`py-1 text-end ${line.quantityReceived >= line.quantityOrdered ? "text-emerald-600 font-medium" : ""}`}>
+                              <td className={`py-1 text-end ${line.quantityReceived >= line.quantityOrdered ? "text-[var(--status-ok-fg)] font-medium" : ""}`}>
                                 {line.quantityReceived}
                               </td>
                             </tr>

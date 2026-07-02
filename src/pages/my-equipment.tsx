@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorCard } from "@/components/ui/error-card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ShiftSummarySheet } from "@/components/shift-summary-sheet";
 import { STATUS_LABELS } from "@/types";
 import { formatRelativeTime } from "@/lib/utils";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
@@ -22,7 +21,6 @@ import {
   LogOut,
   Loader2,
   CheckCircle2,
-  ClipboardCheck,
 } from "lucide-react";
 import { TruncatedText } from "@/components/ui/truncated-text";
 import { Bdi } from "@/components/ui/bdi";
@@ -54,7 +52,6 @@ export default function MyEquipmentPage() {
   const { userId } = useAuth();
   const queryClient = useQueryClient();
   const [returningAll, setReturningAll] = useState(false);
-  const [shiftSummaryOpen, setShiftSummaryOpen] = useState(false);
   const [pendingReturnEquipmentId, setPendingReturnEquipmentId] = useState<string | null>(null);
 
   const { data: items, isLoading, isError, refetch } = useQuery({
@@ -135,28 +132,14 @@ export default function MyEquipmentPage() {
         <meta name="description" content="View all equipment currently checked out to you. Return individual items or use Return All for quick end-of-shift handoffs." />
         <link rel="canonical" href="https://vettrack.replit.app/my-equipment" />
       </Helmet>
-      <div className="flex flex-1 flex-col gap-5 pb-24 animate-fade-in">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold leading-tight">{ t.equipment.myEquipment }</h1>
-            {items && items.length > 0 && (
-              <p className="vt-text-sm text-muted-foreground mt-0.5">
-                {t.myEquipment.checkedOutCount(items.length)}
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-xs h-11 bg-card border-border/60 text-muted-foreground hover:text-foreground"
-              onClick={() => setShiftSummaryOpen(true)}
-              data-testid="btn-shift-summary-my-eq"
-            >
-              <ClipboardCheck className="w-3.5 h-3.5" />
-              {t.myEquipmentPage.shiftSummary}
-            </Button>
-          </div>
+      <div className="mx-auto flex w-full max-w-[720px] flex-1 flex-col gap-5 px-4 pb-24 pt-3 animate-fade-in sm:px-6 lg:max-w-[1120px]">
+        <div>
+          <h1 className="text-2xl font-bold leading-tight">{ t.equipment.myEquipment }</h1>
+          {items && items.length > 0 && (
+            <p className="vt-text-sm text-muted-foreground mt-0.5">
+              {t.myEquipment.checkedOutCount(items.length)}
+            </p>
+          )}
         </div>
 
         {isError && (
@@ -190,7 +173,7 @@ export default function MyEquipmentPage() {
             ))}
           </div>
         ) : isError ? null : !items || items.length === 0 ? (
-          <div className="flex flex-1 flex-col justify-center py-6">
+          <div className="flex min-h-[60vh] flex-col justify-center py-6">
             <EmptyState
               icon={CheckCircle2}
               message={t.myEquipment.empty.message}
@@ -305,11 +288,6 @@ export default function MyEquipmentPage() {
           </div>
         )}
       </div>
-
-      <ShiftSummarySheet
-        open={shiftSummaryOpen}
-        onClose={() => setShiftSummaryOpen(false)}
-      />
 
       <ReturnPlugDialog
         open={Boolean(pendingReturnEquipmentId)}

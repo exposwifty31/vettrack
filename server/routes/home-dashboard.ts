@@ -1,35 +1,74 @@
 import { Router } from "express";
-import { and, eq, gte, isNull, sql } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 import { apiError } from "../lib/apiError.js";
-import { appointments, db, scanLogs, shiftSessions } from "../db.js";
+import { appointments, db, scanLogs } from "../db.js";
+import {
+  resolveCurrentRole,
+  type ActiveShiftSnapshot,
+} from "../lib/role-resolution.js";
 
 /*
  * GET /api/home/dashboard — aggregate "pulse" for the magnetic home dashboard.
- * Read-only. Composes data that no existing endpoint exposes: the open shift
- * session, a no-overdue streak, and today's completion counters. Every query
- * is clinic-scoped and bounded.
+ * Read-only. Composes data that no existing endpoint exposes: the caller's
+ * current roster shift, a no-overdue streak, and today's completion counters.
+ * Every query is clinic-scoped and bounded.
+ *
+ * "On shift" is roster-derived — resolved from `vt_shifts` via
+ * `resolveCurrentRole`, the same source authority Strategy A and the display
+ * board read. The legacy `vt_shift_sessions` clock-in table is orphaned (no
+ * code ever writes it) and is no longer consulted here; a roster window is
+ * self-bounding, so the client no longer needs a staleness guard.
  */
 
 const router = Router();
 
+/** Combine a roster `YYYY-MM-DD` date + `HH:MM[:SS]` time into a server-local instant. */
+function combineLocal(dateStr: string, timeStr: string, dayOffset: number): Date {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const [hours = 0, minutes = 0, seconds = 0] = timeStr.split(":").map(Number);
+  return new Date(year, month - 1, day + dayOffset, hours, minutes, seconds);
+}
+
+/**
+ * Resolve a roster shift's absolute start/end instants. An overnight shift
+ * (start clock-time later than end clock-time) ends on the following day —
+ * matching the overnight window logic in `role-resolution.ts`.
+ */
+function buildShiftWindow(shift: ActiveShiftSnapshot): {
+  startedAt: string;
+  endsAt: string;
+  role: string;
+} {
+  const overnight = shift.startTime > shift.endTime;
+  const startedAt = combineLocal(shift.date, shift.startTime, 0);
+  const endsAt = combineLocal(shift.date, shift.endTime, overnight ? 1 : 0);
+  return {
+    startedAt: startedAt.toISOString(),
+    endsAt: endsAt.toISOString(),
+    role: shift.role,
+  };
+}
+
 router.get("/dashboard", requireAuth, async (req, res) => {
   const clinicId = req.clinicId?.trim();
-  const userId = req.authUser?.id;
+  const authUser = req.authUser;
 
-  if (!clinicId || !userId) {
+  if (!clinicId || !authUser?.id) {
     return apiError(req, res, "errors.validation", undefined, 400);
   }
+  const userId = authUser.id;
 
   try {
-    const [openSession, completedRows, scanRows, streakRows] = await Promise.all([
-      // Latest still-open clinic shift session.
-      db
-        .select({ startedAt: shiftSessions.startedAt })
-        .from(shiftSessions)
-        .where(and(eq(shiftSessions.clinicId, clinicId), isNull(shiftSessions.endedAt)))
-        .orderBy(sql`${shiftSessions.startedAt} desc`)
-        .limit(1),
+    const [roleResult, completedRows, scanRows, streakRows] = await Promise.all([
+      // Current on-shift state, roster-derived (vt_shifts), overnight-aware.
+      resolveCurrentRole({
+        clinicId,
+        userId,
+        userName: authUser.name,
+        fallbackRole: authUser.role,
+        secondaryRole: authUser.secondaryRole ?? null,
+      }),
 
       // Tasks marked completed today (UTC calendar day).
       db
@@ -84,10 +123,11 @@ router.get("/dashboard", requireAuth, async (req, res) => {
       }
     }
 
+    const activeShift =
+      roleResult.source === "shift" ? roleResult.activeShift : null;
+
     return res.json({
-      shift: openSession[0]
-        ? { startedAt: new Date(openSession[0].startedAt).toISOString() }
-        : null,
+      shift: activeShift ? buildShiftWindow(activeShift) : null,
       streak,
       tasksCompletedToday: Number(completedRows[0]?.n ?? 0),
       scansToday: Number(scanRows[0]?.n ?? 0),

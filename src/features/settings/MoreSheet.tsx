@@ -4,7 +4,7 @@ import {
   LogOut, User,
   Bell, MapPin, Settings, Clock,
   Home, Package, ListTodo, ShieldCheck, ShoppingCart,
-  TrendingUp, Monitor, Box, ShoppingBag,
+  Box,
 } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { t } from "@/lib/i18n";
@@ -150,10 +150,7 @@ export function MoreSheet({ open, onClose }: Props) {
                 {t.nav.managementSection}
               </p>
             </div>
-            <SettingRow icon={<TrendingUp  size={20} />} label={t.nav.analytics}      onClick={() => go("/analytics")} />
-            <SettingRow icon={<Monitor     size={20} />} label={t.nav.dashboard}       onClick={() => go("/dashboard")} />
             <SettingRow icon={<Box         size={20} />} label={t.nav.inventoryItems}  onClick={() => go("/inventory-items")} />
-            <SettingRow icon={<ShoppingBag size={20} />} label={t.nav.procurement}     onClick={() => go("/procurement")} />
             <SettingRow icon={<Settings    size={20} />} label={t.nav.admin}           onClick={() => go("/admin")} />
             <SettingRow icon={<Clock       size={20} />} label={t.nav.adminShifts}     onClick={() => go("/admin/shifts")} />
             <div style={{ height: 1, background: "hsl(var(--border))", marginBlock: 8, marginInline: 20 }} />

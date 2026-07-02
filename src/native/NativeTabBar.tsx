@@ -15,8 +15,15 @@ type Props = {
 };
 
 export function isTabActive(location: string, href: string): boolean {
-  if (href === "/home") return location === "/home" || location === "/";
-  return location.startsWith(href.split("?")[0]);
+  const path = href.split("?")[0];
+  if (path === "/home") return location === "/home" || location === "/";
+  // Equipment tab covers the browse list and its detail/scan sub-routes, plus
+  // the personal "My equipment" view (same equipment surface, menu-reachable).
+  if (path === "/equipment") {
+    if (location.startsWith("/equipment/tasks")) return false;
+    return location.startsWith("/equipment") || location.startsWith("/my-equipment");
+  }
+  return location.startsWith(path);
 }
 
 function TabButton({
@@ -76,7 +83,7 @@ export function NativeTabBar({ onMorePress }: Props) {
 
   const leftTabs: TabDef[] = [
     { id: "today", href: "/home", label: t.nav.today, icon: <Home size={22} /> },
-    { id: "equipment", href: "/my-equipment", label: t.nav.equipment, icon: <Package size={22} /> },
+    { id: "equipment", href: "/equipment", label: t.nav.equipment, icon: <Package size={22} /> },
   ];
 
   const rightTabs: TabDef[] = [

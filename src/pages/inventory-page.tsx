@@ -44,9 +44,9 @@ type ContainerItemsResponse = Awaited<ReturnType<typeof api.restock.containerIte
 function containerDotClass(container: InventoryContainer): string {
   if (container.targetQuantity === 0) return "bg-muted-foreground";
   const ratio = container.currentQuantity / container.targetQuantity;
-  if (ratio >= 0.8) return "bg-emerald-500";
-  if (ratio >= 0.5) return "bg-amber-400";
-  return "bg-red-500";
+  if (ratio >= 0.8) return "bg-[hsl(var(--status-ok))]";
+  if (ratio >= 0.5) return "bg-[hsl(var(--status-stale))]";
+  return "bg-[hsl(var(--status-issue))]";
 }
 
 export default function InventoryPage() {
@@ -136,7 +136,11 @@ export default function InventoryPage() {
   const completedCount = useMemo(() => lines.filter((l) => l.actual >= l.expected).length, [lines]);
   const progressPct = totalItems > 0 ? Math.round((completedCount / totalItems) * 100) : 0;
   const progressColor =
-    progressPct < 40 ? "bg-red-500" : progressPct < 80 ? "bg-amber-400" : "bg-emerald-500";
+    progressPct < 40
+      ? "bg-[hsl(var(--status-issue))]"
+      : progressPct < 80
+        ? "bg-[hsl(var(--status-stale))]"
+        : "bg-[hsl(var(--status-ok))]";
   const isRestocking = activeSessionOwnedByMe;
 
   // ── refs ──────────────────────────────────────────────────────────────────
@@ -624,7 +628,7 @@ export default function InventoryPage() {
         <title>{p.title} — VetTrack</title>
       </Helmet>
 
-      <div className="w-full space-y-4 pb-24 motion-safe:animate-page-enter" data-restock-allow>
+      <div className="mx-auto w-full max-w-[720px] space-y-4 px-4 pb-24 pt-3 motion-safe:animate-page-enter sm:px-6 lg:max-w-[1120px]" data-restock-allow>
 
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -704,6 +708,19 @@ export default function InventoryPage() {
           </div>
         )}
 
+        {/* Take-consumables action — inline so it scrolls with the page (BUG-010) */}
+        {containersQ.data && containersQ.data.length > 0 && (
+          <Button
+            type="button"
+            size="lg"
+            onClick={handleOpenDispense}
+            className="w-full gap-2 text-base"
+          >
+            <span aria-hidden className="text-lg">📦</span>
+            {p.takeConsumables}
+          </Button>
+        )}
+
         {/* Container detail card */}
         {selected && (
           <Card className="overflow-hidden border-border/80 shadow-sm">
@@ -714,7 +731,7 @@ export default function InventoryPage() {
                 className={cn(
                   "px-4 py-3 border-b text-sm font-semibold flex flex-wrap items-start justify-between gap-2",
                   isRestocking
-                    ? "bg-amber-50 text-amber-900 border-amber-200 dark:bg-amber-950/40 dark:text-amber-100 dark:border-amber-800"
+                    ? "bg-[var(--status-stale-bg)] text-[var(--status-stale-fg)] border-[var(--status-stale-border)]"
                     : "bg-muted text-muted-foreground border-border",
                 )}
               >
@@ -746,7 +763,7 @@ export default function InventoryPage() {
 
               {/* All stocked banner */}
               {detailsQ.data && missingCount === 0 && totalItems > 0 && (
-                <div className="mx-4 mt-3 mb-1 rounded-lg border border-emerald-400/50 bg-emerald-50 px-3 py-2 text-center text-sm font-medium text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100 dark:border-emerald-700">
+                <div className="mx-4 mt-3 mb-1 rounded-lg border border-[var(--status-ok-border)] bg-[var(--status-ok-bg)] px-3 py-2 text-center text-sm font-medium text-[var(--status-ok-fg)]">
                   {p.allItemsStocked}
                 </div>
               )}
@@ -760,7 +777,7 @@ export default function InventoryPage() {
 
               {/* Other user restocking warning */}
               {otherUserHasSession && (
-                <div className="mx-4 mt-3 rounded-xl border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                <div className="mx-4 mt-3 rounded-xl border border-[var(--status-stale-border)] bg-[var(--status-stale-bg)] p-3 text-sm text-[var(--status-stale-fg)]">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 shrink-0" />
                     {p.otherUserRestocking}
@@ -804,8 +821,8 @@ export default function InventoryPage() {
                     const flash =
                       line.itemId && flashRowId?.id === line.itemId
                         ? flashRowId.type === "success"
-                          ? "bg-emerald-100/80 dark:bg-emerald-900/30"
-                          : "bg-red-100/80 dark:bg-red-900/30"
+                          ? "bg-[var(--status-ok-bg)]"
+                          : "bg-[var(--status-issue-bg)]"
                         : "";
 
                     return (
@@ -814,7 +831,7 @@ export default function InventoryPage() {
                         className={cn(
                           "rounded-xl border border-border/70 px-3 py-3 bg-card transition-all duration-200",
                           flash,
-                          rowPulseCode === line.code && "ring-2 ring-emerald-400/60",
+                          rowPulseCode === line.code && "ring-2 ring-[hsl(var(--status-ok))]",
                           pendingOps > 0 && "opacity-95",
                         )}
                       >
@@ -827,21 +844,21 @@ export default function InventoryPage() {
                                 className={cn(
                                   "w-2 h-2 rounded-full shrink-0",
                                   isComplete
-                                    ? "bg-emerald-500"
+                                    ? "bg-[hsl(var(--status-ok))]"
                                     : optimisticActual === 0
-                                      ? "bg-red-500"
-                                      : "bg-amber-400",
+                                      ? "bg-[hsl(var(--status-issue))]"
+                                      : "bg-[hsl(var(--status-stale))]",
                                 )}
                               />
                               <p className="text-sm font-semibold min-w-0 truncate" dir="auto">{line.label}</p>
                             </div>
                             <div className="mt-1 flex items-center gap-2 text-xs">
                               {isLowStock ? (
-                                <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-50 px-2 py-0.5 text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-300">
+                                <span className="inline-flex items-center rounded-full border border-[var(--status-stale-border)] bg-[var(--status-stale-bg)] px-2 py-0.5 text-[var(--status-stale-fg)]">
                                   {p.shortBy(missing)}
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-50 px-2 py-0.5 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                <span className="inline-flex items-center rounded-full border border-[var(--status-ok-border)] bg-[var(--status-ok-bg)] px-2 py-0.5 text-[var(--status-ok-fg)]">
                                   {p.stocked}
                                 </span>
                               )}
@@ -888,7 +905,7 @@ export default function InventoryPage() {
                                 className={cn(
                                   "w-16 h-11 text-center text-lg font-bold tabular-nums rounded-lg transition-colors",
                                   "hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                  isComplete ? "text-emerald-700 dark:text-emerald-400" : "text-foreground",
+                                  isComplete ? "text-[var(--status-ok-fg)]" : "text-foreground",
                                 )}
                                 disabled={otherUserHasSession}
                                 onClick={() => startInlineEdit(line)}
@@ -918,7 +935,7 @@ export default function InventoryPage() {
                                 type="button"
                                 variant="outline"
                                 size="icon"
-                                className="h-11 w-11 rounded-xl shrink-0 text-emerald-600 border-emerald-300"
+                                className="h-11 w-11 rounded-xl shrink-0 text-[var(--action)] border-[var(--action-border)]"
                                 disabled={otherUserHasSession || optimisticActual >= line.expected}
                                 onClick={() => scanLine(line.itemId, line.code, line.label, line.expected - optimisticActual)}
                                 aria-label={`Full restock ${line.label}`}
@@ -939,7 +956,7 @@ export default function InventoryPage() {
               {sessionState.lastSummary && (
                 <div className="mx-4 my-3 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm space-y-0.5">
                   <div className="flex items-center gap-2 font-semibold mb-1">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <CheckCircle2 className="w-4 h-4 text-[var(--status-ok-fg)]" />
                     {p.lastSessionTitle}
                   </div>
                   <p className="text-muted-foreground">
@@ -948,7 +965,7 @@ export default function InventoryPage() {
                   <p className="text-muted-foreground">
                     {p.lastSessionRemoved(sessionState.lastSummary.totalRemoved)}
                   </p>
-                  <p className={cn("font-medium", sessionState.lastSummary.itemsMissingCount > 0 ? "text-amber-600" : "text-emerald-600")}>
+                  <p className={cn("font-medium", sessionState.lastSummary.itemsMissingCount > 0 ? "text-[var(--status-stale-fg)]" : "text-[var(--status-ok-fg)]")}>
                     {p.lastSessionMissing(sessionState.lastSummary.itemsMissingCount)}
                   </p>
                 </div>
@@ -959,17 +976,15 @@ export default function InventoryPage() {
                 <div className="p-4 border-t sticky bottom-0 bg-card/95 backdrop-blur">
                   <Button
                     type="button"
-                    className="w-full min-h-[48px] rounded-xl text-base font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow"
+                    variant="action"
+                    size="lg"
+                    className="w-full text-base shadow"
                     onClick={finishSession}
-                    disabled={finishMut.isPending}
+                    loading={finishMut.isPending}
                   >
-                    {finishMut.isPending ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : missingCount === 0 ? (
-                      p.finishRestock
-                    ) : (
-                      p.finishRestockWithMissing(missingCount)
-                    )}
+                    {missingCount === 0
+                      ? p.finishRestock
+                      : p.finishRestockWithMissing(missingCount)}
                   </Button>
                 </div>
               )}
@@ -979,7 +994,7 @@ export default function InventoryPage() {
         )}
       </div>
 
-      {/* Scan overlay */}
+      {/* Scan overlay (transient toast — stays fixed by design, not a control) */}
       {scanOverlay && (
         <div
           className="pointer-events-none fixed inset-x-0 bottom-28 z-[85] flex justify-center px-4 md:bottom-32"
@@ -989,7 +1004,7 @@ export default function InventoryPage() {
             className={cn(
               "flex max-w-[min(92vw,24rem)] items-center gap-3 rounded-2xl px-6 py-4 shadow-2xl animate-in fade-in zoom-in",
               scanOverlay.delta !== null
-                ? "bg-emerald-600 text-white"
+                ? "bg-[var(--action)] text-[var(--action-foreground)]"
                 : "bg-destructive text-destructive-foreground border border-destructive/50",
             )}
           >
@@ -1004,17 +1019,6 @@ export default function InventoryPage() {
           </div>
         </div>
       )}
-
-      {/* Fixed floating dispense button — always visible for authenticated users */}
-      <div className="fixed inset-x-0 flex justify-center px-4 z-40 pointer-events-none" style={{ bottom: "calc(5rem + env(safe-area-inset-bottom, 0px))" }}>
-        <button
-          onClick={handleOpenDispense}
-          className="pointer-events-auto flex items-center gap-2 bg-primary text-primary-foreground font-bold rounded-full px-6 py-3 shadow-lg min-h-[52px] motion-safe:active:scale-95 transition-transform"
-        >
-          <span className="text-lg">📦</span>
-          {p.takeConsumables}
-        </button>
-      </div>
 
       {dispenseContainerId && (
         <DispenseSheet

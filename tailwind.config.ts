@@ -46,6 +46,8 @@ export default {
           issue: "hsl(var(--status-issue))",
           maintenance: "hsl(var(--status-maintenance))",
           sterilized: "hsl(var(--status-sterilized))",
+          stale: "hsl(var(--status-stale))",
+          unknown: "hsl(var(--status-unknown))",
         },
 
         ivory: {
@@ -93,17 +95,23 @@ export default {
         pill: 'var(--radius-pill)',
       },
       boxShadow: {
+        hero: 'var(--shadow-hero)',
         card: 'var(--shadow-card)',
         'card-hover': 'var(--shadow-card-hover)',
+        panel: 'var(--shadow-panel)',
         surface: 'var(--shadow-surface)',
+        floating: 'var(--shadow-floating)',
+        modal: 'var(--shadow-modal)',
+        overlay: 'var(--shadow-overlay)',
       },
       fontFamily: {
         sans: [
+          "-apple-system",
+          "system-ui",
           "Heebo",
           "Plus Jakarta Sans",
           "Noto Sans Hebrew",
           "Rubik",
-          "system-ui",
           "sans-serif",
         ],
         mono: ["IBM Plex Mono", "ui-monospace", "monospace"],
@@ -144,6 +152,11 @@ export default {
           from: { transform: "translateX(-100%)" },
           to: { transform: "translateX(0)" },
         },
+        /** Skeleton shimmer — sweeps a highlight band across a 200%-wide gradient. */
+        shimmer: {
+          from: { backgroundPosition: "200% 0" },
+          to: { backgroundPosition: "-200% 0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -152,6 +165,7 @@ export default {
         "page-enter": "page-enter 0.22s ease-out both",
         "pro-rise": "pro-rise 620ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
         "slide-in": "slide-in 0.3s ease-out",
+        shimmer: "shimmer 1.6s ease-in-out infinite",
       },
     },
   },

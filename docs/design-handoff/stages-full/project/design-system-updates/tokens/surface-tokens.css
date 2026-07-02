@@ -1,0 +1,35 @@
+/**
+ * Design System Alignment — §30-D1 (Phase 11)
+ * APPEND into src/index.css's :root block (light) + .dark block — see below.
+ * Full reasoning: README §30.
+ *
+ * Real ivory-* today has exactly TWO background-ish steps:
+ *   --ivory-bg:      246 247 251   (commented "cool near-white — precise, clinical")
+ *   --ivory-surface: 255 255 255
+ * Three new steps below round it out to five, so nested panels, hover and
+ * active/selected states each get their own tier instead of collapsing
+ * onto --ivory-bg or a generic Tailwind gray.
+ *
+ * §30-D2 — this ALSO shifts --ivory-bg itself from cool to warm cream. The
+ * cool value was a deliberate, commented choice ("precise, clinical") — not
+ * a bug — but it's a real reversal of an explicit decision, done because
+ * the design system's own name/guide ("the 'Ivory' design system... warm
+ * off-white background") already promised warmth before that comment
+ * existed. Flagged prominently in README §30, not silently overwritten.
+ */
+
+:root {
+  --ivory-bg:      245 242 236;  /* #F5F2EC — was 246 247 251 (cool); see README §30-D2 */
+  --ivory-panel:   252 251 248;  /* #FCFBF8 — nested/inset surfaces within a card */
+  --ivory-hover:   247 245 241;  /* #F7F5F1 — row/card hover */
+  --ivory-active:  240 236 228;  /* #F0ECE4 — row/card pressed or selected (neutral, not brand-tinted — see README §30-D3) */
+}
+
+/* Dark companions — reasoned extrapolation in the existing navy-tinted dark
+   idiom (matches the jump already present between --ivory-bg and
+   --ivory-surface today), not visually verified in a running app. */
+.dark {
+  --ivory-panel:  15 22 38;   /* between --ivory-bg (11 18 32) and --ivory-surface (19 28 46) */
+  --ivory-hover:  24 34 54;   /* a touch above --ivory-surface */
+  --ivory-active: 30 42 66;   /* clearly elevated — pressed/selected */
+}

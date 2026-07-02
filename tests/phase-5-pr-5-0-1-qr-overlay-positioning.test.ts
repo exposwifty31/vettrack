@@ -85,13 +85,34 @@ describe("Phase 5 PR 5.0.1 — QR scanner overlay positioning fix", () => {
       expect(rootMatch![1]).not.toContain("h-[100dvh]");
     });
 
-    it("root overlay preserves `fixed top-0 left-0 right-0` anchoring + `flex flex-col`", () => {
+    it("root overlay anchors `fixed inset-0` fullscreen + `flex flex-col` (portal fix)", () => {
+      // The overlay is portaled to document.body so `position:fixed` resolves
+      // against the viewport rather than the NativeShell scroll container (which
+      // scoped the old anchoring and clipped the manual-entry footer off-screen).
+      // Fullscreen anchoring is now `fixed inset-0` — `inset-0` is the shorthand
+      // equivalent of the old `top-0 left-0 right-0` (plus `bottom-0`). The root
+      // stays a `flex flex-col` column so header / camera / footer stack and the
+      // footer's manual-entry button sits within the viewport.
+      //
+      // `z-50` is intentional: it matches the documented z-index strategy in
+      // src/index.css so body-portaled Radix dialogs (e.g. ReturnPlugDialog)
+      // stack above the scanner by DOM order. The earlier `z-[70]` predates the
+      // portal and no longer applies.
       const rootMatch = scannerSource.match(
         /<div\s+className=("[^"]*"|`[^`]*`)\s+data-testid="qr-scanner-overlay"/,
       );
       expect(rootMatch).not.toBeNull();
+      // The root overlay is still identified by data-testid="qr-scanner-overlay".
+      expect(scannerSource).toContain('data-testid="qr-scanner-overlay"');
       const cls = rootMatch![1];
-      for (const token of ["fixed", "top-0", "left-0", "right-0", "z-[70]", "flex", "flex-col"]) {
+      for (const token of [
+        "fixed",
+        "inset-0",
+        "qr-scanner-overlay-root",
+        "z-50",
+        "flex",
+        "flex-col",
+      ]) {
         expect(cls).toContain(token);
       }
     });

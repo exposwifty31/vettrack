@@ -48,10 +48,10 @@ describe("Wave 3 UI token consistency checks (static)", () => {
     ).toBe(true);
   });
 
-  it("Home status visuals use semantic token classes", () => {
+  it("Home status visuals use semantic design tokens", () => {
     expect(
-      home.includes("text-destructive") &&
-        home.includes("border-primary"),
+      home.includes("var(--sys-red)") &&
+        home.includes("var(--sys-green)"),
     ).toBe(true);
   });
 });
