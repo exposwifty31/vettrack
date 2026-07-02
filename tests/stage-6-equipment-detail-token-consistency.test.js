@@ -21,6 +21,7 @@ const read = (...p) => fs.readFileSync(path.join(repoRoot, ...p), "utf8");
 const screen = read("src", "features", "equipment", "detail", "EquipmentDetailScreen.tsx");
 const grid = read("src", "features", "equipment", "detail", "EquipmentGlanceGrid.tsx");
 const service = read("src", "features", "equipment", "detail", "EquipmentServiceCard.tsx");
+const locCard = read("src", "features", "equipment", "detail", "EquipmentLocationCard.tsx");
 const i18n = read("src", "lib", "i18n.ts");
 const en = read("locales", "en.json");
 const he = read("locales", "he.json");
@@ -68,6 +69,16 @@ describe("Stage 6 detail — service-schedule card", () => {
     expect(service.includes("hsl(var(--status-")).toBe(true);
     expect(service.includes("t.equipmentDetail.serviceSchedule")).toBe(true);
     expect(BANNED.test(service)).toBe(false);
+  });
+});
+
+describe("Stage 6 detail — location card confidence ladder", () => {
+  it("maps confidence dots to sys tokens (medium = blue), no hardcoded hex", () => {
+    expect(locCard.includes("rgb(var(--sys-green))")).toBe(true);
+    expect(locCard.includes("medium: \"rgb(var(--sys-blue))\"")).toBe(true);
+    expect(locCard.includes("rgb(var(--sys-gray))")).toBe(true);
+    expect(locCard.includes("rgb(var(--sys-red))")).toBe(true);
+    expect(/#[0-9a-fA-F]{6}/.test(locCard)).toBe(false);
   });
 });
 

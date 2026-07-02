@@ -2,11 +2,12 @@ import { t } from "@/lib/i18n";
 import { formatRelativeTime } from "@/lib/utils";
 import type { LocationInference, LocationConfidence } from "./hooks/use-equipment-detail";
 
+// iOS system palette per the Stage 6 confidence ladder (medium = blue, not amber).
 const CONFIDENCE_DOT: Record<LocationConfidence, string> = {
-  high: "#22c55e",
-  medium: "#f59e0b",
-  low: "#94a3b8",
-  unknown: "#ef4444",
+  high: "rgb(var(--sys-green))",
+  medium: "rgb(var(--sys-blue))",
+  low: "rgb(var(--sys-gray))",
+  unknown: "rgb(var(--sys-red))",
 };
 
 const CONFIDENCE_LABEL: Record<LocationConfidence, string> = {
