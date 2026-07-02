@@ -101,7 +101,7 @@ export function AppRoutes() {
         <Route path="/equipment"><AuthGuard><WebOnlyGuard fallback="/my-equipment"><EquipmentPage /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/equipment/new"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/tasks"><AuthGuard><AppointmentsPage /></AuthGuard></Route>
-        <Route path="/equipment/board"><AuthGuard><WebOnlyGuard><WardDisplayPage /></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/equipment/board"><AuthGuard><WebOnlyGuard fallback="/my-equipment"><WardDisplayPage /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/equipment/:id/edit"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/:id/qr"><AuthGuard><WebOnlyGuard><EquipmentQrPrintPage /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/equipment/:id"><AuthGuard><EquipmentDetailPage /></AuthGuard></Route>

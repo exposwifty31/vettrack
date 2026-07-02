@@ -1196,6 +1196,8 @@ const translations = {
 
   board: d.board,
 
+  webOnlyGuard: d.webOnlyGuard,
+
   legalFooter: d.legalFooter,
 
   legalPage: d.legalPage,
