@@ -3600,6 +3600,11 @@ export interface TStructure {
     deployable: string;
     notDeployable: string;
   };
+  webOnlyGuard: {
+    title: string;
+    description: string;
+    cta: string;
+  };
   whatsNew: {
     title: string;
     heading: string;

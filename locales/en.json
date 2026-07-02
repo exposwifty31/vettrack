@@ -3624,6 +3624,11 @@
     "deployable": "Ready",
     "notDeployable": "Not ready"
   },
+  "webOnlyGuard": {
+    "title": "Best viewed on a larger screen",
+    "description": "This view is built for desktop and wide tablet displays. Open it on a computer, or continue with the mobile-optimized view.",
+    "cta": "Go to my equipment"
+  },
   "whatsNew": {
     "title": "What's New — VetTrack",
     "heading": "What's New",
