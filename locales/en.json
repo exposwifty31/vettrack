@@ -1195,7 +1195,8 @@
     "startTime": "Start time",
     "endTime": "End time",
     "employeeName": "Employee name",
-    "role": "Role"
+    "role": "Role",
+    "csvOnly": "Please select a CSV file only."
   },
   "alertsPage": {
     "oneMinuteAgo": "1 minute ago",
@@ -1936,7 +1937,9 @@
     "dispatchingCursorBugFixer": "Starting Cursor agent…",
     "cursorBugFixerDispatched": "Cursor agent started — track progress in the new tab",
     "cursorBugFixerFailed": "Could not start Cursor bug fixer",
-    "cursorBugFixerNotConfigured": "Cursor bug fixer is not fully configured on the server"
+    "cursorBugFixerNotConfigured": "Cursor bug fixer is not fully configured on the server",
+    "secondaryRoleUpdated": "Secondary role updated",
+    "secondaryRoleUpdateFailed": "Failed to update secondary role"
   },
   "layoutHebrew": {
     "home": "Home",
@@ -3962,7 +3965,15 @@
   "adminAssetTypesPage": {
     "typePlaceholder": "Type name",
     "conditionNamePlaceholder": "Condition name",
-    "staleMinPlaceholder": "Stale (min)"
+    "staleMinPlaceholder": "Stale (min)",
+    "title": "Asset Types",
+    "addButton": "Add",
+    "readinessConditionsTitle": "Readiness Conditions",
+    "assetTypeCreated": "Asset type created",
+    "conditionAdded": "Condition added",
+    "emptyTitle": "No asset types configured",
+    "emptySub": "Add your first asset type to start defining readiness conditions.",
+    "selectTypeHint": "Select an asset type to view its readiness conditions."
   },
   "conditionChecklist": {
     "notesPlaceholder": "Notes (optional)"

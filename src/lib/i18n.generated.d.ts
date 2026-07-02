@@ -1199,6 +1199,7 @@ export interface TStructure {
     endTime: string;
     employeeName: string;
     role: string;
+    csvOnly: string;
   };
   alertsPage: {
     oneMinuteAgo: string;
@@ -1940,6 +1941,8 @@ export interface TStructure {
     cursorBugFixerDispatched: string;
     cursorBugFixerFailed: string;
     cursorBugFixerNotConfigured: string;
+    secondaryRoleUpdated: string;
+    secondaryRoleUpdateFailed: string;
   };
   layoutHebrew: {
     home: string;
@@ -3966,6 +3969,14 @@ export interface TStructure {
     typePlaceholder: string;
     conditionNamePlaceholder: string;
     staleMinPlaceholder: string;
+    title: string;
+    addButton: string;
+    readinessConditionsTitle: string;
+    assetTypeCreated: string;
+    conditionAdded: string;
+    emptyTitle: string;
+    emptySub: string;
+    selectTypeHint: string;
   };
   conditionChecklist: {
     notesPlaceholder: string;

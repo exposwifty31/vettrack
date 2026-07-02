@@ -43,7 +43,7 @@ function AdminAssetTypesContent() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/asset-types"] });
       setNewTypeName("");
-      toast.success("Asset type created");
+      toast.success(t.adminAssetTypesPage.assetTypeCreated);
     },
   });
 
@@ -57,7 +57,7 @@ function AdminAssetTypesContent() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/asset-types", selectedTypeId, "conditions"] });
       setNewCondName("");
-      toast.success("Condition added");
+      toast.success(t.adminAssetTypesPage.conditionAdded);
     },
   });
 
@@ -66,12 +66,12 @@ function AdminAssetTypesContent() {
   return (
     <AppShell title={t.operationalState.setupRequired}>
       <Helmet>
-        <title>Asset Types</title>
+        <title>{t.adminAssetTypesPage.title}</title>
       </Helmet>
-      <div className="max-w-2xl mx-auto space-y-6 p-4">
+      <div className="mx-auto max-w-4xl space-y-6 p-4 md:grid md:grid-cols-[minmax(220px,300px)_1fr] md:items-start md:gap-6 md:space-y-0">
         <Card>
           <CardHeader>
-            <CardTitle>Asset Types</CardTitle>
+            <CardTitle>{t.adminAssetTypesPage.title}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-2">
@@ -85,11 +85,16 @@ function AdminAssetTypesContent() {
                 onClick={() => createTypeMut.mutate()}
                 disabled={!newTypeName.trim() || createTypeMut.isPending}
               >
-                Add
+                {t.adminAssetTypesPage.addButton}
               </Button>
             </div>
             {typesQ.isLoading ? (
               <Skeleton className="h-10 w-full" />
+            ) : (typesQ.data ?? []).length === 0 ? (
+              <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border px-4 py-10 text-center">
+                <p className="text-base font-semibold text-foreground">{t.adminAssetTypesPage.emptyTitle}</p>
+                <p className="max-w-[34ch] text-sm text-muted-foreground">{t.adminAssetTypesPage.emptySub}</p>
+              </div>
             ) : (
               <div className="space-y-1">
                 {(typesQ.data ?? []).map((at: AssetType) => (
@@ -110,10 +115,10 @@ function AdminAssetTypesContent() {
           </CardContent>
         </Card>
 
-        {selectedTypeId && (
+        {selectedTypeId ? (
           <Card>
             <CardHeader>
-              <CardTitle>Readiness Conditions</CardTitle>
+              <CardTitle>{t.adminAssetTypesPage.readinessConditionsTitle}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-3 gap-2">
@@ -145,7 +150,7 @@ function AdminAssetTypesContent() {
                     disabled={!newCondName.trim() || createCondMut.isPending}
                     size="sm"
                   >
-                    Add
+                    {t.adminAssetTypesPage.addButton}
                   </Button>
                 </div>
               </div>
@@ -164,6 +169,10 @@ function AdminAssetTypesContent() {
               )}
             </CardContent>
           </Card>
+        ) : (
+          <div className="hidden md:flex md:min-h-[160px] md:items-center md:justify-center md:rounded-2xl md:border md:border-dashed md:border-border md:p-6 md:text-center">
+            <p className="max-w-[34ch] text-sm text-muted-foreground">{t.adminAssetTypesPage.selectTypeHint}</p>
+          </div>
         )}
       </div>
     </AppShell>

@@ -558,3 +558,16 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Gates (orchestrator-run): `npx tsc --noEmit` → 0 errors; palette grep on the 3 pages → 0; Hebrew grep → 0; `i18n:check` → deep parity OK; `pnpm test` on `stage-7-*` + `i18n-no-hebrew-in-source` + `i18n-parity` → **16 passed**. Lock test = 3 describes / 10 asserts, RED-verified before GREEN.
 
 **Verdict:** VERIFIED at gate level. **Deferred (flagged):** shift-leaderboard podium + week/month toggle, audit-log category chips + avatar rows (additive, need new keys + data restructure); live chart/theme render pending the stage-end manual Chrome pass (392/860/1180 · light/dark · en/he).
+
+## 2026-07-02 — Stage 8 (Admin & Governance): palette→token + i18n + IA reconciliation (delegated)
+
+**Claim:** Admin surfaces moved off hardcoded palette onto `--status-*`/`--sys-*` tokens, all Hebrew extracted (admin.tsx + admin-shifts.tsx off the allowlist), S8-D1 audit-logs tab removed (destination kept reachable), and AssetTypes given the responsive 2-col + dashed-empty layout. Delegated sub-agent; gates re-verified by orchestrator.
+
+**Evidence (orchestrator-run):**
+- `git diff --stat`: admin.tsx (−net, 62 lines churned), admin-shifts.tsx (38), AdminAssetTypesPage.tsx (27), locales en+he (+11 keys each), i18n.generated.d.ts (regen), allowlist (−2). New `tests/stage-8-admin-token-consistency.test.js`.
+- Palette grep on all 3 files → **0**; Hebrew grep → **0**. admin.tsx + admin-shifts.tsx removed from `KNOWN_DEBT_ALLOWLIST` (both ratchet assertions hold).
+- **S8-D1 audit-logs tab REMOVED**, reachability confirmed by orchestrator: `/audit-log` route (`routes.tsx:147`, behind AuthGuard+WebOnlyGuard), nav entry (`layout.tsx`), home link (`home.tsx`). Orphaned `AuditLogsSection` helper + unused `ClipboardList` import deleted; no dangling refs (`SharedAuditLogsPanel` remains only in its owner `audit-log.tsx`). `grep ClipboardList admin.tsx` → 0.
+- i18n: +11 keys under existing spread roots (`adminPage` ×2, `adminShiftsPage` ×1, `adminAssetTypesPage` ×8) — no i18n.ts edit; 6 other admin strings mapped to pre-existing keys (`auditLogAdminOnly/Desc/GoHome`, `userRestored/RestoreFailed`, `common.loading`). Copy-appropriateness of the reused keys to confirm in the browser pass.
+- Gates (orchestrator-run): `npx tsc --noEmit` → 0 errors; `i18n:check` → deep parity OK; `pnpm test` stage-8 lock + i18n guards → **18 passed** (lock = 3 describes/18 asserts incl. audit-tab-absent + shift-requests-tab-present + dashed-empty + md-grid).
+
+**Verdict:** VERIFIED at gate level. **Orchestrator decision flagged — BUG-012:** the Admin "shift-requests" tab was **NOT** removed. `AdminShiftRequestsSection` (shift-adjustment approval queue, shipped in the shifts Phase-1 increments) is referenced only from admin.tsx; `/admin/shifts` is CSV *import*, not approvals — removing the tab would orphan a live feature. Kept per the reachability rule; moving approvals to a dedicated route is a separate task. **Deferred:** admin-shifts dashed dropzone + AssetTypes 2-col responsive layout need a browser/breakpoint pass; AssetTypes right-column auto-select intentionally not added (would be a data-fetch behavior change).

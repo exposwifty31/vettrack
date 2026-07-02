@@ -1195,7 +1195,8 @@
     "startTime": "שעת התחלה",
     "endTime": "שעת סיום",
     "employeeName": "שם עובד",
-    "role": "תפקיד"
+    "role": "תפקיד",
+    "csvOnly": "בחר קובץ CSV בלבד."
   },
   "alertsPage": {
     "oneMinuteAgo": "לפני דקה",
@@ -1936,7 +1937,9 @@
     "dispatchingCursorBugFixer": "מפעיל סוכן Cursor…",
     "cursorBugFixerDispatched": "סוכן Cursor הופעל — עקבו בלשונית החדשה",
     "cursorBugFixerFailed": "לא ניתן להפעיל את מתקן הבאגים של Cursor",
-    "cursorBugFixerNotConfigured": "מתקן הבאגים של Cursor לא מוגדר במלואו בשרת"
+    "cursorBugFixerNotConfigured": "מתקן הבאגים של Cursor לא מוגדר במלואו בשרת",
+    "secondaryRoleUpdated": "תפקיד משני עודכן",
+    "secondaryRoleUpdateFailed": "עדכון תפקיד משני נכשל"
   },
   "layoutHebrew": {
     "home": "ראשי",
@@ -3962,7 +3965,15 @@
   "adminAssetTypesPage": {
     "typePlaceholder": "שם סוג",
     "conditionNamePlaceholder": "שם מצב",
-    "staleMinPlaceholder": "מיושן (דק׳)"
+    "staleMinPlaceholder": "מיושן (דק׳)",
+    "title": "סוגי נכסים",
+    "addButton": "הוספה",
+    "readinessConditionsTitle": "תנאי מוכנות",
+    "assetTypeCreated": "סוג נכס נוצר",
+    "conditionAdded": "התנאי נוסף",
+    "emptyTitle": "לא הוגדרו סוגי נכסים",
+    "emptySub": "הוסיפו סוג נכס ראשון כדי להתחיל להגדיר תנאי מוכנות.",
+    "selectTypeHint": "בחרו סוג נכס כדי לצפות בתנאי המוכנות שלו."
   },
   "conditionChecklist": {
     "notesPlaceholder": "הערות (אופציונלי)"

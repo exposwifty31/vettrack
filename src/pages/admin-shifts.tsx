@@ -99,7 +99,7 @@ export default function AdminShiftsPage() {
               onChange={(event) => {
                 const file = event.target.files?.[0] ?? null;
                 if (file && !file.name.toLowerCase().endsWith(".csv")) {
-                  toast.error("בחר קובץ CSV בלבד.");
+                  toast.error(t.adminShiftsPage.csvOnly);
                   setSelectedFile(null);
                   setPreview(null);
                   event.currentTarget.value = "";
@@ -109,16 +109,21 @@ export default function AdminShiftsPage() {
                 setPreview(null);
               }}
             />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-3 rounded-xl border-2 border-dashed border-border p-4 text-start transition-colors hover:border-primary/60 hover:bg-muted/40"
+              data-testid="dropzone-shifts-csv"
+            >
+              <Upload className="w-5 h-5 shrink-0 text-primary" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">{t.adminShiftsPage.uploadCsv}</p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {selectedFile ? selectedFile.name : t.adminShiftsPage.noFileSelected}
+                </p>
+              </div>
+            </button>
             <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-11 text-xs"
-                onClick={() => fileInputRef.current?.click()}
-                data-testid="btn-choose-shifts-csv"
-              >
-                {t.adminShiftsPage.uploadCsv}
-              </Button>
               <Button
                 size="sm"
                 className="h-11 text-xs"
@@ -155,11 +160,6 @@ export default function AdminShiftsPage() {
                 {t.adminShiftsPage.clearUpload}
               </Button>
             </div>
-            {selectedFile && (
-              <p className="text-xs text-muted-foreground">
-                {t.adminShiftsPage.selectedFile}: {selectedFile.name}
-              </p>
-            )}
           </CardContent>
         </Card>
 
@@ -175,15 +175,15 @@ export default function AdminShiftsPage() {
               <div className="grid grid-cols-3 gap-2 text-xs">
                 <div className="rounded-lg border p-2">
                   <div className="text-muted-foreground">{t.adminShiftsPage.totalRows}</div>
-                  <div className="font-semibold">{preview.summary.totalRows}</div>
+                  <div className="text-lg font-bold [font-family:var(--font-num)]">{preview.summary.totalRows}</div>
                 </div>
                 <div className="rounded-lg border p-2">
                   <div className="text-muted-foreground">{t.adminShiftsPage.validRows}</div>
-                  <div className="font-semibold text-emerald-600">{preview.summary.validRows}</div>
+                  <div className="text-lg font-bold [font-family:var(--font-num)] text-[var(--status-ok-fg)]">{preview.summary.validRows}</div>
                 </div>
                 <div className="rounded-lg border p-2">
                   <div className="text-muted-foreground">{t.adminShiftsPage.skippedRows}</div>
-                  <div className="font-semibold text-amber-600">{preview.summary.skippedRows}</div>
+                  <div className="text-lg font-bold [font-family:var(--font-num)] text-[var(--status-stale-fg)]">{preview.summary.skippedRows}</div>
                 </div>
               </div>
 
@@ -221,7 +221,7 @@ export default function AdminShiftsPage() {
               </div>
 
               {preview.issues.length > 0 && (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-foreground">
+                <div className="rounded-xl border border-[var(--status-stale-border)] bg-[var(--status-stale-bg)] p-3 text-foreground">
                   <div className="flex items-center gap-1 text-xs font-semibold text-foreground">
                     <AlertTriangle className="w-4 h-4" />
                     {t.adminShiftsPage.issuesTitle}
