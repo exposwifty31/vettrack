@@ -432,6 +432,7 @@ const translations = {
   dispense: {
     errors: d.dispense.errors,
     bypass: d.dispense.bypass,
+    sheet: d.dispense.sheet,
     errorMessage: (code: string) => {
       const map = d.dispense.errors as Record<string, string>;
       return map[code] ?? map.fallback;

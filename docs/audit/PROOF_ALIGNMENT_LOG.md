@@ -596,3 +596,15 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Gates: `npx tsc --noEmit` → 0 errors; `pnpm test` on `shift-chat-session-scoping` + `shift-chat-broadcast-ack` → **10 passed**.
 
 **Verdict:** VERIFIED at gate level. Residual edge (noted): a brand-new session with zero messages yet won't clear the prior transcript until its first message arrives (no session signal exists outside the message stream to trigger an earlier reset); the isOpen-close/reopen reset still covers the common per-shift path. BUG-001's mid-open cross-session leak is closed.
+
+## 2026-07-02 — Stage 5 tail: DispenseSheet Hebrew → i18n (delegated)
+
+**Claim:** Extracted all 36 hardcoded Hebrew strings from the dispense sheet into `dispense.sheet.*` locale keys with zero behavior change; removed the file from the Hebrew allowlist. Delegated sub-agent; gates re-verified by orchestrator.
+
+**Evidence (orchestrator-run):**
+- `grep '[֐-׿]' src/features/containers/components/DispenseSheet.tsx` → **0**.
+- `git diff --stat`: DispenseSheet.tsx (72 lines, copy-only), locales en+he (+31 keys each), i18n.ts (+1 line `sheet: d.dispense.sheet,` at :435 — the `dispense` namespace is assembled by explicit member selection, not spread, so the member line was required), i18n.generated.d.ts (regen), allowlist (−1).
+- Frozen surface respected: only user-facing strings (JSX text, `title`/`aria-label`, one `toast.error`) changed; dispense mutation / offline-block / validation / control flow untouched. `formatTimeHHMM("he-IL")` left as-is (locale identifier, not rendered copy).
+- Gates (orchestrator-run): `npx tsc --noEmit` → 0 errors; `i18n:check` → deep parity OK; `pnpm test` `i18n-no-hebrew-in-source` + `i18n-parity` → **6 passed**. Allowlist ratchet holds.
+
+**Verdict:** VERIFIED at gate level. Copy-fidelity note: `sheet.back` kept as a dedicated key (original `חזור`, imperative) rather than reusing `common.back` (`חזרה`) to preserve exact copy.

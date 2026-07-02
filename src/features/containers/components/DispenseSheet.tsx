@@ -198,7 +198,7 @@ export function DispenseSheet({
       setSheetState("success");
     },
     onError: () => {
-      toast.error("שגיאה בשרת — נסה שוב");
+      toast.error(t.dispense.sheet.serverError);
     },
   });
 
@@ -299,8 +299,8 @@ export function DispenseSheet({
           {renderDragHandle()}
           <div className="px-4 pb-6 space-y-4">
             <SheetHeader>
-              <SheetTitle className="text-xl text-right">השלמת חירום</SheetTitle>
-              <p className="text-sm text-muted-foreground text-right">פרט את הפריטים שנלקחו בחירום</p>
+              <SheetTitle className="text-xl text-right">{t.dispense.sheet.emergencyCompleteTitle}</SheetTitle>
+              <p className="text-sm text-muted-foreground text-right">{t.dispense.sheet.emergencyCompleteSubtitle}</p>
             </SheetHeader>
 
             {containerItemsQ.isLoading ? (
@@ -319,10 +319,10 @@ export function DispenseSheet({
                           {isEnglishLabel(item.label) && (
                             <span
                               className="inline-block w-2 h-2 rounded-full bg-[hsl(var(--status-stale))] mr-1 align-middle shrink-0"
-                              title="שם באנגלית — מומלץ לתרגם"
+                              title={t.dispense.sheet.englishNameHint}
                             />
                           )}
-                          <span className="text-xs text-muted-foreground mr-2">({item.quantity} במלאי)</span>
+                          <span className="text-xs text-muted-foreground mr-2">({item.quantity} {t.dispense.sheet.inStock})</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <button
@@ -330,7 +330,7 @@ export function DispenseSheet({
                             {...fieldProps({ disabled: qty === 0 })}
                             onClick={() => updateQuantity(item.itemId, -1, item.quantity)}
                             className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center disabled:opacity-30"
-                            aria-label="הפחת"
+                            aria-label={t.dispense.sheet.decrease}
                           >
                             <Minus className="w-5 h-5" />
                           </button>
@@ -340,7 +340,7 @@ export function DispenseSheet({
                             {...fieldProps({ disabled: qty >= item.quantity })}
                             onClick={() => updateQuantity(item.itemId, 1, item.quantity)}
                             className="w-12 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-30"
-                            aria-label="הוסף"
+                            aria-label={t.dispense.sheet.increase}
                           >
                             <Plus className="w-5 h-5" />
                           </button>
@@ -352,7 +352,7 @@ export function DispenseSheet({
 
                 {/* Patient selection for emergency complete */}
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-right">שייך למטופל (אופציונלי)</p>
+                  <p className="text-sm font-medium text-right">{t.dispense.sheet.assignPatientOptional}</p>
                   <div className="grid grid-cols-2 gap-2">
                     {activePatients.map((p) => (
                       <button
@@ -367,7 +367,7 @@ export function DispenseSheet({
                             : "border-border bg-background",
                         )}
                       >
-                        <div className="font-semibold text-sm break-words">{p.animalName || "מטופל ללא שם"}</div>
+                        <div className="font-semibold text-sm break-words">{p.animalName || t.dispense.sheet.unnamedPatient}</div>
                         {p.species && <div className="text-xs text-muted-foreground">{p.species}</div>}
                         {selectedAnimalId === p.animalId && (
                           <CheckCircle className="w-4 h-4 text-primary mt-1" />
@@ -384,7 +384,7 @@ export function DispenseSheet({
                       selectedAnimalId === null ? "border-primary bg-primary/10" : "border-border",
                     )}
                   >
-                    ללא שיוך למטופל
+                    {t.dispense.sheet.noPatientAssignment}
                   </button>
                 </div>
 
@@ -402,7 +402,7 @@ export function DispenseSheet({
                     {completeEmergencyMut.isPending ? (
                       <Loader2 className="w-5 h-5 animate-spin mr-2" />
                     ) : null}
-                    אשר פירוט חירום
+                    {t.dispense.sheet.confirmEmergencyDetails}
                   </Button>
                   <button
                     type="button"
@@ -430,12 +430,12 @@ export function DispenseSheet({
           <div className="px-4 pb-8 flex flex-col items-center text-center space-y-4">
             <CheckCircle className="w-20 h-20 text-[hsl(var(--status-ok))] mt-4" />
             <SheetTitle className="text-2xl font-bold">
-              {successData?.isEmergency ? "עודכן בהצלחה" : "נלקח בהצלחה"}
+              {successData?.isEmergency ? t.dispense.sheet.updatedSuccess : t.dispense.sheet.takenSuccess}
             </SheetTitle>
             {successData && (
               <div className="text-sm text-muted-foreground space-y-1">
-                <p>על ידי: {successData.takenBy.displayName}</p>
-                <p>בשעה: {formatTimeHHMM(successData.takenAt)}</p>
+                <p>{t.dispense.sheet.byLabel} {successData.takenBy.displayName}</p>
+                <p>{t.dispense.sheet.atTimeLabel} {formatTimeHHMM(successData.takenAt)}</p>
                 {successData.dispensed && successData.dispensed.length > 0 && (
                   <ul className="mt-2 text-right space-y-1">
                     {successData.dispensed.map((d) => (
@@ -447,14 +447,14 @@ export function DispenseSheet({
                 )}
               </div>
             )}
-            <p className="text-xs text-muted-foreground">נסגר אוטומטית בעוד שניות...</p>
+            <p className="text-xs text-muted-foreground">{t.dispense.sheet.autoClosing}</p>
             <Button
               variant="outline"
               {...fieldProps()}
               onClick={onClose}
               className="min-h-[48px] w-full rounded-xl"
             >
-              סגור
+              {t.dispense.sheet.close}
             </Button>
           </div>
         </SheetContent>
@@ -470,7 +470,7 @@ export function DispenseSheet({
           {renderDragHandle()}
           <div className="px-4 pb-8 flex flex-col items-center text-center space-y-4">
             <XCircle className="w-20 h-20 text-[var(--status-issue-fg)] mt-4" />
-            <SheetTitle className="text-2xl font-bold text-[var(--status-issue-fg)]">חירום נרשם</SheetTitle>
+            <SheetTitle className="text-2xl font-bold text-[var(--status-issue-fg)]">{t.dispense.sheet.emergencyRecorded}</SheetTitle>
             {successData && (
               <div className="text-sm text-muted-foreground space-y-1">
                 <p className="font-medium">{successData.takenBy.displayName} — {formatTimeHHMM(successData.takenAt)}</p>
@@ -485,10 +485,10 @@ export function DispenseSheet({
                 setSheetState("emergency-complete");
               }}
             >
-              השלם פירוט אחרי הטיפול
+              {t.dispense.sheet.completeAfterTreatment}
             </Button>
             <p className="text-xs text-muted-foreground px-2">
-              תוכל להשלים גם מדף חפיפת משמרת
+              {t.dispense.sheet.completeFromHandover}
             </p>
             <button
               type="button"
@@ -496,7 +496,7 @@ export function DispenseSheet({
               onClick={onClose}
               className="text-sm text-muted-foreground py-2 min-h-[44px]"
             >
-              סגור לעכשיו
+              {t.dispense.sheet.closeForNow}
             </button>
           </div>
         </SheetContent>
@@ -521,8 +521,8 @@ export function DispenseSheet({
           {renderDragHandle()}
           <div className="px-4 pb-6 space-y-4">
             <SheetHeader>
-              <SheetTitle className="text-xl text-right">למי שייך?</SheetTitle>
-              <p className="text-sm text-muted-foreground text-right">בחר מטופל או השאר ללא שיוך</p>
+              <SheetTitle className="text-xl text-right">{t.dispense.sheet.whoBelongsTitle}</SheetTitle>
+              <p className="text-sm text-muted-foreground text-right">{t.dispense.sheet.whoBelongsSubtitle}</p>
             </SheetHeader>
 
             <>
@@ -540,7 +540,7 @@ export function DispenseSheet({
                           : "border-border bg-background",
                       )}
                     >
-                      <div className="font-semibold text-sm break-words">{p.animalName || "מטופל ללא שם"}</div>
+                      <div className="font-semibold text-sm break-words">{p.animalName || t.dispense.sheet.unnamedPatient}</div>
                       {p.species && <div className="text-xs text-muted-foreground">{p.species}</div>}
                       {selectedAnimalId === p.animalId && (
                         <CheckCircle className="w-4 h-4 text-primary mt-1" />
@@ -549,7 +549,7 @@ export function DispenseSheet({
                   ))}
                   {activePatients.length === 0 && (
                     <div className="col-span-2 text-center text-sm text-muted-foreground py-4">
-                      אין מטופלים פעילים היום
+                      {t.dispense.sheet.noActivePatients}
                     </div>
                   )}
                 </div>
@@ -563,7 +563,7 @@ export function DispenseSheet({
                     selectedAnimalId === null ? "border-primary bg-primary/10 font-medium" : "border-border",
                   )}
                 >
-                  ללא שיוך למטופל
+                  {t.dispense.sheet.noPatientAssignment}
                 </button>
 
                 {showBypassOptions && (
@@ -629,7 +629,7 @@ export function DispenseSheet({
                     onClick={() => void handleDispense()}
                   >
                     {dispenseBusy ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-                    אשר לקיחה
+                    {t.dispense.sheet.confirmTake}
                   </Button>
                   <button
                     type="button"
@@ -643,7 +643,7 @@ export function DispenseSheet({
                     }}
                     className="w-full text-sm text-muted-foreground py-2 min-h-[44px]"
                   >
-                    חזור
+                    {t.dispense.sheet.back}
                   </button>
                 </div>
             </>
@@ -661,7 +661,7 @@ export function DispenseSheet({
         <div className="px-4 pb-6 space-y-4">
           <SheetHeader>
             <SheetTitle className="text-xl text-right">
-              {container?.name ?? "טוען..."}
+              {container?.name ?? t.dispense.sheet.loading}
             </SheetTitle>
           </SheetHeader>
 
@@ -677,12 +677,12 @@ export function DispenseSheet({
             ) : (
               <AlertTriangle className="w-6 h-6" />
             )}
-            🚨 חירום
+            🚨 {t.dispense.sheet.emergency}
           </button>
 
           <div className="flex items-center gap-3">
             <div className="flex-1 h-px bg-border" />
-            <span className="text-xs text-muted-foreground">או בחר פריטים</span>
+            <span className="text-xs text-muted-foreground">{t.dispense.sheet.orSelectItems}</span>
             <div className="flex-1 h-px bg-border" />
           </div>
 
@@ -702,7 +702,7 @@ export function DispenseSheet({
                       {isEnglishLabel(item.label) && (
                         <span
                           className="inline-block w-2 h-2 rounded-full bg-[hsl(var(--status-stale))] mr-1 align-middle shrink-0"
-                          title="שם באנגלית — מומלץ לתרגם"
+                          title={t.dispense.sheet.englishNameHint}
                         />
                       )}
                       <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground">
@@ -715,7 +715,7 @@ export function DispenseSheet({
                         {...fieldProps({ disabled: qty === 0 })}
                         onClick={() => updateQuantity(item.itemId, -1, item.quantity)}
                         className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center disabled:opacity-30"
-                        aria-label="הפחת"
+                        aria-label={t.dispense.sheet.decrease}
                       >
                         <Minus className="w-5 h-5" />
                       </button>
@@ -725,7 +725,7 @@ export function DispenseSheet({
                         {...fieldProps({ disabled: qty >= item.quantity })}
                         onClick={() => updateQuantity(item.itemId, 1, item.quantity)}
                         className="w-12 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-30"
-                        aria-label="הוסף"
+                        aria-label={t.dispense.sheet.increase}
                       >
                         <Plus className="w-5 h-5" />
                       </button>
@@ -734,7 +734,7 @@ export function DispenseSheet({
                 );
               })}
               {items.length === 0 && !containerItemsQ.isLoading && (
-                <p className="text-center text-sm text-muted-foreground py-4">אין פריטים במכלול זה</p>
+                <p className="text-center text-sm text-muted-foreground py-4">{t.dispense.sheet.noItemsInContainer}</p>
               )}
             </div>
           )}
@@ -742,7 +742,7 @@ export function DispenseSheet({
           {/* Sticky bottom bar */}
           <div className="sticky bottom-0 bg-background pt-2 pb-2 space-y-2">
             <div className="flex items-center justify-between text-sm text-muted-foreground px-1">
-              <span>{totalSelected} פריטים נבחרו</span>
+              <span>{totalSelected} {t.dispense.sheet.itemsSelected}</span>
               <ChevronRight className="w-4 h-4" />
             </div>
             <Button
@@ -756,7 +756,7 @@ export function DispenseSheet({
                 setSheetState("confirm");
               }}
             >
-              המשך
+              {t.dispense.sheet.continue}
             </Button>
             <button
               type="button"
