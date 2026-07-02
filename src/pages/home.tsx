@@ -10,6 +10,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { ErrorCard } from "@/components/ui/error-card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { LoadingSection } from "@/components/ui/loading-section";
 import { computeAlerts } from "@/lib/utils";
 import { buildAlertAckSet, countCriticalAlerts } from "@/lib/alert-counts";
@@ -125,6 +126,22 @@ export default function HomePage() {
     return () => clearInterval(id);
   }, []);
 
+  // Display-only connectivity cue. Emergency mutations are never queued here —
+  // this only surfaces a "data may be outdated" banner (frozen-surface safe).
+  const [isOffline, setIsOffline] = useState(
+    typeof navigator !== "undefined" && !navigator.onLine,
+  );
+  useEffect(() => {
+    const onOnline = () => setIsOffline(false);
+    const onOffline = () => setIsOffline(true);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
+
   useEffect(() => {
     const params = new URLSearchParams(searchStr);
     if (params.get("scan") === "1") setScannerOpen(true);
@@ -215,7 +232,10 @@ export default function HomePage() {
   }
 
   const showChips = heroState === "active";
-  const showScanCard = heroState !== "loading";
+  // BUG-005: the Today scan card is redundant on the native shell (the tab-bar
+  // ScanFab already offers scan on iPhone/iPad), so it only renders on desktop.
+  const showScanCard = heroState !== "loading" && isDesktop;
+  const showScanSkeleton = heroState === "loading" && isDesktop;
   const showRecent = isDesktop && heroState === "active";
   const recentItems = (activityData?.items ?? []).slice(0, 4);
 
@@ -241,15 +261,19 @@ export default function HomePage() {
           </p>
         </header>
 
-        {equipmentError && (
-          <ErrorCard
-            message={t.equipmentList.errors.loadFailed}
-            onRetry={() => {
-              queryClient.clear();
-              refreshAuth();
-              refetch();
+        {/* Offline — display-only cue; data may be stale until reconnect */}
+        {isOffline && (
+          <div
+            role="alert"
+            className="rounded-xl px-3.5 py-2.5 text-sm font-semibold"
+            style={{
+              background: "rgb(var(--offline-bg))",
+              border: "1px solid rgb(var(--offline-border))",
+              color: "rgb(var(--offline-text))",
             }}
-          />
+          >
+            {t.home.offline}
+          </div>
         )}
 
         {/* Code Blue active — rare, safety-critical, kept above the fold */}
@@ -287,6 +311,19 @@ export default function HomePage() {
           </Link>
         )}
 
+        {/* Equipment-load failure replaces the content region (Code Blue banner
+            above stays visible — it is keepalive-driven, not equipment-driven). */}
+        {equipmentError ? (
+          <ErrorCard
+            message={t.equipmentList.errors.loadFailed}
+            onRetry={() => {
+              queryClient.clear();
+              refreshAuth();
+              refetch();
+            }}
+          />
+        ) : (
+          <>
         {/* Content grid — hero left, criticality + scan + recent right (desktop) */}
         <div className="grid grid-cols-1 items-start gap-5 sm:gap-6 lg:grid-cols-[minmax(320px,360px)_1fr]">
           {/* ON-SHIFT hero */}
@@ -496,6 +533,10 @@ export default function HomePage() {
               </div>
             )}
 
+            {showScanSkeleton && (
+              <Skeleton className="h-[60px] w-full rounded-[16px]" />
+            )}
+
             {showScanCard && (
               <button
                 type="button"
@@ -615,6 +656,8 @@ export default function HomePage() {
               {t.home.addEquipment}
             </Link>
           </div>
+        )}
+          </>
         )}
       </div>
 

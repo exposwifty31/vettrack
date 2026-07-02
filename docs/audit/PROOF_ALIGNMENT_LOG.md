@@ -239,3 +239,17 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Stage 2 status:** CLOSED for screen-agnostic primitives — Button, Card, Skeleton, Badge, ListRow shipped + locked; StatusChip already satisfied by StatusBadge. Deferred (by design): PrimaryActionCard (→ Stage 3), flat scan tab (→ Stage 4 + cross-cutting).
 
 **Verdict:** VERIFIED (RED→GREEN lock test + typecheck + full suite 3544/0 + i18n + build). In-situ visual confirmation deferred to first consumer.
+
+## 2026-07-02 — Stage 3: Today (home.tsx) finish + BUG-005 (test-driven)
+
+**Claim:** Finished Stage 3 on the real `/home` screen (`src/pages/home.tsx`; the `features/today/*` set is unused dead code and was left untouched). Added a display-only offline banner, made an equipment-load error *replace* the content region (Code Blue banner deliberately kept above the gate), skeletoned the scan slot during load, and removed the redundant Today scan card on the native shell (BUG-005).
+
+**Evidence:**
+- Wiring check first: `/home` → `HomePage` (`home.tsx`), which dual-renders via `useIsDesktop` (≥1024px) inside `AppShell`. `features/today/TodayScreen.tsx` (which already had these states) is imported nowhere — confirmed dead. The native shell mounts a tab-bar `ScanFab` (`NativeTabBar`: Today · Equipment · [ScanFab] · Emergency · Menu), so scan stays reachable on iPhone/iPad after removing the Today card. Offline tokens (`--offline-bg/border/text`) and `t.home.offline` ("You're offline — data may be outdated") both pre-exist.
+- RED first: `tests/stage-3-today-token-consistency.test.js` (new) → **5 failed / 1 passed** before edits (only the pre-existing `--action` scan-card assert passed).
+- GREEN: `home.tsx` — added `isOffline` state + online/offline listeners (display-only, no queueing), an amber `role="alert"` banner on the offline tokens; restructured so the content grid + get-started render behind `equipmentError ? <ErrorCard/> : <>…</>` (Code Blue banner outside the gate); `showScanCard = heroState !== "loading" && isDesktop` (BUG-005) with a new `showScanSkeleton` rendering `<Skeleton className="h-[60px] w-full rounded-[16px]"/>` during load; imported the Stage 2 `Skeleton`.
+- Test (post-edit): lock test green (6/6); `npx tsc --noEmit` → **0 errors** (confirms the ternary JSX is balanced); full `pnpm test` → **361 files / 3550 passed / 0 failed** (baseline 3544 + 6 new; no test pins the scan card testid); `pnpm i18n:check` → parity OK; `pnpm build` → built OK.
+- Live browser (dev server :5000, Chrome MCP): at 1280px (isDesktop) dispatched an `offline` event → the amber banner rendered "You're offline — data may be outdated" and the desktop scan card stayed present; screenshot confirms banner styling + intact desktop layout. Reloaded at innerWidth 500 (`matchMedia(min-width:1024px)` = false) → `[data-testid="quick-action-scan"]` **absent**; screenshot confirms the compact hero renders full-width with no scan card (BUG-005).
+- Not visually triggered this pass: the error-replaces-content state (would require forcing the equipment query to fail) and the transient loading skeleton — both are structurally locked (typecheck + source asserts). Dark theme / Hebrew RTL not re-verified on this screen this pass. Recommended follow-up.
+
+**Verdict:** VERIFIED (RED→GREEN lock test + typecheck + full suite 3550/0 + i18n + build + live offline-banner render + live BUG-005 scan-card removal at compact). Error/loading-state visuals and dark/RTL deferred as structural-only.
