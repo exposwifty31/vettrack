@@ -282,3 +282,16 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Live browser (dev server :5000, Chrome MCP, desktop 1280px — procurement is behind `WebOnlyGuard`): `/procurement` renders the header, New-order button, filter chips (All/Draft/Ordered/Partial/Received/Cancelled) and the "No purchase orders" empty state with no breakage. The two changed styles live in `STATUS_BADGE`/a table cell that only render with order rows; the dev clinic has none, so the pills weren't force-rendered (changes are surgical + test/build-covered).
 
 **Verdict:** VERIFIED (RED→GREEN 20/20 + typecheck 0 + full suite 3570/0 + build + live empty-state render). Pill-with-data visual not exercised (no seed data); low risk — two-property change inside existing tokenized structure.
+
+## 2026-07-02 — Stage 5 (increment 3): DispenseSheet palette→token restyle (frozen — restyle only)
+
+**Claim:** Re-tokenized `src/features/containers/components/DispenseSheet.tsx` (7 palette hits → 0). This is a frozen emergency surface (the `classifyEmergencyEndpoint` offline-block / online-only mutations); I changed **classNames only** — no logic, no handlers, no offline-block, and deliberately left the pre-existing hardcoded Hebrew strings untouched (separate out-of-scope i18n concern; the file is already allowlisted by `i18n-no-hebrew-in-source`).
+
+**Evidence:**
+- Enumerated 7 hits: two English-label indicator dots (`bg-amber-400`), success `CheckCircle` (`text-green-500`), emergency-success `XCircle`/title (`text-red-500`/`text-red-700`), emergency-success outline button (`border-red-300 text-red-700`), and the always-visible emergency action button (`bg-red-600 … active:bg-red-700`).
+- RED first: added a DispenseSheet block to `tests/stage-5-inventory-token-consistency.test.js` (banned emerald/amber/red/green + require a `--sys-red`/`--status-issue` token + assert `handleEmergencyTap` still present) → RED before edits.
+- GREEN: dots → `bg-[hsl(var(--status-stale))]`; success check → `text-[hsl(var(--status-ok))]`; emergency XCircle/title → `text-[var(--status-issue-fg)]`; emergency outline button → `border-[var(--status-issue-border)] text-[var(--status-issue-fg)]`; emergency action button → `bg-[rgb(var(--sys-red))] text-white active:brightness-90`. Residual palette: **0**.
+- Test (post-edit): stage-5 lock **29/29**; `npx tsc --noEmit` → **0**; `pnpm build` → built OK; full `pnpm test` → **362 files / 3579 passed / 0 failed** (baseline 3570 + 9 new).
+- Live browser (dev server :5000, Chrome MCP, compact 420px): opened the sheet from the inline "Take consumables" button → the state-0 emergency screen renders the חירום button as solid vivid red (`--sys-red`) with white text, RTL intact, "no items in this container" empty state below. Emergency online-only behavior unchanged. The green success-check and red emergency-success states weren't force-completed (would log real dispense/emergency audit events) — covered structurally by test + build.
+
+**Verdict:** VERIFIED (RED→GREEN 29/29 + typecheck 0 + full suite 3579/0 + build + live emergency-button red-token render, RTL). Frozen emergency offline-block + handlers untouched; Hebrew strings intentionally left for a dedicated i18n pass.
