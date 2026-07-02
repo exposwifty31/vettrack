@@ -45,8 +45,6 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "shared/doctor-operational-shift.ts",
   "src/components/sw-update-banner.tsx",
   "src/features/containers/components/DispenseSheet.tsx",
-  "src/features/shift-chat/components/MessageBubble.tsx",
-  "src/features/shift-chat/components/ShiftChatArchive.tsx",
   "src/features/shift-chat/components/SystemCard.tsx",
   "src/pages/admin-shifts.tsx",
   "src/pages/admin.tsx",

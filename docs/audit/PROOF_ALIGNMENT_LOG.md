@@ -502,3 +502,16 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Gates: typecheck **0×2**, i18n parity OK, `i18n-no-hebrew-in-source` **2/2**, stage-9 lock **8/8** (new BroadcastCard/types describe), `no-hardcoded-ui-strings` pass, build exit 0.
 
 **Verdict:** VERIFIED at gate level (Hebrew now impossible to regress in these two files — off the allowlist; parity + typecheck + build). Remaining Stage 9: MessageBubble/SystemCard/ShiftChatArchive Hebrew, BUG-003 quick-reply, BUG-001 stale messages, standalone chat screen, richer Handover, code-blue.tsx restyle.
+
+## 2026-07-02 — Stage 9 (increment 4): shift-chat MessageBubble + ShiftChatArchive i18n (BUG-002 cont.)
+
+**Claim:** Cleared hardcoded Hebrew + palette from `MessageBubble.tsx` and `ShiftChatArchive.tsx`; both removed from the Hebrew-debt allowlist. Only `SystemCard.tsx` remains on the chat allowlist (9 interpolated event-copies, several for removed ER/med scope — deferred to a focused pass).
+
+**Evidence:**
+- MessageBubble: `"⚡ דחוף"` → `⚡ {t.shiftChat.urgent}`; palette indigo→`primary`, role avatars blue→`sys-blue`/green→`--status-ok`, urgent red→`--status-issue`, mention/hashtag spans → `text-primary` (senior-tech `purple` kept — a deliberate role color outside the token set, not a lint target).
+- ShiftChatArchive: 5 strings → `t.shiftChat.archive.{loading,notFound,title,readOnly,empty}`; `toLocaleString("he-IL")` → `formatDateByLocale(..., {dateStyle:"medium",timeStyle:"short"})` (locale-aware); amber banner → `--status-stale-*`.
+- i18n: `shiftChat.urgent` + `shiftChat.archive.*` (en+he passthrough, `.d.ts` regenerated).
+- Both files `grep`-clean of Hebrew (0) + banned palette (0). Allowlist: removed both; guard's "no stale entries" + "every offender listed" hold (SystemCard remains).
+- Gates: typecheck **0×2**, i18n parity OK, `i18n-no-hebrew-in-source` + `no-hardcoded-ui-strings` pass (3/3), build exit 0.
+
+**Verdict:** VERIFIED at gate level. Remaining Stage 9: SystemCard event-copy i18n (+ removed-scope event cleanup), BUG-003 quick-reply, BUG-001 stale messages, standalone chat screen, richer Handover, code-blue.tsx restyle.

@@ -29,9 +29,9 @@ export function MessageBubble({ message, currentUserId, onReact, onPin, canPin }
       <div
         className={cn(
           "w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0",
-          message.senderRole === "vet" ? "bg-blue-950 text-blue-300" :
+          message.senderRole === "vet" ? "bg-[rgb(var(--sys-blue)/0.15)] text-[rgb(var(--sys-blue))]" :
           message.senderRole === "senior_technician" ? "bg-purple-950 text-purple-300" :
-          "bg-green-950 text-green-400",
+          "bg-[var(--status-ok-bg)] text-[var(--status-ok-fg)]",
         )}
       >
         {(message.senderName ?? "?").slice(0, 2)}
@@ -46,19 +46,19 @@ export function MessageBubble({ message, currentUserId, onReact, onPin, canPin }
           className={cn(
             "px-3 py-2 rounded-2xl text-sm leading-snug",
             isMe
-              ? "bg-indigo-600 text-white rounded-bl-sm"
+              ? "bg-primary text-primary-foreground rounded-bl-sm"
               : "bg-muted text-foreground rounded-br-sm",
-            message.isUrgent && "bg-red-950 border border-red-600 text-red-100",
+            message.isUrgent && "bg-[var(--status-issue-bg)] border border-[var(--status-issue-border)] text-[var(--status-issue-fg)]",
           )}
         >
           {message.isUrgent && (
-            <div className="text-[9px] font-bold text-red-300 tracking-wide mb-1">⚡ דחוף</div>
+            <div className="text-[9px] font-bold text-[var(--status-issue-fg)] tracking-wide mb-1">⚡ {t.shiftChat.urgent}</div>
           )}
           <span
             dangerouslySetInnerHTML={{
               __html: escapeHtml(message.body)
-                .replace(/@(\S+)/g, '<span class="text-indigo-300 font-semibold">@$1</span>')
-                .replace(/#(\S+)/g, '<span class="text-indigo-300 underline cursor-pointer font-semibold">#$1</span>'),
+                .replace(/@(\S+)/g, '<span class="text-primary font-semibold">@$1</span>')
+                .replace(/#(\S+)/g, '<span class="text-primary underline cursor-pointer font-semibold">#$1</span>'),
             }}
           />
         </div>
@@ -72,7 +72,7 @@ export function MessageBubble({ message, currentUserId, onReact, onPin, canPin }
                 className={cn(
                   "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border",
                   mine
-                    ? "bg-indigo-900 border-indigo-500 text-indigo-200"
+                    ? "bg-primary/15 border-primary text-primary"
                     : "bg-muted border-border text-muted-foreground",
                 )}
               >

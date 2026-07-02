@@ -3193,6 +3193,14 @@
         "subtitle": "All technicians — clean and organize the department"
       }
     },
+    "urgent": "Urgent",
+    "archive": {
+      "loading": "Loading…",
+      "notFound": "Not found",
+      "title": "Shift chat archive",
+      "readOnly": "Read only",
+      "empty": "No messages in the archive"
+    },
     "errors": {
       "noOpenShift": "No active shift. Start a shift before sending messages.",
       "sendFailed": "Failed to send message. Please try again.",

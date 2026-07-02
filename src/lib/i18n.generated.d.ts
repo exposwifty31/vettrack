@@ -3196,6 +3196,14 @@ export interface TStructure {
         subtitle: string;
       };
     };
+    urgent: string;
+    archive: {
+      loading: string;
+      notFound: string;
+      title: string;
+      readOnly: string;
+      empty: string;
+    };
     errors: {
       noOpenShift: string;
       sendFailed: string;
