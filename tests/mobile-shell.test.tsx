@@ -44,7 +44,11 @@ vi.mock("@/lib/i18n", () => ({
 }));
 
 vi.mock("@/hooks/use-is-desktop", () => ({ useIsDesktop: () => false }));
-vi.mock("@/lib/capacitor-runtime", () => ({ isCapacitorNative: () => false }));
+vi.mock("@/lib/capacitor-runtime", () => ({
+  isCapacitorNative: () => false,
+  // useScanAffordance (via ScanFab / native tab bars) reads capacitorPlatform.
+  capacitorPlatform: () => "web",
+}));
 vi.mock("@/components/nfc-foreground-scan", () => ({ NfcForegroundScan: () => null }));
 vi.mock("@/components/layout", () => ({
   Layout: ({ children }: { children: React.ReactNode }) => (

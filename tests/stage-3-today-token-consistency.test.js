@@ -38,8 +38,8 @@ describe("Stage 3 Today — error replaces content", () => {
 });
 
 describe("Stage 3 Today — scan card", () => {
-  it("is desktop-only (removed on the native shell — BUG-005)", () => {
-    expect(/showScanCard\s*=[^;]*isDesktop/.test(src)).toBe(true);
+  it("is gated on the fab scan-affordance — iPad only, removed on iPhone/web (BUG-005)", () => {
+    expect(/showScanCard\s*=[^;]*scanAffordance === "fab"/.test(src)).toBe(true);
   });
   it("skeletons the scan slot during load", () => {
     expect(src.includes("showScanSkeleton")).toBe(true);
