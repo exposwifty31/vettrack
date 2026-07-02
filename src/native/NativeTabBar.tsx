@@ -14,7 +14,7 @@ type Props = {
   onMorePress: () => void;
 };
 
-function isTabActive(location: string, href: string): boolean {
+export function isTabActive(location: string, href: string): boolean {
   const path = href.split("?")[0];
   if (path === "/home") return location === "/home" || location === "/";
   // Equipment tab covers the browse list and its detail/scan sub-routes, plus
