@@ -17,6 +17,7 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const src = fs.readFileSync(path.join(repoRoot, "src", "pages", "inventory-page.tsx"), "utf8");
+const procSrc = fs.readFileSync(path.join(repoRoot, "src", "pages", "procurement.tsx"), "utf8");
 
 describe("Stage 5 Inventory — consumes semantic status tokens", () => {
   it("stock indicators read the --status-* HSL tokens, not hardcoded palette", () => {
@@ -44,6 +45,18 @@ describe("Stage 5 Inventory — no hardcoded palette", () => {
       expect(src.includes(token)).toBe(false);
     });
   }
+});
+
+describe("Stage 5 Procurement — no hardcoded palette", () => {
+  const banned = ["emerald-", "amber-", "red-500", "indigo-", "green-6"];
+  for (const token of banned) {
+    it(`does not use the "${token}" palette`, () => {
+      expect(procSrc.includes(token)).toBe(false);
+    });
+  }
+  it("received-quantity emphasis reads the --status-ok token", () => {
+    expect(procSrc.includes("var(--status-ok-fg)")).toBe(true);
+  });
 });
 
 describe("Stage 5 Inventory — BUG-010 dispense button inlined", () => {

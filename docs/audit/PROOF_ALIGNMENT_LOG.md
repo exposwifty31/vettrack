@@ -269,3 +269,16 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Not covered this increment (by design): the container-card grid rebuild, `inventory-item-detail.tsx`, `procurement.tsx`, and `DispenseSheet.tsx` restyle — subsequent Stage-5 increments. RTL not re-verified this pass.
 
 **Verdict:** VERIFIED (RED→GREEN lock test 14/14 + typecheck 0 + full suite 3564/0 + i18n + build + live light/dark token render + live BUG-010 scroll behavior). Restock/NFC behavior untouched.
+
+## 2026-07-02 — Stage 5 (increment 2): Procurement palette→token sweep (test-driven)
+
+**Claim:** Made `src/pages/procurement.tsx` fully palette-clean. The screen was already ~99% tokenized (surface cards, filter chips, `STATUS_BADGE` pill map, divided line tables — the plan's "iOS queue" structure already present); only two palette leaks remained.
+
+**Evidence:**
+- Enumerated: `grep` found exactly 2 hits — `partial` badge `border-amber-500/20` (line 45) and the received-quantity table cell `text-emerald-600` (line 312). No rebuild warranted; the screen already matched the prototype's queue structure.
+- RED first: extended `tests/stage-5-inventory-token-consistency.test.js` with a Procurement block (reads `procurement.tsx`) → **3 failed** (emerald, amber, missing `--status-ok-fg`).
+- GREEN: `partial` → `border-[var(--status-stale-border)]`; received-quantity emphasis → `text-[var(--status-ok-fg)]`. Residual palette: **0**.
+- Test (post-edit): stage-5 lock **20/20**; `npx tsc --noEmit` → **0**; `pnpm build` → built OK; full `pnpm test` → **362 files / 3570 passed / 0 failed** (baseline 3564 + 6 new).
+- Live browser (dev server :5000, Chrome MCP, desktop 1280px — procurement is behind `WebOnlyGuard`): `/procurement` renders the header, New-order button, filter chips (All/Draft/Ordered/Partial/Received/Cancelled) and the "No purchase orders" empty state with no breakage. The two changed styles live in `STATUS_BADGE`/a table cell that only render with order rows; the dev clinic has none, so the pills weren't force-rendered (changes are surgical + test/build-covered).
+
+**Verdict:** VERIFIED (RED→GREEN 20/20 + typecheck 0 + full suite 3570/0 + build + live empty-state render). Pill-with-data visual not exercised (no seed data); low risk — two-property change inside existing tokenized structure.
