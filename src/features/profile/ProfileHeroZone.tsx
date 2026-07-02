@@ -1,12 +1,14 @@
-import { useState } from "react";
-import { Pencil, Check, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { Pencil, Check, X, Camera } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { t } from "@/lib/i18n";
 import { api } from "@/lib/api";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { getInitials } from "@/lib/user-utils";
 import type { UserRole } from "@/types/platform";
+
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 
 function roleLabel(role: UserRole): string {
   return t.profile.roles[role];
@@ -19,6 +21,46 @@ export function ProfileHeroZone() {
   const [draft, setDraft] = useState(name ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const { data: me } = useQuery({
+    queryKey: ["/api/users/me"],
+    queryFn: api.users.me,
+    enabled: Boolean(userId),
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+  const avatarUrl = previewUrl ?? me?.avatarUrl ?? null;
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error(t.profile.photoUploadError);
+      return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      toast.error(t.profile.photoTooLarge);
+      return;
+    }
+    const localPreview = URL.createObjectURL(file);
+    setPreviewUrl(localPreview);
+    setUploading(true);
+    try {
+      await api.users.uploadAvatar(file);
+      await queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+      toast.success(t.profile.photoUpdated);
+    } catch {
+      setPreviewUrl(null);
+      toast.error(t.profile.photoUploadError);
+    } finally {
+      URL.revokeObjectURL(localPreview);
+      setUploading(false);
+    }
+  }
 
   async function handleSave() {
     if (!userId || !draft.trim() || draft.trim() === name) {
@@ -53,23 +95,84 @@ export function ProfileHeroZone() {
       paddingBlock: 28,
       paddingInline: 24,
     }}>
-      {/* Avatar */}
-      <div style={{
-        width: 72,
-        height: 72,
-        borderRadius: "50%",
-        background: "hsl(var(--primary))",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 26,
-        fontWeight: 700,
-        color: "hsl(var(--primary-foreground))",
-        letterSpacing: "-0.02em",
-        flexShrink: 0,
-      }}>
-        {getInitials(name)}
-      </div>
+      {/* Avatar + upload control */}
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        aria-label={t.profile.changePhoto}
+        style={{
+          position: "relative",
+          width: 72,
+          height: 72,
+          padding: 0,
+          border: "none",
+          borderRadius: "50%",
+          background: "transparent",
+          cursor: uploading ? "default" : "pointer",
+          flexShrink: 0,
+          WebkitTapHighlightColor: "transparent",
+          opacity: uploading ? 0.7 : 1,
+        }}
+      >
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt={t.profile.avatarAlt}
+            width={72}
+            height={72}
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: "50%",
+              objectFit: "cover",
+              display: "block",
+            }}
+          />
+        ) : (
+          <span style={{
+            width: 72,
+            height: 72,
+            borderRadius: "50%",
+            background: "hsl(var(--primary))",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 26,
+            fontWeight: 700,
+            color: "hsl(var(--primary-foreground))",
+            letterSpacing: "-0.02em",
+          }}>
+            {getInitials(name)}
+          </span>
+        )}
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            insetInlineEnd: 0,
+            bottom: 0,
+            width: 24,
+            height: 24,
+            borderRadius: "50%",
+            background: "hsl(var(--primary))",
+            color: "hsl(var(--primary-foreground))",
+            border: "2px solid hsl(var(--background))",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Camera size={13} />
+        </span>
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleAvatarChange}
+        style={{ display: "none" }}
+      />
 
       {/* Name + edit */}
       {editing ? (

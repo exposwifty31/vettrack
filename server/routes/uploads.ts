@@ -1,9 +1,21 @@
 import { randomUUID } from "crypto";
 import express from "express";
 import multer from "multer";
+import { and, eq } from "drizzle-orm";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { db, users } from "../db.js";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { buildAvatarKey } from "../lib/upload-filename.js";
+
+/** True when object storage credentials + bucket are present in this environment. */
+function isObjectStorageConfigured(): boolean {
+  return Boolean(
+    process.env.S3_BUCKET &&
+      process.env.S3_ACCESS_KEY_ID &&
+      process.env.S3_SECRET_ACCESS_KEY,
+  );
+}
 
 const router = express.Router();
 
@@ -80,6 +92,59 @@ router.post(
       res.status(500).json(apiError({ code: "INTERNAL_ERROR", reason: "UPLOAD_FAILED", message: "Upload failed", requestId }));
     }
   }
+);
+
+router.post(
+  "/avatar",
+  requireAuth,
+  upload.single("image"),
+  async (req, res) => {
+    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    try {
+      if (!req.file) {
+        return res.status(400).json(apiError({ code: "VALIDATION_FAILED", reason: "NO_IMAGE_UPLOADED", message: "No image uploaded", requestId }));
+      }
+
+      if (!isObjectStorageConfigured()) {
+        return res.status(501).json(
+          apiError({
+            code: "NOT_IMPLEMENTED",
+            reason: "OBJECT_STORAGE_NOT_CONFIGURED",
+            message:
+              "Avatar uploads are not available in this environment. Configure S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY (Railway object storage) to enable them.",
+            requestId,
+          }),
+        );
+      }
+
+      const actor = req.authUser!;
+      const fileName = buildAvatarKey(actor.id, req.file.originalname);
+
+      await getS3Client().send(
+        new PutObjectCommand({
+          Bucket: process.env.S3_BUCKET,
+          Key: fileName,
+          Body: req.file.buffer,
+          ContentType: req.file.mimetype,
+        }),
+      );
+
+      const url = `${process.env.S3_PUBLIC_URL}/${fileName}`;
+
+      await db
+        .update(users)
+        .set({ avatarUrl: url })
+        .where(and(eq(users.id, actor.id), eq(users.clinicId, actor.clinicId)));
+
+      res.json({ success: true, url });
+    } catch (error) {
+      if (error instanceof Error && error.message === "Images only") {
+        return res.status(400).json(apiError({ code: "VALIDATION_FAILED", reason: "INVALID_FILE_TYPE", message: "Only image files are allowed", requestId }));
+      }
+      console.error("[uploads/avatar]", error);
+      res.status(500).json(apiError({ code: "INTERNAL_ERROR", reason: "UPLOAD_FAILED", message: "Upload failed", requestId }));
+    }
+  },
 );
 
 export default router;

@@ -35,6 +35,7 @@ export interface User {
   createdAt: string;
   deletedAt?: string | null;
   deletedBy?: string | null;
+  avatarUrl?: string | null;
   authority?: AuthoritySnapshot;
 }
 

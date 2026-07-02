@@ -124,6 +124,12 @@ router.get("/me", requireAuth, async (req, res) => {
       now,
     });
 
+    const [profileRow] = await db
+      .select({ avatarUrl: users.avatarUrl })
+      .from(users)
+      .where(and(eq(users.clinicId, req.clinicId!), eq(users.id, req.authUser.id)))
+      .limit(1);
+
     // Legacy effectiveRole remains authoritative in Phase 2A.
     // Authority snapshot is advisory only.
     // See docs/authority-model.md §1-§2.
@@ -140,6 +146,7 @@ router.get("/me", requireAuth, async (req, res) => {
 
     res.json({
       ...req.authUser,
+      avatarUrl: profileRow?.avatarUrl ?? null,
       effectiveRole: resolved.effectiveRole,
       roleSource: resolved.source,
       activeShift: resolved.activeShift,

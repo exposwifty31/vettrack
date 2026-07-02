@@ -3988,6 +3988,11 @@ export interface TStructure {
     editDisplayName: string;
     displayNameUpdated: string;
     saveError: string;
+    avatarAlt: string;
+    changePhoto: string;
+    photoUpdated: string;
+    photoUploadError: string;
+    photoTooLarge: string;
     shiftActivity: string;
     noShiftActivity: string;
     shiftActivityError: string;

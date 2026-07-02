@@ -64,6 +64,14 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
     refetchOnWindowFocus: false,
   });
 
+  const { data: me } = useQuery({
+    queryKey: ["/api/users/me"],
+    queryFn: api.users.me,
+    enabled: !!userId && !isFullscreen,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+
   if (isFullscreen) return null;
 
   const alerts = equipment ? computeAlerts(equipment) : [];
@@ -145,27 +153,46 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
             onClick={() => go("/my-profile")}
             style={iconBtn}
           >
-            {/* Visible avatar sized to match the gear/bell glyphs, not the hit area.
-                Muted fill + hairline ring (not a saturated --primary fill) so the
-                least-frequent action doesn't out-weigh the live-badge alerts control. */}
-            <span
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: "50%",
-                background: "hsl(var(--muted))",
-                color: "hsl(var(--foreground))",
-                border: "1px solid hsl(var(--border))",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: "-0.01em",
-              }}
-            >
-              {getInitials(name)}
-            </span>
+            {/* Visible avatar sized (24px) to sit level with the 20px gear/bell
+                glyphs, not the 44px hit area — a 28px circle read oversized next
+                to them (BUG-006). Muted fill + hairline ring (not a saturated
+                --primary fill) so the least-frequent action doesn't out-weigh the
+                live-badge alerts control. */}
+            {me?.avatarUrl ? (
+              <img
+                src={me.avatarUrl}
+                alt={t.profile.avatarAlt}
+                width={24}
+                height={24}
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                  border: "1px solid hsl(var(--border))",
+                  display: "block",
+                }}
+              />
+            ) : (
+              <span
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: "50%",
+                  background: "hsl(var(--muted))",
+                  color: "hsl(var(--foreground))",
+                  border: "1px solid hsl(var(--border))",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                {getInitials(name)}
+              </span>
+            )}
           </button>
 
           <button

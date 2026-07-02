@@ -1,10 +1,12 @@
 // src/components/layout/Topbar.tsx
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useDirection } from "@/hooks/useDirection";
 import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
 import { NAV } from "@/lib/routes/nav-model";
+import { api } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { getInitials } from "@/lib/user-utils";
 
@@ -15,7 +17,7 @@ function navLabel(key: string): string {
 
 export function Topbar() {
   const [location] = useLocation();
-  const { isAdmin, name, activeShift } = useAuth();
+  const { isAdmin, name, activeShift, userId } = useAuth();
   const dir = useDirection();
 
   const visibleItems = NAV.filter((n) => !n.adminOnly || isAdmin);
@@ -60,7 +62,7 @@ export function Topbar() {
       {/* Right controls */}
       <div className="flex items-center gap-2.5 ms-auto shrink-0">
         <ShiftBadge activeShift={activeShift} />
-        <UserAvatar name={name} />
+        <UserAvatar name={name} enabled={Boolean(userId)} />
       </div>
     </header>
   );
@@ -79,12 +81,29 @@ function ShiftBadge({
   );
 }
 
-function UserAvatar({ name }: { name: string | null }) {
+function UserAvatar({ name, enabled }: { name: string | null; enabled: boolean }) {
+  const { data: me } = useQuery({
+    queryKey: ["/api/users/me"],
+    queryFn: api.users.me,
+    enabled,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
   return (
     <Link href="/my-profile" aria-label={t.profile.title}>
-      <div className="w-7 h-7 rounded-full bg-ivory-green flex items-center justify-center text-xs font-bold text-white select-none shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
-        {getInitials(name)}
-      </div>
+      {me?.avatarUrl ? (
+        <img
+          src={me.avatarUrl}
+          alt={t.profile.avatarAlt}
+          width={28}
+          height={28}
+          className="w-7 h-7 rounded-full object-cover select-none shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+        />
+      ) : (
+        <div className="w-7 h-7 rounded-full bg-ivory-green flex items-center justify-center text-xs font-bold text-white select-none shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
+          {getInitials(name)}
+        </div>
+      )}
     </Link>
   );
 }
