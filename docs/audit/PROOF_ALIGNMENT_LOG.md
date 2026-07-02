@@ -225,3 +225,17 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Not visually verified in situ: the Badge `count` overlay positioned over an icon, and the shimmer under an actual loading state on a real screen (both land with their consuming screens). Reduced-motion fallback verified structurally (`motion-reduce:animate-none`), not yet with an OS reduce-motion pass.
 
 **Verdict:** VERIFIED (RED→GREEN lock tests + typecheck + full suite 3540/0 + build + live computed-style of the shimmer). In-situ visual pass of count-overlay + loading shimmer deferred to their first consuming screen; StatusChip §6.6 already satisfied by existing StatusBadge.
+
+## 2026-07-02 — Stage 2 (increment 3): ListRow primitive + Stage 2 close-out (test-driven)
+
+**Claim:** Added the reusable `ListRow` primitive (§6.18) — the last screen-agnostic Stage 2 component — and closed Stage 2. ListRow renders as button/div/asChild, has leading/label/description/meta slots, a reading-forward drill-in chevron, hover/pressed on the surface ramp, a selected state, a 44px min touch target, and logical properties for RTL. Remaining Stage 2 items (`PrimaryActionCard`/QuickScan §6.7, flat scan tab §6.9/6.11) are explicitly screen/behavior-coupled and deferred to their consuming work per the plan (Stage 3 Today + Stage 4/cross-cutting platform-scan model).
+
+**Evidence:**
+- RED first: `tests/stage-2-list-row-token-consistency.test.js` (new, guarded read) → **4 failed / 4** before the file existed.
+- GREEN: `src/components/ui/list-row.tsx` (new) — `min-h-11` (44px), interactive `hover:bg-[var(--surface-hover)] active:bg-[var(--surface-active)]`, `selected` → `bg-[var(--surface-active)]` + `aria-current`, reuses `ForwardChevron` (RTL-aware), logical `text-start`/`ms-auto`/`gap-3`; `asChild` via Radix Slot for router links; renders `<button type="button">` only when interactive (else `<div>`), no `any` (typed `React.ElementType`).
+- Test (post-edit): lock test green (4); `npx tsc --noEmit` (frontend) → **0 errors**; full `pnpm test` → **360 files / 3544 passed / 0 failed** (baseline 3540 + 4 new, zero regressions); `pnpm i18n:check` → parity OK; `pnpm build` → built OK. ListRow's surface tokens (`--surface-hover`/`--surface-active`) were already proven to resolve live in the Stage 1 entry.
+- Not visually verified in situ: ListRow has no consumer yet (library primitive) — its first visual pass lands when a screen (Settings/Admin/Rooms) adopts it.
+
+**Stage 2 status:** CLOSED for screen-agnostic primitives — Button, Card, Skeleton, Badge, ListRow shipped + locked; StatusChip already satisfied by StatusBadge. Deferred (by design): PrimaryActionCard (→ Stage 3), flat scan tab (→ Stage 4 + cross-cutting).
+
+**Verdict:** VERIFIED (RED→GREEN lock test + typecheck + full suite 3544/0 + i18n + build). In-situ visual confirmation deferred to first consumer.
