@@ -52,6 +52,10 @@ export function ProfileHeroZone() {
     try {
       await api.users.uploadAvatar(file);
       await queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+      // The refetched `me` now carries the real presigned URL. Drop the local
+      // preview so the <img> renders that — a revoked object URL (see finally)
+      // must never remain the display source, or the avatar breaks on re-decode.
+      setPreviewUrl(null);
       toast.success(t.profile.photoUpdated);
     } catch {
       setPreviewUrl(null);

@@ -718,3 +718,23 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 ## 2026-07-02 — ⚠️ FLAG (not mine): `src/lib/i18n.ts` has a duplicate `formatDateTimeByLocale`
 
 `src/lib/i18n.ts` (modified in the working tree this session by a concurrent background job — mtime post-dates my edits; not listed dirty at my session start) declares `export function formatDateTimeByLocale` **twice** — at L79 (`date.toLocaleString(locale, options)`) and L95 (`Date | string`, localeTag + `{dateStyle:"medium",timeStyle:"short"}` defaults). This yields `tsc` **TS2323 + TS2393 ×2 = 4 errors**, the repo's only current type errors. Left untouched per the "don't stomp another agent's in-flight file" rule. The L95 version (documented, accepts `Date | string`, has defaults) looks like the intended keeper; the L79 stub looks like the leftover — but the owning job should reconcile. Flagging so a green `tsc` isn't mistakenly attributed to this unit's commits.
+
+## 2026-07-03 — Stage 1–10 audit remediation: 2 MEDIUM findings fixed
+
+**Context:** Reviewed the Stages 1–10 design work (PR #38 + precursors) through three skill lenses — `product-design-fundamentals`, `apple-platform-ux`, `vettrack-codebase-relevance-audit`. Most of the surface is token migration already guarded by the stage-N lock tests; the two defects below were outside that net. (The i18n.ts duplicate flagged in the entry above is now reconciled — `pnpm typecheck` returns 0 errors this session.)
+
+**Finding 1 (MEDIUM, correctness) — avatar pinned to a revoked object URL.**
+- **Verified real:** `src/features/profile/ProfileHeroZone.tsx` displays `avatarUrl = previewUrl ?? me?.avatarUrl`. `previewUrl` was cleared only in the `catch`; on success it stayed set while `finally` called `URL.revokeObjectURL(localPreview)`. Net: after a successful upload the `<img>` src was a *revoked* `blob:` URL that masked the refetched server URL for the component's lifetime — visually "works" only because a decoded `<img>` often survives revocation, but breaks on any re-decode/remount (Capacitor WKWebView).
+- **Fix:** added `setPreviewUrl(null)` on the success path (after `invalidateQueries` has already refreshed `me`) so the render falls through to the real presigned URL before the blob is revoked.
+- **Test:** new `tests/profile-avatar-upload.test.tsx` (happy-dom, 3 cases): success renders `SERVER_URL` (not `OBJECT_URL`) + revokes the preview; non-image rejected without calling upload; upload failure clears preview → falls back to initials + error toast. Genuine regression lock — against the pre-fix code the success assertion `img.src === SERVER_URL` fails (src would be the revoked blob). Harness note: seeded the QueryClient cache to `success/fresh` so post-upload `invalidateQueries` issues a real refetch instead of coalescing with a still-pending mount fetch.
+
+**Finding 2 (MEDIUM, design-system + dark-mode) — hardcoded tab-bar separator.**
+- **Verified real:** `src/native/NativeTabBar.tsx:106` used `borderTop: "0.5px solid rgba(60,60,67,0.18)"` — a fixed light-mode iOS separator. In dark mode (`--background` near-black) an 18%-opacity dark line is effectively invisible, and it's exactly the token drift the PR set out to remove. `NativeHeader.tsx:102` already uses `hsl(var(--border))` for the symmetric bottom border. (Confirmed the other native-shell literals — `#fff` badge text on `--destructive`, the switch thumb, black-alpha shadows — are defensible, not drift.)
+- **Fix:** `borderTop: "0.5px solid hsl(var(--border))"` — adapts per theme, matches the header.
+
+**Gates (this session):**
+- `pnpm typecheck` (frontend + server) → **exit 0, 0 errors**.
+- `pnpm test tests/profile-avatar-upload.test.tsx` → **3 passed**; `tests/mobile-shell.test.tsx` (renders the edited tab bar) → **passed** (18 in the combined run).
+- No i18n keys added (comments English-only) → parity/`i18n-no-hebrew-in-source` unaffected.
+
+**Verdict:** VERIFIED at gate + unit level. **Not device-verified this session:** the dark-mode separator is a visual change on the native shell — the token resolves correctly (`--border` defined in the dark `:root` block of `index.css`) and renders in jsdom, but the actual dark-mode appearance on iPhone/iPad was not re-checked in a simulator. **Deferred (documented, not fixed):** SVG-accepting upload filter (LOW–MED security), duplicated `768` breakpoint constant (LOW), viewport-width tablet classification for landscape phones (LOW), and the `MobileTabBar` re-export shim delete-candidate (cleanup) — all filed to the audit summary for the codebase-cleanup backlog.
