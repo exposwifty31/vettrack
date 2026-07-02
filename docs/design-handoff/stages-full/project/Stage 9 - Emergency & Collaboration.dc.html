@@ -245,6 +245,7 @@ class Component extends DCLogic {
     const themeOpts=[['light','Light'],['dark','Dark']].map(([k,l])=>({key:k,label:l,style:seg(theme===k),onClick:()=>this.set('theme',k)}));
     const sizeOpts=[['compact','Compact'],['medium','Medium'],['expanded','Expanded']].map(([k,l])=>({key:k,label:l,style:seg(size===k),onClick:()=>this.set('size',k)}));
     const screenDefs=[['cart','Crash Cart'],['history','Code Blue History'],['chat','Shift Chat'],['handover','Handover']];
+    const topbarTitleMap={cart:L('Crash Cart Check','בדיקת עגלת חירום'),history:L('Code Blue History','היסטוריית קוד כחול'),chat:L('Shift Chat','צ׳אט משמרת'),handover:L('Shift Handover','העברת משמרת')};
     const screenOpts=screenDefs.map(([k,l])=>({key:k,label:l,style:seg(screen===k),onClick:()=>this.set('screen',k)}));
     const dirOpts=[['ltr','English'],['rtl','עברית']].map(([k,l])=>({key:k,label:l,style:seg(dir===k),onClick:()=>this.set('dir',k)}));
 
@@ -364,7 +365,7 @@ class Component extends DCLogic {
       themeOpts, sizeOpts, screenOpts, dirOpts, hasVariant, variantTitle: vc?vc.title:'', variantOpts,
       frameOuter:f.outer, screenStyle:f.screen,
       isCompact, hasSidebar, isExpanded, navItems,
-      topbarTitle:L('Emergency','חירום'),
+      topbarTitle:topbarTitleMap[screen],
       mainPad: isCompact?'8px 16px 20px':(isExpanded?'24px 32px':'20px 24px'),
       contentMax: isExpanded?'760px':(hasSidebar?'640px':'none'),
       contentGap: isCompact?'16px':'20px',

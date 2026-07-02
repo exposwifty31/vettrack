@@ -1,3 +1,5 @@
+# ConfidenceIndicator
+
 ConfidenceIndicator — proposed addition (§20-D2), not yet in the published
 bundle. Import from `@/components/equipment/confidence-indicator` once merged.
 

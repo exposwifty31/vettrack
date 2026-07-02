@@ -396,3 +396,24 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Gates: `pnpm typecheck` (fe+server) → 0 · `pnpm build` → exit 0 · guard tests (mobile-shell, i18n-no-hebrew, i18n-parity, no-hardcoded-ui-strings) → 21/21.
 
 **Verdict:** VERIFIED at gate level. On-device re-verification of the dropdown keyboard/focus behavior + 44px targets recommended on next sim pass.
+
+## 2026-07-02 — CodeRabbit findings on design-handoff bundle: verify + selective fix
+
+**Claim:** Verified each CodeRabbit inline finding (all in `docs/design-handoff/`) against the current file; fixed the still-valid ones minimally, skipped two with reason. No `src/` touched — repo build/typecheck unaffected.
+
+**Fixed (13):**
+- `deck-stage.js` disconnectedCallback: reset `this._railEnabled=false` so `_enableRail()` re-runs on reconnect (node --check: valid JS).
+- `apply.sh` mkdir: added `src/components/alerts` (bash -n: valid).
+- `alert-card.tsx`: `text-[12.5px]`→`text-sm` (reference file; live `src/components/alerts/AlertCard.tsx` already has no 12.5px).
+- `audit-log-row.prompt.md` / `confidence-indicator.prompt.md`: added top-level `#` heading (MD041).
+- `chat-message.tsx`: gated progress UI on `ackPercent && ackLabel` (no bare bar) + made `ChatMessageProps` a discriminated union; `chat-message.prompt.md` doc updated to match.
+- `Stage 1 …dc.html`: `sizeMeta.expanded.target` `'var(--space-9)'`→`'36pt'` (matches `.page[data-size="expanded"]{--target-min:36px}`, plain-string format like siblings).
+- `Stage 7 …dc.html`: per-screen `topbarTitleMap[screen]`; duplicate `statCols` key renamed to `metricsStatCols` (was silently overwriting the 4-col analytics/dashboard grid with the 3-col metrics value) + 2 metrics template bindings repointed (grep: 4×statCols gap:10px kept, 2×metricsStatCols).
+- `Stage 8` / `Stage 9 …dc.html`: per-screen `topbarTitleMap[screen]` (Admin/Shifts/Asset Types; Crash Cart/History/Chat/Handover). Mirrors the shipped Stage 6 pattern.
+- `README.md`: stale `vettrack-design-handoff/project/`→`docs/design-handoff/stages-full/project/`.
+
+**Skipped (2), with reason:**
+- `apply.sh` "Asset #" i18n (419-422): live `src/` has no `EntityMetaRow`/"Asset #" (grep-verified) — the script was applied-then-reset and isn't executed; converting a dead reference script's sed-injected TSX into a live i18n flow (touching real locales + equipment-detail) is out of scope.
+- `apply.sh` append idempotency (13-16): one-shot reference apply script, self-documented "review the diff before committing," applied-then-reset; guarding all ~8 `cat >>` sites exceeds "minimal" for a non-executing artifact.
+
+**Verdict:** VERIFIED (node --check + bash -n on the scriptable edits; structural grep on the `.dc.html` template/JS edits; scope confirmed docs-only). `.dc.html`/reference `.tsx` are not in tsconfig/vite, so not gate-compiled — validated by parser + pattern-match against the working Stage 6.

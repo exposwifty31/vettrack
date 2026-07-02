@@ -11,15 +11,17 @@ and `dir="rtl"`.
 ## Props
 
 ```ts
-interface ChatMessageProps {
+type ChatMessageProps = {
   variant?: "normal" | "broadcast" | "urgent";
   from: string;
   own?: boolean;
   children: React.ReactNode;
-  ackPercent?: number; // broadcast only, 0-100
-  ackLabel?: string;   // e.g. "4 / 6 acknowledged" — required if ackPercent is set
   className?: string;
-}
+} & (
+  // broadcast progress is all-or-nothing — ackLabel required whenever ackPercent is set
+  | { ackPercent?: undefined; ackLabel?: undefined }
+  | { ackPercent: number; ackLabel: string }
+);
 ```
 
 ## Usage

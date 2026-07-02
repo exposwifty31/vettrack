@@ -5,7 +5,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-export interface ChatMessageProps extends React.HTMLAttributes<HTMLDivElement> {
+type ChatMessageBase = React.HTMLAttributes<HTMLDivElement> & {
   variant?: "normal" | "broadcast" | "urgent";
   /** Sender display name. Always shown for broadcast/urgent; shown for
    * "normal" only when `own` is false. */
@@ -14,11 +14,17 @@ export interface ChatMessageProps extends React.HTMLAttributes<HTMLDivElement> {
    * logical margin utilities (ms-auto/me-auto), so it's correct in RTL too. */
   own?: boolean;
   children: React.ReactNode;
-  /** Broadcast only, 0-100. Always pair with ackLabel — never show a bare bar
-   * with no count (mirrors the Equipment Hero PRD's "never fake precision"). */
-  ackPercent?: number;
-  ackLabel?: string;
-}
+};
+
+/** ackPercent/ackLabel are all-or-nothing (broadcast progress). Encoded as a
+ * discriminated union so TypeScript requires the count label whenever a
+ * percentage is present — never a bare bar (Equipment Hero PRD "never fake
+ * precision"). */
+export type ChatMessageProps = ChatMessageBase &
+  (
+    | { ackPercent?: undefined; ackLabel?: undefined }
+    | { ackPercent: number; ackLabel: string }
+  );
 
 export function ChatMessage({
   variant = "normal",
@@ -43,7 +49,7 @@ export function ChatMessage({
           📢 {from}
         </p>
         <p className="text-base font-bold text-foreground">{children}</p>
-        {typeof ackPercent === "number" ? (
+        {typeof ackPercent === "number" && ackLabel ? (
           <>
             <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-muted">
               <div
@@ -51,11 +57,9 @@ export function ChatMessage({
                 style={{ width: `${ackPercent}%` }}
               />
             </div>
-            {ackLabel ? (
-              <p className="font-num mt-1 text-xs font-semibold text-[var(--status-ok-fg)]">
-                {ackLabel}
-              </p>
-            ) : null}
+            <p className="font-num mt-1 text-xs font-semibold text-[var(--status-ok-fg)]">
+              {ackLabel}
+            </p>
           </>
         ) : null}
       </div>

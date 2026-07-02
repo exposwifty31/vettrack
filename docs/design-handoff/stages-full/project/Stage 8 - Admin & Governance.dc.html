@@ -325,6 +325,7 @@ class Component extends DCLogic {
     const themeOpts=[['light','Light'],['dark','Dark']].map(([k,l])=>({key:k,label:l,style:seg(theme===k),onClick:()=>this.set('theme',k)}));
     const sizeOpts=[['compact','Compact'],['medium','Medium'],['expanded','Expanded']].map(([k,l])=>({key:k,label:l,style:seg(size===k),onClick:()=>this.set('size',k)}));
     const screenDefs=[['admin','Admin'],['shifts','Shifts Import'],['assettypes','Asset Types']];
+    const topbarTitleMap={admin:L('Admin','ניהול'),shifts:L('Shift Import','ייבוא משמרות'),assettypes:L('Asset Types','סוגי נכסים')};
     const screenOpts=screenDefs.map(([k,l])=>({key:k,label:l,style:seg(screen===k),onClick:()=>this.set('screen',k)}));
     const dirOpts=[['ltr','English'],['rtl','עברית']].map(([k,l])=>({key:k,label:l,style:seg(dir===k),onClick:()=>this.set('dir',k)}));
 
@@ -485,7 +486,7 @@ class Component extends DCLogic {
       frameOuter:f.outer, screenStyle:f.screen, browserChrome:f.browser, routePath:routes[screen],
       isCompact, hasSidebar, isExpanded,
       navItems, tabs, moreLabel:L('More','עוד'),
-      topbarTitle:L('Admin','ניהול'),
+      topbarTitle:topbarTitleMap[screen],
       mainPad: isCompact?'8px 16px 20px':(isExpanded?'24px 32px':'20px 24px'),
       contentMax: isExpanded?'900px':(hasSidebar?'700px':'none'),
       contentGap: isCompact?'16px':'20px',

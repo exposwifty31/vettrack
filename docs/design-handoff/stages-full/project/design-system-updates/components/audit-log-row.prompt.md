@@ -1,3 +1,5 @@
+# AuditLogRow
+
 AuditLogRow — proposed addition (§21-D1), not yet in the published bundle.
 Import from `@/components/ui/audit-log-row` once merged.
 

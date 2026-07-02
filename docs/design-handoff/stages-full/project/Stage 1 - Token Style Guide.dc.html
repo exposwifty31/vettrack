@@ -567,7 +567,7 @@ class Component extends DCLogic {
     const sizeMeta = {
       compact:  { label: 'Compact', margin: '16', gap: '20', maxw: 'full', target: '44pt', nav: 'Bottom tab bar', dot: 'rgb(var(--sys-blue))' },
       medium:   { label: 'Medium', margin: '24', gap: '24', maxw: '720', target: '44pt', nav: 'Sidebar 220', dot: 'rgb(var(--sys-green))' },
-      expanded: { label: 'Expanded', margin: '32', gap: '24', maxw: '1120', target: 'var(--space-9)', nav: 'Sidebar + utility bar', dot: 'var(--brand)' },
+      expanded: { label: 'Expanded', margin: '32', gap: '24', maxw: '1120', target: '36pt', nav: 'Sidebar + utility bar', dot: 'var(--brand)' },
     };
     const sizeRows = ['compact', 'medium', 'expanded'].map(k => {
       const m = sizeMeta[k]; const active = size === k;

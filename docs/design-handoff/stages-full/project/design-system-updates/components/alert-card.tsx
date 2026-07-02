@@ -30,7 +30,7 @@ export function AlertCard({ icon: Icon, title, tone }: AlertCardProps) {
     <div
       className={cn(
         "flex items-center gap-2 px-3 py-2.5 rounded-md border-s-4",
-        "text-[12.5px]",
+        "text-sm",
         TONE_STYLES[tone]
       )}
     >

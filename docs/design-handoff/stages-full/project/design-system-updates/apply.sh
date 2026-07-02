@@ -8,7 +8,7 @@ set -euo pipefail
 SRC="${1:?Usage: apply.sh <path-to-design-system-updates>}"
 
 mkdir -p public/fonts/heebo public/icons \
-  src/components/equipment src/components/general src/components/ui
+  src/components/alerts src/components/equipment src/components/general src/components/ui
 
 # Tokens & entities — APPEND, never overwrite (both real files already have
 # unrelated content above what we're adding).

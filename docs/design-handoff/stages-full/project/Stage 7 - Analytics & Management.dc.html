@@ -218,7 +218,7 @@
                     </sc-if>
 
                     <sc-if value="{{ metricsLoading }}" hint-placeholder-val="{{ false }}">
-                      <div style="display:grid; grid-template-columns:{{ statCols }}; gap:12px"><sc-for list="{{ loadingFacts }}" as="lf" hint-placeholder-count="6"><div class="skd" style="height:96px; border-radius:12px"></div></sc-for></div>
+                      <div style="display:grid; grid-template-columns:{{ metricsStatCols }}; gap:12px"><sc-for list="{{ loadingFacts }}" as="lf" hint-placeholder-count="6"><div class="skd" style="height:96px; border-radius:12px"></div></sc-for></div>
                     </sc-if>
 
                     <sc-if value="{{ metricsDisabled }}" hint-placeholder-val="{{ false }}">
@@ -230,7 +230,7 @@
                     </sc-if>
 
                     <sc-if value="{{ metricsShowGrid }}" hint-placeholder-val="{{ true }}">
-                      <div style="display:grid; grid-template-columns:{{ statCols }}; gap:12px"><sc-for list="{{ metricTiles }}" as="m" hint-placeholder-count="6">
+                      <div style="display:grid; grid-template-columns:{{ metricsStatCols }}; gap:12px"><sc-for list="{{ metricTiles }}" as="m" hint-placeholder-count="6">
                         <div style="background:var(--surface); border:1px solid var(--hairline); border-radius:14px; padding:14px 16px"><p style="font:600 11.5px var(--font-sans); color:var(--muted-foreground); margin:0">{{ m.label }}</p><p style="font-family:var(--font-num); font-size:1.5rem; font-weight:600; color:var(--foreground); margin:8px 0 0">{{ m.value }}</p></div>
                       </sc-for></div>
                     </sc-if>
@@ -346,6 +346,7 @@ class Component extends DCLogic {
     const themeOpts=[['light','Light'],['dark','Dark']].map(([k,l])=>({key:k,label:l,style:seg(theme===k),onClick:()=>this.set('theme',k)}));
     const sizeOpts=[['compact','Compact'],['medium','Medium'],['expanded','Expanded']].map(([k,l])=>({key:k,label:l,style:seg(size===k),onClick:()=>this.set('size',k)}));
     const screenDefs=[['analytics','Analytics'],['dashboard','Dashboard'],['metrics','Metrics'],['leaderboard','Leaderboard'],['audit','Audit Log']];
+    const topbarTitleMap={analytics:L('Analytics','ניתוח'),dashboard:L('Dashboard','לוח בקרה'),metrics:L('Operational Metrics','מדדים תפעוליים'),leaderboard:L('Shift Leaderboard','לוח מובילי משמרת'),audit:L('Audit Log','יומן ביקורת')};
     const screenOpts=screenDefs.map(([k,l])=>({key:k,label:l,style:seg(screen===k),onClick:()=>this.set('screen',k)}));
     const dirOpts=[['ltr','English'],['rtl','עברית']].map(([k,l])=>({key:k,label:l,style:seg(dir===k),onClick:()=>this.set('dir',k)}));
 
@@ -546,7 +547,7 @@ class Component extends DCLogic {
       isCompact, hasSidebar, isExpanded,
       navItems, tabs, moreLabel:L('More','עוד'),
       analyticsDemotedLabel:L('Analytics (in More)','ניתוח (בתפריט עוד)'), analyticsNavColor:'var(--muted-foreground)',
-      topbarTitle:L('Analytics','ניתוח'),
+      topbarTitle:topbarTitleMap[screen],
       mainPad: isCompact?'8px 16px 20px':(isExpanded?'24px 32px':'20px 24px'),
       contentMax: isExpanded?'900px':(hasSidebar?'680px':'none'),
       contentGap: isCompact?'16px':'20px',
@@ -567,7 +568,7 @@ class Component extends DCLogic {
       rosterLabel:L('On shift now','במשמרת כעת'), roster,
       attentionLabel:L('Needs attention','דורש טיפול'), attentionItems,
 
-      showMetrics, metricsUnavailable, metricsLoading, metricsDisabled, metricsNoData, metricsShowGrid, metricsHasRanges, rangeOpts, metricTiles, statCols: isCompact?'repeat(2,1fr)':'repeat(3,1fr)',
+      showMetrics, metricsUnavailable, metricsLoading, metricsDisabled, metricsNoData, metricsShowGrid, metricsHasRanges, rangeOpts, metricTiles, metricsStatCols: isCompact?'repeat(2,1fr)':'repeat(3,1fr)',
       metricsTitle:L('Operational Metrics','מדדים תפעוליים'), metricsSubtitle:L('Equipment-Hero deployability counters','מדדי פריסת ציוד'),
       metricsUnavailableTitle:L('Not available for this tenant','לא זמין עבור ארגון זה'), metricsUnavailableSub:L('The real component returns nothing here (server responds 501) — this box exists only to make that explicit for review; the shipped app shows a blank gap, not this note.','הרכיב האמיתי לא מציג דבר (השרת מחזיר 501) — תיבה זו קיימת רק להבהרה בבדיקה; באפליקציה בפועל יוצג רווח ריק.'),
       metricsDisabledPill:L('Disabled','מושבת'), metricsDisabledText:L('Operational metrics are turned off for this account.','מדדים תפעוליים כבויים עבור חשבון זה.'),

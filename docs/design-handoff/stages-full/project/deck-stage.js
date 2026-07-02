@@ -871,6 +871,9 @@
       if (this._liveObserver) this._liveObserver.disconnect();
       if (this._railObserver) this._railObserver.disconnect();
       if (this._onTweakChange) window.removeEventListener('tweakchange', this._onTweakChange);
+      // Allow _enableRail() to run again on reconnect — it short-circuits on
+      // this flag, so leaving it set would strand rail setup after a detach/attach.
+      this._railEnabled = false;
     }
 
     attributeChangedCallback() {

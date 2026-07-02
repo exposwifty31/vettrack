@@ -6,7 +6,7 @@ A user mocked up designs in HTML/CSS/JS using an AI design tool, then exported t
 
 ## What you should do — IMPORTANT
 
-**Find the primary design file under `vettrack-design-handoff/project/` and read it top to bottom.** Then **follow its imports**: open every file it pulls in (shared components, CSS, scripts) so you understand how the pieces fit together before you start implementing.
+**Find the primary design file under `docs/design-handoff/stages-full/project/` and read it top to bottom.** Then **follow its imports**: open every file it pulls in (shared components, CSS, scripts) so you understand how the pieces fit together before you start implementing.
 
 **If anything is ambiguous, ask the user to confirm before you start implementing.** It's much cheaper to clarify scope up front than to build the wrong thing.
 
