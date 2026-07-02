@@ -20,6 +20,7 @@ export function mergeSessionScoped(
 ): ShiftMessage[] {
   if (incoming.length === 0) return prev;
 
+  // Safe: the length === 0 early return above guarantees a last element exists.
   const currentSession = incoming[incoming.length - 1]!.shiftSessionId;
   const existingIds = new Set(prev.map((m) => m.id));
   const newOnes = incoming.filter((m) => !existingIds.has(m.id));

@@ -76,9 +76,15 @@ export function getCurrentLocale(): Locale {
   return getStoredLocale();
 }
 
-export function formatDateTimeByLocale(date: Date, options?: Intl.DateTimeFormatOptions): string {
+/**
+ * Locale-aware date+time (or time-only) formatting. Uses toLocaleString, which —
+ * unlike toLocaleDateString — accepts timeStyle / time-component options without
+ * throwing. Accepts a Date or ISO string.
+ */
+export function formatDateTimeByLocale(date: Date | string, options?: Intl.DateTimeFormatOptions): string {
   const locale = getStoredLocale();
-  return date.toLocaleString(locale, options);
+  const localeTag = locale === "he" ? "he-IL" : "en-US";
+  return new Date(date).toLocaleString(localeTag, options);
 }
 
 export function formatDateByLocale(date: Date | string, options?: Intl.DateTimeFormatOptions): string {

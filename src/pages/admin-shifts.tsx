@@ -20,6 +20,18 @@ export default function AdminShiftsPage() {
   const [preview, setPreview] = useState<ShiftImportPreview | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  /** Shared file intake for both the file picker and drag-and-drop. */
+  function acceptCsvFile(file: File | null | undefined): void {
+    if (file && !file.name.toLowerCase().endsWith(".csv")) {
+      toast.error(t.adminShiftsPage.csvOnly);
+      setSelectedFile(null);
+      setPreview(null);
+      return;
+    }
+    setSelectedFile(file ?? null);
+    setPreview(null);
+  }
+
   const importsQuery = useQuery({
     retry: false,
     refetchOnWindowFocus: false,
@@ -97,21 +109,18 @@ export default function AdminShiftsPage() {
               accept=".csv,text/csv"
               className="hidden"
               onChange={(event) => {
-                const file = event.target.files?.[0] ?? null;
-                if (file && !file.name.toLowerCase().endsWith(".csv")) {
-                  toast.error(t.adminShiftsPage.csvOnly);
-                  setSelectedFile(null);
-                  setPreview(null);
-                  event.currentTarget.value = "";
-                  return;
-                }
-                setSelectedFile(file);
-                setPreview(null);
+                acceptCsvFile(event.target.files?.[0] ?? null);
+                event.currentTarget.value = "";
               }}
             />
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                acceptCsvFile(event.dataTransfer.files?.[0]);
+              }}
               className="flex items-center gap-3 rounded-xl border-2 border-dashed border-border p-4 text-start transition-colors hover:border-primary/60 hover:bg-muted/40"
               data-testid="dropzone-shifts-csv"
             >

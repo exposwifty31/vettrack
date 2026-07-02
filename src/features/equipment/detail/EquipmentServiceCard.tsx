@@ -68,6 +68,11 @@ export function EquipmentServiceCard({ equipment }: Props) {
       </div>
 
       <div
+        role="progressbar"
+        aria-label={t.equipmentDetail.serviceSchedule}
+        aria-valuenow={Math.round(pct)}
+        aria-valuemin={0}
+        aria-valuemax={100}
         style={{
           height: 8,
           borderRadius: 999,

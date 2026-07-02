@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { useDirection } from "@/hooks/useDirection";
 import type { CodeBlueSession } from "@/hooks/useCodeBlueSession";
-import { t } from "@/lib/i18n";
+import { t, formatDateTimeByLocale } from "@/lib/i18n";
 
 const OUTCOME_COLORS: Record<string, string> = {
   rosc: "text-[var(--status-ok-fg)]",
@@ -136,11 +136,11 @@ export default function CodeBlueHistoryPage() {
                 <div className="border-t border-border px-4 py-3 text-sm text-muted-foreground">
                   <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
                     <span className="text-muted-foreground">{t.codeBlue.history.eventStart}</span>
-                    <span>{new Date(s.startedAt).toLocaleTimeString("he-IL")}</span>
+                    <span>{formatDateTimeByLocale(s.startedAt, { timeStyle: "medium" })}</span>
                     {s.endedAt && (
                       <>
                         <span className="text-muted-foreground">{t.codeBlue.history.eventEnd}</span>
-                        <span>{new Date(s.endedAt).toLocaleTimeString("he-IL")}</span>
+                        <span>{formatDateTimeByLocale(s.endedAt, { timeStyle: "medium" })}</span>
                       </>
                     )}
                     <span className="text-muted-foreground">{t.codeBlue.history.cartCheck}</span>

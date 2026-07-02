@@ -10,6 +10,9 @@ import { describe, it, expect } from "vitest";
 import type { ShiftMessage } from "@/features/shift-chat/types";
 import { mergeSessionScoped } from "@/features/shift-chat/message-scoping";
 
+// Distinct, monotonically increasing createdAt per synthetic message so
+// ordering assertions can't pass by coincidence of identical timestamps.
+let _msgSeq = 0;
 const msg = (id: string, shiftSessionId: string): ShiftMessage => ({
   id,
   shiftSessionId,
@@ -27,7 +30,7 @@ const msg = (id: string, shiftSessionId: string): ShiftMessage => ({
   mentionedUserIds: [],
   pinnedAt: null,
   pinnedByUserId: null,
-  createdAt: "2026-07-02T10:00:00.000Z",
+  createdAt: new Date(Date.UTC(2026, 6, 2, 10, 0, _msgSeq++)).toISOString(),
   acks: [],
   reactions: [],
 });

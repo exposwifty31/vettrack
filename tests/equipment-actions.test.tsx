@@ -76,4 +76,15 @@ describe("EquipmentActions — Stage 6 check-in", () => {
     expect(returnMock).toHaveBeenCalledWith("eq-1", expect.objectContaining({ isPluggedIn: true }));
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
   });
+
+  it("surfaces an error toast (and no success) when the return mutation rejects", async () => {
+    returnMock.mockRejectedValueOnce(new Error("network down"));
+    renderActions(checkedOut);
+    fireEvent.click(screen.getByTestId("btn-detail-checkin"));
+    const confirm = await screen.findByTestId("btn-confirm-return-plug");
+    fireEvent.click(confirm);
+    await waitFor(() => expect(returnMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(toastSuccess).not.toHaveBeenCalled();
+  });
 });

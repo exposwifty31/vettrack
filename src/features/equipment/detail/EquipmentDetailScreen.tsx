@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useEquipmentDetail } from "./hooks/use-equipment-detail";
@@ -27,6 +28,13 @@ export function EquipmentDetailScreen({ equipmentId }: Props) {
     useEquipmentDetail(equipmentId);
   const dir = useDirection();
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
+  const [, navigate] = useLocation();
+  // Detail is normally reached from the equipment list; on a deep-link entry
+  // there is no in-app history to pop, so fall back to the list.
+  const handleBack = () => {
+    if (window.history.length > 1) window.history.back();
+    else navigate("/equipment");
+  };
 
   const logsQuery = useQuery({
     queryKey: [`/api/equipment/${equipmentId}/logs`],
@@ -85,7 +93,7 @@ export function EquipmentDetailScreen({ equipmentId }: Props) {
       <button
         type="button"
         data-testid="btn-detail-back"
-        onClick={() => window.history.back()}
+        onClick={handleBack}
         style={{
           display: "flex",
           alignItems: "center",

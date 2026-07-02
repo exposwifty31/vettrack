@@ -6,7 +6,7 @@ import { MessageBubble } from "./MessageBubble";
 import { BroadcastCard } from "./BroadcastCard";
 import { SystemCard } from "./SystemCard";
 import { useAuth } from "@/hooks/use-auth";
-import { t, formatDateByLocale } from "@/lib/i18n";
+import { t, formatDateTimeByLocale } from "@/lib/i18n";
 
 const DATETIME_OPTS = { dateStyle: "medium", timeStyle: "short" } as const;
 
@@ -33,8 +33,8 @@ export function ShiftChatArchive() {
       <div className="mb-4">
         <h1 className="text-lg font-bold">{t.shiftChat.archive.title}</h1>
         <p className="text-xs text-muted-foreground">
-          {formatDateByLocale(data.shift.startedAt, DATETIME_OPTS)}
-          {data.shift.endedAt && ` — ${formatDateByLocale(data.shift.endedAt, DATETIME_OPTS)}`}
+          {formatDateTimeByLocale(data.shift.startedAt, DATETIME_OPTS)}
+          {data.shift.endedAt && ` — ${formatDateTimeByLocale(data.shift.endedAt, DATETIME_OPTS)}`}
         </p>
         <p className="text-xs text-muted-foreground mt-1 bg-[var(--status-stale-bg)] border border-[var(--status-stale-border)] rounded px-2 py-1 inline-block">
           {t.shiftChat.archive.readOnly}

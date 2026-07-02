@@ -1079,7 +1079,7 @@ function EquipmentDetailPageDesktop() {
             className={cn(
               "rounded-xl border px-3 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between",
               equipmentLocalSyncState === "conflict"
-                ? "bg-orange-50 border-orange-200"
+                ? "bg-[var(--status-maint-bg)] border-[var(--status-maint-border)]"
                 : equipmentLocalSyncState === "sync_failed"
                 ? "bg-[var(--status-issue-bg)] border-[var(--status-issue-border)]"
                 : "bg-[var(--status-stale-bg)] border-[var(--status-stale-border)]",
@@ -1090,7 +1090,7 @@ function EquipmentDetailPageDesktop() {
               className={cn(
                 "text-sm font-medium",
                 equipmentLocalSyncState === "conflict"
-                  ? "text-orange-900"
+                  ? "text-[var(--status-maint-fg)]"
                   : equipmentLocalSyncState === "sync_failed"
                   ? "text-[var(--status-issue-fg)]"
                   : "text-[var(--status-stale-fg)]",
