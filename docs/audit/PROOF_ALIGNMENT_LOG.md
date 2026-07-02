@@ -584,3 +584,15 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Gates (orchestrator-run): `npx tsc --noEmit` → 0 errors; `i18n:check` → deep parity OK; `pnpm test` stage-10 lock + i18n guards → **12 passed**.
 
 **Verdict:** VERIFIED at gate level. **Flagged (not built — auth-safety / backend):** (1) `forgot-password.tsx` standalone page — Clerk's mounted `<SignIn>` already exposes forgot-password inside the component, so the flow isn't broken; a standalone page needs Clerk reset wiring with dev-bypass-safe fallback. (2) Licenses page — no LICENSE/NOTICE manifest exists in-repo to render. (3) S10-D2 sign-up→pending-approval queue — backend (couples to Stage 8 approvals). Role-chip chrome added; Clerk submit behavior unchanged. Live theme/breakpoint render pending manual Chrome pass.
+
+## 2026-07-02 — Stage 9 (BUG-001): shift-chat stale messages across session change
+
+**Claim:** Fixed BUG-001 — the chat panel retained messages from a prior shift session. Accumulation is now scoped to the current shift session; prior-session messages drop out.
+
+**Evidence:**
+- Root cause (traced in `useShiftChat.ts`): `allMessages` merged incoming polls by id but reset only on `isOpen` toggle (lines 54–62). When the active shift rolled over mid-open, the new session's messages were *appended* to the old session's and the old ones never left.
+- Fix: extracted pure `mergeSessionScoped(prev, incoming)` → `src/features/shift-chat/message-scoping.ts` — takes the current session from the newest incoming message and filters out any accumulated message whose `shiftSessionId` differs; returns `prev` by reference when nothing changed (no needless re-render). Hook now calls it in the accumulation effect (inline merge removed).
+- Lock: `tests/shift-chat-session-scoping.test.ts` (5 asserts): same-session accumulate, id-dedupe (ref-stable), **drop-prior-session-on-new-session** (the BUG-001 core — fails against the old inline merge), empty-batch ref-stable, mixed-boundary keeps only current session.
+- Gates: `npx tsc --noEmit` → 0 errors; `pnpm test` on `shift-chat-session-scoping` + `shift-chat-broadcast-ack` → **10 passed**.
+
+**Verdict:** VERIFIED at gate level. Residual edge (noted): a brand-new session with zero messages yet won't clear the prior transcript until its first message arrives (no session signal exists outside the message stream to trigger an earlier reset); the isOpen-close/reopen reset still covers the common per-shift path. BUG-001's mid-open cross-session leak is closed.
