@@ -39,6 +39,28 @@ export function endAbsMinutes(startMins: number, endMins: number): number {
   return endMins <= startMins ? endMins + MINUTES_PER_DAY : endMins;
 }
 
+/**
+ * True when `now` falls inside a shift `[start, end)` window on `shiftDate`.
+ * Overnight shifts (end clock-time at/before start) roll the end onto the next
+ * calendar day. Times are interpreted in the server's local zone — the same
+ * frame `role-resolution.ts` uses for its roster window match. `end` may be an
+ * adjusted effective end (extended later or shortened earlier).
+ */
+export function shiftWindowContains(
+  now: Date,
+  shiftDate: string,
+  startTime: string,
+  endTime: string,
+): boolean {
+  const [year, month, day] = shiftDate.split("-").map(Number);
+  const [sh, sm] = startTime.split(":").map(Number);
+  const [eh, em] = endTime.split(":").map(Number);
+  const overnight = timeToMinutes(endTime) <= timeToMinutes(startTime);
+  const start = new Date(year, month - 1, day, sh, sm, 0, 0);
+  const end = new Date(year, month - 1, day + (overnight ? 1 : 0), eh, em, 0, 0);
+  return now >= start && now < end;
+}
+
 export type DirectionReason = "NOT_AN_EXTENSION" | "NOT_EARLIER";
 export type DirectionCheck = { ok: true } | { ok: false; reason: DirectionReason };
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   normalizeTime,
   checkAdjustmentDirection,
+  shiftWindowContains,
 } from "../server/lib/shift-adjustment-window.js";
 
 describe("normalizeTime", () => {
@@ -82,6 +83,42 @@ describe("checkAdjustmentDirection — overnight shift 23:30–06:00", () => {
     expect(checkAdjustmentDirection("leave_early", start, end, "07:00:00")).toEqual({
       ok: false,
       reason: "NOT_EARLIER",
+    });
+  });
+});
+
+describe("shiftWindowContains", () => {
+  // Local-time Date construction: new Date(y, monthIndex, d, h, m).
+  const at = (y: number, mo: number, d: number, h: number, m: number) => new Date(y, mo - 1, d, h, m, 0, 0);
+
+  describe("same-day shift 2026-07-02 07:30–19:30", () => {
+    const inWindow = (h: number, m: number) =>
+      shiftWindowContains(at(2026, 7, 2, h, m), "2026-07-02", "07:30:00", "19:30:00");
+    it("is inside during the day", () => expect(inWindow(12, 0)).toBe(true));
+    it("includes the exact start", () => expect(inWindow(7, 30)).toBe(true));
+    it("excludes the exact end", () => expect(inWindow(19, 30)).toBe(false));
+    it("is outside before start", () => expect(inWindow(7, 0)).toBe(false));
+    it("is outside after end", () => expect(inWindow(20, 0)).toBe(false));
+  });
+
+  describe("overnight shift 2026-07-02 23:30–06:00", () => {
+    const contains = (now: Date) => shiftWindowContains(now, "2026-07-02", "23:30:00", "06:00:00");
+    it("is inside the evening part", () => expect(contains(at(2026, 7, 2, 23, 45))).toBe(true));
+    it("is inside the next-morning part", () => expect(contains(at(2026, 7, 3, 5, 0))).toBe(true));
+    it("excludes the morning end", () => expect(contains(at(2026, 7, 3, 6, 0))).toBe(false));
+    it("is outside before start", () => expect(contains(at(2026, 7, 2, 22, 0))).toBe(false));
+    it("is outside after the morning end", () => expect(contains(at(2026, 7, 3, 7, 0))).toBe(false));
+  });
+
+  describe("effective (adjusted) ends", () => {
+    it("an extended end keeps 21:00 in a 07:30 shift (rostered 19:30 → 23:00)", () => {
+      expect(shiftWindowContains(at(2026, 7, 2, 21, 0), "2026-07-02", "07:30:00", "23:00:00")).toBe(true);
+      // sanity: the same instant is outside the un-extended rostered window
+      expect(shiftWindowContains(at(2026, 7, 2, 21, 0), "2026-07-02", "07:30:00", "19:30:00")).toBe(false);
+    });
+    it("a shortened end drops 16:00 from a 07:30 shift (rostered 19:30 → 15:00)", () => {
+      expect(shiftWindowContains(at(2026, 7, 2, 16, 0), "2026-07-02", "07:30:00", "15:00:00")).toBe(false);
+      expect(shiftWindowContains(at(2026, 7, 2, 14, 0), "2026-07-02", "07:30:00", "15:00:00")).toBe(true);
     });
   });
 });
