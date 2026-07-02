@@ -562,7 +562,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
   // bar. Portaling restores true full-screen behavior on every entry point.
   return createPortal(
     <div className="fixed inset-0 qr-scanner-overlay-root z-50 bg-black flex flex-col motion-safe:animate-page-enter" data-testid="qr-scanner-overlay">
-      {confirmFlash && <div className="pointer-events-none absolute inset-0 z-50 bg-emerald-400/20 animate-pulse" />}
+      {confirmFlash && <div className="pointer-events-none absolute inset-0 z-50 bg-[hsl(var(--status-ok))]/20 animate-pulse" />}
       {/* Header */}
       <div className="relative z-10 flex items-center justify-between px-4 pb-3 bg-gradient-to-b from-black/95 to-black/65 backdrop-blur-sm" style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}>
         <div className="flex flex-col">
@@ -602,10 +602,12 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
               )}
             </Button>
           )}
+          {/* BUG-004: the close control must always be a ≥44px touch target and
+              stay reachable on iPhone (rendered in the always-visible header). */}
           <Button
             variant="ghost"
             size="icon-sm"
-            className="h-10 w-10 text-white hover:bg-white/10"
+            className="h-11 w-11 text-white hover:bg-white/10"
             onClick={onClose}
             data-testid="btn-scanner-cancel"
           >
@@ -697,7 +699,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
         {phase === "error" && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/90 p-6">
             <div className="flex flex-col items-center gap-4 text-center text-white max-w-xs">
-              <AlertCircle className="w-14 h-14 text-red-400" />
+              <AlertCircle className="w-14 h-14 text-[hsl(var(--status-issue))]" />
               <p className="font-bold text-lg">{t.qrScanner.cameraErrorTitle}</p>
               <p className="text-sm text-white/70">
                 {t.qrScanner.cameraErrorDesc}
@@ -731,7 +733,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
         {phase === "not_found" && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/90 p-6">
             <div className="flex flex-col items-center gap-4 text-center text-white max-w-xs">
-              <Tag className="w-14 h-14 text-amber-400" />
+              <Tag className="w-14 h-14 text-[hsl(var(--status-stale))]" />
               <p className="font-bold text-lg">{t.qrScanner.unknownTagTitle}</p>
               <p className="text-sm text-white/70">
                 {t.qrScanner.unknownTagDesc}
@@ -787,15 +789,15 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                 borderRadius: "18px",
               }}
             >
-              {/* Corner brackets */}
-              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-xl" aria-hidden="true" />
-              <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-xl" aria-hidden="true" />
-              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-xl" aria-hidden="true" />
-              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-xl" aria-hidden="true" />
+              {/* Corner brackets — white reticle on the darkened camera mask */}
+              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-xl" aria-hidden="true" />
+              <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-xl" aria-hidden="true" />
+              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-xl" aria-hidden="true" />
+              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-xl" aria-hidden="true" />
               {/* Animated scan line — the surrounding `phase === "scanning"` gate
                   unmounts/remounts this whole overlay each time scanning is
                   re-entered, which restarts the CSS animation cleanly. */}
-              <div className="qr-scan-line absolute left-0 right-0 h-0.5 bg-primary/80" />
+              <div className="qr-scan-line absolute left-0 right-0 h-0.5 bg-white/80" />
               {/* Helper text below the frame */}
               <p className="absolute -bottom-10 inset-x-0 px-2 text-center text-xs leading-snug text-white/80">
                 {t.qrScanner.guideAim}
@@ -896,11 +898,11 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
               <span>{t.scanCelebration.scansToday}</span>
               <span className="text-base text-foreground">{(pulse?.scansToday ?? 0)}</span>
             </div>
-            <div className="mb-4 rounded-2xl border border-emerald-200/70 bg-emerald-50 px-3 py-3 dark:border-emerald-800/60 dark:bg-emerald-950/35 vt-action-green">
-              <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-200">
+            <div className="mb-4 rounded-2xl border border-[var(--status-ok-border)] bg-[var(--status-ok-bg)] px-3 py-3 vt-action-green">
+              <div className="flex items-center gap-2 text-[var(--status-ok-fg)]">
                 <div className="relative">
                   <CheckCircle2 className="h-5 w-5" />
-                  <Sparkles className="h-3.5 w-3.5 absolute -right-1 -top-1 text-emerald-500" />
+                  <Sparkles className="h-3.5 w-3.5 absolute -right-1 -top-1 text-[hsl(var(--status-ok))]" />
                 </div>
                 <p className="text-sm font-semibold">{t.qrScanner.equipmentMatched}</p>
               </div>
@@ -974,7 +976,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
               )}
 
               {isCheckedOut && !checkedOutByMe && !isAdmin && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+                <div className="rounded-xl border border-[var(--status-stale-border)] bg-[var(--status-stale-bg)] px-3 py-2.5 text-sm text-[var(--status-stale-fg)]">
                   {t.qrScanner.onlyOwnerCanReturn}
                 </div>
               )}
@@ -984,7 +986,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                 <Button
                   variant="outline"
                   size="default"
-                  className="min-h-11 flex-1 gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-800 dark:text-emerald-200 dark:hover:bg-emerald-950/50"
+                  className="min-h-11 flex-1 gap-1.5 border-[var(--status-ok-border)] text-[var(--status-ok-fg)] hover:bg-[var(--status-ok-bg)]"
                   onClick={handleMarkOk}
                   disabled={isActing}
                   data-testid="btn-scan-inline-mark-ok"
@@ -995,7 +997,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                 <Button
                   variant="outline"
                   size="default"
-                  className="min-h-11 flex-1 gap-1.5 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
+                  className="min-h-11 flex-1 gap-1.5 border-[var(--status-issue-border)] text-[var(--status-issue-fg)] hover:bg-[var(--status-issue-bg)]"
                   onClick={handleMarkIssue}
                   disabled={isActing}
                   data-testid="btn-scan-inline-mark-issue"
