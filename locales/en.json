@@ -2177,6 +2177,27 @@
     "saving": "Saving...",
     "cancel": "Cancel"
   },
+  "inventoryItemDetailPage": {
+    "title": "Inventory item",
+    "back": "Back",
+    "onHand": "On hand",
+    "usageTitle": "Usage · last 7 days",
+    "usageEmpty": "No usage in the last 7 days",
+    "usageTotal": "{count} used",
+    "facts": "Facts",
+    "factCode": "Code",
+    "factCategory": "Category",
+    "factBillable": "Billable",
+    "factMinCapture": "Min. to capture",
+    "factNfc": "NFC tag",
+    "factCreated": "Added",
+    "inContainers": "In containers",
+    "containersEmpty": "Not stocked in any container",
+    "yes": "Yes",
+    "no": "No",
+    "none": "—",
+    "loadError": "Couldn't load this item"
+  },
   "procurementPage": {
     "title": "Procurement",
     "newPo": "New order",

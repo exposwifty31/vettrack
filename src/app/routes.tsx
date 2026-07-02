@@ -51,6 +51,7 @@ const AuditLogPage = lazy(() => import("@/pages/audit-log"));
 const WhatsNewPage = lazy(() => import("@/pages/whats-new"));
 const ShiftLeaderboardPage = lazy(() => import("@/pages/shift-leaderboard"));
 const InventoryItemsPage = lazy(() => import("@/pages/inventory-items"));
+const InventoryItemDetailPage = lazy(() => import("@/pages/inventory-item-detail"));
 const ProcurementPage = lazy(() => import("@/pages/procurement"));
 const ShiftChatArchive = lazy(() =>
   import("@/features/shift-chat/components/ShiftChatArchive").then((m) => ({ default: m.ShiftChatArchive }))
@@ -149,6 +150,7 @@ export function AppRoutes() {
 
         {/* --- Platform & analytics --- */}
         <Route path="/inventory"><AuthGuard><InventoryPage /></AuthGuard></Route>
+        <Route path="/inventory-items/:id"><AuthGuard><WebOnlyGuard><InventoryItemDetailPage /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/inventory-items"><AuthGuard><WebOnlyGuard><InventoryItemsPage /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/procurement"><AuthGuard><WebOnlyGuard><ProcurementPage /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/analytics/outcome-kpi"><Redirect to="/analytics" replace /></Route>

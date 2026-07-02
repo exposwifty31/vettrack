@@ -765,6 +765,11 @@ const translations = {
 
   inventoryItemsPage: d.inventoryItemsPage,
 
+  inventoryItemDetailPage: {
+    ...d.inventoryItemDetailPage,
+    usageTotal: (count: number) => tr(d.inventoryItemDetailPage.usageTotal, { count }),
+  },
+
   procurementPage: d.procurementPage,
 
   medsPage: {

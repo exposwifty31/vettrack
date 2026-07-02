@@ -1,5 +1,6 @@
 // Not using `Layout` navigationLocked; if that is added, wrap tappable regions with [data-restock-allow] (see layout.tsx).
 import { t } from "@/lib/i18n";
+import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
@@ -232,7 +233,14 @@ export default function InventoryItemsPage() {
                         {items.map((item) => (
                           <tr key={item.id} className="hover:bg-muted/30 transition-colors">
                             <td className="px-4 py-2 font-mono text-xs text-muted-foreground w-36">{item.code}</td>
-                            <td className="px-4 py-2 font-medium">{item.label}</td>
+                            <td className="px-4 py-2 font-medium">
+                              <Link
+                                href={`/inventory-items/${item.id}`}
+                                className="hover:text-primary hover:underline underline-offset-2 transition-colors"
+                              >
+                                {item.label}
+                              </Link>
+                            </td>
                             <td className="px-4 py-2 font-mono text-xs text-muted-foreground hidden sm:table-cell">
                               {item.nfcTagId ?? <span className="opacity-40">—</span>}
                             </td>

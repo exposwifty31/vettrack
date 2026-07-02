@@ -2177,6 +2177,27 @@
     "saving": "שומר...",
     "cancel": "ביטול"
   },
+  "inventoryItemDetailPage": {
+    "title": "פריט מלאי",
+    "back": "חזרה",
+    "onHand": "במלאי",
+    "usageTitle": "שימוש · 7 ימים אחרונים",
+    "usageEmpty": "אין שימוש ב-7 הימים האחרונים",
+    "usageTotal": "{count} שומשו",
+    "facts": "פרטים",
+    "factCode": "קוד",
+    "factCategory": "קטגוריה",
+    "factBillable": "לחיוב",
+    "factMinCapture": "מינימום לתיעוד",
+    "factNfc": "תג NFC",
+    "factCreated": "נוסף",
+    "inContainers": "במכלולים",
+    "containersEmpty": "לא במלאי באף מכלול",
+    "yes": "כן",
+    "no": "לא",
+    "none": "—",
+    "loadError": "טעינת הפריט נכשלה"
+  },
   "procurementPage": {
     "title": "רכש",
     "newPo": "הזמנה חדשה",

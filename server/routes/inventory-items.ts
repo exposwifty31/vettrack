@@ -1,8 +1,15 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { and, asc, eq, isNull } from "drizzle-orm";
-import { inventoryItemPrices, inventoryItems, db, users } from "../db.js";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import {
+  inventoryItemPrices,
+  inventoryItems,
+  containers,
+  containerItems,
+  db,
+  users,
+} from "../db.js";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
@@ -61,6 +68,81 @@ router.get("/", requireAuth, requireEffectiveRole("technician"), async (req, res
     console.error(err);
     res.status(500).json(
       apiError({ code: "INTERNAL_ERROR", reason: "ITEMS_LIST_FAILED", message: "Failed to list inventory items", requestId }),
+    );
+  }
+});
+
+// GET /api/inventory-items/:id/detail — aggregate facts, container distribution, 7-day usage
+router.get("/:id/detail", requireAuth, requireEffectiveRole("technician"), validateUuid("id"), async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  try {
+    const clinicId = req.clinicId!;
+    const id = req.params.id;
+
+    const [item] = await db
+      .select()
+      .from(inventoryItems)
+      .where(and(eq(inventoryItems.id, id), eq(inventoryItems.clinicId, clinicId)))
+      .limit(1);
+
+    if (!item) {
+      return res.status(404).json(
+        apiError({ code: "NOT_FOUND", reason: "ITEM_NOT_FOUND", message: "Inventory item not found", requestId }),
+      );
+    }
+
+    // On-hand distribution across containers (clinic-scoped), largest holdings first.
+    const distribution = await db
+      .select({
+        containerId: containerItems.containerId,
+        containerName: containers.name,
+        quantity: containerItems.quantity,
+      })
+      .from(containerItems)
+      .innerJoin(containers, eq(containers.id, containerItems.containerId))
+      .where(and(eq(containerItems.itemId, id), eq(containerItems.clinicId, clinicId)))
+      .orderBy(desc(containerItems.quantity));
+
+    const onHandTotal = distribution.reduce((sum, row) => sum + (row.quantity ?? 0), 0);
+
+    // 7-day usage: unnest the dispense-event items jsonb, sum per day, zero-filled
+    // via a server-side generate_series so buckets are timezone-consistent.
+    const usageResult = await db.execute(sql`
+      SELECT to_char(d::date, 'YYYY-MM-DD') AS day,
+             COALESCE(u.qty, 0)::int AS quantity
+      FROM generate_series(
+             date_trunc('day', now()) - interval '6 days',
+             date_trunc('day', now()),
+             interval '1 day'
+           ) AS d
+      LEFT JOIN (
+        SELECT date_trunc('day', created_at) AS day,
+               SUM((elem->>'quantity')::int) AS qty
+        FROM vt_dispense_events, jsonb_array_elements(items) AS elem
+        WHERE clinic_id = ${clinicId}
+          AND elem->>'itemId' = ${id}
+          AND status IN ('CONFIRMED', 'COMPLETED')
+          AND created_at >= date_trunc('day', now()) - interval '6 days'
+        GROUP BY 1
+      ) AS u ON u.day = d
+      ORDER BY d
+    `);
+    const usageRows =
+      (usageResult as unknown as { rows?: Array<{ day: string; quantity: number }> }).rows ?? [];
+    const usage7d = usageRows.map((r) => ({ date: r.day, quantity: Number(r.quantity) || 0 }));
+    const usage7dTotal = usage7d.reduce((sum, r) => sum + r.quantity, 0);
+
+    res.json({
+      item,
+      onHandTotal,
+      containers: distribution,
+      usage7d,
+      usage7dTotal,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json(
+      apiError({ code: "INTERNAL_ERROR", reason: "ITEM_DETAIL_FAILED", message: "Failed to load inventory item detail", requestId }),
     );
   }
 });

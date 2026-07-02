@@ -79,6 +79,27 @@ export interface InventoryItem {
   createdAt: string;
 }
 
+export interface InventoryItemContainerHolding {
+  containerId: string;
+  containerName: string;
+  quantity: number;
+}
+
+export interface InventoryItemUsagePoint {
+  /** ISO date (YYYY-MM-DD), server timezone. */
+  date: string;
+  quantity: number;
+}
+
+export interface InventoryItemDetail {
+  item: InventoryItem;
+  onHandTotal: number;
+  containers: InventoryItemContainerHolding[];
+  /** Exactly 7 zero-filled points, oldest → newest. */
+  usage7d: InventoryItemUsagePoint[];
+  usage7dTotal: number;
+}
+
 export type PurchaseOrderStatus = "draft" | "ordered" | "partial" | "received" | "cancelled";
 
 export interface PurchaseOrderLine {
