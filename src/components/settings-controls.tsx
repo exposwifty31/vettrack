@@ -45,6 +45,7 @@ export function SettingsToggle({
 
   return (
     <button
+      type="button"
       role="switch"
       aria-checked={checked}
       aria-labelledby={labelId}

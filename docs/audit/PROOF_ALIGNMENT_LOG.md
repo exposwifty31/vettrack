@@ -608,3 +608,16 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Gates (orchestrator-run): `npx tsc --noEmit` → 0 errors; `i18n:check` → deep parity OK; `pnpm test` `i18n-no-hebrew-in-source` + `i18n-parity` → **6 passed**. Allowlist ratchet holds.
 
 **Verdict:** VERIFIED at gate level. Copy-fidelity note: `sheet.back` kept as a dedicated key (original `חזור`, imperative) rather than reusing `common.back` (`חזרה`) to preserve exact copy.
+
+## 2026-07-02 — Cross-cutting unit 1: BUG-015 (settings re-render) + BUG-014 (settings dropdown)
+
+**Claim:** Fixed the Master-Sound page-jump at its root cause (a full-app remount triggered by any settings toggle); BUG-014 required no change (the mobile settings dropdown already shipped). Delegated sub-agent; gates re-verified by orchestrator.
+
+**Evidence (orchestrator-run):**
+- **BUG-015 root cause (traced, not guessed):** `applySettings()` in `use-settings.tsx` called `setStoredLocale(settings.locale)` on every `update()`; `setStoredLocale` unconditionally dispatches `vettrack:locale-changed`; `main.tsx` keys `<App key={locale-${localeVersion}}>` off that event → every toggle remounted the whole tree and reset scroll. Master Sound surfaced it most because its handler `await`ed an audio tone before `update()`, landing the remount in a detached continuation.
+- Fix (diff-reviewed): `use-settings.tsx` guards the broadcast — `if (settings.locale !== getStoredLocale()) setStoredLocale(...)` — lang/dir still always applied; `settings.tsx` `handleSoundToggle` no longer `async` (fires tone via `void`, commits `update()` synchronously like Dark mode); `settings-controls.tsx` `SettingsToggle` gets `type="button"` (defensive hygiene). This fixes the latent remount for ALL toggles, not just sound.
+- **BUG-014:** verified in code — the mobile top-bar gear (`layout.tsx:927`) already opens a quick-settings dropdown (Dark/Display/Sound/Critical + "All settings" → /settings), shipped `e5375709`. `openSettingsPage` is only the dropdown's "See all" link + native slide-menu item, not the gear. No redundant refactor made. `/settings` reachable.
+- Regression lock: `tests/settings-sound-toggle-no-remount.test.tsx` (5 asserts): no `vettrack:locale-changed` on mount or on soundEnabled/darkMode update; IS dispatched on real locale change; toggle button `type="button"`.
+- Gates (orchestrator-run): `npx tsc --noEmit` → 0 errors; `i18n:check` → parity OK; palette+Hebrew grep on changed files → 0; `pnpm test` regression + i18n guards → **9 passed**.
+
+**Verdict:** VERIFIED at gate level. **Needs device verification:** absence of the visible scroll/jump on a real iPhone WebView + pointer browser. **Flagged gap (separate from BUG-014):** the *desktop* web top bar (`layout/Topbar.tsx`, via WebShell) has no settings entry point at all — if a desktop settings affordance is wanted, that's a distinct additive task, not BUG-014.

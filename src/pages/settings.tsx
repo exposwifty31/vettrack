@@ -96,11 +96,15 @@ export default function SettingsPage() {
     await signOut();
   };
 
-  const handleSoundToggle = async (v: boolean) => {
+  const handleSoundToggle = (v: boolean) => {
+    // Fire the feedback tone without awaiting so the settings update commits
+    // synchronously inside the click handler (matching the Dark mode toggle).
+    // The tone helpers gate on the pre-update stored value, so calling them
+    // before update() preserves the existing audio behavior.
     if (v) {
-      await playFeedbackTone();
+      void playFeedbackTone();
     } else {
-      await playMuteTone();
+      void playMuteTone();
     }
     update({ soundEnabled: v });
     if (push.subscribed) {
