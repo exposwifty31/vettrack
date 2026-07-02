@@ -662,3 +662,13 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - **Flagged (out of scope, same latent bug):** `POST /api/uploads/fault-image` still builds `${S3_PUBLIC_URL}/${key}` — now that S3 is configured its PutObject will succeed but yield an unusable `undefined/...` URL. Needs the same store-key + presign-on-read treatment at the fault read site before fault images are relied upon.
 
 **Verdict:** VERIFIED at gate level. **Needs deploy + device verification:** deploy the new code to VetTrack (the env vars are set but the running image predates the presign change), then confirm real upload → presigned render in the app on iPhone/desktop.
+
+## 2026-07-02 — fault-image: same private-bucket fix as avatar
+
+**Claim:** Applied the avatar private-bucket treatment to `POST /api/uploads/fault-image` — drop the broken `${S3_PUBLIC_URL}/key` construction, add the 501-unconfigured guard, return a presigned URL via the shared helper.
+
+**Evidence:**
+- `uploads.ts` fault-image handler now: (1) returns 501 `OBJECT_STORAGE_NOT_CONFIGURED` when `S3_*` unset (matching /avatar); (2) after PutObject, returns `{ success, url: presignObjectUrl(key), key }` instead of `${S3_PUBLIC_URL}/${key}`. `key` is surfaced so a long-term caller can persist the key and presign on read.
+- **Verified fault-image is currently dead code:** `grep -rn "fault-image" src` → 0 hits (no client caller). The live photo path (`equipment-detail.tsx`) reads files via `FileReader.readAsDataURL` and stores base64 **data URLs** directly in `scan_logs.photo_url` — it never touches S3. So this is a correctness/future-proofing fix, not a live-path change.
+- `pnpm typecheck:server` → 0 errors.
+- **Flagged (pre-existing, out of scope):** scan/report photos are persisted as inline base64 data URLs in `scan_logs.photo_url` (rendered directly in EquipmentDetailActivityTab). If those should move to bucket storage, that's a separate migration (wire the upload → store key → presign at the equipment/scan read sites), not covered here.

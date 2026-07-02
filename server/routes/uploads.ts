@@ -40,6 +40,18 @@ router.post(
         return res.status(400).json(apiError({ code: "VALIDATION_FAILED", reason: "NO_IMAGE_UPLOADED", message: "No image uploaded", requestId }));
       }
 
+      if (!isObjectStorageConfigured()) {
+        return res.status(501).json(
+          apiError({
+            code: "NOT_IMPLEMENTED",
+            reason: "OBJECT_STORAGE_NOT_CONFIGURED",
+            message:
+              "Image uploads are not available in this environment. Configure S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY (Railway object storage) to enable them.",
+            requestId,
+          }),
+        );
+      }
+
       // Safe filename — no path traversal, no user-controlled strings
       const ext = (req.file.originalname.split(".").pop() ?? "jpg")
         .replace(/[^a-z0-9]/gi, "")
@@ -56,11 +68,12 @@ router.post(
         })
       );
 
-      // S3_PUBLIC_URL should be set in env, e.g. https://your-bucket.s3.amazonaws.com
-      // or https://your-endpoint/your-bucket for S3-compatible providers
-      const imageUrl = `${process.env.S3_PUBLIC_URL}/${fileName}`;
+      // Railway buckets are private — return a presigned GET URL. The `key` is
+      // included so callers that persist the reference long-term should store it
+      // and presign on read (as GET /me does) rather than the expiring URL.
+      const url = await presignObjectUrl(fileName);
 
-      res.json({ success: true, url: imageUrl });
+      res.json({ success: true, url, key: fileName });
     } catch (error) {
       if (
         error instanceof Error &&
