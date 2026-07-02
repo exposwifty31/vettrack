@@ -1,6 +1,7 @@
 import { useLocation } from "wouter";
-import { Home, Package, Activity, AlignJustify, QrCode } from "lucide-react";
+import { Home, Package, Activity, AlignJustify } from "lucide-react";
 import { t } from "@/lib/i18n";
+import { ScanFab } from "./ScanFab";
 
 type Props = {
   onMorePress: () => void;
@@ -74,10 +75,11 @@ function SidebarButton({
 export function NativeTabSidebar({ onMorePress }: Props) {
   const [location, navigate] = useLocation();
 
+  // Scan is intentionally NOT a sidebar item on tablet — it is a floating FAB
+  // (ScanFab), the correct affordance for a layout with no bottom tab bar.
   const navItems: NavItem[] = [
     { id: "today",     href: "/home",      label: t.nav.today,     icon: <Home size={20} /> },
     { id: "equipment", href: "/equipment", label: t.nav.equipment, icon: <Package size={20} /> },
-    { id: "scan",      href: "/scan",      label: t.nav.equipmentScan, icon: <QrCode size={20} /> },
     { id: "emergency", href: "/code-blue", label: t.nav.emergency, icon: <Activity size={20} /> },
   ];
 
@@ -133,6 +135,8 @@ export function NativeTabSidebar({ onMorePress }: Props) {
         active={false}
         onClick={onMorePress}
       />
+
+      <ScanFab />
     </nav>
   );
 }

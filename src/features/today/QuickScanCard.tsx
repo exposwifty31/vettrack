@@ -1,9 +1,15 @@
 import { useLocation } from "wouter";
 import { Scan } from "lucide-react";
 import { t } from "@/lib/i18n";
+import { useScanAffordance } from "@/lib/scan-affordance";
 
 export function QuickScanCard() {
   const [, navigate] = useLocation();
+  const affordance = useScanAffordance();
+
+  // Redundant wherever a persistent scan affordance exists (the flat scan tab on
+  // iPhone) and disallowed on web. Only the iPad "fab" layout keeps this CTA.
+  if (affordance !== "fab") return null;
 
   return (
     <button

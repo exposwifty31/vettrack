@@ -621,3 +621,16 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Gates (orchestrator-run): `npx tsc --noEmit` → 0 errors; `i18n:check` → parity OK; palette+Hebrew grep on changed files → 0; `pnpm test` regression + i18n guards → **9 passed**.
 
 **Verdict:** VERIFIED at gate level. **Needs device verification:** absence of the visible scroll/jump on a real iPhone WebView + pointer browser. **Flagged gap (separate from BUG-014):** the *desktop* web top bar (`layout/Topbar.tsx`, via WebShell) has no settings entry point at all — if a desktop settings affordance is wanted, that's a distinct additive task, not BUG-014.
+
+## 2026-07-02 — Cross-cutting unit 2: scan platform model (BUG-004/005/011/016)
+
+**Claim:** Unified the scan affordance behind one pure gate — iPhone = flat scan tab, iPad = FAB, web = none — resolving the flat-tab-vs-FAB conflict by platform context. Delegated sub-agent + one orchestrator follow-up edit; gates re-verified by orchestrator.
+
+**Evidence (orchestrator-run):**
+- New `src/lib/scan-affordance.ts`: pure `scanAffordance({isNative,isTablet}) → "tab"|"fab"|"none"` (`isNative = capacitorPlatform() !== "web"`, `isTablet = min-width:768px`) + `useScanAffordance()`. Lock `tests/scan-affordance.test.ts` (6 asserts, all combos + web-never/native-always invariants).
+- `NativeTabBar.tsx`: raised ScanFab removed from the bar → flat scan **tab** (QrCode → /scan) only when affordance `"tab"` (BUG-016 phone: nothing on web-phone). `ScanFab.tsx`: self-gating fixed FAB, `null` unless `"fab"`, token colors only. `NativeTabSidebar.tsx` (iPad): removed sidebar-only scan item, renders `<ScanFab/>` (BUG-011). `home.tsx`: scan card gate `isDesktop`→`scanAffordance === "fab"` (hidden on web+iPhone, shown iPad).
+- **Orchestrator follow-up:** gated the `?scan=1` deep-link in `home.tsx` — `if (scanAffordance === "none") return;` — so web can't open the scanner via URL (closes the BUG-016 residual the agent flagged).
+- **BUG-004 verified not regressed:** `qr-scanner.tsx` close is `h-11 w-11` (44px), `paddingTop: max(1rem, env(safe-area-inset-top))`, inside the `createPortal` overlay (5113f60e intact). No scan/camera logic touched anywhere.
+- Gates (orchestrator-run): `npx tsc --noEmit` → 0 errors; palette+Hebrew grep on all 6 changed files → 0; `i18n:check` → parity OK (reused `nav.equipmentScan`, no new keys); `pnpm test` scan lock + i18n guards → **12 passed**.
+
+**Verdict:** VERIFIED at gate level. **Needs DEVICE verification** (iPhone + iPad simulators + desktop browser): iPhone flat tab, iPad FAB placement/safe-area over the sidebar, web shows no scan, scanner-close reachability under the notch. **Deferred (flagged):** legacy `layout.tsx renderScanFab` NOT gated — it carries 11 pre-existing palette hits (would fail the changed-files gate) and is reached only transiently via `EquipmentDetailSkeleton`; its raised FAB still renders there. Recommend a dedicated de-palette+gate follow-up (or retire the Layout skeleton). iPad currently shows both FAB + Today scan card (union of the phone/web removals); tighten to FAB-only if desired.
