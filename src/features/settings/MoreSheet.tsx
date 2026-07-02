@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import {
   LogOut, User,
@@ -9,6 +9,7 @@ import {
 import { SettingRow } from "./SettingRow";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
+import { useIsTabletViewport } from "@/lib/use-tablet-viewport";
 
 type Props = {
   open: boolean;
@@ -43,16 +44,7 @@ export function MoreSheet({ open, onClose }: Props) {
   const { isAdmin } = useAuth();
   const dialogRef = useRef<HTMLDivElement>(null);
   const startYRef = useRef<number | null>(null);
-  const [isTablet, setIsTablet] = useState(() =>
-    typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches
-  );
-
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 768px)");
-    const handler = () => setIsTablet(mq.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
+  const isTablet = useIsTabletViewport();
 
   useEffect(() => {
     if (open) dialogRef.current?.focus();
