@@ -88,6 +88,18 @@ describe("Stage 9 — shift-chat SystemCard (event alignment + i18n)", () => {
   });
 });
 
+describe("Stage 9 — shift-chat ShiftChatPanel (live surface tokens)", () => {
+  const src = read("src", "features", "shift-chat", "components", "ShiftChatPanel.tsx");
+  it("has no hardcoded palette (online dot, pinned banner, filters, toggles)", () => {
+    expect(BANNED.test(src)).toBe(false);
+  });
+  it("uses status + primary tokens for chat chrome", () => {
+    expect(src.includes("hsl(var(--status-ok))")).toBe(true); // online dot
+    expect(src.includes("var(--status-stale-")).toBe(true); // pinned banner
+    expect(src.includes("var(--status-issue-fg)")).toBe(true); // urgent toggle
+  });
+});
+
 describe("Stage 9 — code-blue-history.tsx", () => {
   const src = read("src", "pages", "code-blue-history.tsx");
   it("has no hardcoded palette (zinc + outcome colors tokenized)", () => {

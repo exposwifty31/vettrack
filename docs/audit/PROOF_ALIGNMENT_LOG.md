@@ -531,3 +531,16 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Gates: typecheck **0×2**, i18n parity OK, `stage-9` lock **13/13**, `i18n-no-hebrew-in-source` pass, `no-hardcoded-ui-strings` pass, build exit 0.
 
 **Verdict:** VERIFIED at gate level. SystemCard is now contract-aligned (no dead config, no unrendered emitted events) and Hebrew-free. Remaining Stage 9: ShiftChatPanel palette→tokens + BUG-003 behavioral proof (next increment), BUG-001 stale messages, standalone chat screen, richer Handover, code-blue.tsx restyle.
+
+## 2026-07-02 — Stage 9 (increment 6): BUG-003 proof + ShiftChatPanel tokens
+
+**Claim:** Closed BUG-003 (broadcast quick-reply buttons "do nothing") with a behavioral test proving the ack chain fires, and tokenized the last palette in the live chat surface (`ShiftChatPanel.tsx`).
+
+**Evidence:**
+- BUG-003 root-cause trace (2026-07-02): button (`BroadcastCard` line 67/74) → `onAck(status)` → panel `ackMessage({id, status})` (`ShiftChatPanel` line 212) → `ackMutation.mutate` → `shiftChatApi.ackMessage` → `POST /api/shift-chat/messages/:id/ack` (server route exists, validates `status` enum, allows broadcast+system acks, enqueues snooze push). Chain is intact end-to-end — the current buttons DO post. The increment-3 BroadcastCard rewrite fixed it; this increment locks it.
+- New behavioral test `tests/shift-chat-broadcast-ack.test.tsx` (happy-dom + RTL, 5/5): receiver sees 2 reply buttons; primary → `onAck("acknowledged")`; secondary → `onAck("snoozed")`; buttons hidden once acked; sender sees none. Locale-robust (queries by button role/order, not copy).
+- `ShiftChatPanel.tsx` palette → tokens: online dot green→`hsl(var(--status-ok))` (+ glow), pinned banner amber→`--status-stale-*`, room-filter active blue→`primary` (×2), broadcast toggle indigo→`primary`, urgent toggle red→`--status-issue-fg`. `grep` of banned palette regex → 0 matches.
+- New lock: ShiftChatPanel describe in `stage-9-emergency-token-consistency.test.js` (no-palette + status/primary token asserts).
+- Gates: `stage-9` lock **15/15**, `shift-chat-broadcast-ack` **5/5**, `i18n-no-hebrew-in-source` pass, typecheck **0×2**, build exit 0.
+
+**Verdict:** VERIFIED. BUG-002 (shift-chat Hebrew) fully cleared across BroadcastCard/types/MessageBubble/ShiftChatArchive/SystemCard; BUG-003 proven resolved + locked. Remaining Stage 9: BUG-001 (stale messages — `useShiftChat` accumulation not reset on shift change), standalone chat screen, richer Handover, `code-blue.tsx` restyle (frozen surface).
