@@ -440,3 +440,14 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Gates: stage-6 lock **11/11** (3 new asserts: rendered, gated-on-real-data, status-HSL-token bar + no palette), typecheck **0×2**, i18n parity OK, build exit 0, guards (hebrew-in-source + no-hardcoded) pass.
 
 **Verdict:** VERIFIED at gate level. Live render (with a seeded maintenance interval) pending stage-end browser pass.
+
+## 2026-07-02 — Stage 6 (increments 5–6): facility surfaces palette→token
+
+**Claim:** Room Radar (`room-radar.tsx`, 17 palette sites) and Rooms list (`rooms-list.tsx`, 10 sites) moved off hardcoded emerald/amber/red palette onto `--status-*` / `--sys-*` tokens (readiness chips, health rings, status text, action-button color classes, error/attention banners). `my-equipment.tsx` and `new-equipment.tsx` were already palette-free (prior refactors) — no change needed.
+
+**Evidence:**
+- Both files now `grep`-clean of the banned palette (emerald/amber/zinc/indigo/slate-N, red/green/blue/gray-NN, 6-hex) → **0**. Status chips → `--status-{ok,issue,stale}-{bg,fg,border}`; rings/dots → `rgb(var(--sys-{green,orange,red,blue}))`; STATUS_BAR_COLORS `needs_attention` → `border-s-status-maintenance`, fallback → `border-s-border`.
+- RED→GREEN lock test `tests/stage-6-facility-token-consistency.test.js` **4/4** (no-palette + status-token presence, per file).
+- Gates: typecheck **0×2**, `pnpm build` exit 0, guards (i18n-no-hebrew-in-source, no-hardcoded-ui-strings) pass.
+
+**Verdict:** VERIFIED at gate level (static token sweep + lock + typecheck + build). Live dark/RTL render of the radar rings + chips pending the stage-end browser pass.
