@@ -2,20 +2,16 @@ import { randomUUID } from "crypto";
 import express from "express";
 import multer from "multer";
 import { and, eq } from "drizzle-orm";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { db, users } from "../db.js";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
 import { buildAvatarKey } from "../lib/upload-filename.js";
-
-/** True when object storage credentials + bucket are present in this environment. */
-function isObjectStorageConfigured(): boolean {
-  return Boolean(
-    process.env.S3_BUCKET &&
-      process.env.S3_ACCESS_KEY_ID &&
-      process.env.S3_SECRET_ACCESS_KEY,
-  );
-}
+import {
+  getS3Client,
+  isObjectStorageConfigured,
+  presignObjectUrl,
+} from "../lib/object-storage.js";
 
 const router = express.Router();
 
@@ -31,22 +27,6 @@ const upload = multer({
     cb(null, true);
   },
 });
-
-function getS3Client(): S3Client {
-  const accessKeyId = process.env.S3_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
-  if (!accessKeyId || !secretAccessKey) {
-    throw new Error(
-      "S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must be set. " +
-        "Add them to your Railway environment variables.",
-    );
-  }
-  return new S3Client({
-    region: process.env.S3_REGION,
-    endpoint: process.env.S3_ENDPOINT,
-    credentials: { accessKeyId, secretAccessKey },
-  });
-}
 
 router.post(
   "/fault-image",
@@ -129,12 +109,14 @@ router.post(
         }),
       );
 
-      const url = `${process.env.S3_PUBLIC_URL}/${fileName}`;
-
+      // Railway buckets are private — persist the object KEY and serve reads via
+      // short-lived presigned URLs (both here and on GET /me).
       await db
         .update(users)
-        .set({ avatarUrl: url })
+        .set({ avatarUrl: fileName })
         .where(and(eq(users.id, actor.id), eq(users.clinicId, actor.clinicId)));
+
+      const url = await presignObjectUrl(fileName);
 
       res.json({ success: true, url });
     } catch (error) {

@@ -24,6 +24,7 @@ import { ensureUserEmail } from "../services/user-sync.service.js";
 import { countPurgeCandidates, purgeDeletedUsers, PURGE_AFTER_DAYS } from "../lib/cleanup-scheduler.js";
 import { canManageErModeForUser } from "../lib/er-mode-permissions.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { presignObjectUrl } from "../lib/object-storage.js";
 
 /*
  * PERMISSIONS MATRIX — /api/users
@@ -130,6 +131,9 @@ router.get("/me", requireAuth, async (req, res) => {
       .where(and(eq(users.clinicId, req.clinicId!), eq(users.id, req.authUser.id)))
       .limit(1);
 
+    // avatarUrl is stored as a private-bucket object key; presign for the client.
+    const avatarUrl = await presignObjectUrl(profileRow?.avatarUrl);
+
     // Legacy effectiveRole remains authoritative in Phase 2A.
     // Authority snapshot is advisory only.
     // See docs/authority-model.md §1-§2.
@@ -146,7 +150,7 @@ router.get("/me", requireAuth, async (req, res) => {
 
     res.json({
       ...req.authUser,
-      avatarUrl: profileRow?.avatarUrl ?? null,
+      avatarUrl,
       effectiveRole: resolved.effectiveRole,
       roleSource: resolved.source,
       activeShift: resolved.activeShift,
