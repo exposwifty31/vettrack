@@ -57,6 +57,7 @@ import {
   RotateCcw,
   Wrench,
   CalendarDays,
+  CalendarClock,
   Mail,
   FlaskConical,
   Sparkles,
@@ -75,6 +76,7 @@ import type {
   DeletedEquipment,
 } from "@/types";
 import { SharedAuditLogsPanel } from "./audit-log";
+import { AdminShiftRequestsSection } from "@/features/shift-adjustments/AdminShiftRequestsSection";
 import { t, formatDateByLocale } from "@/lib/i18n";
 import { haptics } from "@/lib/haptics";
 
@@ -82,7 +84,7 @@ export default function AdminPage() {
   const { isAdmin, userId } = useAuth();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<
-    "folders" | "users" | "pending" | "support" | "audit-logs" | "deleted"
+    "folders" | "users" | "pending" | "shift-requests" | "support" | "audit-logs" | "deleted"
   >("folders");
 
   const { data: supportUnresolved } = useQuery({
@@ -98,6 +100,16 @@ export default function AdminPage() {
   const { data: pendingUsers } = useQuery({
     queryKey: ["/api/users/pending"],
     queryFn: api.users.listPending,
+    enabled: isAdmin && !!userId,
+    refetchInterval: leaderPoll(30_000),
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+
+  const { data: pendingShiftRequests } = useQuery({
+    queryKey: ["/api/shift-adjustments", "pending"],
+    queryFn: () => api.shiftAdjustments.list("pending"),
     enabled: isAdmin && !!userId,
     refetchInterval: leaderPoll(30_000),
     refetchIntervalInBackground: false,
@@ -133,6 +145,7 @@ export default function AdminPage() {
 
   const unresolvedCount = supportUnresolved?.count ?? 0;
   const pendingCount = pendingUsers?.length ?? 0;
+  const shiftRequestCount = pendingShiftRequests?.length ?? 0;
 
   const pageContent = (
     <>
@@ -227,6 +240,24 @@ export default function AdminPage() {
             {t.adminPage.tabShifts}
           </button>
           <button
+            onClick={() => setActiveTab("shift-requests")}
+            data-testid="admin-tab-shift-requests"
+            className={cn(
+              "flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors relative whitespace-nowrap",
+              activeTab === "shift-requests"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <CalendarClock className="w-4 h-4" />
+            {t.shiftAdjustments.admin.tab}
+            {shiftRequestCount > 0 && (
+              <span className="ms-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+                {shiftRequestCount > 9 ? "9+" : shiftRequestCount}
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => setActiveTab("audit-logs")}
             data-testid="admin-tab-audit-logs"
             className={cn(
@@ -257,6 +288,7 @@ export default function AdminPage() {
         {activeTab === "folders" && <FoldersSection />}
         {activeTab === "pending" && <PendingUsersSection />}
         {activeTab === "users" && <UsersSection />}
+        {activeTab === "shift-requests" && <AdminShiftRequestsSection />}
         {activeTab === "support" && <SupportSection />}
         {activeTab === "audit-logs" && <AuditLogsSection />}
         {activeTab === "deleted" && <DeletedItemsSection />}

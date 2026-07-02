@@ -17,6 +17,7 @@ import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
 import { useAuth } from "@/hooks/use-auth";
 import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { QrScanner } from "@/components/qr-scanner";
+import { ShiftAdjustmentControls } from "@/features/shift-adjustments/ShiftAdjustmentControls";
 import { getCurrentUserId } from "@/lib/auth-store";
 import { subscribeKeepalive } from "@/lib/realtime";
 import type { ActivityFeedItem } from "@/types";
@@ -408,19 +409,9 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => navigate("/handoff")}
-                  data-testid="btn-end-shift"
-                  className="mt-[18px] h-12 w-full rounded-[14px] border text-base font-bold transition-transform motion-safe:active:scale-[0.99]"
-                  style={{
-                    borderColor: "var(--on-ink-muted)",
-                    background: "var(--ink-sheen)",
-                    color: "var(--on-ink)",
-                  }}
-                >
-                  {t.home.shift.endShift}
-                </button>
+                {pulse?.shift && (
+                  <ShiftAdjustmentControls endsAt={pulse.shift.endsAt} />
+                )}
               </>
             )}
           </section>

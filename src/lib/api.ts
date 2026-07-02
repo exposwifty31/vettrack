@@ -31,6 +31,10 @@ import type {
   ShiftImport,
   ShiftImportPreview,
   ShiftImportResult,
+  ShiftAdjustment,
+  ShiftAdjustmentStatus,
+  ShiftAdjustmentDecision,
+  CreateShiftAdjustmentRequest,
   Appointment,
   AppointmentVetMeta,
   CreateAppointmentRequest,
@@ -501,6 +505,24 @@ export const api = {
       }
       return res.json() as Promise<ShiftImportResult>;
     },
+  },
+  shiftAdjustments: {
+    list: (status?: ShiftAdjustmentStatus) =>
+      request<{ requests: ShiftAdjustment[] }>(
+        status ? `/api/shift-adjustments?status=${status}` : "/api/shift-adjustments",
+      ).then((r) => r.requests),
+    create: (data: CreateShiftAdjustmentRequest) =>
+      request<ShiftAdjustment>("/api/shift-adjustments", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    decide: (id: string, decision: ShiftAdjustmentDecision, note?: string) =>
+      request<ShiftAdjustment>(`/api/shift-adjustments/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(note ? { decision, note } : { decision }),
+      }),
+    cancel: (id: string) =>
+      request<ShiftAdjustment>(`/api/shift-adjustments/${id}/cancel`, { method: "POST" }),
   },
   appointments: {
     list: (params: { day?: string; start?: string; end?: string; vetId?: string }) => {

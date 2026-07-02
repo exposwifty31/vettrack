@@ -395,6 +395,8 @@ const translations = {
 
   auth: d.auth,
 
+  shiftAdjustments: d.shiftAdjustments,
+
   home: d.home,
 
   equipment: {
