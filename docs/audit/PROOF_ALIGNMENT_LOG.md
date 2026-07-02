@@ -764,3 +764,16 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - **Gates:** `pnpm typecheck` (frontend + server) → **exit 0**.
 
 **Verdict:** VERIFIED at gate + unit level. **Behavior change (honest ceiling):** the only runtime difference vs before is that large phones in **landscape** now render the phone shell (bottom tab bar + flat scan tab) instead of the tablet sidebar + FAB — the intended #5 fix. No iPad behavior changes. Not device-verified in a simulator this session; the change is reasoned against the concrete device dimension matrix (unit-tested) and touches only the phone-landscape case. **Deferred (cleanup, not started):** the `MobileTabBar` / `MobileShell` re-export shims (delete-candidates pending the `rg` consumer confirmation).
+
+## 2026-07-03 — Shift chat: clear messages when the shift ends (BUG-001 residual)
+
+**Claim:** Fixed "on shift chat the messages still appear" — the panel now shows only the current open shift's messages and empties immediately when the shift ends / there is no open shift (user-confirmed target: "empty immediately").
+
+**Evidence (this session):**
+- **Root cause (traced, not guessed):** the server (`server/routes/shift-chat.ts:57–73`) is already authoritative — it returns only the open shift's messages and `{ messages: [] }` when no shift is open, and honors incremental `after` (`gt(createdAt, afterDate)`). The client accumulates across polls, and the previous `mergeSessionScoped` **early-returned on an empty batch** (`incoming.length === 0 → return prev`), so a shift ending (server → `[]`) left the old messages pinned on screen. An empty batch was ambiguous ("no new messages" vs "no open shift"), so the client couldn't clear safely.
+- **Fix — server-authoritative session id:** server now includes `shiftSessionId: shift?.id ?? null` in **both** response paths (`shift-chat.ts:59` no-shift, `:140` normal). Added to the `MessagesResponse` type. New `reconcileMessages(prev, incoming, prevSessionId, currentSessionId)` replaces `mergeSessionScoped`: `currentSessionId === null` → clear immediately; `!== prevSessionId` → swap in the incoming batch (rollover); same session → append + dedupe by id. `useShiftChat` tracks `sessionRef` and reconciles every poll against `data.shiftSessionId` (reset on open/close).
+- **Empty state:** `ShiftChatPanel` already renders `<EmptyState message={t.shiftChat.panel.empty}>` at 0 messages, so a shift-end clears gracefully (verified `ShiftChatPanel.tsx:194–197`).
+- **Tests:** rewrote `tests/shift-chat-session-scoping.test.ts` for `reconcileMessages` (8 cases): the headline `null → []` clear, empty-stays-empty by reference, first-open full batch, same-session append/dedupe/empty-by-ref, rollover swap, boundary-mixed scoping. **8 passed.** Server response-shape test (`server/tests/shift-chat.test.ts:40`) checks additively (`"pinnedMessage" in body` + arrays) — the new field does not break it.
+- **Gates:** `pnpm typecheck` (frontend + server) → **exit 0**. No stale `mergeSessionScoped` references remain.
+
+**Verdict:** VERIFIED at gate + unit level. **Not exercised this session:** a live shift-rollover against the running server (unit-tested the pure reconcile + confirmed the server now emits the disambiguating field; the poll wiring is a thin effect over it).

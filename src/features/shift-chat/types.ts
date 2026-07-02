@@ -37,6 +37,8 @@ export interface MessagesResponse {
   pinnedMessage: ShiftMessage | null;
   typing: string[];
   onlineUserIds: string[];
+  /** The server's authoritative current open shift session, or null when none is open. */
+  shiftSessionId: string | null;
 }
 
 export interface PostMessageInput {

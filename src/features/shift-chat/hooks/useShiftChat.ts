@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { shiftChatApi } from "../api";
-import { mergeSessionScoped } from "../message-scoping";
+import { reconcileMessages } from "../message-scoping";
 import type { ShiftMessage, PostMessageInput } from "../types";
 import { useAuth } from "@/hooks/use-auth";
 import { t } from "@/lib/i18n";
@@ -41,19 +41,27 @@ export function useShiftChat(isOpen: boolean) {
 
   // ── Local message accumulation ─────────────────────────────────────────────
   const [allMessages, setAllMessages] = useState<ShiftMessage[]>([]);
+  const sessionRef = useRef<string | null>(null);
 
+  // Reconcile every poll against the server's authoritative shift session, so a
+  // shift that ends (shiftSessionId → null) clears the panel immediately and a
+  // shift rollover swaps in the new conversation (BUG-001).
   useEffect(() => {
-    if (!isOpen || !data?.messages?.length) return;
-    setAllMessages((prev) => mergeSessionScoped(prev, data.messages));
-  }, [data?.messages, isOpen]);
+    if (!isOpen || !data) return;
+    const current = data.shiftSessionId ?? null;
+    setAllMessages((prev) => reconcileMessages(prev, data.messages ?? [], sessionRef.current, current));
+    sessionRef.current = current;
+  }, [data, isOpen]);
 
   // Full history on open; keep afterRef when closed so unread polls stay incremental.
   useEffect(() => {
     if (isOpen) {
       afterRef.current = undefined;
+      sessionRef.current = null;
       setAllMessages([]);
       void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
     } else {
+      sessionRef.current = null;
       setAllMessages([]);
     }
   }, [isOpen, queryClient]);

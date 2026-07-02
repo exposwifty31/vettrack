@@ -56,7 +56,7 @@ router.get(
     try {
       const shift = await getOpenShift(clinicId);
       if (!shift) {
-        return res.json({ messages: [], pinnedMessage: null, typing: [], onlineUserIds: [] });
+        return res.json({ messages: [], pinnedMessage: null, typing: [], onlineUserIds: [], shiftSessionId: null });
       }
 
       const afterDate = after ? new Date(after) : undefined;
@@ -137,6 +137,7 @@ router.get(
           : null,
         typing: presence.typing,
         onlineUserIds: presence.onlineUserIds,
+        shiftSessionId: shift.id,
       });
     } catch (err) {
       console.error("[shift-chat] GET /messages error:", err);
