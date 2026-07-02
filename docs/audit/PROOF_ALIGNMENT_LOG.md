@@ -353,3 +353,11 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
   - **QR permission-priming state** — behavioral change to the camera-mount flow; the e2e scan test is live-server-only (excluded from the default suite), so a regression wouldn't be caught by CI and the fork can't verify on device. Recommend the parent implement with live verification.
   - **BUG-016 remove all scan UI on web** — this is a cross-cutting nav change touching `NativeTabSidebar`/`routes`/topbar scan entry points (the plan's "platform scan model" cross-cutting workstream), not isolated to the Stage-4 scan surface. `src/pages/scan.tsx` already redirects non-mobile-shell to `/equipment?scan=1`; the remaining sidebar/topbar entry removal belongs to the parent's cross-cutting task.
 - **Needs manual browser + iOS-sim verification (parent, post-merge):** (1) WebOnlyGuard shows on iPhone/iPad browser + narrow viewport, desktop unaffected, CTA routes to /my-equipment; (2) scanner close reachable/tappable on a real iPhone + white reticle; (3) board overlay red identity, skeleton, footer in light/dark + kiosk; (4) **Code Blue emergency-screen contrast in light AND dark, RTL, on device.**
+
+## 2026-07-02 — Stage 4 (parent post-merge live check): WebOnlyGuard BUG-009
+
+**Claim:** After merging the Stage 4 fork, the parent live-verified the WebOnlyGuard viewport guard the fork had deferred.
+
+**Evidence:** Dev server :5000, Chrome MCP, window resized to **800px** (<1024). Navigated `/equipment/board` → renders the full dark guard screen ("Best viewed on a larger screen" / "This view is built for desktop and wide tablet displays… continue with the mobile-optimized view." / "Go to my equipment" CTA) instead of the command board. At ≥1024 the board renders normally (unchanged). Confirms BUG-009 behavior at the narrow-viewport boundary.
+
+**Still deferred (device/camera-dependent, not verifiable same-origin):** scanner close reachability + white reticle on a real iPhone; Code Blue emergency-screen contrast in light/dark/RTL on device; board overlay red identity in kiosk. QR permission-priming + BUG-016 (remove web scan UI) remain unimplemented (cross-cutting nav workstream).
