@@ -5,7 +5,7 @@
 #   ./scripts/install-ios-sim.sh                    # iPad (A16) default
 #   ./scripts/install-ios-sim.sh --udid <UDID>
 #   ./scripts/install-ios-sim.sh --skip-build       # reuse last native shell sync
-#   ./scripts/install-ios-sim.sh --iphone           # iPhone 16 Pro sim
+#   ./scripts/install-ios-sim.sh --iphone           # newest available iPhone Pro sim
 set -euo pipefail
 
 REPO="${REPO:-$(cd "$(dirname "$0")/.." && pwd)}"
@@ -22,9 +22,12 @@ while [[ $# -gt 0 ]]; do
     --skip-build) SKIP_BUILD=true; shift ;;
     --udid) UDID="$2"; shift 2 ;;
     --iphone)
-      UDID="$(xcrun simctl list devices available 2>/dev/null | grep -m1 'iPhone 16 Pro (' | grep -oE '[A-F0-9-]{36}' || true)"
+      for model in 'iPhone 17 Pro' 'iPhone 16 Pro' 'iPhone 15 Pro'; do
+        UDID="$(xcrun simctl list devices available 2>/dev/null | grep -m1 "$model (" | grep -oE '[A-F0-9-]{36}' || true)"
+        if [[ -n "$UDID" ]]; then break; fi
+      done
       if [[ -z "$UDID" ]]; then
-        echo "FAIL: could not find iPhone 16 Pro simulator — pass --udid" >&2
+        echo "FAIL: could not find an iPhone Pro simulator — pass --udid" >&2
         exit 1
       fi
       shift

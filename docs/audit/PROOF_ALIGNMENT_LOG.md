@@ -515,3 +515,19 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Gates: typecheck **0×2**, i18n parity OK, `i18n-no-hebrew-in-source` + `no-hardcoded-ui-strings` pass (3/3), build exit 0.
 
 **Verdict:** VERIFIED at gate level. Remaining Stage 9: SystemCard event-copy i18n (+ removed-scope event cleanup), BUG-003 quick-reply, BUG-001 stale messages, standalone chat screen, richer Handover, code-blue.tsx restyle.
+
+## 2026-07-02 — Stage 9 (increment 5): SystemCard event-alignment + i18n + tokens (BUG-002 cont.)
+
+**Claim:** Rewrote `SystemCard.tsx` to match the server's actual system-event contract, cleared its hardcoded Hebrew (last shift-chat allowlist entry), and moved dark-only Tailwind palette onto `--status-*` tokens. This is both the de-Hebrew fix and a silent-gap bug fix.
+
+**Evidence (traced against server 2026-07-02):**
+- `postSystemMessage()` (`server/lib/shift-chat-presence.ts`) is the ONLY insert path for `type:"system"` messages (grep confirmed: no other `type: "system"` inserts).
+- Its callers emit exactly 9 event types: `code_blue_start`/`code_blue_end` (`routes/code-blue.ts`), `equipment_overdue`/`alert_reopened` (`lib/alert-reminder.ts`), `code_blue_unreconciled` (`lib/code-blue-reconciliation-scanner.ts`), `outbox_dlq_threshold_exceeded` (`lib/outbox-dlq-scanner.ts`), `critical_push_delivery_failed` (`workers/notification.worker.ts`), `emergency_dispense_unresolved` (`services/dispense.service.ts`), `task_escalated` (`services/task-automation.service.ts`).
+- OLD SystemCard rendered only 3 of the 9 (`code_blue_start/end`, `equipment_overdue`) — the other 6 emitted events hit `if (!config) return null` and rendered nothing (silent gap). It also carried 6 DEAD entries: `med_critical`, `hosp_critical`, `hosp_discharged`, `hosp_deceased` (ER/med scope removed in migrations 142–143) + `low_stock`/`shift_summary` (grep-confirmed never emitted).
+- NEW SystemCard: config = the 9 emitted events, each with a status `tone` (issue/ok/stale) → `TONE_CLASS` pre-formed `--status-*` vars; every label reads `t.shiftChat.system.*`; interpolated data (name, minutes, outcome, time, count) concatenated in TSX (passthrough namespace → no interpolation-fn wiring needed); time via `formatDateByLocale(..., {hour,minute})`.
+- New i18n: `shiftChat.system.{codeBlueStarted,codeBlueEnded,codeBlueUnreconciled,equipmentOverdue,alertReopened,emergencyDispenseUnresolved,taskEscalated,criticalPushFailed,outboxDlqExceeded,minutesShort}` (en+he, passthrough, `.d.ts` regenerated).
+- Allowlist: `SystemCard.tsx` removed — **the shift-chat subsystem now has zero Hebrew-debt entries.** Guard's "every offender listed" + "no stale entries" both hold.
+- RED→GREEN: added SystemCard describe to `stage-9-emergency-token-consistency.test.js` (5 asserts: no-palette, i18n-not-Hebrew, all-9-emitted-present, all-6-dead-absent, status-tone-tokens) — failed 5/5 pre-impl, pass post-impl.
+- Gates: typecheck **0×2**, i18n parity OK, `stage-9` lock **13/13**, `i18n-no-hebrew-in-source` pass, `no-hardcoded-ui-strings` pass, build exit 0.
+
+**Verdict:** VERIFIED at gate level. SystemCard is now contract-aligned (no dead config, no unrendered emitted events) and Hebrew-free. Remaining Stage 9: ShiftChatPanel palette→tokens + BUG-003 behavioral proof (next increment), BUG-001 stale messages, standalone chat screen, richer Handover, code-blue.tsx restyle.

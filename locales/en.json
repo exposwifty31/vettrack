@@ -3225,6 +3225,18 @@
       "sendAria": "Send",
       "closeAria": "Close chat",
       "pinAria": "Pin message"
+    },
+    "system": {
+      "codeBlueStarted": "Code Blue activated",
+      "codeBlueEnded": "Code Blue ended",
+      "codeBlueUnreconciled": "Code Blue session not yet reconciled",
+      "equipmentOverdue": "Equipment not returned",
+      "alertReopened": "Alert re-opened",
+      "emergencyDispenseUnresolved": "Emergency dispense unresolved",
+      "taskEscalated": "Task escalated to admin",
+      "criticalPushFailed": "Critical notification failed to deliver",
+      "outboxDlqExceeded": "Events stuck — admin attention needed",
+      "minutesShort": "min"
     }
   },
   "auditLog": {

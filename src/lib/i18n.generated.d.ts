@@ -3229,6 +3229,18 @@ export interface TStructure {
       closeAria: string;
       pinAria: string;
     };
+    system: {
+      codeBlueStarted: string;
+      codeBlueEnded: string;
+      codeBlueUnreconciled: string;
+      equipmentOverdue: string;
+      alertReopened: string;
+      emergencyDispenseUnresolved: string;
+      taskEscalated: string;
+      criticalPushFailed: string;
+      outboxDlqExceeded: string;
+      minutesShort: string;
+    };
   };
   auditLog: {
     actions: {

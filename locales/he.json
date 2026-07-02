@@ -3225,6 +3225,18 @@
       "sendAria": "שלח",
       "closeAria": "סגור צ׳אט",
       "pinAria": "הצמד הודעה"
+    },
+    "system": {
+      "codeBlueStarted": "Code Blue הופעל",
+      "codeBlueEnded": "Code Blue הסתיים",
+      "codeBlueUnreconciled": "מפגש Code Blue טרם סוכם",
+      "equipmentOverdue": "ציוד לא הוחזר",
+      "alertReopened": "התראה נפתחה מחדש",
+      "emergencyDispenseUnresolved": "ניפוק חירום לא טופל",
+      "taskEscalated": "משימה הוסלמה למנהל",
+      "criticalPushFailed": "התראה קריטית נכשלה במסירה",
+      "outboxDlqExceeded": "אירועים תקועים — נדרשת התערבות מנהל",
+      "minutesShort": "דק׳"
     }
   },
   "auditLog": {

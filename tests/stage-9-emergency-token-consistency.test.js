@@ -43,6 +43,51 @@ describe("Stage 9 — shift-chat BroadcastCard (BUG-002)", () => {
   });
 });
 
+describe("Stage 9 — shift-chat SystemCard (event alignment + i18n)", () => {
+  const src = read("src", "features", "shift-chat", "components", "SystemCard.tsx");
+
+  it("has no hardcoded palette (dark-only Tailwind → status tokens)", () => {
+    expect(BANNED.test(src)).toBe(false);
+  });
+  it("renders copy from i18n, not hardcoded Hebrew", () => {
+    expect(src.includes("t.shiftChat.system.")).toBe(true);
+    expect(/[֐-׿]/.test(src)).toBe(false);
+  });
+  it("handles every event type the server actually emits", () => {
+    // Emitted via postSystemMessage() across server/ (verified 2026-07-02).
+    for (const key of [
+      "code_blue_start",
+      "code_blue_end",
+      "code_blue_unreconciled",
+      "equipment_overdue",
+      "alert_reopened",
+      "emergency_dispense_unresolved",
+      "task_escalated",
+      "critical_push_delivery_failed",
+      "outbox_dlq_threshold_exceeded",
+    ]) {
+      expect(src.includes(`${key}:`)).toBe(true);
+    }
+  });
+  it("drops config for events removed in migrations 142–143 / never emitted", () => {
+    for (const dead of [
+      "med_critical",
+      "hosp_critical",
+      "hosp_discharged",
+      "hosp_deceased",
+      "low_stock",
+      "shift_summary",
+    ]) {
+      expect(src.includes(`${dead}:`)).toBe(false);
+    }
+  });
+  it("uses status tokens for severity tone", () => {
+    expect(src.includes("var(--status-issue-")).toBe(true);
+    expect(src.includes("var(--status-ok-")).toBe(true);
+    expect(src.includes("var(--status-stale-")).toBe(true);
+  });
+});
+
 describe("Stage 9 — code-blue-history.tsx", () => {
   const src = read("src", "pages", "code-blue-history.tsx");
   it("has no hardcoded palette (zinc + outcome colors tokenized)", () => {
