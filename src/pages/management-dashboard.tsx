@@ -157,17 +157,17 @@ export default function ManagementDashboardPage() {
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-2" data-testid="summary-strip">
-            <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3 min-h-[72px]">
-              <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 leading-none">{counts.available}</p>
-              <span className="text-[11px] font-semibold text-emerald-700/80 dark:text-emerald-400/80">{t.managementDashboardPage.available}</span>
+            <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-[var(--status-ok-border)] bg-[var(--status-ok-bg)] p-3 min-h-[72px]">
+              <p className="text-2xl font-bold text-[var(--status-ok-fg)] leading-none">{counts.available}</p>
+              <span className="text-[11px] font-semibold text-[var(--status-ok-fg)]">{t.managementDashboardPage.available}</span>
             </div>
-            <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 min-h-[72px]">
-              <p className="text-2xl font-bold text-amber-700 dark:text-amber-300 leading-none">{counts.inUse}</p>
-              <span className="text-[11px] font-semibold text-amber-700/80 dark:text-amber-400/80">{t.managementDashboardPage.inUse}</span>
+            <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-[var(--status-stale-border)] bg-[var(--status-stale-bg)] p-3 min-h-[72px]">
+              <p className="text-2xl font-bold text-[var(--status-stale-fg)] leading-none">{counts.inUse}</p>
+              <span className="text-[11px] font-semibold text-[var(--status-stale-fg)]">{t.managementDashboardPage.inUse}</span>
             </div>
-            <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-3 min-h-[72px]">
-              <p className="text-2xl font-bold text-red-700 dark:text-red-300 leading-none">{counts.issues + counts.missing}</p>
-              <span className="text-[11px] font-semibold text-red-700/80 dark:text-red-400/80">{t.managementDashboardPage.issues}</span>
+            <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] p-3 min-h-[72px]">
+              <p className="text-2xl font-bold text-[var(--status-issue-fg)] leading-none">{counts.issues + counts.missing}</p>
+              <span className="text-[11px] font-semibold text-[var(--status-issue-fg)]">{t.managementDashboardPage.issues}</span>
             </div>
           </div>
         )}
@@ -198,7 +198,7 @@ export default function ManagementDashboardPage() {
               </div>
             ) : displayCriticalItems.length === 0 ? (
               <div className="flex flex-col items-center py-5 gap-2 text-center">
-                <CheckCircle2 className="w-7 h-7 text-emerald-400" />
+                <CheckCircle2 className="w-7 h-7 text-[hsl(var(--status-ok))]" />
                 <p className="text-sm font-medium text-foreground">{t.managementDashboardPage.allGood}</p>
                 <p className="text-xs text-muted-foreground">{t.managementDashboardPage.allInPlace}</p>
               </div>

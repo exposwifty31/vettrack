@@ -544,3 +544,17 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Gates: `stage-9` lock **15/15**, `shift-chat-broadcast-ack` **5/5**, `i18n-no-hebrew-in-source` pass, typecheck **0×2**, build exit 0.
 
 **Verdict:** VERIFIED. BUG-002 (shift-chat Hebrew) fully cleared across BroadcastCard/types/MessageBubble/ShiftChatArchive/SystemCard; BUG-003 proven resolved + locked. Remaining Stage 9: BUG-001 (stale messages — `useShiftChat` accumulation not reset on shift change), standalone chat screen, richer Handover, `code-blue.tsx` restyle (frozen surface).
+
+## 2026-07-02 — Stage 7 (Analytics & Management): palette→token + i18n + lock (delegated)
+
+**Claim:** Converted the Stage 7 screens off hardcoded palette onto the `--status-*`/`--sys-*` tokens (single declaration, no `dark:` fork), cleared the last Hebrew from `shift-leaderboard.tsx`, and locked it with a token test. Implemented by a delegated sub-agent; gates re-verified by the orchestrator.
+
+**Evidence (orchestrator-run, not agent-reported):**
+- `git diff --stat`: `analytics.tsx` (+/−38), `management-dashboard.tsx` (20), `shift-leaderboard.tsx` (6), allowlist (−1). New file `tests/stage-7-analytics-token-consistency.test.js`.
+- `analytics.tsx`: `STATUS_COLORS_HEX` (4×#hex) → `STATUS_COLORS` = `hsl(var(--status-{ok,issue,maintenance,sterilized}))`; Recharts `<Cell fill>`/`<Bar fill>`/grid `stroke`/axis tick `fill` → token refs; `contentStyle` border → `hsl(var(--border))`. Recharts token pattern matches shipped+verified precedent (`display.tsx:94` `stroke="hsl(var(--status-ok))"`, `TodayScreen.tsx:93` `stroke="var(--brand)"`) — `var()` resolves in SVG presentation attributes on the app's modern engines.
+- `management-dashboard.tsx`: 3 summary tiles `dark:`-forked emerald/amber/red → single-declaration `var(--status-{ok,stale,issue}-{bg,border,fg})`; all-good check → `hsl(var(--status-ok))`.
+- `shift-leaderboard.tsx`: Hebrew comment `{/* תוצאות */}` removed; zero-capture highlight → `var(--status-stale-*)`. Removed from `KNOWN_DEBT_ALLOWLIST` — both ratchet assertions hold.
+- `audit-log.tsx`: **left unchanged** — already 0 palette / 0 Hebrew, delete-free (S7-D3 preserved), semantic-token classes. Prototype chip-filters/avatar-rows deferred (churn over a working Select filter, no defect benefit).
+- Gates (orchestrator-run): `npx tsc --noEmit` → 0 errors; palette grep on the 3 pages → 0; Hebrew grep → 0; `i18n:check` → deep parity OK; `pnpm test` on `stage-7-*` + `i18n-no-hebrew-in-source` + `i18n-parity` → **16 passed**. Lock test = 3 describes / 10 asserts, RED-verified before GREEN.
+
+**Verdict:** VERIFIED at gate level. **Deferred (flagged):** shift-leaderboard podium + week/month toggle, audit-log category chips + avatar rows (additive, need new keys + data restructure); live chart/theme render pending the stage-end manual Chrome pass (392/860/1180 · light/dark · en/he).

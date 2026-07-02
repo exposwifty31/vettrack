@@ -38,11 +38,11 @@ import {
 import { formatChartBucketDay } from "@/lib/utils";
 import { Link } from "wouter";
 
-const STATUS_COLORS_HEX = {
-  ok: "#6ec4a0",
-  issue: "#e08080",
-  maintenance: "#e5c07a",
-  sterilized: "#6dbfbf",
+const STATUS_COLORS = {
+  ok: "hsl(var(--status-ok))",
+  issue: "hsl(var(--status-issue))",
+  maintenance: "hsl(var(--status-maintenance))",
+  sterilized: "hsl(var(--status-sterilized))",
 };
 
 export default function AnalyticsPage() {
@@ -57,10 +57,10 @@ export default function AnalyticsPage() {
 
   const pieData = analytics
     ? [
-        { name: t.status.ok, value: analytics.statusBreakdown.ok, color: STATUS_COLORS_HEX.ok },
-        { name: t.status.issue, value: analytics.statusBreakdown.issue, color: STATUS_COLORS_HEX.issue },
-        { name: t.analyticsPage.maintenance, value: analytics.statusBreakdown.maintenance, color: STATUS_COLORS_HEX.maintenance },
-        { name: t.status.sterilized, value: analytics.statusBreakdown.sterilized, color: STATUS_COLORS_HEX.sterilized },
+        { name: t.status.ok, value: analytics.statusBreakdown.ok, color: STATUS_COLORS.ok },
+        { name: t.status.issue, value: analytics.statusBreakdown.issue, color: STATUS_COLORS.issue },
+        { name: t.analyticsPage.maintenance, value: analytics.statusBreakdown.maintenance, color: STATUS_COLORS.maintenance },
+        { name: t.status.sterilized, value: analytics.statusBreakdown.sterilized, color: STATUS_COLORS.sterilized },
       ].filter((d) => d.value > 0)
     : [];
 
@@ -111,7 +111,7 @@ export default function AnalyticsPage() {
               <Card className="bg-card border-border/60 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <CheckCircle2 className="w-4 h-4 text-[hsl(var(--status-ok))]" />
                     <span className="text-xs text-muted-foreground font-medium">{t.analyticsPage.maintenance}</span>
                   </div>
                   <p className="text-2xl font-bold text-foreground">
@@ -124,7 +124,7 @@ export default function AnalyticsPage() {
               <Card className="bg-card border-border/60 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Droplets className="w-4 h-4 text-teal-500" />
+                    <Droplets className="w-4 h-4 text-[hsl(var(--status-sterilized))]" />
                     <span className="text-xs text-muted-foreground font-medium">{t.analyticsPage.sterilization}</span>
                   </div>
                   <p className="text-2xl font-bold text-foreground">
@@ -137,7 +137,7 @@ export default function AnalyticsPage() {
               <Card className="bg-card border-border/60 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="w-4 h-4 text-red-400" />
+                    <AlertTriangle className="w-4 h-4 text-[hsl(var(--status-stale))]" />
                     <span className="text-xs text-muted-foreground font-medium">{t.analyticsPage.overdue}</span>
                   </div>
                   <p className="text-2xl font-bold text-foreground">
@@ -150,7 +150,7 @@ export default function AnalyticsPage() {
               <Card className="bg-card border-border/60 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Wrench className="w-4 h-4 text-amber-500" />
+                    <Wrench className="w-4 h-4 text-[hsl(var(--status-issue))]" />
                     <span className="text-xs text-muted-foreground font-medium">{t.analyticsPage.issues}</span>
                   </div>
                   <p className="text-2xl font-bold text-foreground">
@@ -189,7 +189,7 @@ export default function AnalyticsPage() {
                   </Pie>
                   <Tooltip
                     formatter={(value: number) => [`${value} ${t.analyticsPage.itemsLabel}`, ""]}
-                    contentStyle={{ borderRadius: "12px", border: "1px solid #e5e7eb", fontSize: "12px" }}
+                    contentStyle={{ borderRadius: "12px", border: "1px solid hsl(var(--border))", fontSize: "12px" }}
                   />
                   <Legend
                     formatter={(value, entry: Payload) =>
@@ -219,13 +219,13 @@ export default function AnalyticsPage() {
             ) : hasScanActivity ? (
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#9ca3af" }} interval={1} />
-                  <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} allowDecimals={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} interval={1} />
+                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} allowDecimals={false} />
                   <Tooltip
-                    contentStyle={{ borderRadius: "12px", border: "1px solid #e5e7eb", fontSize: "12px" }}
+                    contentStyle={{ borderRadius: "12px", border: "1px solid hsl(var(--border))", fontSize: "12px" }}
                   />
-                  <Bar dataKey="scans" fill="#6ec4a0" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="scans" fill="hsl(var(--status-ok))" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
