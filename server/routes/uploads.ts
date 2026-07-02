@@ -7,6 +7,7 @@ import { db, users } from "../db.js";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
 import { buildAvatarKey } from "../lib/upload-filename.js";
+import { detectImageType } from "../lib/image-signature.js";
 import {
   getS3Client,
   isObjectStorageConfigured,
@@ -21,7 +22,11 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
   fileFilter: (_req, file, cb) => {
-    if (!file.mimetype.startsWith("image/")) {
+    // Coarse early reject. The declared mimetype is client-controlled and not
+    // trusted for the accept decision — that is done by magic-byte content
+    // detection in each handler (see detectImageType). SVG is refused outright
+    // because it is script-capable and executes on top-level navigation.
+    if (!file.mimetype.startsWith("image/") || file.mimetype === "image/svg+xml") {
       return cb(new Error("Images only"));
     }
     cb(null, true);
@@ -52,6 +57,13 @@ router.post(
         );
       }
 
+      // Reject anything whose bytes are not a recognized raster image, even if
+      // the client labeled it image/*. Blocks SVG/HTML smuggling (stored XSS).
+      const detectedType = detectImageType(req.file.buffer);
+      if (!detectedType) {
+        return res.status(400).json(apiError({ code: "VALIDATION_FAILED", reason: "INVALID_FILE_TYPE", message: "Only raster image files (PNG, JPEG, WebP, GIF, HEIC) are allowed", requestId }));
+      }
+
       // Safe filename — no path traversal, no user-controlled strings
       const ext = (req.file.originalname.split(".").pop() ?? "jpg")
         .replace(/[^a-z0-9]/gi, "")
@@ -64,7 +76,7 @@ router.post(
           Bucket: process.env.S3_BUCKET,
           Key: fileName,
           Body: req.file.buffer,
-          ContentType: req.file.mimetype,
+          ContentType: detectedType,
         })
       );
 
@@ -110,6 +122,11 @@ router.post(
         );
       }
 
+      const detectedType = detectImageType(req.file.buffer);
+      if (!detectedType) {
+        return res.status(400).json(apiError({ code: "VALIDATION_FAILED", reason: "INVALID_FILE_TYPE", message: "Only raster image files (PNG, JPEG, WebP, GIF, HEIC) are allowed", requestId }));
+      }
+
       const actor = req.authUser!;
       const fileName = buildAvatarKey(actor.id, req.file.originalname);
 
@@ -118,7 +135,7 @@ router.post(
           Bucket: process.env.S3_BUCKET,
           Key: fileName,
           Body: req.file.buffer,
-          ContentType: req.file.mimetype,
+          ContentType: detectedType,
         }),
       );
 
