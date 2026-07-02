@@ -477,3 +477,15 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Deferred (not dead-buttoned):** Flag (equipment-scoped note+photo issue flow lives only inside the desktop screen; the standalone `ReportIssueDialog` is a general support ticket, not an equipment flag) and Report-missing (no API endpoint). Documented in the component header.
 
 **Verdict:** VERIFIED — the return action is exercised end-to-end in a jsdom behavioral test against the proven API+dialog, plus static lock + typecheck + build. Stage 6 increments 1–7 all shipped.
+
+## 2026-07-02 — Stage 9 (increments 1–2): Crash Cart + Code Blue History palette→token
+
+**Claim:** Crash Cart check (`crash-cart.tsx`, 9 sites) and Code Blue History (`code-blue-history.tsx`, 22 sites) moved off hardcoded green/red/amber/zinc palette onto theme + status/sys tokens. History also stops hardcoding `dir="rtl"` — it now mirrors by locale.
+
+**Evidence:**
+- crash-cart: ready/attention banner + present/missing rows + missing-items card → `--status-{ok,issue,stale}-*`; className-only, frozen code-blue mutation/transport surfaces untouched.
+- code-blue-history: zinc dark palette → theme tokens (`bg-card`/`bg-muted`/`border-border`/`text-muted-foreground`/`text-foreground`); outcome pills → `--status-ok-fg`/`--status-issue-fg`/`rgb(var(--sys-blue))`/`--status-stale-fg`; both `dir="rtl"` → `dir={dir}` via `useDirection`, back chevron flips (ArrowLeft/ArrowRight).
+- Both `grep`-clean of banned palette → **0**. Lock test `tests/stage-9-emergency-token-consistency.test.js` **5/5** (no-palette + token presence per file + dir-by-locale). `tests/i18n-code-blue.test.ts` regression still green.
+- Gates: typecheck **0×2**, build exit 0.
+
+**Verdict:** VERIFIED at gate level (static token sweep + lock + i18n-code-blue regression + typecheck + build). Live dark/light/RTL render pending stage-end browser pass. Remaining Stage 9: shift-chat hardcoded-Hebrew (BUG-002) + quick-reply wiring (BUG-003) + stale messages (BUG-001) + standalone chat screen + richer Handover + code-blue.tsx restyle.

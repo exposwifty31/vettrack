@@ -26,3 +26,20 @@ describe("Stage 9 — crash-cart.tsx", () => {
     expect(src.includes("var(--status-issue-")).toBe(true);
   });
 });
+
+describe("Stage 9 — code-blue-history.tsx", () => {
+  const src = read("src", "pages", "code-blue-history.tsx");
+  it("has no hardcoded palette (zinc + outcome colors tokenized)", () => {
+    expect(BANNED.test(src)).toBe(false);
+  });
+  it("maps outcome pills to status/sys tokens", () => {
+    expect(src.includes("var(--status-ok-fg)")).toBe(true);
+    expect(src.includes("var(--status-issue-fg)")).toBe(true);
+    expect(src.includes("rgb(var(--sys-blue))")).toBe(true);
+  });
+  it("mirrors direction by locale instead of hardcoding dir=rtl", () => {
+    expect(src.includes('dir="rtl"')).toBe(false);
+    expect(src.includes("useDirection")).toBe(true);
+    expect(src.includes("dir={dir}")).toBe(true);
+  });
+});
