@@ -1,6 +1,6 @@
 # Shift Logic Rework — Plan
 
-Status: **proposed** (2026-07-02). Awaiting: real EZShift export file + two override params (see Open Items).
+Status: **in progress** (2026-07-02). Phase 0 done; Phase 1 backend + authority wiring done (increments 1–2); Phase 1 frontend (increment 3) remaining. Phase 2 parked (no EZShift export). See Open Items.
 
 ## Goal
 
@@ -48,19 +48,13 @@ Per (clinic, user, date): `effectiveStartTime?`, `effectiveEndTime`, `sourceRole
 - **Timezone fix:** standardize role-resolution + `display.ts` on the clinic timezone (Asia/Jerusalem); extract the shift-window match into **one** shared helper (byte-identical output for the existing path). *Higher-risk — authority-adjacent; gate behind tests.*
 - Verify: home agrees with the board; native shows correct on/off-shift.
 
-### Phase 1 — Shift-extension **request → admin approval** layer (decided 2026-07-02)
+### Phase 1 — Shift-**adjustment** request → admin approval layer (decided 2026-07-02)
 
-Model (from the user): a person who needs to work past their rostered end **requests** an extension with a **required reason**; an **admin approves** it. No self-service override. Only an **approved** request extends the person's effective shift window; the **role never changes** (an extension is not a promotion).
+Model (from the user): a rostered person **requests** a deviation with a **required reason**; an **admin approves** it. No self-service override. Two symmetric directions: **extend** (work past the rostered end) and **leave_early** (leave before it). Only an **approved** request moves the person's effective shift window; the **role never changes** (a deviation is not a promotion). The Today hero "End Shift" button becomes an **"end shift early"** (leave_early) request — the roster model has no clock-out, so it never actually ended a shift.
 
-- **Schema** `vt_shift_extension_requests` (+ migration): `id`, `clinicId`, `requesterUserId`, `requesterName`, `baseShiftDate`, `baseShiftId?` (roster row being extended), `currentEndTime`, `requestedEndTime`, `reason` (required, non-empty), `status` (`pending | approved | rejected | cancelled`), `decidedByUserId?`, `decidedAt?`, `decisionNote?`, `createdAt`.
-- **API** (`server/routes/shifts.ts` or a new `shift-extensions.ts`, registered in `app/routes.ts`):
-  - `POST /api/shifts/extensions` — requester creates a `pending` request; must currently be on a roster shift; `reason` required; validated.
-  - `GET /api/shifts/extensions?status=` — admin sees all pending; a requester sees their own.
-  - `PATCH /api/shifts/extensions/:id` — **admin only** approve/reject (+ optional note). Audited.
-  - New `AuditActionType` members for request/approve/reject (closed union in `server/lib/audit.ts`).
-- **Effective-shift precedence:** approved-and-active extension `requestedEndTime` → roster `vt_shifts` end → none. `role-resolution` consults approved extensions **additively**: with no approved extension the snapshot is **byte-identical to today**. Requires the byte-identical no-extension regression test + an enforcement review before merge.
-- **Frontend:** on-shift home hero gains a **"Request extension"** affordance (sheet: new end time + reason) and shows the request's pending/approved status; the admin surface (`admin.tsx`) gains a **pending-extensions approvals list** (reason shown, approve/reject).
-- **i18n:** new `en.json`/`he.json` keys (parity enforced).
+- **Increment 1 — backend — DONE (`a6e223aa`).** Table `vt_shift_adjustments` (+ migration 156): `id`, `clinicId`, `requesterUserId`, `requesterName`, `kind` (`extend | leave_early`), `baseShiftDate`, `baseShiftId?`, `currentEndTime`, `requestedEndTime`, `reason` (required 3–500), `status` (`pending | approved | rejected | cancelled`), `decidedByUserId?`, `decidedAt?`, `decisionNote?`, `createdAt`. Route `/api/shift-adjustments` (registered in `app/routes.ts`): `POST` create (must be on a roster shift; reason required; overnight-aware direction check; one pending per shift/day), `GET ?status=` (admin: all; requester: own), `PATCH :id` (admin-only approve/reject), `POST :id/cancel` (own pending). Four new `AuditActionType` members. Pure overnight-aware helper `shift-adjustment-window.ts`.
+- **Increment 2 — authority wiring — DONE (`b5f573f0`, frozen surface).** `resolveCurrentRole` consults **approved** adjustments **additively** via fail-safe `resolveEffectiveShift`: `leave_early` shortens the active window (off-shift once the earlier effective end passes); `extend` prolongs it (on past the rostered end while the extended window covers `now`). Precedence: approved-and-active adjustment `requestedEndTime` → roster `vt_shifts` end → none. **Byte-identical** when no userId / no approved row / query throw. Gated by `tests/role-resolution-adjustments.test.ts` (reference-identity assertion + 5 cases + 2 fail-safe) and a real-Postgres probe of the 5 cases; Strategy-A invariant holds.
+- **Increment 3 — frontend + i18n — TODO (next).** On-shift home hero gains **"Request extension"** and **"End shift early"** affordances (sheets: new end time + reason) and shows pending/approved status; the admin surface (`admin.tsx`) gains a **pending-adjustments approvals list** (reason shown, approve/reject); typed `src/lib/api.ts` functions + `src/types/`; new `en.json`/`he.json` keys (parity enforced).
 
 ### Phase 2 — Import hardening — **PARKED** (no EZShift export available)
 The user has no export file to share. The generic CSV importer (`server/routes/shifts.ts`, Hebrew header variants) stays as-is. Revisit only if/when a real `.csv/.xlsx` export appears: confirm column mapping, handle **start-only** shifts via a shift-type→duration map, add a matched/unmatched preview, and import-time timezone handling.
@@ -69,14 +63,14 @@ The user has no export file to share. The generic CSV importer (`server/routes/s
 
 - `authority.ts` Strategy A stays **byte-for-byte** for existing (no-override) inputs.
 - `ClinicalRole` / `ActiveShiftRole` closed unions unchanged (lead_technician stays aliased to senior_technician).
-- An **approved extension** is **additive** and, because it affects the authority-relevant window, goes through the enforcement envelope + a **byte-identical no-extension** regression test.
+- An **approved adjustment** is **additive** and, because it affects the authority-relevant window, is guarded by a **byte-identical no-adjustment** regression test (reference-identity on the no-adjustment path) — **DONE** (`b5f573f0`, `tests/role-resolution-adjustments.test.ts`). `resolveEffectiveShift` is fail-safe: any resolver throw degrades to the pure roster snapshot, so a bug here can never block a clinical mutation.
 - The Phase 0 home rewire is presentation-only and safe. **Phase 0 is DONE** (`66057889`).
 
 ## Open items
 
 1. **EZShift export file** — none available; Phase 2 parked (see above).
-2. **Authority semantics of an approved extension** *(confirm before wiring `role-resolution`)* — recommended: an approved extension **extends the person's effective clinical-authority window** (they keep their on-shift role for the approved extra hours; role unchanged). This is the whole point — a stale roster otherwise expires authority while the person is still working. Alternative: record/audit only, no authority effect.
-3. **"End Shift" / "Start Shift" hero buttons** — in the roster-derived model there is no manual clock-in/out. Today's hero still shows Start/End Shift (→ `/handoff`), which opens the handover summary and does **not** end anything (user-reported 2026-07-02). Decide: remove the buttons, relabel to **"Handover"**, or add an explicit **leave-early** request. See investigation below / current chat.
+2. ~~**Authority semantics of an approved extension**~~ **RESOLVED (user, 2026-07-02):** an approved adjustment **extends/contracts the effective clinical-authority window** — the person keeps their on-shift role for the approved hours (extend) or loses it early (leave_early); role unchanged. Wired in increment 2 (`b5f573f0`).
+3. ~~**"End Shift" / "Start Shift" hero buttons**~~ **RESOLVED (user, 2026-07-02):** the "End Shift" button becomes an explicit **leave_early request** (symmetric with extend). Remaining work is increment 3 (frontend): the hero affordance replaces the misleading `/handoff` navigation. "Start Shift" stays a handover entry point.
 
 ## Verification (per phase)
 
