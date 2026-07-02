@@ -50,6 +50,7 @@
     /* ── Radius ramp — iOS scale (Stage 1) ── */
     --radius-sm:   10px;         /* tight inputs, badges */
     --radius-md:   12px;         /* buttons, smaller cards */
+    --radius-lg:   14px;         /* design alias for base radius (cards/buttons) */
     --radius-xl:   16px;         /* panels, larger surfaces */
     --radius-2xl:  20px;         /* sheets, modals */
     --radius-pill: 999px;
@@ -65,6 +66,8 @@
     --text-xl:   1.294rem;    /* ~22px — section headings */
     --text-2xl:  2rem;        /* ~34px — page titles (iOS large title) */
     --text-3xl:  2.353rem;    /* ~40px — hero numerals / display */
+    --display:         var(--text-3xl);   /* design name — hero/display numerals */
+    --text-largetitle: var(--text-2xl);   /* design name — iOS large title */
     --leading-tight:  1.2;    /* headings */
     --leading-snug:   1.35;   /* titles, short copy */
     --leading-normal: 1.55;   /* body prose */
@@ -109,6 +112,16 @@
     --ivory-warn:     #d97706;
     --ivory-err:      #dc2626;
     --ivory-info:     #2563eb;
+    /* ── Surface ramp (Stage 1 §01) — resting / raised / hover / pressed fills ── */
+    --surface:        #ffffff;
+    --surface-2:      #fafafc;
+    --surface-hover:  #f7f6f3;
+    --surface-active: #efede8;
+    /* ── Translucent bar material (Stage 1 §05) — nav/topbar over content ── */
+    --hairline:       rgba(60, 60, 67, 0.18);
+    --bar-bg:         rgba(255, 255, 255, 0.8);
+    --bar-bg-opaque:  #ffffff;
+    --bar-blur:       20px;
     /* Warning semantic tokens (inline SVG / ER reconciliation triangle) */
     --color-background-warning: #fef3c7;
     --color-border-warning: #d97706;
@@ -116,8 +129,9 @@
 
     /* 60/30/10 — indigo (default palette) */
     --brand: #4f46e5;
+    --brand-foreground: #ffffff;
     --brand-deep: #4338ca;
-    --brand-ink: #312e81;
+    --brand-ink: #1e1b4b;
     --brand-soft: #eef2ff;
     --brand-border: #c7d2fe;
     --brand-shadow: rgba(79, 70, 229, 0.45);
@@ -144,6 +158,11 @@
     --motion-pill: 320ms;
     --ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);
     --ease-reward: cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* Motion aliases (Stage 1 §06) — design token names + standard easing curve */
+    --dur-fast: 120ms;
+    --dur-base: 200ms;
+    --dur-slow: 320ms;
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 
     /* Status pill fills (StatusBadge) — iOS tints over Apple --sys-*; the
        -fg stays a darker shade of the same hue to clear WCAG AA on the tint. */
@@ -165,6 +184,15 @@
     --status-unknown-bg: rgb(142 142 147 / 0.16);
     --status-unknown-fg: #55555a;
     --status-unknown-border: rgb(142 142 147 / 0.30);
+    /* Design canonical names for maintenance/sterilized pill fills. var()
+       resolves at the consuming element, so these inherit the dark overrides
+       of the short maint/steril tokens automatically (no rename needed). */
+    --status-maintenance-bg: var(--status-maint-bg);
+    --status-maintenance-fg: var(--status-maint-fg);
+    --status-maintenance-border: var(--status-maint-border);
+    --status-sterilized-bg: var(--status-steril-bg);
+    --status-sterilized-fg: var(--status-steril-fg);
+    --status-sterilized-border: var(--status-steril-border);
 
     /* ── Emergency surface — replaces all zinc-* in code-blue and crash-cart ── */
     --emergency-bg:         12 12 12;
@@ -204,6 +232,9 @@
     --ink-fill-weak:   rgba(255,255,255,0.08);
     --ink-fill:        rgba(255,255,255,0.18);
     --ink-border:      rgba(255,255,255,0.28);
+    --on-ink-bar:      rgba(255,255,255,0.14);
+    --ink-skeleton:    rgba(255,255,255,0.10);
+    --ink-shimmer:     rgba(255,255,255,0.18);
   }
 
   .dark {
@@ -286,6 +317,14 @@
     --ivory-green:    129 140 248;  /* indigo-400 — active nav (brand, kept) */
     --ivory-greenMid: 99 102 241;   /* indigo-500 */
     --ivory-greenBg:  49 46 129;    /* indigo-900 — active-item tinted surface */
+    /* Surface ramp + bar material — dark */
+    --surface:        #1c1c1e;
+    --surface-2:      #242426;
+    --surface-hover:  #2a2a2c;
+    --surface-active: #313134;
+    --hairline:       rgba(84, 84, 88, 0.4);
+    --bar-bg:         rgba(28, 28, 30, 0.8);
+    --bar-bg-opaque:  #1c1c1e;
   }
 
   /*
@@ -326,8 +365,9 @@
     --brand-green-bright: #a5b4fc;
     --brand-green-mid: #6366f1;
     --brand: #4f46e5;
+    --brand-foreground: #ffffff;
     --brand-deep: #4338ca;
-    --brand-ink: #312e81;
+    --brand-ink: #1e1b4b;
     --brand-soft: #eef2ff;
     --brand-border: #c7d2fe;
     --brand-shadow: rgba(79, 70, 229, 0.45);
@@ -374,6 +414,13 @@
     --ivory-green:    129 140 248;
     --ivory-greenMid: 99 102 241;
     --ivory-greenBg:  49 46 129;
+    --surface:        #1c1c1e;
+    --surface-2:      #242426;
+    --surface-hover:  #2a2a2c;
+    --surface-active: #313134;
+    --hairline:       rgba(84, 84, 88, 0.4);
+    --bar-bg:         rgba(28, 28, 30, 0.8);
+    --bar-bg-opaque:  #1c1c1e;
     --brand-navy: #0b1021;
     --brand-green-bright: #a5b4fc;
     --brand-green-mid: #6366f1;
@@ -384,6 +431,26 @@
     --action-soft: rgba(76, 205, 170, 0.12);
     --action-border: rgba(76, 205, 170, 0.3);
     --nav-bg: hsl(240 2% 8% / 0.8);
+  }
+
+  /* ── Size-class responsive layout tokens (Stage 1 §07) ──
+     Adapted to the app's Tailwind breakpoints (compact / md 768 / lg 1024);
+     the app dispatches layout by breakpoint + shell, not a data-size attribute. */
+  :root {
+    --inline-margin: 16px;
+    --content-gap:   20px;
+    --max-content:   100%;
+  }
+  @media (min-width: 768px) {
+    :root { --inline-margin: 24px; --content-gap: 24px; --max-content: 720px; }
+  }
+  @media (min-width: 1024px) {
+    :root { --inline-margin: 32px; --max-content: 1120px; }
+  }
+  /* Respect reduced-transparency: swap the translucent bar for its opaque
+     equivalent and drop blur (Stage 1 §05 Materials). */
+  @media (prefers-reduced-transparency: reduce) {
+    :root, .dark { --bar-bg: var(--bar-bg-opaque); --bar-blur: 0px; }
   }
 
   /* Scan / confirm uses action color (10% tier), not brand */
