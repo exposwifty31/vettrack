@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { t } from "@/lib/i18n";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { EquipmentSearchBox } from "./EquipmentSearchBox";
 
 /**
@@ -11,34 +12,11 @@ import { EquipmentSearchBox } from "./EquipmentSearchBox";
 export function EquipmentSearchButton() {
   const [open, setOpen] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
 
-  // Keyboard support for the modal overlay: Escape closes it, and Tab is trapped
-  // inside so focus can't land on the page behind the (visually-covering) sheet.
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        return;
-      }
-      if (e.key !== "Tab") return;
-      const focusables = dialogRef.current?.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])',
-      );
-      if (!focusables || focusables.length === 0) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
+  // Escape-to-close + Tab focus-trap for the overlay (the input's autoFocus owns
+  // initial focus).
+  useFocusTrap({ active: open, containerRef: dialogRef, onEscape: close });
 
   return (
     <>

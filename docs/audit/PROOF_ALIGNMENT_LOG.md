@@ -806,6 +806,19 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 
 **Verdict:** VERIFIED at gate + unit level. Not re-exercised live: the upload 400-vs-500 path (thin middleware over multer, reasoned + typechecked) and the overlay focus trap (needs the mobile shell, unreachable in-browser here — same ceiling as the feature's original mobile verification).
 
+## 2026-07-03 — PR #39 follow-up: extract shared useFocusTrap (CodeRabbit re-review)
+
+**Claim:** Addressed the one remaining CodeRabbit nitpick from the re-review — centralized the overlay Tab/Escape handling into a shared `useFocusTrap` hook.
+
+**Evidence (this session):**
+- **Verified the premise (partly false):** `MoreSheet` did NOT actually have a Tab focus-trap — only `dialogRef.focus()` on open + an element-level `onKeyDown` Escape (`MoreSheet.tsx:50,54`). So the logic wasn't literally "duplicated"; the honest framing is that extracting a shared hook creates a real second consumer AND upgrades MoreSheet's a11y (it now traps Tab). That flips my earlier skip (a single-caller hook would have violated the repo's own hooks guideline) into a justified change.
+- **New `src/hooks/use-focus-trap.ts`:** `useFocusTrap({ active, containerRef, onEscape })` — Escape → `onEscape`, Tab/Shift+Tab cycle within the container's focusables. Initial focus stays with each caller (search overlay = input `autoFocus`; MoreSheet = `dialogRef.focus()`). `onEscape` read via a ref so inline callbacks don't re-subscribe the listener each render.
+- **Consumers:** `EquipmentSearchButton` replaced its inline effect with the hook (behavior-preserving). `MoreSheet` adopted the hook and dropped its element-level Escape `onKeyDown` (Escape now global-while-open; drag/touch handlers untouched).
+- **Tests:** new `tests/use-focus-trap.test.tsx` (4) — Escape fires `onEscape`, Tab wraps last→first, Shift+Tab wraps first→last, inactive is a no-op. `mobile-shell` (renders MoreSheet) + `equipment-search-box` still green.
+- **Gates:** `pnpm typecheck` (frontend + server) → **exit 0**; focus-trap 4/4; mobile-shell + search-box 23/2.
+
+**Verdict:** VERIFIED at gate + unit level. The MoreSheet a11y upgrade (now traps Tab) is unit-tested via the hook but not re-exercised on the live mobile shell this session.
+
 ## 2026-07-03 — Equipment search (original verification, retained below)
 
 **Claim:** VERIFIED at gate + unit + component level, plus live desktop browser (placeholder fit + typeahead + result navigation). **Verification ceiling (honest):** the mobile adaptive rendering (iPhone leading icon + search overlay, iPad inline field) could NOT be rendered in-browser this session — `resize_window` to phone/tablet widths reported success but the extension kept screenshotting at desktop width, so the app never dropped into the mobile `NativeShell`. The mobile paths are covered by the component test (the same `EquipmentSearchBox`), the unit-tested `useIsTabletViewport` gate, and typecheck; they still want an on-device/simulator pass. The placeholder uses more horizontal room on mobile (iPad field maxWidth 460, iPhone overlay full-width) than the desktop 340px where it was confirmed fitting.
