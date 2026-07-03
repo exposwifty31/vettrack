@@ -6,6 +6,8 @@
     "appName": "VetTrack",
     "selectItemTitle": "בחר פריט",
     "selectItemSubtitle": "בחר מהרשימה כדי לראות כאן פרטים",
+    "nextShiftLabel": "המשמרת הבאה שלך",
+    "browseEquipment": "עיון בציוד",
     "save": "שמור",
     "cancel": "ביטול",
     "delete": "מחק",

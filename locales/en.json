@@ -6,6 +6,8 @@
     "appName": "VetTrack",
     "selectItemTitle": "Select an item",
     "selectItemSubtitle": "Choose from the list to see details here",
+    "nextShiftLabel": "Your next shift",
+    "browseEquipment": "Browse equipment",
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete",

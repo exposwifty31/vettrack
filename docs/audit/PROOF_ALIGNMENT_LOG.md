@@ -958,3 +958,19 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Verification ceiling:** gate + unit; the rendered aggregated panels (native + web) want a device/browser screenshot pass (owed).
 
 **Verdict:** Phase 4 — DONE at gate + unit (taxonomy + aggregation + cap across native + web + rooms threshold); recovery-adapter detector merge noted as follow-up; visual pass owed.
+
+## 2026-07-03 — UX overhaul Phase 5: actionable off-shift empty states (Today + Scan)
+
+**Claim:** Off-shift Today and Scan are no longer dead ends — both show the caller's next scheduled shift + a "Browse equipment" action. Backed by an additive, read-only `nextShift` read that does not touch authority or on-shift gating.
+
+**Evidence (gate + unit):**
+- Backend: new `resolveNextShift()` in `server/lib/role-resolution.ts` — the caller's next upcoming roster shift (future date, or today not-yet-started), matched by the SAME normalized-name key + name-match SQL the current-shift resolver uses, ordered `asc(date), asc(startTime)`, LIMIT 1. Read-only; documented as never consulted for authority (Strategy A byte-for-byte intact).
+- `server/routes/home-dashboard.ts`: `resolveNextShift` joins the parallel fetch; `buildShiftWindow` param loosened to structural `{date,startTime,endTime,role}` (reused for both shifts); response gains `nextShift: { startsAt, endsAt, role } | null`.
+- `src/types/tasks.ts`: `HomeDashboardPulse.nextShift`. `src/hooks/use-active-shift.ts`: exposes `nextShift` from the shared dashboard query (no extra request).
+- Frontend: `home.tsx` `noshift` branch + `ScanScreen.tsx` off-shift block render `t.common.nextShiftLabel` + locale-formatted `startsAt` (when scheduled) + a "Browse equipment" action → `/equipment` (reachable off-shift; no technician schedule page exists, so browse is the concrete next step).
+- i18n: `common.nextShiftLabel` + `common.browseEquipment` (both locales); types regenerated.
+- `pnpm typecheck` (frontend + server) → exit 0. `pnpm i18n:check` parity ✓. `pnpm test` → 387 files / 3819 pass.
+
+**Verification ceiling (honest):** gate + unit. The `resolveNextShift` roster query is NOT exercised against a live DB this session (no DB integration test added) — it needs a DB/device pass to confirm real next-shift resolution end-to-end. The rendered empty states want a screenshot pass.
+
+**Verdict:** Phase 5 — DONE at gate + unit; live-DB roster query + rendered empty states owed a device/DB pass.

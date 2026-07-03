@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { getCurrentUserId } from "@/lib/auth-store";
+import type { HomeDashboardPulse } from "@/types/tasks";
 
 /**
  * Shared read of roster-derived shift status.
@@ -12,7 +13,11 @@ import { getCurrentUserId } from "@/lib/auth-store";
  * Reuses the `/api/home/dashboard` query key so it dedupes with the Today page
  * cache — no extra request when both are mounted.
  */
-export function useActiveShift(): { hasActiveShift: boolean; isLoading: boolean } {
+export function useActiveShift(): {
+  hasActiveShift: boolean;
+  isLoading: boolean;
+  nextShift: HomeDashboardPulse["nextShift"];
+} {
   const userId = getCurrentUserId();
   const { data, isLoading } = useQuery({
     queryKey: ["/api/home/dashboard"],
@@ -22,5 +27,5 @@ export function useActiveShift(): { hasActiveShift: boolean; isLoading: boolean 
     refetchOnWindowFocus: false,
     staleTime: 60_000,
   });
-  return { hasActiveShift: !!data?.shift, isLoading };
+  return { hasActiveShift: !!data?.shift, isLoading, nextShift: data?.nextShift ?? null };
 }

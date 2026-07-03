@@ -57,6 +57,8 @@ export interface TaskDashboard {
 export interface HomeDashboardPulse {
   /** Current roster shift (vt_shifts), if the caller is on shift now. */
   shift: { startedAt: string; endsAt: string; role: string } | null;
+  /** Next upcoming roster shift (future, or today not-yet-started) — powers the off-shift empty state. */
+  nextShift: { startsAt: string; endsAt: string; role: string } | null;
   /** Consecutive most-recent days with zero overdue tasks. */
   streak: number;
   /** Tasks marked completed today. */

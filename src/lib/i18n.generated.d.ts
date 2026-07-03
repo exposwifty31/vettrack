@@ -9,6 +9,8 @@ export interface TStructure {
     appName: string;
     selectItemTitle: string;
     selectItemSubtitle: string;
+    nextShiftLabel: string;
+    browseEquipment: string;
     save: string;
     cancel: string;
     delete: string;

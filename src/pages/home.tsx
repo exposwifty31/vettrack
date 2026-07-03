@@ -1,6 +1,6 @@
 
 import { Bdi } from "@/components/ui/bdi";
-import { t, formatDateByLocale, getStoredLocale } from "@/lib/i18n";
+import { t, formatDateByLocale, formatDateTimeByLocale, getStoredLocale } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "wouter";
@@ -372,6 +372,19 @@ export default function HomePage() {
                 >
                   {t.homePage.noShiftSub}
                 </p>
+                {pulse?.nextShift && (
+                  <p className="mt-1 text-sm font-semibold" style={{ color: "var(--on-ink-strong)" }}>
+                    {t.common.nextShiftLabel}:{" "}
+                    {formatDateTimeByLocale(pulse.nextShift.startsAt, { weekday: "short", hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                )}
+                <Link
+                  href="/equipment"
+                  className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition-transform motion-safe:active:scale-[0.98]"
+                  style={{ background: "rgba(255,255,255,0.14)", color: "var(--on-ink-strong)" }}
+                >
+                  {t.common.browseEquipment}
+                </Link>
               </div>
             ) : (
               <>

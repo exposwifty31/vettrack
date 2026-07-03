@@ -4,12 +4,12 @@ import { CalendarClock } from "lucide-react";
 import { QrScanner } from "@/components/qr-scanner";
 import { AccountabilityConfirm } from "./AccountabilityConfirm";
 import { useActiveShift } from "@/hooks/use-active-shift";
-import { t } from "@/lib/i18n";
+import { t, formatDateTimeByLocale } from "@/lib/i18n";
 
 export function ScanScreen() {
   const [, navigate] = useLocation();
   const [confirmedName, setConfirmedName] = useState<string | null>(null);
-  const { hasActiveShift, isLoading: shiftLoading } = useActiveShift();
+  const { hasActiveShift, isLoading: shiftLoading, nextShift } = useActiveShift();
 
   const handleClose = useCallback(() => {
     navigate("/home");
@@ -106,6 +106,29 @@ export function ScanScreen() {
             >
               {t.scan.offShiftBody}
             </p>
+            {nextShift && (
+              <p style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "hsl(var(--foreground))", margin: 0 }}>
+                {t.common.nextShiftLabel}:{" "}
+                {formatDateTimeByLocale(nextShift.startsAt, { weekday: "short", hour: "2-digit", minute: "2-digit" })}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => navigate("/equipment")}
+              style={{
+                minHeight: 44,
+                paddingInline: 20,
+                borderRadius: 12,
+                border: "1px solid hsl(var(--border))",
+                background: "hsl(var(--card))",
+                color: "hsl(var(--foreground))",
+                fontSize: "var(--text-sm)",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              {t.common.browseEquipment}
+            </button>
           </div>
         ) : shiftLoading ? null : (
           <QrScanner onClose={handleClose} />

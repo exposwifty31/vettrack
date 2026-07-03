@@ -5,7 +5,7 @@ import { apiError } from "../lib/apiError.js";
 import { appointments, db, scanLogs } from "../db.js";
 import {
   resolveCurrentRole,
-  type ActiveShiftSnapshot,
+  resolveNextShift,
 } from "../lib/role-resolution.js";
 
 /*
@@ -35,7 +35,7 @@ function combineLocal(dateStr: string, timeStr: string, dayOffset: number): Date
  * (start clock-time later than end clock-time) ends on the following day —
  * matching the overnight window logic in `role-resolution.ts`.
  */
-function buildShiftWindow(shift: ActiveShiftSnapshot): {
+function buildShiftWindow(shift: { date: string; startTime: string; endTime: string; role: string }): {
   startedAt: string;
   endsAt: string;
   role: string;
@@ -60,7 +60,7 @@ router.get("/dashboard", requireAuth, async (req, res) => {
   const userId = authUser.id;
 
   try {
-    const [roleResult, completedRows, scanRows, streakRows] = await Promise.all([
+    const [roleResult, nextShiftSnapshot, completedRows, scanRows, streakRows] = await Promise.all([
       // Current on-shift state, roster-derived (vt_shifts), overnight-aware.
       resolveCurrentRole({
         clinicId,
@@ -68,6 +68,14 @@ router.get("/dashboard", requireAuth, async (req, res) => {
         userName: authUser.name,
         fallbackRole: authUser.role,
         secondaryRole: authUser.secondaryRole ?? null,
+      }),
+
+      // Next upcoming roster shift — powers the off-shift empty state. Additive,
+      // read-only; never consulted for authority or on-shift gating.
+      resolveNextShift({
+        clinicId,
+        userId,
+        userName: authUser.name,
       }),
 
       // Tasks marked completed today (UTC calendar day).
@@ -126,8 +134,13 @@ router.get("/dashboard", requireAuth, async (req, res) => {
     const activeShift =
       roleResult.source === "shift" ? roleResult.activeShift : null;
 
+    const nextWindow = nextShiftSnapshot ? buildShiftWindow(nextShiftSnapshot) : null;
+
     return res.json({
       shift: activeShift ? buildShiftWindow(activeShift) : null,
+      nextShift: nextWindow
+        ? { startsAt: nextWindow.startedAt, endsAt: nextWindow.endsAt, role: nextWindow.role }
+        : null,
       streak,
       tasksCompletedToday: Number(completedRows[0]?.n ?? 0),
       scansToday: Number(scanRows[0]?.n ?? 0),

@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db, shiftAdjustments, shifts, users } from "../db.js";
 import { shiftWindowContains } from "./shift-adjustment-window.js";
 
@@ -30,6 +30,70 @@ export interface RoleResolutionResult {
   source: "shift" | "permanent";
   activeShift: ActiveShiftSnapshot | null;
   resolvedAt: Date;
+}
+
+export interface NextShiftSnapshot {
+  date: string;
+  startTime: string;
+  endTime: string;
+  role: ShiftRole;
+}
+
+/**
+ * The caller's next upcoming roster shift — a future date, or today but not yet
+ * started. Read-only and additive: it does NOT touch `resolveCurrentRole` or the
+ * on-shift gating (Strategy A stays byte-for-byte). Matches shifts to the user by
+ * the same normalized-name key the current-shift resolver uses. Returns null when
+ * nothing is scheduled ahead. Any concern here can only omit the "next shift"
+ * readout — it can never affect authority.
+ */
+export async function resolveNextShift(input: {
+  clinicId: string;
+  userId?: string;
+  userName?: string | null;
+  now?: Date;
+}): Promise<NextShiftSnapshot | null> {
+  let normalizedName = normalizeName(input.userName || "");
+  if (input.userId?.trim()) {
+    const [userRow] = await db
+      .select({ name: users.name, displayName: users.displayName })
+      .from(users)
+      .where(and(eq(users.id, input.userId.trim()), eq(users.clinicId, input.clinicId)))
+      .limit(1);
+    const canonical = normalizeName(userRow?.displayName || userRow?.name || "");
+    if (canonical) normalizedName = canonical;
+  }
+  const normalizedNameKey = normalizeNameKey(normalizedName);
+  if (!normalizedNameKey) return null;
+
+  const now = input.now ?? new Date();
+  const today = toLocalDateString(now);
+  const currentTime = toLocalTimeString(now);
+
+  const [next] = await db
+    .select({
+      date: shifts.date,
+      startTime: shifts.startTime,
+      endTime: shifts.endTime,
+      role: shifts.role,
+    })
+    .from(shifts)
+    .where(
+      and(
+        sql`replace(replace(replace(replace(replace(lower(trim(${shifts.employeeName})), ' ', ''), '.', ''), '-', ''), '_', ''), '/', '') = ${normalizedNameKey}`,
+        eq(shifts.clinicId, input.clinicId),
+        or(
+          sql`${shifts.date} > ${today}`,
+          and(eq(shifts.date, today), sql`${shifts.startTime} > ${currentTime}::time`),
+        ),
+      ),
+    )
+    .orderBy(asc(shifts.date), asc(shifts.startTime))
+    .limit(1);
+
+  return next
+    ? { date: next.date, startTime: next.startTime, endTime: next.endTime, role: next.role }
+    : null;
 }
 
 function toLocalDateString(date: Date): string {
