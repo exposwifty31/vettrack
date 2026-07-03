@@ -117,13 +117,11 @@ _Agents: add out-of-scope items here rather than acting on them._
 - TASK: Audit `vt_event_outbox` retention — verify janitor is not letting the table grow unbounded
 - TASK: Review Playwright Phase 9 drills — confirm all 8 drills pass against local dev server
 - TASK: Add `.cursor/rules/` vettrack-specific overrides for i18n and multi-tenancy invariants
-- TASK: Codebase relevance cleanup — delete root artifacts (`Archive.zip`, `Archive 2.zip`, `all-files.md`, `screenshot.png`, `app-tour.js`) after human approval
-- TASK: Remove dead `src/features/today/*` module (6 files; `/app-tour` redirects to `/home`; knip unused)
-- TASK: Audit `docs/design-handoff/` (240 tracked files, ~15MB) — archive externally or trim to active design refs
-- TASK: Deduplicate untracked `.agents/skills/ecc/` mirror of `.claude/skills/ecc/` (~1.7MB each); pick one canonical agent-skills path
-- TASK: Remove or wire `shared/permissions.ts` (knip unused; server uses `er-mode-permissions.ts` instead)
-- TASK: Remove or wire `server/integrations/rollout/*` + `conflicts/*` (knip unused; `vendor-x-rollout.ts` is the active path)
-- TASK: Remove stub `inventory-deduction` worker/queue chain per Removal Protocol (`docs/governance/PRODUCT_DRIVEN_IMPROVEMENT_PLAN.md`)
+- TASK: [post-merge] Purge `Archive.zip` + `Archive 2.zip` (95MB) from git history via `git-filter-repo`, from a fresh clone of `main`, then coordinated force-push to gitlab+origin (rewrites all commit hashes → team re-clones). Files already removed from the working tree in the relevance-audit cleanup PR.
+- TASK: Audit `docs/design-handoff/` (240 tracked files, ~15MB) — archive externally or trim to active design refs. NOTE: partially load-bearing — `Stage N` files are read by `tests/stage-1-token-values.test.js` / `tests/stage-2-*.test.js`; preserve those.
+- TASK: Deduplicate untracked `.agents/skills/ecc/` + `.codex/agents/` mirrors of `.claude/skills/ecc/` (~1.7MB each); pick one canonical agent-skills path + gitignore the rest.
+- TASK: Investigate files newly-flagged unused by knip after removing `src/design-system-entry.ts` (components it re-exported may now be orphaned; nothing broken — build + tests green).
+- DONE (relevance-audit cleanup PR): removed root artifacts, `src/features/today/*`, `shared/permissions.ts`, `server/integrations/{rollout,conflicts}/*`, and the `inventory-deduction` worker/queue stub; untracked `playwright-ui-screenshots/`.
 
 ---
 
