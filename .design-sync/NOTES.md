@@ -70,6 +70,23 @@ doesn't have — so direct staged-script edits are the working approach.)
   Plex Mono) are runtime/host-served (declared via `runtimeFontPrefixes`), NOT
   bundled. Designs render in fallback fonts unless the host page loads them.
 
+## Theme / palette (default = clinical/indigo)
+
+The DS ships a **theme matrix** keyed on `data-color-theme` (each with a `.dark`
+variant). Bare `:root` and `:root[data-color-theme=clinical]` are identical — the
+**clinical** default: cool iOS-gray surface (`--ivory-bg: 242 242 247` = `#f2f2f7`)
++ **indigo** primary (`--primary: 243 75% 59%` ≈ `#5048e5`). Note `--ivory-green`
+is indigo (`#4f46e5`) under clinical, green only under forest.
+`:root[data-color-theme=forest]` is the deep forest-green primary (`142 72% 29%`).
+The design tool renders previews under bare `:root`, i.e. **clinical/indigo**.
+
+- **conventions.md drift caught & fixed 2026-07-03:** the header still described the
+  old "warm off-white / forest-green" look. Corrected to clinical/indigo + a note
+  that forest is opt-in via `data-color-theme=forest`. The conventions-header
+  validation step re-checks these color claims against the fresh `_ds_bundle.css`
+  `:root` values each re-sync — if the app flips the default theme again, expect drift
+  to surface there.
+
 ## Target project
 
 - Synced into the **existing** "VetTrack Design System" project
@@ -107,3 +124,7 @@ re-upload of all 110 components instead of a targeted diff.
   all 110 components render as typographic name blocks.
 - **Staged-script patches are lost on fresh `.ds-sync/`** — must re-apply both
   patches every time `.ds-sync/` is regenerated.
+- **Default theme can silently flip** — the design tool renders the `:root`
+  (`clinical`) palette. A theme change in `src/index.css` / tailwind config shifts
+  `--primary` / `--ivory-*`; the conventions-header validation catches stale color
+  copy, but re-verify it after any such change (see "Theme / palette").

@@ -1,10 +1,13 @@
 # Building with VetTrack
 
-VetTrack is a veterinary-hospital operations UI. Its look is the **"Ivory" design
-system**: a warm off-white background, forest-green primary, and a small set of
-clinical status colors. Components are real shadcn/Radix primitives plus
-VetTrack's own equipment/alert/layout components, styled entirely with **Tailwind
-utility classes backed by CSS custom properties**.
+VetTrack is a veterinary-hospital operations UI. Its default look is the
+**"clinical" theme**: a cool, iOS-influenced neutral surface (`#f2f2f7`), an
+**indigo primary** (`#5048e5`), and a small set of clinical status colors.
+Components are real shadcn/Radix primitives plus VetTrack's own
+equipment/alert/layout components, styled entirely with **Tailwind utility
+classes backed by CSS custom properties**. (The neutral chrome ships under a
+historical `*-ivory-*` token family — the names stayed even though the palette
+is now cool rather than warm.)
 
 ## Setup — link the stylesheet, that's it
 
@@ -16,6 +19,11 @@ Link that one file and every token resolves:
 <link rel="stylesheet" href="styles.css">
 ```
 
+- **Default theme is `clinical` (indigo).** The palette is theme-switchable via a
+  `data-color-theme` attribute on a root element: omit it (or set `clinical`) for
+  the indigo default, `data-color-theme="forest"` for a deep forest-green
+  primary. `.dark` toggles the dark ramp. Designs render under the default unless
+  you set one.
 - **The app is right-to-left by default.** Hebrew is the primary locale; set
   `dir="rtl"` on a wrapping element for authentic layout (the components use
   logical/RTL-aware spacing). `dir="ltr"` is fine for English screens.
@@ -43,20 +51,21 @@ override and extend by passing utilities.
 | `bg-background` / `text-foreground` | page surface + body text |
 | `bg-card` / `text-card-foreground` | cards, raised panels (white) |
 | `bg-popover` / `text-popover-foreground` | menus, popovers |
-| `bg-primary` / `text-primary-foreground` | primary actions (forest green) |
-| `bg-secondary` / `text-secondary-foreground` | secondary surfaces (pale green) |
+| `bg-primary` / `text-primary-foreground` | primary actions (indigo `#5048e5`) |
+| `bg-secondary` / `text-secondary-foreground` | secondary surfaces (pale cool gray) |
 | `bg-muted` / `text-muted-foreground` | muted fills, secondary text |
 | `bg-accent` / `text-accent-foreground` | hover/active accents |
 | `bg-destructive` / `text-destructive-foreground` | danger (red) |
 | `border-border` / `border-input` / `ring-ring` | borders + focus rings |
 
-### Ivory palette (the brand layer, `*-ivory-*`)
+### Ivory palette (the neutral chrome layer, `*-ivory-*`)
 
-Warm-neutral brand surface used across the mobile/PageShell chrome:
-`bg-ivory-bg` (#f3f1eb), `bg-ivory-surface` (white), `border-ivory-border`,
-`text-ivory-text` / `text-ivory-text2` / `text-ivory-text3` (primary→muted),
-`text-ivory-navy`, `text-ivory-green`, `bg-ivory-greenBg` (selected/success
-tint).
+Cool iOS-style neutral ramp used across the mobile/PageShell chrome:
+`bg-ivory-bg` (`#f2f2f7`), `bg-ivory-surface` (white), `border-ivory-border`
+(`#d1d1d6`), `text-ivory-text` / `text-ivory-text2` / `text-ivory-text3`
+(primary→muted, `#1c1c1e`→`#8e8e93`), `text-ivory-navy` (`#0b1021`).
+`text-ivory-green` / `bg-ivory-greenBg` carry the **theme accent tint** (indigo
+under the clinical default, green under `forest`) — despite the legacy name.
 
 ### Clinical status colors (`*-status-*`)
 
