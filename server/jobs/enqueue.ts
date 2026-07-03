@@ -113,9 +113,7 @@ function buildAddOptions(
 
 /**
  * Enqueue a static BullMQ job by {@link StaticJobKind} (matches existing `job.name`).
- * Production: {@link enqueueChargeAlertJob} in charge-alert-enqueue.ts delegates `check-plug` (1c-1);
- * `inventoryDeductionQueue.add` in inventory-deduction.queue.ts delegates
- * `inventory-deduction` (1c-2).
+ * Production: {@link enqueueChargeAlertJob} in charge-alert-enqueue.ts delegates `check-plug` (1c-1).
  */
 export async function enqueueJob<K extends StaticJobKind>(
   kind: K,

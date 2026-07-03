@@ -4,7 +4,7 @@ import { createRedisConnection, getRedisUrl } from "../lib/redis.js";
 export type QueueFactoryConfig = {
   queueName: string;
   defaultJobOptions?: JobsOptions;
-  /** Log prefix for queue error events (e.g. inventory-deduction-queue). */
+  /** Log prefix for queue error events (e.g. charge-alert-queue). */
   logLabel?: string;
 };
 
