@@ -167,6 +167,8 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
                   {unreadCount > 0 && (
                     <span
                       aria-hidden
+                      // Bidi isolation: "9+" visually flips to "+9" in the RTL context.
+                      dir="ltr"
                       style={{
                         position: "absolute",
                         top: 2,
@@ -269,6 +271,9 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
             {alertCount > 0 && (
               <span
                 aria-hidden
+                // Bidi isolation: "9+" visually flips to "+9" in the RTL context
+                // (confirmed on-device in the 2026-07-03 simulator pass).
+                dir="ltr"
                 style={{
                   position: "absolute",
                   top: 2,

@@ -4,6 +4,7 @@
   "ignore": [
     "android/**",
     "ios/**",
+    "src/design-system-entry.ts",
     "src/lib/tokens.ts",
     "drizzle.config.ts",
     "server/seed.ts",

@@ -49,13 +49,14 @@ describe("Wave 6 state consistency checks (static)", () => {
   });
 
   it("Alerts page uses shared loading/error/empty components", () => {
+    // Retry wiring moved into the shared useAlertsController (H2 rewire):
+    // both ErrorCards now retry through the controller's combined refetch.
     expect(
       alerts.includes("import { ErrorCard } from \"@/components/ui/error-card\";") &&
         alerts.includes("import { EmptyState } from \"@/components/ui/empty-state\";") &&
         alerts.includes("SkeletonAlertCard") &&
-        alerts.includes("onRetry={() => {") &&
-        alerts.includes("refetchEq();") &&
-        alerts.includes("refetchAcks();"),
+        alerts.includes("useAlertsController()") &&
+        alerts.includes("onRetry={refetch}"),
     ).toBe(true);
   });
 

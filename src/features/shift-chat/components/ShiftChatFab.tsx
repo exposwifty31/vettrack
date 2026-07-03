@@ -30,7 +30,8 @@ export function ShiftChatFab() {
         >
           <span aria-hidden="true">💬</span>
           {unreadCount > 0 && (
-            <span aria-hidden="true" className="absolute -top-1 -end-1 bg-red-700 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-background">
+            // dir="ltr": "9+" visually flips to "+9" in the RTL context.
+            <span aria-hidden="true" dir="ltr" className="absolute -top-1 -end-1 bg-red-700 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-background">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}

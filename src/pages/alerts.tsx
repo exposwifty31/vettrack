@@ -1,19 +1,14 @@
 import { t } from "@/lib/i18n";
 import { useMobileShellContext } from "@/shell/mobile/MobileShellContext";
-import { AlertsScreen } from "@/features/alerts";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { AlertsScreen, useAlertsController, formatRelativeTime } from "@/features/alerts";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
-import { api } from "@/lib/api";
 import { AppShell } from "@/components/layout/AppShell";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { SkeletonAlertCard } from "@/components/ui/skeleton-cards";
 import { ErrorCard } from "@/components/ui/error-card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { computeAlerts } from "@/lib/utils";
-import { buildAlertAckSet, countActiveAlerts } from "@/lib/alert-counts";
 import {
   AlertTriangle,
   Clock,
@@ -28,25 +23,9 @@ import {
 } from "lucide-react";
 import { TruncatedText } from "@/components/ui/truncated-text";
 import { ForwardChevron } from "@/components/ui/directional-chevron";
-import type { Alert, AlertType, AlertAcknowledgment } from "@/types";
-import { toast } from "sonner";
-import { useAuth } from "@/hooks/use-auth";
-import { haptics } from "@/lib/haptics";
+import type { Alert, AlertType } from "@/types";
 import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { AlertsProView } from "@/components/alerts/AlertsProView";
-
-function formatRelativeTime(date: Date): string {
-  const diffMs = Date.now() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return t.alerts.timeAgo.justNow;
-  if (diffMin === 1) return t.alertsPage.oneMinuteAgo;
-  if (diffMin < 60) return t.alertsPage.minutesAgo(diffMin);
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr === 1) return t.alertsPage.oneHourAgo;
-  if (diffHr < 24) return t.alertsPage.hoursAgo(diffHr);
-  const diffDay = Math.floor(diffHr / 24);
-  return diffDay === 1 ? t.alertsPage.oneDayAgo : t.alertsPage.daysAgo(diffDay);
-}
 
 const ALERT_CONFIG: Record<
   AlertType,
@@ -86,11 +65,6 @@ const ALERT_CONFIG: Record<
   },
 };
 
-// Ownership (take/release an alert) is restricted to the equipment-management
-// tier — senior_technician and above. Mirrors the server gate
-// `requireEffectiveRole("senior_technician")` in server/routes/alert-acks.ts.
-const ALERT_OWNERSHIP_ROLES = new Set(["admin", "vet", "senior_technician"]);
-
 export default function AlertsPage() {
   const inMobileShell = useMobileShellContext();
   if (inMobileShell) return <AlertsScreen />;
@@ -98,69 +72,21 @@ export default function AlertsPage() {
 }
 
 function AlertsPageDesktop() {
-  const queryClient = useQueryClient();
   const [, navigate] = useLocation();
-  const { userId, effectiveRole, role } = useAuth();
-  const canOwnAlerts = ALERT_OWNERSHIP_ROLES.has(
-    String(effectiveRole ?? role ?? "").trim().toLowerCase(),
-  );
-
-  const { data: equipment, isLoading: eqLoading, isError: eqError, refetch: refetchEq } = useQuery({
-    queryKey: ["/api/equipment"],
-    queryFn: api.equipment.list,
-    enabled: !!userId,
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-
-  const { data: acks, isLoading: acksLoading, isError: acksError, refetch: refetchAcks } = useQuery({
-    queryKey: ["/api/alert-acks"],
-    queryFn: api.alertAcks.list,
-    enabled: !!userId,
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-
-  const ackMut = useMutation({
-    mutationFn: ({ equipmentId, alertType }: { equipmentId: string; alertType: string }) =>
-      api.alertAcks.acknowledge(equipmentId, alertType),
-    onSuccess: () => {
-      haptics.tap();
-      queryClient.invalidateQueries({ queryKey: ["/api/alert-acks"] });
-      toast.success(t.alerts.toast.acknowledged);
-    },
-    onError: () => toast.error(t.alerts.toast.acknowledgeError),
-  });
-
-  const unAckMut = useMutation({
-    mutationFn: ({ equipmentId, alertType }: { equipmentId: string; alertType: string }) =>
-      api.alertAcks.remove(equipmentId, alertType),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/alert-acks"] });
-    },
-    onError: () => toast.error(t.alerts.toast.removeError),
-  });
-
-  const isLoading = eqLoading || acksLoading;
-  const hasFatalError = eqError;
-  const hasAckError = acksError;
-  const alerts = equipment ? computeAlerts(equipment) : [];
-
-  const acksMap = new Map<string, AlertAcknowledgment>();
-  if (acks && !hasAckError) {
-    for (const ack of acks) {
-      acksMap.set(`${ack.equipmentId}:${ack.alertType}`, ack);
-    }
-  }
-  const activeAlertCount = countActiveAlerts(alerts, acksMap);
-
-  const equipmentLocationMap = new Map<string, string>();
-  if (equipment) {
-    for (const eq of equipment) {
-      const loc = eq.checkedOutLocation || eq.location;
-      if (loc) equipmentLocationMap.set(eq.id, loc);
-    }
-  }
+  const {
+    alerts,
+    acksMap,
+    equipmentLocationMap,
+    activeAlertCount,
+    canOwnAlerts,
+    hasAckError,
+    hasFatalError,
+    isLoading,
+    refetch,
+    // Renamed: the per-card `const ack = acksMap.get(...)` below shadows `ack`.
+    ack: acknowledgeAlert,
+    unAck: unacknowledgeAlert,
+  } = useAlertsController();
 
   const grouped: Partial<Record<AlertType, Alert[]>> = {};
   for (const alert of alerts) {
@@ -194,18 +120,13 @@ function AlertsPageDesktop() {
         {hasFatalError && (
           <ErrorCard
             message={t.alerts.errors.loadFailed}
-            onRetry={() => {
-              refetchEq();
-              refetchAcks();
-            }}
+            onRetry={refetch}
           />
         )}
         {hasAckError && !hasFatalError && (
           <ErrorCard
             message={t.alertsPage.ackLoadFailed}
-            onRetry={() => {
-              refetchAcks();
-            }}
+            onRetry={refetch}
           />
         )}
 
@@ -251,8 +172,8 @@ function AlertsPageDesktop() {
             equipmentLocationMap={equipmentLocationMap}
             hasAckError={hasAckError}
             onNavigate={(id) => navigate(`/equipment/${id}`)}
-            onAck={(equipmentId, alertType) => ackMut.mutate({ equipmentId, alertType })}
-            onUnAck={(equipmentId, alertType) => unAckMut.mutate({ equipmentId, alertType })}
+            onAck={acknowledgeAlert}
+            onUnAck={unacknowledgeAlert}
             canOwn={canOwnAlerts}
             formatRelativeTime={formatRelativeTime}
           />
@@ -339,12 +260,7 @@ function AlertsPageDesktop() {
                                     size="icon-sm"
                                     className="w-6 h-6 text-muted-foreground hover:text-red-500 shrink-0"
                                     disabled={hasAckError}
-                                    onClick={() =>
-                                      unAckMut.mutate({
-                                        equipmentId: alert.equipmentId,
-                                        alertType: alert.type,
-                                      })
-                                    }
+                                    onClick={() => unacknowledgeAlert(alert.equipmentId, alert.type)}
                                     data-testid={`btn-unack-${alert.equipmentId}`}
                                     aria-label={t.alertsPage.removeAckAria}
                                   >
@@ -358,12 +274,7 @@ function AlertsPageDesktop() {
                                 size="sm"
                                 className="h-11 text-xs w-full border-border/60 text-muted-foreground hover:text-foreground"
                                 disabled={hasAckError}
-                                onClick={() =>
-                                  ackMut.mutate({
-                                    equipmentId: alert.equipmentId,
-                                    alertType: alert.type,
-                                  })
-                                }
+                                onClick={() => acknowledgeAlert(alert.equipmentId, alert.type)}
                                 data-testid={`btn-ack-${alert.equipmentId}`}
                               >
                                 <UserCheck className="w-3.5 h-3.5 me-1.5" />

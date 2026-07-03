@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
-import { useAlertsFeed } from "./hooks/use-alerts-feed";
-import { AlertRow } from "./AlertRow";
+import { useLocation } from "wouter";
+import { useAlertsController, formatRelativeTime } from "./hooks/use-alerts-controller";
+import { AlertsProView } from "@/components/alerts/AlertsProView";
 import { LoadingSection } from "@/components/ui/loading-section";
 import { ErrorCard } from "@/components/ui/error-card";
 import { t } from "@/lib/i18n";
@@ -8,7 +9,19 @@ import { t } from "@/lib/i18n";
 const PULL_THRESHOLD = 72;
 
 export function AlertsScreen() {
-  const { alerts, isLoading, isError, refetch } = useAlertsFeed();
+  const [, navigate] = useLocation();
+  const {
+    alerts,
+    acksMap,
+    equipmentLocationMap,
+    canOwnAlerts,
+    hasAckError,
+    hasFatalError,
+    isLoading,
+    refetch,
+    ack,
+    unAck,
+  } = useAlertsController();
   const [pullDelta, setPullDelta] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const startY = useRef<number | null>(null);
@@ -85,7 +98,7 @@ export function AlertsScreen() {
 
       {isLoading ? (
         <LoadingSection rows={5} />
-      ) : isError ? (
+      ) : hasFatalError ? (
         <ErrorCard message={t.alerts.errors.loadFailed} onRetry={refetch} />
       ) : alerts.length === 0 ? (
         <div
@@ -109,10 +122,18 @@ export function AlertsScreen() {
           </p>
         </div>
       ) : (
-        <div role="list" style={{ flex: 1 }}>
-          {alerts.map((alert) => (
-            <AlertRow key={`${alert.equipmentId}:${alert.type}`} alert={alert} />
-          ))}
+        <div style={{ flex: 1, padding: "0 16px" }}>
+          <AlertsProView
+            alerts={alerts}
+            acksMap={acksMap}
+            equipmentLocationMap={equipmentLocationMap}
+            hasAckError={hasAckError}
+            onNavigate={(id) => navigate(`/equipment/${id}`)}
+            onAck={ack}
+            onUnAck={unAck}
+            canOwn={canOwnAlerts}
+            formatRelativeTime={formatRelativeTime}
+          />
         </div>
       )}
     </div>

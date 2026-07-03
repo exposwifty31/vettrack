@@ -1055,3 +1055,20 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Verification ceiling (owed):** simulator — cold-load Equipment (placeholder, not 0%), no-match search (EmptyState + clear filters), readout count vs bell count on the demo dataset. Scheduled with the batched device pass.
 
 **Verdict:** Phase 2 DONE at gate + unit level; simulator drill owed in the consolidated device pass.
+
+## 2026-07-04 — Phase 3 (H2): native /alerts routed through the grouped pro view + badge bidi
+
+**Claim:** The native alerts wall (flat, non-interactive, no ack — audit H2 "alert fatigue") now renders the SAME grouped, worst-first, navigable, acknowledgeable `AlertsProView` the browser-mobile path already used, via a new shared `useAlertsController` consumed by BOTH the desktop page and the native screen (real duplication removed, not copied). Count badges are bidi-isolated — the on-device "+9" reversal (photographed in the 2026-07-03 pass) is fixed at all three render sites.
+
+**Evidence (gate + unit, actually run):**
+- New `src/features/alerts/hooks/use-alerts-controller.ts`: equipment+acks queries, ack/unack mutations (toasts + haptics preserved), acksMap/locationMap/activeAlertCount, ownership role gate — extracted verbatim from `AlertsPageDesktop`, which now consumes it (`ack` destructured as `acknowledgeAlert` — the per-card `const ack = acksMap.get(...)` shadowed it; caught by `tsc` TS2722, fixed).
+- `AlertsScreen.tsx`: keeps its pull-to-refresh shell + title; body renders `<AlertsProView/>` with the full desktop prop set (nav → `/equipment/:id`, ack/unack, canOwn, formatRelativeTime). Acked alerts are no longer silently hidden (the old feed filtered them out with no way to see/undo).
+- Deleted: `AlertRow.tsx` + `use-alerts-feed.ts` (orphaned by the rewire; verified sole consumers).
+- Badges: `dir="ltr"` on the NativeHeader bell span, NativeHeader chat-launcher span, and `ShiftChatFab` span — device evidence for the reversal already existed in this log ("bell badge reads '+9'"), so this did not wait for the batched pass.
+- knip: `AlertRow`/`use-alerts-feed` absent from the report (clean removal). `src/design-system-entry.ts` false-flag now registered in `knip.json` ignore (the PR-#40 trap the plan told us to close). Remaining knip findings are pre-existing baseline noise (`.design-sync/previews/**`, `.agents/**`, legacy types).
+- New `tests/alerts-screen-grouped.test.tsx` (3 tests, mocked api + auth, real Query cache): worst-first hero + both section labels render; row click navigates to `/equipment/eq-stale`; take-ownership posts `acknowledge("eq-issue","issue")`. Updated `tests/phase-6-state-consistency.test.js` stale markers (`refetchEq();` → `useAlertsController()` + `onRetry={refetch}`) — intent unchanged, mechanism moved into the shared hook.
+- `pnpm typecheck` (both) → exit 0. `pnpm test` → 391 files / 3846 pass.
+
+**Verification ceiling (owed):** simulator — native /alerts grouped + ack + navigate on device; badge renders "9+" not "+9". Scheduled with the batched device pass.
+
+**Verdict:** Phase 3 DONE at gate + unit level; simulator drill owed in the consolidated device pass.
