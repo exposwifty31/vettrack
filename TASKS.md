@@ -120,7 +120,7 @@ _Agents: add out-of-scope items here rather than acting on them._
 - TASK: [post-merge] Purge `Archive.zip` + `Archive 2.zip` (95MB) from git history via `git-filter-repo`, from a fresh clone of `main`, then coordinated force-push to gitlab+origin (rewrites all commit hashes → team re-clones). Files already removed from the working tree in the relevance-audit cleanup PR.
 - TASK: Audit `docs/design-handoff/` (240 tracked files, ~15MB) — archive externally or trim to active design refs. NOTE: partially load-bearing — `Stage N` files are read by `tests/stage-1-token-values.test.js` / `tests/stage-2-*.test.js`; preserve those.
 - TASK: Deduplicate untracked `.agents/skills/ecc/` + `.codex/agents/` mirrors of `.claude/skills/ecc/` (~1.7MB each); pick one canonical agent-skills path + gitignore the rest.
-- TASK: Investigate files newly-flagged unused by knip after removing `src/design-system-entry.ts` (components it re-exported may now be orphaned; nothing broken — build + tests green).
+- TASK: Register `src/design-system-entry.ts` as a knip `entry` (it's the design-sync export entry per `.design-sync/config.json`) so knip stops false-flagging the ~60 DS-only components as unused. Context: the audit initially deleted the DS entry + `AlertCard` + `ShiftProgressHero` as "dead" (0 app imports) — RESTORED (`6cae5478`); they're design-sync-only exports by design. Future relevance audits must treat `.design-sync/config.json` (`entry` + `componentSrcMap`) as a reference root.
 - DONE (relevance-audit cleanup PR): removed root artifacts, `src/features/today/*`, `shared/permissions.ts`, `server/integrations/{rollout,conflicts}/*`, and the `inventory-deduction` worker/queue stub; untracked `playwright-ui-screenshots/`.
 
 ---
