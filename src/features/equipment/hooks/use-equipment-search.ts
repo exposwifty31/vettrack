@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
 import type { Equipment } from "@/types";
 
 /** Max typeahead rows — keep the dropdown scannable, not a second list view. */
@@ -28,9 +29,11 @@ export function matchesEquipmentQuery(eq: Equipment, q: string): boolean {
  * filter is instant — no debounce needed for an in-memory list of this size.
  */
 export function useEquipmentSearch(query: string): { results: Equipment[]; isLoading: boolean } {
+  const { userId } = useAuth();
   const { data, isLoading } = useQuery({
     queryKey: ["/api/equipment"],
     queryFn: api.equipment.list,
+    enabled: !!userId,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });

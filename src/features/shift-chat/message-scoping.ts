@@ -24,15 +24,12 @@ export function reconcileMessages(
   prevSessionId: string | null,
   currentSessionId: string | null,
 ): ShiftMessage[] {
-  // No open shift → show nothing.
   if (currentSessionId === null) return prev.length === 0 ? prev : [];
 
-  // Shift changed → the incoming batch is the new conversation.
   if (currentSessionId !== prevSessionId) {
     return incoming.filter((m) => m.shiftSessionId === currentSessionId);
   }
 
-  // Same shift → append fresh messages scoped to the current session.
   if (incoming.length === 0) return prev;
   const existingIds = new Set(prev.map((m) => m.id));
   const fresh = incoming.filter(

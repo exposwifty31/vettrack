@@ -14,6 +14,7 @@ const listMock = vi.fn();
 
 vi.mock("wouter", () => ({ useLocation: () => ["/", navigateMock] }));
 vi.mock("@/lib/api", () => ({ api: { equipment: { list: () => listMock() } } }));
+vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ userId: "u1" }) }));
 
 import { EquipmentSearchBox } from "@/components/search/EquipmentSearchBox";
 
@@ -66,5 +67,16 @@ describe("EquipmentSearchBox typeahead", () => {
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "zzzzz" } });
     await waitFor(() => expect(listMock).toHaveBeenCalled());
     expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("selects a row via ArrowDown and navigates to it on Enter", async () => {
+    renderBox();
+    const input = screen.getByRole("combobox");
+    fireEvent.change(input, { target: { value: "sn" } }); // matches both serials
+    await screen.findByText("Infusion Pump");
+    fireEvent.keyDown(input, { key: "ArrowDown" }); // active → row 0 (e1)
+    fireEvent.keyDown(input, { key: "ArrowDown" }); // active → row 1 (e2)
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith("/equipment/e2"));
   });
 });

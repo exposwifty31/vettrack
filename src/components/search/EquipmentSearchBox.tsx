@@ -86,7 +86,9 @@ export function EquipmentSearchBox({ tone = "surface", autoFocus, enableSlashSho
       setActive((i) => (i <= 0 ? results.length - 1 : i - 1));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (open && active >= 0) goToEquipment(results[active]!.id);
+      // Guard the index: a background refetch can shrink `results` while a row
+      // is active, leaving `active` past the new end.
+      if (open && active >= 0 && active < results.length) goToEquipment(results[active].id);
       else submitFullSearch();
     } else if (e.key === "Escape") {
       if (query) {

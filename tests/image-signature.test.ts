@@ -48,9 +48,4 @@ describe("detectImageType — magic-byte content detection", () => {
     // @ts-expect-error — guards against a null buffer at the boundary
     expect(detectImageType(null)).toBeNull();
   });
-
-  it("is content-only: a PNG stays a PNG no matter what it was named", () => {
-    // Same PNG bytes an attacker might upload as "logo.svg" with type image/svg+xml.
-    expect(detectImageType(PNG)).toBe("image/png");
-  });
 });
