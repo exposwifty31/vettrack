@@ -899,3 +899,16 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Verification ceiling (honest):** gate + unit ONLY. The two-pane is the "real design work" and needs a native iPad build (`pnpm cap:build:native` + simulator) to confirm: list + detail visible together; row-tap swaps the detail while the list stays mounted + keeps scroll; deep-link to `/equipment/:id`; hardware Back; no flexbox double-scroll. Deferred to a consolidated Phase-3 device pass (owed).
 
 **Verdict:** Phase 3.0 + 3.1 — DONE at gate + unit; on-device two-pane pass owed.
+
+## 2026-07-03 — UX overhaul Phase 3.2: Inventory catalog two-pane (iPad); restock deferred
+
+**Claim:** Wired the inventory CATALOG (`/inventory-items/:id?`) as an iPad two-pane mirroring Equipment. The restock page (`/inventory`) two-pane is DEFERRED — direct inspection shows its horizontal chip selector + scroll-based restock-session UI + non-fixed-height layout don't map to a fixed-height two-pane without risky restructuring of session/scan logic; the catalog delivers the Inventory master-detail intent.
+
+**Evidence (gate + unit):**
+- New `src/features/inventory/tablet/InventoryItemsMasterDetail.tsx` — master = `InventoryItemsPage` (Link rows unchanged), detail = `InventoryItemDetailPage` (reads the shared `:id`; its "back" → `/inventory-items` resolves to the placeholder = clears selection without unmounting the master), placeholder when no id.
+- `routes.tsx`: native-tablet → single `/inventory-items/:id?`; else the original detail + list routes (no reserved siblings to order around).
+- `pnpm typecheck` → exit 0. `pnpm test` → 386 files / 3811 pass (non-tablet routes unchanged in jsdom).
+
+**Verification ceiling:** gate + unit; on-device two-pane pass owed (consolidated Phase-3 device pass). Restock two-pane intentionally NOT implemented — documented scope adjustment based on the page's workflow-specific layout.
+
+**Verdict:** Phase 3.2 — catalog DONE at gate + unit; restock two-pane deferred (documented); device pass owed.

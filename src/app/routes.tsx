@@ -54,6 +54,7 @@ const WhatsNewPage = lazy(() => import("@/pages/whats-new"));
 const ShiftLeaderboardPage = lazy(() => import("@/pages/shift-leaderboard"));
 const InventoryItemsPage = lazy(() => import("@/pages/inventory-items"));
 const InventoryItemDetailPage = lazy(() => import("@/pages/inventory-item-detail"));
+const InventoryItemsMasterDetail = lazy(() => import("@/features/inventory/tablet/InventoryItemsMasterDetail"));
 const ProcurementPage = lazy(() => import("@/pages/procurement"));
 const ShiftChatArchive = lazy(() =>
   import("@/features/shift-chat/components/ShiftChatArchive").then((m) => ({ default: m.ShiftChatArchive }))
@@ -159,8 +160,9 @@ export function AppRoutes() {
         {/* --- Platform & analytics --- */}
         <Route path="/inventory"><AuthGuard><InventoryPage /></AuthGuard></Route>
         {/* Stage 5 inventory-items + detail are responsive — reachable on native (iPad/iPhone). */}
-        <Route path="/inventory-items/:id"><AuthGuard><InventoryItemDetailPage /></AuthGuard></Route>
-        <Route path="/inventory-items"><AuthGuard><InventoryItemsPage /></AuthGuard></Route>
+        {isNativeTablet && <Route path="/inventory-items/:id?"><AuthGuard><InventoryItemsMasterDetail /></AuthGuard></Route>}
+        {!isNativeTablet && <Route path="/inventory-items/:id"><AuthGuard><InventoryItemDetailPage /></AuthGuard></Route>}
+        {!isNativeTablet && <Route path="/inventory-items"><AuthGuard><InventoryItemsPage /></AuthGuard></Route>}
         <Route path="/procurement"><AuthGuard><WebOnlyGuard><ProcurementPage /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/analytics/outcome-kpi"><Redirect to="/analytics" replace /></Route>
         <Route path="/analytics/shift-leaderboard"><AuthGuard><WebOnlyGuard><ShiftLeaderboardPage /></WebOnlyGuard></AuthGuard></Route>
