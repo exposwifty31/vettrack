@@ -102,6 +102,8 @@ export function NativeTabBar({ onMorePress }: Props) {
         display: "flex",
         alignItems: "center",
         paddingBottom: "env(safe-area-inset-bottom)",
+        paddingLeft: "env(safe-area-inset-left)",
+        paddingRight: "env(safe-area-inset-right)",
         backgroundColor: "hsl(var(--background) / 0.96)",
         borderTop: "0.5px solid hsl(var(--border))",
         backdropFilter: "blur(12px)",

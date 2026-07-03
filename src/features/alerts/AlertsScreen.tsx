@@ -59,7 +59,9 @@ export function AlertsScreen() {
         display: "flex",
         flexDirection: "column",
         minHeight: "100%",
-        paddingBottom: "calc(16px + env(safe-area-inset-bottom))",
+        // 16px base + 56px so the last alert row clears the floating chat
+        // FAB (48px + 8px gap above the tab bar) — H5.
+        paddingBottom: "calc(72px + env(safe-area-inset-bottom))",
       }}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}

@@ -98,7 +98,10 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
           height: ownSafeArea ? "calc(48px + env(safe-area-inset-top))" : 48,
           // Push flex children below the status bar
           paddingTop: ownSafeArea ? "env(safe-area-inset-top)" : 0,
-          paddingInline: 12,
+          // Horizontal safe areas: landscape iPhone puts the camera housing on
+          // a side edge — leading/trailing controls must clear it (H4).
+          paddingLeft: "calc(12px + env(safe-area-inset-left))",
+          paddingRight: "calc(12px + env(safe-area-inset-right))",
           display: "flex",
           alignItems: "center",
           flexShrink: 0,

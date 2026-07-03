@@ -1072,3 +1072,13 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Verification ceiling (owed):** simulator — native /alerts grouped + ack + navigate on device; badge renders "9+" not "+9". Scheduled with the batched device pass.
 
 **Verdict:** Phase 3 DONE at gate + unit level; simulator drill owed in the consolidated device pass.
+
+## 2026-07-04 — Phase 4 (H4 + H5): horizontal safe areas + FAB clearance
+
+**Claim:** In landscape, native chrome and page content clear the camera housing: the phone scroll container, the `NativeHeader` row (12px → `calc(12px + env(safe-area-inset-left/right))`), and the `NativeTabBar` all pad the horizontal safe areas (previously only top/bottom were owned — the fixed `inset:0` shell escaped the body's env padding). The floating chat FAB no longer covers the last rows: the equipment and alerts scrollers reserve `calc(72px + env(safe-area-inset-bottom))` (16px base + 48px FAB + 8px gap).
+
+**Evidence:** `NativeShell.tsx` phone scroller, `NativeHeader.tsx:99-103`, `NativeTabBar.tsx` nav style, `EquipmentListScreen.tsx` + `AlertsScreen.tsx` bottom padding. Static regression `tests/native-safe-area-fab-clearance.test.js` (5 checks, house phase-6-state-consistency style) locks all five sites. `pnpm typecheck` → 0 errors; `pnpm test` → 392 files / 3851 pass. Portrait unaffected (side insets resolve to 0). Tablet branch untouched (no housing on iPad; audit scoped this to iPhone landscape).
+
+**Verification ceiling (owed):** simulator — rotate iPhone to landscape: search field + "כל הסטטוסים" chip clear the housing; FAB clears the last equipment row and alert card. Batched device pass.
+
+**Verdict:** Phase 4 DONE at gate + static-check level; simulator drill owed.

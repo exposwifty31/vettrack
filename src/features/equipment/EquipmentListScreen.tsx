@@ -56,7 +56,9 @@ export function EquipmentListScreen() {
         display: "flex",
         flexDirection: "column",
         gap: 12,
-        padding: "16px 16px calc(16px + env(safe-area-inset-bottom))",
+        // Bottom: 16px base + 56px so the last row clears the floating chat
+        // FAB (48px + 8px gap above the tab bar) — H5.
+        padding: "16px 16px calc(72px + env(safe-area-inset-bottom))",
         minHeight: "100%",
       }}
     >

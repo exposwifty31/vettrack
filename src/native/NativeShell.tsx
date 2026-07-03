@@ -96,6 +96,10 @@ export function NativeShell({ children }: Props) {
             overflowX: "hidden",
             WebkitOverflowScrolling: "touch",
             overscrollBehaviorY: "contain",
+            // Landscape: page content (search field, filter chips) must clear
+            // the camera-housing edge (H4). Portrait resolves both to 0.
+            paddingLeft: "env(safe-area-inset-left)",
+            paddingRight: "env(safe-area-inset-right)",
           }}
         >
           {children}
