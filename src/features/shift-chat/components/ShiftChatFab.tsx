@@ -1,32 +1,20 @@
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
-import { useShiftChat } from "../hooks/useShiftChat";
-import { ShiftChatPanel } from "./ShiftChatPanel";
-import { useAuth } from "@/hooks/use-auth";
-import { useLocation } from "wouter";
+import { ShiftChatLauncher } from "./ShiftChatLauncher";
 
+/**
+ * Floating chat launcher for the phone + web shells. On the native tablet the
+ * chat lives in the header (`NativeHeader`) instead, so this FAB is not mounted
+ * there (see `GlobalShiftChat` in main.tsx) — keeping a single chat owner per
+ * device.
+ */
 export function ShiftChatFab() {
-  const { role, effectiveRole } = useAuth();
-  const [location] = useLocation();
-  const [isOpen, setIsOpen] = useState(false);
-  const chat = useShiftChat(isOpen);
-
-  // Only render for shift-eligible roles
-  const eligibleRoles = ["vet", "technician", "senior_technician", "admin"];
-  if (!eligibleRoles.includes(effectiveRole ?? role ?? "")) return null;
-  if (location === "/" || location === "/landing" || location.startsWith("/signin") || location.startsWith("/signup")) {
-    return null;
-  }
-
   return (
-    <>
-      {/* Launcher hides while the panel is open — otherwise it floats over the
-          panel's own close button in the same corner. */}
-      {!isOpen && (
+    <ShiftChatLauncher
+      renderTrigger={({ open, unreadCount }) => (
         <button
           type="button"
-          onClick={() => setIsOpen(true)}
+          onClick={open}
           className={cn(
             "fixed bottom-nav-float end-5 z-[60]",
             "w-12 h-12 rounded-full",
@@ -35,25 +23,19 @@ export function ShiftChatFab() {
             "transition-transform hover:scale-105 motion-safe:active:scale-95",
           )}
           aria-label={
-            chat.unreadCount > 0
-              ? t.shiftChat.openChatUnread(chat.unreadCount > 9 ? "9+" : String(chat.unreadCount))
+            unreadCount > 0
+              ? t.shiftChat.openChatUnread(unreadCount > 9 ? "9+" : String(unreadCount))
               : t.shiftChat.openChat
           }
         >
           <span aria-hidden="true">💬</span>
-          {chat.unreadCount > 0 && (
+          {unreadCount > 0 && (
             <span aria-hidden="true" className="absolute -top-1 -end-1 bg-red-700 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-background">
-              {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
+              {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
         </button>
       )}
-
-      <ShiftChatPanel
-        isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
-        chat={chat}
-      />
-    </>
+    />
   );
 }

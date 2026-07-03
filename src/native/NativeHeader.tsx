@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { Settings, Bell, ChevronRight, Moon, Globe, User, AlertCircle, AlertTriangle } from "lucide-react";
+import { Settings, Bell, ChevronRight, Moon, Globe, User, AlertCircle, AlertTriangle, MessageCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
@@ -12,6 +12,7 @@ import { getInitials } from "@/lib/user-utils";
 import { useIsTabletViewport } from "@/lib/use-tablet-viewport";
 import { EquipmentSearchBox } from "@/components/search/EquipmentSearchBox";
 import { EquipmentSearchButton } from "@/components/search/EquipmentSearchButton";
+import { ShiftChatLauncher } from "@/features/shift-chat/components/ShiftChatLauncher";
 
 /** Routes that own their own top chrome — hide the shared header for these. */
 const FULLSCREEN_ROUTES = ["/code-blue", "/crash-cart", "/scan", "/handoff"];
@@ -146,6 +147,50 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
 
         {/* END side (left in RTL, right in LTR): icon buttons */}
         <div style={{ display: "flex", gap: 4, marginInlineStart: "auto" }}>
+          {/* iPad: chat lives here as a header control (no floating FAB on tablet).
+              The launcher owns the single useShiftChat instance on this device. */}
+          {isTablet && (
+            <ShiftChatLauncher
+              renderTrigger={({ open, unreadCount }) => (
+                <button
+                  type="button"
+                  aria-label={
+                    unreadCount > 0
+                      ? t.shiftChat.openChatUnread(unreadCount > 9 ? "9+" : String(unreadCount))
+                      : t.shiftChat.openChat
+                  }
+                  onClick={open}
+                  style={{ ...iconBtn, position: "relative" }}
+                >
+                  <MessageCircle size={20} color="hsl(var(--foreground))" strokeWidth={1.8} />
+                  {unreadCount > 0 && (
+                    <span
+                      aria-hidden
+                      style={{
+                        position: "absolute",
+                        top: 2,
+                        insetInlineEnd: 2,
+                        minWidth: 16,
+                        height: 16,
+                        borderRadius: 8,
+                        background: "hsl(var(--destructive))",
+                        color: "#fff",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        paddingInline: 3,
+                        lineHeight: 1,
+                      }}
+                    >
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+              )}
+            />
+          )}
           <button
             type="button"
             aria-label={t.nav.settings}

@@ -870,3 +870,18 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Verification ceiling (honest):** gate + unit ONLY. NOT re-verified on iPhone/iPad simulator this session. The iPad sidebar full-nav, the drawer + FAB removal, and the retired card need a native build (`pnpm cap:build:native`) + simulator screenshots — owed. The scan-affordance change is unit-confirmed; its on-device appearance (sidebar Scan item, no FAB, no Today card) is not yet screenshotted.
 
 **Verdict:** Phase 1 — DONE at gate + unit level; on-device simulator pass owed.
+
+## 2026-07-03 — UX overhaul Phase 2: chat relocated to iPad header; one float owner per device
+
+**Claim:** On the native tablet the shift-chat is now a header button (`NativeHeader`) rather than a floating FAB; the global float mounts only on phone/web. A shared `ShiftChatLauncher` guarantees exactly one `useShiftChat` per device (no double subscription). The launcher also hides on focused fullscreen routes to stop the reported overlap with bottom-anchored actions.
+
+**Evidence (gate + unit):**
+- New `src/native/tablet/useIsNativeTablet.ts` — context-independent native-tablet gate (`capacitorPlatform() !== "web" && useIsTabletViewport()`), usable outside NativeShell (needed for the global chat mount, which lives outside the shell provider).
+- New `src/features/shift-chat/components/ShiftChatLauncher.tsx` — owns eligibility + `isOpen` + the single `useShiftChat` + `ShiftChatPanel`, exposes a render-prop trigger. `ShiftChatFab.tsx` reduced to the float trigger; `NativeHeader.tsx` renders a `MessageCircle` chat button (unread badge) on tablet via the same launcher.
+- `src/main.tsx` — the global float is wrapped in `GlobalShiftChat`, which returns null on native tablet so its `useShiftChat` never runs on iPad.
+- `ShiftChatLauncher` now hides on auth/landing AND fullscreen routes (`/code-blue`, `/crash-cart`, `/scan`, `/handoff`).
+- **`pnpm typecheck`** → exit 0. **`pnpm test`** → 386 files / 3811 tests pass (shift-chat broadcast/session-scoping + mobile-shell suites green).
+
+**Verification ceiling (honest):** gate + unit ONLY; NOT re-verified on simulator. The iPad header chat button (placement/badge) and the phone float clearance need a native build + on-device pass. Intentional behavior change: chat is now hidden on the four fullscreen focused routes on BOTH devices (previously the phone float showed on `/code-blue`) — resolves the reported "float overlaps the continue link" observation.
+
+**Verdict:** Phase 2 — DONE at gate + unit; on-device pass owed.
