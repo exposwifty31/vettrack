@@ -988,20 +988,20 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
                         <Moon
                           className={cn(
                             "w-5 h-5 absolute inset-0 transition-all duration-200",
-                            settings.darkMode ? "opacity-100 rotate-0" : "opacity-0 rotate-90"
+                            (settings.appearance === "dark") ? "opacity-100 rotate-0" : "opacity-0 rotate-90"
                           )}
                         />
                         <Sun
                           className={cn(
                             "w-5 h-5 absolute inset-0 transition-all duration-200",
-                            settings.darkMode ? "opacity-0 -rotate-90" : "opacity-100 rotate-0"
+                            (settings.appearance === "dark") ? "opacity-0 -rotate-90" : "opacity-100 rotate-0"
                           )}
                         />
                       </span>
                     }
                     label={t.layout.settings.darkMode}
-                    checked={settings.darkMode}
-                    onCheckedChange={(v) => update({ darkMode: v })}
+                    checked={(settings.appearance === "dark")}
+                    onCheckedChange={(v) => update({ appearance: v ? "dark" : "system" })}
                     data-testid="quick-dark-mode"
                   />
                   <SettingsSelect

@@ -44,7 +44,7 @@ describe("BUG-015 — settings update remount avoidance", () => {
 
       act(() => update!({ soundEnabled: true }));
       act(() => update!({ soundEnabled: false }));
-      act(() => update!({ darkMode: true }));
+      act(() => update!({ appearance: "dark" }));
 
       expect(spy).not.toHaveBeenCalled();
     } finally {

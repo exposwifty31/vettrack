@@ -64,10 +64,10 @@ export function TopbarSettingsMenu() {
               {t.nav.quickSettings}
             </p>
 
-            <button type="button" aria-pressed={settings.darkMode} onClick={() => update({ darkMode: !settings.darkMode })} className={rowClass}>
+            <button type="button" aria-pressed={settings.appearance === "dark"} onClick={() => update({ appearance: settings.appearance === "dark" ? "system" : "dark" })} className={rowClass}>
               <Moon size={18} strokeWidth={1.8} />
               <span className="flex-1 text-start text-sm">{t.nav.darkMode}</span>
-              <MiniSwitch on={settings.darkMode} />
+              <MiniSwitch on={settings.appearance === "dark"} />
             </button>
 
             <button type="button" onClick={() => update({ locale: settings.locale === "he" ? "en" : "he" })} className={rowClass}>

@@ -10,13 +10,18 @@ export type TimeFormat = "12h" | "24h";
 export type DateFormat = "MM/DD/YYYY" | "DD/MM/YYYY" | "YYYY-MM-DD";
 /** Forest = brand green; Clinical = 60/30/10. */
 export type ColorTheme = "forest" | "clinical";
+/** Theme: follow the OS appearance, or force light/dark. */
+export type Appearance = "system" | "light" | "dark";
+/** Dynamic Type bucket — maps to the --type-scale multiplier. */
+export type TextScale = "s" | "m" | "l" | "xl";
 
 export interface UserSettings {
   locale: Locale;
   colorTheme: ColorTheme;
-  darkMode: boolean;
+  appearance: Appearance;
   hapticsEnabled: boolean;
   density: Density;
+  textScale: TextScale;
   soundEnabled: boolean;
   criticalAlertsSound: boolean;
   technicianReturnRemindersEnabled: boolean;
@@ -33,9 +38,10 @@ export const USER_SETTINGS_STORAGE_KEY = "vettrack-settings";
 export const DEFAULT_USER_SETTINGS: UserSettings = {
   locale: getStoredLocale(),
   colorTheme: "clinical",
-  darkMode: false,
+  appearance: "system",
   hapticsEnabled: true,
   density: "comfortable",
+  textScale: "m",
   soundEnabled: true,
   criticalAlertsSound: true,
   technicianReturnRemindersEnabled: true,
@@ -49,7 +55,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
 
 // Incremented when settings schema changes in a way that requires migration.
 // Stored alongside settings as `_v`. Absent → schema v0 (pre-migration build).
-const SETTINGS_SCHEMA_VERSION = 1;
+const SETTINGS_SCHEMA_VERSION = 2;
 
 /** Sync read of persisted user settings (safe outside React). */
 export function getStoredUserSettings(): UserSettings {
@@ -68,11 +74,18 @@ export function getStoredUserSettings(): UserSettings {
     if (typeof parsed.hapticsEnabled !== "boolean") {
       parsed.hapticsEnabled = true;
     }
-    // Migration v0 → v1: darkMode:true stored by an earlier build (e.g. Build 14) is
-    // treated as not user-set and reset to false. Prevents dark-on-dark black voids on
-    // fresh simulator installs that inherited production localStorage.
-    if (typeof parsed._v !== "number" && parsed.darkMode === true) {
-      parsed.darkMode = false;
+    // Migration to v2: replace boolean darkMode with tri-state `appearance`.
+    // v0's darkMode is untrusted inherited state (production localStorage on fresh
+    // installs) → default to "system"; a v1 explicit darkMode:true is a genuine
+    // user choice → "dark". Everything else follows the OS ("system").
+    const storedV = typeof parsed._v === "number" ? parsed._v : 0;
+    const legacyDark = (parsed as { darkMode?: boolean }).darkMode;
+    if (parsed.appearance !== "system" && parsed.appearance !== "light" && parsed.appearance !== "dark") {
+      parsed.appearance = storedV >= 1 && legacyDark === true ? "dark" : "system";
+    }
+    delete (parsed as { darkMode?: boolean }).darkMode;
+    if (parsed.textScale !== "s" && parsed.textScale !== "m" && parsed.textScale !== "l" && parsed.textScale !== "xl") {
+      parsed.textScale = "m";
     }
     const { _v: _storedSchemaVersion, ...storedSettings } = parsed;
     return { ...DEFAULT_USER_SETTINGS, ...storedSettings };

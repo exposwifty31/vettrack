@@ -1111,6 +1111,17 @@
     "closeAria": "Close sync queue"
   },
   "settingsPage": {
+    "appearance": "Appearance",
+    "appearanceDescription": "Follow the system, or force light or dark",
+    "appearanceSystem": "System",
+    "appearanceLight": "Light",
+    "appearanceDark": "Dark",
+    "textSize": "Text size",
+    "textSizeDescription": "Scale text across the app for comfortable reading",
+    "textSizeS": "Small",
+    "textSizeM": "Default",
+    "textSizeL": "Large",
+    "textSizeXL": "Extra large",
     "title": "Settings",
     "subtitle": "Customize your VetTrack experience",
     "display": "Display",

@@ -38,6 +38,7 @@ import {
   ListChecks,
   ClipboardCheck,
   Trash2,
+  Type,
 } from "lucide-react";
 import { Link } from "wouter";
 import { playFeedbackTone, playMuteTone } from "@/lib/sounds";
@@ -227,13 +228,18 @@ export default function SettingsPage() {
               }}
               data-testid="settings-color-theme"
             />
-            <SettingsToggle
-              icon={settings.darkMode ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-              label={t.settingsPage.darkMode}
-              description={t.settingsPage.darkModeDescription}
-              checked={settings.darkMode}
-              onCheckedChange={(v) => update({ darkMode: v })}
-              data-testid="settings-dark-mode"
+            <SettingsSelect
+              icon={settings.appearance === "dark" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+              label={t.settingsPage.appearance}
+              description={t.settingsPage.appearanceDescription}
+              value={settings.appearance}
+              options={[
+                { value: "system", label: t.settingsPage.appearanceSystem },
+                { value: "light", label: t.settingsPage.appearanceLight },
+                { value: "dark", label: t.settingsPage.appearanceDark },
+              ]}
+              onValueChange={(v) => update({ appearance: v as "system" | "light" | "dark" })}
+              data-testid="settings-appearance"
             />
             <SettingsToggle
               icon={<Vibrate className="w-5 h-5" />}
@@ -253,6 +259,20 @@ export default function SettingsPage() {
               ]}
               onValueChange={(v) => update({ density: v as "comfortable" | "compact" })}
               data-testid="settings-density"
+            />
+            <SettingsSelect
+              icon={<Type className="w-5 h-5" />}
+              label={t.settingsPage.textSize}
+              description={t.settingsPage.textSizeDescription}
+              value={settings.textScale}
+              options={[
+                { value: "s", label: t.settingsPage.textSizeS },
+                { value: "m", label: t.settingsPage.textSizeM },
+                { value: "l", label: t.settingsPage.textSizeL },
+                { value: "xl", label: t.settingsPage.textSizeXL },
+              ]}
+              onValueChange={(v) => update({ textScale: v as "s" | "m" | "l" | "xl" })}
+              data-testid="settings-text-size"
             />
             <SettingsSelect
               icon={<Languages className="w-5 h-5" />}

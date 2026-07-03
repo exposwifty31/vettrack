@@ -58,14 +58,14 @@
        Modular ~1.22 ratio. RTL-agnostic (sizes only, no direction). Adopt via
        the .vt-text-* utilities or var() directly; do not hardcode px sizes. */
     /* iOS type ramp (Stage 1) — rem on a 17px root (see html{font-size}). */
-    --text-2xs:  0.647rem;    /* ~11px — dense meta, nav labels */
-    --text-xs:   0.765rem;    /* ~13px — captions, helper text */
-    --text-sm:   0.882rem;    /* ~15px — secondary body, labels */
-    --text-base: 1rem;        /* 17px — body default */
-    --text-lg:   1.176rem;    /* ~20px — emphasized body, card titles */
-    --text-xl:   1.294rem;    /* ~22px — section headings */
-    --text-2xl:  2rem;        /* ~34px — page titles (iOS large title) */
-    --text-3xl:  2.353rem;    /* ~40px — hero numerals / display */
+    --text-2xs:  calc(0.647rem * var(--type-scale, 1));    /* ~11px — dense meta, nav labels */
+    --text-xs:   calc(0.765rem * var(--type-scale, 1));    /* ~13px — captions, helper text */
+    --text-sm:   calc(0.882rem * var(--type-scale, 1));    /* ~15px — secondary body, labels */
+    --text-base: calc(1rem * var(--type-scale, 1));        /* 17px — body default */
+    --text-lg:   calc(1.176rem * var(--type-scale, 1));    /* ~20px — emphasized body, card titles */
+    --text-xl:   calc(1.294rem * var(--type-scale, 1));    /* ~22px — section headings */
+    --text-2xl:  calc(2rem * var(--type-scale, 1));        /* ~34px — page titles (iOS large title) */
+    --text-3xl:  calc(2.353rem * var(--type-scale, 1));    /* ~40px — hero numerals / display */
     --display:         var(--text-3xl);   /* design name — hero/display numerals */
     --text-largetitle: var(--text-2xl);   /* design name — iOS large title */
     --leading-tight:  1.2;    /* headings */

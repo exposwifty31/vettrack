@@ -974,3 +974,19 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Verification ceiling (honest):** gate + unit. The `resolveNextShift` roster query is NOT exercised against a live DB this session (no DB integration test added) — it needs a DB/device pass to confirm real next-shift resolution end-to-end. The rendered empty states want a screenshot pass.
 
 **Verdict:** Phase 5 — DONE at gate + unit; live-DB roster query + rendered empty states owed a device/DB pass.
+
+## 2026-07-03 — UX overhaul Phase 6c: system appearance tri-state + Dynamic Type (native bridge owed)
+
+**Claim:** Appearance now defaults to the OS (system|light|dark) and text size respects a Dynamic Type scale. The web/TS halves are fully gate-verified; the native iOS content-size bridge is delivered as code (TS seam + Swift plugin) but is NOT registered in the Xcode target and is UNVERIFIED — the owed device step.
+
+**Evidence (gate + unit):**
+- Appearance tri-state: `darkMode: boolean` → `appearance: "system"|"light"|"dark"` (default "system") in `user-settings-storage.ts`, with a v1→v2 migration (v1 explicit darkMode:true → "dark"; v0's untrusted darkMode → "system"). `use-settings.tsx` resolves the dark class via `isDarkActive` (honors `prefers-color-scheme` when "system") + a `matchMedia` listener that re-applies on OS scheme change while following the system.
+- Dynamic Type: `textScale: "s"|"m"|"l"|"xl"` → a `--type-scale` multiplier on `<html>`; the 8 `--text-*` tokens in `index.css` wrapped in `calc(<value> * var(--type-scale, 1))` (canonical values unchanged; default 1 = no change). Settings gains an Appearance 3-option select + a Text-size select.
+- Quick toggles updated across `NativeHeader`, web `TopbarSettingsMenu`, and the dead-but-compiled `layout.tsx` (dark ↔ system).
+- Native bridge: new `src/lib/dynamic-type.ts` (`getNativeContentSizeScale()` — null on web / until the plugin is registered) + `ios/App/App/DynamicTypePlugin.swift` (reads `preferredContentSizeCategory`). `SettingsProvider` seeds text size from the OS once, only if the user hasn't chosen — a no-op until the plugin is wired.
+- **NOT DONE (deliberate, documented):** the Swift plugin is NOT added to the Xcode App target (project.pbxproj) — hand-editing it is error-prone and unverifiable without a build. SourceKit's "No such module 'Capacitor'" on that file is expected (it's outside the build). Registering it + `pnpm cap:build:native` on a device is the owed step.
+- Tests updated: `settings-sound-toggle-no-remount` (darkMode→appearance), `stage-1-token-values` (--text-* calc form; canonical values still asserted). `pnpm typecheck` (frontend + server) → exit 0. `pnpm i18n:check` parity ✓. `pnpm test` → 387 files / 3819 pass.
+
+**Verification ceiling (honest):** appearance tri-state + in-app Dynamic Type are gate-verified. The native iOS Dynamic Type bridge is UNVERIFIED — needs Xcode-target registration + a native build. Both also want a device/screenshot pass.
+
+**Verdict:** Phase 6c — appearance + in-app Dynamic Type DONE at gate + unit; native iOS content-size bridge delivered as code but UNREGISTERED + UNVERIFIED (owed device step).

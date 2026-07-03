@@ -348,13 +348,13 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
               <p style={panelHeaderStyle}>{t.nav.quickSettings}</p>
               <button
                 type="button"
-                aria-pressed={settings.darkMode}
-                onClick={() => update({ darkMode: !settings.darkMode })}
+                aria-pressed={settings.appearance === "dark"}
+                onClick={() => update({ appearance: settings.appearance === "dark" ? "system" : "dark" })}
                 style={rowStyle}
               >
                 <Moon size={18} color="hsl(var(--foreground))" strokeWidth={1.8} />
                 <span style={{ flex: 1, textAlign: "start", fontSize: "var(--text-sm)" }}>{t.nav.darkMode}</span>
-                <MiniSwitch on={settings.darkMode} />
+                <MiniSwitch on={settings.appearance === "dark"} />
               </button>
               <button
                 type="button"

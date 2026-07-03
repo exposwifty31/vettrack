@@ -1111,6 +1111,17 @@
     "closeAria": "סגור תור סנכרון"
   },
   "settingsPage": {
+    "appearance": "מראה",
+    "appearanceDescription": "לפי המערכת, או בהיר/כהה קבוע",
+    "appearanceSystem": "מערכת",
+    "appearanceLight": "בהיר",
+    "appearanceDark": "כהה",
+    "textSize": "גודל טקסט",
+    "textSizeDescription": "התאמת גודל הטקסט באפליקציה לקריאה נוחה",
+    "textSizeS": "קטן",
+    "textSizeM": "רגיל",
+    "textSizeL": "גדול",
+    "textSizeXL": "גדול מאוד",
     "title": "הגדרות",
     "subtitle": "התאם אישית את חווית השימוש ב-VetTrack",
     "display": "תצוגה",

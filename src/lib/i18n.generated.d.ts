@@ -1114,6 +1114,17 @@ export interface TStructure {
     closeAria: string;
   };
   settingsPage: {
+    appearance: string;
+    appearanceDescription: string;
+    appearanceSystem: string;
+    appearanceLight: string;
+    appearanceDark: string;
+    textSize: string;
+    textSizeDescription: string;
+    textSizeS: string;
+    textSizeM: string;
+    textSizeL: string;
+    textSizeXL: string;
     title: string;
     subtitle: string;
     display: string;

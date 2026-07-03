@@ -71,14 +71,17 @@ describe("Stage 1 token foundation — radius ramp", () => {
 
 describe("Stage 1 token foundation — type ramp on a 17px root", () => {
   it("rem type scale + display / largetitle aliases", () => {
-    expect(has("--text-2xs: 0.647rem")).toBe(true);
-    expect(has("--text-xs: 0.765rem")).toBe(true);
-    expect(has("--text-sm: 0.882rem")).toBe(true);
-    expect(has("--text-base: 1rem")).toBe(true);
-    expect(has("--text-lg: 1.176rem")).toBe(true);
-    expect(has("--text-xl: 1.294rem")).toBe(true);
-    expect(has("--text-2xl: 2rem")).toBe(true);
-    expect(has("--text-3xl: 2.353rem")).toBe(true);
+    // Type ramp is now Dynamic-Type-aware: each base rem value is wrapped in
+    // calc(<value> * var(--type-scale, 1)). The canonical values are unchanged
+    // (drift protection preserved) — only the scale-multiplier wrapper was added.
+    expect(has("--text-2xs: calc(0.647rem *")).toBe(true);
+    expect(has("--text-xs: calc(0.765rem *")).toBe(true);
+    expect(has("--text-sm: calc(0.882rem *")).toBe(true);
+    expect(has("--text-base: calc(1rem *")).toBe(true);
+    expect(has("--text-lg: calc(1.176rem *")).toBe(true);
+    expect(has("--text-xl: calc(1.294rem *")).toBe(true);
+    expect(has("--text-2xl: calc(2rem *")).toBe(true);
+    expect(has("--text-3xl: calc(2.353rem *")).toBe(true);
     expect(has("--display: var(--text-3xl)")).toBe(true);
     expect(has("--text-largetitle: var(--text-2xl)")).toBe(true);
     expect(has("font-size: 17px")).toBe(true); // html root
