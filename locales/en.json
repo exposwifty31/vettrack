@@ -4,6 +4,8 @@
   },
   "common": {
     "appName": "VetTrack",
+    "selectItemTitle": "Select an item",
+    "selectItemSubtitle": "Choose from the list to see details here",
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete",

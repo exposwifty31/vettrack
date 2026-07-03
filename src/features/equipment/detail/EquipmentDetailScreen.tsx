@@ -21,9 +21,11 @@ const PULL_THRESHOLD = 80;
 
 type Props = {
   equipmentId: string;
+  /** Suppress the in-pane Back button — the two-pane tablet layout owns navigation. */
+  hideBack?: boolean;
 };
 
-export function EquipmentDetailScreen({ equipmentId }: Props) {
+export function EquipmentDetailScreen({ equipmentId, hideBack }: Props) {
   const { equipment, locationInference, isLoading, isError, refetch } =
     useEquipmentDetail(equipmentId);
   const dir = useDirection();
@@ -90,29 +92,31 @@ export function EquipmentDetailScreen({ equipmentId }: Props) {
         minHeight: "100%",
       }}
     >
-      <button
-        type="button"
-        data-testid="btn-detail-back"
-        onClick={handleBack}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-          alignSelf: "flex-start",
-          minHeight: 44,
-          border: "none",
-          background: "transparent",
-          padding: "0 4px 0 0",
-          cursor: "pointer",
-          color: "hsl(var(--primary))",
-          fontSize: "var(--text-sm)",
-          fontWeight: 600,
-          WebkitTapHighlightColor: "transparent",
-        }}
-      >
-        <BackIcon size={18} strokeWidth={2.2} aria-hidden />
-        {t.equipmentDetail.back}
-      </button>
+      {!hideBack && (
+        <button
+          type="button"
+          data-testid="btn-detail-back"
+          onClick={handleBack}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            alignSelf: "flex-start",
+            minHeight: 44,
+            border: "none",
+            background: "transparent",
+            padding: "0 4px 0 0",
+            cursor: "pointer",
+            color: "hsl(var(--primary))",
+            fontSize: "var(--text-sm)",
+            fontWeight: 600,
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          <BackIcon size={18} strokeWidth={2.2} aria-hidden />
+          {t.equipmentDetail.back}
+        </button>
+      )}
 
       {pullDelta > 0 && (
         <div

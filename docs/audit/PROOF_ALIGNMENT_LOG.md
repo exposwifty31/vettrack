@@ -885,3 +885,17 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Verification ceiling (honest):** gate + unit ONLY; NOT re-verified on simulator. The iPad header chat button (placement/badge) and the phone float clearance need a native build + on-device pass. Intentional behavior change: chat is now hidden on the four fullscreen focused routes on BOTH devices (previously the phone float showed on `/code-blue`) — resolves the reported "float overlaps the continue link" observation.
 
 **Verdict:** Phase 2 — DONE at gate + unit; on-device pass owed.
+
+## 2026-07-03 — UX overhaul Phase 3.0 + 3.1: two-pane plumbing + Equipment master-detail (iPad)
+
+**Claim:** Added the reusable two-pane primitive and wired Equipment as the reference iPad master-detail via a single native-tablet-gated combined route `/equipment/:id?`. Phone/web keep the separate list + detail routes with push navigation, byte-for-byte.
+
+**Evidence (gate + unit):**
+- New `src/native/tablet/TwoPaneLayout.tsx` (RTL via logical props; `height:100%` + `minHeight:0` panes so it nests in NativeShell's content scroller without double-scroll), `src/native/tablet/SelectItemPlaceholder.tsx` (localized empty right pane), `src/features/equipment/tablet/EquipmentMasterDetail.tsx` (reads `useParams`, master = `EquipmentListScreen`, detail = `EquipmentDetailScreen` + new `hideBack` prop, placeholder when no id).
+- `src/app/routes.tsx`: `useIsNativeTablet()` gate — on native tablet the `/equipment` list route is dropped and `/equipment/:id?` (kept AFTER the reserved `/equipment/new|tasks|board`, `/:id/edit|qr` siblings) renders `EquipmentMasterDetail`; else the original two routes. Conditional Route children stay direct `<Switch>` children (no fragments, which wouter's Switch won't descend into).
+- i18n: `common.selectItemTitle` / `common.selectItemSubtitle` added to both locales; `pnpm i18n:generate-types` regenerated `i18n.generated.d.ts`; `pnpm i18n:check` deep parity ✓.
+- `pnpm typecheck` → exit 0. `pnpm test` → 386 files / 3811 tests pass. In jsdom `useIsNativeTablet` resolves false, so `deep-link-router` + route-contract tests exercise the UNCHANGED non-tablet routes — the tablet branch is purely additive.
+
+**Verification ceiling (honest):** gate + unit ONLY. The two-pane is the "real design work" and needs a native iPad build (`pnpm cap:build:native` + simulator) to confirm: list + detail visible together; row-tap swaps the detail while the list stays mounted + keeps scroll; deep-link to `/equipment/:id`; hardware Back; no flexbox double-scroll. Deferred to a consolidated Phase-3 device pass (owed).
+
+**Verdict:** Phase 3.0 + 3.1 — DONE at gate + unit; on-device two-pane pass owed.

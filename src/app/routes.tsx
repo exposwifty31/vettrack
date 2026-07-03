@@ -7,6 +7,7 @@ import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { useAuth } from "@/hooks/use-auth";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { WebOnlyGuard } from "@/app/platform/guards/WebOnlyGuard";
+import { useIsNativeTablet } from "@/native/tablet/useIsNativeTablet";
 
 const CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
@@ -19,6 +20,7 @@ const TermsOfUsePage = lazy(() => import("@/pages/terms-of-use"));
 const SupportPage = lazy(() => import("@/pages/support"));
 const EquipmentPage = lazy(() => import("@/pages/equipment-list"));
 const EquipmentDetailPage = lazy(() => import("@/pages/equipment-detail"));
+const EquipmentMasterDetail = lazy(() => import("@/features/equipment/tablet/EquipmentMasterDetail"));
 const NewEquipmentPage = lazy(() => import("@/pages/new-equipment"));
 const AlertsPage = lazy(() => import("@/pages/alerts"));
 const MyEquipmentPage = lazy(() => import("@/pages/my-equipment"));
@@ -83,6 +85,9 @@ function RootRoute() {
 }
 
 export function AppRoutes() {
+  // iPad (native tablet) uses combined `/base/:id?` routes so the master list
+  // stays mounted while the detail pane swaps; phone/web keep separate routes.
+  const isNativeTablet = useIsNativeTablet();
   return (
     <PageErrorBoundary fallbackLabel="Page rendering failed">
       <Switch>
@@ -99,13 +104,16 @@ export function AppRoutes() {
         <Route path="/home"><AuthGuard><HomePage /></AuthGuard></Route>
 
         {/* --- Equipment & board (canonical: /equipment, /equipment/tasks, /equipment/board) --- */}
-        <Route path="/equipment"><AuthGuard><EquipmentPage /></AuthGuard></Route>
+        {/* iPad: single combined route (below, after the reserved siblings) keeps the list mounted. */}
+        {!isNativeTablet && <Route path="/equipment"><AuthGuard><EquipmentPage /></AuthGuard></Route>}
         <Route path="/equipment/new"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/tasks"><AuthGuard><AppointmentsPage /></AuthGuard></Route>
         <Route path="/equipment/board"><AuthGuard><WebOnlyGuard fallback="/my-equipment"><WardDisplayPage /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/equipment/:id/edit"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/:id/qr"><AuthGuard><WebOnlyGuard><EquipmentQrPrintPage /></WebOnlyGuard></AuthGuard></Route>
-        <Route path="/equipment/:id"><AuthGuard><EquipmentDetailPage /></AuthGuard></Route>
+        {isNativeTablet
+          ? <Route path="/equipment/:id?"><AuthGuard><EquipmentMasterDetail /></AuthGuard></Route>
+          : <Route path="/equipment/:id"><AuthGuard><EquipmentDetailPage /></AuthGuard></Route>}
         {/* Legacy aliases → canonicals */}
         <Route path="/appointments"><Redirect to="/equipment/tasks" replace /></Route>
         <Route path="/equipment-tasks"><Redirect to="/equipment/tasks" replace /></Route>

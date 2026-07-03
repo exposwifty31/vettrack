@@ -4,6 +4,8 @@
   },
   "common": {
     "appName": "VetTrack",
+    "selectItemTitle": "בחר פריט",
+    "selectItemSubtitle": "בחר מהרשימה כדי לראות כאן פרטים",
     "save": "שמור",
     "cancel": "ביטול",
     "delete": "מחק",

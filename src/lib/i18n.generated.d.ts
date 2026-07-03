@@ -7,6 +7,8 @@
 export interface TStructure {
   common: {
     appName: string;
+    selectItemTitle: string;
+    selectItemSubtitle: string;
     save: string;
     cancel: string;
     delete: string;
