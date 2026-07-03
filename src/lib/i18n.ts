@@ -334,6 +334,12 @@ const translations = {
         low: d.equipmentDetail.locationCard.confidence.low,
         unknown: d.equipmentDetail.locationCard.confidence.unknown,
       },
+      reasoning: {
+        checkedOut: (email: string) => tr(d.equipmentDetail.locationCard.reasoning.checkedOut, { email }),
+        rfid: (room: string) => tr(d.equipmentDetail.locationCard.reasoning.rfid, { room }),
+        lastKnown: (room: string) => tr(d.equipmentDetail.locationCard.reasoning.lastKnown, { room }),
+        none: d.equipmentDetail.locationCard.reasoning.none,
+      },
     },
     accountability: {
       title: d.equipmentDetail.accountability.title,

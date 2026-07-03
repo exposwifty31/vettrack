@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, request, ApiError } from "@/lib/api";
 import type { Equipment } from "@/types";
+import { t } from "@/lib/i18n";
 
 export type LocationConfidence = "high" | "medium" | "low" | "unknown";
 export type SignalSource = "checkout" | "dock" | "scan" | "rfid" | "none";
@@ -30,7 +31,7 @@ function fallbackInference(equipment: Equipment): LocationInference {
         currentRoom: equipment.checkedOutLocation ?? null,
       },
       lastConfirmedAt: equipment.checkedOutAt ?? null,
-      reasoning: `Checked out by ${equipment.checkedOutByEmail}`,
+      reasoning: t.equipmentDetail.locationCard.reasoning.checkedOut(equipment.checkedOutByEmail),
     };
   }
   if (equipment.lastRfidRoomName) {
@@ -40,7 +41,7 @@ function fallbackInference(equipment: Equipment): LocationInference {
       signalSource: "rfid",
       accountablePerson: null,
       lastConfirmedAt: equipment.lastRfidSeenAt ?? null,
-      reasoning: `Last seen at ${equipment.lastRfidRoomName} (passive RFID)`,
+      reasoning: t.equipmentDetail.locationCard.reasoning.rfid(equipment.lastRfidRoomName),
     };
   }
   if (equipment.roomName) {
@@ -50,7 +51,7 @@ function fallbackInference(equipment: Equipment): LocationInference {
       signalSource: "none",
       accountablePerson: null,
       lastConfirmedAt: null,
-      reasoning: `Last known location: ${equipment.roomName}`,
+      reasoning: t.equipmentDetail.locationCard.reasoning.lastKnown(equipment.roomName),
     };
   }
   return {
@@ -59,7 +60,7 @@ function fallbackInference(equipment: Equipment): LocationInference {
     signalSource: "none",
     accountablePerson: null,
     lastConfirmedAt: null,
-    reasoning: "No location signal available",
+    reasoning: t.equipmentDetail.locationCard.reasoning.none,
   };
 }
 

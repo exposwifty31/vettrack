@@ -548,6 +548,12 @@ export interface TStructure {
         low: string;
         unknown: string;
       };
+      reasoning: {
+        checkedOut: string;
+        rfid: string;
+        lastKnown: string;
+        none: string;
+      };
     };
     accountability: {
       title: string;

@@ -1,7 +1,7 @@
 // src/pages/code-blue.tsx
 import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
-import { AlertTriangle, ArrowRight, Package, Shield, StickyNote } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, Circle, Package, Shield, StickyNote } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { authFetch } from "@/lib/auth-fetch";
@@ -159,6 +159,7 @@ function PreCheckGate({
             <button
               key={item.key}
               type="button"
+              aria-pressed={checked[item.key]}
               onClick={() => toggle(item.key)}
               className={cn(
                 "flex items-center gap-3 p-2 min-h-[44px] rounded border text-sm transition-colors",
@@ -168,7 +169,9 @@ function PreCheckGate({
                   : "border-emergency-border bg-emergency-border text-emergency-text",
               )}
             >
-              <span className={cn("h-4 w-4 rounded-full border-2 shrink-0", checked[item.key] ? "border-[rgb(var(--sys-green))] bg-[rgb(var(--sys-green))]" : "border-emergency-text2/60")} />
+              {checked[item.key]
+                ? <CheckCircle2 className="h-5 w-5 text-[rgb(var(--sys-green))] shrink-0" aria-hidden />
+                : <Circle className="h-5 w-5 text-emergency-text2/60 shrink-0" aria-hidden />}
               <span className="flex-1 min-w-0 [writing-mode:horizontal-tb]">{item.label}</span>
             </button>
           ))}

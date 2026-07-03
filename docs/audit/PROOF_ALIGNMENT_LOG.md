@@ -926,3 +926,18 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Verification ceiling:** gate + unit; device pass owed. Admin + restock two-panes intentionally deferred (documented, direct-inspection rationale).
 
 **Verdict:** Phase 3.3 — Rooms DONE at gate + unit; 3.4 Admin deferred (documented). Phase 3 (iPad master-detail) delivers Equipment + Inventory-catalog + Rooms two-panes; device pass owed for all.
+
+## 2026-07-03 — UX overhaul Phase 6a/6b/6d/6e: cleanups
+
+**Claim:** Four independent review cleanups, all gate + unit verified.
+
+**Evidence:**
+- **6a — untranslated location-card strings:** the four English `reasoning` literals in `use-equipment-detail.ts` (three interpolated `${email}`/`${room}`, one static) now use new `equipmentDetail.locationCard.reasoning.{checkedOut,rfid,lastKnown,none}` keys — both locales, hand-listed accessor in `i18n.ts`, types regenerated. `EquipmentLocationCard` renders localized copy on the Hebrew UI.
+- **6b — Code Blue checkbox semantics:** the pre-check items (`code-blue.tsx` `QUICK_CHECK_ITEMS`) swap the decorative radio-circle `<span>` for the crash-cart affordance (`CheckCircle2`/`Circle`) + `aria-pressed` on each toggle button. Pass/fail (`passed`) semantics and `handleStart` gating unchanged — frozen Code Blue runtime respected.
+- **6d — header touch targets:** `NativeHeader` bumped 44→48px (nav-bar height, wordmark zone, `iconBtn`, and the dependent dropdown-panel offset 46→50px), matching the VetTrack 48px convention already used by `MobilePageHeader`'s back button + the panel rows.
+- **6e — Rooms grid spacing:** wired the orphaned `--content-gap` (responsive 16/24/32) as the grid gutter and `--inline-margin` as the page's outer padding (the wrapper had NO horizontal padding → the grid touched screen edges), and trimmed `RoomCard` `p-4`→`p-3` — fixing the inside-vs-between imbalance the review flagged.
+- **`pnpm typecheck`** → exit 0. **`pnpm i18n:check`** parity ✓. **`pnpm test`** → 386 files / 3811 pass.
+
+**Verification ceiling:** gate + unit. The visual results (localized location card, Code Blue checkbox, 48px header, Rooms spacing) want a device/screenshot pass — part of the owed consolidated device verification.
+
+**Verdict:** Phase 6a/6b/6d/6e — DONE at gate + unit; visual/device pass owed.

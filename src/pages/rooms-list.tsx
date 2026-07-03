@@ -124,7 +124,7 @@ function RoomCard({ room }: { room: Room }) {
   return (
     <Link href={`/rooms/${room.id}`}>
       <Card className="bg-card border-border/60 shadow-sm hover:shadow-md motion-safe:active:scale-[0.98] transition-all cursor-pointer h-full">
-        <CardContent className="p-4 flex flex-col gap-3">
+        <CardContent className="p-3 flex flex-col gap-3">
           {/* Top row: health ring + sync badge */}
           <div className="flex items-start justify-between gap-1">
             <HealthRing total={total} recentlyVerified={recentlyVerified} />
@@ -266,7 +266,7 @@ export default function RoomsListPage({ singleColumn = false }: { singleColumn?:
         <meta name="description" content="Room-by-room equipment inventory. Verify all items in a room with one tap." />
       </Helmet>
 
-      <div className="flex flex-col gap-5 pb-20 animate-fade-in">
+      <div className="flex flex-col gap-5 pb-20 animate-fade-in" style={{ paddingInline: "var(--inline-margin)" }}>
         {/* Header */}
         <div className="flex items-start justify-between pt-1 gap-3">
           <div>
@@ -358,7 +358,7 @@ export default function RoomsListPage({ singleColumn = false }: { singleColumn?:
               <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
               {t.common.loading}
             </p>
-            <div className={`grid gap-3 ${singleColumn ? "grid-cols-1" : "grid-cols-2"}`}>
+            <div className={`grid ${singleColumn ? "grid-cols-1" : "grid-cols-2"}`} style={{ gap: "var(--content-gap)" }}>
               {[...Array(4)].map((_, i) => (
                 <RoomCardSkeleton key={i} />
               ))}
@@ -385,7 +385,7 @@ export default function RoomsListPage({ singleColumn = false }: { singleColumn?:
             }
           />
         ) : filteredRooms && filteredRooms.length > 0 ? (
-          <div className={`grid gap-3 ${singleColumn ? "grid-cols-1" : "grid-cols-2"}`} style={{ minHeight: 240 }}>
+          <div className={`grid ${singleColumn ? "grid-cols-1" : "grid-cols-2"}`} style={{ gap: "var(--content-gap)", minHeight: 240 }}>
             {filteredRooms.map((room) => (
               <RoomCard key={room.id} room={room} />
             ))}

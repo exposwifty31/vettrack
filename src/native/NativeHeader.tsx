@@ -93,8 +93,8 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
     <>
       <header
         style={{
-          // Total height = status bar + 44px nav bar (tablet: shell owns the inset → just 44px)
-          height: ownSafeArea ? "calc(44px + env(safe-area-inset-top))" : 44,
+          // Total height = status bar + 48px nav bar (tablet: shell owns the inset → just 48px)
+          height: ownSafeArea ? "calc(48px + env(safe-area-inset-top))" : 48,
           // Push flex children below the status bar
           paddingTop: ownSafeArea ? "env(safe-area-inset-top)" : 0,
           paddingInline: 12,
@@ -118,7 +118,7 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
           <EquipmentSearchButton />
         )}
 
-        {/* CENTER: VetTrack wordmark — absolutely positioned in the 44px content zone */}
+        {/* CENTER: VetTrack wordmark — absolutely positioned in the 48px content zone */}
         {/* dir="ltr" forces LTR inline ordering — without it, RTL bidi reorders
             the "Vet" text node and <span>Track</span> to visually appear as "TrackVet". */}
         {showWordmark && (
@@ -127,7 +127,7 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
             style={{
               position: "absolute",
               top: "env(safe-area-inset-top)",
-              height: 44,
+              height: 48,
               left: "50%",
               transform: "translateX(-50%)",
               display: "flex",
@@ -413,9 +413,9 @@ function MiniSwitch({ on }: { on: boolean }) {
 }
 
 const iconBtn: React.CSSProperties = {
-  // 44px hit area (iOS HIG floor) inside the 44px nav bar; glyphs stay 20px.
-  width: 44,
-  height: 44,
+  // 48px hit area (VetTrack convention, above the 44pt iOS HIG floor); glyphs stay 20px.
+  width: 48,
+  height: 48,
   border: "none",
   background: "transparent",
   borderRadius: 10,
@@ -434,7 +434,7 @@ const backdropStyle: React.CSSProperties = {
 
 const panelStyle: React.CSSProperties = {
   position: "fixed",
-  top: "calc(env(safe-area-inset-top) + 46px)",
+  top: "calc(env(safe-area-inset-top) + 50px)",
   insetInlineEnd: 12,
   zIndex: 61,
   width: 300,

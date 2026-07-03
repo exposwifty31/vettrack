@@ -544,6 +544,12 @@
         "medium": "Medium confidence",
         "low": "Low confidence",
         "unknown": "Unknown"
+      },
+      "reasoning": {
+        "checkedOut": "Checked out by {email}",
+        "rfid": "Last seen at {room} (passive RFID)",
+        "lastKnown": "Last known location: {room}",
+        "none": "No location signal available"
       }
     },
     "accountability": {

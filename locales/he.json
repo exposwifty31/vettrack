@@ -544,6 +544,12 @@
         "medium": "ביטחון בינוני",
         "low": "ביטחון נמוך",
         "unknown": "לא ידוע"
+      },
+      "reasoning": {
+        "checkedOut": "נלקח על ידי {email}",
+        "rfid": "נראה לאחרונה ב-{room} (RFID פסיבי)",
+        "lastKnown": "מיקום ידוע אחרון: {room}",
+        "none": "אין אות מיקום זמין"
       }
     },
     "accountability": {
