@@ -912,3 +912,17 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Verification ceiling:** gate + unit; on-device two-pane pass owed (consolidated Phase-3 device pass). Restock two-pane intentionally NOT implemented — documented scope adjustment based on the page's workflow-specific layout.
 
 **Verdict:** Phase 3.2 — catalog DONE at gate + unit; restock two-pane deferred (documented); device pass owed.
+
+## 2026-07-03 — UX overhaul Phase 3.3 + 3.4: Rooms two-pane (iPad); Admin two-pane deferred
+
+**Claim:** Wired Rooms (`/rooms/:id?` + `/locations/:id?`) as an iPad two-pane (single-column master list + room-radar detail). Admin two-pane is DEFERRED — its inline per-tab-badge tab bar + horizontal `border-b-2` tab styling need a vertical-rail restyle that's disproportionate surgery on an admin-only screen, and its content already expands to `lg:max-w-[1120px]` so the "wide empty middle" is a row-layout issue a width tweak wouldn't fix.
+
+**Evidence (gate + unit):**
+- New `src/features/rooms/tablet/RoomsMasterDetail.tsx` — master = `RoomsListPage singleColumn`, detail = `RoomRadarPage` (reads shared `:id`; back → `/rooms` = placeholder), placeholder when no id.
+- `rooms-list.tsx`: added optional `singleColumn?: boolean` prop (`grid-cols-2`→`grid-cols-1` in the narrow master pane; defaults false → phone/web unchanged).
+- `routes.tsx`: native-tablet → `/rooms/:id?` + `/locations/:id?` → `RoomsMasterDetail`; else the original list + detail routes for both aliases.
+- `pnpm typecheck` → exit 0. `pnpm test` → 386 files / 3811 pass.
+
+**Verification ceiling:** gate + unit; device pass owed. Admin + restock two-panes intentionally deferred (documented, direct-inspection rationale).
+
+**Verdict:** Phase 3.3 — Rooms DONE at gate + unit; 3.4 Admin deferred (documented). Phase 3 (iPad master-detail) delivers Equipment + Inventory-catalog + Rooms two-panes; device pass owed for all.

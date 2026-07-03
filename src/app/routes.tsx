@@ -26,6 +26,7 @@ const AlertsPage = lazy(() => import("@/pages/alerts"));
 const MyEquipmentPage = lazy(() => import("@/pages/my-equipment"));
 const RoomsListPage = lazy(() => import("@/pages/rooms-list"));
 const RoomRadarPage = lazy(() => import("@/pages/room-radar"));
+const RoomsMasterDetail = lazy(() => import("@/features/rooms/tablet/RoomsMasterDetail"));
 const QrPrintPage = lazy(() => import("@/pages/qr-print"));
 const EquipmentQrPrintPage = lazy(() => import("@/pages/equipment-qr-print"));
 const AdminPage = lazy(() => import("@/pages/admin"));
@@ -127,10 +128,12 @@ export function AppRoutes() {
         <Route path="/alerts"><AuthGuard><AlertsPage /></AuthGuard></Route>
         <Route path="/my-equipment"><AuthGuard><MyEquipmentPage /></AuthGuard></Route>
         <Route path="/my-profile"><AuthGuard><MyProfilePage /></AuthGuard></Route>
-        <Route path="/rooms"><AuthGuard><RoomsListPage /></AuthGuard></Route>
-        <Route path="/rooms/:id"><AuthGuard><RoomRadarPage /></AuthGuard></Route>
-        <Route path="/locations"><AuthGuard><RoomsListPage /></AuthGuard></Route>
-        <Route path="/locations/:id"><AuthGuard><RoomRadarPage /></AuthGuard></Route>
+        {isNativeTablet && <Route path="/rooms/:id?"><AuthGuard><RoomsMasterDetail /></AuthGuard></Route>}
+        {!isNativeTablet && <Route path="/rooms"><AuthGuard><RoomsListPage /></AuthGuard></Route>}
+        {!isNativeTablet && <Route path="/rooms/:id"><AuthGuard><RoomRadarPage /></AuthGuard></Route>}
+        {isNativeTablet && <Route path="/locations/:id?"><AuthGuard><RoomsMasterDetail /></AuthGuard></Route>}
+        {!isNativeTablet && <Route path="/locations"><AuthGuard><RoomsListPage /></AuthGuard></Route>}
+        {!isNativeTablet && <Route path="/locations/:id"><AuthGuard><RoomRadarPage /></AuthGuard></Route>}
         <Route path="/print"><AuthGuard><WebOnlyGuard><QrPrintPage /></WebOnlyGuard></AuthGuard></Route>
 
         {/* --- Emergency & safety --- */}

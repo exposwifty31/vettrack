@@ -201,7 +201,7 @@ function inferZone(room: Room): Zone {
   return "other";
 }
 
-export default function RoomsListPage() {
+export default function RoomsListPage({ singleColumn = false }: { singleColumn?: boolean } = {}) {
   const { isAdmin, userId } = useAuth();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
@@ -358,7 +358,7 @@ export default function RoomsListPage() {
               <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
               {t.common.loading}
             </p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className={`grid gap-3 ${singleColumn ? "grid-cols-1" : "grid-cols-2"}`}>
               {[...Array(4)].map((_, i) => (
                 <RoomCardSkeleton key={i} />
               ))}
@@ -385,7 +385,7 @@ export default function RoomsListPage() {
             }
           />
         ) : filteredRooms && filteredRooms.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3" style={{ minHeight: 240 }}>
+          <div className={`grid gap-3 ${singleColumn ? "grid-cols-1" : "grid-cols-2"}`} style={{ minHeight: 240 }}>
             {filteredRooms.map((room) => (
               <RoomCard key={room.id} room={room} />
             ))}
