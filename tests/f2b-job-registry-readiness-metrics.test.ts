@@ -28,10 +28,6 @@ vi.mock("../server/workers/chargeAlertWorker.js", async (importOriginal) => {
   };
 });
 
-vi.mock("../server/workers/inventory-deduction.worker.js", () => ({
-  processInventoryDeductionJob: vi.fn(),
-}));
-
 vi.mock("../server/workers/expiryCheckWorker.js", async (importOriginal) => {
   const mod = await importOriginal<typeof import("../server/workers/expiryCheckWorker.js")>();
   return { ...mod, runExpiryCheckWorker: vi.fn() };

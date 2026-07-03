@@ -188,10 +188,9 @@ const mockWorkerOn = vi.fn();
 const mockWorkerClose = vi.fn().mockResolvedValue(undefined);
 const mockConnectionQuit = vi.fn().mockResolvedValue(undefined);
 
-const { mockWorkerCtor, mockQueueCtor, mockProcessInventory, mockBindQueue } = vi.hoisted(() => ({
+const { mockWorkerCtor, mockQueueCtor, mockBindQueue } = vi.hoisted(() => ({
   mockWorkerCtor: vi.fn(),
   mockQueueCtor: vi.fn(),
-  mockProcessInventory: vi.fn().mockResolvedValue(undefined),
   mockBindQueue: vi.fn(),
 }));
 
@@ -217,14 +216,6 @@ vi.mock("../server/lib/redis.js", () => ({
   createRedisConnection: vi.fn(),
   getRedisUrl: vi.fn().mockReturnValue("redis://127.0.0.1:6379"),
 }));
-
-vi.mock("../server/workers/inventory-deduction.worker.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../server/workers/inventory-deduction.worker.js")>();
-  return {
-    ...actual,
-    processInventoryDeductionJob: mockProcessInventory,
-  };
-});
 
 vi.mock("../server/workers/chargeAlertWorker.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../server/workers/chargeAlertWorker.js")>();
@@ -342,14 +333,5 @@ describe("F1b-1 — legacy_worker_starter_used counter", () => {
     ).toHaveLength(1);
     expect(getMetricsSnapshot().jobRegistry.legacyWorkerStarterUsed).toBe(1);
     incSpy.mockRestore();
-  });
-
-  it("does not increment legacy_worker_starter_used for disabled inventory starter", async () => {
-    const { startInventoryDeductionWorker } = await import(
-      "../server/workers/inventory-deduction.worker.js"
-    );
-    await startInventoryDeductionWorker();
-
-    expect(getMetricsSnapshot().jobRegistry.legacyWorkerStarterUsed).toBe(0);
   });
 });

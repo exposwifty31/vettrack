@@ -34,11 +34,6 @@ const validationSource = fs.readFileSync(
   "utf8",
 );
 
-const workerSource = fs.readFileSync(
-  path.resolve(__dirname, "../server/workers/inventory-deduction.worker.ts"),
-  "utf8",
-);
-
 const appointmentsServiceSource = fs.readFileSync(
   path.resolve(__dirname, "../server/services/appointments.service.ts"),
   "utf8",
@@ -106,12 +101,6 @@ describe("Query site — dispense-order-validation.ts", () => {
   it("does not query medication appointments for orphan checks", () => {
     expect(validationSource).not.toContain("appointments.containerId");
     expect(validationSource).toContain("return { orphanLines: [] }");
-  });
-});
-
-describe("Query site — inventory-deduction.worker.ts", () => {
-  it("does not load appointment containerId for medication deduction", () => {
-    expect(workerSource).not.toContain("containerId: appointments.containerId");
   });
 });
 

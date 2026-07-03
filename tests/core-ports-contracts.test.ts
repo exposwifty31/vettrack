@@ -3,8 +3,6 @@ import type {
   IHapticsProvider,
   INfcProvider,
   IDeepLinkProvider,
-  IEquipmentCache,
-  ISyncQueue,
 } from "../src/core/ports";
 
 function hasMethod(obj: object, name: string): boolean {
@@ -75,59 +73,5 @@ describe("IDeepLinkProvider contract", () => {
     const { deepLink } = await import("../src/infrastructure/platform/DeepLinkAdapter");
     const cleanup = deepLink.onOpen(vi.fn());
     expect(typeof cleanup).toBe("function");
-  });
-});
-
-describe("IEquipmentCache contract", () => {
-  beforeEach(() => vi.resetModules());
-
-  it("EquipmentCacheAdapter satisfies the interface", async () => {
-    vi.doMock("../src/lib/offline-db", () => ({
-      getCachedEquipment: vi.fn().mockResolvedValue([]),
-      getCachedEquipmentById: vi.fn().mockResolvedValue(undefined),
-      cacheEquipment: vi.fn().mockResolvedValue(undefined),
-    }));
-    const { equipmentCache } = await import("../src/infrastructure/db/EquipmentCacheAdapter");
-    const adapter = equipmentCache as IEquipmentCache;
-    expect(hasMethod(adapter, "getAll")).toBe(true);
-    expect(hasMethod(adapter, "getById")).toBe(true);
-    expect(hasMethod(adapter, "upsertMany")).toBe(true);
-  });
-
-  it("getAll rejects when the underlying store throws", async () => {
-    vi.doMock("../src/lib/offline-db", () => ({
-      getCachedEquipment: vi.fn().mockRejectedValue(new Error("IndexedDB unavailable")),
-      getCachedEquipmentById: vi.fn(),
-      cacheEquipment: vi.fn(),
-    }));
-    const { equipmentCache } = await import("../src/infrastructure/db/EquipmentCacheAdapter");
-    await expect(equipmentCache.getAll()).rejects.toThrow("IndexedDB unavailable");
-  });
-});
-
-describe("ISyncQueue contract", () => {
-  beforeEach(() => vi.resetModules());
-
-  it("SyncQueueAdapter satisfies the interface", async () => {
-    vi.doMock("../src/lib/offline-db", () => ({
-      getPendingSync: vi.fn().mockResolvedValue([]),
-      getPendingCount: vi.fn().mockResolvedValue(0),
-      getFailedCount: vi.fn().mockResolvedValue(0),
-    }));
-    const { syncQueue } = await import("../src/infrastructure/db/SyncQueueAdapter");
-    const adapter = syncQueue as ISyncQueue;
-    expect(hasMethod(adapter, "getPending")).toBe(true);
-    expect(hasMethod(adapter, "pendingCount")).toBe(true);
-    expect(hasMethod(adapter, "failedCount")).toBe(true);
-  });
-
-  it("getPending rejects when the underlying store throws", async () => {
-    vi.doMock("../src/lib/offline-db", () => ({
-      getPendingSync: vi.fn().mockRejectedValue(new Error("IndexedDB unavailable")),
-      getPendingCount: vi.fn(),
-      getFailedCount: vi.fn(),
-    }));
-    const { syncQueue } = await import("../src/infrastructure/db/SyncQueueAdapter");
-    await expect(syncQueue.getPending()).rejects.toThrow("IndexedDB unavailable");
   });
 });
