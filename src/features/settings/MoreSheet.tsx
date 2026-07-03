@@ -1,16 +1,11 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import {
-  LogOut, User,
-  Bell, MapPin, Settings, Clock,
-  Home, Package, ListTodo, ShieldCheck, ShoppingCart,
-  Box,
-} from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
 import { useIsTabletViewport } from "@/lib/use-tablet-viewport";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
+import { getNativeNavSections } from "@/lib/routes/native-nav-model";
 
 type Props = {
   open: boolean;
@@ -66,6 +61,16 @@ export function MoreSheet({ open, onClose }: Props) {
 
   if (!open) return null;
 
+  // Phone drawer: the bottom tab bar already carries `inPhoneTabBar` items
+  // (Today / Equipment / Scan / Emergency), so hide them here to avoid duplicates.
+  const sections = getNativeNavSections()
+    .filter((section) => !section.adminOnly || isAdmin)
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.inPhoneTabBar),
+    }))
+    .filter((section) => section.items.length > 0);
+
   return (
     <>
       <div
@@ -118,56 +123,24 @@ export function MoreSheet({ open, onClose }: Props) {
           <div aria-hidden style={{ width: 32, height: 4, borderRadius: 2, background: "hsl(var(--muted))" }} />
         </div>
 
-        {/* Operations */}
-        <div style={{ paddingInline: 16, paddingTop: 12, paddingBottom: 4 }}>
-          <p style={{ fontSize: "var(--text-2xs)", fontWeight: 600, color: "hsl(var(--muted-foreground))", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
-            {t.nav.operationsSection}
-          </p>
-        </div>
-        <SettingRow icon={<Home         size={20} />} label={t.nav.today}             onClick={() => go("/home")} />
-        <SettingRow icon={<Package      size={20} />} label={t.nav.equipment}         onClick={() => go("/equipment")} />
-        <SettingRow icon={<ListTodo     size={20} />} label={t.nav.equipmentTasks}    onClick={() => go("/equipment/tasks")} />
-        <SettingRow icon={<ShieldCheck  size={20} />} label={t.nav.criticalKitCheck}  onClick={() => go("/crash-cart")} />
-        <SettingRow icon={<MapPin       size={20} />} label={t.nav.rooms}             onClick={() => go("/rooms")} />
-        <SettingRow icon={<User         size={20} />} label={t.nav.mine}              onClick={() => go("/my-equipment")} />
-        <SettingRow icon={<Bell         size={20} />} label={t.nav.alerts}            onClick={() => go("/alerts")} />
-        <SettingRow icon={<ShoppingCart size={20} />} label={t.nav.inventory}         onClick={() => go("/inventory")} />
-
-        <div style={{ height: 1, background: "hsl(var(--border))", marginBlock: 8, marginInline: 20 }} />
-
-        {/* Management — shown only for admins */}
-        {isAdmin && (
-          <>
-            <div style={{ paddingInline: 16, paddingTop: 4, paddingBottom: 4 }}>
-              <p style={{ fontSize: "var(--text-2xs)", fontWeight: 600, color: "hsl(var(--muted-foreground))", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
-                {t.nav.managementSection}
-              </p>
-            </div>
-            <SettingRow icon={<Box         size={20} />} label={t.nav.inventoryItems}  onClick={() => go("/inventory-items")} />
-            <SettingRow icon={<Settings    size={20} />} label={t.nav.admin}           onClick={() => go("/admin")} />
-            <SettingRow icon={<Clock       size={20} />} label={t.nav.adminShifts}     onClick={() => go("/admin/shifts")} />
-            <div style={{ height: 1, background: "hsl(var(--border))", marginBlock: 8, marginInline: 20 }} />
-          </>
-        )}
-
-        {/* Account */}
-        <div style={{ paddingInline: 16, paddingTop: 4, paddingBottom: 4 }}>
-          <p style={{ fontSize: "var(--text-2xs)", fontWeight: 600, color: "hsl(var(--muted-foreground))", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
-            {t.more.account}
-          </p>
-        </div>
-        <SettingRow icon={<User size={20} />} label={t.more.profile} onClick={() => go("/my-profile")} />
-        <SettingRow icon={<Settings size={20} />} label={t.more.settings} onClick={() => go("/settings")} />
-
-        <div style={{ height: 1, background: "hsl(var(--border))", marginBlock: 8, marginInline: 20 }} />
-
-        {/* Session */}
-        <div style={{ paddingInline: 16, paddingTop: 4, paddingBottom: 4 }}>
-          <p style={{ fontSize: "var(--text-2xs)", fontWeight: 600, color: "hsl(var(--muted-foreground))", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
-            {t.more.session}
-          </p>
-        </div>
-        <SettingRow icon={<LogOut size={20} />} label={t.more.endShift} destructive onClick={() => go("/handoff")} />
+        {sections.map((section, idx) => (
+          <div key={section.id}>
+            {idx > 0 && <Divider />}
+            <SectionHeader label={section.label} />
+            {section.items.map((item) => {
+              const Icon = item.Icon;
+              return (
+                <SettingRow
+                  key={item.id}
+                  icon={<Icon size={20} />}
+                  label={item.label}
+                  destructive={item.destructive}
+                  onClick={() => go(item.href)}
+                />
+              );
+            })}
+          </div>
+        ))}
       </div>
     </>
   );

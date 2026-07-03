@@ -5,4 +5,3 @@ export {
   useNativeShellContext as useMobileShellContext,
 } from "@/native/NativeShellContext";
 export { NativeTabBar as MobileTabBar } from "@/native/NativeTabBar";
-export { ScanFab } from "@/native/ScanFab";

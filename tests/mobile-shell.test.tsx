@@ -25,23 +25,43 @@ import { MobileTabBar } from "@/shell/mobile/MobileTabBar";
 import { NativeTabSidebar } from "@/native/NativeTabSidebar";
 import { AppShell } from "@/components/layout/AppShell";
 import { isTabActive as tabBarIsActive } from "@/native/NativeTabBar";
-import { isTabActive as sidebarIsActive } from "@/native/NativeTabSidebar";
+import { isNavItemActive } from "@/lib/routes/native-nav-model";
 
 vi.mock("@/lib/i18n", () => ({
   t: {
     nav: {
       today: "Today",
       equipment: "Equipment",
-      mine: "My equipment",
-      emergency: "Emergency",
-      menu: "Menu",
       equipmentScan: "Scan",
+      emergency: "Emergency",
+      equipmentTasks: "Tasks",
+      criticalKitCheck: "Critical kit check",
+      rooms: "Rooms",
+      mine: "My equipment",
+      alerts: "Alerts",
+      inventory: "Inventory",
+      inventoryItems: "Inventory items",
+      admin: "Admin",
+      adminShifts: "Shifts",
+      operationsSection: "Operations",
+      managementSection: "Management",
+      menu: "Menu",
       tabBar: "Tab navigation",
+    },
+    more: {
+      title: "More",
+      account: "Account",
+      profile: "Profile",
+      settings: "Settings",
+      session: "Session",
+      endShift: "End shift",
     },
     common: { openNavigationMenu: "Open navigation menu" },
   },
   getStoredLocale: () => "he",
 }));
+
+vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ isAdmin: true }) }));
 
 vi.mock("@/hooks/use-is-desktop", () => ({ useIsDesktop: () => false }));
 vi.mock("@/lib/capacitor-runtime", () => ({
@@ -127,8 +147,8 @@ describe("AppShell inside MobileShell", () => {
 // independent of wouter render-time location resolution).
 describe.each([
   ["NativeTabBar", tabBarIsActive],
-  ["NativeTabSidebar", sidebarIsActive],
-])("%s isTabActive", (_name, isTabActive) => {
+  ["NativeTabSidebar", (loc, href) => isNavItemActive(loc, href, [href])],
+])("%s active-state", (_name, isTabActive) => {
   it("marks the Today tab (/home) active at /home and at root /", () => {
     expect(isTabActive("/home", "/home")).toBe(true);
     expect(isTabActive("/", "/home")).toBe(true);
@@ -166,7 +186,7 @@ describe("tab-bar rendering", () => {
   });
 
   it("NativeTabSidebar renders the tab navigation landmark", () => {
-    renderAt("/home", <NativeTabSidebar onMorePress={() => {}} />);
+    renderAt("/home", <NativeTabSidebar />);
     expect(screen.getByRole("navigation", { name: "Tab navigation" })).toBeTruthy();
   });
 });

@@ -14,8 +14,8 @@ describe("scanAffordance — the single scan-surface gate", () => {
     expect(scanAffordance({ isNative: true, isTablet: false })).toBe("tab");
   });
 
-  it("native tablet → fab", () => {
-    expect(scanAffordance({ isNative: true, isTablet: true })).toBe("fab");
+  it("native tablet → none (Scan is a first-class sidebar nav item, not a float)", () => {
+    expect(scanAffordance({ isNative: true, isTablet: true })).toBe("none");
   });
 
   it("web never shows scan UI regardless of viewport", () => {
@@ -23,8 +23,8 @@ describe("scanAffordance — the single scan-surface gate", () => {
     expect(scanAffordance({ isNative: false, isTablet: true })).toBe("none");
   });
 
-  it("native always shows a scan surface (never none)", () => {
-    expect(scanAffordance({ isNative: true, isTablet: false })).not.toBe("none");
-    expect(scanAffordance({ isNative: true, isTablet: true })).not.toBe("none");
+  it("the retired fab affordance is never returned", () => {
+    expect(scanAffordance({ isNative: true, isTablet: false })).not.toBe("fab");
+    expect(scanAffordance({ isNative: true, isTablet: true })).not.toBe("fab");
   });
 });

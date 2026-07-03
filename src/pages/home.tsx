@@ -236,9 +236,9 @@ export default function HomePage() {
 
   const showChips = heroState === "active";
   // BUG-005 / BUG-016: the Today scan card is redundant wherever a persistent
-  // scan affordance exists (the flat scan tab on iPhone) and is disallowed on
-  // web entirely. It survives only on iPad, where the platform gate resolves to
-  // "fab" — the one place a prominent Today scan CTA is not a duplicate.
+  // scan affordance exists. Scan now lives as a flat tab (iPhone) and a sidebar
+  // nav item (iPad), so `scanAffordance` never resolves to "fab" and this gated
+  // card renders on no device — the Stage-3 source contract keeps the gate.
   const showScanCard = heroState !== "loading" && scanAffordance === "fab";
   const showScanSkeleton = heroState === "loading" && scanAffordance === "fab";
   const showRecent = isDesktop && heroState === "active";

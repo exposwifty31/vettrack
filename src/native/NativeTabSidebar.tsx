@@ -1,43 +1,30 @@
 import { useLocation } from "wouter";
-import { Home, Package, Activity, AlignJustify } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { ScanFab } from "./ScanFab";
-
-type Props = {
-  onMorePress: () => void;
-};
-
-type NavItem = {
-  id: string;
-  href: string;
-  label: string;
-  icon: React.ReactNode;
-  onClick?: () => void;
-};
-
-export function isTabActive(location: string, href: string): boolean {
-  const path = href.split("?")[0];
-  if (path === "/home") return location === "/home" || location === "/";
-  // Equipment tab covers the browse list and its detail/scan sub-routes, plus
-  // the personal "My equipment" view (same equipment surface, menu-reachable).
-  if (path === "/equipment") {
-    if (location.startsWith("/equipment/tasks")) return false;
-    return location.startsWith("/equipment") || location.startsWith("/my-equipment");
-  }
-  return location.startsWith(path);
-}
+import { useAuth } from "@/hooks/use-auth";
+import {
+  getNativeNavSections,
+  isNavItemActive,
+  type NativeNavItem,
+} from "@/lib/routes/native-nav-model";
 
 function SidebarButton({
   label,
   icon,
   active,
+  destructive,
   onClick,
 }: {
   label: string;
   icon: React.ReactNode;
   active: boolean;
+  destructive?: boolean;
   onClick: () => void;
 }) {
+  const color = destructive
+    ? "hsl(var(--destructive))"
+    : active
+      ? "hsl(var(--primary))"
+      : "hsl(var(--muted-foreground))";
   return (
     <button
       type="button"
@@ -54,7 +41,7 @@ function SidebarButton({
         background: active ? "hsl(var(--primary) / 0.1)" : "transparent",
         borderRadius: 12,
         cursor: "pointer",
-        color: active ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))",
+        color,
         transition: "background 150ms ease, color 150ms ease",
         WebkitTapHighlightColor: "transparent",
         fontWeight: active ? 600 : 400,
@@ -68,20 +55,42 @@ function SidebarButton({
   );
 }
 
-/**
- * Vertical sidebar navigation for tablet (iPad) layout.
- * Replaces NativeTabBar on wide screens.
- */
-export function NativeTabSidebar({ onMorePress }: Props) {
-  const [location, navigate] = useLocation();
+function SidebarSectionHeader({ label }: { label: string }) {
+  return (
+    <p
+      style={{
+        paddingInline: 16,
+        paddingTop: 14,
+        paddingBottom: 4,
+        margin: 0,
+        fontSize: "var(--text-2xs)",
+        fontWeight: 600,
+        color: "hsl(var(--muted-foreground))",
+        textTransform: "uppercase",
+        letterSpacing: "0.08em",
+      }}
+    >
+      {label}
+    </p>
+  );
+}
 
-  // Scan is intentionally NOT a sidebar item on tablet — it is a floating FAB
-  // (ScanFab), the correct affordance for a layout with no bottom tab bar.
-  const navItems: NavItem[] = [
-    { id: "today",     href: "/home",      label: t.nav.today,     icon: <Home size={20} /> },
-    { id: "equipment", href: "/equipment", label: t.nav.equipment, icon: <Package size={20} /> },
-    { id: "emergency", href: "/code-blue", label: t.nav.emergency, icon: <Activity size={20} /> },
-  ];
+/**
+ * Vertical sidebar navigation for tablet (iPad) layout — the sole nav surface on
+ * tablet. Replaces NativeTabBar on wide screens and carries the full grouped nav
+ * (from `getNativeNavSections`), so there is no overflow "Menu" drawer and no
+ * floating scan FAB on iPad; Scan is a first-class nav item.
+ */
+export function NativeTabSidebar() {
+  const [location, navigate] = useLocation();
+  const { isAdmin } = useAuth();
+
+  const sections = getNativeNavSections().filter(
+    (section) => !section.adminOnly || isAdmin,
+  );
+  const allHrefs = sections.flatMap((section) =>
+    section.items.map((item: NativeNavItem) => item.href),
+  );
 
   return (
     <nav
@@ -117,26 +126,24 @@ export function NativeTabSidebar({ onMorePress }: Props) {
         Vet<span style={{ color: "hsl(var(--primary))" }}>Track</span>
       </div>
 
-      {navItems.map((item) => (
-        <SidebarButton
-          key={item.id}
-          label={item.label}
-          icon={item.icon}
-          active={isTabActive(location, item.href)}
-          onClick={item.onClick ?? (() => navigate(item.href))}
-        />
+      {sections.map((section) => (
+        <div key={section.id}>
+          <SidebarSectionHeader label={section.label} />
+          {section.items.map((item) => {
+            const Icon = item.Icon;
+            return (
+              <SidebarButton
+                key={item.id}
+                label={item.label}
+                icon={<Icon size={20} />}
+                active={isNavItemActive(location, item.href, allHrefs)}
+                destructive={item.destructive}
+                onClick={() => navigate(item.href)}
+              />
+            );
+          })}
+        </div>
       ))}
-
-      <div style={{ flex: 1 }} />
-
-      <SidebarButton
-        label={t.nav.menu}
-        icon={<AlignJustify size={20} />}
-        active={false}
-        onClick={onMorePress}
-      />
-
-      <ScanFab />
     </nav>
   );
 }

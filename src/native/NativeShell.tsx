@@ -42,7 +42,7 @@ export function NativeShell({ children }: Props) {
             paddingTop: "env(safe-area-inset-top)",
           }}
         >
-          <NativeTabSidebar onMorePress={() => setMoreOpen(true)} />
+          <NativeTabSidebar />
 
           <div
             style={{
@@ -68,12 +68,7 @@ export function NativeShell({ children }: Props) {
             </div>
           </div>
 
-          {!moreOpen && <NfcForegroundScan />}
-
-          <MoreSheet
-            open={moreOpen}
-            onClose={() => setMoreOpen(false)}
-          />
+          <NfcForegroundScan />
         </div>
       </NativeShellContext.Provider>
     );
