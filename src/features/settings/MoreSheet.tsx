@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import {
   LogOut, User,
@@ -9,6 +9,8 @@ import {
 import { SettingRow } from "./SettingRow";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
+import { useIsTabletViewport } from "@/lib/use-tablet-viewport";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 
 type Props = {
   open: boolean;
@@ -43,23 +45,15 @@ export function MoreSheet({ open, onClose }: Props) {
   const { isAdmin } = useAuth();
   const dialogRef = useRef<HTMLDivElement>(null);
   const startYRef = useRef<number | null>(null);
-  const [isTablet, setIsTablet] = useState(() =>
-    typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches
-  );
+  const isTablet = useIsTabletViewport();
 
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 768px)");
-    const handler = () => setIsTablet(mq.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
+  useFocusTrap({ active: open, containerRef: dialogRef, onEscape: onClose });
 
   useEffect(() => {
     if (open) dialogRef.current?.focus();
   }, [open]);
 
   function handleBackdropClick() { onClose(); }
-  function handleKeyDown(e: React.KeyboardEvent) { if (e.key === "Escape") onClose(); }
   function handleDragStart(e: React.TouchEvent) { startYRef.current = e.touches[0]?.clientY ?? null; }
   function handleDragEnd(e: React.TouchEvent) {
     if (startYRef.current === null) return;
@@ -85,7 +79,6 @@ export function MoreSheet({ open, onClose }: Props) {
         aria-modal="true"
         aria-label={t.more.title}
         tabIndex={-1}
-        onKeyDown={handleKeyDown}
         onTouchStart={isTablet ? undefined : handleDragStart}
         onTouchEnd={isTablet ? undefined : handleDragEnd}
         style={isTablet ? {

@@ -9,6 +9,9 @@ import { computeAlerts } from "@/lib/utils";
 import { buildAlertAckSet, countActiveAlerts, filterUnackedAlerts } from "@/lib/alert-counts";
 import { t } from "@/lib/i18n";
 import { getInitials } from "@/lib/user-utils";
+import { useIsTabletViewport } from "@/lib/use-tablet-viewport";
+import { EquipmentSearchBox } from "@/components/search/EquipmentSearchBox";
+import { EquipmentSearchButton } from "@/components/search/EquipmentSearchButton";
 
 /** Routes that own their own top chrome — hide the shared header for these. */
 const FULLSCREEN_ROUTES = ["/code-blue", "/crash-cart", "/scan", "/handoff"];
@@ -26,6 +29,7 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
   const [location, navigate] = useLocation();
   const { userId, name } = useAuth();
   const { settings, update } = useSettings();
+  const isTablet = useIsTabletViewport();
   const [openPanel, setOpenPanel] = useState<Panel>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -104,6 +108,15 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
           WebkitBackdropFilter: "blur(12px)",
         }}
       >
+        {/* LEADING: equipment search — inline typeahead field on tablet, icon→overlay on phone */}
+        {isTablet ? (
+          <div style={{ flex: 1, maxWidth: 460, marginInlineEnd: 12 }}>
+            <EquipmentSearchBox tone="surface" />
+          </div>
+        ) : (
+          <EquipmentSearchButton />
+        )}
+
         {/* CENTER: VetTrack wordmark — absolutely positioned in the 44px content zone */}
         {/* dir="ltr" forces LTR inline ordering — without it, RTL bidi reorders
             the "Vet" text node and <span>Track</span> to visually appear as "TrackVet". */}

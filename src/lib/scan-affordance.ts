@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import { capacitorPlatform } from "@/lib/capacitor-runtime";
+import { useIsTabletViewport } from "@/lib/use-tablet-viewport";
 
 /**
  * The one scan-affordance decision for the whole app.
@@ -16,7 +16,7 @@ export type ScanAffordance = "tab" | "fab" | "none";
 export interface ScanAffordanceSignals {
   /** Running inside the Capacitor native shell (iOS/Android), not a browser. */
   isNative: boolean;
-  /** Viewport is tablet-width (≥ the tablet breakpoint). */
+  /** Viewport is tablet-class (see `useIsTabletViewport` — width ≥768 and height ≥500). */
   isTablet: boolean;
 }
 
@@ -26,24 +26,9 @@ export function scanAffordance({ isNative, isTablet }: ScanAffordanceSignals): S
   return isTablet ? "fab" : "tab";
 }
 
-const TABLET_MEDIA_QUERY = "(min-width: 768px)";
-
-function readIsTablet(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.matchMedia(TABLET_MEDIA_QUERY).matches;
-}
-
 /** Reactive hook wrapping the runtime signals around the pure gate. */
 export function useScanAffordance(): ScanAffordance {
-  const [isTablet, setIsTablet] = useState<boolean>(readIsTablet);
-
-  useEffect(() => {
-    const mq = window.matchMedia(TABLET_MEDIA_QUERY);
-    const handler = () => setIsTablet(mq.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-
+  const isTablet = useIsTabletViewport();
   const isNative = capacitorPlatform() !== "web";
   return scanAffordance({ isNative, isTablet });
 }

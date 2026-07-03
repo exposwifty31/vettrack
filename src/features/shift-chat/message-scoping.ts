@@ -1,31 +1,39 @@
 import type { ShiftMessage } from "./types";
 
 /**
- * Merge a freshly-polled batch of messages into the local accumulator, scoped
- * to the current shift session (BUG-001).
+ * Reconcile a freshly-polled batch into the local accumulator, scoped to the
+ * shift session the SERVER reports as currently open (BUG-001).
  *
- * The chat panel accumulates messages across polls so the transcript grows
- * without a full refetch. Accumulation must never retain messages from a prior
- * shift session: when the active shift rolls over while the panel is open, the
- * new session's messages define the current conversation and the previous
- * session's messages must drop out. The current session is taken from the most
- * recent incoming message.
+ * The chat panel accumulates messages across incremental polls so the transcript
+ * grows without a full refetch. The current session is taken from the server's
+ * authoritative `shiftSessionId` — never inferred from the messages — so the two
+ * cases the old inference got wrong are now correct:
  *
- * Returns `prev` by reference when nothing changed, so React can skip the
- * re-render.
+ *   - `currentSessionId === null` (no open shift, e.g. the shift just ended):
+ *     the panel empties immediately. An empty poll batch is otherwise
+ *     ambiguous ("no new messages" vs "no shift"); the session id disambiguates.
+ *   - `currentSessionId !== prevSessionId` (shift rolled over): the incoming
+ *     batch defines the new conversation; the previous session drops out.
+ *
+ * Within one session, new messages are appended and deduped by id. Returns
+ * `prev` by reference when nothing changed so React can skip the re-render.
  */
-export function mergeSessionScoped(
+export function reconcileMessages(
   prev: ShiftMessage[],
   incoming: ShiftMessage[],
+  prevSessionId: string | null,
+  currentSessionId: string | null,
 ): ShiftMessage[] {
+  if (currentSessionId === null) return prev.length === 0 ? prev : [];
+
+  if (currentSessionId !== prevSessionId) {
+    return incoming.filter((m) => m.shiftSessionId === currentSessionId);
+  }
+
   if (incoming.length === 0) return prev;
-
-  // Safe: the length === 0 early return above guarantees a last element exists.
-  const currentSession = incoming[incoming.length - 1]!.shiftSessionId;
   const existingIds = new Set(prev.map((m) => m.id));
-  const newOnes = incoming.filter((m) => !existingIds.has(m.id));
-  const merged = newOnes.length > 0 ? [...prev, ...newOnes] : prev;
-
-  const scoped = merged.filter((m) => m.shiftSessionId === currentSession);
-  return scoped.length === merged.length ? merged : scoped;
+  const fresh = incoming.filter(
+    (m) => !existingIds.has(m.id) && m.shiftSessionId === currentSessionId,
+  );
+  return fresh.length > 0 ? [...prev, ...fresh] : prev;
 }

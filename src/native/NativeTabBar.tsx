@@ -103,7 +103,7 @@ export function NativeTabBar({ onMorePress }: Props) {
         alignItems: "center",
         paddingBottom: "env(safe-area-inset-bottom)",
         backgroundColor: "hsl(var(--background) / 0.96)",
-        borderTop: "0.5px solid rgba(60,60,67,0.18)",
+        borderTop: "0.5px solid hsl(var(--border))",
         backdropFilter: "blur(12px)",
         WebkitBackdropFilter: "blur(12px)",
         flexShrink: 0,

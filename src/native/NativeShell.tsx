@@ -1,23 +1,11 @@
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { NativeShellContext } from "./NativeShellContext";
 import { NativeTabBar } from "./NativeTabBar";
 import { NativeTabSidebar } from "./NativeTabSidebar";
 import { NativeHeader } from "./NativeHeader";
 import { MoreSheet } from "@/features/settings";
 import { NfcForegroundScan } from "@/components/nfc-foreground-scan";
-
-function useIsTablet(): boolean {
-  const [isTablet, setIsTablet] = useState(() =>
-    typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches
-  );
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 768px)");
-    const handler = () => setIsTablet(mq.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return isTablet;
-}
+import { useIsTabletViewport } from "@/lib/use-tablet-viewport";
 
 type Props = {
   children: ReactNode;
@@ -38,7 +26,7 @@ type Props = {
  */
 export function NativeShell({ children }: Props) {
   const [moreOpen, setMoreOpen] = useState(false);
-  const isTablet = useIsTablet();
+  const isTablet = useIsTabletViewport();
 
   if (isTablet) {
     return (
