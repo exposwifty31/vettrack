@@ -7,6 +7,7 @@ import {
   resolveCurrentRole,
   resolveNextShift,
 } from "../lib/role-resolution.js";
+import { buildShiftWindow } from "../lib/shift-window.js";
 
 /*
  * GET /api/home/dashboard — aggregate "pulse" for the magnetic home dashboard.
@@ -22,33 +23,6 @@ import {
  */
 
 const router = Router();
-
-/** Combine a roster `YYYY-MM-DD` date + `HH:MM[:SS]` time into a server-local instant. */
-function combineLocal(dateStr: string, timeStr: string, dayOffset: number): Date {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const [hours = 0, minutes = 0, seconds = 0] = timeStr.split(":").map(Number);
-  return new Date(year, month - 1, day + dayOffset, hours, minutes, seconds);
-}
-
-/**
- * Resolve a roster shift's absolute start/end instants. An overnight shift
- * (start clock-time later than end clock-time) ends on the following day —
- * matching the overnight window logic in `role-resolution.ts`.
- */
-function buildShiftWindow(shift: { date: string; startTime: string; endTime: string; role: string }): {
-  startedAt: string;
-  endsAt: string;
-  role: string;
-} {
-  const overnight = shift.startTime > shift.endTime;
-  const startedAt = combineLocal(shift.date, shift.startTime, 0);
-  const endsAt = combineLocal(shift.date, shift.endTime, overnight ? 1 : 0);
-  return {
-    startedAt: startedAt.toISOString(),
-    endsAt: endsAt.toISOString(),
-    role: shift.role,
-  };
-}
 
 router.get("/dashboard", requireAuth, async (req, res) => {
   const clinicId = req.clinicId?.trim();

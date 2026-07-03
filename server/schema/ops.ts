@@ -259,9 +259,10 @@ export const shiftMessages = vtTable(
   "vt_shift_messages",
   {
     id: text("id").primaryKey(),
-    shiftSessionId: text("shift_session_id")
-      .notNull()
-      .references(() => shiftSessions.id, { onDelete: "cascade" }),
+    // Roster-window ids ("win:<clinic>:<date>:<start>") and legacy
+    // vt_shift_sessions ids coexist here — no FK: the legacy clock-in table is
+    // orphaned, and its cascade would delete chat history.
+    shiftSessionId: text("shift_session_id").notNull(),
     clinicId: text("clinic_id")
       .notNull()
       .references(() => clinics.id, { onDelete: "cascade" }),

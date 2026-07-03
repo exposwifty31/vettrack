@@ -1,6 +1,8 @@
 import { randomUUID } from "crypto";
-import { and, eq, isNull } from "drizzle-orm";
-import { db, shiftMessages, shiftSessions } from "../db.js";
+import { and, eq, inArray } from "drizzle-orm";
+import { db, shiftMessages, shifts } from "../db.js";
+import { shiftWindowContains } from "./shift-adjustment-window.js";
+import { localDateKey, windowBounds, windowSessionId } from "./shift-window.js";
 
 // ─── In-memory presence/typing map ────────────────────────────────────────────
 // Resets on server restart — presence is ephemeral by design.
@@ -54,7 +56,29 @@ export function getPresence(clinicId: string): { onlineUserIds: string[]; typing
 
 // ─── System message auto-poster ───────────────────────────────────────────────
 // Call from any server handler to post a system card to the active shift channel.
-// No-op when no shift is open for the clinic.
+// No-op when the clinic has no active roster window.
+
+/**
+ * The clinic's current roster window id — the earliest `vt_shifts` window
+ * containing `now`. System messages carry no acting user, so this is the
+ * clinic-level analogue of the per-user window in shift-chat-window.ts.
+ * Reads scope by createdAt, so the stamp only matters for the archive.
+ */
+async function resolveClinicWindowId(clinicId: string): Promise<string | null> {
+  const now = new Date();
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const rows = await db
+    .select({ date: shifts.date, startTime: shifts.startTime, endTime: shifts.endTime })
+    .from(shifts)
+    .where(and(
+      eq(shifts.clinicId, clinicId),
+      inArray(shifts.date, [localDateKey(now), localDateKey(yesterday)]),
+    ));
+  const active = rows.filter((r) => shiftWindowContains(now, r.date, r.startTime, r.endTime));
+  if (active.length === 0) return null;
+  active.sort((a, b) => windowBounds(a).startedAt.getTime() - windowBounds(b).startedAt.getTime());
+  return windowSessionId(clinicId, active[0]!);
+}
 
 export async function postSystemMessage(
   clinicId: string,
@@ -62,17 +86,12 @@ export async function postSystemMessage(
   systemEventPayload: Record<string, unknown>,
 ): Promise<void> {
   try {
-    const [shift] = await db
-      .select({ id: shiftSessions.id })
-      .from(shiftSessions)
-      .where(and(eq(shiftSessions.clinicId, clinicId), isNull(shiftSessions.endedAt)))
-      .limit(1);
-
-    if (!shift) return; // No open shift — silent no-op
+    const windowId = await resolveClinicWindowId(clinicId);
+    if (!windowId) return; // No active roster window — silent no-op
 
     await db.insert(shiftMessages).values({
       id: randomUUID(),
-      shiftSessionId: shift.id,
+      shiftSessionId: windowId,
       clinicId,
       senderId: null,
       senderName: null,

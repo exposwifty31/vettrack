@@ -1007,3 +1007,19 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Verification ceiling (still owed — finer interactions not driven this pass):** two-pane row-tap → detail swap (structure confirmed via placeholder + master list, but selection not exercised); the aggregated bell PANEL contents (cap confirmed, panel not opened); Equipment/Inventory two-panes specifically (same `TwoPaneLayout` primitive as Rooms, not individually screenshotted); the 6c Settings appearance/text-size controls + their runtime effect; `resolveNextShift` against real roster data (this user had none); and the 6c native iOS Dynamic Type bridge (still UNREGISTERED in the Xcode target).
 
 **Verdict:** Native build + install on iPad + iPhone — DONE, BUILD SUCCEEDED both. Core visible changes (Phases 1, 2, 3.0/3.3, 4, 5, 6e) CONFIRMED on device via screenshots. Remaining: finer interaction drills + the 6c native bridge registration.
+
+## 2026-07-04 — Phase 0: shift-chat re-anchored to roster window (stale 3-week transcript root cause)
+
+**Claim:** Shift chat no longer derives its conversation from the orphaned `vt_shift_sessions` clock-in table. The session is now the caller's roster shift window (`vt_shifts` via `resolveCurrentRole`) with a deterministic synthetic id (`win:<clinic>:<date>:<start>`); message reads/writes scope by `createdAt ∈ [start, end)` + `clinicId`. This is the server-side root cause the three prior client-only fixes (message-scoping.ts) could not reach.
+
+**Evidence (gate + DB regression, all actually run):**
+- New `server/lib/shift-window.ts` (pure window math + ids; no db import) and `server/lib/shift-chat-window.ts` (`getCurrentShiftWindow`, `windowMessagesWhere` — shared by route and test). `home-dashboard.ts` now imports the shared `buildShiftWindow` (local copy deleted).
+- `server/routes/shift-chat.ts`: `getOpenShift` (the `endedAt IS NULL … limit(1)` no-orderBy query) is GONE — GET /messages, POST /messages, pin, and pinned-message queries all window-scope; returned rows are normalized to the viewer's window id (the client's `reconcileMessages` drops rows whose `shiftSessionId` differs — verified against `message-scoping.ts:30,36`). Archive gains a `win:` branch (roster lookup for bounds; stamped-id fallback; clinic-mismatch → 404). `postSystemMessage` (`shift-chat-presence.ts`) stamps the clinic's earliest active roster window; no-op when none.
+- Schema: `vt_shift_messages.shift_session_id` FK dropped (`migrations/159_shift_messages_drop_session_fk.sql`, both name variants, IF EXISTS) — the legacy table's ON DELETE CASCADE was a latent chat-history-loss bug. Migration applied locally: `✅ Applied migration: 159…`.
+- **DB regression test run against real Postgres** (`pnpm exec tsx tests/shift-chat-window.integration.test.ts` → "✅ all assertions passed"): seeded a never-ended `vt_shift_sessions` row + 3-week-old messages + a two-block roster; asserted (1) session id is roster-derived `win:…`, not the stale id; (2) `windowMessagesWhere` returns ONLY the in-window message; (3) window rollover changes the id; (4) off-window ⇒ null; (5) off-roster user ⇒ null. Excluded from default vitest (DB group) per house convention.
+- Pure contract tests `tests/shift-window.test.ts` (overnight bounds, id round-trip incl. `:` in clinic id, rollover, legacy-id rejection) run in the default suite.
+- `pnpm typecheck` (frontend + server) → exit 0. `pnpm test` → 388 files / 3830 pass.
+
+**Verification ceiling (owed):** iOS Simulator end-to-end (stale session seeded → panel shows only current-window messages; off-shift panel empty + POST 409 toast) — scheduled with the batched device pass alongside the other phases. Client untouched by design; `reconcileMessages` behavior is covered by the existing `tests/shift-chat-session-scoping.test.ts`.
+
+**Verdict:** Phase 0 DONE at gate + DB-regression level; simulator drill owed in the consolidated device pass.

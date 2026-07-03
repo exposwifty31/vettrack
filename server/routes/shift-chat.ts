@@ -1,10 +1,14 @@
-import { Router } from "express";
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull } from "drizzle-orm";
+import { Router, type Request } from "express";
+import { and, asc, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import {
-  db, shiftMessages, shiftMessageAcks, shiftMessageReactions, shiftSessions,
+  db, shiftMessages, shiftMessageAcks, shiftMessageReactions, shiftSessions, shifts,
 } from "../db.js";
+import {
+  getCurrentShiftWindow, windowMessagesWhere, type ChatWindow,
+} from "../lib/shift-chat-window.js";
+import { combineLocal, parseWindowSessionId, windowBounds } from "../lib/shift-window.js";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { writeLimiter } from "../middleware/rate-limiters.js";
 import { validateBody } from "../middleware/validate.js";
@@ -28,14 +32,20 @@ function apiError(params: { code: string; reason?: string; message: string; requ
   };
 }
 
-/** Returns the open shift session for a clinic, or null. */
-async function getOpenShift(clinicId: string) {
-  const [row] = await db
-    .select()
-    .from(shiftSessions)
-    .where(and(eq(shiftSessions.clinicId, clinicId), isNull(shiftSessions.endedAt)))
-    .limit(1);
-  return row ?? null;
+/**
+ * Roster-derived chat window for the calling user (see lib/shift-chat-window.ts).
+ * Never consults the orphaned vt_shift_sessions clock-in table — a stale
+ * never-ended row there is what kept weeks-old transcripts alive (BUG-001).
+ */
+function getRequestShiftWindow(req: Request): Promise<ChatWindow | null> {
+  const user = req.authUser!;
+  return getCurrentShiftWindow({
+    clinicId: req.clinicId!,
+    userId: user.id,
+    userName: user.name ?? "",
+    fallbackRole: user.role,
+    secondaryRole: user.secondaryRole ?? null,
+  });
 }
 
 // ─── GET /api/shift-chat/messages ────────────────────────────────────────────
@@ -54,8 +64,8 @@ router.get(
     touchPresence(clinicId, userId, userName);
 
     try {
-      const shift = await getOpenShift(clinicId);
-      if (!shift) {
+      const shiftWindow = await getRequestShiftWindow(req);
+      if (!shiftWindow) {
         return res.json({ messages: [], pinnedMessage: null, typing: [], onlineUserIds: [], shiftSessionId: null });
       }
 
@@ -67,12 +77,7 @@ router.get(
       const rows = await db
         .select()
         .from(shiftMessages)
-        .where(
-          and(
-            eq(shiftMessages.shiftSessionId, shift.id),
-            afterDate ? gt(shiftMessages.createdAt, afterDate) : undefined,
-          ),
-        )
+        .where(windowMessagesWhere(clinicId, shiftWindow, afterDate))
         .orderBy(asc(shiftMessages.createdAt));
 
       // Fetch acks for broadcast messages in this batch
@@ -114,16 +119,19 @@ router.get(
         .from(shiftMessages)
         .where(
           and(
-            eq(shiftMessages.shiftSessionId, shift.id),
-            eq(shiftMessages.clinicId, clinicId),
+            windowMessagesWhere(clinicId, shiftWindow),
             isNotNull(shiftMessages.pinnedAt),
           ),
         )
         .orderBy(desc(shiftMessages.pinnedAt))
         .limit(1);
 
+      // Rows are normalized to the viewer's window id: stored stamps vary by
+      // poster window, and the client drops rows whose shiftSessionId differs
+      // from the reported session (message-scoping.ts).
       const messages = rows.map((m) => ({
         ...m,
+        shiftSessionId: shiftWindow.id,
         acks: acksMap.get(m.id) ?? [],
         reactions: reactionsMap.get(m.id) ?? [],
       }));
@@ -133,11 +141,11 @@ router.get(
       return res.json({
         messages,
         pinnedMessage: pinnedRow
-          ? { ...pinnedRow, acks: acksMap.get(pinnedRow.id) ?? [], reactions: reactionsMap.get(pinnedRow.id) ?? [] }
+          ? { ...pinnedRow, shiftSessionId: shiftWindow.id, acks: acksMap.get(pinnedRow.id) ?? [], reactions: reactionsMap.get(pinnedRow.id) ?? [] }
           : null,
         typing: presence.typing,
         onlineUserIds: presence.onlineUserIds,
-        shiftSessionId: shift.id,
+        shiftSessionId: shiftWindow.id,
       });
     } catch (err) {
       console.error("[shift-chat] GET /messages error:", err);
@@ -185,8 +193,8 @@ router.post(
     }
 
     try {
-      const shift = await getOpenShift(clinicId);
-      if (!shift) {
+      const shiftWindow = await getRequestShiftWindow(req);
+      if (!shiftWindow) {
         return res.status(409).json(apiError({ code: "CONFLICT", reason: "NO_OPEN_SHIFT", message: "No active shift for this clinic" }));
       }
 
@@ -194,7 +202,7 @@ router.post(
         .insert(shiftMessages)
         .values({
           id: randomUUID(),
-          shiftSessionId: shift.id,
+          shiftSessionId: shiftWindow.id,
           clinicId,
           senderId: user.id,
           senderName: user.name ?? null,
@@ -402,31 +410,30 @@ router.post(
     const messageId = req.params.id;
 
     try {
-      const shift = await getOpenShift(clinicId);
-      if (!shift) {
+      const shiftWindow = await getRequestShiftWindow(req);
+      if (!shiftWindow) {
         return res.status(409).json(apiError({ code: "CONFLICT", reason: "NO_OPEN_SHIFT", message: "No active shift" }));
       }
 
-      // Unpin all current pinned messages for this shift
+      // Unpin all pinned messages inside the current window
       await db
         .update(shiftMessages)
         .set({ pinnedAt: null, pinnedByUserId: null })
         .where(
           and(
-            eq(shiftMessages.shiftSessionId, shift.id),
-            eq(shiftMessages.clinicId, clinicId),
+            windowMessagesWhere(clinicId, shiftWindow),
+            isNotNull(shiftMessages.pinnedAt),
           ),
         );
 
-      // Pin the target message (must belong to the current open shift)
+      // Pin the target message (must belong to the current window)
       const now = new Date();
       const [updated] = await db
         .update(shiftMessages)
         .set({ pinnedAt: now, pinnedByUserId: userId })
         .where(and(
           eq(shiftMessages.id, messageId),
-          eq(shiftMessages.clinicId, clinicId),
-          eq(shiftMessages.shiftSessionId, shift.id),
+          windowMessagesWhere(clinicId, shiftWindow),
         ))
         .returning();
 
@@ -553,6 +560,52 @@ router.get(
     const shiftId  = req.params.shiftId;
 
     try {
+      const windowRef = parseWindowSessionId(shiftId);
+      if (windowRef) {
+        // Roster-window archive — synthetic ids have no vt_shift_sessions row.
+        if (windowRef.clinicId !== clinicId) {
+          return res.status(404).json(apiError({ code: "NOT_FOUND", reason: "SHIFT_NOT_FOUND", message: "Shift not found" }));
+        }
+        const [rosterRow] = await db
+          .select()
+          .from(shifts)
+          .where(and(
+            eq(shifts.clinicId, clinicId),
+            eq(shifts.date, windowRef.date),
+            eq(shifts.startTime, windowRef.startTime),
+          ))
+          .limit(1);
+
+        if (rosterRow) {
+          const bounds = windowBounds(rosterRow);
+          const messages = await db
+            .select()
+            .from(shiftMessages)
+            .where(windowMessagesWhere(clinicId, { id: shiftId, ...bounds }))
+            .orderBy(asc(shiftMessages.createdAt));
+          return res.json({
+            messages,
+            shift: { id: shiftId, clinicId, startedAt: bounds.startedAt.toISOString(), endedAt: bounds.endsAt.toISOString() },
+          });
+        }
+
+        // Roster row purged — fall back to the stamped id so history stays readable.
+        const messages = await db
+          .select()
+          .from(shiftMessages)
+          .where(and(eq(shiftMessages.shiftSessionId, shiftId), eq(shiftMessages.clinicId, clinicId)))
+          .orderBy(asc(shiftMessages.createdAt));
+        return res.json({
+          messages,
+          shift: {
+            id: shiftId,
+            clinicId,
+            startedAt: combineLocal(windowRef.date, windowRef.startTime, 0).toISOString(),
+            endedAt: null,
+          },
+        });
+      }
+
       const [shift] = await db
         .select()
         .from(shiftSessions)

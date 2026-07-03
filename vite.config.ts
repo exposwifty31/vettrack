@@ -132,6 +132,7 @@ export default defineConfig(({ mode }) => {
         "tests/migrations/**",
         "tests/phase-2-3-medication-package-integration.test.ts",
         "tests/equipment-operational-state.integration.test.ts",
+        "tests/shift-chat-window.integration.test.ts",
         "tests/charge-alert-worker.test.js",
         "tests/code-blue-mode-equipment.test.js",
         "tests/equipment-scan-e2e.test.js",
