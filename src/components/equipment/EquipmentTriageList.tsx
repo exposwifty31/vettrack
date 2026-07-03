@@ -103,6 +103,8 @@ interface EquipmentStatStripProps {
   total: number;
   attention: number;
   inUse: number;
+  /** The native screen's hero already shows availability — hide the duplicate cell there. */
+  showUptime?: boolean;
   className?: string;
 }
 
@@ -110,18 +112,22 @@ export function EquipmentStatStrip({
   total,
   attention,
   inUse,
+  showUptime = true,
   className,
 }: EquipmentStatStripProps) {
   const uptime = total > 0 ? Math.round(((total - attention) / total) * 100) : 0;
-  const cells = [
+  const cells: Array<{ v: number | string; l: string; tone: "" | "err" | "ok" }> = [
     { v: total, l: t.equipmentList.statTotal, tone: "" },
-    { v: attention, l: t.equipmentList.statAttention, tone: "err" as const },
+    // Zero items needing attention is a calm state — never paint it red.
+    { v: attention, l: t.equipmentList.statAttention, tone: attention > 0 ? "err" : "" },
     { v: inUse, l: t.equipmentList.statInUse, tone: "" },
-    { v: `${uptime}%`, l: t.equipmentList.statUptime, tone: "ok" as const },
+    ...(showUptime
+      ? [{ v: `${uptime}%`, l: t.equipmentList.statUptime, tone: "ok" as const }]
+      : []),
   ];
 
   return (
-    <div className={cn("grid grid-cols-4 gap-2", className)}>
+    <div className={cn("grid gap-2", showUptime ? "grid-cols-4" : "grid-cols-3", className)}>
       {cells.map((c) => (
         <div
           key={c.l}

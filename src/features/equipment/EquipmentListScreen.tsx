@@ -1,4 +1,6 @@
 import { useRef, useState, useEffect } from "react";
+import { useLocation } from "wouter";
+import { Package } from "lucide-react";
 import { useEquipmentList } from "./hooks/use-equipment-list";
 import { useEquipmentFilters } from "./hooks/use-equipment-filters";
 import { EquipmentLargeTitle } from "./EquipmentLargeTitle";
@@ -10,6 +12,8 @@ import {
 } from "@/components/equipment/EquipmentTriageList";
 import { LoadingSection } from "@/components/ui/loading-section";
 import { ErrorCard } from "@/components/ui/error-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Button } from "@/components/ui/button";
 import { t } from "@/lib/i18n";
 
 const DEBOUNCE_MS = 300;
@@ -38,10 +42,13 @@ export function EquipmentListScreen() {
     }, DEBOUNCE_MS);
   }
 
-  const { items, isLoading, isError, refetch, stats, availabilityPct } = useEquipmentList({
-    search,
-    statusFilter,
-  });
+  const [, navigate] = useLocation();
+  const { items, isLoading, isError, refetch, stats, availabilityPct, verifiedCount, notVerifiedCount } =
+    useEquipmentList({
+      search,
+      statusFilter,
+    });
+  const hasActiveFilters = search !== "" || statusFilter !== "all";
 
   return (
     <div
@@ -57,6 +64,9 @@ export function EquipmentListScreen() {
         title={t.equipment.title}
         count={stats.total}
         availabilityPct={availabilityPct}
+        isLoading={isLoading}
+        verifiedCount={verifiedCount}
+        notVerifiedCount={notVerifiedCount}
       />
 
       <EquipmentSearchBar
@@ -72,25 +82,32 @@ export function EquipmentListScreen() {
       ) : isError ? (
         <ErrorCard message={t.errorCard.defaultMessage} onRetry={refetch} />
       ) : items.length === 0 ? (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flex: 1,
-            padding: "32px 0",
-            color: "hsl(var(--muted-foreground))",
-            fontSize: "var(--text-sm)",
-          }}
-        >
-          {t.equipmentList.empty.message}
-        </div>
+        <EmptyState
+          icon={Package}
+          message={t.equipmentList.empty.message}
+          subMessage={
+            hasActiveFilters ? t.equipmentList.empty.filteredHint : t.equipmentList.empty.emptyHint
+          }
+          action={
+            hasActiveFilters ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-11 text-xs"
+                onClick={() => navigate("/equipment", { replace: true })}
+              >
+                {t.equipmentList.empty.clearFilters}
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <>
           <EquipmentStatStrip
             total={stats.total}
             attention={stats.attention}
             inUse={stats.inUse}
+            showUptime={false}
           />
           <EquipmentTriageList items={items} />
         </>

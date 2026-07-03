@@ -96,6 +96,7 @@ export interface TStructure {
   };
   equipmentList: {
     uptimeLabel: string;
+    verifiedSplit: string;
     search: {
       placeholder: string;
       clearLabel: string;
@@ -117,6 +118,7 @@ export interface TStructure {
     empty: {
       message: string;
       filteredHint: string;
+      clearFilters: string;
       emptyHint: string;
     };
     errors: {

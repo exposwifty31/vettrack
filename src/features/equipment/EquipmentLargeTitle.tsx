@@ -1,12 +1,28 @@
 import { t } from "@/lib/i18n";
+import { INACTIVE_THRESHOLD_DAYS } from "../../../shared/constants";
 
 type Props = {
   title: string;
   count: number;
-  availabilityPct: number;
+  /** null while loading or when nothing matches — renders a placeholder, never a fake 0%. */
+  availabilityPct: number | null;
+  isLoading: boolean;
+  verifiedCount: number | null;
+  notVerifiedCount: number | null;
 };
 
-export function EquipmentLargeTitle({ title, count, availabilityPct }: Props) {
+export function EquipmentLargeTitle({
+  title,
+  count,
+  availabilityPct,
+  isLoading,
+  verifiedCount,
+  notVerifiedCount,
+}: Props) {
+  const showPct = !isLoading && availabilityPct !== null;
+  const showVerifiedSplit =
+    !isLoading && verifiedCount !== null && notVerifiedCount !== null && notVerifiedCount > 0;
+
   return (
     <div
       style={{
@@ -40,8 +56,20 @@ export function EquipmentLargeTitle({ title, count, availabilityPct }: Props) {
             margin: "4px 0 0",
           }}
         >
-          {count}
+          {isLoading ? "—" : count}
         </p>
+        {showVerifiedSplit && (
+          <p
+            data-testid="equipment-verified-split"
+            style={{
+              fontSize: "var(--text-2xs)",
+              color: "rgba(255,255,255,0.72)",
+              margin: "4px 0 0",
+            }}
+          >
+            {t.equipmentList.verifiedSplit(verifiedCount, notVerifiedCount, INACTIVE_THRESHOLD_DAYS)}
+          </p>
+        )}
       </div>
       <div
         style={{
@@ -53,16 +81,21 @@ export function EquipmentLargeTitle({ title, count, availabilityPct }: Props) {
         }}
       >
         <span
+          data-testid="equipment-availability"
           style={{
             fontFamily: "var(--font-num)",
             fontSize: "var(--text-2xl)",
             fontWeight: 700,
-            color: availabilityPct >= 80 ? "var(--action)" : "#f59e0b",
+            color: showPct
+              ? availabilityPct >= 80
+                ? "var(--action)"
+                : "#f59e0b"
+              : "rgba(255,255,255,0.45)",
             letterSpacing: "-0.02em",
             lineHeight: 1,
           }}
         >
-          {availabilityPct}%
+          {showPct ? `${availabilityPct}%` : "—"}
         </span>
         <span
           style={{

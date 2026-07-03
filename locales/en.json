@@ -93,6 +93,7 @@
   },
   "equipmentList": {
     "uptimeLabel": "uptime",
+    "verifiedSplit": "{ok} OK · {stale} not verified {days}+ days",
     "search": {
       "placeholder": "Search by name, serial number, model...",
       "clearLabel": "Clear search"
@@ -114,6 +115,7 @@
     "empty": {
       "message": "No equipment found",
       "filteredHint": "Try changing the filters or search term.",
+      "clearFilters": "Clear filters",
       "emptyHint": "Add your first item to start tracking."
     },
     "errors": {

@@ -93,6 +93,7 @@
   },
   "equipmentList": {
     "uptimeLabel": "זמינות",
+    "verifiedSplit": "{ok} תקין · {stale} לא אומתו {days} ימים+",
     "search": {
       "placeholder": "חיפוש לפי שם, מספר סידורי, דגם...",
       "clearLabel": "נקה חיפוש"
@@ -114,6 +115,7 @@
     "empty": {
       "message": "לא נמצא ציוד",
       "filteredHint": "נסה לשנות את המסננים או את מונח החיפוש.",
+      "clearFilters": "נקה סינון",
       "emptyHint": "הוסף את הפריט הראשון כדי להתחיל במעקב."
     },
     "errors": {

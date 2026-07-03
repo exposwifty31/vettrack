@@ -167,6 +167,8 @@ const translations = {
     statAttention: d.equipmentList.statAttention,
     statInUse: d.equipmentList.statInUse,
     statUptime: d.equipmentList.statUptime,
+    verifiedSplit: (ok: number, stale: number, days: number) =>
+      tr(d.equipmentList.verifiedSplit, { ok, stale, days }),
     filterAll: d.equipmentList.filterAll,
     recoveryAttentionSummary: d.equipmentList.recoveryAttentionSummary,
     paginationCount: (shown: number, total: number) => tr(d.equipmentList.paginationCount, { shown, total }),

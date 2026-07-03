@@ -1038,3 +1038,20 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Verification ceiling (owed):** simulator drill — tap "פתח CODE BLUE" with/without checklist; confirm spinner → `ActiveSession` only after server confirmation. Scheduled with the batched device pass.
 
 **Verdict:** Phase 1 DONE at gate + unit level; simulator drill owed in the consolidated device pass.
+
+## 2026-07-04 — Phase 2 (C2 + H1): no fake 0% KPI; availability reconciled with the bell
+
+**Claim:** The equipment header can no longer show a computed "0% availability" during load or a no-match search (C2), and when equipment is unverified 14+ days the header carries a "not verified" readout computed from the SAME `isInactive` predicate + `/api/equipment` query the alert bell uses — the two surfaces can no longer disagree (H1, additive per the settled decision; `availabilityPct` semantics unchanged when data exists).
+
+**Evidence (gate + unit, actually run):**
+- `use-equipment-list.ts`: `availabilityPct` is now `number | null` (null when `total === 0` — loading AND no-match); added the full-list `["/api/equipment"]` query (cache-shared with `NativeHeader`/`useAlertsFeed`) and `verifiedCount`/`notVerifiedCount` via `isInactive` (`shared/constants` `INACTIVE_THRESHOLD_DAYS`).
+- `EquipmentLargeTitle.tsx`: explicit `isLoading` prop; renders "—" in muted white (never orange, never 0%) until a real percentage exists; count placeholder while loading; new `verifiedSplit` readout line (`{ok} תקין · {stale} לא אומתו {days} ימים+`) rendered only when `notVerified > 0`.
+- `EquipmentStatStrip` (shared with desktop `equipment-list.tsx:877`): attention cell tone neutral when 0 (was hardcoded `err` red); new `showUptime` prop — native list passes `false` (hero already shows the number; kills the same-viewport duplicate), desktop default keeps it (no hero there).
+- `EquipmentListScreen.tsx`: no-match body now uses the shared `EmptyState` (Package icon, filtered-vs-empty subMessage, localized clear-filters action → `/equipment`), replacing the bare text div.
+- i18n: `equipmentList.verifiedSplit` (+ hand-listed interpolated accessor in `i18n.ts` — the buildTranslations gotcha), `equipmentList.empty.clearFilters` (he+en); parity ✓; types regenerated.
+- New `tests/equipment-kpi-placeholders.test.tsx` (9 tests): placeholder while loading / no-match, real % when data exists, readout text via the same `t` accessor + threshold constant, readout omitted at 0, strip zero-attention not red / non-zero red, uptime hidden with `showUptime=false`, kept by default. All pass.
+- `pnpm typecheck` (both) → exit 0. `pnpm i18n:check` ✓. `pnpm test` → 3843 pass.
+
+**Verification ceiling (owed):** simulator — cold-load Equipment (placeholder, not 0%), no-match search (EmptyState + clear filters), readout count vs bell count on the demo dataset. Scheduled with the batched device pass.
+
+**Verdict:** Phase 2 DONE at gate + unit level; simulator drill owed in the consolidated device pass.
