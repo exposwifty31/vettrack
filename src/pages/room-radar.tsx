@@ -1,4 +1,5 @@
 import { t } from "@/lib/i18n";
+import { STALE_THRESHOLD_MS } from "@/lib/attention";
 import { getEquipmentDisplayName } from "@/lib/equipment-display";
 import { Bdi } from "@/components/ui/bdi";
 import { BackChevron, ForwardChevron } from "@/components/ui/directional-chevron";
@@ -376,7 +377,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
 export default function RoomRadarPage() {
   const { id } = useParams<{ id: string }>();
   const { userId } = useAuth();
-  const staleMs = 24 * 60 * 60 * 1000;
+  const staleMs = STALE_THRESHOLD_MS;
   const searchStr = useSearch();
   const nfcParam = new URLSearchParams(searchStr).get("verify");
   const queryClient = useQueryClient();

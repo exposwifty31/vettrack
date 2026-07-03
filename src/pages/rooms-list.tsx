@@ -1,4 +1,5 @@
 import { t } from "@/lib/i18n";
+import { STALE_THRESHOLD_MS } from "@/lib/attention";
 import { Bdi } from "@/components/ui/bdi";
 import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { useState } from "react";
@@ -101,7 +102,7 @@ function HealthRing({ total, recentlyVerified }: { total: number; recentlyVerifi
   );
 }
 
-const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
+// STALE_THRESHOLD_MS: shared 24h staleness cutoff, imported from @/lib/attention
 
 function computeEffectiveStatus(room: Room): string {
   if (room.syncStatus === "requires_audit") return "requires_audit";

@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useSettings } from "@/hooks/use-settings";
 import { computeAlerts } from "@/lib/utils";
 import { buildAlertAckSet, countActiveAlerts, filterUnackedAlerts } from "@/lib/alert-counts";
+import { aggregateAlerts, formatBadgeCount } from "@/lib/attention";
 import { t } from "@/lib/i18n";
 import { getInitials } from "@/lib/user-utils";
 import { useIsTabletViewport } from "@/lib/use-tablet-viewport";
@@ -82,7 +83,7 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
   const alerts = equipment ? computeAlerts(equipment) : [];
   const alertAckSet = buildAlertAckSet(alertAcks);
   const alertCount = countActiveAlerts(alerts, alertAckSet);
-  const recentAlerts = filterUnackedAlerts(alerts, alertAckSet).slice(0, 5);
+  const alertGroups = aggregateAlerts(filterUnackedAlerts(alerts, alertAckSet));
 
   function go(href: string) {
     setOpenPanel(null);
@@ -286,7 +287,7 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
                   lineHeight: 1,
                 }}
               >
-                {alertCount > 99 ? "99+" : alertCount}
+                {formatBadgeCount(alertCount)}
               </span>
             )}
           </button>
@@ -301,19 +302,19 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
           {openPanel === "alerts" ? (
             <div ref={panelRef} tabIndex={-1} aria-label={t.nav.alertsTitle} style={panelStyle}>
               <p style={panelHeaderStyle}>{t.nav.alertsTitle}</p>
-              {recentAlerts.length === 0 ? (
+              {alertGroups.length === 0 ? (
                 <p style={emptyStyle}>{t.nav.noActiveAlerts}</p>
               ) : (
-                recentAlerts.map((a) => (
+                alertGroups.map((group) => (
                   <button
-                    key={`${a.equipmentId}:${a.type}`}
+                    key={group.type}
                     type="button"
-                    onClick={() => go(`/equipment/${a.equipmentId}`)}
+                    onClick={() => go(group.count === 1 ? `/equipment/${group.alerts[0]!.equipmentId}` : "/alerts")}
                     style={rowStyle}
                   >
-                    {/* Distinct shape per severity, not color alone (WCAG 1.4.1):
-                        issue = round AlertCircle (red), warning = AlertTriangle (orange). */}
-                    {a.type === "issue" ? (
+                    {/* Distinct shape per tier, not color alone (WCAG 1.4.1):
+                        critical = round AlertCircle (red), else AlertTriangle. */}
+                    {group.tier === "critical" ? (
                       <AlertCircle
                         size={16}
                         strokeWidth={2}
@@ -325,13 +326,14 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
                         size={16}
                         strokeWidth={2}
                         aria-hidden
-                        style={{ flexShrink: 0, color: "rgb(var(--sys-orange))" }}
+                        style={{ flexShrink: 0, color: group.tier === "urgent" ? "rgb(var(--sys-orange))" : "hsl(var(--muted-foreground))" }}
                       />
                     )}
                     <span style={{ flex: 1, minWidth: 0, textAlign: "start" }}>
-                      <span style={rowTitleStyle}>{a.equipmentName}</span>
-                      {a.detail && <span style={rowSubStyle}>{a.detail}</span>}
+                      <span style={rowTitleStyle}>{t.alerts.types[group.type].label}</span>
+                      <span style={rowSubStyle}>{t.alerts.itemCount(group.count)}</span>
                     </span>
+                    <span style={{ fontSize: "var(--text-sm)", fontWeight: 700, fontVariantNumeric: "tabular-nums", color: "hsl(var(--muted-foreground))" }}>{group.count}</span>
                   </button>
                 ))
               )}

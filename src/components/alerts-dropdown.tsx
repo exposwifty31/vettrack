@@ -6,6 +6,13 @@ import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 import { useDirection } from "@/hooks/useDirection";
 import type { Alert } from "@/types";
+import { aggregateAlerts, formatBadgeCount, type AttentionTier } from "@/lib/attention";
+
+const TIER_ICON_COLOR: Record<AttentionTier, string> = {
+  critical: "text-red-500",
+  urgent: "text-amber-500",
+  maintenance: "text-muted-foreground",
+};
 
 interface AlertsDropdownProps {
   alerts: Alert[];
@@ -32,7 +39,7 @@ export function AlertsDropdown({ alerts, alertCount, badgeAnimating, buttonClass
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, [open]);
 
-  const preview = alerts.slice(0, 6);
+  const groups = aggregateAlerts(alerts);
 
   return (
     <div className="relative" ref={panelRef}>
@@ -66,7 +73,7 @@ export function AlertsDropdown({ alerts, alertCount, badgeAnimating, buttonClass
               )}
               aria-hidden
             >
-              {alertCount > 9 ? "9+" : alertCount}
+              {formatBadgeCount(alertCount)}
             </span>
           </>
         )}
@@ -92,34 +99,37 @@ export function AlertsDropdown({ alerts, alertCount, badgeAnimating, buttonClass
           </div>
 
           <div className="max-h-[min(50dvh,320px)] overflow-y-auto">
-            {preview.length === 0 ? (
+            {groups.length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-muted-foreground">
                 {t.layout.alertsDropdown.empty}
               </p>
             ) : (
               <ul className="divide-y divide-border">
-                {preview.map((alert) => (
-                  <li key={`${alert.equipmentId}-${alert.type}`}>
-                    <Link
-                      href={`/equipment/${alert.equipmentId}`}
-                      className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-muted/60 transition-colors"
-                      onClick={() => setOpen(false)}
-                      role="menuitem"
-                    >
-                      <AlertTriangle
-                        className={cn(
-                          "w-4 h-4 shrink-0 mt-0.5",
-                          alert.severity === "critical" ? "text-red-500" : "text-amber-500",
-                        )}
-                        aria-hidden
-                      />
-                      <div className="min-w-0 flex-1 text-start">
-                        <p className="text-sm font-medium text-foreground truncate">{alert.equipmentName}</p>
-                        <p className="text-xs text-muted-foreground line-clamp-2">{alert.detail}</p>
-                      </div>
-                    </Link>
-                  </li>
-                ))}
+                {groups.map((group) => {
+                  const target = group.count === 1
+                    ? `/equipment/${group.alerts[0]!.equipmentId}`
+                    : "/alerts";
+                  return (
+                    <li key={group.type}>
+                      <Link
+                        href={target}
+                        className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-muted/60 transition-colors"
+                        onClick={() => setOpen(false)}
+                        role="menuitem"
+                      >
+                        <AlertTriangle
+                          className={cn("w-4 h-4 shrink-0", TIER_ICON_COLOR[group.tier])}
+                          aria-hidden
+                        />
+                        <div className="min-w-0 flex-1 text-start">
+                          <p className="text-sm font-medium text-foreground truncate">{t.alerts.types[group.type].label}</p>
+                          <p className="text-xs text-muted-foreground">{t.alerts.itemCount(group.count)}</p>
+                        </div>
+                        <span className="text-sm font-bold tabular-nums text-muted-foreground">{group.count}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>

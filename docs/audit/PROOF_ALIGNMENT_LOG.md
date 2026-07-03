@@ -941,3 +941,20 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Verification ceiling:** gate + unit. The visual results (localized location card, Code Blue checkbox, 48px header, Rooms spacing) want a device/screenshot pass — part of the owed consolidated device verification.
 
 **Verdict:** Phase 6a/6b/6d/6e — DONE at gate + unit; visual/device pass owed.
+
+## 2026-07-03 — UX overhaul Phase 4: unified attention taxonomy + aggregated/tiered/capped bell (native + web)
+
+**Claim:** The bell no longer shows a wall of identical low-urgency warnings (the "60"). A shared attention module defines one tier vocabulary (critical|urgent|maintenance) and aggregates per-equipment alerts into ranked, counted groups; both the native (`NativeHeader`) and web (`alerts-dropdown`, the approved web exception) bell panels render the aggregated tiered groups with a 9+ capped badge. The Rooms 24h staleness threshold now sources from the same module.
+
+**Evidence (gate + unit):**
+- New `src/lib/attention/index.ts` — `AttentionTier` (critical|urgent|maintenance), `tierForAlert` (critical severity → urgent(issue/overdue) → maintenance), `aggregateAlerts` (one group per type, sorted tier-then-count → "12 devices not scanned in 14+ days" as one row), `formatBadgeCount` (9+ cap), canonical `STALE_THRESHOLD_MS` (24h).
+- Web bell `alerts-dropdown.tsx`: flat `slice(0,6)` → tiered group rows (type label + `itemCount`); singleton groups deep-link to the equipment, multi-count → `/alerts`; badge via `formatBadgeCount`.
+- Native bell `NativeHeader.tsx`: flat `slice(0,5)` → the same tiered group rows; badge `99+` → `formatBadgeCount` (9+). Distinct icon shape per tier (AlertCircle critical / AlertTriangle otherwise) keeps WCAG 1.4.1.
+- Rooms staleness unified: `rooms-list.tsx` + `room-radar.tsx` import `STALE_THRESHOLD_MS` instead of inlining `24*60*60*1000`.
+- New `tests/attention.test.ts` (8 tests). `pnpm typecheck` → exit 0. `pnpm test` → **387 files / 3819 tests pass**.
+
+**Scope note (honest):** the shared TIER vocabulary + aggregation + cap ship across both bells and the Rooms threshold is centralized. The equipment "needs attention" recovery-adapter detection logic remains its own derivation (NOT merged) — its per-entity rules are tested and higher-risk to collapse; unifying that DETECTOR onto one `computeAttention` is a bounded follow-up. The user-visible "alarm fatigue" fix (aggregate + tier + cap, native + web) is complete.
+
+**Verification ceiling:** gate + unit; the rendered aggregated panels (native + web) want a device/browser screenshot pass (owed).
+
+**Verdict:** Phase 4 — DONE at gate + unit (taxonomy + aggregation + cap across native + web + rooms threshold); recovery-adapter detector merge noted as follow-up; visual pass owed.
