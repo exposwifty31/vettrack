@@ -1023,3 +1023,18 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Verification ceiling (owed):** iOS Simulator end-to-end (stale session seeded → panel shows only current-window messages; off-shift panel empty + POST 409 toast) — scheduled with the batched device pass alongside the other phases. Client untouched by design; `reconcileMessages` behavior is covered by the existing `tests/shift-chat-session-scoping.test.ts`.
 
 **Verdict:** Phase 0 DONE at gate + DB-regression level; simulator drill owed in the consolidated device pass.
+
+## 2026-07-04 — Phase 1 (C1): CODE BLUE start button always responds
+
+**Claim:** The start button can no longer render armed while silently no-oping. Root cause was twofold: (a) `disabled` gated on `managerId` only while `handleStart` also required `managerName`; (b) `managerName` was seeded into `useState` at mount from `useAuth().name`, which can populate after mount — the state never re-seeded, permanently blanking the name. The manager is now DERIVED at render (identity = id; display name cosmetic with a localized fallback), the disabled state and the click gate are the same `canStart` condition, the in-flight state disables + spins, and success transitions via `refetch()` of server truth (no local session flip — frozen-surface rule held).
+
+**Evidence (gate + unit, actually run):**
+- `src/pages/code-blue.tsx` `PreCheckGate`: `managerId`/`managerName` states replaced by derived `manager` (eligible → `{id: userId, name: name.trim() || t.codeBlue.managerFallbackName}`; else picker state). `disabled={!canStart}` where `canStart = manager !== null && !starting` — identical to the `handleStart` guard. Disabled reason line (`t.codeBlue.startDisabledReason`, role="status") when no manager; muted disabled styling (accent/35); `proceedWithoutFullCheck` secondary button also gated (it previously dead-tapped too). Spinner + `t.codeBlue.startingSession` label while starting.
+- `CodeBluePage`: `starting` threaded into `PreCheckGate`; after `sessions.start()` resolves → `await refetch()` on `useCodeBlueSession` (server-confirmed transition instead of waiting out the 2 s poll). Catch-branch toasts unchanged and now reachable.
+- i18n: `codeBlue.managerFallbackName`, `codeBlue.startDisabledReason`, `codeBlue.startingSession` added to he+en; `pnpm i18n:check` parity ✓; types regenerated.
+- New `tests/code-blue-precheck-gate.test.tsx` (happy-dom): empty-name eligible manager CAN start with fallback name (the C1 regression); named manager passes name through; non-eligible without picked manager → disabled + reason + no call; starting → disabled + in-flight label. 4/4 pass.
+- `pnpm typecheck` (both configs) → exit 0. `pnpm test` → 3834 pass.
+
+**Verification ceiling (owed):** simulator drill — tap "פתח CODE BLUE" with/without checklist; confirm spinner → `ActiveSession` only after server confirmation. Scheduled with the batched device pass.
+
+**Verdict:** Phase 1 DONE at gate + unit level; simulator drill owed in the consolidated device pass.

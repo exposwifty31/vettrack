@@ -2960,6 +2960,9 @@ export interface TStructure {
     loadingManagers: string;
     noManagersAvailable: string;
     you: string;
+    managerFallbackName: string;
+    startDisabledReason: string;
+    startingSession: string;
     selectedManager: string;
     selectOutcome: string;
     selectEquipment: string;

@@ -1,7 +1,7 @@
 // src/pages/code-blue.tsx
 import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
-import { AlertTriangle, ArrowRight, CheckCircle2, Circle, Package, Shield, StickyNote } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, Circle, Loader2, Package, Shield, StickyNote } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { authFetch } from "@/lib/auth-fetch";
@@ -74,11 +74,14 @@ function ManagerPicker({ onSelect }: { onSelect: (id: string, name: string) => v
 
 // ─── Pre-check gate ──────────────────────────────────────────────────────────
 
-function PreCheckGate({
+// Exported for tests (C1 regression — armed-but-silent start button).
+export function PreCheckGate({
   onStart,
+  starting,
   initialEquipmentName,
 }: {
   onStart: (passed: boolean, manager: { id: string; name: string }) => void;
+  starting: boolean;
   initialEquipmentName?: string;
 }) {
   const { userId, role, name } = useAuth();
@@ -94,16 +97,25 @@ function PreCheckGate({
   const [checked, setChecked] = useState<Record<string, boolean>>(
     Object.fromEntries(QUICK_CHECK_ITEMS.map((i) => [i.key, false])),
   );
-  const [managerId, setManagerId] = useState(isEligibleManager ? (userId ?? "") : "");
-  const [managerName, setManagerName] = useState(isEligibleManager ? (name ?? "") : "");
+  const [pickedManager, setPickedManager] = useState<{ id: string; name: string } | null>(null);
+
+  // Derived (not state-seeded): useAuth().name can arrive after mount, and the
+  // display name is cosmetic — identity is the id. A missing name must never
+  // block the emergency, so eligible managers fall back to a generic label.
+  const manager = isEligibleManager
+    ? userId
+      ? { id: userId, name: (name ?? "").trim() || t.codeBlue.managerFallbackName }
+      : null
+    : pickedManager;
+  const canStart = manager !== null && !starting;
 
   const allChecked = QUICK_CHECK_ITEMS.every((i) => checked[i.key]);
 
   const toggle = (key: string) => setChecked((p) => ({ ...p, [key]: !p[key] }));
 
   const handleStart = (passed: boolean) => {
-    if (!managerId || !managerName) return;
-    onStart(passed, { id: managerId, name: managerName });
+    if (!manager || starting) return;
+    onStart(passed, manager);
   };
 
   return (
@@ -140,13 +152,13 @@ function PreCheckGate({
         <p className="text-xs text-emergency-text2/80 mb-3">{t.codeBlue.managerInstruction}</p>
         {isEligibleManager ? (
           <div className="rounded border border-emergency-borderMd bg-emergency-border px-3 py-2 text-sm text-emergency-text">
-            {name} {t.codeBlue.you}
+            {manager?.name ?? t.codeBlue.managerFallbackName} {t.codeBlue.you}
           </div>
         ) : (
           <>
-            <ManagerPicker onSelect={(id, n) => { setManagerId(id); setManagerName(n); }} />
-            {managerId && (
-              <div className="mt-2 text-xs text-[rgb(var(--sys-green))]">{t.codeBlue.selectedManager(managerName)}</div>
+            <ManagerPicker onSelect={(id, n) => setPickedManager({ id, name: n })} />
+            {pickedManager && (
+              <div className="mt-2 text-xs text-[rgb(var(--sys-green))]">{t.codeBlue.selectedManager(pickedManager.name)}</div>
             )}
           </>
         )}
@@ -179,16 +191,24 @@ function PreCheckGate({
       </div>
 
       <Button
-        className="w-full bg-emergency-accent hover:bg-emergency-accent/90 text-white font-bold"
-        disabled={!managerId}
+        className="w-full bg-emergency-accent hover:bg-emergency-accent/90 text-white font-bold disabled:bg-emergency-accent/35 disabled:text-white/70"
+        disabled={!canStart}
         onClick={() => handleStart(allChecked)}
+        data-testid="code-blue-start"
       >
-        {t.codeBlue.openButton}
+        {starting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+        {starting ? t.codeBlue.startingSession : t.codeBlue.openButton}
       </Button>
+      {!manager && !starting && (
+        <p className="mt-2 text-xs text-emergency-text2 text-center" role="status">
+          {t.codeBlue.startDisabledReason}
+        </p>
+      )}
       {!allChecked && (
         <button
           type="button"
-          className="w-full mt-2 min-h-[44px] rounded-lg border border-emergency-border/50 text-xs text-emergency-text2/80 hover:text-emergency-text2 hover:bg-emergency-border/30 transition-colors"
+          disabled={!canStart}
+          className="w-full mt-2 min-h-[44px] rounded-lg border border-emergency-border/50 text-xs text-emergency-text2/80 hover:text-emergency-text2 hover:bg-emergency-border/30 transition-colors disabled:opacity-50 disabled:pointer-events-none"
           onClick={() => handleStart(false)}
         >
           {t.codeBlue.proceedWithoutFullCheck}
@@ -517,7 +537,7 @@ export default function CodeBluePage() {
   const params = new URLSearchParams(search);
   const initEquipmentId = params.get("equipmentId") ?? undefined;
 
-  const { session } = useCodeBlueSession();
+  const { session, refetch } = useCodeBlueSession();
   const [starting, setStarting] = useState(false);
 
   const primaryEquipQ = useQuery<{ name: string } | null>({
@@ -543,6 +563,9 @@ export default function CodeBluePage() {
       });
       haptics.error();
       void playCriticalAlertTone();
+      // Server-confirmed transition: pull the active session now instead of
+      // waiting out the 2 s poll. Never flips local session state.
+      await refetch();
     } catch (err) {
       if (err instanceof ApiError) {
         toast.error(
@@ -563,6 +586,7 @@ export default function CodeBluePage() {
   return (
     <PreCheckGate
       onStart={handleStart}
+      starting={starting}
       initialEquipmentName={primaryEquipQ.data?.name}
     />
   );
