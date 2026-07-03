@@ -990,3 +990,20 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Verification ceiling (honest):** appearance tri-state + in-app Dynamic Type are gate-verified. The native iOS Dynamic Type bridge is UNVERIFIED — needs Xcode-target registration + a native build. Both also want a device/screenshot pass.
 
 **Verdict:** Phase 6c — appearance + in-app Dynamic Type DONE at gate + unit; native iOS content-size bridge delivered as code but UNREGISTERED + UNVERIFIED (owed device step).
+
+## 2026-07-03 — UX overhaul: consolidated native iOS simulator verification pass
+
+**Claim:** Built the native shell (`scripts/build-native-shell.sh` → Vite build with the Clerk key + `cap sync ios`) and installed the app on an iPad (A16, `DA8D1142`) and an iPhone 17 Pro (`9821AC5F`) simulator via `scripts/install-ios-sim.sh`. The prior proof entries' "owed device pass" is now substantially closed for the visible surfaces.
+
+**Evidence (on-device screenshots, authed app rendering — `tmp/.../ipad-launch.png`, `iphone-launch.png`):**
+- **`** BUILD SUCCEEDED **` on BOTH simulators** — every phase (appearance tri-state, `calc()` type tokens, two-pane routing, attention module, `resolveNextShift`, `dynamic-type.ts`) compiles + runs natively. `cap sync` reported 8 plugins; the unregistered `DynamicTypePlugin` is correctly ABSENT (consistent with the documented owed step).
+- **iPad — Phase 1 CONFIRMED:** the sidebar renders the FULL grouped nav (Operations: Today/Equipment/**Scan**/Emergency/Tasks/Critical-kit/Rooms[active]/Mine/Alerts/Inventory · Management · Account · End-shift). No Menu button, no QR FAB.
+- **iPad — Phase 3.0 + 3.3 + 6e CONFIRMED:** Rooms renders as a true two-pane — single-column room list (master) + the localized `SelectItemPlaceholder` ("בחר פריט…") in the detail pane.
+- **iPad — Phase 2 CONFIRMED:** chat is a header button (speech-bubble icon, unread badge), not a FAB.
+- **iPhone — Phase 5 CONFIRMED:** off-shift Today hero shows the "עיון בציוד / Browse equipment" action (dead-end resolved). Next-shift line correctly absent (no upcoming roster shift for this user).
+- **iPhone — Phase 2 CONFIRMED:** exactly one chat float (bottom-leading), clear of content; lean 5-item tab bar preserved.
+- **Both — Phase 4 CONFIRMED:** bell badge reads "+9" (not "60") — the aggregation cap is live on both devices.
+
+**Verification ceiling (still owed — finer interactions not driven this pass):** two-pane row-tap → detail swap (structure confirmed via placeholder + master list, but selection not exercised); the aggregated bell PANEL contents (cap confirmed, panel not opened); Equipment/Inventory two-panes specifically (same `TwoPaneLayout` primitive as Rooms, not individually screenshotted); the 6c Settings appearance/text-size controls + their runtime effect; `resolveNextShift` against real roster data (this user had none); and the 6c native iOS Dynamic Type bridge (still UNREGISTERED in the Xcode target).
+
+**Verdict:** Native build + install on iPad + iPhone — DONE, BUILD SUCCEEDED both. Core visible changes (Phases 1, 2, 3.0/3.3, 4, 5, 6e) CONFIRMED on device via screenshots. Remaining: finer interaction drills + the 6c native bridge registration.
