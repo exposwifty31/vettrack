@@ -21,6 +21,7 @@ import { QrScanner } from "@/components/qr-scanner";
 import { useScanAffordance } from "@/lib/scan-affordance";
 import { ShiftAdjustmentControls } from "@/features/shift-adjustments/ShiftAdjustmentControls";
 import { getCurrentUserId } from "@/lib/auth-store";
+import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { subscribeKeepalive } from "@/lib/realtime";
 import type { ActivityFeedItem } from "@/types";
 import {
@@ -587,12 +588,16 @@ export default function HomePage() {
                   <p className="text-[16px] font-semibold text-ivory-text">
                     {t.homePage.recentActivity}
                   </p>
-                  <Link
-                    href="/audit-log"
-                    className="text-[13px] font-semibold text-brand"
-                  >
-                    {t.homePage.viewAll}
-                  </Link>
+                  {/* /audit-log is WebOnlyGuard-walled — on native the link
+                      silently bounced back to /home (Phase 7 #4). */}
+                  {!isCapacitorNative() && (
+                    <Link
+                      href="/audit-log"
+                      className="text-[13px] font-semibold text-brand"
+                    >
+                      {t.homePage.viewAll}
+                    </Link>
+                  )}
                 </div>
                 {activityLoading ? (
                   <div className="px-[18px] pb-3">

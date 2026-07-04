@@ -121,6 +121,15 @@ const PAGE_SIZE = 9;
 
 export default function EquipmentListPage() {
   const inMobileShell = useMobileShellContext();
+  const searchStr = useSearch();
+  const [, navigate] = useLocation();
+  // Shared deep link: only the desktop list reads ?scan=1; in the shell the
+  // scanner is its own surface, so forward the intent there (Phase 7 #5).
+  const wantsScan = inMobileShell && new URLSearchParams(searchStr).get("scan") === "1";
+  useEffect(() => {
+    if (wantsScan) navigate("/scan", { replace: true });
+  }, [wantsScan, navigate]);
+  if (wantsScan) return null;
   return inMobileShell ? <EquipmentListScreen /> : <EquipmentListPageDesktop />;
 }
 

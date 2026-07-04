@@ -15,6 +15,7 @@ import { Toaster } from "sonner";
 import { HelmetProvider } from "react-helmet-async";
 import { AppErrorBoundary } from "@/components/ui/app-error-boundary";
 import { SyncStatusBanner } from "@/components/sync-status-banner";
+import { GlobalSyncQueue } from "@/components/global-sync-queue";
 import { SwUpdateBanner } from "@/components/sw-update-banner";
 import { ShiftChatFab } from "@/features/shift-chat/components/ShiftChatFab";
 import {
@@ -197,6 +198,7 @@ if (!rootEl) {
               <AppBootstrap />
               <SwUpdateBanner />
               <SyncStatusBanner />
+              <GlobalSyncQueue />
               <GlobalShiftChat />
               <Toaster
                 position="top-center"

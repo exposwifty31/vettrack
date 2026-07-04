@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
-import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useSearch } from "wouter";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import { toast } from "sonner";
 import { useEquipmentDetail } from "./hooks/use-equipment-detail";
 import { EquipmentLocationCard } from "./EquipmentLocationCard";
 import { EquipmentMetaStrip } from "./EquipmentMetaStrip";
@@ -9,12 +10,18 @@ import { EquipmentGlanceGrid } from "./EquipmentGlanceGrid";
 import { EquipmentServiceCard } from "./EquipmentServiceCard";
 import { EquipmentActions } from "./EquipmentActions";
 import { EquipmentAccountabilityTimeline } from "./EquipmentAccountabilityTimeline";
+import { ReportEquipmentIssueSheet } from "./ReportEquipmentIssueSheet";
+import { ReservationBanner } from "@/components/equipment/ReservationBanner";
 import { LoadingSection } from "@/components/ui/loading-section";
 import { ErrorCard } from "@/components/ui/error-card";
 import { getEquipmentDisplayName } from "@/lib/equipment-display";
+import { shouldShowReservationBanner } from "@/lib/equipment-waitlist-ui";
 import { useDirection } from "@/hooks/useDirection";
+import { useAuth } from "@/hooks/use-auth";
+import { useActiveShift } from "@/hooks/use-active-shift";
+import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
-import { request } from "@/lib/api";
+import { api, request } from "@/lib/api";
 import type { ScanLog } from "@/types";
 
 const PULL_THRESHOLD = 80;
@@ -31,6 +38,56 @@ export function EquipmentDetailScreen({ equipmentId, hideBack }: Props) {
   const dir = useDirection();
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
   const [, navigate] = useLocation();
+  const searchStr = useSearch();
+  const queryClient = useQueryClient();
+  const { userId } = useAuth();
+  const { hasActiveShift } = useActiveShift();
+  const [issueOpen, setIssueOpen] = useState(false);
+
+  // Scanner "Mark Issue" deep-links ?action=issue; only the desktop page read
+  // it before, so the button no-oped on native (Phase 7 #1).
+  useEffect(() => {
+    if (new URLSearchParams(searchStr).get("action") === "issue") setIssueOpen(true);
+  }, [searchStr]);
+
+  // Reservation-ready push deep-links here; without the banner the notified
+  // user had no way to claim on native (Phase 7 #2). Same query key as the
+  // desktop page so the caches share.
+  const waitlistQ = useQuery({
+    queryKey: ["equipment-waitlist", equipmentId],
+    queryFn: () => api.equipment.waitlist(equipmentId),
+    enabled: !!equipmentId && !!userId,
+    refetchOnWindowFocus: false,
+  });
+  const showReservationBanner = shouldShowReservationBanner(
+    waitlistQ.data?.myStatus,
+    waitlistQ.data?.reservationExpiresAt,
+  );
+
+  const checkoutMut = useMutation({
+    mutationFn: () => api.equipment.checkout(equipmentId),
+    onSuccess: (res) => {
+      haptics.tap();
+      queryClient.setQueryData([`/api/equipment/${equipmentId}`], res.equipment);
+      queryClient.invalidateQueries({ queryKey: ["equipment-waitlist", equipmentId] });
+      toast.success(
+        res.pendingSyncId !== undefined
+          ? t.equipmentDetail.toast.savedOffline
+          : t.equipmentDetail.toast.checkedOut,
+      );
+    },
+    onError: (err: Error) => {
+      toast.error(t.equipmentDetail.toast.checkoutFailed(err.message));
+    },
+  });
+  // Same off-shift ownership gate as the desktop checkout choke point.
+  const handleReservationCheckout = () => {
+    if (!hasActiveShift) {
+      toast.error(t.scan.offShiftBody);
+      return;
+    }
+    checkoutMut.mutate();
+  };
   // Detail is normally reached from the equipment list; on a deep-link entry
   // there is no in-app history to pop, so fall back to the list.
   const handleBack = () => {
@@ -157,6 +214,16 @@ export function EquipmentDetailScreen({ equipmentId, hideBack }: Props) {
 
           <EquipmentMetaStrip equipment={equipment} />
 
+          {showReservationBanner && waitlistQ.data?.reservationExpiresAt && (
+            <ReservationBanner
+              equipmentId={equipment.id}
+              expiresAt={waitlistQ.data.reservationExpiresAt}
+              onCheckout={handleReservationCheckout}
+              checkoutPending={checkoutMut.isPending}
+              showNextInLine={waitlistQ.data.myPosition === 1}
+            />
+          )}
+
           {locationInference && (
             <EquipmentLocationCard inference={locationInference} />
           )}
@@ -170,6 +237,12 @@ export function EquipmentDetailScreen({ equipmentId, hideBack }: Props) {
           )}
 
           <EquipmentActions equipment={equipment} />
+
+          <ReportEquipmentIssueSheet
+            equipment={equipment}
+            open={issueOpen}
+            onOpenChange={setIssueOpen}
+          />
         </>
       ) : null}
     </div>
