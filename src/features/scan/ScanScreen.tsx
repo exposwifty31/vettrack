@@ -52,7 +52,7 @@ export function ScanScreen() {
             margin: "4px 0 0",
           }}
         >
-          {t.scan.scanPrompt}
+          {scanBlocked ? t.scan.offShiftSubtitle : t.scan.scanPrompt}
         </p>
       </div>
 

@@ -480,6 +480,7 @@ const translations = {
     scanPrompt: d.scan.scanPrompt,
     offShiftTitle: d.scan.offShiftTitle,
     offShiftBody: d.scan.offShiftBody,
+    offShiftSubtitle: d.scan.offShiftSubtitle,
     checkedInTo: d.scan.checkedInTo,
     passToColleague: d.scan.passToColleague,
     done: d.scan.done,

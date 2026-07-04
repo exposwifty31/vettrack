@@ -35,8 +35,8 @@ export type NativeNavSection = {
   items: NativeNavItem[];
 };
 
-export function getNativeNavSections(): NativeNavSection[] {
-  return [
+export function getNativeNavSections(opts?: { hasActiveShift?: boolean }): NativeNavSection[] {
+  const sections: NativeNavSection[] = [
     {
       id: "operations",
       label: t.nav.operationsSection,
@@ -79,6 +79,12 @@ export function getNativeNavSections(): NativeNavSection[] {
       ],
     },
   ];
+  // "End shift" while off-shift is a contradiction — handoff needs an active
+  // roster shift (M9). Callers that don't know the shift state keep the row.
+  if (opts?.hasActiveShift === false) {
+    return sections.filter((section) => section.id !== "session");
+  }
+  return sections;
 }
 
 /**

@@ -12,6 +12,7 @@ import { Bdi } from "@/components/ui/bdi";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 import { useDirection } from "@/hooks/useDirection";
+import { useNativeShellContext } from "@/native/NativeShellContext";
 import { toast } from "sonner";
 import { haptics } from "@/lib/haptics";
 import { playCriticalAlertTone } from "@/lib/sounds";
@@ -87,6 +88,7 @@ export function PreCheckGate({
   const { userId, role, name } = useAuth();
   const [, navigate] = useLocation();
   const dir = useDirection();
+  const inNativeShell = useNativeShellContext();
   const isEligibleManager = role === "vet" || role === "admin";
   const QUICK_CHECK_ITEMS = [
     { key: "unitReady", label: t.codeBlue.preCheck.unitReady },
@@ -121,17 +123,22 @@ export function PreCheckGate({
   return (
     <div className="flex flex-col bg-emergency-bg w-full overflow-hidden" dir={dir} style={{ height: "100%", paddingTop: "env(safe-area-inset-top)" }}>
       <div className="flex-shrink-0 px-4 pt-4 pb-3">
-      {/* Leave before starting — accidental entry must never trap the user. */}
-      <button
-        type="button"
-        onClick={() => navigate("/home")}
-        data-testid="code-blue-leave-setup"
-        aria-label={t.common.back}
-        className="mb-4 flex h-11 items-center gap-1.5 rounded-full border border-emergency-border bg-emergency-border/80 px-3 text-xs font-medium text-emergency-text transition-colors hover:bg-emergency-border motion-safe:active:scale-95"
-      >
-        <ArrowRight className="h-4 w-4" aria-hidden />
-        {t.common.back}
-      </button>
+      {/* Leave before starting — accidental entry must never trap the user.
+          Inside the native shell Emergency is a tab root and the tab bar /
+          sidebar is always visible, so a back-to-home affordance is redundant
+          there (M6); the web page keeps it. */}
+      {!inNativeShell && (
+        <button
+          type="button"
+          onClick={() => navigate("/home")}
+          data-testid="code-blue-leave-setup"
+          aria-label={t.common.back}
+          className="mb-4 flex h-11 items-center gap-1.5 rounded-full border border-emergency-border bg-emergency-border/80 px-3 text-xs font-medium text-emergency-text transition-colors hover:bg-emergency-border motion-safe:active:scale-95"
+        >
+          <ArrowRight className="h-4 w-4" aria-hidden />
+          {t.common.back}
+        </button>
+      )}
       <div className="flex items-center gap-2 text-emergency-accent">
         <AlertTriangle className="h-6 w-6 shrink-0" aria-hidden />
         <h1 className="text-xl font-bold text-emergency-accent">{t.codeBlue.openTitle}</h1>

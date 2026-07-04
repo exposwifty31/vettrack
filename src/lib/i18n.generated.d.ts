@@ -4052,6 +4052,7 @@ export interface TStructure {
     scanPrompt: string;
     offShiftTitle: string;
     offShiftBody: string;
+    offShiftSubtitle: string;
     checkedInTo: string;
     passToColleague: string;
     done: string;

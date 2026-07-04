@@ -5,6 +5,7 @@ import { t } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
 import { useIsTabletViewport } from "@/lib/use-tablet-viewport";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
+import { useActiveShift } from "@/hooks/use-active-shift";
 import { getNativeNavSections } from "@/lib/routes/native-nav-model";
 
 type Props = {
@@ -41,6 +42,7 @@ export function MoreSheet({ open, onClose }: Props) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const startYRef = useRef<number | null>(null);
   const isTablet = useIsTabletViewport();
+  const { hasActiveShift, isLoading: shiftLoading } = useActiveShift();
 
   useFocusTrap({ active: open, containerRef: dialogRef, onEscape: onClose });
 
@@ -63,7 +65,7 @@ export function MoreSheet({ open, onClose }: Props) {
 
   // Phone drawer: the bottom tab bar already carries `inPhoneTabBar` items
   // (Today / Equipment / Scan / Emergency), so hide them here to avoid duplicates.
-  const sections = getNativeNavSections()
+  const sections = getNativeNavSections({ hasActiveShift: shiftLoading || hasActiveShift })
     .filter((section) => !section.adminOnly || isAdmin)
     .map((section) => ({
       ...section,

@@ -1103,3 +1103,24 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Verification ceiling (owed):** simulator — Day field at 320/375 widths + landscape; empty-technician message; pinned "!Hi everyone" renders upright; status chips Hebrew on room radar/scan result; checklist-flip re-verify. Batched device pass.
 
 **Verdict:** Phase 5 DONE at gate + unit level; simulator drill owed in the consolidated device pass.
+
+## 2026-07-04 — Phase 6 (M4–M9 + polish): consistency sweep
+
+**Claim:** The scan header no longer invites scanning while off-shift (M5); the Code Blue setup screen drops its redundant back-to-home button inside the native shell where Emergency is a tab root with an always-visible tab bar/sidebar, keeping it on web (M6); nav labels no longer collide (M7); "End shift" disappears from the drawer and iPad sidebar when there is no active roster shift (M9); the room-radar verify-all button ellipsizes on one line and the equipment card title truncates on the content's trailing end in RTL (M4 a+b); the Code Blue "מנהל ההפצה" ("distribution manager") mistranslation is corrected to event-manager copy in BOTH locales.
+
+**Evidence (gate + unit, actually run):**
+- M5: `ScanScreen.tsx` subtitle `scanBlocked ? t.scan.offShiftSubtitle : t.scan.scanPrompt`; new `scan.offShiftSubtitle` (he+en) + hand-listed accessor (`t.scan` is hand-built).
+- M6: `code-blue.tsx` leave-setup button gated `{!inNativeShell && …}` via `useNativeShellContext()` (default false → web + existing unit tests keep the button). Verified `NativeTabBar` mounts unconditionally in the phone shell (only `NativeHeader` hides on fullscreen routes) — no escape is lost on native, deep-link included.
+- M7: he `nav.admin` "ניהול"→"ניהול מערכת" (was byte-identical to `nav.managementSection`), `nav.mine` "שלי"→"הציוד שלי", `nav.inventoryItems` "פריטי מלאי"→"קטלוג פריטים" (vs "מלאי ומתכלים"); en `Item catalog`. Copy-only — consumed via `t.nav.*` by `native-nav-model`/`MoreSheet`/`NativeTabSidebar`, no code edit.
+- M9: `getNativeNavSections(opts?: {hasActiveShift?})` filters the `session` section when `false`; `MoreSheet` + `NativeTabSidebar` pass `shiftLoading || hasActiveShift` (row stays during load — no flash-in of a destructive row). `useActiveShift` dedupes on the `/api/home/dashboard` key — no new request.
+- M4: verify-all button `flex-1 min-w-0` + `truncate` spans (all three states, icons `shrink-0`); card title `<p dir="auto">` so a Latin device name truncates at its own trailing end; (c) checked in source — `TwoPaneLayout` master width is a fixed px prop and `room-radar` has no inner max-width narrower than the pane (only a modal `max-w-sm` and empty-state `max-w-xs`).
+- Polish: `codeBlue.{managerLabel,managerLabelShort,managerInstruction,managerOnlyHint}` → event-manager copy he+en. Monospace audit: only `formatElapsed` timer + gateway-code input use `font-mono` — both are codes/digits, no change needed. CSV import-preview disabled button: shadcn disabled affordance + per-row errors render directly above; remaining gap is untranslated dialog copy → Plan 2 Wave 4 (CsvImportDialog decision).
+- New `tests/phase-6-consistency-polish.test.ts` (11 tests): session-section gating (false/true/legacy), consumer wiring markers, M5 swap marker + key existence, M6 gate-before-button ordering, M4 truncation markers, manager-copy contracts (en literal + he "הפצה" absence), nav-collision assertions. All pass.
+- `tests/mobile-shell.test.tsx` harness updated: renders now wrap in `QueryClientProvider` (the sidebar legitimately reads the shift query; disabled without a user id — no fetch). Contract assertions unchanged.
+- Gates: `pnpm typecheck` (both) → 0 errors; `pnpm i18n:check` ✓; `pnpm test` → **393 files / 3883 pass**.
+
+**Residue (explicit):** "loading-state consistency (every loader gets a timeout/error state)" is unbounded across the app — not attempted here; carry to Plan 2 or a dedicated pass. CSV import dialog copy untranslated (Plan 2 Wave 4).
+
+**Verification ceiling (owed):** simulator — off-shift scan subtitle; Emergency tab shows no back button (native) while web keeps it; drawer/sidebar hide End-shift off-shift; long room name verify-all button single-line; Latin card title ellipsis side. Batched device pass.
+
+**Verdict:** Phase 6 DONE at gate + unit level; simulator drill owed in the consolidated device pass.

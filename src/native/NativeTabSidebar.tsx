@@ -1,6 +1,7 @@
 import { useLocation } from "wouter";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/hooks/use-auth";
+import { useActiveShift } from "@/hooks/use-active-shift";
 import {
   getNativeNavSections,
   isNavItemActive,
@@ -84,8 +85,9 @@ function SidebarSectionHeader({ label }: { label: string }) {
 export function NativeTabSidebar() {
   const [location, navigate] = useLocation();
   const { isAdmin } = useAuth();
+  const { hasActiveShift, isLoading: shiftLoading } = useActiveShift();
 
-  const sections = getNativeNavSections().filter(
+  const sections = getNativeNavSections({ hasActiveShift: shiftLoading || hasActiveShift }).filter(
     (section) => !section.adminOnly || isAdmin,
   );
   const allHrefs = sections.flatMap((section) =>

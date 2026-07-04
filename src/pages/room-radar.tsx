@@ -238,7 +238,10 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
 
               <div className="flex-1 min-w-0">
                 <Link href={`/equipment/${eq.id}`}>
-                  <p className="font-bold text-base truncate leading-snug hover:text-primary transition-colors">
+                  {/* dir="auto": a Latin device name in the RTL card truncated
+                      from its leading side; auto directs the line by content so
+                      the ellipsis lands on the trailing end (M4). */}
+                  <p dir="auto" className="font-bold text-base truncate leading-snug hover:text-primary transition-colors">
                     <Bdi>{displayName}</Bdi>
                   </p>
                 </Link>
@@ -650,7 +653,7 @@ export default function RoomRadarPage() {
               onClick={handleVerifyAll}
               disabled={verifyState !== "idle"}
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all min-h-[44px] border",
+                "flex-1 min-w-0 flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all min-h-[44px] border",
                 verifyState === "done"
                   ? "bg-[hsl(var(--status-ok))] text-white border-[hsl(var(--status-ok))] shadow-md"
                   : "bg-primary text-primary-foreground border-primary hover:bg-primary/90 active:scale-[0.98] shadow-sm"
@@ -658,18 +661,22 @@ export default function RoomRadarPage() {
             >
               {verifyState === "verifying" ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {t.roomRadarPage.verifying}
+                  <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+                  <span className="truncate">{t.roomRadarPage.verifying}</span>
                 </>
               ) : verifyState === "done" ? (
                 <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  {t.roomRadarPage.itemsVerified(verifiedCount)}
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{t.roomRadarPage.itemsVerified(verifiedCount)}</span>
                 </>
               ) : (
                 <>
-                  <ShieldCheck className="w-4 h-4" />
-                  {t.roomRadarPage.verifyAllInRoom(room?.name ?? t.roomRadarPage.roomFallback)}
+                  <ShieldCheck className="w-4 h-4 shrink-0" />
+                  {/* Long room names wrapped this button to 4 lines (M4) —
+                      one ellipsized line inside the flex-1 cell instead. */}
+                  <span className="truncate">
+                    {t.roomRadarPage.verifyAllInRoom(room?.name ?? t.roomRadarPage.roomFallback)}
+                  </span>
                 </>
               )}
             </button>

@@ -19,6 +19,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useMobileShellContext } from "@/shell/mobile/MobileShellContext";
 import { MobileShell } from "@/shell/mobile/MobileShell";
 import { MobileTabBar } from "@/shell/mobile/MobileTabBar";
@@ -97,7 +98,14 @@ function ContextReadout() {
 
 function renderAt(path: string, ui: React.ReactElement) {
   const { hook } = memoryLocation({ path });
-  return render(<Router hook={hook}>{ui}</Router>);
+  // The shell nav reads useActiveShift (M9 end-shift gating); with no user id
+  // the query stays disabled, but the provider must exist.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <Router hook={hook}>{ui}</Router>
+    </QueryClientProvider>,
+  );
 }
 
 describe("MobileShellContext", () => {
