@@ -1219,3 +1219,17 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Note: the Railway CLI link on this machine is stale (registered for /Users/dan/vettrack, token expired) — irrelevant while CI deploys main, but fix before any manual `railway up`.
 
 **Verdict:** All three post-merge drills PASS. Phase 0 verified at code, test, AND production-behavior level. No owed items remain from the audit's merge conditions except the deferred Claude Design prompts.
+
+## 2026-07-05 — /init: CLAUDE.md drift audit + corrections
+
+**Claim:** CLAUDE.md re-verified against the live repo; six drift points fixed, no rewrite of the accurate core (frozen surfaces, realtime, authority, i18n untouched).
+
+**Evidence (each checked against the actual file, not assumed):**
+- `package.json` read in full: `architecture:gates` → `scripts/architecture/run-architecture-gates.mjs` runs tsc (frontend) + tsc (`tsconfig.server-check.json`) + depcruise + madge cycles only — tenant:lint and knip are NOT in the gate suite (script grepped, lines 26–41). Commands section corrected.
+- Capacitor native shell absent from CLAUDE.md despite `cap:*` scripts, `ios/`/`android/` dirs, and `scripts/build-native-shell.sh` (header read: reads `VITE_CLERK_PUBLISHABLE_KEY`/`VITE_API_ORIGIN` from `.env` only, never sets `CAPACITOR_SERVER_URL`). Added commands + gotcha paragraph + layout line.
+- `server/lib/auth-mode.ts` grepped: clerk mode requires secret AND `CLERK_ENABLED !== "false"`; `CLERK_ENABLED=false` → dev-bypass (`clerk-explicitly-disabled`). Auth modes section corrected.
+- `vite.config.ts` exclude list read: `tests/shift-chat-window.integration.test.ts` had been added (file header read — requires DATABASE_URL + migration 159, runs via `pnpm exec tsx`). Tests section updated; dedicated runners' actual include lists verified in `vitest.db-integration.config.ts` (equipment-operational-state only) and `vitest.integration.ops.config.ts` (+ waitlist) — first draft overstated their coverage and was corrected.
+- `ls src/features/` → 12 modules (was documented as 4); `server/domain/` exists (equipment/ + service-task.adapter.ts, README cross-checked) and was missing from the layout; `server/app/routes.ts` has 46 imports / `server/routes/` 49 files (was "~44").
+- Architecture intro updated to post-scope-change reality (README scope note: medication/billing/ER removed in migrations 142–143; legacy routes are redirects).
+
+**Verdict:** CLAUDE.md now matches the repo at commit time. Not re-verified here: worker table, telemetry enums, rate-limit numbers (unchanged text, not re-audited).

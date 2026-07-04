@@ -17,16 +17,18 @@ pnpm typecheck:server         # server tsconfig only
 pnpm test                   # vitest unit/integration (excludes DB/live-server tests)
 pnpm test -- --reporter=verbose  # with detail
 pnpm test -- tests/some.test.ts  # single file
+pnpm test:db-integration    # equipment-operational-state DB test (needs DATABASE_URL + migrations)
+pnpm test:integration:ops   # equipment operational-state + waitlist integration tests
 pnpm test:playwright:ci     # Playwright CI suite (Chromium)
 pnpm test:playwright:phase9 # Phase 9 realtime/PWA drills (needs running app)
 pnpm test:signup            # signup E2E flow
 
 # Architecture gates (server/schema, module boundaries, dead code)
-pnpm architecture:gates      # runs the full gate suite below in sequence
-pnpm tenant:lint:touched     # warn-only: flags queries missing clinicId filter (touched files)
+pnpm architecture:gates      # tsc (frontend + tsconfig.server-check.json) + depcruise + madge cycles
+pnpm tenant:lint:touched     # warn-only: flags queries missing clinicId filter (touched files); NOT part of architecture:gates
 pnpm depcruise:check         # dependency-cruiser boundary check against known-violations baseline
 pnpm architecture:cycles     # import-cycle regression check
-pnpm knip                   # unused files/exports/deps
+pnpm knip                   # unused files/exports/deps (also not part of architecture:gates)
 
 # i18n
 pnpm i18n:check              # locales/en.json ⟷ locales/he.json parity
@@ -36,13 +38,21 @@ pnpm db:migrate             # apply pending migrations on demand (same path runs
 npx drizzle-kit generate    # author the next migration after schema changes in server/db.ts
 npx drizzle-kit push        # push schema directly (dev only)
 
+# Native shell (Capacitor — ios/ + android/ wrap the built web bundle)
+pnpm cap:build:native       # scripts/build-native-shell.sh --ios (use --android / --all via cap:build:native:android / :all)
+pnpm cap:open:ios           # open Xcode project
+pnpm cap:install:ios-sim    # install onto booted simulator
+
 # Other
 pnpm build                  # frontend production build → dist/public
 pnpm start                  # production server
 pnpm worker                 # background job worker (requires Redis)
+pnpm seed:dev               # seed dev database (server/seed.ts)
 pnpm auth:preflight         # verify Clerk config + auth mode
 pnpm validate:prod          # pre-deployment checks
 ```
+
+**Native shell builds must go through `scripts/build-native-shell.sh`** (`pnpm cap:build:native`), never plain `pnpm build && npx cap sync`. The script bakes `VITE_CLERK_PUBLISHABLE_KEY` and `VITE_API_ORIGIN` into the bundle (read from `.env` only — it ignores `.env.local`) and never sets `CAPACITOR_SERVER_URL` (a thin web wrapper breaks App Review 4.2 and social OAuth). A plain `pnpm build` has no Clerk key, so the shell silently falls into dev-bypass and crashes on `useUser`/`ClerkProvider`.
 
 **Minimal dev `.env`:**
 ```
@@ -65,9 +75,9 @@ Omit `CLERK_SECRET_KEY` / `VITE_CLERK_PUBLISHABLE_KEY` to use dev-bypass auth (h
 
 ## Architecture
 
-VetTrack is a veterinary hospital operations platform: equipment tracking, medication workflows, inventory, scheduling, billing, and external PMS integrations for multi-clinic deployments.
+VetTrack is a veterinary hospital operations platform: equipment tracking & custody, Code Blue emergency workflows, inventory/dispense, tasks & shifts, and external PMS integrations for multi-clinic deployments. (Legacy `/patients`, `/er`, `/billing`, `/meds` routes survive only as redirects — see scope note below.)
 
-**Stack:** React 18 + Vite frontend (port 5000) · Express + TypeScript backend (port 3001) · PostgreSQL + Drizzle ORM · BullMQ + Redis · Clerk auth · PWA / offline-first
+**Stack:** React 18 + Vite frontend (port 5000) · Express + TypeScript backend (port 3001) · PostgreSQL + Drizzle ORM · BullMQ + Redis · Clerk auth · PWA / offline-first · Capacitor 8 native shell (iOS/Android)
 
 ### Directory layout
 
@@ -76,7 +86,7 @@ src/              React frontend
   app/            Router (src/app/routes.tsx — all pages lazy-loaded via wouter)
   pages/          Route-level page components
   components/     Shared UI components (shadcn primitives in components/ui/)
-  features/       Feature-scoped modules (auth, containers, inventory, shift-chat)
+  features/       Feature-scoped modules (alerts, auth, containers, equipment, inventory, profile, rooms, scan, settings, shift-adjustments, shift-chat, today)
   hooks/          Auth, push, settings, offline sync hooks
   lib/            api.ts, offline-db.ts (Dexie), sync-engine.ts, i18n.ts
 server/
@@ -85,10 +95,11 @@ server/
   schema/         pgTable definitions (core, equipment, inventory, tasks, ops, er, integrations)
   migrate.ts      Migration runner (exports runMigrations())
   app/
-    routes.ts     Registers ~44 API route modules
+    routes.ts     Registers ~46 API route modules
     start-schedulers.ts  Starts all BullMQ workers + background schedulers
   routes/         One file per API resource
   services/       Domain services (appointments, equipment, waitlist, inventory, restock, dispense, code-blue…)
+  domain/         Hexagonal equipment evidence-graph + Asset Copilot (domain/equipment/**, service-task.adapter.ts)
   lib/            Business logic (billing, alerts, push, forecast, audit, queues, realtime/event-publisher, code-blue-keepalive, authority…)
   lib/authority/enforcement/ Evaluator families (stale, oprole, task-assignment, stale-task-ownership, code-blue-manager, clinical-invariant); each ships `off | shadow | enforce`
   jobs/runtime.ts BullMQ job runtime (charge-alert, expiry-check, stale-checkin-sweep)
@@ -102,6 +113,7 @@ migrations/       SQL files run in order via pnpm db:migrate (also applied at se
 tests/            All vitest tests; some groups are excluded by default (see below). Phase 9 drills: deterministic counter contracts (`tests/phase-9-deterministic-drills.test.ts`) + Playwright browser harness (`tests/phase-9-drills.spec.ts`)
 scripts/          Dev/ops scripts (includes scripts/i18n/check-parity.ts and scripts/i18n/generate-types.ts)
 public/sw.js      Service worker (build-tag versioned cache, emergency endpoint denylist)
+ios/ android/     Capacitor native shells (capacitor.config.ts at root) — build only via scripts/build-native-shell.sh
 ```
 
 ### Multi-tenancy (critical rule)
@@ -125,8 +137,8 @@ These exist as load-bearing contracts. Extend or wire additively — do **not** 
 ### Auth modes
 
 Resolved at startup by `server/lib/auth-mode.ts`:
-- **dev-bypass** — no Clerk keys set → hardcoded `DEV_USER` (admin, `clinicId = "dev-clinic-default"`)
-- **clerk** — `CLERK_SECRET_KEY` present → full Clerk JWT validation
+- **clerk** — `CLERK_SECRET_KEY` present AND `CLERK_ENABLED !== "false"` → full Clerk JWT validation
+- **dev-bypass** — otherwise (no secret, or `CLERK_ENABLED=false` explicitly) → hardcoded `DEV_USER` (admin, `clinicId = "dev-clinic-default"`)
 
 `req.authUser` (set by `server/middleware/auth.ts`) is always populated before route handlers. **Role is always read from `vt_users.role` in the DB**, never from JWT claims.
 
@@ -246,7 +258,7 @@ Use `logAudit()` from `server/lib/audit.ts` for all critical actions. It is fire
 ### Tests
 
 `pnpm test` runs vitest. Several test groups are excluded by default in `vite.config.ts`:
-- DB integration tests (require `DATABASE_URL` + applied migrations): `tests/restock.service.test.ts`, `tests/migrations/**`, `tests/phase-2-3-medication-package-integration.test.ts`, `tests/equipment-operational-state.integration.test.ts`
+- DB integration tests (require `DATABASE_URL` + applied migrations): `tests/restock.service.test.ts`, `tests/migrations/**`, `tests/phase-2-3-medication-package-integration.test.ts`, `tests/equipment-operational-state.integration.test.ts`, `tests/shift-chat-window.integration.test.ts`. Dedicated runners cover only a subset: `pnpm test:db-integration` (equipment-operational-state), `pnpm test:integration:ops` (operational-state + waitlist); the shift-chat test runs directly via `pnpm exec tsx tests/shift-chat-window.integration.test.ts`.
 - Live-server tests (require dev server on :3001): `tests/charge-alert-worker.test.js`, `tests/code-blue-mode-equipment.test.js`, `tests/equipment-scan-e2e.test.js`, `tests/expiry-api.test.js`, `tests/expiry-check-worker.test.js`, `tests/returns-api.test.js`
 - Phase 9 deterministic drills: `tests/phase-9-deterministic-drills.test.ts` covers bounded-counter contracts in unit form; `tests/phase-9-drills.spec.ts` is the Playwright browser harness for the eight realtime/PWA drills.
 
