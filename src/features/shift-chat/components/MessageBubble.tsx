@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { Bdi } from "@/components/ui/bdi";
 import type { ShiftMessage } from "../types";
 import { t } from "@/lib/i18n";
 
@@ -54,13 +55,17 @@ export function MessageBubble({ message, currentUserId, onReact, onPin, canPin }
           {message.isUrgent && (
             <div className="text-[9px] font-bold text-[var(--status-issue-fg)] tracking-wide mb-1">⚡ {t.shiftChat.urgent}</div>
           )}
-          <span
-            dangerouslySetInnerHTML={{
-              __html: escapeHtml(message.body)
-                .replace(/@(\S+)/g, '<span class="text-primary font-semibold">@$1</span>')
-                .replace(/#(\S+)/g, '<span class="text-primary underline cursor-pointer font-semibold">#$1</span>'),
-            }}
-          />
+          {/* Bdi: a Latin-script body in the RTL panel rendered "!Hi everyone"
+              without isolation — same fix as the pinned banner. */}
+          <Bdi>
+            <span
+              dangerouslySetInnerHTML={{
+                __html: escapeHtml(message.body)
+                  .replace(/@(\S+)/g, '<span class="text-primary font-semibold">@$1</span>')
+                  .replace(/#(\S+)/g, '<span class="text-primary underline cursor-pointer font-semibold">#$1</span>'),
+              }}
+            />
+          </Bdi>
         </div>
 
         {reactionCounts.length > 0 && (
