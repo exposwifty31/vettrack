@@ -1140,3 +1140,18 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Verification ceiling (owed):** simulator — scanner Mark Issue opens the sheet on slim detail and the issue lands in logs; simulated `notified` waitlist state shows the banner and claim checks out; sync-failure toast "view queue" opens the sheet on web + native; iPad landscape Home shows no View-all; `/equipment?scan=1` lands on the scanner. Batched device pass.
 
 **Verdict:** Phase 7 DONE at gate + unit level; simulator drill owed in the consolidated device pass.
+
+## 2026-07-04 — Phase 8 (M3): iPad Home dashboard
+
+**Claim:** On the native iPad app, Home no longer renders the phone page centered at 720px (greeting + one card + emptiness). A new `HomeTabletDashboard` composes the reconciled surfaces into a 2-column bento: the roster `ShiftHero` (same component the phone Today uses), an equipment tile (availability % from the triage tier + the Phase-2 `isInactive` not-verified readout via `t.equipmentList.verifiedSplit`), a worst-first alerts tile fed by the shared Phase-3 `useAlertsController` (rows navigate to the device, count badge bidi-isolated), and room verification bars sorted worst-first (same pct + color thresholds as the rooms HealthRing). Code Blue keepalive banner kept above the tiles (display-only, frozen-surface safe). Phone/desktop Home is untouched (renamed inner component only).
+
+**Evidence (gate + unit, actually run):**
+- **Predicate correction:** the plan said fork on `useIsTabletViewport()`, but that is viewport-width-only and would hijack desktop web Home too. Used the existing precise gate `useIsNativeTablet()` (tablet viewport AND Capacitor non-web) — the audit finding was native-iPad-only.
+- `home.tsx`: component-level fork (`isNativeTablet ? <HomeTabletDashboard/> : <HomePhoneAndDesktop/>`) — NOT an early return, so hook order survives a runtime predicate flip (iPad Split View resize). The phone body is byte-identical except the function rename.
+- `HomeTabletDashboard.tsx`: no new endpoints — `/api/home/dashboard`, `/api/equipment`, `/api/rooms`, and the alerts controller's queries, all with the app's existing query keys (cache-shared). Availability computed over the FULL list (no ≤50-page caveat). Designed loading (skeleton rows / "—" placeholder — the C2 rule holds: no computed 0% during load) and empty states (alerts-clear message, rooms help line); tiles link to their full surfaces; Latin names bidi-isolated (`Bdi` + `dir="auto"`), pct/count badges `dir="ltr"`.
+- New `tests/home-tablet-dashboard.test.tsx` (6 tests, happy-dom, mocked api/auth/realtime, HelmetProvider+QueryClientProvider): four tiles render; availability 67% from a 1-attention-of-3 fixture; verifiedSplit(0,3,14) rendered from the same isInactive predicate; alert row navigates to `/equipment/eq-issue`; room bars sort ICU(50%) before Surgery 1(100%); static fork contract on home.tsx. All pass.
+- Gates: `pnpm typecheck` (both) → 0 errors; `pnpm i18n:check` ✓ (zero new keys — every label reused); `pnpm test` → **395 files / 3899 pass**.
+
+**Verification ceiling (owed):** simulator — iPad portrait + landscape render the bento (no 720px cap), tiles navigate, phone Home unchanged. Batched device pass.
+
+**Verdict:** Phase 8 DONE at gate + unit level; simulator drill owed in the consolidated device pass.

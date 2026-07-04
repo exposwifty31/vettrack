@@ -22,6 +22,8 @@ import { useScanAffordance } from "@/lib/scan-affordance";
 import { ShiftAdjustmentControls } from "@/features/shift-adjustments/ShiftAdjustmentControls";
 import { getCurrentUserId } from "@/lib/auth-store";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import { useIsNativeTablet } from "@/native/tablet/useIsNativeTablet";
+import { HomeTabletDashboard } from "@/features/today/HomeTabletDashboard";
 import { subscribeKeepalive } from "@/lib/realtime";
 import type { ActivityFeedItem } from "@/types";
 import {
@@ -100,6 +102,14 @@ function activityStyle(item: ActivityFeedItem): ActivityStyle {
 }
 
 export default function HomePage() {
+  // M3: the phone page rendered centered-and-capped on iPad — greeting, one
+  // card, empty space. Component-level fork (not an early return) so hook
+  // order survives a runtime predicate flip (e.g. iPad Split View resize).
+  const isNativeTablet = useIsNativeTablet();
+  return isNativeTablet ? <HomeTabletDashboard /> : <HomePhoneAndDesktop />;
+}
+
+function HomePhoneAndDesktop() {
   const { name, refreshAuth } = useAuth();
   const userId = getCurrentUserId();
   const queryClient = useQueryClient();
