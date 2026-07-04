@@ -42,6 +42,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { STATUS_LABELS } from "@/types";
 import type { EquipmentStatus, Equipment } from "@/types";
+import { equipmentStatusLabel } from "@/lib/equipment-status-label";
 import { BackChevron } from "@/components/ui/directional-chevron";
 import {
   ArrowLeft,
@@ -1614,7 +1615,7 @@ function EquipmentDetailPageDesktop() {
                           <div className="min-w-0 flex flex-col gap-1">
                             <div className="flex items-center gap-2 flex-wrap">
                               <Badge variant={statusToBadgeVariant(log.status)}>
-                                {STATUS_LABELS[log.status as keyof typeof STATUS_LABELS] || log.status}
+                                {equipmentStatusLabel(log.status)}
                               </Badge>
                               <span className="text-xs font-medium truncate">
                                 {log.staffName || log.userEmail}
@@ -1686,7 +1687,7 @@ function EquipmentDetailPageDesktop() {
                     {s === "issue" && <AlertTriangle className="w-4 h-4 text-[var(--status-issue-fg)]" />}
                     {s === "maintenance" && <Wrench className="w-4 h-4 text-[var(--status-maint-fg)]" />}
                     {s === "sterilized" && <Droplets className="w-4 h-4 text-teal-500" />}
-                    {STATUS_LABELS[s]}
+                    {equipmentStatusLabel(s)}
                   </button>
                 ))}
               </div>
@@ -1915,7 +1916,7 @@ function EquipmentDetailPageDesktop() {
                     )}
                   </div>
                   <Badge variant={statusToBadgeVariant(equipment.status)} className="shrink-0 text-xs" data-testid="scan-action-status-badge">
-                    {STATUS_LABELS[equipment.status as keyof typeof STATUS_LABELS] || equipment.status}
+                    {equipmentStatusLabel(equipment.status)}
                   </Badge>
                 </div>
 
@@ -1929,7 +1930,7 @@ function EquipmentDetailPageDesktop() {
                     </p>
                     {equipment.checkedOutLocation && (
                       <p className="text-primary text-xs mt-0.5">
-                        Location: {equipment.checkedOutLocation}
+                        {t.equipmentDetail.locationCard.title}: {equipment.checkedOutLocation}
                       </p>
                     )}
                   </div>

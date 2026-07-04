@@ -301,6 +301,20 @@ function getTaskReasonBullets(scoreBreakdown: {
 
 const USER_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+/** Localized long zone name for the label — never the raw IANA id (M1). */
+function timeZoneDisplayName(tz: string): string {
+  try {
+    const locale =
+      typeof document !== "undefined" ? document.documentElement.lang || undefined : undefined;
+    const parts = new Intl.DateTimeFormat(locale, { timeZone: tz, timeZoneName: "long" })
+      .formatToParts(new Date());
+    return parts.find((p) => p.type === "timeZoneName")?.value ?? tz;
+  } catch {
+    return tz;
+  }
+}
+const USER_TIMEZONE_LABEL = timeZoneDisplayName(USER_TIMEZONE);
+
 export default function AppointmentsPage() {
   const { userId, role, effectiveRole, isLoaded } = useAuth();
   const dir = useDirection();
@@ -683,7 +697,7 @@ export default function AppointmentsPage() {
                   </div>
 
                   <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
-                    <div className="text-xs font-semibold text-foreground mb-2">Why this task?</div>
+                    <div className="text-xs font-semibold text-foreground mb-2">{t.appointmentsPage.whyThisTask}</div>
                     <ul className="space-y-1 text-xs text-muted-foreground">
                       {getTaskReasonBullets(nbt.scoreBreakdown).map((reason) => (
                         <li key={reason}>{"\u2022"} {reason}</li>
@@ -816,7 +830,7 @@ export default function AppointmentsPage() {
             <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
               <Zap className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden />
               <CardTitle className="text-sm font-semibold">
-                Today
+                {t.appointmentsPage.todayHeading}
                 {dashboardQuery.data ? (
                   <span className="text-muted-foreground font-normal"> ({dashboardQuery.data.counts.today})</span>
                 ) : null}
@@ -1103,7 +1117,10 @@ export default function AppointmentsPage() {
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 items-end">
             <div className="min-w-0">
               <label htmlFor={`${bookingFormId}-filter-day`} className="text-xs text-muted-foreground block text-end mb-1">{t.appointmentsPage.dayLabel}</label>
-              <Input id={`${bookingFormId}-filter-day`} dir="ltr" className="text-left w-full max-w-full" type="date" value={day} onChange={(e) => setDay(e.target.value)} />
+              {/* min-w-0 on the control itself: a grid child's native date input
+                  keeps its intrinsic width on iOS/WebKit and overflows the cell
+                  without it (user-reported iPhone task-controls overflow). */}
+              <Input id={`${bookingFormId}-filter-day`} dir="ltr" className="text-left w-full max-w-full min-w-0" type="date" value={day} onChange={(e) => setDay(e.target.value)} />
             </div>
             <div className="min-w-0">
               <label htmlFor={`${bookingFormId}-filter-tech`} className="text-xs text-muted-foreground block text-end mb-1">{t.appointmentsPage.technicianFilter}</label>
@@ -1386,6 +1403,15 @@ export default function AppointmentsPage() {
           </option>
         ))}
       </select>
+      {/* H3: an empty technician list silently dead-ended the form — the
+          required select had zero options and submit stayed disabled with
+          no explanation. */}
+      {(metaQuery.isError ||
+        (metaQuery.isSuccess && (metaQuery.data?.vets ?? []).length === 0)) && (
+        <p className="mt-1 text-xs text-destructive" role="alert">
+          {t.appointmentsPage.noEligibleTechnicians}
+        </p>
+      )}
     </div>
 
     <div>
@@ -1460,7 +1486,7 @@ export default function AppointmentsPage() {
 
     <div>
       <label htmlFor={`${bookingFormId}-start`} className="text-xs text-muted-foreground block text-start">
-        {t.appointmentsPage.labelScheduledTime} <span className="text-muted-foreground/70">({USER_TIMEZONE})</span>
+        {t.appointmentsPage.labelScheduledTime} <span className="text-muted-foreground/70">({USER_TIMEZONE_LABEL})</span>
       </label>
       <Input
         id={`${bookingFormId}-start`}

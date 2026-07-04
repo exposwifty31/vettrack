@@ -28,8 +28,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { STATUS_LABELS } from "@/types";
 import type { Equipment } from "@/types";
+import { equipmentStatusLabel } from "@/lib/equipment-status-label";
 import { equipmentTriageTier, TRIAGE_ORDER, statusToBadgeVariant, type EquipmentTriageTier } from "@/lib/design-tokens";
 import {
   EquipmentStatStrip,
@@ -846,13 +846,13 @@ function EquipmentListPageDesktop() {
                     className="h-11 text-xs"
                     onClick={() => navigate("/equipment", { replace: true })}
                   >
-                    Clear all filters
+                    {t.equipmentList.empty.clearFilters}
                   </Button>
                 ) : (
                   <Link href="/equipment/new">
                     <Button size="sm" className="h-11 text-xs">
                       <Plus className="w-4 h-4 me-1" />
-                      Add Equipment
+                      {t.home.addEquipment}
                     </Button>
                   </Link>
                 )
@@ -1307,7 +1307,7 @@ function EquipmentItem({
                       className="font-semibold"
                       style={{ flexShrink: 0 }}
                     >
-                      {STATUS_LABELS[eq.status as keyof typeof STATUS_LABELS] || eq.status}
+                      {equipmentStatusLabel(eq.status)}
                     </Badge>
                     {!selectMode && (
                       <ForwardChevron className="w-4 h-4 text-muted-foreground" style={{ flexShrink: 0 }} />

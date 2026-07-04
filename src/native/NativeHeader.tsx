@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { Settings, Bell, ChevronRight, Moon, Globe, User, AlertCircle, AlertTriangle, MessageCircle } from "lucide-react";
+import { Settings, Bell, Moon, Globe, User, AlertCircle, AlertTriangle, MessageCircle } from "lucide-react";
+import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
@@ -348,7 +349,7 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
               <div style={dividerStyle} />
               <button type="button" onClick={() => go("/alerts")} style={footerStyle}>
                 <span>{t.nav.seeAllAlerts}</span>
-                <ChevronRight size={16} style={{ opacity: 0.6 }} />
+                <ForwardChevron size={16} style={{ opacity: 0.6 }} />
               </button>
             </div>
           ) : (
@@ -377,11 +378,11 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
               <button type="button" onClick={() => go("/my-profile")} style={rowStyle}>
                 <User size={18} color="hsl(var(--foreground))" strokeWidth={1.8} />
                 <span style={{ flex: 1, textAlign: "start", fontSize: "var(--text-sm)" }}>{t.nav.profile}</span>
-                <ChevronRight size={16} style={{ opacity: 0.6 }} />
+                <ForwardChevron size={16} style={{ opacity: 0.6 }} />
               </button>
               <button type="button" onClick={() => go("/settings")} style={footerStyle}>
                 <span>{t.nav.allSettings}</span>
-                <ChevronRight size={16} style={{ opacity: 0.6 }} />
+                <ForwardChevron size={16} style={{ opacity: 0.6 }} />
               </button>
             </div>
           )}

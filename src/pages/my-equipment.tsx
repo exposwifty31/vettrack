@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorCard } from "@/components/ui/error-card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { STATUS_LABELS } from "@/types";
+import { equipmentStatusLabel } from "@/lib/equipment-status-label";
 import { formatRelativeTime } from "@/lib/utils";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
 import {
@@ -235,7 +235,7 @@ export default function MyEquipmentPage() {
                           <TruncatedText text={item.name} className="font-semibold text-sm" as="p" />
                         </Bdi>
                         <Badge variant={statusToBadgeVariant(item.status)} className="shrink-0 text-[10px] px-2 py-0.5">
-                          {STATUS_LABELS[item.status] || item.status}
+                          {equipmentStatusLabel(item.status)}
                         </Badge>
                         {recoveryBadgeKey && (
                           <Badge

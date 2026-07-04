@@ -29,7 +29,7 @@ import { extractEquipmentId } from "@/lib/equipment-id";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
-import { STATUS_LABELS } from "@/types";
+import { equipmentStatusLabel } from "@/lib/equipment-status-label";
 import type { Equipment } from "@/types";
 import { ReturnPlugDialog } from "@/components/return-plug-dialog";
 import { haptics } from "@/lib/haptics";
@@ -925,7 +925,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                 )}
               </div>
               <Badge variant={statusToBadgeVariant(scannedEquipment.status)} className="shrink-0" data-testid="scan-inline-status-badge">
-                {STATUS_LABELS[scannedEquipment.status] || scannedEquipment.status}
+                {equipmentStatusLabel(scannedEquipment.status)}
               </Badge>
             </div>
 

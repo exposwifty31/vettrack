@@ -338,6 +338,8 @@ const translations = {
       },
       reasoning: {
         checkedOut: (email: string) => tr(d.equipmentDetail.locationCard.reasoning.checkedOut, { email }),
+        dock: (room: string) => tr(d.equipmentDetail.locationCard.reasoning.dock, { room }),
+        scan: (email: string) => tr(d.equipmentDetail.locationCard.reasoning.scan, { email }),
         rfid: (room: string) => tr(d.equipmentDetail.locationCard.reasoning.rfid, { room }),
         lastKnown: (room: string) => tr(d.equipmentDetail.locationCard.reasoning.lastKnown, { room }),
         none: d.equipmentDetail.locationCard.reasoning.none,
@@ -731,6 +733,7 @@ const translations = {
   roomsListPage: {
     ...d.roomsListPage,
     subtitle: (count: number) => tr(d.roomsListPage.subtitle, { count }),
+    healthRingTitle: (pct: number) => tr(d.roomsListPage.healthRingTitle, { pct }),
   },
 
   managementDashboardPage: d.managementDashboardPage,

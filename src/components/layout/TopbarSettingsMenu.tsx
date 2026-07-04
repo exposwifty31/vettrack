@@ -4,7 +4,8 @@
 // both consume the same nav.* i18n keys and useSettings hook, so copy/behavior stay in lockstep.
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { Settings, Moon, Globe, User, ChevronRight } from "lucide-react";
+import { Settings, Moon, Globe, User } from "lucide-react";
+import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { useSettings } from "@/hooks/use-settings";
 import { t } from "@/lib/i18n";
 
@@ -83,12 +84,12 @@ export function TopbarSettingsMenu() {
             <button type="button" onClick={() => go("/my-profile")} className={rowClass}>
               <User size={18} strokeWidth={1.8} />
               <span className="flex-1 text-start text-sm">{t.nav.profile}</span>
-              <ChevronRight size={16} className="opacity-60" />
+              <ForwardChevron size={16} className="opacity-60" />
             </button>
 
             <button type="button" onClick={() => go("/settings")} className={footerClass}>
               <span>{t.nav.allSettings}</span>
-              <ChevronRight size={16} className="opacity-60" />
+              <ForwardChevron size={16} className="opacity-60" />
             </button>
           </div>
         </>

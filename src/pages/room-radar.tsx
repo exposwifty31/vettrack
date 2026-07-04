@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
-import { STATUS_LABELS } from "@/types";
+import { equipmentStatusLabel } from "@/lib/equipment-status-label";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -196,11 +196,13 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
   const verifiedLabel = justVerified
     ? t.roomRadarPage.verifiedNow
     : eq.lastVerifiedAt
-    ? `${t.roomRadarPage.verifiedPrefix} ${formatRelativeTime(eq.lastVerifiedAt)}${verifierInitials ? ` · ${verifierInitials}` : ""}`
+    // LRI…PDI isolate the Latin initials so RTL text doesn't scramble the
+    // dots into ".D.E" (M2 bidi garble).
+    ? `${t.roomRadarPage.verifiedPrefix} ${formatRelativeTime(eq.lastVerifiedAt)}${verifierInitials ? ` · ⁦${verifierInitials}⁩` : ""}`
     : null;
 
   const holderLabel = isCheckedOut
-    ? eq.checkedOutByEmail?.split("@")[0] ?? "Someone"
+    ? eq.checkedOutByEmail?.split("@")[0] ?? t.roomRadarPage.unknownHolder
     : null;
   const locationLabel = eq.checkedOutLocation || eq.location || eq.roomName || null;
 
@@ -248,7 +250,7 @@ function RadarEquipmentCard({ equipment: eq, justVerified, staleMs }: RadarEquip
                 )}
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <Badge variant={statusVariant} className="text-[10px] py-0 px-2 h-5">
-                    {STATUS_LABELS[eq.status as keyof typeof STATUS_LABELS] ?? eq.status}
+                    {equipmentStatusLabel(eq.status)}
                   </Badge>
                   {isCheckedOut ? (
                     <span className="text-[10px] font-semibold text-[var(--status-stale-fg)]">{t.roomRadarPage.inUseCard}</span>
@@ -506,9 +508,7 @@ export default function RoomRadarPage() {
             {/* Body */}
             <div className="px-5 py-4 flex flex-col gap-2">
               <p className="text-sm text-muted-foreground text-center leading-relaxed">
-                Tapping this NFC tag will mark{" "}
-                <span className="font-semibold text-foreground">all equipment in this room</span> as verified.
-                Confirm only if all items are present and accounted for.
+                {t.roomRadarPage.nfcVerifyAllBody}
               </p>
 
               <div className="flex items-center justify-between text-xs bg-muted/60 border border-border rounded-lg px-3 py-2 mt-1">
@@ -669,7 +669,7 @@ export default function RoomRadarPage() {
               ) : (
                 <>
                   <ShieldCheck className="w-4 h-4" />
-                  {t.roomRadarPage.verifyAllInRoom(room?.name ?? "Room")}
+                  {t.roomRadarPage.verifyAllInRoom(room?.name ?? t.roomRadarPage.roomFallback)}
                 </>
               )}
             </button>

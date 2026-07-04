@@ -1082,3 +1082,24 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Verification ceiling (owed):** simulator — rotate iPhone to landscape: search field + "כל הסטטוסים" chip clear the housing; FAB clears the last equipment row and alert card. Batched device pass.
 
 **Verdict:** Phase 4 DONE at gate + static-check level; simulator drill owed.
+
+## 2026-07-04 — Phase 5 (H3 + M2 + M1): dead-end form, bidi, localization sweep, Day-field overflow
+
+**Claim:** The task-creation form explains itself when no technician can be selected (H3); the pinned-chat banner and iPad room initials are bidi-isolated and the settings chevrons are direction-aware (M2); the M1 sweep is done for everything i18n-fixable — equipment status vocabulary now resolves through `t.status.*` everywhere ("OK" chips no longer leak English), the location card composes localized reasoning client-side from the structured inference fields (no server change needed), the "1 מחוברים" plural is ICU, the timezone label renders a localized zone name instead of the raw IANA id, and the Task Controls "Day" date input can no longer overflow its grid cell on iPhone.
+
+**Evidence (gate + unit, actually run):**
+- i18n keys (he+en, parity ✓, types regenerated): `appointmentsPage.{todayHeading,whyThisTask}` (existing `noEligibleTechnicians` wired), `status.{critical,needs_attention}`, `roomRadarPage.{unknownHolder,roomFallback,nfcVerifyAllBody}`, `roomsListPage.{healthRingTitle,healthRingHelp}`, `equipmentDetail.locationCard.reasoning.{dock,scan}`, `shiftChat.panel.onlineCount` → ICU plural (`one {מחובר אחד} other {# מחוברים}` / `one {1 online} other {# online}`).
+- H3 (`appointments.tsx`): empty/errored `metaQuery.data.vets` renders `t.appointmentsPage.noEligibleTechnicians` under the booking select (`role="alert"`), explaining the blocked submit. Day `<Input type="date">` gains `min-w-0` (grid child kept intrinsic width on iOS/WebKit — the user-reported overflow); localized `USER_TIMEZONE_LABEL` via `Intl.DateTimeFormat(...).formatToParts` keyed off `document.documentElement.lang`.
+- M2: `ShiftChatPanel` pinned body wrapped in `<Bdi>`; `room-radar` verifier initials wrapped in LRI/PDI isolates; `TopbarSettingsMenu` + `NativeHeader` menu rows `ChevronRight` → `ForwardChevron`. Checklist-flip left untouched pending device verify (plan's verify-first instruction).
+- M1 status vocabulary: new `src/lib/equipment-status-label.ts` (`t.status.*` → legacy dict → raw fallback) consumed at ALL render sites: `qr-scanner:928`, `EquipmentDetailActivityTab:91`, `EquipmentDetailStatusStrip:89`, `my-equipment:238`, `equipment-list:1310`, `room-radar:253`, `equipment-detail:{1617,1689,1918}`. `equipment-list` "Clear all filters"/"Add Equipment" literals → existing keys; `equipment-detail:1932` "Location:" → `locationCard.title`. `admin.tsx` + `status-badge.tsx` inspected: local dicts (tickets / already-localized) — not the leak.
+- Location card: `EquipmentLocationCard` now builds reasoning from `signalSource`/`accountablePerson`/`inferredLocation` via `t.…reasoning.*` (server English prose ignored; `· relative-time` suffix only when the accountable-person row isn't already showing the timestamp).
+- New `tests/i18n-ux-audit-sweep.test.ts` (21 tests): key existence both locales, `equipmentStatusLabel` full he mapping + critical/needs_attention + unknown fallback, ICU singular≠plural with no `#`/`{`/`plural` leakage + en exact renders, reasoning dock/scan interpolation. All pass.
+- Gates: `pnpm typecheck` (both configs) → 0 errors; `pnpm i18n:check` ✓; `pnpm test` → **393 files / 3872 pass**.
+
+**Out-of-band incident (recorded, not mine):** during the session-limit pause, `src/pages/appointments.tsx` was renamed to `src/pages/Tasks.tsx` in the working tree (file mtime 00:57) and `routes.tsx` repointed (mtime 03:28). This broke 7 test files that read the path from disk and violates the frozen rule "no appointment→task renames of internal surfaces" (Phase 6 §17). Restored: `mv Tasks.tsx appointments.tsx` (diff vs HEAD verified = Phase 5 content edits ONLY — zero foreign content lost) + router import reverted. If the rename is wanted, it needs a deliberate pass over the 7 guard tests + doctrine.
+
+**Residue (explicit):** `equipment-detail.tsx` `actionLabel: \`Status updated to …\`` ×2 (:562/:578, toast-history strings) and `:1928` "In use by {email}" remain English — noted for the Phase 6 polish or Plan 2; deferred native date-picker locale text per settled scope.
+
+**Verification ceiling (owed):** simulator — Day field at 320/375 widths + landscape; empty-technician message; pinned "!Hi everyone" renders upright; status chips Hebrew on room radar/scan result; checklist-flip re-verify. Batched device pass.
+
+**Verdict:** Phase 5 DONE at gate + unit level; simulator drill owed in the consolidated device pass.

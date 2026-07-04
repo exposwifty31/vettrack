@@ -42,6 +42,8 @@ export interface TStructure {
     help: string;
   };
   status: {
+    critical: string;
+    needs_attention: string;
     ok: string;
     issue: string;
     maintenance: string;
@@ -554,6 +556,8 @@ export interface TStructure {
       };
       reasoning: {
         checkedOut: string;
+        dock: string;
+        scan: string;
         rfid: string;
         lastKnown: string;
         none: string;
@@ -1644,6 +1648,9 @@ export interface TStructure {
     recoveryNeverConfirmed: string;
   };
   roomRadarPage: {
+    unknownHolder: string;
+    roomFallback: string;
+    nfcVerifyAllBody: string;
     roomVacant: string;
     patientActive: string;
     syncedBadge: string;
@@ -1705,6 +1712,8 @@ export interface TStructure {
     pilotRecent: string;
   };
   roomsListPage: {
+    healthRingTitle: string;
+    healthRingHelp: string;
     createRoomFailed: string;
     title: string;
     subtitle: string;
@@ -2689,6 +2698,9 @@ export interface TStructure {
     ariaOperationalToggle: string;
   };
   appointmentsPage: {
+    todayHeading: string;
+    whyThisTask: string;
+    noEligibleTechnicians: string;
     toast: {
       taskStarted: string;
       taskCompleted: string;

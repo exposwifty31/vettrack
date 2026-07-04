@@ -3,8 +3,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { STATUS_LABELS } from "@/types";
 import type { ScanLog, TransferLog } from "@/types";
+import { equipmentStatusLabel } from "@/lib/equipment-status-label";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
 import { formatRelativeTime } from "@/lib/utils";
 import { t } from "@/lib/i18n";
@@ -88,8 +88,7 @@ export function EquipmentDetailActivityTab({
                       {t.equipmentDetail.activityScan}
                     </Badge>
                     <Badge variant={statusToBadgeVariant(entry.scan.status)}>
-                      {STATUS_LABELS[entry.scan.status as keyof typeof STATUS_LABELS] ??
-                        entry.scan.status}
+                      {equipmentStatusLabel(entry.scan.status)}
                     </Badge>
                     <span className="text-xs text-muted-foreground truncate">
                       {entry.scan.userEmail}

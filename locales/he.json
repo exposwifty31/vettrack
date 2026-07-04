@@ -39,6 +39,8 @@
     "help": "עזרה"
   },
   "status": {
+    "critical": "קריטי",
+    "needs_attention": "דורש טיפול",
     "ok": "תקין",
     "issue": "תקלה",
     "maintenance": "תחזוקה",
@@ -551,6 +553,8 @@
       },
       "reasoning": {
         "checkedOut": "נלקח על ידי {email}",
+        "dock": "מעוגן ב-{room}",
+        "scan": "נסרק לאחרונה על ידי {email}",
         "rfid": "נראה לאחרונה ב-{room} (RFID פסיבי)",
         "lastKnown": "מיקום ידוע אחרון: {room}",
         "none": "אין אות מיקום זמין"
@@ -1641,6 +1645,9 @@
     "recoveryNeverConfirmed": "מעולם לא אושר"
   },
   "roomRadarPage": {
+    "unknownHolder": "משתמש לא ידוע",
+    "roomFallback": "חדר",
+    "nfcVerifyAllBody": "הצמדת תג ה-NFC תסמן את כל הציוד בחדר כמאומת. אשרו רק אם כל הפריטים נמצאים במקומם.",
     "roomVacant": "חדר פנוי",
     "patientActive": "מטופל פעיל",
     "syncedBadge": "מסונכרן",
@@ -1702,6 +1709,8 @@
     "pilotRecent": "עדכני"
   },
   "roomsListPage": {
+    "healthRingTitle": "{pct}% מהפריטים אומתו ב-24 השעות האחרונות",
+    "healthRingHelp": "כל כרטיס חדר מציג טבעת בריאות: עיגול צבעוני שמראה איזה אחוז מהפריטים אומתו ב-24 השעות האחרונות. ירוק ≥ 80%, ענבר ≥ 40%, אדום < 40%. לא עדכני = לא בוקר ב-24+ שעות.",
     "createRoomFailed": "יצירת החדר נכשלה",
     "title": "חדרים",
     "subtitle": "{count, plural, one{חדר אחד} two{שני חדרים} many{# חדרים} other{# חדרים}} · לחץ לפרטים",
@@ -2686,6 +2695,9 @@
     "ariaOperationalToggle": "בקרת מצב ER גלובלי"
   },
   "appointmentsPage": {
+    "todayHeading": "היום",
+    "whyThisTask": "למה המשימה הזו?",
+    "noEligibleTechnicians": "לא נמצאו טכנאים כשירים.",
     "toast": {
       "taskStarted": "משימה התחילה",
       "taskCompleted": "משימה הושלמה",
@@ -3277,7 +3289,7 @@
     "panel": {
       "title": "צ׳אט משמרת",
       "description": "הודעות ושידורים בזמן אמת למשמרת הנוכחית.",
-      "onlineCount": "{count} מחוברים",
+      "onlineCount": "{count, plural, one {מחובר אחד} other {# מחוברים}}",
       "loading": "טוען...",
       "empty": "אין הודעות עדיין",
       "filterAll": "הכל",

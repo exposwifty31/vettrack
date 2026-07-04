@@ -89,7 +89,7 @@ function HealthRing({ total, recentlyVerified }: { total: number; recentlyVerifi
       <div
         className="w-11 h-11 rounded-full flex items-center justify-center p-[2.5px]"
         style={{ background: `conic-gradient(${color} ${pct}%, hsl(var(--border)) ${pct}%)` }}
-        title={`${pct}% of items verified in last 24h`}
+        title={t.roomsListPage.healthRingTitle(pct)}
       >
         <div className="w-full h-full rounded-full bg-card flex items-center justify-center">
           <DoorOpen className="w-5 h-5 text-primary" />
@@ -278,7 +278,7 @@ export default function RoomsListPage({ singleColumn = false }: { singleColumn?:
               <h1 className="text-2xl font-bold leading-tight">{t.roomsListPage.title}</h1>
               <HelpTooltip
                 side="bottom"
-                content="Each room card shows a Health Ring: a coloured circle showing what % of items were verified in the last 24 hours. Green ≥ 80%, Amber ≥ 40%, Red < 40%. Stale = not audited in 24+ hours."
+                content={t.roomsListPage.healthRingHelp}
               />
             </div>
             <p className="text-sm text-muted-foreground">

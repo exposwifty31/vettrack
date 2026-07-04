@@ -1,8 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { STATUS_LABELS } from "@/types";
 import type { Equipment, EquipmentStatus } from "@/types";
+import { equipmentStatusLabel } from "@/lib/equipment-status-label";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
 import { formatRelativeTime, getExpiryBadgeState } from "@/lib/utils";
 import { t } from "@/lib/i18n";
@@ -86,7 +86,7 @@ export function EquipmentDetailStatusStrip({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={statusToBadgeVariant(status)} className="text-xs">
-                {STATUS_LABELS[status] ?? status}
+                {equipmentStatusLabel(status)}
               </Badge>
               {recoveryBadgeKey && (
                 <Badge variant="outline" className="text-xs" data-testid="equipment-detail-recovery-badge">

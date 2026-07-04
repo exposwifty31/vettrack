@@ -9,6 +9,7 @@ import { SystemCard } from "./SystemCard";
 import { BROADCAST_TEMPLATES, type BroadcastKey } from "../types";
 import { useAuth } from "@/hooks/use-auth";
 import { t } from "@/lib/i18n";
+import { Bdi } from "@/components/ui/bdi";
 import { MessageSquare } from "lucide-react";
 
 type ChatState = ReturnType<typeof useShiftChat>;
@@ -150,7 +151,9 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
           <div className="px-3 py-2 bg-[var(--status-stale-bg)] border-b border-[var(--status-stale-border)] flex items-start gap-2 flex-shrink-0">
             <span className="text-xs">📌</span>
             <p className="text-xs text-[var(--status-stale-fg)] leading-snug line-clamp-2">
-              {chat.pinnedMessage.body}
+              {/* Bdi: a Latin-script pinned message in the RTL panel rendered
+                  with its punctuation flipped ("!Hi everyone") — M2. */}
+              <Bdi>{chat.pinnedMessage.body}</Bdi>
             </p>
           </div>
         )}

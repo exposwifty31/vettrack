@@ -21,9 +21,32 @@ type Props = {
   inference: LocationInference;
 };
 
+// The server's `reasoning` string is English prose; rebuild it here from the
+// structured fields so the card follows the app locale (M1).
+function localizedReasoning(inference: LocationInference): string {
+  const r = t.equipmentDetail.locationCard.reasoning;
+  const person = inference.accountablePerson?.name ?? "";
+  switch (inference.signalSource) {
+    case "checkout":
+      return r.checkedOut(person);
+    case "dock":
+      return r.dock(inference.inferredLocation ?? "");
+    case "scan":
+      return r.scan(person);
+    case "rfid":
+      return r.rfid(inference.inferredLocation ?? "");
+    case "none":
+      return inference.inferredLocation ? r.lastKnown(inference.inferredLocation) : r.none;
+  }
+}
+
 export function EquipmentLocationCard({ inference }: Props) {
   const dotColor = CONFIDENCE_DOT[inference.confidence];
   const confidenceLabel = CONFIDENCE_LABEL[inference.confidence];
+  const reasoningText =
+    inference.lastConfirmedAt && !inference.accountablePerson
+      ? `${localizedReasoning(inference)} · ${formatRelativeTime(inference.lastConfirmedAt)}`
+      : localizedReasoning(inference);
   const locationLabel =
     inference.confidence === "unknown"
       ? t.equipmentDetail.locationCard.unknown
@@ -94,18 +117,16 @@ export function EquipmentLocationCard({ inference }: Props) {
         >
           {locationLabel ?? inference.inferredLocation ?? t.equipmentDetail.locationCard.unknown}
         </p>
-        {inference.reasoning && (
-          <p
-            style={{
-              fontSize: "var(--text-sm)",
-              color: "rgba(255,255,255,0.55)",
-              margin: "4px 0 0",
-              lineHeight: 1.4,
-            }}
-          >
-            {inference.reasoning}
-          </p>
-        )}
+        <p
+          style={{
+            fontSize: "var(--text-sm)",
+            color: "rgba(255,255,255,0.55)",
+            margin: "4px 0 0",
+            lineHeight: 1.4,
+          }}
+        >
+          {reasoningText}
+        </p>
       </div>
 
       {inference.accountablePerson && (

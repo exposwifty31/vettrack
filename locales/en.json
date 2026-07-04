@@ -39,6 +39,8 @@
     "help": "Help"
   },
   "status": {
+    "critical": "Critical",
+    "needs_attention": "Needs attention",
     "ok": "Ready",
     "issue": "Issue",
     "maintenance": "Maintenance",
@@ -551,6 +553,8 @@
       },
       "reasoning": {
         "checkedOut": "Checked out by {email}",
+        "dock": "Docked at {room}",
+        "scan": "Last scanned by {email}",
         "rfid": "Last seen at {room} (passive RFID)",
         "lastKnown": "Last known location: {room}",
         "none": "No location signal available"
@@ -1641,6 +1645,9 @@
     "recoveryNeverConfirmed": "Never confirmed"
   },
   "roomRadarPage": {
+    "unknownHolder": "Unknown user",
+    "roomFallback": "Room",
+    "nfcVerifyAllBody": "Tapping this NFC tag marks all equipment in this room as verified. Confirm only if all items are present and accounted for.",
     "roomVacant": "Room available",
     "patientActive": "Active patient",
     "syncedBadge": "Synced",
@@ -1702,6 +1709,8 @@
     "pilotRecent": "Recent"
   },
   "roomsListPage": {
+    "healthRingTitle": "{pct}% of items verified in the last 24h",
+    "healthRingHelp": "Each room card shows a Health Ring: a coloured circle showing what % of items were verified in the last 24 hours. Green ≥ 80%, Amber ≥ 40%, Red < 40%. Stale = not audited in 24+ hours.",
     "createRoomFailed": "Failed to create room",
     "title": "Rooms",
     "subtitle": "{count, plural, one{1 room} other{# rooms}} · tap to inspect",
@@ -2686,6 +2695,9 @@
     "ariaOperationalToggle": "Global ER mode control"
   },
   "appointmentsPage": {
+    "todayHeading": "Today",
+    "whyThisTask": "Why this task?",
+    "noEligibleTechnicians": "No eligible technicians found.",
     "toast": {
       "taskStarted": "Task started",
       "taskCompleted": "Task completed",
@@ -3277,7 +3289,7 @@
     "panel": {
       "title": "Shift chat",
       "description": "Live messages and broadcasts for the current shift.",
-      "onlineCount": "{count} online",
+      "onlineCount": "{count, plural, one {1 online} other {# online}}",
       "loading": "Loading...",
       "empty": "No messages yet",
       "filterAll": "All",
