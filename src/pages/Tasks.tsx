@@ -1117,10 +1117,11 @@ export default function AppointmentsPage() {
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 items-end">
             <div className="min-w-0">
               <label htmlFor={`${bookingFormId}-filter-day`} className="text-xs text-muted-foreground block text-end mb-1">{t.appointmentsPage.dayLabel}</label>
-              {/* min-w-0 on the control itself: a grid child's native date input
-                  keeps its intrinsic width on iOS/WebKit and overflows the cell
-                  without it (user-reported iPhone task-controls overflow). */}
-              <Input id={`${bookingFormId}-filter-day`} dir="ltr" className="text-left w-full max-w-full min-w-0" type="date" value={day} onChange={(e) => setDay(e.target.value)} />
+              {/* min-w-0 + appearance-none on the control itself: a grid child's
+                  native date input keeps its UA intrinsic width on iOS/WebKit and
+                  escapes the cell without both — min-w-0 alone still let the
+                  end-side edge overflow the card in RTL portrait. */}
+              <Input id={`${bookingFormId}-filter-day`} dir="ltr" className="text-left w-full max-w-full min-w-0 appearance-none" type="date" value={day} onChange={(e) => setDay(e.target.value)} />
             </div>
             <div className="min-w-0">
               <label htmlFor={`${bookingFormId}-filter-tech`} className="text-xs text-muted-foreground block text-end mb-1">{t.appointmentsPage.technicianFilter}</label>

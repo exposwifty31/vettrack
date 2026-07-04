@@ -325,4 +325,10 @@ describe("Slice 4.2 — Mobile RTL overflow fix", () => {
     expect(appointments).toContain("min-w-0");
     expect(appointments).toContain("max-w-full");
   });
+
+  it("Date input resets UA appearance so the width clamp wins on iOS WebKit", () => {
+    // min-w-0 alone still let the native date input's intrinsic width escape
+    // the card end-side in RTL portrait (2026-07-04 device audit)
+    expect(appointments).toContain("min-w-0 appearance-none");
+  });
 });
