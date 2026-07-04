@@ -31,6 +31,7 @@ export { Breadcrumb } from "@/components/layout/Breadcrumb";
 export { IconSidebar } from "@/components/layout/IconSidebar";
 export { PageShell } from "@/components/layout/PageShell";
 export { Sidebar } from "@/components/layout/Sidebar";
+export { SidebarDivider } from "@/components/layout/IconSidebar";
 export { Topbar } from "@/components/layout/Topbar";
 
 // ── Alerts ───────────────────────────────────────────────────────────

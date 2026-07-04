@@ -47,16 +47,51 @@ stage:
 mechanism needs esbuild/ts-morph resolvable from the repo root, which this repo
 doesn't have — so direct staged-script edits are the working approach.)
 
-## Render verification
+## Render verification (previews ARE now authored + render-verified — 2026-07-03)
 
-- **Previews were NOT render-verified** (validated with `--no-render-check` per
-  user request). All 110 components ship as honest "floor cards" (typographic
-  name blocks) — they are fully functional and have real `.d.ts` + `.prompt.md`,
-  but no authored preview composition. Playwright + Chrome-for-Testing are
-  installed (`~/Library/Caches/ms-playwright/chromium-1217`) but the headless
-  render check hit a launch error; left unresolved by request.
-- To author rich previews later: write `.design-sync/previews/<Name>.tsx` and
-  re-run the build, then validate (ideally with the render check working).
+All 110 components now have **authored previews** in `.design-sync/previews/*.tsx`
+(no more floor cards). 103/110 render-verified clean; the 7 exceptions are known
+warns recorded below. Key toolchain facts for re-syncs:
+
+- **Render check works via system Chrome.** The cached
+  `~/Library/Caches/ms-playwright/chromium-1217` is a CORRUPTED/partial download
+  (missing `…Framework.framework` → `SIGABRT` on launch — that was the old
+  "launch error"). Fix: `package-validate.mjs` / `package-capture.mjs` read
+  `DS_CHROMIUM_PATH`; set it to system Chrome:
+  `DS_CHROMIUM_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"`.
+  Works with the sandbox on (playwright 1.59 pins chromium 1217, but system
+  Chrome 149 drives fine for the basic CDP ops).
+- **Preview provider** (`.design-sync/preview-provider.tsx`, wired via
+  `cfg.extraEntries` + `cfg.provider`): wraps every card in `QueryClientProvider`
+  (retry off) + wouter `Router`, and seeds `localStorage['vettrack_onboarding_v1']='1'`
+  so `<Layout>`-wrapping components don't capture the first-run onboarding overlay.
+  Editing it is a bundle change → full `package-build`, not `preview-rebuild`.
+- **`cfg.overrides` cardMode:single** applied to 46 fixed/portal overlay components
+  (Dialog/AlertDialog/Select/Sheet families, app dialogs/sheets, FirstScanCelebration,
+  OnboardingWalkthrough, EquipmentDetailSkeleton, …). Grades use `?story=` isolated
+  capture (clean); `package-validate` uses the grid layout where portals overflow →
+  `[GRID_OVERFLOW]`. cardMode:single is the fix and is exempt from re-flagging. Add
+  any NEW overlay here.
+- **Authoring contract** (adding/reworking previews): import components from
+  `'vettrack'` (→ `window.VetTrack`), JSX automatic (no React import), Tailwind
+  classes resolve, i18n bundled (Hebrew default). Data components: pass realistic
+  props where accepted; pure-`useQuery` ones render empty/loading via the provider.
+- **`SidebarDivider`** must be exported from `src/design-system-entry.ts`
+  (`export { SidebarDivider } from "@/components/layout/IconSidebar"`) — it's carded
+  but was missing from the barrel (added 2026-07-03).
+
+### Known render warns (triaged legitimate — do NOT re-chase)
+
+- **AppErrorBoundary / PageErrorBoundary** — `[RENDER_ERRORS]`. The preview renders a
+  throwing child so the boundary shows its fallback UI; the pageerror IS the
+  intentional caught error. Root non-empty → non-blocking.
+- **ShiftSummarySheet / SyncQueueSheet** — `[RENDER_BLANK]` (~4.5KB PNG). Hand-rolled
+  `fixed inset-x-0 bottom-0` full-screen overlays that collapse measured output even
+  under cardMode:single; ShiftSummarySheet also has an off-screen `ShiftShareCard`
+  capture target. The chrome renders; full framing is a ceiling.
+- **SwUpdateBanner / UpdateBanner / SyncStatusBanner** — `[RENDER] root empty`. Render
+  `null` without live app state (a sonner toast event / `useAuth().isSignedIn` /
+  `SyncContext` pending counts). Ceiling — ship as floor cards unless decorators are added.
 
 ## Component grouping
 
@@ -128,3 +163,20 @@ re-upload of all 110 components instead of a targeted diff.
   (`clinical`) palette. A theme change in `src/index.css` / tailwind config shifts
   `--primary` / `--ivory-*`; the conventions-header validation catches stale color
   copy, but re-verify it after any such change (see "Theme / palette").
+
+## Re-sync log — 2026-07-04 (post UX-audit remediation, Phases 0–8)
+
+Incremental re-sync after the 10-phase UX-audit remediation (branch
+`claude/refine-local-plan-jjrebb`). `anchor: ok`, targeted diff — NOT a full
+re-upload. Pushed 6 paths: `_ds_bundle.js` (bundleSha12 5308096e99bc →
+81fb922e86ae; carries all Phase 2/5/6/7 component-behavior changes — the
+per-component `.jsx` cards are re-export stubs, so code changes ride the
+bundle), `_ds_bundle.css` + `styles.css`, `_ds_sync.json`, and
+`components/equipment/EquipmentStatStrip/{.d.ts,.prompt.md}` — the ONLY
+public-interface change across all phases (new `showUptime?: boolean` prop).
+`renderHashes`: zero diffs (previews render identically). Validate flagged
+exactly the 7 known triaged warns (AppErrorBoundary, PageErrorBoundary,
+ShiftSummarySheet, SyncQueueSheet, SwUpdateBanner, SyncStatusBanner,
+UpdateBanner) — no new failures. `compiled.css` rebuilt via `pnpm build` and
+came out byte-identical to the committed copy (remediation used inline styles
++ existing utilities). Cache re-anchored from `ds-bundle/_ds_sync.json`.

@@ -6,12 +6,172 @@
   "buildCmd": "pnpm build",
   "srcDir": "src/components",
   "tsconfig": "tsconfig.json",
-  "runtimeFontPrefixes": ["Plus Jakarta Sans", "Heebo", "Noto Sans Hebrew", "Rubik", "DM Mono", "IBM Plex Mono"],
+  "runtimeFontPrefixes": [
+    "Plus Jakarta Sans",
+    "Heebo",
+    "Noto Sans Hebrew",
+    "Rubik",
+    "DM Mono",
+    "IBM Plex Mono"
+  ],
   "cssEntry": ".design-sync/compiled.css",
   "entry": "src/design-system-entry.ts",
   "readmeHeader": ".design-sync/conventions.md",
-  "guidelinesGlob": ["docs/equipment-hero-prd.md", "docs/ux-friction-audit.md"],
+  "guidelinesGlob": [
+    "docs/equipment-hero-prd.md",
+    "docs/ux-friction-audit.md"
+  ],
   "libOverrides": {},
+  "extraEntries": [
+    ".design-sync/preview-provider.tsx"
+  ],
+  "provider": {
+    "component": "PreviewProvider"
+  },
+  "overrides": {
+    "ShiftSummarySheet": {
+      "cardMode": "single",
+      "primaryStory": "Open",
+      "viewport": "440x820"
+    },
+    "SyncQueueSheet": {
+      "cardMode": "single",
+      "primaryStory": "AllSynced",
+      "viewport": "440x820"
+    },
+    "DockReturnFlow": {
+      "cardMode": "single"
+    },
+    "EquipmentConfirmInRoomSheet": {
+      "cardMode": "single"
+    },
+    "EquipmentDetailToolsSheet": {
+      "cardMode": "single"
+    },
+    "EquipmentRoomSweepSheet": {
+      "cardMode": "single"
+    },
+    "AlertDialog": {
+      "cardMode": "single"
+    },
+    "AlertDialogAction": {
+      "cardMode": "single"
+    },
+    "AlertDialogCancel": {
+      "cardMode": "single"
+    },
+    "AlertDialogContent": {
+      "cardMode": "single"
+    },
+    "AlertDialogDescription": {
+      "cardMode": "single"
+    },
+    "AlertDialogFooter": {
+      "cardMode": "single"
+    },
+    "AlertDialogHeader": {
+      "cardMode": "single"
+    },
+    "AlertDialogOverlay": {
+      "cardMode": "single"
+    },
+    "AlertDialogPortal": {
+      "cardMode": "single"
+    },
+    "AlertDialogTitle": {
+      "cardMode": "single"
+    },
+    "AlertDialogTrigger": {
+      "cardMode": "single"
+    },
+    "CrashCartAdminSheet": {
+      "cardMode": "single"
+    },
+    "CsvImportDialog": {
+      "cardMode": "single"
+    },
+    "Dialog": {
+      "cardMode": "single"
+    },
+    "DialogClose": {
+      "cardMode": "single"
+    },
+    "DialogContent": {
+      "cardMode": "single"
+    },
+    "DialogDescription": {
+      "cardMode": "single"
+    },
+    "DialogFooter": {
+      "cardMode": "single"
+    },
+    "DialogHeader": {
+      "cardMode": "single"
+    },
+    "DialogTitle": {
+      "cardMode": "single"
+    },
+    "DialogTrigger": {
+      "cardMode": "single"
+    },
+    "FirstScanCelebration": {
+      "cardMode": "single"
+    },
+    "MoveRoomSheet": {
+      "cardMode": "single"
+    },
+    "OnboardingWalkthrough": {
+      "cardMode": "single"
+    },
+    "ReportIssueDialog": {
+      "cardMode": "single"
+    },
+    "ReturnPlugDialog": {
+      "cardMode": "single"
+    },
+    "Select": {
+      "cardMode": "single"
+    },
+    "SelectContent": {
+      "cardMode": "single"
+    },
+    "SelectGroup": {
+      "cardMode": "single"
+    },
+    "SelectItem": {
+      "cardMode": "single"
+    },
+    "SelectLabel": {
+      "cardMode": "single"
+    },
+    "SelectSeparator": {
+      "cardMode": "single"
+    },
+    "Sheet": {
+      "cardMode": "single"
+    },
+    "SheetClose": {
+      "cardMode": "single"
+    },
+    "SheetContent": {
+      "cardMode": "single"
+    },
+    "SheetDescription": {
+      "cardMode": "single"
+    },
+    "SheetFooter": {
+      "cardMode": "single"
+    },
+    "SheetHeader": {
+      "cardMode": "single"
+    },
+    "SheetTitle": {
+      "cardMode": "single"
+    },
+    "EquipmentDetailSkeleton": {
+      "cardMode": "single"
+    }
+  },
   "componentSrcMap": {
     "AlertCard": "src/components/alerts/AlertCard.tsx",
     "AlertDialog": "src/components/ui/alert-dialog.tsx",
