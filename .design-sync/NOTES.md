@@ -23,7 +23,8 @@ runs in a non-standard configuration. Read this before re-syncing.
   (`pnpm build`) and re-copy the latest `dist/public/assets/index-*.css` to
   `.design-sync/compiled.css`, or tokens/utilities added since the last app build
   will be missing.
-- **`componentSrcMap`** in config.json pins all 110 component→source paths.
+- **`componentSrcMap`** in config.json pins all 111 component→source paths
+  (110 + `SidebarDivider`, added 2026-07-03).
   Because `--entry` is set (bypassing synth-entry discovery), components are NOT
   auto-discovered — every component must have a `componentSrcMap` entry AND an
   export in `src/design-system-entry.ts`.
@@ -49,9 +50,10 @@ doesn't have — so direct staged-script edits are the working approach.)
 
 ## Render verification (previews ARE now authored + render-verified — 2026-07-03)
 
-All 110 components now have **authored previews** in `.design-sync/previews/*.tsx`
-(no more floor cards). 103/110 render-verified clean; the 7 exceptions are known
-warns recorded below. Key toolchain facts for re-syncs:
+All 111 components now have **authored previews** in `.design-sync/previews/*.tsx`
+(no more floor cards). 103/110 render-verified clean at the 2026-07-03 pass
+(`SidebarDivider` was added after it); the 7 exceptions are known warns
+recorded below. Key toolchain facts for re-syncs:
 
 - **Render check works via system Chrome.** The cached
   `~/Library/Caches/ms-playwright/chromium-1217` is a CORRUPTED/partial download
@@ -146,7 +148,7 @@ The design tool renders previews under bare `:root`, i.e. **clinical/indigo**.
 `.design-sync/.cache/remote-sync.json` before running the driver. The driver needs
 all fields (`sourceKeys`, `sourceHashes`, `bundleSha12`, etc.) to produce a useful
 diff — saving only partial content results in "anchor malformed" and forces a full
-re-upload of all 110 components instead of a targeted diff.
+re-upload of all 111 components instead of a targeted diff.
 
 **Repo path:** The DS_SRC_GLOB / DS_TS_BASEURL env vars use `/Users/dan/vettrack-ship/`
 (not `/Users/dan/vettrack/`).
@@ -155,8 +157,9 @@ re-upload of all 110 components instead of a targeted diff.
 
 - **compiled.css goes stale** — any commit touching `src/index.css` or Tailwind
   config requires `pnpm build` + CSS re-copy before re-syncing.
-- **Previews are floor cards only** — no authored `.design-sync/previews/` files;
-  all 110 components render as typographic name blocks.
+- **Previews are authored but NOT in git** — `.design-sync/previews/*.tsx` (111
+  files) and `preview-provider.tsx` exist only in the working tree; losing the
+  checkout regresses every card to a typographic floor block on the next sync.
 - **Staged-script patches are lost on fresh `.ds-sync/`** — must re-apply both
   patches every time `.ds-sync/` is regenerated.
 - **Default theme can silently flip** — the design tool renders the `:root`
