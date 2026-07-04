@@ -71,7 +71,7 @@ describe("toUtcDate — timezone-qualified ISO contract", () => {
 describe("appointments UI emits timezone-qualified ISO", () => {
   it("sends start/end/scheduled timestamps via .toISOString()", () => {
     const src = readFileSync(
-      resolve(process.cwd(), "src/pages/appointments.tsx"),
+      resolve(process.cwd(), "src/pages/Tasks.tsx"),
       "utf-8",
     );
     // Every datetime payload field must be assigned from a .toISOString()

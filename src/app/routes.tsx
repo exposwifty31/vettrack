@@ -49,7 +49,7 @@ const AdminShiftsPage = lazy(() => import("@/pages/admin-shifts"));
 const AdminAssetTypesPage = lazy(() => import("@/pages/AdminAssetTypesPage"));
 const AdminDocksPage = lazy(() => import("@/pages/AdminDocksPage"));
 const OperationalMetricsDashboardPage = lazy(() => import("@/pages/OperationalMetricsDashboardPage"));
-const AppointmentsPage = lazy(() => import("@/pages/appointments"));
+const AppointmentsPage = lazy(() => import("@/pages/Tasks"));
 const AuditLogPage = lazy(() => import("@/pages/audit-log"));
 const WhatsNewPage = lazy(() => import("@/pages/whats-new"));
 const ShiftLeaderboardPage = lazy(() => import("@/pages/shift-leaderboard"));

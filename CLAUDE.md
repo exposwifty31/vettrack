@@ -118,7 +118,7 @@ These exist as load-bearing contracts. Extend or wire additively — do **not** 
 - **Emergency endpoint cache denylist:** `/api/display/snapshot`, `/api/code-blue/sessions/active`, `/api/realtime/{stream,replay,outbox-head,telemetry}` — never read from or written to Cache Storage. The bypass is unconditional and pre-existing entries are purged on SW activate.
 - **Enforcement envelope:** every evaluator family in `server/lib/authority/enforcement/*` is `off | shadow | enforce`, resolved per-clinic with a short TTL. `off` short-circuits the wiring; `shadow` runs but never denies; `enforce` may deny with a stable reason code.
 - **Strategy A safety net:** the legacy shift-derived authority path stays byte-for-byte identical for clinics without an open `vt_clinical_check_ins` row. Strategy A is **not retired** — wiring-layer fallbacks degrade to `off` on resolver throw (CI-16/CI-20).
-- **i18n key namespace:** `appointmentsPage.*` is frozen for internal compatibility — only the rendered copy was renamed to "Tasks" / "משימות" (Phase 6 §17). The `vt_appointments` table and `/api/appointments` route stay.
+- **i18n key namespace:** `appointmentsPage.*` is frozen for internal compatibility — only the rendered copy was renamed to "Tasks" / "משימות" (Phase 6 §17). The `vt_appointments` table and `/api/appointments` route stay. The client page component was renamed `src/pages/appointments.tsx` → `src/pages/Tasks.tsx` (2026-07-04, sanctioned) — a client-file rename only; it does not touch the frozen server/table/key surfaces.
 - **Audit `AuditActionType` union:** closed type; new audit kinds must be added to the union in `server/lib/audit.ts`, never inferred.
 - **Telemetry cardinality:** every Phase 9 telemetry field is a bounded enum routed through `POST /api/realtime/telemetry` and a closed `incrementMetric()` union. No PII, no IPs, no UAs, no raw timestamps, no free-form labels.
 
@@ -210,7 +210,7 @@ Redis is optional in dev (app runs; queues log `QUEUE_DISABLED_NO_REDIS`). Produ
 - Frontend: import `t` from `@/lib/i18n` — typed against `src/lib/i18n.generated.d.ts`. Codegen runs via `scripts/i18n/generate-types.ts`.
 - Backend: `req.locale` is set by `i18nMiddleware` from `Accept-Language` or `x-locale`. JSON error envelopes are produced by `apiError()` in `server/lib/apiError.ts` and rendered server-side per locale.
 - `_meta.*` JSON keys are non-rendering metadata (Phase 6 §5 invariant 13) — included in parity, filtered out of the runtime accessor by `stripInternalKeys`.
-- **Terminology:** user-facing copy uses **Tasks / משימות** for the unified task model. The `appointmentsPage.*` key namespace, the `vt_appointments` table, and the `/api/appointments` route are intentionally **not renamed** (Phase 6 §17 forbidden) — only the rendered copy changed.
+- **Terminology:** user-facing copy uses **Tasks / משימות** for the unified task model. The `appointmentsPage.*` key namespace, the `vt_appointments` table, and the `/api/appointments` route are intentionally **not renamed** (Phase 6 §17 forbidden) — only the rendered copy changed. Exception carved out 2026-07-04: the client page file is `src/pages/Tasks.tsx` (renamed from `appointments.tsx`; guard tests updated in the same commit).
 - **No hardcoded copy in source.** `tests/i18n-no-hebrew-in-source.test.ts` rejects Hebrew strings in `.ts`/`.tsx`. Hebrew belongs only in `locales/*.json`.
 - Hebrew text never appears in identifiers, variable names, or file names.
 
@@ -240,7 +240,7 @@ Use `logAudit()` from `server/lib/audit.ts` for all critical actions. It is fire
 - **No high-cardinality telemetry.** Every Phase 9 telemetry surface is a bounded enum. Don't add free-form labels, raw durations, IPs, UAs, or PII to metrics.
 - **No weakening of authority semantics.** Evaluators must keep their `off | shadow | enforce` envelope and the Strategy A safety-valve fallback. Don't remove Strategy A; don't change `off` to issue clinical-validation queries.
 - **No emergency endpoint in any cache.** Adding a Code Blue, snapshot, or realtime endpoint to Cache Storage is a regression.
-- **No appointment → task renames of internal surfaces.** Rename copy only; the table, route, and `appointmentsPage.*` key namespace stay.
+- **No appointment → task renames of internal surfaces.** Rename copy only; the table, route, and `appointmentsPage.*` key namespace stay. (The client page file `src/pages/Tasks.tsx` is the one sanctioned rename — 2026-07-04.)
 - **Realtime / PWA work needs browser verification.** Type-check and vitest cover counter contracts; the Playwright drills (`tests/phase-9-drills.spec.ts`) cover the live transport. Both should pass before claiming a Phase-9-adjacent change is done.
 
 ### Tests

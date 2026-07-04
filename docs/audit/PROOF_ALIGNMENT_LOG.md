@@ -1155,3 +1155,9 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Verification ceiling (owed):** simulator — iPad portrait + landscape render the bento (no 720px cap), tiles navigate, phone Home unchanged. Batched device pass.
 
 **Verdict:** Phase 8 DONE at gate + unit level; simulator drill owed in the consolidated device pass.
+
+## 2026-07-04 — Sanctioned rename: src/pages/appointments.tsx → src/pages/Tasks.tsx
+
+**Claim:** The client page-file rename (made out-of-band during the session pause, reverted pending a decision, now confirmed by the user) is applied deliberately: `git mv` (history preserved), router lazy import → `@/pages/Tasks`, all 7 guard tests that read the path from disk updated, and the doctrine amended in three places (frozen-surfaces bullet, i18n terminology note, operational-doctrine bullet) to carve out exactly this one client-file rename. The genuinely frozen surfaces are untouched: `appointmentsPage.*` key namespace, `vt_appointments` table, `/api/appointments` server route, and the `/appointments` URL redirect — and the `i18n-appointments-tasks.test.ts` "internal identifiers frozen (§17)" assertions still enforce them.
+
+**Evidence:** `git mv` shows `R src/pages/appointments.tsx -> src/pages/Tasks.tsx`. Updated: `routes.tsx:52`, `tests/{phase-6-state-consistency,phase-3-3-recall-production,phase-3-ui-token-consistency,appointments-scheduling,epic8-slice2-tasks-scheduling}.test.js`, `tests/{appointment-datetime-contract,i18n-appointments-tasks}.test.ts`, `CLAUDE.md` ×3. Gates: `pnpm typecheck` (both) → 0; `pnpm test` → **395 files / 3899 pass** (the 7 previously-broken files included).

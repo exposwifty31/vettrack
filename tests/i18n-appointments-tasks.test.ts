@@ -112,9 +112,11 @@ describe("Phase 6 PR 6.8 — empty-state and status-hint keys resolve", () => {
   });
 });
 
-describe("Phase 6 PR 6.8 — appointments.tsx is Hebrew-free", () => {
+describe("Phase 6 PR 6.8 — Tasks page source is Hebrew-free", () => {
   it("contains zero Hebrew literals", () => {
-    const source = readFileSync(resolve(process.cwd(), "src/pages/appointments.tsx"), "utf-8");
+    // Page file renamed appointments.tsx → Tasks.tsx (2026-07-04, sanctioned
+    // client-file rename; table/route/key namespace remain frozen per §17).
+    const source = readFileSync(resolve(process.cwd(), "src/pages/Tasks.tsx"), "utf-8");
     const hebrewMatches = source.match(/[֐-׿]+/g);
     expect(hebrewMatches).toBeNull();
   });

@@ -16,7 +16,7 @@ function read(relPath) {
   return fs.readFileSync(path.join(repoRoot, relPath), "utf8");
 }
 
-const appointments = read("src/pages/appointments.tsx");
+const appointments = read("src/pages/Tasks.tsx");
 const enLocale     = JSON.parse(read("locales/en.json"));
 const heLocale     = JSON.parse(read("locales/he.json"));
 

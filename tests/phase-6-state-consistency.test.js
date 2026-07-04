@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const repoRoot = path.resolve(__dirname, "..");
-const appointments = fs.readFileSync(path.join(repoRoot, "src", "pages", "appointments.tsx"), "utf8");
+const appointments = fs.readFileSync(path.join(repoRoot, "src", "pages", "Tasks.tsx"), "utf8");
 const settings = fs.readFileSync(path.join(repoRoot, "src", "pages", "settings.tsx"), "utf8");
 const equipmentList = fs.readFileSync(path.join(repoRoot, "src", "pages", "equipment-list.tsx"), "utf8");
 const alerts = fs.readFileSync(path.join(repoRoot, "src", "pages", "alerts.tsx"), "utf8");

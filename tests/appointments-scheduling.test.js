@@ -21,7 +21,7 @@ const taskRbacFile = fs.readFileSync(path.join(repoRoot, "server", "lib", "task-
 const serverIndex = fs.readFileSync(path.join(repoRoot, "server", "index.ts"), "utf8");
 const appRoutesPath = path.join(repoRoot, "server", "app", "routes.ts");
 const appRoutes = fs.existsSync(appRoutesPath) ? fs.readFileSync(appRoutesPath, "utf8") : "";
-const appointmentsPage = fs.readFileSync(path.join(repoRoot, "src", "pages", "appointments.tsx"), "utf8");
+const appointmentsPage = fs.readFileSync(path.join(repoRoot, "src", "pages", "Tasks.tsx"), "utf8");
 
 describe("Appointments Scheduling", () => {
   it("Appointments table migration exists", () => {
