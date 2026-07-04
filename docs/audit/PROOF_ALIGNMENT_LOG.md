@@ -1208,3 +1208,14 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - **Still owed:** chat empty-state drill (off-shift → no weeks-old transcript) — blocked on production deploy; the Railway CLI/MCP token expired (`invalid_grant`) and re-login is interactive. `vettrack.uk` still runs the pre-branch server at drill time, which is also why the transcript remains visible on-device (consistent with the audit's Phase 0 ceiling).
 
 **Verdict:** 2 of 3 post-merge drills PASS at device level; chat drill remains deploy-gated.
+
+## 2026-07-04 — Production deploy + chat empty-state drill PASS (Phase 0 closed end-to-end)
+
+**Claim:** The merged server is live on vettrack.uk and the audit's CEILING drill (chat off-shift) now passes on production.
+
+**Evidence:**
+- Deploy path was CI, not local CLI: pushes to origin/main triggered ci.yml runs 28715881342 (5f3746c2b) + 28716199830 (0a5456387), both success incl. the "🚢 Deploy to Railway" job (repo-secret RAILWAY_TOKEN; local CLI token expired and was never needed). Live `build-info.json`: buildTag 1.1.2-mr6q19ux, builtAt 2026-07-04T18:54:47Z; live index bundle references `Tasks-4Mcq3vG8.js` — a chunk that exists only post-merge.
+- **Chat drill (drill-chat-offshift.png):** iPhone 17 Pro sim, off-shift, fresh chat-panel open against production → empty state "אין הודעות עדיין", presence "0 מחוברים", no weeks-old transcript. Read-only; nothing posted.
+- Note: the Railway CLI link on this machine is stale (registered for /Users/dan/vettrack, token expired) — irrelevant while CI deploys main, but fix before any manual `railway up`.
+
+**Verdict:** All three post-merge drills PASS. Phase 0 verified at code, test, AND production-behavior level. No owed items remain from the audit's merge conditions except the deferred Claude Design prompts.
