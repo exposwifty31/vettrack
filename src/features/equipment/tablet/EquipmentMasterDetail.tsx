@@ -1,4 +1,5 @@
-import { useParams } from "wouter";
+import { useEffect } from "react";
+import { useLocation, useParams, useSearch } from "wouter";
 import { TwoPaneLayout } from "@/native/tablet/TwoPaneLayout";
 import { SelectItemPlaceholder } from "@/native/tablet/SelectItemPlaceholder";
 import { EquipmentListScreen, EquipmentDetailScreen } from "@/features/equipment";
@@ -12,6 +13,17 @@ import { t } from "@/lib/i18n";
  */
 export default function EquipmentMasterDetail() {
   const { id } = useParams<{ id?: string }>();
+  const searchStr = useSearch();
+  const [, navigate] = useLocation();
+
+  // Same deep-link forward as EquipmentListPage (Phase 7 #5): the scanner is
+  // its own surface on the tablet too, so /equipment?scan=1 (vettrack://scan,
+  // /equipment/scan alias) must not strand on the master-detail list.
+  const wantsScan = new URLSearchParams(searchStr).get("scan") === "1";
+  useEffect(() => {
+    if (wantsScan) navigate("/scan", { replace: true });
+  }, [wantsScan, navigate]);
+  if (wantsScan) return null;
 
   return (
     <TwoPaneLayout

@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { computeAlerts } from "@/lib/utils";
-import { buildAlertAckSet, countActiveAlerts, countCriticalAlerts } from "@/lib/alert-counts";
+import { buildAlertAckSet, countActiveAlerts, countCriticalAlerts, filterUnackedAlerts } from "@/lib/alert-counts";
 import {
   ArrowLeft,
   ArrowRight,
@@ -941,8 +941,10 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
               />
             )}
 
+            {/* Unacked-only, matching NativeHeader — the badge counts unacked,
+                so the panel must not list acked rows the badge ignores. */}
             <AlertsDropdown
-              alerts={alerts}
+              alerts={filterUnackedAlerts(alerts, alertAckSet)}
               alertCount={alertCount}
               badgeAnimating={alertBadgeAnimating}
             />

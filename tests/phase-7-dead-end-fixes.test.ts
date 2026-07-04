@@ -102,3 +102,11 @@ describe("5 — /equipment?scan=1 forwards to /scan in the shell", () => {
     expect(list).toContain('navigate("/scan", { replace: true })');
   });
 });
+
+describe("6 — the tablet master-detail honors the scan deep link (Bugbot a6c2bae4)", () => {
+  it("EquipmentMasterDetail forwards ?scan=1 to /scan like the list page", () => {
+    const md = read("src/features/equipment/tablet/EquipmentMasterDetail.tsx");
+    expect(md).toContain('new URLSearchParams(searchStr).get("scan") === "1"');
+    expect(md).toContain('navigate("/scan", { replace: true })');
+  });
+});

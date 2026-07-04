@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { cn, computeAlerts } from "@/lib/utils";
-import { buildAlertAckSet, countActiveAlerts } from "@/lib/alert-counts";
+import { buildAlertAckSet, countActiveAlerts, filterUnackedAlerts } from "@/lib/alert-counts";
 import { useAuth } from "@/hooks/use-auth";
 import { useDirection } from "@/hooks/useDirection";
 import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
@@ -44,7 +44,8 @@ export function Topbar() {
   });
 
   const alerts = equipment ? computeAlerts(equipment) : [];
-  const alertCount = countActiveAlerts(alerts, buildAlertAckSet(alertAcks));
+  const alertAckSet = buildAlertAckSet(alertAcks);
+  const alertCount = countActiveAlerts(alerts, alertAckSet);
 
   const [badgeAnimating, setBadgeAnimating] = useState(false);
   const prevAlertCount = useRef(alertCount);
@@ -102,8 +103,10 @@ export function Topbar() {
         <TopbarSearch />
         <ShiftBadge activeShift={activeShift} />
         {signedIn && (
+          // Unacked-only, matching NativeHeader — the badge counts unacked,
+          // so the panel must not list acked rows the badge ignores.
           <AlertsDropdown
-            alerts={alerts}
+            alerts={filterUnackedAlerts(alerts, alertAckSet)}
             alertCount={alertCount}
             badgeAnimating={badgeAnimating}
             buttonClassName="h-8 w-8 min-h-0 min-w-0"
