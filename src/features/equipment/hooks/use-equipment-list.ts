@@ -64,7 +64,10 @@ export function useEquipmentList({
     stats.total > 0 ? Math.round(((stats.total - stats.attention) / stats.total) * 100) : null;
 
   function refetch() {
-    queryClient.invalidateQueries({ queryKey: ["/api/equipment", "paginated"] });
+    // Prefix invalidation: matches both the paginated rows and the full-list
+    // query behind the verified split — a manual retry must refresh both or
+    // the header readout goes stale against the rows (H1).
+    queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
   }
 
   return {
