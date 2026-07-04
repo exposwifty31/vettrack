@@ -1175,3 +1175,25 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - This commit also lands the pre-existing intended `.design-sync/config.json` + `NOTES.md` + `src/design-system-entry.ts` (SidebarDivider barrel) working-tree state that this sync ran against, per the plan's working-tree note.
 
 **Verdict:** Phase 9 DONE — targeted 6-path mirror push confirmed written; anchor cycle closed.
+
+## 2026-07-04 — SUPERSEDING: Phase 5 Day-field claim refuted on-device; fixed post-merge
+
+**Supersedes:** the Phase 5 entry's claim that the Task-Controls Day field "stays inside its cell". The adversarial branch audit (2026-07-04) refuted it on-device: on iPhone 17 Pro portrait RTL the date input's end-side edge rendered ~30 device-px outside the white card (two independent captures, `iphone-10-task-controls.png`). `min-w-0` reduced but did not eliminate the WebKit intrinsic-width escape.
+
+**Claim:** `appearance-none` added to the date `Input` (`src/pages/Tasks.tsx:1123`, commit adf9d164c on main post-merge) resets the UA styling so the `w-full/max-w-full/min-w-0` clamp actually applies; static tripwire extended (`tests/epic8-slice2-tasks-scheduling.test.js` — "resets UA appearance" assertion).
+
+**Evidence:** epic8 file 41/41 pass; full gates below. **Owed:** simulator re-drill after the next native-shell rebuild — this entry stays open until the device capture shows the field inside the card.
+
+## 2026-07-04 — Chat bubble bidi isolation (audit residue #2)
+
+**Claim:** `MessageBubble` body is now wrapped in `<Bdi dir="auto">` (`src/features/shift-chat/components/MessageBubble.tsx`, commit 7cd198e7f) — the audit reproduced "!Hi everyone" in bubbles while only the pinned banner had been Bdi-wrapped in M2.
+
+**Evidence:** new `tests/shift-chat-bubble-bidi.test.tsx` (2 tests, happy-dom): Latin body renders inside `<bdi dir="auto">`; @mention highlighting stays inside the isolate. Both fail without the wrap (closest("bdi") === null). 2/2 pass.
+
+## 2026-07-04 — Merge to main + design-sync follow-up (audit disposition)
+
+**Claim:** `claude/refine-local-plan-jjrebb` fast-forward-merged to main (99b8bc906 → 5624f69b2); pre-merge working-tree debris (34 tracked files byte-identical to main + untracked stale `appointments.tsx` differing from `Tasks.tsx` by one comment word) preserved via stash + scratchpad, not discarded. Design-sync follow-ups landed (commit 5fee44f53): NativeList `showUptime={false}` preview variant, NOTES count 110→111, stale floor-cards risk bullet replaced. Targeted re-sync pushed exactly 6 paths (`_ds_bundle.js`, `_ds_bundle.css`, `styles.css`, `_ds_sync.json`, `_preview/EquipmentStatStrip.js`, StatStrip `prompt.md`); remote anchor pre-verified byte-equivalent (bundleSha12 81fb922e86ae) — the audit-session Claude Design prompts touched no synced artifacts, as they reported.
+
+**Evidence (run, not assumed):** driver verdict: anchor ok, diff changed=[EquipmentStatStrip] only, renderChurned=[], validate exit 1 == exactly the 7 known triaged warns (parsed `.render-check.json`: flagged set == {AppErrorBoundary, PageErrorBoundary, ShiftSummarySheet, SyncQueueSheet, SwUpdateBanner, SyncStatusBanner, UpdateBanner}, zero new); `write_files` → `{"written":6}`; re-anchored `.cache/remote-sync.json` (new bundleSha12 e12d5243d0a4). Gates on main post-fixes: `pnpm typecheck` (both tsconfigs) exit 0; `pnpm i18n:check` deep parity ✓; `pnpm test` (dev env) → **397 files / 3902 tests, 0 failed** — including the two files the audit flagged as pre-existing failures.
+
+**Verdict:** Merge DONE; fixes A (Day field) + B (bubble bidi) + C (design-sync) landed. Owed: deploy + post-deploy chat drill, Day-field + bubble sim drills (logged when run).
