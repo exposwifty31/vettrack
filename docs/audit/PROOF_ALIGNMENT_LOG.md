@@ -1197,3 +1197,14 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Evidence (run, not assumed):** driver verdict: anchor ok, diff changed=[EquipmentStatStrip] only, renderChurned=[], validate exit 1 == exactly the 7 known triaged warns (parsed `.render-check.json`: flagged set == {AppErrorBoundary, PageErrorBoundary, ShiftSummarySheet, SyncQueueSheet, SwUpdateBanner, SyncStatusBanner, UpdateBanner}, zero new); `write_files` → `{"written":6}`; re-anchored `.cache/remote-sync.json` (new bundleSha12 e12d5243d0a4). Gates on main post-fixes: `pnpm typecheck` (both tsconfigs) exit 0; `pnpm i18n:check` deep parity ✓; `pnpm test` (dev env) → **397 files / 3902 tests, 0 failed** — including the two files the audit flagged as pre-existing failures.
 
 **Verdict:** Merge DONE; fixes A (Day field) + B (bubble bidi) + C (design-sync) landed. Owed: deploy + post-deploy chat drill, Day-field + bubble sim drills (logged when run).
+
+## 2026-07-04 — Device drills: Day-field + bubble bidi PASS (closes the superseding entry's owed capture)
+
+**Claim:** Both client-side fixes verified on-simulator against the freshly built native shell (bundle `Tasks-D9zXaCKE.js`, installed on iPhone 17 Pro + iPad A16 sims).
+
+**Evidence (observed on device, screenshots in session scratchpad):**
+- **Day field (drill-day-field-fixed.png, device-resolution 1206×2622):** iPhone 17 Pro portrait RTL, Tasks → בקרות משימות — the date input ("4 Jul 2026") renders fully inside the white card, edge-aligned with the technician select / hours / interval inputs. The audited ~30 device-px end-side escape is gone. The superseding Phase 5 entry's owed capture is now closed.
+- **Bubble bidi (iPad chat panel, zoomed capture):** the Latin message bubble renders "Hi everyone!" — trailing punctuation at the end, identical to the pinned banner above it. The audit's "!Hi everyone" reordering no longer reproduces.
+- **Still owed:** chat empty-state drill (off-shift → no weeks-old transcript) — blocked on production deploy; the Railway CLI/MCP token expired (`invalid_grant`) and re-login is interactive. `vettrack.uk` still runs the pre-branch server at drill time, which is also why the transcript remains visible on-device (consistent with the audit's Phase 0 ceiling).
+
+**Verdict:** 2 of 3 post-merge drills PASS at device level; chat drill remains deploy-gated.
