@@ -1359,3 +1359,19 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Earlier this session: fresh bundled shell `1.1.2-mr74k1yp` (build-native-shell), simulator smoke BUILD SUCCEEDED + installed on iPad sim, typecheck + full vitest green.
 
 **Verdict:** VERIFIED — remaining work is the human §D/§E flow: Xcode archive as 1.1.0 (21) → Upload → resubmit with reviewer credentials; bump to 22 via agvtool only if ASC reports a duplicate build number.
+
+## 2026-07-05 — TestFlight 1.1.0 (21) device findings fixed: bare auth shell, dark Clerk card, stale What's New (committed with this entry)
+
+**Claim:** The three device-only regressions from the user's TestFlight screenshots are fixed on main (809b5b59d, 6cb9046b5): signed-out /signin no longer renders inside the native chrome, the Clerk card follows dark mode, and What's New shows 1.1.0 content. Build 21 will NOT be submitted; a fixed build 23 supersedes it.
+
+**Evidence:**
+- Root causes read from source, not inferred: `PlatformRouter` wraps every route in `NativeShell` (no auth carve-out — chrome + dead tabs around /signin); `clerkAppearance.variables` were static light colors (white card on `.dark`); `locales/*.json whatsNew.currentVersion` was "1.0.1"/"Build 20" while the dismissal key deliberately re-surfaces the sheet on version change. All three invisible in the simulator: dev-bypass never lands on /signin, and the sim defaults to light appearance.
+- Dark-mode "default" itself was diagnosed as system-follow (`appearance: "system"` default + device auto-dark at 06:18) — kept by user decision; only the dark styling was fixed.
+- Command: `pnpm test -- tests/native-auth-surface.test.ts` → 5 passed (new source-contract suite: chrome renders only after the auth-route early return; dark palette swaps variables but not element classes; both auth pages pass the reactive flag).
+- Command: `pnpm i18n:generate-types && pnpm i18n:check` → deep key parity green after replacing the five `whatsNew.items.*` keys.
+- Command: `pnpm typecheck` (both tsconfigs) → clean, twice (after each commit's file set).
+- Command: `pnpm test -- tests/i18n-parity.test.ts tests/native-auth-surface.test.ts tests/phase-6-consistency-polish.test.ts` → 20 passed.
+- `git diff --stat locales/` verified surgical (40 lines/file, whatsNew block only — no whole-file reformat).
+- NOT verified yet: on-device rendering of the three fixes (requires build 23 via build-native-shell.sh → archive → TestFlight; next step).
+
+**Verdict:** VERIFIED (code + contracts); PARTIAL (device verification awaits build 23)
