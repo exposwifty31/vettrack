@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Home, Package, QrCode, Activity, ListTodo, ShieldCheck, MapPin, User,
-  Bell, ShoppingCart, Box, Settings, Clock, LogOut,
+  Bell, ShoppingCart, Box, Settings, Clock, LogOut, Bug,
 } from "lucide-react";
 import { t } from "@/lib/i18n";
 
@@ -69,6 +69,9 @@ export function getNativeNavSections(opts?: { hasActiveShift?: boolean }): Nativ
       items: [
         { id: "profile",  href: "/my-profile", label: t.more.profile,  Icon: User },
         { id: "settings", href: "/settings",   label: t.more.settings, Icon: Settings },
+        // Dropped by accident in the Stage 1–5 nav-model restage (the MoreSheet
+        // row pre-dated the model); restored 2026-07-05 (device finding).
+        { id: "report-bug", href: "/support", label: t.nav.reportBug, Icon: Bug },
       ],
     },
     {

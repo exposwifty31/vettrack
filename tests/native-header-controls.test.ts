@@ -15,6 +15,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
+import { getNativeNavSections } from "../src/lib/routes/native-nav-model";
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf-8");
 
@@ -49,6 +50,19 @@ describe("phone search overlay — escapes the blurred header's stacking context
     const panels = source.indexOf("{openPanel && (");
     expect(headerClose).toBeGreaterThan(-1);
     expect(panels).toBeGreaterThan(headerClose);
+  });
+});
+
+describe("Report a Bug — present in the nav model (regression: lost in nav restage)", () => {
+  it("account section carries a non-admin report-bug item routed to /support", () => {
+    const sections = getNativeNavSections();
+    const account = sections.find((s) => s.id === "account");
+    expect(account).toBeDefined();
+    expect(account?.adminOnly).toBeFalsy();
+    const item = account?.items.find((i) => i.id === "report-bug");
+    expect(item?.href).toBe("/support");
+    // Not a phone tab-bar item — must stay visible in the MoreSheet drawer.
+    expect(item?.inPhoneTabBar).toBeFalsy();
   });
 });
 
