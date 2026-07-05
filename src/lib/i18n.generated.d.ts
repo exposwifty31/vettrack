@@ -3775,27 +3775,27 @@ export interface TStructure {
     currentDate: string;
     buildLabel: string;
     items: {
-      clinicalDesign: {
+      ipadExperience: {
         title: string;
         description: string;
         badge: string;
       };
-      accessibility: {
+      equipmentSearch: {
         title: string;
         description: string;
         badge: string;
       };
-      nativeApp: {
+      alertBell: {
         title: string;
         description: string;
         badge: string;
       };
-      signIn: {
+      appearance: {
         title: string;
         description: string;
         badge: string;
       };
-      navigation: {
+      reliability: {
         title: string;
         description: string;
         badge: string;

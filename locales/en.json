@@ -3768,33 +3768,33 @@
     "heading": "What's New",
     "description": "The latest features and improvements in VetTrack.",
     "configureAlerts": "Configure alerts in Settings",
-    "currentVersion": "1.0.1",
-    "currentDate": "June 2026",
-    "buildLabel": "Build 20",
+    "currentVersion": "1.1.0",
+    "currentDate": "July 2026",
+    "buildLabel": "Build 23",
     "items": {
-      "clinicalDesign": {
-        "title": "Clinical design system refresh",
-        "description": "Refreshed typography, contrast, and 44px touch targets across equipment, Today, alerts, and Code Blue — built for bedside use on phones and tablets.",
+      "ipadExperience": {
+        "title": "Built for iPad",
+        "description": "Equipment, Rooms, and the inventory catalog open in a two-pane split view, and Home is a new at-a-glance dashboard.",
         "badge": "New"
       },
-      "accessibility": {
-        "title": "Accessibility improvements",
-        "description": "Skip-to-content link, visible focus rings, form labels, and WCAG AA contrast on emergency and alert surfaces.",
+      "equipmentSearch": {
+        "title": "Faster equipment search",
+        "description": "Type-ahead suggestions by name, serial number, or model — on iPhone and iPad.",
+        "badge": "New"
+      },
+      "alertBell": {
+        "title": "A smarter alert bell",
+        "description": "Alerts are grouped, prioritized, and capped so the critical ones surface first instead of flooding the bell.",
         "badge": "Improved"
       },
-      "nativeApp": {
-        "title": "Native iOS app",
-        "description": "VetTrack runs as a bundled Capacitor app on iOS with NFC scanning, camera capture, haptic feedback, and offline-capable sync.",
+      "appearance": {
+        "title": "Appearance & text size",
+        "description": "Light, dark, or follow-the-system appearance, and text that scales with iOS Dynamic Type.",
         "badge": "New"
       },
-      "signIn": {
-        "title": "Sign in with Apple & Google",
-        "description": "Social sign-in opens in the system browser for secure one-tap login on mobile, in addition to email and password.",
-        "badge": "New"
-      },
-      "navigation": {
-        "title": "Easier navigation",
-        "description": "Back button on every screen, fixed header while scrolling, and a clear exit from the Equipment Command Board.",
+      "reliability": {
+        "title": "Shift & emergency reliability",
+        "description": "Code Blue start responds instantly, shift chat stays anchored to the current roster, and clearer guidance when you're off shift.",
         "badge": "Improved"
       }
     },

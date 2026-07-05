@@ -13,11 +13,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Shield,
-  Stethoscope,
-  Smartphone,
-  MapPin,
-  ShieldCheck,
+  Tablet,
+  Search,
+  Bell,
+  SunMoon,
   HeartPulse,
 } from "lucide-react";
 
@@ -72,34 +71,34 @@ export default function WhatsNewPage() {
       date: wn.currentDate,
       highlights: [
         {
+          icon: <Tablet className="w-5 h-5 text-primary" />,
+          title: wn.items.ipadExperience.title,
+          description: wn.items.ipadExperience.description,
+          badge: { label: wn.items.ipadExperience.badge, variant: "default" },
+        },
+        {
+          icon: <Search className="w-5 h-5 text-primary" />,
+          title: wn.items.equipmentSearch.title,
+          description: wn.items.equipmentSearch.description,
+          badge: { label: wn.items.equipmentSearch.badge, variant: "default" },
+        },
+        {
+          icon: <Bell className="w-5 h-5 text-primary" />,
+          title: wn.items.alertBell.title,
+          description: wn.items.alertBell.description,
+          badge: { label: wn.items.alertBell.badge, variant: "secondary" },
+        },
+        {
+          icon: <SunMoon className="w-5 h-5 text-primary" />,
+          title: wn.items.appearance.title,
+          description: wn.items.appearance.description,
+          badge: { label: wn.items.appearance.badge, variant: "default" },
+        },
+        {
           icon: <HeartPulse className="w-5 h-5 text-primary" />,
-          title: wn.items.clinicalDesign.title,
-          description: wn.items.clinicalDesign.description,
-          badge: { label: wn.items.clinicalDesign.badge, variant: "default" },
-        },
-        {
-          icon: <Shield className="w-5 h-5 text-primary" />,
-          title: wn.items.accessibility.title,
-          description: wn.items.accessibility.description,
-          badge: { label: wn.items.accessibility.badge, variant: "secondary" },
-        },
-        {
-          icon: <Smartphone className="w-5 h-5 text-primary" />,
-          title: wn.items.nativeApp.title,
-          description: wn.items.nativeApp.description,
-          badge: { label: wn.items.nativeApp.badge, variant: "default" },
-        },
-        {
-          icon: <ShieldCheck className="w-5 h-5 text-primary" />,
-          title: wn.items.signIn.title,
-          description: wn.items.signIn.description,
-          badge: { label: wn.items.signIn.badge, variant: "default" },
-        },
-        {
-          icon: <MapPin className="w-5 h-5 text-primary" />,
-          title: wn.items.navigation.title,
-          description: wn.items.navigation.description,
-          badge: { label: wn.items.navigation.badge, variant: "secondary" },
+          title: wn.items.reliability.title,
+          description: wn.items.reliability.description,
+          badge: { label: wn.items.reliability.badge, variant: "secondary" },
         },
       ],
     },
