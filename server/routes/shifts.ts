@@ -322,6 +322,37 @@ function detectRole(shiftName: string): ShiftRole | null {
   return detectShiftRole(shiftName);
 }
 
+/**
+ * Labels that name real staff roles the roster CSV cannot carry: vet shifts
+ * import via the doctor CSV (userId column), and students never hold roster
+ * authority. Distinguishing them from truly irrelevant labels keeps real
+ * staff rows from being skipped as "not relevant" without explanation.
+ */
+function classifyUnsupportedRosterRole(shiftName: string): "vet" | "student" | null {
+  const normalized = normalizeWhitespace(shiftName).toLowerCase();
+  if (normalized.includes("סטודנט") || normalized.includes("student")) return "student";
+  if (
+    normalized.includes("וטרינר") ||
+    normalized.includes("רופא") ||
+    normalized.includes("vet") ||
+    normalized.includes("doctor")
+  ) {
+    return "vet";
+  }
+  return null;
+}
+
+function skippedRoleReason(shiftName: string): string {
+  const unsupported = classifyUnsupportedRosterRole(shiftName);
+  if (unsupported === "vet") {
+    return `Shift "${shiftName}" is a vet shift — doctor schedules import via the doctor CSV (userId column), not the roster CSV`;
+  }
+  if (unsupported === "student") {
+    return `Shift "${shiftName}" is a student shift — students are not part of the on-shift roster`;
+  }
+  return `Shift "${shiftName}" is not relevant to VetTrack`;
+}
+
 function resolveHeaderIndex(headers: string[], variants: readonly string[]): number {
   const normalizedHeaders = headers.map((header) => normalizeHeader(header));
   for (const variant of variants) {
@@ -424,7 +455,7 @@ function parseShiftsCsvContent(csvContent: string, filename: string): ShiftParse
 
     const role = detectShiftRole(shiftNameRaw);
     if (!role) {
-      issues.push({ rowNumber, reason: `Shift "${shiftNameRaw}" is not relevant to VetTrack`, data: rowData });
+      issues.push({ rowNumber, reason: skippedRoleReason(shiftNameRaw), data: rowData });
       continue;
     }
 
@@ -632,7 +663,7 @@ router.post("/import/confirm", requireAuth, requireAdmin, uploadCsvFile, async (
       performedByEmail: req.authUser!.email ?? "",
       targetId: importId,
       targetType: "shift_import",
-      metadata: { filename: parsed.filename, rowCount: parsed.validRows.length },
+      metadata: { filename: parsed.filename, rowCount: parsed.validRows.length, skippedRows: parsed.issues.length },
     });
     return res.json({
       importId,

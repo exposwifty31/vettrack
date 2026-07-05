@@ -1,6 +1,6 @@
 // TODO(arch): file exceeds 1100 lines. Split into handler modules following
 // the equipment-route-utils.ts / handlers/ pattern already started in this directory.
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { randomUUID } from "crypto";
 import multer from "multer";
 import { z } from "zod";
@@ -220,6 +220,37 @@ const router = Router();
 
 const FIELD_MAX_LENGTH = 500;
 
+/**
+ * Shared response mapping for the checkout gate errors thrown by
+ * evaluateCheckoutV1Preconditions / assertWaitlistCheckoutAllowed — used by
+ * every custody-flip route (/scan, /:id/toggle) so a new gate code cannot be
+ * mapped in one handler and missed in another. Returns null for other errors.
+ */
+function mapCheckoutGateError(err: unknown, req: Request, res: Response): Response | null {
+  if (err instanceof CheckoutPreconditionError) {
+    if (err.code === "STAGING_CONFLICT") {
+      return res.status(409).json({
+        code: err.code,
+        error: "You are not the top priority claim holder",
+        queue: err.extra?.queue,
+      });
+    }
+    if (err.code === "BUNDLE_INCOMPLETE") {
+      return res.status(422).json({ code: err.code, ...err.extra });
+    }
+    return res.status(err.httpStatus).json({
+      code: err.code,
+      error: typeof err.extra?.error === "string" ? err.extra.error : err.message,
+      ...err.extra,
+    });
+  }
+  if (err instanceof EquipmentWaitlistError) {
+    const status = err.code === "WAITLIST_RESERVATION_HELD_BY_OTHER" ? 409 : 422;
+    return apiErrorI18n(req, res, `equipmentWaitlist.${err.code}`, undefined, status);
+  }
+  return null;
+}
+
 type EquipmentRow = typeof equipment.$inferSelect;
 
 export async function cleanExpiredUndoTokens(): Promise<void> {
@@ -336,6 +367,8 @@ router.post("/scan", requireAuth, checkoutLimiter, requireEffectiveRole("student
       undoToken: result.undoToken,
     });
   } catch (err) {
+    const gateMapped = mapCheckoutGateError(err, req, res);
+    if (gateMapped) return gateMapped;
     if (err instanceof CheckoutConflictError) {
       return res.status(409).json({
         ...apiError({
@@ -421,36 +454,14 @@ router.post(
         undoToken: result.undoToken,
       });
     } catch (err) {
-      if (err instanceof CheckoutPreconditionError) {
-        if (err.code === "STAGING_CONFLICT") {
-          return res.status(409).json({
-            code: err.code,
-            error: "You are not the top priority claim holder",
-            queue: err.extra?.queue,
-          });
-        }
-        if (err.code === "BUNDLE_INCOMPLETE") {
-          return res.status(422).json({ code: err.code, ...err.extra });
-        }
-        return res.status(err.httpStatus).json({
-          code: err.code,
-          error:
-            typeof err.extra?.error === "string"
-              ? err.extra.error
-              : err.message,
-          ...err.extra,
-        });
-      }
+      const gateMapped = mapCheckoutGateError(err, req, res);
+      if (gateMapped) return gateMapped;
       if (err instanceof CheckoutConflictError) {
         return res.status(409).json({
           code: "VERSION_CONFLICT",
           error: "Version conflict, please retry",
           checkedOutByEmail: err.checkedOutByEmail,
         });
-      }
-      if (err instanceof EquipmentWaitlistError) {
-        const status = err.code === "WAITLIST_RESERVATION_HELD_BY_OTHER" ? 409 : 422;
-        return apiErrorI18n(req, res, `equipmentWaitlist.${err.code}`, undefined, status);
       }
       if (err instanceof CustodyReturnVersionConflictError) {
         return res.status(409).json(

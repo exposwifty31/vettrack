@@ -283,8 +283,9 @@ describe("server/index.ts — integration webhooks", () => {
   const src = read("server/index.ts");
 
   it("mounts raw body route before express.json for HMAC", () => {
-    const jsonIdx = src.indexOf("app.use(express.json())");
+    const jsonIdx = src.indexOf("app.use(express.json(");
     const whIdx = src.indexOf('"/api/integration-webhooks/:adapterId"');
+    expect(jsonIdx).toBeGreaterThan(-1);
     expect(whIdx).toBeGreaterThan(-1);
     expect(jsonIdx).toBeGreaterThan(whIdx);
   });

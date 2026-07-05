@@ -1219,3 +1219,102 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Note: the Railway CLI link on this machine is stale (registered for /Users/dan/vettrack, token expired) — irrelevant while CI deploys main, but fix before any manual `railway up`.
 
 **Verdict:** All three post-merge drills PASS. Phase 0 verified at code, test, AND production-behavior level. No owed items remain from the audit's merge conditions except the deferred Claude Design prompts.
+
+## 2026-07-05 — /init: CLAUDE.md drift audit + corrections
+
+**Claim:** CLAUDE.md re-verified against the live repo; six drift points fixed, no rewrite of the accurate core (frozen surfaces, realtime, authority, i18n untouched).
+
+**Evidence (each checked against the actual file, not assumed):**
+- `package.json` read in full: `architecture:gates` → `scripts/architecture/run-architecture-gates.mjs` runs tsc (frontend) + tsc (`tsconfig.server-check.json`) + depcruise + madge cycles only — tenant:lint and knip are NOT in the gate suite (script grepped, lines 26–41). Commands section corrected.
+- Capacitor native shell absent from CLAUDE.md despite `cap:*` scripts, `ios/`/`android/` dirs, and `scripts/build-native-shell.sh` (header read: reads `VITE_CLERK_PUBLISHABLE_KEY`/`VITE_API_ORIGIN` from `.env` only, never sets `CAPACITOR_SERVER_URL`). Added commands + gotcha paragraph + layout line.
+- `server/lib/auth-mode.ts` grepped: clerk mode requires secret AND `CLERK_ENABLED !== "false"`; `CLERK_ENABLED=false` → dev-bypass (`clerk-explicitly-disabled`). Auth modes section corrected.
+- `vite.config.ts` exclude list read: `tests/shift-chat-window.integration.test.ts` had been added (file header read — requires DATABASE_URL + migration 159, runs via `pnpm exec tsx`). Tests section updated; dedicated runners' actual include lists verified in `vitest.db-integration.config.ts` (equipment-operational-state only) and `vitest.integration.ops.config.ts` (+ waitlist) — first draft overstated their coverage and was corrected.
+- `ls src/features/` → 12 modules (was documented as 4); `server/domain/` exists (equipment/ + service-task.adapter.ts, README cross-checked) and was missing from the layout; `server/app/routes.ts` has 46 imports / `server/routes/` 49 files (was "~44").
+- Architecture intro updated to post-scope-change reality (README scope note: medication/billing/ER removed in migrations 142–143; legacy routes are redirects).
+
+**Verdict:** CLAUDE.md now matches the repo at commit time. Not re-verified here: worker table, telemetry enums, rate-limit numbers (unchanged text, not re-audited).
+
+## 2026-07-05 — F1/P0: quick-scan now enforces waitlist + precondition gates (committed with this entry)
+
+**Claim:** `quickScanEquipmentCustody()` now calls `evaluateCheckoutV1Preconditions()` + `assertWaitlistCheckoutAllowed()` before checkout (mirroring `toggleEquipmentCustody()`), and `POST /api/equipment/scan` maps `CheckoutPreconditionError` / `EquipmentWaitlistError` to their documented 4xx codes instead of 500.
+
+**Evidence:**
+- RED first (TDD): before the fix, `tests/equipment-quick-scan-gates.test.ts` failed with `expected Error: TX_SENTINEL to be an instance of EquipmentWaitlistError` — proving all three denial scenarios (reserved-by-other, untracked, staged-conflict) reached `db.transaction` ungated. Integration RED: quick-scan by non-reserved userC returned `200` (expected 409) in `tests/equipment-waitlist.integration.test.ts`, reproducing the audit's runtime evidence.
+- `server/services/equipment-custody-toggle.service.ts:832-833` — checkout branch of `quickScanEquipmentCustody` now runs `evaluateCheckoutV1Preconditions(...)` then `assertWaitlistCheckoutAllowed(...)`, and threads `preCheck.v1StageClaimId`/`v1NewUsageState` into `performEquipmentCheckout` + `finalizeCheckoutSideEffects` (same order/args as toggle at lines 726-751).
+- `server/routes/equipment.ts` — `/scan` catch now handles `CheckoutPreconditionError` (STAGING_CONFLICT→409, BUNDLE_INCOMPLETE→422, else `err.httpStatus`) and `EquipmentWaitlistError` (WAITLIST_RESERVATION_HELD_BY_OTHER→409 via `apiErrorI18n`), mirroring `/toggle`.
+- Test: `pnpm test -- tests/equipment-quick-scan-gates.test.ts tests/equipment-scan-lifecycle.test.ts` → 2 files, 39 tests passed.
+- Test: `DATABASE_URL=postgres://…/vettrack pnpm exec vitest run --config vitest.integration.ops.config.ts tests/equipment-waitlist.integration.test.ts` → 8 passed (includes new "quick-scan by non-reserved user is denied while reservation held (F1 regression)": userC scan → 409 `equipmentWaitlist.WAITLIST_RESERVATION_HELD_BY_OTHER`, custody stays `returned`, reserved userB scan → 200 checkout, row `fulfilled`).
+- Command: `pnpm typecheck` → clean (both tsconfigs). `pnpm test` → 400 files / 3914 tests passed.
+- Pre-existing noise ruled out: `tests/equipment-operational-state.integration.test.ts` fails 10-11 sweep/metrics tests IDENTICALLY with my changes stashed (`git stash` → 11 failed → `git stash pop`) — environment-dependent, unrelated to this fix.
+- Note: `vitest.integration.ops` suite silently self-skips unless `DATABASE_URL` is exported in the shell — `tests/vitest-setup.ts:3-5` injects a dummy `vettrack_test` URL before the test file's `dotenv/config` runs, so the reachability probe fails and `describe.skipIf` skips all 57 tests.
+
+**Verdict:** VERIFIED
+
+## 2026-07-05 — F2/P1: explicit express.json limit + 413/400 body-parser error mapping (committed with this entry)
+
+**Claim:** `express.json()` now has an explicit `5mb` limit (aligned with the multer upload limits), and body-parser failures return 413/400 via a shared, testable terminal handler instead of the blanket 500.
+
+**Evidence:**
+- RED first (TDD): `tests/body-parser-errors.test.ts` failed on missing module `server/lib/body-parser-errors.js` before implementation.
+- `server/lib/body-parser-errors.ts` — exports `JSON_BODY_LIMIT = "5mb"`, `classifyBodyParserError()` (`entity.too.large`→413 PAYLOAD_TOO_LARGE, `entity.parse.failed`/SyntaxError+400→400 INVALID_JSON, other typed body-parser 4xx→own status, unrelated errors→null), and `terminalErrorHandler()` (classify-first, blanket 500 otherwise).
+- `server/index.ts` — `app.use(express.json({ limit: JSON_BODY_LIMIT }))` replaces the unlimited default; the inline terminal handler is replaced by `app.use(terminalErrorHandler)`. Raw-body webhook mount order unchanged (still before express.json).
+- Test: `pnpm test -- tests/body-parser-errors.test.ts` → 11 passed (classifier units + behavioral tests mounting the REAL exported handler on a live express app: 6 MB body → 413, `{"broken":` → 400, valid JSON → 200, unrelated throw → 500).
+- Runtime proof on the real server (`PORT=3102 tsx server/index.ts`, same probes as the audit): 6 MB JSON POST `/api/shifts/import/preview` → `HTTP 413 {"error":"Request body exceeds the 5mb limit","code":"PAYLOAD_TOO_LARGE"}`; malformed JSON → `HTTP 400 {"error":"Request body is not valid JSON","code":"INVALID_JSON"}`. Audit had recorded 500 for both.
+- Ripple fixed: `tests/integration-adapter.test.js` "mounts raw body route before express.json for HMAC" searched the literal `app.use(express.json())`; search loosened to `app.use(express.json(` and a `> -1` guard added so the ordering invariant is still enforced.
+- Command: `pnpm typecheck` → clean. `pnpm test` → 401 files / 3925 tests passed (includes the new file).
+
+**Verdict:** VERIFIED
+
+## 2026-07-05 — F3/P2: shift CSV role-label classification + skipped-row visibility at confirm (committed with this entry)
+
+**Claim:** Roster CSV rows with vet/student labels are no longer skipped with a misleading "not relevant to VetTrack" reason; skipped counts now surface in the confirm audit log and as a warning toast in the admin UI.
+
+**Evidence:**
+- Root cause re-verified before fixing: the wetcheck run hit `parseShiftsCsvContent`→`detectShiftRole` (Employee-name CSV, `scripts/wetcheck/simulate.mjs` p1ShiftImport), and the 2 dropped rows were `וטרינר בוקר` (vet) + `סטודנט בוקר` (student) — NOT night variants (`טכנאי לילה`/`בכיר לילה` match טכנאי/בכיר and import fine). Mapping vet/student INTO the roster is intentionally not done: `vt_shift_role` pg enum is closed (`technician|senior_technician|admin`, server/schema/ops.ts:10) and `shared/authority.ts` documents students as never shift-elevated; vet schedules import via the doctor CSV path (`vt_doctor_shifts`).
+- `server/routes/shifts.ts` — new `classifyUnsupportedRosterRole()` + `skippedRoleReason()`: vet labels (וטרינר/רופא/vet/doctor) → reason pointing at the doctor CSV path; student labels (סטודנט/student) → "students are not part of the on-shift roster"; other labels keep the generic reason. Confirm `logAudit` metadata now includes `skippedRows`. (File is on the i18n Hebrew-in-source allowlist; `pnpm i18n:check` → deep parity ✓.)
+- `src/pages/admin-shifts.tsx` — confirm success with `skippedRows > 0` now shows `toast.warning(importSuccessWithSkipped(inserted, skipped))` instead of a plain success toast (audit's "silent bulk confirm"). New key in `locales/en.json`+`he.json`, parametrized accessor added in `src/lib/i18n.ts` (hand-built namespace gotcha), types regenerated via `pnpm i18n:generate-types`.
+- TDD: `tests/shift-csv-role-labels.test.ts` written first → 4 failed (vet/student reasons missing, audit metadata missing, toast missing) → after fix 5/5 pass. Exercises the real POST /api/shifts/import/preview route (Hebrew + English labels, recognized roles unaffected).
+- Command: `pnpm typecheck` → clean. `pnpm test` → 3930 passed. `pnpm i18n:check` → parity ✓.
+
+**Verdict:** VERIFIED
+
+## 2026-07-05 — F4/P2: waitlist promotion deferred until asset-typed units are deployable (committed with this entry)
+
+**Claim:** Reservations are no longer hollow for asset-typed gear: return of an asset-typed unit no longer promotes the head waiter (the checkout bundle gate cannot pass while custody is "returned"); promotion fires from the existing dock-return path once the unit is fully deployable, and the TTL-expiry sweep applies the same deployability check.
+
+**Evidence:**
+- Root cause re-verified: `computeBundleReadinessGate` hard-requires `custodyState === "docked"` (server/services/equipment-operational-state.service.ts:43), so a just-returned asset-typed unit can NEVER be checked out by the promoted user — the reservation TTL burned down un-redeemably. Chosen remedy is the audit's option (b): promote only when deployable (matches the dock-return path's existing `isEquipmentFullyDeployable` guard at server/routes/equipment-operational-state.ts:372-376).
+- `server/services/equipment-custody-toggle.service.ts` — `performEquipmentReturn` now calls `promoteNextWaitlistInTx` only when `existing.assetTypeId` is null; non-asset units keep promote-on-return byte-identical.
+- `server/services/equipment-waitlist.service.ts` — `promoteEquipmentWaitlistIfEligible` (dock_return + ttl_expiry triggers) additionally requires `isEquipmentFullyDeployable(...)` for asset-typed units, so the sweep cannot re-issue a hollow reservation either.
+- TDD RED first: new integration case "asset-typed return defers promotion…" failed with `expected 1 to be +0` (return promoted immediately) and the sweep case failed the same way (next waiter promoted onto an unverified unit).
+- Test: `DATABASE_URL=… vitest run --config vitest.integration.ops.config.ts tests/equipment-waitlist.integration.test.ts` → **10 passed**, including unchanged pre-existing behavior: "return → promotes head waiter" (non-asset), "TTL expiry → expires and promotes next" (non-asset), "dock-return → promotes head waiter when unit becomes deployable". New case proves the reservation is redeemable: dock-return with verified condition → promotion → reserved user `/checkout` → 200.
+- Command: `pnpm typecheck` → clean. `pnpm architecture:cycles` → 0 cycles, matches baseline (new import `equipment-waitlist.service` → `equipment-operational-state.service` is acyclic). `pnpm test` → full default suite green.
+
+**Verdict:** VERIFIED
+
+## 2026-07-05 — P2: RFID suite teardown + prepare-real-db purge tool hardened (committed with this entry)
+
+**Claim:** The RFID integration suite no longer leaks `rfid-test-*` clinics, and `scripts/wetcheck/prepare-real-db.ts` no longer crashes mid-purge — it discovers all clinic child tables dynamically, runs atomically, and gates audit-row purging behind an explicit flag.
+
+**Evidence:**
+- Root cause discovered during teardown work: `vt_audit_logs` is append-only (`no_delete_audit_logs` rule, `DO INSTEAD NOTHING` — migrations/013) while its clinic FK is `ON DELETE RESTRICT` — so ANY clinic that ever wrote an audit row is undeletable via plain SQL. This is why the dev DB accumulated ~390 orphan test clinics: even the test file's own `db.delete(auditLogs)` calls (now removed) were silent no-ops.
+- `tests/rfid-ingest.test.ts` — audit assertions converted from DB reads to a `logAudit` spy (same mock pattern as the waitlist integration suite), so the test clinics never acquire audit rows; `afterAll` deletes children→parents and asserts zero residue (fails the suite loudly on regression). No audit-rule DDL anywhere — an earlier draft that transactionally dropped/re-created the rule was flagged by the permission classifier and replaced with this cleaner design.
+- Verified live: `DATABASE_URL=…vettrack pnpm test -- tests/rfid-ingest.test.ts` → 1 file / 8 tests passed; `rfid-test` clinic count before=392, after=392 (previous behavior: +2 per run and the count grew 384→392 across the broken iterations of this session).
+- `scripts/wetcheck/prepare-real-db.ts` — three latent bugs fixed: (1) its `DELETE FROM vt_audit_logs` silently no-oped against the rule, so `--execute` would ALWAYS have crashed at the clinic delete; (2) its hardcoded 25-table list missed 18 RESTRICT-FK tables (verified via pg_constraint: e.g. vt_po_lines, vt_purchase_orders, vt_push_subscriptions, vt_clinical_check_ins…); (3) no transaction — a mid-purge failure left a partial purge. Now: child tables + delete order discovered from pg_constraint (children before referenced parents via `orderTablesForDeletion`), whole purge in one `db.transaction`, audit-row purge requires the NEW `ALLOW_AUDIT_LOG_PURGE=1` flag (preflight aborts cleanly before any delete otherwise; rule drop/re-create happens inside the same transaction so the invariant can't be left off). `main()` now runs only on direct invocation so the module is unit-testable.
+- Test: `pnpm test -- tests/prepare-real-db-order.test.ts` → 5 passed (chain, diamond, cycle, self-ref, determinism).
+- Dry-run against dev DB (safe, verified no changes): discovers **56 child tables** (was 25 hardcoded), reports 398 test clinics / 9,648 equipment / **10,459 audit rows** with the flag guidance. NOT verified: the `--execute` path was not run anywhere (destructive; requires the human CONFIRM_PURGE gate) — first real run should be against a throwaway DB.
+- Command: `pnpm typecheck` → clean; `pnpm test` → 3937 passed.
+
+**Verdict:** VERIFIED (teardown + dry-run); PARTIAL (execute path unexercised by design — human-gated)
+
+## 2026-07-05 — Origin hygiene: read-only reconciliation report (committed with this entry)
+
+**Claim:** Produced docs/audit/ORIGIN_RECONCILIATION_2026-07-05.md from live origin state; no branches merged, deleted, or pushed.
+
+**Evidence:**
+- Command: `git fetch origin --prune` → three of the audit's four cursor/* branches deleted upstream during prune (output listed them); the fourth (alerts-dropdown) was already gone.
+- Command: `git rev-list --left-right --count origin/main...main` → `0 6` (local main strictly ahead; the two Bugbot fixes 57423a3d7/4b2beed02 the audit tracked are now IN origin/main).
+- Command: per-branch `git rev-list --left-right --count origin/main...<branch>` for all 21 origin branches + `gh pr list` (16 open PRs) → table in the report; `feat/legal-pages-privacy-terms-support` measured 0 ahead (fully merged).
+- Nothing state-changing was run: no push, no merge, no branch deletion (prune only removed local remote-tracking refs for branches already deleted server-side).
+
+**Verdict:** VERIFIED

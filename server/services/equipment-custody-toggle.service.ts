@@ -503,7 +503,13 @@ export async function performEquipmentReturn(
       type: "EQUIPMENT_CUSTODY_STATE_CHANGED",
       payload: { equipmentId, custodyState: "returned", hasActiveClaims },
     });
-    waitlistPromotedOnReturn = await promoteNextWaitlistInTx(tx, clinicId, equipmentId, returnTime);
+    // Asset-typed units cannot pass the checkout bundle gate until dock-return
+    // re-verification (custody "returned" ≠ "docked"), so promoting here would
+    // start a reservation TTL the holder cannot redeem. The dock-return path
+    // promotes once the unit is fully deployable.
+    if (!existing.assetTypeId) {
+      waitlistPromotedOnReturn = await promoteNextWaitlistInTx(tx, clinicId, equipmentId, returnTime);
+    }
   }
 
   return {
@@ -829,14 +835,17 @@ export async function quickScanEquipmentCustody(
     };
   }
 
+  const preCheck = await evaluateCheckoutV1Preconditions(clinicId, equipmentId, actor.id, snap);
+  await assertWaitlistCheckoutAllowed(clinicId, equipmentId, actor.id);
+
   let txResult: EquipmentCheckoutTxResult | null = null;
   await db.transaction(async (tx) => {
     txResult = await performEquipmentCheckout(tx, {
       clinicId,
       equipmentId,
       actor,
-      v1StageClaimId: null,
-      v1NewUsageState: "in_use",
+      v1StageClaimId: preCheck.v1StageClaimId,
+      v1NewUsageState: preCheck.v1NewUsageState,
     });
   });
 
@@ -849,7 +858,7 @@ export async function quickScanEquipmentCustody(
     actorRole,
     equipment: (txResult as EquipmentCheckoutTxResult).updated,
     reminderBaseTime: (txResult as EquipmentCheckoutTxResult).reminderBaseTime,
-    v1StageClaimId: null,
+    v1StageClaimId: preCheck.v1StageClaimId,
     auditMetadata: { via: "quick_scan" },
   });
 

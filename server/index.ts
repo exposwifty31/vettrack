@@ -24,6 +24,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { runMigrations } from "./migrate.js";
 import { globalApiLimiter } from "./middleware/rate-limiters.js";
+import { JSON_BODY_LIMIT, terminalErrorHandler } from "./lib/body-parser-errors.js";
 import { i18nMiddleware } from "../lib/i18n/middleware.js";
 import { tenantContext } from "./middleware/tenant-context.js";
 import { sessionContextMiddleware } from "./middleware/auth.js";
@@ -258,7 +259,7 @@ app.use(
 
 mountRfidRoutes(app, "/api/rfid", () => rfidRoutes);
 
-app.use(express.json());
+app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
 function sanitizeValue(value: unknown): unknown {
   if (typeof value === "string") {
@@ -369,11 +370,7 @@ if (process.env.NODE_ENV === "production" || process.env.PLAYWRIGHT_E2E === "tru
   });
 }
 
-app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error("Unhandled application error", err);
-  if (res.headersSent) return;
-  res.status(500).json({ error: "Internal Server Error" });
-});
+app.use(terminalErrorHandler);
 
 function resolvePort(value: string | undefined): number {
   if (!value || value.trim() === "") return 3001;
