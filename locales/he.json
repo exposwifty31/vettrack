@@ -1232,6 +1232,7 @@
     "previewReady": "תצוגה מקדימה מוכנה",
     "previewFailed": "בניית תצוגה מקדימה נכשלה",
     "importSuccess": "ייבוא המשמרות הושלם",
+    "importSuccessWithSkipped": "הייבוא הושלם — {inserted} שורות יובאו, {skipped} דולגו",
     "importFailed": "ייבוא המשמרות נכשל",
     "noFileSelected": "לא נבחר קובץ",
     "previewButton": "תצוגה מקדימה",

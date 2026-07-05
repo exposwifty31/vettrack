@@ -1235,6 +1235,7 @@ export interface TStructure {
     previewReady: string;
     previewFailed: string;
     importSuccess: string;
+    importSuccessWithSkipped: string;
     importFailed: string;
     noFileSelected: string;
     previewButton: string;

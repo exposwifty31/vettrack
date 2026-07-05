@@ -1232,6 +1232,7 @@
     "previewReady": "Preview ready",
     "previewFailed": "Preview generation failed",
     "importSuccess": "Shift import completed",
+    "importSuccessWithSkipped": "Import completed — {inserted} rows imported, {skipped} skipped",
     "importFailed": "Shift import failed",
     "noFileSelected": "No file selected",
     "previewButton": "Preview",

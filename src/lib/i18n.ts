@@ -634,6 +634,8 @@ const translations = {
   adminShiftsPage: {
     ...d.adminShiftsPage,
     rowLabel: (row: number) => tr(d.adminShiftsPage.rowLabel, { row }),
+    importSuccessWithSkipped: (inserted: number, skipped: number) =>
+      tr(d.adminShiftsPage.importSuccessWithSkipped, { inserted, skipped }),
   },
 
   alertsPage: {

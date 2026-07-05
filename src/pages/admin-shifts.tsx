@@ -55,7 +55,11 @@ export default function AdminShiftsPage() {
   const confirmMut = useMutation({
     mutationFn: (file: File) => api.shifts.confirmImport(file),
     onSuccess: (result) => {
-      toast.success(t.adminShiftsPage.importSuccess);
+      if (result.skippedRows > 0) {
+        toast.warning(t.adminShiftsPage.importSuccessWithSkipped(result.insertedRows, result.skippedRows));
+      } else {
+        toast.success(t.adminShiftsPage.importSuccess);
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/shifts/imports"] });
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
       // Keep selected file + preview visible after confirm so admins can

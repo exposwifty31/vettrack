@@ -1264,3 +1264,16 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Command: `pnpm typecheck` → clean. `pnpm test` → 401 files / 3925 tests passed (includes the new file).
 
 **Verdict:** VERIFIED
+
+## 2026-07-05 — F3/P2: shift CSV role-label classification + skipped-row visibility at confirm (committed with this entry)
+
+**Claim:** Roster CSV rows with vet/student labels are no longer skipped with a misleading "not relevant to VetTrack" reason; skipped counts now surface in the confirm audit log and as a warning toast in the admin UI.
+
+**Evidence:**
+- Root cause re-verified before fixing: the wetcheck run hit `parseShiftsCsvContent`→`detectShiftRole` (Employee-name CSV, `scripts/wetcheck/simulate.mjs` p1ShiftImport), and the 2 dropped rows were `וטרינר בוקר` (vet) + `סטודנט בוקר` (student) — NOT night variants (`טכנאי לילה`/`בכיר לילה` match טכנאי/בכיר and import fine). Mapping vet/student INTO the roster is intentionally not done: `vt_shift_role` pg enum is closed (`technician|senior_technician|admin`, server/schema/ops.ts:10) and `shared/authority.ts` documents students as never shift-elevated; vet schedules import via the doctor CSV path (`vt_doctor_shifts`).
+- `server/routes/shifts.ts` — new `classifyUnsupportedRosterRole()` + `skippedRoleReason()`: vet labels (וטרינר/רופא/vet/doctor) → reason pointing at the doctor CSV path; student labels (סטודנט/student) → "students are not part of the on-shift roster"; other labels keep the generic reason. Confirm `logAudit` metadata now includes `skippedRows`. (File is on the i18n Hebrew-in-source allowlist; `pnpm i18n:check` → deep parity ✓.)
+- `src/pages/admin-shifts.tsx` — confirm success with `skippedRows > 0` now shows `toast.warning(importSuccessWithSkipped(inserted, skipped))` instead of a plain success toast (audit's "silent bulk confirm"). New key in `locales/en.json`+`he.json`, parametrized accessor added in `src/lib/i18n.ts` (hand-built namespace gotcha), types regenerated via `pnpm i18n:generate-types`.
+- TDD: `tests/shift-csv-role-labels.test.ts` written first → 4 failed (vet/student reasons missing, audit metadata missing, toast missing) → after fix 5/5 pass. Exercises the real POST /api/shifts/import/preview route (Hebrew + English labels, recognized roles unaffected).
+- Command: `pnpm typecheck` → clean. `pnpm test` → 3930 passed. `pnpm i18n:check` → parity ✓.
+
+**Verdict:** VERIFIED
