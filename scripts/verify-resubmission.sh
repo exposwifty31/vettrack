@@ -8,6 +8,10 @@ REPO="${REPO:-/Users/dan/vettrack}"
 cd "$REPO" || { echo "FAIL: repo not found at $REPO"; exit 2; }
 
 # --- secret -----------------------------------------------------------------
+if [ -z "${CLERK_SECRET_KEY:-}" ] && [ -f "$REPO/.env" ]; then
+  # Same source the server + build-native-shell already read (gitignored).
+  CLERK_SECRET_KEY=$(grep -m1 '^CLERK_SECRET_KEY=' "$REPO/.env" | cut -d= -f2- | tr -d '"' | tr -d "'")
+fi
 if [ -z "${CLERK_SECRET_KEY:-}" ]; then
   # Try to pull from Railway (project pacific-flow / service VetTrack)
   CLERK_SECRET_KEY=$(cd /Users/dan/.vt-deploy 2>/dev/null && \
