@@ -1249,3 +1249,18 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Note: `vitest.integration.ops` suite silently self-skips unless `DATABASE_URL` is exported in the shell — `tests/vitest-setup.ts:3-5` injects a dummy `vettrack_test` URL before the test file's `dotenv/config` runs, so the reachability probe fails and `describe.skipIf` skips all 57 tests.
 
 **Verdict:** VERIFIED
+
+## 2026-07-05 — F2/P1: explicit express.json limit + 413/400 body-parser error mapping (committed with this entry)
+
+**Claim:** `express.json()` now has an explicit `5mb` limit (aligned with the multer upload limits), and body-parser failures return 413/400 via a shared, testable terminal handler instead of the blanket 500.
+
+**Evidence:**
+- RED first (TDD): `tests/body-parser-errors.test.ts` failed on missing module `server/lib/body-parser-errors.js` before implementation.
+- `server/lib/body-parser-errors.ts` — exports `JSON_BODY_LIMIT = "5mb"`, `classifyBodyParserError()` (`entity.too.large`→413 PAYLOAD_TOO_LARGE, `entity.parse.failed`/SyntaxError+400→400 INVALID_JSON, other typed body-parser 4xx→own status, unrelated errors→null), and `terminalErrorHandler()` (classify-first, blanket 500 otherwise).
+- `server/index.ts` — `app.use(express.json({ limit: JSON_BODY_LIMIT }))` replaces the unlimited default; the inline terminal handler is replaced by `app.use(terminalErrorHandler)`. Raw-body webhook mount order unchanged (still before express.json).
+- Test: `pnpm test -- tests/body-parser-errors.test.ts` → 11 passed (classifier units + behavioral tests mounting the REAL exported handler on a live express app: 6 MB body → 413, `{"broken":` → 400, valid JSON → 200, unrelated throw → 500).
+- Runtime proof on the real server (`PORT=3102 tsx server/index.ts`, same probes as the audit): 6 MB JSON POST `/api/shifts/import/preview` → `HTTP 413 {"error":"Request body exceeds the 5mb limit","code":"PAYLOAD_TOO_LARGE"}`; malformed JSON → `HTTP 400 {"error":"Request body is not valid JSON","code":"INVALID_JSON"}`. Audit had recorded 500 for both.
+- Ripple fixed: `tests/integration-adapter.test.js` "mounts raw body route before express.json for HMAC" searched the literal `app.use(express.json())`; search loosened to `app.use(express.json(` and a `> -1` guard added so the ordering invariant is still enforced.
+- Command: `pnpm typecheck` → clean. `pnpm test` → 401 files / 3925 tests passed (includes the new file).
+
+**Verdict:** VERIFIED
