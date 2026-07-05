@@ -1,0 +1,874 @@
+{
+  "base": "http://localhost:3101",
+  "startedAt": "2026-07-04T20:06:37.073Z",
+  "durationMs": 67990,
+  "total": 81,
+  "passed": 51,
+  "failed": 30,
+  "failures": [
+    "P0 · Preflight & auth gates :: health endpoint up + db up :: 200 db=undefined",
+    "P0 · Preflight & auth gates :: student role blocked from billing (403) :: 404 \"<!DOCTYPE html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<title>Error</title>\\n</head>\\n<body>\\n<pre>Cannot GET /api/billing<",
+    "P1 · Shift CSV import (EZ export) :: preview parses 9 valid rows :: 200 {\"totalRows\":9,\"validRows\":7,\"skippedRows\":2}",
+    "P1 · Shift CSV import (EZ export) :: 5000-row CSV import (stress) :: 500 valid=undefined ms=5",
+    "P1 · Shift CSV import (EZ export) :: non-admin cannot import (403) :: 200 {\"importId\":\"d4c6c96d-7d9f-48ad-913f-3927c46cb0c1\",\"filename\":\"wetcheck-ezvet-shifts.csv\",\"insertedRows\":7,\"skippedRows\":2,\"issues\":[{\"rowNu",
+    "P2 · Morning scan / checkout / return :: return with isPluggedIn=false creates return record :: 200 returnRecord=true",
+    "P3 · Waitlist lifecycle :: admin checkout while beta holds reservation → 409 RESERVATION_HELD_BY_OTHER :: 422 {\"code\":\"BUNDLE_INCOMPLETE\",\"ok\":false,\"reason\":\"CONDITIONS_NOT_MET\",\"failedConditions\":[],\"staleConditions\":[],\"unknownConditions\":[\"Batter",
+    "P3 · Waitlist lifecycle :: BUG PROBE: quick-scan bypasses waitlist reservation? :: CONFIRMED: admin quick-scan stole beta's reserved unit (checkout succeeded)",
+    "P3 · Waitlist lifecycle :: beta redeems reservation via checkout :: 422 {\"code\":\"BUNDLE_INCOMPLETE\",\"ok\":false,\"reason\":\"CONDITIONS_NOT_MET\",\"failedConditions\":[],\"staleConditions\":[],\"unknownConditions\":[\"Batter",
+    "P3 · Waitlist lifecycle :: beta leaves-after-fulfilled → 404 WAITLIST_NOT_ON_WAITLIST :: 200 {\"equipmentId\":\"aec0ffee-0000-4000-8000-000000001005\",\"queueSize\":1,\"myPosition\":null,\"myStatus\":null,\"reservationExpiresAt\":null,\"notifiedU",
+    "P3 · Waitlist lifecycle :: admin leaves pump05 waitlist :: 404 {\"error\":\"You are not on the waitlist\",\"code\":\"equipmentWaitlist.WAITLIST_NOT_ON_WAITLIST\"}",
+    "P4 · Redocking (dock-return) :: dock-return pump07 (returned→docked, all verified → ready) :: 404 readiness=undefined",
+    "P4 · Redocking (dock-return) :: dock-return pump06 straight from checked_out clears custody :: 404 custody=undefined readiness=undefined",
+    "P4 · Redocking (dock-return) :: dock-return partial verification → not_ready :: 404 readiness=undefined",
+    "P4 · Redocking (dock-return) :: dock-return via master NFC tag resolves dock :: 404 readiness=undefined",
+    "P4 · Redocking (dock-return) :: dock-return legacy unit without asset type → 422 :: 404 \"<!DOCTYPE html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<title>Error</title>\\n</head>\\n<body>\\n<pre>Cannot POST /api/operati",
+    "P4 · Redocking (dock-return) :: dock-return with wrong-asset-type condition → 422 :: 404 \"<!DOCTYPE html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<title>Error</title>\\n</head>\\n<body>\\n<pre>Cannot POST /api/operati",
+    "P4 · Redocking (dock-return) :: concurrent dock-returns → one wins, one 409 :: statuses=404,404 (expect 200 + 409/200)",
+    "P4 · Redocking (dock-return) :: waitlist promotion fires on deployable dock-return (mon04) :: return=200 dock=404 notified=aec0ffee-0000-4000-8000-000000009001",
+    "P5 · Staging queue :: alpha stages pump03 (routine) :: 404 \"<!DOCTYPE html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<title>Error</title>\\n</head>\\n<body>\\n<pre>Cann",
+    "P5 · Staging queue :: beta stages pump03 (emergency) → outranks alpha :: 404",
+    "P5 · Staging queue :: alpha checkout while beta holds top claim → 409 STAGING_CONFLICT :: 200 undefined",
+    "P5 · Staging queue :: beta (top claim) checkout succeeds :: 409 {\"code\":\"ALREADY_CHECKED_OUT\",\"error\":\"Equipment is already checked out\"}",
+    "P6 · Inventory (dispense / restock) :: legacy container restock disabled → 409 :: 400 {\"error\":\"Validation failed\",\"details\":[{\"field\":\"addedQuantity\",\"message\":\"Required\"}]}",
+    "P7 · Tasks (appointments) :: task list loads :: 400 count=undefined",
+    "P7 · Tasks (appointments) :: patch task status → in_progress :: 400 status={\"code\":\"UNASSIGNED_TASK_STATUS\",\"error\":\"UNASSIGNED_TASK_STATUS\",\"reason\":\"UNASSIGNED_TASK_STATUS\",",
+    "P8 · Realtime (SSE / outbox) :: replay from 0 returns custody events :: 400 events=undefined custody=0",
+    "P8 · Realtime (SSE / outbox) :: telemetry rejects unknown enum :: 200",
+    "P9 · Adversarial inputs & tenancy :: malformed JSON body → 4xx not 500 :: 500",
+    "P10 · Concurrency & rate limits (final block) :: global limiter kicks in under burst (expect 429s) :: 429s=0/120"
+  ],
+  "results": [
+    {
+      "phase": "P0 · Preflight & auth gates",
+      "name": "health endpoint up + db up",
+      "ok": false,
+      "note": "200 db=undefined",
+      "ms": 1149
+    },
+    {
+      "phase": "P0 · Preflight & auth gates",
+      "name": "users/me resolves dev admin",
+      "ok": true,
+      "note": "200 role=admin",
+      "ms": 726
+    },
+    {
+      "phase": "P0 · Preflight & auth gates",
+      "name": "pending account gated (403 ACCOUNT_PENDING_APPROVAL)",
+      "ok": true,
+      "note": "403 {\"code\":\"ACCESS_DENIED\",\"error\":\"ACCESS_DENIED\",\"reason\":\"ACCOUNT_PENDING_APPROVAL\",\"message\":\"Account pending approval\",\"requestId\":\"1329fb",
+      "detail": {
+        "code": "ACCESS_DENIED",
+        "error": "ACCESS_DENIED",
+        "reason": "ACCOUNT_PENDING_APPROVAL",
+        "message": "Account pending approval",
+        "requestId": "1329fbe8-0fbc-4f0a-9c1d-14f20a5797a1"
+      },
+      "ms": 713
+    },
+    {
+      "phase": "P0 · Preflight & auth gates",
+      "name": "blocked account gated (403 ACCOUNT_BLOCKED)",
+      "ok": true,
+      "note": "403 {\"code\":\"ACCESS_DENIED\",\"error\":\"ACCESS_DENIED\",\"reason\":\"ACCOUNT_BLOCKED\",\"message\":\"Your account has been suspended.\",\"requestId\":\"189e41b",
+      "detail": {
+        "code": "ACCESS_DENIED",
+        "error": "ACCESS_DENIED",
+        "reason": "ACCOUNT_BLOCKED",
+        "message": "Your account has been suspended.",
+        "requestId": "189e41b3-db01-4b6f-8fa4-5ce147b3f5d0"
+      },
+      "ms": 712
+    },
+    {
+      "phase": "P0 · Preflight & auth gates",
+      "name": "student role blocked from billing (403)",
+      "ok": false,
+      "note": "404 \"<!DOCTYPE html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<title>Error</title>\\n</head>\\n<body>\\n<pre>Cannot GET /api/billing<",
+      "detail": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /api/billing</pre>\n</body>\n</html>\n",
+      "ms": 713
+    },
+    {
+      "phase": "P1 · Shift CSV import (EZ export)",
+      "name": "preview parses 9 valid rows",
+      "ok": false,
+      "note": "200 {\"totalRows\":9,\"validRows\":7,\"skippedRows\":2}",
+      "ms": 732
+    },
+    {
+      "phase": "P1 · Shift CSV import (EZ export)",
+      "name": "confirm imports 9 rows",
+      "ok": true,
+      "note": "200 {\"importId\":\"46653e05-4896-4f96-a479-ccfe10ed673a\",\"filename\":\"wetcheck-ezvet-shifts.csv\",\"insertedRows\":7,\"skippedRows\":2,\"issues\":[{\"rowNumber\":6,\"reason\":\"Sh",
+      "ms": 720
+    },
+    {
+      "phase": "P1 · Shift CSV import (EZ export)",
+      "name": "duplicate confirm behavior (dedupe or duplicate rows?)",
+      "ok": true,
+      "note": "200 {\"importId\":\"3ff1d6d0-24ef-4918-9d2e-4265fe802b07\",\"filename\":\"wetcheck-ezvet-shifts.csv\",\"insertedRows\":7,\"skippedRows\":2,\"issues\":[{\"rowNumber\":6,\"reason\":\"Sh",
+      "ms": 710
+    },
+    {
+      "phase": "P1 · Shift CSV import (EZ export)",
+      "name": "shifts list for today returns imported rows",
+      "ok": true,
+      "note": "200 rows=4",
+      "ms": 715
+    },
+    {
+      "phase": "P1 · Shift CSV import (EZ export)",
+      "name": "empty CSV rejected (400)",
+      "ok": true,
+      "note": "400 {\"code\":\"VALIDATION_FAILED\",\"error\":\"VALIDATION_FAILED\",\"reason\":\"MISSING_CSV_INPUT\",\"message\":\"Provide a CSV file upload or `csv` string in",
+      "detail": {
+        "code": "VALIDATION_FAILED",
+        "error": "VALIDATION_FAILED",
+        "reason": "MISSING_CSV_INPUT",
+        "message": "Provide a CSV file upload or `csv` string in request body",
+        "requestId": "ba3b00c6-f094-4101-9817-fc69d9de9742"
+      },
+      "ms": 711
+    },
+    {
+      "phase": "P1 · Shift CSV import (EZ export)",
+      "name": "garbage headers → all rows skipped",
+      "ok": true,
+      "note": "200 {\"totalRows\":1,\"validRows\":0,\"skippedRows\":1}",
+      "ms": 712
+    },
+    {
+      "phase": "P1 · Shift CSV import (EZ export)",
+      "name": "bad date / bad time rows land in issues",
+      "ok": true,
+      "note": "200 {\"totalRows\":1,\"validRows\":0,\"skippedRows\":1}",
+      "ms": 712
+    },
+    {
+      "phase": "P1 · Shift CSV import (EZ export)",
+      "name": "5000-row CSV import (stress)",
+      "ok": false,
+      "note": "500 valid=undefined ms=5",
+      "ms": 711
+    },
+    {
+      "phase": "P1 · Shift CSV import (EZ export)",
+      "name": "non-admin cannot import (403)",
+      "ok": false,
+      "note": "200 {\"importId\":\"d4c6c96d-7d9f-48ad-913f-3927c46cb0c1\",\"filename\":\"wetcheck-ezvet-shifts.csv\",\"insertedRows\":7,\"skippedRows\":2,\"issues\":[{\"rowNu",
+      "detail": {
+        "importId": "d4c6c96d-7d9f-48ad-913f-3927c46cb0c1",
+        "filename": "wetcheck-ezvet-shifts.csv",
+        "insertedRows": 7,
+        "skippedRows": 2,
+        "issues": [
+          {
+            "rowNumber": 6,
+            "reason": "Shift \"וטרינר בוקר\" is not relevant to VetTrack",
+            "data": {
+              "date": "2026-07-04",
+              "startTime": "08:00",
+              "endTime": "16:00",
+              "employeeName": "WC Maya Rosen",
+              "shiftName": "וטרינר בוקר"
+            }
+          },
+          {
+            "rowNumber": 7,
+            "reason": "Shift \"סטודנט בוקר\" is not relevant to VetTrack",
+            "data": {
+              "date": "2026-07-04",
+              "startTime": "08:00",
+              "endTime": "14:00",
+              "employeeName": "WC Avi Katz",
+              "shiftName": "סטודנט בוקר"
+            }
+          }
+        ]
+      },
+      "ms": 713
+    },
+    {
+      "phase": "P2 · Morning scan / checkout / return",
+      "name": "equipment list loads",
+      "ok": true,
+      "note": "200 count=21",
+      "ms": 710
+    },
+    {
+      "phase": "P2 · Morning scan / checkout / return",
+      "name": "quick-scan checkout (pump01, alpha)",
+      "ok": true,
+      "note": "200 action=checkout",
+      "ms": 726
+    },
+    {
+      "phase": "P2 · Morning scan / checkout / return",
+      "name": "quick-scan toggle returns it (alpha)",
+      "ok": true,
+      "note": "200 action=return",
+      "ms": 729
+    },
+    {
+      "phase": "P2 · Morning scan / checkout / return",
+      "name": "checkout not_ready pump04 → 422 BUNDLE_INCOMPLETE",
+      "ok": true,
+      "note": "422 BUNDLE_INCOMPLETE",
+      "ms": 717
+    },
+    {
+      "phase": "P2 · Morning scan / checkout / return",
+      "name": "checkout untracked pump08 → 422 CUSTODY_CHAIN_BROKEN",
+      "ok": true,
+      "note": "422 CUSTODY_CHAIN_BROKEN",
+      "ms": 721
+    },
+    {
+      "phase": "P2 · Morning scan / checkout / return",
+      "name": "checkout soft-deleted oxy04 → 404",
+      "ok": true,
+      "note": "404 {\"code\":\"NOT_FOUND\",\"error\":\"NOT_FOUND\",\"reason\":\"EQUIPMENT_NOT_FOUND\",\"message\":\"Equipment not found\",\"requestId\":\"abffb96e-cff3-4388-b2fc-",
+      "detail": {
+        "code": "NOT_FOUND",
+        "error": "NOT_FOUND",
+        "reason": "EQUIPMENT_NOT_FOUND",
+        "message": "Equipment not found",
+        "requestId": "abffb96e-cff3-4388-b2fc-6482f6ad3082"
+      },
+      "ms": 714
+    },
+    {
+      "phase": "P2 · Morning scan / checkout / return",
+      "name": "checkout unknown UUID → 404",
+      "ok": true,
+      "note": "404 {\"code\":\"NOT_FOUND\",\"error\":\"NOT_FOUND\",\"reason\":\"EQUIPMENT_NOT_FOUND\",\"message\":\"Equipment not found\",\"requestId\":\"3889d66b-5ecf-47f3-a6a7-",
+      "detail": {
+        "code": "NOT_FOUND",
+        "error": "NOT_FOUND",
+        "reason": "EQUIPMENT_NOT_FOUND",
+        "message": "Equipment not found",
+        "requestId": "3889d66b-5ecf-47f3-a6a7-b4c8f034b8ba"
+      },
+      "ms": 716
+    },
+    {
+      "phase": "P2 · Morning scan / checkout / return",
+      "name": "checkout invalid UUID → 400",
+      "ok": true,
+      "note": "400 {\"error\":\"Invalid id: must be a valid UUID\"}",
+      "detail": {
+        "error": "Invalid id: must be a valid UUID"
+      },
+      "ms": 713
+    },
+    {
+      "phase": "P2 · Morning scan / checkout / return",
+      "name": "double checkout conflict (pump02: alpha then beta) → 409",
+      "ok": true,
+      "note": "first=200 second=409 code=ALREADY_CHECKED_OUT",
+      "ms": 1433
+    },
+    {
+      "phase": "P2 · Morning scan / checkout / return",
+      "name": "return by NON-holder (beta returns alpha's pump02) — observed behavior",
+      "ok": true,
+      "note": "200 (200 = anyone may return; policy question)",
+      "ms": 717
+    },
+    {
+      "phase": "P2 · Morning scan / checkout / return",
+      "name": "double return is idempotent-ish",
+      "ok": true,
+      "note": "200",
+      "ms": 719
+    },
+    {
+      "phase": "P2 · Morning scan / checkout / return",
+      "name": "return with isPluggedIn=false creates return record",
+      "ok": false,
+      "note": "200 returnRecord=true",
+      "ms": 1440
+    },
+    {
+      "phase": "P2 · Morning scan / checkout / return",
+      "name": "emergency checkout without reason → 422",
+      "ok": true,
+      "note": "422 EMERGENCY_REASON_REQUIRED",
+      "ms": 709
+    },
+    {
+      "phase": "P2 · Morning scan / checkout / return",
+      "name": "emergency checkout of staged mon03 cancels staging claims",
+      "ok": true,
+      "note": "checkout=200 activeClaims=\"<!DOCTYPE html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=",
+      "ms": 1432
+    },
+    {
+      "phase": "P2 · Morning scan / checkout / return",
+      "name": "return emergency unit (mon03)",
+      "ok": true,
+      "note": "200 {\"equipment\":{\"id\":\"aec0ffee-0000-4000-8000-000000001013\",\"clinicId\":\"dev-clinic-default\",\"name\":\"WC Monitor 03\",\"nameHe\":null,\"serialNumber",
+      "detail": {
+        "equipment": {
+          "id": "aec0ffee-0000-4000-8000-000000001013",
+          "clinicId": "dev-clinic-default",
+          "name": "WC Monitor 03",
+          "nameHe": null,
+          "serialNumber": null,
+          "model": null,
+          "manufacturer": null,
+          "purchaseDate": null,
+          "expiryDate": null,
+          "expiryNotifiedAt": null,
+          "location": null,
+          "folderId": null,
+          "roomId": "aec0ffee-0000-4000-8000-000000000102",
+          "status": "ok",
+          "lastSeen": "2026-07-04T20:07:00.436Z",
+          "lastStatus": "ok",
+          "lastMaintenanceDate": null,
+          "lastSterilizationDate": null,
+          "maintenanceIntervalDays": null,
+          "imageUrl": null,
+          "nfcTagId": null,
+          "rfidTagEpc": null,
+          "lastRfidSeenAt": null,
+          "lastRfidRoomId": null,
+          "lastRfidGatewayCode": null,
+          "lastVerifiedAt": null,
+          "lastVerifiedById": null,
+          "checkedOutById": null,
+          "checkedOutByEmail": null,
+          "checkedOutAt": null,
+          "checkedOutLocation": null,
+          "expectedReturnMinutes": null,
+          "createdAt": "2026-07-04T23:02:14.082Z",
+          "version": 3,
+          "deletedAt": null,
+          "deletedBy": null,
+          "usuallyFoundHere": null,
+          "searchAlias": null,
+          "staffNote": null,
+          "assetTypeId": "aec0ffee-0000-4000-8000-000000000302",
+          "dockId": "aec0ffee-0000-4000-8000-000000000202",
+          "dockConfirmedReadyAt": null,
+          "dockConfirmedById": null,
+          "custodyState": "returned",
+          "custodyStateSince": "2026-07-04T20:07:00.436Z",
+          "untrackedDepartureAt": null,
+          "emergencyOverrideAt": "2026-07-04T20:06:59.004Z",
+          "emergencyOverrideById": "dev-user-alpha",
+          "readinessState": "unknown",
+          "readinessStateSince": "2026-07-04T20:07:00.436Z",
+          "usageState": "available",
+          "usageStateSince": "2026-07-04T20:07:00.436Z"
+        },
+        "undoToken": "bc5a791d-2451-4ac6-b49d-1ecb1c941152",
+        "returnRecord": null
+      },
+      "ms": 723
+    },
+    {
+      "phase": "P3 · Waitlist lifecycle",
+      "name": "snapshot pump05: 2 waiting (beta, noam)",
+      "ok": true,
+      "note": "200 queueSize=2",
+      "ms": 713
+    },
+    {
+      "phase": "P3 · Waitlist lifecycle",
+      "name": "admin joins pump05 waitlist → position 3",
+      "ok": true,
+      "note": "201 pos=3",
+      "ms": 718
+    },
+    {
+      "phase": "P3 · Waitlist lifecycle",
+      "name": "duplicate join → 409 WAITLIST_ALREADY_JOINED",
+      "ok": true,
+      "note": "409 {\"error\":\"You are already on the waitlist\",\"code\":\"equipmentWaitlist.WAITLIST_ALREADY_JOINED\"}",
+      "detail": {
+        "error": "You are already on the waitlist",
+        "code": "equipmentWaitlist.WAITLIST_ALREADY_JOINED"
+      },
+      "ms": 722
+    },
+    {
+      "phase": "P3 · Waitlist lifecycle",
+      "name": "holder cannot join own waitlist (alpha) → 422",
+      "ok": true,
+      "note": "422 {\"error\":\"You already have this device checked out\",\"code\":\"equipmentWaitlist.WAITLIST_SELF_CHECKOUT\"}",
+      "detail": {
+        "error": "You already have this device checked out",
+        "code": "equipmentWaitlist.WAITLIST_SELF_CHECKOUT"
+      },
+      "ms": 713
+    },
+    {
+      "phase": "P3 · Waitlist lifecycle",
+      "name": "join waitlist on available unit → 422 WAITLIST_NOT_IN_USE",
+      "ok": true,
+      "note": "422 {\"error\":\"Device is not checked out to another user\",\"code\":\"equipmentWaitlist.WAITLIST_NOT_IN_USE\"}",
+      "detail": {
+        "error": "Device is not checked out to another user",
+        "code": "equipmentWaitlist.WAITLIST_NOT_IN_USE"
+      },
+      "ms": 713
+    },
+    {
+      "phase": "P3 · Waitlist lifecycle",
+      "name": "holder returns pump05 → head waiter (beta) promoted to notified",
+      "ok": true,
+      "note": "return=200 betaStatus=notified expires=2026-07-04T20:17:04.739Z",
+      "ms": 5093
+    },
+    {
+      "phase": "P3 · Waitlist lifecycle",
+      "name": "admin checkout while beta holds reservation → 409 RESERVATION_HELD_BY_OTHER",
+      "ok": false,
+      "note": "422 {\"code\":\"BUNDLE_INCOMPLETE\",\"ok\":false,\"reason\":\"CONDITIONS_NOT_MET\",\"failedConditions\":[],\"staleConditions\":[],\"unknownConditions\":[\"Batter",
+      "detail": {
+        "code": "BUNDLE_INCOMPLETE",
+        "ok": false,
+        "reason": "CONDITIONS_NOT_MET",
+        "failedConditions": [],
+        "staleConditions": [],
+        "unknownConditions": [
+          "Battery charged",
+          "Line primed"
+        ]
+      },
+      "ms": 715
+    },
+    {
+      "phase": "P3 · Waitlist lifecycle",
+      "name": "BUG PROBE: quick-scan bypasses waitlist reservation?",
+      "ok": false,
+      "note": "CONFIRMED: admin quick-scan stole beta's reserved unit (checkout succeeded)",
+      "ms": 1448
+    },
+    {
+      "phase": "P3 · Waitlist lifecycle",
+      "name": "beta redeems reservation via checkout",
+      "ok": false,
+      "note": "422 {\"code\":\"BUNDLE_INCOMPLETE\",\"ok\":false,\"reason\":\"CONDITIONS_NOT_MET\",\"failedConditions\":[],\"staleConditions\":[],\"unknownConditions\":[\"Batter",
+      "detail": {
+        "code": "BUNDLE_INCOMPLETE",
+        "ok": false,
+        "reason": "CONDITIONS_NOT_MET",
+        "failedConditions": [],
+        "staleConditions": [],
+        "unknownConditions": [
+          "Battery charged",
+          "Line primed"
+        ]
+      },
+      "ms": 715
+    },
+    {
+      "phase": "P3 · Waitlist lifecycle",
+      "name": "beta leaves-after-fulfilled → 404 WAITLIST_NOT_ON_WAITLIST",
+      "ok": false,
+      "note": "200 {\"equipmentId\":\"aec0ffee-0000-4000-8000-000000001005\",\"queueSize\":1,\"myPosition\":null,\"myStatus\":null,\"reservationExpiresAt\":null,\"notifiedU",
+      "detail": {
+        "equipmentId": "aec0ffee-0000-4000-8000-000000001005",
+        "queueSize": 1,
+        "myPosition": null,
+        "myStatus": null,
+        "reservationExpiresAt": null,
+        "notifiedUserId": null,
+        "entries": [
+          {
+            "position": 1,
+            "userId": "aec0ffee-0000-4000-8000-000000009003",
+            "displayName": "Noam Levi",
+            "status": "waiting",
+            "joinedAt": "2026-07-04T19:42:14.038Z",
+            "reservationExpiresAt": null
+          }
+        ]
+      },
+      "ms": 722
+    },
+    {
+      "phase": "P3 · Waitlist lifecycle",
+      "name": "expired reservation (mon04 guy, TTL passed) — sweep + next promotion?",
+      "ok": true,
+      "note": "guyStillListed=false notifiedUserId=none queueSize=1",
+      "ms": 716
+    },
+    {
+      "phase": "P3 · Waitlist lifecycle",
+      "name": "admin leaves pump05 waitlist",
+      "ok": false,
+      "note": "404 {\"error\":\"You are not on the waitlist\",\"code\":\"equipmentWaitlist.WAITLIST_NOT_ON_WAITLIST\"}",
+      "detail": {
+        "error": "You are not on the waitlist",
+        "code": "equipmentWaitlist.WAITLIST_NOT_ON_WAITLIST"
+      },
+      "ms": 714
+    },
+    {
+      "phase": "P4 · Redocking (dock-return)",
+      "name": "dock-return pump07 (returned→docked, all verified → ready)",
+      "ok": false,
+      "note": "404 readiness=undefined",
+      "ms": 708
+    },
+    {
+      "phase": "P4 · Redocking (dock-return)",
+      "name": "dock-return pump06 straight from checked_out clears custody",
+      "ok": false,
+      "note": "404 custody=undefined readiness=undefined",
+      "ms": 710
+    },
+    {
+      "phase": "P4 · Redocking (dock-return)",
+      "name": "dock-return partial verification → not_ready",
+      "ok": false,
+      "note": "404 readiness=undefined",
+      "ms": 1424
+    },
+    {
+      "phase": "P4 · Redocking (dock-return)",
+      "name": "dock-return via master NFC tag resolves dock",
+      "ok": false,
+      "note": "404 readiness=undefined",
+      "ms": 1422
+    },
+    {
+      "phase": "P4 · Redocking (dock-return)",
+      "name": "dock-return unknown master tag → 404",
+      "ok": true,
+      "note": "404 \"<!DOCTYPE html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<title>Error</title>\\n</head>\\n<body>\\n<pre>Cannot POST /api/operati",
+      "detail": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /api/operational-state/equipment/aec0ffee-0000-4000-8000-000000001007/dock-return</pre>\n</body>\n</html>\n",
+      "ms": 708
+    },
+    {
+      "phase": "P4 · Redocking (dock-return)",
+      "name": "dock-return legacy unit without asset type → 422",
+      "ok": false,
+      "note": "404 \"<!DOCTYPE html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<title>Error</title>\\n</head>\\n<body>\\n<pre>Cannot POST /api/operati",
+      "detail": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /api/operational-state/equipment/aec0ffee-0000-4000-8000-000000001031/dock-return</pre>\n</body>\n</html>\n",
+      "ms": 710
+    },
+    {
+      "phase": "P4 · Redocking (dock-return)",
+      "name": "dock-return with wrong-asset-type condition → 422",
+      "ok": false,
+      "note": "404 \"<!DOCTYPE html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<title>Error</title>\\n</head>\\n<body>\\n<pre>Cannot POST /api/operati",
+      "detail": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /api/operational-state/equipment/aec0ffee-0000-4000-8000-000000001012/dock-return</pre>\n</body>\n</html>\n",
+      "ms": 707
+    },
+    {
+      "phase": "P4 · Redocking (dock-return)",
+      "name": "concurrent dock-returns → one wins, one 409",
+      "ok": false,
+      "note": "statuses=404,404 (expect 200 + 409/200)",
+      "ms": 7
+    },
+    {
+      "phase": "P4 · Redocking (dock-return)",
+      "name": "waitlist promotion fires on deployable dock-return (mon04)",
+      "ok": false,
+      "note": "return=200 dock=404 notified=aec0ffee-0000-4000-8000-000000009001",
+      "ms": 2145
+    },
+    {
+      "phase": "P5 · Staging queue",
+      "name": "alpha stages pump03 (routine)",
+      "ok": false,
+      "note": "404 \"<!DOCTYPE html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<title>Error</title>\\n</head>\\n<body>\\n<pre>Cann",
+      "ms": 709
+    },
+    {
+      "phase": "P5 · Staging queue",
+      "name": "beta stages pump03 (emergency) → outranks alpha",
+      "ok": false,
+      "note": "404",
+      "ms": 710
+    },
+    {
+      "phase": "P5 · Staging queue",
+      "name": "alpha checkout while beta holds top claim → 409 STAGING_CONFLICT",
+      "ok": false,
+      "note": "200 undefined",
+      "ms": 725
+    },
+    {
+      "phase": "P5 · Staging queue",
+      "name": "beta (top claim) checkout succeeds",
+      "ok": false,
+      "note": "409 {\"code\":\"ALREADY_CHECKED_OUT\",\"error\":\"Equipment is already checked out\"}",
+      "detail": {
+        "code": "ALREADY_CHECKED_OUT",
+        "error": "Equipment is already checked out"
+      },
+      "ms": 715
+    },
+    {
+      "phase": "P5 · Staging queue",
+      "name": "beta returns pump03",
+      "ok": true,
+      "note": "200 {\"equipment\":{\"id\":\"aec0ffee-0000-4000-8000-000000001003\",\"clinicId\":\"dev-clinic-default\",\"name\":\"WC Pump 03\",\"nameHe\":null,\"serialNumber\":n",
+      "detail": {
+        "equipment": {
+          "id": "aec0ffee-0000-4000-8000-000000001003",
+          "clinicId": "dev-clinic-default",
+          "name": "WC Pump 03",
+          "nameHe": null,
+          "serialNumber": null,
+          "model": null,
+          "manufacturer": null,
+          "purchaseDate": null,
+          "expiryDate": null,
+          "expiryNotifiedAt": null,
+          "location": null,
+          "folderId": null,
+          "roomId": "aec0ffee-0000-4000-8000-000000000103",
+          "status": "ok",
+          "lastSeen": "2026-07-04T20:07:26.262Z",
+          "lastStatus": "ok",
+          "lastMaintenanceDate": null,
+          "lastSterilizationDate": null,
+          "maintenanceIntervalDays": null,
+          "imageUrl": null,
+          "nfcTagId": null,
+          "rfidTagEpc": null,
+          "lastRfidSeenAt": null,
+          "lastRfidRoomId": null,
+          "lastRfidGatewayCode": null,
+          "lastVerifiedAt": null,
+          "lastVerifiedById": null,
+          "checkedOutById": null,
+          "checkedOutByEmail": null,
+          "checkedOutAt": null,
+          "checkedOutLocation": null,
+          "expectedReturnMinutes": null,
+          "createdAt": "2026-07-04T23:02:14.075Z",
+          "version": 3,
+          "deletedAt": null,
+          "deletedBy": null,
+          "usuallyFoundHere": null,
+          "searchAlias": null,
+          "staffNote": null,
+          "assetTypeId": "aec0ffee-0000-4000-8000-000000000301",
+          "dockId": "aec0ffee-0000-4000-8000-000000000203",
+          "dockConfirmedReadyAt": null,
+          "dockConfirmedById": null,
+          "custodyState": "returned",
+          "custodyStateSince": "2026-07-04T20:07:26.262Z",
+          "untrackedDepartureAt": null,
+          "emergencyOverrideAt": null,
+          "emergencyOverrideById": null,
+          "readinessState": "unknown",
+          "readinessStateSince": "2026-07-04T20:07:26.262Z",
+          "usageState": "available",
+          "usageStateSince": "2026-07-04T20:07:26.262Z"
+        },
+        "undoToken": "0feb6962-32de-4af5-a951-5c23a8812f73",
+        "returnRecord": null
+      },
+      "ms": 721
+    },
+    {
+      "phase": "P6 · Inventory (dispense / restock)",
+      "name": "containers list",
+      "ok": true,
+      "note": "200 count=2",
+      "ms": 714
+    },
+    {
+      "phase": "P6 · Inventory (dispense / restock)",
+      "name": "dispense from ICU cart (authority envelope observed)",
+      "ok": true,
+      "note": "403 {\"code\":\"INSUFFICIENT_ROLE\",\"error\":\"INSUFFICIENT_ROLE\",\"reason\":\"INSUFFICIENT_CLINICAL_AUTHORITY\",\"message\":\"Clinical authority required\",\"requestId\":\"wetcheck",
+      "ms": 713
+    },
+    {
+      "phase": "P6 · Inventory (dispense / restock)",
+      "name": "legacy container restock disabled → 409",
+      "ok": false,
+      "note": "400 {\"error\":\"Validation failed\",\"details\":[{\"field\":\"addedQuantity\",\"message\":\"Required\"}]}",
+      "detail": {
+        "error": "Validation failed",
+        "details": [
+          {
+            "field": "addedQuantity",
+            "message": "Required"
+          }
+        ]
+      },
+      "ms": 714
+    },
+    {
+      "phase": "P6 · Inventory (dispense / restock)",
+      "name": "restock session start",
+      "ok": true,
+      "note": "201 session=fd83e628-4be0-48a8-a52b-f36c59eb061b",
+      "ms": 725
+    },
+    {
+      "phase": "P6 · Inventory (dispense / restock)",
+      "name": "restock scan event",
+      "ok": true,
+      "note": "200 {\"event\":{\"id\":\"5fb19d13-ba14-4e9c-8cb4-74c5ae889e89\",\"clinicId\":\"dev-clinic-default\",\"sessionId\":\"fd83e628-4be0-48a8-a52b-f36c59eb061b\",\"co",
+      "ms": 720
+    },
+    {
+      "phase": "P6 · Inventory (dispense / restock)",
+      "name": "restock finish",
+      "ok": true,
+      "note": "200 {\"session\":{\"id\":\"fd83e628-4be0-48a8-a52b-f36c59eb061b\",\"clinicId\":\"dev-clinic-default\",\"containerId\":\"aec0ffee-0000-4000-8000-000000004102\"",
+      "ms": 721
+    },
+    {
+      "phase": "P6 · Inventory (dispense / restock)",
+      "name": "dispense more than on-hand → floor/negative guard",
+      "ok": true,
+      "note": "403 {\"code\":\"INSUFFICIENT_ROLE\",\"error\":\"INSUFFICIENT_ROLE\",\"reason\":\"INSUFFICIENT_CLINICAL_AUTHORITY\",\"message\":\"Clinical authority required\",\"requestId\":\"f8273f99",
+      "ms": 710
+    },
+    {
+      "phase": "P7 · Tasks (appointments)",
+      "name": "task list loads",
+      "ok": false,
+      "note": "400 count=undefined",
+      "ms": 716
+    },
+    {
+      "phase": "P7 · Tasks (appointments)",
+      "name": "create task",
+      "ok": true,
+      "note": "201 id=69dbe0c0-0c31-459b-8103-9c44a770d960",
+      "ms": 710
+    },
+    {
+      "phase": "P7 · Tasks (appointments)",
+      "name": "patch task status → in_progress",
+      "ok": false,
+      "note": "400 status={\"code\":\"UNASSIGNED_TASK_STATUS\",\"error\":\"UNASSIGNED_TASK_STATUS\",\"reason\":\"UNASSIGNED_TASK_STATUS\",",
+      "ms": 718
+    },
+    {
+      "phase": "P7 · Tasks (appointments)",
+      "name": "create task with end before start → validation",
+      "ok": true,
+      "note": "400 {\"code\":\"INVALID_TIME_WINDOW\",\"error\":\"INVALID_TIME_WINDOW\",\"reason\":\"INVALID_TIME_WINDOW\",\"message\":\"endTime must be gr",
+      "ms": 712
+    },
+    {
+      "phase": "P7 · Tasks (appointments)",
+      "name": "delete created task",
+      "ok": true,
+      "note": "200",
+      "ms": 718
+    },
+    {
+      "phase": "P8 · Realtime (SSE / outbox)",
+      "name": "outbox head cursor advances past 0",
+      "ok": true,
+      "note": "200 head={\"maxPublishedId\":41,\"requestId\":\"affee3cd-0b8c-44f6-bbb0-5543dcf02a4a\"}",
+      "ms": 711
+    },
+    {
+      "phase": "P8 · Realtime (SSE / outbox)",
+      "name": "replay from 0 returns custody events",
+      "ok": false,
+      "note": "400 events=undefined custody=0",
+      "ms": 710
+    },
+    {
+      "phase": "P8 · Realtime (SSE / outbox)",
+      "name": "SSE stream connects and yields data within 12s",
+      "ok": true,
+      "note": "200 first-chunk=\": connected\\n\\n\"",
+      "ms": 7
+    },
+    {
+      "phase": "P8 · Realtime (SSE / outbox)",
+      "name": "telemetry rejects unknown enum",
+      "ok": false,
+      "note": "200",
+      "ms": 710
+    },
+    {
+      "phase": "P9 · Adversarial inputs & tenancy",
+      "name": "XSS payload in equipment name is sanitized",
+      "ok": true,
+      "note": "201 name=\"WC &lt;script&gt;alert(1)&lt;/script&gt; Probe\"",
+      "ms": 716
+    },
+    {
+      "phase": "P9 · Adversarial inputs & tenancy",
+      "name": "SQL-ish input treated as data",
+      "ok": true,
+      "note": "200",
+      "ms": 727
+    },
+    {
+      "phase": "P9 · Adversarial inputs & tenancy",
+      "name": "100KB note accepted or bounded (no 500)",
+      "ok": true,
+      "note": "400",
+      "ms": 718
+    },
+    {
+      "phase": "P9 · Adversarial inputs & tenancy",
+      "name": "malformed JSON body → 4xx not 500",
+      "ok": false,
+      "note": "500",
+      "ms": 707
+    },
+    {
+      "phase": "P9 · Adversarial inputs & tenancy",
+      "name": "cross-clinic isolation: other clinic sees zero wetcheck equipment",
+      "ok": true,
+      "note": "200 leaked=0 total=0",
+      "ms": 715
+    },
+    {
+      "phase": "P9 · Adversarial inputs & tenancy",
+      "name": "cross-clinic scan of wetcheck unit → 404",
+      "ok": true,
+      "note": "404 {\"code\":\"NOT_FOUND\",\"error\":\"NOT_FOUND\",\"reason\":\"EQUIPMENT_NOT_FOUND\",\"message\":\"Equipment not found\",\"requestId\":\"72854228-7335-4344-adda-",
+      "detail": {
+        "code": "NOT_FOUND",
+        "error": "NOT_FOUND",
+        "reason": "EQUIPMENT_NOT_FOUND",
+        "message": "Equipment not found",
+        "requestId": "72854228-7335-4344-adda-c9fa45998781"
+      },
+      "ms": 715
+    },
+    {
+      "phase": "P9 · Adversarial inputs & tenancy",
+      "name": "cross-clinic dock-return blocked",
+      "ok": true,
+      "note": "404 \"<!DOCTYPE html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<title>Error</title>\\n</head>\\n<body>\\n<pre>Cannot POST /api/operati",
+      "detail": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /api/operational-state/equipment/aec0ffee-0000-4000-8000-000000001007/dock-return</pre>\n</body>\n</html>\n",
+      "ms": 710
+    },
+    {
+      "phase": "P10 · Concurrency & rate limits (final block)",
+      "name": "10 parallel checkouts, one winner",
+      "ok": true,
+      "note": "wins=1 conflicts=9 statuses=409,409,409,200,409,409,409,409,409,409",
+      "ms": 2196
+    },
+    {
+      "phase": "P10 · Concurrency & rate limits (final block)",
+      "name": "rapid quick-scan toggle x20 stays consistent",
+      "ok": true,
+      "note": "flips=20/20 last=return",
+      "ms": 197
+    },
+    {
+      "phase": "P10 · Concurrency & rate limits (final block)",
+      "name": "global limiter kicks in under burst (expect 429s)",
+      "ok": false,
+      "note": "429s=0/120",
+      "ms": 659
+    }
+  ]
+}

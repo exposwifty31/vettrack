@@ -1,0 +1,10 @@
+Employee,Shift,Date,Start,End
+WC Dan Erez,טכנאי בוקר,{{DAY0}},08:00,16:00
+WC Guy Segev,בכיר בוקר,{{DAY0}},08:00,16:00
+WC Noam Levi,טכנאי ערב,{{DAY0}},16:00,00:00
+WC Omer Cohen,בכיר ערב,{{DAY0}},16:00,00:00
+WC Maya Rosen,וטרינר בוקר,{{DAY0}},08:00,16:00
+WC Avi Katz,סטודנט בוקר,{{DAY0}},08:00,14:00
+WC Dan Erez,טכנאי לילה,{{DAY1}},00:00,08:00
+WC Guy Segev,בכיר לילה,{{DAY1}},00:00,08:00
+WC Noam Levi,טכנאי בוקר,{{DAY1}},08:00,16:00

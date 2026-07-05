@@ -1,0 +1,4 @@
+interface:
+  display_name: "Apple Platform UX"
+  short_description: "Design iPhone and iPad workflows"
+  default_prompt: "Use $apple-platform-ux to design an iPhone and iPad experience for a clinical workflow."

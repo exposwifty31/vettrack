@@ -1,0 +1,4 @@
+interface:
+  display_name: "VetTrack Codebase Relevance Audit"
+  short_description: "Audit every file for app relevance"
+  default_prompt: "Use $vettrack-codebase-relevance-audit to scan VetTrack end to end and classify every repository file as keep, verify, or deletion candidate."

@@ -94,3 +94,10 @@ ds-bundle/
 
 # Xcode SwiftPM resolution (local machine noise)
 ios/**/xcshareddata/swiftpm/
+
+# Agent-session tooling artifacts (recreated by CLIs; never app code)
+.agents/
+.codex/
+.design-sync/previews/
+.design-sync/preview-provider.tsx
+VetTrack Design System/
