@@ -1306,3 +1306,15 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Command: `pnpm typecheck` → clean; `pnpm test` → 3937 passed.
 
 **Verdict:** VERIFIED (teardown + dry-run); PARTIAL (execute path unexercised by design — human-gated)
+
+## 2026-07-05 — Origin hygiene: read-only reconciliation report (committed with this entry)
+
+**Claim:** Produced docs/audit/ORIGIN_RECONCILIATION_2026-07-05.md from live origin state; no branches merged, deleted, or pushed.
+
+**Evidence:**
+- Command: `git fetch origin --prune` → three of the audit's four cursor/* branches deleted upstream during prune (output listed them); the fourth (alerts-dropdown) was already gone.
+- Command: `git rev-list --left-right --count origin/main...main` → `0 6` (local main strictly ahead; the two Bugbot fixes 57423a3d7/4b2beed02 the audit tracked are now IN origin/main).
+- Command: per-branch `git rev-list --left-right --count origin/main...<branch>` for all 21 origin branches + `gh pr list` (16 open PRs) → table in the report; `feat/legal-pages-privacy-terms-support` measured 0 ahead (fully merged).
+- Nothing state-changing was run: no push, no merge, no branch deletion (prune only removed local remote-tracking refs for branches already deleted server-side).
+
+**Verdict:** VERIFIED
