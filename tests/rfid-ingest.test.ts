@@ -5,10 +5,21 @@
 
 import "dotenv/config";
 import { randomUUID } from "crypto";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Pool } from "pg";
 import { eq, and } from "drizzle-orm";
-import { db, equipment, equipmentRfidReads, eventOutbox, auditLogs } from "../server/db.js";
+
+// Audit writes are asserted via this spy instead of vt_audit_logs rows: the
+// table is append-only (DO INSTEAD NOTHING delete rule) while its clinic FK is
+// RESTRICT, so real audit rows would make the rfid-test-* clinics permanently
+// undeletable — the leak this suite's teardown exists to prevent.
+vi.mock("../server/lib/audit.js", () => ({
+  logAudit: vi.fn().mockResolvedValue(undefined),
+  resolveAuditActorRole: () => "system",
+}));
+
+import { db, equipment, equipmentRfidReads, eventOutbox } from "../server/db.js";
+import { logAudit } from "../server/lib/audit.js";
 import { ingestRfidBatch } from "../server/lib/rfid-ingest.js";
 
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
@@ -59,7 +70,30 @@ describeDb("ingestRfidBatch", () => {
   });
 
   afterAll(async () => {
-    await probePool?.end();
+    // Teardown: this suite used to leak its rfid-test-* clinics (hundreds of
+    // orphan clinics / ~9k equipment rows accumulated in the dev DB). Audit
+    // writes go through the logAudit mock above, so no append-only audit rows
+    // block the clinic delete. Delete children before parents, then verify
+    // zero residue so a cleanup regression fails the suite loudly.
+    try {
+      const clinicIds = [clinicA, clinicB];
+      for (const table of ["vt_equipment_rfid_reads", "vt_event_outbox", "vt_equipment", "vt_rooms"]) {
+        await probePool!.query(`DELETE FROM ${table} WHERE clinic_id = ANY($1)`, [clinicIds]);
+      }
+      await probePool!.query(`DELETE FROM vt_clinics WHERE id = ANY($1)`, [clinicIds]);
+
+      const { rows } = await probePool!.query<{ residue: string }>(
+        `SELECT (SELECT count(*) FROM vt_clinics WHERE id = ANY($1)) +
+                (SELECT count(*) FROM vt_equipment WHERE clinic_id = ANY($1)) +
+                (SELECT count(*) FROM vt_rooms WHERE clinic_id = ANY($1)) AS residue`,
+        [clinicIds],
+      );
+      if (Number(rows[0]?.residue ?? 0) !== 0) {
+        throw new Error(`rfid-ingest teardown left residue for ${clinicA}/${clinicB}`);
+      }
+    } finally {
+      await probePool?.end();
+    }
   });
 
   beforeEach(async () => {
@@ -74,13 +108,7 @@ describeDb("ingestRfidBatch", () => {
     await db
       .delete(eventOutbox)
       .where(and(eq(eventOutbox.clinicId, clinicA), eq(eventOutbox.type, "EQUIPMENT_RFID_OBSERVED")));
-    await db.delete(auditLogs).where(
-      and(
-        eq(auditLogs.clinicId, clinicA),
-        eq(auditLogs.targetId, equipmentId),
-        eq(auditLogs.actionType, "equipment_rfid_observed_room_changed"),
-      ),
-    );
+    vi.mocked(logAudit).mockClear();
   });
 
   async function loadEquipment() {
@@ -154,13 +182,7 @@ describeDb("ingestRfidBatch", () => {
       [equipmentId, roomId],
     );
     await db.delete(equipmentRfidReads).where(eq(equipmentRfidReads.equipmentId, equipmentId));
-    await db.delete(auditLogs).where(
-      and(
-        eq(auditLogs.clinicId, clinicA),
-        eq(auditLogs.targetId, equipmentId),
-        eq(auditLogs.actionType, "equipment_rfid_observed_room_changed"),
-      ),
-    );
+    vi.mocked(logAudit).mockClear();
 
     const before = await loadEquipment();
     const readAt = new Date("2026-05-27T11:00:00.000Z");
@@ -185,22 +207,17 @@ describeDb("ingestRfidBatch", () => {
         and(eq(equipmentRfidReads.equipmentId, equipmentId), eq(equipmentRfidReads.batchId, batchId)),
       );
     expect(reads.length).toBe(1);
-    const audits = await db
-      .select()
-      .from(auditLogs)
-      .where(
-        and(
-          eq(auditLogs.clinicId, clinicA),
-          eq(auditLogs.actionType, "equipment_rfid_observed_room_changed"),
-          eq(auditLogs.targetId, equipmentId),
-        ),
+    const auditCalls = vi
+      .mocked(logAudit)
+      .mock.calls.map(([entry]) => entry)
+      .filter(
+        (entry) =>
+          entry.clinicId === clinicA &&
+          entry.actionType === "equipment_rfid_observed_room_changed" &&
+          entry.targetId === equipmentId,
       );
-    const auditsForBatch = audits.filter((row) => {
-      const meta = row.metadata as { batchId?: string; toRoomId?: string } | null;
-      return meta?.batchId === batchId && meta?.toRoomId === room2;
-    });
-    expect(auditsForBatch).toHaveLength(1);
-    expect(auditsForBatch[0]?.metadata).toMatchObject({
+    expect(auditCalls).toHaveLength(1);
+    expect(auditCalls[0]?.metadata).toMatchObject({
       batchId,
       toRoomId: room2,
       readAt: readAt.toISOString(),

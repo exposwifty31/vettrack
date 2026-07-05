@@ -1291,3 +1291,18 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Command: `pnpm typecheck` → clean. `pnpm architecture:cycles` → 0 cycles, matches baseline (new import `equipment-waitlist.service` → `equipment-operational-state.service` is acyclic). `pnpm test` → full default suite green.
 
 **Verdict:** VERIFIED
+
+## 2026-07-05 — P2: RFID suite teardown + prepare-real-db purge tool hardened (committed with this entry)
+
+**Claim:** The RFID integration suite no longer leaks `rfid-test-*` clinics, and `scripts/wetcheck/prepare-real-db.ts` no longer crashes mid-purge — it discovers all clinic child tables dynamically, runs atomically, and gates audit-row purging behind an explicit flag.
+
+**Evidence:**
+- Root cause discovered during teardown work: `vt_audit_logs` is append-only (`no_delete_audit_logs` rule, `DO INSTEAD NOTHING` — migrations/013) while its clinic FK is `ON DELETE RESTRICT` — so ANY clinic that ever wrote an audit row is undeletable via plain SQL. This is why the dev DB accumulated ~390 orphan test clinics: even the test file's own `db.delete(auditLogs)` calls (now removed) were silent no-ops.
+- `tests/rfid-ingest.test.ts` — audit assertions converted from DB reads to a `logAudit` spy (same mock pattern as the waitlist integration suite), so the test clinics never acquire audit rows; `afterAll` deletes children→parents and asserts zero residue (fails the suite loudly on regression). No audit-rule DDL anywhere — an earlier draft that transactionally dropped/re-created the rule was flagged by the permission classifier and replaced with this cleaner design.
+- Verified live: `DATABASE_URL=…vettrack pnpm test -- tests/rfid-ingest.test.ts` → 1 file / 8 tests passed; `rfid-test` clinic count before=392, after=392 (previous behavior: +2 per run and the count grew 384→392 across the broken iterations of this session).
+- `scripts/wetcheck/prepare-real-db.ts` — three latent bugs fixed: (1) its `DELETE FROM vt_audit_logs` silently no-oped against the rule, so `--execute` would ALWAYS have crashed at the clinic delete; (2) its hardcoded 25-table list missed 18 RESTRICT-FK tables (verified via pg_constraint: e.g. vt_po_lines, vt_purchase_orders, vt_push_subscriptions, vt_clinical_check_ins…); (3) no transaction — a mid-purge failure left a partial purge. Now: child tables + delete order discovered from pg_constraint (children before referenced parents via `orderTablesForDeletion`), whole purge in one `db.transaction`, audit-row purge requires the NEW `ALLOW_AUDIT_LOG_PURGE=1` flag (preflight aborts cleanly before any delete otherwise; rule drop/re-create happens inside the same transaction so the invariant can't be left off). `main()` now runs only on direct invocation so the module is unit-testable.
+- Test: `pnpm test -- tests/prepare-real-db-order.test.ts` → 5 passed (chain, diamond, cycle, self-ref, determinism).
+- Dry-run against dev DB (safe, verified no changes): discovers **56 child tables** (was 25 hardcoded), reports 398 test clinics / 9,648 equipment / **10,459 audit rows** with the flag guidance. NOT verified: the `--execute` path was not run anywhere (destructive; requires the human CONFIRM_PURGE gate) — first real run should be against a throwaway DB.
+- Command: `pnpm typecheck` → clean; `pnpm test` → 3937 passed.
+
+**Verdict:** VERIFIED (teardown + dry-run); PARTIAL (execute path unexercised by design — human-gated)
