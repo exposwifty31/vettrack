@@ -1318,3 +1318,17 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Nothing state-changing was run: no push, no merge, no branch deletion (prune only removed local remote-tracking refs for branches already deleted server-side).
 
 **Verdict:** VERIFIED
+
+## 2026-07-05 — PR #42 merged: wet-check remediation shipped to production (c9c394c67; this entry committed locally, unpushed)
+
+**Claim:** All 8 remediation commits went through PR #42 with Cursor + CodeRabbit review, all findings addressed, merged green, and the CI deploy to Railway production succeeded with runtime verification.
+
+**Evidence:**
+- PR: https://github.com/exposwifty31/vettrack/pull/42 — branch `fix/wetcheck-audit-remediation`, merged via merge commit `c9c394c67`, branch deleted.
+- Cursor Bugbot: APPROVED, "no findings requiring human review" (both review rounds).
+- CodeRabbit: 5 inline findings → 4 fixed in `6c147c9ef` (shared `mapCheckoutGateError()` for /scan + /toggle with updated contract test; `PROTECTED_ACCOUNT_EMAIL` env override + masked console output, hard-coded default kept as the documented fail-safe; cycle-break comment corrected; `pool.end()` errors logged) and 1 answered with rationale (audit-rule swap stays in the single transaction — splitting it would let a crash leave the append-only rule off; ACCESS EXCLUSIVE lock + maintenance-window requirement now documented in the script header). CodeRabbit replied `review_comment_addressed` on the threads, final review APPROVED.
+- CI on the PR (both rounds): Tests & typecheck, Architecture gates, Integration ops, Playwright E2E ×2, Merge gate — all pass. Local before push: 403 files / 3,938 tests green.
+- Post-merge main run: all jobs success including "🚢 Deploy to Railway".
+- Production verification (vettrack.uk, buildTag `1.1.2-mr73syhp`, builtAt 2026-07-05T01:20:08Z): malformed JSON POST → `400 {"code":"INVALID_JSON"}` ×3; 6 MB JSON POST → `413 {"code":"PAYLOAD_TOO_LARGE"}`; 300 KB body parses (old 100 KB default gone). Note: one probe fired mid-rollover hit the outgoing container and returned the old 500 — re-probed after the new container settled (buildTag flip observed) and confirmed 400.
+
+**Verdict:** VERIFIED
