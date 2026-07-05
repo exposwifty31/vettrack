@@ -6,7 +6,8 @@ import { t } from "@/lib/i18n";
 import { VetTrackMark } from "@/components/vettrack-mark";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignUp } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
-import { clerkAppearance, clerkAppearanceNative } from "@/lib/clerk-appearance";
+import { getClerkAppearance, getClerkAppearanceNative } from "@/lib/clerk-appearance";
+import { useIsDarkActive } from "@/hooks/use-settings";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { ClerkAuthFormShell } from "@/components/clerk-auth-form-shell";
 import { NativeSocialButtons } from "@/components/native-social-buttons";
@@ -18,6 +19,7 @@ export default function SignUpPage() {
   const isNative = isCapacitorNative();
   const { isLoaded, isSignedIn } = useAuth();
   const [, navigate] = useLocation();
+  const isDark = useIsDarkActive();
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
@@ -85,7 +87,7 @@ export default function SignUpPage() {
                       routing="hash"
                       signInUrl="/signin"
                       fallbackRedirectUrl="/"
-                      appearance={isNative ? clerkAppearanceNative : clerkAppearance}
+                      appearance={isNative ? getClerkAppearanceNative(isDark) : getClerkAppearance(isDark)}
                     />
                   </div>
                 </ClerkAuthFormShell>

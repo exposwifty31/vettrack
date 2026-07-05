@@ -6,15 +6,31 @@
  * (replaced by `@clerk/shared/types` in Clerk Core 3+), and `@clerk/clerk-react`
  * accepts this shape structurally at the `<SignIn appearance={...} />` call site.
  */
+/**
+ * Clerk `variables` need concrete colors (Clerk derives shades from them, so
+ * `hsl(var(--…))` indirection breaks). Both palettes mirror `src/index.css`:
+ * light = `:root` clinical, dark = `.dark` clinical.
+ */
+const lightVariables = {
+  colorPrimary: "hsl(243, 75%, 59%)",
+  colorText: "hsl(240, 6%, 10%)",
+  colorTextSecondary: "hsl(240, 4%, 44%)",
+  colorBackground: "hsl(0, 0%, 100%)",
+  colorInputBackground: "hsl(0, 0%, 100%)",
+  borderRadius: "1rem",
+};
+
+const darkVariables = {
+  colorPrimary: "hsl(234, 89%, 74%)",
+  colorText: "hsl(0, 0%, 100%)",
+  colorTextSecondary: "hsl(240, 5%, 64%)",
+  colorBackground: "hsl(240, 2%, 11%)",
+  colorInputBackground: "hsl(240, 3%, 15%)",
+  borderRadius: "1rem",
+};
+
 export const clerkAppearance = {
-  variables: {
-    colorPrimary: "#15803d",
-    colorText: "hsl(127, 21%, 8%)",
-    colorTextSecondary: "hsl(215, 15%, 36%)",
-    colorBackground: "hsl(0 0% 100%)",
-    colorInputBackground: "hsl(0 0% 100%)",
-    borderRadius: "1rem",
-  },
+  variables: lightVariables,
   elements: {
     rootBox: "w-full",
     logoBox: "hidden",
@@ -58,3 +74,19 @@ export const clerkAppearanceNative = {
     dividerText: "hidden",
   },
 };
+
+/**
+ * Dark-aware accessors: element classes above already flip with the `.dark`
+ * Tailwind tokens, but Clerk paints its card/inputs from `variables`, which
+ * are static — a signed-out dark-mode device got a white card (TestFlight
+ * 1.1.0/21 screenshot). Pass `isDark` from `useIsDarkActive()`.
+ */
+export function getClerkAppearance(isDark: boolean) {
+  return isDark ? { ...clerkAppearance, variables: darkVariables } : clerkAppearance;
+}
+
+export function getClerkAppearanceNative(isDark: boolean) {
+  return isDark
+    ? { ...clerkAppearanceNative, variables: darkVariables }
+    : clerkAppearanceNative;
+}

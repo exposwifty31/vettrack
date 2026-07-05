@@ -76,6 +76,33 @@ function applySettings(settings: Settings) {
   }
 }
 
+/**
+ * Reactive form of `isDarkActive`: re-renders when the user flips appearance
+ * AND when the OS scheme changes while appearance is "system". Needed by
+ * consumers that must pass a concrete light/dark value to third-party widgets
+ * (Clerk's `variables` can't read our CSS custom properties).
+ */
+export function useIsDarkActive(): boolean {
+  const { settings } = useSettings();
+  const [osDark, setOsDark] = useState<boolean>(() =>
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = (e: MediaQueryListEvent) => setOsDark(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  if (settings.appearance === "dark") return true;
+  if (settings.appearance === "light") return false;
+  return osDark;
+}
+
 interface SettingsContextType {
   settings: Settings;
   update: (patch: Partial<Settings>) => void;

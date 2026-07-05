@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { useLocation } from "wouter";
 import { NativeShellContext } from "./NativeShellContext";
 import { NativeTabBar } from "./NativeTabBar";
 import { NativeTabSidebar } from "./NativeTabSidebar";
@@ -24,9 +25,39 @@ type Props = {
  *     to protect interactive content.
  *   - Bottom: NativeTabBar adds paddingBottom via env(safe-area-inset-bottom).
  */
+/** Signed-out surfaces own their whole viewport — no header, tab bar, or sidebar. */
+const AUTH_ROUTE_PATTERN = /^\/(signin|signup)(\/|$)/;
+
 export function NativeShell({ children }: Props) {
   const [moreOpen, setMoreOpen] = useState(false);
   const isTablet = useIsTabletViewport();
+  const [location] = useLocation();
+
+  // Auth routes render bare: app chrome around a sign-in form is dead UI for a
+  // signed-out user (every tab bounces back through AuthGuard → /signin).
+  if (AUTH_ROUTE_PATTERN.test(location)) {
+    return (
+      <NativeShellContext.Provider value={true}>
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            overflowY: "auto",
+            overflowX: "hidden",
+            WebkitOverflowScrolling: "touch",
+            overscrollBehaviorY: "contain",
+            background: "hsl(var(--background))",
+            paddingTop: "env(safe-area-inset-top)",
+            paddingBottom: "env(safe-area-inset-bottom)",
+            paddingLeft: "env(safe-area-inset-left)",
+            paddingRight: "env(safe-area-inset-right)",
+          }}
+        >
+          {children}
+        </div>
+      </NativeShellContext.Provider>
+    );
+  }
 
   if (isTablet) {
     return (

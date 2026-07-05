@@ -7,7 +7,8 @@ import { VetTrackMark } from "@/components/vettrack-mark";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignIn, useUser } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
 import { PhoneSignIn } from "@/components/phone-sign-in";
-import { clerkAppearance, clerkAppearanceNative } from "@/lib/clerk-appearance";
+import { getClerkAppearance, getClerkAppearanceNative } from "@/lib/clerk-appearance";
+import { useIsDarkActive } from "@/hooks/use-settings";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { ClerkAuthFormShell } from "@/components/clerk-auth-form-shell";
 import { AuthBootstrapSpinner } from "@/components/native-clerk-gate";
@@ -22,6 +23,7 @@ export default function SignInPage() {
   const { isLoaded: clerkLoaded, isSignedIn: clerkSignedIn } = useUser();
   const [, navigate] = useLocation();
   const [usePhoneFlow, setUsePhoneFlow] = useState(false);
+  const isDark = useIsDarkActive();
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
@@ -117,7 +119,7 @@ export default function SignInPage() {
                           routing="hash"
                           signUpUrl="/signup"
                           fallbackRedirectUrl="/home"
-                          appearance={isNative ? clerkAppearanceNative : clerkAppearance}
+                          appearance={isNative ? getClerkAppearanceNative(isDark) : getClerkAppearance(isDark)}
                         />
                       </div>
                     </ClerkAuthFormShell>
