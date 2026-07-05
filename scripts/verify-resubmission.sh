@@ -10,7 +10,13 @@ cd "$REPO" || { echo "FAIL: repo not found at $REPO"; exit 2; }
 # --- secret -----------------------------------------------------------------
 if [ -z "${CLERK_SECRET_KEY:-}" ] && [ -f "$REPO/.env" ]; then
   # Same source the server + build-native-shell already read (gitignored).
-  CLERK_SECRET_KEY=$(grep -m1 '^CLERK_SECRET_KEY=' "$REPO/.env" | cut -d= -f2- | tr -d '"' | tr -d "'")
+  # sk_live only: these gates audit the PRODUCTION instance — a dev sk_test
+  # key would silently check the wrong instance and pass/fail falsely.
+  ENV_SK=$(grep -m1 '^CLERK_SECRET_KEY=' "$REPO/.env" | cut -d= -f2- | tr -d '"' | tr -d "'")
+  case "$ENV_SK" in
+    sk_live_*) CLERK_SECRET_KEY="$ENV_SK" ;;
+    sk_*) echo "  note: .env CLERK_SECRET_KEY is not sk_live_ (dev instance) — ignoring for prod gates" ;;
+  esac
 fi
 if [ -z "${CLERK_SECRET_KEY:-}" ]; then
   # Try to pull from Railway (project pacific-flow / service VetTrack)
