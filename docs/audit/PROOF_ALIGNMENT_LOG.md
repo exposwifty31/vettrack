@@ -1347,3 +1347,15 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - NOT verified: the two Clerk-admin gates (redirect URL + allowed_origins) and the Xcode archive/upload itself (§D human step). Xcode MARKETING_VERSION=1.1.0 / CURRENT_PROJECT_VERSION=21 vs web bundle appVersion 1.1.2 noted (cosmetic; ASC uses 1.1.0 (21)).
 
 **Verdict:** VERIFIED (preflight preparation); PARTIAL (2 Clerk-admin gates + archive await user)
+
+## 2026-07-05 — Archive preflight FULL PASS after Railway re-auth (committed with this entry)
+
+**Claim:** All 16 resubmission gates pass; archive-from-clean-tree reports zero blockers. System is ready for the human Xcode archive (§D).
+
+**Evidence:**
+- User re-ran `railway login` (danerez5@gmail.com); verify script's Railway fallback pulled the live key; the .env sk_test guard printed its skip note as designed.
+- Command: `REPO=$PWD ./scripts/verify-resubmission.sh` → **PASS: 16 FAIL: 0** — including the two previously-blocked [2.1a] gates: redirect URL `vettrack://oauth-callback` present, `allowed_origins` includes `capacitor://localhost`; demo login still `complete`.
+- Command: `DEV_LANE=/Users/dan/vettrack SHIP_LANE=$PWD ./scripts/archive-from-clean-tree.sh --skip-build` → ship CLEAN @ 21f859134 on main, verify PASS, "Blockers: none", next step = Xcode archive.
+- Earlier this session: fresh bundled shell `1.1.2-mr74k1yp` (build-native-shell), simulator smoke BUILD SUCCEEDED + installed on iPad sim, typecheck + full vitest green.
+
+**Verdict:** VERIFIED — remaining work is the human §D/§E flow: Xcode archive as 1.1.0 (21) → Upload → resubmit with reviewer credentials; bump to 22 via agvtool only if ASC reports a duplicate build number.
