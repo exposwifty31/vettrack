@@ -5,7 +5,7 @@ import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
-import { useSettings } from "@/hooks/use-settings";
+import { useIsDarkActive, useSettings } from "@/hooks/use-settings";
 import { computeAlerts } from "@/lib/utils";
 import { buildAlertAckSet, countActiveAlerts, filterUnackedAlerts } from "@/lib/alert-counts";
 import { aggregateAlerts, formatBadgeCount } from "@/lib/attention";
@@ -32,6 +32,7 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
   const [location, navigate] = useLocation();
   const { userId, name } = useAuth();
   const { settings, update } = useSettings();
+  const isDarkNow = useIsDarkActive();
   const isTablet = useIsTabletViewport();
   const [openPanel, setOpenPanel] = useState<Panel>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -357,13 +358,17 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
               <p style={panelHeaderStyle}>{t.nav.quickSettings}</p>
               <button
                 type="button"
-                aria-pressed={settings.appearance === "dark"}
-                onClick={() => update({ appearance: settings.appearance === "dark" ? "system" : "dark" })}
+                aria-pressed={isDarkNow}
+                // Toggle between EXPLICIT light/dark based on what's currently
+                // rendered. The old mapping (dark→"system") read as "off" but
+                // resolved back to dark on a dark OS — a lossy binary control
+                // over a tri-state (device finding, 2026-07-05).
+                onClick={() => update({ appearance: isDarkNow ? "light" : "dark" })}
                 style={rowStyle}
               >
                 <Moon size={18} color="hsl(var(--foreground))" strokeWidth={1.8} />
                 <span style={{ flex: 1, textAlign: "start", fontSize: "var(--text-sm)" }}>{t.nav.darkMode}</span>
-                <MiniSwitch on={settings.appearance === "dark"} />
+                <MiniSwitch on={isDarkNow} />
               </button>
               <button
                 type="button"

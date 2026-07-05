@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Search } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
@@ -41,7 +42,13 @@ export function EquipmentSearchButton() {
         <Search size={20} strokeWidth={1.8} color="hsl(var(--foreground))" aria-hidden />
       </button>
 
-      {open && (
+      {/* Portal to <body>: this button lives INSIDE the blurred header, whose
+          backdrop-filter creates a stacking context (and, per spec, a containing
+          block) that traps position:fixed descendants — the overlay painted
+          BEHIND z-indexed page content (device finding, 2026-07-05). The
+          header's own dropdown panels already render outside it for the same
+          reason. */}
+      {open && createPortal(
         <>
           <div
             aria-hidden
@@ -91,7 +98,8 @@ export function EquipmentSearchButton() {
               {t.common.cancel}
             </button>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </>
   );

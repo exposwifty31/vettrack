@@ -6,12 +6,13 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { Settings, Moon, Globe, User } from "lucide-react";
 import { ForwardChevron } from "@/components/ui/directional-chevron";
-import { useSettings } from "@/hooks/use-settings";
+import { useIsDarkActive, useSettings } from "@/hooks/use-settings";
 import { t } from "@/lib/i18n";
 
 export function TopbarSettingsMenu() {
   const [, navigate] = useLocation();
   const { settings, update } = useSettings();
+  const isDarkNow = useIsDarkActive();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -65,10 +66,12 @@ export function TopbarSettingsMenu() {
               {t.nav.quickSettings}
             </p>
 
-            <button type="button" aria-pressed={settings.appearance === "dark"} onClick={() => update({ appearance: settings.appearance === "dark" ? "system" : "dark" })} className={rowClass}>
+            {/* Explicit light/dark toggle keyed on the ACTIVE mode — mirrors NativeHeader
+                (dark→"system" was lossy: "off" resolved back to dark on a dark OS). */}
+            <button type="button" aria-pressed={isDarkNow} onClick={() => update({ appearance: isDarkNow ? "light" : "dark" })} className={rowClass}>
               <Moon size={18} strokeWidth={1.8} />
               <span className="flex-1 text-start text-sm">{t.nav.darkMode}</span>
-              <MiniSwitch on={settings.appearance === "dark"} />
+              <MiniSwitch on={isDarkNow} />
             </button>
 
             <button type="button" onClick={() => update({ locale: settings.locale === "he" ? "en" : "he" })} className={rowClass}>

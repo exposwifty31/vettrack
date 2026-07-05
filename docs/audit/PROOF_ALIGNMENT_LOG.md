@@ -1375,3 +1375,15 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - NOT verified yet: on-device rendering of the three fixes (requires build 23 via build-native-shell.sh → archive → TestFlight; next step).
 
 **Verdict:** VERIFIED (code + contracts); PARTIAL (device verification awaits build 23)
+
+## 2026-07-05 — Device findings round 2: quick-toggle tri-state loss, search overlay stacking trap, stale system scheme (committed with this entry)
+
+**Claim:** Three further device reports fixed: (1) dark→light via the header quick toggle landed on "system" (lossy binary over a tri-state — explicit light/dark now, keyed on the ACTIVE mode via useIsDarkActive, both NativeHeader and TopbarSettingsMenu); (2) phone search overlay + typed query painted behind page content (the header's backdrop-filter stacking context trapped the position:fixed overlay — now portaled to document.body, matching the header's own panels, which were already rendered outside </header> for exactly this reason); (3) "system" resolving dark on a LIGHT phone — no native forcing exists (Info.plist/AppDelegate/capacitor.config all checked clean), diagnosis is WKWebView missing the prefers-color-scheme change while suspended; hardened with a visibilitychange/pageshow re-query.
+
+**Evidence:**
+- Root causes read from source: NativeHeader.tsx:361 `"dark" ? "system" : "dark"` (and its TopbarSettingsMenu twin); NativeHeader.tsx:113 `backdropFilter: blur(12px)` + EquipmentSearchButton's fixed overlay rendered INSIDE the header; the pre-existing comment at the panels block ("fixed to the viewport so the header's backdrop-filter … doesn't trap them") confirms the trap class was known — the search overlay just never got the treatment.
+- Command: `pnpm test -- tests/native-header-controls.test.ts tests/native-auth-surface.test.ts` → 10 passed (new suite pins toggle semantics, portal usage, panels-outside-header, and the foreground re-query).
+- Command: `pnpm typecheck` → clean (both tsconfigs).
+- NOT verified: on-device behavior of "system" after the resume re-query — if the user's light phone still renders dark under "system" on the new build with the app foregrounded during an OS appearance flip, escalate to a native trait plugin (UITraitCollection → JS), since the web-side signal would be proven unreliable on this device.
+
+**Verdict:** VERIFIED (code + contracts); PARTIAL (device verification awaits next build)

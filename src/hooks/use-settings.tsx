@@ -152,6 +152,25 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     return () => mq.removeEventListener("change", onChange);
   }, [settings]);
 
+  // Resume hardening: WKWebView can miss the prefers-color-scheme change event
+  // when the OS appearance flips while the app is suspended (device finding,
+  // 2026-07-05 — "system" stayed dark on a light phone). Re-query on every
+  // return to foreground; applySettings is idempotent and cheap.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const reapply = () => {
+      if (document.visibilityState === "visible" && settings.appearance === "system") {
+        applySettings(settings);
+      }
+    };
+    document.addEventListener("visibilitychange", reapply);
+    window.addEventListener("pageshow", reapply);
+    return () => {
+      document.removeEventListener("visibilitychange", reapply);
+      window.removeEventListener("pageshow", reapply);
+    };
+  }, [settings]);
+
   // Seed text size from the OS Dynamic Type on native — once, and only if the
   // user hasn't chosen a size yet (still the default). No-op on web and until the
   // native plugin is registered (getNativeContentSizeScale → null).
