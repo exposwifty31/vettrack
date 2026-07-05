@@ -1332,3 +1332,18 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Production verification (vettrack.uk, buildTag `1.1.2-mr73syhp`, builtAt 2026-07-05T01:20:08Z): malformed JSON POST → `400 {"code":"INVALID_JSON"}` ×3; 6 MB JSON POST → `413 {"code":"PAYLOAD_TOO_LARGE"}`; 300 KB body parses (old 100 KB default gone). Note: one probe fired mid-rollover hit the outgoing container and returned the old 500 — re-probed after the new container settled (buildTag flip observed) and confirmed 400.
 
 **Verdict:** VERIFIED
+
+## 2026-07-05 — App Store archive preflight: system prepared, one user-gated blocker (committed with this entry)
+
+**Claim:** Finished the interrupted Codex release review; ship + dev lanes clean, native shell rebuilt from current main, 14/15 verify gates pass — the only remaining blocker is the sk_live Clerk key for the two [2.1a] admin-config gates (user action: `railway login` or export CLERK_SECRET_KEY).
+
+**Evidence:**
+- Codex session findings triaged: its pnpm-11/install churn was its own sandbox (this shell runs the repo-pinned pnpm 9.15.9, `node_modules/.bin` intact); its "CLERK_SECRET_KEY not available locally" stall was the verify script not reading `.env` — fixed (sk_live-only guard, b2ce9bafa) after discovering `.env` carries the DEV sk_test key which must NOT feed the prod gates.
+- Tree hygiene (ca5163cbb): audit deliverables committed (docs/audit reports, scripts/wetcheck tooling, .claude project skills, docs/design-system.md); recreatable agent artifacts ignored (.agents/, .codex/, design-sync previews, 12MB "VetTrack Design System/") in .gitignore + shared .git/info/exclude → dev lane (/Users/dan/vettrack, branch main-sync) porcelain 0, ship porcelain 0.
+- Command: `REPO=$PWD ./scripts/build-native-shell.sh` → vite build + cap sync ios, 8 plugins; bundled `ios/App/App/public/build-info.json` shows buildTag `1.1.2-mr74k1yp`, builtAt 2026-07-05T01:40:57Z; clerk-native-instance chunk present; tree still clean after sync.
+- Command: `DEV_LANE=/Users/dan/vettrack SHIP_LANE=$PWD ./scripts/archive-from-clean-tree.sh --skip-build` → ship CLEAN @ b2ce9bafa on main, dev-lane guard passed, no debug instrumentation, bundled-shell invariant OK; verify-resubmission **PASS 14 / FAIL 1** — sole FAIL is "CLERK_SECRET_KEY not set". Demo login gate (top re-rejection risk) = complete; CORS, icon (1024/no-alpha), build number 21, bundled shell, pk_live + vettrack.uk baked, signin chunk 16.7KB, Control-widget files, AASA + entitlements all PASS.
+- Command: `pnpm typecheck && pnpm test` → exit 0 (typecheck clean, full vitest suite green — completes the run Codex left unfinished).
+- Railway CLI + MCP both `Unauthorized` (OAuth token expired) — the sk_live pull path needs interactive `railway login`; credential scanning outside the repo was declined by policy, deliberately left to the user.
+- NOT verified: the two Clerk-admin gates (redirect URL + allowed_origins) and the Xcode archive/upload itself (§D human step). Xcode MARKETING_VERSION=1.1.0 / CURRENT_PROJECT_VERSION=21 vs web bundle appVersion 1.1.2 noted (cosmetic; ASC uses 1.1.0 (21)).
+
+**Verdict:** VERIFIED (preflight preparation); PARTIAL (2 Clerk-admin gates + archive await user)
