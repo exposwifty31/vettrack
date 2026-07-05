@@ -191,15 +191,30 @@ describe("POST /api/equipment/scan route — gate error mapping contract", () =>
     routeSource.indexOf('router.post("/scan"'),
     routeSource.indexOf("// POST /api/equipment/:id/toggle"),
   );
+  const toggleHandler = routeSource.slice(
+    routeSource.indexOf("// POST /api/equipment/:id/toggle"),
+    routeSource.indexOf("// POST /api/equipment/:id/checkout"),
+  );
+  const mapperSource = routeSource.slice(
+    routeSource.indexOf("function mapCheckoutGateError("),
+    routeSource.indexOf("router.get("),
+  );
 
-  it("maps CheckoutPreconditionError to its documented status codes", () => {
-    expect(scanHandler).toContain("CheckoutPreconditionError");
-    expect(scanHandler).toContain("STAGING_CONFLICT");
-    expect(scanHandler).toContain("BUNDLE_INCOMPLETE");
+  it("scan and toggle share the checkout gate error mapper", () => {
+    expect(scanHandler).toContain("mapCheckoutGateError(err, req, res)");
+    expect(toggleHandler).toContain("mapCheckoutGateError(err, req, res)");
   });
 
-  it("maps EquipmentWaitlistError to 409/422 via the i18n error envelope", () => {
-    expect(scanHandler).toContain("EquipmentWaitlistError");
-    expect(scanHandler).toContain("WAITLIST_RESERVATION_HELD_BY_OTHER");
+  it("the mapper covers CheckoutPreconditionError's documented status codes", () => {
+    expect(mapperSource).toContain("CheckoutPreconditionError");
+    expect(mapperSource).toContain("STAGING_CONFLICT");
+    expect(mapperSource).toContain("BUNDLE_INCOMPLETE");
+    expect(mapperSource).toContain("err.httpStatus");
+  });
+
+  it("the mapper covers EquipmentWaitlistError via the i18n error envelope", () => {
+    expect(mapperSource).toContain("EquipmentWaitlistError");
+    expect(mapperSource).toContain("WAITLIST_RESERVATION_HELD_BY_OTHER");
+    expect(mapperSource).toContain("apiErrorI18n");
   });
 });

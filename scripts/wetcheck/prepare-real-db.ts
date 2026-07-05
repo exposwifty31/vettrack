@@ -16,6 +16,12 @@
  *     it the script aborts in preflight (before deleting anything) and tells you.
  *     With the flag, the rule is dropped and re-created inside the same transaction,
  *     so the append-only invariant is never left off, even on a crash.
+ *   - LOCKING: dropping the rule takes an ACCESS EXCLUSIVE lock on vt_audit_logs
+ *     that is held until the transaction commits, so ALL audit reads/writes block
+ *     for the duration of the purge. This is an offline maintenance tool — run it
+ *     in a maintenance window, never against a live-traffic database. (Kept in one
+ *     transaction deliberately: splitting the rule swap out would allow a crash to
+ *     leave the append-only rule off permanently.)
  *
  * Typical use:
  *   # 1) See what would be removed (safe):
@@ -42,7 +48,10 @@ import { pathToFileURL } from "url";
 import { sql } from "drizzle-orm";
 import { db, pool } from "../../server/db.js";
 
-const PROTECTED_EMAIL = "danerez5@gmail.com";
+// Hard-coded default is deliberate — the protected-account guarantee must not
+// depend on remembering an env var. PROTECTED_ACCOUNT_EMAIL can override it.
+const PROTECTED_EMAIL = (process.env.PROTECTED_ACCOUNT_EMAIL || "danerez5@gmail.com").trim();
+const PROTECTED_EMAIL_MASKED = PROTECTED_EMAIL.replace(/^(.).*(.)@/, "$1***$2@");
 const EXECUTE = process.argv.includes("--execute") && process.env.CONFIRM_PURGE === "1";
 const ALLOW_AUDIT_LOG_PURGE = process.env.ALLOW_AUDIT_LOG_PURGE === "1";
 const TEST_CLINIC_LIKE = ["rfid-test-%", "clinic-f3-%", "clinic-e2e-%", "rfid-clinic-%"];
@@ -53,7 +62,9 @@ export type FkEdge = { child: string; parent: string };
 /**
  * Order tables so that every table is deleted before the tables it references
  * with a delete-blocking FK (children first). Cycles are broken deterministically
- * (alphabetical) — safe because the caller runs everything in one transaction.
+ * (alphabetical); a genuine bidirectional RESTRICT cycle cannot be resolved by
+ * ordering — the delete would fail and the caller's transaction rolls back
+ * atomically (nothing is half-purged).
  */
 export function orderTablesForDeletion(tables: string[], edges: FkEdge[]): string[] {
   const remaining = new Set(tables);
@@ -130,7 +141,7 @@ async function main(): Promise<void> {
   }
   console.info(`[prepare-real-db] target=${dbUrl.replace(/:[^:@/]*@/, ":***@")}`);
   console.info(`[prepare-real-db] mode=${EXECUTE ? "EXECUTE (irreversible)" : "DRY-RUN (no changes)"}`);
-  console.info(`[prepare-real-db] protected account: ${PROTECTED_EMAIL}`);
+  console.info(`[prepare-real-db] protected account: ${PROTECTED_EMAIL_MASKED}`);
 
   // vt_clinics uses `id` (not `clinic_id`). Build the target-clinic set once and
   // reference it everywhere via `<clinic-fk-col> IN (targetClinics)`.
@@ -172,7 +183,7 @@ async function main(): Promise<void> {
   console.info(`  equipment under test clinics  : ${testEquipmentCount}`);
   console.info(`  audit rows under test clinics : ${auditRowCount} (needs ALLOW_AUDIT_LOG_PURGE=1 if > 0)`);
   console.info(`  dev-clinic-default fixtures   : ${devFixtureCount} (by name prefix)`);
-  console.info(`  protected ${PROTECTED_EMAIL} rows : ${protectedRows} (never deleted)`);
+  console.info(`  protected ${PROTECTED_EMAIL_MASKED} rows : ${protectedRows} (never deleted)`);
   console.info(`  child tables (discovered)     : ${orderedTables.length}`);
   console.info("─────────────────────────────────────────────────────\n");
 
@@ -247,6 +258,6 @@ if (isDirectRun) {
       process.exitCode = 1;
     })
     .finally(() => {
-      pool.end().catch(() => {});
+      pool.end().catch((err) => console.error("[prepare-real-db] pool.end() failed:", err));
     });
 }
