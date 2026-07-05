@@ -450,6 +450,79 @@ describe.skipIf(!dbReachable)("equipment waitlist integration", () => {
     );
   });
 
+  it("asset-typed return defers promotion to dock-return; reservation is never hollow (F4 regression)", async () => {
+    const dockId = randomUUID();
+    const assetTypeId = randomUUID();
+    const conditionId = randomUUID();
+    await probePool!.query(
+      `INSERT INTO vt_docks (id, clinic_id, name) VALUES ($1, $2, 'Dock A') ON CONFLICT DO NOTHING`,
+      [dockId, ctx.clinicId],
+    );
+    await probePool!.query(
+      `INSERT INTO vt_asset_types (id, clinic_id, name) VALUES ($1, $2, 'Pump') ON CONFLICT DO NOTHING`,
+      [assetTypeId, ctx.clinicId],
+    );
+    await probePool!.query(
+      `INSERT INTO vt_asset_type_conditions (id, clinic_id, asset_type_id, condition_name, verification_method, stale_after_minutes, display_order)
+       VALUES ($1, $2, $3, 'Visual', 'visual', 60, 0) ON CONFLICT DO NOTHING`,
+      [conditionId, ctx.clinicId, assetTypeId],
+    );
+    await checkoutAs(ctx.userA);
+    await api(`/api/equipment/${ctx.eqId}/waitlist`, "POST", undefined, ctx.userB);
+
+    await probePool!.query(
+      `UPDATE vt_equipment SET asset_type_id = $2, dock_id = $3 WHERE id = $1`,
+      [ctx.eqId, assetTypeId, dockId],
+    );
+
+    await returnAs(ctx.userA);
+
+    // Post-return the unit cannot pass the checkout bundle gate (custody
+    // "returned" ≠ "docked"), so promoting here would start a hollow TTL.
+    expect(await countNotified(ctx.eqId, ctx.clinicId)).toBe(0);
+
+    currentUserId = ctx.userA;
+    const dockReturn = await api(`/api/equipment/${ctx.eqId}/dock-return`, "POST", {
+      dockId,
+      conditionVerifications: [{ conditionId, verified: true }],
+    });
+    expect(dockReturn.status).toBe(200);
+    await waitForNotified(ctx.eqId, ctx.clinicId, 1);
+
+    const co = await api(`/api/equipment/${ctx.eqId}/checkout`, "POST", {}, ctx.userB);
+    expect(co.status).toBe(200);
+  });
+
+  it("TTL sweep does not promote the next waiter while an asset-typed unit is unverified (F4)", async () => {
+    const assetTypeId = randomUUID();
+    await probePool!.query(
+      `INSERT INTO vt_asset_types (id, clinic_id, name) VALUES ($1, $2, 'Pump') ON CONFLICT DO NOTHING`,
+      [assetTypeId, ctx.clinicId],
+    );
+    await probePool!.query(
+      `UPDATE vt_equipment SET asset_type_id = $2, custody_state = 'returned', readiness_state = 'unknown',
+       usage_state = 'available', checked_out_by_id = NULL, version = version + 1 WHERE id = $1`,
+      [ctx.eqId, assetTypeId],
+    );
+    await probePool!.query(
+      `INSERT INTO vt_equipment_waitlist (id, clinic_id, equipment_id, user_id, joined_at, status, notified_at, reservation_expires_at, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, now() AT TIME ZONE 'UTC', 'notified', now() AT TIME ZONE 'UTC', (now() AT TIME ZONE 'UTC') - interval '1 minute', now() AT TIME ZONE 'UTC', now() AT TIME ZONE 'UTC')`,
+      [randomUUID(), ctx.clinicId, ctx.eqId, ctx.userB],
+    );
+    await probePool!.query(
+      `INSERT INTO vt_equipment_waitlist (id, clinic_id, equipment_id, user_id, joined_at, status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, now() AT TIME ZONE 'UTC', 'waiting', now() AT TIME ZONE 'UTC', now() AT TIME ZONE 'UTC')`,
+      [randomUUID(), ctx.clinicId, ctx.eqId, ctx.userC],
+    );
+
+    const { expired } = await runEquipmentWaitlistReservationSweep();
+    expect(expired).toBeGreaterThanOrEqual(1);
+
+    // userC must stay "waiting" — promoting onto an unverified unit would be hollow.
+    await new Promise((r) => setTimeout(r, 100));
+    expect(await countNotified(ctx.eqId, ctx.clinicId)).toBe(0);
+  });
+
   it("rejects duplicate active waitlist row for same user", async () => {
     await checkoutAs(ctx.userA);
     const first = await api(`/api/equipment/${ctx.eqId}/waitlist`, "POST", undefined, ctx.userB);

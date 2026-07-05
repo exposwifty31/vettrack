@@ -9,6 +9,7 @@ import {
 } from "../db.js";
 import type { AuditDbExecutor } from "../lib/audit.js";
 import { insertRealtimeDomainEvent } from "../lib/realtime-outbox.js";
+import { isEquipmentFullyDeployable } from "./equipment-operational-state.service.js";
 import { isPostgresUniqueViolation } from "../lib/pg-result.js";
 import { EQUIPMENT_WAITLIST_RESERVATION_TTL_MINUTES } from "../../shared/equipment-waitlist.js";
 import type { EquipmentWaitlistSnapshot } from "../../shared/equipment-waitlist.js";
@@ -401,6 +402,15 @@ export async function promoteEquipmentWaitlistIfEligible(
 ): Promise<EquipmentWaitlistRow | null> {
   const eqRow = await loadEquipment(clinicId, equipmentId);
   if (!eqRow || !isWaitlistPromotionEligible(eqRow)) return null;
+  // Asset-typed units are only checkout-able when fully deployable (docked +
+  // ready + available); promoting earlier hands out a reservation the holder
+  // cannot redeem while its TTL burns down.
+  if (
+    eqRow.assetTypeId &&
+    !isEquipmentFullyDeployable(eqRow.custodyState, eqRow.readinessState, eqRow.usageState)
+  ) {
+    return null;
+  }
 
   const now = new Date();
   let promoted: EquipmentWaitlistRow | null = null;

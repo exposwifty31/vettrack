@@ -503,7 +503,13 @@ export async function performEquipmentReturn(
       type: "EQUIPMENT_CUSTODY_STATE_CHANGED",
       payload: { equipmentId, custodyState: "returned", hasActiveClaims },
     });
-    waitlistPromotedOnReturn = await promoteNextWaitlistInTx(tx, clinicId, equipmentId, returnTime);
+    // Asset-typed units cannot pass the checkout bundle gate until dock-return
+    // re-verification (custody "returned" ≠ "docked"), so promoting here would
+    // start a reservation TTL the holder cannot redeem. The dock-return path
+    // promotes once the unit is fully deployable.
+    if (!existing.assetTypeId) {
+      waitlistPromotedOnReturn = await promoteNextWaitlistInTx(tx, clinicId, equipmentId, returnTime);
+    }
   }
 
   return {

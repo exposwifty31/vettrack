@@ -1277,3 +1277,17 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Command: `pnpm typecheck` → clean. `pnpm test` → 3930 passed. `pnpm i18n:check` → parity ✓.
 
 **Verdict:** VERIFIED
+
+## 2026-07-05 — F4/P2: waitlist promotion deferred until asset-typed units are deployable (committed with this entry)
+
+**Claim:** Reservations are no longer hollow for asset-typed gear: return of an asset-typed unit no longer promotes the head waiter (the checkout bundle gate cannot pass while custody is "returned"); promotion fires from the existing dock-return path once the unit is fully deployable, and the TTL-expiry sweep applies the same deployability check.
+
+**Evidence:**
+- Root cause re-verified: `computeBundleReadinessGate` hard-requires `custodyState === "docked"` (server/services/equipment-operational-state.service.ts:43), so a just-returned asset-typed unit can NEVER be checked out by the promoted user — the reservation TTL burned down un-redeemably. Chosen remedy is the audit's option (b): promote only when deployable (matches the dock-return path's existing `isEquipmentFullyDeployable` guard at server/routes/equipment-operational-state.ts:372-376).
+- `server/services/equipment-custody-toggle.service.ts` — `performEquipmentReturn` now calls `promoteNextWaitlistInTx` only when `existing.assetTypeId` is null; non-asset units keep promote-on-return byte-identical.
+- `server/services/equipment-waitlist.service.ts` — `promoteEquipmentWaitlistIfEligible` (dock_return + ttl_expiry triggers) additionally requires `isEquipmentFullyDeployable(...)` for asset-typed units, so the sweep cannot re-issue a hollow reservation either.
+- TDD RED first: new integration case "asset-typed return defers promotion…" failed with `expected 1 to be +0` (return promoted immediately) and the sweep case failed the same way (next waiter promoted onto an unverified unit).
+- Test: `DATABASE_URL=… vitest run --config vitest.integration.ops.config.ts tests/equipment-waitlist.integration.test.ts` → **10 passed**, including unchanged pre-existing behavior: "return → promotes head waiter" (non-asset), "TTL expiry → expires and promotes next" (non-asset), "dock-return → promotes head waiter when unit becomes deployable". New case proves the reservation is redeemable: dock-return with verified condition → promotion → reserved user `/checkout` → 200.
+- Command: `pnpm typecheck` → clean. `pnpm architecture:cycles` → 0 cycles, matches baseline (new import `equipment-waitlist.service` → `equipment-operational-state.service` is acyclic). `pnpm test` → full default suite green.
+
+**Verdict:** VERIFIED
