@@ -384,6 +384,28 @@ describe.skipIf(!dbReachable)("equipment waitlist integration", () => {
     expect(rows[0]?.status).toBe("fulfilled");
   });
 
+  it("quick-scan by non-reserved user is denied while reservation held (F1 regression)", async () => {
+    await checkoutAs(ctx.userA);
+    await api(`/api/equipment/${ctx.eqId}/waitlist`, "POST", undefined, ctx.userB);
+    await returnAs(ctx.userA);
+    expect(await countNotified(ctx.eqId, ctx.clinicId)).toBe(1);
+
+    const stolen = await api(`/api/equipment/scan`, "POST", { equipmentId: ctx.eqId }, ctx.userC);
+    expect(stolen.status).toBe(409);
+    expect(stolen.json.code).toBe("equipmentWaitlist.WAITLIST_RESERVATION_HELD_BY_OTHER");
+    expect(await equipmentCustody(ctx.eqId)).toBe("returned");
+
+    const redeemed = await api(`/api/equipment/scan`, "POST", { equipmentId: ctx.eqId }, ctx.userB);
+    expect(redeemed.status).toBe(200);
+    expect(redeemed.json.action).toBe("checkout");
+
+    const { rows } = await probePool!.query<{ status: string }>(
+      `SELECT status FROM vt_equipment_waitlist WHERE clinic_id = $1 AND equipment_id = $2 AND user_id = $3`,
+      [ctx.clinicId, ctx.eqId, ctx.userB],
+    );
+    expect(rows[0]?.status).toBe("fulfilled");
+  });
+
   it("dock-return → promotes head waiter when unit becomes deployable", async () => {
     const dockId = randomUUID();
     const assetTypeId = randomUUID();

@@ -1233,3 +1233,19 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - Architecture intro updated to post-scope-change reality (README scope note: medication/billing/ER removed in migrations 142–143; legacy routes are redirects).
 
 **Verdict:** CLAUDE.md now matches the repo at commit time. Not re-verified here: worker table, telemetry enums, rate-limit numbers (unchanged text, not re-audited).
+
+## 2026-07-05 — F1/P0: quick-scan now enforces waitlist + precondition gates (committed with this entry)
+
+**Claim:** `quickScanEquipmentCustody()` now calls `evaluateCheckoutV1Preconditions()` + `assertWaitlistCheckoutAllowed()` before checkout (mirroring `toggleEquipmentCustody()`), and `POST /api/equipment/scan` maps `CheckoutPreconditionError` / `EquipmentWaitlistError` to their documented 4xx codes instead of 500.
+
+**Evidence:**
+- RED first (TDD): before the fix, `tests/equipment-quick-scan-gates.test.ts` failed with `expected Error: TX_SENTINEL to be an instance of EquipmentWaitlistError` — proving all three denial scenarios (reserved-by-other, untracked, staged-conflict) reached `db.transaction` ungated. Integration RED: quick-scan by non-reserved userC returned `200` (expected 409) in `tests/equipment-waitlist.integration.test.ts`, reproducing the audit's runtime evidence.
+- `server/services/equipment-custody-toggle.service.ts:832-833` — checkout branch of `quickScanEquipmentCustody` now runs `evaluateCheckoutV1Preconditions(...)` then `assertWaitlistCheckoutAllowed(...)`, and threads `preCheck.v1StageClaimId`/`v1NewUsageState` into `performEquipmentCheckout` + `finalizeCheckoutSideEffects` (same order/args as toggle at lines 726-751).
+- `server/routes/equipment.ts` — `/scan` catch now handles `CheckoutPreconditionError` (STAGING_CONFLICT→409, BUNDLE_INCOMPLETE→422, else `err.httpStatus`) and `EquipmentWaitlistError` (WAITLIST_RESERVATION_HELD_BY_OTHER→409 via `apiErrorI18n`), mirroring `/toggle`.
+- Test: `pnpm test -- tests/equipment-quick-scan-gates.test.ts tests/equipment-scan-lifecycle.test.ts` → 2 files, 39 tests passed.
+- Test: `DATABASE_URL=postgres://…/vettrack pnpm exec vitest run --config vitest.integration.ops.config.ts tests/equipment-waitlist.integration.test.ts` → 8 passed (includes new "quick-scan by non-reserved user is denied while reservation held (F1 regression)": userC scan → 409 `equipmentWaitlist.WAITLIST_RESERVATION_HELD_BY_OTHER`, custody stays `returned`, reserved userB scan → 200 checkout, row `fulfilled`).
+- Command: `pnpm typecheck` → clean (both tsconfigs). `pnpm test` → 400 files / 3914 tests passed.
+- Pre-existing noise ruled out: `tests/equipment-operational-state.integration.test.ts` fails 10-11 sweep/metrics tests IDENTICALLY with my changes stashed (`git stash` → 11 failed → `git stash pop`) — environment-dependent, unrelated to this fix.
+- Note: `vitest.integration.ops` suite silently self-skips unless `DATABASE_URL` is exported in the shell — `tests/vitest-setup.ts:3-5` injects a dummy `vettrack_test` URL before the test file's `dotenv/config` runs, so the reachability probe fails and `describe.skipIf` skips all 57 tests.
+
+**Verdict:** VERIFIED

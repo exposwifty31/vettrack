@@ -336,6 +336,30 @@ router.post("/scan", requireAuth, checkoutLimiter, requireEffectiveRole("student
       undoToken: result.undoToken,
     });
   } catch (err) {
+    if (err instanceof CheckoutPreconditionError) {
+      if (err.code === "STAGING_CONFLICT") {
+        return res.status(409).json({
+          code: err.code,
+          error: "You are not the top priority claim holder",
+          queue: err.extra?.queue,
+        });
+      }
+      if (err.code === "BUNDLE_INCOMPLETE") {
+        return res.status(422).json({ code: err.code, ...err.extra });
+      }
+      return res.status(err.httpStatus).json({
+        code: err.code,
+        error:
+          typeof err.extra?.error === "string"
+            ? err.extra.error
+            : err.message,
+        ...err.extra,
+      });
+    }
+    if (err instanceof EquipmentWaitlistError) {
+      const status = err.code === "WAITLIST_RESERVATION_HELD_BY_OTHER" ? 409 : 422;
+      return apiErrorI18n(req, res, `equipmentWaitlist.${err.code}`, undefined, status);
+    }
     if (err instanceof CheckoutConflictError) {
       return res.status(409).json({
         ...apiError({

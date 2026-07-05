@@ -829,14 +829,17 @@ export async function quickScanEquipmentCustody(
     };
   }
 
+  const preCheck = await evaluateCheckoutV1Preconditions(clinicId, equipmentId, actor.id, snap);
+  await assertWaitlistCheckoutAllowed(clinicId, equipmentId, actor.id);
+
   let txResult: EquipmentCheckoutTxResult | null = null;
   await db.transaction(async (tx) => {
     txResult = await performEquipmentCheckout(tx, {
       clinicId,
       equipmentId,
       actor,
-      v1StageClaimId: null,
-      v1NewUsageState: "in_use",
+      v1StageClaimId: preCheck.v1StageClaimId,
+      v1NewUsageState: preCheck.v1NewUsageState,
     });
   });
 
@@ -849,7 +852,7 @@ export async function quickScanEquipmentCustody(
     actorRole,
     equipment: (txResult as EquipmentCheckoutTxResult).updated,
     reminderBaseTime: (txResult as EquipmentCheckoutTxResult).reminderBaseTime,
-    v1StageClaimId: null,
+    v1StageClaimId: preCheck.v1StageClaimId,
     auditMetadata: { via: "quick_scan" },
   });
 
