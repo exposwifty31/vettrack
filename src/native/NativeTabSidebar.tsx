@@ -161,7 +161,7 @@ export function NativeTabSidebar() {
         </div>
       ))}
     </nav>
-    <ReportIssueDialog open={reportBugOpen} onOpenChange={setReportBugOpen} />
+    {reportBugOpen && <ReportIssueDialog open onOpenChange={setReportBugOpen} />}
     </>
   );
 }

@@ -161,7 +161,7 @@ export function MoreSheet({ open, onClose }: Props) {
       </div>
         </>
       )}
-      <ReportIssueDialog open={reportBugOpen} onOpenChange={setReportBugOpen} />
+      {reportBugOpen && <ReportIssueDialog open onOpenChange={setReportBugOpen} />}
     </>
   );
 }
