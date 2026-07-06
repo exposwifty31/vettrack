@@ -3,6 +3,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { getBundledAppVersion, resolveDisplayAppVersion } from "@/lib/app-version";
 import { ShiftSummarySheet } from "@/components/shift-summary-sheet";
 import { DeleteAccountDialog } from "@/components/delete-account-dialog";
+import { DevRoleSwitcher } from "@/features/settings/DevRoleSwitcher";
 import { SettingsSectionHeader, SettingsToggle, SettingsSelect } from "@/components/settings-controls";
 import { useSettings } from "@/hooks/use-settings";
 import { useAuth } from "@/hooks/use-auth";
@@ -659,6 +660,8 @@ export default function SettingsPage() {
         </section>
 
         {/* About */}
+        <DevRoleSwitcher />
+
         <section className="space-y-2">
           <SettingsSectionHeader label={t.settingsPage.about} />
           <div className="rounded-xl bg-card border border-border/60 px-4 py-4 space-y-1">
