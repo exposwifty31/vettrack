@@ -18,13 +18,20 @@ import { t } from "@/lib/i18n";
  */
 export type NativeNavItem = {
   id: string;
-  href: string;
+  /** Route to navigate to. Omitted for action rows (see `action`). */
+  href?: string;
   label: string;
   Icon: LucideIcon;
   /** Destructive styling (e.g. End shift). */
   destructive?: boolean;
   /** Already reachable from the phone bottom tab bar — hidden in the phone drawer. */
   inPhoneTabBar?: boolean;
+  /**
+   * Row triggers an in-app action instead of navigating. `"report-issue"` opens
+   * the bug-report dialog (POSTs a support ticket) — it must NOT link to the
+   * static /support info page. Renderers handle this before falling back to href.
+   */
+  action?: "report-issue";
 };
 
 export type NativeNavSection = {
@@ -69,9 +76,10 @@ export function getNativeNavSections(opts?: { hasActiveShift?: boolean }): Nativ
       items: [
         { id: "profile",  href: "/my-profile", label: t.more.profile,  Icon: User },
         { id: "settings", href: "/settings",   label: t.more.settings, Icon: Settings },
-        // Dropped by accident in the Stage 1–5 nav-model restage (the MoreSheet
-        // row pre-dated the model); restored 2026-07-05 (device finding).
-        { id: "report-bug", href: "/support", label: t.nav.reportBug, Icon: Bug },
+        // Opens the bug-report dialog (creates a support ticket). NOT the static
+        // /support info page — that's the App Store support URL, linked from
+        // Settings + the legal footer. (Device finding on build 25, 2026-07-07.)
+        { id: "report-bug", action: "report-issue", label: t.nav.reportBug, Icon: Bug },
       ],
     },
     {

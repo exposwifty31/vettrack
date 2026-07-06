@@ -41,6 +41,28 @@ describe("M9 — end-shift row gated on active shift", () => {
   });
 });
 
+describe("Report a Bug opens the bug-report dialog, not the /support info page", () => {
+  const reportBugRow = getNativeNavSections()
+    .flatMap((s) => s.items)
+    .find((i) => i.id === "report-bug");
+
+  it("the nav row is an action row, not a link to the static support page", () => {
+    expect(reportBugRow).toBeDefined();
+    // Build 25 regression: this row pointed at /support (App Store info page),
+    // so tapping "Report a Bug" showed read-only text instead of a form.
+    expect(reportBugRow?.action).toBe("report-issue");
+    expect(reportBugRow?.href).toBeUndefined();
+  });
+
+  it("both native consumers mount ReportIssueDialog and route the action to it", () => {
+    for (const file of ["src/features/settings/MoreSheet.tsx", "src/native/NativeTabSidebar.tsx"]) {
+      const source = read(file);
+      expect(source).toContain("ReportIssueDialog");
+      expect(source).toContain('item.action === "report-issue"');
+    }
+  });
+});
+
 describe("M5 — scan subtitle follows shift state", () => {
   it("ScanScreen swaps the prompt when scanning is blocked", () => {
     const source = read("src/features/scan/ScanScreen.tsx");

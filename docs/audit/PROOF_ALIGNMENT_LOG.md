@@ -1416,3 +1416,32 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - **NOT verified (flagged pending):** the III.6 live flow walk across all four platforms — no booted simulator / running app in this session, so FLOW_INVENTORY.md rows are stamped `⏳ pending`, none falsely marked `pass`. The native-sim gate (`cap:build:native` + `cap:install:ios-sim`) and Playwright suites (`test:playwright:*`) are likewise environment-gated and not run here.
 
 **Verdict:** VERIFIED (baseline + post-change gate green, code + inertness test, fence clean); PARTIAL (live 4-platform flow walk + native-sim/Playwright gates pending a running app/simulator — the FLOW_INVENTORY live-walk protocol is the next action).
+
+## 2026-07-07 — "Report a Bug" opens the bug-report dialog instead of the /support info page (uncommitted)
+
+**Claim:** On the native shell (build 25 finding), the "Report a Bug" nav row navigated to `/support` — a static `LegalDocumentShell` info page — instead of an actual bug-report form. Repointed the row to open the existing `ReportIssueDialog` (which POSTs `/api/support` to create a support ticket), matching the desktop web behavior. `/support` stays as the public App-Store support page (Settings + legal footer links unchanged).
+
+**Evidence:**
+- `src/pages/support.tsx:16-34` — Read: `SupportPage` renders `LegalDocumentShell` with read-only `SUPPORT_SECTION_KEYS` sections and `backHref="/signin"`; it is a marketing/info doc, no form (confirms the reported symptom).
+- `src/app/platform/index.ts:9` — `/support` is a `MARKETING_PATHS` entry (unauth marketing target), not an in-app form.
+- `src/components/report-issue-dialog.tsx:41` — the real reporter already exists: `api.support.create({...})` → `server/routes/support.ts:45` `POST /` (requireAuth) inserts into `supportTickets`. Desktop `src/components/layout.tsx:1361,1579` already opens this dialog; native did not.
+- `src/lib/routes/native-nav-model.ts` — row changed from `{ id:"report-bug", href:"/support", ... }` to `{ id:"report-bug", action:"report-issue", ... }`; `href` made optional + `action?: "report-issue"` added to `NativeNavItem`.
+- `src/features/settings/MoreSheet.tsx` + `src/native/NativeTabSidebar.tsx` — both native renderers now mount `ReportIssueDialog` and route `item.action === "report-issue"` to `setReportBugOpen(true)`; MoreSheet keeps the dialog mounted across sheet close (`if (!open && !reportBugOpen) return null`).
+- Command: `npx tsc --noEmit` → exit 0 (frontend); `npx tsc -p tsconfig.server.json --noEmit` → exit 0 (server).
+- Test: `pnpm test -- tests/phase-6-consistency-polish.test.ts` → `Test Files 1 passed`, `Tests 13 passed` (2 new: report-bug row is an action with no href; both consumers mount `ReportIssueDialog` and match `item.action === "report-issue"`).
+
+**Not verified this session:** live device/browser drive of the dialog submitting a ticket — no dev server/Postgres running, and the native shell only renders under Capacitor-native / touch-coarse targets. Behavior proven at model + type + source-contract level; `ReportIssueDialog`/`/api/support` are pre-existing and already exercised by the desktop path.
+
+**Verdict:** VERIFIED (static + unit); PARTIAL (no live end-to-end drive)
+
+### 2026-07-07 (follow-up) — CI failure fixed + behavioral render test added (PR #45)
+
+**Context:** PR #45's first full-suite CI run (the handoff had only run one selected test locally) surfaced two failures the static grep test could not: (1) `ReportIssueDialog` was mounted unconditionally in `MoreSheet`/`NativeTabSidebar`, so its `useMutation`/`useAuth` ran even while closed → crashed `mobile-shell.test.tsx` (no `QueryClientProvider`); (2) `native-header-controls.test.ts` still asserted the old `/support` href. This is the exact "green selected tests ≠ green suite / green CI ≠ working runtime" gap named in the external-review reconciliation (III.6).
+
+**Fix + evidence:**
+- `src/features/settings/MoreSheet.tsx:164`, `src/native/NativeTabSidebar.tsx:164` — dialog mount gated on open state: `{reportBugOpen && <ReportIssueDialog open onOpenChange={setReportBugOpen} />}`. A closed dialog now runs zero data hooks.
+- `tests/native-header-controls.test.ts:63-64` — updated to the new contract (`item?.action === "report-issue"`, `item?.href` undefined).
+- **New behavioral test** (CodeRabbit ASSERTIVE review, 1 actionable comment): `tests/report-bug-native-action.test.tsx` — mounts `NativeTabSidebar` and `MoreSheet` under real `QueryClientProvider` + wouter `Router` with real i18n, clicks the report-issue row, and asserts `ReportIssueDialog` opens (`findByText(t.reportIssueDialog.title)`). `pnpm test -- tests/report-bug-native-action.test.tsx` → **2 passed**. This is the render-and-click coverage a source grep can't provide; it fails if the action→dialog wiring breaks.
+- Commands: `npx tsc --noEmit` → exit 0; `pnpm test -- tests/phase-6-consistency-polish.test.ts` → 13 passed; full suite on CI (commit `8419beea1`) → all required checks green (Tests & typecheck, both Playwright shards, Architecture gates, Integration ops, Merge gate).
+
+**Verdict:** VERIFIED (full suite green + behavioral render test now covers the runtime path). Live on-device drive of an actual ticket submission still pending (unchanged from prior entry).

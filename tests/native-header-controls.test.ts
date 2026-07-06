@@ -54,13 +54,14 @@ describe("phone search overlay — escapes the blurred header's stacking context
 });
 
 describe("Report a Bug — present in the nav model (regression: lost in nav restage)", () => {
-  it("account section carries a non-admin report-bug item routed to /support", () => {
+  it("account section carries a non-admin report-bug item that opens the report dialog", () => {
     const sections = getNativeNavSections();
     const account = sections.find((s) => s.id === "account");
     expect(account).toBeDefined();
     expect(account?.adminOnly).toBeFalsy();
     const item = account?.items.find((i) => i.id === "report-bug");
-    expect(item?.href).toBe("/support");
+    expect(item?.action).toBe("report-issue");
+    expect(item?.href).toBeUndefined();
     // Not a phone tab-bar item — must stay visible in the MoreSheet drawer.
     expect(item?.inPhoneTabBar).toBeFalsy();
   });
