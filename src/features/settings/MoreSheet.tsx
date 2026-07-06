@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { SettingRow } from "./SettingRow";
 import { t } from "@/lib/i18n";
@@ -6,7 +6,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useIsTabletViewport } from "@/lib/use-tablet-viewport";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useActiveShift } from "@/hooks/use-active-shift";
-import { getNativeNavSections } from "@/lib/routes/native-nav-model";
+import { getNativeNavSections, type NativeNavItem } from "@/lib/routes/native-nav-model";
+import { ReportIssueDialog } from "@/components/report-issue-dialog";
 
 type Props = {
   open: boolean;
@@ -43,6 +44,7 @@ export function MoreSheet({ open, onClose }: Props) {
   const startYRef = useRef<number | null>(null);
   const isTablet = useIsTabletViewport();
   const { hasActiveShift, isLoading: shiftLoading } = useActiveShift();
+  const [reportBugOpen, setReportBugOpen] = useState(false);
 
   useFocusTrap({ active: open, containerRef: dialogRef, onEscape: onClose });
 
@@ -61,7 +63,18 @@ export function MoreSheet({ open, onClose }: Props) {
 
   function go(href: string) { navigate(href); onClose(); }
 
-  if (!open) return null;
+  function handleSelect(item: NativeNavItem) {
+    if (item.action === "report-issue") {
+      onClose();
+      setReportBugOpen(true);
+      return;
+    }
+    if (item.href) go(item.href);
+  }
+
+  // Render even when the sheet is closed so the report-bug dialog — opened from a
+  // row that also closes the sheet — stays mounted while it is visible.
+  if (!open && !reportBugOpen) return null;
 
   // Phone drawer: the bottom tab bar already carries `inPhoneTabBar` items
   // (Today / Equipment / Scan / Emergency), so hide them here to avoid duplicates.
@@ -75,6 +88,8 @@ export function MoreSheet({ open, onClose }: Props) {
 
   return (
     <>
+      {open && (
+        <>
       <div
         aria-hidden
         onClick={handleBackdropClick}
@@ -137,13 +152,16 @@ export function MoreSheet({ open, onClose }: Props) {
                   icon={<Icon size={20} />}
                   label={item.label}
                   destructive={item.destructive}
-                  onClick={() => go(item.href)}
+                  onClick={() => handleSelect(item)}
                 />
               );
             })}
           </div>
         ))}
       </div>
+        </>
+      )}
+      <ReportIssueDialog open={reportBugOpen} onOpenChange={setReportBugOpen} />
     </>
   );
 }
