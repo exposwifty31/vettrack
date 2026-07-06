@@ -1387,3 +1387,17 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - NOT verified: on-device behavior of "system" after the resume re-query — if the user's light phone still renders dark under "system" on the new build with the app foregrounded during an OS appearance flip, escalate to a native trait plugin (UITraitCollection → JS), since the web-side signal would be proven unreliable on this device.
 
 **Verdict:** VERIFIED (code + contracts); PARTIAL (device verification awaits next build)
+
+## 2026-07-06 — CLAUDE.md refresh: document platform-routing seam + grown src/ hexagonal layout (`/init`)
+
+**Claim:** `CLAUDE.md` was refreshed (doc-only, +23/−1) to close two gaps found by verifying the doc against the live code: (1) the `src/app/platform/` platform-routing seam (`PlatformTarget` resolution order, `PlatformRouter`, `WebOnlyGuard`) was undocumented; (2) the `src/` tree omitted the newer hexagonal layer (`core/`, `infrastructure/`, `native/`, `desktop/`, `shell/`, `types/`, `app/platform/`). Also added a one-line pointer to the `docs/design/program-plan.md` forward-looking program. Existing command block and every architecture subsection were left unchanged (command block re-verified accurate against `package.json`).
+
+**Evidence:**
+- Seam facts read from source, not inferred: `src/app/platform/index.ts` (`PlatformTarget` union + `resolvePlatformTarget()`:36 / `usePlatformTarget()`:51, native→marketing→touch-narrow→desktop order; marketing paths `/signin /signup /privacy /terms /support`; touch-narrow `(max-width: 767px) and (pointer: coarse)`), `PlatformRouter.tsx` (mobile→NativeShell else passthrough), `guards/WebOnlyGuard.tsx` (native Redirect + <1024px guard screen).
+- `WebOnlyGuard` fenced set re-grepped in `src/app/routes.tsx` rather than copied from the plan's II.1 subset — actual set is broader: `/equipment/board`, `/equipment/:id/qr`, `/print`, `/code-blue/display`, `/emergency-equipment-wall`, `/audit-log`, `/procurement`, `/analytics{,/shift-leaderboard}`, `/dashboard`. Doc describes it by format-category to stay accurate.
+- Hexagonal layer confirmed by listing dirs + barrels: `src/core/{entities,ports,use-cases}` (use-cases has `offline-emergency-block.ts`), `src/infrastructure/{api,auth,db,platform}` (`infrastructure/index.ts` re-exports `equipmentCache/syncQueue` + `haptics/nfc/deepLink`), `src/shell/index.ts` self-labels "legacy compat". Migration-in-progress caveat sourced from those barrel comments + branch names.
+- Command: every path named in the new text resolves — `ls -d src/{app/platform,core,infrastructure,native,desktop,shell,types}` + `WebOnlyGuard.tsx` + `offline-emergency-block.ts` + `docs/design/{program-plan,plan-validation-register,platform-strategy-research}.md` all present.
+- Command: `git diff --stat CLAUDE.md` → 1 file changed, +23/−1 (no code touched).
+- Command: `pnpm typecheck` (both tsconfigs) → exit 0, clean — sanity that the doc-only change perturbed nothing.
+
+**Verdict:** VERIFIED (doc matches code; all referenced paths resolve; typecheck green)

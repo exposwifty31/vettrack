@@ -79,16 +79,25 @@ VetTrack is a veterinary hospital operations platform: equipment tracking & cust
 
 **Stack:** React 18 + Vite frontend (port 5000) · Express + TypeScript backend (port 3001) · PostgreSQL + Drizzle ORM · BullMQ + Redis · Clerk auth · PWA / offline-first · Capacitor 8 native shell (iOS/Android)
 
+**Active program (intent, not yet built):** `docs/design/program-plan.md` is the forward-looking program — per-role UX, the web app as a management console, and the Command Center board as a fourth `"board"` platform target — with `docs/design/{plan-validation-register,platform-strategy-research}.md` as its cited research base. Treat it as direction, not current state.
+
 ### Directory layout
 
 ```
 src/              React frontend
   app/            Router (src/app/routes.tsx — all pages lazy-loaded via wouter)
+  app/platform/   PlatformTarget seam + PlatformRouter + guards/ (WebOnlyGuard) — see "Platform routing seam"
   pages/          Route-level page components
   components/     Shared UI components (shadcn primitives in components/ui/)
   features/       Feature-scoped modules (alerts, auth, containers, equipment, inventory, profile, rooms, scan, settings, shift-adjustments, shift-chat, today)
+  core/           Client hexagonal domain: entities/, ports/, use-cases/ (e.g. offline-emergency-block.ts) — pure TS, no framework imports
+  infrastructure/ Adapters implementing core ports: api/, auth/, db/ (Dexie equipmentCache/syncQueue), platform/ (haptics/nfc/deepLink)
+  native/         Capacitor shell composition: NativeShell, NativeTabBar, NativeTabSidebar, tablet/
+  desktop/        WebShell (desktop web chrome)
+  shell/          Legacy barrel re-exporting native/desktop shells — prefer direct imports
   hooks/          Auth, push, settings, offline sync hooks
-  lib/            api.ts, offline-db.ts (Dexie), sync-engine.ts, i18n.ts
+  lib/            api.ts, offline-db.ts (Dexie), sync-engine.ts, i18n.ts (some concerns migrating into core/ + infrastructure/)
+  types/          API-response + domain TypeScript types (per "API client pattern")
 server/
   index.ts        Express entry — imports env-bootstrap FIRST, then registers routes
   db.ts           Drizzle pool + re-exports from schema/
@@ -115,6 +124,19 @@ scripts/          Dev/ops scripts (includes scripts/i18n/check-parity.ts and scr
 public/sw.js      Service worker (build-tag versioned cache, emergency endpoint denylist)
 ios/ android/     Capacitor native shells (capacitor.config.ts at root) — build only via scripts/build-native-shell.sh
 ```
+
+### Platform routing seam
+
+`src/app/platform/` decides which shell renders. `PlatformTarget = "mobile" | "desktop" | "marketing"`; `resolvePlatformTarget()` (sync, safe at module-init) and `usePlatformTarget()` (reactive — re-evaluates on wouter navigation + `matchMedia` change) resolve in this order:
+
+1. **Capacitor-native** → `mobile`
+2. **marketing path** (`/signin`, `/signup`, `/privacy`, `/terms`, `/support`) → `marketing`
+3. **touch-narrow** (`(max-width: 767px) and (pointer: coarse)` — installed PWA / mobile Safari) → `mobile`
+4. else → `desktop`
+
+- **`PlatformRouter`** (`src/app/platform/PlatformRouter.tsx`) wraps AppRoutes: `mobile → NativeShell` (owns safe-area, scroll, tab bar, MoreSheet); `desktop`/`marketing` → passthrough (each page's own `AppShell` owns web chrome).
+- **`WebOnlyGuard`** (`src/app/platform/guards/WebOnlyGuard.tsx`, mount **inside** `AuthGuard`) gates desktop-dense / large-format surfaces — Command board, analytics, procurement, audit-log, QR/print pages, and the Code Blue wall displays. Capacitor-native → `Redirect` to `fallback`; browser below the 1024px desktop breakpoint → dark guard screen routing to the mobile view instead of an overflowing desktop layout. Re-grep `WebOnlyGuard` in `src/app/routes.tsx` for the exact current set before relying on it.
+- The client shell layers live in `src/native/` (Capacitor), `src/desktop/` (`WebShell`), with `src/shell/` a legacy barrel. `src/core/` + `src/infrastructure/` are an **in-progress hexagonal migration** (branches `feat/P2-S1-infrastructure-adapters`, `feat/native-migration-phases-1-3`) — some concerns still live in `src/lib/*`; prefer the newer paths for new code, but don't assume the migration is complete.
 
 ### Multi-tenancy (critical rule)
 
