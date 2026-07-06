@@ -1433,3 +1433,15 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Not verified this session:** live device/browser drive of the dialog submitting a ticket — no dev server/Postgres running, and the native shell only renders under Capacitor-native / touch-coarse targets. Behavior proven at model + type + source-contract level; `ReportIssueDialog`/`/api/support` are pre-existing and already exercised by the desktop path.
 
 **Verdict:** VERIFIED (static + unit); PARTIAL (no live end-to-end drive)
+
+### 2026-07-07 (follow-up) — CI failure fixed + behavioral render test added (PR #45)
+
+**Context:** PR #45's first full-suite CI run (the handoff had only run one selected test locally) surfaced two failures the static grep test could not: (1) `ReportIssueDialog` was mounted unconditionally in `MoreSheet`/`NativeTabSidebar`, so its `useMutation`/`useAuth` ran even while closed → crashed `mobile-shell.test.tsx` (no `QueryClientProvider`); (2) `native-header-controls.test.ts` still asserted the old `/support` href. This is the exact "green selected tests ≠ green suite / green CI ≠ working runtime" gap named in the external-review reconciliation (III.6).
+
+**Fix + evidence:**
+- `src/features/settings/MoreSheet.tsx:164`, `src/native/NativeTabSidebar.tsx:164` — dialog mount gated on open state: `{reportBugOpen && <ReportIssueDialog open onOpenChange={setReportBugOpen} />}`. A closed dialog now runs zero data hooks.
+- `tests/native-header-controls.test.ts:63-64` — updated to the new contract (`item?.action === "report-issue"`, `item?.href` undefined).
+- **New behavioral test** (CodeRabbit ASSERTIVE review, 1 actionable comment): `tests/report-bug-native-action.test.tsx` — mounts `NativeTabSidebar` and `MoreSheet` under real `QueryClientProvider` + wouter `Router` with real i18n, clicks the report-issue row, and asserts `ReportIssueDialog` opens (`findByText(t.reportIssueDialog.title)`). `pnpm test -- tests/report-bug-native-action.test.tsx` → **2 passed**. This is the render-and-click coverage a source grep can't provide; it fails if the action→dialog wiring breaks.
+- Commands: `npx tsc --noEmit` → exit 0; `pnpm test -- tests/phase-6-consistency-polish.test.ts` → 13 passed; full suite on CI (commit `8419beea1`) → all required checks green (Tests & typecheck, both Playwright shards, Architecture gates, Integration ops, Merge gate).
+
+**Verdict:** VERIFIED (full suite green + behavioral render test now covers the runtime path). Live on-device drive of an actual ticket submission still pending (unchanged from prior entry).
