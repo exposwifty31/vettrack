@@ -91,7 +91,7 @@ export function FoldersSection() {
             data-testid="btn-create-folder"
           >
             <Plus className="w-4 h-4 me-1" />
-            New
+            {t.adminPage.folderNew}
           </Button>
         </div>
       </CardHeader>
@@ -117,6 +117,7 @@ export function FoldersSection() {
                   <Button
                     variant="ghost"
                     size="icon-sm"
+                    aria-label={`${t.adminPage.editFolder} — ${f.name}`}
                     onClick={() => {
                       setEditFolder(f);
                       setFolderName(f.name);
@@ -128,6 +129,7 @@ export function FoldersSection() {
                   <Button
                     variant="ghost"
                     size="icon-sm"
+                    aria-label={`${t.common.delete} — ${f.name}`}
                     className="text-destructive hover:text-destructive h-11 w-11"
                     data-testid={`btn-delete-folder-${f.id}`}
                     onClick={async () => {
@@ -180,7 +182,7 @@ export function FoldersSection() {
             <Label htmlFor="folderName">{t.adminPage.folderName}</Label>
             <Input
               id="folderName"
-              placeholder="e.g. Surgery Room 1"
+              placeholder={t.adminPage.folderNamePlaceholder}
               value={folderName}
               onChange={(e) => setFolderName(e.target.value)}
               onKeyDown={(e) => {

@@ -150,7 +150,12 @@ export function UsersSection() {
       setPendingSecondaryRoleUserId(null);
       toast.success(t.adminPage.secondaryRoleUpdated);
     },
-    onError: () => toast.error(t.adminPage.secondaryRoleUpdateFailed),
+    onError: () => {
+      // Roll back the optimistic Select value so it falls back to the persisted role.
+      setPendingSecondaryRole(undefined);
+      setPendingSecondaryRoleUserId(null);
+      toast.error(t.adminPage.secondaryRoleUpdateFailed);
+    },
   });
 
   const updateStatusMut = useMutation({
@@ -185,7 +190,7 @@ export function UsersSection() {
       queryClient.invalidateQueries({ queryKey: ["/api/users/pending"] });
       toast.success(t.adminPage.userDeleted);
     },
-    onError: () => toast.error(t.adminPage.userRestoreFailed),
+    onError: () => toast.error(t.adminPage.userDeleteFailed),
   });
 
   const restoreUserMut = useMutation({
@@ -413,7 +418,7 @@ export function UsersSection() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Secondary: None</SelectItem>
+                      <SelectItem value="none">{t.adminPage.secondaryRoleNone}</SelectItem>
                       <SelectItem value="admin">{t.adminPage.roleAdmin}</SelectItem>
                       <SelectItem value="senior_technician">{t.adminPage.roleSeniorTechnician}</SelectItem>
                       <SelectItem value="technician">{t.adminPage.roleTechnician}</SelectItem>
