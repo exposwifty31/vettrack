@@ -118,6 +118,8 @@ pnpm test:playwright:ci            # for web-UI phases
 ```
 Proof → `docs/audit/PROOF_ALIGNMENT_LOG.md`. Gate green locally → PR opens; PR merging green closes the phase.
 
+**III.9 — Zero unresolved warnings.** *Scope: not a single warn remains unresolved.* Every gate and CI run — typecheck, lint, `architecture:gates` (dependency-cruiser / cycle baseline), `knip`, tests, build — must end with **zero live warnings**, not merely zero errors. A warning is dispositioned like an error: fixed in-fence, or (owner-signed) moved to the documented baseline with a cited reason. "Green with warnings" is not a close-out state. A phase that surfaces a pre-existing warning **in its touched surface** clears it in-fence; an out-of-fence pre-existing warning is recorded in the PR body under "Audit findings (not touched)" (III.7) and flagged for the owner (III.6 shape) — never left silent. No PR opens while its gate prints a warning it has not dispositioned.
+
 ---
 
 # Part IV — THE WORK
