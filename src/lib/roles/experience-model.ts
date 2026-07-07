@@ -144,3 +144,18 @@ export function buildRoleExperience(input: ExperienceInput): RoleExperience {
 export function can(experience: RoleExperience, capability: Capability): boolean {
   return experience.capabilities.has(capability);
 }
+
+/**
+ * Filter admin-gated nav items behind the experience object — the single home for
+ * the old `!item.adminOnly || isAdmin` gate, now expressed as the `app.adminNav`
+ * capability (byte-identical; see tests). Generic over any `{ adminOnly?: boolean }`
+ * shape so the web nav model (`NavNode`) and native sections (`NativeNavSection`)
+ * share one implementation.
+ */
+export function filterAdminNav<T extends { adminOnly?: boolean }>(
+  items: readonly T[],
+  experience: RoleExperience,
+): T[] {
+  const showAdmin = can(experience, "app.adminNav");
+  return items.filter((item) => !item.adminOnly || showAdmin);
+}

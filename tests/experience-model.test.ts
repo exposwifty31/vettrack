@@ -4,9 +4,12 @@ import {
   archetypeForRole,
   buildRoleExperience,
   can,
+  filterAdminNav,
   resolveCapabilities,
   type ExperienceInput,
 } from "@/lib/roles/experience-model";
+import { NAV } from "@/lib/routes/nav-model";
+import { getNativeNavSections } from "@/lib/routes/native-nav-model";
 
 // The full 7-role client space (src/types/platform.ts) — the two aliases
 // (lead_technician / vet_tech) are type-level only; the server never emits them,
@@ -164,5 +167,36 @@ describe("experience-model — shift overlay is capabilities-only + shift-scoped
     expect(caps.has("app.adminNav")).toBe(true);
     expect(caps.has("codeBlue.manage")).toBe(true);
     expect(caps.has("management.webWrite")).toBe(true);
+  });
+});
+
+describe("filterAdminNav — byte-identical to the pre-Phase-2 nav gate", () => {
+  const ALL_ROLES: UserRole[] = [
+    "admin",
+    "vet",
+    "technician",
+    "senior_technician",
+    "lead_technician",
+    "vet_tech",
+    "student",
+  ];
+  const expFor = (role: UserRole) =>
+    buildRoleExperience({ role, effectiveRole: role, roleSource: "permanent", isAdmin: role === "admin" });
+
+  it("web NAV visibility matches the old `!adminOnly || isAdmin` filter for every role", () => {
+    for (const role of ALL_ROLES) {
+      const before = NAV.filter((n) => !n.adminOnly || role === "admin").map((n) => n.id);
+      const after = filterAdminNav(NAV, expFor(role)).map((n) => n.id);
+      expect(after).toEqual(before);
+    }
+  });
+
+  it("native sections visibility matches the old `!adminOnly || isAdmin` filter for every role", () => {
+    const sections = getNativeNavSections({ hasActiveShift: true });
+    for (const role of ALL_ROLES) {
+      const before = sections.filter((s) => !s.adminOnly || role === "admin").map((s) => s.id);
+      const after = filterAdminNav(sections, expFor(role)).map((s) => s.id);
+      expect(after).toEqual(before);
+    }
   });
 });
