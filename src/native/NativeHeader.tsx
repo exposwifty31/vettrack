@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { Settings, Bell, Moon, Globe, User, AlertCircle, AlertTriangle, MessageCircle } from "lucide-react";
+import { Settings, Bell, Moon, Globe, User, AlertCircle, AlertTriangle, MessageCircle, Radio } from "lucide-react";
 import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -15,6 +15,7 @@ import { useIsTabletViewport } from "@/lib/use-tablet-viewport";
 import { EquipmentSearchBox } from "@/components/search/EquipmentSearchBox";
 import { EquipmentSearchButton } from "@/components/search/EquipmentSearchButton";
 import { ShiftChatLauncher } from "@/features/shift-chat/components/ShiftChatLauncher";
+import { NfcForegroundScan } from "@/components/nfc-foreground-scan";
 
 /** Routes that own their own top chrome — hide the shared header for these. */
 const FULLSCREEN_ROUTES = ["/code-blue", "/crash-cart", "/scan", "/handoff"];
@@ -158,6 +159,26 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
 
         {/* END side (left in RTL, right in LTR): icon buttons */}
         <div style={{ display: "flex", gap: 4, marginInlineStart: "auto" }}>
+          {/* NFC quick-scan toggle — now reachable from any page (was an
+              equipment-only corner FAB). Owns the single foreground NFC session. */}
+          <NfcForegroundScan
+            renderTrigger={({ enabled, starting, toggle }) => (
+              <button
+                type="button"
+                onClick={toggle}
+                disabled={starting}
+                aria-label={enabled ? t.equipmentNfc.scanReady : t.equipmentNfc.enableScan}
+                aria-pressed={enabled}
+                style={{ ...iconBtn, position: "relative", opacity: starting ? 0.6 : 1 }}
+              >
+                <Radio
+                  size={20}
+                  color={enabled ? "hsl(var(--primary))" : "hsl(var(--foreground))"}
+                  strokeWidth={1.8}
+                />
+              </button>
+            )}
+          />
           {/* Chat lives in the header on every native/mobile shell (phone + iPad) —
               the floating FAB is desktop-web only. The launcher owns the single
               useShiftChat instance on this device. */}

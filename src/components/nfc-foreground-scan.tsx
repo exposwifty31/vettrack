@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Radio } from "lucide-react";
@@ -16,9 +16,16 @@ import { getCachedEquipmentById } from "@/lib/offline-db";
 import { useNfcSupported } from "@/hooks/use-nfc-supported";
 import { startNfcScanSession } from "@/lib/nfc-platform";
 
-export function NfcForegroundScan() {
+type NfcTriggerArgs = { enabled: boolean; starting: boolean; toggle: () => void };
+
+/**
+ * Owns the foreground equipment-NFC scan session (single owner per device) and
+ * exposes its state + toggle through `renderTrigger`, so the trigger can live in
+ * the NativeHeader (native) or a floating FAB (web) — mirroring the shift-chat
+ * launcher/FAB split.
+ */
+export function NfcForegroundScan({ renderTrigger }: { renderTrigger: (args: NfcTriggerArgs) => ReactNode }) {
   const queryClient = useQueryClient();
-  const [location] = useLocation();
   const { supported: nfcSupported } = useNfcSupported();
   const [enabled, setEnabled] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -101,27 +108,40 @@ export function NfcForegroundScan() {
   };
 
   if (!nfcSupported) return null;
-  // Quick-scan is an equipment affordance — on every other page it just
-  // crowds the floating corner (chat FAB) and covers content.
-  if (!location.startsWith("/equipment") && !location.startsWith("/scan")) return null;
+  const toggle = () => {
+    if (enabled) stopScan();
+    else void startScan();
+  };
+  return <>{renderTrigger({ enabled, starting, toggle })}</>;
+}
 
+/**
+ * Floating NFC toggle for the DESKTOP / web shell (no NativeHeader there). Native
+ * shells render the toggle in NativeHeader instead — one NFC session owner per
+ * platform. Page-gated to the equipment surfaces on web where a corner FAB would
+ * otherwise crowd content.
+ */
+export function NfcForegroundScanFab() {
+  const [location] = useLocation();
+  if (!location.startsWith("/equipment") && !location.startsWith("/scan")) return null;
   return (
-    <div className="fixed bottom-nav-float-2 end-4 z-[60] md:bottom-6" data-testid="nfc-foreground-scan">
-      <Button
-        type="button"
-        size="sm"
-        variant={enabled ? "default" : "outline"}
-        className="shadow-md gap-1.5 min-h-11 min-w-11 h-11"
-        onClick={() => {
-          if (enabled) stopScan();
-          else void startScan();
-        }}
-        disabled={starting}
-        aria-pressed={enabled}
-      >
-        <Radio className="w-4 h-4" />
-        {enabled ? t.equipmentNfc.scanReady : t.equipmentNfc.enableScan}
-      </Button>
-    </div>
+    <NfcForegroundScan
+      renderTrigger={({ enabled, starting, toggle }) => (
+        <div className="fixed bottom-nav-float-2 end-4 z-[60] md:bottom-6" data-testid="nfc-foreground-scan">
+          <Button
+            type="button"
+            size="sm"
+            variant={enabled ? "default" : "outline"}
+            className="shadow-md gap-1.5 min-h-11 min-w-11 h-11"
+            onClick={toggle}
+            disabled={starting}
+            aria-pressed={enabled}
+          >
+            <Radio className="w-4 h-4" />
+            {enabled ? t.equipmentNfc.scanReady : t.equipmentNfc.enableScan}
+          </Button>
+        </div>
+      )}
+    />
   );
 }
