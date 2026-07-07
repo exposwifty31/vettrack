@@ -180,6 +180,56 @@ function formatTimeHHMM(date: Date): string {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+/**
+ * datetime-local field with a readable overlay. iOS renders a native
+ * `datetime-local` value in the OS locale (jumbled day/time/year/month order under
+ * Hebrew) and that text can't be styled. So we show our own `formatDateTimeByLocale`
+ * string in a look-alike box and lay the real (invisible) native input on top purely
+ * as the tap target / picker — the user sees a correct string, tapping opens the wheel.
+ */
+function LocalDateTimeField({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const valid = Boolean(value) && !Number.isNaN(new Date(value).getTime());
+  return (
+    <div className="relative">
+      <div
+        aria-hidden
+        dir="auto"
+        className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 text-sm"
+      >
+        {valid ? (
+          formatDateTimeByLocale(new Date(value), {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        ) : (
+          <span className="text-muted-foreground">{label}</span>
+        )}
+      </div>
+      <input
+        id={id}
+        type="datetime-local"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={label}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+      />
+    </div>
+  );
+}
+
 function statusActions(status: AppointmentStatus): AppointmentStatus[] {
   if (status === "scheduled") return ["arrived", "in_progress", "completed", "cancelled", "no_show"];
   if (status === "arrived") return ["in_progress", "completed", "cancelled", "no_show"];
@@ -1549,41 +1599,23 @@ export default function AppointmentsPage() {
       <label htmlFor={`${bookingFormId}-start`} className="text-xs text-muted-foreground block text-start">
         {t.appointmentsPage.labelScheduledTime} <span className="text-muted-foreground/70">({USER_TIMEZONE_LABEL})</span>
       </label>
-      <Input
+      <LocalDateTimeField
         id={`${bookingFormId}-start`}
-        dir="ltr"
-        className="text-left"
-        type="datetime-local"
+        label={t.appointmentsPage.labelScheduledTime}
         value={formStartLocal}
-        onChange={(e) => setFormStartLocal(e.target.value)}
+        onChange={setFormStartLocal}
       />
-      {/* Readable preview — the native datetime-local renders its value in the OS
-          locale (jumbled in Hebrew on iOS); this line shows it correctly. */}
-      {formStartLocal && !Number.isNaN(new Date(formStartLocal).getTime()) && (
-        <p dir="auto" className="mt-1 text-xs font-medium text-muted-foreground">
-          {formatDateTimeByLocale(new Date(formStartLocal), {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </p>
-      )}
     </div>
 
     <div>
       <label htmlFor={`${bookingFormId}-end`} className="text-xs text-muted-foreground block text-start">{t.appointmentsPage.labelExpectedEnd}</label>
-      <Input
+      <LocalDateTimeField
         id={`${bookingFormId}-end`}
-        dir="ltr"
-        className="text-left"
-        type="datetime-local"
+        label={t.appointmentsPage.labelExpectedEnd}
         value={formEndLocal}
-        onChange={(e) => {
+        onChange={(v) => {
           setManualEndOverride(true);
-          setFormEndLocal(e.target.value);
+          setFormEndLocal(v);
         }}
       />
     </div>
