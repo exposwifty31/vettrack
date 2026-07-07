@@ -3673,7 +3673,60 @@ export interface TStructure {
   metrics: {
     disabled: string;
   };
+  console: {
+    colAdapter: string;
+    colStatus: string;
+    colUpdated: string;
+    colType: string;
+    colOccurred: string;
+    colRetries: string;
+    valEnabled: string;
+    valDisabled: string;
+    valNever: string;
+    dash: string;
+    readOnly: string;
+    accessPendingServer: string;
+    pendingEndpoint: string;
+    retry: string;
+    state: {
+      loading: string;
+      empty: string;
+      error: string;
+    };
+    pagination: {
+      page: string;
+      next: string;
+      previous: string;
+    };
+    integrations: {
+      title: string;
+      subtitle: string;
+    };
+    webhooks: {
+      title: string;
+      subtitle: string;
+    };
+    notifications: {
+      title: string;
+      subtitle: string;
+    };
+    rfidReaders: {
+      title: string;
+      subtitle: string;
+    };
+    opsHealth: {
+      title: string;
+      subtitle: string;
+    };
+  };
   nav: {
+    integrations: string;
+    webhooks: string;
+    notifications: string;
+    rfidReaders: string;
+    opsHealth: string;
+    groupAdministration: string;
+    groupOperations: string;
     today: string;
     alertsTitle: string;
     noActiveAlerts: string;

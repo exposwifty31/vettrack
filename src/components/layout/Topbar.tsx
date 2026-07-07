@@ -7,6 +7,7 @@ import { buildAlertAckSet, countActiveAlerts, filterUnackedAlerts } from "@/lib/
 import { useAuth } from "@/hooks/use-auth";
 import { useExperience } from "@/hooks/use-experience";
 import { filterAdminNav } from "@/lib/roles/experience-model";
+import { visibleWebManagementNav } from "@/lib/routes/web-management-nav-model";
 import { useDirection } from "@/hooks/useDirection";
 import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
 import { NAV } from "@/lib/routes/nav-model";
@@ -63,12 +64,28 @@ export function Topbar() {
   }, [alertCount]);
 
   const visibleItems = filterAdminNav(NAV, experience);
+  const managementItems = visibleWebManagementNav(experience);
 
   const activeHref =
-    visibleItems
+    [...visibleItems, ...managementItems]
       .slice()
       .sort((a, b) => b.href.length - a.href.length)
       .find((n) => resolveNavItemActive(location, n.href))?.href ?? "";
+
+  const renderNavLink = (n: { id: string; href: string; labelKey: string }) => (
+    <Link
+      key={n.id}
+      href={n.href}
+      className={cn(
+        "text-sm font-medium px-2.5 py-1 rounded-[4px] whitespace-nowrap transition-colors duration-100",
+        activeHref === n.href
+          ? "bg-indigo-600 text-white font-semibold"
+          : "text-white/60 hover:text-white/85"
+      )}
+    >
+      {navLabel(n.labelKey)}
+    </Link>
+  );
 
   return (
     <header
@@ -85,20 +102,11 @@ export function Topbar() {
 
       {/* Primary nav */}
       <nav className="flex items-center gap-0.5 flex-1 overflow-x-auto">
-        {visibleItems.map((n) => (
-          <Link
-            key={n.id}
-            href={n.href}
-            className={cn(
-              "text-sm font-medium px-2.5 py-1 rounded-[4px] whitespace-nowrap transition-colors duration-100",
-              activeHref === n.href
-                ? "bg-indigo-600 text-white font-semibold"
-                : "text-white/60 hover:text-white/85"
-            )}
-          >
-            {navLabel(n.labelKey)}
-          </Link>
-        ))}
+        {visibleItems.map(renderNavLink)}
+        {managementItems.length > 0 && (
+          <span className="mx-1 h-4 w-px shrink-0 bg-white/20" aria-hidden="true" />
+        )}
+        {managementItems.map(renderNavLink)}
       </nav>
 
       {/* Right controls */}

@@ -1237,6 +1237,8 @@ const translations = {
 
   nav: d.nav,
 
+  console: d.console,
+
   board: d.board,
 
   webOnlyGuard: d.webOnlyGuard,

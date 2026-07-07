@@ -1511,3 +1511,42 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - **III.9 disposition:** gate warnings out of Phase-2 fence, flagged in PR body not fixed — 4 pre-existing depcruise `no-features-to-pages-internals` (rooms/inventory tablet) + untuned `knip` baseline (excluded from architecture:gates). Diff adds zero new warnings.
 
 **Verdict:** VERIFIED (byte-identical + full gate green). Live browser walk of nav not run — consistent with the owner-accepted Phase-0 live-walk skip; covered by the byte-identical proof + full suite. PR #50 open; CI polling per III.7.
+
+## 2026-07-07 — Phase 6 (B2): web chrome restage + headless pre-build (branch claude/phase-6-web-chrome)
+
+**Context:** Wave-2 Phase 6, unblocked by the merged Phase 2. Preceded by a 15-agent ground-truth workflow (wf_899f9b82) that read the 8 unwired server routes + 5 chrome surfaces in parallel and produced a fence-hardened, adversarially-verified blueprint.
+
+**Claim:** Additive headless console — nav model + typed API client + primitives + 5 guarded skeleton pages + nav wiring — grounded in the REAL handler shapes, fence-clean, zero behavior change to existing surfaces.
+
+**Evidence (verified 2026-07-07):**
+- **Ground truth:** workflow verified every claim against live code (not its own citations). Caught: sync/retry/replay return **202** (`integrations.ts:561`, `ops.routes.ts:123,190`); `configLogs`/`rollback`/`promote` unverified/vendor-x-only → deferred, not invented; **Q1** — every console read is `requireAdmin` (`integrations.ts:79`+; `admin-outbox-*`) so a lead (management.web, no webWrite) 403s.
+- **Nav model:** `src/lib/routes/web-management-nav-model.ts` gated on `management.web` (5 modules → routes); 7 tests (structure + capability visibility across all 7 roles incl. secondary-admin).
+- **API client:** `api.integrations` (16 methods) + `src/types/integrations.ts` hand-typed from `server/schema/integrations.ts` rows (timestamps → ISO strings); request bodies from the route zod schemas.
+- **Primitives:** `src/desktop/management/` — ManagementGuard (`can("management.web")`, admits lead — not `role==="admin"` hard-gate), WriteGate (`management.webWrite`), ReadOnlyChip, DataTable (headless, RTL logical props), DetailDrawer (direction-aware inline-end anchor). 7 behavioral tests (guards + DataTable states).
+- **Pages:** 5 under `src/pages/console/`; integrations + ops-health wire real reads with the Q1 lead-vs-admin split (`accessPendingServer` for read-only users); webhooks/notifications/rfid render honest `pendingEndpoint` (Q2–Q4). Ops-health is observe-only (ReadOnlyChip, no requeue/drop — frozen-surface doctrine).
+- **Wiring (additive):** `routes.tsx` (5 lazy + 5 `AuthGuard>WebOnlyGuard>ManagementGuard` routes; `/admin/metrics` NOT edited — critique dropped it as non-additive + real-mobile-screen); IconSidebar + Topbar render the management section from `visibleWebManagementNav`; console `nav.*`/`console.*` i18n keys wired into the hand-built `i18n.ts` accessor.
+- **Gate:** `tsc --noEmit` (fe) 0 · server tsc 0 (architecture:gates) · `pnpm test` **410 files / 3987 passed** · `pnpm i18n:check` deep parity ✓ · `pnpm architecture:gates` All G1, **0 cycles**.
+- **Fence (III.4):** additive only — no `src/native/**`, no `native-nav-model.ts`, no server-route edits, no existing operational-page internals. Frozen surfaces untouched (no audit kind/telemetry/realtime/SW/build-tag/appointments change).
+
+**Owner questions (surfaced, non-blocking):** Q1 (lead server-read access — future phase), Q2–Q4 (missing endpoints — Phase 7), Q5 (`/admin/metrics` fencing — dropped, separate ticket), Q6 (lead+secondary-admin webWrite edge). Deferred to Phase 7: ConfigFormScaffold, Pagination, configLogs/rollback/promote, the rich dashboard/health display.
+
+**Verdict:** VERIFIED (grounded + full gate green). Live browser walk of the console not run — consistent with the owner-accepted Phase-0 live-walk skip; covered by tsc + full suite + capability-visibility + guard tests. PR pending; held for owner merge.
+
+## 2026-07-07 — Phase 6 PR #52 review round: CodeRabbit remediation (6 findings)
+
+**Context:** PR #52 CI fully green (CodeRabbit/Cursor/Vercel/Merge-gate/Playwright×2/Architecture/Integration/Tests all pass), but `mergeStateStatus: BLOCKED` via `reviewDecision: CHANGES_REQUESTED` from `coderabbitai[bot]` (review 4644511306). Cursor's review was `COMMENTED` only (Bugbot hit a usage limit — no code findings). Owner directive: "poll the pr merge when green" → address the block, then merge.
+
+**Claim:** All 6 CodeRabbit findings (5 inline + 1 outside-diff, every one tagged `🔵 Trivial/nitpick`) verified against live code and fixed; each fix is correct, minimal, and within the Phase-6 additive fence. III.9 (zero unresolved warnings) satisfied.
+
+**Evidence (verified 2026-07-07):**
+- **F1 `DataTable.tsx:62-63` — redundant `col.sortValue!`.** CodeRabbit's literal suggestion (bare `col.sortValue(a)`) would FAIL tsc: inside the `.sort()` closure TS re-widens the property access to optional. Fixed correctly by hoisting `const sortValue = col.sortValue;` after the `if (!col?.sortValue) return` guard — a `const` local stays narrowed inside closures. No bare `!`. `npx tsc --noEmit` → 0.
+- **F2 `DataTable.tsx` sortable `<th>`.** Added `aria-sort` (`ascending|descending|none`, omitted on non-sortable cols) via `AriaAttributes["aria-sort"]` (added to the `react` type import) + `aria-hidden="true"` on all three chevron icons — matching the `Lock` a11y treatment in `ReadOnlyChip`. Path-instruction a11y for `src/**/*.tsx`.
+- **F3 `IntegrationsConsolePage.tsx` inline `columns`.** Wrapped in `useMemo<Column<IntegrationConfig>[]>(() => [...], [])` so it stops invalidating DataTable's internal `[rows, sort, columns]` sort memo each parent render. `t` is a module import (stable) → empty dep list is exhaustive-deps-correct.
+- **F4 triplicated pending scaffolds.** Extracted `src/desktop/management/PendingConsolePage.tsx` (icon+title+subtitle → AppShell/header/EmptyState with `t.console.pendingEndpoint`), exported from the barrel, and collapsed Webhooks/Notifications/RfidReaders onto it. 3 real consumers → knip-clean (not the deferred-unused case that removed WriteGate/DetailDrawer).
+- **F5 `console-management.test.tsx` error branch.** Added a test: `isError` + `onRetry` → asserts EmptyState is absent (`queryByText("EMPTY_MSG")` null), the ErrorCard retry button renders (`getByRole("button")`), and `fireEvent.click` invokes `onRetry` once (ErrorCard calls it synchronously in its retry handler). File 5→6 tests.
+- **F6 `Topbar.tsx:89-121` duplicated nav JSX.** Extracted a `renderNavLink` helper (mirroring `IconSidebar`'s `renderItem`); both `visibleItems.map` and `managementItems.map` now call it. Identical rendered markup.
+- **Gate:** `npx tsc --noEmit` (fe) 0 · `tsc -p tsconfig.server.json` 0 · `pnpm i18n:check` deep parity ✓ · `pnpm architecture:gates` All G1 passed, **0 cycles** · `pnpm test -- tests/web-management-nav-model.test.ts tests/console-management.test.tsx` → **13 passed**.
+- **III.9:** knip still exits 1 — confirmed pre-existing baseline (identical `unused files` count when my diff is `git stash`ed; none of my touched/new files appear in its output; `PendingConsolePage` correctly seen as used). Not part of `architecture:gates`. My diff adds zero new warnings.
+- **Fence (III.4):** additive/refactor within the Phase-6 surface only — no server, native, frozen-surface, or i18n-key changes (F4 reuses the existing `console.*` keys; parity unchanged). Stray untracked files (`locales/i18next-master.zip`, `docs/design/web-console-audit-round2-2026-07-07.md`) deliberately NOT staged.
+
+**Verdict:** VERIFIED (all 6 findings fixed, correct, gate green). After push, the stale `coderabbitai[bot]` CHANGES_REQUESTED review is dismissed via REST (per the merge-gating rule) once CI re-greens, then merge per the owner directive.

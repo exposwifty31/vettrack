@@ -65,6 +65,19 @@ import type { OutcomeKpiRoiResponse } from "../../shared/er-types.js";
 import type { AuthoritySnapshot } from "../../shared/authority.js";
 
 import type { ShiftActivityItem } from "@/types";
+import type {
+  IntegrationAdapter,
+  IntegrationConfig,
+  IntegrationDashboardV1,
+  IntegrationHealthV1,
+  IntegrationMappingReview,
+  IntegrationPagination,
+  IntegrationSyncRequest,
+  IntegrationSyncRun,
+  MappingReviewStatus,
+  PatchIntegrationConfigRequest,
+  UpsertIntegrationConfigRequest,
+} from "@/types/integrations";
 export type { ShiftActivityItem };
 
 import { getStoredLocale, t } from "@/lib/i18n";
@@ -1119,5 +1132,77 @@ export const api = {
         assetCopilot: boolean;
         cursorBugFixer: boolean;
       }>("/api/platform/capabilities"),
+  },
+  // Web management console — Integrations (Phase 6). Grounded in server/routes/integrations.ts
+  // + integrations/routes/ops.routes.ts. All reads are requireAdmin server-side (Q1: a lead
+  // holding management.web will 403 until server access is relaxed in a later phase).
+  integrations: {
+    // reads
+    dashboard: () => request<IntegrationDashboardV1>("/api/integrations/dashboard"),
+    health: () => request<IntegrationHealthV1>("/api/integrations/health"),
+    adapters: () =>
+      request<{ adapters: IntegrationAdapter[] }>("/api/integrations/adapters").then((r) => r.adapters),
+    listConfigs: () =>
+      request<{ configs: IntegrationConfig[] }>("/api/integrations/configs").then((r) => r.configs),
+    getConfig: (adapterId: string) =>
+      request<{ config: IntegrationConfig }>(`/api/integrations/configs/${adapterId}`).then((r) => r.config),
+    runs: (params?: { limit?: number; offset?: number }) => {
+      const qs = new URLSearchParams();
+      if (params?.limit != null) qs.set("limit", String(params.limit));
+      if (params?.offset != null) qs.set("offset", String(params.offset));
+      const query = qs.toString();
+      return request<{ runs: IntegrationSyncRun[]; pagination: IntegrationPagination }>(
+        `/api/integrations/runs${query ? `?${query}` : ""}`,
+      );
+    },
+    mappingsReview: (status?: MappingReviewStatus) => {
+      const query = status ? `?status=${status}` : "";
+      return request<{ items: IntegrationMappingReview[] }>(
+        `/api/integrations/mappings/review${query}`,
+      ).then((r) => r.items);
+    },
+    // writes — management.webWrite (admin / secondary-admin) only
+    upsertConfig: (body: UpsertIntegrationConfigRequest) =>
+      request<{ config: IntegrationConfig }>("/api/integrations/configs", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }).then((r) => r.config),
+    patchConfig: (adapterId: string, body: PatchIntegrationConfigRequest) =>
+      request<{ config: IntegrationConfig }>(`/api/integrations/configs/${adapterId}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }).then((r) => r.config),
+    deleteConfig: (adapterId: string) =>
+      request<{ ok: true }>(`/api/integrations/configs/${adapterId}`, { method: "DELETE" }),
+    storeCredentials: (adapterId: string, credentials: Record<string, string>) =>
+      request<{ ok: true }>(`/api/integrations/configs/${adapterId}/credentials`, {
+        method: "POST",
+        body: JSON.stringify({ credentials }),
+      }),
+    // adapter-defined result shape
+    validateCredentials: (adapterId: string) =>
+      request<unknown>(`/api/integrations/configs/${adapterId}/validate`, { method: "POST" }),
+    // 202 Accepted
+    runSync: (adapterId: string, body: IntegrationSyncRequest) =>
+      request<{ ok: true; jobId: string }>(`/api/integrations/configs/${adapterId}/sync`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    updateMapping: (id: string, reviewStatus: Exclude<MappingReviewStatus, "pending">) =>
+      request<{ item: IntegrationMappingReview }>(`/api/integrations/mappings/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ reviewStatus }),
+      }).then((r) => r.item),
+    // ops sub-router — 202 Accepted
+    retryRun: (runId: string, body?: { dryRun?: boolean; correlationId?: string }) =>
+      request<{ ok: true; jobId: string; retriedRunId: string }>(
+        `/api/integrations/ops/runs/${runId}/retry`,
+        { method: "POST", body: JSON.stringify(body ?? {}) },
+      ),
+    replayWebhook: (id: string) =>
+      request<{ ok: true; jobId: string; eventId: string; requestId: string }>(
+        `/api/integrations/ops/webhooks/${id}/replay`,
+        { method: "POST" },
+      ),
   },
 };

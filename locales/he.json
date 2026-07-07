@@ -3670,7 +3670,60 @@
   "metrics": {
     "disabled": "המדדים כבויים עבור תקופה זו."
   },
+  "console": {
+    "colAdapter": "מתאם",
+    "colStatus": "סטטוס",
+    "colUpdated": "עודכן",
+    "colType": "סוג",
+    "colOccurred": "התרחש",
+    "colRetries": "ניסיונות",
+    "valEnabled": "מופעל",
+    "valDisabled": "מושבת",
+    "valNever": "אף פעם",
+    "dash": "—",
+    "readOnly": "קריאה בלבד",
+    "accessPendingServer": "גישת קריאה ממתינה להפעלה בשרת",
+    "pendingEndpoint": "עדיין לא זמין — ממתין לתמיכת שרת",
+    "retry": "נסה שוב",
+    "state": {
+      "loading": "טוען…",
+      "empty": "אין כאן עדיין כלום",
+      "error": "טעינת התצוגה נכשלה"
+    },
+    "pagination": {
+      "page": "עמוד",
+      "next": "הבא",
+      "previous": "הקודם"
+    },
+    "integrations": {
+      "title": "אינטגרציות",
+      "subtitle": "מתאמי PMS, תצורות ותקינות סנכרון"
+    },
+    "webhooks": {
+      "title": "Webhooks",
+      "subtitle": "אירועי Webhook נכנסים מ-PMS"
+    },
+    "notifications": {
+      "title": "הודעות",
+      "subtitle": "משלוח וואטסאפ ודחיפה"
+    },
+    "rfidReaders": {
+      "title": "קוראי RFID",
+      "subtitle": "פעימות וכיסוי קוראים"
+    },
+    "opsHealth": {
+      "title": "תקינות מערכת",
+      "subtitle": "תיבת יוצאים, DLQ, תורים ותקינות אינטגרציות — צפייה בלבד"
+    }
+  },
   "nav": {
+    "integrations": "אינטגרציות",
+    "webhooks": "Webhooks",
+    "notifications": "הודעות",
+    "rfidReaders": "קוראי RFID",
+    "opsHealth": "תקינות מערכת",
+    "groupAdministration": "ניהול",
+    "groupOperations": "תפעול",
     "today": "היום",
     "alertsTitle": "התראות",
     "noActiveAlerts": "אין התראות פעילות",

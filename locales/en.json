@@ -3670,7 +3670,60 @@
   "metrics": {
     "disabled": "Metrics are turned off for this period."
   },
+  "console": {
+    "colAdapter": "Adapter",
+    "colStatus": "Status",
+    "colUpdated": "Updated",
+    "colType": "Type",
+    "colOccurred": "Occurred",
+    "colRetries": "Retries",
+    "valEnabled": "Enabled",
+    "valDisabled": "Disabled",
+    "valNever": "Never",
+    "dash": "—",
+    "readOnly": "Read only",
+    "accessPendingServer": "Read access pending server enablement",
+    "pendingEndpoint": "Not yet available — pending backend support",
+    "retry": "Retry",
+    "state": {
+      "loading": "Loading…",
+      "empty": "Nothing here yet",
+      "error": "Couldn't load this view"
+    },
+    "pagination": {
+      "page": "Page",
+      "next": "Next",
+      "previous": "Previous"
+    },
+    "integrations": {
+      "title": "Integrations",
+      "subtitle": "PMS adapters, configs, and sync health"
+    },
+    "webhooks": {
+      "title": "Webhooks",
+      "subtitle": "Inbound PMS webhook events"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "subtitle": "WhatsApp and push delivery"
+    },
+    "rfidReaders": {
+      "title": "RFID Readers",
+      "subtitle": "Reader heartbeat and coverage"
+    },
+    "opsHealth": {
+      "title": "Ops Health",
+      "subtitle": "Outbox, DLQ, queues, and integration health — observe only"
+    }
+  },
   "nav": {
+    "integrations": "Integrations",
+    "webhooks": "Webhooks",
+    "notifications": "Notifications",
+    "rfidReaders": "RFID Readers",
+    "opsHealth": "Ops Health",
+    "groupAdministration": "Administration",
+    "groupOperations": "Operations",
     "today": "Today",
     "alertsTitle": "Alerts",
     "noActiveAlerts": "No active alerts",

@@ -7,6 +7,7 @@ import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { useAuth } from "@/hooks/use-auth";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { WebOnlyGuard } from "@/app/platform/guards/WebOnlyGuard";
+import { ManagementGuard } from "@/desktop/management";
 import { useIsNativeTablet } from "@/native/tablet/useIsNativeTablet";
 
 const CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
@@ -61,6 +62,12 @@ const ShiftChatArchive = lazy(() =>
   import("@/features/shift-chat/components/ShiftChatArchive").then((m) => ({ default: m.ShiftChatArchive }))
 );
 const MyProfilePage = lazy(() => import("@/pages/my-profile"));
+// --- Web management console (Phase 6) ---
+const IntegrationsConsolePage = lazy(() => import("@/pages/console/IntegrationsConsolePage"));
+const WebhooksConsolePage = lazy(() => import("@/pages/console/WebhooksConsolePage"));
+const NotificationsConsolePage = lazy(() => import("@/pages/console/NotificationsConsolePage"));
+const RfidReadersConsolePage = lazy(() => import("@/pages/console/RfidReadersConsolePage"));
+const OpsHealthConsolePage = lazy(() => import("@/pages/console/OpsHealthConsolePage"));
 
 function RedirectPreserveSearch({ to }: { to: string }) {
   const search = useSearch();
@@ -154,6 +161,12 @@ export function AppRoutes() {
         <Route path="/admin/asset-types"><AuthGuard><AdminAssetTypesPage /></AuthGuard></Route>
         <Route path="/admin/docks"><AuthGuard><AdminDocksPage /></AuthGuard></Route>
         <Route path="/admin/metrics"><AuthGuard><OperationalMetricsDashboardPage /></AuthGuard></Route>
+        {/* Web management console (Phase 6) — desktop-only, capability-gated (management.web) */}
+        <Route path="/admin/integrations"><AuthGuard><WebOnlyGuard><ManagementGuard><IntegrationsConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/admin/webhooks"><AuthGuard><WebOnlyGuard><ManagementGuard><WebhooksConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/admin/notifications"><AuthGuard><WebOnlyGuard><ManagementGuard><NotificationsConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/admin/rfid-readers"><AuthGuard><WebOnlyGuard><ManagementGuard><RfidReadersConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/ops/health"><AuthGuard><WebOnlyGuard><ManagementGuard><OpsHealthConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/settings"><AuthGuard><SettingsPage /></AuthGuard></Route>
         <Route path="/help"><AuthGuard><HelpPage /></AuthGuard></Route>
         <Route path="/audit-log"><AuthGuard><WebOnlyGuard><AuditLogPage /></WebOnlyGuard></AuthGuard></Route>

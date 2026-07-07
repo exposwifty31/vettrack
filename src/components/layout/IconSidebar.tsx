@@ -6,11 +6,13 @@ import type { LucideIcon } from "lucide-react";
 import {
   Home, Package, Grid, Bell, MapPin, Settings,
   List, ListTodo, Scan, Plus, Activity, Gauge, Boxes, Clock,
+  Cable, Webhook, BellRing, RadioTower,
 } from "lucide-react";
 import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
 import { NAV } from "@/lib/routes/nav-model";
 import { useExperience } from "@/hooks/use-experience";
 import { filterAdminNav } from "@/lib/roles/experience-model";
+import { visibleWebManagementNav } from "@/lib/routes/web-management-nav-model";
 import { t } from "@/lib/i18n";
 
 /** Kept for backward compat — PageShell / my-equipment.tsx still reference this type. */
@@ -24,6 +26,7 @@ export interface SidebarItem {
 const ICON_MAP: Record<string, LucideIcon> = {
   Home, Package, Grid, Bell, MapPin, Settings,
   List, ListTodo, Scan, Plus, Activity, Gauge, Boxes, Clock,
+  Cable, Webhook, BellRing, RadioTower,
 };
 
 function navLabel(key: string): string {
@@ -37,9 +40,31 @@ export function IconSidebar() {
   const experience = useExperience();
 
   const visibleItems = filterAdminNav(NAV, experience);
+  const managementItems = visibleWebManagementNav(experience);
 
   const borderClass =
     dir === "rtl" ? "border-e border-ivory-border" : "border-s border-ivory-border";
+
+  const renderItem = (n: { id: string; href: string; labelKey: string; icon: string }) => {
+    const isActive = resolveNavItemActive(location, n.href);
+    const Icon = ICON_MAP[n.icon];
+    if (!Icon) return null;
+    return (
+      <Link key={n.id} href={n.href} aria-label={navLabel(n.labelKey)}>
+        <span
+          title={navLabel(n.labelKey)}
+          className={cn(
+            "relative w-[30px] h-[30px] rounded-sm flex items-center justify-center transition-colors duration-100 cursor-pointer",
+            isActive
+              ? "bg-ivory-greenBg text-ivory-green"
+              : "text-ivory-text3 hover:text-ivory-text2"
+          )}
+        >
+          <Icon size={15} strokeWidth={2.2} />
+        </span>
+      </Link>
+    );
+  };
 
   return (
     <aside
@@ -49,26 +74,9 @@ export function IconSidebar() {
         borderClass
       )}
     >
-      {visibleItems.map((n) => {
-        const isActive = resolveNavItemActive(location, n.href);
-        const Icon = ICON_MAP[n.icon];
-        if (!Icon) return null;
-        return (
-          <Link key={n.id} href={n.href} aria-label={navLabel(n.labelKey)}>
-            <span
-              title={navLabel(n.labelKey)}
-              className={cn(
-                "relative w-[30px] h-[30px] rounded-sm flex items-center justify-center transition-colors duration-100 cursor-pointer",
-                isActive
-                  ? "bg-ivory-greenBg text-ivory-green"
-                  : "text-ivory-text3 hover:text-ivory-text2"
-              )}
-            >
-              <Icon size={15} strokeWidth={2.2} />
-            </span>
-          </Link>
-        );
-      })}
+      {visibleItems.map(renderItem)}
+      {managementItems.length > 0 && <SidebarDivider />}
+      {managementItems.map(renderItem)}
     </aside>
   );
 }
