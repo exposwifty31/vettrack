@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Redirect } from "wouter";
-import { t } from "@/lib/i18n";
+import { t, formatDateTimeByLocale } from "@/lib/i18n";
 import { useDirection } from "@/hooks/useDirection";
 import { CalendarDays, CheckCircle2, ChevronRight, Clock3, Plus, User, Zap } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
@@ -1428,7 +1428,7 @@ export default function AppointmentsPage() {
       </div>
 
       <Dialog open={bookingOpen} onOpenChange={setBookingOpen}>
-        <DialogContent dir={dir} className="text-start max-h-[85dvh] flex flex-col overflow-hidden p-0">
+        <DialogContent dir={dir} className="text-start max-h-[85dvh] flex flex-col overflow-hidden p-0 touch-none">
           <DialogHeader className="shrink-0 px-6 pt-6">
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1 space-y-1 text-start">
@@ -1442,7 +1442,7 @@ export default function AppointmentsPage() {
               </div>
             </div>
           </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 pb-6">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y px-6 pb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
     <div>
       <label htmlFor={`${bookingFormId}-vet`} className="text-xs text-muted-foreground block text-start">
@@ -1557,6 +1557,20 @@ export default function AppointmentsPage() {
         value={formStartLocal}
         onChange={(e) => setFormStartLocal(e.target.value)}
       />
+      {/* Readable preview — the native datetime-local renders its value in the OS
+          locale (jumbled in Hebrew on iOS); this line shows it correctly. */}
+      {formStartLocal && !Number.isNaN(new Date(formStartLocal).getTime()) && (
+        <p dir="auto" className="mt-1 text-xs font-medium text-muted-foreground">
+          {formatDateTimeByLocale(new Date(formStartLocal), {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </p>
+      )}
     </div>
 
     <div>
@@ -1608,14 +1622,14 @@ export default function AppointmentsPage() {
       </Dialog>
 
       <Dialog open={conflictOpen} onOpenChange={setConflictOpen}>
-        <DialogContent dir={dir} className="text-start max-h-[85dvh] flex flex-col overflow-hidden p-0">
+        <DialogContent dir={dir} className="text-start max-h-[85dvh] flex flex-col overflow-hidden p-0 touch-none">
           <DialogHeader className="shrink-0 px-6 pt-6">
             <DialogTitle>{t.appointmentsPage.conflictTitle}</DialogTitle>
             <DialogDescription>
               {t.appointmentsPage.conflictBody}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 py-4">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y px-6 py-4">
             <label className="text-xs text-muted-foreground block text-start">{t.appointmentsPage.overrideReason}</label>
             <Textarea dir="ltr" className="text-left" value={conflictReason} onChange={(e) => setConflictReason(e.target.value)} placeholder={t.appointmentsPage.overridePlaceholder} rows={3} />
           </div>

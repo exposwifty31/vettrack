@@ -1600,3 +1600,9 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - **Item 4 — admin can scan without an active shift.** Added to Phase 7 scope in `program-plan.md` (verify against `resolveAuthority()` + scan-affordance + server handler; ship any server relaxation as a shadow evaluator, not a raw gate removal).
 
 **Verdict:** bugs 1–3 + 5 are code-verified fixes (deterministic for 1/2/3; a principled robustness fix for 5). Device re-verification pending (rebuild + reinstall). Fence: only `src/pages/Tasks.tsx`, `src/pages/inventory-page.tsx`, `docs/design/program-plan.md` — no server, no schema, no frozen surface.
+
+### 2026-07-07 — Device-QA round 2 (3 more, branch fix/device-qa-punchlist)
+- **Avatar "? on blue".** `me.avatarUrl` is a user-uploaded presigned URL; the "?" is the fallback (`getInitials(useAuth().name)` → "?" when name empty) or a broken presigned image (iOS renders broken img as "?"). Fix (NativeHeader): `onError` on the `<img>` → fall back to initials; initials now use `me?.displayName || me?.name || name` (DB source, populated) instead of the empty auth-store name.
+- **New Task sheet still moves freely.** `react-remove-scroll` absent → the Radix dialog doesn't lock scroll, so during the NativeShell scroller's WebView rubber-band the portaled `position:fixed` dialog shifts. Fix (dialog-scoped, no impact on the intentional two-tone overscroll): `touch-none` on both DialogContents + `touch-pan-y` on their scroll bodies (drag on header/footer no longer scrolls the page; inner list still scrolls).
+- **Scheduled time shows "7 18:06, 2026 ביולי".** The native `datetime-local` renders its value in the iOS OS locale (jumbled in Hebrew) — not controllable via CSS/`dir`. Fix: added a readable preview line under the input via our own `formatDateTimeByLocale` (Intl orders Hebrew correctly). Input stays for editing.
+- Gate: tsc 0, 411 files / 3996 tests, i18n parity, no-hebrew-in-source. Device re-verification pending.

@@ -34,6 +34,9 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
   const { settings, update } = useSettings();
   const isDarkNow = useIsDarkActive();
   const isTablet = useIsTabletViewport();
+  // Fall back to initials if the presigned avatar URL fails to load (a broken img
+  // renders as a "?" placeholder on iOS WebKit).
+  const [avatarError, setAvatarError] = useState(false);
   const [openPanel, setOpenPanel] = useState<Panel>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -224,10 +227,11 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
                 to them (BUG-006). Muted fill + hairline ring (not a saturated
                 --primary fill) so the least-frequent action doesn't out-weigh the
                 live-badge alerts control. */}
-            {me?.avatarUrl ? (
+            {me?.avatarUrl && !avatarError ? (
               <img
                 src={me.avatarUrl}
                 alt={t.profile.avatarAlt}
+                onError={() => setAvatarError(true)}
                 width={24}
                 height={24}
                 style={{
@@ -256,7 +260,7 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
                   letterSpacing: "-0.01em",
                 }}
               >
-                {getInitials(name)}
+                {getInitials(me?.displayName || me?.name || name)}
               </span>
             )}
           </button>
