@@ -119,23 +119,32 @@ describe("Wave 6 state consistency checks (static)", () => {
     ).toBe(true);
   });
 
+  // Phase 3 (A2): the home state primitives moved into the shared surface pieces.
+  const recentActivity = fs.readFileSync(
+    path.join(repoRoot, "src", "features", "today", "surfaces", "RecentActivityCard.tsx"),
+    "utf8",
+  );
+  const onShiftHero = fs.readFileSync(
+    path.join(repoRoot, "src", "features", "today", "surfaces", "OnShiftHero.tsx"),
+    "utf8",
+  );
+
   it("Home page activity feed shows LoadingSection while loading, not blank", () => {
     expect(
-      home.includes("isLoading: activityLoading") &&
-        home.includes("activityLoading ? (") &&
-        home.includes("<LoadingSection rows={4} />"),
+      recentActivity.includes("isLoading ? (") &&
+        recentActivity.includes("<LoadingSection rows={4} />"),
     ).toBe(true);
   });
 
   it("Home page shift hero shows a loading state while the pulse loads, not blank", () => {
-    expect(home.includes('heroState === "loading"')).toBe(true);
+    expect(onShiftHero.includes('heroState === "loading"')).toBe(true);
   });
 
   it("Home page uses shared EmptyState component for the activity empty state", () => {
     expect(
-      home.includes("import { EmptyState }") &&
-        home.includes("t.homePage.activityFeedEmpty") &&
-        home.includes("t.homePage.activityFeedEmptyHint"),
+      recentActivity.includes("import { EmptyState }") &&
+        recentActivity.includes("t.homePage.activityFeedEmpty") &&
+        recentActivity.includes("t.homePage.activityFeedEmptyHint"),
     ).toBe(true);
   });
 });

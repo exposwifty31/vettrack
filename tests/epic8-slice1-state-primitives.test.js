@@ -119,38 +119,54 @@ describe("Equipment list state integration", () => {
 
 // ── Home dashboard integration ────────────────────────────────────────────────
 
+// Phase 3 (A2): home.tsx is now a thin ops/floor fork; the state primitives moved
+// into the shared surface pieces. These guards follow them to their new homes.
 describe("Home dashboard state integration", () => {
+  const recentActivity = read("src/features/today/surfaces/RecentActivityCard.tsx");
+  const onShiftHero = read("src/features/today/surfaces/OnShiftHero.tsx");
+  const floorSurface = read("src/features/today/surfaces/FloorHomeSurface.tsx");
+  const opsSurface = read("src/features/today/surfaces/OpsHomeSurface.tsx");
+
+  it("home.tsx forks to the ops/floor surfaces (no inline body left)", () => {
+    expect(home).toContain("homeSurface");
+    expect(home).toContain("OpsHomeSurface");
+    expect(home).toContain("FloorHomeSurface");
+  });
+
   it("loading state: activity feed shows LoadingSection while fetching", () => {
-    expect(home).toContain("isLoading: activityLoading");
-    expect(home).toContain("activityLoading ? (");
-    expect(home).toContain("<LoadingSection rows={4} />");
+    expect(recentActivity).toContain("isLoading ? (");
+    expect(recentActivity).toContain("<LoadingSection rows={4} />");
   });
 
   it("loading state: shift hero renders a skeleton while the pulse loads", () => {
-    expect(home).toContain('heroState === "loading"');
+    expect(onShiftHero).toContain('heroState === "loading"');
   });
 
   it("empty state: activity feed uses EmptyState with i18n keys", () => {
-    expect(home).toContain("t.homePage.activityFeedEmpty");
-    expect(home).toContain("t.homePage.activityFeedEmptyHint");
+    expect(recentActivity).toContain("t.homePage.activityFeedEmpty");
+    expect(recentActivity).toContain("t.homePage.activityFeedEmptyHint");
+    expect(recentActivity).toContain("<EmptyState");
   });
 
   it("rest state: no-shift hero renders a designed empty state, not a blank", () => {
-    expect(home).toContain("t.home.shift.noShift");
-    expect(home).toContain("t.homePage.noShiftSub");
+    expect(onShiftHero).toContain("t.home.shift.noShift");
+    expect(onShiftHero).toContain("t.homePage.noShiftSub");
   });
 
-  it("error state: equipment fetch error shows ErrorCard with retry", () => {
-    expect(home).toContain("equipmentError");
-    expect(home).toContain("<ErrorCard");
-    expect(home).toContain("onRetry");
+  it("error state: home surfaces show ErrorCard with retry", () => {
+    for (const surface of [floorSurface, opsSurface]) {
+      expect(surface).toContain("<ErrorCard");
+      expect(surface).toContain("onRetry");
+    }
   });
 
-  it("no hardcoded empty-state prose strings remain in home.tsx", () => {
-    expect(home).not.toContain("No recent activity");
-    expect(home).not.toContain("No inventory alerts");
-    expect(home).not.toContain("Scans, status changes, and moves show up here");
-    expect(home).not.toContain("Sterilization, maintenance, and issues appear here");
+  it("no hardcoded empty-state prose strings remain in the home surfaces", () => {
+    for (const src of [recentActivity, onShiftHero, floorSurface, opsSurface]) {
+      expect(src).not.toContain("No recent activity");
+      expect(src).not.toContain("No inventory alerts");
+      expect(src).not.toContain("Scans, status changes, and moves show up here");
+      expect(src).not.toContain("Sterilization, maintenance, and issues appear here");
+    }
   });
 });
 

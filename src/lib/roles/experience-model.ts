@@ -17,6 +17,14 @@ import type { UserRole, ShiftRole } from "@/types/platform";
 export type ExperienceArchetype = "admin" | "vet" | "lead" | "tech" | "student";
 
 /**
+ * Two home compositions (Phase 3 / A2, I.4 locked v1 split). `ops` = admin + lead
+ * (coverage / readiness / exceptions); `floor` = vet / tech / student (scan / tasks /
+ * my-equipment). Derived from the PERMANENT archetype — shift elevation never reshapes
+ * home (I.4). Full 5-archetype differentiation is Phase 8; this is the v1 two-way split.
+ */
+export type HomeSurface = "ops" | "floor";
+
+/**
  * Closed capability union (bounded-enum doctrine). Extend deliberately: every new
  * member needs an archetype grant below and, if server-enforced, an authority
  * evaluator. `management.*` are defined for the Phase 6 web console (admin full;
@@ -74,6 +82,26 @@ export function archetypeForRole(role: UserRole | ShiftRole): ExperienceArchetyp
 }
 
 /**
+ * Archetype → home surface (Phase 3 / A2). ops = admin + lead; floor = vet + tech +
+ * student (I.4 locked). Total over the 5 archetypes; the `?? "floor"` degrade mirrors
+ * `capabilitiesForRole` so an unmapped runtime value never throws — floor is the
+ * least-capable home, the safe default (matches the pre-Phase-3 non-admin view).
+ */
+const HOME_SURFACE_BY_ARCHETYPE: Record<ExperienceArchetype, HomeSurface> = {
+  admin: "ops",
+  lead: "ops",
+  vet: "floor",
+  tech: "floor",
+  student: "floor",
+};
+
+/** Home surface for a role, via its archetype. Derives from the PERMANENT role — never
+ *  the shift overlay (I.4: shift changes capabilities only, never home/nav shape). */
+export function homeSurfaceForRole(role: UserRole | ShiftRole): HomeSurface {
+  return HOME_SURFACE_BY_ARCHETYPE[archetypeForRole(role)] ?? "floor";
+}
+
+/**
  * Base capability grant per archetype — reproduces the pre-Phase-2 ad-hoc checks:
  * - codeBlue.manage      : isAdmin || vet || senior_technician || technician  (layout:466)
  * - shiftChat.broadcast  : senior_technician || admin                         (ShiftChatPanel)
@@ -114,6 +142,9 @@ const SECONDARY_ADMIN_CAPS: readonly Capability[] = [
 
 export interface RoleExperience {
   archetype: ExperienceArchetype;
+  /** Which home composition renders (Phase 3). Derived from the permanent archetype;
+   *  invariant under shift elevation (I.4). */
+  homeSurface: HomeSurface;
   capabilities: ReadonlySet<Capability>;
 }
 
@@ -163,6 +194,7 @@ export function resolveCapabilities(input: ExperienceInput): ReadonlySet<Capabil
 export function buildRoleExperience(input: ExperienceInput): RoleExperience {
   return {
     archetype: archetypeForRole(input.role),
+    homeSurface: homeSurfaceForRole(input.role),
     capabilities: resolveCapabilities(input),
   };
 }

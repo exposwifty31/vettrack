@@ -428,6 +428,11 @@ const translations = {
 
   home: d.home,
 
+  // Phase 3 (A2) home ops/floor surfaces. No interpolated keys → plain namespace
+  // spread (the buildTranslations gotcha: without this line t.homeSurface is
+  // undefined at runtime even with the JSON keys + generated .d.ts present).
+  homeSurface: d.homeSurface,
+
   equipment: {
     ...d.equipment,
     rfidLastSeen: {

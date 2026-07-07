@@ -819,6 +819,25 @@
       "decideFailed": "Couldn't update the request. Please try again."
     }
   },
+  "homeSurface": {
+    "coverage": "Coverage",
+    "readiness": "Readiness",
+    "exceptions": "Exceptions",
+    "available": "Available",
+    "ready": "Ready",
+    "notReady": "Not ready",
+    "inUse": "In use",
+    "roomReadiness": "Room readiness",
+    "noExceptions": "No exceptions",
+    "tasks": "Tasks",
+    "tasksEmpty": "No tasks right now",
+    "today": "today",
+    "overdue": "overdue",
+    "myEquipment": "My equipment",
+    "myEquipmentEmpty": "Nothing checked out",
+    "inYourCare": "in your care",
+    "scanCta": "Scan equipment"
+  },
   "home": {
     "equipmentOverview": "Equipment overview",
     "shiftSummary": "Shift summary",

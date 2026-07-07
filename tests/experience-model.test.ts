@@ -5,8 +5,10 @@ import {
   buildRoleExperience,
   can,
   filterAdminNav,
+  homeSurfaceForRole,
   resolveCapabilities,
   type ExperienceInput,
+  type HomeSurface,
 } from "@/lib/roles/experience-model";
 import { NAV } from "@/lib/routes/nav-model";
 import { getNativeNavSections } from "@/lib/routes/native-nav-model";
@@ -60,6 +62,64 @@ describe("experience-model — archetype map", () => {
     expect(archetypeForRole("technician")).toBe("tech");
     expect(archetypeForRole("vet_tech")).toBe("tech");
     expect(archetypeForRole("student")).toBe("student");
+  });
+});
+
+describe("experience-model — homeSurface (Phase 3 / A2)", () => {
+  it("is total over the 7 client roles (ops | floor, never undefined)", () => {
+    for (const role of ALL_ROLES) {
+      const surface: HomeSurface = homeSurfaceForRole(role);
+      expect(surface === "ops" || surface === "floor").toBe(true);
+    }
+  });
+
+  it("maps ops = admin + lead (senior/lead_technician), floor = vet + tech + student (I.4)", () => {
+    expect(homeSurfaceForRole("admin")).toBe("ops");
+    expect(homeSurfaceForRole("senior_technician")).toBe("ops");
+    expect(homeSurfaceForRole("lead_technician")).toBe("ops");
+    expect(homeSurfaceForRole("vet")).toBe("floor");
+    expect(homeSurfaceForRole("technician")).toBe("floor");
+    expect(homeSurfaceForRole("vet_tech")).toBe("floor");
+    expect(homeSurfaceForRole("student")).toBe("floor");
+  });
+
+  it("buildRoleExperience derives homeSurface from the PERMANENT role", () => {
+    const exp = buildRoleExperience({
+      role: "admin",
+      effectiveRole: "admin",
+      roleSource: "permanent",
+      isAdmin: true,
+    });
+    expect(exp.homeSurface).toBe("ops");
+  });
+
+  it("shift elevation changes capabilities but NEVER homeSurface (I.4)", () => {
+    const base: ExperienceInput = {
+      role: "technician",
+      effectiveRole: "technician",
+      roleSource: "permanent",
+      isAdmin: false,
+    };
+    const elevated: ExperienceInput = {
+      role: "technician",
+      effectiveRole: "senior_technician",
+      roleSource: "shift",
+      isAdmin: false,
+    };
+    const permExp = buildRoleExperience(base);
+    const shiftExp = buildRoleExperience(elevated);
+    // capabilities DO react to the shift…
+    expect(can(permExp, "shiftChat.broadcast")).toBe(false);
+    expect(can(shiftExp, "shiftChat.broadcast")).toBe(true);
+    // …but the home surface stays keyed to the permanent role.
+    expect(permExp.homeSurface).toBe("floor");
+    expect(shiftExp.homeSurface).toBe("floor");
+  });
+
+  it("degrades an unmapped runtime role to floor without throwing", () => {
+    const run = () => homeSurfaceForRole("ghost_role" as unknown as UserRole);
+    expect(run).not.toThrow();
+    expect(run()).toBe("floor");
   });
 });
 

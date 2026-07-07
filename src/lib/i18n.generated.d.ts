@@ -822,6 +822,25 @@ export interface TStructure {
       decideFailed: string;
     };
   };
+  homeSurface: {
+    coverage: string;
+    readiness: string;
+    exceptions: string;
+    available: string;
+    ready: string;
+    notReady: string;
+    inUse: string;
+    roomReadiness: string;
+    noExceptions: string;
+    tasks: string;
+    tasksEmpty: string;
+    today: string;
+    overdue: string;
+    myEquipment: string;
+    myEquipmentEmpty: string;
+    inYourCare: string;
+    scanCta: string;
+  };
   home: {
     equipmentOverview: string;
     shiftSummary: string;

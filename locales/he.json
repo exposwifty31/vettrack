@@ -819,6 +819,25 @@
       "decideFailed": "לא ניתן לעדכן את הבקשה. נסו שוב."
     }
   },
+  "homeSurface": {
+    "coverage": "כיסוי",
+    "readiness": "מוכנות",
+    "exceptions": "חריגות",
+    "available": "זמין",
+    "ready": "מוכן",
+    "notReady": "לא מוכן",
+    "inUse": "בשימוש",
+    "roomReadiness": "מוכנות חדרים",
+    "noExceptions": "אין חריגות",
+    "tasks": "משימות",
+    "tasksEmpty": "אין משימות כרגע",
+    "today": "היום",
+    "overdue": "באיחור",
+    "myEquipment": "הציוד שלי",
+    "myEquipmentEmpty": "לא נלקח ציוד",
+    "inYourCare": "באחריותך",
+    "scanCta": "סריקת ציוד"
+  },
   "home": {
     "equipmentOverview": "סקירת ציוד",
     "shiftSummary": "סיכום משמרת",
