@@ -57,3 +57,20 @@ Full knip output is reproducible with `pnpm knip`; the raw log for this baseline
 ## Baseline gate snapshot (this branch, pre-change)
 
 Recorded in `PROOF_ALIGNMENT_LOG.md` (2026-07-06 Phase 0 entry): `typecheck` ✅, `test` ✅ (405 files / 3949 tests), `i18n:check` ✅, `architecture:gates` ✅ (0 cycles). Native-sim + Playwright suites are environment-gated (require Xcode/booted simulator + running app) and were not run in this session — flagged for the live-walk follow-up.
+
+## Clean sub-phase log — 2026-07-07 (branch `claude/relevance-cleanup-improve`)
+
+First deletions against this baseline (superseding stale PR #40, which was closed for being unsafe against current `main`). Every candidate re-grepped 0-ref before removal; gate green after each batch.
+
+**Removed — Tier 1 cruft (~100MB, no code refs):** `Archive.zip`, `Archive 2.zip`, `all-files.md`, `app-tour.js` (root), `screenshot.png`, `.nvrmc`, a session `.txt` dump, 38 `playwright-ui-screenshots/*` + `index.html` (generated output; dir was already gitignored). `.gitignore` guards added.
+
+**Removed — Tier 2 verified-dead code:** `server/integrations/conflicts/*` + `server/integrations/rollout/*` (unwired), `shared/permissions.ts` (superseded by `er-mode-permissions.ts`), `src/lib/constants/regex.ts`, `src/lib/task-dashboard-filters.ts`, `src/hooks/use-is-mobile.ts`.
+
+**Kept despite appearing removable (evidence corrected the record):**
+- `inventory-deduction.{queue,worker}` — LIVE via `dispense.service.ts:614` + 5 tests (a "no-op producer" comment obscured a live import).
+- `src/lib/camera.ts` — 6 live refs.
+- `src/infrastructure/db/*` adapters — intentional hexagonal-migration scaffolding (this baseline's Lens-2 note); not dead.
+
+**Refactor (not a deletion):** `admin.tsx` 1656 → 219 LOC, sections extracted to `src/pages/admin/*`. See TASKS.md Backlog for the ranked remaining >800-LOC split queue.
+
+Net: the 11-candidate / 266-knip figures above are partially retired; the largest single win was ~100MB of non-code weight the knip lens never counted (it only sees TS/JS).

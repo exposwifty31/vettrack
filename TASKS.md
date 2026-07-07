@@ -117,13 +117,12 @@ _Agents: add out-of-scope items here rather than acting on them._
 - TASK: Audit `vt_event_outbox` retention — verify janitor is not letting the table grow unbounded
 - TASK: Review Playwright Phase 9 drills — confirm all 8 drills pass against local dev server
 - TASK: Add `.cursor/rules/` vettrack-specific overrides for i18n and multi-tenancy invariants
-- TASK: Codebase relevance cleanup — delete root artifacts (`Archive.zip`, `Archive 2.zip`, `all-files.md`, `screenshot.png`, `app-tour.js`) after human approval
-- TASK: Remove dead `src/features/today/*` module (6 files; `/app-tour` redirects to `/home`; knip unused)
+- DONE (2026-07-07 relevance cleanup): deleted root cruft (`Archive.zip`, `Archive 2.zip`, `all-files.md`, `screenshot.png`, `app-tour.js`, `.nvrmc`, session `.txt`, 38 `playwright-ui-screenshots/`); removed verified-dead `shared/permissions.ts` (server uses `er-mode-permissions.ts`), `server/integrations/{rollout,conflicts}/*`, `src/lib/constants/regex.ts`, `src/lib/task-dashboard-filters.ts`, `src/hooks/use-is-mobile.ts`. Gate green; superseded stale PR #40.
+- TASK: Remove dead `src/features/today/*` unused siblings (`QuickScanCard`, `ShiftHero`, `TodayScreen`, `UrgentCountChips`, `use-today-shift`, `index.ts`) — verify each is unreachable first. KEEP `HomeTabletDashboard.tsx` — it is LIVE (`src/pages/home.tsx:26` imports it). PR #40's blanket `features/today` deletion was unsafe for this reason.
 - TASK: Audit `docs/design-handoff/` (240 tracked files, ~15MB) — archive externally or trim to active design refs
 - TASK: Deduplicate untracked `.agents/skills/ecc/` mirror of `.claude/skills/ecc/` (~1.7MB each); pick one canonical agent-skills path
-- TASK: Remove or wire `shared/permissions.ts` (knip unused; server uses `er-mode-permissions.ts` instead)
-- TASK: Remove or wire `server/integrations/rollout/*` + `conflicts/*` (knip unused; `vendor-x-rollout.ts` is the active path)
-- TASK: Remove stub `inventory-deduction` worker/queue chain per Removal Protocol (`docs/governance/PRODUCT_DRIVEN_IMPROVEMENT_PLAN.md`)
+- NOTE (do not "clean"): `inventory-deduction` worker/queue is NOT dead — `server/services/dispense.service.ts:614` enqueues it and 5 tests assert its shape. Removing it is a behavior change (Removal Protocol), not a relevance-cleanup deletion. Reassess only if the dispense enqueue path is intentionally retired.
+- TASK: Split remaining >800-LOC files (repo ceiling). `admin.tsx` DONE (1656→219 + prop-less section files under `src/pages/admin/`). Next, modular/clean: `equipment-list.tsx` (1351 — extract `EquipmentItem` + desktop sub-sections). Monolithic/higher-risk (single cohesive component; needs real decomposition + visual-regression, do individually): `equipment-detail.tsx` (2075), `Tasks.tsx` (1590), `inventory-page.tsx` (1033), route files `containers.ts`/`users.ts`/`equipment.ts`. EXCLUDE frozen/generated: `i18n.generated.d.ts` (generated), `metrics.ts`, `code-blue.ts`, `realtime.ts`, `auth.ts`, hand-built `i18n.ts`.
 
 ---
 
