@@ -156,10 +156,10 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
 
         {/* END side (left in RTL, right in LTR): icon buttons */}
         <div style={{ display: "flex", gap: 4, marginInlineStart: "auto" }}>
-          {/* iPad: chat lives here as a header control (no floating FAB on tablet).
-              The launcher owns the single useShiftChat instance on this device. */}
-          {isTablet && (
-            <ShiftChatLauncher
+          {/* Chat lives in the header on every native/mobile shell (phone + iPad) —
+              the floating FAB is desktop-web only. The launcher owns the single
+              useShiftChat instance on this device. */}
+          <ShiftChatLauncher
               renderTrigger={({ open, unreadCount }) => (
                 <button
                   type="button"
@@ -201,7 +201,6 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
                 </button>
               )}
             />
-          )}
           <button
             type="button"
             aria-label={t.nav.settings}

@@ -31,16 +31,16 @@ import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { clerkProviderPropsForRuntime } from "@/lib/clerk-capacitor-config";
 import { NativeClerkGate } from "@/components/native-clerk-gate";
 import { primeNfcSupportCache } from "@/lib/nfc-platform";
-import { useIsNativeTablet } from "@/native/tablet/useIsNativeTablet";
+import { usePlatformTarget } from "@/app/platform";
 
 /**
- * The global chat float belongs to the phone + web shells only. On the native
- * tablet the chat lives in NativeHeader, which owns the single useShiftChat
- * instance — so mounting the float here too would double-subscribe.
+ * The global chat float is for the DESKTOP / marketing web shells only. Every
+ * mobile shell (phone + iPad, native or installed PWA) renders NativeHeader, which
+ * owns the single useShiftChat instance via its header launcher — so mounting the
+ * float on mobile too would double-subscribe.
  */
 function GlobalShiftChat() {
-  const isNativeTablet = useIsNativeTablet();
-  return isNativeTablet ? null : <ShiftChatFab />;
+  return usePlatformTarget() === "mobile" ? null : <ShiftChatFab />;
 }
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
