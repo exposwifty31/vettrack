@@ -1511,3 +1511,23 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - **III.9 disposition:** gate warnings out of Phase-2 fence, flagged in PR body not fixed — 4 pre-existing depcruise `no-features-to-pages-internals` (rooms/inventory tablet) + untuned `knip` baseline (excluded from architecture:gates). Diff adds zero new warnings.
 
 **Verdict:** VERIFIED (byte-identical + full gate green). Live browser walk of nav not run — consistent with the owner-accepted Phase-0 live-walk skip; covered by the byte-identical proof + full suite. PR #50 open; CI polling per III.7.
+
+## 2026-07-07 — Phase 6 (B2): web chrome restage + headless pre-build (branch claude/phase-6-web-chrome)
+
+**Context:** Wave-2 Phase 6, unblocked by the merged Phase 2. Preceded by a 15-agent ground-truth workflow (wf_899f9b82) that read the 8 unwired server routes + 5 chrome surfaces in parallel and produced a fence-hardened, adversarially-verified blueprint.
+
+**Claim:** Additive headless console — nav model + typed API client + primitives + 5 guarded skeleton pages + nav wiring — grounded in the REAL handler shapes, fence-clean, zero behavior change to existing surfaces.
+
+**Evidence (verified 2026-07-07):**
+- **Ground truth:** workflow verified every claim against live code (not its own citations). Caught: sync/retry/replay return **202** (`integrations.ts:561`, `ops.routes.ts:123,190`); `configLogs`/`rollback`/`promote` unverified/vendor-x-only → deferred, not invented; **Q1** — every console read is `requireAdmin` (`integrations.ts:79`+; `admin-outbox-*`) so a lead (management.web, no webWrite) 403s.
+- **Nav model:** `src/lib/routes/web-management-nav-model.ts` gated on `management.web` (5 modules → routes); 7 tests (structure + capability visibility across all 7 roles incl. secondary-admin).
+- **API client:** `api.integrations` (16 methods) + `src/types/integrations.ts` hand-typed from `server/schema/integrations.ts` rows (timestamps → ISO strings); request bodies from the route zod schemas.
+- **Primitives:** `src/desktop/management/` — ManagementGuard (`can("management.web")`, admits lead — not `role==="admin"` hard-gate), WriteGate (`management.webWrite`), ReadOnlyChip, DataTable (headless, RTL logical props), DetailDrawer (direction-aware inline-end anchor). 7 behavioral tests (guards + DataTable states).
+- **Pages:** 5 under `src/pages/console/`; integrations + ops-health wire real reads with the Q1 lead-vs-admin split (`accessPendingServer` for read-only users); webhooks/notifications/rfid render honest `pendingEndpoint` (Q2–Q4). Ops-health is observe-only (ReadOnlyChip, no requeue/drop — frozen-surface doctrine).
+- **Wiring (additive):** `routes.tsx` (5 lazy + 5 `AuthGuard>WebOnlyGuard>ManagementGuard` routes; `/admin/metrics` NOT edited — critique dropped it as non-additive + real-mobile-screen); IconSidebar + Topbar render the management section from `visibleWebManagementNav`; console `nav.*`/`console.*` i18n keys wired into the hand-built `i18n.ts` accessor.
+- **Gate:** `tsc --noEmit` (fe) 0 · server tsc 0 (architecture:gates) · `pnpm test` **410 files / 3987 passed** · `pnpm i18n:check` deep parity ✓ · `pnpm architecture:gates` All G1, **0 cycles**.
+- **Fence (III.4):** additive only — no `src/native/**`, no `native-nav-model.ts`, no server-route edits, no existing operational-page internals. Frozen surfaces untouched (no audit kind/telemetry/realtime/SW/build-tag/appointments change).
+
+**Owner questions (surfaced, non-blocking):** Q1 (lead server-read access — future phase), Q2–Q4 (missing endpoints — Phase 7), Q5 (`/admin/metrics` fencing — dropped, separate ticket), Q6 (lead+secondary-admin webWrite edge). Deferred to Phase 7: ConfigFormScaffold, Pagination, configLogs/rollback/promote, the rich dashboard/health display.
+
+**Verdict:** VERIFIED (grounded + full gate green). Live browser walk of the console not run — consistent with the owner-accepted Phase-0 live-walk skip; covered by tsc + full suite + capability-visibility + guard tests. PR pending; held for owner merge.
