@@ -9,7 +9,8 @@ import {
 } from "lucide-react";
 import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
 import { NAV } from "@/lib/routes/nav-model";
-import { useAuth } from "@/hooks/use-auth";
+import { useExperience } from "@/hooks/use-experience";
+import { filterAdminNav } from "@/lib/roles/experience-model";
 import { t } from "@/lib/i18n";
 
 /** Kept for backward compat — PageShell / my-equipment.tsx still reference this type. */
@@ -33,9 +34,9 @@ function navLabel(key: string): string {
 export function IconSidebar() {
   const [location] = useLocation();
   const dir = useDirection();
-  const { isAdmin } = useAuth();
+  const experience = useExperience();
 
-  const visibleItems = NAV.filter((n) => !n.adminOnly || isAdmin);
+  const visibleItems = filterAdminNav(NAV, experience);
 
   const borderClass =
     dir === "rtl" ? "border-e border-ivory-border" : "border-s border-ivory-border";

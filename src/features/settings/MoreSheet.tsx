@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { SettingRow } from "./SettingRow";
 import { t } from "@/lib/i18n";
-import { useAuth } from "@/hooks/use-auth";
+import { useExperience } from "@/hooks/use-experience";
+import { filterAdminNav } from "@/lib/roles/experience-model";
 import { useIsTabletViewport } from "@/lib/use-tablet-viewport";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useActiveShift } from "@/hooks/use-active-shift";
@@ -39,7 +40,7 @@ function Divider() {
 
 export function MoreSheet({ open, onClose }: Props) {
   const [, navigate] = useLocation();
-  const { isAdmin } = useAuth();
+  const experience = useExperience();
   const dialogRef = useRef<HTMLDivElement>(null);
   const startYRef = useRef<number | null>(null);
   const isTablet = useIsTabletViewport();
@@ -78,8 +79,10 @@ export function MoreSheet({ open, onClose }: Props) {
 
   // Phone drawer: the bottom tab bar already carries `inPhoneTabBar` items
   // (Today / Equipment / Scan / Emergency), so hide them here to avoid duplicates.
-  const sections = getNativeNavSections({ hasActiveShift: shiftLoading || hasActiveShift })
-    .filter((section) => !section.adminOnly || isAdmin)
+  const sections = filterAdminNav(
+    getNativeNavSections({ hasActiveShift: shiftLoading || hasActiveShift }),
+    experience,
+  )
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => !item.inPhoneTabBar),

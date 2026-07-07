@@ -86,6 +86,7 @@ import { statusToBadgeVariant } from "@/lib/design-tokens";
 import { toast } from "sonner";
 import { toastSuccess } from "@/lib/ui-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useExperience } from "@/hooks/use-experience";
 import { useActiveShift } from "@/hooks/use-active-shift";
 import { usePendingSyncForEquipment, useSyncQueue } from "@/hooks/use-sync";
 import { MoveRoomSheet } from "@/components/move-room-sheet";
@@ -159,6 +160,7 @@ function EquipmentDetailPageDesktop() {
   const [, navigate] = useLocation();
   const searchStr = useSearch();
   const { isAdmin, email, userId, role, effectiveRole } = useAuth();
+  const experience = useExperience();
   const queryEnabled = !!userId;
   const ROLE_LEVEL: Record<string, number> = {
     admin: 40,
@@ -173,8 +175,7 @@ function EquipmentDetailPageDesktop() {
   /** Baseline DB/shift role is student — not elevated technician/vet for this session. */
   const isStudentEquipmentRole = resolvedEquipmentRole === "student";
   const canDuplicate = (ROLE_LEVEL[resolvedEquipmentRole] ?? 0) >= 20;
-  // Pattern from shift-chat-panel.tsx — effectiveRole may differ from role during shift
-  const hasVetAccess = isAdmin || effectiveRole === "vet" || role === "vet";
+  const hasVetAccess = experience.can("equipment.vetActions");
   const { settings } = useSettings();
   const { supported: nfcWriteSupported } = useNfcSupported();
   const { discard } = useSyncQueue();

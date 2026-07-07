@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { t } from "@/lib/i18n";
-import { useAuth } from "@/hooks/use-auth";
+import { useExperience } from "@/hooks/use-experience";
+import { filterAdminNav } from "@/lib/roles/experience-model";
 import { useActiveShift } from "@/hooks/use-active-shift";
 import { ReportIssueDialog } from "@/components/report-issue-dialog";
 import {
@@ -86,12 +87,13 @@ function SidebarSectionHeader({ label }: { label: string }) {
  */
 export function NativeTabSidebar() {
   const [location, navigate] = useLocation();
-  const { isAdmin } = useAuth();
+  const experience = useExperience();
   const { hasActiveShift, isLoading: shiftLoading } = useActiveShift();
   const [reportBugOpen, setReportBugOpen] = useState(false);
 
-  const sections = getNativeNavSections({ hasActiveShift: shiftLoading || hasActiveShift }).filter(
-    (section) => !section.adminOnly || isAdmin,
+  const sections = filterAdminNav(
+    getNativeNavSections({ hasActiveShift: shiftLoading || hasActiveShift }),
+    experience,
   );
   const allHrefs = sections.flatMap((section) =>
     section.items
