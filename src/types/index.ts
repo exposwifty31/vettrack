@@ -7,3 +7,4 @@ export * from "./inventory.js";
 export * from "./safety-surfaces.js";
 export * from "./cursor-bug-fixer.js";
 export * from "./shift-adjustments.js";
+export * from "./integrations.js";
