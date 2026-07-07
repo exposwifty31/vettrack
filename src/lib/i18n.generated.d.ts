@@ -3673,6 +3673,42 @@ export interface TStructure {
   metrics: {
     disabled: string;
   };
+  console: {
+    readOnly: string;
+    accessPendingServer: string;
+    pendingEndpoint: string;
+    retry: string;
+    state: {
+      loading: string;
+      empty: string;
+      error: string;
+    };
+    pagination: {
+      page: string;
+      next: string;
+      previous: string;
+    };
+    integrations: {
+      title: string;
+      subtitle: string;
+    };
+    webhooks: {
+      title: string;
+      subtitle: string;
+    };
+    notifications: {
+      title: string;
+      subtitle: string;
+    };
+    rfidReaders: {
+      title: string;
+      subtitle: string;
+    };
+    opsHealth: {
+      title: string;
+      subtitle: string;
+    };
+  };
   nav: {
     integrations: string;
     webhooks: string;
