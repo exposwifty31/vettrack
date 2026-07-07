@@ -67,6 +67,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useExperience } from "@/hooks/use-experience";
+import { filterAdminNav } from "@/lib/roles/experience-model";
 import { useSync } from "@/hooks/use-sync";
 import { QrScanner } from "@/components/qr-scanner";
 import { useSettings } from "@/hooks/use-settings";
@@ -164,7 +166,8 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
   const prevAlertCountRef = useRef(0);
   const prevCriticalCountRef = useRef<number | null>(null);
   const soundToggleRequestIdRef = useRef(0);
-  const { isAdmin, role, userId, effectiveRole } = useAuth();
+  const { role, userId, effectiveRole } = useAuth();
+  const experience = useExperience();
   const resolvedNavRole = String(effectiveRole ?? role ?? "").trim().toLowerCase();
   const { pendingCount, failedCount, isSyncing, justSynced, triggerSync } = useSync();
   const { settings, update } = useSettings();
@@ -463,7 +466,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     prevCriticalCountRef.current = criticalCount;
   }, [criticalCount]);
 
-  const canAccessCodeBlue = isAdmin || role === "vet" || role === "senior_technician" || role === "technician";
+  const canAccessCodeBlue = experience.can("codeBlue.manage");
 
   const canAccessInventoryNav =
     role === "admin" || role === "vet" || role === "senior_technician" || role === "technician";
@@ -547,7 +550,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     t,
   ]);
 
-  const visibleItems = navItems.filter((item) => !item.adminOnly || isAdmin);
+  const visibleItems = filterAdminNav(navItems, experience);
 
   const operationMenuItems = useMemo(
     () =>

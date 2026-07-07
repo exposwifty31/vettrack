@@ -5,6 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { cn, computeAlerts } from "@/lib/utils";
 import { buildAlertAckSet, countActiveAlerts, filterUnackedAlerts } from "@/lib/alert-counts";
 import { useAuth } from "@/hooks/use-auth";
+import { useExperience } from "@/hooks/use-experience";
+import { filterAdminNav } from "@/lib/roles/experience-model";
 import { useDirection } from "@/hooks/useDirection";
 import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
 import { NAV } from "@/lib/routes/nav-model";
@@ -22,7 +24,8 @@ function navLabel(key: string): string {
 
 export function Topbar() {
   const [location] = useLocation();
-  const { isAdmin, name, activeShift, userId } = useAuth();
+  const { name, activeShift, userId } = useAuth();
+  const experience = useExperience();
   const dir = useDirection();
   const signedIn = Boolean(userId);
 
@@ -59,7 +62,7 @@ export function Topbar() {
     prevAlertCount.current = alertCount;
   }, [alertCount]);
 
-  const visibleItems = NAV.filter((n) => !n.adminOnly || isAdmin);
+  const visibleItems = filterAdminNav(NAV, experience);
 
   const activeHref =
     visibleItems

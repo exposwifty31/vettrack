@@ -107,6 +107,51 @@ recorded below. Key toolchain facts for re-syncs:
   Plex Mono) are runtime/host-served (declared via `runtimeFontPrefixes`), NOT
   bundled. Designs render in fallback fonts unless the host page loads them.
 
+## Known design-system-check flags (triaged benign — do NOT re-chase)
+
+`check_design_system`, run in the target project against the synced
+`_ds_bundle.css`, reports three items that are **expected artifacts of this repo's
+non-standard "ship the whole app's compiled Tailwind CSS" config** (see the intro
+note), not defects. **None is fixable by editing source or the bundle** —
+verified 2026-07-07 against `.design-sync/compiled.css`, the file that becomes
+`_ds_bundle.css`:
+
+1. **`DM Mono` @font-face has no font file.** By design — DM Mono is a
+   `runtimeFontPrefixes` entry (host-served, never bundled; see "## Fonts").
+   `compiled.css` declares `font-family: DM Mono, IBM Plex Mono, ui-monospace,
+   monospace` with **zero `@font-face` blocks**, so numerals fall back to IBM
+   Plex Mono — also a slashed-zero mono, so the intended stat/count look holds.
+   Resolve *in the design tool* by uploading the DM Mono file via the sidebar
+   banner, or accept the fallback. **No code/token change wanted.**
+   - **Resolved 2026-07-07 (console audit): fallback accepted.** No DM Mono
+     font file exists in the repo or in the design project (`fonts/` holds
+     Heebo only), so the sidebar-banner upload path is moot. The IBM Plex Mono
+     fallback (also slashed-zero) is recorded as the accepted rendering for
+     synced component previews. Note the console `.dc.html` templates and
+     `VetTrack Console.html` load DM Mono themselves via a Google Fonts
+     `<link>`, so Present-mode console deliverables render true DM Mono
+     regardless of the bundle.
+2. **~73 `--tw-*` custom properties + ~200 utility props under component
+   selectors.** These are Tailwind's compiler internals (`--tw-ring-*`,
+   `--tw-shadow-*`, `--tw-translate-*`, gradient/filter/backdrop vars, …) emitted
+   by `pnpm build` into the compiled CSS. They do **not** exist in `src/` (grep:
+   zero hand-authored `--tw-*`), so they cannot be annotated or scoped in source —
+   they only exist in compiled output. Shipping the full app CSS as the DS bundle
+   necessarily carries them.
+
+**Why there is no source-side fix (and no safe edit right now):** the bundle is
+regenerated from `pnpm build` output on every sync (`cssEntry` →
+`.design-sync/compiled.css`), so editing `_ds_bundle.css` — in the project or the
+`ds-bundle/` / `VetTrack Design System/` repo copies — is overwritten on the next
+sync. The suggested `/* @kind … */` markers are **not a convention this toolchain
+recognizes** (zero usage in the repo) and the `--tw-*` tokens have no source
+origin to attach them to. The only lever that changes these is a **re-sync**,
+which overwrites the live project's `_ds_bundle.css` / `styles.css` (see "##
+Target project" / "## Re-sync risks") — so it must wait until the design project's
+owner is done working. If a cleaner bundle is ever wanted, it is a *build-pipeline*
+change (a DS-only CSS entry that excludes Tailwind's base/utility layers), scoped
+as a re-sync-time task — never an edit to the live project.
+
 ## Theme / palette (default = clinical/indigo)
 
 The DS ships a **theme matrix** keyed on `data-color-theme` (each with a `.dark`

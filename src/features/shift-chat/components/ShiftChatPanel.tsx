@@ -8,6 +8,7 @@ import { BroadcastCard } from "./BroadcastCard";
 import { SystemCard } from "./SystemCard";
 import { BROADCAST_TEMPLATES, type BroadcastKey } from "../types";
 import { useAuth } from "@/hooks/use-auth";
+import { useExperience } from "@/hooks/use-experience";
 import { t } from "@/lib/i18n";
 import { Bdi } from "@/components/ui/bdi";
 import { MessageSquare } from "lucide-react";
@@ -24,7 +25,8 @@ const UNIQUE_ROOM_TAGS = (msgs: { roomTag: string | null }[]) =>
   [...new Set(msgs.map((m) => m.roomTag).filter(Boolean))] as string[];
 
 export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
-  const { role, effectiveRole, userId } = useAuth();
+  const { userId } = useAuth();
+  const experience = useExperience();
   const { sendMessage, isSending, notifyTyping, ackMessage, reactToMessage, pinMessage } = chat;
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -34,18 +36,8 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [composerPadding, setComposerPadding] = useState(0);
 
-  const canSendBroadcast =
-    effectiveRole === "senior_technician" ||
-    role === "senior_technician" ||
-    effectiveRole === "admin" ||
-    role === "admin";
-  const canPin =
-    effectiveRole === "vet" ||
-    role === "vet" ||
-    effectiveRole === "senior_technician" ||
-    role === "senior_technician" ||
-    effectiveRole === "admin" ||
-    role === "admin";
+  const canSendBroadcast = experience.can("shiftChat.broadcast");
+  const canPin = experience.can("shiftChat.pin");
 
   useEffect(() => {
     if (isOpen && bottomRef.current) {
