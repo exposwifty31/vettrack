@@ -75,11 +75,12 @@ export function useOpsHome() {
       .slice(0, 5);
   }, [rooms]);
 
+  // Hero "loading" keys on the pulse only (pre-split parity), not the combined isLoading.
   const heroState: HeroState = today.pulse
     ? today.pulse.shift
       ? "active"
       : "noshift"
-    : today.isLoading
+    : today.pulseLoading
       ? "loading"
       : "noshift";
 
@@ -97,6 +98,7 @@ export function useOpsHome() {
     totalCount: equipment?.length ?? 0,
     isLoading: today.isLoading,
     isError: today.isError,
+    equipmentError: today.equipmentError,
     equipment,
     refetch: today.refetch,
     roomsLoading,

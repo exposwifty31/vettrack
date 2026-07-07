@@ -66,6 +66,11 @@ export function useTodayShift() {
     equipment,
     isLoading,
     isError,
+    // Per-query flags so callers can reproduce the pre-split home gating exactly:
+    // the shift hero's "loading" state keys on the pulse only, and the full-content
+    // ErrorCard keys on the equipment query only (not a sibling's failure).
+    pulseLoading,
+    equipmentError,
     criticalCount,
     overdueCount,
     itemsOutCount,

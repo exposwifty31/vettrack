@@ -1,4 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
+import { useEnterOnce } from "@/hooks/use-enter-once";
 import { ErrorCard } from "@/components/ui/error-card";
 import { t } from "@/lib/i18n";
 import { QuickScanCard } from "../QuickScanCard";
@@ -21,13 +22,16 @@ import { MyEquipmentCard } from "./floor/MyEquipmentCard";
 export function FloorHomeSurface({ isTablet }: { isTablet: boolean }) {
   const { name } = useAuth();
   const home = useFloorHome();
-  const showError = home.isError && !home.equipment;
+  const rise = useEnterOnce("home") ? "vt-pro-rise" : "";
+  // Full-content error keys on the equipment query alone (pre-split parity) — a
+  // pulse/tasks failure degrades within the content region, it does not blank the page.
+  const showError = home.equipmentError && !home.equipment;
 
   return (
     <HomeShell bare={isTablet}>
       <div className="vt-enter-stagger mx-auto flex w-full max-w-[640px] flex-col gap-4 px-4 pb-nav-safe pt-3 sm:gap-5 sm:px-6">
         <HomeChrome />
-        <HomeGreeting name={name} size="large" />
+        <HomeGreeting name={name} size="large" className={rise} />
 
         {showError ? (
           <ErrorCard message={t.equipmentList.errors.loadFailed} onRetry={() => home.refetch()} />
@@ -39,6 +43,7 @@ export function FloorHomeSurface({ isTablet }: { isTablet: boolean }) {
               scansDone={home.scansToday}
               heroState={home.heroState}
               emphasis="primary"
+              className={rise}
             />
             <QuickScanCard />
             <TasksPreviewCard dashboard={home.taskDashboard} isLoading={home.isLoading} />

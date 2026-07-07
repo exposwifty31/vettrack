@@ -1,3 +1,4 @@
+import { Skeleton } from "@/components/ui/skeleton";
 import { t } from "@/lib/i18n";
 import { pctColor } from "./ops-tile-helpers";
 
@@ -22,6 +23,9 @@ export function CoverageCard({
   inUse: number;
   isLoading: boolean;
 }) {
+  // Cold cache: availabilityPct is null AND the counts are placeholder 0s. Show the
+  // skeleton state (like HomeTabletDashboard) rather than a misleading "0 ready" flash.
+  const loading = isLoading && availabilityPct === null;
   const tier = availabilityPct === null ? "var(--ivory-text3)" : pctColor(availabilityPct);
 
   return (
@@ -29,6 +33,7 @@ export function CoverageCard({
       data-testid="ops-coverage-card"
       className="relative overflow-hidden rounded-[20px] border border-ivory-border bg-ivory-surface p-5 shadow-hero"
       aria-label={t.homeSurface.coverage}
+      aria-busy={loading}
     >
       <span className="absolute inset-x-0 top-0 h-1" style={{ background: tier }} aria-hidden />
 
@@ -42,17 +47,25 @@ export function CoverageCard({
           className="font-num text-[2.75rem] font-bold leading-none tracking-[-0.03em] tabular-nums"
           style={{ color: tier }}
         >
-          {isLoading && availabilityPct === null ? "—" : availabilityPct === null ? "—" : `${availabilityPct}%`}
+          {availabilityPct === null ? "—" : `${availabilityPct}%`}
         </span>
         <span className="text-[13px] font-semibold text-ivory-text3">{t.homeSurface.available}</span>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-        <Stat value={ready} label={t.homeSurface.ready} />
-        <Stat value={notReady} label={t.homeSurface.notReady} tone={notReady > 0 ? "warn" : "neutral"} />
-        <Stat value={itemsOut} label={t.home.shift.itemsOut} />
-        <Stat value={inUse} label={t.homeSurface.inUse} />
-      </div>
+      {loading ? (
+        <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-9 rounded-lg" />
+          ))}
+        </div>
+      ) : (
+        <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+          <Stat value={ready} label={t.homeSurface.ready} />
+          <Stat value={notReady} label={t.homeSurface.notReady} tone={notReady > 0 ? "warn" : "neutral"} />
+          <Stat value={itemsOut} label={t.home.shift.itemsOut} />
+          <Stat value={inUse} label={t.homeSurface.inUse} />
+        </div>
+      )}
     </section>
   );
 }

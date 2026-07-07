@@ -39,12 +39,14 @@ export function OnShiftHero({
   scansDone,
   heroState,
   emphasis = "primary",
+  className,
 }: {
   pulse: HomeDashboardPulse | undefined;
   itemsOut: number;
   scansDone: number;
   heroState: HeroState;
   emphasis?: "primary" | "demoted";
+  className?: string;
 }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -67,6 +69,7 @@ export function OnShiftHero({
       className={cn(
         "relative w-full overflow-hidden shadow-hero",
         demoted ? "rounded-2xl p-4" : "rounded-[20px] p-[18px]",
+        className,
       )}
       style={{
         background:

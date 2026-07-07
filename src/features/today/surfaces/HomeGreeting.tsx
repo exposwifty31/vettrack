@@ -17,9 +17,11 @@ function greetingFor(hour: number, name: string): string {
 export function HomeGreeting({
   name,
   size = "large",
+  className,
 }: {
   name?: string | null;
   size?: "compact" | "large";
+  className?: string;
 }) {
   const firstName = name?.split(" ")[0] || t.homePage.fallbackName;
   const greeting = greetingFor(new Date().getHours(), firstName);
@@ -30,7 +32,7 @@ export function HomeGreeting({
   });
 
   return (
-    <header>
+    <header className={className}>
       <h1
         className={
           size === "large"

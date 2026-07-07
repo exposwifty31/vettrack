@@ -15,19 +15,22 @@ export function useFloorHome() {
   const userId = getCurrentUserId();
 
   const { data: myEquipment, isLoading: myEquipmentLoading } = useQuery({
-    queryKey: ["/api/equipment/my", userId ?? ""],
+    // Canonical bare key (matches layout.tsx / my-equipment page) so the cache dedupes.
+    queryKey: ["/api/equipment/my"],
     queryFn: api.equipment.listMy,
     enabled: !!userId,
     retry: false,
     refetchOnWindowFocus: false,
   });
 
-  const { pulse, isLoading } = today;
+  const { pulse, pulseLoading } = today;
+  // Match the pre-split home: the hero "loading" keys on the PULSE only, so a fast
+  // pulse error while tasks/equipment are still in flight shows "noshift", not a skeleton.
   const heroState: HeroState = pulse
     ? pulse.shift
       ? "active"
       : "noshift"
-    : isLoading
+    : pulseLoading
       ? "loading"
       : "noshift";
 

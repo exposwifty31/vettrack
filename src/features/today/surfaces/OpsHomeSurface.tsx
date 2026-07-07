@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { useEnterOnce } from "@/hooks/use-enter-once";
 import { getCurrentUserId } from "@/lib/auth-store";
 import { ErrorCard } from "@/components/ui/error-card";
 import { t } from "@/lib/i18n";
@@ -25,13 +26,15 @@ export function OpsHomeSurface() {
   const userId = getCurrentUserId();
   const isDesktop = useIsDesktop();
   const home = useOpsHome();
-  const showError = home.isError && !home.equipment;
+  const rise = useEnterOnce("home") ? "vt-pro-rise" : "";
+  // Equipment-only error gate (pre-split parity) — see FloorHomeSurface.
+  const showError = home.equipmentError && !home.equipment;
 
   return (
     <HomeShell>
       <div className="vt-enter-stagger mx-auto flex w-full max-w-[720px] flex-col gap-5 px-4 pb-nav-safe pt-3 sm:px-6 lg:max-w-[1120px]">
         <HomeChrome />
-        <HomeGreeting name={name} size="compact" />
+        <HomeGreeting name={name} size="compact" className={rise} />
 
         {showError ? (
           <ErrorCard message={t.equipmentList.errors.loadFailed} onRetry={() => home.refetch()} />
@@ -63,6 +66,7 @@ export function OpsHomeSurface() {
               scansDone={home.scansToday}
               heroState={home.heroState}
               emphasis="demoted"
+              className={rise}
             />
 
             {isDesktop && home.heroState === "active" && (

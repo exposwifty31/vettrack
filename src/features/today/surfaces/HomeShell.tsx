@@ -1,12 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
+import { Helmet } from "react-helmet-async";
 import { Siren } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { QrScanner } from "@/components/qr-scanner";
 import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
-import { useEnterOnce } from "@/hooks/use-enter-once";
 import { useScanAffordance } from "@/lib/scan-affordance";
 import { subscribeKeepalive } from "@/lib/realtime";
 import { t } from "@/lib/i18n";
@@ -28,8 +28,6 @@ import { t } from "@/lib/i18n";
 interface HomeShellContextValue {
   activeCodeBlueId: string | null;
   isOffline: boolean;
-  /** Enter-animation class (empty after the first mount this session). */
-  rise: string;
 }
 
 const HomeShellContext = createContext<HomeShellContextValue | null>(null);
@@ -48,7 +46,6 @@ export function HomeShell({ bare = false, children }: { bare?: boolean; children
     typeof navigator !== "undefined" && !navigator.onLine,
   );
   const searchStr = useSearch();
-  const rise = useEnterOnce("home") ? "vt-pro-rise" : "";
   const scanAffordance = useScanAffordance();
 
   useRealtimeReconciliation({ queryClient });
@@ -81,12 +78,20 @@ export function HomeShell({ bare = false, children }: { bare?: boolean; children
   }, [searchStr, scanAffordance]);
 
   const ctx = useMemo<HomeShellContextValue>(
-    () => ({ activeCodeBlueId, isOffline, rise }),
-    [activeCodeBlueId, isOffline, rise],
+    () => ({ activeCodeBlueId, isOffline }),
+    [activeCodeBlueId, isOffline],
   );
 
   const body = (
     <HomeShellContext.Provider value={ctx}>
+      <Helmet>
+        <title>Dashboard — VetTrack</title>
+        <meta
+          name="description"
+          content="Real-time veterinary equipment dashboard. Track your shift at a glance, scan equipment, and triage critical and overdue items across your clinic."
+        />
+        <link rel="canonical" href="https://vettrack.replit.app/" />
+      </Helmet>
       {children}
       {scannerOpen && <QrScanner onClose={() => setScannerOpen(false)} />}
     </HomeShellContext.Provider>
