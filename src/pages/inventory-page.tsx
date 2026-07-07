@@ -202,6 +202,10 @@ export default function InventoryPage() {
   const [scanOverlay, setScanOverlay] = useState<{ label: string; delta: number | null } | null>(null);
   const [scanGeneration, setScanGeneration] = useState(0);
   const [isNfcStarting, setIsNfcStarting] = useState(false);
+  // Live NFC state drives the button (a ref alone never re-renders, so the button
+  // couldn't reflect a stalled session or offer a way to recover — it just sat
+  // "NFC Live" and disabled). Mirrors the equipment NfcForegroundScan toggle.
+  const [nfcActive, setNfcActive] = useState(false);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -596,6 +600,7 @@ export default function InventoryPage() {
       });
       nfcSessionStopRef.current = session.stop;
       nfcActiveRef.current = true;
+      setNfcActive(true);
       haptics.scanSuccess();
       toast.success(p.nfcReady, { duration: 3200 });
     } catch {
@@ -605,6 +610,17 @@ export default function InventoryPage() {
       setIsNfcStarting(false);
     }
   };
+
+  const stopNFCScan = useCallback(async () => {
+    const stop = nfcSessionStopRef.current;
+    nfcSessionStopRef.current = null;
+    nfcActiveRef.current = false;
+    setNfcActive(false);
+    await stop?.().catch(() => {});
+  }, []);
+
+  // Tear the NFC session down on unmount so it can't leak / stay open across pages.
+  useEffect(() => () => { void stopNFCScan(); }, [stopNFCScan]);
 
   const handleOpenDispense = useCallback(() => {
     if (!selectedId) {
@@ -638,14 +654,15 @@ export default function InventoryPage() {
           </h1>
           {nfcSupported && (
             <Button
-              variant="outline"
+              variant={nfcActive ? "default" : "outline"}
               size="sm"
-              onClick={startNFCScan}
-              disabled={isNfcStarting || nfcActiveRef.current}
+              onClick={() => (nfcActive ? void stopNFCScan() : void startNFCScan())}
+              disabled={isNfcStarting}
+              aria-pressed={nfcActive}
               className="gap-1.5 shrink-0 min-h-[40px]"
             >
               {isNfcStarting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Nfc className="w-4 h-4" />}
-              {nfcActiveRef.current ? p.nfcLive : isNfcStarting ? p.nfcStarting : p.nfcLabel}
+              {nfcActive ? p.nfcLive : isNfcStarting ? p.nfcStarting : p.nfcLabel}
             </Button>
           )}
         </div>
