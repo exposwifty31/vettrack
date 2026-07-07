@@ -101,3 +101,9 @@ ios/**/xcshareddata/swiftpm/
 .design-sync/previews/
 .design-sync/preview-provider.tsx
 VetTrack Design System/
+
+# Repo-weight cruft (removed 2026-07-07 relevance cleanup; keep it from returning)
+/*.zip
+/all-files.md
+/screenshot*.png
+*-this-session-is-being-continued-*.txt

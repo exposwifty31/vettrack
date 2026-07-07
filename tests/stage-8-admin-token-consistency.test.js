@@ -10,7 +10,17 @@ const BANNED = /\b(emerald|amber|zinc|indigo|slate)-[0-9]|\b(red|green|blue|gray
 const HEBREW = /[֐-׿]/;
 
 describe("Stage 8 — admin.tsx", () => {
-  const src = read("src", "pages", "admin.tsx");
+  // The admin page was split into a shell (admin.tsx) + per-tab section files
+  // (src/pages/admin/*.tsx). The token-consistency contract covers the whole
+  // admin surface, so read the shell plus every section file.
+  const adminDir = path.join(repoRoot, "src", "pages", "admin");
+  const src =
+    read("src", "pages", "admin.tsx") +
+    fs
+      .readdirSync(adminDir)
+      .filter((f) => f.endsWith(".tsx"))
+      .map((f) => fs.readFileSync(path.join(adminDir, f), "utf8"))
+      .join("\n");
 
   it("has no hardcoded palette", () => {
     expect(BANNED.test(src)).toBe(false);
