@@ -44,7 +44,21 @@ const SHIFT_SENSITIVE: ReadonlySet<Capability> = new Set<Capability>([
   "shiftChat.pin",
 ]);
 
-/** Total map — every one of the 7 client roles, no default fallthrough (II role divergence). */
+/**
+ * Total map — every one of the 7 client roles, no default fallthrough (II role divergence).
+ *
+ * NOTE — intentional client↔server divergence (do not "align" without a plan change):
+ * this follows the IV.2-A keystone — `senior_technician`/`lead_technician` → lead,
+ * `technician`/`vet_tech` → tech. The SERVER's `normalizeUserRole`
+ * (`server/middleware/auth.ts`) instead collapses the two ALIASES (`lead_technician`,
+ * `vet_tech`) to `student`, since they are not real DB roles. These disagree, but it
+ * is safe: `normalizeUserRole` runs at every authUser construction, so the client's
+ * `useAuth().role` is always one of the 5 real DB roles — an alias never reaches this
+ * map at runtime. The server stays the enforcement boundary; a client capability grant
+ * authorizes nothing on its own. If an alias ever did flow raw, the client would show
+ * affordances the server 403s (a UX bug, not a privilege escalation), and
+ * `capabilitiesForRole`'s `?? []` guard degrades any unmapped value to no-grant.
+ */
 const ARCHETYPE_BY_ROLE: Record<UserRole, ExperienceArchetype> = {
   admin: "admin",
   vet: "vet",
@@ -121,13 +135,25 @@ export interface ExperienceInput {
  * The overlay adds capabilities only; it never changes archetype (I.4 — shift never
  * reshapes home/nav).
  */
+/**
+ * Base capabilities for a role, defensive against runtime values outside the 7-key
+ * map. `effectiveRole` in particular can arrive unnormalized (a stale offline-cache
+ * snapshot, or a legacy alias in a `vt_shifts.role` row — see role-resolution),
+ * violating the compile-time type. An unknown role degrades to no grant — matching
+ * the pre-Phase-2 string checks, which returned `false` — instead of throwing on
+ * `for...of undefined` and crashing every nav render.
+ */
+function capabilitiesForRole(role: UserRole | ShiftRole): readonly Capability[] {
+  return CAPABILITIES_BY_ARCHETYPE[archetypeForRole(role)] ?? [];
+}
+
 export function resolveCapabilities(input: ExperienceInput): ReadonlySet<Capability> {
-  const caps = new Set<Capability>(CAPABILITIES_BY_ARCHETYPE[archetypeForRole(input.role)]);
+  const caps = new Set<Capability>(capabilitiesForRole(input.role));
   if (input.isAdmin) {
     for (const c of SECONDARY_ADMIN_CAPS) caps.add(c);
   }
   if (input.roleSource === "shift") {
-    for (const c of CAPABILITIES_BY_ARCHETYPE[archetypeForRole(input.effectiveRole)]) {
+    for (const c of capabilitiesForRole(input.effectiveRole)) {
       if (SHIFT_SENSITIVE.has(c)) caps.add(c);
     }
   }
