@@ -170,6 +170,38 @@ describe("experience-model — shift overlay is capabilities-only + shift-scoped
   });
 });
 
+describe("experience-model — defensive against out-of-map runtime roles (crash-vs-degrade)", () => {
+  // Compile-time types constrain roles to the 7-key union, but runtime values can
+  // violate that (stale offline cache, unnormalized legacy alias in a vt_shifts.role
+  // row). The model must degrade to no-grant, never throw on for...of undefined.
+  it("does not throw and grants no shift caps when effectiveRole is an unmapped value", () => {
+    const run = () =>
+      resolveCapabilities({
+        role: "technician",
+        effectiveRole: "ghost_role" as unknown as ShiftRole,
+        roleSource: "shift",
+        isAdmin: false,
+      });
+    expect(run).not.toThrow();
+    const caps = run();
+    expect(caps.has("codeBlue.manage")).toBe(true); // from the permanent tech base
+    expect(caps.has("shiftChat.broadcast")).toBe(false); // unknown shift role contributes nothing
+    expect(caps.has("shiftChat.pin")).toBe(false);
+  });
+
+  it("does not throw and degrades to no-grant when the permanent role is unmapped", () => {
+    const run = () =>
+      resolveCapabilities({
+        role: "legacy_role" as unknown as UserRole,
+        effectiveRole: "legacy_role" as unknown as UserRole,
+        roleSource: "permanent",
+        isAdmin: false,
+      });
+    expect(run).not.toThrow();
+    expect(run().size).toBe(0);
+  });
+});
+
 describe("filterAdminNav — byte-identical to the pre-Phase-2 nav gate", () => {
   const ALL_ROLES: UserRole[] = [
     "admin",
