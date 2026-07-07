@@ -38,6 +38,10 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
   // Fall back to initials if the presigned avatar URL fails to load (a broken img
   // renders as a "?" placeholder on iOS WebKit).
   const [avatarError, setAvatarError] = useState(false);
+  // Pages that run their own foreground NFC session (e.g. /inventory restock): the
+  // header NFC toggle hides there so only ONE Core NFC session runs per device
+  // (iOS forbids a second concurrent reader session).
+  const pageOwnsNfc = location.startsWith("/inventory");
   const [openPanel, setOpenPanel] = useState<Panel>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -83,6 +87,12 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
     staleTime: 30_000,
     refetchOnWindowFocus: false,
   });
+
+  // Clear a stale avatar-load failure when the presigned URL rotates (it refetches
+  // ~every 30s) so a single transient failure doesn't permanently downgrade to initials.
+  useEffect(() => {
+    setAvatarError(false);
+  }, [me?.avatarUrl]);
 
   if (isFullscreen) return null;
 
@@ -159,8 +169,10 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
 
         {/* END side (left in RTL, right in LTR): icon buttons */}
         <div style={{ display: "flex", gap: 4, marginInlineStart: "auto" }}>
-          {/* NFC quick-scan toggle — now reachable from any page (was an
-              equipment-only corner FAB). Owns the single foreground NFC session. */}
+          {/* NFC quick-scan toggle — reachable from any page (was an equipment-only
+              corner FAB). Hidden where a page owns its own NFC session (e.g.
+              /inventory) so only one Core NFC session is live at a time. */}
+          {!pageOwnsNfc && (
           <NfcForegroundScan
             renderTrigger={({ enabled, starting, toggle }) => (
               <button
@@ -179,6 +191,7 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
               </button>
             )}
           />
+          )}
           {/* Chat lives in the header on every native/mobile shell (phone + iPad) —
               the floating FAB is desktop-web only. The launcher owns the single
               useShiftChat instance on this device. */}

@@ -9,6 +9,7 @@ import type { SidebarItem } from "@/components/layout/IconSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingSection } from "@/components/ui/loading-section";
 import { Input } from "@/components/ui/input";
+import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -198,6 +199,23 @@ function LocalDateTimeField({
   value: string;
   onChange: (value: string) => void;
 }) {
+  // Desktop/pointer browsers render datetime-local correctly and need the visible
+  // native picker affordance (calendar/spinner). Only iOS jumbles the value under
+  // Hebrew — so the readable overlay is scoped to the native shell.
+  if (!isCapacitorNative()) {
+    return (
+      <Input
+        id={id}
+        type="datetime-local"
+        dir="ltr"
+        className="text-left"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={label}
+      />
+    );
+  }
+
   const valid = Boolean(value) && !Number.isNaN(new Date(value).getTime());
   return (
     <div className="relative">
