@@ -35,7 +35,7 @@ Previously `db:migrate` ran `drizzle-kit migrate`. That path is retired — use 
 
 ## CI
 
-GitLab CI and GitHub Actions run `pnpm migrate` against test PostgreSQL before integration tests.
+GitHub Actions runs `pnpm migrate` against test PostgreSQL before integration tests.
 
 ## Migration Runner Internals
 

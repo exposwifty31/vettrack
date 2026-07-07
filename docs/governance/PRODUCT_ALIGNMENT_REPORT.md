@@ -302,4 +302,4 @@ REMOVE domains: ER patients, medication formulary, pharmacy forecast, billing UI
 
 ## Next phase
 
-**Phase 3 — GitHub Governance Audit** → `GITHUB_GOVERNANCE.md` (branches, PRs, issues, releases, security).
+**Phase 3 — GitHub governance** → [`docs/devops/github-setup.md`](../devops/github-setup.md) (branches, PRs, required checks).

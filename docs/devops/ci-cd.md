@@ -4,7 +4,7 @@
 
 ## Overview
 
-Pipeline definitions live in **`.github/workflows/`** (GitHub Actions). GitLab CI (`.gitlab-ci.yml`) was removed in the GitHub-first migration (`f927e5b1`).
+Pipeline definitions live in **`.github/workflows/`** (GitHub Actions).
 
 **Status:** GitHub Actions is active on `origin`. Local commands below are the pre-merge contract regardless.
 
@@ -25,8 +25,6 @@ Maintenance scope: [`docs/MAINTENANCE_MODE.md`](../MAINTENANCE_MODE.md)
 | [`e2e-simulation-nightly.yml`](../../.github/workflows/e2e-simulation-nightly.yml) | Nightly 05:00 UTC; manual | No |
 | [`workday-simulation-nightly.yml`](../../.github/workflows/workday-simulation-nightly.yml) | Nightly 04:00 UTC; manual | No |
 | [`staging-e2e-manual.yml`](../../.github/workflows/staging-e2e-manual.yml) | Manual on `staging` | No |
-
-Legacy GitLab pipeline notes: [`docs/GITLAB_DEVELOPMENT.md`](../GITLAB_DEVELOPMENT.md).
 
 ---
 
@@ -60,7 +58,7 @@ Two shards run `pnpm test:playwright:ci` against a local API on `127.0.0.1:3001`
 
 ## Release gate (manual)
 
-Pilot/demo readiness: typecheck, full vitest, i18n parity, RTL/mobile/PWA, offline/sync, workflow integration tests, accessibility structure checks. Dispatch from Actions or GitLab pipeline UI when CI is active.
+Pilot/demo readiness: typecheck, full vitest, i18n parity, RTL/mobile/PWA, offline/sync, workflow integration tests, accessibility structure checks. Dispatch from GitHub Actions UI.
 
 ---
 

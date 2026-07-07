@@ -1,25 +1,26 @@
 # VetTrack — CI/CD Governance Audit
 
 **Phase:** 4 — CI/CD Governance Audit  
-**Generated:** 2026-06-18  
+**Generated:** 2026-06-18 · **Updated:** 2026-07-07 (GitHub Actions only)  
 **Governor:** Product Engineering Governor  
-**Prerequisites:** [`GITHUB_GOVERNANCE.md`](./GITHUB_GOVERNANCE.md), [`ARCHITECTURE_MAP.md`](./ARCHITECTURE_MAP.md)  
-**References:** `docs/devops/ci-cd.md`, `.github/workflows/`, `.gitlab-ci.yml`, `deploy.sh`
+**Prerequisites:** [`ARCHITECTURE_MAP.md`](./ARCHITECTURE_MAP.md)  
+**Canonical pipeline doc:** [`docs/devops/ci-cd.md`](../devops/ci-cd.md) · [`docs/devops/github-setup.md`](../devops/github-setup.md)  
+**Active CI:** `.github/workflows/`
 
 ---
 
 ## Executive summary
 
-VetTrack has a **mature dual-platform CI design** (GitHub Actions + GitLab CI) with strong typecheck, vitest, architecture gates, and sharded Playwright. **GitHub is the active execution path** today; GitLab pipelines mirror GitHub but **`gitlab/main` is 71 commits behind** and may be suspended per `MAINTENANCE_MODE.md`.
+VetTrack CI runs on **GitHub Actions** (`.github/workflows/`).
 
 | Dimension | Grade | Headline |
 |-----------|-------|----------|
-| Build reliability | **B+** | Recent `main` green; earlier failures on auth/native fixes |
-| Merge gate strength | **B** | Solid when enabled; **not enforced** (no branch protection) |
-| Pipeline duplication | **C+** ↑ | Two platforms + duplicate installs; ~~GitLab missing contracts gate~~ **contracts gate added 2026-06-18** |
-| Deploy safety | **B** | Railway gated off by default; preflight script exists |
-| Quality coverage gaps | **B-** ↑ | ~~No knip in PR lane~~ **knip non-blocking in both platforms (2026-06-18)**; i18n parity confirmed in merge gate; vitest excludes DB/live-server suites |
-| Native/mobile CI | **D** | Manual scripts only; no iOS/Android in merge path |
+| Build reliability | **B+** | Recent `main` green; failures cluster around native/auth TypeScript |
+| Merge gate strength | **B** | Solid when enabled; verify branch protection lists **both** `ci.yml` merge gate and Playwright shards |
+| Pipeline maintenance | **B** | Single GitHub Actions platform |
+| Deploy safety | **B** | Railway gated off by default (`RAILWAY_USE_CLI_DEPLOY`); preflight script exists |
+| Quality coverage gaps | **B-** | knip non-blocking in architecture gates; vitest excludes DB/live-server suites |
+| Native/mobile CI | **D** | Manual `pnpm cap:build:native` only; no iOS/Android in merge path |
 
 ---
 
@@ -30,61 +31,32 @@ VetTrack has a **mature dual-platform CI design** (GitHub Actions + GitLab CI) w
 | Layer | Tooling | CI entry |
 |-------|---------|----------|
 | Package manager | pnpm 9.15.9, frozen lockfile | All jobs |
-| Node | 22.x (`.nvmrc`) | `setup-node` / `node:22-alpine` |
+| Node | 22.x (`.nvmrc`) | `actions/setup-node` |
 | Frontend build | Vite → `dist/public` | `pnpm build` |
-| Server | `tsx` / compiled check via `tsconfig.server-check.json` | Dual `tsc` |
+| Server | `tsx` / `tsconfig.server-check.json` | Dual `tsc` |
 | DB | Postgres 16 service container | `pnpm migrate` → `scripts/run-migrations.ts` |
 | E2E | Playwright Chromium, 2 shards | `pnpm test:playwright:ci` |
 
-### Observed duration (GitHub, 2026-06-18, run `27743693070`)
-
-| Job | Outcome | Approx. wall time |
-|-----|---------|-----------------|
-| **Total workflow** | success | **~3m 17s** (`run_duration_ms`: 197s) |
-| Integration ops | success | ~2m (parallel) |
-| Architecture gates | success | ~2m (parallel) |
-| Tests & typecheck | success | ~3m (longest pole) |
-| Playwright (per shard) | success | ~1m 54s – 2m 23s (separate workflow) |
-
-**PR feedback time (typical):** ~3–5 minutes for CI + ~2–4 minutes Playwright (parallel workflows) → **~5–7 minutes** if both required.
-
-### Reliability (recent `main` history)
-
-| Run | Result | Notes |
-|-----|--------|-------|
-| PR #3 / `main` push | ✅ CI + Playwright | Phase-5 CSP hardening |
-| `workflow_dispatch` on `main` | ❌ CI failure | Manual re-run — investigate if recurring |
-| Native OAuth merge push | cancelled | Superseded by faster push |
-| Auth Clerk session fix | ❌ CI then ✅ Playwright | Fixed in follow-up commit |
-| Legal pages PR #2 | ✅ | |
-| Account deletion PR #1 | ✅ | |
-
-**Trend:** Failures cluster around **native/auth TypeScript** changes; core suite recovers quickly.
-
-### Cache effectiveness
-
-| Platform | Mechanism | Assessment |
-|----------|-----------|------------|
-| GitHub | `actions/setup-node` `cache: pnpm` keyed on lockfile | **Good** |
-| GitLab | `.pnpm_cache` on `node_modules` + `.pnpm-store` | **Good** |
-| Playwright browsers | Re-installed each run (`playwright install --with-deps`) | **Acceptable cost** (~30–60s) |
-| Vite build | No cross-job build artifact reuse | **Opportunity** — GitLab chains build→test; GitHub rebuilds in Playwright |
-
-### Parallelization
+### Parallelization (GitHub)
 
 | Pattern | Status |
 |---------|--------|
-| `test` ∥ `integration-ops` ∥ `architecture-gates` (GitHub) | **Good** |
-| GitLab `typecheck:frontend` ∥ `typecheck:server` → `build` → `test` | **Good staged DAG** |
+| `test` ∥ `integration-ops` ∥ `architecture-gates` | **Good** |
 | Playwright 2 shards, `fail-fast: false` | **Good** |
+| `concurrency: cancel-in-progress` per ref | **Good** |
 | Duplicate `pnpm install` + dual `tsc` in `test` and `architecture-gates` | **Medium waste** — acceptable for isolation |
-| `concurrency: cancel-in-progress` per ref | **Good** — saves queue time |
+
+### Cache
+
+| Mechanism | Assessment |
+|-----------|------------|
+| `actions/setup-node` `cache: pnpm` keyed on lockfile | **Good** |
+| Playwright browsers re-installed each run | **Acceptable** (~30–60s) |
+| Vite build not shared between CI test and Playwright jobs | **Opportunity** — artifact reuse |
 
 ---
 
-## Workflows inventory
-
-### GitHub Actions (8 files)
+## Workflows inventory (GitHub Actions)
 
 | Workflow | Trigger | Blocking? | Purpose |
 |----------|---------|-----------|---------|
@@ -96,42 +68,14 @@ VetTrack has a **mature dual-platform CI design** (GitHub Actions + GitLab CI) w
 | `e2e-simulation-nightly.yml` | Nightly 05:00 UTC; manual | No | Local simulation |
 | `staging-e2e-manual.yml` | Manual on `staging` | No | Staging auth/Code Blue smoke |
 
-### GitLab CI (`.gitlab-ci.yml`)
-
-Mirrors GitHub with **more granular stages**: `typecheck` → `build` → `test` → `integration` → `architecture` → `deploy` → `playwright` + scheduled simulation stages.
-
-| Job | GitHub equivalent | Drift? |
-|-----|-------------------|--------|
-| `typecheck:*` + `build:frontend` | Part of `test` job | GitLab more staged |
-| `test:vitest` | `test` job | Aligned |
-| `integration:ops` | `integration-ops` | Aligned |
-| `architecture:gates` | `architecture-gates` | **Missing `contracts-gate.sh`** on GitLab |
-| `ci:merge-gate` | `gate` job | Aligned (weaker — no script validation) |
-| `playwright:shard-*` + `ci:playwright-gate` | `playwright.yml` | Aligned |
-| `deploy:*` | `deploy-check` + `deploy` | Aligned; gated on `RAILWAY_USE_CLI_DEPLOY` |
-| `android:build` (per open MR !20) | None | **Not on `main` branch file** — pending MR |
-
-### Duplicate / dead / unused
+### Known gaps
 
 | Issue | Severity | Detail |
 |-------|----------|--------|
-| **Dual platform maintenance** | **High** | Every CI change should touch both files; GitLab already drifted (contracts) |
-| **Playwright not in `ci.yml` merge gate** | **High** | Two workflows must both pass; branch protection must list **both** |
-| **`ci.yml` on `cursor/**` without Playwright** | **Medium** | Agent pushes get unit CI but **not** E2E unless PR opened to `main` |
-| **`master` branch in Playwright only** | **Low** | Legacy branch name; harmless |
-| **Stale `BuildFailed` workflow** | **Medium** | Documented in `TROUBLESHOOTING.md` — disable in GitHub UI if present |
-| **Release-gate duplicates `ci.yml` tests** | **Low** | Intentional (manual, richer gates per DP-04 comment) |
-| **Nightlies on default branch only** | **Low** | Correct — non-blocking observability |
-
-### Workflow complexity
-
-| Area | Assessment |
-|------|------------|
-| `ci.yml` merge gate `if: always()` + skip handling | **Well-designed** — deploy skip does not block |
-| Deploy preflight secret guard | **Good** — missing secrets → skip, not fail |
-| Playwright API boot + 60×2s health wait | **Robust**; logs uploaded on failure |
-| GitLab `ci:merge-gate` | **Thin** — only echoes success; relies on `needs:` DAG |
-| `.gitlab-ci.yml` length (~557 lines) | **High** — same concern as monolith routes |
+| Playwright not inside `ci.yml` merge gate | **High** | Branch protection must require **both** workflows |
+| `ci.yml` on `cursor/**` without Playwright | **Medium** | Agent pushes get unit CI but not E2E until PR to `main` |
+| Stale `BuildFailed` workflow | **Medium** | Disable in GitHub UI if present — see `TROUBLESHOOTING.md` |
+| Native Capacitor build absent from CI | **High** (mobile ship) | Manual `pnpm cap:build:native` per `CLAUDE.md` |
 
 ---
 
@@ -147,42 +91,16 @@ push main
   → else: skip (current default)
 ```
 
-**Observed:** Deploy jobs **skipped** on 2026-06-18 `main` run — `RAILWAY_USE_CLI_DEPLOY` not enabled. Aligns with `CONTRIBUTING.md` ("leave disabled unless approved").
-
-### Railway vs GitHub Actions
-
-| Mode | Status |
-|------|--------|
-| Railway Git integration (push-to-deploy) | May run independently of Actions — **verify in Railway dashboard** |
-| CLI deploy from CI | Opt-in via repo variable |
-| Migrations | **`runMigrations()` at server boot** + `pnpm migrate` in CI — production applies on deploy start |
+**Observed:** Deploy jobs often **skipped** when `RAILWAY_USE_CLI_DEPLOY` is not enabled. Verify whether Railway Git integration deploys independently of Actions.
 
 ### Rollback capability
 
 | Mechanism | Available? | Notes |
 |-----------|------------|-------|
-| Railway deployment history rollback | **Yes** (platform) | Operational — not automated in repo |
-| Blue/green or canary | **No** | Single service deploy |
+| Railway deployment history rollback | **Yes** (platform) | Not automated in repo |
 | DB migration rollback | **Manual** | Forward-only SQL migrations |
 | PWA `__VT_BUILD_TAG__` | **Yes** | Client cache bust on new build |
-| Feature flags / enforcement `shadow` | **Yes** | Per-clinic degrade paths |
-
-### Environment protection
-
-| Control | Status | Severity |
-|---------|--------|----------|
-| `RAILWAY_USE_CLI_DEPLOY` default off | **Good** | — |
-| Production secrets in GitHub/GitLab CI vars | Expected | Masking required |
-| No GitHub Environment gates (staging/prod) | **Gap** | **Medium** |
-| `deploy.sh` blocks `PILOT_MODE` without `ALLOW_EQUIPMENT_PILOT_MODE` | **Good** | Prevents accidental pilot deploy |
-| `pnpm validate:prod` | Local/script | **Not in merge gate** |
-
-### Deployment bottlenecks
-
-1. **Single-threaded `main` deploy** — no staging branch on remotes today.  
-2. **Playwright + full CI before merge** — correct but slow for large MRs.  
-3. **No automated smoke against production URL post-deploy** — workday nightly needs `TEST_BASE_URL_STAGING`.  
-4. **Worker process split** — `notification.worker` not deployed via same `deploy.sh` path.
+| Authority evaluators `shadow` mode | **Yes** | Per-clinic degrade paths |
 
 ---
 
@@ -190,49 +108,33 @@ push main
 
 ### Merge-blocking (when CI active + branch protection configured)
 
-| Gate | GitHub `ci.yml` | GitHub Playwright | GitLab | Local contract |
-|------|-----------------|-------------------|--------|----------------|
-| Frontend `tsc` | ✅ | — (build only) | ✅ | `npx tsc --noEmit` |
-| Server `tsc` | ✅ | — | ✅ | `tsconfig.server-check.json` |
-| `pnpm build` | ✅ | ✅ | ✅ | `pnpm build` |
-| `pnpm migrate` + vitest | ✅ | ✅ (E2E path) | ✅ | `pnpm test` |
-| `test:integration:ops` | ✅ | — | ✅ | Documented |
-| `@vettrack/contracts` + emergency parity | ✅ | — | **❌ Missing** | `contracts-gate.sh` |
-| dependency-cruiser | ✅ | — | ✅ | `architecture:gates` |
-| madge cycle baseline | ✅ | — | ✅ | |
-| tenant / query-key / route lint | Warn-only | — | Warn-only | |
-| Playwright CI suite (2 shards) | Separate workflow | ✅ | ✅ | `pnpm test:playwright:ci` |
+| Gate | `ci.yml` | `playwright.yml` | Local contract |
+|------|----------|------------------|----------------|
+| Frontend `tsc` | ✅ | — (build only) | `npx tsc --noEmit` |
+| Server `tsc` | ✅ | — | `tsconfig.server-check.json` |
+| `pnpm build` | ✅ | ✅ | `pnpm build` |
+| `pnpm migrate` + vitest | ✅ | ✅ (E2E path) | `pnpm test` |
+| `test:integration:ops` | ✅ | — | `pnpm test:integration:ops` |
+| `@vettrack/contracts` + emergency parity | ✅ | — | `scripts/ci/contracts-gate.sh` |
+| dependency-cruiser + cycle baseline | ✅ | — | `pnpm architecture:gates` |
+| tenant / query-key / route lint | Warn-only | — | `pnpm tenant:lint:touched` |
+| Playwright CI suite (2 shards) | Separate workflow | ✅ | `pnpm test:playwright:ci` |
+| i18n parity | ✅ in vitest (`i18n-parity.test`) | — | `pnpm i18n:check` |
 
 ### Not in PR lane (gaps)
 
-| Check | Where it runs | Product risk | Severity |
-|-------|---------------|--------------|----------|
-| **knip** (dead exports) | Local / agent rules only | Dead code accumulates | **High** |
-| **i18n parity** (`check-parity.ts`) | `release-gate` manual; vitest `i18n-parity.test` in full test? | Broken HE/EN | **Medium** |
-| **Dependabot / SCA** | Not configured | Vulnerable deps | **High** |
-| **ESLint** | Not in CI | Style/consistency | **Low** (if no eslint project-wide) |
-| **DB integration tests** | Excluded from default vitest | Migration/service regressions | **Medium** |
-| **Live-server tests** | Excluded (`charge-alert`, `returns-api`, etc.) | Worker/API integration | **Medium** |
-| **Native Capacitor build** | Manual scripts | Store submission regressions | **High** for mobile ship |
-| **`validate:prod`** | Manual | Misconfigured prod env | **Medium** |
-| **Phase 9 Playwright drills** | In CI suite when `PW_SUITE=ci` | Frozen surface regressions | Covered if CI green |
+| Check | Where it runs | Severity |
+|-------|---------------|----------|
+| **knip** (dead exports) | Non-blocking in architecture gates | **Medium** — monitor growth |
+| **Dependabot / SCA** | Not configured | **High** |
+| **DB integration tests** | Excluded from default vitest | **Medium** |
+| **Live-server tests** | Excluded | **Medium** |
+| **Native Capacitor build** | Manual scripts | **High** for store ship |
+| **`validate:prod`** | Manual | **Medium** |
 
 ### Release gate (manual — `release-gate.yml`)
 
-Richer than PR CI: i18n parity script, RTL foundation, mobile/PWA vitest groups, workflow integration tests, accessibility structure. **Correctly non-blocking** for daily merges; should run before pilot/demo/native store submission.
-
----
-
-## GitHub vs GitLab CI drift register
-
-| Item | GitHub | GitLab | Severity |
-|------|--------|--------|----------|
-| `contracts-gate.sh` | ✅ in architecture-gates | ❌ absent | **Critical** for mobile contract |
-| `cursor/**` push triggers unit CI | ✅ | ✅ | Aligned |
-| `transformation/**` branch rules | ❌ | ✅ | **Medium** — large MRs on GitLab only |
-| Playwright on `cursor/**` | ❌ (no PR to main) | MR rules only | **Medium** |
-| Active pipeline on current `main` | ✅ (71 commits ahead) | **Stale base** | **Critical** |
-| Android `android:build` manual job | ❌ | In MR !20 only | **Medium** — native ship |
+Richer than PR CI: extended vitest groups, PWA/offline drills, accessibility structure. **Non-blocking** for daily merges; run before pilot/demo/App Store submission.
 
 ---
 
@@ -240,39 +142,27 @@ Richer than PR CI: i18n parity script, RTL foundation, mobile/PWA vitest groups,
 
 ### P0 — Restore trust in the delivery pipeline
 
-| # | Recommendation | Business impact | Engineering impact | Effort | ROI |
-|---|----------------|-----------------|-------------------|--------|-----|
-| 1 | **Reconcile `gitlab/main` with GitHub `main`** (or retire GitLab CI until needed) | Stops MR !17/!20 merging against false base | One-time sync + process | M | **Very high** |
-| 2 | **Enable branch protection** requiring `CI — VetTrack` merge gate + both Playwright shards | Prevents broken `main` | GitHub settings | S | **Very high** |
-| 3 | **Add `contracts-gate.sh` to GitLab `architecture:gates`** | Mobile/offline contract safety | 2-line script addition | XS | **High** |
+| # | Recommendation | Effort | ROI |
+|---|----------------|--------|-----|
+| 1 | **Enable branch protection** requiring `CI — VetTrack` merge gate + both Playwright shards | S | **Very high** |
+| 2 | Document **required checks** list in `docs/devops/ci-cd.md` matching actual GitHub job names | XS | **High** |
+| 3 | Verify **Railway deploy mode** (git vs CLI) vs Actions skip behavior | S | **High** |
 
 ### P1 — Close quality gaps without slowing every PR
 
-| # | Recommendation | Business impact | Effort | ROI |
-|---|----------------|-----------------|--------|-----|
-| 4 | Add **knip** to architecture-gates (or weekly scheduled job) | Less dead code drag | S | **High** |
-| 5 | Add **Dependabot** (npm + actions) | Security + dep freshness | S | **High** |
-| 6 | Run **i18n parity** in `ci.yml` or promote `i18n-parity.test` visibility | Hebrew market quality | S | **High** |
-| 7 | Document **required checks** list in `docs/devops/ci-cd.md` matching actual job names | Onboarding + protection setup | XS | **Medium** |
-| 8 | Verify **Railway deploy mode** (git vs CLI) and whether `main` push deploys outside Actions | Release clarity | S | **High** |
+| # | Recommendation | Effort | ROI |
+|---|----------------|--------|-----|
+| 4 | Add **Dependabot** (npm + actions) | S | **High** |
+| 5 | Scheduled **knip report** artifact (non-blocking) | S | **Medium** |
+| 6 | Share **Vite build artifact** between CI test and Playwright jobs | M | **Medium** |
 
-### P2 — Speed and maintainability
+### P2 — Mobile and production hardening
 
 | # | Recommendation | Effort | ROI |
 |---|----------------|--------|-----|
-| 9 | **Single CI platform** — generate GitLab from GitHub or vice versa, or delete inactive one | M | **High** long-term |
-| 10 | Share **Vite build artifact** between CI test and Playwright jobs | M | **Medium** |
-| 11 | Add **Playwright to `cursor/**` PR policy** (require PR to `main` for agents) | S | **Medium** |
-| 12 | Scheduled **knip + depcruise** report artifact (non-blocking) | S | **Medium** |
-
-### P3 — Mobile and production hardening
-
-| # | Recommendation | Effort | ROI |
-|---|----------------|--------|-----|
-| 13 | Merge MR !20 **android:build** manual job + document secrets | M | **High** for Play store |
-| 14 | Add **macOS job** for Capacitor archive smoke (manual/nightly only) | L | **Medium** |
-| 15 | Post-deploy **health smoke** (`/api/health/ready`) against staging URL | M | **Medium** |
-| 16 | Run **`validate:prod`** in deploy preflight when secrets present | S | **Medium** |
+| 7 | Nightly or manual **macOS Capacitor archive smoke** | L | **Medium** |
+| 8 | Post-deploy **health smoke** (`/api/health/ready`) against staging URL | M | **Medium** |
+| 9 | Run **`validate:prod`** in deploy preflight when secrets present | S | **Medium** |
 
 ---
 
@@ -282,12 +172,12 @@ From `MAINTENANCE_MODE.md` and `docs/devops/ci-cd.md`:
 
 ```bash
 pnpm install --frozen-lockfile
-npx tsc --noEmit
-npx tsc --noEmit --project tsconfig.server-check.json
+pnpm typecheck
 bash scripts/ci/contracts-gate.sh
 pnpm migrate && pnpm test
 pnpm test:integration:ops          # when touching ops/integration paths
-pnpm architecture:gates            # optional full G1
+pnpm architecture:gates            # when touching server/module boundaries
+pnpm i18n:check                    # when touching locales
 pnpm test:playwright:ci            # when touching UI/realtime/PWA/Code Blue
 ```
 
@@ -298,15 +188,15 @@ pnpm test:playwright:ci            # when touching UI/realtime/PWA/Code Blue
 | Level | VetTrack today | Target |
 |-------|----------------|--------|
 | L1 Typecheck + unit tests | ✅ | Keep |
-| L2 Architecture + contracts | ✅ GitHub / ⚠️ GitLab | Align GitLab |
+| L2 Architecture + contracts | ✅ GitHub | Keep |
 | L3 E2E Playwright sharded | ✅ | Keep |
-| L4 Branch protection + required checks | ❌ | **P0** |
-| L5 SCA + knip + i18n in PR | Partial | **P1** |
+| L4 Branch protection + required checks | ⚠️ verify | **P0** |
+| L5 SCA + knip visibility in PR | Partial | **P1** |
 | L6 Manual release gate before demo/ship | ✅ | Run before App Store |
-| L7 Native build in CI | ❌ | **P3** |
+| L7 Native build in CI | ❌ | **P2** |
 
 ---
 
 ## Next phase
 
-**Phase 5 — Engineering Friction Analysis** → `ENGINEERING_FRICTION_REPORT.md` (onboarding, testing difficulty, bug-prone areas, cost estimates).
+**Phase 5 — Engineering Friction Analysis** → [`ENGINEERING_FRICTION_REPORT.md`](./ENGINEERING_FRICTION_REPORT.md)

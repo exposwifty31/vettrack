@@ -54,7 +54,7 @@ Use `gh` for GitHub operations. Never delete branches, workflows, or repositorie
 | 0 Product Discovery | `PRODUCT_MODEL.md` |
 | 1 Repository Intelligence | `ARCHITECTURE_MAP.md` |
 | 2 Product Alignment Audit | `PRODUCT_ALIGNMENT_REPORT.md` |
-| 3 GitHub Governance Audit | `GITHUB_GOVERNANCE.md` |
+| 3 GitHub governance | `docs/devops/github-setup.md` |
 | 4 CI/CD Governance Audit | `CI_CD_GOVERNANCE.md` |
 | 5 Engineering Friction Analysis | `ENGINEERING_FRICTION_REPORT.md` |
 | 6 Prioritized Improvement Plan | `PRODUCT_DRIVEN_IMPROVEMENT_PLAN.md` |

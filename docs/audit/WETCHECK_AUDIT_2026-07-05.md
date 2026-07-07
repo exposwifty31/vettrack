@@ -27,7 +27,7 @@ The audit surfaced **one high-impact correctness bug in the #1 priority flow (sc
 
 ### 2.1 What this repo is
 
-`vettrack-ship` is a git **worktree** of the GitHub repo **`exposwifty31/vettrack`** (a GitLab mirror `dboy31561/vettrack` also exists). The older `/Users/dan/vettrack` folder is a legacy checkout of a different/older repo and is not the source of truth for this app.
+`vettrack-ship` is a git **worktree** of the GitHub repo **`exposwifty31/vettrack`**. The older `/Users/dan/vettrack` folder is a legacy checkout of a different/older repo and is not the source of truth for this app.
 
 - **Current branch:** `claude/refine-local-plan-jjrebb` — in sync with its own upstream (0 ahead / 0 behind), and **3 commits ahead of `origin/main`** (two Bugbot review fixes + audit-doc commits).
 - **Working tree:** clean except untracked `.agents/skills/` tooling (not app code).

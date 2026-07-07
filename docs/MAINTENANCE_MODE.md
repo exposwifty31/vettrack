@@ -23,18 +23,9 @@ This repository is the **production monolith**: React web app, Express API, Post
 
 **Product scope:** ER/patient, medication tasks, and formulary were removed June 2026 — [`docs/scope-change-2026.md`](scope-change-2026.md).
 
-## Git remotes
+## Git remote
 
-| Remote | URL | Role |
-|--------|-----|------|
-| **`origin`** | `github.com/exposwifty31/vettrack` | **Canonical** — push PRs here |
-| **`gitlab`** | `gitlab.com/dboy31561/vettrack` | Secondary mirror (migration in progress) |
-
-```bash
-git remote -v
-# origin  → GitHub (canonical)
-# gitlab  → GitLab (mirror)
-```
+**`origin`** → `github.com/exposwifty31/vettrack` (canonical). Push PRs here only.
 
 Clone and setup: [`docs/devops/github-setup.md`](devops/github-setup.md), [`docs/setup/environment.md`](setup/environment.md).
 
@@ -59,7 +50,7 @@ npx tsc --noEmit --project tsconfig.server-check.json
 pnpm test
 ```
 
-See [`docs/devops/ci-cd.md`](devops/ci-cd.md). Legacy GitLab workflow: [`docs/GITLAB_DEVELOPMENT.md`](GITLAB_DEVELOPMENT.md) (secondary remote only).
+See [`docs/devops/ci-cd.md`](devops/ci-cd.md).
 
 ## Contracts package
 
@@ -75,5 +66,4 @@ After bumping the dependency, run `bash scripts/ci/contracts-gate.sh`.
 
 - [`docs/scope-change-2026.md`](scope-change-2026.md) — product scope after migrations 142–143
 - [`docs/governance/REPO_CLEANUP_MANIFEST.md`](governance/REPO_CLEANUP_MANIFEST.md) — repo hygiene inventory
-- [`docs/GITLAB_DEVELOPMENT.md`](GITLAB_DEVELOPMENT.md) — legacy GitLab MR workflow
 - [`CONTRIBUTING.md`](../CONTRIBUTING.md) — tests, release flow, deployment variables

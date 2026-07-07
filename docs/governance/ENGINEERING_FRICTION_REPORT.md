@@ -61,7 +61,7 @@ Identify where engineering time is lost, bugs originate, and onboarding or maint
 | **Engineering cost** | **L** — every agent/engineer asks "where do I push?" |
 | **Product impact** | **High** — wrong code ships or MRs rebased twice |
 | **Risk** | **High** |
-| **Evidence** | [`GITHUB_GOVERNANCE.md`](./GITHUB_GOVERNANCE.md) |
+| **Evidence** | [`docs/devops/github-setup.md`](../devops/github-setup.md) |
 
 ### 1.2 Monolith files (change blast radius)
 

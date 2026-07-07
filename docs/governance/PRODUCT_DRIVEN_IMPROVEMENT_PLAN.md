@@ -1,5 +1,7 @@
 # VetTrack — Product-Driven Improvement Plan
 
+> **Obsolete GitLab references (2026-07-07):** P0-1 (GitLab sync) and P0-3 (GitLab CI) are closed — GitHub is canonical. `GITHUB_GOVERNANCE.md` and `GITLAB_DEVELOPMENT.md` removed. Ignore GitLab items below.
+
 **Phase:** 6 — Prioritized Improvement Plan  
 **Generated:** 2026-06-18  
 **Governor:** Product Engineering Governor  
@@ -57,7 +59,7 @@ This plan converts governance audits into **product-outcome-ranked** work. Every
 - Triage 6 open GitLab MRs: rebase/close drafts !8, !10; decide !17 vs !20 vs !9.
 - **Requires explicit approval** before force-push or remote deletion.
 
-**Evidence:** [`GITHUB_GOVERNANCE.md`](./GITHUB_GOVERNANCE.md) §Platform reality; [`CI_CD_GOVERNANCE.md`](./CI_CD_GOVERNANCE.md) §Drift register.
+**Evidence:** [`docs/devops/github-setup.md`](../devops/github-setup.md) §Platform reality; [`CI_CD_GOVERNANCE.md`](./CI_CD_GOVERNANCE.md) §Drift register.
 
 ---
 
@@ -76,7 +78,7 @@ This plan converts governance audits into **product-outcome-ranked** work. Every
 - `ci.yml` → merge gate job
 - `playwright.yml` → shard 1/2 and 2/2 (or exact job names from workflow)
 
-**Evidence:** [`CI_CD_GOVERNANCE.md`](./CI_CD_GOVERNANCE.md) §Quality gate maturity L4; [`GITHUB_GOVERNANCE.md`](./GITHUB_GOVERNANCE.md) §Branch protection.
+**Evidence:** [`CI_CD_GOVERNANCE.md`](./CI_CD_GOVERNANCE.md) §Quality gate maturity L4; [`docs/devops/github-setup.md`](../devops/github-setup.md) §Branch protection.
 
 ---
 
@@ -222,7 +224,7 @@ This plan converts governance audits into **product-outcome-ranked** work. Every
 | **Expected ROI** | **High** — baseline compliance; low effort. |
 | **Status** | ✅ Done — 2026-06-18. `.github/dependabot.yml` (npm + GitHub Actions, weekly grouped), `SECURITY.md` (disclosure policy, `security@vettrack.uk` — verify address), and `.github/CODEOWNERS` created. Branch protection + labels require manual `gh auth refresh` — see `docs/devops/github-setup.md`. |
 
-**Evidence:** [`GITHUB_GOVERNANCE.md`](./GITHUB_GOVERNANCE.md) §Security P2 items 7–8.
+**Evidence:** [`docs/devops/github-setup.md`](../devops/github-setup.md) §Security P2 items 7–8.
 
 ---
 
@@ -361,7 +363,7 @@ This plan converts governance audits into **product-outcome-ranked** work. Every
 | **Estimated effort** | **S** (2–3 hours) |
 | **Expected ROI** | **Medium** |
 
-**Evidence:** [`GITHUB_GOVERNANCE.md`](./GITHUB_GOVERNANCE.md) §P1 review hygiene.
+**Evidence:** [`docs/devops/github-setup.md`](../devops/github-setup.md) §P1 review hygiene.
 
 ---
 
@@ -667,7 +669,7 @@ After each implemented item:
 | [`PRODUCT_MODEL.md`](./PRODUCT_MODEL.md) | 0 | ✅ |
 | [`ARCHITECTURE_MAP.md`](./ARCHITECTURE_MAP.md) | 1 | ✅ |
 | [`PRODUCT_ALIGNMENT_REPORT.md`](./PRODUCT_ALIGNMENT_REPORT.md) | 2 | ✅ |
-| [`GITHUB_GOVERNANCE.md`](./GITHUB_GOVERNANCE.md) | 3 | ✅ |
+| [`docs/devops/github-setup.md`](../devops/github-setup.md) | 3 | ✅ |
 | [`CI_CD_GOVERNANCE.md`](./CI_CD_GOVERNANCE.md) | 4 | ✅ |
 | [`ENGINEERING_FRICTION_REPORT.md`](./ENGINEERING_FRICTION_REPORT.md) | 5 | ✅ |
 | **PRODUCT_DRIVEN_IMPROVEMENT_PLAN.md** | 6 | ✅ |

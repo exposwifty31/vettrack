@@ -396,7 +396,7 @@ Per-route: `requireAuth`, `requireRole`, `requireEffectiveRole`, `idempotencyMid
 | **Equipment vs operational-state** | Routes split across `equipment.ts`, `equipment-operational-state.ts`, and services — no single owner file |
 | **Tasks naming** | Product says Tasks; code says appointments; `vt_tasks` is a third concept |
 | **Mobile** | Capacitor in-repo vs Expo in `literate-dollop` — contracts in external repo |
-| **CI ownership** | GitHub Actions + GitLab CI + suspended remotes — unclear which gate is authoritative |
+| **CI ownership** | GitHub Actions (`.github/workflows/`) |
 | **Worker deployment** | `start-schedulers` in API process vs `pnpm worker` notification process vs Railway worker service config |
 | **Integrations** | `server/integrations/` is well-factored; `server/routes/integrations.ts` is large catch-all API |
 | **Domain layer adoption** | `server/domain/equipment/` exists but most logic still in routes + services |

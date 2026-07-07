@@ -27,8 +27,6 @@
 
    SSH alternative: `git clone git@github.com:exposwifty31/vettrack.git`
 
-   GitLab mirror (secondary): `git clone git@gitlab.com:dboy31561/vettrack.git` — add `origin` → GitHub if cloning from GitLab.
-
 2. **Create `.env`** (minimal — no Clerk keys needed)
    ```
    DATABASE_URL=postgres://vettrack:vettrack@localhost:5432/vettrack
@@ -134,8 +132,6 @@ RAILWAY_SERVICE        (deploy only)
 Pipeline jobs: Tests & typecheck → Integration ops → Architecture gates → Merge gate (deploy jobs optional).
 
 See [`docs/devops/ci-cd.md`](../devops/ci-cd.md) and [`docs/devops/github-setup.md`](../devops/github-setup.md).
-
-Legacy GitLab CI variables: see [`docs/GITLAB_DEVELOPMENT.md`](../GITLAB_DEVELOPMENT.md) if using the `gitlab` remote mirror.
 
 ---
 

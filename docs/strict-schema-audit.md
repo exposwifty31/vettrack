@@ -1,5 +1,7 @@
 # Zod .strict() schema audit (PR-15 / VA-01)
 
+> **Historical snapshot — partial obsolescence (post migrations 142–143, June 2026).** Rows for `/api/medication-tasks`, medication inventory, ER/patient routes, and formulary fields describe **removed** surfaces. Do not treat them as live API contracts. For current scope see [`scope-change-2026.md`](./scope-change-2026.md). For today's routes run `pnpm docs:audit` → [`audit/routes.md`](./audit/routes.md). Re-audit dispense, code-blue, equipment, and tasks rows against current `server/routes/` before relying on YES/NO columns.
+
 **Generated:** 2026-05-21  
 **Source commits:** PR-15 (`ca2439cc`), PR-16 (`928f512f`)  
 **Auditor:** Composer 2.5  
