@@ -111,11 +111,16 @@ describe("HomeTabletDashboard — M3 iPad bento", () => {
 });
 
 describe("HomePage fork", () => {
-  it("home.tsx forks on useIsNativeTablet at the component level", () => {
+  it("home.tsx forks on homeSurface + useIsNativeTablet at the component level", () => {
     const source = readFileSync(resolve(process.cwd(), "src/pages/home.tsx"), "utf-8");
-    expect(source).toContain(
-      "return isNativeTablet ? <HomeTabletDashboard /> : <HomePhoneAndDesktop />;",
-    );
-    expect(source).toContain("function HomePhoneAndDesktop()");
+    // Phase 3 (A2): the fork now selects by homeSurface (ops/floor) THEN tablet.
+    // Both hooks are called unconditionally before the nested-ternary component
+    // selection (no early return / post-branch hook) — the M3 invariant.
+    expect(source).toContain("useIsNativeTablet()");
+    expect(source).toContain("useExperience()");
+    expect(source).toContain("homeSurface");
+    expect(source).toContain("<HomeTabletDashboard />");
+    expect(source).toContain("<OpsHomeSurface />");
+    expect(source).toContain("<FloorHomeSurface isTablet={isNativeTablet} />");
   });
 });

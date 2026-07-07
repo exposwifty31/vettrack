@@ -34,7 +34,7 @@ interface HomeShellContextValue {
 
 const HomeShellContext = createContext<HomeShellContextValue | null>(null);
 
-export function useHomeShellContext(): HomeShellContextValue {
+function useHomeShellContext(): HomeShellContextValue {
   const ctx = useContext(HomeShellContext);
   if (!ctx) throw new Error("useHomeShellContext must be used within <HomeShell>");
   return ctx;

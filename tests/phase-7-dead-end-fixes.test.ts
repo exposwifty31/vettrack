@@ -87,9 +87,11 @@ describe("3 — sync-queue viewer reachable everywhere", () => {
 
 describe("4 — iPad Home View-all no longer bounces", () => {
   it("the /audit-log link is gated on !isCapacitorNative()", () => {
-    const home = read("src/pages/home.tsx");
-    const gateIdx = home.indexOf("{!isCapacitorNative() && (");
-    const linkIdx = home.indexOf('href="/audit-log"');
+    // Phase 3 (A2): the recent-activity list moved out of home.tsx into the
+    // shared RecentActivityCard surface piece; the native guard moved with it.
+    const activity = read("src/features/today/surfaces/RecentActivityCard.tsx");
+    const gateIdx = activity.indexOf("{!isCapacitorNative() && (");
+    const linkIdx = activity.indexOf('href="/audit-log"');
     expect(gateIdx).toBeGreaterThan(-1);
     expect(linkIdx).toBeGreaterThan(gateIdx);
   });

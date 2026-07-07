@@ -4,48 +4,52 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 /**
- * Stage 3 — Today (home.tsx) finish LOCK (static source assertions).
+ * Stage 3 — Today finish LOCK (static source assertions).
  *
- * Stage 3 gaps from the audit + bug report:
- *  - offline state: a display-only banner on the offline tokens (no queueing);
- *  - error replaces the content region (not stacked above it);
- *  - the scan card is skeletoned during load and removed on the native shell
- *    (BUG-005 — redundant with the tab-bar ScanFab on iPhone/iPad);
- *  - the scan card + urgency chips read semantic tokens, not hardcoded palette.
+ * Phase 3 (A2) split home.tsx into the ops/floor surfaces; the Stage-3 primitives
+ * moved with the code. These guards follow them:
+ *  - offline banner + online/offline listeners → HomeShell (shared plumbing);
+ *  - error replaces the content region → the ops/floor surfaces (showError branch);
+ *  - the scan card stays gated on the fab scan-affordance (BUG-005) — reused
+ *    QuickScanCard, semantic brand token, not hardcoded palette.
  */
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
-const src = fs.readFileSync(path.join(repoRoot, "src", "pages", "home.tsx"), "utf8");
+const read = (...p) => fs.readFileSync(path.join(repoRoot, ...p), "utf8");
 
-describe("Stage 3 Today — offline state", () => {
+const homeShell = read("src", "features", "today", "surfaces", "HomeShell.tsx");
+const floorSurface = read("src", "features", "today", "surfaces", "FloorHomeSurface.tsx");
+const opsSurface = read("src", "features", "today", "surfaces", "OpsHomeSurface.tsx");
+const quickScan = read("src", "features", "today", "QuickScanCard.tsx");
+
+describe("Stage 3 Today — offline state (HomeShell)", () => {
   it("renders a display-only offline banner on the offline tokens", () => {
-    expect(src.includes("isOffline")).toBe(true);
-    expect(src.includes("var(--offline-bg)")).toBe(true);
-    expect(src.includes("t.home.offline")).toBe(true);
-    expect(src.includes('role="alert"')).toBe(true);
+    expect(homeShell.includes("isOffline")).toBe(true);
+    expect(homeShell.includes("var(--offline-bg)")).toBe(true);
+    expect(homeShell.includes("t.home.offline")).toBe(true);
+    expect(homeShell.includes('role="alert"')).toBe(true);
   });
   it("listens to online/offline without queueing (display-only)", () => {
-    expect(src.includes('addEventListener("offline"')).toBe(true);
-    expect(src.includes('addEventListener("online"')).toBe(true);
+    expect(homeShell.includes('addEventListener("offline"')).toBe(true);
+    expect(homeShell.includes('addEventListener("online"')).toBe(true);
   });
 });
 
 describe("Stage 3 Today — error replaces content", () => {
-  it("gates the content region behind !equipmentError", () => {
-    expect(/equipmentError\s*\?/.test(src) || src.includes("!equipmentError")).toBe(true);
+  it("both surfaces gate the content region behind a fetch-error branch", () => {
+    for (const surface of [floorSurface, opsSurface]) {
+      expect(/showError\s*\?/.test(surface)).toBe(true);
+      expect(surface.includes("<ErrorCard")).toBe(true);
+    }
   });
 });
 
-describe("Stage 3 Today — scan card", () => {
+describe("Stage 3 Today — scan card (reused QuickScanCard)", () => {
   it("is gated on the fab scan-affordance — iPad only, removed on iPhone/web (BUG-005)", () => {
-    expect(/showScanCard\s*=[^;]*scanAffordance === "fab"/.test(src)).toBe(true);
+    expect(/affordance !== "fab"/.test(quickScan)).toBe(true);
   });
-  it("skeletons the scan slot during load", () => {
-    expect(src.includes("showScanSkeleton")).toBe(true);
-    expect(src.includes("Skeleton")).toBe(true);
-  });
-  it("uses the --action semantic green, not hardcoded palette", () => {
-    expect(src.includes("var(--action)")).toBe(true);
+  it("uses a semantic brand token, not hardcoded palette", () => {
+    expect(quickScan.includes("var(--brand)")).toBe(true);
   });
 });

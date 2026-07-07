@@ -49,9 +49,16 @@ describe("Wave 3 UI token consistency checks (static)", () => {
   });
 
   it("Home status visuals use semantic design tokens", () => {
+    // Phase 3 (A2): status visuals moved into the home surfaces.
+    const surfaces = [
+      ["src", "features", "today", "surfaces", "HomeShell.tsx"],
+      ["src", "features", "today", "surfaces", "OnShiftHero.tsx"],
+      ["src", "features", "today", "surfaces", "ops", "ops-tile-helpers.tsx"],
+    ]
+      .map((p) => fs.readFileSync(path.join(repoRoot, ...p), "utf8"))
+      .join("\n");
     expect(
-      home.includes("var(--sys-red)") &&
-        home.includes("var(--sys-green)"),
+      surfaces.includes("var(--sys-red)") && surfaces.includes("var(--sys-green)"),
     ).toBe(true);
   });
 });
