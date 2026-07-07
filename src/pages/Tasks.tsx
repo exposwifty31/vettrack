@@ -25,12 +25,17 @@ import type { Appointment, AppointmentStatus, CreateAppointmentRequest, TaskPrio
 import { toast } from "sonner";
 import { toastSuccess } from "@/lib/ui-toast";
 
-const DAY_START_HOUR = 8;
-const DAY_END_HOUR = 20;
-const SLOT_MINUTES = 15;
+const DEFAULT_DAY_START_HOUR = 8;
+const DEFAULT_DAY_END_HOUR = 20;
+const DEFAULT_SLOT_MINUTES = 15;
 const MIN_SLOT_HEIGHT_PX = 44;
-const PIXELS_PER_MINUTE = Math.max(1.2, MIN_SLOT_HEIGHT_PX / SLOT_MINUTES);
 const HOUR_ROW_HEIGHT = 60;
+/** Adjustable slot granularities offered in the Interval control (minutes). */
+const SLOT_MINUTE_OPTIONS = [10, 15, 20, 30, 60] as const;
+/** Compositor-safe px/minute for a given slot size (keeps a slot ≥ MIN_SLOT_HEIGHT_PX). */
+function pixelsPerMinuteFor(slotMinutes: number): number {
+  return Math.max(1.2, MIN_SLOT_HEIGHT_PX / slotMinutes);
+}
 const DASHBOARD_REFETCH_MS = 45_000;
 
 const DURATION_PRESETS = () => [
@@ -166,8 +171,8 @@ function dateAtLocalDay(dayIso: string, hour: number, minute: number): Date {
   return new Date(`${dayIso}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`);
 }
 
-function minutesSinceDayStart(dayIso: string, date: Date): number {
-  const dayStart = dateAtLocalDay(dayIso, DAY_START_HOUR, 0).getTime();
+function minutesSinceDayStart(dayIso: string, date: Date, dayStartHour: number): number {
+  const dayStart = dateAtLocalDay(dayIso, dayStartHour, 0).getTime();
   return Math.max(0, Math.floor((date.getTime() - dayStart) / 60000));
 }
 
@@ -341,6 +346,15 @@ export default function AppointmentsPage() {
   const [selectedDuration, setSelectedDuration] = useState<number>(20);
   const [manualEndOverride, setManualEndOverride] = useState(false);
 
+  // Adjustable booking-grid geometry (bug: these were fixed constants that looked
+  // tappable). The window + slot size drive the grid, slot generation, and the
+  // drag-to-book math; `pixelsPerMinute` moves with `slotMinutes` so the geometry
+  // stays internally consistent.
+  const [dayStartHour, setDayStartHour] = useState(DEFAULT_DAY_START_HOUR);
+  const [dayEndHour, setDayEndHour] = useState(DEFAULT_DAY_END_HOUR);
+  const [slotMinutes, setSlotMinutes] = useState<number>(DEFAULT_SLOT_MINUTES);
+  const pixelsPerMinute = pixelsPerMinuteFor(slotMinutes);
+
   const meQuery = useQuery({
     queryKey: ["/api/users/me"],
     queryFn: api.users.me,
@@ -396,13 +410,23 @@ export default function AppointmentsPage() {
   });
   const recommendationsQuery = useTaskRecommendations(Boolean(userId) && Boolean(meUserId));
 
+  // Assignable staff = vets AND technicians. The server splits them into two arrays
+  // (`vets` = role "vet"; `technicians` = technician/senior_technician). A
+  // technician-staffed clinic has an empty `vets`, which is why the picker showed
+  // only the all-staff option — read the merged, deduped set everywhere staff are listed.
+  const assignees = useMemo(() => {
+    const all = [...(metaQuery.data?.vets ?? []), ...(metaQuery.data?.technicians ?? [])];
+    const seen = new Set<string>();
+    return all.filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
+  }, [metaQuery.data?.vets, metaQuery.data?.technicians]);
+
   const vetNameMap = useMemo(() => {
     const map = new Map<string, string>();
-    for (const vet of metaQuery.data?.vets ?? []) {
+    for (const vet of assignees) {
       map.set(vet.id, vet.displayName || vet.name);
     }
     return map;
-  }, [metaQuery.data?.vets]);
+  }, [assignees]);
 
   function resolveVet(vetId: string | null | undefined): string {
     if (!vetId) return t.appointmentsPage.unassigned;
@@ -520,28 +544,28 @@ export default function AppointmentsPage() {
     return filteredAppointments.map((appointment) => {
       const start = new Date(appointment.startTime);
       const end = new Date(appointment.endTime);
-      const top = minutesSinceDayStart(day, start) * PIXELS_PER_MINUTE;
-      const height = Math.max(24, (end.getTime() - start.getTime()) / 60000 * PIXELS_PER_MINUTE);
+      const top = minutesSinceDayStart(day, start, dayStartHour) * pixelsPerMinute;
+      const height = Math.max(24, (end.getTime() - start.getTime()) / 60000 * pixelsPerMinute);
       return { appointment, top, height, start, end };
     });
-  }, [filteredAppointments, day]);
+  }, [filteredAppointments, day, dayStartHour, pixelsPerMinute]);
 
   const appointmentStatusLabels = statusLabel();
 
-  const totalGridMinutes = (DAY_END_HOUR - DAY_START_HOUR) * 60;
-  const totalGridHeight = totalGridMinutes * PIXELS_PER_MINUTE;
+  const totalGridMinutes = (dayEndHour - dayStartHour) * 60;
+  const totalGridHeight = totalGridMinutes * pixelsPerMinute;
 
   const slotStarts = useMemo(() => {
     const slots: Date[] = [];
-    for (let mins = DAY_START_HOUR * 60; mins < DAY_END_HOUR * 60; mins += SLOT_MINUTES) {
+    for (let mins = dayStartHour * 60; mins < dayEndHour * 60; mins += slotMinutes) {
       slots.push(dateAtLocalDay(day, Math.floor(mins / 60), mins % 60));
     }
     return slots;
-  }, [day]);
+  }, [day, dayStartHour, dayEndHour, slotMinutes]);
 
   const selectedVetMeta = useMemo(
-    () => metaQuery.data?.vets.find((vet) => vet.id === selectedVetId) ?? null,
-    [metaQuery.data?.vets, selectedVetId],
+    () => assignees.find((vet) => vet.id === selectedVetId) ?? null,
+    [assignees, selectedVetId],
   );
 
   const availableIntervals = useMemo(() => {
@@ -1133,7 +1157,7 @@ export default function AppointmentsPage() {
                 className="h-10 w-full min-w-0 max-w-full rounded-md border border-input bg-background px-3 text-sm text-left truncate"
               >
                 <option value="">{t.appointmentsPage.allTechnicians}</option>
-                {(metaQuery.data?.vets ?? []).map((vet) => (
+                {assignees.map((vet) => (
                   <option key={vet.id} value={vet.id}>
                     {vet.displayName || vet.name || t.appointmentsPage.unknownUser}
                   </option>
@@ -1141,14 +1165,50 @@ export default function AppointmentsPage() {
               </select>
             </div>
             <div className="min-w-0">
-              <label className="text-xs text-muted-foreground block text-end mb-1">{t.appointmentsPage.hours}</label>
-              <div dir="ltr" className="h-10 w-full px-3 rounded-md border flex items-center justify-start text-sm whitespace-nowrap">
-                {String(DAY_START_HOUR).padStart(2, "0")}:00 – {String(DAY_END_HOUR).padStart(2, "0")}:00
+              <label htmlFor={`${bookingFormId}-hours-start`} className="text-xs text-muted-foreground block text-end mb-1">{t.appointmentsPage.hours}</label>
+              <div dir="ltr" className="flex items-center gap-1">
+                <select
+                  id={`${bookingFormId}-hours-start`}
+                  value={dayStartHour}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    setDayStartHour(v);
+                    if (dayEndHour <= v) setDayEndHour(Math.min(24, v + 1));
+                  }}
+                  className="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>
+                  ))}
+                </select>
+                <span aria-hidden className="text-muted-foreground">–</span>
+                <select
+                  id={`${bookingFormId}-hours-end`}
+                  value={dayEndHour}
+                  onChange={(e) => setDayEndHour(Number(e.target.value))}
+                  className="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  {Array.from({ length: 24 }, (_, i) => i + 1)
+                    .filter((h) => h > dayStartHour)
+                    .map((h) => (
+                      <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>
+                    ))}
+                </select>
               </div>
             </div>
             <div className="min-w-0">
-              <label className="text-xs text-muted-foreground block text-end mb-1">{t.appointmentsPage.interval}</label>
-              <div dir="ltr" className="h-10 w-full px-3 rounded-md border flex items-center text-sm">{t.appointmentsPage.minutesShort(SLOT_MINUTES)}</div>
+              <label htmlFor={`${bookingFormId}-interval`} className="text-xs text-muted-foreground block text-end mb-1">{t.appointmentsPage.interval}</label>
+              <select
+                id={`${bookingFormId}-interval`}
+                dir="ltr"
+                value={slotMinutes}
+                onChange={(e) => setSlotMinutes(Number(e.target.value))}
+                className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                {SLOT_MINUTE_OPTIONS.map((m) => (
+                  <option key={m} value={m}>{t.appointmentsPage.minutesShort(m)}</option>
+                ))}
+              </select>
             </div>
             {canCreateTask && (
               <div className="col-span-1 sm:col-span-2">
@@ -1190,10 +1250,10 @@ export default function AppointmentsPage() {
             ) : (
               <div className="relative border rounded-xl overflow-hidden">
                 <div className="max-h-[70vh] overflow-auto">
-                  <div className="relative" style={{ height: `${Math.max(totalGridHeight, HOUR_ROW_HEIGHT * (DAY_END_HOUR - DAY_START_HOUR))}px` }}>
-                    {Array.from({ length: DAY_END_HOUR - DAY_START_HOUR + 1 }).map((_, idx) => {
-                      const hour = DAY_START_HOUR + idx;
-                      const y = idx * 60 * PIXELS_PER_MINUTE;
+                  <div className="relative" style={{ height: `${Math.max(totalGridHeight, HOUR_ROW_HEIGHT * (dayEndHour - dayStartHour))}px` }}>
+                    {Array.from({ length: dayEndHour - dayStartHour + 1 }).map((_, idx) => {
+                      const hour = dayStartHour + idx;
+                      const y = idx * 60 * pixelsPerMinute;
                       return (
                         <div key={hour} className="absolute inset-x-0 border-t border-dashed border-border/70" style={{ top: y }}>
                           <span className="absolute -top-2 start-2 text-[10px] text-muted-foreground bg-background px-1">
@@ -1207,7 +1267,7 @@ export default function AppointmentsPage() {
                       ? (
                         <>
                           {slotAvailability.map(({ slot, available }) => {
-                            const top = minutesSinceDayStart(day, slot) * PIXELS_PER_MINUTE;
+                            const top = minutesSinceDayStart(day, slot, dayStartHour) * pixelsPerMinute;
                             return (
                               <button
                                 key={slot.toISOString()}
@@ -1222,7 +1282,7 @@ export default function AppointmentsPage() {
                                 className={`absolute inset-x-0 border-t pointer-events-none ${
                                   available ? "focus:bg-emerald-50/80" : "bg-muted/40"
                                 }`}
-                                style={{ top, height: SLOT_MINUTES * PIXELS_PER_MINUTE }}
+                                style={{ top, height: slotMinutes * pixelsPerMinute }}
                                 aria-label={`${t.appointmentsPage.scheduleTaskAt} ${formatTimeHHMM(slot)}`}
                               />
                             );
@@ -1235,7 +1295,7 @@ export default function AppointmentsPage() {
                             onClick={(e) => {
                               const rect = e.currentTarget.getBoundingClientRect();
                               const y = e.clientY - rect.top;
-                              const slotIndex = Math.floor(y / PIXELS_PER_MINUTE / SLOT_MINUTES);
+                              const slotIndex = Math.floor(y / pixelsPerMinute / slotMinutes);
                               const entry = slotAvailability[slotIndex];
                               if (entry?.available) openQuickBooking(entry.slot);
                             }}
@@ -1382,7 +1442,7 @@ export default function AppointmentsPage() {
               </div>
             </div>
           </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 pb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
     <div>
       <label htmlFor={`${bookingFormId}-vet`} className="text-xs text-muted-foreground block text-start">
@@ -1398,7 +1458,7 @@ export default function AppointmentsPage() {
         className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
       >
         <option value="">{t.appointmentsPage.placeholderSelectTechnician}</option>
-        {(metaQuery.data?.vets ?? []).map((vet) => (
+        {assignees.map((vet) => (
           <option key={vet.id} value={vet.id}>
             {vet.displayName || vet.name || t.appointmentsPage.unknownUser}
           </option>
@@ -1555,7 +1615,7 @@ export default function AppointmentsPage() {
               {t.appointmentsPage.conflictBody}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 py-4">
             <label className="text-xs text-muted-foreground block text-start">{t.appointmentsPage.overrideReason}</label>
             <Textarea dir="ltr" className="text-left" value={conflictReason} onChange={(e) => setConflictReason(e.target.value)} placeholder={t.appointmentsPage.overridePlaceholder} rows={3} />
           </div>
