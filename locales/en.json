@@ -3671,6 +3671,16 @@
     "disabled": "Metrics are turned off for this period."
   },
   "console": {
+    "colAdapter": "Adapter",
+    "colStatus": "Status",
+    "colUpdated": "Updated",
+    "colType": "Type",
+    "colOccurred": "Occurred",
+    "colRetries": "Retries",
+    "valEnabled": "Enabled",
+    "valDisabled": "Disabled",
+    "valNever": "Never",
+    "dash": "—",
     "readOnly": "Read only",
     "accessPendingServer": "Read access pending server enablement",
     "pendingEndpoint": "Not yet available — pending backend support",

@@ -3674,6 +3674,16 @@ export interface TStructure {
     disabled: string;
   };
   console: {
+    colAdapter: string;
+    colStatus: string;
+    colUpdated: string;
+    colType: string;
+    colOccurred: string;
+    colRetries: string;
+    valEnabled: string;
+    valDisabled: string;
+    valNever: string;
+    dash: string;
     readOnly: string;
     accessPendingServer: string;
     pendingEndpoint: string;
