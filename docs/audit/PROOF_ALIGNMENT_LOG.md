@@ -1459,3 +1459,40 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 - **Final gate:** `npx tsc --noEmit` (fe) 0 · `tsc -p tsconfig.server.json` 0 · `pnpm test` 407/3959 · `pnpm i18n:check` deep parity · `pnpm architecture:gates` all G1 passed (0 cycles).
 
 **Verdict:** VERIFIED (all gates green; every deletion re-verified 0-ref against current main; split behavior-preserving with strengthened token test). File-splitting beyond `admin.tsx` deferred to backlog by design (remaining candidates are monolithic — need individual review + visual-regression, not a bulk cleanup pass).
+
+## 2026-07-07 — Design-sync `check_design_system` triage (Claude Design handoff, no code fix)
+
+**Context:** Claude Design (working live in the "VetTrack Design System" claude.ai project) hit a wall: `check_design_system` flags three items in the synced `_ds_bundle.css` that it cannot fix from its side (bundle is read-only synced source; its writable `templates/` can't clear them). Relayed to me to handle the source (repo) side — with a hard constraint: **do not disrupt the live design-project session.** A re-sync is the disruptive action (overwrites the project's `_ds_bundle.css`/`styles.css`), so the resolution is documentation-only, no code edit, no sync.
+
+**Claim:** All three flags are expected artifacts of this repo's documented non-standard sync config ("ship the whole app's compiled Tailwind CSS as the DS bundle"), not defects — and none is fixable by editing source or the bundle.
+
+**Evidence (verified against `.design-sync/compiled.css`, the file that becomes `_ds_bundle.css`, 2026-07-07):**
+- **DM Mono @font-face:** `grep -oc "@font-face" .design-sync/compiled.css` → **0 blocks**; `font-family:DM Mono,IBM Plex Mono,ui-monospace,monospace` present. DM Mono is a `runtimeFontPrefixes` entry in `.design-sync/config.json:9-16` (host-served, never bundled — also stated in NOTES.md "## Fonts" and conventions.md:90-92). Fallback IBM Plex Mono is itself a slashed-zero mono → the stat/count look holds. Confirms Claude Design's "keep the token, let fallback render; resolve by uploading the font in the design tool." No code change.
+- **`--tw-*` tokens:** `grep -oE "\-\-tw-[a-z0-9-]+" | sort -u | wc -l` → **73 distinct** (`--tw-ring-*`, `--tw-shadow-*`, `--tw-translate-*`, gradient/filter/backdrop vars). `grep -rl "\-\-tw-" src/` → **zero hand-authored** — they exist only in `pnpm build` compiled output, so they cannot be `@kind`-annotated or `:root`-scoped in source. (Claude Design's report cited 231 `--tw-*` / 206 props — same class of item; higher count reflects occurrence-vs-distinct counting in his synced bundle.)
+- **`@kind` marker convention:** `grep -rn "@kind" --include="*.md" --include="*.css"` → **zero usage** in the repo. The suggested marker is not a convention this toolchain recognizes and has nothing to attach to.
+- **Why no safe edit now:** `.design-sync/config.json` `cssEntry` → `.design-sync/compiled.css` (a copy of `dist/public/assets/index-*.css`); NOTES.md "## Re-sync risks" + "## Target project" document that a re-sync overwrites the live project's `_ds_bundle.css`/`styles.css`. Editing any `_ds_bundle.css` copy (`ds-bundle/`, `VetTrack Design System/`) is overwritten on next sync.
+
+**Action taken:** `.design-sync/NOTES.md` — added "## Known design-system-check flags (triaged benign — do NOT re-chase)", mirroring the existing "Known render warns (do NOT re-chase)" pattern, so the next `/design-sync` run has an authoritative record (the notes file is the sync agent's read-first). This fulfills Claude Design's explicit "flag these to the /design-sync agent on the next run." **No source/token/bundle edit; no sync triggered** (Claude Design's session left undisturbed).
+
+**Verdict:** VERIFIED (all three flags reproduced/root-caused against compiled source; documented as triaged-benign). No code change is correct — a cleaner bundle, if ever wanted, is a build-pipeline change deferred to a re-sync-time task.
+
+## 2026-07-07 — Web Console Phase-1 handoff: design↔code drift-list verification
+
+**Context:** Claude Design shipped the Web Management Console Phase-1 handoff (ZIP at `docs/design/VetTrack Design System - Phase 1 .zip` → `design_handoff_web_console/`: README + DESIGN_SYNC_FLAGS.md + reference prototype `console/{data.js,ui.jsx,modules.jsx,modules2.jsx}` + `VetTrack Console.html`). The handoff names `vettrack-ship` as "the oracle for truth" and asks the implementer to confirm the §4 drift list against live source. Verified every checkable codebase claim + scanned the mock source for undisclosed defects.
+
+**Claim:** All six drift flags accurately describe the current codebase, and the mock source is clean on frozen-surfaces / secrets / entities / roles.
+
+**Evidence (verified against source 2026-07-07):**
+- **A3 (stale token):** `src/index.css:94` → `--status-stale: 35 100% 50%; /* sys-orange */`, byte-identical to `--status-maintenance` (`:92`). Distinct stale token does NOT exist; `-bg/-fg/-border` triplet (`:181-183`) is orange. Mock's purple `#AF52DE` is genuine drift. **CONFIRMED** (open owner decision: add purple triplet vs revert mock to orange).
+- **A4 (i18n):** `grep -c '"console' locales/{en,he}.json` → 0/0; no top-level `console` namespace. **CONFIRMED no `console.*` keys.** Refinement: a keyed relative-time formatter DOES exist — `src/features/alerts/hooks/use-alerts-controller.ts:16` `formatRelativeTime` uses `t.alertsPage.minutesAgo(n)/hoursAgo/daysAgo`; a second lives at `src/lib/utils.ts:27`. Console should generalize the existing keyed one, not add a third.
+- **B1 (readiness rules):** no `vt_readiness*`/`readiness_rule` table in `server/schema`/`db.ts`; no rule-governance audit kind. Adjacent `equipment_readiness_state_changed` exists (`audit.ts:218`) but is a state-change kind, not rule governance. **CONFIRMED net-new/unmodeled.**
+- **B2 (integrations):** `grep -rin provet server/integrations` → empty (absent). `server/integrations/adapters/vendor-stubs.ts` → `chameleon-stub-v1`/`priza-stub-v1`/`smartflow-stub-v1` ("stub — pending vendor approval"). `server/integrations/webhooks/` → `inbound.router.ts` only (no outbound). **CONFIRMED.**
+- **B3 (DLQ ids):** `server/app/start-schedulers.ts` real workers = `startIntegrationWorker`/`startStaleTaskOwnershipSweepWorker`/`startEquipmentConditionStalenessWorker`/… — mock's `notification.whatsapp_send` etc. are illustrative. **CONFIRMED.**
+- **B4/B6 (audit kinds + roles):** `room_bulk_verified` present (`audit.ts:38`, the kind Design remapped fictional `rule.created` to). `server/middleware/auth.ts:8` → `UserRole = "admin"|"vet"|"technician"|"senior_technician"|"student"` — exactly 5 (Design cited `:17`; actual `:8` — trivial offset). Mock surfaces exactly these 5 (`data.js:363-370`); no `lead_technician`/`vet_tech` leaked. **CONFIRMED.**
+- **Undisclosed-defect scan of mock source (value-add beyond Design's flags):**
+  - Frozen surfaces: only hit is Ops Health's own read-only disclaimer ("the console observes only; it never requeues, purges, or changes transport" — `modules2.jsx:139`); zero requeue/purge/drain/replay/transport/Code-Blue controls. **Clean.**
+  - Secrets: `••` dot-masks present (`modules2.jsx:23,30,40`); zero reveal/showSecret/fullKey/copySecret. **Clean.**
+  - Entities: "Patient monitor" (`data.js:150`) = equipment type; "Pharmacy fridge/room" (`data.js:182,282,338`) = inventory location — NOT the removed patient-record/formulary/medication domains. **Benign.**
+  - M1r bidi: reference source shows isolation markers (`ui.jsx:7` `isolate`, ~19 `bdi`/`dir` usages). NOTE: only the reference prototype is in this ZIP, not the per-module `.dc.html` templates where Design says M1r was applied — numeral bidi best re-confirmed live.
+
+**Verdict:** VERIFIED. Handoff is high-trust — every codebase claim is accurate and the mock source is clean on all four compliance-critical dimensions. Trustworthy to build against. One genuine OPEN owner decision remains (A3 stale = purple vs orange). No code changed this session (audit/verification only).

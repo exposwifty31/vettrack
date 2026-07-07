@@ -191,6 +191,9 @@ graph LR
 - **Allowed:** `src/lib/auth-fetch.ts` (or the one header point in `src/lib/api.ts`), one switcher component under `src/features/settings/`, `src/pages/settings.tsx` (mount only), one new test file, the two audit docs. **DO NOT:** `server/middleware/auth.ts`, `server/lib/auth-mode.ts`, `server/seed.ts`, Clerk provider code.
 
 ### Phase 1 (B1) — Web management design brief → Claude Design
+
+> ✅ **COMPLETE 2026-07-07.** Brief authored (`docs/design/web-management-brief.md`); the round ran in Claude Design and returned as the Phase-1 handoff (`docs/design/VetTrack Design System - Phase 1 .zip` → `design_handoff_web_console/`: README + `DESIGN_SYNC_FLAGS.md` + the navigable `console/*` reference prototype + ten per-module `.dc.html` harnesses). **Drift-list verified against live source** (PROOF_ALIGNMENT_LOG 2026-07-07): all six code claims (A3 stale token · A4 i18n · B1 readiness-rules · B2 integrations · B3 job ids · B4/B6 audit-kinds+roles) accurate, and the mock is clean on frozen-surfaces / secrets / entities / roles. **This satisfies Phase 7's `-.external wait.->` dependency — designs are IN.** Build constraints from the return are folded into the "Design-return reconciliation" section below; the sequencing is unchanged (Phase 7 still waits on Phase 2 + Phase 6).
+
 - `docs/design/web-management-brief.md`: positioning (web = console), personas (admin full / lead read-only).
 - IA spine, one section per module: Management Home (restages `/dashboard`) · People & Roles (`/admin` tabs + `/admin/shifts`) · Equipment Governance (asset-types, docks, readiness rules, folders) · Inventory & Procurement (incl. net-new restock UI) · Integrations & Webhooks (net-new) · Notifications (net-new: whatsapp/push) · RFID Readers (net-new) · Ops Health (net-new: outbox DLQ/health, display heartbeats + future Displays, queue health, `/admin/metrics` restage) · Analytics & Reports (Stage 7 restage) · Audit (Stage 8 restage).
 - Per module: exists-vs-net-new table; inputs (Stage 1 tokens, Stage 7/8 `.dc.html`, 111 components, `docs/design-system.md`). Hard constraints stated: Hebrew-default RTL, i18n keys only, compose from existing components, desktop-only ≥1024px, no native implications, frozen surfaces (read-only views over bounded telemetry, no new transport), the III.2 bar with Phase R references as the calibration set. Requested: screens + empty/loading/error states + RTL spot-checks.
@@ -282,6 +285,7 @@ SSE transport + outbox cursor · BroadcastChannel envelope · SW emergency-endpo
 - Exact student scope in Phase 8.
 - `/equipment/board` end-state (alias vs redirect) — decided at Phase 10.
 - Whether Phase 8 mobile surfaces get a second Claude Design brief or compose from Stage 3/4 specs.
+- **`--status-stale` color (design drift A3, opened 2026-07-07):** the Phase-1 mock uses purple `#AF52DE` for stale custody; code's `--status-stale` is orange, aliasing maintenance (`src/index.css:94`). Adopting purple also fixes the flagship-audit **M3** two-ambers collision (maintenance vs stale indistinguishable). Decide: add the distinct purple `--status-stale` triplet to `src/index.css` (light+dark) + Tailwind alias, or revert the mock to orange. Small, self-contained once decided; gates the Phase 7c/7e readiness palette. Until decided, Phase 6/7 bind to whatever `--status-stale` ships — never hardcode purple.
 - **Postgres RLS as the tenancy security boundary** (external review 2026-07-07): today `clinicId` is application-layer + a `tenant:lint` CI gate; there is **zero RLS** in the DB. RLS is a legitimate defense-in-depth upgrade — but it is an owner-gated **hardening program**, not part of this UX/console/board work, and it must **never** be pulled into a UX phase (`clinicId on every query` is Frozen; changing the security boundary is a dedicated, separately-reviewed effort).
 - **Worker "second backend" boundary** (external review 2026-07-07): `server/workers/` is large (13 workers, ~50 scheduler starts) and trending toward a second backend. A maintainability follow-on (decomposition / clearer ownership) — captured in the Phase 10 product-growth-roadmap; Phase 7a Ops Health is the observability down-payment, not the fix.
 
@@ -322,6 +326,30 @@ SSE transport + outbox cursor · BroadcastChannel envelope · SW emergency-endpo
 **Bottom line:** two findings deserve weight (behavioral-testing gap, native migration) and both are already in the plan's DNA; two are legitimate-but-out-of-scope hardening items (RLS, worker split) routed to Deferred; the rest are stale, wrong, or generic.
 
 **Maintainability posture (the report's "solo-dev survivability" caution).** The tension is real — this program *adds* surface (4th platform, per-role, console). But its design deliberately *lowers* future maintenance cost rather than raising it: I.2 framework-free portable contracts (consumed by `literate-dollop`), Phase 6 headless pre-build (each returning design is a skinning pass, not a rebuild), additive-only fences (III.4), and per-phase clean sub-phases that shrink the II.2 clutter measurably. **Doc reconciliation flagged (owner):** `docs/MAINTENANCE_MODE.md` frames this repo as frozen "maintenance mode," which no longer matches an active 10-phase program — it should be updated when the owner is ready (flagged here, not silently changed).
+
+# Design-return reconciliation (Web console Phase-1 handoff, 2026-07-07)
+> Phase 1's designs returned and were **verified against live source** (see the Phase 1 status marker + PROOF_ALIGNMENT_LOG 2026-07-07). This reconciles the returned deliverable with the Phase 6/7 build plan. **No phase is restructured and nothing becomes an atomic "build-the-console" batch** — the implementation was always Phase 6 (headless pre-build) → Phase 7 (per-module skinning, 7a–7e *each independently shippable*). Two rational adjustments + the verified build constraints:
+
+**1. Module → Phase-7 slice map.** The returned deliverable has **10** modules; the slice list named nine — **People & Roles was missing** (it is an existing-`/admin` restage, so it slipped the net-new enumeration). Full map:
+
+| Slice | Modules | Note |
+|---|---|---|
+| 7a | Management Home · Ops Health | `/dashboard` restage + DLQ/outbox/heartbeat consoles |
+| 7b | Integrations · Webhooks · Notifications | secrets never round-trip; **outbound webhook delivery is a future surface** (B2) |
+| 7c | RFID Readers · Equipment Governance | **readiness rules blocked on schema** (B1) |
+| 7d | Inventory & Procurement | restock completion |
+| 7e | Analytics & Reports · Audit | Stage 7/8 restage |
+| **7f** | **People & Roles** | **added** — restage existing `/admin` tabs + `/admin/shifts` (already split shell + per-tab sections, PR #47) into the console shell; lower-risk existing-surface restage, independently shippable |
+
+**2. Build against verified code, never the mock's literal values** (`DESIGN_SYNC_FLAGS.md` §4 — all confirmed accurate against source):
+- **A3 `--status-stale`** — OPEN owner decision (see Deferred questions). Bind to whatever token ships; never hardcode the mock's purple. Gates 7c + 7e palette.
+- **A4 i18n** — no `console.*` keys exist. Add the `console.*` namespace (he+en, parity) and **generalize the existing keyed relative-time formatter** (`src/features/alerts/hooks/use-alerts-controller.ts:16`; a second lives at `src/lib/utils.ts:27`) — do not author a third. Applies to every slice.
+- **B1 readiness rules** — net-new governed entity: **no `vt_` table, no closed-union audit kind** (adjacent `equipment_readiness_state_changed` is a state kind, not rule governance). 7c must land a schema migration + append `AuditActionType` members FIRST; do not assume it is modeled.
+- **B2 integrations** — no Provet adapter. Bind cards to the **adapter registry** (`generic-pms` + `chameleon/priza/smartflow` stubs + flag-gated `vendor-x`), not a vendor name. Webhooks are **inbound-only** (`server/integrations/webhooks/inbound.router.ts`) — the outbound-delivery UI in 7b is a future surface, not a wireable one.
+- **B3 / B4 illustrative ids** — DLQ job ids (7a) key off real BullMQ job names (`server/app/start-schedulers.ts`); audit target/entity ids (7e) key off real entities. Audit **kinds** already map to the real closed union.
+- **Repo-side residues** (DM Mono font, Tailwind `--tw-*` bundle noise) tracked in `.design-sync/NOTES.md` → "Known design-system-check flags"; neither blocks console UI work. The Tailwind-scoping fix is an EDIT-tier re-sync build change (A2), not a phase.
+
+**Net effect on sequencing:** unchanged. Wave 1 (R ∥ 0 ∥ 1) is **complete**; Wave 2 opens with **Phase 2** (the A-keystone that P3/P4/P6 depend on). Phase 7's external-design wait is now satisfied, but Phase 7 still gates on Phase 2 (`IconSidebar`/`Topbar`) + Phase 6 (headless scaffold), so it stays in Wave 3.
 
 # How to verify this plan hangs together
 This is a planning artifact, not code — verification is structural, done by the reviewer:
