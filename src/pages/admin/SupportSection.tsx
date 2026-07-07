@@ -47,6 +47,12 @@ const STATUS_LABELS: Record<string, string> = {
   resolved: t.adminPage.ticketStatusResolved,
 };
 
+const SEVERITY_LABELS: Record<string, string> = {
+  low: t.adminPage.severityLow,
+  medium: t.adminPage.severityMedium,
+  high: t.adminPage.severityHigh,
+};
+
 export function SupportSection() {
   const { userId } = useAuth();
   const queryClient = useQueryClient();
@@ -145,13 +151,19 @@ export function SupportSection() {
         ) : (
           <div className="flex flex-col gap-2">
             {tickets.map((ticket) => (
-              <button
+              // Row is a non-interactive container so the "Resolve" button is not
+              // nested inside another button (invalid interactive nesting). The
+              // ticket-info area is the clickable "open detail" control.
+              <div
                 key={ticket.id}
-                onClick={() => openDetail(ticket)}
-                data-testid={`ticket-row-${ticket.id}`}
-                className="flex items-start justify-between p-3 bg-muted/50 rounded-xl border border-border hover:bg-muted/50 transition-colors text-left w-full gap-3"
+                className="flex items-start justify-between p-3 bg-muted/50 rounded-xl border border-border hover:bg-muted/50 transition-colors w-full gap-3"
               >
-                <div className="flex-1 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => openDetail(ticket)}
+                  data-testid={`ticket-row-${ticket.id}`}
+                  className="flex-1 min-w-0 text-left"
+                >
                   <TruncatedText text={ticket.title} className="text-sm font-medium" as="p" />
                   <Bdi dir="ltr">
                     <TruncatedText text={ticket.userEmail} className="text-xs text-muted-foreground" as="p" />
@@ -159,24 +171,23 @@ export function SupportSection() {
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {formatDateByLocale(ticket.createdAt)}
                   </p>
-                </div>
+                </button>
                 <div className="flex flex-col items-end gap-1 shrink-0">
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
                     className="h-7 px-2 text-[10px]"
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={() =>
                       updateMut.mutate({
                         id: ticket.id,
                         status: "resolved",
                         adminNote: ticket.adminNote || "",
-                      });
-                    }}
+                      })
+                    }
                     disabled={updateMut.isPending || ticket.status === "resolved"}
                   >
-                    Resolve
+                    {t.adminPage.ticketResolve}
                   </Button>
                   <span
                     className={cn(
@@ -184,7 +195,7 @@ export function SupportSection() {
                       SEVERITY_STYLES[ticket.severity],
                     )}
                   >
-                    {ticket.severity}
+                    {SEVERITY_LABELS[ticket.severity] ?? ticket.severity}
                   </span>
                   <span
                     className={cn(
@@ -195,7 +206,7 @@ export function SupportSection() {
                     {STATUS_LABELS[ticket.status]}
                   </span>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         )}
@@ -224,7 +235,7 @@ export function SupportSection() {
                     SEVERITY_STYLES[selectedTicket.severity],
                   )}
                 >
-                  {selectedTicket.severity} severity
+                  {SEVERITY_LABELS[selectedTicket.severity] ?? selectedTicket.severity}
                 </span>
                 <span
                   className={cn(
@@ -238,7 +249,7 @@ export function SupportSection() {
 
               <div className="flex flex-col gap-1">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Description
+                  {t.adminPage.ticketDescription}
                 </p>
                 <p className="text-sm whitespace-pre-wrap">
                   {selectedTicket.description}
@@ -248,7 +259,7 @@ export function SupportSection() {
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                 <div>
                   <span className="font-semibold text-muted-foreground">
-                    Submitted by
+                    {t.adminPage.ticketSubmittedBy}
                   </span>
                   <Bdi dir="ltr">
                     <TruncatedText text={selectedTicket.userEmail} className="text-sm" as="p" />
@@ -256,14 +267,14 @@ export function SupportSection() {
                 </div>
                 <div>
                   <span className="font-semibold text-muted-foreground">
-                    Date
+                    {t.adminPage.ticketDate}
                   </span>
                   <p>{new Date(selectedTicket.createdAt).toLocaleString()}</p>
                 </div>
                 {selectedTicket.pageUrl && (
                   <div className="col-span-2">
                     <span className="font-semibold text-muted-foreground">
-                      Page URL
+                      {t.adminPage.ticketPageUrl}
                     </span>
                     <TruncatedText text={selectedTicket.pageUrl} className="text-sm" as="p" />
                   </div>
@@ -271,7 +282,7 @@ export function SupportSection() {
                 {selectedTicket.appVersion && (
                   <div>
                     <span className="font-semibold text-muted-foreground">
-                      App Version
+                      {t.adminPage.ticketAppVersion}
                     </span>
                     <p>{selectedTicket.appVersion}</p>
                   </div>
@@ -289,7 +300,7 @@ export function SupportSection() {
                     ) : (
                       <ChevronDown className="w-3 h-3" />
                     )}
-                    Device Info
+                    {t.adminPage.ticketDeviceInfo}
                   </button>
                   {expandedDevice && (
                     <p className="text-xs mt-1 text-muted-foreground break-all">
@@ -301,7 +312,7 @@ export function SupportSection() {
 
               <div className="border-t border-border pt-4 flex flex-col gap-3">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Admin Actions
+                  {t.adminPage.ticketAdminActions}
                 </p>
                 {cursorBugFixerReady && (
                   <Button
@@ -327,7 +338,7 @@ export function SupportSection() {
                 )}
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="ticket-status" className="text-xs">
-                    Status
+                    {t.adminPage.ticketStatusLabel}
                   </Label>
                   <Select
                     value={detailStatus}
@@ -350,7 +361,7 @@ export function SupportSection() {
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="ticket-note" className="text-xs">
-                    Internal Note
+                    {t.adminPage.ticketInternalNote}
                   </Label>
                   <Textarea
                     id="ticket-note"
@@ -370,7 +381,7 @@ export function SupportSection() {
                 onClick={() => setSelectedTicket(null)}
                 disabled={updateMut.isPending}
               >
-                Close
+                {t.common.close}
               </Button>
               <Button
                 onClick={() => {
@@ -386,7 +397,7 @@ export function SupportSection() {
                 {updateMut.isPending && (
                   <Loader2 className="w-4 h-4 me-2 animate-spin" />
                 )}
-                Save
+                {t.common.save}
               </Button>
             </DialogFooter>
           </DialogContent>
