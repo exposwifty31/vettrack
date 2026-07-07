@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { Settings, Bell, Moon, Globe, User, AlertCircle, AlertTriangle, MessageCircle } from "lucide-react";
+import { Settings, Bell, Moon, Globe, User, AlertCircle, AlertTriangle, MessageCircle, Radio } from "lucide-react";
 import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -15,6 +15,7 @@ import { useIsTabletViewport } from "@/lib/use-tablet-viewport";
 import { EquipmentSearchBox } from "@/components/search/EquipmentSearchBox";
 import { EquipmentSearchButton } from "@/components/search/EquipmentSearchButton";
 import { ShiftChatLauncher } from "@/features/shift-chat/components/ShiftChatLauncher";
+import { NfcForegroundScan } from "@/components/nfc-foreground-scan";
 
 /** Routes that own their own top chrome — hide the shared header for these. */
 const FULLSCREEN_ROUTES = ["/code-blue", "/crash-cart", "/scan", "/handoff"];
@@ -34,6 +35,13 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
   const { settings, update } = useSettings();
   const isDarkNow = useIsDarkActive();
   const isTablet = useIsTabletViewport();
+  // Fall back to initials if the presigned avatar URL fails to load (a broken img
+  // renders as a "?" placeholder on iOS WebKit).
+  const [avatarError, setAvatarError] = useState(false);
+  // Pages that run their own foreground NFC session (e.g. /inventory restock): the
+  // header NFC toggle hides there so only ONE Core NFC session runs per device
+  // (iOS forbids a second concurrent reader session).
+  const pageOwnsNfc = location.startsWith("/inventory");
   const [openPanel, setOpenPanel] = useState<Panel>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -80,6 +88,12 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
     refetchOnWindowFocus: false,
   });
 
+  // Clear a stale avatar-load failure when the presigned URL rotates (it refetches
+  // ~every 30s) so a single transient failure doesn't permanently downgrade to initials.
+  useEffect(() => {
+    setAvatarError(false);
+  }, [me?.avatarUrl]);
+
   if (isFullscreen) return null;
 
   const alerts = equipment ? computeAlerts(equipment) : [];
@@ -121,42 +135,67 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
             <EquipmentSearchBox tone="surface" />
           </div>
         ) : (
-          <EquipmentSearchButton />
-        )}
-
-        {/* CENTER: VetTrack wordmark — absolutely positioned in the 48px content zone */}
-        {/* dir="ltr" forces LTR inline ordering — without it, RTL bidi reorders
-            the "Vet" text node and <span>Track</span> to visually appear as "TrackVet". */}
-        {showWordmark && (
-          <div
-            dir="ltr"
-            style={{
-              position: "absolute",
-              top: "env(safe-area-inset-top)",
-              height: 48,
-              left: "50%",
-              transform: "translateX(-50%)",
-              display: "flex",
-              alignItems: "center",
-              fontWeight: 700,
-              fontSize: 17,
-              letterSpacing: "-0.02em",
-              color: "hsl(var(--foreground))",
-              pointerEvents: "none",
-              userSelect: "none",
-              whiteSpace: "nowrap",
-            }}
-          >
-            Vet<span style={{ color: "hsl(var(--primary))" }}>Track</span>
-          </div>
+          <>
+            <EquipmentSearchButton />
+            {/* LEADING brand as a home link (logo → Today). Left-aligned so it can't
+                collide with the end-side icon group the way the old centered wordmark
+                did once chat moved into the header. dir="ltr" keeps "VetTrack" ordered. */}
+            {showWordmark && (
+              <button
+                type="button"
+                onClick={() => navigate("/home")}
+                aria-label={t.nav.today}
+                dir="ltr"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  marginInlineStart: 6,
+                  padding: "4px 6px",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontSize: 17,
+                  letterSpacing: "-0.02em",
+                  color: "hsl(var(--foreground))",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Vet<span style={{ color: "hsl(var(--primary))" }}>Track</span>
+              </button>
+            )}
+          </>
         )}
 
         {/* END side (left in RTL, right in LTR): icon buttons */}
         <div style={{ display: "flex", gap: 4, marginInlineStart: "auto" }}>
-          {/* iPad: chat lives here as a header control (no floating FAB on tablet).
-              The launcher owns the single useShiftChat instance on this device. */}
-          {isTablet && (
-            <ShiftChatLauncher
+          {/* NFC quick-scan toggle — reachable from any page (was an equipment-only
+              corner FAB). Hidden where a page owns its own NFC session (e.g.
+              /inventory) so only one Core NFC session is live at a time. */}
+          {!pageOwnsNfc && (
+          <NfcForegroundScan
+            renderTrigger={({ enabled, starting, toggle }) => (
+              <button
+                type="button"
+                onClick={toggle}
+                disabled={starting}
+                aria-label={enabled ? t.equipmentNfc.scanReady : t.equipmentNfc.enableScan}
+                aria-pressed={enabled}
+                style={{ ...iconBtn, position: "relative", opacity: starting ? 0.6 : 1 }}
+              >
+                <Radio
+                  size={20}
+                  color={enabled ? "hsl(var(--primary))" : "hsl(var(--foreground))"}
+                  strokeWidth={1.8}
+                />
+              </button>
+            )}
+          />
+          )}
+          {/* Chat lives in the header on every native/mobile shell (phone + iPad) —
+              the floating FAB is desktop-web only. The launcher owns the single
+              useShiftChat instance on this device. */}
+          <ShiftChatLauncher
               renderTrigger={({ open, unreadCount }) => (
                 <button
                   type="button"
@@ -198,7 +237,6 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
                 </button>
               )}
             />
-          )}
           <button
             type="button"
             aria-label={t.nav.settings}
@@ -224,10 +262,11 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
                 to them (BUG-006). Muted fill + hairline ring (not a saturated
                 --primary fill) so the least-frequent action doesn't out-weigh the
                 live-badge alerts control. */}
-            {me?.avatarUrl ? (
+            {me?.avatarUrl && !avatarError ? (
               <img
                 src={me.avatarUrl}
                 alt={t.profile.avatarAlt}
+                onError={() => setAvatarError(true)}
                 width={24}
                 height={24}
                 style={{
@@ -256,7 +295,7 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
                   letterSpacing: "-0.01em",
                 }}
               >
-                {getInitials(name)}
+                {getInitials(me?.displayName || me?.name || name)}
               </span>
             )}
           </button>

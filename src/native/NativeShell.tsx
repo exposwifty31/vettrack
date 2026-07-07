@@ -5,7 +5,6 @@ import { NativeTabBar } from "./NativeTabBar";
 import { NativeTabSidebar } from "./NativeTabSidebar";
 import { NativeHeader } from "./NativeHeader";
 import { MoreSheet } from "@/features/settings";
-import { NfcForegroundScan } from "@/components/nfc-foreground-scan";
 import { useIsTabletViewport } from "@/lib/use-tablet-viewport";
 
 type Props = {
@@ -98,8 +97,6 @@ export function NativeShell({ children }: Props) {
               {children}
             </div>
           </div>
-
-          <NfcForegroundScan />
         </div>
       </NativeShellContext.Provider>
     );
@@ -135,8 +132,6 @@ export function NativeShell({ children }: Props) {
         >
           {children}
         </div>
-
-        {!moreOpen && <NfcForegroundScan />}
 
         <NativeTabBar
           onMorePress={() => setMoreOpen(true)}
