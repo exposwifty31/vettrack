@@ -1496,3 +1496,18 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
   - M1r bidi: reference source shows isolation markers (`ui.jsx:7` `isolate`, ~19 `bdi`/`dir` usages). NOTE: only the reference prototype is in this ZIP, not the per-module `.dc.html` templates where Design says M1r was applied — numeral bidi best re-confirmed live.
 
 **Verdict:** VERIFIED. Handoff is high-trust — every codebase claim is accurate and the mock source is clean on all four compliance-critical dimensions. Trustworthy to build against. One genuine OPEN owner decision remains (A3 stale = purple vs orange). No code changed this session (audit/verification only).
+
+## 2026-07-07 — Phase 2 (A1): role → experience model foundation (PR #50)
+
+**Claim:** The IV.2-A keystone landed as a behavior-preserving refactor — a pure-TS role→experience model + hook, with nav filtering and 3 ad-hoc role checks routed through it, output proven byte-identical to the pre-Phase-2 code.
+
+**Evidence (verified 2026-07-07):**
+- **Foundation:** `src/lib/roles/experience-model.ts` (pure TS, no React/DOM/wouter) — 7 client roles → 5 archetypes (total map; `lead_technician`/`vet_tech` → lead/tech), closed `Capability` union, `resolveCapabilities` folding secondary-admin (`SECONDARY_ADMIN_CAPS`, minus shift-chat) + shift overlay (`SHIFT_SENSITIVE` only). `src/hooks/use-experience.ts` wraps `useAuth()`.
+- **Byte-identical proof:** `tests/experience-model.test.ts` — parity sweep inlines the exact pre-Phase-2 predicates (`canAccessCodeBlue` layout:466, `ShiftChatPanel` canSendBroadcast/canPin, `hasVetAccess` equipment-detail:177, nav `!adminOnly||isAdmin`) and asserts `can()` ≡ them across the 5 DB roles × shift × secondary-admin; `filterAdminNav` asserted equal to the old inline filter over the REAL web `NAV` + native sections, all 7 roles. `pnpm test -- tests/experience-model.test.ts` → 12 passed.
+- **Two correctness bugs caught pre-wiring** (reasoning against the inlined predicates): (1) blanket isAdmin fold would over-grant shift-chat to secondary-admins → fixed via `SECONDARY_ADMIN_CAPS`; (2) blanket shift overlay would leak code-blue to a shift-elevated student → fixed via `SHIFT_SENSITIVE`.
+- **Consumer migration (7 files):** IconSidebar/Topbar/NativeTabSidebar/MoreSheet/layout.tsx nav → `filterAdminNav(source, experience)`; layout `canAccessCodeBlue` → `can("codeBlue.manage")`; ShiftChatPanel → `can("shiftChat.broadcast"/".pin")`; equipment-detail `hasVetAccess` → `can("equipment.vetActions")`.
+- **Full gate:** `npx tsc --noEmit` (frontend) 0 · `tsc -p tsconfig.server.json` 0 (via architecture:gates) · `pnpm test` → **408 files / 3971 passed** (0 regressions) · `pnpm architecture:gates` → All G1 passed, **0 import cycles** both trees · `pnpm i18n:check` → deep parity ✓.
+- **Fence honored (III.4):** untouched — server enforcement, `use-auth.tsx` contract, home surfaces, route registration, `NativeTabBar.tsx`. ~20 page-level `isAdmin` gates left for Phase 8.
+- **III.9 disposition:** gate warnings out of Phase-2 fence, flagged in PR body not fixed — 4 pre-existing depcruise `no-features-to-pages-internals` (rooms/inventory tablet) + untuned `knip` baseline (excluded from architecture:gates). Diff adds zero new warnings.
+
+**Verdict:** VERIFIED (byte-identical + full gate green). Live browser walk of nav not run — consistent with the owner-accepted Phase-0 live-walk skip; covered by the byte-identical proof + full suite. PR #50 open; CI polling per III.7.
