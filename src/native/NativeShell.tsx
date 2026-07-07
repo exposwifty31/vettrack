@@ -118,7 +118,10 @@ export function NativeShell({ children }: Props) {
           // NO paddingTop here — NativeHeader owns the top safe area.
         }}
       >
-        <NativeHeader />
+        {/* No centered wordmark on phone: the header now carries the chat launcher
+            (matching iPad), and a centered wordmark collides with the icon group on
+            the narrow phone canvas. */}
+        <NativeHeader showWordmark={false} />
 
         <div
           style={{
