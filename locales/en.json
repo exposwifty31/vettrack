@@ -3671,6 +3671,13 @@
     "disabled": "Metrics are turned off for this period."
   },
   "nav": {
+    "integrations": "Integrations",
+    "webhooks": "Webhooks",
+    "notifications": "Notifications",
+    "rfidReaders": "RFID Readers",
+    "opsHealth": "Ops Health",
+    "groupAdministration": "Administration",
+    "groupOperations": "Operations",
     "today": "Today",
     "alertsTitle": "Alerts",
     "noActiveAlerts": "No active alerts",

@@ -3674,6 +3674,13 @@ export interface TStructure {
     disabled: string;
   };
   nav: {
+    integrations: string;
+    webhooks: string;
+    notifications: string;
+    rfidReaders: string;
+    opsHealth: string;
+    groupAdministration: string;
+    groupOperations: string;
     today: string;
     alertsTitle: string;
     noActiveAlerts: string;

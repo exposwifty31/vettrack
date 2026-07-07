@@ -3671,6 +3671,13 @@
     "disabled": "המדדים כבויים עבור תקופה זו."
   },
   "nav": {
+    "integrations": "אינטגרציות",
+    "webhooks": "Webhooks",
+    "notifications": "הודעות",
+    "rfidReaders": "קוראי RFID",
+    "opsHealth": "תקינות מערכת",
+    "groupAdministration": "ניהול",
+    "groupOperations": "תפעול",
     "today": "היום",
     "alertsTitle": "התראות",
     "noActiveAlerts": "אין התראות פעילות",
