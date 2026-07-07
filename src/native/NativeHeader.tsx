@@ -124,34 +124,36 @@ export function NativeHeader({ showWordmark = true, ownSafeArea = true }: Props 
             <EquipmentSearchBox tone="surface" />
           </div>
         ) : (
-          <EquipmentSearchButton />
-        )}
-
-        {/* CENTER: VetTrack wordmark — absolutely positioned in the 48px content zone */}
-        {/* dir="ltr" forces LTR inline ordering — without it, RTL bidi reorders
-            the "Vet" text node and <span>Track</span> to visually appear as "TrackVet". */}
-        {showWordmark && (
-          <div
-            dir="ltr"
-            style={{
-              position: "absolute",
-              top: "env(safe-area-inset-top)",
-              height: 48,
-              left: "50%",
-              transform: "translateX(-50%)",
-              display: "flex",
-              alignItems: "center",
-              fontWeight: 700,
-              fontSize: 17,
-              letterSpacing: "-0.02em",
-              color: "hsl(var(--foreground))",
-              pointerEvents: "none",
-              userSelect: "none",
-              whiteSpace: "nowrap",
-            }}
-          >
-            Vet<span style={{ color: "hsl(var(--primary))" }}>Track</span>
-          </div>
+          <>
+            <EquipmentSearchButton />
+            {/* LEADING brand as a home link (logo → Today). Left-aligned so it can't
+                collide with the end-side icon group the way the old centered wordmark
+                did once chat moved into the header. dir="ltr" keeps "VetTrack" ordered. */}
+            {showWordmark && (
+              <button
+                type="button"
+                onClick={() => navigate("/home")}
+                aria-label={t.nav.today}
+                dir="ltr"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  marginInlineStart: 6,
+                  padding: "4px 6px",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontSize: 17,
+                  letterSpacing: "-0.02em",
+                  color: "hsl(var(--foreground))",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Vet<span style={{ color: "hsl(var(--primary))" }}>Track</span>
+              </button>
+            )}
+          </>
         )}
 
         {/* END side (left in RTL, right in LTR): icon buttons */}
