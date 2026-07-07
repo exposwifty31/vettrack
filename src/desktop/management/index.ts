@@ -1,8 +1,7 @@
 // Web management console primitives (Phase 6 / B2). Domain-neutral, composed from
-// components/ui. ConfigFormScaffold + Pagination are deferred to Phase 7 (the
-// interactive edit/paginate flows); the read-only scaffold needs only these.
+// components/ui. Deferred to Phase 7 (no consumer in the read-only scaffold):
+// WriteGate (write-affordance gating), DetailDrawer (row-detail drawer),
+// ConfigFormScaffold + Pagination (edit/paginate flows).
 export { ManagementGuard } from "./ManagementGuard";
-export { WriteGate } from "./WriteGate";
 export { ReadOnlyChip } from "./ReadOnlyChip";
 export { DataTable, type Column } from "./DataTable";
-export { DetailDrawer } from "./DetailDrawer";

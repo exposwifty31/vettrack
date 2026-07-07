@@ -14,7 +14,6 @@ vi.mock("@/hooks/use-experience", () => ({
 }));
 
 import { ManagementGuard } from "@/desktop/management/ManagementGuard";
-import { WriteGate } from "@/desktop/management/WriteGate";
 import { DataTable, type Column } from "@/desktop/management/DataTable";
 
 beforeEach(() => mockCan.mockReset());
@@ -44,22 +43,6 @@ describe("ManagementGuard", () => {
       </ManagementGuard>,
     );
     expect(screen.queryByText("CONSOLE_CONTENT")).toBeNull();
-  });
-});
-
-describe("WriteGate", () => {
-  it("renders write affordances only for management.webWrite (admin/secondary-admin)", () => {
-    mockCan.mockImplementation((cap) => cap === "management.webWrite");
-    render(<WriteGate fallback={<span>READONLY</span>}><button>EDIT</button></WriteGate>);
-    expect(screen.getByText("EDIT")).toBeTruthy();
-    expect(screen.queryByText("READONLY")).toBeNull();
-  });
-
-  it("renders the fallback for read-only users (lead — no webWrite)", () => {
-    mockCan.mockReturnValue(false);
-    render(<WriteGate fallback={<span>READONLY</span>}><button>EDIT</button></WriteGate>);
-    expect(screen.queryByText("EDIT")).toBeNull();
-    expect(screen.getByText("READONLY")).toBeTruthy();
   });
 });
 
