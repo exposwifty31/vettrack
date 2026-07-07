@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Cable } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
@@ -26,32 +27,38 @@ export default function IntegrationsConsolePage() {
     retry: false,
   });
 
-  const columns: Column<IntegrationConfig>[] = [
-    {
-      key: "adapter",
-      header: t.console.colAdapter,
-      sortValue: (r) => r.adapterId,
-      cell: (r) => <Bdi className="font-medium">{r.adapterId}</Bdi>,
-    },
-    {
-      key: "status",
-      header: t.console.colStatus,
-      sortValue: (r) => (r.enabled ? 1 : 0),
-      cell: (r) => (
-        <Badge variant={r.enabled ? "default" : "secondary"}>
-          {r.enabled ? t.console.valEnabled : t.console.valDisabled}
-        </Badge>
-      ),
-    },
-    {
-      key: "updated",
-      header: t.console.colUpdated,
-      sortValue: (r) => r.updatedAt,
-      cell: (r) => (
-        <span className="text-muted-foreground">{new Date(r.updatedAt).toLocaleDateString()}</span>
-      ),
-    },
-  ];
+  // Stable reference so DataTable's internal sort memo (keyed on `columns`) isn't
+  // invalidated on every parent re-render. `t` is a module-level import (stable), so
+  // the column defs never actually change — an empty dep list is correct here.
+  const columns = useMemo<Column<IntegrationConfig>[]>(
+    () => [
+      {
+        key: "adapter",
+        header: t.console.colAdapter,
+        sortValue: (r) => r.adapterId,
+        cell: (r) => <Bdi className="font-medium">{r.adapterId}</Bdi>,
+      },
+      {
+        key: "status",
+        header: t.console.colStatus,
+        sortValue: (r) => (r.enabled ? 1 : 0),
+        cell: (r) => (
+          <Badge variant={r.enabled ? "default" : "secondary"}>
+            {r.enabled ? t.console.valEnabled : t.console.valDisabled}
+          </Badge>
+        ),
+      },
+      {
+        key: "updated",
+        header: t.console.colUpdated,
+        sortValue: (r) => r.updatedAt,
+        cell: (r) => (
+          <span className="text-muted-foreground">{new Date(r.updatedAt).toLocaleDateString()}</span>
+        ),
+      },
+    ],
+    [],
+  );
 
   return (
     <AppShell>

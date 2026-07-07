@@ -1,4 +1,4 @@
-import { useMemo, useState, type ElementType, type ReactNode } from "react";
+import { useMemo, useState, type AriaAttributes, type ElementType, type ReactNode } from "react";
 import { ChevronDown, ChevronUp, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -58,9 +58,10 @@ export function DataTable<T>({
     const col = columns.find((c) => c.key === sort.key);
     if (!col?.sortValue) return rows;
     const dir = sort.dir === "asc" ? 1 : -1;
+    const sortValue = col.sortValue; // narrowed non-null by the guard above
     return [...rows].sort((a, b) => {
-      const va = col.sortValue!(a);
-      const vb = col.sortValue!(b);
+      const va = sortValue(a);
+      const vb = sortValue(b);
       const cmp =
         typeof va === "number" && typeof vb === "number"
           ? va - vb
@@ -90,34 +91,45 @@ export function DataTable<T>({
         <table className="w-full min-w-full text-sm">
           <thead className="bg-muted/40">
             <tr>
-              {columns.map((c) => (
-                <th
-                  key={c.key}
-                  scope="col"
-                  className={cn("px-3 py-2 text-start font-semibold text-muted-foreground", c.className)}
-                >
-                  {c.sortValue ? (
-                    <button
-                      type="button"
-                      onClick={() => toggleSort(c.key)}
-                      className="inline-flex items-center gap-1 hover:text-foreground"
-                    >
-                      {c.header}
-                      {sort?.key === c.key ? (
-                        sort.dir === "asc" ? (
-                          <ChevronUp className="h-3.5 w-3.5" />
+              {columns.map((c) => {
+                const isSorted = sort?.key === c.key;
+                const ariaSort: AriaAttributes["aria-sort"] = c.sortValue
+                  ? isSorted
+                    ? sort.dir === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : "none"
+                  : undefined;
+                return (
+                  <th
+                    key={c.key}
+                    scope="col"
+                    aria-sort={ariaSort}
+                    className={cn("px-3 py-2 text-start font-semibold text-muted-foreground", c.className)}
+                  >
+                    {c.sortValue ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleSort(c.key)}
+                        className="inline-flex items-center gap-1 hover:text-foreground"
+                      >
+                        {c.header}
+                        {isSorted ? (
+                          sort.dir === "asc" ? (
+                            <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
+                          ) : (
+                            <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                          )
                         ) : (
-                          <ChevronDown className="h-3.5 w-3.5" />
-                        )
-                      ) : (
-                        <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" />
-                      )}
-                    </button>
-                  ) : (
-                    c.header
-                  )}
-                </th>
-              ))}
+                          <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" aria-hidden="true" />
+                        )}
+                      </button>
+                    ) : (
+                      c.header
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>

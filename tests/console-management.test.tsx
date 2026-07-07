@@ -2,7 +2,7 @@
  * @vitest-environment happy-dom
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import { Boxes } from "lucide-react";
@@ -68,5 +68,17 @@ describe("DataTable — states", () => {
     render(<DataTable<Row> {...base} rows={[{ id: "1", name: "Alpha" }, { id: "2", name: "Beta" }]} />);
     expect(screen.getByText("Alpha")).toBeTruthy();
     expect(screen.getByText("Beta")).toBeTruthy();
+  });
+
+  it("shows the error affordance (not the empty state) and wires onRetry", () => {
+    const onRetry = vi.fn();
+    render(<DataTable<Row> {...base} rows={undefined} isError onRetry={onRetry} />);
+    // Error branch renders ErrorCard, not the zero-rows EmptyState.
+    expect(screen.queryByText("EMPTY_MSG")).toBeNull();
+    const retryButton = screen.getByRole("button");
+    expect(retryButton).toBeTruthy();
+    // ErrorCard invokes onRetry synchronously inside its retry handler.
+    fireEvent.click(retryButton);
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });

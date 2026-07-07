@@ -1,7 +1,6 @@
 import { RadioTower } from "lucide-react";
-import { AppShell } from "@/components/layout/AppShell";
+import { PendingConsolePage } from "@/desktop/management";
 import { t } from "@/lib/i18n";
-import { EmptyState } from "@/components/ui/empty-state";
 
 /**
  * RFID Readers console (Phase 6 scaffold). No reader entity/GET exists server-side —
@@ -10,14 +9,10 @@ import { EmptyState } from "@/components/ui/empty-state";
  */
 export default function RfidReadersConsolePage() {
   return (
-    <AppShell>
-      <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-6">
-        <header className="space-y-1">
-          <h1 className="text-2xl font-bold text-foreground">{t.console.rfidReaders.title}</h1>
-          <p className="text-sm text-muted-foreground">{t.console.rfidReaders.subtitle}</p>
-        </header>
-        <EmptyState icon={RadioTower} message={t.console.pendingEndpoint} />
-      </div>
-    </AppShell>
+    <PendingConsolePage
+      icon={RadioTower}
+      title={t.console.rfidReaders.title}
+      subtitle={t.console.rfidReaders.subtitle}
+    />
   );
 }

@@ -5,3 +5,4 @@
 export { ManagementGuard } from "./ManagementGuard";
 export { ReadOnlyChip } from "./ReadOnlyChip";
 export { DataTable, type Column } from "./DataTable";
+export { PendingConsolePage } from "./PendingConsolePage";

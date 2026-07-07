@@ -1531,3 +1531,22 @@ Append-only log of implementation claims backed by verified evidence. Purpose: p
 **Owner questions (surfaced, non-blocking):** Q1 (lead server-read access — future phase), Q2–Q4 (missing endpoints — Phase 7), Q5 (`/admin/metrics` fencing — dropped, separate ticket), Q6 (lead+secondary-admin webWrite edge). Deferred to Phase 7: ConfigFormScaffold, Pagination, configLogs/rollback/promote, the rich dashboard/health display.
 
 **Verdict:** VERIFIED (grounded + full gate green). Live browser walk of the console not run — consistent with the owner-accepted Phase-0 live-walk skip; covered by tsc + full suite + capability-visibility + guard tests. PR pending; held for owner merge.
+
+## 2026-07-07 — Phase 6 PR #52 review round: CodeRabbit remediation (6 findings)
+
+**Context:** PR #52 CI fully green (CodeRabbit/Cursor/Vercel/Merge-gate/Playwright×2/Architecture/Integration/Tests all pass), but `mergeStateStatus: BLOCKED` via `reviewDecision: CHANGES_REQUESTED` from `coderabbitai[bot]` (review 4644511306). Cursor's review was `COMMENTED` only (Bugbot hit a usage limit — no code findings). Owner directive: "poll the pr merge when green" → address the block, then merge.
+
+**Claim:** All 6 CodeRabbit findings (5 inline + 1 outside-diff, every one tagged `🔵 Trivial/nitpick`) verified against live code and fixed; each fix is correct, minimal, and within the Phase-6 additive fence. III.9 (zero unresolved warnings) satisfied.
+
+**Evidence (verified 2026-07-07):**
+- **F1 `DataTable.tsx:62-63` — redundant `col.sortValue!`.** CodeRabbit's literal suggestion (bare `col.sortValue(a)`) would FAIL tsc: inside the `.sort()` closure TS re-widens the property access to optional. Fixed correctly by hoisting `const sortValue = col.sortValue;` after the `if (!col?.sortValue) return` guard — a `const` local stays narrowed inside closures. No bare `!`. `npx tsc --noEmit` → 0.
+- **F2 `DataTable.tsx` sortable `<th>`.** Added `aria-sort` (`ascending|descending|none`, omitted on non-sortable cols) via `AriaAttributes["aria-sort"]` (added to the `react` type import) + `aria-hidden="true"` on all three chevron icons — matching the `Lock` a11y treatment in `ReadOnlyChip`. Path-instruction a11y for `src/**/*.tsx`.
+- **F3 `IntegrationsConsolePage.tsx` inline `columns`.** Wrapped in `useMemo<Column<IntegrationConfig>[]>(() => [...], [])` so it stops invalidating DataTable's internal `[rows, sort, columns]` sort memo each parent render. `t` is a module import (stable) → empty dep list is exhaustive-deps-correct.
+- **F4 triplicated pending scaffolds.** Extracted `src/desktop/management/PendingConsolePage.tsx` (icon+title+subtitle → AppShell/header/EmptyState with `t.console.pendingEndpoint`), exported from the barrel, and collapsed Webhooks/Notifications/RfidReaders onto it. 3 real consumers → knip-clean (not the deferred-unused case that removed WriteGate/DetailDrawer).
+- **F5 `console-management.test.tsx` error branch.** Added a test: `isError` + `onRetry` → asserts EmptyState is absent (`queryByText("EMPTY_MSG")` null), the ErrorCard retry button renders (`getByRole("button")`), and `fireEvent.click` invokes `onRetry` once (ErrorCard calls it synchronously in its retry handler). File 5→6 tests.
+- **F6 `Topbar.tsx:89-121` duplicated nav JSX.** Extracted a `renderNavLink` helper (mirroring `IconSidebar`'s `renderItem`); both `visibleItems.map` and `managementItems.map` now call it. Identical rendered markup.
+- **Gate:** `npx tsc --noEmit` (fe) 0 · `tsc -p tsconfig.server.json` 0 · `pnpm i18n:check` deep parity ✓ · `pnpm architecture:gates` All G1 passed, **0 cycles** · `pnpm test -- tests/web-management-nav-model.test.ts tests/console-management.test.tsx` → **13 passed**.
+- **III.9:** knip still exits 1 — confirmed pre-existing baseline (identical `unused files` count when my diff is `git stash`ed; none of my touched/new files appear in its output; `PendingConsolePage` correctly seen as used). Not part of `architecture:gates`. My diff adds zero new warnings.
+- **Fence (III.4):** additive/refactor within the Phase-6 surface only — no server, native, frozen-surface, or i18n-key changes (F4 reuses the existing `console.*` keys; parity unchanged). Stray untracked files (`locales/i18next-master.zip`, `docs/design/web-console-audit-round2-2026-07-07.md`) deliberately NOT staged.
+
+**Verdict:** VERIFIED (all 6 findings fixed, correct, gate green). After push, the stale `coderabbitai[bot]` CHANGES_REQUESTED review is dismissed via REST (per the merge-gating rule) once CI re-greens, then merge per the owner directive.
