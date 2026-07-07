@@ -1,9 +1,5 @@
 {
   "mcpServers": {
-    "GitLab": {
-      "type": "http",
-      "url": "https://gitlab.com/api/v4/mcp"
-    },
     "railway": {
       "command": "railway",
       "args": ["mcp"]

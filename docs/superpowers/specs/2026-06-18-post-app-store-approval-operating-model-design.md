@@ -121,7 +121,7 @@ These are not revisited by this operating model:
 - `docs/governance/PRODUCT_DRIVEN_IMPROVEMENT_PLAN.md` — source improvement plan (P0-5 now closed); weekly rhythm table
 - `docs/governance/PRODUCT_MODEL.md` — product scope, critical paths, and frozen surfaces
 - `docs/governance/ARCHITECTURE_MAP.md` — full system architecture map
-- `docs/governance/GITHUB_GOVERNANCE.md` — branch protection, remote canon, CI gate status
+- `docs/devops/github-setup.md` — branch protection, remote canon, CI gate status
 - `docs/governance/PRODUCT_ALIGNMENT_REPORT.md` — product/engineering alignment findings
 
 ### Agent infrastructure

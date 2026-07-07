@@ -9,7 +9,7 @@ configuration that is easy to get wrong.
 
 **Maintenance mode:** see [`docs/MAINTENANCE_MODE.md`](docs/MAINTENANCE_MODE.md). Expo/RN work belongs in [`exposwifty31/literate-dollop`](https://github.com/exposwifty31/literate-dollop).
 
-**Git remote:** `origin` → GitHub (`github.com/exposwifty31/vettrack`). GitLab (`gitlab.com/dboy31561/vettrack`) is configured as the `gitlab` remote. Push to `origin` (GitHub) for canonical history; push to `gitlab` when GitLab CI is active. See [`docs/GITLAB_DEVELOPMENT.md`](docs/GITLAB_DEVELOPMENT.md).
+**Git remote:** `origin` → GitHub (`github.com/exposwifty31/vettrack`). Push PRs to `origin` only. Setup: [`docs/devops/github-setup.md`](docs/devops/github-setup.md).
 
 **CI:** remote merge gates may be suspended — run local checks below before merge. Do not push directly to `main` when MR workflow is active.
 
@@ -18,13 +18,8 @@ configuration that is easy to get wrong.
 ### Merge requests / pull requests
 
 ```bash
-# GitHub (canonical remote — always push here):
 git push -u origin feat/my-change
 # Open PR on github.com/exposwifty31/vettrack targeting main
-
-# GitLab (when GitLab CI is active):
-git push -u gitlab feat/my-change
-# Open MR targeting main — see docs/GITLAB_DEVELOPMENT.md
 ```
 
 When CI resumes, required checks include typecheck, vitest, architecture gates, and Playwright shards. Squash-merge if intermediate commits in the MR left CI red and the final head is green.

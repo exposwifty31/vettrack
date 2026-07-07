@@ -1,5 +1,7 @@
 # Expo Agent Brief — VetTrack Governance → literate-dollop
 
+> **Obsolete GitLab references (2026-07-07):** GitLab remote/CI and related docs are out of scope. Canonical: GitHub `origin` + GitHub Actions. Ignore GitLab rows in tables below.
+
 **Type:** Cross-repo agent runbook  
 **Generated:** 2026-06-19  
 **Audience:** Agents and maintainers working in [`exposwifty31/literate-dollop`](https://github.com/exposwifty31/literate-dollop)  
@@ -19,8 +21,8 @@
 | **Capacitor (H0)** | **Active store path.** iOS 1.0.1 approved and auto-releasing (2026-06-18). Android submission in flight. |
 | **Governance** | Product Engineering Governor Phases 0–6 complete under `docs/governance/`. Improvement plan in execution (Phase 7). |
 | **Contracts** | **Consumes** `@vettrack/contracts` from literate-dollop via `github:` path dep — does not author contracts here. |
-| **CI** | GitHub Actions active and green on `main`; GitLab CI mirrored with contracts gate added 2026-06-18. Branch protection still pending (P0-2). |
-| **Remote truth** | **Unresolved tension:** docs say GitLab canonical; practice is GitHub `exposwifty31/vettrack` as `origin` (71 commits ahead of GitLab). P0-1 decision pending. |
+| **CI** | GitHub Actions active on `main`. Branch protection still pending (P0-2). See [`docs/devops/github-setup.md`](../devops/github-setup.md). |
+| **Remote** | `origin` → GitHub `exposwifty31/vettrack` (canonical). |
 
 ### literate-dollop (Expo/RN)
 
@@ -58,7 +60,7 @@ Capacitor and Expo **coexist** until Horizon 7 kill-switch. Do not delete Capaci
 | [`PRODUCT_MODEL.md`](./PRODUCT_MODEL.md) | Product vision, personas, critical paths, mobile dual-track |
 | [`PRODUCT_ALIGNMENT_REPORT.md`](./PRODUCT_ALIGNMENT_REPORT.md) | Live product vs stated scope |
 | [`ARCHITECTURE_MAP.md`](./ARCHITECTURE_MAP.md) | Module/route/worker inventory |
-| [`GITHUB_GOVERNANCE.md`](./GITHUB_GOVERNANCE.md) | Branch/MR/remote drift audit |
+| [`docs/devops/github-setup.md`](../devops/github-setup.md) | Branch/MR/remote drift audit |
 | [`CI_CD_GOVERNANCE.md`](./CI_CD_GOVERNANCE.md) | Pipeline maturity, gate gaps |
 | [`ENGINEERING_FRICTION_REPORT.md`](./ENGINEERING_FRICTION_REPORT.md) | Delivery friction ranked by product impact |
 | [`PRODUCT_DRIVEN_IMPROVEMENT_PLAN.md`](./PRODUCT_DRIVEN_IMPROVEMENT_PLAN.md) | P0–P3 prioritized execution plan |

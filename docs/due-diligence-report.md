@@ -1,5 +1,7 @@
 # VetTrack — Raise Readiness Tracker
 
+> **Historical snapshot (April 2026).** Gate checklists reference removed domains (medication tasks, parallel medication models, pharmacy forecast, ER/patient) dropped in migrations 142–143. Closed security items (1.1–1.7) remain valid history; **do not** use medication-task or formulary rows as build targets. Current product scope: [`scope-change-2026.md`](./scope-change-2026.md). Active engineering rules: [`../CLAUDE.md`](../CLAUDE.md).
+
 **Purpose:** Internal living document. Tracks progress from current state → Serious Seed Candidate.  
 **Last updated:** 2026-04-25 (sprint complete)  
 **Owner:** Founder / CTO

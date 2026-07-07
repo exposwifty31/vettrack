@@ -1,11 +1,13 @@
 # VetTrack — Repository Cleanup Manifest
 
+> **Update 2026-07-07:** GitLab is out of scope. Removed: `docs/GITLAB_DEVELOPMENT.md`, `docs/governance/GITHUB_GOVERNANCE.md`, `.gitlab/merge_request_templates/`. Canonical remote: GitHub `origin` only.
+
 **Generated:** 2026-06-20  
 **Production anchor:** iOS `MARKETING_VERSION=1.0.1`, `CURRENT_PROJECT_VERSION=20`; locales `whatsNew.currentVersion=1.0.1`, `buildLabel=Build 20`  
 **Product scope:** [`docs/scope-change-2026.md`](../scope-change-2026.md) (migrations 142–143)  
 **Ship lane:** `<vettrack-ship>` worktree → `main` (do not modify)  
 **Dev lane:** `<vettrack-dev>` worktree → `main-sync`  
-**Remotes:** `origin` → `github.com/exposwifty31/vettrack` (canonical); `gitlab` → `gitlab.com/dboy31561/vettrack` (secondary mirror)
+**Remotes:** `origin` → `github.com/exposwifty31/vettrack` (canonical)
 
 ---
 
@@ -42,8 +44,8 @@
 | `PRODUCT_MODEL.md` | **KEEP** | Canonical product model post scope-change |
 | `ARCHITECTURE_MAP.md` | **KEEP** | Architecture inventory |
 | `PRODUCT_ALIGNMENT_REPORT.md` | **KEEP** | June 2026 alignment audit — still valid |
-| `GITHUB_GOVERNANCE.md` | **KEEP** | Documents GitHub/GitLab divergence; index from `docs/README.md` |
-| `CI_CD_GOVERNANCE.md` | **UPDATE** | References deleted `.gitlab-ci.yml`; update after GitHub-first migration |
+| `GITHUB_GOVERNANCE.md` | **DELETED** (2026-07-07) | Was dual-remote audit; superseded by `docs/devops/github-setup.md` |
+| `CI_CD_GOVERNANCE.md` | **UPDATE** ✅ | GitHub Actions only (2026-07-07) |
 | `ENGINEERING_FRICTION_REPORT.md` | **KEEP** | Friction inventory; dual-CI note is historical context |
 | `FROZEN_SURFACE_CHANGE_PROTOCOL.md` | **KEEP** | Frozen surface change protocol |
 | `LITERATE_DOLLOP_PARITY_REPORT.md` | **KEEP** | Expo/RN parity tracking |
@@ -79,7 +81,7 @@
 | `docs/MAINTENANCE_MODE.md` | **UPDATE** ✅ | Build 15; GitLab as `origin`; forbids GitHub remote |
 | `docs/README.md` | **UPDATE** ✅ | Missing governance index; GitLab CI as primary devops link |
 | `docs/setup/environment.md` | **UPDATE** ✅ | GitLab-only clone; GitLab CI variables section |
-| `docs/GITLAB_DEVELOPMENT.md` | **UPDATE** ✅ | Declares GitLab primary; references `.gitlab-ci.yml` |
+| `docs/GITLAB_DEVELOPMENT.md` | **DELETED** (2026-07-07) | GitLab out of scope |
 | `docs/devops/ci-cd.md` | **UPDATE** ✅ | Dual CI; `.gitlab-ci.yml` deleted in `f927e5b1` |
 | `docs/runbooks/inventory-jobs-failed-deductions.md` | **UPDATE** ✅ | Medication inventory jobs — feature removed (migration 143) |
 | `CONTRIBUTING.md` | **UPDATE** ✅ | Async inventory skew section references live medication deduction worker |

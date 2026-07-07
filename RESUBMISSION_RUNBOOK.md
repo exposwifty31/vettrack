@@ -128,7 +128,7 @@ The Apple-sign-up error had a stack of causes, each hiding the next. All are loa
 ## G. Residual risks & how to handle
 
 - **Client Trust re-enabling (HIGH — this is what to watch).** It was disabled via the dashboard's *24-hour "Revert update"*. If it turns back on, demo login fails again (`needs_client_trust`). Before each submission: run the §C login check (must say `complete`), and in **Clerk → Configure → Updates** confirm "Client Trust" is reverted, not on a timer. Durable option: leave it off for this instance; the in-app `needs_client_trust` email-code handler is NOT a fix here because the reviewer can't read the demo mailbox.
-- **Unpushed commits (MEDIUM).** 16 commits are local-only. If GitLab access returns and CI deploys `origin/main`, production **regresses** to pre-fix code and breaks the live app the reviewer hits. **Push `main` to origin before any CI deploy.**
+- **Unpushed commits (MEDIUM).** Local-only commits must be pushed before any CI deploy to `origin/main`, or production may regress. **Push `main` to origin before any CI deploy.**
 - **Direct-deploy drift.** Production is updated by `railway up` from `/Users/dan/.vt-deploy`, not CI. The Railway MCP token may be expired; use the **CLI** (`railway up --detach`, run from a plain dir — do NOT pass `.` as the path arg, it errors with "prefix not found" on CLI 5.5.0).
 
 ## H. Troubleshooting (failure → fix, all seen before)
@@ -148,7 +148,7 @@ The Apple-sign-up error had a stack of causes, each hiding the next. All are loa
 
 ## J. After acceptance
 
-- Push the 16 commits to origin the moment GitLab unblocks (`git push origin main`).
+- Push local commits to `origin` before deploy: `git push origin main`.
 - Fix the Railway Worker start command permanently in the dashboard (Custom Start Command = `pnpm worker`) and correct the `NODE_ENV` variable (currently the literal string `PORT 8080`; should be `production`).
 - Deferred UX items (not App-Review-blocking): Tasks-page card spacing (needs populated-data repro) and the Shift-Chat keyboard/bottom-sheet issue (needs device repro; likely add `@capacitor/keyboard`).
 
