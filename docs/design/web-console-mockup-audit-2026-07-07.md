@@ -61,15 +61,15 @@
 
 Each is a sidebar entry that does not navigate. No states, no drawers, no RTL variants exist for any of them. The chat sidebar in the design project confirms only People & Roles and Inventory & Procurement are queued next. Annotations to carry into each build:
 
-2. **People & Roles** — carry persona pattern: role edits admin-only; lead sees roster read-only. Role vocabulary must match the numeric hierarchy (admin/vet/senior_technician=lead_technician/vet_tech/technician/student). Drawer exemplar candidate (user detail: role, shift, check-in state).
-3. **Equipment Governance** — the needs-attention rows already deep-link here; build the VT-204 drawer first (S3). Custody/stale semantics need the M3 color fix.
-4. **Inventory & Procurement** — "New restock" is the flagship's only creation flow; design the restock drawer/wizard with lead read-only variant. Badge binding (M4) applies.
-5. **Integrations & Webhooks** — **carry non-negotiable #4:** credentials render masked (••••), rotate is write-only (never round-trip a secret into an editable input), reveal never exists. The Home activity item "System rotated webhook secret" correctly shows no secret value — keep that discipline. Provet PMS is the only named vendor ✓.
-6. **Notifications** — WhatsApp failure surfaces exist on Home; module needs delivery-log states + retry semantics (retry is a mutation → admin-only).
-7. **RFID Readers** — heartbeat/offline states already have Home vocabulary ("no heartbeat 12m", "6 of 7 online", מוגבל/degraded). Reader registration = admin-only.
-8. **Ops Health** — **frozen-surface rules:** outbox/DLQ/telemetry/keepalive are observed only; carry the READ-ONLY chip pattern; no requeue/purge/transport controls in v1. Charts CSS-illustrative → recharts annotation.
-9. **Analytics & Reports** — chart treatment must adopt the fixed readiness palette (post-M3). Wide-layout needs make S2 (max-width strategy) a prerequisite.
-10. **Audit** — feed pattern exists (Recent activity); fix M2 (timestamps) before this module inherits it. `AuditActionType` vocabulary is closed — copy must map to real audit kinds.
+- **Module 2 — People & Roles** — carry persona pattern: role edits admin-only; lead sees roster read-only. Role vocabulary must match `ROLE_HIERARCHY` exactly (admin · vet · senior_technician · lead_technician · vet_tech · technician · student) — do not collapse `senior_technician` and `lead_technician`. Drawer exemplar candidate (user detail: role, shift, check-in state).
+- **Module 3 — Equipment Governance** — the needs-attention rows already deep-link here; build the VT-204 drawer first (S3). Custody/stale semantics need the M3 color fix.
+- **Module 4 — Inventory & Procurement** — "New restock" is the flagship's only creation flow; design the restock drawer/wizard with lead read-only variant. Badge binding (M4) applies.
+- **Module 5 — Integrations & Webhooks** — **carry non-negotiable #4:** credentials render masked (••••), rotate is write-only (never round-trip a secret into an editable input), reveal never exists. The Home activity item "System rotated webhook secret" correctly shows no secret value — keep that discipline. Provet PMS is the only named vendor ✓.
+- **Module 6 — Notifications** — WhatsApp failure surfaces exist on Home; module needs delivery-log states + retry semantics (retry is a mutation → admin-only).
+- **Module 7 — RFID Readers** — heartbeat/offline states already have Home vocabulary ("no heartbeat 12m", "6 of 7 online", מוגבל/degraded). Reader registration = admin-only.
+- **Module 8 — Ops Health** — **frozen-surface rules:** outbox/DLQ/telemetry/keepalive are observed only; carry the READ-ONLY chip pattern; no requeue/purge/transport controls in v1. Charts CSS-illustrative → recharts annotation.
+- **Module 9 — Analytics & Reports** — chart treatment must adopt the fixed readiness palette (post-M3). Wide-layout needs make S2 (max-width strategy) a prerequisite.
+- **Module 10 — Audit** — feed pattern exists (Recent activity); fix M2 (timestamps) before this module inherits it. `AuditActionType` vocabulary is closed — copy must map to real audit kinds.
 
 ---
 

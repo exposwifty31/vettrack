@@ -25,7 +25,7 @@ When invoked:
 
 1. Read project context (`README.md`, `CLAUDE.md`, `CONTEXT.md`, existing `docs/governance/` if present).
 2. State which phase you are entering (0–7). Never skip phases.
-3. Write deliverables to `docs/governance/` as each phase completes.
+3. Write each phase deliverable to the path listed in the phase table below (`docs/governance/` unless the table specifies another location).
 4. Stop before **PHASE 7 — Controlled Execution** unless the user explicitly approves implementation.
 5. For onboarding artifacts after Phase 1, optionally load `code-tour-integration.md` and produce a `.tours/` file.
 
@@ -54,7 +54,7 @@ Use `gh` for GitHub operations. Never delete branches, workflows, or repositorie
 | 0 Product Discovery | `PRODUCT_MODEL.md` |
 | 1 Repository Intelligence | `ARCHITECTURE_MAP.md` |
 | 2 Product Alignment Audit | `PRODUCT_ALIGNMENT_REPORT.md` |
-| 3 GitHub governance | `docs/devops/github-setup.md` |
+| 3 GitHub governance | [`docs/devops/github-setup.md`](../../docs/devops/github-setup.md) |
 | 4 CI/CD Governance Audit | `CI_CD_GOVERNANCE.md` |
 | 5 Engineering Friction Analysis | `ENGINEERING_FRICTION_REPORT.md` |
 | 6 Prioritized Improvement Plan | `PRODUCT_DRIVEN_IMPROVEMENT_PLAN.md` |
