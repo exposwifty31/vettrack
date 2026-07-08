@@ -22,7 +22,6 @@ import { startOutboxDlqScanner } from "../lib/outbox-dlq-scanner.js";
 import { startCodeBlueReconciliationScanner } from "../lib/code-blue-reconciliation-scanner.js";
 import { startEquipmentConditionStalenessWorker } from "../workers/equipmentConditionStalenessWorker.js";
 import { startStagingExpiryWorker } from "../workers/stagingExpiryWorker.js";
-import { startProcedureBoundReleaseWorker } from "../workers/procedureBoundReleaseWorker.js";
 import { startEquipmentWaitlistReservationWorker } from "../workers/equipment-waitlist-reservation.worker.js";
 import { startStaleCheckoutSweepWorker } from "../workers/staleCheckoutSweepWorker.js";
 
@@ -69,7 +68,6 @@ export async function startBackgroundSchedulers() {
   // Equipment Operational State V1/V2 workers
   startEquipmentConditionStalenessWorker();
   startStagingExpiryWorker();
-  startProcedureBoundReleaseWorker();
   startEquipmentWaitlistReservationWorker();
   startStaleCheckoutSweepWorker();
 }

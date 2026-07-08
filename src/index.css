@@ -91,7 +91,7 @@
     --status-issue: 4 100% 59%;        /* sys-red */
     --status-maintenance: 35 100% 50%; /* sys-orange */
     --status-sterilized: 211 100% 50%; /* sys-blue */
-    --status-stale: 35 100% 50%;       /* sys-orange — stale custody */
+    --status-stale: 279 68% 60%;       /* sys-purple #AF52DE — stale custody, distinct from maintenance-orange (decided 2026-07-08) */
     --status-unknown: 240 2% 57%;      /* sys-gray — unknown/indeterminate */
     --sat: env(safe-area-inset-top);
     --sab: env(safe-area-inset-bottom);
@@ -178,9 +178,9 @@
     --status-steril-bg: rgb(0 122 255 / 0.12);
     --status-steril-fg: #0a56c9;
     --status-steril-border: rgb(0 122 255 / 0.24);
-    --status-stale-bg: rgb(255 149 0 / 0.14);
-    --status-stale-fg: #8a4b00;
-    --status-stale-border: rgb(255 149 0 / 0.28);
+    --status-stale-bg: rgb(175 82 222 / 0.14);
+    --status-stale-fg: #6b21a8;
+    --status-stale-border: rgb(175 82 222 / 0.28);
     --status-unknown-bg: rgb(142 142 147 / 0.16);
     --status-unknown-fg: #55555a;
     --status-unknown-border: rgb(142 142 147 / 0.30);
@@ -274,7 +274,7 @@
     --status-issue: 4 100% 61%;
     --status-maintenance: 37 100% 52%;
     --status-sterilized: 213 100% 52%;
-    --status-stale: 37 100% 52%;
+    --status-stale: 279 70% 70%;
     --status-unknown: 240 3% 61%;
 
     /* Status pill fills — dark (bright fg reads on the dark tint) */
@@ -290,9 +290,9 @@
     --status-steril-bg: rgb(10 132 255 / 0.18);
     --status-steril-fg: #4da3ff;
     --status-steril-border: rgb(10 132 255 / 0.32);
-    --status-stale-bg: rgb(255 159 10 / 0.18);
-    --status-stale-fg: #ffb340;
-    --status-stale-border: rgb(255 159 10 / 0.32);
+    --status-stale-bg: rgb(191 131 236 / 0.18);
+    --status-stale-fg: #cba6f7;
+    --status-stale-border: rgb(191 131 236 / 0.32);
     --status-unknown-bg: rgb(152 152 157 / 0.20);
     --status-unknown-fg: #aeaeb3;
     --status-unknown-border: rgb(152 152 157 / 0.34);

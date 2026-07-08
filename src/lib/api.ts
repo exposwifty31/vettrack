@@ -61,7 +61,6 @@ import type {
   Dock,
   OperationalMetricsSummary,
 } from "@/types";
-import type { OutcomeKpiRoiResponse } from "../../shared/er-types.js";
 import type { AuthoritySnapshot } from "../../shared/authority.js";
 
 import type { ShiftActivityItem } from "@/types";
@@ -352,7 +351,6 @@ export const api = {
   },
   analytics: {
     summary: () => request<AnalyticsSummary>("/api/analytics"),
-    outcomeKpiRoi: () => request<OutcomeKpiRoiResponse>("/api/analytics/outcome-kpi-roi"),
     shiftCompletion: (from?: string, to?: string) => {
       const qs = new URLSearchParams();
       if (from) qs.set("from", from);
@@ -1103,16 +1101,6 @@ export const api = {
       request<void>(`/api/equipment/${id}/stage/${claimId}`, { method: "DELETE" }),
     stagingQueue: (id: string) =>
       request<StagingClaim[]>(`/api/equipment/${id}/staging-queue`),
-    procedureBind: (id: string, data: { hospitalizationId: string }) =>
-      request<{ ok: boolean; equipment: { id: string; usageState: string; readinessState: string; version: number } }>(
-        `/api/equipment/${id}/procedure-bind`,
-        { method: "POST", body: JSON.stringify(data) },
-      ),
-    procedureUnbind: (id: string) =>
-      request<{ ok: boolean; equipment: { id: string; usageState: string; readinessState: string; version: number } }>(
-        `/api/equipment/${id}/procedure-bind`,
-        { method: "DELETE" },
-      ),
     metricsSummary: (params?: { from?: string; to?: string }) => {
       const qs = new URLSearchParams();
       if (params?.from) qs.set("from", params.from);

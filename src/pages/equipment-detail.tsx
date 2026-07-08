@@ -27,16 +27,6 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -120,7 +110,6 @@ import { playCriticalAlertTone } from "@/lib/sounds";
 import { haptics } from "@/lib/haptics";
 import { safeStorageSetItem } from "@/lib/safe-browser";
 import { isOnline } from "@/lib/safe-browser";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { isEquipmentRecoveryUiEnabled } from "@/lib/equipment-recovery-ui-flag";
 import { deriveEquipmentRecoverySnapshotFromSource } from "@/lib/equipment-recovery-adapter";
 import {
@@ -215,9 +204,6 @@ function EquipmentDetailPageDesktop() {
   const [reportIssueNote, setReportIssueNote] = useState("");
   const [reportIssuePhoto, setReportIssuePhoto] = useState<string | null>(null);
   const [reportIssueNoteError, setReportIssueNoteError] = useState("");
-  const [bindOpen, setBindOpen] = useState(false);
-  const [releaseConfirmOpen, setReleaseConfirmOpen] = useState(false);
-  const [selectedHospId, setSelectedHospId] = useState<string>("");
 
   useEffect(() => {
     const params = new URLSearchParams(searchStr);
@@ -458,38 +444,6 @@ function EquipmentDetailPageDesktop() {
     queryFn: () => api.equipment.waitlist(id!),
     enabled: !!id && !!userId && queryEnabled,
     refetchOnWindowFocus: false,
-  });
-
-  const hospitalizationsQ = useQuery({
-    queryKey: ["/api/patients", "active"],
-    queryFn: async () => ({ patients: [] as Array<{ id: string; status: string; animal?: { name?: string } }> }),
-    enabled: bindOpen,
-  });
-
-  const procedureBindMut = useMutation({
-    mutationFn: (hospitalizationId: string) =>
-      api.operationalState.procedureBind(id!, { hospitalizationId }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
-      queryClient.invalidateQueries({ queryKey: ["equipment-truth", id] });
-      queryClient.invalidateQueries({ queryKey: ["deployability", id] });
-      queryClient.invalidateQueries({ queryKey: ["staging-queue", id] });
-      setBindOpen(false);
-      setSelectedHospId("");
-      toast.success(t.operationalState.procedureBound);
-    },
-  });
-
-  const procedureUnbindMut = useMutation({
-    mutationFn: () => api.operationalState.procedureUnbind(id!),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
-      queryClient.invalidateQueries({ queryKey: ["equipment-truth", id] });
-      queryClient.invalidateQueries({ queryKey: ["deployability", id] });
-      queryClient.invalidateQueries({ queryKey: ["staging-queue", id] });
-      setReleaseConfirmOpen(false);
-      toast.success(t.operationalState.procedureReleased);
-    },
   });
 
   function invalidateAll() {
@@ -1474,22 +1428,6 @@ function EquipmentDetailPageDesktop() {
                     {t.dockReturn.title}
                   </Button>
                 )}
-                {equipment.custodyState === "docked" &&
-                  equipment.usageState === "available" &&
-                  hasVetAccess && (
-                  <Button variant="outline" onClick={() => setBindOpen(true)}>
-                    {t.stagingQueue.bindToHospitalization}
-                  </Button>
-                )}
-                {equipment.usageState === "procedure_bound" && hasVetAccess && (
-                  <Button
-                    variant="destructive"
-                    onClick={() => setReleaseConfirmOpen(true)}
-                    disabled={procedureUnbindMut.isPending}
-                  >
-                    {t.stagingQueue.releaseFromProcedure}
-                  </Button>
-                )}
               </div>
 
               <DockReturnFlow
@@ -1516,63 +1454,6 @@ function EquipmentDetailPageDesktop() {
                 }}
               />
 
-              <Dialog open={bindOpen} onOpenChange={setBindOpen}>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>{t.stagingQueue.bindToHospitalization}</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-3">
-                    {equipment.readinessState !== "ready" && (
-                      <p className="text-sm text-[var(--status-stale-fg)] bg-[var(--status-stale-bg)] rounded p-2">
-                        {t.operationalState.procedureBindNotReadyWarning}
-                      </p>
-                    )}
-                    <Select value={selectedHospId} onValueChange={setSelectedHospId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder={t.stagingQueue.selectHospitalization} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(hospitalizationsQ.data?.patients ?? []).map((h) => (
-                          <SelectItem key={h.id} value={h.id}>
-                            {h.animal?.name ?? h.id} — {h.status}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setBindOpen(false)}>
-                      {t.common.cancel}
-                    </Button>
-                    <Button
-                      onClick={() => procedureBindMut.mutate(selectedHospId)}
-                      disabled={!selectedHospId || procedureBindMut.isPending}
-                    >
-                      {t.stagingQueue.bindToHospitalization}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-
-              <AlertDialog open={releaseConfirmOpen} onOpenChange={setReleaseConfirmOpen}>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{t.stagingQueue.confirmRelease}</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {t.stagingQueue.confirmReleaseDescription}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => procedureUnbindMut.mutate()}
-                      disabled={procedureUnbindMut.isPending}
-                    >
-                      {t.stagingQueue.releaseFromProcedure}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
             </TabsContent>
           )}
 

@@ -21,7 +21,6 @@ export const REGISTERED_QUERY_KEYS = [
   "[\"/api/admin/outbox/dlq\"]",
   "[\"/api/alert-acks\"]",
   "[\"/api/analytics\"]",
-  "[\"/api/analytics/outcome-kpi-roi\"]",
   "[\"/api/analytics/shift-completion\",\"*\"]",
   "[\"/api/animals/active\"]",
   "[\"/api/appointments\",\"*\"]",
