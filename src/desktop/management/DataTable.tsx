@@ -138,9 +138,21 @@ export function DataTable<T>({
                 key={rowKey(row)}
                 className={cn(
                   "border-t border-border/50",
-                  onRowClick && "cursor-pointer hover:bg-muted/30",
+                  onRowClick &&
+                    "cursor-pointer hover:bg-muted/30 focus-visible:bg-muted/40 focus-visible:outline-none",
                 )}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
+                tabIndex={onRowClick ? 0 : undefined}
+                onKeyDown={
+                  onRowClick
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onRowClick(row);
+                        }
+                      }
+                    : undefined
+                }
               >
                 {columns.map((c) => (
                   <td key={c.key} className={cn("px-3 py-2 align-middle", c.className)}>
