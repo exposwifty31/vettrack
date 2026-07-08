@@ -57,6 +57,16 @@ describe("web-management-nav-model — structure", () => {
     expect(people?.writeCap).toBe("management.webWrite");
   });
 
+  it("7c: Equipment Governance node is present, administration group, writable", () => {
+    const gov = WEB_MANAGEMENT_NAV.find((n) => n.id === "mgmt-governance");
+    expect(gov).toBeDefined();
+    expect(gov?.href).toBe("/admin/governance");
+    expect(gov?.labelKey).toBe("nav.governance");
+    expect(gov?.icon).toBe("ShieldCheck");
+    expect(gov?.group).toBe("administration");
+    expect(gov?.writeCap).toBe("management.webWrite");
+  });
+
   it("7a: Management Home node is present (restaged /dashboard), operations, read-only", () => {
     const home = WEB_MANAGEMENT_NAV.find((n) => n.id === "mgmt-home");
     expect(home).toBeDefined();

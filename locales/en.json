@@ -3313,7 +3313,25 @@
     "readerOnline": "Online",
     "readerStale": "Stale",
     "readerNoSignal": "No signal",
-    "readerUnassigned": "Unassigned"
+    "readerUnassigned": "Unassigned",
+    "governance": {
+      "title": "Equipment Governance",
+      "subtitle": "Readiness policy for this clinic",
+      "staleEvidenceLabel": "Stale evidence window",
+      "staleEvidenceHelp": "Equipment evidence older than this window counts as stale.",
+      "hoursLabel": "Hours",
+      "minimumReadyTitle": "Minimum ready by type",
+      "minimumReadyEmpty": "No per-type minimums configured.",
+      "colType": "Equipment type",
+      "colMinimum": "Minimum ready",
+      "editTitle": "Edit readiness policy",
+      "edit": "Edit",
+      "save": "Save",
+      "saved": "Readiness policy updated",
+      "saveFailed": "Could not update readiness policy",
+      "usingDefaults": "Using defaults",
+      "lastUpdated": "Updated"
+    }
   },
   "nav": {
     "integrations": "Integrations",
@@ -3370,7 +3388,8 @@
     "reportBug": "Report a Bug",
     "profile": "My Profile",
     "people": "People & Roles",
-    "managementHome": "Management Home"
+    "managementHome": "Management Home",
+    "governance": "Governance"
   },
   "phoneSignIn": {
     "title": "Phone Sign In",

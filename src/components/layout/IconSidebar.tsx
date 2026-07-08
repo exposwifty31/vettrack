@@ -6,7 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Home, Package, Grid, Bell, MapPin, Settings,
   List, ListTodo, Scan, Plus, Activity, Gauge, Boxes, Clock,
-  Cable, Webhook, BellRing, RadioTower, Users,
+  Cable, Webhook, BellRing, RadioTower, Users, ShieldCheck,
 } from "lucide-react";
 import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
 import { NAV } from "@/lib/routes/nav-model";
@@ -26,7 +26,7 @@ export interface SidebarItem {
 const ICON_MAP: Record<string, LucideIcon> = {
   Home, Package, Grid, Bell, MapPin, Settings,
   List, ListTodo, Scan, Plus, Activity, Gauge, Boxes, Clock,
-  Cable, Webhook, BellRing, RadioTower, Users,
+  Cable, Webhook, BellRing, RadioTower, Users, ShieldCheck,
 };
 
 function navLabel(key: string): string {

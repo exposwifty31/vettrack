@@ -216,6 +216,7 @@ export type AuditActionType =
   | "equipment_condition_verified"
   | "equipment_custody_state_changed"
   | "equipment_readiness_state_changed"
+  | "equipment_readiness_rules_updated"
   | "equipment_usage_state_changed"
   | "equipment_emergency_checkout"
   | "equipment_custody_chain_broken"
