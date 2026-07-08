@@ -2,7 +2,7 @@
 
 Routes derived from `server/app/routes.ts`, `server/index.ts`, and `server/routes/*.ts`.
 
-Generated 2026-06-16. **239** unique method+path pairs.
+Generated 2026-07-08. **249** unique method+path pairs.
 
 ---
 
@@ -22,8 +22,8 @@ Generated 2026-06-16. **239** unique method+path pairs.
 | `storage.ts` | `POST /api/storage/upload-url` |
 | `support.ts` | `GET /api/support`, `POST /api/support`, `PATCH /api/support/:id`, `GET /api/support/unresolved-count` |
 | `test.ts` | `POST /api/test/charge-alert/run`, `POST /api/test/create-scenario`, `POST /api/test/expiry-check/run`, `GET /api/test/notifications`, `GET /api/test/returns/:id`, `POST /api/test/run-scheduler` |
-| `uploads.ts` | `POST /api/uploads/fault-image` |
-| `users.ts` | `GET /api/users`, `PATCH /api/users/:id/delete`, `PATCH /api/users/:id/display_name`, `PATCH /api/users/:id/restore`, `PATCH /api/users/:id/role`, `PATCH /api/users/:id/secondary-role` (+9 more) |
+| `uploads.ts` | `POST /api/uploads/avatar`, `POST /api/uploads/fault-image` |
+| `users.ts` | `GET /api/users`, `PATCH /api/users/:id/delete`, `PATCH /api/users/:id/display_name`, `PATCH /api/users/:id/restore`, `PATCH /api/users/:id/role`, `PATCH /api/users/:id/secondary-role` (+12 more) |
 
 ## Equipment
 
@@ -32,6 +32,7 @@ Generated 2026-06-16. **239** unique method+path pairs.
 | `activity.ts` | `GET /api/activity`, `GET /api/activity/my-scan-count` |
 | `alert-acks.ts` | `GET /api/alert-acks`, `POST /api/alert-acks`, `PATCH /api/alert-acks/:id/resolve` |
 | `equipment-copilot.ts` | `POST /api/equipment/:id/copilot/explain` |
+| `equipment-inference.ts` | `GET /api/equipment/:id/location-inference` |
 | `equipment-operational-state.ts` | `GET /api/asset-types`, `POST /api/asset-types`, `GET /api/asset-types/:assetTypeId/conditions`, `POST /api/asset-types/:assetTypeId/conditions`, `GET /api/docks`, `POST /api/docks` (+8 more) |
 | `equipment.ts` | `GET /api/equipment`, `POST /api/equipment`, `DELETE /api/equipment/:id`, `GET /api/equipment/:id`, `PATCH /api/equipment/:id`, `POST /api/equipment/:id/checkout` (+18 more) |
 | `folders.ts` | `GET /api/folders`, `POST /api/folders`, `DELETE /api/folders/:id`, `PATCH /api/folders/:id` |
@@ -64,7 +65,7 @@ Generated 2026-06-16. **239** unique method+path pairs.
 |------|---------------|
 | `containers.ts` | `GET /api/containers`, `POST /api/containers`, `POST /api/containers/:id/blind-audit`, `POST /api/containers/:id/dispense`, `POST /api/containers/:id/restock`, `POST /api/containers/bootstrap-defaults` (+1 more) |
 | `dispense.ts` | `POST /api/dispense/:id/confirm`, `POST /api/dispense/draft`, `POST /api/dispense/emergency` |
-| `inventory-items.ts` | `GET /api/inventory-items`, `POST /api/inventory-items`, `PATCH /api/inventory-items/:id`, `PATCH /api/inventory-items/:id/deactivate`, `GET /api/inventory-items/:id/prices`, `POST /api/inventory-items/:id/prices` |
+| `inventory-items.ts` | `GET /api/inventory-items`, `POST /api/inventory-items`, `PATCH /api/inventory-items/:id`, `PATCH /api/inventory-items/:id/deactivate`, `GET /api/inventory-items/:id/detail`, `GET /api/inventory-items/:id/prices` (+1 more) |
 | `procurement.ts` | `GET /api/procurement`, `POST /api/procurement`, `GET /api/procurement/:id`, `PATCH /api/procurement/:id/cancel`, `PATCH /api/procurement/:id/receive`, `PATCH /api/procurement/:id/submit` |
 | `restock.ts` | `POST /api/restock/cancel`, `POST /api/restock/container-items`, `POST /api/restock/finish`, `POST /api/restock/scan`, `POST /api/restock/start` |
 
@@ -89,4 +90,8 @@ Generated 2026-06-16. **239** unique method+path pairs.
 - `POST /api/integrations/ops/runs/:runId/retry` (`server/integrations/routes/ops.routes.ts`)
 - `POST /api/integrations/ops/sync/window` (`server/integrations/routes/ops.routes.ts`)
 - `POST /api/integrations/ops/webhooks/:id/replay` (`server/integrations/routes/ops.routes.ts`)
+- `GET /api/shift-adjustments` (`server/routes/shift-adjustments.ts`)
+- `POST /api/shift-adjustments` (`server/routes/shift-adjustments.ts`)
+- `PATCH /api/shift-adjustments/:id` (`server/routes/shift-adjustments.ts`)
+- `POST /api/shift-adjustments/:id/cancel` (`server/routes/shift-adjustments.ts`)
 - `POST /api/webhooks/clerk` (`server/routes/webhooks.ts`)

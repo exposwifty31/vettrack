@@ -48,6 +48,8 @@ Consult before extending existing surfaces. Update in phase PRs.
 | [audit/FLOW_INVENTORY.md](./audit/FLOW_INVENTORY.md) | Route × platform × role inventory |
 | [audit/PROOF_ALIGNMENT_LOG.md](./audit/PROOF_ALIGNMENT_LOG.md) | Gate evidence — what was actually run |
 | [audit/IMPROVEMENT_LOG.md](./audit/IMPROVEMENT_LOG.md) | III.5 improvement queue (owner-routed) |
+| [audit/PHASE_0-6_AUDIT_2026-07-08.md](./audit/PHASE_0-6_AUDIT_2026-07-08.md) | Pre-Phase-7 audit + verify of Phases 0–6 (evidence-backed) |
+| [audit/TECH_DEBT_REGISTER.md](./audit/TECH_DEBT_REGISTER.md) | Scored tech-debt backlog (audit findings + deferred carryover) |
 | [audit/codebase-relevance-classification.json](./audit/codebase-relevance-classification.json) | Per-file classification artifact |
 | [audit/HANDOVER.md](./audit/HANDOVER.md) | Session handover notes |
 | [audit/WETCHECK_AUDIT_2026-07-05.md](./audit/WETCHECK_AUDIT_2026-07-05.md) | Worktree / origin reconciliation |
@@ -79,6 +81,16 @@ Consult before extending existing surfaces. Update in phase PRs.
 ---
 
 ## Architecture
+
+### Codemaps (token-lean, AI/onboarding context — `/update-codemaps`)
+
+| Doc | Purpose |
+|-----|---------|
+| [CODEMAPS/architecture.md](./CODEMAPS/architecture.md) | System shape, platform seam, layer boundaries, frozen contracts |
+| [CODEMAPS/backend.md](./CODEMAPS/backend.md) | Request pipeline, route groups, realtime, workers, authority |
+| [CODEMAPS/frontend.md](./CODEMAPS/frontend.md) | Shell selection, feature map, experience model, board, state |
+| [CODEMAPS/data.md](./CODEMAPS/data.md) | Schema files → domains, migrations, load-bearing tables |
+| [CODEMAPS/dependencies.md](./CODEMAPS/dependencies.md) | Runtime stack, external services, unused-dep signal |
 
 | Doc | Purpose |
 |-----|---------|

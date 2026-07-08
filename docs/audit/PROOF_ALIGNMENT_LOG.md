@@ -1736,3 +1736,28 @@ Branch claude/phase-4-board-platform. Each finding re-verified against the curre
 - **Fix (in-fence):** cap each default aggregate with the existing `withTimeout(queryX, AGGREGATE_TIMEOUT_MS=1500)` inside safeBlock — so slowness degrades to undefined just like failure, and an aggregate (capped 1500ms) can never dominate the 2500ms envelope (the only remaining trip cause is the load-bearing main query, unchanged). Corrected the overclaiming comment. safeBlock stays the pure try/catch primitive (injectable deps unchanged; tests still inject plain fns).
 - **Test:** added slowness case to command-board-aggregates-degradation.test.ts — `safeBlock(() => withTimeout(hangingPromise, 10))` resolves undefined (slowness → degrade, not just throws).
 - **Gate:** FE tsc 0 · server tsc 0 · full suite green · architecture gates pass.
+
+---
+
+## Pre-Phase-7 Audit + Verify — Phases 0–6 (2026-07-08)
+
+**Task:** `/audit` + `/verify` implementation of Phases 0–6; produce `/tech-debt`, `/update-docs`, `/update-codemaps`. Not a code change — a verification + documentation pass.
+
+**Health gates (run this session, real output):**
+- `pnpm typecheck` → exit 0 (FE + server tsconfigs).
+- `pnpm test` → **418 files / 4038 tests passed, 0 failed** (37.19s).
+- `pnpm i18n:check` → `en.json`/`he.json` deep key parity ✓.
+- `pnpm architecture:gates` → exit 0 (dependency-cruiser baseline + madge cycles).
+- `pnpm knip` → exit 1 (findings, non-blocking; not part of architecture:gates) → routed to TECH_DEBT.
+- `pnpm docs:audit` → exit 0, regenerated 3 inventories (249 API routes, 64 tables).
+
+**Deliverable verification (each grepped/read at file:line — see PHASE_0-6_AUDIT table):** P0 dev-switcher (`auth-fetch.ts:24,96`), P1 brief, P2 experience-model (`experience-model.ts:17,70,202`), P3 home fork (`home.tsx:21-30` + surfaces), P4 board target (`platform/index.ts:6,35,61,87`) + BoardShell + command-board extraction + `/board` route (`routes.tsx:126`, AuthGuard-only), P5 additive blocks (`shared/equipment-board.ts:157-160`) + panels, P6 nav model + 5 scaffold routes (`routes.tsx:171-175`) + `desktop/management/`. **All present.**
+
+**Findings (evidence-backed, not inferred):**
+- **A-1 (Major):** `server/tests/{security,shift-chat}.test.ts` (14 blocks) match no runner glob — `vite.config.ts:128` = `tests/**`+`src/**`; grep of all `*.config.ts` shows 0 references to `server/tests`. Silent zero-coverage.
+- **A-2 (Minor):** 25 unused prod deps + 5 devDeps — spot-checked `framer-motion/zustand/fuse.js/react-virtuoso/pdf-parse` + 2 radix = 0 imports in `src/`+`server/`. (madge/code-inspector are CLI-script deps → knip false-positive class, flagged.)
+- **A-3 (Minor):** 200 unused exports + 203 unused exported types (hexagonal barrels + `src/types/billing.ts` removed scope).
+- **A-4 (Minor):** plan↔code drift — `routes.tsx:169` `/admin/metrics` is AuthGuard-only; plan §239 still says "fence it"; deviation logged PROOF:1527/1531 as "dropped, separate ticket" but not reflected in plan text.
+- **Clean signal:** 0 TODO/FIXME/HACK/@ts-ignore/eslint-disable in any Phase 0–6 surface (grep).
+
+**Deliverables written:** `docs/audit/PHASE_0-6_AUDIT_2026-07-08.md`, `docs/audit/TECH_DEBT_REGISTER.md`, `docs/CODEMAPS/{architecture,backend,frontend,data,dependencies}.md`, regenerated `docs/audit/{db,routes,frontend-routes}.md`, appended IMPROVEMENT_LOG IMP-006…009, indexed in `docs/README.md`. No source/schema/test code changed.

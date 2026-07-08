@@ -2,7 +2,7 @@
 
 All routes from `src/app/routes.tsx`. Page components are lazy-loaded via `React.lazy()` unless noted.
 
-Generated 2026-06-16.
+Generated 2026-07-08.
 
 ---
 
@@ -22,6 +22,7 @@ Generated 2026-06-16.
 | `/equipment/board` | `AuthGuard` | AuthGuard |
 | `/equipment/:id/edit` | `AuthGuard` | AuthGuard |
 | `/equipment/:id/qr` | `AuthGuard` | AuthGuard |
+| `/equipment/:id?` | `AuthGuard` | AuthGuard |
 | `/equipment/:id` | `AuthGuard` | AuthGuard |
 | `/alerts` | `AuthGuard` | AuthGuard |
 | `/my-equipment` | `AuthGuard` | AuthGuard |
@@ -39,7 +40,7 @@ Generated 2026-06-16.
 | `/equipment-tasks` | Redirect | → `/equipment/tasks` |
 | `/display` | Redirect | → `/equipment/board` |
 | `/equipment-board` | Redirect | → `/equipment/board` |
-| `/scan` | Redirect | → `/equipment?scan=1` |
+| `/scan` | `AuthGuard` | AuthGuard |
 | `/equipment/scan` | Redirect | → `/equipment?scan=1` |
 | `/equipment/maintenance` | Redirect | → `/equipment?status=maintenance` |
 | `/equipment/intelligence` | Redirect | → `/equipment` |
@@ -68,6 +69,10 @@ Generated 2026-06-16.
 | `/admin/asset-types` | `AuthGuard` | AuthGuard |
 | `/admin/docks` | `AuthGuard` | AuthGuard |
 | `/admin/metrics` | `AuthGuard` | AuthGuard |
+| `/admin/integrations` | `AuthGuard` | AuthGuard |
+| `/admin/webhooks` | `AuthGuard` | AuthGuard |
+| `/admin/notifications` | `AuthGuard` | AuthGuard |
+| `/admin/rfid-readers` | `AuthGuard` | AuthGuard |
 | `/settings` | `AuthGuard` | AuthGuard |
 | `/help` | `AuthGuard` | AuthGuard |
 | `/audit-log` | `AuthGuard` | AuthGuard |

@@ -2,7 +2,7 @@
 
 All tables prefixed `vt_`. Schema source of truth: `server/schema/` (re-exported from `server/schema/index.ts` and `server/db.ts`).
 
-Generated 2026-06-16.
+Generated 2026-07-08.
 
 ---
 
@@ -10,6 +10,7 @@ Generated 2026-06-16.
 
 | Table |
 |-------|
+| `vt_apple_oauth_tokens` |
 | `vt_clinics` |
 | `vt_users` |
 
@@ -81,6 +82,7 @@ Generated 2026-06-16.
 | `vt_push_subscriptions` |
 | `vt_scheduled_notifications` |
 | `vt_server_config` |
+| `vt_shift_adjustments` |
 | `vt_shift_imports` |
 | `vt_shift_message_acks` |
 | `vt_shift_message_reactions` |
@@ -105,4 +107,4 @@ Generated 2026-06-16.
 
 ---
 
-**Total tables:** 62
+**Total tables:** 64
