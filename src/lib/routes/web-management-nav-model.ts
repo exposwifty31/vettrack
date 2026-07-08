@@ -30,6 +30,14 @@ export interface WebManagementNavNode {
 
 export const WEB_MANAGEMENT_NAV: WebManagementNavNode[] = [
   {
+    id: "mgmt-home",
+    labelKey: "nav.managementHome",
+    href: "/dashboard",
+    icon: "Gauge",
+    group: "operations",
+    reach: "management.web",
+  },
+  {
     id: "mgmt-integrations",
     labelKey: "nav.integrations",
     href: "/admin/integrations",

@@ -3283,7 +3283,12 @@
     },
     "opsHealth": {
       "title": "תקינות מערכת",
-      "subtitle": "תיבת יוצאים, DLQ, תורים ותקינות אינטגרציות — צפייה בלבד"
+      "subtitle": "תיבת יוצאים, DLQ, תורים ותקינות אינטגרציות — צפייה בלבד",
+      "healthTitle": "בריאות ה-Outbox בזמן אמת",
+      "outboxSize": "צבר Outbox",
+      "publishLag": "השהיית פרסום (ms)",
+      "deadLettered": "אירועים שנכשלו",
+      "dlqPermanent": "כשלים קבועים"
     },
     "colName": "שם",
     "colEmail": "דוא״ל",
@@ -3352,7 +3357,8 @@
     "settings": "הגדרות",
     "reportBug": "דווח על בעיה",
     "profile": "הפרופיל שלי",
-    "people": "צוות ותפקידים"
+    "people": "צוות ותפקידים",
+    "managementHome": "מרכז ניהול"
   },
   "phoneSignIn": {
     "title": "התחברות עם טלפון",

@@ -3287,6 +3287,11 @@ export interface TStructure {
     opsHealth: {
       title: string;
       subtitle: string;
+      healthTitle: string;
+      outboxSize: string;
+      publishLag: string;
+      deadLettered: string;
+      dlqPermanent: string;
     };
     colName: string;
     colEmail: string;
@@ -3356,6 +3361,7 @@ export interface TStructure {
     reportBug: string;
     profile: string;
     people: string;
+    managementHome: string;
   };
   phoneSignIn: {
     title: string;

@@ -191,7 +191,7 @@ export function AppRoutes() {
         <Route path="/analytics/outcome-kpi"><Redirect to="/analytics" replace /></Route>
         <Route path="/analytics/shift-leaderboard"><AuthGuard><WebOnlyGuard><ShiftLeaderboardPage /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/analytics"><AuthGuard><WebOnlyGuard><AnalyticsPage /></WebOnlyGuard></AuthGuard></Route>
-        <Route path="/dashboard"><AuthGuard><WebOnlyGuard><ManagementDashboardPage /></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/dashboard"><AuthGuard><WebOnlyGuard><ManagementGuard><ManagementDashboardPage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/whats-new"><AuthGuard><WhatsNewPage /></AuthGuard></Route>
         <Route path="/shift-chat/:shiftId"><AuthGuard><ShiftChatArchive /></AuthGuard></Route>
         {/* Legacy aliases for removed pages → home (no broken nav) */}
