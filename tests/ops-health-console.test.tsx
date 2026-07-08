@@ -88,7 +88,9 @@ describe("OpsHealthConsolePage — resilience", () => {
     dlqMock.mockRejectedValue(new Error("dlq boom"));
     renderPage();
     expect(screen.getByText(t.console.opsHealth.title)).toBeTruthy();
-    // Health summary still renders; the DLQ table degrades to ErrorCard (retry button).
+    // Health summary still renders (that fetch succeeded) alongside the DLQ error.
+    expect(await screen.findByText("3")).toBeTruthy(); // outbox_size card
+    // The DLQ table degrades to ErrorCard (retry button), not the empty state.
     expect((await screen.findAllByRole("button")).length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText(t.console.state.empty)).toBeNull();
   });

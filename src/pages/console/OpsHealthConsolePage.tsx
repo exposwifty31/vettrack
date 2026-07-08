@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Activity } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
@@ -55,7 +56,10 @@ export default function OpsHealthConsolePage() {
     retry: false,
   });
 
-  const columns: Column<DlqItem>[] = [
+  // Stable columns so DataTable's sort memo (keyed on `columns`) isn't invalidated
+  // each render; `t` is module-stable, so the defs never change (empty deps).
+  const columns = useMemo<Column<DlqItem>[]>(
+    () => [
     {
       key: "type",
       header: t.console.colType,
@@ -76,7 +80,9 @@ export default function OpsHealthConsolePage() {
       sortValue: (r) => r.retryCount,
       cell: (r) => r.retryCount,
     },
-  ];
+    ],
+    [],
+  );
 
   const health = healthQ.data;
   const permanentDlq = health?.dlq_permanent_count ?? 0;
