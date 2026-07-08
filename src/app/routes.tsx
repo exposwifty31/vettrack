@@ -38,6 +38,7 @@ const CodeBlueDisplay = lazy(() => import("@/pages/code-blue-display"));
 const CrashCartCheckPage = lazy(() => import("@/pages/crash-cart"));
 const CodeBlueHistoryPage = lazy(() => import("@/pages/code-blue-history"));
 const WardDisplayPage = lazy(() => import("@/pages/display"));
+const CommandBoardScreen = lazy(() => import("@/features/command-board"));
 const HandoffPage = lazy(() => import("@/pages/handoff"));
 const NotFoundPage = lazy(() => import("@/pages/not-found"));
 const ScanPage = lazy(() => import("@/pages/scan"));
@@ -118,6 +119,11 @@ export function AppRoutes() {
         <Route path="/equipment/new"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/tasks"><AuthGuard><AppointmentsPage /></AuthGuard></Route>
         <Route path="/equipment/board"><AuthGuard><WebOnlyGuard fallback="/my-equipment"><WardDisplayPage /></WebOnlyGuard></AuthGuard></Route>
+        {/* Standalone Command Center kiosk. AuthGuard only — the platform target */}
+        {/* already does the gating WebOnlyGuard would: native → mobile (NativeShell), */}
+        {/* narrow browser at /board → board (full BoardShell kiosk, not the desktop */}
+        {/* interstitial). BoardShell (via PlatformRouter) owns the dark kiosk chrome. */}
+        <Route path="/board"><AuthGuard><CommandBoardScreen kioskMode /></AuthGuard></Route>
         <Route path="/equipment/:id/edit"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/:id/qr"><AuthGuard><WebOnlyGuard><EquipmentQrPrintPage /></WebOnlyGuard></AuthGuard></Route>
         {isNativeTablet

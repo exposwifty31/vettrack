@@ -37,10 +37,13 @@ import { usePlatformTarget } from "@/app/platform";
  * The global chat float is for the DESKTOP / marketing web shells only. Every
  * mobile shell (phone + iPad, native or installed PWA) renders NativeHeader, which
  * owns the single useShiftChat instance via its header launcher — so mounting the
- * float on mobile too would double-subscribe.
+ * float on mobile too would double-subscribe. The board kiosk (/board) is
+ * chrome-free: it must show no FAB. GlobalShiftChat is a root sibling of the
+ * router, so BoardShell cannot suppress it — the gate lives here.
  */
 function GlobalShiftChat() {
-  return usePlatformTarget() === "mobile" ? null : <ShiftChatFab />;
+  const target = usePlatformTarget();
+  return target === "mobile" || target === "board" ? null : <ShiftChatFab />;
 }
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
