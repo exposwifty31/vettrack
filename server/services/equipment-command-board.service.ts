@@ -1,14 +1,20 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
-import { db, equipment, rooms } from "../db.js";
+import { and, count, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { db, docks, equipment, equipmentWaitlist, rooms, stagingQueue } from "../db.js";
 import type {
   EquipmentBoardAlert,
+  EquipmentBoardDocksBlock,
+  EquipmentBoardLocationRow,
+  EquipmentBoardPowerBlock,
+  EquipmentBoardStagingBlock,
   EquipmentBoardTypeRow,
   EquipmentBoardUnitRow,
+  EquipmentBoardWaitlistBlock,
   EquipmentCommandBoardSnapshot,
   EquipmentReadinessStatus,
 } from "../../shared/equipment-board.js";
 import { isEquipmentFullyDeployable } from "./equipment-operational-state.service.js";
 import { getReadinessRules } from "./equipment-readiness-rules.service.js";
+import { withTimeout } from "../lib/with-timeout.js";
 
 export type BuildCommandBoardSnapshotFn = (params: {
   clinicId: string;
@@ -31,14 +37,167 @@ function deriveReadinessStatus(row: {
   return "ready";
 }
 
+/**
+ * Aggregates critical units by room for the board's by-location breakdown.
+ * Pure transform of the already-fetched rows — NO additional query. Keyed by
+ * roomId (room names are not unique), so distinct rooms sharing a name stay
+ * separate; room-less units bucket under "__unassigned__" with an empty
+ * locationName the client localizes. Critical units only, matching overview /
+ * byType and the totalCritical field.
+ */
+export function aggregateByLocation(
+  rows: Array<{ id: string; roomId: string | null; roomName: string | null }>,
+  criticalUnits: EquipmentBoardUnitRow[],
+): EquipmentBoardLocationRow[] {
+  const rowById = new Map(rows.map((r) => [r.id, r]));
+  const byLocationMap = new Map<string, EquipmentBoardLocationRow>();
+  for (const unit of criticalUnits) {
+    const row = rowById.get(unit.equipmentId);
+    const locKey = row?.roomId ?? "__unassigned__";
+    const loc = byLocationMap.get(locKey) ?? {
+      locationId: row?.roomId ?? undefined,
+      locationName: row?.roomName ?? "",
+      totalCritical: 0,
+      ready: 0,
+      inUse: 0,
+      blocked: 0,
+      stale: 0,
+      overdue: 0,
+      unknown: 0,
+    };
+    loc.totalCritical += 1;
+    if (unit.status === "ready") loc.ready += 1;
+    else if (unit.status === "in_use") loc.inUse += 1;
+    else if (unit.status === "blocked") loc.blocked += 1;
+    else if (unit.status === "stale") loc.stale += 1;
+    else if (unit.status === "overdue") loc.overdue += 1;
+    else loc.unknown += 1;
+    byLocationMap.set(locKey, loc);
+  }
+  return [...byLocationMap.values()];
+}
+
+/**
+ * Wraps an enrichment-block query so a THROWN failure degrades ONLY that block to
+ * undefined (never rethrows). Slowness is bounded separately by the per-aggregate
+ * withTimeout in defaultBoardAggregates — together they keep a cosmetic aggregate,
+ * whether it fails OR hangs, from tripping the 2500ms envelope / legacy fallback.
+ */
+export async function safeBlock<T>(query: () => Promise<T>): Promise<T | undefined> {
+  try {
+    return await query();
+  } catch (err) {
+    // Degrade gracefully but NOT silently — the caught error's stack names the
+    // failing queryX, so a persistently-broken aggregate is observable in the
+    // logs instead of surfacing only as an invisibly missing panel.
+    console.warn("[command-board] enrichment aggregate failed; degrading block to undefined", err);
+    return undefined;
+  }
+}
+
+/**
+ * Power posture across the clinic, from the LATEST return per equipment. The
+ * returns log is append-only, so the newest row per equipment needs DISTINCT ON
+ * (raw sql). Filters vt_equipment_returns' OWN clinic_id — power must NOT inherit
+ * tenancy from an equipment join (cross-tenant leak).
+ */
+async function queryPower(clinicId: string): Promise<EquipmentBoardPowerBlock> {
+  const result = await db.execute(sql`
+    SELECT
+      count(*) FILTER (WHERE latest.is_plugged_in) AS plugged,
+      count(*) FILTER (WHERE NOT latest.is_plugged_in AND latest.plug_in_alert_sent_at IS NULL) AS unplugged,
+      count(*) FILTER (WHERE NOT latest.is_plugged_in AND latest.plug_in_alert_sent_at IS NOT NULL) AS alert
+    FROM (
+      SELECT DISTINCT ON (equipment_id) is_plugged_in, plug_in_alert_sent_at
+      FROM vt_equipment_returns
+      WHERE clinic_id = ${clinicId}
+      ORDER BY equipment_id, returned_at DESC
+    ) latest
+  `);
+  // db.execute() returns a generic Drizzle QueryResult whose row shape is not
+  // inferable from a raw sql`` string, so the `rows` shape is asserted here on
+  // purpose (fields coerced individually with Number() below). Intentional cast.
+  const row = (result as unknown as { rows?: Array<Record<string, unknown>> }).rows?.[0];
+  return {
+    plugged: Number(row?.plugged ?? 0),
+    unplugged: Number(row?.unplugged ?? 0),
+    alert: Number(row?.alert ?? 0),
+  };
+}
+
+/** Dock capacity (vt_docks) + occupancy (vt_equipment.dock_id / dock_confirmed_ready_at). */
+async function queryDocks(clinicId: string): Promise<EquipmentBoardDocksBlock> {
+  const totalRows = await db.select({ n: count() }).from(docks).where(eq(docks.clinicId, clinicId));
+  const occRows = await db
+    .select({
+      occupied: count(),
+      ready: sql<number>`count(*) FILTER (WHERE ${equipment.dockConfirmedReadyAt} IS NOT NULL)`,
+    })
+    .from(equipment)
+    .where(
+      and(eq(equipment.clinicId, clinicId), isNull(equipment.deletedAt), isNotNull(equipment.dockId)),
+    );
+  return {
+    total: Number(totalRows[0]?.n ?? 0),
+    occupied: Number(occRows[0]?.occupied ?? 0),
+    ready: Number(occRows[0]?.ready ?? 0),
+  };
+}
+
+/** Active-waitlist depth. */
+async function queryWaitlist(clinicId: string): Promise<EquipmentBoardWaitlistBlock> {
+  const rows = await db
+    .select({ n: count() })
+    .from(equipmentWaitlist)
+    .where(
+      and(
+        eq(equipmentWaitlist.clinicId, clinicId),
+        inArray(equipmentWaitlist.status, ["waiting", "notified"]),
+      ),
+    );
+  return { depth: Number(rows[0]?.n ?? 0) };
+}
+
+/** Active staging-queue depth. */
+async function queryStaging(clinicId: string): Promise<EquipmentBoardStagingBlock> {
+  const rows = await db
+    .select({ n: count() })
+    .from(stagingQueue)
+    .where(and(eq(stagingQueue.clinicId, clinicId), eq(stagingQueue.status, "active")));
+  return { depth: Number(rows[0]?.n ?? 0) };
+}
+
+/** The four enrichment aggregates, injectable so degradation is exercisable in tests. */
+export type BoardAggregateFns = {
+  power: (clinicId: string) => Promise<EquipmentBoardPowerBlock | undefined>;
+  docks: (clinicId: string) => Promise<EquipmentBoardDocksBlock | undefined>;
+  waitlist: (clinicId: string) => Promise<EquipmentBoardWaitlistBlock | undefined>;
+  staging: (clinicId: string) => Promise<EquipmentBoardStagingBlock | undefined>;
+};
+
+// Each aggregate is bounded on BOTH axes: safeBlock catches a throw, and
+// withTimeout(AGGREGATE_TIMEOUT_MS) caps latency — so a slow query (notably the
+// power DISTINCT ON, whose returned_at sort is unindexed at scale) degrades to
+// undefined instead of eating the shared 2500ms snapshot budget. The cap sits well
+// under the envelope, so an aggregate can never dominate it.
+const AGGREGATE_TIMEOUT_MS = 1500;
+
+export const defaultBoardAggregates: BoardAggregateFns = {
+  power: (clinicId) => safeBlock(() => withTimeout(queryPower(clinicId), AGGREGATE_TIMEOUT_MS)),
+  docks: (clinicId) => safeBlock(() => withTimeout(queryDocks(clinicId), AGGREGATE_TIMEOUT_MS)),
+  waitlist: (clinicId) => safeBlock(() => withTimeout(queryWaitlist(clinicId), AGGREGATE_TIMEOUT_MS)),
+  staging: (clinicId) => safeBlock(() => withTimeout(queryStaging(clinicId), AGGREGATE_TIMEOUT_MS)),
+};
+
 /** Builds equipment command board snapshot (critical rows, overview, alerts, utilization signals). */
-export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (params) => {
+export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (
+  params,
+  aggregates: BoardAggregateFns = defaultBoardAggregates,
+) => {
   const { clinicId } = params;
   const now = new Date();
-  const rules = await getReadinessRules(clinicId);
-  const staleCutoff = new Date(now.getTime() - rules.staleEvidenceMs);
 
-  const rows = await db
+  const rowsQuery = db
     .select({
       id: equipment.id,
       name: equipment.name,
@@ -50,6 +209,7 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (par
       usageState: equipment.usageState,
       lastSeen: equipment.lastSeen,
       roomName: rooms.name,
+      roomId: equipment.roomId,
     })
     .from(equipment)
     .leftJoin(rooms, and(eq(equipment.roomId, rooms.id), eq(rooms.clinicId, clinicId)))
@@ -60,6 +220,21 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (par
         inArray(equipment.status, ["critical", "issue", "needs_attention"]),
       ),
     );
+
+  // Phase 5 (C2) — enrichment aggregates run CONCURRENTLY with the main query
+  // (latency = max, not sum). Each degrades to undefined on its own failure
+  // (safeBlock), so Promise.all only rejects on the load-bearing
+  // getReadinessRules / rows query — the 2500ms timeout envelope is unchanged.
+  const [rules, rows, power, docks, waitlist, staging] = await Promise.all([
+    getReadinessRules(clinicId),
+    rowsQuery,
+    aggregates.power(clinicId),
+    aggregates.docks(clinicId),
+    aggregates.waitlist(clinicId),
+    aggregates.staging(clinicId),
+  ]);
+
+  const staleCutoff = new Date(now.getTime() - rules.staleEvidenceMs);
 
   const criticalUnits: EquipmentBoardUnitRow[] = rows.map((row) => {
     const status = deriveReadinessStatus(row);
@@ -160,9 +335,13 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (par
     clinicId,
     overview,
     byType: [...byTypeMap.values()],
-    byLocation: [],
+    byLocation: aggregateByLocation(rows, criticalUnits),
     criticalUnits,
     alerts,
+    power,
+    docks,
+    waitlist,
+    staging,
     roiSignals: {
       overusedUnits: sortedByUtil.slice(0, 5),
       underusedUnits: sortedByUtil.slice(-5).reverse(),
