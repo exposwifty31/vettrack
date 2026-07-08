@@ -37,7 +37,9 @@ export async function listRfidReaders(clinicId: string): Promise<RfidReaderRow[]
     )
     .map((o) => ({
       gatewayCode: o.gatewayCode,
-      lastSeenAt: o.lastSeenAt,
+      // pg returns max(timestamptz) as a Date; normalize to ISO so the wire format
+      // is stable regardless of the driver's type parser (the type claims string).
+      lastSeenAt: o.lastSeenAt ? new Date(o.lastSeenAt).toISOString() : null,
       observedEquipmentCount: Number(o.observedEquipmentCount ?? 0),
     }));
 
