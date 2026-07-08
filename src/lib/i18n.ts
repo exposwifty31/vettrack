@@ -356,18 +356,6 @@ const translations = {
     ariaEditFloorNote: d.equipmentDetail.ariaEditFloorNote,
   },
 
-  adminPilotCoverage: {
-    title: d.adminPilotCoverage.title,
-    total: d.adminPilotCoverage.total,
-    everConfirmed: d.adminPilotCoverage.everConfirmed,
-    confirmedToday: d.adminPilotCoverage.confirmedToday,
-    neverConfirmed: d.adminPilotCoverage.neverConfirmed,
-    noItems: d.adminPilotCoverage.noItems,
-    statusNever: d.adminPilotCoverage.statusNever,
-    statusStale: d.adminPilotCoverage.statusStale,
-    statusRecent: d.adminPilotCoverage.statusRecent,
-    confirmCount: (count: number) => tr(d.adminPilotCoverage.confirmCount, { count }),
-  },
 
   newEquipment: {
     heading: d.newEquipment.heading,
@@ -721,15 +709,6 @@ const translations = {
 
   helpPage: d.helpPage,
 
-  pilotHomePage: {
-    ...d.pilotHomePage,
-    recoverySublineStale: (relative: string) =>
-      tr(d.pilotHomePage.recoverySublineStale, { relative }),
-    recoverySublineVeryStale: (relative: string) =>
-      tr(d.pilotHomePage.recoverySublineVeryStale, { relative }),
-    recoveryLastConfirmed: (relative: string) =>
-      tr(d.pilotHomePage.recoveryLastConfirmed, { relative }),
-  },
 
   roomRadarPage: {
     ...d.roomRadarPage,
@@ -798,11 +777,9 @@ const translations = {
 
   pageErrorBoundary: d.pageErrorBoundary,
 
-  billingLedger: d.billingLedger,
 
   patientDetail: d.patientDetail,
 
-  patientsPage: d.patientsPage,
 
   inventoryItemsPage: d.inventoryItemsPage,
 
@@ -815,42 +792,7 @@ const translations = {
 
   procurementPage: d.procurementPage,
 
-  medsPage: {
-    ...d.medsPage,
-    prescribed: (dose: string) => tr(d.medsPage.prescribed, { dose }),
-    concentration: (conc: string) => tr(d.medsPage.concentration, { conc }),
-    routeLabel: (route: string) => tr(d.medsPage.routeLabel, { route }),
-    concentrationLabel: (conc: string) => tr(d.medsPage.concentrationLabel, { conc }),
-    mgTotal: (mg: string) => tr(d.medsPage.mgTotal, { mg }),
-    assignMedicationWithVolume: (volume: string) => tr(d.medsPage.assignMedicationWithVolume, { volume }),
-    assignMedicationWithTab: (tab: string) => tr(d.medsPage.assignMedicationWithTab, { tab }),
-    deviationFromRecommended: (sign: string, pct: string) => tr(d.medsPage.deviationFromRecommended, { sign, pct }),
-    deviationBlocked: (sign: string, pct: string) => tr(d.medsPage.deviationBlocked, { sign, pct }),
-    medicationTaskCreated: (volume: string) => tr(d.medsPage.medicationTaskCreated, { volume }),
-  },
 
-  pharmacyForecast: {
-    ...d.pharmacyForecast,
-    chipDrugs: (count: number) => tr(d.pharmacyForecast.chipDrugs, { count }),
-    chipCri: (count: number) => tr(d.pharmacyForecast.chipCri, { count }),
-    chipPrn: (count: number) => tr(d.pharmacyForecast.chipPrn, { count }),
-    chipLd: (count: number) => tr(d.pharmacyForecast.chipLd, { count }),
-    chipFlags: (count: number) => tr(d.pharmacyForecast.chipFlags, { count }),
-    approveBlocked: (n: number) => tr(d.pharmacyForecast.approveBlocked, { n }),
-    approveGateLabel: (code: string, fallback: string) =>
-      ({
-        UNRESOLVED_PATIENT_FLAGS: d.pharmacyForecast.approveGateUnresolvedPatientFlags,
-        UNRESOLVED_DRUG_FLAGS: d.pharmacyForecast.approveGateUnresolvedDrugFlags,
-        PRN_QUANTITY_REQUIRED: d.pharmacyForecast.approveGatePrnQuantityRequired,
-        NO_DRUG_LINES: d.pharmacyForecast.approveGateNoDrugLines,
-      } as Record<string, string>)[code] ?? fallback,
-    emailPreviewSummary: (patientCount: number, hours: number) =>
-      tr(d.pharmacyForecast.emailPreviewSummary, { patientCount, hours }),
-    smtpFallbackWarning: (reason: string) =>
-      tr(d.pharmacyForecast.smtpFallbackWarning, { reason }),
-    quantityFrequencyBasis: (per24: number, inWindow: number, hours: number) =>
-      tr(d.pharmacyForecast.quantityFrequencyBasis, { per24, inWindow, hours }),
-  },
 
   appointmentsPage: {
     ...d.appointmentsPage,
@@ -873,152 +815,13 @@ const translations = {
       tr(d.cop.adminNoDispenseDetail, { taskId: params.taskId, hours: params.hours }),
   },
 
-  adminMedicationIntegrity: d.adminMedicationIntegrity,
 
   adminOpsDashboard: d.adminOpsDashboard,
 
   er: d.er,
 
-  erCommandCenter: {
-    title: d.erCommandCenter.title,
-    lanes: d.erCommandCenter.lanes,
-    quickScan: d.erCommandCenter.quickScan,
-    quickScanNoPatient: d.erCommandCenter.quickScanNoPatient,
-    quickScanPickPatientFirst: d.erCommandCenter.quickScanPickPatientFirst,
-    quickIntake: d.erCommandCenter.quickIntake,
-    species: d.erCommandCenter.species,
-    severity: d.erCommandCenter.severity,
-    complaint: d.erCommandCenter.complaint,
-    submitIntake: d.erCommandCenter.submitIntake,
-    assign: d.erCommandCenter.assign,
-    ack: d.erCommandCenter.ack,
-    impactLink: d.erCommandCenter.impactLink,
-    refresh: d.erCommandCenter.refresh,
-    loadingBoard: d.erCommandCenter.loadingBoard,
-    createHandoff: d.erCommandCenter.createHandoff,
-    handoffPatient: d.erCommandCenter.handoffPatient,
-    handoffSelectPatient: d.erCommandCenter.handoffSelectPatient,
-    handoffCurrentStability: d.erCommandCenter.handoffCurrentStability,
-    handoffPendingTasks: d.erCommandCenter.handoffPendingTasks,
-    handoffCriticalWarnings: d.erCommandCenter.handoffCriticalWarnings,
-    handoffActiveIssue: d.erCommandCenter.handoffActiveIssue,
-    handoffNextAction: d.erCommandCenter.handoffNextAction,
-    handoffEtaMinutes: d.erCommandCenter.handoffEtaMinutes,
-    handoffOwner: d.erCommandCenter.handoffOwner,
-    handoffOwnerUnassigned: d.erCommandCenter.handoffOwnerUnassigned,
-    handoffAddItem: d.erCommandCenter.handoffAddItem,
-    handoffSubmit: d.erCommandCenter.handoffSubmit,
-    handoffNoPatients: d.erCommandCenter.handoffNoPatients,
-    handoffItem: (n: number) => tr(d.erCommandCenter.handoffItem, { n: String(n) }),
-    ackOverride: d.erCommandCenter.ackOverride,
-    ackDeniedTooltip: d.erCommandCenter.ackDeniedTooltip,
-    ackOverrideTooltip: d.erCommandCenter.ackOverrideTooltip,
-    overrideModalTitle: d.erCommandCenter.overrideModalTitle,
-    overrideModalDesc: d.erCommandCenter.overrideModalDesc,
-    overrideReasonLabel: d.erCommandCenter.overrideReasonLabel,
-    overrideReasonPlaceholder: d.erCommandCenter.overrideReasonPlaceholder,
-    overrideCancel: d.erCommandCenter.overrideCancel,
-    overrideConfirm: d.erCommandCenter.overrideConfirm,
-    badges: d.erCommandCenter.badges,
-    escalationTimer: (time: string) => tr(d.erCommandCenter.escalationTimer, { time }),
-    escalationOverdue: d.erCommandCenter.escalationOverdue,
-    reconciliationWarning: d.erCommandCenter.reconciliationWarning,
-    activeAssistance: {
-      title: d.erCommandCenter.activeAssistance.title,
-      toggleOn: d.erCommandCenter.activeAssistance.toggleOn,
-      toggleOff: d.erCommandCenter.activeAssistance.toggleOff,
-      toggleHint: d.erCommandCenter.activeAssistance.toggleHint,
-      noSession: d.erCommandCenter.activeAssistance.noSession,
-      openCodeBlue: d.erCommandCenter.activeAssistance.openCodeBlue,
-      activePatient: (name: string) => tr(d.erCommandCenter.activeAssistance.activePatient, { name }),
-      weightHint: (weight: number) =>
-        tr(d.erCommandCenter.activeAssistance.weightHint, { weight: String(weight) }),
-      metronome: d.erCommandCenter.activeAssistance.metronome,
-      bpm: d.erCommandCenter.activeAssistance.bpm,
-      bpmIncrease: d.erCommandCenter.activeAssistance.bpmIncrease,
-      bpmDecrease: d.erCommandCenter.activeAssistance.bpmDecrease,
-      metronomeStart: d.erCommandCenter.activeAssistance.metronomeStart,
-      metronomePause: d.erCommandCenter.activeAssistance.metronomePause,
-      soundOn: d.erCommandCenter.activeAssistance.soundOn,
-      soundOff: d.erCommandCenter.activeAssistance.soundOff,
-      beatIndicator: d.erCommandCenter.activeAssistance.beatIndicator,
-      medTimers: d.erCommandCenter.activeAssistance.medTimers,
-      epiTimerLabel: d.erCommandCenter.activeAssistance.epiTimerLabel,
-      adjTimerLabel: d.erCommandCenter.activeAssistance.adjTimerLabel,
-      reset: d.erCommandCenter.activeAssistance.reset,
-      timerDue: d.erCommandCenter.activeAssistance.timerDue,
-      quickLog: d.erCommandCenter.activeAssistance.quickLog,
-      unitsMg: d.erCommandCenter.activeAssistance.unitsMg,
-      unitsU: d.erCommandCenter.activeAssistance.unitsU,
-      logDisabled: d.erCommandCenter.activeAssistance.logDisabled,
-      drugs: d.erCommandCenter.activeAssistance.drugs,
-      logLabels: d.erCommandCenter.activeAssistance.logLabels,
-    },
-    icuTelemetry: {
-      stripAria: d.erCommandCenter.icuTelemetry.stripAria,
-      stripHeading: d.erCommandCenter.icuTelemetry.stripHeading,
-      asOf: (time: string) => tr(d.erCommandCenter.icuTelemetry.asOf, { time }),
-      noVitals: d.erCommandCenter.icuTelemetry.noVitals,
-      vent: d.erCommandCenter.icuTelemetry.vent,
-      ventOn: d.erCommandCenter.icuTelemetry.ventOn,
-      panelAria: d.erCommandCenter.icuTelemetry.panelAria,
-      signals: d.erCommandCenter.icuTelemetry.signals,
-      hr: d.erCommandCenter.icuTelemetry.hr,
-      rr: d.erCommandCenter.icuTelemetry.rr,
-      spo2: d.erCommandCenter.icuTelemetry.spo2,
-      etco2: d.erCommandCenter.icuTelemetry.etco2,
-      ventilated: d.erCommandCenter.icuTelemetry.ventilated,
-      fio2: d.erCommandCenter.icuTelemetry.fio2,
-      peep: d.erCommandCenter.icuTelemetry.peep,
-      mode: d.erCommandCenter.icuTelemetry.mode,
-      unitBpm: d.erCommandCenter.icuTelemetry.unitBpm,
-      unitRr: d.erCommandCenter.icuTelemetry.unitRr,
-      unitPct: d.erCommandCenter.icuTelemetry.unitPct,
-      unitMmHg: d.erCommandCenter.icuTelemetry.unitMmHg,
-      unitPeep: d.erCommandCenter.icuTelemetry.unitPeep,
-      temp: d.erCommandCenter.icuTelemetry.temp,
-      unitTemp: d.erCommandCenter.icuTelemetry.unitTemp,
-      bp: d.erCommandCenter.icuTelemetry.bp,
-      staleBadge: d.erCommandCenter.icuTelemetry.staleBadge,
-      dataStaleRecheck: d.erCommandCenter.icuTelemetry.dataStaleRecheck,
-      ventilatorActive: d.erCommandCenter.icuTelemetry.ventilatorActive,
-      sysOverDia: (sys: number, dia: number) =>
-        tr(d.erCommandCenter.icuTelemetry.sysOverDia, { sys, dia }),
-      lastUpdated: (time: string) => tr(d.erCommandCenter.icuTelemetry.lastUpdated, { time }),
-    },
-  },
 
-  erImpact: {
-    title: d.erImpact.title,
-    subtitle: d.erImpact.subtitle,
-    windowLabel: d.erImpact.windowLabel,
-    windowDays: (n: number) => tr(d.erImpact.windowDays, { n }),
-    baselinePeriod: d.erImpact.baselinePeriod,
-    generatedAt: d.erImpact.generatedAt,
-    loadError: d.erImpact.loadError,
-    noData: d.erImpact.noData,
-    metricBaseline: d.erImpact.metricBaseline,
-    metricCurrent: d.erImpact.metricCurrent,
-    metricDelta: d.erImpact.metricDelta,
-    metricDeltaPct: d.erImpact.metricDeltaPct,
-    kpi: d.erImpact.kpi,
-    confidence: d.erImpact.confidence,
-  },
 
-  erOperationalControl: {
-    sectionTitle: d.erOperationalControl.sectionTitle,
-    currentMode: d.erOperationalControl.currentMode,
-    states: d.erOperationalControl.states,
-    targetLabel: d.erOperationalControl.targetLabel,
-    apply: d.erOperationalControl.apply,
-    confirmTitle: d.erOperationalControl.confirmTitle,
-    confirmBody: (from: string, to: string) =>
-      tr(d.erOperationalControl.confirmBody, { from, to }),
-    confirmAction: d.erOperationalControl.confirmAction,
-    cancel: d.erOperationalControl.cancel,
-    toggleFailed: d.erOperationalControl.toggleFailed,
-    ariaOperationalToggle: d.erOperationalControl.ariaOperationalToggle,
-  },
 
   shiftChat: {
     ...d.shiftChat,
