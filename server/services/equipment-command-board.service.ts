@@ -14,6 +14,7 @@ import type {
 } from "../../shared/equipment-board.js";
 import { isEquipmentFullyDeployable } from "./equipment-operational-state.service.js";
 import { getReadinessRules } from "./equipment-readiness-rules.service.js";
+import { withTimeout } from "../lib/with-timeout.js";
 
 export type BuildCommandBoardSnapshotFn = (params: {
   clinicId: string;
@@ -77,10 +78,10 @@ export function aggregateByLocation(
 }
 
 /**
- * Wraps an enrichment-block query so a failure degrades ONLY that block to
- * undefined. This is the load-bearing guarantee: because it never throws,
- * Promise.all can only reject on the load-bearing main query — the 2500ms
- * timeout envelope + legacy-list fallback never trip on a cosmetic aggregate.
+ * Wraps an enrichment-block query so a THROWN failure degrades ONLY that block to
+ * undefined (never rethrows). Slowness is bounded separately by the per-aggregate
+ * withTimeout in defaultBoardAggregates — together they keep a cosmetic aggregate,
+ * whether it fails OR hangs, from tripping the 2500ms envelope / legacy fallback.
  */
 export async function safeBlock<T>(query: () => Promise<T>): Promise<T | undefined> {
   try {
@@ -167,11 +168,18 @@ export type BoardAggregateFns = {
   staging: (clinicId: string) => Promise<EquipmentBoardStagingBlock | undefined>;
 };
 
+// Each aggregate is bounded on BOTH axes: safeBlock catches a throw, and
+// withTimeout(AGGREGATE_TIMEOUT_MS) caps latency — so a slow query (notably the
+// power DISTINCT ON, whose returned_at sort is unindexed at scale) degrades to
+// undefined instead of eating the shared 2500ms snapshot budget. The cap sits well
+// under the envelope, so an aggregate can never dominate it.
+const AGGREGATE_TIMEOUT_MS = 1500;
+
 export const defaultBoardAggregates: BoardAggregateFns = {
-  power: (clinicId) => safeBlock(() => queryPower(clinicId)),
-  docks: (clinicId) => safeBlock(() => queryDocks(clinicId)),
-  waitlist: (clinicId) => safeBlock(() => queryWaitlist(clinicId)),
-  staging: (clinicId) => safeBlock(() => queryStaging(clinicId)),
+  power: (clinicId) => safeBlock(() => withTimeout(queryPower(clinicId), AGGREGATE_TIMEOUT_MS)),
+  docks: (clinicId) => safeBlock(() => withTimeout(queryDocks(clinicId), AGGREGATE_TIMEOUT_MS)),
+  waitlist: (clinicId) => safeBlock(() => withTimeout(queryWaitlist(clinicId), AGGREGATE_TIMEOUT_MS)),
+  staging: (clinicId) => safeBlock(() => withTimeout(queryStaging(clinicId), AGGREGATE_TIMEOUT_MS)),
 };
 
 /** Builds equipment command board snapshot (critical rows, overview, alerts, utilization signals). */

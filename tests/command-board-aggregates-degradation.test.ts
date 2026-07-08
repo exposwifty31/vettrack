@@ -12,6 +12,7 @@ import {
   safeBlock,
   defaultBoardAggregates,
 } from "../server/services/equipment-command-board.service.js";
+import { withTimeout } from "../server/lib/with-timeout.js";
 
 describe("safeBlock — enrichment degradation primitive", () => {
   it("resolves the query value on success", async () => {
@@ -32,6 +33,13 @@ describe("safeBlock — enrichment degradation primitive", () => {
         throw new Error("sync boom");
       }),
     ).resolves.toBeUndefined();
+  });
+
+  it("degrades a SLOW (hanging) query to undefined via withTimeout — not just throws", async () => {
+    // The defaultBoardAggregates cap latency with withTimeout so a slow-but-not-
+    // failing aggregate can't eat the shared 2500ms snapshot budget.
+    const hangs = new Promise<number>(() => {});
+    await expect(safeBlock(() => withTimeout(hangs, 10))).resolves.toBeUndefined();
   });
 });
 
