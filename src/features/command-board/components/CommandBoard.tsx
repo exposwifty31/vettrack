@@ -11,6 +11,7 @@ import type { EquipmentCommandBoardSnapshot } from "@/types/safety-surfaces";
 import type { EquipmentBoardUnitRow, EquipmentReadinessStatus } from "../../../../shared/equipment-board";
 import { STATUS_BG, STATUS_BAR_COLOR, statusLabel } from "../status-tokens";
 import { useKioskModeFromUrl } from "../use-kiosk-mode-from-url";
+import { DocksPanel, PowerPanel, StagingPanel, WaitlistPanel } from "./board-panels";
 
 /** The six readiness buckets that make up a stacked readiness bar. */
 type ReadinessCounts = {
@@ -171,7 +172,7 @@ function LocationCard({ row }: { row: EquipmentCommandBoardSnapshot["byLocation"
           : "bg-[rgb(var(--ivory-surface))] border-ivory-border",
       )}
     >
-      <div className="vt-text-xs font-bold text-ivory-text truncate">{row.locationName}</div>
+      <div className="vt-text-xs font-bold text-ivory-text truncate">{row.locationName || t.board.unassigned}</div>
       <div className="flex gap-2 flex-wrap">
         <span className={cn("vt-text-2xs font-semibold px-1.5 py-0.5 rounded border", STATUS_BG.ready)}>
           {row.ready} {t.board.available}
@@ -318,6 +319,10 @@ export function CommandBoard({
           <ADRing pct={pct} ready={board.overview.ready} total={board.overview.totalCritical} />
           <ReadinessMix overview={board.overview} />
 
+          {/* Enrichment panels — tolerant-reader: each mounts only when present */}
+          {board.power && <PowerPanel power={board.power} />}
+          {board.docks && <DocksPanel docks={board.docks} />}
+
           {/* Alerts count */}
           {board.alerts.length > 0 && (
             <div className="w-full rounded-xl border border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] px-3 py-2.5">
@@ -361,6 +366,10 @@ export function CommandBoard({
               </div>
             </section>
           )}
+
+          {/* Waitlist / staging depth — tolerant-reader guarded */}
+          {board.waitlist && <WaitlistPanel depth={board.waitlist.depth} />}
+          {board.staging && <StagingPanel depth={board.staging.depth} />}
 
           {/* Critical Units — needs attention */}
           {needAttention.length > 0 && (
