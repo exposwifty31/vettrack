@@ -3305,6 +3305,10 @@ export interface TStructure {
       editTitle: string;
       save: string;
     };
+    colConfigured: string;
+    colCredentials: string;
+    valYes: string;
+    valNo: string;
   };
   nav: {
     integrations: string;

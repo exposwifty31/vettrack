@@ -3301,7 +3301,11 @@
       "statusBlocked": "חסום",
       "editTitle": "עריכת חבר צוות",
       "save": "שמירת שינויים"
-    }
+    },
+    "colConfigured": "מוגדר",
+    "colCredentials": "אישורים נדרשים",
+    "valYes": "כן",
+    "valNo": "לא"
   },
   "nav": {
     "integrations": "אינטגרציות",
