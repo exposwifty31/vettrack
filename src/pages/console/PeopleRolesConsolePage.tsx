@@ -48,7 +48,7 @@ function statusMeta(status: UserStatus): { label: string; variant: "ok" | "secon
 const USERS_KEY = ["/api/users"] as const;
 
 /** Collapse the 7 client roles onto the 5 the updateRole endpoint accepts (server parity). */
-function toServerRole(role: UserRole): ServerRole {
+export function toServerRole(role: UserRole): ServerRole {
   if (role === "lead_technician") return "senior_technician";
   if (role === "vet_tech") return "technician";
   if (role === "admin" || role === "vet" || role === "senior_technician" || role === "technician") return role;
