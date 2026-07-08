@@ -3361,6 +3361,7 @@ export interface TStructure {
     reportBug: string;
     profile: string;
     people: string;
+    managementHome: string;
   };
   phoneSignIn: {
     title: string;

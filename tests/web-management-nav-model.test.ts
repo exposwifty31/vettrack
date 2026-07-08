@@ -56,6 +56,16 @@ describe("web-management-nav-model — structure", () => {
     expect(people?.group).toBe("administration");
     expect(people?.writeCap).toBe("management.webWrite");
   });
+
+  it("7a: Management Home node is present (restaged /dashboard), operations, read-only", () => {
+    const home = WEB_MANAGEMENT_NAV.find((n) => n.id === "mgmt-home");
+    expect(home).toBeDefined();
+    expect(home?.href).toBe("/dashboard");
+    expect(home?.labelKey).toBe("nav.managementHome");
+    expect(home?.icon).toBe("Gauge");
+    expect(home?.group).toBe("operations");
+    expect(home?.writeCap).toBeUndefined();
+  });
 });
 
 describe("web-management-nav-model — capability visibility", () => {
