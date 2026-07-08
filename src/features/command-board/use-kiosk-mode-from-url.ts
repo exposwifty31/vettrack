@@ -13,7 +13,10 @@ export function useKioskModeFromUrl(): boolean {
     if (typeof window === "undefined") return false;
     try {
       return new URL(window.location.href).searchParams.get("kiosk") === "1";
-    } catch {
+    } catch (err) {
+      // window.location.href is normally a well-formed URL; log if it ever isn't,
+      // then fall back to non-kiosk rather than swallowing it silently.
+      console.warn("[board] failed to parse ?kiosk from the URL; defaulting to non-kiosk", err);
       return false;
     }
   }, []);
