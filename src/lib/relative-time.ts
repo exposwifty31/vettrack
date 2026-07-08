@@ -16,6 +16,9 @@ import { t } from "@/lib/i18n";
  */
 export function formatRelativeTime(date: Date): string {
   const diffMs = Date.now() - date.getTime();
+  // Invalid Date → getTime() is NaN → every branch below is false and it would
+  // fall through to daysAgo(NaN). Guard like src/lib/utils.ts does.
+  if (Number.isNaN(diffMs)) return t.alerts.timeAgo.justNow;
   const diffMin = Math.floor(diffMs / 60000);
   if (diffMin < 1) return t.alerts.timeAgo.justNow;
   if (diffMin === 1) return t.alertsPage.oneMinuteAgo;

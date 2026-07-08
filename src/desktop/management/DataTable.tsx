@@ -142,7 +142,6 @@ export function DataTable<T>({
                     "cursor-pointer hover:bg-muted/30 focus-visible:bg-muted/40 focus-visible:outline-none",
                 )}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
-                role={onRowClick ? "button" : undefined}
                 tabIndex={onRowClick ? 0 : undefined}
                 onKeyDown={
                   onRowClick

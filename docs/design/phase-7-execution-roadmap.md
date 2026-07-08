@@ -14,7 +14,7 @@ Synthesized from 6 code-verified slice blueprints + adversarial verdicts. Where 
 | 2 | **7a — Ops Health** (half) | medium | ✅ ready | All 7 reads registered, observe-only, zero server work. **Correction: lead does NOT see data** — every Ops read is `requireAdmin` and the scaffold gates on `management.webWrite`; lead gets the honest "pending server enablement" state. Fix the lead test expectation accordingly. Retry/drop/replay controls stay **unwired**. |
 | 3 | **7e — Audit** (half) | medium | ✅ ready | Existing-surface restage over real data. Category chips = client display grouping over the closed `AuditActionType` union. **Correction: the Audit module has no top-bar "Export" — only the drawer's "Export entry" (owner-gated); "Export"/"Schedule" belong to Analytics.** Omit `Source/IP` + structured diff (no backing). |
 | 4 | **7b — Integrations** (module) | medium | ✅ ready | Enriches the existing `IntegrationsConsolePage` against **already-registered** `GET /configs` + `GET /adapters` (blueprint's empty `serverBindings[]` understates this — enumerate them). Card `endpoint` field is a second unbacked source gap (only jsonb metadata) alongside the masked-credential gap. Bind card identity to `adapter.name/id`, never mock vendor strings. |
-| 5 | **7d — Inventory & Procurement** | medium | ⚠️ partial | PO tab + cancel client ship immediately; **Restock tab and Low-stock tab are BLOCKED** on two net-new reads (`GET /api/restock/sessions`, low-stock aggregate) → render pending until owner-approved. Fix `RestockSession.status` type (`active|finished` → `active|completed|cancelled`). Cancel is **owner-only** (`assertSessionOwned`) — scope the affordance to the current user's sessions in v1. |
+| 5 | **7d — Inventory & Procurement** | medium | ⚠️ partial | PO tab + cancel client ship immediately; **Restock tab and Low-stock tab are BLOCKED** on two net-new reads (`GET /api/restock/sessions`, low-stock aggregate) → render pending until owner-approved. Fix `RestockSession.status` type (`active`/`finished` → `active`/`completed`/`cancelled`). Cancel is **owner-only** (`assertSessionOwned`) — scope the affordance to the current user's sessions in v1. |
 | — | **7a — Management Home** (half) | medium | 🚧 soft-blocked | Data-backed tiles (readiness, ops-summary, activity, exceptions-from-equipment) proceed in parallel; **staffing / inventory-low-stock / connectivity tiles + the `/dashboard` route+gate decision are owner-gated.** |
 | 6 | **7c — RFID + Equipment Governance** | high | ⛔ split required | RFID readers (derived read) + governance asset-types/docks restage are buildable now. **Readiness Rules is owner-gated — but the blueprint's "no table exists — Verified" premise is WRONG.** |
 
@@ -29,6 +29,7 @@ Synthesized from 6 code-verified slice blueprints + adversarial verdicts. Where 
 Six load-bearing files are touched by nearly every slice. Serialize them through **one foundation PR first**, then every slice does only additive appends.
 
 ### FOUNDATION PR (`feat/phase7-console-foundation`) — land before any slice
+
 1. **`src/lib/relative-time.ts`** (NEW) — generalize the *keyed* formatter from `use-alerts-controller.ts:16`. Note the reality the blueprints understate: that formatter pulls keys from **two** namespaces (`t.alerts.timeAgo.*` + `t.alertsPage.*`), so this is key-plumbing, not a trivial move.
 2. **`src/features/alerts/hooks/use-alerts-controller.ts`** — delegate to the shared module, behavior byte-identical, keep back-compat export. **This is a cross-feature touch into `alerts` — every verdict flagged it as beyond-fence; get owner sign-off here, once, and gate it behind its own test so no slice re-does it.**
 3. **`src/desktop/management/DataTable.tsx`** — C6 fix: `role="button"` + `tabIndex=0` + `Enter`/`Space` `onKeyDown` when `onRowClick` is set. Shared by 7b/7c/7d/7e/7f — land once.
@@ -37,6 +38,7 @@ Six load-bearing files are touched by nearly every slice. Serialize them through
 The `console.*` i18n namespace is a **whole-subtree passthrough** (`console: d.console`, i18n.ts:1048) and `nav: d.nav` (:1046) — so **new plain-string `console.*`/`nav.*` keys need NO `i18n.ts` edit**, only both-locale JSON parity. The only `i18n.ts` hand-wiring required is for **interpolated/parameterized** keys (relative-time functions) — and those already exist as `t.alertsPage.minutesAgo(n)`, so reuse them rather than authoring parameterized `console.*` functions.
 
 ### Per-slice append order (serialize merges)
+
 Each slice PR then only appends to shared files — merge in build order (7f → 7a → 7e → 7b → 7d → 7c) so appends never collide:
 - **`src/lib/routes/web-management-nav-model.ts`** — one node appended per slice (nav.people, managementHome?, analytics, auditLog, integrations already present, inventory, equipmentGovernance). Tests use `WEB_MANAGEMENT_NAV.length` dynamically → stay green; each slice adds one positive presence assertion.
 - **`src/components/layout/IconSidebar.tsx`** — append icon import + `ICON_MAP` entry (unmapped icon ⇒ node silently dropped). **Only IconSidebar — not Topbar.**
@@ -107,15 +109,18 @@ All items below carry `needsOwnerReview: true`. **No new table, migration, route
 ## 5. Cross-cutting concerns
 
 ### Round-2 audit blockers — shared checklist (every slice, every clickable surface)
+
 - **C6 (WCAG 2.1.1) keyboard rows** — `DataTable` `onRowClick` `<tr>` has `onClick` only, no `role`/`tabIndex`/`onKeyDown`. **Fixed once in the foundation PR;** every slice's row/drawer-opener inherits it. Each slice adds an Enter/Space activation test.
 - **M1r RTL numerals** — wrap Hebrew-or-numeric spans (DLQ age, counts, latency, cursor ids, dates, heartbeats, phone/device tokens) in `dir="auto"` (via `<Bdi>`), **never `dir="ltr"`.** Reserve `dir="ltr"` for pure-Latin tokens (endpoints, firmware, HTTP codes, secret hashes). Hebrew-default/RTL; zero Hebrew literals in `.ts/.tsx` (enforced by `tests/i18n-no-hebrew-in-source`).
 
 ### Purple `--status-stale` readiness palette
+
 - Shipped token: `var(--status-stale)` / `-bg` / `-fg` / `-border` — light `279 68% 60%` (fg `#6b21a8`), dark `279 70% 70%` (decided 2026-07-08, index.css:94/182/277). **Bind to the token; never hardcode the mock's `#AF52DE`/`rgb(175 82 222)` or the stale `282 68% 60%`/`#7d3ec9` from `DESIGN_SYNC_FLAGS §A3` — that flag is outdated; do NOT re-open it.**
 - **7d low-stock is NOT stale-custody (audit C7)** — bind low-stock dots to **`var(--status-maint-*)` (amber)**, not purple.
 - **7f student role dot** is a role-identity color, not the stale status token — bind to the code `RoleBadge` scheme, not the mock literal.
 
 ### Scan-without-shift scope-add routing
+
 "Admins can scan without an active shift" (program-plan §247) is **NOT a Phase-7 console slice.** It lives in `resolveAuthority()` / the scan handler as an `off\|shadow\|enforce` evaluator change shipped **shadow-first.** Explicitly out of 7f; route to a later authority phase.
 
 ---
