@@ -1708,3 +1708,8 @@ Branch claude/phase-4-board-platform. Each finding re-verified against the curre
   - `tests/command-board-aggregates-degradation.test.ts` (new, DB-free, in pnpm test): safeBlock resolves value on success, degrades to undefined on async + sync throw (never throws); all 4 default aggregates are functions. **8/8 with byLocation.**
   - **Live-DB SQL proof (DATABASE_URL exported, real vettrack DB):** all 4 queries execute valid (no column/syntax errors — highest-likelihood bug ruled out). Power DISTINCT-ON logic + clinicId isolation proven deterministically via an inline VALUES fixture: input {e1 older plugged + e1 latest unplugged, e2 alert, e3 plugged, e4 clinic-B} → `1|1|1` (plugged=e3, unplugged=e1's LATEST not its older plugged row, alert=e2; e4 excluded). Proves latest-per-equipment (no double-count of history) + 3-way partition + tenant isolation.
 - **Gate:** FE tsc 0 · server tsc 0 · **full suite 416 files / 4026 tests** · SQL logic proven against live DB.
+
+### Commit 4 — i18n board.* keys (locales/en.json + he.json)
+- **12 new board.* keys** in BOTH locales (same commit): unassigned, power, plugged, unplugged, powerAlert, docks, docksOccupied, docksReady, waitlist, staging, inQueue, highLoad. Inserted after board.notDeployable (both files, targeted Edit — no whole-file reformat).
+- **No i18n.ts edit:** verified board is a whole-object ref `board: d.board` (i18n.ts:1247), so new keys flow to the typed `t.board.*` accessor automatically (the hand-listed-namespace gotcha does not apply). Regenerated src/lib/i18n.generated.d.ts via scripts/i18n/generate-types.ts.
+- **Gate:** pnpm i18n:check parity ✓ · tests/i18n-parity.test.ts + i18n-no-hebrew-in-source 6/6 ✓ · FE+server tsc 0 (generated d.ts compiles).

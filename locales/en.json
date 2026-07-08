@@ -3845,7 +3845,19 @@
     "loading": "Loading...",
     "fallbackBoardUnavailable": "Command board data is unavailable",
     "deployable": "Ready",
-    "notDeployable": "Not ready"
+    "notDeployable": "Not ready",
+    "unassigned": "Unassigned",
+    "power": "Power",
+    "plugged": "Plugged in",
+    "unplugged": "Unplugged",
+    "powerAlert": "Power alert",
+    "docks": "Docks",
+    "docksOccupied": "Occupied",
+    "docksReady": "Ready",
+    "waitlist": "Waitlist",
+    "staging": "Staging",
+    "inQueue": "in queue",
+    "highLoad": "High load"
   },
   "webOnlyGuard": {
     "title": "Best viewed on a larger screen",

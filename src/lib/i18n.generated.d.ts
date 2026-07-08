@@ -3849,6 +3849,18 @@ export interface TStructure {
     fallbackBoardUnavailable: string;
     deployable: string;
     notDeployable: string;
+    unassigned: string;
+    power: string;
+    plugged: string;
+    unplugged: string;
+    powerAlert: string;
+    docks: string;
+    docksOccupied: string;
+    docksReady: string;
+    waitlist: string;
+    staging: string;
+    inQueue: string;
+    highLoad: string;
   };
   webOnlyGuard: {
     title: string;

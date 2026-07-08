@@ -3845,7 +3845,19 @@
     "loading": "טוען...",
     "fallbackBoardUnavailable": "נתוני לוח מפקד אינם זמינים",
     "deployable": "מוכן",
-    "notDeployable": "לא מוכן"
+    "notDeployable": "לא מוכן",
+    "unassigned": "לא משויך",
+    "power": "חשמל",
+    "plugged": "מחובר",
+    "unplugged": "מנותק",
+    "powerAlert": "התראת חשמל",
+    "docks": "עמדות עגינה",
+    "docksOccupied": "תפוסות",
+    "docksReady": "מוכנות",
+    "waitlist": "רשימת המתנה",
+    "staging": "היערכות",
+    "inQueue": "בתור",
+    "highLoad": "עומס גבוה"
   },
   "webOnlyGuard": {
     "title": "מיטבי לצפייה במסך גדול יותר",
