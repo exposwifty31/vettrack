@@ -19,22 +19,33 @@ import type { User, UserRole, UserStatus } from "@/types";
 type ServerRole = "admin" | "vet" | "senior_technician" | "technician" | "student";
 const SERVER_ROLES: ServerRole[] = ["admin", "vet", "senior_technician", "technician", "student"];
 
-/** Client roles → the 5 display labels (lead_technician/vet_tech collapse like the server does). */
-const ROLE_LABEL: Record<UserRole, string> = {
-  admin: t.adminPage.roleAdmin,
-  vet: t.adminPage.roleVet,
-  technician: t.adminPage.roleTechnician,
-  senior_technician: t.adminPage.roleSeniorTechnician,
-  lead_technician: t.adminPage.roleSeniorTechnician,
-  vet_tech: t.adminPage.roleTechnician,
-  student: t.adminPage.roleStudent,
-};
+/**
+ * Client roles → the 5 display labels (lead_technician/vet_tech collapse like the
+ * server does). Read `t` LAZILY (at call time): `t` is a reassignable binding that
+ * changes on locale switch, so capturing it in a module-level const would go stale.
+ */
+function roleLabel(role: UserRole): string {
+  switch (role) {
+    case "admin": return t.adminPage.roleAdmin;
+    case "vet": return t.adminPage.roleVet;
+    case "senior_technician":
+    case "lead_technician": return t.adminPage.roleSeniorTechnician;
+    case "technician":
+    case "vet_tech": return t.adminPage.roleTechnician;
+    case "student": return t.adminPage.roleStudent;
+  }
+}
 
-const STATUS: Record<UserStatus, { label: string; variant: "ok" | "secondary" | "issue" }> = {
-  active: { label: t.console.people.statusActive, variant: "ok" },
-  pending: { label: t.console.people.statusPending, variant: "secondary" },
-  blocked: { label: t.console.people.statusBlocked, variant: "issue" },
-};
+function statusMeta(status: UserStatus): { label: string; variant: "ok" | "secondary" | "issue" } {
+  switch (status) {
+    case "active": return { label: t.console.people.statusActive, variant: "ok" };
+    case "pending": return { label: t.console.people.statusPending, variant: "secondary" };
+    case "blocked": return { label: t.console.people.statusBlocked, variant: "issue" };
+  }
+}
+
+/** Canonical react-query key for the clinic user list — shared with UsersSection + friends. */
+const USERS_KEY = ["/api/users"] as const;
 
 /** Collapse the 7 client roles onto the 5 the updateRole endpoint accepts (server parity). */
 function toServerRole(role: UserRole): ServerRole {
@@ -53,14 +64,14 @@ function RoleEditSheet({ user, onClose }: { user: User; onClose: () => void }) {
   const mut = useMutation({
     mutationFn: () => api.users.updateRole(user.id, role),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["console", "people", "list"] });
+      queryClient.invalidateQueries({ queryKey: USERS_KEY });
       toast.success(t.adminPage.roleUpdated);
       onClose();
     },
     onError: () => toast.error(t.adminPage.roleUpdateFailed),
   });
 
-  const status = STATUS[user.status];
+  const status = statusMeta(user.status);
 
   return (
     <Sheet open onOpenChange={(open) => !open && onClose()}>
@@ -75,7 +86,7 @@ function RoleEditSheet({ user, onClose }: { user: User; onClose: () => void }) {
           <div className="flex flex-col gap-1.5">
             <span className="text-xs text-muted-foreground">{t.console.colStatus}</span>
             <div>
-              <Badge variant={status?.variant ?? "secondary"}>{status?.label ?? user.status}</Badge>
+              <Badge variant={status.variant}>{status.label}</Badge>
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
@@ -89,7 +100,7 @@ function RoleEditSheet({ user, onClose }: { user: User; onClose: () => void }) {
               <SelectContent>
                 {SERVER_ROLES.map((r) => (
                   <SelectItem key={r} value={r}>
-                    {ROLE_LABEL[r]}
+                    {roleLabel(r)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -121,7 +132,7 @@ export default function PeopleRolesConsolePage() {
   const [editing, setEditing] = useState<User | null>(null);
 
   const usersQ = useQuery({
-    queryKey: ["console", "people", "list"],
+    queryKey: USERS_KEY,
     queryFn: () => api.users.list(),
     enabled: hasServerAccess,
     retry: false,
@@ -144,16 +155,16 @@ export default function PeopleRolesConsolePage() {
       {
         key: "role",
         header: t.console.colRole,
-        sortValue: (u) => u.role,
-        cell: (u) => ROLE_LABEL[u.role] ?? u.role,
+        sortValue: (u) => roleLabel(u.role),
+        cell: (u) => roleLabel(u.role),
       },
       {
         key: "status",
         header: t.console.colStatus,
         sortValue: (u) => u.status,
         cell: (u) => {
-          const s = STATUS[u.status];
-          return <Badge variant={s?.variant ?? "secondary"}>{s?.label ?? u.status}</Badge>;
+          const s = statusMeta(u.status);
+          return <Badge variant={s.variant}>{s.label}</Badge>;
         },
       },
     ],
