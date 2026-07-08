@@ -117,7 +117,6 @@ export default defineConfig(({ mode }) => {
             "vendor-charts": ["recharts"],
             "vendor-export": ["jspdf", "xlsx"],
             "vendor-react": ["react", "react-dom"],
-            "vendor-motion": ["framer-motion"],
           },
         },
       },

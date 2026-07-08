@@ -1736,3 +1736,19 @@ Branch claude/phase-4-board-platform. Each finding re-verified against the curre
 - **Fix (in-fence):** cap each default aggregate with the existing `withTimeout(queryX, AGGREGATE_TIMEOUT_MS=1500)` inside safeBlock — so slowness degrades to undefined just like failure, and an aggregate (capped 1500ms) can never dominate the 2500ms envelope (the only remaining trip cause is the load-bearing main query, unchanged). Corrected the overclaiming comment. safeBlock stays the pure try/catch primitive (injectable deps unchanged; tests still inject plain fns).
 - **Test:** added slowness case to command-board-aggregates-degradation.test.ts — `safeBlock(() => withTimeout(hangingPromise, 10))` resolves undefined (slowness → degrade, not just throws).
 - **Gate:** FE tsc 0 · server tsc 0 · full suite green · architecture gates pass.
+
+---
+
+## Pre-Phase-7 Debt-Clearing Cleanup — Groups A–G (2026-07-08)
+
+**Branch:** `chore/pre-phase-7-cleanup` (off `origin/main` @ f8c180491). Resolves my Phase-0–6 audit findings + the external archaeology report, each claim re-verified against code before acting.
+
+- **Group A (dead code):** deleted `src/types/{patients,billing}.ts` (0 import-path refs) + dead `HospitalizationStatus` re-export; removed 10 removed-domain top-level locale namespaces + `adminPage.pilotMode*` (23 keys) from he/en + 197 accessor lines; regen d.ts. **Guard-test catch:** first pass also stripped `admin.formulary` — broke `tests/i18n-admin-sheets.test.ts` (Phase-6 headless-prebuild surface); reverted & kept formulary. **Rejected report claim:** `SyncType` "patients"/"billing" is a live PMS-integration contract (grep proof: `integration-schedules.ts`, `inbound.router.ts`, `ops.routes.ts:214` direction logic) — NOT removed. Gate: typecheck 0 · i18n parity ✓ · 4038 tests.
+- **Group B (broken surfaces):** removed `outcome-kpi-roi` (reachable admin route → 500 on dropped `vt_billing_ledger`): route + service + api client + query-key + `shared/er-types.ts`; removed procedure-bind UI (bound removed patients) from `equipment-detail.tsx` + api methods + unused imports; unregistered + deleted no-op `procedureBoundReleaseWorker`. Gate: typecheck 0 · architecture:gates pass · 4038 tests. Residue (server procedure-bind route + orphaned locale keys) → Phase 7S.
+- **Group C (docs/config):** regen inventories (249→248 routes, outcome-kpi-roi gone); FLOW_INVENTORY board row corrected (target shipped Phase 4); MAINTENANCE_MODE reframed (active program, not frozen); program-plan Phase 6 `/admin/metrics` drift reconciled (intentionally unfenced); PF-02 historical banner; removed stray `locales/i18next-master.zip` + gitignore rule; knip.json stale ignores dropped (`tokens.ts`/`seed.ts`) + `server/tests/**` added; stale `vendor-motion` vite chunk removed.
+- **Group D (dep cull): DEFERRED** — env pnpm v9-CLI/v11-node_modules mismatch forces a risky full reinstall; 25-dep removal list verified + recorded (IMP-007) for a matching-pnpm env.
+- **Group E (purple stale):** `--status-stale` orange→purple `#AF52DE` (light+dark + bg/fg/border); ends the stale/maintenance collision; token tests assert existence not value → 4038 pass.
+- **Group F (server smoke tests):** `test:server:smoke` npm script + header + `server/tests/**` knip-ignore.
+- **Group G (plan):** scheduled Phase 7S (equipment god-file split) + reconfirmed RLS/worker owner-gated.
+
+Each group committed separately, full suite green per group. Audit-report branch `docs/phase-0-6-audit` stays local (Phase 10 push, per owner).

@@ -16,10 +16,10 @@ Per rule III.6, every flow in the app must be provable 100% functioning across p
 | Guard (in `routes.tsx`) | iPhone | iPad | Web (≥1024) | Board | Marketing |
 |---|:--:|:--:|:--:|:--:|:--:|
 | Marketing path (`isMarketingPathname`) | — | — | — | — | ✅ chrome-free |
-| `AuthGuard` only | ✅ | ✅ | ✅ | n/a¹ | — |
+| `AuthGuard` only | ✅ | ✅ | ✅ | ✅¹ | — |
 | `AuthGuard > WebOnlyGuard` | redirect→fallback² | redirect→fallback² | ✅ | ✅³ | — |
 
-¹ The `board` PlatformTarget does not exist yet (Phase 4). Today `/equipment/board` is a `WebOnlyGuard` web route.
+¹ The `board` PlatformTarget **shipped in Phase 4** (PR #55). `/board` is `AuthGuard`-only and renders `BoardShell` (dark kiosk chrome, wake-lock, self-heal); `/equipment/board` remains a `WebOnlyGuard` web route during the transition (end-state decided at Phase 10).
 ² Capacitor-native redirects to the guard's `fallback` (e.g. `/equipment/board` → `/my-equipment`); browser < 1024px shows the dark guard screen.
 ³ Board-class (large-format) surfaces are the WebOnlyGuard set by design.
 

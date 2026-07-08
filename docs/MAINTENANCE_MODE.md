@@ -1,4 +1,6 @@
-# VetTrack maintenance mode
+# VetTrack repository scope & ship lane
+
+> **Not frozen "maintenance" (reframed 2026-07-08).** This doc was titled "maintenance mode," but the repo is under an **active multi-phase program** (per-role UX · web management console · Command Center board — see [`docs/design/program-plan.md`](design/program-plan.md)). The doc's real purpose is narrower and still accurate: **what ships from THIS repo vs the sibling Expo/RN repo**, plus the native ship lane. Read it as scope-boundaries, not a freeze.
 
 This repository is the **production monolith**: React web app, Express API, PostgreSQL, PWA/offline sync, and **Capacitor** native shell (iOS/Android). Active mobile strategy and Expo/RN work live elsewhere.
 

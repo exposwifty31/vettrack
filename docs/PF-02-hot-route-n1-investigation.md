@@ -1,5 +1,7 @@
 # PF-02 — Hot-route N+1 investigation (PR-27)
 
+> ⚠️ **Historical (pre-scope-change).** Dated 2026-05-21, before the June-2026 removal of ER/patient/medication/billing (see [`docs/scope-change-2026.md`](scope-change-2026.md)). The "ER board" / patient references below describe removed surfaces — read for the equipment-list N+1 method only, not as current architecture.
+
 **Date:** 2026-05-21  
 **Finding:** PF-02 (equipment list + ER board N+1 risk)  
 **Outcome:** No handler changes in this PR — static review did not reproduce application-level N+1.
