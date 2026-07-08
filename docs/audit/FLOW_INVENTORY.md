@@ -21,7 +21,7 @@ Per rule III.6, every flow in the app must be provable 100% functioning across p
 
 ¹ The `board` PlatformTarget **shipped in Phase 4** (PR #55). `/board` is `AuthGuard`-only and renders `BoardShell` (dark kiosk chrome, wake-lock, self-heal); `/equipment/board` remains a `WebOnlyGuard` web route during the transition (end-state decided at Phase 10).
 ² Capacitor-native redirects to the guard's `fallback` (e.g. `/equipment/board` → `/my-equipment`); browser < 1024px shows the dark guard screen.
-³ Board-class (large-format) surfaces are the WebOnlyGuard set by design.
+³ This column is the **WebOnlyGuard** web route `/equipment/board` (plus the other WebOnlyGuard large-format surfaces) rendering on a board-class display — **not** the `AuthGuard`-only `/board` kiosk in row ¹. The two board surfaces are distinct: `/board` (AuthGuard only → `BoardShell` kiosk) vs `/equipment/board` (`AuthGuard > WebOnlyGuard` web route).
 
 ## Marketing (unauthenticated, chrome-free)
 

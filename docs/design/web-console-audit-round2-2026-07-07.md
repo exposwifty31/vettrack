@@ -1,5 +1,7 @@
 # VetTrack Web Console — Round-2 Audit (deliverable + code alignment)
 
+> 📌 **Historical snapshot (2026-07-07).** One finding has since landed: **P8 / M3 `--status-stale`** — the mock/code stale-color disagreement was **resolved 2026-07-08** by shipping the distinct purple `--status-stale` in `src/index.css` (light `279 68% 60%` / dark `279 70% 70%` + `-bg/-fg/-border`). The "stale=orange / owner decision" claims below (§1 P8, the §125 summary, and §8 item 4) describe the pre-fix state — read them as of the audit date, not current.
+
 **Date:** 2026-07-07 · **Auditor coordinates cited as** Module · Persona · State · Locale · Width.
 **Artifacts audited:** (a) `VetTrack Console.html` — integrated interactive console (React, working nav/personas/drawers), driven live in Present mode; (b) ten `templates/console-*/​*.dc.html` — per-module harness templates (Persona · State · Locale · **Width** toggles), driven live + read as source from the project export; (c) `vettrack-ship` codebase as oracle.
 **Method notes:** the deliverable is split: the four states + width presets live in the ten templates; the drawers/navigation depth lives in the integrated console. Both were exercised. Harness quirk confirmed again: template segmented toggles intermittently swallow mouse clicks — keyboard Enter always registers; the integrated console responds to mouse normally.
@@ -169,6 +171,6 @@ The persona system is now real depth, not chrome: the same drawer downgrades hon
 1. **M1r (Blocker):** `dir="ltr"` wrappers garble Hebrew numeral strings on the empty-state progress (6 templates) and Home inventory values — the default locale renders inverted meaning. Patch P1 is a one-attribute change per span, supplied above.
 2. **C2 (High):** Audit vocabulary must map to the real closed `AuditActionType` union — the §AU-D2 claim is currently false.
 3. **C3 (High):** Remove/genericize "MedVet Labs" (Provet-only rule).
-4. **P8 (owner decision):** pick purple-stale (add token to `src/index.css` light+dark: `--status-stale: 282 68% 60%`, bg `rgb(175 82 222 / 0.12)`, fg `#7d3ec9`, border `rgb(175 82 222 / 0.28)`) **or** revert the design to the shipped orange — the mock and the code currently disagree.
+4. **P8 — ✅ RESOLVED 2026-07-08 (this audit snapshot predates the fix):** purple-stale was adopted and shipped in the pre-Phase-7 cleanup. `src/index.css` now carries a distinct purple `--status-stale` (light `279 68% 60%` / dark `279 70% 70%` + `-bg/-fg/-border`), ending the mock/code disagreement. *(Original open item, kept for the record: pick purple-stale or revert to the shipped orange — the mock and code disagreed at audit time.)*
 
 With those four landed (plus the C1 guard threshold and C6 keyboard activation as fast follows), this is a Go.
