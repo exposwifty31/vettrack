@@ -46,6 +46,16 @@ describe("web-management-nav-model — structure", () => {
     expect(opsHealth?.writeCap).toBeUndefined();
     expect(opsHealth?.group).toBe("operations");
   });
+
+  it("7f: People & Roles node is present, administration group, writable", () => {
+    const people = WEB_MANAGEMENT_NAV.find((n) => n.id === "mgmt-people");
+    expect(people).toBeDefined();
+    expect(people?.href).toBe("/admin/people");
+    expect(people?.labelKey).toBe("nav.people");
+    expect(people?.icon).toBe("Users");
+    expect(people?.group).toBe("administration");
+    expect(people?.writeCap).toBe("management.webWrite");
+  });
 });
 
 describe("web-management-nav-model — capability visibility", () => {

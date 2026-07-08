@@ -3284,6 +3284,18 @@
     "opsHealth": {
       "title": "Ops Health",
       "subtitle": "Outbox, DLQ, queues, and integration health — observe only"
+    },
+    "colName": "Name",
+    "colEmail": "Email",
+    "colRole": "Role",
+    "people": {
+      "title": "People & Roles",
+      "subtitle": "Staff accounts and their roles for this clinic.",
+      "statusActive": "Active",
+      "statusPending": "Pending",
+      "statusBlocked": "Blocked",
+      "editTitle": "Edit member",
+      "save": "Save changes"
     }
   },
   "nav": {
@@ -3339,7 +3351,8 @@
     "emergencyHistory": "Emergency Equipment History",
     "settings": "Settings",
     "reportBug": "Report a Bug",
-    "profile": "My Profile"
+    "profile": "My Profile",
+    "people": "People & Roles"
   },
   "phoneSignIn": {
     "title": "Phone Sign In",

@@ -3288,6 +3288,18 @@ export interface TStructure {
       title: string;
       subtitle: string;
     };
+    colName: string;
+    colEmail: string;
+    colRole: string;
+    people: {
+      title: string;
+      subtitle: string;
+      statusActive: string;
+      statusPending: string;
+      statusBlocked: string;
+      editTitle: string;
+      save: string;
+    };
   };
   nav: {
     integrations: string;
@@ -3343,6 +3355,7 @@ export interface TStructure {
     settings: string;
     reportBug: string;
     profile: string;
+    people: string;
   };
   phoneSignIn: {
     title: string;

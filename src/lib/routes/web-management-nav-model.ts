@@ -72,6 +72,15 @@ export const WEB_MANAGEMENT_NAV: WebManagementNavNode[] = [
     group: "operations",
     reach: "management.web",
   },
+  {
+    id: "mgmt-people",
+    labelKey: "nav.people",
+    href: "/admin/people",
+    icon: "Users",
+    group: "administration",
+    reach: "management.web",
+    writeCap: "management.webWrite",
+  },
 ];
 
 /** Flattened href list (active-state + dead-link tests; mirrors NAV_HREFS). */
