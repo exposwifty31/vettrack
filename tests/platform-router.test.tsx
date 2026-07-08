@@ -13,6 +13,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 vi.mock("@/lib/capacitor-runtime", () => ({
   isCapacitorNative: () => false,
@@ -41,12 +42,16 @@ afterEach(() => cleanup());
 
 function renderAt(path: string) {
   const { hook } = memoryLocation({ path });
+  // BoardShell mounts useBoardAutoReload → useQueryClient, so a provider is required.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <Router hook={hook}>
-      <PlatformRouter>
-        <div data-testid="child">page</div>
-      </PlatformRouter>
-    </Router>,
+    <QueryClientProvider client={queryClient}>
+      <Router hook={hook}>
+        <PlatformRouter>
+          <div data-testid="child">page</div>
+        </PlatformRouter>
+      </Router>
+    </QueryClientProvider>,
   );
 }
 

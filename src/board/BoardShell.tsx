@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { KioskAwake } from "./KioskAwake";
 import { BoardErrorBoundary } from "./BoardErrorBoundary";
+import { useBoardAutoReload } from "./useBoardAutoReload";
 
 type Props = { children: ReactNode };
 
@@ -27,6 +28,10 @@ export function BoardShell({ children }: Props) {
   const [, navigate] = useLocation();
   const [resetSeq, setResetSeq] = useState(0);
   const [wakeEpoch, setWakeEpoch] = useState(0);
+
+  // Confirmed-SW-update → reload, deferred while a Code Blue is active. Reads the
+  // snapshot cache read-only; owns no poller. (See useBoardAutoReload.)
+  useBoardAutoReload();
 
   // Fullscreen on the first user gesture (Fullscreen API requires one). First of
   // either pointerdown/keydown fires it, then removes both listeners.
