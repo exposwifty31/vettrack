@@ -1752,3 +1752,20 @@ Branch claude/phase-4-board-platform. Each finding re-verified against the curre
 - **Group G (plan):** scheduled Phase 7S (equipment god-file split) + reconfirmed RLS/worker owner-gated.
 
 Each group committed separately, full suite green per group. Audit-report branch `docs/phase-0-6-audit` stays local (Phase 10 push, per owner).
+
+---
+
+## 2026-07-08 — Remove dead Tasks → /patients chart links (owner-sanctioned out-of-band fix)
+
+**Claim:** Removed `PatientChartLink` (component + 6 call sites) from `src/pages/Tasks.tsx` — it promised a patient chart but `/patients/:id` has been a redirect to `/equipment` since migrations 142–143. Device labels keep rendering; the legacy redirect stays. New static guard test added. Out-of-band vs the Phase 7 program (owner-commissioned from the 2026-07-08 product-archaeology audit's Critical finding); zero file overlap with the in-flight 7a slice.
+
+**Evidence:**
+- `src/pages/Tasks.tsx` — `grep -n "PatientChartLink\|patientDetail\|/patients"` → no matches (exit 1); pre-fix grep showed the component at :337 with `href={`/patients/${animalId}`}` at :341 and call sites at :772/:852/:877/:971/:1076/:1398.
+- `src/pages/Tasks.tsx:3` — `import { Redirect } from "wouter"` (unused `Link` dropped; `Redirect` still used at :695).
+- `src/app/routes.tsx:203-204` — `/patients` + `/patients/:id` → `<Redirect to="/equipment" replace />` untouched (grep-confirmed post-edit via the new guard test).
+- Test: `pnpm test -- tests/tasks-dead-patient-links.test.ts` → `Test Files 1 passed (1) · Tests 4 passed (4)`.
+- Command: `pnpm typecheck` → exit 0 (frontend + server tsconfigs). `pnpm i18n:check` → "locales/en.json and locales/he.json are in deep key parity." (no locale edits; `patientDetail.*` keys intentionally left — the 7a agent has both locale files dirty).
+- Command: `pnpm test` (full suite) → `Test Files 410 passed | 10 skipped (420) · Tests 3995 passed | 54 skipped (4049)`.
+- FLOW_INVENTORY `/equipment/tasks` row NOT re-stamped — live-walk deferral stands (III.6 owner-accepted); this entry claims static + suite evidence only.
+
+**Verdict:** VERIFIED
