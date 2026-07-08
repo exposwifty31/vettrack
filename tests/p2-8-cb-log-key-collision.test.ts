@@ -11,7 +11,7 @@ import { describe, it, expect } from "vitest";
 describe("P2-8: CB overlay log key collision", () => {
   it("key pattern includes index disambiguator", async () => {
     const fs = await import("fs");
-    const source = fs.readFileSync("src/pages/display.tsx", "utf8");
+    const source = fs.readFileSync("src/features/command-board/components/CodeBlueOverlay.tsx", "utf8");
 
     // The key must include the index to disambiguate
     expect(source).toContain("entry.elapsedMs}-${entry.label}-${idx}");
@@ -21,7 +21,7 @@ describe("P2-8: CB overlay log key collision", () => {
 
   it("map callback receives index parameter", async () => {
     const fs = await import("fs");
-    const source = fs.readFileSync("src/pages/display.tsx", "utf8");
+    const source = fs.readFileSync("src/features/command-board/components/CodeBlueOverlay.tsx", "utf8");
 
     expect(source).toContain("displayedLogs.map((entry, idx)");
   });
