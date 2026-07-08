@@ -3301,7 +3301,11 @@
       "statusBlocked": "Blocked",
       "editTitle": "Edit member",
       "save": "Save changes"
-    }
+    },
+    "colConfigured": "Configured",
+    "colCredentials": "Required credentials",
+    "valYes": "Yes",
+    "valNo": "No"
   },
   "nav": {
     "integrations": "Integrations",
