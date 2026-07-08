@@ -7,7 +7,6 @@ import { subDays } from "date-fns";
 import { analyticsCache } from "../lib/analytics-cache.js";
 import { computeUsageTrends } from "../lib/analytics-engine.js";
 import { INACTIVE_THRESHOLD_DAYS } from "../../shared/constants.js";
-import { getOutcomeKpiRoiDashboard } from "../services/outcome-kpi-roi.service.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 /*
@@ -15,7 +14,6 @@ import { resolveRequestId, apiError } from "../lib/route-utils.js";
  * ─────────────────────────────────────────────────────
  * GET  /         student+  Aggregate dashboard statistics
  * GET  /billing  student+  Billing analytics dashboard
- * GET  /outcome-kpi-roi  student+  Outcome KPI & ROI vs pre-activation baseline (requires config)
  * ─────────────────────────────────────────────────────
  * Viewer read access is intentional — dashboard stats are informational
  * and do not expose any PII or mutation capability.
@@ -184,27 +182,6 @@ router.get("/billing", requireAuth, requireAdmin, async (req, res) => {
         code: "INTERNAL_ERROR",
         reason: "BILLING_ANALYTICS_FAILED",
         message: "Failed to get billing analytics",
-        requestId,
-      }),
-    );
-  }
-});
-
-/** GET /api/analytics/outcome-kpi-roi — Phase 7 leadership dashboard (real DB comparison windows). */
-router.get("/outcome-kpi-roi", requireAuth, requireAdmin, async (req, res) => {
-  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
-  try {
-    const clinicId = req.clinicId!;
-    const body = await getOutcomeKpiRoiDashboard(clinicId);
-    res.setHeader("X-Analytics-Cache", "MISS");
-    res.json(body);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(
-      apiError({
-        code: "INTERNAL_ERROR",
-        reason: "OUTCOME_KPI_ROI_FAILED",
-        message: "Failed to compute outcome KPI metrics",
         requestId,
       }),
     );
