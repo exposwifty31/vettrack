@@ -3305,7 +3305,15 @@
     "colConfigured": "מוגדר",
     "colCredentials": "אישורים נדרשים",
     "valYes": "כן",
-    "valNo": "לא"
+    "valNo": "לא",
+    "colGateway": "שער",
+    "colRoom": "חדר",
+    "colLastSeen": "נראה לאחרונה",
+    "colObserved": "ציוד שזוהה",
+    "readerOnline": "מקוון",
+    "readerStale": "לא עדכני",
+    "readerNoSignal": "אין אות",
+    "readerUnassigned": "לא משויך"
   },
   "nav": {
     "integrations": "אינטגרציות",

@@ -765,6 +765,14 @@ export const api = {
         requestId: string;
       }>("/api/containers/reconcile-unused-charge", { method: "POST", body: JSON.stringify(body) }),
   },
+  rfidReaders: {
+    list: () =>
+      request<{
+        clinicId: string;
+        readers: import("@/types").RfidReaderRow[];
+        requestId: string;
+      }>("/api/admin/rfid-readers"),
+  },
   adminOutboxHealth: {
     get: () =>
       request<{

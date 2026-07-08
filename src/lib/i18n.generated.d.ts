@@ -3309,6 +3309,14 @@ export interface TStructure {
     colCredentials: string;
     valYes: string;
     valNo: string;
+    colGateway: string;
+    colRoom: string;
+    colLastSeen: string;
+    colObserved: string;
+    readerOnline: string;
+    readerStale: string;
+    readerNoSignal: string;
+    readerUnassigned: string;
   };
   nav: {
     integrations: string;

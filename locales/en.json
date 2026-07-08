@@ -3305,7 +3305,15 @@
     "colConfigured": "Configured",
     "colCredentials": "Required credentials",
     "valYes": "Yes",
-    "valNo": "No"
+    "valNo": "No",
+    "colGateway": "Gateway",
+    "colRoom": "Room",
+    "colLastSeen": "Last seen",
+    "colObserved": "Observed",
+    "readerOnline": "Online",
+    "readerStale": "Stale",
+    "readerNoSignal": "No signal",
+    "readerUnassigned": "Unassigned"
   },
   "nav": {
     "integrations": "Integrations",
