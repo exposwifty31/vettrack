@@ -44,9 +44,11 @@ export const PLAYWRIGHT_SUITE_MATCH: Record<string, string[]> = {
     'e2e/flows/**/*.spec.ts',
     'pwa.spec.ts',
     'phase-9-drills.spec.ts',
+    'board-kiosk.spec.ts',
   ],
   pwa: ['pwa.spec.ts'],
   phase9: ['phase-9-drills.spec.ts'],
+  board: ['board-kiosk.spec.ts'],
   signup: ['signup-flow.spec.ts'],
   workday: ['e2e/simulation/workday.spec.ts'],
   waitlist: [

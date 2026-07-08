@@ -35,7 +35,7 @@ interface CommandBoardScreenProps {
   kioskMode?: boolean;
 }
 
-export function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProps) {
+function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProps) {
   const qc = useQueryClient();
   const realtimeIngestor = useMemo(() => new EventIngestor(qc), [qc]);
 
