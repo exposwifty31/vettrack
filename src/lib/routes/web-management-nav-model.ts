@@ -98,6 +98,14 @@ export const WEB_MANAGEMENT_NAV: WebManagementNavNode[] = [
     reach: "management.web",
     writeCap: "management.webWrite",
   },
+  {
+    id: "mgmt-audit",
+    labelKey: "nav.auditLog",
+    href: "/admin/audit-log",
+    icon: "ScrollText",
+    group: "administration",
+    reach: "management.web",
+  },
 ];
 
 /** Flattened href list (active-state + dead-link tests; mirrors NAV_HREFS). */

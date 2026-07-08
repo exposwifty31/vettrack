@@ -3331,6 +3331,14 @@
       "saveFailed": "לא ניתן לעדכן את מדיניות המוכנות",
       "usingDefaults": "משתמש בברירת מחדל",
       "lastUpdated": "עודכן"
+    },
+    "audit": {
+      "title": "יומן ביקורת",
+      "subtitle": "פעולות מתועדות במרפאה זו",
+      "colTimestamp": "זמן",
+      "colAction": "פעולה",
+      "colActor": "מבצע",
+      "colTarget": "יעד"
     }
   },
   "nav": {
