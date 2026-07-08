@@ -93,7 +93,11 @@ function RoleEditSheet({ user, onClose }: { user: User; onClose: () => void }) {
             <label className="text-xs text-muted-foreground" htmlFor="people-role">
               {t.console.colRole}
             </label>
-            <Select value={role} onValueChange={(v) => setRole(v as ServerRole)}>
+            <Select
+              value={role}
+              // `v` is always one of SERVER_ROLES — the only SelectItems rendered below — so the cast is sound.
+              onValueChange={(v) => setRole(v as ServerRole)}
+            >
               <SelectTrigger id="people-role">
                 <SelectValue />
               </SelectTrigger>

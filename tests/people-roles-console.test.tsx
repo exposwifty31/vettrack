@@ -83,6 +83,17 @@ describe("PeopleRolesConsolePage — capability gating", () => {
     expect(screen.getByText("noa@clinic.test")).toBeTruthy();
     expect(listMock).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps the page chrome and shows the DataTable error state when the fetch fails", async () => {
+    mockCan.mockImplementation((cap) => cap === "management.webWrite");
+    listMock.mockRejectedValue(new Error("roster boom")); // retry:false → single failure
+    renderPage();
+    // Chrome renders regardless of the fetch outcome.
+    expect(screen.getByText(t.console.people.title)).toBeTruthy();
+    // DataTable error branch (ErrorCard + retry), NOT the zero-rows empty state.
+    expect(await screen.findByRole("button")).toBeTruthy();
+    expect(screen.queryByText(t.console.state.empty)).toBeNull();
+  });
 });
 
 describe("PeopleRolesConsolePage — role-edit drawer", () => {
