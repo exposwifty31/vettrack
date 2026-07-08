@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 
-/** The three runtime deployment targets. */
-export type PlatformTarget = "mobile" | "desktop" | "marketing";
+/** The four runtime deployment targets. */
+export type PlatformTarget = "mobile" | "desktop" | "marketing" | "board";
 
 /** Public routes that belong to the marketing shell (no app chrome). */
 const MARKETING_PATHS = new Set(["/signin", "/signup", "/privacy", "/terms", "/support"]);
@@ -26,16 +26,39 @@ export function isMarketingPath(): boolean {
 }
 
 /**
+ * Single source of truth for the board-path predicate (used by both isBoardPath
+ * and usePlatformTarget). Segment-safe: matches /board and /board/* but NOT
+ * /boardroom (would be a false positive) or /equipment/board (stays desktop).
+ * Do NOT read window.location here — the reactive hook depends on the pathname
+ * argument to re-evaluate on wouter navigation into/out of /board.
+ */
+function isBoardPathname(pathname: string): boolean {
+  return pathname === "/board" || pathname.startsWith("/board/");
+}
+
+/** True when the current path is the standalone Command Center board (kiosk shell). */
+export function isBoardPath(): boolean {
+  if (typeof window === "undefined") return false;
+  return isBoardPathname(window.location.pathname);
+}
+
+/**
  * Synchronous (no re-render) resolution of the current platform target.
  * Safe to call at module initialisation time or inside hooks.
  *
  *   mobile    — Capacitor native OR narrow touch viewport (PWA / mobile-Safari)
  *   marketing — public unauthenticated routes
+ *   board     — standalone Command Center wall/kiosk (/board), browser only
  *   desktop   — everything else (wide viewport, pointer device)
+ *
+ * board is checked AFTER native (a Capacitor build on /board stays mobile →
+ * NativeShell, never the wall-kiosk chrome) and BEFORE touch-narrow (a coarse-
+ * pointer tablet/TV browser at /board must resolve board, not fall to mobile).
  */
 export function resolvePlatformTarget(): PlatformTarget {
   if (isCapacitorNative()) return "mobile";
   if (isMarketingPath()) return "marketing";
+  if (isBoardPath()) return "board";
   if (isTouchNarrow()) return "mobile";
   return "desktop";
 }
@@ -61,6 +84,7 @@ export function usePlatformTarget(): PlatformTarget {
 
   if (isCapacitorNative()) return "mobile";
   if (isMarketingPathname(pathname)) return "marketing";
+  if (isBoardPathname(pathname)) return "board";
   if (touchNarrow) return "mobile";
   return "desktop";
 }
