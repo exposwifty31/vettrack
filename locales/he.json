@@ -3284,6 +3284,16 @@
     "opsHealth": {
       "title": "תקינות מערכת",
       "subtitle": "תיבת יוצאים, DLQ, תורים ותקינות אינטגרציות — צפייה בלבד"
+    },
+    "colName": "שם",
+    "colEmail": "דוא״ל",
+    "colRole": "תפקיד",
+    "people": {
+      "title": "צוות ותפקידים",
+      "subtitle": "חשבונות הצוות והתפקידים שלהם במרפאה זו.",
+      "statusActive": "פעיל",
+      "statusPending": "ממתין",
+      "statusBlocked": "חסום"
     }
   },
   "nav": {
@@ -3339,7 +3349,8 @@
     "emergencyHistory": "היסטוריית ציוד חירום",
     "settings": "הגדרות",
     "reportBug": "דווח על בעיה",
-    "profile": "הפרופיל שלי"
+    "profile": "הפרופיל שלי",
+    "people": "צוות ותפקידים"
   },
   "phoneSignIn": {
     "title": "התחברות עם טלפון",

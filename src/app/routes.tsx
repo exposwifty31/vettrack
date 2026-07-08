@@ -69,6 +69,7 @@ const WebhooksConsolePage = lazy(() => import("@/pages/console/WebhooksConsolePa
 const NotificationsConsolePage = lazy(() => import("@/pages/console/NotificationsConsolePage"));
 const RfidReadersConsolePage = lazy(() => import("@/pages/console/RfidReadersConsolePage"));
 const OpsHealthConsolePage = lazy(() => import("@/pages/console/OpsHealthConsolePage"));
+const PeopleRolesConsolePage = lazy(() => import("@/pages/console/PeopleRolesConsolePage"));
 
 function RedirectPreserveSearch({ to }: { to: string }) {
   const search = useSearch();
@@ -173,6 +174,7 @@ export function AppRoutes() {
         <Route path="/admin/notifications"><AuthGuard><WebOnlyGuard><ManagementGuard><NotificationsConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/admin/rfid-readers"><AuthGuard><WebOnlyGuard><ManagementGuard><RfidReadersConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/ops/health"><AuthGuard><WebOnlyGuard><ManagementGuard><OpsHealthConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/admin/people"><AuthGuard><WebOnlyGuard><ManagementGuard><PeopleRolesConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/settings"><AuthGuard><SettingsPage /></AuthGuard></Route>
         <Route path="/help"><AuthGuard><HelpPage /></AuthGuard></Route>
         <Route path="/audit-log"><AuthGuard><WebOnlyGuard><AuditLogPage /></WebOnlyGuard></AuthGuard></Route>
