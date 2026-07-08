@@ -3293,7 +3293,9 @@
       "subtitle": "Staff accounts and their roles for this clinic.",
       "statusActive": "Active",
       "statusPending": "Pending",
-      "statusBlocked": "Blocked"
+      "statusBlocked": "Blocked",
+      "editTitle": "Edit member",
+      "save": "Save changes"
     }
   },
   "nav": {

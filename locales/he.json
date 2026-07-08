@@ -3293,7 +3293,9 @@
       "subtitle": "חשבונות הצוות והתפקידים שלהם במרפאה זו.",
       "statusActive": "פעיל",
       "statusPending": "ממתין",
-      "statusBlocked": "חסום"
+      "statusBlocked": "חסום",
+      "editTitle": "עריכת חבר צוות",
+      "save": "שמירת שינויים"
     }
   },
   "nav": {

@@ -3297,6 +3297,8 @@ export interface TStructure {
       statusActive: string;
       statusPending: string;
       statusBlocked: string;
+      editTitle: string;
+      save: string;
     };
   };
   nav: {
