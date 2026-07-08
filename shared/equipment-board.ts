@@ -97,6 +97,30 @@ export type EquipmentBoardRoiSignals = {
   duplicatePurchaseRisks: unknown[];
 };
 
+/** Power posture across critical equipment (derived from latest returns; no battery %). */
+export type EquipmentBoardPowerBlock = {
+  plugged: number;
+  unplugged: number;
+  alert: number;
+};
+
+/** Dock capacity + occupancy across the clinic. */
+export type EquipmentBoardDocksBlock = {
+  total: number;
+  occupied: number;
+  ready: number;
+};
+
+/** Equipment-waitlist depth (active entries). */
+export type EquipmentBoardWaitlistBlock = {
+  depth: number;
+};
+
+/** Staging-queue depth (active entries). */
+export type EquipmentBoardStagingBlock = {
+  depth: number;
+};
+
 export type EquipmentCommandBoardSnapshot = {
   generatedAt: string;
   clinicId: string;
@@ -127,5 +151,12 @@ export type EquipmentCommandBoardSnapshot = {
       locationName?: string;
     }>;
   };
+  // Phase 5 (C2) — OPTIONAL additive enrichment blocks. Each degrades to
+  // undefined independently server-side; every client reader must be tolerant
+  // (render nothing when a block is absent). Never assume presence.
+  power?: EquipmentBoardPowerBlock;
+  docks?: EquipmentBoardDocksBlock;
+  waitlist?: EquipmentBoardWaitlistBlock;
+  staging?: EquipmentBoardStagingBlock;
   roiSignals: EquipmentBoardRoiSignals;
 };
