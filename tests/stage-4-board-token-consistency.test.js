@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 /**
- * Stage 4 — Command board (display.tsx) token LOCK.
+ * Stage 4 — Command board token LOCK.
  *
  * The board was already largely tokenized. Stage 4 finishes it:
  *   - overdue reads the orange (maintenance) token, not red (issue).
@@ -12,11 +12,22 @@ import { fileURLToPath } from "url";
  *     palette onto the theme-independent emergency-* + --sys-* tokens
  *     (restyle only — the overlay's SSE/timer behavior is frozen).
  *   - additive skeleton loading state + a footer status strip.
+ *
+ * Phase 4 C1: the board moved out of src/pages/display.tsx into the
+ * command-board feature module. Each assertion is repointed to the file that
+ * now owns the token — the palette lock spans the whole surface (all four
+ * files concatenated).
  */
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
-const src = fs.readFileSync(path.join(repoRoot, "src", "pages", "display.tsx"), "utf8");
+const read = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
+
+const tokensSrc = read("src/features/command-board/status-tokens.ts");
+const boardSrc = read("src/features/command-board/components/CommandBoard.tsx");
+const overlaySrc = read("src/features/command-board/components/CodeBlueOverlay.tsx");
+const screenSrc = read("src/features/command-board/CommandBoardScreen.tsx");
+const allSrc = tokensSrc + boardSrc + overlaySrc + screenSrc;
 
 describe("Stage 4 board — no hardcoded palette (incl. Code Blue overlay)", () => {
   const banned = [
@@ -27,27 +38,28 @@ describe("Stage 4 board — no hardcoded palette (incl. Code Blue overlay)", () 
   ];
   for (const token of banned) {
     it(`does not use the "${token}" palette`, () => {
-      expect(src.includes(token)).toBe(false);
+      expect(allSrc.includes(token)).toBe(false);
     });
   }
   it("Code Blue overlay reads the emergency-* tokens", () => {
-    expect(src.includes("bg-emergency-bg")).toBe(true);
-    expect(src.includes("bg-emergency-accent")).toBe(true);
-    expect(src.includes("text-emergency-text2")).toBe(true);
+    expect(overlaySrc.includes("bg-emergency-bg")).toBe(true);
+    expect(overlaySrc.includes("bg-emergency-accent")).toBe(true);
+    expect(overlaySrc.includes("text-emergency-text2")).toBe(true);
   });
   it("fallback board unavailable notice uses the emergency-amber token", () => {
-    expect(src.includes("text-emergency-amber")).toBe(true);
+    expect(screenSrc.includes("text-emergency-amber")).toBe(true);
   });
 });
 
 describe("Stage 4 board — overdue reads orange, not red", () => {
-  it("overdue maps to the maintenance (orange) token in all three maps", () => {
-    // STATUS_COLOR / STATUS_BG / STATUS_BAR_COLOR overdue rows carry maintenance/maint.
-    // (statusLabel's `overdue: t.board.overdue` map line has no class token — excluded.)
-    const overdueLines = src
+  it("overdue maps to the maintenance (orange) token in the class-token maps", () => {
+    // STATUS_BG / STATUS_BAR_COLOR overdue rows carry maintenance/maint. (The dead
+    // STATUS_COLOR map was removed; statusLabel's `overdue: t.board.overdue` line
+    // has no class token — excluded.)
+    const overdueLines = tokensSrc
       .split(/\r?\n/)
       .filter((l) => /overdue:/.test(l) && /var\(--status/.test(l));
-    expect(overdueLines.length).toBeGreaterThanOrEqual(3);
+    expect(overdueLines.length).toBeGreaterThanOrEqual(2);
     for (const line of overdueLines) {
       expect(/maintenance|maint-/.test(line)).toBe(true);
       expect(/status-issue/.test(line)).toBe(false);
@@ -57,15 +69,15 @@ describe("Stage 4 board — overdue reads orange, not red", () => {
 
 describe("Stage 4 board — additive skeleton + footer", () => {
   it("renders a board skeleton while the snapshot loads", () => {
-    expect(src.includes('data-testid="board-skeleton"')).toBe(true);
-    expect(src.includes("motion-safe:animate-pulse")).toBe(true);
+    expect(screenSrc.includes('data-testid="board-skeleton"')).toBe(true);
+    expect(screenSrc.includes("motion-safe:animate-pulse")).toBe(true);
   });
   it("keeps the accessible loading label", () => {
-    expect(src.includes("t.board.loading")).toBe(true);
+    expect(screenSrc.includes("t.board.loading")).toBe(true);
   });
   it("renders a footer status strip reusing board.updated + board.live", () => {
-    expect(/<footer/.test(src)).toBe(true);
-    expect(src.includes("t.board.updated")).toBe(true);
-    expect(src.includes("t.board.live")).toBe(true);
+    expect(/<footer/.test(boardSrc)).toBe(true);
+    expect(boardSrc.includes("t.board.updated")).toBe(true);
+    expect(boardSrc.includes("t.board.live")).toBe(true);
   });
 });

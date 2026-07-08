@@ -9,8 +9,11 @@ import { describe, it, expect } from "vitest";
 import fs from "fs";
 
 describe("P2-7: Ward display Code Blue overlay (current architecture)", () => {
-  it("display.tsx renders CodeBlueOverlay when codeBlueSession is present", () => {
-    const source = fs.readFileSync("src/pages/display.tsx", "utf8");
+  it("CommandBoardScreen renders CodeBlueOverlay when codeBlueSession is present", () => {
+    // Phase 4 C1: the board UI + Phase-9 data path moved out of display.tsx into
+    // the command-board module; the codeBlueSession→CodeBlueOverlay dispatch now
+    // lives in CommandBoardScreen.
+    const source = fs.readFileSync("src/features/command-board/CommandBoardScreen.tsx", "utf8");
     expect(source).toContain("CodeBlueOverlay");
     expect(source).toMatch(/snapshot\.codeBlueSession[\s\S]{0,80}CodeBlueOverlay/);
   });
@@ -21,10 +24,10 @@ describe("P2-7: Ward display Code Blue overlay (current architecture)", () => {
   });
 
   it("CodeBlueOverlay timer uses session.startedAt from server", () => {
-    const source = fs.readFileSync("src/pages/display.tsx", "utf8");
-    const overlayBlock = source.slice(
-      source.indexOf("function CodeBlueOverlay"),
-      source.indexOf("export default function WardDisplayPage"),
+    // CodeBlueOverlay is now its own presentational file; read it directly.
+    const overlayBlock = fs.readFileSync(
+      "src/features/command-board/components/CodeBlueOverlay.tsx",
+      "utf8",
     );
     expect(overlayBlock).toContain("session.startedAt");
     expect(overlayBlock).not.toMatch(/Date\.now\(\)\s*-\s*Date\.now/);
