@@ -11,7 +11,7 @@ import type { EquipmentCommandBoardSnapshot } from "@/types/safety-surfaces";
 import type { EquipmentBoardUnitRow, EquipmentReadinessStatus } from "../../../../shared/equipment-board";
 import { STATUS_BG, STATUS_BAR_COLOR, statusLabel } from "../status-tokens";
 import { useKioskModeFromUrl } from "../use-kiosk-mode-from-url";
-import { useBoardMode } from "../use-board-mode";
+import { countCriticalAlerts, useBoardMode } from "../use-board-mode";
 import { DocksPanel, PowerPanel, StagingPanel, WaitlistPanel } from "./board-panels";
 
 /** The six readiness buckets that make up a stacked readiness bar. */
@@ -407,7 +407,7 @@ export function CommandBoard({
                 {board.alerts.length} {t.board.attention}
               </div>
               <div className="vt-text-2xs text-ivory-text3 mt-0.5">
-                {board.alerts.filter((a) => a.severity === "critical").length} {t.board.critical}
+                {countCriticalAlerts(board)} {t.board.critical}
               </div>
             </div>
           )}

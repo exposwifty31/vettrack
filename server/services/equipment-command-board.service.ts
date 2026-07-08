@@ -86,7 +86,11 @@ export function aggregateByLocation(
 export async function safeBlock<T>(query: () => Promise<T>): Promise<T | undefined> {
   try {
     return await query();
-  } catch {
+  } catch (err) {
+    // Degrade gracefully but NOT silently — the caught error's stack names the
+    // failing queryX, so a persistently-broken aggregate is observable in the
+    // logs instead of surfacing only as an invisibly missing panel.
+    console.warn("[command-board] enrichment aggregate failed; degrading block to undefined", err);
     return undefined;
   }
 }
@@ -110,6 +114,9 @@ async function queryPower(clinicId: string): Promise<EquipmentBoardPowerBlock> {
       ORDER BY equipment_id, returned_at DESC
     ) latest
   `);
+  // db.execute() returns a generic Drizzle QueryResult whose row shape is not
+  // inferable from a raw sql`` string, so the `rows` shape is asserted here on
+  // purpose (fields coerced individually with Number() below). Intentional cast.
   const row = (result as unknown as { rows?: Array<Record<string, unknown>> }).rows?.[0];
   return {
     plugged: Number(row?.plugged ?? 0),

@@ -10,6 +10,15 @@ export const PRESSURE_ALERT_THRESHOLD = 3;
 export const PRESSURE_EXIT_HOLD_MS = 30_000;
 
 /**
+ * Single source of truth for "how many critical alerts are on the board" — used
+ * both by the pressure-threshold decision here and by the calm-mode alert count in
+ * CommandBoard, so the two never drift on what counts as critical.
+ */
+export function countCriticalAlerts(board: EquipmentCommandBoardSnapshot): number {
+  return board.alerts.filter((a) => a.severity === "critical").length;
+}
+
+/**
  * Derives the board's display mode from the ALREADY-polled snapshot (props) — no
  * new poller, no SSE, nothing persisted. Pressure when an emergency is active OR
  * critical alerts reach the threshold.
@@ -21,7 +30,7 @@ export const PRESSURE_EXIT_HOLD_MS = 30_000;
  * handled server-side by CommandBoardScreen's overlay early return, above this.
  */
 export function useBoardMode(board: EquipmentCommandBoardSnapshot): BoardMode {
-  const criticalAlerts = board.alerts.filter((a) => a.severity === "critical").length;
+  const criticalAlerts = countCriticalAlerts(board);
   const rawPressure = board.activeEmergency != null || criticalAlerts >= PRESSURE_ALERT_THRESHOLD;
 
   const [mode, setMode] = useState<BoardMode>(rawPressure ? "pressure" : "calm");

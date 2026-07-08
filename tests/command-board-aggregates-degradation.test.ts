@@ -7,12 +7,17 @@
  * legacy list because a cosmetic aggregate failed. SQL correctness + clinicId
  * scoping of the four aggregates is covered by the DB-integration suite.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   safeBlock,
   defaultBoardAggregates,
 } from "../server/services/equipment-command-board.service.js";
 import { withTimeout } from "../server/lib/with-timeout.js";
+
+// safeBlock now logs the caught error before degrading; silence the expected
+// warnings from the failure/slowness cases so the suite output stays clean.
+beforeEach(() => vi.spyOn(console, "warn").mockImplementation(() => {}));
+afterEach(() => vi.restoreAllMocks());
 
 describe("safeBlock — enrichment degradation primitive", () => {
   it("resolves the query value on success", async () => {
