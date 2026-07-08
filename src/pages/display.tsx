@@ -4,22 +4,15 @@
 // This wrapper owns ONLY the /equipment/board entry point: the ?kiosk=1 URL
 // contract and the host-owned kiosk wake-lock. It deliberately imports none of
 // the realtime transport — CommandBoardScreen is its single owner.
-import { useMemo } from "react";
 import { useKioskWakeLock } from "@/hooks/useKioskWakeLock";
 import CommandBoardScreen from "@/features/command-board";
+import { useKioskModeFromUrl } from "@/features/command-board/use-kiosk-mode-from-url";
 
 export default function WardDisplayPage() {
   // Phase 9 PR 9.2 — `?kiosk=1` opts this Department Display into TV-grade
   // behavior: screen wake-lock with bounded reacquire discipline. Non-kiosk
   // views of /equipment/board (e.g. an operator's tab) do not request it.
-  const kioskMode = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return new URL(window.location.href).searchParams.get("kiosk") === "1";
-    } catch {
-      return false;
-    }
-  }, []);
+  const kioskMode = useKioskModeFromUrl();
 
   useKioskWakeLock(kioskMode);
 

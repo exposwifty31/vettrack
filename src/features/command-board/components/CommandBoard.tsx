@@ -3,7 +3,6 @@
 // behavioral change is an additive optional `kioskMode` prop: when provided
 // (the /board route) it wins over the internal ?kiosk=1 URL read; when omitted
 // (/equipment/board) the URL read is byte-identical to the pre-move behavior.
-import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { X } from "lucide-react";
 import { t } from "@/lib/i18n";
@@ -11,6 +10,31 @@ import { cn } from "@/lib/utils";
 import type { EquipmentCommandBoardSnapshot } from "@/types/safety-surfaces";
 import type { EquipmentBoardUnitRow, EquipmentReadinessStatus } from "../../../../shared/equipment-board";
 import { STATUS_BG, STATUS_BAR_COLOR, statusLabel } from "../status-tokens";
+import { useKioskModeFromUrl } from "../use-kiosk-mode-from-url";
+
+/** The six readiness buckets that make up a stacked readiness bar. */
+type ReadinessCounts = {
+  ready: number;
+  inUse: number;
+  stale: number;
+  blocked: number;
+  overdue: number;
+  unknown: number;
+};
+
+/** Non-empty readiness segments in fixed display order — shared by ReadinessMix + TypeRow. */
+function buildSegments(counts: ReadinessCounts): Array<{ key: EquipmentReadinessStatus; count: number }> {
+  return (
+    [
+      { key: "ready"   as const, count: counts.ready   },
+      { key: "in_use"  as const, count: counts.inUse   },
+      { key: "stale"   as const, count: counts.stale   },
+      { key: "blocked" as const, count: counts.blocked },
+      { key: "overdue" as const, count: counts.overdue },
+      { key: "unknown" as const, count: counts.unknown },
+    ] as Array<{ key: EquipmentReadinessStatus; count: number }>
+  ).filter((s) => s.count > 0);
+}
 
 // ── ADRing ──────────────────────────────────────────────────────────────────
 
@@ -24,7 +48,7 @@ function ADRing({ pct, ready, total }: { pct: number; ready: number; total: numb
   return (
     <div className="flex flex-col items-center gap-2">
       <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="-rotate-90">
+        <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
           {/* Track */}
           <circle
             cx={size / 2} cy={size / 2} r={r}
@@ -67,16 +91,7 @@ function ADRing({ pct, ready, total }: { pct: number; ready: number; total: numb
 
 function ReadinessMix({ overview }: { overview: EquipmentCommandBoardSnapshot["overview"] }) {
   const total = overview.totalCritical || 1;
-  const segments: Array<{ key: EquipmentReadinessStatus; count: number }> = (
-    [
-      { key: "ready"   as const, count: overview.ready   },
-      { key: "in_use"  as const, count: overview.inUse   },
-      { key: "stale"   as const, count: overview.stale   },
-      { key: "blocked" as const, count: overview.blocked },
-      { key: "overdue" as const, count: overview.overdue },
-      { key: "unknown" as const, count: overview.unknown },
-    ] as Array<{ key: EquipmentReadinessStatus; count: number }>
-  ).filter((s) => s.count > 0);
+  const segments = buildSegments(overview);
 
   return (
     <div className="flex-1 min-w-0">
@@ -111,16 +126,7 @@ function ReadinessMix({ overview }: { overview: EquipmentCommandBoardSnapshot["o
 
 function TypeRow({ row }: { row: EquipmentCommandBoardSnapshot["byType"][number] }) {
   const total = row.total || 1;
-  const segments: Array<{ key: EquipmentReadinessStatus; count: number }> = (
-    [
-      { key: "ready"   as const, count: row.ready   },
-      { key: "in_use"  as const, count: row.inUse   },
-      { key: "stale"   as const, count: row.stale   },
-      { key: "blocked" as const, count: row.blocked },
-      { key: "overdue" as const, count: row.overdue },
-      { key: "unknown" as const, count: row.unknown },
-    ] as Array<{ key: EquipmentReadinessStatus; count: number }>
-  ).filter((s) => s.count > 0);
+  const segments = buildSegments(row);
 
   const belowMin = row.belowMinimumReady && row.minimumReady != null;
 
@@ -145,8 +151,8 @@ function TypeRow({ row }: { row: EquipmentCommandBoardSnapshot["byType"][number]
             style={{ width: `${(count / total) * 100}%` }}
           />
         ))}
-        {/* Empty track */}
-        {total === 0 && <div className="flex-1 bg-muted" />}
+        {/* Empty track — driven by the raw count (total is normalized to ≥1 above). */}
+        {row.total === 0 && <div className="flex-1 bg-muted" />}
       </div>
     </div>
   );
@@ -236,14 +242,7 @@ export function CommandBoard({
   const [, navigate] = useLocation();
   // Same ?kiosk=1 contract as WardDisplayPage — wall displays get no exit button.
   // The /board route passes kioskMode explicitly; it wins over the URL read.
-  const kioskModeFromUrl = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return new URL(window.location.href).searchParams.get("kiosk") === "1";
-    } catch {
-      return false;
-    }
-  }, []);
+  const kioskModeFromUrl = useKioskModeFromUrl();
   const kioskMode = kioskModeProp ?? kioskModeFromUrl;
   const now = new Date(currentTime);
   const timeStr = now.toLocaleTimeString("he-IL", {

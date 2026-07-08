@@ -52,13 +52,14 @@ describe("Stage 4 board — no hardcoded palette (incl. Code Blue overlay)", () 
 });
 
 describe("Stage 4 board — overdue reads orange, not red", () => {
-  it("overdue maps to the maintenance (orange) token in all three maps", () => {
-    // STATUS_COLOR / STATUS_BG / STATUS_BAR_COLOR overdue rows carry maintenance/maint.
-    // (statusLabel's `overdue: t.board.overdue` map line has no class token — excluded.)
+  it("overdue maps to the maintenance (orange) token in the class-token maps", () => {
+    // STATUS_BG / STATUS_BAR_COLOR overdue rows carry maintenance/maint. (The dead
+    // STATUS_COLOR map was removed; statusLabel's `overdue: t.board.overdue` line
+    // has no class token — excluded.)
     const overdueLines = tokensSrc
       .split(/\r?\n/)
       .filter((l) => /overdue:/.test(l) && /var\(--status/.test(l));
-    expect(overdueLines.length).toBeGreaterThanOrEqual(3);
+    expect(overdueLines.length).toBeGreaterThanOrEqual(2);
     for (const line of overdueLines) {
       expect(/maintenance|maint-/.test(line)).toBe(true);
       expect(/status-issue/.test(line)).toBe(false);

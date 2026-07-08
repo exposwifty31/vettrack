@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { STATUS_BG } from "./status-tokens";
 import { CommandBoard } from "./components/CommandBoard";
 import { CodeBlueOverlay } from "./components/CodeBlueOverlay";
+import { useKioskModeFromUrl } from "./use-kiosk-mode-from-url";
 
 interface CommandBoardScreenProps {
   kioskMode?: boolean;
@@ -44,14 +45,7 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
   // /equipment/board wrapper leaves it undefined and this URL read applies.
   // Wake-lock is now host-owned (display.tsx wrapper / BoardShell), so kioskMode
   // here only feeds the operational heartbeat + the board's exit-button guard.
-  const kioskModeFromUrl = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return new URL(window.location.href).searchParams.get("kiosk") === "1";
-    } catch {
-      return false;
-    }
-  }, []);
+  const kioskModeFromUrl = useKioskModeFromUrl();
   const kioskMode = kioskModeProp ?? kioskModeFromUrl;
 
   // Phase 9 PR 9.3 — visibility / pageshow / online / resume reconciliation.

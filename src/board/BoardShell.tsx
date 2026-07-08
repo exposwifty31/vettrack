@@ -38,7 +38,11 @@ export function BoardShell({ children }: Props) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     function enterFullscreen(): void {
-      document.documentElement.requestFullscreen?.().catch(() => {});
+      document.documentElement.requestFullscreen?.().catch((err) => {
+        // Benign on a kiosk (browser policy / unsupported) — the display stays
+        // windowed, but don't swallow it silently.
+        console.warn("[board] fullscreen request rejected; continuing windowed", err);
+      });
       window.removeEventListener("pointerdown", enterFullscreen);
       window.removeEventListener("keydown", enterFullscreen);
     }

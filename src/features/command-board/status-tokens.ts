@@ -4,17 +4,6 @@
 import { t } from "@/lib/i18n";
 import type { EquipmentReadinessStatus } from "../../../shared/equipment-board";
 
-// STATUS_COLOR is currently unreferenced (kept verbatim, not exported, to keep
-// the extraction a clean move — flag for a later knip sweep, not this commit).
-const STATUS_COLOR: Record<EquipmentReadinessStatus, string> = {
-  ready:    "text-[hsl(var(--status-ok))]",
-  in_use:   "text-[hsl(var(--status-sterilized))]",
-  blocked:  "text-[hsl(var(--status-issue))]",
-  stale:    "text-[hsl(var(--status-maintenance))]",
-  overdue:  "text-[hsl(var(--status-maintenance))]",
-  unknown:  "text-ivory-text3",
-};
-
 export const STATUS_BG: Record<EquipmentReadinessStatus, string> = {
   ready:   "bg-[var(--status-ok-bg)]   border-[var(--status-ok-border)]   text-[var(--status-ok-fg)]",
   in_use:  "bg-[var(--status-steril-bg)] border-[var(--status-steril-border)] text-[var(--status-steril-fg)]",
