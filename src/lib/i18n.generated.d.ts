@@ -3287,6 +3287,11 @@ export interface TStructure {
     opsHealth: {
       title: string;
       subtitle: string;
+      healthTitle: string;
+      outboxSize: string;
+      publishLag: string;
+      deadLettered: string;
+      dlqPermanent: string;
     };
     colName: string;
     colEmail: string;

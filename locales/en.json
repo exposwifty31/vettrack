@@ -3283,7 +3283,12 @@
     },
     "opsHealth": {
       "title": "Ops Health",
-      "subtitle": "Outbox, DLQ, queues, and integration health — observe only"
+      "subtitle": "Outbox, DLQ, queues, and integration health — observe only",
+      "healthTitle": "Realtime outbox health",
+      "outboxSize": "Outbox backlog",
+      "publishLag": "Publish lag (ms)",
+      "deadLettered": "Dead-lettered",
+      "dlqPermanent": "Permanent (DLQ)"
     },
     "colName": "Name",
     "colEmail": "Email",
