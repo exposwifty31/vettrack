@@ -3331,6 +3331,14 @@
       "saveFailed": "Could not update readiness policy",
       "usingDefaults": "Using defaults",
       "lastUpdated": "Updated"
+    },
+    "audit": {
+      "title": "Audit Log",
+      "subtitle": "Logged critical actions for this clinic",
+      "colTimestamp": "Time",
+      "colAction": "Action",
+      "colActor": "Actor",
+      "colTarget": "Target"
     }
   },
   "nav": {

@@ -3335,6 +3335,14 @@ export interface TStructure {
       usingDefaults: string;
       lastUpdated: string;
     };
+    audit: {
+      title: string;
+      subtitle: string;
+      colTimestamp: string;
+      colAction: string;
+      colActor: string;
+      colTarget: string;
+    };
   };
   nav: {
     integrations: string;
