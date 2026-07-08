@@ -1,3 +1,10 @@
+/**
+ * Shift-chat auth / role-gate smoke tests.
+ * Run with: npx tsx server/tests/shift-chat.test.ts  (or `pnpm test:server:smoke`)
+ * Requires: the dev server running on http://localhost:3001.
+ * NOT part of `pnpm test` (vitest) — this is a live-server script; see the
+ * test:server:smoke npm script and the sibling server/tests/security.test.ts.
+ */
 const BASE = "http://localhost:3001";
 let passed = 0;
 let failed = 0;

@@ -48,6 +48,7 @@
     "knip:production": "knip --production",
     "test:integration:ops": "vitest run --config vitest.integration.ops.config.ts",
     "test:db-integration": "vitest run --config vitest.db-integration.config.ts",
+    "test:server:smoke": "tsx server/tests/security.test.ts && tsx server/tests/shift-chat.test.ts",
     "test:playwright:waitlist": "cross-env PW_SUITE=waitlist playwright test --config=playwright.config.ts --project=chromium",
     "test:playwright": "pnpm test:playwright:ci",
     "test:playwright:ci": "cross-env PW_SUITE=ci playwright test --config=playwright.config.ts --project=chromium",

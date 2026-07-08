@@ -8,7 +8,7 @@
     "src/lib/tokens.ts",
     "drizzle.config.ts",
     "server/seed.ts",
-    "server/tests/validate.ts",
+    "server/tests/**",
     "scripts/**",
     "tests/ui-smoke-*.ts",
     "server/integrations/adapters/priza.ts"
