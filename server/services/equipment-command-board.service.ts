@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db, equipment, rooms } from "../db.js";
 import type {
   EquipmentBoardAlert,
+  EquipmentBoardLocationRow,
   EquipmentBoardTypeRow,
   EquipmentBoardUnitRow,
   EquipmentCommandBoardSnapshot,
@@ -31,6 +32,46 @@ function deriveReadinessStatus(row: {
   return "ready";
 }
 
+/**
+ * Aggregates critical units by room for the board's by-location breakdown.
+ * Pure transform of the already-fetched rows — NO additional query. Keyed by
+ * roomId (room names are not unique), so distinct rooms sharing a name stay
+ * separate; room-less units bucket under "__unassigned__" with an empty
+ * locationName the client localizes. Critical units only, matching overview /
+ * byType and the totalCritical field.
+ */
+export function aggregateByLocation(
+  rows: Array<{ id: string; roomId: string | null; roomName: string | null }>,
+  criticalUnits: EquipmentBoardUnitRow[],
+): EquipmentBoardLocationRow[] {
+  const rowById = new Map(rows.map((r) => [r.id, r]));
+  const byLocationMap = new Map<string, EquipmentBoardLocationRow>();
+  for (const unit of criticalUnits) {
+    const row = rowById.get(unit.equipmentId);
+    const locKey = row?.roomId ?? "__unassigned__";
+    const loc = byLocationMap.get(locKey) ?? {
+      locationId: row?.roomId ?? undefined,
+      locationName: row?.roomName ?? "",
+      totalCritical: 0,
+      ready: 0,
+      inUse: 0,
+      blocked: 0,
+      stale: 0,
+      overdue: 0,
+      unknown: 0,
+    };
+    loc.totalCritical += 1;
+    if (unit.status === "ready") loc.ready += 1;
+    else if (unit.status === "in_use") loc.inUse += 1;
+    else if (unit.status === "blocked") loc.blocked += 1;
+    else if (unit.status === "stale") loc.stale += 1;
+    else if (unit.status === "overdue") loc.overdue += 1;
+    else loc.unknown += 1;
+    byLocationMap.set(locKey, loc);
+  }
+  return [...byLocationMap.values()];
+}
+
 /** Builds equipment command board snapshot (critical rows, overview, alerts, utilization signals). */
 export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (params) => {
   const { clinicId } = params;
@@ -50,6 +91,7 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (par
       usageState: equipment.usageState,
       lastSeen: equipment.lastSeen,
       roomName: rooms.name,
+      roomId: equipment.roomId,
     })
     .from(equipment)
     .leftJoin(rooms, and(eq(equipment.roomId, rooms.id), eq(rooms.clinicId, clinicId)))
@@ -160,7 +202,7 @@ export const buildCommandBoardSnapshot: BuildCommandBoardSnapshotFn = async (par
     clinicId,
     overview,
     byType: [...byTypeMap.values()],
-    byLocation: [],
+    byLocation: aggregateByLocation(rows, criticalUnits),
     criticalUnits,
     alerts,
     roiSignals: {
