@@ -94,6 +94,22 @@ describe("CommandBoard enrichment panels — tolerant reader", () => {
     expect(getAllByText(t.board.inQueue).length).toBeGreaterThanOrEqual(2); // waitlist + staging
   });
 
+  it("renders the pressure layout when critical alerts reach the threshold", () => {
+    const alerts = Array.from({ length: 3 }, (_, i) => ({
+      id: `a${i}`,
+      type: "critical_unit_blocked" as const,
+      severity: "critical" as const,
+      message: "x",
+    }));
+    const { getByText } = renderBoard(board({ alerts }));
+    expect(getByText(t.board.highLoad)).toBeTruthy();
+  });
+
+  it("stays in the calm layout below the threshold (no pressure banner)", () => {
+    const { queryByText } = renderBoard(board({ alerts: [] }));
+    expect(queryByText(t.board.highLoad)).toBeNull();
+  });
+
   it("labels a room-less byLocation bucket with the unassigned key", () => {
     const { getByText } = renderBoard(
       board({

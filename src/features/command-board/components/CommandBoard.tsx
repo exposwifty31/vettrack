@@ -11,6 +11,7 @@ import type { EquipmentCommandBoardSnapshot } from "@/types/safety-surfaces";
 import type { EquipmentBoardUnitRow, EquipmentReadinessStatus } from "../../../../shared/equipment-board";
 import { STATUS_BG, STATUS_BAR_COLOR, statusLabel } from "../status-tokens";
 import { useKioskModeFromUrl } from "../use-kiosk-mode-from-url";
+import { useBoardMode } from "../use-board-mode";
 import { DocksPanel, PowerPanel, StagingPanel, WaitlistPanel } from "./board-panels";
 
 /** The six readiness buckets that make up a stacked readiness bar. */
@@ -227,6 +228,79 @@ function UnitRow({ unit }: { unit: EquipmentBoardUnitRow }) {
   );
 }
 
+// ── PressureMain ─────────────────────────────────────────────────────────────
+
+function TickerStat({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="flex items-center gap-1.5 shrink-0">
+      <span className="text-ivory-text3">{label}</span>
+      <span className="font-bold tabular-nums text-ivory-text">{value}</span>
+    </span>
+  );
+}
+
+/**
+ * Pressure-mode body (critical-alert surge, no server Code Blue): the
+ * needs-attention block goes full-bleed and the calm panels demote to a
+ * single-line ticker. Layout emphasis only — a real Code Blue is handled above
+ * this by CommandBoardScreen's server-driven overlay.
+ */
+function PressureMain({
+  board,
+  needAttention,
+}: {
+  board: EquipmentCommandBoardSnapshot;
+  needAttention: EquipmentBoardUnitRow[];
+}) {
+  const linked = board.activeEmergency?.linkedEquipment ?? [];
+  return (
+    <main id="main-content" className="flex-1 overflow-hidden p-4 flex flex-col gap-3" dir="rtl">
+      <section className="flex-1 overflow-auto rounded-xl border border-[var(--status-issue-border)] bg-[var(--status-issue-bg)] p-6 flex flex-col gap-4">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="w-3 h-3 rounded-full bg-[hsl(var(--status-issue))] motion-safe:animate-pulse" aria-hidden />
+          <span className="vt-text-2xl font-black uppercase tracking-widest text-[var(--status-issue-fg)]">
+            {t.board.highLoad}
+          </span>
+          <span className="vt-text-sm text-ivory-text2 ms-auto">
+            {needAttention.length} {t.board.attention}
+          </span>
+        </div>
+        {linked.length > 0 ? (
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+            {linked.map((eq) => (
+              <div
+                key={eq.equipmentId}
+                className="rounded-lg border border-[var(--status-issue-border)] bg-[rgb(var(--ivory-surface))] px-3 py-2"
+              >
+                <div className="vt-text-sm font-bold text-ivory-text truncate">{eq.displayName}</div>
+                {eq.locationName && <div className="vt-text-xs text-ivory-text3">{eq.locationName}</div>}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+            {needAttention.map((u) => (
+              <UnitRow key={u.equipmentId} unit={u} />
+            ))}
+          </div>
+        )}
+      </section>
+      <div className="shrink-0 flex items-center gap-4 overflow-x-auto rounded-xl border border-ivory-border bg-[rgb(var(--ivory-surface))] px-4 py-2 vt-text-xs">
+        <TickerStat
+          label={t.board.deployableNow}
+          value={`${board.overview.ready}/${board.overview.totalCritical}`}
+        />
+        {board.power && <TickerStat label={t.board.powerAlert} value={String(board.power.alert)} />}
+        {board.docks && (
+          <TickerStat label={t.board.docks} value={`${board.docks.occupied}/${board.docks.total}`} />
+        )}
+        {board.waitlist && <TickerStat label={t.board.waitlist} value={String(board.waitlist.depth)} />}
+        {board.staging && <TickerStat label={t.board.staging} value={String(board.staging.depth)} />}
+      </div>
+    </main>
+  );
+}
+
 // ── CommandBoard ─────────────────────────────────────────────────────────────
 
 export function CommandBoard({
@@ -245,6 +319,7 @@ export function CommandBoard({
   // The /board route passes kioskMode explicitly; it wins over the URL read.
   const kioskModeFromUrl = useKioskModeFromUrl();
   const kioskMode = kioskModeProp ?? kioskModeFromUrl;
+  const mode = useBoardMode(board);
   const now = new Date(currentTime);
   const timeStr = now.toLocaleTimeString("he-IL", {
     hour: "2-digit",
@@ -312,6 +387,8 @@ export function CommandBoard({
       </header>
 
       {/* Body */}
+      {mode === "pressure" && <PressureMain board={board} needAttention={needAttention} />}
+      {mode === "calm" && (
       <main id="main-content" className="flex-1 overflow-auto p-4 grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-4">
 
         {/* Left: ADRing + ReadinessMix */}
@@ -396,6 +473,7 @@ export function CommandBoard({
           )}
         </div>
       </main>
+      )}
 
       {/* Footer — quiet status strip: last refresh + live indicator */}
       <footer className="shrink-0 flex items-center gap-3 border-t border-ivory-border bg-[rgb(var(--ivory-surface))] px-5 py-2">
