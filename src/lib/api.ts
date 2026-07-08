@@ -765,6 +765,27 @@ export const api = {
         requestId: string;
       }>("/api/containers/reconcile-unused-charge", { method: "POST", body: JSON.stringify(body) }),
   },
+  rfidReaders: {
+    list: () =>
+      request<{
+        clinicId: string;
+        readers: import("@/types").RfidReaderRow[];
+        requestId: string;
+      }>("/api/admin/rfid-readers"),
+  },
+  equipmentGovernance: {
+    getReadinessRules: () =>
+      request<{
+        clinicId: string;
+        rules: import("@/types").EquipmentReadinessRulesV1;
+        updatedAt: string | null;
+      }>("/api/admin/equipment/readiness-rules"),
+    updateReadinessRules: (body: { staleEvidenceMs: number }) =>
+      request<{ clinicId: string; rules: import("@/types").EquipmentReadinessRulesV1 }>(
+        "/api/admin/equipment/readiness-rules",
+        { method: "PATCH", body: JSON.stringify(body) },
+      ),
+  },
   adminOutboxHealth: {
     get: () =>
       request<{

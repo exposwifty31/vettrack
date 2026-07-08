@@ -3305,7 +3305,33 @@
     "colConfigured": "מוגדר",
     "colCredentials": "אישורים נדרשים",
     "valYes": "כן",
-    "valNo": "לא"
+    "valNo": "לא",
+    "colGateway": "שער",
+    "colRoom": "חדר",
+    "colLastSeen": "נראה לאחרונה",
+    "colObserved": "ציוד שזוהה",
+    "readerOnline": "מקוון",
+    "readerStale": "לא עדכני",
+    "readerNoSignal": "אין אות",
+    "readerUnassigned": "לא משויך",
+    "governance": {
+      "title": "ממשל ציוד",
+      "subtitle": "מדיניות מוכנות למרפאה זו",
+      "staleEvidenceLabel": "חלון ראיות מיושנות",
+      "staleEvidenceHelp": "ראיות ציוד ישנות מהחלון ייחשבו כלא עדכניות.",
+      "hoursLabel": "שעות",
+      "minimumReadyTitle": "מינימום מוכן לפי סוג",
+      "minimumReadyEmpty": "לא הוגדרו מינימומים לפי סוג.",
+      "colType": "סוג ציוד",
+      "colMinimum": "מינימום מוכן",
+      "editTitle": "עריכת מדיניות מוכנות",
+      "edit": "עריכה",
+      "save": "שמירה",
+      "saved": "מדיניות המוכנות עודכנה",
+      "saveFailed": "לא ניתן לעדכן את מדיניות המוכנות",
+      "usingDefaults": "משתמש בברירת מחדל",
+      "lastUpdated": "עודכן"
+    }
   },
   "nav": {
     "integrations": "אינטגרציות",
@@ -3362,7 +3388,8 @@
     "reportBug": "דווח על בעיה",
     "profile": "הפרופיל שלי",
     "people": "צוות ותפקידים",
-    "managementHome": "מרכז ניהול"
+    "managementHome": "מרכז ניהול",
+    "governance": "ממשל ציוד"
   },
   "phoneSignIn": {
     "title": "התחברות עם טלפון",

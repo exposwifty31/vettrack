@@ -89,6 +89,15 @@ export const WEB_MANAGEMENT_NAV: WebManagementNavNode[] = [
     reach: "management.web",
     writeCap: "management.webWrite",
   },
+  {
+    id: "mgmt-governance",
+    labelKey: "nav.governance",
+    href: "/admin/governance",
+    icon: "ShieldCheck",
+    group: "administration",
+    reach: "management.web",
+    writeCap: "management.webWrite",
+  },
 ];
 
 /** Flattened href list (active-state + dead-link tests; mirrors NAV_HREFS). */

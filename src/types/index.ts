@@ -7,3 +7,5 @@ export * from "./safety-surfaces.js";
 export * from "./cursor-bug-fixer.js";
 export * from "./shift-adjustments.js";
 export * from "./integrations.js";
+export * from "./rfid-readers.js";
+export * from "./equipment-readiness.js";

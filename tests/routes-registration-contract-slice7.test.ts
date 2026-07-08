@@ -42,6 +42,8 @@ const EXPECTED_MOUNT_PATHS = [
   "/api/admin",
   "/api/admin",
   "/api/admin",
+  "/api/admin", // adminRfidReadersRoutes (7c)
+  "/api/admin", // adminEquipmentGovernanceRoutes (7c)
   "/api/admin/cursor-bug-fixer",
   "/api/stability",
   "/api/platform",

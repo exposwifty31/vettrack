@@ -3309,6 +3309,32 @@ export interface TStructure {
     colCredentials: string;
     valYes: string;
     valNo: string;
+    colGateway: string;
+    colRoom: string;
+    colLastSeen: string;
+    colObserved: string;
+    readerOnline: string;
+    readerStale: string;
+    readerNoSignal: string;
+    readerUnassigned: string;
+    governance: {
+      title: string;
+      subtitle: string;
+      staleEvidenceLabel: string;
+      staleEvidenceHelp: string;
+      hoursLabel: string;
+      minimumReadyTitle: string;
+      minimumReadyEmpty: string;
+      colType: string;
+      colMinimum: string;
+      editTitle: string;
+      edit: string;
+      save: string;
+      saved: string;
+      saveFailed: string;
+      usingDefaults: string;
+      lastUpdated: string;
+    };
   };
   nav: {
     integrations: string;
@@ -3366,6 +3392,7 @@ export interface TStructure {
     profile: string;
     people: string;
     managementHome: string;
+    governance: string;
   };
   phoneSignIn: {
     title: string;
