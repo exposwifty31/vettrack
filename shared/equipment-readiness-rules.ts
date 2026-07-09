@@ -11,6 +11,15 @@ export const DEFAULT_EQUIPMENT_READINESS_RULES_V1: EquipmentReadinessRulesV1 = {
   minimumReadyByType: {},
 };
 
+/** Governance edit bounds for `staleEvidenceMs` (1 minute … 90 days). Shared so
+ *  the server validator and the console input agree on the accepted range. */
+export const MIN_STALE_EVIDENCE_MS = 60_000;
+export const MAX_STALE_EVIDENCE_MS = 90 * 86_400_000;
+
+export function isValidStaleEvidenceMs(n: number): boolean {
+  return Number.isInteger(n) && n >= MIN_STALE_EVIDENCE_MS && n <= MAX_STALE_EVIDENCE_MS;
+}
+
 export function parseEquipmentReadinessRulesV1(raw: string | null): EquipmentReadinessRulesV1 {
   if (!raw?.trim()) return DEFAULT_EQUIPMENT_READINESS_RULES_V1;
   try {

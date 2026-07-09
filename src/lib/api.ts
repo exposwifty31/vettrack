@@ -765,6 +765,41 @@ export const api = {
         requestId: string;
       }>("/api/containers/reconcile-unused-charge", { method: "POST", body: JSON.stringify(body) }),
   },
+  rfidReaders: {
+    list: () =>
+      request<{
+        clinicId: string;
+        readers: import("@/types").RfidReaderRow[];
+        requestId: string;
+      }>("/api/admin/rfid-readers"),
+  },
+  webhooks: {
+    list: () =>
+      request<{
+        clinicId: string;
+        events: import("@/types").WebhookEventRow[];
+      }>("/api/admin/webhooks"),
+  },
+  notifications: {
+    list: () =>
+      request<{
+        clinicId: string;
+        deliveries: import("@/types").NotificationDeliveryRow[];
+      }>("/api/admin/notifications"),
+  },
+  equipmentGovernance: {
+    getReadinessRules: () =>
+      request<{
+        clinicId: string;
+        rules: import("@/types").EquipmentReadinessRulesV1;
+        updatedAt: string | null;
+      }>("/api/admin/equipment/readiness-rules"),
+    updateReadinessRules: (body: { staleEvidenceMs: number }) =>
+      request<{ clinicId: string; rules: import("@/types").EquipmentReadinessRulesV1 }>(
+        "/api/admin/equipment/readiness-rules",
+        { method: "PATCH", body: JSON.stringify(body) },
+      ),
+  },
   adminOutboxHealth: {
     get: () =>
       request<{
@@ -855,6 +890,8 @@ export const api = {
       }>("/api/queue/metrics"),
   },
   restock: {
+    sessions: () =>
+      request<{ sessions: import("@/types").RestockSessionRow[] }>("/api/restock/sessions"),
     start: (containerId: string) =>
       request<RestockSession>("/api/restock/start", {
         method: "POST",
@@ -892,6 +929,8 @@ export const api = {
   },
   inventoryItems: {
     list: () => request<InventoryItem[]>("/api/inventory-items"),
+    lowStock: () =>
+      request<{ items: import("@/types").LowStockRow[] }>("/api/inventory-items/low-stock"),
     detail: (id: string) => request<InventoryItemDetail>(`/api/inventory-items/${id}/detail`),
     create: (data: { code: string; label: string; category?: string; nfcTagId?: string | null; parLevel?: number | null; reorderPoint?: number | null }) =>
       request<InventoryItem>("/api/inventory-items", { method: "POST", body: JSON.stringify(data) }),

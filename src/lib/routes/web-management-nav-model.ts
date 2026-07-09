@@ -30,6 +30,14 @@ export interface WebManagementNavNode {
 
 export const WEB_MANAGEMENT_NAV: WebManagementNavNode[] = [
   {
+    id: "mgmt-home",
+    labelKey: "nav.managementHome",
+    href: "/dashboard",
+    icon: "Gauge",
+    group: "operations",
+    reach: "management.web",
+  },
+  {
     id: "mgmt-integrations",
     labelKey: "nav.integrations",
     href: "/admin/integrations",
@@ -73,6 +81,14 @@ export const WEB_MANAGEMENT_NAV: WebManagementNavNode[] = [
     reach: "management.web",
   },
   {
+    id: "mgmt-analytics",
+    labelKey: "nav.analytics",
+    href: "/analytics",
+    icon: "BarChart3",
+    group: "operations",
+    reach: "management.web",
+  },
+  {
     id: "mgmt-people",
     labelKey: "nav.people",
     href: "/admin/people",
@@ -80,6 +96,31 @@ export const WEB_MANAGEMENT_NAV: WebManagementNavNode[] = [
     group: "administration",
     reach: "management.web",
     writeCap: "management.webWrite",
+  },
+  {
+    id: "mgmt-governance",
+    labelKey: "nav.governance",
+    href: "/admin/governance",
+    icon: "ShieldCheck",
+    group: "administration",
+    reach: "management.web",
+    writeCap: "management.webWrite",
+  },
+  {
+    id: "mgmt-audit",
+    labelKey: "nav.auditLog",
+    href: "/admin/audit-log",
+    icon: "ScrollText",
+    group: "administration",
+    reach: "management.web",
+  },
+  {
+    id: "mgmt-inventory",
+    labelKey: "nav.inventory",
+    href: "/admin/inventory",
+    icon: "Package",
+    group: "administration",
+    reach: "management.web",
   },
 ];
 

@@ -68,6 +68,9 @@ const IntegrationsConsolePage = lazy(() => import("@/pages/console/IntegrationsC
 const WebhooksConsolePage = lazy(() => import("@/pages/console/WebhooksConsolePage"));
 const NotificationsConsolePage = lazy(() => import("@/pages/console/NotificationsConsolePage"));
 const RfidReadersConsolePage = lazy(() => import("@/pages/console/RfidReadersConsolePage"));
+const GovernanceConsolePage = lazy(() => import("@/pages/console/GovernanceConsolePage"));
+const AuditConsolePage = lazy(() => import("@/pages/console/AuditConsolePage"));
+const InventoryConsolePage = lazy(() => import("@/pages/console/InventoryConsolePage"));
 const OpsHealthConsolePage = lazy(() => import("@/pages/console/OpsHealthConsolePage"));
 const PeopleRolesConsolePage = lazy(() => import("@/pages/console/PeopleRolesConsolePage"));
 
@@ -173,6 +176,9 @@ export function AppRoutes() {
         <Route path="/admin/webhooks"><AuthGuard><WebOnlyGuard><ManagementGuard><WebhooksConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/admin/notifications"><AuthGuard><WebOnlyGuard><ManagementGuard><NotificationsConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/admin/rfid-readers"><AuthGuard><WebOnlyGuard><ManagementGuard><RfidReadersConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/admin/governance"><AuthGuard><WebOnlyGuard><ManagementGuard><GovernanceConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/admin/audit-log"><AuthGuard><WebOnlyGuard><ManagementGuard><AuditConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/admin/inventory"><AuthGuard><WebOnlyGuard><ManagementGuard><InventoryConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/ops/health"><AuthGuard><WebOnlyGuard><ManagementGuard><OpsHealthConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/admin/people"><AuthGuard><WebOnlyGuard><ManagementGuard><PeopleRolesConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/settings"><AuthGuard><SettingsPage /></AuthGuard></Route>
@@ -191,7 +197,7 @@ export function AppRoutes() {
         <Route path="/analytics/outcome-kpi"><Redirect to="/analytics" replace /></Route>
         <Route path="/analytics/shift-leaderboard"><AuthGuard><WebOnlyGuard><ShiftLeaderboardPage /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/analytics"><AuthGuard><WebOnlyGuard><AnalyticsPage /></WebOnlyGuard></AuthGuard></Route>
-        <Route path="/dashboard"><AuthGuard><WebOnlyGuard><ManagementDashboardPage /></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/dashboard"><AuthGuard><WebOnlyGuard><ManagementGuard><ManagementDashboardPage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/whats-new"><AuthGuard><WhatsNewPage /></AuthGuard></Route>
         <Route path="/shift-chat/:shiftId"><AuthGuard><ShiftChatArchive /></AuthGuard></Route>
         {/* Legacy aliases for removed pages → home (no broken nav) */}
