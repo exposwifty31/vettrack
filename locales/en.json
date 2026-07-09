@@ -3381,7 +3381,21 @@
       "colTotal": "Total",
       "colInUse": "In use",
       "unassignedRoom": "Unassigned"
-    }
+    },
+    "stActive": "Active",
+    "stMuted": "Muted",
+    "stCompleted": "Completed",
+    "stCancelled": "Cancelled",
+    "stReceived": "Received",
+    "stRejectedSignature": "Signature rejected",
+    "stProcessed": "Processed",
+    "stFailed": "Failed",
+    "stReplayPending": "Replay pending",
+    "stSent": "Sent",
+    "stPending": "Pending",
+    "stDraft": "Draft",
+    "stOrdered": "Ordered",
+    "stPartial": "Partial"
   },
   "nav": {
     "integrations": "Integrations",

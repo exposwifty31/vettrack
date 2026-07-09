@@ -3385,6 +3385,20 @@ export interface TStructure {
       colInUse: string;
       unassignedRoom: string;
     };
+    stActive: string;
+    stMuted: string;
+    stCompleted: string;
+    stCancelled: string;
+    stReceived: string;
+    stRejectedSignature: string;
+    stProcessed: string;
+    stFailed: string;
+    stReplayPending: string;
+    stSent: string;
+    stPending: string;
+    stDraft: string;
+    stOrdered: string;
+    stPartial: string;
   };
   nav: {
     integrations: string;

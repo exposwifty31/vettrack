@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Bdi } from "@/components/ui/bdi";
 import { formatRelativeTime } from "@/lib/relative-time";
+import { consoleStatusLabel } from "@/lib/console-status-label";
 import type { WebhookEventRow } from "@/types";
 
 /**
@@ -42,7 +43,7 @@ export default function WebhooksConsolePage() {
         key: "status",
         header: t.console.colStatus,
         sortValue: (r) => r.status,
-        cell: (r) => <Badge variant="secondary">{r.status}</Badge>,
+        cell: (r) => <Badge variant="secondary">{consoleStatusLabel(r.status)}</Badge>,
       },
       {
         key: "signature",

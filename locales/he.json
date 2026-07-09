@@ -3381,7 +3381,21 @@
       "colTotal": "סה״כ",
       "colInUse": "בשימוש",
       "unassignedRoom": "לא משויך"
-    }
+    },
+    "stActive": "פעיל",
+    "stMuted": "מושתק",
+    "stCompleted": "הושלם",
+    "stCancelled": "בוטל",
+    "stReceived": "התקבל",
+    "stRejectedSignature": "חתימה נדחתה",
+    "stProcessed": "עובד",
+    "stFailed": "נכשל",
+    "stReplayPending": "ממתין לשידור חוזר",
+    "stSent": "נשלח",
+    "stPending": "ממתין",
+    "stDraft": "טיוטה",
+    "stOrdered": "הוזמן",
+    "stPartial": "חלקי"
   },
   "nav": {
     "integrations": "אינטגרציות",
