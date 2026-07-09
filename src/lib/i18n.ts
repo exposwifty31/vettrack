@@ -727,6 +727,8 @@ const translations = {
 
   managementDashboardPage: d.managementDashboardPage,
 
+  pwa: d.pwa,
+
   qrPrintPage: d.qrPrintPage,
 
   stabilityPage: d.stabilityPage,

@@ -28,7 +28,7 @@ export function PwaInstallPrompt() {
   if (canInstall && !androidDismissed) {
     return (
       <aside
-        aria-label="Install VetTrack"
+        aria-label={t.pwa.installAriaLabel}
         data-testid="pwa-install-banner"
         className="fixed bottom-0 inset-x-0 z-50"
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 0px)" }}
@@ -39,12 +39,12 @@ export function PwaInstallPrompt() {
             alt=""
             className="w-12 h-12 rounded-xl shrink-0"
           />
-          <div className="flex-1 min-w-0" dir="ltr">
+          <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm text-foreground leading-snug">
-              Install VetTrack
+              {t.pwa.installTitle}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
-              Add to your home screen for faster access — works offline too.
+              {t.pwa.installSubtitle}
             </p>
             <div className="flex gap-2 mt-3">
               <button
@@ -55,13 +55,13 @@ export function PwaInstallPrompt() {
                 className="inline-flex items-center justify-center gap-1.5 px-4 min-h-[44px] rounded-lg bg-primary text-primary-foreground text-sm font-semibold"
               >
                 <Download className="w-4 h-4" />
-                Install
+                {t.pwa.install}
               </button>
               <button
                 onClick={() => setAndroidDismissed(true)}
                 className="inline-flex items-center justify-center gap-1.5 px-4 min-h-[44px] rounded-lg bg-secondary text-secondary-foreground text-sm font-medium"
               >
-                Not now
+                {t.pwa.notNow}
               </button>
             </div>
           </div>
@@ -82,7 +82,7 @@ export function PwaInstallPrompt() {
   if (isIos && !iosGuidanceDismissed) {
     return (
       <aside
-        aria-label="Add VetTrack to Home Screen"
+        aria-label={t.pwa.iosAriaLabel}
         data-testid="pwa-ios-guidance"
         className="fixed bottom-0 inset-x-0 z-50"
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 0px)" }}
@@ -95,12 +95,12 @@ export function PwaInstallPrompt() {
               alt=""
               className="w-10 h-10 rounded-xl shrink-0"
             />
-            <div className="flex-1 min-w-0" dir="ltr">
+            <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm text-foreground leading-tight">
-                Install VetTrack
+                {t.pwa.installTitle}
               </p>
               <p className="text-xs text-muted-foreground leading-snug">
-                Works offline · Full-screen · No App Store needed
+                {t.pwa.iosTagline}
               </p>
             </div>
             <button

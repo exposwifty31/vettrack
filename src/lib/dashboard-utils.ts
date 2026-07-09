@@ -1,5 +1,6 @@
 import type { Equipment } from "@/types";
 import { getEquipmentDisplayName } from "@/lib/equipment-display";
+import { t } from "@/lib/i18n";
 
 const MISSING_HOURS = 24;
 const MISSING_COST_DEFAULT = 500;
@@ -81,7 +82,7 @@ export function computeCriticalItems(equipment: Equipment[]): CriticalItem[] {
       items.push({
         id: eq.id,
         name: getEquipmentDisplayName(eq),
-        reason: "Active Issue",
+        reason: t.managementDashboardPage.criticalReasonActiveIssue,
         location: eq.location,
         status: "issue",
       });
@@ -89,7 +90,9 @@ export function computeCriticalItems(equipment: Equipment[]): CriticalItem[] {
       items.push({
         id: eq.id,
         name: getEquipmentDisplayName(eq),
-        reason: eq.lastSeen ? "Not seen in 24+ hours" : "Never scanned",
+        reason: eq.lastSeen
+          ? t.managementDashboardPage.criticalReasonNotSeen24h
+          : t.managementDashboardPage.criticalReasonNeverScanned,
         location: eq.location,
         status: "missing",
       });
@@ -198,7 +201,7 @@ export function computeDashboardData(equipment: Equipment[]): DashboardData {
       criticalItems.push({
         id: eq.id,
         name: getEquipmentDisplayName(eq),
-        reason: "Active Issue",
+        reason: t.managementDashboardPage.criticalReasonActiveIssue,
         location: eq.location,
         status: "issue",
       });
@@ -207,7 +210,9 @@ export function computeDashboardData(equipment: Equipment[]): DashboardData {
       criticalItems.push({
         id: eq.id,
         name: getEquipmentDisplayName(eq),
-        reason: eq.lastSeen ? "Not seen in 24+ hours" : "Never scanned",
+        reason: eq.lastSeen
+          ? t.managementDashboardPage.criticalReasonNotSeen24h
+          : t.managementDashboardPage.criticalReasonNeverScanned,
         location: eq.location,
         status: "missing",
       });
