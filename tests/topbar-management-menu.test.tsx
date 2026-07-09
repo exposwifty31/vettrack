@@ -3,8 +3,9 @@
  *
  * M2 fix — the Topbar collapses the ~11 Phase 7 management links into a labeled
  * "Management" dropdown so they never overflow the horizontal nav strip. Covers:
- * empty → renders nothing, trigger opens/lists the links, active item is marked
- * aria-current, and selecting an item closes the menu.
+ * empty → renders nothing, trigger opens/lists the links (rendered as anchors so
+ * Ctrl/middle-click and the link a11y role are preserved), active item is marked
+ * aria-current, and the menu closes on link-select, Escape, and outside-click.
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
@@ -55,15 +56,42 @@ describe("TopbarManagementMenu", () => {
   it("marks the active item with aria-current", () => {
     renderMenu("/admin/people");
     fireEvent.click(screen.getByRole("button", { name: new RegExp(t.nav.management) }));
-    const active = screen.getByRole("button", { name: navText("nav.people") });
+    const active = screen.getByRole("link", { name: navText("nav.people") });
     expect(active.getAttribute("aria-current")).toBe("page");
+  });
+
+  it("renders the items as anchors, not buttons", () => {
+    renderMenu();
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(t.nav.management) }));
+    const link = screen.getByRole("link", { name: navText("nav.integrations") });
+    expect(link.tagName).toBe("A");
+    expect(link.getAttribute("href")).toBe("/admin/integrations");
   });
 
   it("closes the menu after a link is selected", () => {
     renderMenu();
     fireEvent.click(screen.getByRole("button", { name: new RegExp(t.nav.management) }));
-    fireEvent.click(screen.getByRole("button", { name: navText("nav.integrations") }));
+    fireEvent.click(screen.getByRole("link", { name: navText("nav.integrations") }));
     // Panel collapses — the other links are gone.
     expect(screen.queryByText(navText("nav.auditLog"))).toBeNull();
+  });
+
+  it("closes the menu when Escape is pressed", () => {
+    renderMenu();
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(t.nav.management) }));
+    expect(screen.getByText(navText("nav.integrations"))).toBeTruthy();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByText(navText("nav.integrations"))).toBeNull();
+  });
+
+  it("closes the menu when the outside overlay is clicked", () => {
+    const { container } = renderMenu();
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(t.nav.management) }));
+    expect(screen.getByText(navText("nav.integrations"))).toBeTruthy();
+    // The click-outside backdrop is the fixed full-screen overlay (z-40).
+    const overlay = container.querySelector(".z-40");
+    expect(overlay).toBeTruthy();
+    fireEvent.click(overlay!);
+    expect(screen.queryByText(navText("nav.integrations"))).toBeNull();
   });
 });
