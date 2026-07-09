@@ -34,9 +34,17 @@ import {
   Activity,
   Trophy,
   TrendingUp,
+  Gauge,
+  PackageOpen,
+  Timer,
+  Download,
+  MapPin,
 } from "lucide-react";
 import { formatChartBucketDay } from "@/lib/utils";
 import { Link } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Bdi } from "@/components/ui/bdi";
+import { toCsv, downloadCsv, type CsvCell } from "@/lib/csv-export";
 
 const STATUS_COLORS = {
   ok: "hsl(var(--status-ok))",
@@ -72,6 +80,35 @@ export default function AnalyticsPage() {
     : [];
   const hasScanActivity = chartData.some((d) => d.scans > 0);
 
+  const dwellLabel = (seconds: number | null | undefined): string => {
+    if (seconds == null) return t.console.dash;
+    const hours = Math.round(seconds / 3600);
+    return hours < 24 ? `${hours}h` : `${Math.round(hours / 24)}d`;
+  };
+
+  const handleExport = () => {
+    if (!analytics) return;
+    const kpiRows: CsvCell[][] = [
+      [t.analyticsPage.maintenance, `${analytics.maintenanceComplianceRate}%`],
+      [t.analyticsPage.sterilization, `${analytics.sterilizationComplianceRate}%`],
+      [t.console.analytics.readyRate, analytics.readiness ? `${analytics.readiness.readyPct}%` : ""],
+      [t.console.analytics.checkedOut, analytics.occupancy ? `${analytics.occupancy.currentlyCheckedOutPct}%` : ""],
+      [t.console.analytics.inUse, analytics.occupancy ? `${analytics.occupancy.currentlyInUsePct}%` : ""],
+      [t.console.analytics.onTimeTitle, analytics.taskOnTime?.onTimePct != null ? `${analytics.taskOnTime.onTimePct}%` : ""],
+    ];
+    const perRoomRows: CsvCell[][] = (analytics.perRoom ?? []).map((r) => [
+      r.roomName || t.console.analytics.unassignedRoom,
+      r.total,
+      r.inUse,
+    ]);
+    const csv = [
+      toCsv([t.analyticsPage.title, ""], kpiRows),
+      "",
+      toCsv([t.console.colRoom, t.console.analytics.colTotal, t.console.analytics.colInUse], perRoomRows),
+    ].join("\r\n");
+    downloadCsv("vettrack-analytics.csv", csv);
+  };
+
   const pageContent = (
     <>
       <Helmet>
@@ -82,12 +119,24 @@ export default function AnalyticsPage() {
       <div className="flex flex-col gap-5 pb-24 animate-fade-in">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold leading-tight">{t.analyticsPage.title}</h1>
-          <Link href="/analytics/shift-leaderboard">
-            <span className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-3 py-1.5 text-xs font-medium shadow-sm hover:bg-muted/50 transition-colors cursor-pointer">
-              <TrendingUp className="h-3.5 w-3.5 text-primary" />
-              {t.analyticsPage.shiftLeaderboardLink}
-            </span>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={!analytics}
+              onClick={handleExport}
+            >
+              <Download className="h-3.5 w-3.5" />
+              {t.console.analytics.exportCsv}
+            </Button>
+            <Link href="/analytics/shift-leaderboard">
+              <span className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-3 py-1.5 text-xs font-medium shadow-sm hover:bg-muted/50 transition-colors cursor-pointer">
+                <TrendingUp className="h-3.5 w-3.5 text-primary" />
+                {t.analyticsPage.shiftLeaderboardLink}
+              </span>
+            </Link>
+          </div>
         </div>
 
         {isError && (
@@ -162,6 +211,63 @@ export default function AnalyticsPage() {
             </>
           )}
         </div>
+
+        {/* Phase 7e KPIs — readiness, occupancy, task on-time (all real-data-backed) */}
+        {!isLoading && analytics && (
+          <div className="grid gap-3 md:grid-cols-3">
+            <Card className="bg-card border-border/60 shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Gauge className="w-4 h-4 text-[hsl(var(--status-ok))]" />
+                  <span className="text-xs text-muted-foreground font-medium">{t.console.analytics.readinessTitle}</span>
+                </div>
+                <p className="text-2xl font-bold text-foreground">{analytics.readiness?.readyPct ?? 0}%</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t.console.analytics.readyRate}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t.console.analytics.notReadyBacklog}: {analytics.readiness?.notReady ?? 0} · {t.console.analytics.dwellLabel}{" "}
+                  {dwellLabel(analytics.readiness?.avgNotReadyDwellSeconds)}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card border-border/60 shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <PackageOpen className="w-4 h-4 text-[hsl(var(--status-issue))]" />
+                  <span className="text-xs text-muted-foreground font-medium">{t.console.analytics.occupancyTitle}</span>
+                </div>
+                <p className="text-2xl font-bold text-foreground">{analytics.occupancy?.currentlyInUsePct ?? 0}%</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t.console.analytics.inUse}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t.console.analytics.checkedOut}: {analytics.occupancy?.currentlyCheckedOutPct ?? 0}%
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card border-border/60 shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Timer className="w-4 h-4 text-[hsl(var(--status-maintenance))]" />
+                  <span className="text-xs text-muted-foreground font-medium">{t.console.analytics.onTimeTitle}</span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-2xl font-bold text-foreground">
+                    {analytics.taskOnTime?.onTimePct != null ? `${analytics.taskOnTime.onTimePct}%` : t.console.dash}
+                  </p>
+                  {analytics.taskOnTime?.deltaPct != null && analytics.taskOnTime.deltaPct !== 0 && (
+                    <span
+                      className={`text-xs font-semibold ${analytics.taskOnTime.deltaPct > 0 ? "text-[hsl(var(--status-ok))]" : "text-[hsl(var(--status-issue))]"}`}
+                    >
+                      {analytics.taskOnTime.deltaPct > 0 ? "▲" : "▼"} {Math.abs(analytics.taskOnTime.deltaPct)}%
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">{t.console.analytics.onTimeCompleted}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t.console.analytics.vsPrevious}</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Status distribution */}
         <Card className="bg-card border-border/60 shadow-sm">
@@ -273,6 +379,42 @@ export default function AnalyticsPage() {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Per-room equipment distribution (snapshot) */}
+        {!isLoading && analytics?.perRoom && analytics.perRoom.length > 0 && (
+          <Card className="bg-card border-border/60 shadow-sm">
+            <CardHeader className="pb-2 pt-4 px-4">
+              <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-muted-foreground" />
+                {t.console.analytics.perRoomTitle}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-muted-foreground">
+                      <th className="text-start font-medium py-1.5">{t.console.colRoom}</th>
+                      <th className="text-end font-medium py-1.5">{t.console.analytics.colTotal}</th>
+                      <th className="text-end font-medium py-1.5">{t.console.analytics.colInUse}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analytics.perRoom.map((r) => (
+                      <tr key={r.roomId} className="border-t border-border/50">
+                        <td className="py-1.5">
+                          <Bdi>{r.roomName || t.console.analytics.unassignedRoom}</Bdi>
+                        </td>
+                        <td className="py-1.5 text-end tabular-nums">{r.total}</td>
+                        <td className="py-1.5 text-end tabular-nums">{r.inUse}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </CardContent>
           </Card>
         )}
