@@ -118,7 +118,15 @@ export function ActionTooltip({
       onFocus={() => setOpen(true)}
       onBlur={() => setOpen(false)}
       onClick={() => setOpen((v) => !v)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setOpen((v) => !v);
+        }
+      }}
+      role="button"
       tabIndex={0}
+      aria-expanded={open}
       aria-describedby={open ? tooltipId : undefined}
     >
       {children}
@@ -272,11 +280,10 @@ export function formatScheduledLabel(appointment: Appointment): string | null {
 export function completeButtonState(args: {
   appointment: Appointment;
   meId?: string;
-  meClerkId?: string | null;
   effectiveRole?: string;
   role?: string;
 }) {
-  const { appointment, meId, meClerkId, effectiveRole, role } = args;
+  const { appointment, meId, effectiveRole, role } = args;
   if (appointment.status !== "in_progress") {
     return { visible: false, disabled: true, tooltip: "" };
   }
@@ -305,8 +312,11 @@ export const statusLabel = (): Record<AppointmentStatus, string> => ({
   no_show: t.appointmentsPage.statusNoShow,
 });
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** True only for a canonical UUID — a hyphenated free-text name must not match. */
 export function looksLikeUuid(s: string): boolean {
-  return s.includes("-") && s.length > 20;
+  return UUID_RE.test(s);
 }
 
 // The `vt_appointments` wire fields are still named animalId/ownerId (frozen

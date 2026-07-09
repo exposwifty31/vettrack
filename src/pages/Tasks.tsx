@@ -197,6 +197,8 @@ export default function AppointmentsPage() {
           endTime: new Date(formEndLocal).toISOString(),
           notes: formNotes.trim() || null,
           status: "scheduled",
+          taskType: formTaskType,
+          scheduledAt: new Date(formStartLocal).toISOString(),
         };
         setPendingConflictPayload(payload);
         setConflictReason("");
@@ -432,7 +434,6 @@ export default function AppointmentsPage() {
               const nbtCompleteState = completeButtonState({
                 appointment: nbt,
                 meId: meQuery.data?.id,
-                meClerkId: meQuery.data?.clerkId,
                 role: meQuery.data?.role,
                 effectiveRole: meQuery.data?.effectiveRole,
               });
@@ -630,7 +631,6 @@ export default function AppointmentsPage() {
                     const completeState = completeButtonState({
                       appointment: todayTask,
                       meId: meQuery.data?.id,
-                      meClerkId: meQuery.data?.clerkId,
                       role: meQuery.data?.role,
                       effectiveRole: meQuery.data?.effectiveRole,
                     });
@@ -734,7 +734,6 @@ export default function AppointmentsPage() {
                     const completeState = completeButtonState({
                       appointment: myTask,
                       meId: meQuery.data?.id,
-                      meClerkId: meQuery.data?.clerkId,
                       role: meQuery.data?.role,
                       effectiveRole: meQuery.data?.effectiveRole,
                     });
@@ -1051,7 +1050,6 @@ export default function AppointmentsPage() {
                       const completeState = completeButtonState({
                         appointment,
                         meId: meQuery.data?.id,
-                        meClerkId: meQuery.data?.clerkId,
                         role: meQuery.data?.role,
                         effectiveRole: meQuery.data?.effectiveRole,
                       });
