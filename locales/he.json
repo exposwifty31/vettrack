@@ -3362,6 +3362,23 @@
       "colPar": "יעד",
       "colOnHand": "במלאי",
       "colShort": "חוסר"
+    },
+    "analytics": {
+      "exportCsv": "ייצוא CSV",
+      "readinessTitle": "מוכנות ציוד",
+      "readyRate": "מוכן כעת",
+      "notReadyBacklog": "ממתין למוכנות",
+      "dwellLabel": "זמן ממוצע",
+      "occupancyTitle": "תפוסה (כעת)",
+      "checkedOut": "בשימוש חוץ",
+      "inUse": "בשימוש",
+      "onTimeTitle": "משימות בזמן (30 ימים)",
+      "onTimeCompleted": "מהמשימות שהושלמו בזמן",
+      "vsPrevious": "מול 30 הימים הקודמים",
+      "perRoomTitle": "ציוד לפי חדר",
+      "colTotal": "סה״כ",
+      "colInUse": "בשימוש",
+      "unassignedRoom": "לא משויך"
     }
   },
   "nav": {

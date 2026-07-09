@@ -81,6 +81,14 @@ export const WEB_MANAGEMENT_NAV: WebManagementNavNode[] = [
     reach: "management.web",
   },
   {
+    id: "mgmt-analytics",
+    labelKey: "nav.analytics",
+    href: "/analytics",
+    icon: "BarChart3",
+    group: "operations",
+    reach: "management.web",
+  },
+  {
     id: "mgmt-people",
     labelKey: "nav.people",
     href: "/admin/people",
