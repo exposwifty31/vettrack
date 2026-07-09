@@ -375,6 +375,8 @@ function createPairIssueHandler(): RequestHandler {
   return async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
     try {
+      // req.clinicId / req.authUser are populated by requireAuth (+ requireAdmin)
+      // on every display route before the handler runs — the assertions are safe.
       const clinicId = req.clinicId!;
       const issued = await issuePairingCode(clinicId);
       logAudit({

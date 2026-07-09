@@ -129,8 +129,9 @@ export async function issuePairingCode(clinicId: string): Promise<IssuedPairingC
       await timedRedisOp("displayPair:issue", () =>
         r.set(redisKey(code), JSON.stringify(entry), "EX", ttlSec),
       );
-    } catch {
-      // best-effort; fallback below still holds the code
+    } catch (err) {
+      // best-effort; the in-process fallback below still holds the code
+      console.warn("[displayPair:issue] Redis set failed; using in-process fallback", err);
     }
   } else {
     recordRedisFallback("displayPair:issue");
@@ -165,8 +166,9 @@ export async function consumePairingCode(rawCode: unknown): Promise<string | nul
           resolved = { clinicId: parsed.clinicId, expiresAtMs: parsed.expiresAtMs };
         }
       }
-    } catch {
+    } catch (err) {
       // fall through to in-process fallback
+      console.warn("[displayPair:consume] Redis eval failed; using in-process fallback", err);
     }
   } else {
     recordRedisFallback("displayPair:consume");

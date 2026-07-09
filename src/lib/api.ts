@@ -310,16 +310,27 @@ export async function containerDispenseWithResult(
  */
 export async function claimDisplayPairing(code: string, name?: string): Promise<DisplayPairClaim> {
   const body = JSON.stringify(name ? { code, name } : { code });
-  const res = await fetch(resolveApiUrl("/api/display/pair/claim"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Locale": getStoredLocale() },
-    body,
-  });
-  const json = (await res.json().catch(() => ({}))) as ApiErrorPayload & Record<string, unknown>;
-  if (!res.ok) {
-    throw new ApiError(res.status, toApiErrorMessage(res.status, json), json);
+  // Bound the request so a stalled network doesn't leave the kiosk stuck on a
+  // disabled "pair" button forever — abort after 15s and surface a normal error.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const res = await fetch(resolveApiUrl("/api/display/pair/claim"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Locale": getStoredLocale() },
+      body,
+      signal: controller.signal,
+    });
+    const json = (await res.json().catch(() => ({}))) as ApiErrorPayload & Record<string, unknown>;
+    if (!res.ok) {
+      throw new ApiError(res.status, toApiErrorMessage(res.status, json), json);
+    }
+    // The success shape is validated server-side; cast past the ApiErrorPayload
+    // union used for the error branch above to the claim result.
+    return json as unknown as DisplayPairClaim;
+  } finally {
+    clearTimeout(timeout);
   }
-  return json as unknown as DisplayPairClaim;
 }
 
 export const api = {

@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import { resolveApiUrl } from "@/lib/api-origin";
 import { getCurrentClinicId } from "@/lib/auth-store";
 import { applyEvent, DISPLAY_SNAPSHOT_QUERY_KEY, forceResyncWardErCaches, resetRealtimeCaches } from "@/lib/event-reducer";
-import { getStoredDisplayToken } from "@/lib/display-token-store";
+import { getStoredDisplayToken, clearStoredDisplayToken } from "@/lib/display-token-store";
 import type { RealtimeEvent } from "@/types/realtime-events";
 import { SUPPORTED_REALTIME_EVENT_SCHEMA_VERSION } from "../../shared/realtime-schema-version";
 
@@ -856,6 +856,14 @@ async function attachDisplayStream(displayToken: string): Promise<void> {
       credentials: "include",
       signal: controller.signal,
     });
+    if (res.status === 401) {
+      // Token revoked/invalid — stop reconnecting and return to the pairing
+      // kiosk instead of retrying a dead token forever (server load + never recovers).
+      teardownDisplayStream();
+      clearStoredDisplayToken();
+      if (typeof window !== "undefined") window.location.href = "/board/pair";
+      return;
+    }
     if (!res.ok || !res.body) {
       scheduleDisplayReconnect(displayToken);
       return;

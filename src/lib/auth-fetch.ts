@@ -1,6 +1,6 @@
 import { getCurrentUserId, getStoredBearerToken } from "./auth-store";
 import { resolveApiUrl } from "./api-origin";
-import { getStoredDisplayToken } from "./display-token-store";
+import { getStoredDisplayToken, clearStoredDisplayToken } from "./display-token-store";
 
 type ClerkTokenGetter = (() => Promise<string | null>) | null;
 
@@ -85,7 +85,14 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
     if (displayToken) {
       const displayHeaders = new Headers(options.headers ?? {});
       displayHeaders.set("x-display-token", displayToken);
-      return fetch(resolvedUrl, { ...options, headers: displayHeaders, credentials: "include" });
+      const displayRes = await fetch(resolvedUrl, { ...options, headers: displayHeaders, credentials: "include" });
+      if (displayRes.status === 401) {
+        // Revoked/invalid display token — clear it and return to the pairing
+        // kiosk rather than the /signin flow a headless display can't complete.
+        clearStoredDisplayToken();
+        if (typeof window !== "undefined") window.location.href = "/board/pair";
+      }
+      return displayRes;
     }
   }
 

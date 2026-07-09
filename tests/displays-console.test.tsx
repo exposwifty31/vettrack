@@ -7,6 +7,7 @@
  * manage drawer's two-step revoke calling the revoke endpoint.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { ReactNode } from "react";
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Router } from "wouter";
@@ -18,7 +19,7 @@ vi.mock("@/hooks/use-experience", () => ({
   useExperience: () => ({ archetype: "admin", capabilities: new Set(), can: mockCan }),
 }));
 vi.mock("@/components/layout/AppShell", () => ({
-  AppShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AppShell: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 const listMock = vi.fn();
 const renameMock = vi.fn();
