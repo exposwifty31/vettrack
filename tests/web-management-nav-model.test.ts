@@ -67,6 +67,16 @@ describe("web-management-nav-model — structure", () => {
     expect(gov?.writeCap).toBe("management.webWrite");
   });
 
+  it("7e: Analytics node is present, operations group, read-only", () => {
+    const an = WEB_MANAGEMENT_NAV.find((n) => n.id === "mgmt-analytics");
+    expect(an).toBeDefined();
+    expect(an?.href).toBe("/analytics");
+    expect(an?.labelKey).toBe("nav.analytics");
+    expect(an?.icon).toBe("BarChart3");
+    expect(an?.group).toBe("operations");
+    expect(an?.writeCap).toBeUndefined();
+  });
+
   it("7d: Inventory node is present, administration group, read-only", () => {
     const inv = WEB_MANAGEMENT_NAV.find((n) => n.id === "mgmt-inventory");
     expect(inv).toBeDefined();

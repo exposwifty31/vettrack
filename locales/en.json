@@ -568,7 +568,9 @@
     "actionDoneBody": "Action completed for {name}.",
     "ariaEdit": "Edit equipment",
     "ariaDuplicate": "Duplicate equipment",
-    "ariaEditFloorNote": "Edit floor note"
+    "ariaEditFloorNote": "Edit floor note",
+    "expiryDateLabel": "Expiry date",
+    "daysUnit": "days"
   },
   "newEquipment": {
     "heading": {
@@ -3362,6 +3364,23 @@
       "colPar": "Par",
       "colOnHand": "On hand",
       "colShort": "Short"
+    },
+    "analytics": {
+      "exportCsv": "Export CSV",
+      "readinessTitle": "Equipment readiness",
+      "readyRate": "Ready now",
+      "notReadyBacklog": "Not-ready backlog",
+      "dwellLabel": "avg dwell",
+      "occupancyTitle": "Occupancy (now)",
+      "checkedOut": "Checked out",
+      "inUse": "In use",
+      "onTimeTitle": "Task on-time (30d)",
+      "onTimeCompleted": "of completed tasks on time",
+      "vsPrevious": "vs previous 30d",
+      "perRoomTitle": "Equipment by room",
+      "colTotal": "Total",
+      "colInUse": "In use",
+      "unassignedRoom": "Unassigned"
     }
   },
   "nav": {

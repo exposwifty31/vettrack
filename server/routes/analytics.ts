@@ -1,11 +1,18 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { db, pool, equipment, scanLogs } from "../db.js";
-import { gte, desc, eq, and, isNull, sql } from "drizzle-orm";
+import { db, pool, equipment, scanLogs, rooms, appointments } from "../db.js";
+import { gte, lt, desc, eq, and, isNull, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { subDays } from "date-fns";
 import { analyticsCache } from "../lib/analytics-cache.js";
 import { computeUsageTrends } from "../lib/analytics-engine.js";
+import {
+  computeReadiness,
+  computeOccupancy,
+  computePerRoom,
+  computeOnTime,
+  type EquipmentKpiRow,
+} from "../lib/analytics-kpis.js";
 import { INACTIVE_THRESHOLD_DAYS } from "../../shared/constants.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
@@ -122,6 +129,44 @@ router.get("/", requireAuth, requireEffectiveRole("student"), async (req, res) =
       .orderBy(desc(sql`count(*)`))
       .limit(5);
 
+    // --- Phase 7e additive KPIs (all clinic-scoped, point-in-time, real-data-backed) ---
+    const nowMs = now.getTime();
+    const readiness = computeReadiness(allEquipment as EquipmentKpiRow[], nowMs);
+    const occupancy = computeOccupancy(allEquipment as EquipmentKpiRow[]);
+
+    const roomRows = await db
+      .select({ id: rooms.id, name: rooms.name })
+      .from(rooms)
+      .where(eq(rooms.clinicId, clinicId));
+    const roomNameById = new Map(roomRows.map((r) => [r.id, r.name]));
+    const perRoom = computePerRoom(allEquipment as EquipmentKpiRow[], roomNameById);
+
+    // Task on-time: completed tasks whose completedAt ≤ endTime, trailing 30d vs prior 30d.
+    const onTimeCounts = async (from: Date, to: Date) => {
+      const [r] = await db
+        .select({
+          onTimeCount: sql<number>`count(*) filter (where ${appointments.completedAt} is not null and ${appointments.completedAt} <= ${appointments.endTime})::int`,
+          completedCount: sql<number>`count(*) filter (where ${appointments.completedAt} is not null)::int`,
+        })
+        .from(appointments)
+        .where(
+          and(
+            eq(appointments.clinicId, clinicId),
+            eq(appointments.status, "completed"),
+            gte(appointments.endTime, from),
+            lt(appointments.endTime, to),
+          ),
+        );
+      return { onTimeCount: Number(r?.onTimeCount ?? 0), completedCount: Number(r?.completedCount ?? 0) };
+    };
+    const priorFrom = subDays(now, 60);
+    const currentFrom = subDays(now, 30);
+    const [currentOnTime, priorOnTime] = await Promise.all([
+      onTimeCounts(currentFrom, now),
+      onTimeCounts(priorFrom, currentFrom),
+    ]);
+    const taskOnTime = computeOnTime(currentOnTime, priorOnTime);
+
     const payload = {
       totalEquipment: total,
       statusBreakdown,
@@ -129,6 +174,10 @@ router.get("/", requireAuth, requireEffectiveRole("student"), async (req, res) =
       sterilizationComplianceRate,
       scanActivity,
       topProblemEquipment,
+      readiness,
+      occupancy,
+      perRoom,
+      taskOnTime,
     };
 
     analyticsCache.set(clinicId, payload);

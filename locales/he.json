@@ -568,7 +568,9 @@
     "actionDoneBody": "הפעולה הושלמה עבור {name}.",
     "ariaEdit": "ערוך ציוד",
     "ariaDuplicate": "שכפל ציוד",
-    "ariaEditFloorNote": "ערוך הערת קומה"
+    "ariaEditFloorNote": "ערוך הערת קומה",
+    "expiryDateLabel": "תאריך תפוגה",
+    "daysUnit": "ימים"
   },
   "newEquipment": {
     "heading": {
@@ -3362,6 +3364,23 @@
       "colPar": "יעד",
       "colOnHand": "במלאי",
       "colShort": "חוסר"
+    },
+    "analytics": {
+      "exportCsv": "ייצוא CSV",
+      "readinessTitle": "מוכנות ציוד",
+      "readyRate": "מוכן כעת",
+      "notReadyBacklog": "ממתין למוכנות",
+      "dwellLabel": "זמן ממוצע",
+      "occupancyTitle": "תפוסה (כעת)",
+      "checkedOut": "בשימוש חוץ",
+      "inUse": "בשימוש",
+      "onTimeTitle": "משימות בזמן (30 ימים)",
+      "onTimeCompleted": "מהמשימות שהושלמו בזמן",
+      "vsPrevious": "מול 30 הימים הקודמים",
+      "perRoomTitle": "ציוד לפי חדר",
+      "colTotal": "סה״כ",
+      "colInUse": "בשימוש",
+      "unassignedRoom": "לא משויך"
     }
   },
   "nav": {
