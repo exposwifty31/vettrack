@@ -2930,18 +2930,6 @@
       "folder_deleted": "Folder Deleted",
       "alert_acknowledged": "Alert Acknowledged",
       "alert_acknowledgment_removed": "Alert Ack Removed",
-      "system.init": "System Initialised",
-      "system.verified": "System Verified",
-      "rounds.started": "Rounds Started",
-      "rounds.completed": "Rounds Completed",
-      "equipment.scan": "Equipment Scanned",
-      "equipment.checkout": "Equipment Checked Out",
-      "equipment.transfer": "Equipment Transferred",
-      "equipment.maintenance_review": "Maintenance Review",
-      "equipment.request": "Equipment Requested",
-      "alert.received": "Alert Received",
-      "audit_log.search": "Audit Log Search",
-      "report.viewed": "Report Viewed",
       "code_blue_started": "Code Blue started",
       "code_blue_ended": "Code Blue ended",
       "code_blue_initiator_authority_denied": "Code Blue start denied — not authorized",
@@ -3070,7 +3058,13 @@
       "outbox_dlq_drop": "Outbox dlq drop",
       "animals_hard_purged": "Animals hard purged",
       "support_ticket_created": "Support ticket created",
-      "support_ticket_updated": "Support ticket updated"
+      "support_ticket_updated": "Support ticket updated",
+      "CRITICAL_TASK_EXECUTED": "Critical task executed",
+      "CRITICAL_NOTIFICATION_SENT": "Critical notification sent",
+      "TASK_ESCALATED": "Task escalated",
+      "TASK_AUTO_ASSIGNED": "Task auto-assigned",
+      "TASK_STUCK_NOTIFIED": "Stuck task flagged",
+      "MANUAL_OWNERSHIP_CONFIRMATION": "Ownership manually confirmed"
     }
   },
   "whatsAppMessage": {

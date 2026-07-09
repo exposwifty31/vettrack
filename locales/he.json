@@ -2930,18 +2930,6 @@
       "folder_deleted": "תיקייה נמחקה",
       "alert_acknowledged": "התראה אושרה",
       "alert_acknowledgment_removed": "אישור התראה הוסר",
-      "system.init": "אתחול מערכת",
-      "system.verified": "מערכת אומתה",
-      "rounds.started": "סבב התחיל",
-      "rounds.completed": "סבב הסתיים",
-      "equipment.scan": "סריקת ציוד",
-      "equipment.checkout": "הוצאת ציוד",
-      "equipment.transfer": "העברת ציוד",
-      "equipment.maintenance_review": "ביקורת תחזוקה",
-      "equipment.request": "בקשת ציוד",
-      "alert.received": "התראה התקבלה",
-      "audit_log.search": "חיפוש ביומן",
-      "report.viewed": "דוח נצפה",
       "code_blue_started": "החייאה (Code Blue) נפתחה",
       "code_blue_ended": "החייאה (Code Blue) הסתיימה",
       "code_blue_initiator_authority_denied": "פתיחת החייאה נדחתה — אין הרשאה",
@@ -3070,7 +3058,13 @@
       "outbox_dlq_drop": "הודעת DLQ הוסרה",
       "animals_hard_purged": "בעלי חיים נמחקו לצמיתות",
       "support_ticket_created": "פנייה לתמיכה נוצרה",
-      "support_ticket_updated": "פנייה לתמיכה עודכנה"
+      "support_ticket_updated": "פנייה לתמיכה עודכנה",
+      "CRITICAL_TASK_EXECUTED": "משימה קריטית בוצעה",
+      "CRITICAL_NOTIFICATION_SENT": "התראה קריטית נשלחה",
+      "TASK_ESCALATED": "משימה הוסלמה",
+      "TASK_AUTO_ASSIGNED": "משימה שויכה אוטומטית",
+      "TASK_STUCK_NOTIFIED": "התראה על משימה תקועה",
+      "MANUAL_OWNERSHIP_CONFIRMATION": "בעלות אושרה ידנית"
     }
   },
   "whatsAppMessage": {

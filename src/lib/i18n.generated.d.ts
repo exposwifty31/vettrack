@@ -2933,18 +2933,6 @@ export interface TStructure {
       folder_deleted: string;
       alert_acknowledged: string;
       alert_acknowledgment_removed: string;
-      "system.init": string;
-      "system.verified": string;
-      "rounds.started": string;
-      "rounds.completed": string;
-      "equipment.scan": string;
-      "equipment.checkout": string;
-      "equipment.transfer": string;
-      "equipment.maintenance_review": string;
-      "equipment.request": string;
-      "alert.received": string;
-      "audit_log.search": string;
-      "report.viewed": string;
       code_blue_started: string;
       code_blue_ended: string;
       code_blue_initiator_authority_denied: string;
@@ -3074,6 +3062,12 @@ export interface TStructure {
       animals_hard_purged: string;
       support_ticket_created: string;
       support_ticket_updated: string;
+      CRITICAL_TASK_EXECUTED: string;
+      CRITICAL_NOTIFICATION_SENT: string;
+      TASK_ESCALATED: string;
+      TASK_AUTO_ASSIGNED: string;
+      TASK_STUCK_NOTIFIED: string;
+      MANUAL_OWNERSHIP_CONFIRMATION: string;
     };
   };
   whatsAppMessage: {

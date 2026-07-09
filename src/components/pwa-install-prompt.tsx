@@ -48,6 +48,7 @@ export function PwaInstallPrompt() {
             </p>
             <div className="flex gap-2 mt-3">
               <button
+                type="button"
                 onClick={async () => {
                   await promptInstall();
                   setAndroidDismissed(true);
@@ -58,6 +59,7 @@ export function PwaInstallPrompt() {
                 {t.pwa.install}
               </button>
               <button
+                type="button"
                 onClick={() => setAndroidDismissed(true)}
                 className="inline-flex items-center justify-center gap-1.5 px-4 min-h-[44px] rounded-lg bg-secondary text-secondary-foreground text-sm font-medium"
               >
@@ -66,6 +68,7 @@ export function PwaInstallPrompt() {
             </div>
           </div>
           <button
+            type="button"
             onClick={() => setAndroidDismissed(true)}
             aria-label={t.common.close}
             className="flex items-center justify-center min-w-[44px] min-h-[44px] -mt-2 -me-2 text-muted-foreground hover:text-foreground shrink-0"
@@ -104,6 +107,7 @@ export function PwaInstallPrompt() {
               </p>
             </div>
             <button
+              type="button"
               onClick={dismissIosGuidance}
               aria-label={t.common.close}
               className="flex items-center justify-center min-w-[44px] min-h-[44px] -mt-2 -me-2 text-muted-foreground hover:text-foreground shrink-0"

@@ -74,28 +74,35 @@ export function computeDashboardCounts(equipment: Equipment[]): DashboardCounts 
   return { available, inUse, issues, missing };
 }
 
+/**
+ * Build a critical-item row for an equipment flagged with an active issue or
+ * counted as missing. Centralizes the localized reason text so
+ * computeCriticalItems and computeDashboardData cannot drift (CodeRabbit #73).
+ */
+function toCriticalItem(eq: Equipment, kind: "issue" | "missing"): CriticalItem {
+  const reason =
+    kind === "issue"
+      ? t.managementDashboardPage.criticalReasonActiveIssue
+      : eq.lastSeen
+        ? t.managementDashboardPage.criticalReasonNotSeen24h
+        : t.managementDashboardPage.criticalReasonNeverScanned;
+  return {
+    id: eq.id,
+    name: getEquipmentDisplayName(eq),
+    reason,
+    location: eq.location,
+    status: kind,
+  };
+}
+
 export function computeCriticalItems(equipment: Equipment[]): CriticalItem[] {
   const items: CriticalItem[] = [];
 
   for (const eq of equipment) {
     if (isEquipmentIssue(eq)) {
-      items.push({
-        id: eq.id,
-        name: getEquipmentDisplayName(eq),
-        reason: t.managementDashboardPage.criticalReasonActiveIssue,
-        location: eq.location,
-        status: "issue",
-      });
+      items.push(toCriticalItem(eq, "issue"));
     } else if (isEquipmentMissing(eq)) {
-      items.push({
-        id: eq.id,
-        name: getEquipmentDisplayName(eq),
-        reason: eq.lastSeen
-          ? t.managementDashboardPage.criticalReasonNotSeen24h
-          : t.managementDashboardPage.criticalReasonNeverScanned,
-        location: eq.location,
-        status: "missing",
-      });
+      items.push(toCriticalItem(eq, "missing"));
     }
   }
 
@@ -198,24 +205,10 @@ export function computeDashboardData(equipment: Equipment[]): DashboardData {
 
     if (hasIssue) {
       issueCost += ISSUE_COST_DEFAULT;
-      criticalItems.push({
-        id: eq.id,
-        name: getEquipmentDisplayName(eq),
-        reason: t.managementDashboardPage.criticalReasonActiveIssue,
-        location: eq.location,
-        status: "issue",
-      });
+      criticalItems.push(toCriticalItem(eq, "issue"));
     } else if (isMissing) {
       missingCost += MISSING_COST_DEFAULT;
-      criticalItems.push({
-        id: eq.id,
-        name: getEquipmentDisplayName(eq),
-        reason: eq.lastSeen
-          ? t.managementDashboardPage.criticalReasonNotSeen24h
-          : t.managementDashboardPage.criticalReasonNeverScanned,
-        location: eq.location,
-        status: "missing",
-      });
+      criticalItems.push(toCriticalItem(eq, "missing"));
     }
 
     if (isInUse) {

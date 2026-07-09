@@ -1,6 +1,6 @@
 # Phase 7 Live Walk — vettrack.uk Management Console Audit
 
-**Date:** 2026-07-09 · **Auditor:** Claude (browser automation, read-only) · **Session:** Dan Erez, role `admin`, clinic `org_3CPrzrlCdGh1yNNIrmRILv3qZob`
+**Date:** 2026-07-09 · **Auditor:** Claude (browser automation, read-only) · **Session:** admin user (identity redacted), role `admin`, clinic (org id redacted)
 **Scope:** the 11 Phase 7 desktop-console modules, live on production. This walk serves as the desktop-web row of the FLOW_INVENTORY live-walk protocol (stamped `⏳ pending` since Phase 0; the file itself lives on the `claude/phase-0-baseline` branch, not main).
 
 ## Preconditions
@@ -17,7 +17,7 @@ No writes performed. Governance drawer opened and cancelled (never saved); Peopl
 |---|--------|---------|--------------------------|
 | 1 | `/dashboard` Management Home | ✅ pass | KPI cards (62 תקלות / 0 בשימוש / 62 זמין) + 62-item critical-alert list; all API 200; 0 console errors. Alert sub-labels ("Never scanned", "Not seen in 24+ hours") are English on the Hebrew UI → issue M1. (ss_7940ljlm7) |
 | 2 | `/ops/health` | ✅ pass | Read-only chip; 4 cards render real values — Outbox 0, publish lag "—", failed events 0, permanent failures 0 (no perpetual skeletons; "—" used for absent lag). DLQ = honest empty state. `outbox-health` + `outbox/dlq` → 200. Observe-only: no action buttons. (ss_3744hm50a) |
-| 3 | `/admin/integrations` | ✅ pass | 4 adapters (Generic PMS + 3 stubs); Configured=לא; credential **names only** (`base_url, api_key`); read-only chip. Hardened check: `/api/integrations/configs` → `{"configs":[]}` — no secret material exists server-side to leak. (ss_0997xpv2a) |
+| 3 | `/admin/integrations` | ✅ pass | 4 adapters (Generic PMS + 3 stubs); Configured=לא; credential **names only** (`base_url, api_key`); read-only chip. Hardened check: `/api/integrations/configs` → `{"configs":[]}` — this clinic has no configured integrations, so no credential values are returned on this path (scope: this clinic only, not a server-wide secrets audit). (ss_0997xpv2a) |
 | 4 | `/admin/webhooks` | ✅ pass (empty) | Read-only chip; honest empty state; `/api/admin/webhooks` → 200. No events in this clinic, so the 5-column contract and no-payload rule are unverifiable with live data — expected empty, not a bug. (ss_6442q2vo9) |
 | 5 | `/admin/notifications` | ✅ pass | 1 push delivery; recipient masked `web.push.apple.com …AjfM`. **Masking is server-side** — API returns only `maskedTarget`, never the raw endpoint/token. No templates tab. Status renders raw English "active" → issue M1. (ss_09549n3nz) |
 | 6 | `/admin/rfid-readers` | ✅ pass (empty) | Read-only chip; honest empty state ("פעימות וכיסוי קוראים"); API 200. No gateways observed in this clinic — column contract unverifiable, expected. (ss_2483nk1pl) |
