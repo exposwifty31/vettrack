@@ -3343,7 +3343,11 @@
     "colSignature": "חתימה",
     "colProcessed": "עובד",
     "sigValid": "תקינה",
-    "sigInvalid": "לא תקינה"
+    "sigInvalid": "לא תקינה",
+    "colChannel": "ערוץ",
+    "colTarget": "נמען",
+    "channelPush": "פוש",
+    "channelWhatsapp": "וואטסאפ"
   },
   "nav": {
     "integrations": "אינטגרציות",

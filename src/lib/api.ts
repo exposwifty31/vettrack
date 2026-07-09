@@ -780,6 +780,13 @@ export const api = {
         events: import("@/types").WebhookEventRow[];
       }>("/api/admin/webhooks"),
   },
+  notifications: {
+    list: () =>
+      request<{
+        clinicId: string;
+        deliveries: import("@/types").NotificationDeliveryRow[];
+      }>("/api/admin/notifications"),
+  },
   equipmentGovernance: {
     getReadinessRules: () =>
       request<{

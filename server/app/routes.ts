@@ -40,6 +40,7 @@ import adminTaskOwnershipRoutes from "../routes/admin-task-ownership.js";
 import adminRfidReadersRoutes from "../routes/admin-rfid-readers.js";
 import adminEquipmentGovernanceRoutes from "../routes/admin-equipment-governance.js";
 import adminWebhooksRoutes from "../routes/admin-webhooks.js";
+import adminNotificationsRoutes from "../routes/admin-notifications.js";
 import cursorBugFixerRoutes from "../routes/cursor-bug-fixer.js";
 import stabilityRoutes from "../routes/stability.js";
 
@@ -107,6 +108,7 @@ function registerAdminConfigRoutes(app: express.Express) {
   app.use("/api/admin", adminRfidReadersRoutes);
   app.use("/api/admin", adminEquipmentGovernanceRoutes);
   app.use("/api/admin", adminWebhooksRoutes);
+  app.use("/api/admin", adminNotificationsRoutes);
   app.use("/api/admin/cursor-bug-fixer", cursorBugFixerRoutes);
   app.use("/api/stability", stabilityRoutes);
 }
