@@ -14,7 +14,21 @@ const repoRoot = path.resolve(__dirname, "../..");
 const baselinePath = path.join(repoRoot, "docs/architecture/baseline-cycles.json");
 
 function normalizeCycle(line) {
-  return line.trim().replace(/\s+/g, " ");
+  const collapsed = line.trim().replace(/\s+/g, " ");
+  // Canonicalize cyclic rotation. madge emits a simple cycle a>b>c (looping c→a)
+  // starting from a traversal-order-dependent node, so the SAME cycle can be
+  // printed from a different start across OSes or after an unrelated import edge
+  // shifts enumeration order — which would otherwise read as a false "new cycle".
+  // Rotate to begin at the lexicographically smallest node so both the baseline
+  // and the live scan compare identically; a genuinely different node set still
+  // canonicalizes differently and is still flagged.
+  const nodes = collapsed.split(" > ");
+  if (nodes.length < 2) return collapsed;
+  let minIdx = 0;
+  for (let i = 1; i < nodes.length; i += 1) {
+    if (nodes[i] < nodes[minIdx]) minIdx = i;
+  }
+  return [...nodes.slice(minIdx), ...nodes.slice(0, minIdx)].join(" > ");
 }
 
 function parseMadgeStdout(stdout) {
