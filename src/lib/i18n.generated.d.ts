@@ -3343,6 +3343,10 @@ export interface TStructure {
       colActor: string;
       colTarget: string;
     };
+    colSignature: string;
+    colProcessed: string;
+    sigValid: string;
+    sigInvalid: string;
   };
   nav: {
     integrations: string;

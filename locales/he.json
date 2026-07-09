@@ -3339,7 +3339,11 @@
       "colAction": "פעולה",
       "colActor": "מבצע",
       "colTarget": "יעד"
-    }
+    },
+    "colSignature": "חתימה",
+    "colProcessed": "עובד",
+    "sigValid": "תקינה",
+    "sigInvalid": "לא תקינה"
   },
   "nav": {
     "integrations": "אינטגרציות",

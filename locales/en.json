@@ -3339,7 +3339,11 @@
       "colAction": "Action",
       "colActor": "Actor",
       "colTarget": "Target"
-    }
+    },
+    "colSignature": "Signature",
+    "colProcessed": "Processed",
+    "sigValid": "Valid",
+    "sigInvalid": "Invalid"
   },
   "nav": {
     "integrations": "Integrations",

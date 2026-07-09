@@ -773,6 +773,13 @@ export const api = {
         requestId: string;
       }>("/api/admin/rfid-readers"),
   },
+  webhooks: {
+    list: () =>
+      request<{
+        clinicId: string;
+        events: import("@/types").WebhookEventRow[];
+      }>("/api/admin/webhooks"),
+  },
   equipmentGovernance: {
     getReadinessRules: () =>
       request<{
