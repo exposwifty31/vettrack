@@ -7,6 +7,7 @@ import {
   Home, Package, Grid, Bell, MapPin, Settings,
   List, ListTodo, Scan, Plus, Activity, Gauge, Boxes, Clock,
   Cable, Webhook, BellRing, RadioTower, Users, ShieldCheck, ScrollText, BarChart3,
+  MonitorSmartphone,
 } from "lucide-react";
 import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
 import { NAV } from "@/lib/routes/nav-model";
@@ -27,6 +28,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Home, Package, Grid, Bell, MapPin, Settings,
   List, ListTodo, Scan, Plus, Activity, Gauge, Boxes, Clock,
   Cable, Webhook, BellRing, RadioTower, Users, ShieldCheck, ScrollText, BarChart3,
+  MonitorSmartphone,
 };
 
 function navLabel(key: string): string {

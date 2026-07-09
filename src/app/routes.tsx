@@ -9,6 +9,7 @@ import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { WebOnlyGuard } from "@/app/platform/guards/WebOnlyGuard";
 import { ManagementGuard } from "@/desktop/management";
 import { useIsNativeTablet } from "@/native/tablet/useIsNativeTablet";
+import { hasStoredDisplayToken } from "@/lib/display-token-store";
 
 const CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
@@ -39,6 +40,7 @@ const CrashCartCheckPage = lazy(() => import("@/pages/crash-cart"));
 const CodeBlueHistoryPage = lazy(() => import("@/pages/code-blue-history"));
 const WardDisplayPage = lazy(() => import("@/pages/display"));
 const CommandBoardScreen = lazy(() => import("@/features/command-board"));
+const BoardPairPage = lazy(() => import("@/pages/board-pair"));
 const HandoffPage = lazy(() => import("@/pages/handoff"));
 const NotFoundPage = lazy(() => import("@/pages/not-found"));
 const ScanPage = lazy(() => import("@/pages/scan"));
@@ -73,6 +75,7 @@ const AuditConsolePage = lazy(() => import("@/pages/console/AuditConsolePage"));
 const InventoryConsolePage = lazy(() => import("@/pages/console/InventoryConsolePage"));
 const OpsHealthConsolePage = lazy(() => import("@/pages/console/OpsHealthConsolePage"));
 const PeopleRolesConsolePage = lazy(() => import("@/pages/console/PeopleRolesConsolePage"));
+const DisplaysConsolePage = lazy(() => import("@/pages/console/DisplaysConsolePage"));
 
 function RedirectPreserveSearch({ to }: { to: string }) {
   const search = useSearch();
@@ -102,6 +105,10 @@ export function AppRoutes() {
   // iPad (native tablet) uses combined `/base/:id?` routes so the master list
   // stays mounted while the detail pane swaps; phone/web keep separate routes.
   const isNativeTablet = useIsNativeTablet();
+  // Phase 9 — a paired display device (device token in localStorage, no Clerk
+  // user) may view /board without AuthGuard. The stored token still authorizes
+  // every board data request server-side; AuthGuard stays for normal users.
+  const isDisplayPaired = hasStoredDisplayToken();
   return (
     <PageErrorBoundary fallbackLabel="Page rendering failed">
       <Switch>
@@ -127,7 +134,15 @@ export function AppRoutes() {
         {/* already does the gating WebOnlyGuard would: native → mobile (NativeShell), */}
         {/* narrow browser at /board → board (full BoardShell kiosk, not the desktop */}
         {/* interstitial). BoardShell (via PlatformRouter) owns the dark kiosk chrome. */}
-        <Route path="/board"><AuthGuard><CommandBoardScreen kioskMode /></AuthGuard></Route>
+        <Route path="/board">
+          {isDisplayPaired
+            ? <CommandBoardScreen kioskMode />
+            : <AuthGuard><CommandBoardScreen kioskMode /></AuthGuard>}
+        </Route>
+        {/* Display-device pairing kiosk. NO AuthGuard — a headless display has no */}
+        {/* Clerk user; it redeems a pairing code for a device token, then → /board. */}
+        {/* Matches isBoardPathname (/board/*) so it renders inside BoardShell. */}
+        <Route path="/board/pair"><BoardPairPage /></Route>
         <Route path="/equipment/:id/edit"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/:id/qr"><AuthGuard><WebOnlyGuard><EquipmentQrPrintPage /></WebOnlyGuard></AuthGuard></Route>
         {isNativeTablet
@@ -181,6 +196,7 @@ export function AppRoutes() {
         <Route path="/admin/inventory"><AuthGuard><WebOnlyGuard><ManagementGuard><InventoryConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/ops/health"><AuthGuard><WebOnlyGuard><ManagementGuard><OpsHealthConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/admin/people"><AuthGuard><WebOnlyGuard><ManagementGuard><PeopleRolesConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/admin/displays"><AuthGuard><WebOnlyGuard><ManagementGuard><DisplaysConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/settings"><AuthGuard><SettingsPage /></AuthGuard></Route>
         <Route path="/help"><AuthGuard><HelpPage /></AuthGuard></Route>
         <Route path="/audit-log"><AuthGuard><WebOnlyGuard><AuditLogPage /></WebOnlyGuard></AuthGuard></Route>

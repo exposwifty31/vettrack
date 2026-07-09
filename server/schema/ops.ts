@@ -422,3 +422,35 @@ export const taskOwnershipConfirmQueue = vtTable(
   }),
 );
 export type TaskOwnershipConfirmQueueRow = typeof taskOwnershipConfirmQueue.$inferSelect;
+
+/**
+ * Phase 9 — Display-device pairing. A paired, headless display device (kiosk /
+ * board) authenticates with a long-lived bearer token whose sha256 hash is
+ * stored here (never the raw token). Scoped, deliberate exception to the
+ * ephemeral display-heartbeat contract: this row IS a persistent device
+ * identity, kept separate from `display-heartbeat-store` liveness state.
+ * `revokedAt IS NULL` is enforced on every auth lookup; `lastSeenAt` is a
+ * best-effort presence bump and carries no clinical meaning.
+ */
+export const displayDevices = vtTable(
+  "vt_display_devices",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    tokenHashUq: uniqueIndex("ux_vt_display_devices_token_hash").on(t.tokenHash),
+    clinicActiveIdx: index("idx_vt_display_devices_clinic_active")
+      .on(t.clinicId)
+      .where(sql`${t.revokedAt} IS NULL`),
+  }),
+);
+export type DisplayDevice = typeof displayDevices.$inferSelect;

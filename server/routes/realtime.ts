@@ -2,7 +2,7 @@ import type { Response } from "express";
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { and, asc, eq, gt, isNotNull, sql } from "drizzle-orm";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireDisplayOrUser } from "../middleware/auth.js";
 import { db, eventOutbox } from "../db.js";
 import { outboxEmitter, type PublishedOutboxRow } from "../lib/event-publisher.js";
 import { incrementMetric } from "../lib/metrics.js";
@@ -570,7 +570,7 @@ router.post("/telemetry", requireAuth, (req, res) => {
 });
 
 /** Outbox-backed SSE; all domain events use monotonic `vt_event_outbox.id` (`Last-Event-ID` resume). */
-router.get("/stream", requireAuth, async (req, res) => {
+router.get("/stream", requireDisplayOrUser, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId?.trim();

@@ -1,8 +1,9 @@
 import type { Request, Response, NextFunction } from "express";
 import * as Sentry from "@sentry/node";
 import { clerkClient } from "@clerk/express";
-import { clinics, db, users } from "../db.js";
+import { clinics, db, displayDevices, users } from "../db.js";
 import { and, eq, isNull, sql } from "drizzle-orm";
+import { constantTimeEqual, hashToken, looksLikeDisplayToken } from "../lib/display-token.js";
 import { randomUUID } from "crypto";
 import { STABILITY_TOKEN } from "../lib/stability-token.js";
 import { resolveCurrentRole } from "../lib/role-resolution.js";
@@ -36,6 +37,10 @@ declare global {
       effectiveRole?: string;
       roleSource?: string;
       activeShift?: unknown;
+      /** Phase 9 — set by `requireDisplayOrUser` when a display device token authenticated. */
+      isDisplayAuth?: boolean;
+      /** Phase 9 — vt_display_devices.id of the authenticated display device (display path only). */
+      displayDeviceId?: string;
     }
   }
 }
@@ -667,6 +672,139 @@ export function createRequireAuthAny(resolver: AuthResolver = resolveAuthUser) {
 }
 
 export const requireAuthAny = createRequireAuthAny();
+
+// ── Phase 9 — Display-device pairing auth (ADDITIVE) ─────────────────────────
+//
+// A sibling resolver + middleware for headless paired display devices. These are
+// NEW exports; `resolveAuthUser` and every existing `requireAuth*` path are left
+// byte-identical. A display token is accepted ONLY on routes that opt in via
+// `requireDisplayOrUser`. On every other (requireAuth-guarded) route a display
+// token is NOT a valid Clerk credential, so in Clerk mode it is rejected with 401
+// — the deny-list holds by construction. (In dev-bypass, requireAuth returns the
+// hardcoded admin for ANY request; that is the pre-existing dev-only behavior and
+// why deny-list tests must force Clerk mode.)
+
+export type DisplayAuthResult =
+  | { ok: true; clinicId: string; deviceId: string }
+  | { ok: false; status: number; body: Record<string, string> };
+
+/** Lookup contract for an active (non-revoked) display device by token hash. */
+export type DisplayDeviceLookup = (
+  tokenHash: string,
+) => Promise<{ id: string; clinicId: string; tokenHash: string } | null>;
+
+/**
+ * Read a display token from `x-display-token`, or from an `Authorization: Bearer`
+ * header ONLY when the bearer value has the `vtd_` display-token shape. A Clerk
+ * JWT bearer is deliberately NOT treated as a display token so those requests
+ * continue to flow through the existing user resolver untouched.
+ */
+export function extractDisplayToken(req: Request): string | null {
+  const headerVal = req.headers["x-display-token"];
+  const fromHeader =
+    typeof headerVal === "string"
+      ? headerVal.trim()
+      : Array.isArray(headerVal)
+        ? headerVal[0]?.trim() ?? ""
+        : "";
+  if (fromHeader) return fromHeader;
+
+  const authz = typeof req.headers.authorization === "string" ? req.headers.authorization : "";
+  const match = authz.match(/^Bearer\s+(\S+)$/i);
+  if (match && looksLikeDisplayToken(match[1])) return match[1];
+  return null;
+}
+
+// tenant-lint:scoped auth resolver — clinic is DERIVED from the globally-unique token_hash, not filtered by it
+async function lookupActiveDisplayDevice(
+  tokenHash: string,
+): Promise<{ id: string; clinicId: string; tokenHash: string } | null> {
+  const [row] = await db
+    .select({
+      id: displayDevices.id,
+      clinicId: displayDevices.clinicId,
+      tokenHash: displayDevices.tokenHash,
+    })
+    // tenant-lint:scoped auth lookup keyed by unique token_hash; clinicId is the RESULT, not a filter
+    .from(displayDevices)
+    .where(and(eq(displayDevices.tokenHash, tokenHash), isNull(displayDevices.revokedAt)))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * Resolve a display-device token to its clinic. Reads `x-display-token` / bearer,
+ * hashes it, and looks up an ACTIVE (`revoked_at IS NULL`) row by token hash.
+ * `lookup` is injectable for tests; the default hits `vt_display_devices`.
+ */
+export async function resolveDisplayAuth(
+  req: Request,
+  lookup: DisplayDeviceLookup = lookupActiveDisplayDevice,
+): Promise<DisplayAuthResult> {
+  const token = extractDisplayToken(req);
+  if (!token) {
+    return {
+      ok: false,
+      status: 401,
+      body: { error: "UNAUTHORIZED", reason: "MISSING_DISPLAY_TOKEN", message: "Unauthorized" },
+    };
+  }
+
+  const tokenHash = hashToken(token);
+  const row = await lookup(tokenHash);
+  if (!row || !constantTimeEqual(row.tokenHash, tokenHash)) {
+    return {
+      ok: false,
+      status: 401,
+      body: { error: "UNAUTHORIZED", reason: "INVALID_DISPLAY_TOKEN", message: "Unauthorized" },
+    };
+  }
+
+  return { ok: true, clinicId: row.clinicId, deviceId: row.id };
+}
+
+/**
+ * Middleware factory: when a display token is present, authenticate the request
+ * as a display device (sets `req.clinicId` + display markers); otherwise delegate
+ * to the EXISTING user middleware (`requireAuth` by default) with zero changes to
+ * its behavior. A present-but-invalid display token is rejected with 401 and does
+ * NOT fall through to the user path (so a bad token can never reach dev-bypass admin).
+ */
+export function createRequireDisplayOrUser(
+  resolveDisplay: (req: Request) => Promise<DisplayAuthResult> = resolveDisplayAuth,
+  userMiddleware: (req: Request, res: Response, next: NextFunction) => unknown = requireAuth,
+) {
+  return async function requireDisplayOrUserHandler(req: Request, res: Response, next: NextFunction) {
+    if (!extractDisplayToken(req)) {
+      return userMiddleware(req, res, next);
+    }
+    const requestId = resolveRequestId(req, res);
+    try {
+      const result = await resolveDisplay(req);
+      if (!result.ok) {
+        return res.status(result.status).json({ ...result.body, requestId });
+      }
+      req.clinicId = result.clinicId;
+      req.isDisplayAuth = true;
+      req.displayDeviceId = result.deviceId;
+      req.locale = resolveRequestLocale(req);
+      return next();
+    } catch (err) {
+      const status = isLikelyInvalidTokenError(err) ? 401 : 500;
+      console.error("[auth] requireDisplayOrUser error", err);
+      return res.status(status).json(
+        buildApiErrorBody({
+          code: status === 401 ? "UNAUTHORIZED" : "AUTH_FAILED",
+          reason: status === 401 ? "INVALID_DISPLAY_TOKEN" : "AUTH_HANDLER_ERROR",
+          message: status === 401 ? "Invalid display token" : "Auth failed",
+          requestId,
+        }),
+      );
+    }
+  };
+}
+
+export const requireDisplayOrUser = createRequireDisplayOrUser();
 
 export function requireAdmin(
   req: Request,

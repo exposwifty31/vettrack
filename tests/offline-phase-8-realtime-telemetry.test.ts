@@ -9,6 +9,9 @@ vi.mock("../server/middleware/auth.js", () => ({
   requireAuth: (_req: Request, _res: Response, next: NextFunction) => {
     next();
   },
+  requireDisplayOrUser: (_req: Request, _res: Response, next: NextFunction) => {
+    next();
+  },
 }));
 
 type Captured = { statusCode: number; body: Record<string, unknown> };

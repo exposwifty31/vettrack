@@ -122,6 +122,15 @@ export const WEB_MANAGEMENT_NAV: WebManagementNavNode[] = [
     group: "administration",
     reach: "management.web",
   },
+  {
+    id: "mgmt-displays",
+    labelKey: "nav.displays",
+    href: "/admin/displays",
+    icon: "MonitorSmartphone",
+    group: "administration",
+    reach: "management.web",
+    writeCap: "management.webWrite",
+  },
 ];
 
 /** Flattened href list (active-state + dead-link tests; mirrors NAV_HREFS). */

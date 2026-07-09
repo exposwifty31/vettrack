@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { resolveApiUrl } from "@/lib/api-origin";
 import { getCurrentClinicId } from "@/lib/auth-store";
 import { applyEvent, DISPLAY_SNAPSHOT_QUERY_KEY, forceResyncWardErCaches, resetRealtimeCaches } from "@/lib/event-reducer";
+import { getStoredDisplayToken, clearStoredDisplayToken } from "@/lib/display-token-store";
 import type { RealtimeEvent } from "@/types/realtime-events";
 import { SUPPORTED_REALTIME_EVENT_SCHEMA_VERSION } from "../../shared/realtime-schema-version";
 
@@ -763,8 +764,161 @@ export class EventIngestor {
   }
 }
 
+/**
+ * Dispatch one raw SSE `data:` payload to keepalive subscribers or the outbox
+ * ingestors + legacy handlers. Shared by the native EventSource path and the
+ * Phase 9 display fetch-reader path so both interpret frames identically.
+ */
+function dispatchRealtimeMessage(rawData: string): void {
+  try {
+    const parsed = JSON.parse(rawData) as unknown;
+    // Phase 9 PR 9.4 — intercept structured KEEPALIVE events. These carry
+    // the server's view of activeCodeBlueSessionId + reconnect stormHint
+    // and are routed only to keepalive subscribers, never to outbox
+    // ingestors / legacy handlers.
+    if (isKeepaliveEnvelope(parsed)) {
+      for (const cb of keepaliveSubscribers) {
+        try {
+          cb(parsed.payload);
+        } catch {
+          // never let one subscriber break the others
+        }
+      }
+      return;
+    }
+    const realtimeEvent = parsed as RealtimeEvent;
+    maybeReportPropagation(realtimeEvent);
+    for (const ing of ingestors) {
+      ing.ingest(realtimeEvent);
+    }
+    for (const h of legacyHandlers) {
+      h(realtimeEvent);
+    }
+  } catch {
+    // Ignore malformed payloads to keep stream alive.
+  }
+}
+
+// Phase 9 — paired display-device SSE. A native EventSource cannot set the
+// `x-display-token` header the server's `requireDisplayOrUser` middleware needs,
+// so a headless display (no Clerk cookie) reads the SAME `/api/realtime/stream`
+// over fetch, header-authenticated. This is additive and gated on a stored
+// display token; the native user path (below) is left byte-identical.
+let displayStreamController: AbortController | null = null;
+let displayReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleDisplayReconnect(displayToken: string, delayMs = 3000): void {
+  if (streamSubscriptions <= 0) return;
+  if (displayReconnectTimer) return;
+  displayReconnectTimer = setTimeout(() => {
+    displayReconnectTimer = null;
+    if (streamSubscriptions <= 0) return;
+    void attachDisplayStream(displayToken);
+  }, delayMs);
+}
+
+/** Parse one SSE frame (`event:` / `data:` lines). Named CONNECTION_EVICTED forces a reconnect. */
+function handleDisplaySseFrame(frame: string, displayToken: string): void {
+  let eventName = "message";
+  const dataLines: string[] = [];
+  for (const line of frame.split("\n")) {
+    if (line.startsWith("event:")) eventName = line.slice(6).trim();
+    else if (line.startsWith("data:")) dataLines.push(line.slice(5).replace(/^ /, ""));
+    // `id:` lines need no special handling — the ingestor cursor is driven by
+    // each event payload's own outbox id.
+  }
+  if (eventName === "CONNECTION_EVICTED") {
+    displayStreamController?.abort();
+    displayStreamController = null;
+    scheduleDisplayReconnect(displayToken, 2000);
+    return;
+  }
+  if (dataLines.length === 0) return;
+  dispatchRealtimeMessage(dataLines.join("\n"));
+}
+
+async function attachDisplayStream(displayToken: string): Promise<void> {
+  if (displayStreamController) return;
+  const controller = new AbortController();
+  displayStreamController = controller;
+
+  const headers: Record<string, string> = {
+    Accept: "text/event-stream",
+    "x-display-token": displayToken,
+  };
+  const lastId = readStoredLastOutboxId();
+  if (lastId != null && lastId > 0) headers["Last-Event-ID"] = String(lastId);
+
+  try {
+    const res = await fetch(resolveApiUrl("/api/realtime/stream"), {
+      method: "GET",
+      headers,
+      credentials: "include",
+      signal: controller.signal,
+    });
+    if (res.status === 401) {
+      // Token revoked/invalid — stop reconnecting and return to the pairing
+      // kiosk instead of retrying a dead token forever (server load + never recovers).
+      teardownDisplayStream();
+      clearStoredDisplayToken();
+      if (typeof window !== "undefined") window.location.href = "/board/pair";
+      return;
+    }
+    if (!res.ok || !res.body) {
+      scheduleDisplayReconnect(displayToken);
+      return;
+    }
+    // onopen-equivalent: close replay gaps via paginated HTTP catch-up.
+    for (const ing of ingestors) {
+      void ing.replayHttpCatchUpAfter(ing.getLastAppliedEventId());
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let sepIdx = buffer.indexOf("\n\n");
+      while (sepIdx !== -1) {
+        const frame = buffer.slice(0, sepIdx);
+        buffer = buffer.slice(sepIdx + 2);
+        handleDisplaySseFrame(frame, displayToken);
+        sepIdx = buffer.indexOf("\n\n");
+      }
+    }
+    // Server closed the stream — reconnect unless we were disposed.
+    scheduleDisplayReconnect(displayToken);
+  } catch {
+    // Aborted (disconnect) or transient network error — reconnect if still subscribed.
+    scheduleDisplayReconnect(displayToken);
+  } finally {
+    if (displayStreamController === controller) {
+      displayStreamController = null;
+    }
+  }
+}
+
+function teardownDisplayStream(): void {
+  if (displayReconnectTimer) {
+    clearTimeout(displayReconnectTimer);
+    displayReconnectTimer = null;
+  }
+  displayStreamController?.abort();
+  displayStreamController = null;
+}
+
 function attachSharedStream(): void {
   if (source) return;
+
+  const displayToken = getStoredDisplayToken();
+  if (displayToken) {
+    // Paired display device: authenticate SSE via fetch + `x-display-token`.
+    // The native EventSource path below is intentionally not used here.
+    if (!displayStreamController) void attachDisplayStream(displayToken);
+    return;
+  }
 
   source = new EventSource(resolveApiUrl("/api/realtime/stream"));
   source.onopen = () => {
@@ -774,33 +928,7 @@ function attachSharedStream(): void {
     }
   };
   source.onmessage = (event) => {
-    try {
-      const parsed = JSON.parse(event.data) as unknown;
-      // Phase 9 PR 9.4 — intercept structured KEEPALIVE events. These carry
-      // the server's view of activeCodeBlueSessionId + reconnect stormHint
-      // and are routed only to keepalive subscribers, never to outbox
-      // ingestors / legacy handlers.
-      if (isKeepaliveEnvelope(parsed)) {
-        for (const cb of keepaliveSubscribers) {
-          try {
-            cb(parsed.payload);
-          } catch {
-            // never let one subscriber break the others
-          }
-        }
-        return;
-      }
-      const realtimeEvent = parsed as RealtimeEvent;
-      maybeReportPropagation(realtimeEvent);
-      for (const ing of ingestors) {
-        ing.ingest(realtimeEvent);
-      }
-      for (const h of legacyHandlers) {
-        h(realtimeEvent);
-      }
-    } catch {
-      // Ignore malformed payloads to keep stream alive.
-    }
+    dispatchRealtimeMessage(event.data);
   };
   source.onerror = () => {
     // Browser EventSource handles reconnect automatically.
@@ -870,6 +998,8 @@ export function disconnectRealtime(options?: {
       legacyHandlers.clear();
       source?.close();
       source = null;
+      // Phase 9 — tear down the display fetch-reader stream too (if any).
+      teardownDisplayStream();
     }
   } catch {
     // Ignore close errors.
