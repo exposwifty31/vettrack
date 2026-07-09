@@ -328,16 +328,20 @@ function looksLikeUuid(s: string): boolean {
   return s.includes("-") && s.length > 20;
 }
 
-function formatDevice(animalId: string | null | undefined): string {
-  if (!animalId) return t.appointmentsPage.unassigned;
-  if (looksLikeUuid(animalId)) return t.appointmentsPage.linkedDevice;
-  return animalId;
+// The `vt_appointments` wire fields are still named animalId/ownerId (frozen
+// /api/appointments contract); in the equipment-first product they carry a
+// device reference and a location label. These render helpers take the wire
+// value under device/location names — client-render clarity only, no wire change.
+function formatDevice(deviceRef: string | null | undefined): string {
+  if (!deviceRef) return t.appointmentsPage.unassigned;
+  if (looksLikeUuid(deviceRef)) return t.appointmentsPage.linkedDevice;
+  return deviceRef;
 }
 
-function formatLocation(ownerId: string | null | undefined): string | null {
-  if (!ownerId) return null;
-  if (looksLikeUuid(ownerId)) return t.appointmentsPage.linkedOwner;
-  return ownerId;
+function formatLocation(location: string | null | undefined): string | null {
+  if (!location) return null;
+  if (looksLikeUuid(location)) return t.appointmentsPage.linkedOwner;
+  return location;
 }
 
 function compactMeta(...parts: (string | null | undefined)[]): string {
@@ -393,8 +397,8 @@ export default function AppointmentsPage() {
   const [conflictReason, setConflictReason] = useState("");
 
   const [formVetId, setFormVetId] = useState("");
-  const [formAnimalId, setFormAnimalId] = useState("");
-  const [formOwnerId, setFormOwnerId] = useState("");
+  const [formDeviceRef, setFormDeviceRef] = useState("");
+  const [formLocation, setFormLocation] = useState("");
   const [formNotes, setFormNotes] = useState("");
   const [formTaskType, setFormTaskType] = useState<Appointment["taskType"]>("maintenance");
   const [formStartLocal, setFormStartLocal] = useState<string>(() => toLocalDateTimeInputValue(new Date()));
@@ -497,16 +501,16 @@ export default function AppointmentsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/dashboard", meUserId ?? ""], exact: true });
       setBookingOpen(false);
       setFormNotes("");
-      setFormAnimalId("");
-      setFormOwnerId("");
+      setFormDeviceRef("");
+      setFormLocation("");
       setFormTaskType("maintenance");
     },
     onError: (error: Error) => {
       if (error.message === "APPOINTMENT_CONFLICT") {
         const payload: CreateAppointmentRequest = {
           vetId: formVetId.trim(),
-          animalId: formAnimalId.trim() || null,
-          ownerId: formOwnerId.trim() || null,
+          animalId: formDeviceRef.trim() || null,
+          ownerId: formLocation.trim() || null,
           startTime: new Date(formStartLocal).toISOString(),
           endTime: new Date(formEndLocal).toISOString(),
           notes: formNotes.trim() || null,
@@ -658,7 +662,7 @@ export default function AppointmentsPage() {
       toast.error(t.appointmentsPage.toast.errorPickTechnician);
       return;
     }
-    if (!formAnimalId.trim()) {
+    if (!formDeviceRef.trim()) {
       toast.error(t.appointmentsPage.toast.errorPickDevice);
       return;
     }
@@ -676,8 +680,8 @@ export default function AppointmentsPage() {
 
     const payload: CreateAppointmentRequest = {
       vetId: formVetId.trim(),
-      animalId: formAnimalId.trim() || null,
-      ownerId: formOwnerId.trim() || null,
+      animalId: formDeviceRef.trim() || null,
+      ownerId: formLocation.trim() || null,
       startTime: start.toISOString(),
       endTime: end.toISOString(),
       notes: formNotes.trim() || null,
@@ -1533,8 +1537,8 @@ export default function AppointmentsPage() {
         id={`${bookingFormId}-asset`}
         dir="ltr"
         className="text-left"
-        value={formAnimalId}
-        onChange={(e) => setFormAnimalId(e.target.value)}
+        value={formDeviceRef}
+        onChange={(e) => setFormDeviceRef(e.target.value)}
         placeholder={t.appointmentsPage.placeholderDevice}
         required
         aria-required="true"
@@ -1549,8 +1553,8 @@ export default function AppointmentsPage() {
         id={`${bookingFormId}-location`}
         dir="ltr"
         className="text-left"
-        value={formOwnerId}
-        onChange={(e) => setFormOwnerId(e.target.value)}
+        value={formLocation}
+        onChange={(e) => setFormLocation(e.target.value)}
         placeholder={t.appointmentsPage.placeholderLocation}
       />
     </div>
@@ -1642,7 +1646,7 @@ export default function AppointmentsPage() {
               disabled={
                 createMutation.isPending
                 || !formVetId.trim()
-                || !formAnimalId.trim()
+                || !formDeviceRef.trim()
                 || !formStartLocal
                 || !formEndLocal
               }
