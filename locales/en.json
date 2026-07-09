@@ -3347,7 +3347,22 @@
     "colChannel": "Channel",
     "colTarget": "Recipient",
     "channelPush": "Push",
-    "channelWhatsapp": "WhatsApp"
+    "channelWhatsapp": "WhatsApp",
+    "inventory": {
+      "title": "Inventory",
+      "subtitle": "Procurement, restock, and low-stock oversight",
+      "tabPurchaseOrders": "Purchase orders",
+      "tabRestock": "Restock sessions",
+      "tabLowStock": "Low stock",
+      "colSupplier": "Supplier",
+      "colContainer": "Container",
+      "colStarted": "Started",
+      "colFinished": "Finished",
+      "colItem": "Item",
+      "colPar": "Par",
+      "colOnHand": "On hand",
+      "colShort": "Short"
+    }
   },
   "nav": {
     "integrations": "Integrations",

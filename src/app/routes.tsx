@@ -70,6 +70,7 @@ const NotificationsConsolePage = lazy(() => import("@/pages/console/Notification
 const RfidReadersConsolePage = lazy(() => import("@/pages/console/RfidReadersConsolePage"));
 const GovernanceConsolePage = lazy(() => import("@/pages/console/GovernanceConsolePage"));
 const AuditConsolePage = lazy(() => import("@/pages/console/AuditConsolePage"));
+const InventoryConsolePage = lazy(() => import("@/pages/console/InventoryConsolePage"));
 const OpsHealthConsolePage = lazy(() => import("@/pages/console/OpsHealthConsolePage"));
 const PeopleRolesConsolePage = lazy(() => import("@/pages/console/PeopleRolesConsolePage"));
 
@@ -177,6 +178,7 @@ export function AppRoutes() {
         <Route path="/admin/rfid-readers"><AuthGuard><WebOnlyGuard><ManagementGuard><RfidReadersConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/admin/governance"><AuthGuard><WebOnlyGuard><ManagementGuard><GovernanceConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/admin/audit-log"><AuthGuard><WebOnlyGuard><ManagementGuard><AuditConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/admin/inventory"><AuthGuard><WebOnlyGuard><ManagementGuard><InventoryConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/ops/health"><AuthGuard><WebOnlyGuard><ManagementGuard><OpsHealthConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/admin/people"><AuthGuard><WebOnlyGuard><ManagementGuard><PeopleRolesConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/settings"><AuthGuard><SettingsPage /></AuthGuard></Route>

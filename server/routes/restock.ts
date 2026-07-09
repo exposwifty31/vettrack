@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
+import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import {
   cancelSession,
@@ -11,6 +11,7 @@ import {
   scanItem,
   startRestockSession,
 } from "../services/restock.service.js";
+import { listRestockSessionsForClinic } from "../services/inventory-console.service.js";
 import {
   handleCheckViolation,
   isCheckViolation,
@@ -19,6 +20,24 @@ import {
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 const router = Router();
+
+/**
+ * GET /api/restock/sessions — management-console oversight (B3). All restock sessions
+ * across the clinic (not just the caller's own), so it is requireAdmin. Read-only.
+ */
+router.get("/sessions", requireAuth, requireAdmin, async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  try {
+    const clinicId = req.clinicId!;
+    const sessions = await listRestockSessionsForClinic(clinicId);
+    res.json({ sessions });
+  } catch (err) {
+    console.error("[restock/sessions] failed", err);
+    res.status(500).json(
+      apiError({ code: "INTERNAL_ERROR", reason: "RESTOCK_SESSIONS_FAILED", message: "Failed to list restock sessions", requestId }),
+    );
+  }
+});
 
 const startSchema = z.object({
   containerId: z.string().uuid(),

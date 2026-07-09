@@ -14,6 +14,7 @@ import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/a
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { listLowStockItems } from "../services/inventory-console.service.js";
 
 // TODO(constraint-handler): unify with db-constraint-errors.ts when adding inventory_items mappings (post-PR #366)
 
@@ -72,6 +73,24 @@ router.get("/", requireAuth, requireEffectiveRole("technician"), async (req, res
     console.error(err);
     res.status(500).json(
       apiError({ code: "INTERNAL_ERROR", reason: "ITEMS_LIST_FAILED", message: "Failed to list inventory items", requestId }),
+    );
+  }
+});
+
+/**
+ * GET /api/inventory-items/low-stock — management-console oversight (B4). Items whose
+ * summed on-hand across containers is below their par level. requireAdmin, read-only.
+ */
+router.get("/low-stock", requireAuth, requireAdmin, async (req, res) => {
+  const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+  try {
+    const clinicId = req.clinicId!;
+    const items = await listLowStockItems(clinicId);
+    res.json({ items });
+  } catch (err) {
+    console.error("[inventory-items/low-stock] failed", err);
+    res.status(500).json(
+      apiError({ code: "INTERNAL_ERROR", reason: "LOW_STOCK_FAILED", message: "Failed to list low-stock items", requestId }),
     );
   }
 });

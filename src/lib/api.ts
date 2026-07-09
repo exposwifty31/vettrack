@@ -890,6 +890,8 @@ export const api = {
       }>("/api/queue/metrics"),
   },
   restock: {
+    sessions: () =>
+      request<{ sessions: import("@/types").RestockSessionRow[] }>("/api/restock/sessions"),
     start: (containerId: string) =>
       request<RestockSession>("/api/restock/start", {
         method: "POST",
@@ -927,6 +929,8 @@ export const api = {
   },
   inventoryItems: {
     list: () => request<InventoryItem[]>("/api/inventory-items"),
+    lowStock: () =>
+      request<{ items: import("@/types").LowStockRow[] }>("/api/inventory-items/low-stock"),
     detail: (id: string) => request<InventoryItemDetail>(`/api/inventory-items/${id}/detail`),
     create: (data: { code: string; label: string; category?: string; nfcTagId?: string | null; parLevel?: number | null; reorderPoint?: number | null }) =>
       request<InventoryItem>("/api/inventory-items", { method: "POST", body: JSON.stringify(data) }),

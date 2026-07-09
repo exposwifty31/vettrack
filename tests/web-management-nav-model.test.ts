@@ -67,6 +67,16 @@ describe("web-management-nav-model — structure", () => {
     expect(gov?.writeCap).toBe("management.webWrite");
   });
 
+  it("7d: Inventory node is present, administration group, read-only", () => {
+    const inv = WEB_MANAGEMENT_NAV.find((n) => n.id === "mgmt-inventory");
+    expect(inv).toBeDefined();
+    expect(inv?.href).toBe("/admin/inventory");
+    expect(inv?.labelKey).toBe("nav.inventory");
+    expect(inv?.icon).toBe("Package");
+    expect(inv?.group).toBe("administration");
+    expect(inv?.writeCap).toBeUndefined();
+  });
+
   it("7e: Audit Log node is present, administration group, read-only", () => {
     const audit = WEB_MANAGEMENT_NAV.find((n) => n.id === "mgmt-audit");
     expect(audit).toBeDefined();

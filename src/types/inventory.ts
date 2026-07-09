@@ -3,6 +3,9 @@
  * No imports from ./index.ts.
  */
 
+// Management-console read rows (Phase 7d) — shared with the server.
+export type { RestockSessionRow, LowStockRow } from "../../shared/inventory-console.js";
+
 export interface InventoryContainer {
   id: string;
   clinicId: string;
@@ -25,7 +28,7 @@ export interface RestockSession {
   clinicId: string;
   containerId: string;
   ownedByUserId: string;
-  status: "active" | "finished";
+  status: "active" | "completed" | "cancelled";
   startedAt: string;
   finishedAt: string | null;
 }
