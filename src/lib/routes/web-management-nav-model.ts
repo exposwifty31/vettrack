@@ -106,6 +106,14 @@ export const WEB_MANAGEMENT_NAV: WebManagementNavNode[] = [
     group: "administration",
     reach: "management.web",
   },
+  {
+    id: "mgmt-inventory",
+    labelKey: "nav.inventory",
+    href: "/admin/inventory",
+    icon: "Package",
+    group: "administration",
+    reach: "management.web",
+  },
 ];
 
 /** Flattened href list (active-state + dead-link tests; mirrors NAV_HREFS). */

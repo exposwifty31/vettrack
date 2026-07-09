@@ -3351,6 +3351,21 @@ export interface TStructure {
     colTarget: string;
     channelPush: string;
     channelWhatsapp: string;
+    inventory: {
+      title: string;
+      subtitle: string;
+      tabPurchaseOrders: string;
+      tabRestock: string;
+      tabLowStock: string;
+      colSupplier: string;
+      colContainer: string;
+      colStarted: string;
+      colFinished: string;
+      colItem: string;
+      colPar: string;
+      colOnHand: string;
+      colShort: string;
+    };
   };
   nav: {
     integrations: string;

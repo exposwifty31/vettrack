@@ -3347,7 +3347,22 @@
     "colChannel": "ערוץ",
     "colTarget": "נמען",
     "channelPush": "פוש",
-    "channelWhatsapp": "וואטסאפ"
+    "channelWhatsapp": "וואטסאפ",
+    "inventory": {
+      "title": "מלאי",
+      "subtitle": "רכש, חידוש מלאי ומעקב מחסור",
+      "tabPurchaseOrders": "הזמנות רכש",
+      "tabRestock": "חידושי מלאי",
+      "tabLowStock": "מלאי נמוך",
+      "colSupplier": "ספק",
+      "colContainer": "מכל",
+      "colStarted": "התחיל",
+      "colFinished": "הסתיים",
+      "colItem": "פריט",
+      "colPar": "יעד",
+      "colOnHand": "במלאי",
+      "colShort": "חוסר"
+    }
   },
   "nav": {
     "integrations": "אינטגרציות",
