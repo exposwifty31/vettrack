@@ -372,6 +372,37 @@ export interface AnalyticsSummary {
     name: string;
     issueCount: number;
   }>;
+  // Phase 7e additive KPIs (real-data-backed, point-in-time unless noted).
+  readiness?: {
+    ready: number;
+    notReady: number;
+    unknown: number;
+    readyPct: number;
+    /** Avg dwell (seconds) of equipment currently not_ready — backlog age, not time-to-ready. */
+    avgNotReadyDwellSeconds: number | null;
+  };
+  occupancy?: {
+    currentlyCheckedOutPct: number;
+    currentlyInUsePct: number;
+  };
+  perRoom?: Array<{
+    roomId: string;
+    roomName: string;
+    total: number;
+    inUse: number;
+    ok: number;
+    issue: number;
+    maintenance: number;
+    sterilized: number;
+  }>;
+  taskOnTime?: {
+    onTimeCount: number;
+    completedCount: number;
+    onTimePct: number | null;
+    /** Prior equal-length window; the one genuine week-over-week delta on this payload. */
+    previousPct: number | null;
+    deltaPct: number | null;
+  };
 }
 
 export interface BulkDeleteRequest {

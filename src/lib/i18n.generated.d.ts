@@ -3366,6 +3366,23 @@ export interface TStructure {
       colOnHand: string;
       colShort: string;
     };
+    analytics: {
+      exportCsv: string;
+      readinessTitle: string;
+      readyRate: string;
+      notReadyBacklog: string;
+      dwellLabel: string;
+      occupancyTitle: string;
+      checkedOut: string;
+      inUse: string;
+      onTimeTitle: string;
+      onTimeCompleted: string;
+      vsPrevious: string;
+      perRoomTitle: string;
+      colTotal: string;
+      colInUse: string;
+      unassignedRoom: string;
+    };
   };
   nav: {
     integrations: string;
