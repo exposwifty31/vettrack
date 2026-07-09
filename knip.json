@@ -1,6 +1,13 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "drizzle": false,
+  "ignoreDependencies": [
+    "@capacitor/camera",
+    "@capacitor/ios",
+    "@clerk/clerk-sdk-node",
+    "madge",
+    "@types/react-window"
+  ],
   "ignore": [
     "android/**",
     "ios/**",
