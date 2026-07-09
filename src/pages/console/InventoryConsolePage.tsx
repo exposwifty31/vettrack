@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Package } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
@@ -80,6 +80,21 @@ export default function InventoryConsolePage() {
     { key: "lowstock", label: t.console.inventory.tabLowStock },
   ];
 
+  // WAI-ARIA Tabs keyboard pattern: roving tabindex + Arrow/Home/End navigation.
+  const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ po: null, restock: null, lowstock: null });
+  const onTabKeyDown = (e: React.KeyboardEvent, idx: number) => {
+    let nextIdx: number | null = null;
+    if (e.key === "ArrowRight") nextIdx = (idx + 1) % TABS.length;
+    else if (e.key === "ArrowLeft") nextIdx = (idx - 1 + TABS.length) % TABS.length;
+    else if (e.key === "Home") nextIdx = 0;
+    else if (e.key === "End") nextIdx = TABS.length - 1;
+    if (nextIdx === null) return;
+    e.preventDefault();
+    const nextKey = TABS[nextIdx].key;
+    setTab(nextKey);
+    tabRefs.current[nextKey]?.focus();
+  };
+
   return (
     <AppShell>
       <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-6">
@@ -94,11 +109,14 @@ export default function InventoryConsolePage() {
         {hasServerAccess ? (
           <>
             <div role="tablist" className="inline-flex rounded-lg border border-border p-1">
-              {TABS.map((tb) => (
+              {TABS.map((tb, i) => (
                 <button
                   key={tb.key}
+                  ref={(el) => (tabRefs.current[tb.key] = el)}
                   role="tab"
                   aria-selected={tab === tb.key}
+                  tabIndex={tab === tb.key ? 0 : -1}
+                  onKeyDown={(e) => onTabKeyDown(e, i)}
                   onClick={() => setTab(tb.key)}
                   className={cn(
                     "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",

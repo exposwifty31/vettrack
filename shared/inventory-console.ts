@@ -2,10 +2,13 @@
  * Inventory management-console read rows (Phase 7d). Clinic-scoped, read-only
  * oversight views: restock sessions (B3) and low-stock items (B4).
  */
+/** Restock session lifecycle (mirrors vt_restock_sessions.status). */
+export type RestockSessionStatus = "active" | "completed" | "cancelled";
+
 export type RestockSessionRow = {
   id: string;
   containerName: string;
-  status: string;
+  status: RestockSessionStatus;
   startedAt: string;
   finishedAt: string | null;
 };

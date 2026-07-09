@@ -1,6 +1,6 @@
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { db, restockSessions, containers, inventoryItems, containerItems } from "../db.js";
-import type { RestockSessionRow, LowStockRow } from "../../shared/inventory-console.js";
+import type { RestockSessionRow, RestockSessionStatus, LowStockRow } from "../../shared/inventory-console.js";
 
 const LIST_LIMIT = 100;
 
@@ -26,7 +26,8 @@ export async function listRestockSessionsForClinic(clinicId: string): Promise<Re
   return rows.map((r) => ({
     id: r.id,
     containerName: r.containerName,
-    status: r.status,
+    // DB text column; the schema constrains it to the lifecycle set.
+    status: r.status as RestockSessionStatus,
     startedAt: r.startedAt.toISOString(),
     finishedAt: r.finishedAt ? r.finishedAt.toISOString() : null,
   }));

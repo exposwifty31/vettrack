@@ -99,4 +99,26 @@ describe("InventoryConsolePage — lazy tab switching", () => {
     expect(await screen.findByText("Saline 500ml")).toBeTruthy();
     expect(screen.getByText("16")).toBeTruthy(); // short = par 20 − onHand 4
   });
+
+  it("moves between tabs with ArrowRight (WAI-ARIA roving tabindex)", async () => {
+    renderPage();
+    await screen.findByText("Acme Vet Supply");
+    const poTab = screen.getByRole("tab", { name: t.console.inventory.tabPurchaseOrders });
+    poTab.focus();
+    fireEvent.keyDown(poTab, { key: "ArrowRight" });
+    expect(await screen.findByText("Crash Cart A")).toBeTruthy(); // restock tab now active
+  });
+});
+
+describe("InventoryConsolePage — resilience", () => {
+  it("keeps the chrome and degrades to the error affordance when the PO fetch fails", async () => {
+    mockCan.mockImplementation((cap) => cap === "management.webWrite");
+    poMock.mockRejectedValue(new Error("po boom")); // retry:false → single failure
+    renderPage();
+    // Chrome (title + tablist) renders regardless of the fetch outcome.
+    expect(screen.getByText(t.console.inventory.title)).toBeTruthy();
+    // DataTable error branch exposes a retry control; NOT the zero-rows empty state.
+    expect((await screen.findAllByRole("button")).length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText(t.console.state.empty)).toBeNull();
+  });
 });
