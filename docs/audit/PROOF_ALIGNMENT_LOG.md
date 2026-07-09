@@ -1788,3 +1788,22 @@ Each group committed separately, full suite green per group. Audit-report branch
 **R5 — historical-doc noise trim (docs-only).** The pre-2026 historical/handoff noise was already handled: IMP-003 bannered `strict-schema-audit.md` + `due-diligence-report.md`; IMP-005 deleted the GitLab docs; IMP-006 ran the pre-Phase-7 cleanup. Remaining `docs/design/` files are current 2026-07 planning artifacts (`program-plan.md`, `phase-7-execution-roadmap.md`, `web-management-brief.md`, the two 2026-07-07 web-console audits), not noise — no additional bannering needed. Recorded here per the IMP-003 pattern.
 
 **Verdict:** VERIFIED (R3 code + gates; R4/R5 docs reconciliation).
+
+---
+
+## 2026-07-09 — Phase 9: Display-device pairing (server + client, own PR)
+
+**Claim:** Additive display-token auth for headless paired wall displays — new `vt_display_devices` table, a sibling auth resolver (existing auth byte-identical), pairing + management endpoints, a `/board/pair` kiosk screen, a Displays admin console, and the runtime plumbing for a paired display to render the board.
+
+**Security-critical verification (checked against real code, not the subagent's report):**
+- `resolveAuthUser` **byte-identical** — `git diff -U0 server/middleware/auth.ts` hunks are at lines 4/6 (imports), 40 (`declare global` markers), and 676+ (new sibling block); NONE overlap the `resolveAuthUser` body (245–496). `tests/auth-hardening.test.ts` **unmodified** (`git status` clean) and green.
+- **Deny-list by construction + test forces Clerk mode:** `tests/display-token-deny-list.test.ts` wraps each assertion in `withClerkMode` (sets `CLERK_SECRET_KEY`, clears `CLERK_ENABLED`) so `resolveAuthUser` cannot dev-bypass; a `vtd_` token in bearer/`x-display-token`/both → 401 on the `requireAuth` guard. Also proves `requireDisplayOrUser` never falls through to the user path on a bad token (so a bad token can't reach dev-bypass admin).
+- **Resolver safety** (`auth.ts:702–807`): `extractDisplayToken` only treats `vtd_`-prefixed bearers as display tokens (Clerk JWTs untouched); `lookupActiveDisplayDevice` filters `revoked_at IS NULL` keyed by unique `token_hash` (clinic is the RESULT, tenant-lint waiver annotated) + constant-time hash equality; `requireDisplayOrUser` sets only `req.clinicId` + display markers (never a fake `authUser` → admin routes stay `requireAuth`+`requireAdmin`).
+- **Client scoping** (`auth-fetch.ts`): the `x-display-token` branch runs only when `!getCurrentUserId()` AND a `vtd_` token is stored — a signed-in user never enters it (user path byte-identical). `/board` drops `AuthGuard` only when a token is stored; the **server enforces the token on every request** so a forged localStorage token yields 401 (empty shell, no data leak). `realtime.ts` leaves the native `EventSource` path untouched for users; the fetch-based display SSE reader reuses the shared `dispatchRealtimeMessage` (same cursor/envelope).
+- **Frozen surfaces held:** SSE cursor/envelope/replay unchanged (only the `/stream` auth middleware swapped); `AuditActionType` append-only (+4 `display_*` kinds); OFF-07 route ratchet catalogs the display routes as NON-emergency (no SW cache bypass); migration is one new table (hand-authored `160_`; `drizzle-kit generate` deliberately NOT run — snapshot drift).
+
+**Commands:** `pnpm typecheck` → exit 0 · `CI=true pnpm test` → `446 files / 4223 passed` · `pnpm i18n:check` → deep parity · `pnpm architecture:gates` → G1 passed (0 cycles) · `pnpm db:migrate` → `160_vt_display_devices.sql` applied, `\d` confirms columns/indexes/FK.
+
+**Board flow NOT live-walked** (III.6 deferral stands — no physical display available); this entry claims static + suite + migration evidence. Board canonicalization (`/equipment/board`→`/board`) intentionally deferred to Phase 10.
+
+**Verdict:** VERIFIED (server security core + client plumbing; gates green; existing auth byte-identical).
