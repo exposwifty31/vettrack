@@ -102,6 +102,34 @@ export function homeSurfaceForRole(role: UserRole | ShiftRole): HomeSurface {
 }
 
 /**
+ * Standing authority / governance capabilities WITHHELD from the student archetype.
+ *
+ * Doctrine — "student = restricted tech" (Phase 8): a student is a technician MINUS
+ * standing authority. So `student` is DERIVED as `tech − WITHHELD_FROM_STUDENT`,
+ * never hand-listed — the mirror of the SECONDARY_ADMIN_CAPS "admin set MINUS
+ * shift-chat" style below. The payoff is a one-way ratchet: a capability added to
+ * `tech` later either flows to students automatically (a shared floor affordance) or
+ * is named here (standing authority) — it can never SILENTLY leak into the student
+ * grant. Withheld = code-blue command + admin nav + the web-console grants. Shift-
+ * scoped collaboration (shiftChat.*) is deliberately NOT withheld: a student elevated
+ * on a shift still earns it through the SHIFT_SENSITIVE overlay in `resolveCapabilities`,
+ * which this set does not touch (it filters only the permanent tech→student base).
+ *
+ * Today `tech = ["codeBlue.manage"]`, so the derivation yields `student = []` —
+ * BYTE-IDENTICAL to the pre-Phase-8 literal `student: []` (see experience-model test).
+ * Extend THIS set (never the student list) if an authority cap ever lands in tech.
+ */
+const WITHHELD_FROM_STUDENT: ReadonlySet<Capability> = new Set<Capability>([
+  "codeBlue.manage",
+  "app.adminNav",
+  "management.web",
+  "management.webWrite",
+]);
+
+/** Technician base grant — the floor authority the student archetype is a restricted subset of. */
+const TECH_CAPABILITIES: readonly Capability[] = ["codeBlue.manage"];
+
+/**
  * Base capability grant per archetype — reproduces the pre-Phase-2 ad-hoc checks:
  * - codeBlue.manage      : isAdmin || vet || senior_technician || technician  (layout:466)
  * - shiftChat.broadcast  : senior_technician || admin                         (ShiftChatPanel)
@@ -121,8 +149,31 @@ const CAPABILITIES_BY_ARCHETYPE: Record<ExperienceArchetype, readonly Capability
   ],
   vet: ["codeBlue.manage", "shiftChat.pin", "equipment.vetActions"],
   lead: ["codeBlue.manage", "shiftChat.broadcast", "shiftChat.pin", "management.web"],
-  tech: ["codeBlue.manage"],
-  student: [],
+  tech: TECH_CAPABILITIES,
+  // student = tech − WITHHELD_FROM_STUDENT (restricted technician). Derived, not
+  // literal, so it is a strict subset of tech by construction. Today → [].
+  student: TECH_CAPABILITIES.filter((c) => !WITHHELD_FROM_STUDENT.has(c)),
+};
+
+/**
+ * Per-archetype native tab-bar ORDER (Phase 8 seam). DORMANT data — like
+ * `management.web`, which shipped consumer-less in Phase 2, this ships without a
+ * reader: `NativeTabBar` is frozen this phase. It records the intended primary-tab
+ * emphasis per archetype so a future tab bar can reorder without re-deriving intent:
+ *   - vet     → clinical-first (code-blue / rooms lead)
+ *   - tech    → scan / tasks first (custody throughput)
+ *   - student → guided: tasks first, emergency last (read-mostly)
+ *   - admin / lead → ops-first (fleet coverage / exceptions)
+ * Values are real native-nav item ids (`src/lib/routes/native-nav-model.ts`); the
+ * experience-model test asserts totality over the 5 archetypes + id validity. This
+ * is ORDERING only — it grants nothing; access stays the capability set + server.
+ */
+export const TAB_BAR_ORDER_BY_ARCHETYPE: Record<ExperienceArchetype, readonly string[]> = {
+  admin: ["today", "equipment", "alerts", "rooms", "scan"],
+  lead: ["today", "equipment", "alerts", "rooms", "scan"],
+  vet: ["today", "emergency", "rooms", "equipment", "tasks"],
+  tech: ["today", "scan", "tasks", "equipment", "emergency"],
+  student: ["today", "tasks", "equipment", "scan", "emergency"],
 };
 
 /**

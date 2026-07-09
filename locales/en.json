@@ -826,7 +826,15 @@
     "myEquipment": "My equipment",
     "myEquipmentEmpty": "Nothing checked out",
     "inYourCare": "in your care",
-    "scanCta": "Scan equipment"
+    "scanCta": "Scan equipment",
+    "clinicalReadiness": "Clinical readiness",
+    "clinicalReadinessEmpty": "No equipment to review yet",
+    "clinicalActions": "Clinical actions",
+    "codeBlueReadinessHint": "Check emergency response readiness",
+    "crashCartHint": "Verify the crash cart is stocked",
+    "roomReadinessHint": "Review room verification status",
+    "guidedTitle": "Guided mode",
+    "guidedBody": "Work through your tasks and scans step by step. Check with a supervisor before any emergency action."
   },
   "home": {
     "equipmentOverview": "Equipment overview",

@@ -19,7 +19,11 @@ const repoRoot = path.resolve(__dirname, "..");
 const read = (...p) => fs.readFileSync(path.join(repoRoot, ...p), "utf8");
 
 const homeShell = read("src", "features", "today", "surfaces", "HomeShell.tsx");
-const floorSurface = read("src", "features", "today", "surfaces", "FloorHomeSurface.tsx");
+// Phase 8: FloorHomeSurface became a dispatcher; the floor CONTENT (and its
+// error-branch invariant) moved into the per-archetype floor surfaces.
+const techSurface = read("src", "features", "today", "surfaces", "TechHomeSurface.tsx");
+const vetSurface = read("src", "features", "today", "surfaces", "VetHomeSurface.tsx");
+const studentSurface = read("src", "features", "today", "surfaces", "StudentHomeSurface.tsx");
 const opsSurface = read("src", "features", "today", "surfaces", "OpsHomeSurface.tsx");
 const quickScan = read("src", "features", "today", "QuickScanCard.tsx");
 
@@ -37,8 +41,8 @@ describe("Stage 3 Today — offline state (HomeShell)", () => {
 });
 
 describe("Stage 3 Today — error replaces content", () => {
-  it("both surfaces gate the content region behind a fetch-error branch", () => {
-    for (const surface of [floorSurface, opsSurface]) {
+  it("every content surface gates the content region behind a fetch-error branch", () => {
+    for (const surface of [techSurface, vetSurface, studentSurface, opsSurface]) {
       expect(/showError\s*\?/.test(surface)).toBe(true);
       expect(surface.includes("<ErrorCard")).toBe(true);
     }

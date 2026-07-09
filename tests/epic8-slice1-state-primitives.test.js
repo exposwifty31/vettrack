@@ -124,7 +124,12 @@ describe("Equipment list state integration", () => {
 describe("Home dashboard state integration", () => {
   const recentActivity = read("src/features/today/surfaces/RecentActivityCard.tsx");
   const onShiftHero = read("src/features/today/surfaces/OnShiftHero.tsx");
-  const floorSurface = read("src/features/today/surfaces/FloorHomeSurface.tsx");
+  // Phase 8: FloorHomeSurface is now a dispatcher; the floor content (and its
+  // ErrorCard/empty-state invariants) live in the per-archetype floor surfaces.
+  const techSurface = read("src/features/today/surfaces/TechHomeSurface.tsx");
+  const vetSurface = read("src/features/today/surfaces/VetHomeSurface.tsx");
+  const studentSurface = read("src/features/today/surfaces/StudentHomeSurface.tsx");
+  const floorSurfaces = [techSurface, vetSurface, studentSurface];
   const opsSurface = read("src/features/today/surfaces/OpsHomeSurface.tsx");
 
   it("home.tsx forks to the ops/floor surfaces (no inline body left)", () => {
@@ -154,14 +159,14 @@ describe("Home dashboard state integration", () => {
   });
 
   it("error state: home surfaces show ErrorCard with retry", () => {
-    for (const surface of [floorSurface, opsSurface]) {
+    for (const surface of [...floorSurfaces, opsSurface]) {
       expect(surface).toContain("<ErrorCard");
       expect(surface).toContain("onRetry");
     }
   });
 
   it("no hardcoded empty-state prose strings remain in the home surfaces", () => {
-    for (const src of [recentActivity, onShiftHero, floorSurface, opsSurface]) {
+    for (const src of [recentActivity, onShiftHero, ...floorSurfaces, opsSurface]) {
       expect(src).not.toContain("No recent activity");
       expect(src).not.toContain("No inventory alerts");
       expect(src).not.toContain("Scans, status changes, and moves show up here");
