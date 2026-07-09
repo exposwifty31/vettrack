@@ -3,10 +3,17 @@
  * are already fully aggregated in the query cache, so there is no server round-trip.
  */
 
-/** Escape one cell: wrap in quotes when it contains a comma, quote, or newline. */
+/**
+ * Escape one cell. First neutralizes spreadsheet formula injection — values
+ * starting with `= + - @`, tab, or CR can execute as formulas in Excel/Sheets, and
+ * this export carries staff-editable strings (e.g. room names) — by prefixing a
+ * single quote. Then applies RFC-4180 quoting when the cell contains a comma,
+ * quote, or newline.
+ */
 function escapeCell(value: unknown): string {
-  const s = value == null ? "" : String(value);
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  const raw = value == null ? "" : String(value);
+  const guarded = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+  return /[",\n\r]/.test(guarded) ? `"${guarded.replace(/"/g, '""')}"` : guarded;
 }
 
 export type CsvCell = string | number | null | undefined;

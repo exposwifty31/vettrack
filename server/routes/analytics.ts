@@ -161,7 +161,11 @@ router.get("/", requireAuth, requireEffectiveRole("student"), async (req, res) =
     };
     const priorFrom = subDays(now, 60);
     const currentFrom = subDays(now, 30);
-    const taskOnTime = computeOnTime(await onTimeCounts(currentFrom, now), await onTimeCounts(priorFrom, currentFrom));
+    const [currentOnTime, priorOnTime] = await Promise.all([
+      onTimeCounts(currentFrom, now),
+      onTimeCounts(priorFrom, currentFrom),
+    ]);
+    const taskOnTime = computeOnTime(currentOnTime, priorOnTime);
 
     const payload = {
       totalEquipment: total,

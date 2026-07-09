@@ -221,12 +221,21 @@ export default function AnalyticsPage() {
                   <Gauge className="w-4 h-4 text-[hsl(var(--status-ok))]" />
                   <span className="text-xs text-muted-foreground font-medium">{t.console.analytics.readinessTitle}</span>
                 </div>
-                <p className="text-2xl font-bold text-foreground">{analytics.readiness?.readyPct ?? 0}%</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{t.console.analytics.readyRate}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {t.console.analytics.notReadyBacklog}: {analytics.readiness?.notReady ?? 0} · {t.console.analytics.dwellLabel}{" "}
-                  {dwellLabel(analytics.readiness?.avgNotReadyDwellSeconds)}
+                <p className="text-2xl font-bold text-foreground">
+                  {analytics.readiness ? `${analytics.readiness.readyPct}%` : t.console.dash}
                 </p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t.console.analytics.readyRate}</p>
+                {analytics.readiness && (
+                  <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                    <span>
+                      {t.console.analytics.notReadyBacklog}:{" "}
+                      <span className="tabular-nums">{analytics.readiness.notReady}</span>
+                    </span>
+                    <span>
+                      {t.console.analytics.dwellLabel} {dwellLabel(analytics.readiness.avgNotReadyDwellSeconds)}
+                    </span>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -236,11 +245,15 @@ export default function AnalyticsPage() {
                   <PackageOpen className="w-4 h-4 text-[hsl(var(--status-issue))]" />
                   <span className="text-xs text-muted-foreground font-medium">{t.console.analytics.occupancyTitle}</span>
                 </div>
-                <p className="text-2xl font-bold text-foreground">{analytics.occupancy?.currentlyInUsePct ?? 0}%</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{t.console.analytics.inUse}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {t.console.analytics.checkedOut}: {analytics.occupancy?.currentlyCheckedOutPct ?? 0}%
+                <p className="text-2xl font-bold text-foreground">
+                  {analytics.occupancy ? `${analytics.occupancy.currentlyInUsePct}%` : t.console.dash}
                 </p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t.console.analytics.inUse}</p>
+                {analytics.occupancy && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t.console.analytics.checkedOut}: {analytics.occupancy.currentlyCheckedOutPct}%
+                  </p>
+                )}
               </CardContent>
             </Card>
 

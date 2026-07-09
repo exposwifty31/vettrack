@@ -48,6 +48,10 @@ describe("computeOccupancy", () => {
     ];
     expect(computeOccupancy(rows)).toEqual({ currentlyCheckedOutPct: 25, currentlyInUsePct: 50 });
   });
+
+  it("returns 0/0 for an empty fleet (no divide-by-zero)", () => {
+    expect(computeOccupancy([])).toEqual({ currentlyCheckedOutPct: 0, currentlyInUsePct: 0 });
+  });
 });
 
 describe("computePerRoom", () => {
