@@ -13,16 +13,12 @@ import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
 import { NAV } from "@/lib/routes/nav-model";
 import { api } from "@/lib/api";
 import { t } from "@/lib/i18n";
+import { navLabel } from "@/lib/nav-label";
 import { getInitials } from "@/lib/user-utils";
 import { AlertsDropdown } from "@/components/alerts-dropdown";
 import { TopbarSettingsMenu } from "@/components/layout/TopbarSettingsMenu";
 import { TopbarManagementMenu } from "@/components/layout/TopbarManagementMenu";
 import { TopbarSearch } from "@/components/layout/TopbarSearch";
-
-function navLabel(key: string): string {
-  const k = key.startsWith("nav.") ? key.slice(4) : key;
-  return (t.nav as Record<string, string>)[k] ?? key;
-}
 
 export function Topbar() {
   const [location] = useLocation();
