@@ -44,11 +44,7 @@ import {
   AlertTriangle,
   Wrench,
   Droplets,
-  Package,
   MapPin,
-  Calendar,
-  Hash,
-  Clock,
   FolderOpen,
   Loader2,
   LogIn,
@@ -57,20 +53,14 @@ import {
   Camera,
   Copy,
   MoveHorizontal,
-  CalendarX,
-  CalendarClock,
-  CalendarCheck,
   MoreHorizontal,
 } from "lucide-react";
 import {
   cn,
-  formatDate,
-  formatDateTime,
   formatRelativeTime,
   buildWhatsAppUrl,
   isOverdue,
   isSterilizationDue,
-  getExpiryBadgeState,
 } from "@/lib/utils";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
 import { toast } from "sonner";
@@ -87,6 +77,7 @@ import { EquipmentDetailStatusStrip } from "@/components/equipment/EquipmentDeta
 import { EquipmentDetailToolsSheet } from "@/components/equipment/EquipmentDetailToolsSheet";
 import { EquipmentDetailActivityTab } from "@/components/equipment/EquipmentDetailActivityTab";
 import { EquipmentDetailScanLogTab } from "@/components/equipment/EquipmentDetailScanLogTab";
+import { EquipmentDetailDetailsTab } from "@/components/equipment/EquipmentDetailDetailsTab";
 import { DockReturnFlow } from "@/components/equipment/DockReturnFlow";
 import { DockReturnNfc } from "@/components/dock-return-nfc";
 import {
@@ -1330,71 +1321,7 @@ function EquipmentDetailPageDesktop() {
           </TabsList>
 
           <TabsContent value="details">
-            <Card className="bg-card border-border/60 shadow-sm">
-              <CardContent className="p-4 flex flex-col gap-3">
-                {[
-                  { icon: Hash, label: t.equipmentDetail.serialNumber, value: equipment.serialNumber },
-                  { icon: Package, label: t.equipmentDetail.model, value: equipment.model },
-                  { icon: Package, label: t.equipmentDetail.manufacturer, value: equipment.manufacturer },
-                  { icon: Calendar, label: t.equipmentDetail.purchaseDate, value: formatDate(equipment.purchaseDate) },
-                  { icon: Calendar, label: "Expiry Date", value: formatDate(equipment.expiryDate) },
-                  { icon: MapPin, label: t.equipmentDetail.location, value: equipment.location },
-                  {
-                    icon: Clock,
-                    label: t.equipmentDetail.maintenanceInterval,
-                    value: equipment.maintenanceIntervalDays
-                      ? `${equipment.maintenanceIntervalDays} days`
-                      : undefined,
-                  },
-                  {
-                    icon: Wrench,
-                    label: t.equipmentDetail.lastMaintenance,
-                    value: formatDateTime(equipment.lastMaintenanceDate?.toString()),
-                  },
-                  {
-                    icon: Droplets,
-                    label: t.equipmentDetail.lastSterilization,
-                    value: formatDateTime(equipment.lastSterilizationDate?.toString()),
-                  },
-                ]
-                  .filter((r) => r.value && r.value !== "—")
-                  .map((row, i) => (
-                    <div key={i} className="flex items-start gap-3">
-                      <row.icon className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-xs text-muted-foreground">{row.label}</p>
-                        <p className="text-sm font-medium">{row.value}</p>
-                      </div>
-                    </div>
-                  ))}
-                {(() => {
-                  const expiryState = getExpiryBadgeState(equipment.expiryDate);
-                  if (!expiryState) return null;
-                  if (expiryState === "expired") {
-                    return (
-                      <Badge variant="issue" className="mt-1 text-xs font-medium">
-                        <CalendarX className="w-3.5 h-3.5" />
-                        Expired
-                      </Badge>
-                    );
-                  }
-                  if (expiryState === "expiring_soon") {
-                    return (
-                      <Badge variant="maintenance" className="mt-1 text-xs font-medium">
-                        <CalendarClock className="w-3.5 h-3.5" />
-                        Expiring Soon (≤7 days)
-                      </Badge>
-                    );
-                  }
-                  return (
-                    <Badge variant="ok" className="mt-1 text-xs font-medium">
-                      <CalendarCheck className="w-3.5 h-3.5" />
-                      Valid
-                    </Badge>
-                  );
-                })()}
-              </CardContent>
-            </Card>
+            <EquipmentDetailDetailsTab equipment={equipment} />
           </TabsContent>
 
           <TabsContent value="activity">
