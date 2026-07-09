@@ -21,7 +21,11 @@ const taskRbacFile = fs.readFileSync(path.join(repoRoot, "server", "lib", "task-
 const serverIndex = fs.readFileSync(path.join(repoRoot, "server", "index.ts"), "utf8");
 const appRoutesPath = path.join(repoRoot, "server", "app", "routes.ts");
 const appRoutes = fs.existsSync(appRoutesPath) ? fs.readFileSync(appRoutesPath, "utf8") : "";
-const appointmentsPage = fs.readFileSync(path.join(repoRoot, "src", "pages", "Tasks.tsx"), "utf8");
+// Tasks feature source spans Tasks.tsx + the extracted task-utils.tsx (R6 split).
+const appointmentsPage = [
+  fs.readFileSync(path.join(repoRoot, "src", "pages", "Tasks.tsx"), "utf8"),
+  fs.readFileSync(path.join(repoRoot, "src", "pages", "tasks", "task-utils.tsx"), "utf8"),
+].join("\n");
 
 describe("Appointments Scheduling", () => {
   it("Appointments table migration exists", () => {
