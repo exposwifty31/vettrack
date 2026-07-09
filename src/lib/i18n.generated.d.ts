@@ -830,6 +830,14 @@ export interface TStructure {
     myEquipmentEmpty: string;
     inYourCare: string;
     scanCta: string;
+    clinicalReadiness: string;
+    clinicalReadinessEmpty: string;
+    clinicalActions: string;
+    codeBlueReadinessHint: string;
+    crashCartHint: string;
+    roomReadinessHint: string;
+    guidedTitle: string;
+    guidedBody: string;
   };
   home: {
     equipmentOverview: string;

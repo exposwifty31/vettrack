@@ -19,7 +19,8 @@ import { resolve } from "path";
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf-8");
 
 describe("Tasks page carries no dead /patients promise", () => {
-  const tasks = read("src/pages/Tasks.tsx");
+  // R6 split: the device-label render helper now lives in task-utils.tsx; read both.
+  const tasks = read("src/pages/Tasks.tsx") + "\n" + read("src/pages/tasks/task-utils.tsx");
 
   it("has no /patients hrefs", () => {
     expect(tasks).not.toContain("/patients");

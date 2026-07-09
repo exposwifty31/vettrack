@@ -7,6 +7,9 @@ import {
   filterAdminNav,
   homeSurfaceForRole,
   resolveCapabilities,
+  TAB_BAR_ORDER_BY_ARCHETYPE,
+  type Capability,
+  type ExperienceArchetype,
   type ExperienceInput,
   type HomeSurface,
 } from "@/lib/roles/experience-model";
@@ -259,6 +262,93 @@ describe("experience-model — defensive against out-of-map runtime roles (crash
       });
     expect(run).not.toThrow();
     expect(run().size).toBe(0);
+  });
+});
+
+describe("experience-model — student is a restricted-tech subset (Phase 8)", () => {
+  // The permanent archetype base grant (no shift overlay, no secondary-admin) — the
+  // raw CAPABILITIES_BY_ARCHETYPE entry, reached through the public resolver.
+  const baseCaps = (role: UserRole): ReadonlySet<Capability> =>
+    resolveCapabilities({ role, effectiveRole: role, roleSource: "permanent", isAdmin: false });
+
+  // One representative DB role per archetype (aliases collapse onto these).
+  const REP: Record<ExperienceArchetype, UserRole> = {
+    admin: "admin",
+    vet: "vet",
+    lead: "senior_technician",
+    tech: "technician",
+    student: "student",
+  };
+
+  it("student ⊆ tech — every student cap is also a tech cap", () => {
+    const tech = baseCaps("technician");
+    const student = baseCaps("student");
+    expect([...student].every((c) => tech.has(c))).toBe(true);
+  });
+
+  it("student ⊊ tech — a STRICT subset once tech carries ≥1 cap", () => {
+    const tech = baseCaps("technician");
+    const student = baseCaps("student");
+    expect(tech.size).toBeGreaterThanOrEqual(1);
+    expect(student.size).toBeLessThan(tech.size);
+  });
+
+  it("student baseline is EMPTY today — byte-identical to the pre-Phase-8 literal", () => {
+    expect(
+      resolveCapabilities({
+        role: "student",
+        effectiveRole: "student",
+        roleSource: "permanent",
+        isAdmin: false,
+      }).size,
+    ).toBe(0);
+  });
+
+  it("per-archetype capability snapshots (guards silent over/under-grant)", () => {
+    // Exact base grant per archetype. A change here must be a deliberate edit — this
+    // is the tripwire that a refactor (e.g. the student derivation) left grants intact.
+    const SNAPSHOT: Record<ExperienceArchetype, Capability[]> = {
+      admin: [
+        "codeBlue.manage",
+        "shiftChat.broadcast",
+        "shiftChat.pin",
+        "equipment.vetActions",
+        "app.adminNav",
+        "management.web",
+        "management.webWrite",
+      ],
+      vet: ["codeBlue.manage", "shiftChat.pin", "equipment.vetActions"],
+      lead: ["codeBlue.manage", "shiftChat.broadcast", "shiftChat.pin", "management.web"],
+      tech: ["codeBlue.manage"],
+      student: [],
+    };
+    for (const [archetype, expected] of Object.entries(SNAPSHOT) as [ExperienceArchetype, Capability[]][]) {
+      const caps = [...baseCaps(REP[archetype])].sort();
+      expect(caps).toEqual([...expected].sort());
+    }
+  });
+});
+
+describe("experience-model — TAB_BAR_ORDER_BY_ARCHETYPE seam (Phase 8, dormant)", () => {
+  const ARCHETYPES: ExperienceArchetype[] = ["admin", "vet", "lead", "tech", "student"];
+  const validTabIds = new Set(
+    getNativeNavSections({ hasActiveShift: true }).flatMap((s) => s.items.map((i) => i.id)),
+  );
+
+  it("is total over the 5 archetypes — a non-empty order each, no undefined", () => {
+    for (const archetype of ARCHETYPES) {
+      const order = TAB_BAR_ORDER_BY_ARCHETYPE[archetype];
+      expect(order).toBeDefined();
+      expect(order.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("every ordered id is a real native-nav item id, with no duplicates", () => {
+    for (const archetype of ARCHETYPES) {
+      const order = TAB_BAR_ORDER_BY_ARCHETYPE[archetype];
+      for (const id of order) expect(validTabIds.has(id)).toBe(true);
+      expect(new Set(order).size).toBe(order.length);
+    }
   });
 });
 

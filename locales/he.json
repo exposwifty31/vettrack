@@ -826,7 +826,15 @@
     "myEquipment": "הציוד שלי",
     "myEquipmentEmpty": "לא נלקח ציוד",
     "inYourCare": "באחריותך",
-    "scanCta": "סריקת ציוד"
+    "scanCta": "סריקת ציוד",
+    "clinicalReadiness": "מוכנות קלינית",
+    "clinicalReadinessEmpty": "אין עדיין ציוד לבדיקה",
+    "clinicalActions": "פעולות קליניות",
+    "codeBlueReadinessHint": "בדקו את המוכנות לתגובת חירום",
+    "crashCartHint": "ודאו שעגלת ההחייאה מצוידת",
+    "roomReadinessHint": "בדקו את סטטוס אימות החדרים",
+    "guidedTitle": "מצב מודרך",
+    "guidedBody": "התקדמו במשימות ובסריקות שלכם שלב אחר שלב. היוועצו במפקח לפני כל פעולת חירום."
   },
   "home": {
     "equipmentOverview": "סקירת ציוד",

@@ -89,3 +89,12 @@ Per `docs/scope-change-2026.md` (migrations 142–143), patient/ER/med domains w
 4. Re-stamp touched rows in every phase; Phase 10 re-verifies the full inventory across all four platforms.
 
 > **⚠️ Role-gating column caveat:** precise per-role nav visibility (`adminOnly` flags across nav models) is only partially verified in Part II.1 and is re-grepped authoritatively at Phase 2 start. The gating notes above are the current best read from `IconSidebar`/`MoreSheet` + guard placement, not a final contract.
+
+## Reconciliations (Phase 7R)
+
+**R4 — inventory-deduction "no-op vs live" conflict (docs-only; no code change).** Two docs disagreed, and both are half-right about different objects:
+- `scope-change-2026.md:28` labels `server/workers/inventory-deduction.worker.ts` a **no-op stub** — correct: `processInventoryDeductionJob` returns immediately ("kept for job-runtime wiring compatibility"), and `startInventoryDeductionWorker` warns "worker disabled".
+- `RELEVANCE_BASELINE.md:70` flags it **LIVE via `dispense.service.ts`** — also correct, but about the *queue*, not the worker: `dispense.service.ts:609` still **enqueues** a deduction job post-TX (the live import), which the no-op worker then ignores.
+- The **actual** inventory deduction runs **inline** at dispense completion (`dispense.service.ts:634`, per the worker's own `@deprecated` note).
+
+Resolution: **intentionally preserved** post-migration-143 — the no-op worker + still-enqueued-but-ignored queue are wiring-compat scaffolding; the real deduction is inline. **Not removed** (this surfaces the conflict rather than acting on the audit's removal suggestion, per program-plan Phase 7R R4).

@@ -6,7 +6,7 @@ import type { HeroState } from "../OnShiftHero";
 
 /**
  * Floor data engine. Wraps the shared {@link useTodayShift} (pulse / tasks /
- * equipment / criticality — all cache-deduped, shared with TodayScreen) and adds
+ * equipment / criticality — all cache-deduped, shared across the today home surfaces) and adds
  * the "equipment checked out to me" read. `heroState` is derived here so the surface
  * stays presentational. No new endpoint — `listMy` hits the existing GET /api/equipment/my.
  */

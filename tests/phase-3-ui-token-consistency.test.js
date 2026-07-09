@@ -6,7 +6,12 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const repoRoot = path.resolve(__dirname, "..");
-const appointments = fs.readFileSync(path.join(repoRoot, "src", "pages", "Tasks.tsx"), "utf8");
+// Tasks feature source spans Tasks.tsx + the extracted task-utils.tsx (R6 split);
+// read both so token definitions (in task-utils) and usages (in Tasks) are covered.
+const appointments = [
+  fs.readFileSync(path.join(repoRoot, "src", "pages", "Tasks.tsx"), "utf8"),
+  fs.readFileSync(path.join(repoRoot, "src", "pages", "tasks", "task-utils.tsx"), "utf8"),
+].join("\n");
 const layout = fs.readFileSync(path.join(repoRoot, "src", "components", "layout.tsx"), "utf8");
 const home = fs.readFileSync(path.join(repoRoot, "src", "pages", "home.tsx"), "utf8");
 

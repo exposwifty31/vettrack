@@ -1769,3 +1769,22 @@ Each group committed separately, full suite green per group. Audit-report branch
 - FLOW_INVENTORY `/equipment/tasks` row NOT re-stamped — live-walk deferral stands (III.6 owner-accepted); this entry claims static + suite evidence only.
 
 **Verdict:** VERIFIED
+
+---
+
+## 2026-07-09 — Phase 7R residue: R3 (TodayScreen orphan) + R4/R5 (docs reconciliation)
+
+**R3 — remove dead `TodayScreen` orphan (code).** Deleted `src/features/today/TodayScreen.tsx` + its single-export barrel `src/features/today/index.ts`; fixed the stale "shared with TodayScreen" comment in `use-floor-home.ts`.
+- Evidence: `grep -rn TodayScreen src` → only its own definition, the barrel re-export, and one comment (zero importers). `grep -rn TodayScreen tests` → none. Nav `"today"` → `/home` (`nav-model.ts:14`, `native-nav-model.ts:51`), **not** `TodayScreen`; `home.tsx` imports the today surfaces by subpath, never the barrel.
+- `pnpm typecheck` → exit 0. `pnpm test` → `Test Files 437 passed · Tests 4141 passed`.
+- Shipped as PR #74 (branch `claude/phase-7r-remove-today-orphan`).
+
+**R4 — inventory-deduction "no-op vs live" reconciliation (docs-only, NO code change).** Resolves the conflict between `scope-change-2026.md:28` ("no-op stub") and `RELEVANCE_BASELINE.md:70` ("LIVE via dispense.service.ts"):
+- Worker IS a no-op: `inventory-deduction.worker.ts` `processInventoryDeductionJob` returns immediately; `startInventoryDeductionWorker` logs "worker disabled".
+- Queue IS enqueued-to (the live import RELEVANCE_BASELINE saw): `dispense.service.ts:609` enqueues post-TX; the no-op worker ignores it.
+- Real deduction runs INLINE: `dispense.service.ts:634` (per the worker's `@deprecated` note).
+- Verdict: intentionally preserved post-143 (wiring-compat scaffolding); NOT removed. Reconciliation note added to `docs/audit/FLOW_INVENTORY.md`.
+
+**R5 — historical-doc noise trim (docs-only).** The pre-2026 historical/handoff noise was already handled: IMP-003 bannered `strict-schema-audit.md` + `due-diligence-report.md`; IMP-005 deleted the GitLab docs; IMP-006 ran the pre-Phase-7 cleanup. Remaining `docs/design/` files are current 2026-07 planning artifacts (`program-plan.md`, `phase-7-execution-roadmap.md`, `web-management-brief.md`, the two 2026-07-07 web-console audits), not noise — no additional bannering needed. Recorded here per the IMP-003 pattern.
+
+**Verdict:** VERIFIED (R3 code + gates; R4/R5 docs reconciliation).
