@@ -568,7 +568,9 @@
     "actionDoneBody": "Action completed for {name}.",
     "ariaEdit": "Edit equipment",
     "ariaDuplicate": "Duplicate equipment",
-    "ariaEditFloorNote": "Edit floor note"
+    "ariaEditFloorNote": "Edit floor note",
+    "expiryDateLabel": "Expiry date",
+    "daysUnit": "days"
   },
   "newEquipment": {
     "heading": {
