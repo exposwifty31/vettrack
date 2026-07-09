@@ -60,6 +60,9 @@ import type {
   DeployabilityResponse,
   Dock,
   OperationalMetricsSummary,
+  DisplayDevice,
+  DisplayPairingCode,
+  DisplayPairClaim,
 } from "@/types";
 import type { AuthoritySnapshot } from "../../shared/authority.js";
 
@@ -105,6 +108,7 @@ import {
   EQUIPMENT_LIST_FETCH_TIMEOUT_MS,
   TASKS_FETCH_TIMEOUT_MS,
 } from "./request-core";
+import type { ApiErrorPayload } from "./request-core";
 
 /** Compatibility re-exports (Slice 1 — request core extracted). */
 export {
@@ -295,6 +299,27 @@ export async function containerDispenseWithResult(
     }
     throw err;
   }
+}
+
+/**
+ * Redeem a pairing code for a display-device token (PUBLIC — POST
+ * /api/display/pair/claim). Deliberately bypasses the authenticated fetch layer:
+ * a claiming display has no Clerk user, so `authFetch` (which requires a userId)
+ * must not be used. The raw `token` is returned exactly once and MUST be
+ * persisted by the caller (see display-token-store).
+ */
+export async function claimDisplayPairing(code: string, name?: string): Promise<DisplayPairClaim> {
+  const body = JSON.stringify(name ? { code, name } : { code });
+  const res = await fetch(resolveApiUrl("/api/display/pair/claim"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Locale": getStoredLocale() },
+    body,
+  });
+  const json = (await res.json().catch(() => ({}))) as ApiErrorPayload & Record<string, unknown>;
+  if (!res.ok) {
+    throw new ApiError(res.status, toApiErrorMessage(res.status, json), json);
+  }
+  return json as unknown as DisplayPairClaim;
 }
 
 export const api = {
@@ -1030,6 +1055,23 @@ export const api = {
         method: "POST",
         body: JSON.stringify(body),
       }),
+    // Phase 9 — display-device pairing (admin, requireAuth + requireAdmin). The
+    // PUBLIC claim endpoint is `claimDisplayPairing` above (it must skip authFetch).
+    pairIssue: (): Promise<DisplayPairingCode> =>
+      request<DisplayPairingCode>("/api/display/pair/issue", { method: "POST" }),
+    devices: {
+      list: (): Promise<DisplayDevice[]> =>
+        request<{ devices: DisplayDevice[] }>("/api/display/devices").then((r) => r.devices),
+      rename: (id: string, name: string): Promise<DisplayDevice> =>
+        request<{ device: DisplayDevice }>(`/api/display/devices/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ name }),
+        }).then((r) => r.device),
+      revoke: (id: string): Promise<{ ok: boolean; id: string }> =>
+        request<{ ok: boolean; id: string }>(`/api/display/devices/${id}/revoke`, {
+          method: "POST",
+        }),
+    },
   },
   realtime: {
     outboxHead: () => request<{ maxPublishedId: number }>("/api/realtime/outbox-head"),

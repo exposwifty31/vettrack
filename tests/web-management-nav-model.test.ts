@@ -77,6 +77,16 @@ describe("web-management-nav-model — structure", () => {
     expect(an?.writeCap).toBeUndefined();
   });
 
+  it("P9: Displays node is present, administration group, writable", () => {
+    const displays = WEB_MANAGEMENT_NAV.find((n) => n.id === "mgmt-displays");
+    expect(displays).toBeDefined();
+    expect(displays?.href).toBe("/admin/displays");
+    expect(displays?.labelKey).toBe("nav.displays");
+    expect(displays?.icon).toBe("MonitorSmartphone");
+    expect(displays?.group).toBe("administration");
+    expect(displays?.writeCap).toBe("management.webWrite");
+  });
+
   it("7d: Inventory node is present, administration group, read-only", () => {
     const inv = WEB_MANAGEMENT_NAV.find((n) => n.id === "mgmt-inventory");
     expect(inv).toBeDefined();

@@ -3430,6 +3430,29 @@ export interface TStructure {
       editTitle: string;
       save: string;
     };
+    displays: {
+      title: string;
+      subtitle: string;
+      issueCode: string;
+      issuing: string;
+      colLastSeen: string;
+      statusActive: string;
+      statusRevoked: string;
+      manageTitle: string;
+      nameLabel: string;
+      save: string;
+      renamed: string;
+      renameError: string;
+      revoke: string;
+      revokeConfirm: string;
+      revoked: string;
+      revokeError: string;
+      issueError: string;
+      issueDialogTitle: string;
+      issueDialogDescription: string;
+      codeExpires: string;
+      empty: string;
+    };
     colConfigured: string;
     colCredentials: string;
     valYes: string;
@@ -3529,6 +3552,7 @@ export interface TStructure {
     notifications: string;
     rfidReaders: string;
     opsHealth: string;
+    displays: string;
     groupAdministration: string;
     groupOperations: string;
     today: string;
@@ -3605,6 +3629,18 @@ export interface TStructure {
     verifying: string;
     verify: string;
     changePhone: string;
+  };
+  boardPair: {
+    title: string;
+    subtitle: string;
+    codeLabel: string;
+    codePlaceholder: string;
+    nameLabel: string;
+    namePlaceholder: string;
+    error: string;
+    pairing: string;
+    pairButton: string;
+    hint: string;
   };
   board: {
     deployableNow: string;

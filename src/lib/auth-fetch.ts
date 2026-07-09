@@ -1,5 +1,6 @@
 import { getCurrentUserId, getStoredBearerToken } from "./auth-store";
 import { resolveApiUrl } from "./api-origin";
+import { getStoredDisplayToken } from "./display-token-store";
 
 type ClerkTokenGetter = (() => Promise<string | null>) | null;
 
@@ -73,6 +74,21 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
   }
 
   const userId = getCurrentUserId()?.trim();
+
+  // Phase 9 — paired display-device path. A headless display has no Clerk user;
+  // when a device token is stored AND no user is signed in, authenticate the
+  // request with the `x-display-token` header instead of the user bearer. Gated
+  // on `!userId` so a normal signed-in session is never routed through here —
+  // the user-auth path below stays byte-identical and cannot be affected.
+  if (!userId) {
+    const displayToken = getStoredDisplayToken();
+    if (displayToken) {
+      const displayHeaders = new Headers(options.headers ?? {});
+      displayHeaders.set("x-display-token", displayToken);
+      return fetch(resolvedUrl, { ...options, headers: displayHeaders, credentials: "include" });
+    }
+  }
+
   if (!userId) {
     console.warn("Blocked request: missing userId");
     throw new Error("AUTH_INVALID");

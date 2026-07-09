@@ -1053,6 +1053,8 @@ const translations = {
 
   board: d.board,
 
+  boardPair: d.boardPair,
+
   webOnlyGuard: d.webOnlyGuard,
 
   legalFooter: d.legalFooter,
