@@ -22,8 +22,9 @@ interface EquipmentDetailDetailsTabProps {
 
 /**
  * Details tab for the equipment detail page (Phase 7S extraction). Presentational:
- * renders the equipment's static spec rows + an expiry badge. Behavior-preserving move
- * out of the equipment-detail.tsx god-file — JSX kept verbatim.
+ * renders the equipment's static spec rows + an expiry badge. Extracted from the
+ * equipment-detail.tsx god-file; the previously-hardcoded English labels (expiry
+ * date, "days", the expiry badge states) were moved onto the `t` accessor per review.
  */
 export function EquipmentDetailDetailsTab({ equipment }: EquipmentDetailDetailsTabProps) {
   return (
@@ -34,13 +35,13 @@ export function EquipmentDetailDetailsTab({ equipment }: EquipmentDetailDetailsT
           { icon: Package, label: t.equipmentDetail.model, value: equipment.model },
           { icon: Package, label: t.equipmentDetail.manufacturer, value: equipment.manufacturer },
           { icon: Calendar, label: t.equipmentDetail.purchaseDate, value: formatDate(equipment.purchaseDate) },
-          { icon: Calendar, label: "Expiry Date", value: formatDate(equipment.expiryDate) },
+          { icon: Calendar, label: t.equipmentDetail.expiryDateLabel, value: formatDate(equipment.expiryDate) },
           { icon: MapPin, label: t.equipmentDetail.location, value: equipment.location },
           {
             icon: Clock,
             label: t.equipmentDetail.maintenanceInterval,
             value: equipment.maintenanceIntervalDays
-              ? `${equipment.maintenanceIntervalDays} days`
+              ? `${equipment.maintenanceIntervalDays} ${t.equipmentDetail.daysUnit}`
               : undefined,
           },
           {
@@ -71,7 +72,7 @@ export function EquipmentDetailDetailsTab({ equipment }: EquipmentDetailDetailsT
             return (
               <Badge variant="issue" className="mt-1 text-xs font-medium">
                 <CalendarX className="w-3.5 h-3.5" />
-                Expired
+                {t.equipmentDetail.expiryExpired}
               </Badge>
             );
           }
@@ -79,14 +80,14 @@ export function EquipmentDetailDetailsTab({ equipment }: EquipmentDetailDetailsT
             return (
               <Badge variant="maintenance" className="mt-1 text-xs font-medium">
                 <CalendarClock className="w-3.5 h-3.5" />
-                Expiring Soon (≤7 days)
+                {t.equipmentDetail.expirySoon}
               </Badge>
             );
           }
           return (
             <Badge variant="ok" className="mt-1 text-xs font-medium">
               <CalendarCheck className="w-3.5 h-3.5" />
-              Valid
+              {t.equipmentDetail.expiryValid}
             </Badge>
           );
         })()}

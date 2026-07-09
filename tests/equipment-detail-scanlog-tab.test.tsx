@@ -11,6 +11,9 @@ import { t } from "@/lib/i18n";
 import { EquipmentDetailScanLogTab } from "@/components/equipment/EquipmentDetailScanLogTab";
 import type { ScanLog } from "@/types";
 
+// Partial fixture: only the fields EquipmentDetailScanLogTab reads. ScanLog has many
+// more required fields, so the cast keeps the fixture focused. timestamp is a string
+// (ScanLog.timestamp: string), matching the real API shape.
 const LOG = {
   id: "s1",
   status: "issue",
@@ -18,7 +21,7 @@ const LOG = {
   userEmail: "amir@clinic.test",
   staffRole: "lead_technician",
   note: "cracked casing",
-  timestamp: new Date("2026-07-01T10:00:00.000Z"),
+  timestamp: "2026-07-01T10:00:00.000Z",
 } as unknown as ScanLog;
 
 afterEach(() => cleanup());
@@ -48,5 +51,15 @@ describe("EquipmentDetailScanLogTab", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: t.equipmentDetail.scanLogWeek }));
     expect(onRangeChange).toHaveBeenCalledWith("7d");
+  });
+
+  it("shows the loading state (skeletons) — not the empty state, not rows", () => {
+    render(
+      <EquipmentDetailScanLogTab range="today" onRangeChange={() => {}} isLoading={true} logs={undefined} />,
+    );
+    // Range toggle still renders; the empty state and any rows do NOT (loading branch).
+    expect(screen.getByRole("button", { name: t.equipmentDetail.scanLogToday })).toBeTruthy();
+    expect(screen.queryByText(t.equipmentDetail.scanLogEmpty)).toBeNull();
+    expect(screen.queryByText("Dr. Amir")).toBeNull();
   });
 });

@@ -11,6 +11,9 @@ import { t } from "@/lib/i18n";
 import { EquipmentDetailDetailsTab } from "@/components/equipment/EquipmentDetailDetailsTab";
 import type { Equipment } from "@/types";
 
+// Partial fixture: only the fields EquipmentDetailDetailsTab reads. Equipment has many
+// more required fields, so the cast keeps the fixture minimal; per-test spreads add the
+// spec fields under exercise.
 const base = {
   id: "e1",
   name: "Infusion Pump",
@@ -38,6 +41,6 @@ describe("EquipmentDetailDetailsTab", () => {
     render(
       <EquipmentDetailDetailsTab equipment={{ ...base, expiryDate: "2020-01-01" } as Equipment} />,
     );
-    expect(screen.getByText("Expired")).toBeTruthy();
+    expect(screen.getByText(t.equipmentDetail.expiryExpired)).toBeTruthy();
   });
 });

@@ -572,6 +572,8 @@ export interface TStructure {
     ariaEdit: string;
     ariaDuplicate: string;
     ariaEditFloorNote: string;
+    expiryDateLabel: string;
+    daysUnit: string;
   };
   newEquipment: {
     heading: {

@@ -293,6 +293,8 @@ const translations = {
     expiryExpired: d.equipmentDetail.expiryExpired,
     expirySoon: d.equipmentDetail.expirySoon,
     expiryValid: d.equipmentDetail.expiryValid,
+    expiryDateLabel: d.equipmentDetail.expiryDateLabel,
+    daysUnit: d.equipmentDetail.daysUnit,
     deleteTitle: (name: string) => tr(d.equipmentDetail.deleteTitle, { name }),
     deleteBody: d.equipmentDetail.deleteBody,
     deleteConfirm: d.equipmentDetail.deleteConfirm,

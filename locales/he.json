@@ -568,7 +568,9 @@
     "actionDoneBody": "הפעולה הושלמה עבור {name}.",
     "ariaEdit": "ערוך ציוד",
     "ariaDuplicate": "שכפל ציוד",
-    "ariaEditFloorNote": "ערוך הערת קומה"
+    "ariaEditFloorNote": "ערוך הערת קומה",
+    "expiryDateLabel": "תאריך תפוגה",
+    "daysUnit": "ימים"
   },
   "newEquipment": {
     "heading": {
