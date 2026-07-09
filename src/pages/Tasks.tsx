@@ -187,20 +187,12 @@ export default function AppointmentsPage() {
       setFormLocation("");
       setFormTaskType("maintenance");
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables: CreateAppointmentRequest) => {
       if (error.message === "APPOINTMENT_CONFLICT") {
-        const payload: CreateAppointmentRequest = {
-          vetId: formVetId.trim(),
-          animalId: formDeviceRef.trim() || null,
-          ownerId: formLocation.trim() || null,
-          startTime: new Date(formStartLocal).toISOString(),
-          endTime: new Date(formEndLocal).toISOString(),
-          notes: formNotes.trim() || null,
-          status: "scheduled",
-          taskType: formTaskType,
-          scheduledAt: new Date(formStartLocal).toISOString(),
-        };
-        setPendingConflictPayload(payload);
+        // Reuse the exact submitted payload (staleness-free + DRY) rather than
+        // rebuilding it from live form state, which could drift between submit
+        // and the conflict response.
+        setPendingConflictPayload(variables);
         setConflictReason("");
         setConflictOpen(true);
         return;

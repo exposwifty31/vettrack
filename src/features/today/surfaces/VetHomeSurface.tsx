@@ -94,7 +94,10 @@ export function VetHomeSurface({ isTablet }: { isTablet: boolean }) {
             </OpsTile>
 
             {showActions && (
-              <section className="flex flex-col gap-1 rounded-2xl border border-ivory-border bg-ivory-surface p-4 shadow-card">
+              <section
+                aria-label={t.homeSurface.clinicalActions}
+                className="flex flex-col gap-1 rounded-2xl border border-ivory-border bg-ivory-surface p-4 shadow-card"
+              >
                 <span className="mb-1 text-[15px] font-bold text-ivory-text">
                   {t.homeSurface.clinicalActions}
                 </span>

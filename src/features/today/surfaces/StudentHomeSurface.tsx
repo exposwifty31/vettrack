@@ -41,7 +41,10 @@ export function StudentHomeSurface({ isTablet }: { isTablet: boolean }) {
         <HomeGreeting name={name} size="large" className={rise} />
 
         {guided && (
-          <section className="flex items-start gap-3 rounded-2xl border border-ivory-border bg-ivory-surface p-4 shadow-card">
+          <section
+            aria-label={t.homeSurface.guidedTitle}
+            className="flex items-start gap-3 rounded-2xl border border-ivory-border bg-ivory-surface p-4 shadow-card"
+          >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-ivory-text3">
               <GraduationCap className="h-5 w-5" aria-hidden />
             </span>
