@@ -9,6 +9,7 @@ import { DataTable, ReadOnlyChip, type Column } from "@/desktop/management";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { formatRelativeTime } from "@/lib/relative-time";
+import { consoleStatusLabel } from "@/lib/console-status-label";
 import type { NotificationDeliveryRow } from "@/types";
 
 /** Channel → localized label. Read `t` lazily (reassignable on locale switch). */
@@ -52,7 +53,7 @@ export default function NotificationsConsolePage() {
         key: "status",
         header: t.console.colStatus,
         sortValue: (r) => r.status,
-        cell: (r) => r.status,
+        cell: (r) => consoleStatusLabel(r.status),
       },
       {
         key: "created",

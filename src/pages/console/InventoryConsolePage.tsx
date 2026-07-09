@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Bdi } from "@/components/ui/bdi";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/relative-time";
+import { consoleStatusLabel } from "@/lib/console-status-label";
 import type { PurchaseOrder, RestockSessionRow, LowStockRow } from "@/types";
 
 type Tab = "po" | "restock" | "lowstock";
@@ -48,7 +49,7 @@ export default function InventoryConsolePage() {
   const poColumns = useMemo<Column<PurchaseOrder>[]>(
     () => [
       { key: "supplier", header: t.console.inventory.colSupplier, sortValue: (r) => r.supplierName, cell: (r) => <Bdi className="font-medium">{r.supplierName}</Bdi> },
-      { key: "status", header: t.console.colStatus, sortValue: (r) => r.status, cell: (r) => <Badge variant="secondary">{r.status}</Badge> },
+      { key: "status", header: t.console.colStatus, sortValue: (r) => r.status, cell: (r) => <Badge variant="secondary">{consoleStatusLabel(r.status)}</Badge> },
       { key: "created", header: t.console.colOccurred, sortValue: (r) => r.createdAt, cell: (r) => formatRelativeTime(new Date(r.createdAt)) },
     ],
     [],
@@ -57,7 +58,7 @@ export default function InventoryConsolePage() {
   const restockColumns = useMemo<Column<RestockSessionRow>[]>(
     () => [
       { key: "container", header: t.console.inventory.colContainer, sortValue: (r) => r.containerName, cell: (r) => <Bdi className="font-medium">{r.containerName}</Bdi> },
-      { key: "status", header: t.console.colStatus, sortValue: (r) => r.status, cell: (r) => <Badge variant="secondary">{r.status}</Badge> },
+      { key: "status", header: t.console.colStatus, sortValue: (r) => r.status, cell: (r) => <Badge variant="secondary">{consoleStatusLabel(r.status)}</Badge> },
       { key: "started", header: t.console.inventory.colStarted, sortValue: (r) => r.startedAt, cell: (r) => formatRelativeTime(new Date(r.startedAt)) },
       { key: "finished", header: t.console.inventory.colFinished, sortValue: (r) => r.finishedAt ?? "", cell: (r) => (r.finishedAt ? formatRelativeTime(new Date(r.finishedAt)) : <span className="text-muted-foreground">{t.console.dash}</span>) },
     ],
