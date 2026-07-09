@@ -86,6 +86,7 @@ import { AssetCopilotPanel } from "@/components/equipment/AssetCopilotPanel";
 import { EquipmentDetailStatusStrip } from "@/components/equipment/EquipmentDetailStatusStrip";
 import { EquipmentDetailToolsSheet } from "@/components/equipment/EquipmentDetailToolsSheet";
 import { EquipmentDetailActivityTab } from "@/components/equipment/EquipmentDetailActivityTab";
+import { EquipmentDetailScanLogTab } from "@/components/equipment/EquipmentDetailScanLogTab";
 import { DockReturnFlow } from "@/components/equipment/DockReturnFlow";
 import { DockReturnNfc } from "@/components/dock-return-nfc";
 import {
@@ -1459,68 +1460,12 @@ function EquipmentDetailPageDesktop() {
 
           {isAdmin && (
             <TabsContent value="scanlog">
-              <div className="flex flex-col gap-3">
-                <div className="flex gap-2">
-                  {(["today", "7d", "all"] as const).map((range) => (
-                    <Button
-                      key={range}
-                      variant={scanHistoryRange === range ? "default" : "outline"}
-                      size="sm"
-                      className="h-8 text-xs"
-                      onClick={() => setScanHistoryRange(range)}
-                    >
-                      {range === "today"
-                        ? t.equipmentDetail.scanLogToday
-                        : range === "7d"
-                        ? t.equipmentDetail.scanLogWeek
-                        : t.equipmentDetail.scanLogAll}
-                    </Button>
-                  ))}
-                </div>
-                {adminLogsLoading ? (
-                  <>
-                    <Skeleton className="h-16 w-full rounded-xl" />
-                    <Skeleton className="h-16 w-full rounded-xl" />
-                    <Skeleton className="h-16 w-full rounded-xl" />
-                  </>
-                ) : !adminScanLogs?.items.length ? (
-                  <Card className="bg-card border-border/60 shadow-sm">
-                    <CardContent className="p-8 text-center">
-                      <p className="text-muted-foreground text-sm">{t.equipmentDetail.scanLogEmpty}</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  adminScanLogs.items.map((log) => (
-                    <Card key={log.id} className="bg-card border-border/60 shadow-sm">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex flex-col gap-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Badge variant={statusToBadgeVariant(log.status)}>
-                                {equipmentStatusLabel(log.status)}
-                              </Badge>
-                              <span className="text-xs font-medium truncate">
-                                {log.staffName || log.userEmail}
-                              </span>
-                              {log.staffRole && (
-                                <span className="text-xs text-muted-foreground capitalize">
-                                  {log.staffRole.replace(/_/g, " ")}
-                                </span>
-                              )}
-                            </div>
-                            {log.note && (
-                              <p className="text-xs text-muted-foreground">{log.note}</p>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground shrink-0">
-                            {formatRelativeTime(log.timestamp.toString())}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
+              <EquipmentDetailScanLogTab
+                range={scanHistoryRange}
+                onRangeChange={setScanHistoryRange}
+                isLoading={adminLogsLoading}
+                logs={adminScanLogs?.items}
+              />
             </TabsContent>
           )}
         </Tabs>
