@@ -234,7 +234,12 @@ export type AuditActionType =
   | "equipment_semi_dock_notified"
   | "equipment_stale_checkout_nudged"
   // Sprint 1.7 — inference engine fires when no location signal exists for a device.
-  | "equipment_location_unknown";
+  | "equipment_location_unknown"
+  // Phase 9 — Display device pairing
+  | "display_pairing_code_issued"
+  | "display_device_paired"
+  | "display_device_renamed"
+  | "display_device_revoked";
 
 export interface LogAuditParams {
   clinicId: string;

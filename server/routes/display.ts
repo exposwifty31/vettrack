@@ -1,6 +1,7 @@
 // server/routes/display.ts
 import type { RequestHandler } from "express";
 import { Router } from "express";
+import { randomUUID } from "crypto";
 import { and, desc, eq, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
 import { fetchLinkedEquipmentForSession } from "../lib/code-blue-linked-equipment.js";
 import {
@@ -10,13 +11,22 @@ import {
   codeBlueLogEntries,
   codeBluePresence,
   crashCartChecks,
+  displayDevices,
   equipment,
   rooms,
   shifts,
   users,
 } from "../db.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAdmin, requireAuth, requireDisplayOrUser } from "../middleware/auth.js";
+import { authSensitiveLimiter } from "../middleware/rate-limiters.js";
 import { recordHeartbeat } from "../lib/display-heartbeat-store.js";
+import {
+  consumePairingCode,
+  hashToken,
+  issuePairingCode,
+  mintToken,
+} from "../lib/display-token.js";
+import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { incrementMetric } from "../lib/metrics.js";
 import { withTimeout } from "../lib/with-timeout.js";
 import { isEquipmentFullyDeployable } from "../services/equipment-operational-state.service.js";
@@ -291,6 +301,23 @@ function createDisplayHeartbeatHandler(): RequestHandler {
   return async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
     try {
+      // Phase 9 — paired display-device token branch (additive). Bump the
+      // device's persistent lastSeenAt, clinic-scoped and revoked-filtered.
+      // This is separate from the ephemeral session heartbeat store below.
+      if (req.isDisplayAuth && req.displayDeviceId && req.clinicId) {
+        const now = new Date();
+        await db
+          .update(displayDevices)
+          .set({ lastSeenAt: now, updatedAt: now })
+          .where(
+            and(
+              eq(displayDevices.id, req.displayDeviceId),
+              eq(displayDevices.clinicId, req.clinicId),
+              isNull(displayDevices.revokedAt),
+            ),
+          );
+      }
+
       const body: unknown = req.body ?? {};
       const sessionId =
         typeof (body as { displaySessionId?: unknown }).displaySessionId === "string"
@@ -299,6 +326,12 @@ function createDisplayHeartbeatHandler(): RequestHandler {
       const kioskMode = (body as { kioskMode?: unknown }).kioskMode === true;
 
       if (!sessionId) {
+        // A paired display-device heartbeat need not carry a session id — the
+        // lastSeenAt bump above is the whole job. Only user/session heartbeats
+        // require displaySessionId.
+        if (req.isDisplayAuth) {
+          return res.json({ ok: true });
+        }
         return res.status(400).json(
           apiError({
             code: "INVALID_INPUT",
@@ -328,11 +361,300 @@ function createDisplayHeartbeatHandler(): RequestHandler {
   };
 }
 
+const MAX_DEVICE_NAME_LEN = 120;
+
+function normalizeDeviceName(raw: unknown, fallback: string): string {
+  if (typeof raw !== "string") return fallback;
+  const trimmed = raw.trim();
+  if (!trimmed) return fallback;
+  return trimmed.slice(0, MAX_DEVICE_NAME_LEN);
+}
+
+/** POST /pair/issue — admin mints a short-lived, clinic-bound pairing code. */
+function createPairIssueHandler(): RequestHandler {
+  return async (req, res) => {
+    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    try {
+      const clinicId = req.clinicId!;
+      const issued = await issuePairingCode(clinicId);
+      logAudit({
+        clinicId,
+        actionType: "display_pairing_code_issued",
+        performedBy: req.authUser!.id,
+        performedByEmail: req.authUser!.email,
+        targetType: "display_pairing_code",
+        metadata: { expiresAt: issued.expiresAt.toISOString() },
+        actorRole: resolveAuditActorRole(req),
+      });
+      res.status(201).json({ code: issued.code, expiresAt: issued.expiresAt.toISOString() });
+    } catch (err) {
+      console.error("[display:pair/issue]", err);
+      res.status(500).json(
+        apiError({
+          code: "INTERNAL_ERROR",
+          reason: "PAIRING_CODE_ISSUE_FAILED",
+          message: "Failed to issue pairing code",
+          requestId,
+        }),
+      );
+    }
+  };
+}
+
+/**
+ * POST /pair/claim — PUBLIC (no auth). A headless device redeems a pairing code
+ * for a device token. The raw token is returned ONCE and never persisted; only
+ * its hash is stored. Guarded by `authSensitiveLimiter` (5/min per IP).
+ */
+function createPairClaimHandler(): RequestHandler {
+  return async (req, res) => {
+    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    try {
+      const body: unknown = req.body ?? {};
+      const clinicId = await consumePairingCode((body as { code?: unknown }).code);
+      if (!clinicId) {
+        return res.status(400).json(
+          apiError({
+            code: "INVALID_PAIRING_CODE",
+            reason: "INVALID_OR_EXPIRED_PAIRING_CODE",
+            message: "Invalid or expired pairing code",
+            requestId,
+          }),
+        );
+      }
+
+      const name = normalizeDeviceName((body as { name?: unknown }).name, "Display device");
+      const id = randomUUID();
+      const token = mintToken();
+      await db.insert(displayDevices).values({
+        id,
+        clinicId,
+        name,
+        tokenHash: hashToken(token),
+      });
+
+      logAudit({
+        clinicId,
+        actionType: "display_device_paired",
+        performedBy: id,
+        performedByEmail: "display-device",
+        targetId: id,
+        targetType: "display_device",
+        metadata: { name },
+      });
+
+      // Raw token returned exactly once — the device must persist it now.
+      res.status(201).json({ id, token, name, clinicId });
+    } catch (err) {
+      console.error("[display:pair/claim]", err);
+      res.status(500).json(
+        apiError({
+          code: "INTERNAL_ERROR",
+          reason: "PAIRING_CLAIM_FAILED",
+          message: "Failed to claim pairing code",
+          requestId,
+        }),
+      );
+    }
+  };
+}
+
+/** GET /devices — admin, clinic-scoped device registry. NEVER returns token/hash. */
+function createDevicesListHandler(): RequestHandler {
+  return async (req, res) => {
+    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    try {
+      const clinicId = req.clinicId!;
+      const rows = await db
+        .select({
+          id: displayDevices.id,
+          name: displayDevices.name,
+          lastSeenAt: displayDevices.lastSeenAt,
+          revokedAt: displayDevices.revokedAt,
+          createdAt: displayDevices.createdAt,
+          updatedAt: displayDevices.updatedAt,
+        })
+        .from(displayDevices)
+        .where(eq(displayDevices.clinicId, clinicId))
+        .orderBy(desc(displayDevices.createdAt));
+
+      res.json({
+        devices: rows.map((d) => ({
+          id: d.id,
+          name: d.name,
+          lastSeenAt: d.lastSeenAt?.toISOString() ?? null,
+          revokedAt: d.revokedAt?.toISOString() ?? null,
+          createdAt: d.createdAt.toISOString(),
+          updatedAt: d.updatedAt.toISOString(),
+        })),
+      });
+    } catch (err) {
+      console.error("[display:devices]", err);
+      res.status(500).json(
+        apiError({
+          code: "INTERNAL_ERROR",
+          reason: "DEVICE_LIST_FAILED",
+          message: "Failed to load display devices",
+          requestId,
+        }),
+      );
+    }
+  };
+}
+
+/** PATCH /devices/:id — admin rename, clinic-scoped. */
+function createDeviceRenameHandler(): RequestHandler {
+  return async (req, res) => {
+    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    try {
+      const clinicId = req.clinicId!;
+      const id = req.params.id;
+      const rawName = (req.body as { name?: unknown } | undefined)?.name;
+      if (typeof rawName !== "string" || !rawName.trim()) {
+        return res.status(400).json(
+          apiError({
+            code: "INVALID_INPUT",
+            reason: "MISSING_DEVICE_NAME",
+            message: "name is required",
+            requestId,
+          }),
+        );
+      }
+      const name = rawName.trim().slice(0, MAX_DEVICE_NAME_LEN);
+
+      const [updated] = await db
+        .update(displayDevices)
+        .set({ name, updatedAt: new Date() })
+        .where(and(eq(displayDevices.id, id), eq(displayDevices.clinicId, clinicId)))
+        .returning({
+          id: displayDevices.id,
+          name: displayDevices.name,
+          lastSeenAt: displayDevices.lastSeenAt,
+          revokedAt: displayDevices.revokedAt,
+          createdAt: displayDevices.createdAt,
+          updatedAt: displayDevices.updatedAt,
+        });
+
+      if (!updated) {
+        return res.status(404).json(
+          apiError({
+            code: "NOT_FOUND",
+            reason: "DISPLAY_DEVICE_NOT_FOUND",
+            message: "Display device not found",
+            requestId,
+          }),
+        );
+      }
+
+      logAudit({
+        clinicId,
+        actionType: "display_device_renamed",
+        performedBy: req.authUser!.id,
+        performedByEmail: req.authUser!.email,
+        targetId: id,
+        targetType: "display_device",
+        metadata: { name },
+        actorRole: resolveAuditActorRole(req),
+      });
+
+      res.json({
+        device: {
+          id: updated.id,
+          name: updated.name,
+          lastSeenAt: updated.lastSeenAt?.toISOString() ?? null,
+          revokedAt: updated.revokedAt?.toISOString() ?? null,
+          createdAt: updated.createdAt.toISOString(),
+          updatedAt: updated.updatedAt.toISOString(),
+        },
+      });
+    } catch (err) {
+      console.error("[display:devices/:id rename]", err);
+      res.status(500).json(
+        apiError({
+          code: "INTERNAL_ERROR",
+          reason: "DEVICE_RENAME_FAILED",
+          message: "Failed to rename display device",
+          requestId,
+        }),
+      );
+    }
+  };
+}
+
+/** POST /devices/:id/revoke — admin revoke, clinic-scoped. Idempotent-ish: an already-revoked/unknown id → 404. */
+function createDeviceRevokeHandler(): RequestHandler {
+  return async (req, res) => {
+    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    try {
+      const clinicId = req.clinicId!;
+      const id = req.params.id;
+      const now = new Date();
+
+      const [revoked] = await db
+        .update(displayDevices)
+        .set({ revokedAt: now, updatedAt: now })
+        .where(
+          and(
+            eq(displayDevices.id, id),
+            eq(displayDevices.clinicId, clinicId),
+            isNull(displayDevices.revokedAt),
+          ),
+        )
+        .returning({ id: displayDevices.id });
+
+      if (!revoked) {
+        return res.status(404).json(
+          apiError({
+            code: "NOT_FOUND",
+            reason: "DISPLAY_DEVICE_NOT_FOUND",
+            message: "Active display device not found",
+            requestId,
+          }),
+        );
+      }
+
+      logAudit({
+        clinicId,
+        actionType: "display_device_revoked",
+        performedBy: req.authUser!.id,
+        performedByEmail: req.authUser!.email,
+        targetId: id,
+        targetType: "display_device",
+        actorRole: resolveAuditActorRole(req),
+      });
+
+      res.json({ ok: true, id });
+    } catch (err) {
+      console.error("[display:devices/:id/revoke]", err);
+      res.status(500).json(
+        apiError({
+          code: "INTERNAL_ERROR",
+          reason: "DEVICE_REVOKE_FAILED",
+          message: "Failed to revoke display device",
+          requestId,
+        }),
+      );
+    }
+  };
+}
+
 /** Factory — mount a fresh Router per path (never reuse the same instance). */
 export function createDisplayRouter(deps: DisplayRouterDeps = {}): Router {
   const router = Router();
-  router.get("/snapshot", requireAuth, createDisplaySnapshotHandler(deps));
-  router.post("/heartbeat", requireAuth, createDisplayHeartbeatHandler());
+
+  // Pairing lifecycle.
+  router.post("/pair/issue", requireAuth, requireAdmin, createPairIssueHandler());
+  router.post("/pair/claim", authSensitiveLimiter, createPairClaimHandler());
+
+  // Display-device OR user consumable surfaces (token reaches ONLY these).
+  router.get("/snapshot", requireDisplayOrUser, createDisplaySnapshotHandler(deps));
+  router.post("/heartbeat", requireDisplayOrUser, createDisplayHeartbeatHandler());
+
+  // Admin device management (user-only; never accepts a display token).
+  router.get("/devices", requireAuth, requireAdmin, createDevicesListHandler());
+  router.patch("/devices/:id", requireAuth, requireAdmin, createDeviceRenameHandler());
+  router.post("/devices/:id/revoke", requireAuth, requireAdmin, createDeviceRevokeHandler());
+
   return router;
 }
 
