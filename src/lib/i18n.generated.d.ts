@@ -3443,6 +3443,7 @@ export interface TStructure {
     people: string;
     managementHome: string;
     governance: string;
+    management: string;
   };
   phoneSignIn: {
     title: string;

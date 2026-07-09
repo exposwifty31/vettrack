@@ -16,6 +16,7 @@ import { t } from "@/lib/i18n";
 import { getInitials } from "@/lib/user-utils";
 import { AlertsDropdown } from "@/components/alerts-dropdown";
 import { TopbarSettingsMenu } from "@/components/layout/TopbarSettingsMenu";
+import { TopbarManagementMenu } from "@/components/layout/TopbarManagementMenu";
 import { TopbarSearch } from "@/components/layout/TopbarSearch";
 
 function navLabel(key: string): string {
@@ -72,10 +73,19 @@ export function Topbar() {
       .sort((a, b) => b.href.length - a.href.length)
       .find((n) => resolveNavItemActive(location, n.href))?.href ?? "";
 
+  // Keep the active operational tab visible even when the strip overflows (M2).
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    navRef.current
+      ?.querySelector('[aria-current="page"]')
+      ?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [location]);
+
   const renderNavLink = (n: { id: string; href: string; labelKey: string }) => (
     <Link
       key={n.id}
       href={n.href}
+      aria-current={activeHref === n.href ? "page" : undefined}
       className={cn(
         "text-sm font-medium px-2.5 py-1 rounded-[4px] whitespace-nowrap transition-colors duration-100",
         activeHref === n.href
@@ -100,14 +110,17 @@ export function Topbar() {
         Vet<em className="text-[var(--brand-green-bright)] not-italic">Track</em>
       </Link>
 
-      {/* Primary nav */}
-      <nav className="flex items-center gap-0.5 flex-1 overflow-x-auto">
+      {/* Primary (operational) nav — horizontal, scrolls the active tab into view */}
+      <nav ref={navRef} className="flex items-center gap-0.5 flex-1 overflow-x-auto">
         {visibleItems.map(renderNavLink)}
-        {managementItems.length > 0 && (
-          <span className="mx-1 h-4 w-px shrink-0 bg-white/20" aria-hidden="true" />
-        )}
-        {managementItems.map(renderNavLink)}
       </nav>
+
+      {/* Management console links — collapsed into a labeled dropdown so ~11 nodes never
+          overflow the strip (M2). Sits outside the scroll container, always visible. */}
+      {managementItems.length > 0 && (
+        <span className="mx-1 h-4 w-px shrink-0 bg-white/20" aria-hidden="true" />
+      )}
+      <TopbarManagementMenu items={managementItems} activeHref={activeHref} />
 
       {/* Right controls */}
       <div className="flex items-center gap-1.5 ms-auto shrink-0">
