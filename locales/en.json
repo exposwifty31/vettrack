@@ -3343,7 +3343,11 @@
     "colSignature": "Signature",
     "colProcessed": "Processed",
     "sigValid": "Valid",
-    "sigInvalid": "Invalid"
+    "sigInvalid": "Invalid",
+    "colChannel": "Channel",
+    "colTarget": "Recipient",
+    "channelPush": "Push",
+    "channelWhatsapp": "WhatsApp"
   },
   "nav": {
     "integrations": "Integrations",

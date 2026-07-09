@@ -10,3 +10,4 @@ export * from "./integrations.js";
 export * from "./rfid-readers.js";
 export * from "./equipment-readiness.js";
 export * from "./webhooks.js";
+export * from "./notifications.js";

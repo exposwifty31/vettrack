@@ -3347,6 +3347,10 @@ export interface TStructure {
     colProcessed: string;
     sigValid: string;
     sigInvalid: string;
+    colChannel: string;
+    colTarget: string;
+    channelPush: string;
+    channelWhatsapp: string;
   };
   nav: {
     integrations: string;
