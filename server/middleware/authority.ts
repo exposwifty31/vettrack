@@ -42,6 +42,7 @@ import { resolveAuthority } from "../lib/authority.js";
 import {
   emitAuthorityDeniedAudit,
   emitAuthorityResolutionFailedAudit,
+  emitCodeBlueBreakGlassAudit,
   emitDispenseLegacyFallbackAudit,
   isAuthorityObsV1Enabled,
 } from "../lib/authority-audit.js";
@@ -71,6 +72,26 @@ export interface RequireClinicalAuthorityOptions {
    * MUST NOT be used outside dispense.
    */
   allowPermanentClinicalRoleFallbackForLegacyDispense?: true;
+
+  /**
+   * EMERGENCY BREAK-GLASS — Code Blue initiation only (Phase 10a T1).
+   *
+   * When true, a clinical-non-student identity whose snapshot has:
+   *   effectiveClinicalRole === null
+   *   reason === "EZSHIFT_NONE"
+   *
+   * may still pass if their permanent clinicalRole is in allow[].
+   *
+   * Rationale: a cardiac arrest must not wait on roster scheduling. This is an
+   * INDEPENDENT opt-in from the dispense fallback above — it emits its own
+   * distinct metric + audit and does NOT widen or reuse the dispense flag.
+   *
+   * Set ONLY on POST /api/code-blue/sessions. MUST NOT be used by any other
+   * consumer, and it never elevates a student (clinicalRole "student" is
+   * excluded) nor resurrects a stale/revoked check-in (reason must be
+   * EZSHIFT_NONE).
+   */
+  allowPermanentClinicalRoleForEmergency?: true;
 }
 
 declare global {
@@ -193,6 +214,29 @@ export function requireClinicalAuthority(
       ) {
         incrementMetric("authority_legacy_fallback_used");
         emitDispenseLegacyFallbackAudit({ req, snapshot });
+        next();
+        return;
+      }
+    }
+
+    // Phase 10a T1: emergency break-glass for Code Blue initiation. Independent
+    // of the dispense fallback above — a route sets at most one of the two
+    // flags, and both require effectiveClinicalRole === null so neither shadows
+    // the other. Same predicate as the dispense branch, but a distinct metric +
+    // audit so break-glass grants are separable from dispense compatibility.
+    const emergencyBreakGlassOpted =
+      opts.allowPermanentClinicalRoleForEmergency === true;
+
+    if (emergencyBreakGlassOpted) {
+      if (
+        snapshot.effectiveClinicalRole === null &&
+        snapshot.reason === "EZSHIFT_NONE" &&
+        snapshot.clinicalRole !== null &&
+        snapshot.clinicalRole !== "student" &&
+        opts.allow.includes(snapshot.clinicalRole as ActiveShiftRole)
+      ) {
+        incrementMetric("authority_emergency_break_glass_used");
+        emitCodeBlueBreakGlassAudit({ req, snapshot });
         next();
         return;
       }
