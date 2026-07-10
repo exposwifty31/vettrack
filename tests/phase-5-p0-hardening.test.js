@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
+import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -63,10 +64,51 @@ describe("Phase 5 P0 hardening checks (static)", () => {
     expect(deployScript).toContain("\"REDIS_URL\"");
   });
 
-  it("CI deploy job exports CLERK_WEBHOOK_SECRET and DATA_INTEGRITY_HEALTH_TOKEN and deploy.sh enforces them", () => {
+  it("CI deploy job exports CLERK_WEBHOOK_SECRET and DATA_INTEGRITY_HEALTH_TOKEN", () => {
     const ciWorkflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
     expect(ciWorkflow).toContain("CLERK_WEBHOOK_SECRET: ${{ secrets.CLERK_WEBHOOK_SECRET }}");
     expect(ciWorkflow).toContain("DATA_INTEGRITY_HEALTH_TOKEN: ${{ secrets.DATA_INTEGRITY_HEALTH_TOKEN }}");
+  });
+
+  it("deploy.sh declares the pilot-critical preflight vars", () => {
     expect(deployScript).toMatch(/pilot_required_vars=\("CLERK_WEBHOOK_SECRET" "DATA_INTEGRITY_HEALTH_TOKEN"\)/);
   });
+});
+
+describe("deploy.sh preflight (behavioral)", () => {
+  const preflightEnv = {
+    PATH: process.env.PATH,
+    DATABASE_URL: "postgres://preflight-test",
+    REDIS_URL: "redis://preflight-test",
+    SESSION_SECRET: "preflight-test-secret",
+    CLERK_SECRET_KEY: "sk_test_preflight",
+    VITE_CLERK_PUBLISHABLE_KEY: "pk_test_preflight",
+    ALLOWED_ORIGIN: "https://preflight.test",
+    DB_CONFIG_ENCRYPTION_KEY: "preflight-test-key",
+    CLERK_WEBHOOK_SECRET: "whsec_preflight",
+    DATA_INTEGRITY_HEALTH_TOKEN: "token_preflight",
+  };
+
+  function runPreflight(env) {
+    return spawnSync("bash", [path.join(repoRoot, "deploy.sh"), "--check", "--no-color"], {
+      env,
+      encoding: "utf8",
+    });
+  }
+
+  it("passes with all required and pilot-critical vars present", () => {
+    const result = runPreflight(preflightEnv);
+    expect(result.status).toBe(0);
+  });
+
+  it.each(["CLERK_WEBHOOK_SECRET", "DATA_INTEGRITY_HEALTH_TOKEN"])(
+    "fails with a validation message when %s is missing",
+    (missing) => {
+      const env = { ...preflightEnv };
+      delete env[missing];
+      const result = runPreflight(env);
+      expect(result.status).not.toBe(0);
+      expect(result.stdout).toContain(`Required variable missing: ${missing}`);
+    },
+  );
 });
