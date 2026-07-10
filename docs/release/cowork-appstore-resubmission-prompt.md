@@ -50,7 +50,9 @@ If any gate fails, stop and surface the exact failure to the owner. Do not "fix"
 signing/Clerk config yourself — that's the owner's credentialed action.
 
 ## Step 2 — Build the native shell (the ONE sanctioned path)
-  pnpm cap:build:native        (iOS; pnpm cap:build:native:android / pnpm cap:build:native:all for the others)
+  pnpm cap:build:native            # iOS (default)
+  pnpm cap:build:native:android    # Android
+  pnpm cap:build:native:all        # both platforms
 Confirm it read .env (not .env.local) and did NOT set CAPACITOR_SERVER_URL. If the
 build warns about a missing VITE_CLERK_PUBLISHABLE_KEY, STOP — .env is misconfigured
 and the shell would ship in dev-bypass.
