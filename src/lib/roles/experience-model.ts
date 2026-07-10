@@ -292,6 +292,7 @@ const CUSTODY_ONLY_NAV_KEYS: ReadonlySet<string> = new Set<string>([
   "mine", // my equipment (return)
   "inventory", // dispense / restock
   // hrefs (web layout nav items key on href, not id)
+  "/", // layout.tsx Home nav item uses "/" (Topbar/sidebar Home uses "/home")
   "/home",
   "/scan",
   "/equipment",

@@ -8,7 +8,7 @@ import { getCurrentUserId } from "@/lib/auth-store";
 import { useAuth } from "@/hooks/use-auth";
 import { subscribeKeepalive } from "@/lib/realtime";
 import { useAlertsController } from "@/features/alerts";
-import { OnShiftHero, type HeroState } from "./surfaces/OnShiftHero";
+import { OnShiftHero, deriveHeroState } from "./surfaces/OnShiftHero";
 import { Bdi } from "@/components/ui/bdi";
 import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { equipmentTriageTier } from "@/lib/design-tokens";
@@ -172,15 +172,9 @@ export function HomeTabletDashboard() {
     ? equipment.filter((e) => e.custodyState === "checked_out").length
     : 0;
 
-  // Roster-derived on-shift state, mirroring use-ops-home (pulse present iff inside
-  // a scheduled window). Matches the phone/web surfaces' OnShiftHero contract.
-  const heroState: HeroState = pulse
-    ? pulse.shift
-      ? "active"
-      : "noshift"
-    : pulseLoading
-      ? "loading"
-      : "noshift";
+  // Roster-derived on-shift state — shared helper so the tablet, ops, and floor
+  // surfaces can't drift. Matches the phone/web surfaces' OnShiftHero contract.
+  const heroState = deriveHeroState(pulse, pulseLoading);
 
   const firstName = name?.split(" ")[0] || t.homePage.fallbackName;
   const greeting = greetingFor(new Date().getHours(), firstName);

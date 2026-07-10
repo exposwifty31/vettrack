@@ -412,4 +412,14 @@ describe("experience-model — custody-only archetype (student)", () => {
       expect(filterCustodyNav(ops, exp(role)).length).toBe(ops.length);
     }
   });
+
+  it("keeps Home for a student whether the item keys on '/home' (NAV) or '/' (web layout)", () => {
+    // layout.tsx's Home nav item uses href "/", the NAV/native model uses "/home".
+    const items = [{ href: "/" }, { href: "/home" }, { href: "/equipment" }, { href: "/alerts" }];
+    const kept = filterCustodyNav(items, exp("student")).map((i) => i.href);
+    expect(kept).toContain("/"); // legacy Home href retained (regression: was dropped)
+    expect(kept).toContain("/home");
+    expect(kept).toContain("/equipment");
+    expect(kept).not.toContain("/alerts");
+  });
 });

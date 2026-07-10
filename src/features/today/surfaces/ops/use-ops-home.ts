@@ -6,7 +6,7 @@ import { equipmentTriageTier } from "@/lib/design-tokens";
 import { useAlertsController } from "@/features/alerts";
 import { useTodayShift } from "../../hooks/use-today-shift";
 import { ALERT_ORDER, roomPct } from "./ops-tile-helpers";
-import type { HeroState } from "../OnShiftHero";
+import { deriveHeroState } from "../OnShiftHero";
 import type { Room } from "@/types";
 
 /**
@@ -76,13 +76,7 @@ export function useOpsHome() {
   }, [rooms]);
 
   // Hero "loading" keys on the pulse only (pre-split parity), not the combined isLoading.
-  const heroState: HeroState = today.pulse
-    ? today.pulse.shift
-      ? "active"
-      : "noshift"
-    : today.pulseLoading
-      ? "loading"
-      : "noshift";
+  const heroState = deriveHeroState(today.pulse, today.pulseLoading);
 
   return {
     ...coverage,

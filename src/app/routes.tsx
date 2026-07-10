@@ -161,12 +161,12 @@ export function AppRoutes() {
         <Route path="/alerts"><AuthGuard><CustodyGuard><AlertsPage /></CustodyGuard></AuthGuard></Route>
         <Route path="/my-equipment"><AuthGuard><MyEquipmentPage /></AuthGuard></Route>
         <Route path="/my-profile"><AuthGuard><MyProfilePage /></AuthGuard></Route>
-        {isNativeTablet && <Route path="/rooms/:id?"><AuthGuard><RoomsMasterDetail /></AuthGuard></Route>}
+        {isNativeTablet && <Route path="/rooms/:id?"><AuthGuard><CustodyGuard><RoomsMasterDetail /></CustodyGuard></AuthGuard></Route>}
         {!isNativeTablet && <Route path="/rooms"><AuthGuard><CustodyGuard><RoomsListPage /></CustodyGuard></AuthGuard></Route>}
-        {!isNativeTablet && <Route path="/rooms/:id"><AuthGuard><RoomRadarPage /></AuthGuard></Route>}
-        {isNativeTablet && <Route path="/locations/:id?"><AuthGuard><RoomsMasterDetail /></AuthGuard></Route>}
-        {!isNativeTablet && <Route path="/locations"><AuthGuard><RoomsListPage /></AuthGuard></Route>}
-        {!isNativeTablet && <Route path="/locations/:id"><AuthGuard><RoomRadarPage /></AuthGuard></Route>}
+        {!isNativeTablet && <Route path="/rooms/:id"><AuthGuard><CustodyGuard><RoomRadarPage /></CustodyGuard></AuthGuard></Route>}
+        {isNativeTablet && <Route path="/locations/:id?"><AuthGuard><CustodyGuard><RoomsMasterDetail /></CustodyGuard></AuthGuard></Route>}
+        {!isNativeTablet && <Route path="/locations"><AuthGuard><CustodyGuard><RoomsListPage /></CustodyGuard></AuthGuard></Route>}
+        {!isNativeTablet && <Route path="/locations/:id"><AuthGuard><CustodyGuard><RoomRadarPage /></CustodyGuard></AuthGuard></Route>}
         <Route path="/print"><AuthGuard><WebOnlyGuard><QrPrintPage /></WebOnlyGuard></AuthGuard></Route>
 
         {/* --- Emergency & safety --- */}
