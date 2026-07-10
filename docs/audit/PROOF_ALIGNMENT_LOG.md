@@ -1975,3 +1975,24 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 - **SKIPPED — audit-prompt:225 (`BoardShell` vs `NativeShell`), false positive:** re-raise of the earlier finding. Verified again: `/board` renders via `BoardShell` (`src/board/BoardShell.tsx`, `PlatformRouter.tsx:23-24` for the `board` target); `NativeShell` is the `mobile` shell. Doc is correct; the root cause was `CLAUDE.md` not documenting the `board` target — fixed in `4b4ec4497`. Rebuttal posted on the PR.
 
 **Verdict:** VERIFIED (real bug fixed + gates green; docs hardened; 1 documented false-positive skip).
+
+---
+
+## 2026-07-10 — CI-driven Railway CLI deploy cutover (PR #77, merge dfad1d98d)
+
+**Claim:** The CI deploy job now actually deploys (it had been a silent no-op since inception — `ci.yml` read `RAILWAY_USE_CLI_DEPLOY` from `secrets.*` while the value is a repo *variable*, so every deploy step skipped while Railway's GitHub auto-deploy did the real work). Deploys are now CLI-canonical: gated on all three CI jobs, verified to terminal status + healthcheck, Worker included; production auto-deploy sources disconnected; Staging repointed off the dead `dboy3156/VetTrack` repo.
+
+**Evidence:**
+- PR contract: PR #77 run @ 57b5b6646 → `gh run view` jobs: `🚢 Deploy to Railway: skipped`, `✅ Merge gate: success` (deploy must skip on PRs, gate stays green).
+- Canary merge run 29091300231 deploy job log @ 12:10:01Z → `Invalid RAILWAY_TOKEN` — the June-19 token was dead and had never been exercised (the old step always skipped). No Railway deployment was created (production unaffected). Replacement production project token validated locally (`RAILWAY_TOKEN=<new> railway deployment list --service VetTrack` exit 0) before storing; `gh api .../actions/secrets/RAILWAY_TOKEN` → `updated_at: 2026-07-10T12:35:16Z`.
+- Recovery run 29093071317 (workflow_dispatch on main) → all jobs success; deploy log: `✅ deployment SUCCESS` (12:42:46) → `🩺 Verifying /api/healthz` → `✅ Healthcheck OK` → Worker `✅ deployment SUCCESS` (12:44:51) → `✅ Deploy complete`.
+- `railway deployment list --service VetTrack --environment production` → newest: `2026-07-10T12:41:01 SUCCESS`, CLI-origin (no commit meta); prior GitHub-triggered deployment (#75) now REMOVED. Exactly one new deployment.
+- `railway deployment list --service Worker` → `2026-07-10T12:42:48 SUCCESS` — first Worker deployment since 2026-06-12 (it had been building from the dead `dboy3156/VetTrack` repo).
+- `railway logs --service Worker` → `NOTIFICATION_WORKER_STARTED` @ 12:44:52 + `[worker] notification worker listening (notifications)…` — runs as worker, not a stray web server; no `WORKER_DISABLED_NO_REDIS`.
+- `curl -si https://vettrack.uk/api/healthz` → `HTTP/2 200`.
+- GraphQL read-back (production): VetTrack `{source.repo: null, healthcheckPath: "/api/healthz", healthcheckTimeout: 300, startCommand: "pnpm start"}`; Worker `{source.repo: null, startCommand: "pnpm worker"}` — no auto-deploy sources remain in production.
+- GraphQL read-back (Staging): both instances `source.repo: exposwifty31/vettrack`; Staging VetTrack healthcheck fixed `api/healthz/` → `/api/healthz`; Staging Worker startCommand `pnpm worker`.
+- Guard test: `pnpm test -- tests/phase-5-p0-hardening.test.js` → 13 passed, incl. new behavioral cases spawning `deploy.sh --check` with each pilot-critical var removed (nonzero exit + `Required variable missing: <var>`).
+- Discrepancy noted (supersedes the plan's R1/R2 ordering): Railway's `serviceInstanceUpdate` nulls `source` when omitted from input — the VetTrack healthcheck update disconnected its GitHub source ahead of schedule. Verified harmless (desired end state); the canary therefore ran with the CLI as the only deployer.
+
+**Verdict:** VERIFIED
