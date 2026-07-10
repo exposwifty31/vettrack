@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useShiftChat } from "../hooks/useShiftChat";
 import { ShiftChatPanel } from "./ShiftChatPanel";
 import { useAuth } from "@/hooks/use-auth";
+import { isKioskSuppressedPathname } from "@/app/platform";
 
 type TriggerArgs = {
   /** Open the chat panel. */
@@ -35,6 +36,13 @@ export function ShiftChatLauncher({ renderTrigger }: Props) {
   if (location === "/" || location === "/landing" || location.startsWith("/signin") || location.startsWith("/signup")) {
     return null;
   }
+  // Kiosk/wall/emergency routes: shares the same predicate as the PWA install
+  // promo (src/app/platform) so the two suppression lists can't drift apart.
+  // Covers /board (headless kiosk, has its own header launcher story on
+  // tablet — irrelevant here since /board never resolves the desktop/web
+  // shell that mounts this launcher) and /emergency-equipment-wall, in
+  // addition to /code-blue and /crash-cart already covered below.
+  if (isKioskSuppressedPathname(location)) return null;
   // Focused fullscreen flows own the whole screen (and usually a bottom-anchored
   // primary action, e.g. Code Blue's "continue without full check"). The launcher
   // hides here so the float never overlaps that content — matching the header's

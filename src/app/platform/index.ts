@@ -43,6 +43,25 @@ export function isBoardPath(): boolean {
 }
 
 /**
+ * Non-board kiosk/wall-display and emergency-flow routes: never a personal
+ * device, or never worth interrupting. Segment-safe matching, same rule as
+ * isBoardPathname — "/code-blue" matches "/code-blue/display" but not
+ * "/code-blueprint".
+ */
+const KIOSK_SUPPRESSED_PREFIXES = ["/code-blue", "/crash-cart", "/emergency-equipment-wall"];
+
+/**
+ * Single source of truth for "is this a kiosk/wall/emergency route where
+ * personal-device chrome (PWA install promo, floating shift-chat launcher)
+ * must never render". Reuses isBoardPathname so /board stays defined in one
+ * place; callers should not maintain a second copy of this prefix list.
+ */
+export function isKioskSuppressedPathname(pathname: string): boolean {
+  if (isBoardPathname(pathname)) return true;
+  return KIOSK_SUPPRESSED_PREFIXES.some((r) => pathname === r || pathname.startsWith(`${r}/`));
+}
+
+/**
  * Synchronous (no re-render) resolution of the current platform target.
  * Safe to call at module initialisation time or inside hooks.
  *
