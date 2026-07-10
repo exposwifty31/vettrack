@@ -133,6 +133,37 @@ describe("startDisplayRevocationWatch (F6 live-stream revocation lifecycle)", ()
     stop();
   });
 
+  it("skips overlapping rechecks while one is still in flight (inFlight guard)", async () => {
+    let release: (v: { ok: boolean }) => void = () => {};
+    const pending = new Promise<{ ok: boolean }>((res) => {
+      release = res;
+    });
+    const resolve = vi.fn(() => pending);
+    const onRevoked = vi.fn();
+    // Large timeout so the still-pending recheck is NOT force-settled during the window.
+    const stop = startDisplayRevocationWatch(displayReq, onRevoked, resolve, 1000, 5, 1_000_000);
+
+    await vi.advanceTimersByTimeAsync(3000); // three ticks fire; the first recheck is still pending
+    expect(resolve).toHaveBeenCalledTimes(1); // overlap guard: exactly one in-flight recheck
+    expect(onRevoked).not.toHaveBeenCalled();
+
+    release({ ok: true }); // settle so nothing dangles
+    await vi.advanceTimersByTimeAsync(0);
+    stop();
+  });
+
+  it("times out a hung resolver into the error path (never pins inFlight forever)", async () => {
+    const resolve = vi.fn(() => new Promise<{ ok: boolean }>(() => {})); // never settles
+    const onRevoked = vi.fn();
+    // timeout 500ms < interval 1000ms → a hung recheck is abandoned within its cycle.
+    const stop = startDisplayRevocationWatch(displayReq, onRevoked, resolve, 1000, 5, 500);
+
+    await vi.advanceTimersByTimeAsync(1600); // tick@1000 starts the recheck; timeout@1500 rejects it
+    expect(incrementMetric).toHaveBeenCalledWith("display_revocation_recheck_error");
+    expect(onRevoked).not.toHaveBeenCalled(); // a single timeout is under the fail-closed cap
+    stop();
+  });
+
   it("does NOT watch a user (non-display) connection — the /stream gate lives in the function", async () => {
     const resolve = vi.fn(async () => ({ ok: true }));
     const onRevoked = vi.fn();

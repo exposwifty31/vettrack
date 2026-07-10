@@ -37,4 +37,19 @@ describe("MyEquipmentCard", () => {
     expect(screen.getByText(t.homeSurface.myEquipmentEmpty)).toBeTruthy();
     expect(screen.queryByText(t.equipmentList.errors.loadFailed)).toBeNull();
   });
+
+  it("keeps cached items visible on a refetch error and retries on click", () => {
+    const onRetry = vi.fn();
+    const items = [
+      { id: "eq-1", name: "Otoscope", readinessState: "ready" },
+    ] as unknown as ComponentProps<typeof MyEquipmentCard>["items"];
+    renderCard({ items, isError: true, onRetry });
+    // Cached row stays visible instead of being replaced by a blank/error card.
+    expect(screen.getByText("Otoscope")).toBeTruthy();
+    // A concise refresh-failed message sits alongside the retry (not the full empty-error copy).
+    expect(screen.getByText(t.homeSurface.myEquipmentRefreshFailed)).toBeTruthy();
+    expect(screen.queryByText(t.equipmentList.errors.loadFailed)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: t.common.tryAgain }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
 });

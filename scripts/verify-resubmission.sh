@@ -91,7 +91,10 @@ else no "icon file missing"; fi
 # LAST_SHIPPED_BUILD env for a one-off check.
 hdr "[build number — must exceed last shipped]"
 BN=$(grep -m1 'CURRENT_PROJECT_VERSION = ' ios/App/App.xcodeproj/project.pbxproj | grep -oE '[0-9]+' | head -1)
-FILE_LAST=$(grep -oE '[0-9]+' ios/.last-shipped-build 2>/dev/null | head -1)
+# Read the WHOLE baseline file (stripping surrounding whitespace) — do NOT grep out
+# the first digit run. A malformed file like "build-25-old" must fail the `^[0-9]+$`
+# check below (fail closed), not silently parse to "25".
+FILE_LAST=$(tr -d '[:space:]' < ios/.last-shipped-build 2>/dev/null || true)
 LAST="${LAST_SHIPPED_BUILD:-${FILE_LAST:-}}"
 # Validate both integers before the numeric compare. BN comes from a parsed
 # pbxproj; LAST can come from a hand-set LAST_SHIPPED_BUILD env or a garbled
@@ -110,6 +113,27 @@ elif [ "$BN" -gt "$LAST" ]; then
   ok "build $BN > last shipped $LAST"
 else
   no "build ${BN} must be > last shipped $LAST — bump first: pnpm resubmit  (then update ios/.last-shipped-build after upload)"
+fi
+
+# --- no literal CFBundleVersion in any SOURCE bundle plist (app + extensions) ----
+# Every app/extension Info.plist must derive CFBundleVersion from $(CURRENT_PROJECT_VERSION).
+# A literal integer (e.g. the VetTrackControl widget) desyncs from the app the moment
+# resubmit.sh's global build bump runs → ITMS-90473 upload rejection. Scoped to
+# git-TRACKED plists so build output (xcarchive / DerivedData / vendored frameworks,
+# all gitignored — their literal versions are correct and not ours) is never flagged.
+hdr "[no literal CFBundleVersion in source bundle plists]"
+LITERAL_PLISTS=""
+while IFS= read -r plist; do
+  [ -f "$plist" ] || continue
+  val=$(grep -A1 '<key>CFBundleVersion</key>' "$plist" 2>/dev/null | sed -n '2p' | tr -d '[:space:]')
+  case "$val" in
+    *'<string>'[0-9]*) LITERAL_PLISTS="$LITERAL_PLISTS ${plist}=${val}" ;;
+  esac
+done < <(git ls-files ios/App 2>/dev/null | grep -E '/Info\.plist$')
+if [ -z "$LITERAL_PLISTS" ]; then
+  ok "all source bundle Info.plist CFBundleVersion values reference \$(CURRENT_PROJECT_VERSION)"
+else
+  no "literal CFBundleVersion in:$LITERAL_PLISTS — set to \$(CURRENT_PROJECT_VERSION) so the build bump can't desync an extension"
 fi
 
 # --- bundled shell + native clerk chunk -------------------------------------

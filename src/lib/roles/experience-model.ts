@@ -327,10 +327,9 @@ export function filterCustodyNav<T extends { id?: string; href?: string }>(
 }
 
 /**
- * The nav items a flat (web) nav should render for this experience: admin-only
- * items dropped for non-admins, then narrowed to the custody set for custody-only
- * users. Single composition so `layout.tsx` / `IconSidebar` / `Topbar` can't apply
- * the two filters in different orders.
+ * Single source for a flat (web) nav's visible items, so `layout.tsx` /
+ * `IconSidebar` / `Topbar` compose the admin + custody filters identically instead
+ * of re-deriving the order per shell.
  */
 export function visibleNavItems<T extends { adminOnly?: boolean; id?: string; href?: string }>(
   items: readonly T[],
@@ -340,10 +339,10 @@ export function visibleNavItems<T extends { adminOnly?: boolean; id?: string; hr
 }
 
 /**
- * The nav SECTIONS a native nav should render: drop admin-only sections, custody-
- * filter each surviving section's items, and drop any section left empty. Callers
- * that need a further per-item filter (e.g. the MoreSheet hiding tab-bar items)
- * apply it on top and re-drop empties.
+ * Single source for a native nav's visible sections (same admin + custody rules as
+ * {@link visibleNavItems}, applied per section). Callers that need a further
+ * per-item filter (e.g. MoreSheet hiding tab-bar items) apply it on top and re-drop
+ * empties.
  */
 export function visibleNavSections<
   I extends { id: string },

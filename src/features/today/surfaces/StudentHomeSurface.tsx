@@ -1,4 +1,4 @@
-import { useLocation } from "wouter";
+import { Link } from "wouter";
 import { GraduationCap, ShoppingCart } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useExperience } from "@/hooks/use-experience";
@@ -24,7 +24,6 @@ import { MyEquipmentCard } from "./floor/MyEquipmentCard";
 export function StudentHomeSurface({ isTablet }: { isTablet: boolean }) {
   const { name } = useAuth();
   const { can } = useExperience();
-  const [, navigate] = useLocation();
   const home = useFloorHome();
   const rise = useEnterOnce("home") ? "vt-pro-rise" : "";
   const showError = home.equipmentError && !home.equipment;
@@ -73,9 +72,8 @@ export function StudentHomeSurface({ isTablet }: { isTablet: boolean }) {
               isError={home.myEquipmentError}
               onRetry={() => void home.refetchMyEquipment()}
             />
-            <button
-              type="button"
-              onClick={() => navigate("/inventory")}
+            <Link
+              href="/inventory"
               className="flex min-h-[44px] items-center gap-3 rounded-2xl border border-ivory-border bg-ivory-surface p-4 text-start shadow-card transition-colors hover:bg-muted/40"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-ivory-text3">
@@ -86,7 +84,7 @@ export function StudentHomeSurface({ isTablet }: { isTablet: boolean }) {
                 <span className="block text-sm text-ivory-text3">{t.homeSurface.inventoryActionHint}</span>
               </span>
               <ForwardChevron className="h-4 w-4 shrink-0 opacity-40" aria-hidden />
-            </button>
+            </Link>
           </>
         )}
       </div>

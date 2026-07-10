@@ -835,7 +835,8 @@
     "roomReadinessHint": "בדקו את סטטוס אימות החדרים",
     "guidedTitle": "מצב מודרך",
     "guidedBody": "השאילו והחזירו ציוד, ונפקו או חדשו מלאי. לכל דבר אחר פנו למפקח/ת.",
-    "inventoryActionHint": "ניפוק או חידוש פריטים"
+    "inventoryActionHint": "ניפוק או חידוש פריטים",
+    "myEquipmentRefreshFailed": "לא ניתן לרענן — מוצג מידע שמור"
   },
   "home": {
     "equipmentOverview": "סקירת ציוד",

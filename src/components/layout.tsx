@@ -475,7 +475,9 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     role === "admin" ||
     role === "vet" ||
     role === "senior_technician" ||
+    role === "lead_technician" ||
     role === "technician" ||
+    role === "vet_tech" ||
     role === "student";
 
   const navItems: NavItem[] = useMemo(() => {

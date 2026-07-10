@@ -66,7 +66,7 @@ echo "  marketing: iOS=$CUR_MKT  package.json=$PKG_VER  -> $NEW_MKT"
 
 # --- edit pbxproj (all targets), package.json, and Info.plist deterministically ---
 python3 - "$PBXPROJ" "$PLIST" "$PKG" "$NEW_BUILD" "$NEW_MKT" <<'PY'
-import json, os, re, sys
+import json, os, re, shutil, sys
 pbx, plist, pkg, build, mkt = sys.argv[1:6]
 
 # --- STAGE: compute + validate every edit in memory before touching any file.
@@ -87,17 +87,53 @@ if n_plist == 0: sys.exit("FAIL: no CFBundleVersion key found in Info.plist — 
 d = json.load(open(pkg)); d['version'] = mkt
 pkg_out = json.dumps(d, indent=2) + "\n"
 
-# --- COMMIT: all three staged; write each atomically (tmp on same dir + os.replace)
-# so an interruption can't leave a half-written file, only an all-or-per-file swap.
+# --- COMMIT: treat the three-file update as a transaction. Journal each original,
+# write each atomically (tmp on same dir + os.replace); if any write or the final
+# consistency check fails, roll back the files already replaced; always clean up the
+# tmp/journal artifacts.
 def atomic_write(path, data):
     tmp = f"{path}.tmp"
-    with open(tmp, "w") as f:
-        f.write(data)
-    os.replace(tmp, path)
+    try:
+        with open(tmp, "w") as f:
+            f.write(data)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
 
-atomic_write(pbx, s)
-atomic_write(plist, p)
-atomic_write(pkg, pkg_out)
+targets = [(pbx, s), (plist, p), (pkg, pkg_out)]
+backups = {path: f"{path}.bak" for path, _ in targets}
+for path in backups:
+    shutil.copy2(path, backups[path])  # journal originals
+
+done = []
+try:
+    for path, data in targets:
+        atomic_write(path, data)
+        done.append(path)
+    # cross-file consistency check — only report success if all three agree.
+    pbx_now = open(pbx).read()
+    if f'CURRENT_PROJECT_VERSION = {build};' not in pbx_now:
+        raise RuntimeError("pbxproj build not applied")
+    if f'MARKETING_VERSION = {mkt};' not in pbx_now:
+        raise RuntimeError("pbxproj marketing not applied")
+    plist_now = open(plist).read()
+    if '<key>CFBundleVersion</key>' not in plist_now or '$(CURRENT_PROJECT_VERSION)' not in plist_now:
+        raise RuntimeError("Info.plist CFBundleVersion is not $(CURRENT_PROJECT_VERSION)")
+    if json.load(open(pkg)).get('version') != mkt:
+        raise RuntimeError("package.json version mismatch")
+except Exception as e:
+    for path in reversed(done):
+        os.replace(backups[path], path)  # restore already-swapped files (consumes that .bak)
+    for bak in backups.values():
+        if os.path.exists(bak):
+            os.remove(bak)
+    sys.exit(f"FAIL: version bump rolled back (files restored) — {e}")
+
+# success — drop the journals
+for bak in backups.values():
+    if os.path.exists(bak):
+        os.remove(bak)
 PY
 
 echo "  applied:"

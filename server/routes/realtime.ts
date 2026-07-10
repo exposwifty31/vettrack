@@ -25,18 +25,36 @@ const DISPLAY_REVOCATION_RECHECK_MS = 10_000;
 // after the cap, which then reconnect via the client's /board/pair path.
 const DISPLAY_REVOCATION_MAX_CONSECUTIVE_ERRORS = 5;
 
+/** Reject `promise` after `ms` if it hasn't settled, clearing the timer either way.
+ *  Used to bound the revocation resolver so a HANGING lookup becomes a counted
+ *  error instead of pinning `inFlight` forever (which would silently stop all
+ *  future re-checks and let a revoked token stream indefinitely). */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(label)), ms);
+    timer.unref?.();
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 /**
  * F6 — periodic revocation watch for a display-authed SSE connection. Every
  * `intervalMs`, re-validate the display token; on revocation (`resolveDisplay`
  * returns `!ok`) it invokes `onRevoked` (which closes the stream so the client's
- * existing 401 → /board/pair reconnect path takes over). A transient resolver
- * error keeps the stream open and bumps a bounded counter — a rising count flags a
- * persistently-stuck recheck without flooding logs. After
- * `maxConsecutiveErrors` re-checks fail in a row (sustained outage) the watch fails
+ * existing 401 → /board/pair reconnect path takes over). Each recheck is bounded by
+ * `timeoutMs` (defaults to `intervalMs`) so a hung resolver rejects into the error
+ * path rather than pinning the in-flight flag forever. A transient resolver error
+ * keeps the stream open and bumps a bounded counter — a rising count flags a
+ * persistently-stuck recheck without flooding logs. After `maxConsecutiveErrors`
+ * re-checks fail in a row (sustained outage OR sustained hang) the watch fails
  * CLOSED: it bumps `display_revocation_recheck_failclosed` and invokes `onRevoked`,
  * bounding how long a token revoked during the outage can survive. Any single
- * success resets the error streak. `resolveDisplay`, `intervalMs`, and
- * `maxConsecutiveErrors` are injectable for tests. Returns a stop function.
+ * success resets the error streak. `resolveDisplay`, `intervalMs`,
+ * `maxConsecutiveErrors`, and `timeoutMs` are injectable for tests. Returns a stop
+ * function.
  *
  * ONLY display-authed connections are watched: a user (Clerk) connection is
  * re-authenticated per request, not here, so this returns a no-op stop for it (the
@@ -50,6 +68,7 @@ export function startDisplayRevocationWatch(
   resolveDisplay: (r: Request) => Promise<{ ok: boolean }> = resolveDisplayAuth,
   intervalMs: number = DISPLAY_REVOCATION_RECHECK_MS,
   maxConsecutiveErrors: number = DISPLAY_REVOCATION_MAX_CONSECUTIVE_ERRORS,
+  timeoutMs: number = intervalMs,
 ): () => void {
   if (!req.isDisplayAuth) return () => {};
   let inFlight = false;
@@ -58,7 +77,7 @@ export function startDisplayRevocationWatch(
   const timer = setInterval(() => {
     if (stopped || inFlight) return;
     inFlight = true;
-    void resolveDisplay(req)
+    void withTimeout(resolveDisplay(req), timeoutMs, "display revocation recheck timed out")
       .then((check) => {
         consecutiveErrors = 0; // a successful recheck clears the outage streak
         if (!check.ok) {
@@ -67,6 +86,7 @@ export function startDisplayRevocationWatch(
         }
       })
       .catch(() => {
+        // A throw OR a timeout (hung resolver) lands here.
         consecutiveErrors += 1;
         incrementMetric("display_revocation_recheck_error");
         if (consecutiveErrors >= maxConsecutiveErrors) {

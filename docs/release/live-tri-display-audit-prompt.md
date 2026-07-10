@@ -24,7 +24,7 @@ Three displays, side by side, all signed into the **same clinic**, ideally showi
 - **The airplane-mode offline test drops the mirror.** Airplane mode disables the Wi-Fi/Bluetooth link iPhone Mirroring runs on, so the mirror session disconnects. Run flow **E**'s offline Code Blue test **holding the physical iPhone directly** (not through the mirror), then reconnect and resume mirroring — or skip it and note it as owner-run-separately.
 - **Latency includes mirror overhead.** Times measured through the mirror carry a small mirroring lag; for any latency finding that's borderline, sanity-check it once on the physical screen.
 
-**Role coverage.** VetTrack has five UI archetypes — `admin · vet · lead · tech · student` (client roles `senior_technician`→lead, `technician`→tech; the server's `normalizeUserRole` collapses the non-DB aliases `lead_technician`/`vet_tech` → `student` via its default-to-`student` fallback — they are hierarchy-table entries, not real DB roles). On **Web (dev/staging builds)** use the **dev-role switcher** (Settings → *Developer · role override*) to cycle roles. On the **iPhone/iPad production build** the role is whatever the signed-in account is — note which role you are, and if you can, sign in as more than one.
+**Role coverage.** VetTrack has five UI archetypes — `admin · vet · lead · tech · student`. The client experience-model maps the DB roles to archetypes: `senior_technician`/`lead_technician` → lead, `technician`/`vet_tech` → tech — so cycling any of those in the switcher shows lead/tech behavior, **not** student (see `tests/experience-model.test.ts`). (`lead_technician`/`vet_tech` are non-DB hierarchy-table aliases; the server's `normalizeUserRole` recognizes only the five real DB roles — a backend nuance that doesn't change what this visual audit sees.) On **Web (dev/staging builds)** use the **dev-role switcher** (Settings → *Developer · role override*) to cycle roles. On the **iPhone/iPad production build** the role is whatever the signed-in account is — note which role you are, and if you can, sign in as more than one.
 
 **Ground rules the audit is measured against:**
 - **Hebrew is the DEFAULT locale and the app is RTL.** Every screen must mirror correctly: layout direction, icon/chevron direction, text alignment, number/date formatting, and the back-gesture direction. English is the secondary locale — check parity, but Hebrew-RTL is the primary lens.
@@ -32,7 +32,7 @@ Three displays, side by side, all signed into the **same clinic**, ideally showi
 - **No hardcoded copy.** Every user-facing string must come from the locale files; a literal English (or Hebrew) string baked into a component is a finding even if it "looks fine."
 - **Emergency and realtime are load-bearing.** Code Blue must never queue offline, never optimistically terminate, and must propagate across displays over SSE within a couple seconds. Treat any lag, desync, or stale emergency state as high severity.
 
-**Safety — read before you paste the prompt (non-negotiable).** This audit drives real mutations (start/end Code Blue, dispense/restock, start/end shifts, checkout/checkin) with computer control across three displays. Run it **only against a synthetic test clinic seeded for this audit** — never against a production clinic that holds real client, patient, or device data. Concretely:
+**Safety — read before you paste the prompt (non-negotiable).** This audit drives real mutations (start/end Code Blue, dispense/restock, start/end shifts, check-out/check-in) with computer control across three displays. Run it **only against a synthetic test clinic seeded for this audit** — never against a production clinic that holds real client, patient, or device data. Concretely:
 - **Use a dedicated test clinic + test account.** `vettrack.uk` Display 3 must be signed into the **test clinic**, not a live hospital's tenant. If a production tenant is the only thing available, do **read-only** navigation and **skip every mutating flow** — do not create Code Blue sessions, dispense, or start shifts in it.
 - **Every mutating flow must be reversed.** After the sweep, close/end any Code Blue session you opened, reverse or void test dispenses/restocks, end test shifts, and check test equipment back in. Leaving a live emergency session or an open shift behind is itself a finding. Treat the cleanup as a gate, not an afterthought.
 - **Redact PII in every artifact.** Screenshots and finding reports must not carry real client names, patient names, phone numbers, device serial/pairing tokens, or account emails. Use seeded synthetic data; if a real value is unavoidably on screen, blur/crop it before attaching. Never paste a pairing token, session token, or `pk_live`/secret into a finding.
@@ -128,7 +128,7 @@ SAFETY — HARD CONSTRAINTS (these override the instruction to "test everything"
    same data, same state, same result? When they differ, is the difference
    intentional (a management-only affordance on Web) or a bug (stale data, a
    missing field, a different number)? Mobile wins ties.
-7. REALTIME PROPAGATION — mutate on one display, watch the other two. A checkout,
+7. REALTIME PROPAGATION — mutate on one display, watch the other two. A check-out,
    a task completion, a Code Blue start/log/end must propagate over SSE to the
    other displays within ~1–2s WITHOUT a manual refresh. Time it. A display that
    needs a reload to catch up is a finding.
@@ -157,7 +157,7 @@ B. HOME / PER-ROLE SURFACE  (Phase 8 — the newest per-role work)
      home, correct tab-bar order per archetype. Compare the same role's home across
      iPhone vs iPad vs Web.
 
-C. EQUIPMENT — list → detail → edit, scan/custody (checkout/return), my-equipment,
+C. EQUIPMENT — list → detail → edit, scan/custody (check-out/return), my-equipment,
    maintenance, intelligence. Checkout on iPhone → confirm it appears on iPad + Web
    in realtime. RTL on the equipment cards. Empty states (no equipment). Long
    device names / IDs (truncation + RTL mixing).

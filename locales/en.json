@@ -835,7 +835,8 @@
     "roomReadinessHint": "Review room verification status",
     "guidedTitle": "Guided mode",
     "guidedBody": "Check equipment out and back in, and dispense or restock inventory. Ask a supervisor for anything else.",
-    "inventoryActionHint": "Dispense or restock items"
+    "inventoryActionHint": "Dispense or restock items",
+    "myEquipmentRefreshFailed": "Couldn't refresh — showing saved items"
   },
   "home": {
     "equipmentOverview": "Equipment overview",
