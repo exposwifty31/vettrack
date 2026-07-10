@@ -109,6 +109,21 @@ import {
   TASKS_FETCH_TIMEOUT_MS,
 } from "./request-core";
 import type { ApiErrorPayload } from "./request-core";
+import { getDevRoleOverride } from "./auth-fetch";
+
+/**
+ * Headers for the auth-bootstrap raw fetches (`/users/me`, `/users/sync`). These
+ * deliberately bypass `authFetch` (its userId guard fires before the session is
+ * established), so they must attach the dev-role override THEMSELVES — otherwise
+ * useAuth always resolves the default dev role and the dev-role switcher can't
+ * drive the client (OBS-1). Inert in Clerk builds (`getDevRoleOverride` → null).
+ */
+function bootstrapHeaders(init: RequestInit): Record<string, string> {
+  const headers = mergeRequestHeaders(init);
+  const devRole = getDevRoleOverride();
+  if (devRole) headers["x-dev-role-override"] = devRole;
+  return headers;
+}
 
 /** Compatibility re-exports (Slice 1 — request core extracted). */
 export {
@@ -184,7 +199,7 @@ function bootstrapCredentials(init: RequestInit): RequestCredentials {
 export async function authFetchUsersMe(init: RequestInit = {}): Promise<Response> {
   return bootstrapFetchWithTimeout(
     "/api/users/me",
-    { credentials: bootstrapCredentials(init), ...init, headers: mergeRequestHeaders(init) },
+    { credentials: bootstrapCredentials(init), ...init, headers: bootstrapHeaders(init) },
   );
 }
 
@@ -199,7 +214,7 @@ export async function authPostUsersSync(
       credentials: bootstrapCredentials({ ...init, body: payload }),
       method: "POST",
       ...init,
-      headers: mergeRequestHeaders({ ...init, body: payload }),
+      headers: bootstrapHeaders({ ...init, body: payload }),
       body: payload,
     },
   );

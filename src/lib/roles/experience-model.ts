@@ -277,13 +277,26 @@ export function filterAdminNav<T extends { adminOnly?: boolean }>(
  */
 const CUSTODY_ONLY_ARCHETYPES: ReadonlySet<ExperienceArchetype> = new Set<ExperienceArchetype>(["student"]);
 
-/** Nav-item ids a custody-only archetype may see; everything else is hidden. */
-const CUSTODY_ONLY_NAV_IDS: ReadonlySet<string> = new Set<string>([
+/**
+ * Nav-item keys a custody-only archetype may see; everything else is hidden.
+ * Matched against BOTH the item id (native sections, web NAV nodes) and the item
+ * href (web layout nav items, which have no id) so one filter covers every nav
+ * shape. Anything not listed — Command Board, Alerts, Rooms, Emergency, Tasks,
+ * admin — is dropped for the student.
+ */
+const CUSTODY_ONLY_NAV_KEYS: ReadonlySet<string> = new Set<string>([
+  // ids
   "today", // home
   "scan", // scan = checkout/checkin
   "equipment", // find equipment to check out
   "mine", // my equipment (return)
   "inventory", // dispense / restock
+  // hrefs (web layout nav items key on href, not id)
+  "/home",
+  "/scan",
+  "/equipment",
+  "/my-equipment",
+  "/inventory",
 ]);
 
 /** True when this experience is restricted to the custody-only nav set. */
@@ -292,14 +305,18 @@ export function isCustodyOnly(experience: RoleExperience): boolean {
 }
 
 /**
- * Filter a flat list of id-keyed nav items to the custody-only allow-set. A no-op
- * for non-custody experiences. Used on native nav SECTION items (the student's
- * primary surface) after {@link filterAdminNav} has dropped admin sections.
+ * Filter a flat list of nav items to the custody-only allow-set (by id OR href).
+ * A no-op for non-custody experiences. Applied after {@link filterAdminNav} on
+ * both the native sections (the student's primary surface) and the web nav.
  */
-export function filterCustodyNav<T extends { id: string }>(
+export function filterCustodyNav<T extends { id?: string; href?: string }>(
   items: readonly T[],
   experience: RoleExperience,
 ): T[] {
   if (!isCustodyOnly(experience)) return [...items];
-  return items.filter((item) => CUSTODY_ONLY_NAV_IDS.has(item.id));
+  return items.filter(
+    (item) =>
+      (item.id !== undefined && CUSTODY_ONLY_NAV_KEYS.has(item.id)) ||
+      (item.href !== undefined && CUSTODY_ONLY_NAV_KEYS.has(item.href)),
+  );
 }
