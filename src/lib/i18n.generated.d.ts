@@ -838,6 +838,7 @@ export interface TStructure {
     roomReadinessHint: string;
     guidedTitle: string;
     guidedBody: string;
+    inventoryActionHint: string;
   };
   home: {
     equipmentOverview: string;

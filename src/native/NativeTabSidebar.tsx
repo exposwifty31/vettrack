@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { t } from "@/lib/i18n";
 import { useExperience } from "@/hooks/use-experience";
-import { filterAdminNav } from "@/lib/roles/experience-model";
+import { filterAdminNav, filterCustodyNav } from "@/lib/roles/experience-model";
 import { useActiveShift } from "@/hooks/use-active-shift";
 import { ReportIssueDialog } from "@/components/report-issue-dialog";
 import {
@@ -94,7 +94,9 @@ export function NativeTabSidebar() {
   const sections = filterAdminNav(
     getNativeNavSections({ hasActiveShift: shiftLoading || hasActiveShift }),
     experience,
-  );
+  )
+    .map((section) => ({ ...section, items: filterCustodyNav(section.items, experience) }))
+    .filter((section) => section.items.length > 0);
   const allHrefs = sections.flatMap((section) =>
     section.items
       .map((item: NativeNavItem) => item.href)

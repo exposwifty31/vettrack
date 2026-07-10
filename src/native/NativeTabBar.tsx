@@ -1,7 +1,9 @@
 import { useLocation } from "wouter";
-import { Home, Package, Activity, AlignJustify, QrCode } from "lucide-react";
+import { Home, Package, Activity, AlignJustify, QrCode, User } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useScanAffordance } from "@/lib/scan-affordance";
+import { useExperience } from "@/hooks/use-experience";
+import { isCustodyOnly } from "@/lib/roles/experience-model";
 
 type TabDef = {
   id: string;
@@ -85,15 +87,19 @@ function TabButton({
 export function NativeTabBar({ onMorePress }: Props) {
   const [location, navigate] = useLocation();
   const affordance = useScanAffordance();
+  const experience = useExperience();
+  const custodyOnly = isCustodyOnly(experience);
 
   const leftTabs: TabDef[] = [
     { id: "today", href: "/home", label: t.nav.today, icon: <Home size={22} /> },
     { id: "equipment", href: "/equipment", label: t.nav.equipment, icon: <Package size={22} /> },
   ];
 
-  const rightTabs: TabDef[] = [
-    { id: "emergency", href: "/code-blue", label: t.nav.emergency, icon: <Activity size={22} /> },
-  ];
+  // Custody-only (student): no Emergency tab — swap in My Equipment so the bar
+  // stays entirely within the custody scope (Home · Equipment · Scan · Mine · Menu).
+  const rightTabs: TabDef[] = custodyOnly
+    ? [{ id: "mine", href: "/my-equipment", label: t.nav.mine, icon: <User size={22} /> }]
+    : [{ id: "emergency", href: "/code-blue", label: t.nav.emergency, icon: <Activity size={22} /> }];
 
   return (
     <nav

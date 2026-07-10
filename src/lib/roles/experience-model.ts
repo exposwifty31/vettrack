@@ -268,3 +268,38 @@ export function filterAdminNav<T extends { adminOnly?: boolean }>(
   const showAdmin = can(experience, "app.adminNav");
   return items.filter((item) => !item.adminOnly || showAdmin);
 }
+
+/**
+ * Custody-only archetypes: their entire system footprint is equipment custody +
+ * inventory (owner scope, 2026-07). Today only the student — a supervised trainee
+ * whose nav is pared to Home · Scan (checkout/checkin) · Equipment · My Equipment ·
+ * Inventory (dispense/restock). See [[student-role-meaning]].
+ */
+const CUSTODY_ONLY_ARCHETYPES: ReadonlySet<ExperienceArchetype> = new Set<ExperienceArchetype>(["student"]);
+
+/** Nav-item ids a custody-only archetype may see; everything else is hidden. */
+const CUSTODY_ONLY_NAV_IDS: ReadonlySet<string> = new Set<string>([
+  "today", // home
+  "scan", // scan = checkout/checkin
+  "equipment", // find equipment to check out
+  "mine", // my equipment (return)
+  "inventory", // dispense / restock
+]);
+
+/** True when this experience is restricted to the custody-only nav set. */
+export function isCustodyOnly(experience: RoleExperience): boolean {
+  return CUSTODY_ONLY_ARCHETYPES.has(experience.archetype);
+}
+
+/**
+ * Filter a flat list of id-keyed nav items to the custody-only allow-set. A no-op
+ * for non-custody experiences. Used on native nav SECTION items (the student's
+ * primary surface) after {@link filterAdminNav} has dropped admin sections.
+ */
+export function filterCustodyNav<T extends { id: string }>(
+  items: readonly T[],
+  experience: RoleExperience,
+): T[] {
+  if (!isCustodyOnly(experience)) return [...items];
+  return items.filter((item) => CUSTODY_ONLY_NAV_IDS.has(item.id));
+}

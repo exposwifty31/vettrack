@@ -834,7 +834,8 @@
     "crashCartHint": "Verify the crash cart is stocked",
     "roomReadinessHint": "Review room verification status",
     "guidedTitle": "Guided mode",
-    "guidedBody": "Work through your tasks and scans step by step. Check with a supervisor before any emergency action."
+    "guidedBody": "Check equipment out and back in, and dispense or restock inventory. Ask a supervisor for anything else.",
+    "inventoryActionHint": "Dispense or restock items"
   },
   "home": {
     "equipmentOverview": "Equipment overview",

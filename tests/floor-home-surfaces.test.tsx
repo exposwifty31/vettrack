@@ -91,17 +91,21 @@ describe("floor surfaces — per-archetype smoke", () => {
     expect(screen.queryByText(t.homeSurface.clinicalActions)).toBeNull();
   });
 
-  it("StudentHomeSurface leads with the guided banner (authority withheld)", async () => {
+  it("StudentHomeSurface is custody-only: guided banner + inventory action, NO tasks", async () => {
     caps = new Set<Capability>(); // student base — no codeBlue.manage
     renderSurface(<StudentHomeSurface isTablet={false} />);
     expect(await screen.findByText(t.homeSurface.guidedTitle)).toBeTruthy();
-    expect(screen.getByText(t.homeSurface.tasks)).toBeTruthy();
+    // Custody scope: the inventory (dispense/restock) action is present…
+    expect(screen.getByText(t.homeSurface.inventoryActionHint)).toBeTruthy();
+    // …and tasks are NOT (removed from the custody-only student surface).
+    expect(screen.queryByText(t.homeSurface.tasks)).toBeNull();
   });
 
-  it("StudentHomeSurface drops the guided banner once the withheld cap is earned", async () => {
+  it("StudentHomeSurface drops the guided banner once the withheld cap is earned (still custody-only)", async () => {
     caps = new Set<Capability>(["codeBlue.manage"]); // e.g. shift-elevated / secondary-admin
     renderSurface(<StudentHomeSurface isTablet={false} />);
-    expect(await screen.findByText(t.homeSurface.tasks)).toBeTruthy();
+    expect(await screen.findByText(t.homeSurface.inventoryActionHint)).toBeTruthy();
     expect(screen.queryByText(t.homeSurface.guidedTitle)).toBeNull();
+    expect(screen.queryByText(t.homeSurface.tasks)).toBeNull();
   });
 });

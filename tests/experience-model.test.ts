@@ -5,7 +5,9 @@ import {
   buildRoleExperience,
   can,
   filterAdminNav,
+  filterCustodyNav,
   homeSurfaceForRole,
+  isCustodyOnly,
   resolveCapabilities,
   TAB_BAR_ORDER_BY_ARCHETYPE,
   type Capability,
@@ -379,6 +381,35 @@ describe("filterAdminNav — byte-identical to the pre-Phase-2 nav gate", () => 
       const before = sections.filter((s) => !s.adminOnly || role === "admin").map((s) => s.id);
       const after = filterAdminNav(sections, expFor(role)).map((s) => s.id);
       expect(after).toEqual(before);
+    }
+  });
+});
+
+describe("experience-model — custody-only archetype (student)", () => {
+  const exp = (role: UserRole) => buildRoleExperience({ role, effectiveRole: role, roleSource: "permanent", isAdmin: role === "admin" });
+
+  it("isCustodyOnly is true only for the student archetype", () => {
+    expect(isCustodyOnly(exp("student"))).toBe(true);
+    for (const role of ["admin", "vet", "senior_technician", "technician"] as const) {
+      expect(isCustodyOnly(exp(role))).toBe(false);
+    }
+  });
+
+  it("filterCustodyNav pares the native operations items to the custody set for a student", () => {
+    const ops = getNativeNavSections()[0].items;
+    const studentIds = filterCustodyNav(ops, exp("student")).map((i) => i.id);
+    // Allowed: home + scan (checkout/checkin) + equipment + my-equipment + inventory.
+    expect(new Set(studentIds)).toEqual(new Set(["today", "scan", "equipment", "mine", "inventory"]));
+    // Explicitly NOT present: emergency / tasks / crash-cart / rooms / alerts.
+    for (const denied of ["emergency", "tasks", "crash-cart", "rooms", "alerts"]) {
+      expect(studentIds).not.toContain(denied);
+    }
+  });
+
+  it("filterCustodyNav is a no-op for non-custody archetypes", () => {
+    const ops = getNativeNavSections()[0].items;
+    for (const role of ["admin", "vet", "technician"] as const) {
+      expect(filterCustodyNav(ops, exp(role)).length).toBe(ops.length);
     }
   });
 });

@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { SettingRow } from "./SettingRow";
 import { t } from "@/lib/i18n";
 import { useExperience } from "@/hooks/use-experience";
-import { filterAdminNav } from "@/lib/roles/experience-model";
+import { filterAdminNav, filterCustodyNav } from "@/lib/roles/experience-model";
 import { useIsTabletViewport } from "@/lib/use-tablet-viewport";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useActiveShift } from "@/hooks/use-active-shift";
@@ -85,7 +85,7 @@ export function MoreSheet({ open, onClose }: Props) {
   )
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => !item.inPhoneTabBar),
+      items: filterCustodyNav(section.items, experience).filter((item) => !item.inPhoneTabBar),
     }))
     .filter((section) => section.items.length > 0);
 
