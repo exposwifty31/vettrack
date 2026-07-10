@@ -1,4 +1,4 @@
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { and, asc, eq, gt, isNotNull, sql } from "drizzle-orm";
@@ -17,6 +17,34 @@ const MAX_OUTBOX_REPLAY = 1000;
 // server closes its live connection. Kiosks are few, so a light DB read at this
 // cadence is negligible; aligned with the ~10 s keepalive.
 const DISPLAY_REVOCATION_RECHECK_MS = 10_000;
+
+/**
+ * F6 — periodic revocation watch for a display-authed SSE connection. Every
+ * `intervalMs`, re-validate the display token; on revocation (`resolveDisplay`
+ * returns `!ok`) it invokes `onRevoked` (which closes the stream so the client's
+ * existing 401 → /board/pair reconnect path takes over). A transient resolver
+ * error keeps the stream open and bumps a bounded counter — a rising count flags a
+ * persistently-stuck recheck without flooding logs. `resolveDisplay` and
+ * `intervalMs` are injectable for tests. Returns a stop function.
+ */
+export function startDisplayRevocationWatch(
+  req: Request,
+  onRevoked: () => void,
+  resolveDisplay: (r: Request) => Promise<{ ok: boolean }> = resolveDisplayAuth,
+  intervalMs: number = DISPLAY_REVOCATION_RECHECK_MS,
+): () => void {
+  const timer = setInterval(() => {
+    void resolveDisplay(req)
+      .then((check) => {
+        if (!check.ok) onRevoked();
+      })
+      .catch(() => {
+        incrementMetric("display_revocation_recheck_error");
+      });
+  }, intervalMs);
+  timer.unref?.();
+  return () => clearInterval(timer);
+}
 
 function parseLastEventId(header: unknown): number | undefined {
   if (typeof header !== "string") return undefined;
@@ -633,39 +661,20 @@ router.get("/stream", requireDisplayOrUser, async (req, res) => {
     recordStreamConnect(clinicId);
     const stopKeepalive = startKeepalive(res, clinicId);
 
-    // Phase 10 (F6) — enforce display-token revocation on the LIVE stream, not
-    // only at connect. A revoked kiosk would otherwise keep receiving operational
-    // data on its already-open SSE connection until it happened to reconnect. For
-    // display-authed connections, re-validate the token on an interval (the
-    // lookup filters `revoked_at IS NULL`); on revocation, close the stream so the
-    // client's existing 401 → /board/pair reconnect path takes over. Additive
-    // auth re-check — no transport, envelope, or keepalive change; user
-    // (non-display) connections are unaffected.
-    let revocationTimer: ReturnType<typeof setInterval> | null = null;
-    if (req.isDisplayAuth) {
-      revocationTimer = setInterval(() => {
-        void resolveDisplayAuth(req)
-          .then((check) => {
-            if (!check.ok) finalize();
-          })
-          .catch(() => {
-            // Best-effort: a transient DB error must never tear down a live board.
-            // Record a bounded counter so a persistently-stuck recheck is visible
-            // (a rising count) without flooding logs; the stream stays open.
-            incrementMetric("display_revocation_recheck_error");
-          });
-      }, DISPLAY_REVOCATION_RECHECK_MS);
-      revocationTimer.unref?.();
-    }
+    // Phase 10 (F6) — enforce display-token revocation on the LIVE stream, not only
+    // at connect. A revoked kiosk would otherwise keep receiving operational data on
+    // its already-open SSE connection until it happened to reconnect. Additive auth
+    // re-check — no transport, envelope, or keepalive change; user (non-display)
+    // connections are unaffected. See startDisplayRevocationWatch above (tested).
+    const stopRevocationWatch = req.isDisplayAuth
+      ? startDisplayRevocationWatch(req, () => finalize())
+      : null;
 
     finalize = () => {
       if (cleaned) return;
       cleaned = true;
       stopKeepalive();
-      if (revocationTimer !== null) {
-        clearInterval(revocationTimer);
-        revocationTimer = null;
-      }
+      stopRevocationWatch?.();
       outboxEmitter.off(`clinic:${clinicId}`, onOutbox);
       unsubscribe(res);
       try {
