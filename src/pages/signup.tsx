@@ -50,20 +50,22 @@ export default function SignUpPage() {
             <p className="text-sm text-muted-foreground">{t.authPage.signUpSubtitle}</p>
           </div>
 
+          {/* Informational only — these are the roles VetTrack serves, NOT a
+              selectable control. A user's actual role is assigned by their clinic
+              admin on approval, so none of these chips is "selected" or submitted. */}
           <div className="mb-6 flex flex-col items-center gap-2">
             <span className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">
               {t.authPage.roleLabel}
             </span>
             <div className="flex flex-wrap justify-center gap-2">
-              <span className="inline-flex h-8 items-center rounded-full border border-primary bg-primary px-3.5 text-xs font-semibold text-primary-foreground">
-                {t.authPage.roleVetTech}
-              </span>
-              <span className="inline-flex h-8 items-center rounded-full border border-border bg-card px-3.5 text-xs font-semibold text-foreground">
-                {t.authPage.roleVeterinarian}
-              </span>
-              <span className="inline-flex h-8 items-center rounded-full border border-border bg-card px-3.5 text-xs font-semibold text-foreground">
-                {t.authPage.roleStudent}
-              </span>
+              {[t.authPage.roleVetTech, t.authPage.roleVeterinarian, t.authPage.roleStudent].map((label) => (
+                <span
+                  key={label}
+                  className="inline-flex h-8 items-center rounded-full border border-border bg-card px-3.5 text-xs font-semibold text-foreground"
+                >
+                  {label}
+                </span>
+              ))}
             </div>
           </div>
 

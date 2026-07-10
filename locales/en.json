@@ -3743,7 +3743,7 @@
     "createAccount": "Create account",
     "signUpSubtitle": "Sign up to manage your veterinary equipment",
     "signUpLoadError": "The sign-up page failed to load. Check your connection and refresh. If the problem persists, make sure Clerk is configured for this domain and the Publishable Key matches the environment.",
-    "roleLabel": "Role",
+    "roleLabel": "For every role",
     "roleVetTech": "Vet Tech",
     "roleVeterinarian": "Veterinarian",
     "roleStudent": "Student",

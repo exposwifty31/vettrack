@@ -3743,7 +3743,7 @@
     "createAccount": "יצירת חשבון",
     "signUpSubtitle": "הירשם לניהול ציוד הוטרינרי שלך",
     "signUpLoadError": "דף ההרשמה לא נטען. בדוק את החיבור ורענן. אם הבעיה נמשכת, ודא ש-Clerk מוגדר לדומיין זה ושמפתח ה-Publishable Key תואם לסביבה.",
-    "roleLabel": "תפקיד",
+    "roleLabel": "לכל תפקיד",
     "roleVetTech": "טכנאי/ת וטרינרי/ת",
     "roleVeterinarian": "וטרינר/ית",
     "roleStudent": "סטודנט/ית",
