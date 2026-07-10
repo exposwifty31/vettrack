@@ -2594,6 +2594,7 @@ export interface TStructure {
     endEventChooseOutcome: string;
     managerOnlyHint: string;
     activeSessionExists: string;
+    clinicalAuthorityRequired: string;
     startSessionFailed: string;
     endSessionFailed: string;
     elapsedSinceStart: string;

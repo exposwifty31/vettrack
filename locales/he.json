@@ -2591,6 +2591,7 @@
     "endEventChooseOutcome": "סיום אירוע — בחר תוצאה",
     "managerOnlyHint": "זמין למנהל האירוע בלבד",
     "activeSessionExists": "כבר פתוח מפגש Code Blue פעיל.",
+    "clinicalAuthorityRequired": "רק צוות קליני במשמרת יכול לפתוח Code Blue. בקשו מהרופא האחראי לפתוח את האירוע.",
     "startSessionFailed": "פתיחת מפגש Code Blue נכשלה",
     "endSessionFailed": "סיום מפגש Code Blue נכשל",
     "elapsedSinceStart": "זמן מאז תחילת האירוע",

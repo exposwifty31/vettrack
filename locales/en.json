@@ -2591,6 +2591,7 @@
     "endEventChooseOutcome": "End event — choose outcome",
     "managerOnlyHint": "Available to the event manager only",
     "activeSessionExists": "An active Code Blue session is already open.",
+    "clinicalAuthorityRequired": "Only clinical staff on shift can open a Code Blue. Ask the responsible clinician to start the event.",
     "startSessionFailed": "Failed to start Code Blue session",
     "endSessionFailed": "Failed to end Code Blue session",
     "elapsedSinceStart": "Elapsed since event start",

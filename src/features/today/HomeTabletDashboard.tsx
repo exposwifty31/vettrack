@@ -321,10 +321,12 @@ export function HomeTabletDashboard() {
         ) : null}
       </section>
 
-      {/* Alerts — worst-first head of the shared controller feed (Phase 3). */}
+      {/* Exceptions — worst-first head of the shared controller feed (Phase 3).
+          Titled to match the canonical phone/web ExceptionsTile (mobile is the
+          source of truth); "התראות/Alerts" is a separate nav destination. */}
       <section style={tileStyle} data-testid="tablet-tile-alerts">
         <TileHeader
-          title={t.nav.alerts}
+          title={t.homeSurface.exceptions}
           href="/alerts"
           aside={
             alertsCtl.activeAlertCount > 0 ? (
