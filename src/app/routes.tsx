@@ -7,6 +7,7 @@ import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { useAuth } from "@/hooks/use-auth";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { WebOnlyGuard } from "@/app/platform/guards/WebOnlyGuard";
+import { CustodyGuard } from "@/app/platform/guards/CustodyGuard";
 import { ManagementGuard } from "@/desktop/management";
 import { useIsNativeTablet } from "@/native/tablet/useIsNativeTablet";
 import { hasStoredDisplayToken } from "@/lib/display-token-store";
@@ -157,11 +158,11 @@ export function AppRoutes() {
         <Route path="/equipment/scan"><Redirect to="/equipment?scan=1" replace /></Route>
         <Route path="/equipment/maintenance"><Redirect to="/equipment?status=maintenance" replace /></Route>
         <Route path="/equipment/intelligence"><Redirect to="/equipment" replace /></Route>
-        <Route path="/alerts"><AuthGuard><AlertsPage /></AuthGuard></Route>
+        <Route path="/alerts"><AuthGuard><CustodyGuard><AlertsPage /></CustodyGuard></AuthGuard></Route>
         <Route path="/my-equipment"><AuthGuard><MyEquipmentPage /></AuthGuard></Route>
         <Route path="/my-profile"><AuthGuard><MyProfilePage /></AuthGuard></Route>
         {isNativeTablet && <Route path="/rooms/:id?"><AuthGuard><RoomsMasterDetail /></AuthGuard></Route>}
-        {!isNativeTablet && <Route path="/rooms"><AuthGuard><RoomsListPage /></AuthGuard></Route>}
+        {!isNativeTablet && <Route path="/rooms"><AuthGuard><CustodyGuard><RoomsListPage /></CustodyGuard></AuthGuard></Route>}
         {!isNativeTablet && <Route path="/rooms/:id"><AuthGuard><RoomRadarPage /></AuthGuard></Route>}
         {isNativeTablet && <Route path="/locations/:id?"><AuthGuard><RoomsMasterDetail /></AuthGuard></Route>}
         {!isNativeTablet && <Route path="/locations"><AuthGuard><RoomsListPage /></AuthGuard></Route>}
