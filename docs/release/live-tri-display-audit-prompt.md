@@ -214,16 +214,21 @@ G. DISPLAY PAIRING  (Phase 9 — the newest surface)
 H. ROOMS / LOCATIONS · SHIFT (chat, handover, pending) · SETTINGS / HELP /
    WHAT'S-NEW — walk each, apply the lens, cross-display parity.
 
-I. LARGE-FORMAT / WEB-ONLY  (Web + board only; MUST redirect on iPhone/iPad)
-   - `/dashboard`, `/analytics/*`, `/procurement`, `/audit-log`, `/equipment/board`,
-     QR/print sheets. On Web ≥1024: do they render well, with real hierarchy (not a
+I. LARGE-FORMAT / WEB-ONLY  (Web only; MUST redirect on iPhone/iPad)
+   - `/dashboard`, `/analytics/*`, `/procurement`, `/audit-log`, QR/print sheets.
+     On Web ≥1024: do they render well, with real hierarchy (not a
      dashboard-by-numbers)? On iPhone/iPad: navigating to one of these must REDIRECT
      to the mobile fallback — never render a broken desktop layout. Verify the
      redirect, don't just accept the destination.
+   - `/board` is the canonical Command Center KIOSK (Phase 10) — it is NOT in this
+     must-redirect set: it renders on Web AND native (BoardShell via PlatformRouter),
+     so audit it as a kiosk (flows E + G), not as a desktop route that should bounce.
 
 J. REDIRECTS & REMOVED SCOPE (a rendered page here = blocking finding)
    - `/appointments`, `/equipment-tasks` → `/equipment/tasks`
-   - `/display`, `/equipment-board` → `/equipment/board`
+   - `/equipment/board`, `/display`, `/equipment-board` → `/board` (Phase 10 —
+     `/board` is the canonical Command Center; all three must redirect to it, with
+     `/equipment/board` + `/display` preserving any `?kiosk=1` query)
    - `/patients`, `/patients/:id`, `/billing`, `/er`, `/meds`, `/pharmacy-forecast`
      → must REDIRECT (these domains were removed). If any renders a real page,
      that's a blocking finding. Also hunt the app for any surviving LINK that points
