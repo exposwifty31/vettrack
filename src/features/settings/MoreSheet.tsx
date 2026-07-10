@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { SettingRow } from "./SettingRow";
 import { t } from "@/lib/i18n";
 import { useExperience } from "@/hooks/use-experience";
-import { filterAdminNav, filterCustodyNav } from "@/lib/roles/experience-model";
+import { visibleNavSections } from "@/lib/roles/experience-model";
 import { useIsTabletViewport } from "@/lib/use-tablet-viewport";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useActiveShift } from "@/hooks/use-active-shift";
@@ -79,14 +79,12 @@ export function MoreSheet({ open, onClose }: Props) {
 
   // Phone drawer: the bottom tab bar already carries `inPhoneTabBar` items
   // (Today / Equipment / Scan / Emergency), so hide them here to avoid duplicates.
-  const sections = filterAdminNav(
+  // Shared admin+custody visibility first, then the tab-bar filter on top.
+  const sections = visibleNavSections(
     getNativeNavSections({ hasActiveShift: shiftLoading || hasActiveShift }),
     experience,
   )
-    .map((section) => ({
-      ...section,
-      items: filterCustodyNav(section.items, experience).filter((item) => !item.inPhoneTabBar),
-    }))
+    .map((section) => ({ ...section, items: section.items.filter((item) => !item.inPhoneTabBar) }))
     .filter((section) => section.items.length > 0);
 
   return (

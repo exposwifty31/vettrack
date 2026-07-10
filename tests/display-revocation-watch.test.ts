@@ -3,8 +3,9 @@
 // actual periodic re-check must (a) close the stream when the token is revoked and
 // (b) keep the stream open + bump a bounded counter on a transient resolver error.
 // The /stream handler's revocation watch is extracted into `startDisplayRevocationWatch`
-// (injectable resolver + interval) precisely so it can be exercised with fake timers
-// without mounting the full SSE route (db / outbox / keepalive / subscribe).
+// (injectable resolver + interval, self-gated on req.isDisplayAuth) precisely so it
+// can be exercised with fake timers without mounting the full SSE route (db / outbox
+// / keepalive / subscribe).
 
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 import type { Request } from "express";
@@ -28,7 +29,10 @@ beforeAll(async () => {
   ({ startDisplayRevocationWatch } = await import("../server/routes/realtime.js"));
 }, 30000);
 
-const req = { headers: {} } as unknown as Request;
+// The watch only reads req.isDisplayAuth; a minimal cast is enough (the real handler
+// passes the full Express Request).
+const displayReq = { headers: {}, isDisplayAuth: true } as unknown as Request;
+const userReq = { headers: {}, isDisplayAuth: false } as unknown as Request;
 
 beforeEach(() => {
   incrementMetric.mockReset();
@@ -39,26 +43,39 @@ afterEach(() => {
 });
 
 describe("startDisplayRevocationWatch (F6 live-stream revocation lifecycle)", () => {
-  it("keeps the stream open while active, closes it on revocation, and stops on teardown", async () => {
-    let active = true;
-    const resolve = vi.fn(async () => ({ ok: active }));
+  it("keeps the stream open while the token stays active", async () => {
+    const resolve = vi.fn(async () => ({ ok: true }));
     const onRevoked = vi.fn();
-    const stop = startDisplayRevocationWatch(req, onRevoked, resolve, 1000);
+    const stop = startDisplayRevocationWatch(displayReq, onRevoked, resolve, 1000);
 
-    // Tick 1: token still active → the stream stays open.
     await vi.advanceTimersByTimeAsync(1000);
     expect(resolve).toHaveBeenCalledTimes(1);
     expect(onRevoked).not.toHaveBeenCalled();
+    stop();
+  });
 
-    // Tick 2: token revoked → the stream is finalized exactly once.
-    active = false;
+  it("closes the stream once the token is revoked", async () => {
+    let active = true;
+    const resolve = vi.fn(async () => ({ ok: active }));
+    const onRevoked = vi.fn();
+    const stop = startDisplayRevocationWatch(displayReq, onRevoked, resolve, 1000);
+
+    await vi.advanceTimersByTimeAsync(1000); // still active
+    expect(onRevoked).not.toHaveBeenCalled();
+    active = false; // revoked
     await vi.advanceTimersByTimeAsync(1000);
     expect(onRevoked).toHaveBeenCalledTimes(1);
-
-    // Teardown halts further rechecks.
     stop();
+  });
+
+  it("stop() suppresses any further rechecks and callbacks", async () => {
+    const resolve = vi.fn(async () => ({ ok: false }));
+    const onRevoked = vi.fn();
+    const stop = startDisplayRevocationWatch(displayReq, onRevoked, resolve, 1000);
+    stop(); // torn down before the first tick
     await vi.advanceTimersByTimeAsync(5000);
-    expect(resolve).toHaveBeenCalledTimes(2);
+    expect(resolve).not.toHaveBeenCalled();
+    expect(onRevoked).not.toHaveBeenCalled();
   });
 
   it("keeps the stream open and increments the bounded counter on a transient resolver error", async () => {
@@ -66,14 +83,21 @@ describe("startDisplayRevocationWatch (F6 live-stream revocation lifecycle)", ()
       throw new Error("db down");
     });
     const onRevoked = vi.fn();
-    const stop = startDisplayRevocationWatch(req, onRevoked, resolve, 1000);
+    const stop = startDisplayRevocationWatch(displayReq, onRevoked, resolve, 1000);
 
     await vi.advanceTimersByTimeAsync(1000);
-    // A transient error must NEVER tear down a live board…
-    expect(onRevoked).not.toHaveBeenCalled();
-    // …but it IS surfaced via the bounded counter so a stuck recheck is visible.
+    expect(onRevoked).not.toHaveBeenCalled(); // a blip must never tear down a live board
     expect(incrementMetric).toHaveBeenCalledWith("display_revocation_recheck_error");
-
     stop();
+  });
+
+  it("does NOT watch a user (non-display) connection — the /stream gate lives in the function", async () => {
+    const resolve = vi.fn(async () => ({ ok: true }));
+    const onRevoked = vi.fn();
+    const stop = startDisplayRevocationWatch(userReq, onRevoked, resolve, 1000);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(resolve).not.toHaveBeenCalled();
+    expect(onRevoked).not.toHaveBeenCalled();
+    stop(); // no-op stop is safe to call
   });
 });

@@ -90,21 +90,26 @@ else no "icon file missing"; fi
 # successful upload; `resubmit.sh` prints the reminder). Override via
 # LAST_SHIPPED_BUILD env for a one-off check.
 hdr "[build number — must exceed last shipped]"
-BN=$(grep -m1 'CURRENT_PROJECT_VERSION = ' ios/App/App.xcodeproj/project.pbxproj | grep -oE '[0-9]+')
-LAST=$(grep -oE '[0-9]+' ios/.last-shipped-build 2>/dev/null | head -1)
-LAST="${LAST_SHIPPED_BUILD:-${LAST:-}}"
-if [ -z "${LAST:-}" ]; then
-  # Explicit if/else — an `&& ok || no` chain would also run `no` if `ok` itself
-  # returned non-zero, misreporting a passing check.
-  if [ "${BN:-0}" -ge 1 ]; then
-    ok "CURRENT_PROJECT_VERSION = ${BN} (no ios/.last-shipped-build — strict check off)"
-  else
-    no "build number missing from pbxproj"
-  fi
-elif [ "${BN:-0}" -gt "$LAST" ]; then
+BN=$(grep -m1 'CURRENT_PROJECT_VERSION = ' ios/App/App.xcodeproj/project.pbxproj | grep -oE '[0-9]+' | head -1)
+FILE_LAST=$(grep -oE '[0-9]+' ios/.last-shipped-build 2>/dev/null | head -1)
+LAST="${LAST_SHIPPED_BUILD:-${FILE_LAST:-}}"
+# Validate both integers before the numeric compare. BN comes from a parsed
+# pbxproj; LAST can come from a hand-set LAST_SHIPPED_BUILD env or a garbled
+# baseline file. A non-numeric value must FAIL the gate — not skew `-gt` (which
+# errors/misbehaves on non-ints) or slip through a `${x:-0}` default.
+if ! [[ "${BN:-}" =~ ^[0-9]+$ ]]; then
+  no "could not parse a numeric CURRENT_PROJECT_VERSION from pbxproj (got '${BN:-<empty>}')"
+elif [ -z "${LAST:-}" ]; then
+  # Fail CLOSED. The app is LIVE, so a missing baseline is a misconfiguration,
+  # not a first submission — without it the "must exceed last shipped" rule can't
+  # be evaluated, and passing anyway could wave a duplicate CFBundleVersion through.
+  no "no last-shipped baseline (ios/.last-shipped-build absent and LAST_SHIPPED_BUILD unset) — record the last build uploaded to App Store Connect there before archiving"
+elif ! [[ "$LAST" =~ ^[0-9]+$ ]]; then
+  no "last-shipped baseline is not a number (got '$LAST') — fix ios/.last-shipped-build or the LAST_SHIPPED_BUILD env"
+elif [ "$BN" -gt "$LAST" ]; then
   ok "build $BN > last shipped $LAST"
 else
-  no "build ${BN:-?} must be > last shipped $LAST — bump first: pnpm resubmit  (then update ios/.last-shipped-build after upload)"
+  no "build ${BN} must be > last shipped $LAST — bump first: pnpm resubmit  (then update ios/.last-shipped-build after upload)"
 fi
 
 # --- bundled shell + native clerk chunk -------------------------------------

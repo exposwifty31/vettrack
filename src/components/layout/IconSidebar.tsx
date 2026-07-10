@@ -12,7 +12,7 @@ import {
 import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
 import { NAV } from "@/lib/routes/nav-model";
 import { useExperience } from "@/hooks/use-experience";
-import { filterAdminNav, filterCustodyNav } from "@/lib/roles/experience-model";
+import { visibleNavItems } from "@/lib/roles/experience-model";
 import { visibleWebManagementNav } from "@/lib/routes/web-management-nav-model";
 import { t } from "@/lib/i18n";
 
@@ -41,7 +41,7 @@ export function IconSidebar() {
   const dir = useDirection();
   const experience = useExperience();
 
-  const visibleItems = filterCustodyNav(filterAdminNav(NAV, experience), experience);
+  const visibleItems = visibleNavItems(NAV, experience);
   const managementItems = visibleWebManagementNav(experience);
 
   const borderClass =

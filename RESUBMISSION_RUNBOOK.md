@@ -1,9 +1,10 @@
 # VetTrack — App Store Resubmission Runbook (A–Z)
 
 **Audience:** a future Claude session (or Dan) executing the resubmission cold.
-**Goal:** get VetTrack **1.0.1 (20)** through App Review after the **5.1.1(v)** rejection on build 15
-(Submission `a0758d36-14b9-49c0-bf20-eb337ffcb8c6`).
-**Last verified:** 2026-06-17, production includes account deletion + native Apple token link; locales/Xcode aligned to build **20**.
+**Goal:** ship an App Store **update** to the live VetTrack app.
+> **Historical origin (resolved):** this runbook was first written to clear the **5.1.1(v)** rejection of build 15 and land **1.0.1 (20)** — submission `a0758d36-14b9-49c0-bf20-eb337ffcb8c6`. That rejection is **resolved and the app is LIVE**, so every run of this runbook is now an update / re-upload, not a first submission.
+**Current version fields:** marketing **1.1.2** (`package.json` = source of truth), build **25** (`CURRENT_PROJECT_VERSION`; `ios/.last-shipped-build` records the last build uploaded). Bump only via `pnpm resubmit` (§B.1) — never by hand.
+**Last verified:** 2026-07-10, version fields single-sourced + reconciled to 1.1.2 / build 25 (tooling in §B.1); production includes account deletion + native Apple token link.
 
 > Secrets: this file never contains the live Clerk key. Export it from Railway first:
 > `export CLERK_SECRET_KEY=$(cd /Users/dan/.vt-deploy 2>/dev/null && railway variables --json 2>/dev/null | python3 -c "import json,sys;print(json.load(sys.stdin)['CLERK_SECRET_KEY'])")`
@@ -87,9 +88,12 @@ curl -s https://api.clerk.com/v1/instance -H "Authorization: Bearer $SK" \
 sips -g hasAlpha -g pixelWidth ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png | tail -2
 #   EXPECT: hasAlpha: no   pixelWidth: 1024
 
-# Build number must be >= 4
+# Build number must be STRICTLY GREATER than the last shipped build (the app is
+# live — App Store Connect rejects a duplicate CFBundleVersion within a version).
+# verify-resubmission.sh checks CURRENT_PROJECT_VERSION > ios/.last-shipped-build.
 grep -m1 CURRENT_PROJECT_VERSION ios/App/App.xcodeproj/project.pbxproj
-#   EXPECT: CURRENT_PROJECT_VERSION = 20
+#   EXPECT: CURRENT_PROJECT_VERSION greater than $(cat ios/.last-shipped-build)
+#   (currently pbxproj=25 and last-shipped=25 → run `pnpm resubmit` to bump to 26 first)
 
 # Shell is a BUNDLED app (no server.url) and carries the native OAuth transport
 python3 -c "import json;c=json.load(open('ios/App/App/capacitor.config.json'));print('BUNDLED:', 'server' not in c or not c.get('server',{}).get('url'))"
@@ -132,8 +136,8 @@ Simulator smoke before archive:
 
 ## E. Resubmit in App Store Connect
 
-1. Open the app → the **1.0** version (or create version 1.0 if needed).
-2. **Build** → select the freshly uploaded **1.0.1 (20)**.
+1. Open the app → the current marketing version (**1.1.2**), or create the new version if you ran `pnpm resubmit:release <target>`.
+2. **Build** → select the freshly uploaded build — the `build=<n> marketing=<v>` values `pnpm resubmit` printed (e.g. **1.1.2 (26)**).
 3. **App Review Information**:
    - Sign-In required: **Yes**.
    - Username: `reviewer@vettrack.uk`  Password: `VetTrack2026!`

@@ -1882,7 +1882,9 @@ Each group committed separately, full suite green per group. Audit-report branch
 
 ## 2026-07-10 — Phase 10.A: per-role sweep (Part C) + S1 fix
 
-**Per-role sweep (cowork, localhost:5000, switcher now driving the client):** all 5 roles OK — admin (ops home + full nav incl. System Management), vet (clinical home, NO admin nav), senior_technician (ops home, mgmt dropdown, NO System Management), technician (tech floor, no admin), student (custody-only home + nav = Today·Equipment only). RTL mirrors correctly all roles; English parity clean; scroll app-wide; no hardcoded copy. **No out-of-scope MUTATION reachable for any role** (server 403s confirmed for student on /api/tasks/dashboard, /api/shift-chat/messages, /api/appointments/meta). The Round-2 client nav-gating gap (vet/student seeing admin sections) is resolved by the OBS-1 real fix.
+**Per-role sweep (cowork, localhost:5000, switcher now driving the client):** all 5 roles OK — admin (ops home + full nav incl. System Management), vet (clinical home, NO admin nav), senior_technician (ops home, mgmt dropdown, NO System Management), technician (tech floor, no admin), student (custody-only home + nav — see correction below). RTL mirrors correctly all roles; English parity clean; scroll app-wide; no hardcoded copy.
+
+> **Correction (student nav set).** This sweep line originally read "student … nav = Today·Equipment only." That observation **predated the student-inventory-nav fix** (`canAccessInventoryNav` now includes `student`, layout.tsx:471-474). The authoritative custody **web** nav is **Home · Equipment · My Equipment · Inventory** — the `CUSTODY_ONLY_NAV_KEYS` allow-set `{today, scan, equipment, mine, inventory}` intersected with the web `navItems` (`/scan` is a mobile tab-bar action, not a web nav row, so it doesn't surface on web). This matches the allow-set stated in the Round-2 entry above and is proven by `tests/experience-model.test.ts` (exact ordered custody set) + `tests/custody-guard.test.tsx`. No contradiction remains between the two entries. **No out-of-scope MUTATION reachable for any role** (server 403s confirmed for student on /api/tasks/dashboard, /api/shift-chat/messages, /api/appointments/meta). The Round-2 client nav-gating gap (vet/student seeing admin sections) is resolved by the OBS-1 real fix.
 
 **S1 (MEDIUM, fixed):** a student could VIEW /alerts (with data) by direct URL while /equipment/tasks redirects them — inconsistent with the custody-only scope (view-only; no mutation reachable). Added `CustodyGuard` (redirects `isCustodyOnly` users to `/equipment`, mirroring the Tasks page's inline student redirect) and wrapped `/alerts` + `/rooms`.
 - **Verified in-browser:** student `/alerts` → redirects to `/equipment`; admin `/alerts` still renders (no over-redirect). `custody-guard` test (student redirects · other roles render · no premature bounce pre-auth-load). Full suite 447 files / 4231 tests pass; tsc clean.
@@ -1908,3 +1910,30 @@ Genuine formal review at head 0b360a3b7 (CHANGES_REQUESTED; ack "Full review tri
 **Commands:** frontend `tsc` 0 · server `tsc` 0 · `bash -n verify-resubmission.sh` OK · full suite green · architecture gates G1.
 
 **Verdict:** VERIFIED (6/6; suite/tsc/gates green). Re-review re-requested at the new head.
+
+---
+
+## 2026-07-10 — Round-2 dual-review reconciliation (CodeRabbit CLI + SDD reviewer) on #76
+
+Reconciled the two independent pre-merge review passes into one fix batch. Findings addressed:
+
+**Real code (correctness/robustness):**
+1. **pwa-install-prompt prefix boundary (Minor):** `location.startsWith(r)` matched `/boardroom` when suppressing `/board`. Now splits the query string and matches `path === r || path.startsWith(\`${r}/\`)`, so only the exact route and its children suppress the promo.
+2. **realtime `startDisplayRevocationWatch` self-gate + in-flight guard (Major):** the revocation watch now self-gates on `req.isDisplayAuth` (returns a no-op teardown for user connections — testable without the SSE route) and holds an `inFlight` guard so a slow resolver can't stack overlapping re-checks. Call site is unconditional; `finalize()` calls the returned `stop`.
+3. **nav-helper extraction (Minor, DRY):** `visibleNavItems` / `visibleNavSections` in `experience-model.ts` compose `filterAdminNav` + `filterCustodyNav` once; five consumers (layout, Topbar, IconSidebar, NativeTabSidebar, MoreSheet) call the shared helper instead of re-deriving the two-filter sequence.
+4. **MyEquipmentCard cached-on-error (Major, stability):** when `/api/equipment/my` rejects but cached rows exist, the rows stay visible with a small retry affordance (rather than being replaced by the error state); retry buttons are ≥44px tap targets.
+
+**Tests strengthened (per SDD/CLI):** custody tests now include the `lead_technician`/`vet_tech` aliases (assert `isCustodyOnly` false / route renders); `experience-model` asserts the **exact ordered** custody nav array (`[today, equipment, scan, mine, inventory]`) and item-identity for the no-op case; `custody-guard` asserts the redirect **destination** (`/equipment`) via a location probe, not just the disappearance of content; `display-revocation-watch` gained a user-connection-not-watched case + narrowed-cast comment.
+
+**Docs/scripts:**
+5. **audit-prompt safety guardrail (CRITICAL):** `live-tri-display-audit-prompt.md` now carries an owner-facing safety block AND an in-prompt HARD-CONSTRAINTS block — run only against a synthetic test clinic, reverse every mutation (cleanup gate), redact PII in screenshots/findings, and never touch permissions/deletion/billing. A production tenant forces read-only.
+6. **PROOF_ALIGNMENT_LOG reconcile:** corrected the per-role-sweep "student nav = Today·Equipment only" line — it predated the inventory-nav fix; authoritative custody web nav is Home·Equipment·My Equipment·Inventory (allow-set ∩ web navItems).
+7. **RESUBMISSION_RUNBOOK versions:** reframed the goal from first-time "1.0.1 (20)" to live-app update; build check is now "> last shipped" (not ">= 4"); App Store Connect step is version-agnostic.
+8. **verify-resubmission.sh fail-closed:** no baseline (no `ios/.last-shipped-build` + no `LAST_SHIPPED_BUILD`) now FAILS instead of passing "strict check off"; `BN`/`LAST` validated `^[0-9]+$` before the numeric compare.
+9. **resubmit.sh atomic/fail-safe:** preflights `$PLIST` (+ validates parsed build int) before any edit; the Python stages all three substitutions with match-count guards, then writes each via tmp + `os.replace` (no half-applied bump).
+
+**Commands (this branch, real output):** `pnpm typecheck` → exit 0 (frontend + server) · `pnpm i18n:check` → deep key parity ✓ · `pnpm test` → **449 files / 4242 tests pass** · `pnpm architecture:gates` → All G1 checks passed (4 warn + 10 known baseline, cycles match) · `bash -n` both scripts OK · resubmit.sh bump exercised on file **copies** in a scratch dir (build 25→99 ×4, marketing 1.1.2→2.0.0 ×4, plist stays `$(CURRENT_PROJECT_VERSION)`, 0 leftover `.tmp`, real files untouched).
+
+**F6 fail-open tradeoff — surfaced to owner (open decision):** the revocation watch increments `display_revocation_recheck_error` and keeps the stream OPEN on a resolver throw (a transient DB blip must not tear down a live board). The residual risk: a *sustained* DB outage means a token revoked during the outage keeps streaming until the DB recovers. Options: (a) keep as-is and rely on the bounded counter + an ops alert on sustained errors; (b) add a max-consecutive-error cap that closes the stream after N failed re-checks. Left as-is pending the owner's call.
+
+**Verdict:** VERIFIED (all gates green; scripts exercised on copies). CodeRabbit CLI re-review to run at the new head before merge.

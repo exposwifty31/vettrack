@@ -306,9 +306,13 @@ export function isCustodyOnly(experience: RoleExperience): boolean {
 }
 
 /**
- * Filter a flat list of nav items to the custody-only allow-set (by id OR href).
- * A no-op for non-custody experiences. Applied after {@link filterAdminNav} on
- * both the native sections (the student's primary surface) and the web nav.
+ * A student is a supervised trainee whose operational footprint is deliberately
+ * narrow — equipment checkout/checkin + inventory dispense/restock only — so their
+ * nav must not offer surfaces they can't act on. This keeps only the custody
+ * allow-set (matched by id OR href, since the web layout keys items on `href` and
+ * the native model on `id`); it is a no-op for every other archetype. Layered
+ * after {@link filterAdminNav} on both the native sections and the web nav so the
+ * two filters compose without either re-deriving the other's rules.
  */
 export function filterCustodyNav<T extends { id?: string; href?: string }>(
   items: readonly T[],
@@ -320,4 +324,32 @@ export function filterCustodyNav<T extends { id?: string; href?: string }>(
       (item.id !== undefined && CUSTODY_ONLY_NAV_KEYS.has(item.id)) ||
       (item.href !== undefined && CUSTODY_ONLY_NAV_KEYS.has(item.href)),
   );
+}
+
+/**
+ * The nav items a flat (web) nav should render for this experience: admin-only
+ * items dropped for non-admins, then narrowed to the custody set for custody-only
+ * users. Single composition so `layout.tsx` / `IconSidebar` / `Topbar` can't apply
+ * the two filters in different orders.
+ */
+export function visibleNavItems<T extends { adminOnly?: boolean; id?: string; href?: string }>(
+  items: readonly T[],
+  experience: RoleExperience,
+): T[] {
+  return filterCustodyNav(filterAdminNav(items, experience), experience);
+}
+
+/**
+ * The nav SECTIONS a native nav should render: drop admin-only sections, custody-
+ * filter each surviving section's items, and drop any section left empty. Callers
+ * that need a further per-item filter (e.g. the MoreSheet hiding tab-bar items)
+ * apply it on top and re-drop empties.
+ */
+export function visibleNavSections<
+  I extends { id: string },
+  S extends { adminOnly?: boolean; items: I[] },
+>(sections: readonly S[], experience: RoleExperience): S[] {
+  return filterAdminNav(sections, experience)
+    .map((section) => ({ ...section, items: filterCustodyNav(section.items, experience) }))
+    .filter((section) => section.items.length > 0);
 }

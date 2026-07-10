@@ -6,7 +6,7 @@ import { cn, computeAlerts } from "@/lib/utils";
 import { buildAlertAckSet, countActiveAlerts, filterUnackedAlerts } from "@/lib/alert-counts";
 import { useAuth } from "@/hooks/use-auth";
 import { useExperience } from "@/hooks/use-experience";
-import { filterAdminNav, filterCustodyNav } from "@/lib/roles/experience-model";
+import { visibleNavItems } from "@/lib/roles/experience-model";
 import { visibleWebManagementNav } from "@/lib/routes/web-management-nav-model";
 import { useDirection } from "@/hooks/useDirection";
 import { resolveNavItemActive } from "@/lib/routes/resolve-nav-active";
@@ -60,7 +60,7 @@ export function Topbar() {
     prevAlertCount.current = alertCount;
   }, [alertCount]);
 
-  const visibleItems = filterCustodyNav(filterAdminNav(NAV, experience), experience);
+  const visibleItems = visibleNavItems(NAV, experience);
   const managementItems = visibleWebManagementNav(experience);
 
   const activeHref =

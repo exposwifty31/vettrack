@@ -26,6 +26,12 @@ const DISPLAY_REVOCATION_RECHECK_MS = 10_000;
  * error keeps the stream open and bumps a bounded counter — a rising count flags a
  * persistently-stuck recheck without flooding logs. `resolveDisplay` and
  * `intervalMs` are injectable for tests. Returns a stop function.
+ *
+ * ONLY display-authed connections are watched: a user (Clerk) connection is
+ * re-authenticated per request, not here, so this returns a no-op stop for it (the
+ * gate lives in the function so it is unit-testable, not only at the call site).
+ * Overlapping checks are prevented with an in-flight flag — if a lookup outlasts
+ * `intervalMs`, the next tick is skipped rather than piling up concurrent queries.
  */
 export function startDisplayRevocationWatch(
   req: Request,
@@ -33,13 +39,20 @@ export function startDisplayRevocationWatch(
   resolveDisplay: (r: Request) => Promise<{ ok: boolean }> = resolveDisplayAuth,
   intervalMs: number = DISPLAY_REVOCATION_RECHECK_MS,
 ): () => void {
+  if (!req.isDisplayAuth) return () => {};
+  let inFlight = false;
   const timer = setInterval(() => {
+    if (inFlight) return;
+    inFlight = true;
     void resolveDisplay(req)
       .then((check) => {
         if (!check.ok) onRevoked();
       })
       .catch(() => {
         incrementMetric("display_revocation_recheck_error");
+      })
+      .finally(() => {
+        inFlight = false;
       });
   }, intervalMs);
   timer.unref?.();
@@ -666,15 +679,14 @@ router.get("/stream", requireDisplayOrUser, async (req, res) => {
     // its already-open SSE connection until it happened to reconnect. Additive auth
     // re-check — no transport, envelope, or keepalive change; user (non-display)
     // connections are unaffected. See startDisplayRevocationWatch above (tested).
-    const stopRevocationWatch = req.isDisplayAuth
-      ? startDisplayRevocationWatch(req, () => finalize())
-      : null;
+    // Self-gates on req.isDisplayAuth (no-op stop for user connections).
+    const stopRevocationWatch = startDisplayRevocationWatch(req, () => finalize());
 
     finalize = () => {
       if (cleaned) return;
       cleaned = true;
       stopKeepalive();
-      stopRevocationWatch?.();
+      stopRevocationWatch();
       outboxEmitter.off(`clinic:${clinicId}`, onOutbox);
       unsubscribe(res);
       try {

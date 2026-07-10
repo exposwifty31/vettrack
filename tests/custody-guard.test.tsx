@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
-import { Router } from "wouter";
+import { Router, useLocation } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import { buildRoleExperience, type ExperienceArchetype } from "@/lib/roles/experience-model";
 import type { UserRole } from "@/types/platform";
@@ -28,6 +28,13 @@ vi.mock("@/hooks/use-experience", () => ({
 
 import { CustodyGuard } from "@/app/platform/guards/CustodyGuard";
 
+// Renders the current wouter location so a redirect's DESTINATION is assertable,
+// not merely the disappearance of the protected content.
+function LocationProbe() {
+  const [loc] = useLocation();
+  return <div data-testid="location">{loc}</div>;
+}
+
 function renderAt(path: string) {
   const { hook } = memoryLocation({ path });
   return render(
@@ -35,6 +42,7 @@ function renderAt(path: string) {
       <CustodyGuard fallback="/equipment">
         <div data-testid="protected">protected content</div>
       </CustodyGuard>
+      <LocationProbe />
     </Router>,
   );
 }
@@ -45,19 +53,22 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("CustodyGuard", () => {
-  it("renders children for non-custody roles", () => {
-    for (const role of ["admin", "vet", "senior_technician", "technician"] as UserRole[]) {
+  it("renders children for non-custody roles (incl. the lead/tech aliases)", () => {
+    for (const role of ["admin", "vet", "senior_technician", "technician", "lead_technician", "vet_tech"] as UserRole[]) {
       cleanup();
       mockAuth = { isLoaded: true, role };
       renderAt("/alerts");
       expect(screen.queryByTestId("protected"), `role ${role} should see the route`).toBeTruthy();
+      expect(screen.getByTestId("location").textContent, `role ${role} should stay put`).toBe("/alerts");
     }
   });
 
-  it("redirects a custody-only user (student) away from the route", () => {
+  it("redirects a custody-only user (student) to the fallback route", () => {
     mockAuth = { isLoaded: true, role: "student" };
     renderAt("/alerts");
     expect(screen.queryByTestId("protected")).toBeNull();
+    // The redirect lands on the exact fallback, not just "somewhere else".
+    expect(screen.getByTestId("location").textContent).toBe("/equipment");
   });
 
   it("does not redirect before auth is loaded (no premature bounce)", () => {

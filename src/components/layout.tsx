@@ -68,7 +68,7 @@ import { Badge } from "@/components/ui/badge";
 
 import { useAuth } from "@/hooks/use-auth";
 import { useExperience } from "@/hooks/use-experience";
-import { filterAdminNav, filterCustodyNav } from "@/lib/roles/experience-model";
+import { visibleNavItems } from "@/lib/roles/experience-model";
 import { useSync } from "@/hooks/use-sync";
 import { QrScanner } from "@/components/qr-scanner";
 import { useSettings } from "@/hooks/use-settings";
@@ -557,7 +557,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     t,
   ]);
 
-  const visibleItems = filterCustodyNav(filterAdminNav(navItems, experience), experience);
+  const visibleItems = visibleNavItems(navItems, experience);
 
   const operationMenuItems = useMemo(
     () =>

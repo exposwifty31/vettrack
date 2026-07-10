@@ -32,6 +32,12 @@ Three displays, side by side, all signed into the **same clinic**, ideally showi
 - **No hardcoded copy.** Every user-facing string must come from the locale files; a literal English (or Hebrew) string baked into a component is a finding even if it "looks fine."
 - **Emergency and realtime are load-bearing.** Code Blue must never queue offline, never optimistically terminate, and must propagate across displays over SSE within a couple seconds. Treat any lag, desync, or stale emergency state as high severity.
 
+**Safety — read before you paste the prompt (non-negotiable).** This audit drives real mutations (start/end Code Blue, dispense/restock, start/end shifts, checkout/checkin) with computer control across three displays. Run it **only against a synthetic test clinic seeded for this audit** — never against a production clinic that holds real client, patient, or device data. Concretely:
+- **Use a dedicated test clinic + test account.** `vettrack.uk` Display 3 must be signed into the **test clinic**, not a live hospital's tenant. If a production tenant is the only thing available, do **read-only** navigation and **skip every mutating flow** — do not create Code Blue sessions, dispense, or start shifts in it.
+- **Every mutating flow must be reversed.** After the sweep, close/end any Code Blue session you opened, reverse or void test dispenses/restocks, end test shifts, and check test equipment back in. Leaving a live emergency session or an open shift behind is itself a finding. Treat the cleanup as a gate, not an afterthought.
+- **Redact PII in every artifact.** Screenshots and finding reports must not carry real client names, patient names, phone numbers, device serial/pairing tokens, or account emails. Use seeded synthetic data; if a real value is unavoidably on screen, blur/crop it before attaching. Never paste a pairing token, session token, or `pk_live`/secret into a finding.
+- **Never touch access, billing, or deletion.** No permission/sharing changes, no permanent deletes (emptying trash, hard-deleting records), no financial actions — those are out of scope for a QA sweep regardless of clinic.
+
 ---
 
 ```text
@@ -66,6 +72,25 @@ small, embarrassing, "ship-blocking-in-aggregate" details that a tired human
 misses. Assume the app is 95% right and your entire value is the last 5%. Be
 relentless. Do not reassure the human. Do not say "looks good" and move on —
 prove it looks good with a screenshot, or record why it doesn't.
+
+SAFETY — HARD CONSTRAINTS (these override the instruction to "test everything"):
+  - You are operating against a SYNTHETIC TEST CLINIC seeded for this audit.
+    Confirm with the human that all three displays are signed into the test
+    clinic BEFORE you run any mutating flow. If you cannot confirm it is a test
+    clinic, do READ-ONLY navigation only: do NOT create/end Code Blue sessions,
+    do NOT dispense/restock, do NOT start/end shifts, do NOT check equipment
+    in/out. Ask the human first.
+  - Every mutation you make, you undo. Maintain a running cleanup list as you go
+    (session opened, item dispensed, shift started, equipment checked out) and,
+    before you finish, reverse each one — end sessions, void test dispenses, end
+    shifts, check items back in. Report anything you could not cleanly reverse.
+  - Redact PII. Real client/patient names, phone numbers, device serials,
+    pairing/session tokens, and account emails must never appear in a screenshot
+    you keep or in a finding. Prefer seeded synthetic data; blur/crop anything
+    real before attaching. Never copy a token or secret into a report.
+  - Out of scope regardless of clinic: changing permissions/sharing, permanently
+    deleting data, and any billing/financial action. Do not perform these even
+    to "test" them — describe them as untested and move on.
 
 ## The lens (apply ALL of these to EVERY screen, on EACH of the three displays)
 

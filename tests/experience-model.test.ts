@@ -388,28 +388,28 @@ describe("filterAdminNav — byte-identical to the pre-Phase-2 nav gate", () => 
 describe("experience-model — custody-only archetype (student)", () => {
   const exp = (role: UserRole) => buildRoleExperience({ role, effectiveRole: role, roleSource: "permanent", isAdmin: role === "admin" });
 
-  it("isCustodyOnly is true only for the student archetype", () => {
+  it("isCustodyOnly is true only for the student archetype (incl. the lead/tech aliases → false)", () => {
     expect(isCustodyOnly(exp("student"))).toBe(true);
-    for (const role of ["admin", "vet", "senior_technician", "technician"] as const) {
+    for (const role of ["admin", "vet", "senior_technician", "technician", "lead_technician", "vet_tech"] as const) {
       expect(isCustodyOnly(exp(role))).toBe(false);
     }
   });
 
-  it("filterCustodyNav pares the native operations items to the custody set for a student", () => {
+  it("filterCustodyNav pares the native operations items to the exact custody set (ordered) for a student", () => {
     const ops = getNativeNavSections()[0].items;
     const studentIds = filterCustodyNav(ops, exp("student")).map((i) => i.id);
-    // Allowed: home + scan (checkout/checkin) + equipment + my-equipment + inventory.
-    expect(new Set(studentIds)).toEqual(new Set(["today", "scan", "equipment", "mine", "inventory"]));
+    // Exact set AND order — the filter preserves the source nav order.
+    expect(studentIds).toEqual(["today", "equipment", "scan", "mine", "inventory"]);
     // Explicitly NOT present: emergency / tasks / crash-cart / rooms / alerts.
     for (const denied of ["emergency", "tasks", "crash-cart", "rooms", "alerts"]) {
       expect(studentIds).not.toContain(denied);
     }
   });
 
-  it("filterCustodyNav is a no-op for non-custody archetypes", () => {
+  it("filterCustodyNav is a no-op (identical items) for non-custody archetypes", () => {
     const ops = getNativeNavSections()[0].items;
-    for (const role of ["admin", "vet", "technician"] as const) {
-      expect(filterCustodyNav(ops, exp(role)).length).toBe(ops.length);
+    for (const role of ["admin", "vet", "technician", "senior_technician", "lead_technician", "vet_tech"] as const) {
+      expect(filterCustodyNav(ops, exp(role))).toEqual([...ops]);
     }
   });
 

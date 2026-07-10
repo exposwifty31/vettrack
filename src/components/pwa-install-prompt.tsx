@@ -22,8 +22,12 @@ export function PwaInstallPrompt() {
   // Session-level dismiss for the Android/Chrome banner (native prompt handles persistence).
   const [androidDismissed, setAndroidDismissed] = useState(false);
 
-  // Never show the promo on emergency flows or kiosk/display surfaces.
-  if (PROMO_SUPPRESSED_PREFIXES.some((r) => location.startsWith(r))) return null;
+  // Never show the promo on emergency flows or kiosk/display surfaces. Match a
+  // whole path segment — exact prefix or prefix + "/" — so "/board" covers
+  // "/board" and "/board/pair" but NOT "/boardroom" (and "/code-blue" ≠
+  // "/code-blueprint").
+  const path = location.split("?")[0];
+  if (PROMO_SUPPRESSED_PREFIXES.some((r) => path === r || path.startsWith(`${r}/`))) return null;
 
   // Already installed — show nothing.
   if (isStandalone) return null;
