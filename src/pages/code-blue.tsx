@@ -585,12 +585,19 @@ export default function CodeBluePage() {
       // longer than a normal toast (F2). The `code` set here is the server's
       // stable reason, not free-form copy.
       if (err instanceof ApiError) {
+        // Map the server's stable `code` first — a 403 can be a clinical-authority
+        // denial OR a blocked/pending account, which need different messages.
+        // Fall back to status only for the generic cases.
         const message =
-          err.status === 409
-            ? t.codeBlue.activeSessionExists
-            : err.status === 403
-              ? t.codeBlue.clinicalAuthorityRequired
-              : t.codeBlue.startSessionFailed;
+          err.code === "ACCOUNT_BLOCKED"
+            ? t.auth.guard.blockedTitle
+            : err.code === "ACCOUNT_PENDING_APPROVAL"
+              ? t.auth.guard.pendingTitle
+              : err.code === "INSUFFICIENT_ROLE" || err.code === "MANAGER_NOT_CODE_BLUE_ELIGIBLE"
+                ? t.codeBlue.clinicalAuthorityRequired
+                : err.status === 409
+                  ? t.codeBlue.activeSessionExists
+                  : t.codeBlue.startSessionFailed;
         toast.error(message, { duration: 8000 });
       } else {
         toast.error(t.api.networkUnavailable, { duration: 8000 });

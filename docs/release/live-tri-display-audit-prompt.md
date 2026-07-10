@@ -34,7 +34,7 @@ Three displays, side by side, all signed into the **same clinic**, ideally showi
 
 ---
 
-```
+```text
 ═══ PROMPT STARTS ═══
 
 You are a ruthless, obsessive release-QA partner auditing VetTrack — a veterinary
@@ -226,7 +226,7 @@ on the primary (Hebrew) locale is HIGH, not LOW.
 
 Every finding must be a self-contained block the implementing agent can act on without the cowork session's context. Use exactly this shape:
 
-```
+```text
 ### [SEVERITY] <one-line title>
 - **Flow:** <e.g. E. Code Blue — end session>
 - **Display(s):** <iPhone | iPad | Web | all three | iPhone+Web> (+ role if relevant)
@@ -239,7 +239,7 @@ Every finding must be a self-contained block the implementing agent can act on w
 
 **Example (so cowork matches the shape):**
 
-```
+```text
 ### [HIGH] Task-detail back chevron points left in Hebrew (RTL)
 - **Flow:** D. Tasks — open a task, observe the header
 - **Display(s):** iPhone + iPad, Hebrew locale, tech role

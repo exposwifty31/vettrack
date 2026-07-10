@@ -650,6 +650,9 @@ router.get("/stream", requireDisplayOrUser, async (req, res) => {
           })
           .catch(() => {
             // Best-effort: a transient DB error must never tear down a live board.
+            // Record a bounded counter so a persistently-stuck recheck is visible
+            // (a rising count) without flooding logs; the stream stays open.
+            incrementMetric("display_revocation_recheck_error");
           });
       }, DISPLAY_REVOCATION_RECHECK_MS);
       revocationTimer.unref?.();
