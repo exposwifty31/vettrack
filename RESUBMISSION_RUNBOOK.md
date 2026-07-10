@@ -65,6 +65,7 @@ cd /Users/dan/vettrack
 SK="$CLERK_SECRET_KEY"
 
 # [2.1] Demo login must COMPLETE (this is the #1 re-rejection risk)
+# First: export REVIEWER_PASSWORD='…'  (from your password manager — never commit it)
 curl -s -D /tmp/h.txt -X POST "https://clerk.vettrack.uk/v1/client/sign_ins?_is_native=1&_clerk_js_version=5.125.13" \
   -H "Origin: capacitor://localhost" -H "Content-Type: application/x-www-form-urlencoded" \
   --data-urlencode "identifier=reviewer@vettrack.uk" -o /tmp/si.json
@@ -72,7 +73,7 @@ JWT=$(grep -i "^authorization:" /tmp/h.txt | cut -d' ' -f2 | tr -d '\r')
 SID=$(python3 -c "import json;print(json.load(open('/tmp/si.json'))['response']['id'])")
 curl -s -X POST "https://clerk.vettrack.uk/v1/client/sign_ins/${SID}/attempt_first_factor?_is_native=1" \
   -H "Origin: capacitor://localhost" -H "Authorization: ${JWT}" -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-urlencode "strategy=password" --data-urlencode "password=VetTrack2026!" \
+  --data-urlencode "strategy=password" --data-urlencode "password=$REVIEWER_PASSWORD" \
   | python3 -c "import json,sys;r=json.load(sys.stdin).get('response',{});print('LOGIN:', r.get('status'))"
 #   EXPECT: LOGIN: complete   (if 'needs_client_trust' → Client Trust is back ON, see §G)
 
@@ -140,7 +141,7 @@ Simulator smoke before archive:
 2. **Build** → select the freshly uploaded build — the `build=<n> marketing=<v>` values `pnpm resubmit` printed (e.g. **1.1.2 (26)**).
 3. **App Review Information**:
    - Sign-In required: **Yes**.
-   - Username: `reviewer@vettrack.uk`  Password: `VetTrack2026!`
+   - Username: `reviewer@vettrack.uk`  Password: *(from your password manager — paste it into this App Store Connect field; never commit it to the repo)*
    - Notes: *"Sign in with Apple/Google open in the system browser per Apple's guidelines. A demo email/password account with full admin access is provided above. The demo account cannot be deleted (protected for review). To test account deletion, sign in with a personal Apple ID, then Settings → Danger zone → Delete account. The app is a native Capacitor app; all features work offline-capable."*
 4. **Confirm Client Trust is permanently off** (§G) before submitting.
 5. **Add for Review → Submit**.

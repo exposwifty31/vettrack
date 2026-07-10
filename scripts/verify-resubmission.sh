@@ -31,24 +31,37 @@ ok(){ echo "  PASS  $1"; PASS=$((PASS+1)); }
 no(){ echo "  FAIL  $1"; FAIL=$((FAIL+1)); }
 hdr(){ echo; echo "== $1 =="; }
 
+# --- demo-reviewer credential (NEVER hardcoded) ------------------------------
+# The password comes from the REVIEWER_PASSWORD env — keep it in your password
+# manager (it also goes into the App Store Connect review notes), never in the repo.
+# Email defaults to the demo account identifier (not a secret). If the account
+# password is ever rotated in Clerk, only the env value changes; this script carries
+# nothing to leak.
+REVIEWER_EMAIL="${REVIEWER_EMAIL:-reviewer@vettrack.uk}"
+REVIEWER_PASSWORD="${REVIEWER_PASSWORD:-}"
+
 # --- [2.1] demo login must COMPLETE (the #1 re-rejection risk) ---------------
 hdr "[2.1] Demo login (must be 'complete')"
-curl -s -D /tmp/vt_h.txt -X POST \
-  "https://clerk.vettrack.uk/v1/client/sign_ins?_is_native=1&_clerk_js_version=5.125.13" \
-  -H "Origin: capacitor://localhost" -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-urlencode "identifier=reviewer@vettrack.uk" -o /tmp/vt_si.json
-JWT=$(grep -i "^authorization:" /tmp/vt_h.txt | cut -d' ' -f2 | tr -d '\r')
-SID=$(python3 -c "import json;print(json.load(open('/tmp/vt_si.json'))['response']['id'])" 2>/dev/null)
-if [ -z "$SID" ]; then no "could not start sign-in (FAPI unreachable or 429 — wait ~3 min)";
+if [ -z "$REVIEWER_PASSWORD" ]; then
+  no "REVIEWER_PASSWORD not set — export it (from your password manager) before running; demo-login gate skipped"
 else
-  STATUS=$(curl -s -X POST \
-    "https://clerk.vettrack.uk/v1/client/sign_ins/${SID}/attempt_first_factor?_is_native=1" \
-    -H "Origin: capacitor://localhost" -H "Authorization: ${JWT}" \
-    -H "Content-Type: application/x-www-form-urlencoded" \
-    --data-urlencode "strategy=password" --data-urlencode "password=VetTrack2026!" \
-    | python3 -c "import json,sys;print(json.load(sys.stdin).get('response',{}).get('status','?'))" 2>/dev/null)
-  if [ "$STATUS" = "complete" ]; then ok "login status = complete";
-  else no "login status = '$STATUS' (needs_client_trust => Client Trust is back ON, see §G)"; fi
+  curl -s -D /tmp/vt_h.txt -X POST \
+    "https://clerk.vettrack.uk/v1/client/sign_ins?_is_native=1&_clerk_js_version=5.125.13" \
+    -H "Origin: capacitor://localhost" -H "Content-Type: application/x-www-form-urlencoded" \
+    --data-urlencode "identifier=$REVIEWER_EMAIL" -o /tmp/vt_si.json
+  JWT=$(grep -i "^authorization:" /tmp/vt_h.txt | cut -d' ' -f2 | tr -d '\r')
+  SID=$(python3 -c "import json;print(json.load(open('/tmp/vt_si.json'))['response']['id'])" 2>/dev/null)
+  if [ -z "$SID" ]; then no "could not start sign-in (FAPI unreachable or 429 — wait ~3 min)";
+  else
+    STATUS=$(curl -s -X POST \
+      "https://clerk.vettrack.uk/v1/client/sign_ins/${SID}/attempt_first_factor?_is_native=1" \
+      -H "Origin: capacitor://localhost" -H "Authorization: ${JWT}" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      --data-urlencode "strategy=password" --data-urlencode "password=$REVIEWER_PASSWORD" \
+      | python3 -c "import json,sys;print(json.load(sys.stdin).get('response',{}).get('status','?'))" 2>/dev/null)
+    if [ "$STATUS" = "complete" ]; then ok "login status = complete";
+    else no "login status = '$STATUS' (needs_client_trust => Client Trust is back ON, see §G)"; fi
+  fi
 fi
 
 # --- [2.1a] Clerk config gating Apple/Google sign-up ------------------------
