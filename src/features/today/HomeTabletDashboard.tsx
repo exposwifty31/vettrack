@@ -8,7 +8,7 @@ import { getCurrentUserId } from "@/lib/auth-store";
 import { useAuth } from "@/hooks/use-auth";
 import { subscribeKeepalive } from "@/lib/realtime";
 import { useAlertsController } from "@/features/alerts";
-import { ShiftHero } from "./ShiftHero";
+import { OnShiftHero, type HeroState } from "./surfaces/OnShiftHero";
 import { Bdi } from "@/components/ui/bdi";
 import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { equipmentTriageTier } from "@/lib/design-tokens";
@@ -172,6 +172,16 @@ export function HomeTabletDashboard() {
     ? equipment.filter((e) => e.custodyState === "checked_out").length
     : 0;
 
+  // Roster-derived on-shift state, mirroring use-ops-home (pulse present iff inside
+  // a scheduled window). Matches the phone/web surfaces' OnShiftHero contract.
+  const heroState: HeroState = pulse
+    ? pulse.shift
+      ? "active"
+      : "noshift"
+    : pulseLoading
+      ? "loading"
+      : "noshift";
+
   const firstName = name?.split(" ")[0] || t.homePage.fallbackName;
   const greeting = greetingFor(new Date().getHours(), firstName);
   const dateLine = formatDateByLocale(new Date(), {
@@ -263,12 +273,15 @@ export function HomeTabletDashboard() {
         </button>
       )}
 
-      {/* Shift — the roster-derived hero, same component the phone Today uses. */}
-      <ShiftHero
-        shift={pulse?.shift ?? null}
+      {/* Shift — the roster-derived hero, the SAME component the phone/web Today
+          surfaces use. On-shift is roster-derived (no self-start affordance); the
+          iPad was the last surface still on the legacy button-bearing ShiftHero
+          (Phase 10 F4). */}
+      <OnShiftHero
+        pulse={pulse}
         itemsOut={itemsOut}
-        scansToday={pulse?.scansToday ?? 0}
-        isLoading={pulseLoading && !pulse}
+        scansDone={pulse?.scansToday ?? 0}
+        heroState={heroState}
       />
 
       {/* Equipment — availability + the Phase-2 not-verified reconciliation. */}
