@@ -63,10 +63,10 @@ describe("Phase 5 P0 hardening checks (static)", () => {
     expect(deployScript).toContain("\"REDIS_URL\"");
   });
 
-  it("CI deploy jobs export CLERK_WEBHOOK_SECRET and DATA_INTEGRITY_HEALTH_TOKEN", () => {
+  it("CI deploy job exports CLERK_WEBHOOK_SECRET and DATA_INTEGRITY_HEALTH_TOKEN and deploy.sh enforces them", () => {
     const ciWorkflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
     expect(ciWorkflow).toContain("CLERK_WEBHOOK_SECRET: ${{ secrets.CLERK_WEBHOOK_SECRET }}");
     expect(ciWorkflow).toContain("DATA_INTEGRITY_HEALTH_TOKEN: ${{ secrets.DATA_INTEGRITY_HEALTH_TOKEN }}");
-    expect(ciWorkflow).toMatch(/for var in[\s\S]*CLERK_WEBHOOK_SECRET[\s\S]*DATA_INTEGRITY_HEALTH_TOKEN/);
+    expect(deployScript).toMatch(/pilot_required_vars=\("CLERK_WEBHOOK_SECRET" "DATA_INTEGRITY_HEALTH_TOKEN"\)/);
   });
 });
