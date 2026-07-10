@@ -61,7 +61,7 @@ export function MyEquipmentCard({
           ))}
           </div>
           {isError && onRetry && (
-            <div className="mt-2 flex flex-wrap items-center gap-2" role="status">
+            <output className="mt-2 flex flex-wrap items-center gap-2">
               <span id="my-equipment-refresh-error" className="text-[13px] text-ivory-text3">
                 {t.homeSurface.myEquipmentRefreshFailed}
               </span>
@@ -73,7 +73,7 @@ export function MyEquipmentCard({
               >
                 {t.common.tryAgain}
               </button>
-            </div>
+            </output>
           )}
         </>
       ) : isError ? (

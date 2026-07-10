@@ -11,6 +11,7 @@ import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import { t } from "@/lib/i18n";
 import { MyEquipmentCard } from "@/features/today/surfaces/floor/MyEquipmentCard";
+import type { Equipment } from "@/types";
 
 function renderCard(props: Partial<ComponentProps<typeof MyEquipmentCard>> = {}) {
   const { hook } = memoryLocation({ path: "/home" });
@@ -40,9 +41,9 @@ describe("MyEquipmentCard", () => {
 
   it("keeps cached items visible on a refetch error and retries on click", () => {
     const onRetry = vi.fn();
-    const items = [
-      { id: "eq-1", name: "Otoscope", readinessState: "ready" },
-    ] as unknown as ComponentProps<typeof MyEquipmentCard>["items"];
+    const items: Equipment[] = [
+      { id: "eq-1", name: "Otoscope", status: "ok", readinessState: "ready" },
+    ];
     renderCard({ items, isError: true, onRetry });
     // Cached row stays visible instead of being replaced by a blank/error card.
     expect(screen.getByText("Otoscope")).toBeTruthy();
