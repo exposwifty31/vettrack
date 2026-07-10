@@ -18,8 +18,8 @@ Maintenance scope: [`docs/MAINTENANCE_MODE.md`](../MAINTENANCE_MODE.md)
 
 | Workflow | Trigger | Merge-blocking (when CI active) |
 |----------|---------|--------------------------------|
-| [`ci.yml`](../../.github/workflows/ci.yml) | PR/push `main`, `staging`, `cursor/**`; manual | Yes (`Merge gate`) |
-| [`playwright.yml`](../../.github/workflows/playwright.yml) | PR/push `main`, `master`, `staging` | Yes (both shards) |
+| [`ci.yml`](../../.github/workflows/ci.yml) | PR/push `main`; manual | Yes (`Merge gate`) |
+| [`playwright.yml`](../../.github/workflows/playwright.yml) | PR/push `main` | Yes (both shards) |
 | [`release-gate.yml`](../../.github/workflows/release-gate.yml) | Manual only | No (pilot readiness) |
 | [`flake-detection.yml`](../../.github/workflows/flake-detection.yml) | Nightly 03:00 UTC; manual | No |
 | [`e2e-simulation-nightly.yml`](../../.github/workflows/e2e-simulation-nightly.yml) | Nightly 05:00 UTC; manual | No |
@@ -35,9 +35,8 @@ Maintenance scope: [`docs/MAINTENANCE_MODE.md`](../MAINTENANCE_MODE.md)
 | **Tests & typecheck** | `tsc`, server `tsc`, `pnpm build`, `pnpm migrate`, `pnpm test` (Postgres service) |
 | **Integration ops** | `pnpm test:integration:ops` |
 | **Architecture gates (G1)** | `@vettrack/contracts` gate, `tsc`, depcruise, cycle baseline, tenant/query-key/route warn-only lints |
-| **Deploy pre-flight** | `deploy.sh --check` on `main` when `RAILWAY_USE_CLI_DEPLOY == 'true'` and secrets present |
-| **Deploy to Railway** | `deploy.sh` when CLI deploy enabled |
-| **Merge gate** | Requires test, integration-ops, architecture-gates; deploy jobs may skip |
+| **Deploy to Railway** | push/dispatch on `main` when `vars.RAILWAY_USE_CLI_DEPLOY == 'true'`; needs test + integration-ops + architecture-gates; runs `deploy.sh` (preflight → `railway up --ci` VetTrack → status poll → healthcheck curl → `railway up --ci` Worker → status poll) |
+| **Merge gate** | Requires test, integration-ops, architecture-gates; deploy may skip (PR runs) but must not fail |
 
 ### `@vettrack/contracts` gate
 
@@ -89,7 +88,27 @@ See [`docs/capacitor-native-app.md`](../capacitor-native-app.md) and [`docs/mobi
 
 ## Deployment
 
-**Railway** on `main` push when `RAILWAY_USE_CLI_DEPLOY=true` and deploy secrets are configured. Leave disabled until explicitly approved.
+**CI-driven Railway CLI deploy is the canonical (and only) path to production.** Railway's GitHub auto-deploy is disconnected for the production `VetTrack` and `Worker` services — the `deploy` job in `ci.yml` deploys both via `railway up --ci` after all merge gates pass, then polls the deployment status to `SUCCESS` and curls the public healthcheck. A green deploy job means *deployed and serving*, not merely queued.
+
+| Config | Where | Value |
+|--------|-------|-------|
+| `RAILWAY_USE_CLI_DEPLOY` | repo **variable** (not secret) — deploy kill-switch | `true` |
+| `RAILWAY_TOKEN` | repo secret | Railway project token (production environment) |
+| `RAILWAY_SERVICE` | repo secret | VetTrack service ID |
+| `RAILWAY_WORKER_SERVICE` | repo secret | Worker service ID (unset ⇒ worker deploy skipped) |
+
+**Railway dashboard source-of-truth** (deploy settings intentionally live per-service in the dashboard — the shared `railway.json` is build-only so the Worker never inherits a web healthcheck or start command):
+
+| Service (production) | Start command | Healthcheck |
+|----------------------|---------------|-------------|
+| VetTrack | `pnpm start` | `/api/healthz` (timeout 300s) |
+| Worker | `pnpm worker` | none (no HTTP server) |
+
+Both services build from the root `Dockerfile` (pinned in `railway.json`).
+
+**Known limitation:** `playwright.yml` is a separate workflow, so the deploy job cannot `needs:` it. Branch protection (both Playwright shards required + strict up-to-date) guarantees Playwright passed on the exact merged tree; a push-run Playwright failure on `main` does not retroactively block the deploy.
+
+**Staging** (`Staging ` environment) auto-deploys from `main` via Railway's GitHub integration — it is a mirror of production code with staging variables, not a pre-production gate.
 
 ---
 

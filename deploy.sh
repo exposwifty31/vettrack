@@ -57,6 +57,50 @@ for var in "${pilot_required_vars[@]}"; do
   fi
 done
 
+# Pinned CLI — bump deliberately, never @latest (deploys must be reproducible).
+RAILWAY_CLI_VERSION="${RAILWAY_CLI_VERSION:-5.26.0}"
+DEPLOY_WAIT_TIMEOUT="${DEPLOY_WAIT_TIMEOUT:-600}"
+HEALTHCHECK_URL="${HEALTHCHECK_URL:-https://vettrack.uk/api/healthz}"
+
+railway_cli() {
+  npx --yes "@railway/cli@${RAILWAY_CLI_VERSION}" "$@"
+}
+
+# `up --ci` exits when the build finishes; the deployment then still has to
+# start (and pass its healthcheck). Poll until a terminal status.
+wait_for_deploy() {
+  local svc="$1"
+  local deadline=$(( $(date +%s) + DEPLOY_WAIT_TIMEOUT ))
+  local status
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    status=$(railway_cli deployment list --service "$svc" --json 2>/dev/null \
+      | jq -r 'sort_by(.createdAt) | last | .status // empty' 2>/dev/null || true)
+    case "$status" in
+      SUCCESS)
+        echo "✅ $svc deployment SUCCESS"
+        return 0
+        ;;
+      FAILED|CRASHED|REMOVED|SKIPPED|NEEDS_APPROVAL)
+        echo "❌ $svc deployment reached terminal status: $status"
+        return 1
+        ;;
+      *)
+        echo "⏳ $svc deployment status: ${status:-unknown} — waiting..."
+        sleep 10
+        ;;
+    esac
+  done
+  echo "❌ Timed out after ${DEPLOY_WAIT_TIMEOUT}s waiting for $svc deployment"
+  return 1
+}
+
+deploy_service() {
+  local svc="$1"
+  echo "🚀 Deploying to Railway (service: $svc)..."
+  railway_cli up --service "$svc" --ci
+  wait_for_deploy "$svc"
+}
+
 if [ "$CHECK_MODE" = false ]; then
   if [ -z "$RAILWAY_TOKEN" ]; then
     echo "❌ RAILWAY_TOKEN is not set — cannot deploy"
@@ -66,7 +110,35 @@ if [ "$CHECK_MODE" = false ]; then
     echo "❌ RAILWAY_SERVICE is not set — cannot deploy to multi-service project"
     exit 1
   fi
-  echo "🚀 Deploying to Railway (service: $RAILWAY_SERVICE)..."
-  npx --yes @railway/cli@latest up --service "$RAILWAY_SERVICE" --detach
-  echo "✅ Deploy triggered — Railway is building"
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "❌ jq is required to verify deployment status"
+    exit 1
+  fi
+
+  deploy_service "$RAILWAY_SERVICE"
+
+  if [ -n "$HEALTHCHECK_URL" ]; then
+    echo "🩺 Verifying $HEALTHCHECK_URL..."
+    healthcheck_ok=false
+    for _ in $(seq 1 12); do
+      if curl -fsS --max-time 10 "$HEALTHCHECK_URL" >/dev/null 2>&1; then
+        healthcheck_ok=true
+        break
+      fi
+      sleep 10
+    done
+    if [ "$healthcheck_ok" != true ]; then
+      echo "❌ Post-deploy healthcheck failed: $HEALTHCHECK_URL"
+      exit 1
+    fi
+    echo "✅ Healthcheck OK"
+  fi
+
+  if [ -n "$RAILWAY_WORKER_SERVICE" ]; then
+    deploy_service "$RAILWAY_WORKER_SERVICE"
+  else
+    echo "ℹ️ RAILWAY_WORKER_SERVICE unset — skipping worker deploy"
+  fi
+
+  echo "✅ Deploy complete"
 fi
