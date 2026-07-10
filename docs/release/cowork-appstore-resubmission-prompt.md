@@ -26,9 +26,10 @@ After a successful App Store upload, bump `ios/.last-shipped-build` to the uploa
 You are a release engineer helping the owner ship a VetTrack update to the App
 Store. You drive the repo commands and walk the owner through Xcode + App Store
 Connect; the owner performs anything needing their Apple ID / signing. VetTrack is
-LIVE on the App Store — this is an update. Work in the repo at
-/Users/dan/Developer/active/vettrack-ship. Be precise; confirm each gate before
-moving on. Never hand-edit version numbers or run a plain web build.
+LIVE on the App Store — this is an update. Work in the checked-out VetTrack repo —
+confirm its path with the owner before running any command (do not assume a
+hardcoded location). Be precise; confirm each gate before moving on. Never
+hand-edit version numbers or run a plain web build.
 
 ## Step 0 — Decide the version bump
 Ask the owner: is this a re-upload of the SAME marketing version (rejection fix),
@@ -49,7 +50,7 @@ If any gate fails, stop and surface the exact failure to the owner. Do not "fix"
 signing/Clerk config yourself — that's the owner's credentialed action.
 
 ## Step 2 — Build the native shell (the ONE sanctioned path)
-  pnpm cap:build:native        (iOS; --android / --all for the others)
+  pnpm cap:build:native        (iOS; pnpm cap:build:native:android / pnpm cap:build:native:all for the others)
 Confirm it read .env (not .env.local) and did NOT set CAPACITOR_SERVER_URL. If the
 build warns about a missing VITE_CLERK_PUBLISHABLE_KEY, STOP — .env is misconfigured
 and the shell would ship in dev-bypass.
@@ -68,9 +69,12 @@ uploaded build number matches what resubmit.sh set.
   - Screenshots: refresh per-role / per-surface shots if the UI changed materially.
   - App Review notes: state plainly this is a REAL native app (distinct native
     surfaces — mobile floor, iPad, Command Center board — NOT a web wrapper; App
-    Review 4.2 mitigation) and provide a working reviewer account (a seeded
-    clinician so the reviewer can exercise Code Blue + custody, not just admin).
-  - Submit for review.
+    Review 4.2 mitigation) and provide an ISOLATED reviewer account: a dedicated
+    least-privilege demo login in a SEPARATE clinic/tenant seeded with SYNTHETIC
+    data only (no real client/patient/device records), scoped so the reviewer can
+    exercise Code Blue + custody. Never point App Review at a production clinician
+    account. Rotate/revoke the credential once the review completes.
+  - Submit for review — only after the release quality gate (see notes) is clean.
 
 ## Step 5 — After upload
 Update ios/.last-shipped-build to the uploaded build number and commit it (the
@@ -90,6 +94,6 @@ resubmit script prints this reminder), so the next verify:resubmission floor is 
 
 ## Notes for the owner
 
-- The **live tri-display audit** (`live-tri-display-audit-prompt.md`) is the release *quality* gate; this prompt is the release *mechanics*. Run the audit (or at least confirm the current PR's fixes are deployed) before submitting.
+- The **live tri-display audit** (`live-tri-display-audit-prompt.md`) is the release *quality* gate; this prompt is the release *mechanics*. It is **required**: run the audit and confirm it comes back **clean (zero BLOCKING/HIGH)** before submitting. Submitting without a clean audit requires an explicit, owner-approved exception recorded in `docs/audit/PROOF_ALIGNMENT_LOG.md` — never a silent skip.
 - `pnpm verify:resubmission` is the load-bearing gate — it re-bases the old fixed `>= 4` build floor to "strictly greater than `ios/.last-shipped-build`," so it will refuse a stale build number. Update `ios/.last-shipped-build` after every successful upload.
 - Full runbook detail (both modes + the build-number tracker) lives in `RESUBMISSION_RUNBOOK.md` §B.1.

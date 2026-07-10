@@ -1962,3 +1962,16 @@ Formal review findings verified against current code; still-valid ones fixed, on
 **Commands (real output):** `pnpm typecheck` exit 0 · `pnpm i18n:check` parity ✓ · `pnpm test` **449 files / 4247 pass** · `pnpm architecture:gates` All G1 passed · `bash -n` both scripts OK · resubmit happy+rollback exercised on copies · verify gates tested standalone.
 
 **Verdict:** VERIFIED (all gates green; scripts + plist gate exercised). One credential finding surfaced to owner as an explicit action.
+
+---
+
+## 2026-07-10 — CodeRabbit review on #78 @ 4b4ec4497 (7 fixed, 1 skipped)
+
+The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed state) — NOT clean; 8 findings were open at head. Verified each:
+
+- **routes.tsx:158 (Major, real bug):** `/equipment-board` used a plain `Redirect` (dropped the query string) while `/display` + `/equipment/board` use `RedirectPreserveSearch` — a bookmarked `/equipment-board?kiosk=1` silently lost kiosk mode. Switched it to `RedirectPreserveSearch`; all three legacy board aliases now preserve search consistently. (tsc 0 · 94 board/route tests + full suite 4246 pass · arch G1.)
+- **cowork-appstore-resubmission-prompt.md:** hardcoded owner repo path → placeholder + confirm-with-owner; `--android / --all` → exact `pnpm cap:build:native:android` / `:all`; reviewer account is now **isolated** (dedicated least-privilege login in a separate synthetic-data tenant, revoked after review — was "a seeded clinician"); the live-audit quality gate is now **required** (clean = zero BLOCKING/HIGH, or a documented owner-approved exception in this log) rather than "or at least confirm fixes deployed".
+- **product-growth-roadmap.md:** MD022 heading-spacing (blank line after each `### N ·` heading); added a **department-replay caveat** to problem #3 — a department-filtered feed can't ride the clinic-global outbox cursor as-is (the gap-detector would resync-loop / drop events), so it needs a separate per-department cursor designed up front.
+- **SKIPPED — audit-prompt:225 (`BoardShell` vs `NativeShell`), false positive:** re-raise of the earlier finding. Verified again: `/board` renders via `BoardShell` (`src/board/BoardShell.tsx`, `PlatformRouter.tsx:23-24` for the `board` target); `NativeShell` is the `mobile` shell. Doc is correct; the root cause was `CLAUDE.md` not documenting the `board` target — fixed in `4b4ec4497`. Rebuttal posted on the PR.
+
+**Verdict:** VERIFIED (real bug fixed + gates green; docs hardened; 1 documented false-positive skip).

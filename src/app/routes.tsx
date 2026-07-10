@@ -155,7 +155,7 @@ export function AppRoutes() {
         <Route path="/appointments"><Redirect to="/equipment/tasks" replace /></Route>
         <Route path="/equipment-tasks"><Redirect to="/equipment/tasks" replace /></Route>
         <Route path="/display"><RedirectPreserveSearch to="/board" /></Route>
-        <Route path="/equipment-board"><Redirect to="/board" replace /></Route>
+        <Route path="/equipment-board"><RedirectPreserveSearch to="/board" /></Route>
         <Route path="/scan"><AuthGuard><ScanPage /></AuthGuard></Route>
         <Route path="/equipment/scan"><Redirect to="/equipment?scan=1" replace /></Route>
         <Route path="/equipment/maintenance"><Redirect to="/equipment?status=maintenance" replace /></Route>
