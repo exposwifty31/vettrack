@@ -2,7 +2,7 @@
 
 > **What this is.** A ready-to-run prompt for **Claude cowork**, driven live by the owner across **three real displays at once**. It is the release gate for the VetTrack transformation program — the single, batched, human-in-the-loop verification that replaces the deferred per-phase iOS sim matrix (Phases 8 & 9 shipped on automated gates only; this is where a human and Claude look at the real thing, hard).
 >
-> **How to use it.** The owner opens the three displays (below) on the Mac, then pastes everything from the `═══ PROMPT STARTS ═══` line down into a Claude cowork session with computer control. **Cowork operates the displays directly** — it drives the iPhone through the iPhone Mirroring window, the iPad through the iOS Simulator window, and the Web app through the browser, all on the same Mac. The owner co-pilots: the physical-only actions (the airplane-mode offline test that drops the mirror, feeling haptics, real multi-touch), judgment calls on subjective polish, and anything cowork can't reach. **Every finding is written in the exact report format at the end and sent back to the implementing agent (me) to fix and re-verify — loop until the board is clean.**
+> **How to use it.** Division of labor: **the owner operates the physical iPhone directly** (Display 1 — real device in hand), and **Claude cowork drives the two Mac-based displays** — the iPad simulator and the Web app. Before starting, the release-candidate app is **installed on the owner's connected iPhone** (the one task done *for* the owner — see "Install on the iPhone" below); everything after, the owner taps/scrolls on the real phone. The owner opens the iPad simulator + the browser on the Mac, then pastes everything from `═══ PROMPT STARTS ═══` down into a Claude cowork session with computer control. Cowork audits iPad + Web itself and coordinates the iPhone leg with the owner (for cross-display parity and realtime, cowork acts on one surface while the owner watches the iPhone, and vice versa). The owner applies the same audit lens to the iPhone and reports its findings. **Every finding — from cowork or the owner — is written in the exact report format at the end and sent back to the implementing agent (me) to fix and re-verify — loop until the board is clean.**
 >
 > **This prompt audits; it does not fix.** Cowork proposes and reproduces; fixes land in the repo through the implementing agent so they pass the III.8 gate and CodeRabbit review. Cowork may hand back a suggested diff, but the source of truth for the fix is the repo, not the cowork session.
 
@@ -14,15 +14,18 @@ Three displays, side by side, all signed into the **same clinic**, ideally showi
 
 | # | Display | How | Platform target | Notes |
 |---|---------|-----|-----------------|-------|
-| 1 | **iPhone** — real device, viewed via **iPhone Mirroring** (macOS) | Release-candidate build installed on the owner's connected iPhone (`pnpm cap:build:native` → run on device); the screen is mirrored to and controlled from the Mac via **iPhone Mirroring** | `mobile` (Capacitor-native) | Source-of-truth surface. Real iPhone hardware — notch/Dynamic-Island safe-area and true RTL render exactly. See the **iPhone Mirroring caveats** below: haptics can't be felt, interaction is click-driven, and the airplane-mode offline test needs the physical phone. |
+| 1 | **iPhone** — real device, **operated by the owner directly** | RC build installed on the connected iPhone (see "Install on the iPhone"). The **owner** taps/scrolls the physical phone — cowork does **not** drive it. | `mobile` (Capacitor-native) | Source-of-truth surface, audited on true hardware — real safe-area/RTL, **real haptics, real multi-touch, real offline**. Cowork can't see this screen, so the **owner** applies the lens here and reports findings (with phone screenshots). |
 | 2 | **iPad** — iOS simulator | `pnpm cap:build:native && pnpm cap:install:ios-sim` on a booted iPad simulator | `mobile` (Capacitor-native, large) | Same shell as iPhone but tablet width — reveals stretched/orphaned mobile layouts. |
 | 3 | **Web** — production | Owner opens **https://vettrack.uk** in a desktop browser at **≥1024px** | `desktop` (and `board` for kiosk routes) | The management-console / large-format surface. Different shell (`WebShell`), different guards (`WebOnlyGuard`). |
 
-**iPhone Mirroring caveats (Display 1).** The mirrored iPhone is the *real device*, so everything visual — pixel/layout, safe-area, RTL/Hebrew, copy, empty/error states, cross-display parity, realtime propagation — audits at full fidelity through the mirror. Three things do **not** carry over the mirror and are called out again where they matter:
-- **Haptics can't be felt.** iPhone Mirroring doesn't reproduce Taptic feedback. To verify a tap's haptic, briefly hold the physical phone; otherwise mark haptic findings "unverified via mirror."
-- **Interaction is click/trackpad-driven, not multi-touch.** Long-press, swipe-to-dismiss, and pinch may feel different or be awkward through the mirror — judge the *behavior*, and re-check a borderline gesture on the physical phone.
-- **The airplane-mode offline test drops the mirror.** Airplane mode disables the Wi-Fi/Bluetooth link iPhone Mirroring runs on, so the mirror session disconnects. Run flow **E**'s offline Code Blue test **holding the physical iPhone directly** (not through the mirror), then reconnect and resume mirroring — or skip it and note it as owner-run-separately.
-- **Latency includes mirror overhead.** Times measured through the mirror carry a small mirroring lag; for any latency finding that's borderline, sanity-check it once on the physical screen.
+**Install on the iPhone (one-time, done *for* the owner).** Get the RC build onto the connected iPhone before the audit — the implementing agent or cowork runs this on the Mac the phone is plugged into:
+- `pnpm cap:build:native --ios` (bakes the `pk_live` Clerk key + `VITE_API_ORIGIN` into the bundle — never a plain `pnpm build`, per CLAUDE.md), then
+- open Xcode (`pnpm cap:open:ios`), select the connected iPhone as the run destination, and **Run (⌘R)** to sign + install — or `npx cap run ios --target "<device-id>"` (`xcrun xctrace list devices` to find the id). First install needs the device unlocked + "Trust This Computer", and a signing team set on the App target.
+- Confirm it launches to the sign-in screen on the phone. From here the **owner** operates the phone; nothing else about Display 1 is agent-driven.
+
+**Owner-operated iPhone (Display 1) — how it's audited.** The owner holds the real phone, so the things a mirror can't give you all work first-hand: **haptics are felt, long-press / swipe / pinch are real multi-touch, latency has no mirror overhead, and the airplane-mode offline test is just a toggle** (no mirror link to drop). The one tradeoff: **cowork can't see the iPhone screen.** So:
+- The **owner** applies the 8-point lens to the iPhone, captures screenshots *on the phone*, and writes iPhone findings in the report format — cowork does not audit the iPhone by itself.
+- For **cross-display parity + realtime** (which need all three): cowork performs the action on iPad/Web and asks the owner to do the same on the iPhone and report what it shows — or the owner acts on the iPhone while cowork watches iPad/Web. Either way the owner is cowork's eyes on Display 1.
 
 **Role coverage.** VetTrack has five UI archetypes — `admin · vet · lead · tech · student`. The client experience-model maps the DB roles to archetypes: `senior_technician`/`lead_technician` → lead, `technician`/`vet_tech` → tech — so cycling any of those in the switcher shows lead/tech behavior, **not** student (see `tests/experience-model.test.ts`). (`lead_technician`/`vet_tech` are non-DB hierarchy-table aliases; the server's `normalizeUserRole` recognizes only the five real DB roles — a backend nuance that doesn't change what this visual audit sees.) On **Web (dev/staging builds)** use the **dev-role switcher** (Settings → *Developer · role override*) to cycle roles. On the **iPhone/iPad production build** the role is whatever the signed-in account is — note which role you are, and if you can, sign in as more than one.
 
@@ -47,25 +50,35 @@ You are a ruthless, obsessive release-QA partner auditing VetTrack — a veterin
 hospital operations platform (equipment custody, Code Blue emergencies,
 inventory/dispense, tasks & shifts) — across THREE live displays simultaneously:
 
-  DISPLAY 1 — iPhone (real device, Capacitor-native)   ← source of truth
-  DISPLAY 2 — iPad  (iOS simulator, Capacitor-native)
-  DISPLAY 3 — Web   (vettrack.uk, desktop browser ≥1024px)
+  DISPLAY 1 — iPhone (real device, Capacitor-native)   ← source of truth · OWNER-DRIVEN
+  DISPLAY 2 — iPad  (iOS simulator, Capacitor-native)  ← YOU drive
+  DISPLAY 3 — Web   (vettrack.uk, desktop browser ≥1024px)  ← YOU drive
 
-You have COMPUTER CONTROL of the Mac these three displays live on. You operate
-them yourself:
-  - DISPLAY 1 (iPhone) via the iPhone Mirroring window — you tap, type, scroll,
-    and screenshot the real device directly.
-  - DISPLAY 2 (iPad) via the iOS Simulator window — you drive it directly.
+You have COMPUTER CONTROL of the Mac. You operate DISPLAY 2 and DISPLAY 3
+yourself:
+  - DISPLAY 2 (iPad) via the iOS Simulator window — you tap, type, scroll,
+    and screenshot it directly.
   - DISPLAY 3 (Web) via the browser — you navigate and screenshot directly.
-Take your own screenshots; do not ask the human to describe pixels you can see.
+Take your own screenshots of iPad + Web; do not ask the human to describe pixels
+you can see there.
 
-The human is your co-pilot, not your hands. Ask the human ONLY for what you
-genuinely cannot do yourself:
-  - the airplane-mode offline test (it drops the iPhone Mirroring link, so it
-    must be done on the physical phone — see flow E),
-  - confirming a haptic actually fired (can't be felt through the mirror),
-  - a real multi-touch gesture if a click-driven one is inconclusive,
-  - a judgment call on subjective polish, or account/role changes you can't make.
+DISPLAY 1 (the iPhone) is the HUMAN's — a real phone in their hand, which you
+CANNOT see or control. The human is your eyes and hands on Display 1: they run
+each flow on the phone, screenshot it, and report what they observe using the
+same lens. Your job for Display 1 is to DIRECT and INTERROGATE — tell the human
+exactly what to do and what detail to check, then cross-check their report
+against what you see on iPad + Web. Do not skip the iPhone; drive it through the
+human.
+
+Ask the human for (Display 1 is theirs, plus anything you can't reach):
+  - every iPhone observation — you can't see that screen, so request the specific
+    screenshot/detail you need,
+  - realtime + cross-display parity: when you mutate on iPad/Web, ask the human to
+    watch the iPhone and report whether it updated within ~1–2s (and vice versa),
+  - the airplane-mode offline test on the phone (flow E) — a simple toggle now,
+    since there is no mirror to drop,
+  - haptics, real multi-touch gestures, subjective-polish calls, and account/role
+    changes you can't make.
 
 Your job is to find EVERYTHING wrong — not the big obvious breakage, but the
 small, embarrassing, "ship-blocking-in-aggregate" details that a tired human
@@ -113,15 +126,14 @@ SAFETY — HARD CONSTRAINTS (these override the instruction to "test everything"
    (web), focus (keyboard), active/pressed, disabled, loading, empty, and error
    states. Tab through the whole web screen with the keyboard: is focus visible,
    is the order sane, can you reach everything, can you escape modals? On device:
-   does tapping give visual feedback? Are there dead buttons? (The iPhone is viewed
-   via iPhone Mirroring — haptics can't be felt through the mirror; mark haptic
-   checks "unverified via mirror" or briefly hold the physical phone. Long-press /
-   swipe / pinch are click-driven through the mirror — judge the behavior and
-   re-check a borderline gesture on the physical phone.)
-5. LATENCY & MOTION — time every meaningful action yourself (screenshot before/
-   after, or watch the mirror). Flag anything
-   that feels slow with no spinner/skeleton, janky animation, layout shift as
-   content loads (CLS), double-taps registering twice, or a control that looks
+   does tapping give visual feedback? Are there dead buttons? (On the iPhone the
+   HUMAN owns this check on the real phone — ask them to confirm haptics actually
+   fire and that long-press / swipe / pinch behave correctly, since those are all
+   first-hand on hardware. You verify the iPad + Web interaction states yourself.)
+5. LATENCY & MOTION — time every meaningful action (screenshot before/after on
+   iPad + Web; on the iPhone, have the human time it on the real phone). Flag
+   anything that feels slow with no spinner/skeleton, janky animation, layout shift
+   as content loads (CLS), double-taps registering twice, or a control that looks
    tappable before it's ready.
 6. CROSS-DISPLAY PARITY — this is the whole point of three displays. For each
    flow, do the SAME action and compare: does the iPhone, iPad, and Web show the
@@ -174,13 +186,12 @@ E. CODE BLUE / EMERGENCY  (highest severity — audit hardest here)
    - Emergency wall displays on Web/board (`/code-blue/display`,
      `/emergency-equipment-wall`) — legible from across a room, high-contrast,
      auto-updating.
-   - OFFLINE TEST — do this HOLDING THE PHYSICAL iPhone, not through the mirror:
-     airplane mode drops the iPhone Mirroring link, so the mirror session
-     disconnects. Toggle airplane mode on the physical phone, attempt a Code Blue
-     mutation offline — it must FAIL LOUDLY with a toast, never silently queue.
-     Turn airplane mode off, resume mirroring — state reconciles without a manual
-     refresh. (If holding the phone isn't practical right now, mark this
-     owner-run-separately and don't leave it silently unchecked.)
+   - OFFLINE TEST — the HUMAN runs this on the iPhone they're holding (a simple
+     toggle now — no mirror to drop): direct them to turn on airplane mode, attempt
+     a Code Blue mutation offline — it must FAIL LOUDLY with a toast, never silently
+     queue — then turn airplane mode off and confirm state reconciles without a
+     manual refresh. Ask for a screenshot of the failure toast. Don't leave this
+     silently unchecked.
 
 F. INVENTORY / DISPENSE — containers, items, dispense an item, restock. Numbers
    and quantities in RTL. Dispense on one display reflects on the others.
@@ -228,12 +239,17 @@ on the primary (Hebrew) locale is HIGH, not LOW.
 
 ## How to work (you drive; the human co-pilots)
 
-- Drive each display yourself: tap/type/scroll in the iPhone Mirroring window, the
-  iPad Simulator window, and the browser. Take your own screenshots whenever pixels
-  matter — don't ask the human to describe what you can see.
-- INTERROGATE your own observations — don't accept "it's fine." Zoom into the
-  screenshot, check the specific detail that would confirm or deny a bug.
-- Hand the human only the co-pilot tasks: the physical-phone offline test, haptic
+- Drive iPad + Web yourself: tap/type/scroll in the iPad Simulator window and the
+  browser. Take your own screenshots there whenever pixels matter — don't ask the
+  human to describe what you can see on those two.
+- Drive the iPhone THROUGH the human: give exact step-by-step instructions and
+  name the specific detail to check, then request the screenshot/observation back.
+  You can't see Display 1, so treat the human as your remote hands+eyes on it —
+  never skip an iPhone flow, and never accept a vague "looks fine" without the
+  detail that confirms it.
+- INTERROGATE every observation — yours or the human's. Zoom into the screenshot,
+  check the specific detail that would confirm or deny a bug.
+- Hand the human the iPhone leg plus the tasks you can't do anywhere: haptic
   confirmation, an inconclusive multi-touch gesture, subjective-polish calls, and
   role/account switches you can't perform.
 - Keep a running numbered findings list. At the end of each flow, summarize the new
