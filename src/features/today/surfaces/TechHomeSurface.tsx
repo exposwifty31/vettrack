@@ -48,7 +48,12 @@ export function TechHomeSurface({ isTablet }: { isTablet: boolean }) {
             />
             <QuickScanCard />
             <TasksPreviewCard dashboard={home.taskDashboard} isLoading={home.isLoading} />
-            <MyEquipmentCard items={home.myEquipment} isLoading={home.myEquipmentLoading} />
+            <MyEquipmentCard
+              items={home.myEquipment}
+              isLoading={home.myEquipmentLoading}
+              isError={home.myEquipmentError}
+              onRetry={() => void home.refetchMyEquipment()}
+            />
             <UrgentCountChips criticalCount={home.criticalCount} overdueCount={home.overdueCount} />
             <GetStartedCard visible={!home.isLoading && home.totalCount === 0} />
           </>

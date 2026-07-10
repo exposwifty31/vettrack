@@ -170,7 +170,10 @@ export function AppRoutes() {
         <Route path="/print"><AuthGuard><WebOnlyGuard><QrPrintPage /></WebOnlyGuard></AuthGuard></Route>
 
         {/* --- Emergency & safety --- */}
-        <Route path="/code-blue"><AuthGuard><CodeBluePage /></AuthGuard></Route>
+        {/* Students (custody-only) are redirected off Code Blue too — consistent with
+            /alerts + /rooms and the owner's "custody only" scope; they're already
+            server-403'd on every CB mutation. Clinical roles are unaffected. */}
+        <Route path="/code-blue"><AuthGuard><CustodyGuard><CodeBluePage /></CustodyGuard></AuthGuard></Route>
         <Route path="/code-blue/display"><AuthGuard><WebOnlyGuard><CodeBlueDisplay /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/crash-cart"><AuthGuard><CrashCartCheckPage /></AuthGuard></Route>
         <Route path="/handoff"><AuthGuard><HandoffPage /></AuthGuard></Route>

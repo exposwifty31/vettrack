@@ -468,8 +468,15 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
 
   const canAccessCodeBlue = experience.can("codeBlue.manage");
 
+  // All roles reach Inventory — students dispense/restock as part of their custody
+  // scope (the custody nav filter keeps /inventory via CUSTODY_ONLY_NAV_KEYS), so
+  // they must not be pre-gated out before filterCustodyNav runs.
   const canAccessInventoryNav =
-    role === "admin" || role === "vet" || role === "senior_technician" || role === "technician";
+    role === "admin" ||
+    role === "vet" ||
+    role === "senior_technician" ||
+    role === "technician" ||
+    role === "student";
 
   const navItems: NavItem[] = useMemo(() => {
     const allItems: NavItem[] = [

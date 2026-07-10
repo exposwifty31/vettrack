@@ -67,7 +67,12 @@ export function StudentHomeSurface({ isTablet }: { isTablet: boolean }) {
               className={rise}
             />
             <QuickScanCard />
-            <MyEquipmentCard items={home.myEquipment} isLoading={home.myEquipmentLoading} />
+            <MyEquipmentCard
+              items={home.myEquipment}
+              isLoading={home.myEquipmentLoading}
+              isError={home.myEquipmentError}
+              onRetry={() => void home.refetchMyEquipment()}
+            />
             <button
               type="button"
               onClick={() => navigate("/inventory")}

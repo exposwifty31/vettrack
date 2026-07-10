@@ -94,9 +94,13 @@ BN=$(grep -m1 'CURRENT_PROJECT_VERSION = ' ios/App/App.xcodeproj/project.pbxproj
 LAST=$(grep -oE '[0-9]+' ios/.last-shipped-build 2>/dev/null | head -1)
 LAST="${LAST_SHIPPED_BUILD:-${LAST:-}}"
 if [ -z "${LAST:-}" ]; then
-  [ "${BN:-0}" -ge 1 ] \
-    && ok "CURRENT_PROJECT_VERSION = ${BN} (no ios/.last-shipped-build — strict check off)" \
-    || no "build number missing from pbxproj"
+  # Explicit if/else — an `&& ok || no` chain would also run `no` if `ok` itself
+  # returned non-zero, misreporting a passing check.
+  if [ "${BN:-0}" -ge 1 ]; then
+    ok "CURRENT_PROJECT_VERSION = ${BN} (no ios/.last-shipped-build — strict check off)"
+  else
+    no "build number missing from pbxproj"
+  fi
 elif [ "${BN:-0}" -gt "$LAST" ]; then
   ok "build $BN > last shipped $LAST"
 else

@@ -14,7 +14,12 @@ export function useFloorHome() {
   const today = useTodayShift();
   const userId = getCurrentUserId();
 
-  const { data: myEquipment, isLoading: myEquipmentLoading } = useQuery({
+  const {
+    data: myEquipment,
+    isLoading: myEquipmentLoading,
+    isError: myEquipmentError,
+    refetch: refetchMyEquipment,
+  } = useQuery({
     // Canonical bare key (matches layout.tsx / my-equipment page) so the cache dedupes.
     queryKey: ["/api/equipment/my"],
     queryFn: api.equipment.listMy,
@@ -32,6 +37,8 @@ export function useFloorHome() {
     ...today,
     myEquipment,
     myEquipmentLoading,
+    myEquipmentError,
+    refetchMyEquipment,
     heroState,
     totalCount: today.equipment?.length ?? 0,
   };

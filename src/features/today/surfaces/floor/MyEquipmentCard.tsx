@@ -16,9 +16,15 @@ const MAX_ROWS = 4;
 export function MyEquipmentCard({
   items,
   isLoading,
+  isError = false,
+  onRetry,
 }: {
   items: Equipment[] | undefined;
   isLoading: boolean;
+  /** When the /api/equipment/my read rejected — render a retryable failure state
+      instead of a silent empty card. */
+  isError?: boolean;
+  onRetry?: () => void;
 }) {
   const rows = items ?? [];
   return (
@@ -35,6 +41,19 @@ export function MyEquipmentCard({
 
       {isLoading ? (
         <LoadingSection rows={3} />
+      ) : isError ? (
+        <div className="flex flex-col items-start gap-2 py-1" role="alert">
+          <p className="text-sm text-ivory-text3">{t.equipmentList.errors.loadFailed}</p>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={() => onRetry()}
+              className="min-h-[36px] rounded-lg border border-ivory-border px-3 text-sm font-medium text-ivory-text transition-colors hover:bg-muted/40"
+            >
+              {t.common.tryAgain}
+            </button>
+          )}
+        </div>
       ) : rows.length === 0 ? (
         <p className="py-1 text-sm text-ivory-text3">{t.homeSurface.myEquipmentEmpty}</p>
       ) : (

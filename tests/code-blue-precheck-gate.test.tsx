@@ -75,6 +75,23 @@ describe("PreCheckGate — C1 start-button contract", () => {
     expect(onStart).not.toHaveBeenCalled();
   });
 
+  it("admin is NOT auto-selected as the event manager (F3): start stays disabled until one is picked", () => {
+    // F3 / CodeRabbit: an identity-admin is no longer auto-filled as the clinical
+    // event manager (that was the Round-1 bug — armed + enabled, then 403'd). Like
+    // any non-eligible user they must pick a manager, so the start is disabled.
+    authState.role = "admin";
+    authState.userId = "u-admin-1";
+    const { onStart } = renderGate();
+    const button = screen.getByTestId("code-blue-start") as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(screen.getByText(t.codeBlue.startDisabledReason)).toBeTruthy();
+    // The auto-fill "…(you)" manager card is NOT rendered for an admin.
+    expect(screen.queryByText(t.codeBlue.you)).toBeNull();
+
+    fireEvent.click(button);
+    expect(onStart).not.toHaveBeenCalled();
+  });
+
   it("while starting, the button is disabled and shows the in-flight label", () => {
     const { onStart } = renderGate({ starting: true });
     const button = screen.getByTestId("code-blue-start") as HTMLButtonElement;

@@ -1868,7 +1868,7 @@ Each group committed separately, full suite green per group. Audit-report branch
 
 **Round-2 result (cowork, localhost:5000):** all 11 fixes (F1–F11) PASS, no regressions. Two new findings (OBS-1, board-pair bidi) + the owner's student-scope + sign-up findings addressed below.
 
-**Student = custody-only** (owner scope): a student's operational footprint — the actions/mutations they can perform — is equipment checkout/checkin + inventory dispense/restock; nav + home are pared to that. (Route *visibility* is a separate, server-enforced concern: non-custody routes redirect students via `CustodyGuard`, with `/code-blue` a deliberate view-only exception — actions disabled + server-403'd — see the per-role-sweep entry below.) `experience-model` gains `isCustodyOnly` + `filterCustodyNav` (allow-set: today·scan·equipment·mine·inventory). `StudentHomeSurface` rebuilt to Scan + My Equipment + Inventory (+ supervised banner); tasks/alerts dropped. `NativeTabBar` swaps Emergency→My Equipment for students; `NativeTabSidebar`/`MoreSheet` apply the custody filter. Evidence: new `experience-model` tests (allow-set = {today,scan,equipment,mine,inventory}; no-op for non-custody) + updated `floor-home-surfaces` (custody contract: inventory action present, tasks absent). `pnpm test` 446 files / 4227 pass; frontend tsc 0; i18n parity green. NOTE: live role verification blocked by the OBS-1 env issue below; verified by unit tests + source.
+**Student = custody-only** (owner scope): a student's operational footprint — the actions/mutations they can perform — is equipment checkout/checkin + inventory dispense/restock; nav + home are pared to that. (Route *visibility* is a separate, server-enforced concern: non-custody routes — including `/code-blue`, `/alerts`, `/rooms`/`/locations` — redirect students via `CustodyGuard`; the server stays the mutation boundary. The `/code-blue` redirect was added in the CodeRabbit-review pass — see that entry below, which supersedes the earlier "view-only exception".) `experience-model` gains `isCustodyOnly` + `filterCustodyNav` (allow-set: today·scan·equipment·mine·inventory). `StudentHomeSurface` rebuilt to Scan + My Equipment + Inventory (+ supervised banner); tasks/alerts dropped. `NativeTabBar` swaps Emergency→My Equipment for students; `NativeTabSidebar`/`MoreSheet` apply the custody filter. Evidence: new `experience-model` tests (allow-set = {today,scan,equipment,mine,inventory}; no-op for non-custody) + updated `floor-home-surfaces` (custody contract: inventory action present, tasks absent). `pnpm test` 446 files / 4227 pass; frontend tsc 0; i18n parity green. NOTE: live role verification blocked by the OBS-1 env issue below; verified by unit tests + source.
 
 **OBS-1 (dev-tool, not production):** impersonating a non-admin still showed admin nav. DIAGNOSED via browser: `switcherInDom:false`, `/api/users/me` with `x-dev-role-override:vet`→`vet` / no header→`admin`. So the server override is correct; the CLIENT baked the production `VITE_CLERK_PUBLISHABLE_KEY` (from `.env`; the empty `.env.local` value didn't override it for Vite) → `isDevBypassBuild()` false → the dev-role switcher is hidden and the override header is never sent → app stays admin. NOT a production over-exposure. Hardened `DevRoleSwitcher` to clear `vt_session` + the query cache on switch (for when it IS active). Real local unblock = run the dev client without the Clerk key baked.
 
@@ -1891,3 +1891,20 @@ Each group committed separately, full suite green per group. Audit-report branch
 **Harness caveat (cowork):** the native/phone tab bar wasn't loadable (CDP viewport pinned ~856px); the student native tab-bar scope (Home·Equipment·Scan·My-Equipment, no Emergency) is verified by unit test (`experience-model` custody-nav cases) but needs a real-device/native build to confirm live — same deferral as F1/F4.
 
 **Verdict:** VERIFIED (5 roles pass; S1 fixed + browser-confirmed; suite/tsc green).
+
+---
+
+## 2026-07-10 — CodeRabbit review on #76 @ 0b360a3b7 (6/6 addressed)
+
+Genuine formal review at head 0b360a3b7 (CHANGES_REQUESTED; ack "Full review triggered", not a rate-limit skip). All six:
+
+1. **layout.tsx `canAccessInventoryNav` (Minor):** excluded `student`, so the Inventory nav item was never added → `filterCustodyNav` never saw it → students lost their in-scope Inventory. Added `student`.
+2. **verify-resubmission.sh (Minor, 10.B):** `[ … ] && ok || no` would also run `no` if `ok` returned non-zero. Replaced with explicit if/else.
+3. **MyEquipmentCard error state (Major, stability):** `useFloorHome` only returned `myEquipment`/`isLoading`, so a rejected `/api/equipment/my` (retry:false) showed a silent empty card. Now exposes `myEquipmentError` + `refetchMyEquipment`; the card renders a retryable failure state; all three floor surfaces wired. New `my-equipment-card` test (error→retry; success-empty≠error).
+4. **/code-blue CustodyGuard (Major, security):** students are now redirected off `/code-blue` too — consistent with `/alerts`+`/rooms` and the owner's "custody only" scope (they were already server-403'd on CB mutations). Supersedes the earlier view-only-exception note. **Flagged for owner:** revertable if students should retain emergency *visibility*.
+5. **code-blue-precheck-gate (Minor):** added an admin-path case — admin is not auto-selected as event manager (start stays disabled, no auto-fill "you" card), locking the F3 fix.
+6. **RoleChips (Trivial):** extracted the duplicated sign-in/sign-up role-chip markup into `src/features/auth/components/RoleChips.tsx`; both pages consume it.
+
+**Commands:** frontend `tsc` 0 · server `tsc` 0 · `bash -n verify-resubmission.sh` OK · full suite green · architecture gates G1.
+
+**Verdict:** VERIFIED (6/6; suite/tsc/gates green). Re-review re-requested at the new head.

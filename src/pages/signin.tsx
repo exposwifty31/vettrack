@@ -4,6 +4,7 @@ import { Helmet } from "react-helmet-async";
 import { Loader2 } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { VetTrackMark } from "@/components/vettrack-mark";
+import { RoleChips } from "@/features/auth/components/RoleChips";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignIn, useUser } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
 import { PhoneSignIn } from "@/components/phone-sign-in";
@@ -69,23 +70,7 @@ export default function SignInPage() {
             <p className="text-sm text-muted-foreground">{t.authPage.signInSubtitle}</p>
           </div>
 
-          {/* Informational only — the roles VetTrack serves, NOT a selectable
-              control. The user's actual role is assigned by their clinic admin. */}
-          <div className="mb-6 flex flex-col items-center gap-2">
-            <span className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">
-              {t.authPage.roleLabel}
-            </span>
-            <div className="flex flex-wrap justify-center gap-2">
-              {[t.authPage.roleVetTech, t.authPage.roleVeterinarian, t.authPage.roleStudent].map((label) => (
-                <span
-                  key={label}
-                  className="inline-flex h-8 items-center rounded-full border border-border bg-card px-3.5 text-xs font-semibold text-foreground"
-                >
-                  {label}
-                </span>
-              ))}
-            </div>
-          </div>
+          <RoleChips />
 
           {CLERK_PUBLISHABLE_KEY ? (
             <div className="flex flex-col items-center gap-4">
