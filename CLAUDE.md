@@ -127,14 +127,15 @@ ios/ android/     Capacitor native shells (capacitor.config.ts at root) — buil
 
 ### Platform routing seam
 
-`src/app/platform/` decides which shell renders. `PlatformTarget = "mobile" | "desktop" | "marketing"`; `resolvePlatformTarget()` (sync, safe at module-init) and `usePlatformTarget()` (reactive — re-evaluates on wouter navigation + `matchMedia` change) resolve in this order:
+`src/app/platform/` decides which shell renders. `PlatformTarget = "mobile" | "desktop" | "marketing" | "board"`; `resolvePlatformTarget()` (sync, safe at module-init) and `usePlatformTarget()` (reactive — re-evaluates on wouter navigation + `matchMedia` change) resolve in this order:
 
 1. **Capacitor-native** → `mobile`
 2. **marketing path** (`/signin`, `/signup`, `/privacy`, `/terms`, `/support`) → `marketing`
-3. **touch-narrow** (`(max-width: 767px) and (pointer: coarse)` — installed PWA / mobile Safari) → `mobile`
-4. else → `desktop`
+3. **board path** (`/board`, `/board/pair`) → `board` (before touch-narrow, so a coarse-pointer tablet/TV browser at `/board` gets the kiosk, not the mobile shell)
+4. **touch-narrow** (`(max-width: 767px) and (pointer: coarse)` — installed PWA / mobile Safari) → `mobile`
+5. else → `desktop`
 
-- **`PlatformRouter`** (`src/app/platform/PlatformRouter.tsx`) wraps AppRoutes: `mobile → NativeShell` (owns safe-area, scroll, tab bar, MoreSheet); `desktop`/`marketing` → passthrough (each page's own `AppShell` owns web chrome).
+- **`PlatformRouter`** (`src/app/platform/PlatformRouter.tsx`) wraps AppRoutes: `mobile → NativeShell` (owns safe-area, scroll, tab bar, MoreSheet); `board → BoardShell` (`src/board/BoardShell.tsx` — dark full-bleed kiosk host for the canonical `/board` Command Center); `desktop`/`marketing` → passthrough (each page's own `AppShell` owns web chrome).
 - **`WebOnlyGuard`** (`src/app/platform/guards/WebOnlyGuard.tsx`, mount **inside** `AuthGuard`) gates desktop-dense / large-format surfaces — Command board, analytics, procurement, audit-log, QR/print pages, and the Code Blue wall displays. Capacitor-native → `Redirect` to `fallback`; browser below the 1024px desktop breakpoint → dark guard screen routing to the mobile view instead of an overflowing desktop layout. Re-grep `WebOnlyGuard` in `src/app/routes.tsx` for the exact current set before relying on it.
 - The client shell layers live in `src/native/` (Capacitor), `src/desktop/` (`WebShell`), with `src/shell/` a legacy barrel. `src/core/` + `src/infrastructure/` are an **in-progress hexagonal migration** (branches `feat/P2-S1-infrastructure-adapters`, `feat/native-migration-phases-1-3`) — some concerns still live in `src/lib/*`; prefer the newer paths for new code, but don't assume the migration is complete.
 

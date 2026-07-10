@@ -13,7 +13,9 @@ describe("equipment readiness wedge smoke", () => {
     expect(routes).toContain('path="/critical-kit-check"');
     expect(routes).toContain('path="/display"');
     expect(routes).toContain('path="/equipment/board"');
-    expect(routes).not.toMatch(/path="\/equipment\/board"[^>]*>\s*<Redirect/);
+    // Phase 10: /equipment/board is now a redirect to the canonical /board kiosk
+    // (was a WardDisplayPage render route).
+    expect(routes).toMatch(/path="\/equipment\/board"><RedirectPreserveSearch to="\/board"/);
   });
 
   it("mounts equipment-board API alias via router factory", () => {

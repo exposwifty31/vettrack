@@ -1,10 +1,10 @@
 /** Canonical generated hrefs for migrated wedge surfaces. */
 export const CANONICAL_HREFS = {
-  // The real canonical routes (routes.tsx). The dashed `/equipment-board` and
-  // `/equipment-tasks` paths are redirect aliases — pointing nav at them forced an
-  // extra client redirect on every click and made active-state miss (the location
-  // after redirect never equalled the alias href). Point straight at canonical (F10).
-  equipmentBoard: "/equipment/board",
+  // The real canonical routes (routes.tsx). Point nav straight at canonical to avoid
+  // an extra client redirect + active-state miss (F10). Phase 10: /board is the
+  // single canonical Command Center; /equipment/board redirects to it, so nav goes
+  // straight to /board (the BoardShell kiosk).
+  equipmentBoard: "/board",
   equipmentTasks: "/equipment/tasks",
   locations: "/locations",
   criticalKitCheck: "/critical-kit-check",

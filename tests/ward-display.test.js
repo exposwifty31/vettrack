@@ -4,9 +4,8 @@ import { describe, it, expect } from "vitest";
 
 const routeSource = readFileSync("./server/routes/display.ts", "utf-8");
 // Phase 4 C1: the former display.tsx was split into the command-board module.
-// Source-scrape assertions are repointed to the file that now owns each concern;
-// display.tsx is now a thin host wrapper (kiosk URL + wake-lock only).
-const wrapperSource = readFileSync("./src/pages/display.tsx", "utf-8");
+// Phase 10: the display.tsx wrapper was removed entirely (/equipment/board → /board).
+// Source-scrape assertions point at the files that now own each concern.
 const screenSource = readFileSync("./src/features/command-board/CommandBoardScreen.tsx", "utf-8");
 const boardSource = readFileSync("./src/features/command-board/components/CommandBoard.tsx", "utf-8");
 const overlaySource = readFileSync("./src/features/command-board/components/CodeBlueOverlay.tsx", "utf-8");
@@ -121,20 +120,7 @@ describe("Ward Display — overdue medication job (removed)", () => {
     expect(withoutExit).not.toContain("<a href");
   });
 
-  it("the display.tsx wrapper owns no realtime transport (single-owner invariant)", () => {
-    // Post-extraction guard: the thin wrapper must not re-import the Phase-9
-    // data path — CommandBoardScreen is its single owner.
-    for (const ref of [
-      "EventIngestor",
-      "connectRealtime",
-      "publishBuildTagGossip",
-      "publishCodeBlueSeenGossip",
-      "useDisplaySnapshot",
-      "useDisplayHeartbeat",
-      "useRealtimeReconciliation",
-      "useCodeBlueKeepaliveReconciliation",
-    ]) {
-      expect(wrapperSource).not.toContain(ref);
-    }
-  });
+  // (Phase 10: the display.tsx thin wrapper was removed — /equipment/board now
+  // redirects to the canonical /board kiosk, so CommandBoardScreen is the single
+  // owner by construction; the wrapper single-owner invariant no longer applies.)
 });

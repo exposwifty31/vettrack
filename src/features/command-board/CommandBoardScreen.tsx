@@ -1,9 +1,9 @@
 // CommandBoardScreen — the single owner of the Command Center board UI and its
 // Phase-9 realtime data path (SSE connect+replay, snapshot poll, reconciliation,
-// keepalive, build-tag + code-blue gossip, heartbeat). Two hosts consume this
-// ONE screen and neither re-implements any of it:
-//   - src/pages/display.tsx (WardDisplayPage)  → /equipment/board (kiosk via ?kiosk=1)
-//   - /board route (through BoardShell)         → <CommandBoardScreen kioskMode/>
+// keepalive, build-tag + code-blue gossip, heartbeat). The canonical /board route
+// (through BoardShell) mounts this ONE screen as <CommandBoardScreen kioskMode/>;
+// the legacy /equipment/board now redirects to /board (Phase 10), so there is a
+// single board host.
 // Because only the one matched route mounts this component, connectRealtime's
 // module-global subscription refcount can never reach 2.
 //
