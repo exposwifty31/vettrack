@@ -42,7 +42,7 @@ describe("MyEquipmentCard", () => {
   it("keeps cached items visible on a refetch error and retries on click", () => {
     const onRetry = vi.fn();
     const items: Equipment[] = [
-      { id: "eq-1", name: "Otoscope", status: "ok", readinessState: "ready" },
+      { id: "eq-1", name: "Otoscope", status: "ok", createdAt: "2026-07-01T00:00:00.000Z", readinessState: "ready" },
     ];
     renderCard({ items, isError: true, onRetry });
     // Cached row stays visible instead of being replaced by a blank/error card.
@@ -52,5 +52,14 @@ describe("MyEquipmentCard", () => {
     expect(screen.queryByText(t.equipmentList.errors.loadFailed)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: t.common.tryAgain }));
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the refresh-failed message on error even without an onRetry handler (button omitted)", () => {
+    const items: Equipment[] = [
+      { id: "eq-2", name: "Thermometer", status: "ok", createdAt: "2026-07-01T00:00:00.000Z" },
+    ];
+    renderCard({ items, isError: true }); // no onRetry
+    expect(screen.getByText(t.homeSurface.myEquipmentRefreshFailed)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: t.common.tryAgain })).toBeNull();
   });
 });

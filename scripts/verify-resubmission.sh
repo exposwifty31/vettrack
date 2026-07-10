@@ -7,6 +7,12 @@ set -uo pipefail
 REPO="${REPO:-/Users/dan/vettrack}"
 cd "$REPO" || { echo "FAIL: repo not found at $REPO"; exit 2; }
 
+# Private temp dir (0700, unpredictable name) for the response bodies + the sign-in
+# JWT this script writes — never predictable world-readable /tmp paths another local
+# user could read or pre-create/symlink. Removed on exit.
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/vt-resubmit.XXXXXX")" || { echo "FAIL: could not create temp dir"; exit 2; }
+trap 'rm -rf "$TMP"' EXIT
+
 # --- secret -----------------------------------------------------------------
 if [ -z "${CLERK_SECRET_KEY:-}" ] && [ -f "$REPO/.env" ]; then
   # Same source the server + build-native-shell already read (gitignored).
@@ -45,12 +51,12 @@ hdr "[2.1] Demo login (must be 'complete')"
 if [ -z "$REVIEWER_PASSWORD" ]; then
   no "REVIEWER_PASSWORD not set — export it (from your password manager) before running; demo-login gate skipped"
 else
-  curl -s -D /tmp/vt_h.txt -X POST \
+  curl -s -D "$TMP/h.txt" -X POST \
     "https://clerk.vettrack.uk/v1/client/sign_ins?_is_native=1&_clerk_js_version=5.125.13" \
     -H "Origin: capacitor://localhost" -H "Content-Type: application/x-www-form-urlencoded" \
-    --data-urlencode "identifier=$REVIEWER_EMAIL" -o /tmp/vt_si.json
-  JWT=$(grep -i "^authorization:" /tmp/vt_h.txt | cut -d' ' -f2 | tr -d '\r')
-  SID=$(python3 -c "import json;print(json.load(open('/tmp/vt_si.json'))['response']['id'])" 2>/dev/null)
+    --data-urlencode "identifier=$REVIEWER_EMAIL" -o "$TMP/si.json"
+  JWT=$(grep -i "^authorization:" "$TMP/h.txt" | cut -d' ' -f2 | tr -d '\r')
+  SID=$(python3 -c "import json;print(json.load(open('$TMP/si.json'))['response']['id'])" 2>/dev/null)
   if [ -z "$SID" ]; then no "could not start sign-in (FAPI unreachable or 429 — wait ~3 min)";
   else
     STATUS=$(curl -s -X POST \
@@ -193,10 +199,10 @@ done
 
 # --- AASA live + entitlements -----------------------------------------------
 hdr "[AASA + entitlements]"
-if curl -sS https://vettrack.uk/.well-known/apple-app-site-association -o /tmp/vt_aasa.json 2>/dev/null; then
+if curl -sS https://vettrack.uk/.well-known/apple-app-site-association -o "$TMP/aasa.json" 2>/dev/null; then
   python3 -c "
 import json, sys
-d = json.load(open('/tmp/vt_aasa.json'))
+d = json.load(open('$TMP/aasa.json'))
 details = d.get('applinks', {}).get('details', [])
 app_ids = details[0].get('appIDs', []) if details else []
 components = details[0].get('components', []) if details else []

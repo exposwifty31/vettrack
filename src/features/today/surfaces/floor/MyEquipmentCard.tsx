@@ -60,19 +60,21 @@ export function MyEquipmentCard({
             </Link>
           ))}
           </div>
-          {isError && onRetry && (
+          {isError && (
             <output className="mt-2 flex flex-wrap items-center gap-2">
               <span id="my-equipment-refresh-error" className="text-[13px] text-ivory-text3">
                 {t.homeSurface.myEquipmentRefreshFailed}
               </span>
-              <button
-                type="button"
-                onClick={() => onRetry()}
-                aria-describedby="my-equipment-refresh-error"
-                className="min-h-[44px] shrink-0 rounded-lg border border-ivory-border px-3 text-sm font-medium text-ivory-text transition-colors hover:bg-muted/40"
-              >
-                {t.common.tryAgain}
-              </button>
+              {onRetry && (
+                <button
+                  type="button"
+                  onClick={() => onRetry()}
+                  aria-describedby="my-equipment-refresh-error"
+                  className="min-h-[44px] shrink-0 rounded-lg border border-ivory-border px-3 text-sm font-medium text-ivory-text transition-colors hover:bg-muted/40"
+                >
+                  {t.common.tryAgain}
+                </button>
+              )}
             </output>
           )}
         </>
