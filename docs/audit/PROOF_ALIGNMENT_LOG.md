@@ -1849,3 +1849,15 @@ Each group committed separately, full suite green per group. Audit-report branch
 **Commands:** frontend `tsc --noEmit` exit 0 · `pnpm test` → `446 files / 4224 tests passed` (home-tablet-dashboard, home-surface-fork, epic8-slice1-state-primitives, phase-6-state-consistency incl.) · `pnpm i18n:check` deep parity · `pnpm architecture:gates` G1 passed (0 cycles, dead module removed).
 
 **Verdict:** VERIFIED. F5 (cross-display shift-entry inconsistency) resolves with it — no surface offers self-start now.
+
+---
+
+## 2026-07-10 — Phase 10.A: F11 (web scroll) + Round-2 re-audit prompt
+
+**F11 (owner finding, Round 1) — web content unscrollable by trackpad/wheel.** `PageShell` outer was `min-h-screen`, so a tall page grew past the viewport and the DOCUMENT scrolled (only the scrollbar drag worked); `#page-main` (`overflow-y-auto overscroll-contain`, the intended scroll region) never got a bounded height, never overflowed, and the wheel hit the `overflow-y-hidden` row (PageShell.tsx:31) as a scroll boundary and was eaten. Fix: outer → `h-screen overflow-hidden` so `#page-main` is the real scroll container.
+- **Verified in-browser** (localhost:5000 dev-bypass, this branch): on `/settings`, `document.getElementById('page-main')` → `overflowY: "auto"`, `scrollHeight - clientHeight = 1632`, `document` overflow `0`; a real wheel-scroll (computer tool, 5 ticks) advanced the content from the "Sound" section to "Account"; the Topbar stayed fixed. Screenshot captured.
+- Committed `5e72d8ab8`, pushed to PR #76.
+
+**Round-2 re-audit prompt authored** — `docs/release/re-audit-round-2-prompt.md`: per-fix PASS/FAIL verification of F1–F11 on localhost:5000 (F1/F4 flagged iPad-build-only), the Code Blue full-flow deep dive as a vet (the Round-1 gap), and a role-cycling continuation sweep. Same finding-report format; loop continues on PR #76.
+
+**Verdict:** VERIFIED (F11 fixed + browser-confirmed). Round 2 handed to owner + cowork.
