@@ -77,9 +77,10 @@ const OpsHealthConsolePage = lazy(() => import("@/pages/console/OpsHealthConsole
 const PeopleRolesConsolePage = lazy(() => import("@/pages/console/PeopleRolesConsolePage"));
 const DisplaysConsolePage = lazy(() => import("@/pages/console/DisplaysConsolePage"));
 
-function RedirectPreserveSearch({ to }: { to: string }) {
+export function RedirectPreserveSearch({ to }: { to: string }) {
   const search = useSearch();
-  return <Redirect to={`${to}${search}`} replace />;
+  const query = search ? (search.startsWith("?") ? search : `?${search}`) : "";
+  return <Redirect to={`${to}${query}`} replace />;
 }
 
 /** `/` — signed-in users go to `/home`; everyone else goes to `/signin`. */
