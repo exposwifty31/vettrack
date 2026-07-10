@@ -1877,3 +1877,17 @@ Each group committed separately, full suite green per group. Audit-report branch
 **board-pair dir:** hardcoded `dir="rtl"` made the English subtitle's trailing period float to the RTL start. Now `dir={useDirection()}` — verified in-browser (Hebrew container dir=rtl, subtitle correct); English follows LTR. board-pair test passes.
 
 **Verdict:** VERIFIED (suite/tsc/parity green; OBS-1 diagnosed server-correct). Student live-verify + OBS-1 pending the localhost dev-client env unblock.
+
+---
+
+## 2026-07-10 — Phase 10.A: per-role sweep (Part C) + S1 fix
+
+**Per-role sweep (cowork, localhost:5000, switcher now driving the client):** all 5 roles OK — admin (ops home + full nav incl. System Management), vet (clinical home, NO admin nav), senior_technician (ops home, mgmt dropdown, NO System Management), technician (tech floor, no admin), student (custody-only home + nav = Today·Equipment only). RTL mirrors correctly all roles; English parity clean; scroll app-wide; no hardcoded copy. **No out-of-scope MUTATION reachable for any role** (server 403s confirmed for student on /api/tasks/dashboard, /api/shift-chat/messages, /api/appointments/meta). The Round-2 client nav-gating gap (vet/student seeing admin sections) is resolved by the OBS-1 real fix.
+
+**S1 (MEDIUM, fixed):** a student could VIEW /alerts (with data) by direct URL while /equipment/tasks redirects them — inconsistent with the custody-only scope (view-only; no mutation reachable). Added `CustodyGuard` (redirects `isCustodyOnly` users to `/equipment`, mirroring the Tasks page's inline student redirect) and wrapped `/alerts` + `/rooms`.
+- **Verified in-browser:** student `/alerts` → redirects to `/equipment`; admin `/alerts` still renders (no over-redirect). `custody-guard` test (student redirects · other roles render · no premature bounce pre-auth-load). Full suite 447 files / 4231 tests pass; tsc clean.
+- **Deliberate exception:** `/code-blue` is left view-only for students (actions disabled client-side + server 403 on the mutation; emergency awareness is defensible). Can be locked down further if the owner wants strict route-level custody isolation.
+
+**Harness caveat (cowork):** the native/phone tab bar wasn't loadable (CDP viewport pinned ~856px); the student native tab-bar scope (Home·Equipment·Scan·My-Equipment, no Emergency) is verified by unit test (`experience-model` custody-nav cases) but needs a real-device/native build to confirm live — same deferral as F1/F4.
+
+**Verdict:** VERIFIED (5 roles pass; S1 fixed + browser-confirmed; suite/tsc green).
