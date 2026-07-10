@@ -1861,3 +1861,19 @@ Each group committed separately, full suite green per group. Audit-report branch
 **Round-2 re-audit prompt authored** — `docs/release/re-audit-round-2-prompt.md`: per-fix PASS/FAIL verification of F1–F11 on localhost:5000 (F1/F4 flagged iPad-build-only), the Code Blue full-flow deep dive as a vet (the Round-1 gap), and a role-cycling continuation sweep. Same finding-report format; loop continues on PR #76.
 
 **Verdict:** VERIFIED (F11 fixed + browser-confirmed). Round 2 handed to owner + cowork.
+
+---
+
+## 2026-07-10 — Phase 10.A Round-2: student custody-only + OBS-1 + sign-up chips + board-pair dir
+
+**Round-2 result (cowork, localhost:5000):** all 11 fixes (F1–F11) PASS, no regressions. Two new findings (OBS-1, board-pair bidi) + the owner's student-scope + sign-up findings addressed below.
+
+**Student = custody-only** (owner scope): a student's entire footprint is equipment checkout/checkin + inventory dispense/restock. `experience-model` gains `isCustodyOnly` + `filterCustodyNav` (allow-set: today·scan·equipment·mine·inventory). `StudentHomeSurface` rebuilt to Scan + My Equipment + Inventory (+ supervised banner); tasks/alerts dropped. `NativeTabBar` swaps Emergency→My Equipment for students; `NativeTabSidebar`/`MoreSheet` apply the custody filter. Evidence: new `experience-model` tests (allow-set = {today,scan,equipment,mine,inventory}; no-op for non-custody) + updated `floor-home-surfaces` (custody contract: inventory action present, tasks absent). `pnpm test` 446 files / 4227 pass; frontend tsc 0; i18n parity green. NOTE: live role verification blocked by the OBS-1 env issue below; verified by unit tests + source.
+
+**OBS-1 (dev-tool, not production):** impersonating a non-admin still showed admin nav. DIAGNOSED via browser: `switcherInDom:false`, `/api/users/me` with `x-dev-role-override:vet`→`vet` / no header→`admin`. So the server override is correct; the CLIENT baked the production `VITE_CLERK_PUBLISHABLE_KEY` (from `.env`; the empty `.env.local` value didn't override it for Vite) → `isDevBypassBuild()` false → the dev-role switcher is hidden and the override header is never sent → app stays admin. NOT a production over-exposure. Hardened `DevRoleSwitcher` to clear `vt_session` + the query cache on switch (for when it IS active). Real local unblock = run the dev client without the Clerk key baked.
+
+**Sign-up/sign-in role chips:** three static role chips with the first styled "selected" + a "Role" label read as a role selector that does nothing (clinic admin assigns the role). Neutralized to identical informational tags + relabeled "For every role" / "לכל תפקיד", on both pages.
+
+**board-pair dir:** hardcoded `dir="rtl"` made the English subtitle's trailing period float to the RTL start. Now `dir={useDirection()}` — verified in-browser (Hebrew container dir=rtl, subtitle correct); English follows LTR. board-pair test passes.
+
+**Verdict:** VERIFIED (suite/tsc/parity green; OBS-1 diagnosed server-correct). Student live-verify + OBS-1 pending the localhost dev-client env unblock.
