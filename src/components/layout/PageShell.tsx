@@ -20,7 +20,7 @@ export function PageShell({ sidebarItems, children }: PageShellProps) {
   const dir = useDirection();
 
   return (
-    <div dir={dir} className="min-h-screen min-w-0 bg-ivory-bg text-ivory-text flex flex-col">
+    <div dir={dir} className="h-screen min-w-0 overflow-hidden bg-ivory-bg text-ivory-text flex flex-col">
       <a
         href="#page-main"
         className="sr-only focus:not-sr-only focus:absolute focus:z-[200] focus:top-2 focus:start-2 focus:px-4 focus:py-2 focus:rounded-lg focus:bg-primary focus:text-primary-foreground focus:text-sm focus:font-medium"
