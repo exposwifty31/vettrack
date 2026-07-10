@@ -1980,7 +1980,7 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 
 ## 2026-07-10 — CI-driven Railway CLI deploy cutover (PR #77, merge dfad1d98d)
 
-**Claim:** The CI deploy job now actually deploys (it had been a silent no-op since inception — `ci.yml` read `RAILWAY_USE_CLI_DEPLOY` from `secrets.*` while the value is a repo *variable*, so every deploy step skipped while Railway's GitHub auto-deploy did the real work). Deploys are now CLI-canonical: gated on all three CI jobs, verified to terminal status + healthcheck, Worker included; production auto-deploy sources disconnected; Staging repointed off the dead `dboy3156/VetTrack` repo.
+**Claim:** The CI deploy job now actually deploys (it had been a silent no-op in every run inspected, and provably since at least the 2026-06-19 token rotation — `ci.yml` read `RAILWAY_USE_CLI_DEPLOY` from `secrets.*` while the value is a repo *variable*, so the deploy steps skipped while Railway's GitHub auto-deploy did the real work; the June-19 `RAILWAY_TOKEN` turned out to be invalid, so any genuinely executed deploy in that window would have failed red, and none did). Deploys are now CLI-canonical: gated on all three CI jobs, verified to terminal status + healthcheck, Worker included; production auto-deploy sources disconnected; Staging repointed off the dead `dboy3156/VetTrack` repo.
 
 **Evidence:**
 - PR contract: PR #77 run @ 57b5b6646 → `gh run view` jobs: `🚢 Deploy to Railway: skipped`, `✅ Merge gate: success` (deploy must skip on PRs, gate stays green).
