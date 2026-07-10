@@ -14,9 +14,15 @@ Three displays, side by side, all signed into the **same clinic**, ideally showi
 
 | # | Display | How | Platform target | Notes |
 |---|---------|-----|-----------------|-------|
-| 1 | **iPhone** — real device | Release-candidate build installed on the owner's connected iPhone (`pnpm cap:build:native` → run on device) | `mobile` (Capacitor-native) | Source-of-truth surface. Notch/Dynamic-Island safe-area, haptics, real touch. |
+| 1 | **iPhone** — real device, viewed via **iPhone Mirroring** (macOS) | Release-candidate build installed on the owner's connected iPhone (`pnpm cap:build:native` → run on device); the screen is mirrored to and controlled from the Mac via **iPhone Mirroring** | `mobile` (Capacitor-native) | Source-of-truth surface. Real iPhone hardware — notch/Dynamic-Island safe-area and true RTL render exactly. See the **iPhone Mirroring caveats** below: haptics can't be felt, interaction is click-driven, and the airplane-mode offline test needs the physical phone. |
 | 2 | **iPad** — iOS simulator | `pnpm cap:build:native && pnpm cap:install:ios-sim` on a booted iPad simulator | `mobile` (Capacitor-native, large) | Same shell as iPhone but tablet width — reveals stretched/orphaned mobile layouts. |
 | 3 | **Web** — production | Owner opens **https://vettrack.uk** in a desktop browser at **≥1024px** | `desktop` (and `board` for kiosk routes) | The management-console / large-format surface. Different shell (`WebShell`), different guards (`WebOnlyGuard`). |
+
+**iPhone Mirroring caveats (Display 1).** The mirrored iPhone is the *real device*, so everything visual — pixel/layout, safe-area, RTL/Hebrew, copy, empty/error states, cross-display parity, realtime propagation — audits at full fidelity through the mirror. Three things do **not** carry over the mirror and are called out again where they matter:
+- **Haptics can't be felt.** iPhone Mirroring doesn't reproduce Taptic feedback. To verify a tap's haptic, briefly hold the physical phone; otherwise mark haptic findings "unverified via mirror."
+- **Interaction is click/trackpad-driven, not multi-touch.** Long-press, swipe-to-dismiss, and pinch may feel different or be awkward through the mirror — judge the *behavior*, and re-check a borderline gesture on the physical phone.
+- **The airplane-mode offline test drops the mirror.** Airplane mode disables the Wi-Fi/Bluetooth link iPhone Mirroring runs on, so the mirror session disconnects. Run flow **E**'s offline Code Blue test **holding the physical iPhone directly** (not through the mirror), then reconnect and resume mirroring — or skip it and note it as owner-run-separately.
+- **Latency includes mirror overhead.** Times measured through the mirror carry a small mirroring lag; for any latency finding that's borderline, sanity-check it once on the physical screen.
 
 **Role coverage.** VetTrack has five UI archetypes — `admin · vet · lead · tech · student` (client roles `senior_technician`→lead, `technician`→tech; server collapses the `lead_technician`/`vet_tech` aliases → `student`). On **Web (dev/staging builds)** use the **dev-role switcher** (Settings → *Developer · role override*) to cycle roles. On the **iPhone/iPad production build** the role is whatever the signed-in account is — note which role you are, and if you can, sign in as more than one.
 
@@ -68,7 +74,11 @@ and move on — prove it looks good or record why it doesn't.
    (web), focus (keyboard), active/pressed, disabled, loading, empty, and error
    states. Tab through the whole web screen with the keyboard: is focus visible,
    is the order sane, can you reach everything, can you escape modals? On device:
-   does tapping give haptic/visual feedback? Are there dead buttons?
+   does tapping give visual feedback? Are there dead buttons? (The iPhone is viewed
+   via iPhone Mirroring — haptics can't be felt through the mirror; mark haptic
+   checks "unverified via mirror" or briefly hold the physical phone. Long-press /
+   swipe / pinch are click-driven through the mirror — judge the behavior and
+   re-check a borderline gesture on the physical phone.)
 5. LATENCY & MOTION — time every meaningful action (I'll count). Flag anything
    that feels slow with no spinner/skeleton, janky animation, layout shift as
    content loads (CLS), double-taps registering twice, or a control that looks
@@ -124,9 +134,13 @@ E. CODE BLUE / EMERGENCY  (highest severity — audit hardest here)
    - Emergency wall displays on Web/board (`/code-blue/display`,
      `/emergency-equipment-wall`) — legible from across a room, high-contrast,
      auto-updating.
-   - OFFLINE TEST (if you can toggle airplane mode on iPhone): attempt a Code Blue
+   - OFFLINE TEST — do this HOLDING THE PHYSICAL iPhone, not through the mirror:
+     airplane mode drops the iPhone Mirroring link, so the mirror session
+     disconnects. Toggle airplane mode on the physical phone, attempt a Code Blue
      mutation offline — it must FAIL LOUDLY with a toast, never silently queue.
-     Come back online — state reconciles without a manual refresh.
+     Turn airplane mode off, resume mirroring — state reconciles without a manual
+     refresh. (If holding the phone isn't practical right now, mark this
+     owner-run-separately and don't leave it silently unchecked.)
 
 F. INVENTORY / DISPENSE — containers, items, dispense an item, restock. Numbers
    and quantities in RTL. Dispense on one display reflects on the others.
