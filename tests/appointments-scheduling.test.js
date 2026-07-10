@@ -76,6 +76,22 @@ describe("Appointments Scheduling", () => {
     ).toBe(true);
   });
 
+  it("T2: admin actor bypasses the shift-window gate on task-create only", () => {
+    expect(serviceFile.includes('if (args.actorRole === "admin") return;')).toBe(true);
+    expect(
+      serviceFile.includes(
+        "await assertWithinVetShift({ clinicId, vetId, startTime, endTime, actorRole: actor?.role });"
+      )
+    ).toBe(true);
+    // updateAppointment's call site must NOT thread actorRole — the admin
+    // bypass is scoped to task-create only, not edits/reschedules.
+    expect(
+      serviceFile.includes(
+        "await assertWithinVetShift({ clinicId, vetId: nextVetId, startTime: nextStartTime, endTime: nextEndTime });"
+      )
+    ).toBe(true);
+  });
+
   it("Service enforces status transition rules", () => {
     expect(
       serviceFile.includes("VALID_STATUS_TRANSITIONS") &&
