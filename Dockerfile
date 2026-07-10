@@ -22,5 +22,5 @@ ENV VITE_PILOT_MODE=$VITE_PILOT_MODE
 # Railway service vars can set VITE_PILOT_MODE=true; mainline images must still build full platform.
 RUN if [ "$ALLOW_EQUIPMENT_PILOT_MODE" != "true" ]; then export VITE_PILOT_MODE=false; fi && pnpm build
 
-EXPOSE 5000
+EXPOSE 8080
 CMD ["pnpm", "start"]

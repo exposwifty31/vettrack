@@ -2,18 +2,16 @@ name: CI — VetTrack
 
 on:
   pull_request:
-    branches: [main, staging]
+    branches: [main]
   push:
-    branches:
-      - main
-      - staging
-      # Cloud-agent / feature branches (PR push does not match main/staging-only filter).
-      - "cursor/**"
+    branches: [main]
   workflow_dispatch:
 
+# Never cancel an in-flight main run — it may be mid-deploy, and a canceled
+# `railway up` upload can still finish building after a newer one (out-of-order deploy).
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -22,6 +20,7 @@ jobs:
   test:
     name: 🧪 Tests & typecheck
     runs-on: ubuntu-latest
+    timeout-minutes: 25
 
     services:
       postgres:
@@ -85,6 +84,7 @@ jobs:
   integration-ops:
     name: 🔌 Integration ops
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     services:
       postgres:
@@ -133,6 +133,7 @@ jobs:
   architecture-gates:
     name: 🏛️ Architecture gates (G1)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: ⬇️ Checkout
@@ -189,76 +190,21 @@ jobs:
         run: pnpm knip --no-exit-code
         continue-on-error: true
 
-  deploy-check:
-    name: 🚀 Deploy pre-flight
-    runs-on: ubuntu-latest
-    needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.RAILWAY_USE_CLI_DEPLOY == 'true'
-
-    env:
-      NODE_ENV: production
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      REDIS_URL: ${{ secrets.REDIS_URL }}
-      SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-      VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
-      ALLOWED_ORIGIN: ${{ secrets.ALLOWED_ORIGIN }}
-      DB_CONFIG_ENCRYPTION_KEY: ${{ secrets.DB_CONFIG_ENCRYPTION_KEY }}
-      CLERK_WEBHOOK_SECRET: ${{ secrets.CLERK_WEBHOOK_SECRET }}
-      DATA_INTEGRITY_HEALTH_TOKEN: ${{ secrets.DATA_INTEGRITY_HEALTH_TOKEN }}
-      PORT: 3001
-
-    steps:
-      - name: 🔎 Resolve deploy pre-flight availability
-        id: preflight_guard
-        run: |
-          missing=0
-          for var in DATABASE_URL REDIS_URL SESSION_SECRET CLERK_SECRET_KEY VITE_CLERK_PUBLISHABLE_KEY ALLOWED_ORIGIN DB_CONFIG_ENCRYPTION_KEY CLERK_WEBHOOK_SECRET DATA_INTEGRITY_HEALTH_TOKEN; do
-            if [ -z "${!var}" ]; then
-              echo "Missing $var for deploy pre-flight."
-              missing=1
-            fi
-          done
-          if [ "$missing" -eq 1 ]; then
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: ℹ️ Skip pre-flight (secrets unavailable)
-        if: steps.preflight_guard.outputs.enabled != 'true'
-        run: echo "Skipping deploy pre-flight because required deploy secrets are unavailable in this context."
-
-      - name: ⬇️ Checkout
-        if: steps.preflight_guard.outputs.enabled == 'true'
-        uses: actions/checkout@v4
-
-      - name: 📦 pnpm
-        if: steps.preflight_guard.outputs.enabled == 'true'
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: 🟢 Node.js
-        if: steps.preflight_guard.outputs.enabled == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: ".nvmrc"
-          cache: "pnpm"
-
-      - name: 📥 Install dependencies
-        if: steps.preflight_guard.outputs.enabled == 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: ✅ Pre-flight env check
-        if: steps.preflight_guard.outputs.enabled == 'true'
-        run: bash deploy.sh --check --no-color
-
   deploy:
     name: 🚢 Deploy to Railway
     runs-on: ubuntu-latest
-    needs: [test, deploy-check]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.RAILWAY_USE_CLI_DEPLOY == 'true'
+    timeout-minutes: 30
+    needs: [test, integration-ops, architecture-gates]
+    # vars.RAILWAY_USE_CLI_DEPLOY (repo *variable*, not secret) is the deploy kill-switch.
+    # workflow_dispatch on main = "redeploy main" recovery button.
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && github.ref == 'refs/heads/main'
+      && vars.RAILWAY_USE_CLI_DEPLOY == 'true'
+    # Serialize production deploys across runs; never cancel one mid-flight.
+    concurrency:
+      group: railway-production-deploy
+      cancel-in-progress: false
 
     env:
       NODE_ENV: production
@@ -273,31 +219,25 @@ jobs:
       DATA_INTEGRITY_HEALTH_TOKEN: ${{ secrets.DATA_INTEGRITY_HEALTH_TOKEN }}
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE }}
-      RAILWAY_USE_CLI_DEPLOY: ${{ secrets.RAILWAY_USE_CLI_DEPLOY }}
+      RAILWAY_WORKER_SERVICE: ${{ secrets.RAILWAY_WORKER_SERVICE }}
       PORT: 3001
 
     steps:
-      - name: 🔎 Resolve Railway deploy mode
-        id: railway_mode
-        run: |
-          if [[ "${RAILWAY_USE_CLI_DEPLOY}" == "true" ]]; then
-            echo "use_cli=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "use_cli=false" >> "$GITHUB_OUTPUT"
-          fi
-
+      # Pinned SHA + no persisted credentials: this job holds RAILWAY_TOKEN and
+      # uploads the checkout to Railway — keep the git credential out of it.
       - name: ⬇️ Checkout
-        if: steps.railway_mode.outputs.use_cli == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
 
       - name: 🚀 Deploy
-        if: steps.railway_mode.outputs.use_cli == 'true'
         run: bash deploy.sh --no-color
 
   gate:
     name: ✅ Merge gate
     runs-on: ubuntu-latest
-    needs: [test, integration-ops, architecture-gates, deploy-check, deploy]
+    timeout-minutes: 5
+    needs: [test, integration-ops, architecture-gates, deploy]
     if: always()
 
     steps:
@@ -314,14 +254,6 @@ jobs:
           if [[ "${{ needs.architecture-gates.result }}" != "success" ]]; then
             echo "❌ Architecture gates failed — blocking merge"
             exit 1
-          fi
-          if [[ "${{ needs.deploy-check.result }}" != "success" ]]; then
-            if [[ "${{ needs.deploy-check.result }}" == "skipped" ]]; then
-              echo "ℹ️ Deploy pre-flight skipped (RAILWAY_USE_CLI_DEPLOY disabled)"
-            else
-              echo "❌ Deploy pre-flight did not succeed — blocking merge"
-              exit 1
-            fi
           fi
           if [[ "${{ needs.deploy.result }}" != "success" ]]; then
             if [[ "${{ needs.deploy.result }}" == "skipped" ]]; then
