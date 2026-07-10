@@ -172,11 +172,10 @@ export function throwIfUnauthorized(res: Response, init: RequestInit): void {
 }
 
 export function toApiErrorMessage(status: number, payload: ApiErrorPayload | null): string {
-  const base = payload?.message || payload?.error || `HTTP ${status}`;
-  if (payload?.requestId) {
-    return `${base} (requestId: ${payload.requestId})`;
-  }
-  return base;
+  // User-facing message only — never append the requestId. It's an internal
+  // correlation id (leaking it in a toast is bad UX and info disclosure, F2);
+  // it stays available programmatically on `ApiError.requestId` for logging.
+  return payload?.message || payload?.error || `HTTP ${status}`;
 }
 
 export function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {

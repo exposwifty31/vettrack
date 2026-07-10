@@ -33,10 +33,14 @@ describe("Phase 5 API error contract checks (static)", () => {
   });
 
   it("Frontend API client understands structured error payloads with requestId", () => {
+    // The client parses requestId onto ApiError so callers/logs can access it.
+    // It is intentionally NOT appended to the user-facing message (Phase 10 F2 —
+    // a raw requestId GUID in a toast is info disclosure + bad UX), so the
+    // contract asserted here is the structural parse, not the display string.
     expect(
       requestCore.includes("export interface ApiErrorPayload") &&
         requestCore.includes("toApiErrorMessage") &&
-        requestCore.includes("payload?.requestId"),
+        requestCore.includes("this.requestId = payload.requestId"),
     ).toBe(true);
   });
 });

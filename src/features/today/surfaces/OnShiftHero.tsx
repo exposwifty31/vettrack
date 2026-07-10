@@ -27,6 +27,19 @@ function formatElapsed(totalMin: number): string {
 export type HeroState = "loading" | "noshift" | "active";
 
 /**
+ * Roster-derived hero state, shared by every home surface (ops / floor / tablet):
+ * `active` iff inside a scheduled shift window, `loading` only until the pulse
+ * resolves, else `noshift`. Single source of truth so the three surfaces can't drift.
+ */
+export function deriveHeroState(
+  pulse: HomeDashboardPulse | undefined,
+  pulseLoading: boolean,
+): HeroState {
+  if (!pulse) return pulseLoading ? "loading" : "noshift";
+  return pulse.shift ? "active" : "noshift";
+}
+
+/**
  * The roster-derived on-shift hero (extracted from home.tsx). No clock-in/out
  * buttons — on-shift is roster-derived server-side (`pulse.shift` present iff the
  * caller is inside a scheduled window). Self-ticks its own minute clock. `emphasis`

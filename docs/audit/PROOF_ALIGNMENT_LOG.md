@@ -1807,3 +1807,158 @@ Each group committed separately, full suite green per group. Audit-report branch
 **Board flow NOT live-walked** (III.6 deferral stands — no physical display available); this entry claims static + suite + migration evidence. Board canonicalization (`/equipment/board`→`/board`) intentionally deferred to Phase 10.
 
 **Verdict:** VERIFIED (server security core + client plumbing; gates green; existing auth byte-identical).
+
+---
+
+## 2026-07-10 — Phase 10.A: live tri-display cowork audit — findings fix batch (F1/F2/F3/F6/F7/F8/F9/F10)
+
+**Context:** the owner + Claude cowork ran the tri-display audit (`docs/release/live-tri-display-audit-prompt.md`) across iPhone (real device via iPhone Mirroring), iPad (iOS sim), and Web (vettrack.uk), all signed in as admin, Hebrew/RTL, same live backend. Ten findings returned; the two owner-decision items (F4/F5 shift model, CB active-session 2s poll) are surfaced separately, not silently changed. Fixes below verified against real code + suite.
+
+**F1 (MEDIUM) — iPad exceptions title parity.** `use-ops-home.ts:60` `topExceptions` and `HomeTabletDashboard`'s tile render the SAME `alertsCtl.alerts` feed (ack-filtered, worst-first, top-5, badge, `/alerts` link); the `ExceptionsTile` comment says "reimplemented from HomeTabletDashboard's alerts tile". Phone/web title it `t.homeSurface.exceptions`; the iPad kept `t.nav.alerts`. Fix: iPad → `t.homeSurface.exceptions`. Evidence: `ExceptionsTile.tsx:34` vs `HomeTabletDashboard.tsx` tile header; `home-tablet-dashboard`/`home-surface-fork` tests pass.
+
+**F2 (HIGH) — CB 403 leaked English + requestId.** `toApiErrorMessage` (request-core.ts:174) appended `(requestId: …)`; the CB start handler showed raw `err.message`. Fix: `toApiErrorMessage` no longer appends requestId (stays on `ApiError.requestId`, verified `request-core.ts:99 this.requestId = payload.requestId`); CB start/end handlers show localized strings only (new `codeBlue.clinicalAuthorityRequired` he/en, parity green); failed-start toast 8s. Evidence: `code-blue.tsx:582` handler; `phase-5-error-contract`/`phase-5-pr-5-6-error-shape` tests pass (server `body.requestId` contract unchanged).
+
+**F3 (MEDIUM) — admin auto-filled as CB event manager then 403.** `code-blue.tsx:92` was `role === "vet" || role === "admin"`. Server gate is `requireClinicalAuthority({ allow:["vet","senior_technician","technician"], allowSystemAdmin:false })` (code-blue.ts:280) — but an admin with a shift-derived clinical role CAN pass the snapshot path (authority.ts:186–192), so NOT hard-blocked client-side. Fix: `role === "vet"` (admin no longer auto-assigned; picks a clinician via the manager list). Evidence: `code-blue-precheck-gate` test passes.
+
+**F6 (HIGH, security) — revoked display kept streaming.** Revocation was enforced only at connect; the open SSE kept delivering data (+40s observed). Fix: `/stream` (realtime.ts) re-validates a display-authed connection every 10s via `resolveDisplayAuth` (lookup filters `revoked_at IS NULL`, auth.ts:730) and closes on revocation → client's existing 401→/board/pair path. Additive; no transport/envelope/keepalive change; user connections untouched. Evidence: new deny-list test case (`resolveDisplayAuth(req, ()=>null)` → `!ok/401`), 7 tests pass; server tsc exit 0.
+
+**F7+F8 (MEDIUM) — admin registry stale.** `/heartbeat` (display.ts:653, `requireDisplayOrUser`) DOES write `lastSeenAt` (display.ts:311); the board mounts `useDisplayHeartbeat` via `CommandBoardScreen`. Root cause of both "device not appearing on pair" (F7) and "Last seen: Never" (F8) was the admin list never refetching. Fix: `DisplaysConsolePage` devices query gets `refetchInterval: 15s` + `refetchOnWindowFocus`. Evidence: `displays-console` test passes.
+
+**F9 (LOW) — install promo on /board/pair kiosk.** `pwa-install-prompt.tsx` suppressed only emergency routes. Fix: added `/board` to the suppression prefixes (covers `/board` + `/board/pair`).
+
+**F10 (LOW/MEDIUM) — nav through redirecting aliases.** `CANONICAL_HREFS.equipmentBoard/equipmentTasks` held `/equipment-board`,`/equipment-tasks` (redirect aliases; routes.tsx:153,155). Fix: point at canonical `/equipment/board`,`/equipment/tasks` (routes.tsx:131,132). Only `layout.tsx` consumes these keys (href + active-state, same constant) — stays consistent; wedge-smoke tests (assert the alias redirect routes still exist) pass.
+
+**Commands:** `pnpm test` → `446 files / 4224 tests passed` · frontend `tsc --noEmit` exit 0 · server `tsc -p tsconfig.server.json` exit 0 · `pnpm i18n:check` → deep parity · `pnpm architecture:gates` → G1 passed (0 new cycles).
+
+**Not changed (surfaced for owner decision):** F4/F5 (iPad "Start shift" → /handoff summary; no self-start-shift API exists — `/api/shifts` is admin GET + CSV import only; shift model is a product decision) and the CB active-session 2s poll (`useCodeBlueSession.ts:109` `refetchInterval:2000` — pre-existing frozen Code Blue surface; not altered without owner sign-off).
+
+**Verdict:** VERIFIED (8 findings fixed + suite/gates green); F4/F5 + CB-poll DEFERRED to owner decision.
+
+---
+
+## 2026-07-10 — Phase 10.A: F4 shift-start resolution (owner decision: align iPad to roster-derived hero)
+
+**Finding (F4/F5):** the iPad "Start shift" button opened the /handoff summary sheet and started no shift.
+
+**Investigation:** no self-start-shift API exists — `server/routes/shifts.ts` exposes only admin GET (`/`, line 815) + CSV import (`/import*`); `vt_shifts` (roster, carries `role` → feeds `resolveAuthority`) is admin-scheduled, and `vt_shift_sessions` (clock-in, no role) is documented as the "orphaned/legacy" table (`home-dashboard.ts:18-20`). On-shift is **roster-derived by design**: all four Phase-8 surfaces (Ops/Vet/Tech/Student) render `OnShiftHero` — "no start/end buttons … on-shift is roster-derived server-side" (`OnShiftHero.tsx:31`). Grep proved the iPad `HomeTabletDashboard` was the **only** surface still importing/rendering the legacy button-bearing `ShiftHero` (`grep -rn '<ShiftHero|import { ShiftHero }' src` → 1 hit, HomeTabletDashboard:11).
+
+**Owner decision:** align the iPad to the rest rather than reverse the roster-derived design (build-self-start was reconsidered once the deliberate no-self-start architecture surfaced).
+
+**Change:** `HomeTabletDashboard` renders `OnShiftHero` (heroState derived exactly as `use-ops-home.ts:79`), and `src/features/today/ShiftHero.tsx` deleted (its only consumer). Authority untouched — no clock-in path introduced; `vt_shift_sessions` stays orphaned; `resolveAuthority` stays roster-only.
+
+**Commands:** frontend `tsc --noEmit` exit 0 · `pnpm test` → `446 files / 4224 tests passed` (home-tablet-dashboard, home-surface-fork, epic8-slice1-state-primitives, phase-6-state-consistency incl.) · `pnpm i18n:check` deep parity · `pnpm architecture:gates` G1 passed (0 cycles, dead module removed).
+
+**Verdict:** VERIFIED. F5 (cross-display shift-entry inconsistency) resolves with it — no surface offers self-start now.
+
+---
+
+## 2026-07-10 — Phase 10.A: F11 (web scroll) + Round-2 re-audit prompt
+
+**F11 (owner finding, Round 1) — web content unscrollable by trackpad/wheel.** `PageShell` outer was `min-h-screen`, so a tall page grew past the viewport and the DOCUMENT scrolled (only the scrollbar drag worked); `#page-main` (`overflow-y-auto overscroll-contain`, the intended scroll region) never got a bounded height, never overflowed, and the wheel hit the `overflow-y-hidden` row (PageShell.tsx:31) as a scroll boundary and was eaten. Fix: outer → `h-screen overflow-hidden` so `#page-main` is the real scroll container.
+- **Verified in-browser** (localhost:5000 dev-bypass, this branch): on `/settings`, `document.getElementById('page-main')` → `overflowY: "auto"`, `scrollHeight - clientHeight = 1632`, `document` overflow `0`; a real wheel-scroll (computer tool, 5 ticks) advanced the content from the "Sound" section to "Account"; the Topbar stayed fixed. Screenshot captured.
+- Committed `5e72d8ab8`, pushed to PR #76.
+
+**Round-2 re-audit prompt authored** — `docs/release/re-audit-round-2-prompt.md`: per-fix PASS/FAIL verification of F1–F11 on localhost:5000 (F1/F4 flagged iPad-build-only), the Code Blue full-flow deep dive as a vet (the Round-1 gap), and a role-cycling continuation sweep. Same finding-report format; loop continues on PR #76.
+
+**Verdict:** VERIFIED (F11 fixed + browser-confirmed). Round 2 handed to owner + cowork.
+
+---
+
+## 2026-07-10 — Phase 10.A Round-2: student custody-only + OBS-1 + sign-up chips + board-pair dir
+
+**Round-2 result (cowork, localhost:5000):** all 11 fixes (F1–F11) PASS, no regressions. Two new findings (OBS-1, board-pair bidi) + the owner's student-scope + sign-up findings addressed below.
+
+**Student = custody-only** (owner scope): a student's operational footprint — the actions/mutations they can perform — is equipment checkout/checkin + inventory dispense/restock; nav + home are pared to that. (Route *visibility* is a separate, server-enforced concern: non-custody routes `/alerts` + `/rooms`/`/locations` redirect students via `CustodyGuard`; `/code-blue` is intentionally NOT redirected — owner decision: students keep emergency-awareness visibility of an active Code Blue while still being server-403'd on every CB mutation.) `experience-model` gains `isCustodyOnly` + `filterCustodyNav` (allow-set: today·scan·equipment·mine·inventory). `StudentHomeSurface` rebuilt to Scan + My Equipment + Inventory (+ supervised banner); tasks/alerts dropped. `NativeTabBar` swaps Emergency→My Equipment for students; `NativeTabSidebar`/`MoreSheet` apply the custody filter. Evidence: new `experience-model` tests (allow-set = {today,scan,equipment,mine,inventory}; no-op for non-custody) + updated `floor-home-surfaces` (custody contract: inventory action present, tasks absent). `pnpm test` 446 files / 4227 pass; frontend tsc 0; i18n parity green. NOTE: live role verification blocked by the OBS-1 env issue below; verified by unit tests + source.
+
+**OBS-1 (dev-tool, not production):** impersonating a non-admin still showed admin nav. DIAGNOSED via browser: `switcherInDom:false`, `/api/users/me` with `x-dev-role-override:vet`→`vet` / no header→`admin`. So the server override is correct; the CLIENT baked the production `VITE_CLERK_PUBLISHABLE_KEY` (from `.env`; the empty `.env.local` value didn't override it for Vite) → `isDevBypassBuild()` false → the dev-role switcher is hidden and the override header is never sent → app stays admin. NOT a production over-exposure. Hardened `DevRoleSwitcher` to clear `vt_session` + the query cache on switch (for when it IS active). Real local unblock = run the dev client without the Clerk key baked.
+
+**Sign-up/sign-in role chips:** three static role chips with the first styled "selected" + a "Role" label read as a role selector that does nothing (clinic admin assigns the role). Neutralized to identical informational tags + relabeled "For every role" / "לכל תפקיד", on both pages.
+
+**board-pair dir:** hardcoded `dir="rtl"` made the English subtitle's trailing period float to the RTL start. Now `dir={useDirection()}` — verified in-browser (Hebrew container dir=rtl, subtitle correct); English follows LTR. board-pair test passes.
+
+**Verdict:** VERIFIED (suite/tsc/parity green; OBS-1 diagnosed server-correct). Student live-verify + OBS-1 pending the localhost dev-client env unblock.
+
+---
+
+## 2026-07-10 — Phase 10.A: per-role sweep (Part C) + S1 fix
+
+**Per-role sweep (cowork, localhost:5000, switcher now driving the client):** all 5 roles OK — admin (ops home + full nav incl. System Management), vet (clinical home, NO admin nav), senior_technician (ops home, mgmt dropdown, NO System Management), technician (tech floor, no admin), student (custody-only home + nav — see correction below). RTL mirrors correctly all roles; English parity clean; scroll app-wide; no hardcoded copy.
+
+> **Correction (student nav set).** This sweep line originally read "student … nav = Today·Equipment only." That observation **predated the student-inventory-nav fix** (`canAccessInventoryNav` now includes `student`, layout.tsx:471-474). The authoritative custody **web** nav is **Home · Equipment · My Equipment · Inventory** — the `CUSTODY_ONLY_NAV_KEYS` allow-set `{today, scan, equipment, mine, inventory}` intersected with the web `navItems` (`/scan` is a mobile tab-bar action, not a web nav row, so it doesn't surface on web). This matches the allow-set stated in the Round-2 entry above and is proven by `tests/experience-model.test.ts` (exact ordered custody set) + `tests/custody-guard.test.tsx`. No contradiction remains between the two entries. **No out-of-scope MUTATION reachable for students** (server 403s confirmed for student on /api/tasks/dashboard, /api/shift-chat/messages, /api/appointments/meta — the cited evidence is student-specific; the other roles were swept for nav/view scope, not exhaustively for mutation reachability). The Round-2 client nav-gating gap (vet/student seeing admin sections) is resolved by the OBS-1 real fix.
+
+**S1 (MEDIUM, fixed):** a student could VIEW /alerts (with data) by direct URL while /equipment/tasks redirects them — inconsistent with the custody-only scope (view-only; no mutation reachable). Added `CustodyGuard` (redirects `isCustodyOnly` users to `/equipment`, mirroring the Tasks page's inline student redirect) and wrapped `/alerts` + `/rooms`.
+- **Verified in-browser:** student `/alerts` → redirects to `/equipment`; admin `/alerts` still renders (no over-redirect). `custody-guard` test (student redirects · other roles render · no premature bounce pre-auth-load). Full suite 447 files / 4231 tests pass; tsc clean.
+- **Deliberate exception:** `/code-blue` is left view-only for students (actions disabled client-side + server 403 on the mutation; emergency awareness is defensible). Can be locked down further if the owner wants strict route-level custody isolation.
+
+**Harness caveat (cowork):** the native/phone tab bar wasn't loadable (CDP viewport pinned ~856px); the student native tab-bar scope (Home·Equipment·Scan·My-Equipment, no Emergency) is verified by unit test (`experience-model` custody-nav cases) but needs a real-device/native build to confirm live — same deferral as F1/F4.
+
+**Verdict:** VERIFIED (5 roles pass; S1 fixed + browser-confirmed; suite/tsc green).
+
+---
+
+## 2026-07-10 — CodeRabbit review on #76 @ 0b360a3b7 (6/6 addressed)
+
+Genuine formal review at head 0b360a3b7 (CHANGES_REQUESTED; ack "Full review triggered", not a rate-limit skip). All six:
+
+1. **layout.tsx `canAccessInventoryNav` (Minor):** excluded `student`, so the Inventory nav item was never added → `filterCustodyNav` never saw it → students lost their in-scope Inventory. Added `student`.
+2. **verify-resubmission.sh (Minor, 10.B):** `[ … ] && ok || no` would also run `no` if `ok` returned non-zero. Replaced with explicit if/else.
+3. **MyEquipmentCard error state (Major, stability):** `useFloorHome` only returned `myEquipment`/`isLoading`, so a rejected `/api/equipment/my` (retry:false) showed a silent empty card. Now exposes `myEquipmentError` + `refetchMyEquipment`; the card renders a retryable failure state; all three floor surfaces wired. New `my-equipment-card` test (error→retry; success-empty≠error).
+4. **/code-blue CustodyGuard (Major, security):** initially wrapped `/code-blue` in `CustodyGuard`, then **reverted per owner decision** — students KEEP emergency-awareness *visibility* of an active Code Blue (they are already server-403'd on every CB mutation, so it stays view-only). `/alerts` + `/rooms` still redirect. This is a deliberate divergence from the CodeRabbit finding, recorded here.
+5. **code-blue-precheck-gate (Minor):** added an admin-path case — admin is not auto-selected as event manager (start stays disabled, no auto-fill "you" card), locking the F3 fix.
+6. **RoleChips (Trivial):** extracted the duplicated sign-in/sign-up role-chip markup into `src/features/auth/components/RoleChips.tsx`; both pages consume it.
+
+**Commands:** frontend `tsc` 0 · server `tsc` 0 · `bash -n verify-resubmission.sh` OK · full suite green · architecture gates G1.
+
+**Verdict:** VERIFIED (6/6; suite/tsc/gates green). Re-review re-requested at the new head.
+
+---
+
+## 2026-07-10 — Round-2 dual-review reconciliation (CodeRabbit CLI + SDD reviewer) on #76
+
+Reconciled the two independent pre-merge review passes into one fix batch. Findings addressed:
+
+**Real code (correctness/robustness):**
+1. **pwa-install-prompt prefix boundary (Minor):** `location.startsWith(r)` matched `/boardroom` when suppressing `/board`. Now splits the query string and matches `path === r || path.startsWith(\`${r}/\`)`, so only the exact route and its children suppress the promo.
+2. **realtime `startDisplayRevocationWatch` self-gate + in-flight guard (Major):** the revocation watch now self-gates on `req.isDisplayAuth` (returns a no-op teardown for user connections — testable without the SSE route) and holds an `inFlight` guard so a slow resolver can't stack overlapping re-checks. Call site is unconditional; `finalize()` calls the returned `stop`.
+3. **nav-helper extraction (Minor, DRY):** `visibleNavItems` / `visibleNavSections` in `experience-model.ts` compose `filterAdminNav` + `filterCustodyNav` once; five consumers (layout, Topbar, IconSidebar, NativeTabSidebar, MoreSheet) call the shared helper instead of re-deriving the two-filter sequence.
+4. **MyEquipmentCard cached-on-error (Major, stability):** when `/api/equipment/my` rejects but cached rows exist, the rows stay visible with a small retry affordance (rather than being replaced by the error state); retry buttons are ≥44px tap targets.
+
+**Tests strengthened (per SDD/CLI):** custody tests now include the `lead_technician`/`vet_tech` aliases (assert `isCustodyOnly` false / route renders); `experience-model` asserts the **exact ordered** custody nav array (`[today, equipment, scan, mine, inventory]`) and item-identity for the no-op case; `custody-guard` asserts the redirect **destination** (`/equipment`) via a location probe, not just the disappearance of content; `display-revocation-watch` gained a user-connection-not-watched case + narrowed-cast comment.
+
+**Docs/scripts:**
+5. **audit-prompt safety guardrail (CRITICAL):** `live-tri-display-audit-prompt.md` now carries an owner-facing safety block AND an in-prompt HARD-CONSTRAINTS block — run only against a synthetic test clinic, reverse every mutation (cleanup gate), redact PII in screenshots/findings, and never touch permissions/deletion/billing. A production tenant forces read-only.
+6. **PROOF_ALIGNMENT_LOG reconcile:** corrected the per-role-sweep "student nav = Today·Equipment only" line — it predated the inventory-nav fix; authoritative custody web nav is Home·Equipment·My Equipment·Inventory (allow-set ∩ web navItems).
+7. **RESUBMISSION_RUNBOOK versions:** reframed the goal from first-time "1.0.1 (20)" to live-app update; build check is now "> last shipped" (not ">= 4"); App Store Connect step is version-agnostic.
+8. **verify-resubmission.sh fail-closed:** no baseline (no `ios/.last-shipped-build` + no `LAST_SHIPPED_BUILD`) now FAILS instead of passing "strict check off"; `BN`/`LAST` validated `^[0-9]+$` before the numeric compare.
+9. **resubmit.sh atomic/fail-safe:** preflights `$PLIST` (+ validates parsed build int) before any edit; the Python stages all three substitutions with match-count guards, then writes each via tmp + `os.replace` (no half-applied bump).
+
+**Commands (this branch, real output):** `pnpm typecheck` → exit 0 (frontend + server) · `pnpm i18n:check` → deep key parity ✓ · `pnpm test` → **449 files / 4242 tests pass** · `pnpm architecture:gates` → All G1 checks passed (4 warn + 10 known baseline, cycles match) · `bash -n` both scripts OK · resubmit.sh bump exercised on file **copies** in a scratch dir (build 25→99 ×4, marketing 1.1.2→2.0.0 ×4, plist stays `$(CURRENT_PROJECT_VERSION)`, 0 leftover `.tmp`, real files untouched).
+
+**F6 fail-closed cap — owner decision (RESOLVED):** the revocation watch keeps the stream OPEN on a single resolver throw (a transient DB blip must not tear down a live board), but the owner adopted the bounded fail-closed policy: after **5 consecutive** failed re-checks (~50s at the 10s cadence — a failure is a throw OR a timeout, since each recheck is now time-bounded so a hung resolver can't pin the watch) it fails CLOSED — emits `display_revocation_recheck_failclosed` and closes the stream so the board reconnects via `/board/pair`. Any single success resets the streak. Implemented in `startDisplayRevocationWatch` (commit bdd9cc183 + this batch's resolver-timeout). **Operational signal:** `display_revocation_recheck_error` climbing = transient/slow rechecks (stream stays up); `display_revocation_recheck_failclosed` firing = a board was dropped by a sustained outage (page ops) — distinct from a genuine token revoke, which never touches these counters.
+
+**Verdict:** VERIFIED (all gates green; scripts exercised on copies). CodeRabbit CLI re-review to run at the new head before merge.
+
+---
+
+## 2026-07-10 — Round-3 formal CodeRabbit review on #76 @ bdd9cc183 + capacitor preflight
+
+Formal review findings verified against current code; still-valid ones fixed, one skipped-with-reason.
+
+**Fixed (code):**
+- **realtime.ts (bug):** `startDisplayRevocationWatch` now bounds each recheck with `withTimeout(…, timeoutMs=intervalMs)`. Without it a HUNG resolver pinned `inFlight` forever → the watch silently stopped re-checking → a revoked token would stream indefinitely (worse than the fail-open it replaced). A timeout now routes a hang into the error/cap path. New tests: inFlight overlap-guard (pending resolver across 3 ticks → `resolve` called once) + hung-resolver timeout (→ `display_revocation_recheck_error`, under cap).
+- **layout.tsx:** `canAccessInventoryNav` now includes the `lead_technician`/`vet_tech` aliases (was a 5-role list; the comment says "all roles reach Inventory" — now exhaustive over the `UserRole` union).
+- **StudentHomeSurface.tsx:** the Inventory CTA is a wouter `<Link href="/inventory">` (was `<button onClick={navigate}>`) — real link semantics/affordances, matching MyEquipmentCard.
+- **MyEquipmentCard.tsx:** the cached-rows-on-error branch now shows a concise `homeSurface.myEquipmentRefreshFailed` message in a `role="status"`, with the retry button `aria-describedby` it (was a bare button). New he+en key (parity ✓). New test: cached items stay visible on error + retry fires.
+
+**Fixed (docs):** `experience-model` JSDocs trimmed to the cross-shell rationale (dropped step recitation). Audit-prompt: role-coverage line corrected — the client maps `lead_technician`→lead / `vet_tech`→tech (what an auditor cycling roles actually sees; the server `normalizeUserRole` nuance no longer framed as "collapses to student"); check-in/check-out hyphenation made consistent (3 spots). PROOF: F6 entry now records the adopted fail-closed cap + operational signal (was "pending owner's call"); "no out-of-scope mutation reachable" narrowed from "any role" to "students" (the cited 403 evidence is student-specific).
+
+**Fixed (scripts + iOS — incl. capacitor preflight blocker):**
+- **`ios/App/VetTrackControl/Info.plist` (🔴 upload blocker):** widget `CFBundleVersion` was a literal `25`; `resubmit.sh`'s global build bump advances the app to `n+1` but a literal widget stays `25` → app/extension `CFBundleVersion` mismatch → ITMS-90473 upload rejection triggered by the resubmit tooling itself. Set to `$(CURRENT_PROJECT_VERSION)` so it self-maintains. (Surfaced by the capacitor-apple-review-preflight agent.)
+- **verify-resubmission.sh:** added a gate that fails if any git-TRACKED source `ios/App/**/Info.plist` carries a literal-integer `CFBundleVersion` (build output is gitignored, so it's never scanned — tested: PASS on the 2 source plists). Baseline read now uses the WHOLE `ios/.last-shipped-build` (whitespace-stripped) + `^[0-9]+$` validation — `build-25-old`/`25.1` now fail closed instead of parsing to `25` (tested).
+- **resubmit.sh:** the three-file bump is now transactional — journal each original, atomic per-file write, roll back already-replaced files + clean up `.bak`/`.tmp` on any failure, plus a cross-file consistency check before printing success. **Tested on file copies:** happy path (build 25→99, mkt 1.1.2→2.0.0, 0 artifacts) AND an injected 2nd-write failure → all three files restored, exit 1, 0 artifacts. Real repo files untouched.
+
+**Credential exposure — RESOLVED (2026-07-10).** The App-Review / demo-account password was committed in plaintext across `RESUBMISSION_RUNBOOK.md`, `scripts/verify-resubmission.sh`, and `docs/archive/2026/gan-harness/spec.md` (public repo). Resolution: **owner rotated the account password in Clerk** (the leaked value is now dead) **and made the repo private**; then the repo was hardened — `verify-resubmission.sh` now reads the password from a `REVIEWER_PASSWORD` env var (skips the demo-login gate with a clear FAIL if unset), the runbook + archive docs redact it and point to the password manager / App Store Connect review notes. Verified: `git grep VetTrack2026` → no matches in tracked files; `bash -n` clean; the email identifier (not a secret; also a functional `DEFAULT_PROTECTED_EMAILS` entry) is intentionally retained.
+
+**Commands (real output):** `pnpm typecheck` exit 0 · `pnpm i18n:check` parity ✓ · `pnpm test` **449 files / 4247 pass** · `pnpm architecture:gates` All G1 passed · `bash -n` both scripts OK · resubmit happy+rollback exercised on copies · verify gates tested standalone.
+
+**Verdict:** VERIFIED (all gates green; scripts + plist gate exercised). One credential finding surfaced to owner as an explicit action.

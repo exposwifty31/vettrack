@@ -268,3 +268,87 @@ export function filterAdminNav<T extends { adminOnly?: boolean }>(
   const showAdmin = can(experience, "app.adminNav");
   return items.filter((item) => !item.adminOnly || showAdmin);
 }
+
+/**
+ * Custody-only archetypes: their entire system footprint is equipment custody +
+ * inventory (owner scope, 2026-07). Today only the student — a supervised trainee
+ * whose nav is pared to Home · Scan (checkout/checkin) · Equipment · My Equipment ·
+ * Inventory (dispense/restock). See [[student-role-meaning]].
+ */
+const CUSTODY_ONLY_ARCHETYPES: ReadonlySet<ExperienceArchetype> = new Set<ExperienceArchetype>(["student"]);
+
+/**
+ * Nav-item keys a custody-only archetype may see; everything else is hidden.
+ * Matched against BOTH the item id (native sections, web NAV nodes) and the item
+ * href (web layout nav items, which have no id) so one filter covers every nav
+ * shape. Anything not listed — Command Board, Alerts, Rooms, Emergency, Tasks,
+ * admin — is dropped for the student.
+ */
+const CUSTODY_ONLY_NAV_KEYS: ReadonlySet<string> = new Set<string>([
+  // ids
+  "today", // home
+  "scan", // scan = checkout/checkin
+  "equipment", // find equipment to check out
+  "mine", // my equipment (return)
+  "inventory", // dispense / restock
+  // hrefs (web layout nav items key on href, not id)
+  "/", // layout.tsx Home nav item uses "/" (Topbar/sidebar Home uses "/home")
+  "/home",
+  "/scan",
+  "/equipment",
+  "/my-equipment",
+  "/inventory",
+]);
+
+/** True when this experience is restricted to the custody-only nav set. */
+export function isCustodyOnly(experience: RoleExperience): boolean {
+  return CUSTODY_ONLY_ARCHETYPES.has(experience.archetype);
+}
+
+/**
+ * A student is a supervised trainee whose operational footprint is deliberately
+ * narrow — equipment checkout/checkin + inventory dispense/restock only — so their
+ * nav must not offer surfaces they can't act on. This keeps only the custody
+ * allow-set (matched by id OR href, since the web layout keys items on `href` and
+ * the native model on `id`); it is a no-op for every other archetype. Layered
+ * after {@link filterAdminNav} on both the native sections and the web nav so the
+ * two filters compose without either re-deriving the other's rules.
+ */
+export function filterCustodyNav<T extends { id?: string; href?: string }>(
+  items: readonly T[],
+  experience: RoleExperience,
+): T[] {
+  if (!isCustodyOnly(experience)) return [...items];
+  return items.filter(
+    (item) =>
+      (item.id !== undefined && CUSTODY_ONLY_NAV_KEYS.has(item.id)) ||
+      (item.href !== undefined && CUSTODY_ONLY_NAV_KEYS.has(item.href)),
+  );
+}
+
+/**
+ * Single source for a flat (web) nav's visible items, so `layout.tsx` /
+ * `IconSidebar` / `Topbar` compose the admin + custody filters identically instead
+ * of re-deriving the order per shell.
+ */
+export function visibleNavItems<T extends { adminOnly?: boolean; id?: string; href?: string }>(
+  items: readonly T[],
+  experience: RoleExperience,
+): T[] {
+  return filterCustodyNav(filterAdminNav(items, experience), experience);
+}
+
+/**
+ * Single source for a native nav's visible sections (same admin + custody rules as
+ * {@link visibleNavItems}, applied per section). Callers that need a further
+ * per-item filter (e.g. MoreSheet hiding tab-bar items) apply it on top and re-drop
+ * empties.
+ */
+export function visibleNavSections<
+  I extends { id: string },
+  S extends { adminOnly?: boolean; items: I[] },
+>(sections: readonly S[], experience: RoleExperience): S[] {
+  return filterAdminNav(sections, experience)
+    .map((section) => ({ ...section, items: filterCustodyNav(section.items, experience) }))
+    .filter((section) => section.items.length > 0);
+}

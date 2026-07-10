@@ -181,6 +181,12 @@ describe.each([
     expect(isTabActive("/home", "/equipment")).toBe(false);
   });
 
+  it("does NOT mark the Equipment tab active on /my-equipment (custody-only Mine tab owns it — no dual-active)", () => {
+    expect(isTabActive("/my-equipment", "/equipment")).toBe(false);
+    // …and the dedicated Mine tab (custody-only) is the one that lights up there.
+    expect(isTabActive("/my-equipment", "/my-equipment")).toBe(true);
+  });
+
   it("marks the Emergency tab (/code-blue) active at /code-blue only", () => {
     expect(isTabActive("/code-blue", "/code-blue")).toBe(true);
     expect(isTabActive("/home", "/code-blue")).toBe(false);

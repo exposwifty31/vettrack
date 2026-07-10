@@ -33,6 +33,12 @@ import type { DisplayDevice, DisplayPairingCode } from "@/types";
 /** Canonical react-query key for the clinic's paired display registry. */
 const DEVICES_KEY = ["/api/display/devices"] as const;
 
+// The registry is a live operational view: a device pairs on a DIFFERENT display
+// and heartbeats its `lastSeenAt` from there, so the admin list must refresh on
+// its own to reflect new pairs (F7) and liveness (F8) without a manual reload.
+// This is an admin-console poll, not the emergency realtime path.
+const DEVICES_REFETCH_MS = 15_000;
+
 function statusMeta(device: DisplayDevice): { label: string; variant: "ok" | "issue" } {
   return device.revokedAt
     ? { label: t.console.displays.statusRevoked, variant: "issue" }
@@ -171,6 +177,8 @@ export default function DisplaysConsolePage() {
     queryFn: () => api.display.devices.list(),
     enabled: hasServerAccess,
     retry: false,
+    refetchInterval: DEVICES_REFETCH_MS,
+    refetchOnWindowFocus: true,
   });
 
   const issueMut = useMutation({

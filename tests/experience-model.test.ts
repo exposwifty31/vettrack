@@ -5,7 +5,9 @@ import {
   buildRoleExperience,
   can,
   filterAdminNav,
+  filterCustodyNav,
   homeSurfaceForRole,
+  isCustodyOnly,
   resolveCapabilities,
   TAB_BAR_ORDER_BY_ARCHETYPE,
   type Capability,
@@ -380,5 +382,44 @@ describe("filterAdminNav — byte-identical to the pre-Phase-2 nav gate", () => 
       const after = filterAdminNav(sections, expFor(role)).map((s) => s.id);
       expect(after).toEqual(before);
     }
+  });
+});
+
+describe("experience-model — custody-only archetype (student)", () => {
+  const exp = (role: UserRole) => buildRoleExperience({ role, effectiveRole: role, roleSource: "permanent", isAdmin: role === "admin" });
+
+  it("isCustodyOnly is true only for the student archetype (incl. the lead/tech aliases → false)", () => {
+    expect(isCustodyOnly(exp("student"))).toBe(true);
+    for (const role of ["admin", "vet", "senior_technician", "technician", "lead_technician", "vet_tech"] as const) {
+      expect(isCustodyOnly(exp(role))).toBe(false);
+    }
+  });
+
+  it("filterCustodyNav pares the native operations items to the exact custody set (ordered) for a student", () => {
+    const ops = getNativeNavSections()[0].items;
+    const studentIds = filterCustodyNav(ops, exp("student")).map((i) => i.id);
+    // Exact set AND order — the filter preserves the source nav order.
+    expect(studentIds).toEqual(["today", "equipment", "scan", "mine", "inventory"]);
+    // Explicitly NOT present: emergency / tasks / crash-cart / rooms / alerts.
+    for (const denied of ["emergency", "tasks", "crash-cart", "rooms", "alerts"]) {
+      expect(studentIds).not.toContain(denied);
+    }
+  });
+
+  it("filterCustodyNav is a no-op (identical items) for non-custody archetypes", () => {
+    const ops = getNativeNavSections()[0].items;
+    for (const role of ["admin", "vet", "technician", "senior_technician", "lead_technician", "vet_tech"] as const) {
+      expect(filterCustodyNav(ops, exp(role))).toEqual([...ops]);
+    }
+  });
+
+  it("keeps Home for a student whether the item keys on '/home' (NAV) or '/' (web layout)", () => {
+    // layout.tsx's Home nav item uses href "/", the NAV/native model uses "/home".
+    const items = [{ href: "/" }, { href: "/home" }, { href: "/equipment" }, { href: "/alerts" }];
+    const kept = filterCustodyNav(items, exp("student")).map((i) => i.href);
+    expect(kept).toContain("/"); // legacy Home href retained (regression: was dropped)
+    expect(kept).toContain("/home");
+    expect(kept).toContain("/equipment");
+    expect(kept).not.toContain("/alerts");
   });
 });

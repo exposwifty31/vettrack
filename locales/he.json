@@ -834,7 +834,9 @@
     "crashCartHint": "ודאו שעגלת ההחייאה מצוידת",
     "roomReadinessHint": "בדקו את סטטוס אימות החדרים",
     "guidedTitle": "מצב מודרך",
-    "guidedBody": "התקדמו במשימות ובסריקות שלכם שלב אחר שלב. היוועצו במפקח לפני כל פעולת חירום."
+    "guidedBody": "השאילו והחזירו ציוד, ונפקו או חדשו מלאי. לכל דבר אחר פנו למפקח/ת.",
+    "inventoryActionHint": "ניפוק או חידוש פריטים",
+    "myEquipmentRefreshFailed": "לא ניתן לרענן — מוצג מידע שמור"
   },
   "home": {
     "equipmentOverview": "סקירת ציוד",
@@ -2591,6 +2593,7 @@
     "endEventChooseOutcome": "סיום אירוע — בחר תוצאה",
     "managerOnlyHint": "זמין למנהל האירוע בלבד",
     "activeSessionExists": "כבר פתוח מפגש Code Blue פעיל.",
+    "clinicalAuthorityRequired": "רק צוות קליני במשמרת יכול לפתוח Code Blue. בקשו מהרופא האחראי לפתוח את האירוע.",
     "startSessionFailed": "פתיחת מפגש Code Blue נכשלה",
     "endSessionFailed": "סיום מפגש Code Blue נכשל",
     "elapsedSinceStart": "זמן מאז תחילת האירוע",
@@ -3741,7 +3744,7 @@
     "createAccount": "יצירת חשבון",
     "signUpSubtitle": "הירשם לניהול ציוד הוטרינרי שלך",
     "signUpLoadError": "דף ההרשמה לא נטען. בדוק את החיבור ורענן. אם הבעיה נמשכת, ודא ש-Clerk מוגדר לדומיין זה ושמפתח ה-Publishable Key תואם לסביבה.",
-    "roleLabel": "תפקיד",
+    "roleLabel": "לכל תפקיד",
     "roleVetTech": "טכנאי/ת וטרינרי/ת",
     "roleVeterinarian": "וטרינר/ית",
     "roleStudent": "סטודנט/ית",

@@ -68,7 +68,7 @@ import { Badge } from "@/components/ui/badge";
 
 import { useAuth } from "@/hooks/use-auth";
 import { useExperience } from "@/hooks/use-experience";
-import { filterAdminNav } from "@/lib/roles/experience-model";
+import { visibleNavItems } from "@/lib/roles/experience-model";
 import { useSync } from "@/hooks/use-sync";
 import { QrScanner } from "@/components/qr-scanner";
 import { useSettings } from "@/hooks/use-settings";
@@ -468,8 +468,17 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
 
   const canAccessCodeBlue = experience.can("codeBlue.manage");
 
+  // All roles reach Inventory — students dispense/restock as part of their custody
+  // scope (the custody nav filter keeps /inventory via CUSTODY_ONLY_NAV_KEYS), so
+  // they must not be pre-gated out before filterCustodyNav runs.
   const canAccessInventoryNav =
-    role === "admin" || role === "vet" || role === "senior_technician" || role === "technician";
+    role === "admin" ||
+    role === "vet" ||
+    role === "senior_technician" ||
+    role === "lead_technician" ||
+    role === "technician" ||
+    role === "vet_tech" ||
+    role === "student";
 
   const navItems: NavItem[] = useMemo(() => {
     const allItems: NavItem[] = [
@@ -550,7 +559,7 @@ export function Layout({ children, title: _title, onScan, scannerOpen: scannerOp
     t,
   ]);
 
-  const visibleItems = filterAdminNav(navItems, experience);
+  const visibleItems = visibleNavItems(navItems, experience);
 
   const operationMenuItems = useMemo(
     () =>

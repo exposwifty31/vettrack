@@ -130,7 +130,12 @@ export function VetHomeSurface({ isTablet }: { isTablet: boolean }) {
 
             <UrgentCountChips criticalCount={home.criticalCount} overdueCount={home.overdueCount} />
             <TasksPreviewCard dashboard={home.taskDashboard} isLoading={home.isLoading} />
-            <MyEquipmentCard items={home.myEquipment} isLoading={home.myEquipmentLoading} />
+            <MyEquipmentCard
+              items={home.myEquipment}
+              isLoading={home.myEquipmentLoading}
+              isError={home.myEquipmentError}
+              onRetry={() => void home.refetchMyEquipment()}
+            />
             <GetStartedCard visible={!home.isLoading && home.totalCount === 0} />
           </>
         )}

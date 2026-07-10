@@ -16,9 +16,15 @@ const MAX_ROWS = 4;
 export function MyEquipmentCard({
   items,
   isLoading,
+  isError = false,
+  onRetry,
 }: {
   items: Equipment[] | undefined;
   isLoading: boolean;
+  /** When the /api/equipment/my read rejected — render a retryable failure state
+      instead of a silent empty card. */
+  isError?: boolean;
+  onRetry?: () => void;
 }) {
   const rows = items ?? [];
   return (
@@ -35,11 +41,12 @@ export function MyEquipmentCard({
 
       {isLoading ? (
         <LoadingSection rows={3} />
-      ) : rows.length === 0 ? (
-        <p className="py-1 text-sm text-ivory-text3">{t.homeSurface.myEquipmentEmpty}</p>
-      ) : (
-        <div className="flex flex-col gap-1">
-          {rows.slice(0, MAX_ROWS).map((item) => (
+      ) : rows.length > 0 ? (
+        // Cached items stay visible even if a background refetch failed — surface
+        // a small retry affordance alongside them rather than replacing them.
+        <>
+          <div className="flex flex-col gap-1">
+            {rows.slice(0, MAX_ROWS).map((item) => (
             <Link
               key={item.id}
               href={`/equipment/${item.id}`}
@@ -52,7 +59,40 @@ export function MyEquipmentCard({
               <ForwardChevron className="h-4 w-4 shrink-0 opacity-40" aria-hidden />
             </Link>
           ))}
+          </div>
+          {isError && (
+            <output className="mt-2 flex flex-wrap items-center gap-2">
+              <span id="my-equipment-refresh-error" className="text-[13px] text-ivory-text3">
+                {t.homeSurface.myEquipmentRefreshFailed}
+              </span>
+              {onRetry && (
+                <button
+                  type="button"
+                  onClick={() => onRetry()}
+                  aria-describedby="my-equipment-refresh-error"
+                  className="min-h-[44px] shrink-0 rounded-lg border border-ivory-border px-3 text-sm font-medium text-ivory-text transition-colors hover:bg-muted/40"
+                >
+                  {t.common.tryAgain}
+                </button>
+              )}
+            </output>
+          )}
+        </>
+      ) : isError ? (
+        <div className="flex flex-col items-start gap-2 py-1" role="alert">
+          <p className="text-sm text-ivory-text3">{t.equipmentList.errors.loadFailed}</p>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={() => onRetry()}
+              className="min-h-[44px] rounded-lg border border-ivory-border px-3 text-sm font-medium text-ivory-text transition-colors hover:bg-muted/40"
+            >
+              {t.common.tryAgain}
+            </button>
+          )}
         </div>
+      ) : (
+        <p className="py-1 text-sm text-ivory-text3">{t.homeSurface.myEquipmentEmpty}</p>
       )}
     </section>
   );

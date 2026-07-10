@@ -1,9 +1,10 @@
 # VetTrack — App Store Resubmission Runbook (A–Z)
 
 **Audience:** a future Claude session (or Dan) executing the resubmission cold.
-**Goal:** get VetTrack **1.0.1 (20)** through App Review after the **5.1.1(v)** rejection on build 15
-(Submission `a0758d36-14b9-49c0-bf20-eb337ffcb8c6`).
-**Last verified:** 2026-06-17, production includes account deletion + native Apple token link; locales/Xcode aligned to build **20**.
+**Goal:** ship an App Store **update** to the live VetTrack app.
+> **Historical origin (resolved):** this runbook was first written to clear the **5.1.1(v)** rejection of build 15 and land **1.0.1 (20)** — submission `a0758d36-14b9-49c0-bf20-eb337ffcb8c6`. That rejection is **resolved and the app is LIVE**, so every run of this runbook is now an update / re-upload, not a first submission.
+**Current version fields:** marketing **1.1.2** (`package.json` = source of truth), build **25** (`CURRENT_PROJECT_VERSION`; `ios/.last-shipped-build` records the last build uploaded). Bump only via `pnpm resubmit` (§B.1) — never by hand.
+**Last verified:** 2026-07-10, version fields single-sourced + reconciled to 1.1.2 / build 25 (tooling in §B.1); production includes account deletion + native Apple token link.
 
 > Secrets: this file never contains the live Clerk key. Export it from Railway first:
 > `export CLERK_SECRET_KEY=$(cd /Users/dan/.vt-deploy 2>/dev/null && railway variables --json 2>/dev/null | python3 -c "import json,sys;print(json.load(sys.stdin)['CLERK_SECRET_KEY'])")`
@@ -25,9 +26,35 @@
 - **Code:** account deletion + Playwright CI fixes merged to `github/main` (PR #1). Local `main` synced. Deploy to Railway before App Review (§K).
 - **Production web** (`https://vettrack.uk`): serving the current bundle. The iOS shell is a **bundled app** (no `server.url`) — it does NOT depend on production for the frontend, but the API + Clerk it calls are production.
 - **Clerk (production instance `clerk.vettrack.uk`):** redirect URLs, allowed origins, Apple+Google OAuth, demo account, Client Trust — all configured (verify in §C).
-- **Build number:** `CURRENT_PROJECT_VERSION = 20`, `MARKETING_VERSION = 1.0.1`. Ready to archive as **1.0.1 (20)**.
+- **Version:** the app is **LIVE on the App Store**, so every submission is an update. Version fields are single-sourced (`package.json` = the marketing version of record = **1.1.2**; iOS `MARKETING_VERSION` reconciled to match; `CURRENT_PROJECT_VERSION` = **25**; `Info.plist CFBundleVersion` = `$(CURRENT_PROJECT_VERSION)`, no literal). **Do not hand-edit version fields — use `pnpm resubmit` / `pnpm resubmit:release` (§B.1).**
 - **Synced shell:** `npx cap sync ios` already run from HEAD. `dist/public` == `ios/App/App/public`.
 - **Legal pages:** `/privacy`, `/terms`, and `/support` are implemented — verify all three on production after deploy before setting App Store / Play Console URLs. See `docs/legal-pages.md`.
+
+## B.1. Version bump — one command (`scripts/resubmit.sh`)
+
+The app is live, so bump before every archive. `resubmit.sh` single-sources the
+version across `package.json`, the pbxproj (`CURRENT_PROJECT_VERSION` +
+`MARKETING_VERSION`), and `Info.plist` (`CFBundleVersion = $(CURRENT_PROJECT_VERSION)`),
+then runs the §C verification. It edits version fields only — no app logic.
+
+- **Same version, new binary** (App Store re-upload / fix a rejected build):
+  ```bash
+  pnpm resubmit            # build n -> n+1; marketing version unchanged
+  ```
+- **New product version** (new work shipped — you pick patch/minor/major; reserve
+  major for releases that warrant it, no auto-increment):
+  ```bash
+  pnpm resubmit:release 1.2.0     # sets marketing 1.2.0 + seeds build n+1
+  ```
+
+Then `pnpm cap:build:native` and archive (§C/§D). After a **successful** App Store
+upload, record the shipped build so the next bump is validated against it:
+```bash
+echo <that build number> > ios/.last-shipped-build
+```
+The §C build-number gate fails until the current build exceeds `ios/.last-shipped-build`
+(override for a one-off with `LAST_SHIPPED_BUILD=<n>`). Native builds still go only
+through `scripts/build-native-shell.sh`; the archive/upload is human-run (§D).
 
 ## C. PRE-ARCHIVE VERIFICATION — run these every time before archiving
 
@@ -38,6 +65,7 @@ cd /Users/dan/vettrack
 SK="$CLERK_SECRET_KEY"
 
 # [2.1] Demo login must COMPLETE (this is the #1 re-rejection risk)
+# First: export REVIEWER_PASSWORD='…'  (from your password manager — never commit it)
 curl -s -D /tmp/h.txt -X POST "https://clerk.vettrack.uk/v1/client/sign_ins?_is_native=1&_clerk_js_version=5.125.13" \
   -H "Origin: capacitor://localhost" -H "Content-Type: application/x-www-form-urlencoded" \
   --data-urlencode "identifier=reviewer@vettrack.uk" -o /tmp/si.json
@@ -45,7 +73,7 @@ JWT=$(grep -i "^authorization:" /tmp/h.txt | cut -d' ' -f2 | tr -d '\r')
 SID=$(python3 -c "import json;print(json.load(open('/tmp/si.json'))['response']['id'])")
 curl -s -X POST "https://clerk.vettrack.uk/v1/client/sign_ins/${SID}/attempt_first_factor?_is_native=1" \
   -H "Origin: capacitor://localhost" -H "Authorization: ${JWT}" -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-urlencode "strategy=password" --data-urlencode "password=VetTrack2026!" \
+  --data-urlencode "strategy=password" --data-urlencode "password=$REVIEWER_PASSWORD" \
   | python3 -c "import json,sys;r=json.load(sys.stdin).get('response',{});print('LOGIN:', r.get('status'))"
 #   EXPECT: LOGIN: complete   (if 'needs_client_trust' → Client Trust is back ON, see §G)
 
@@ -61,9 +89,12 @@ curl -s https://api.clerk.com/v1/instance -H "Authorization: Bearer $SK" \
 sips -g hasAlpha -g pixelWidth ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png | tail -2
 #   EXPECT: hasAlpha: no   pixelWidth: 1024
 
-# Build number must be >= 4
+# Build number must be STRICTLY GREATER than the last shipped build (the app is
+# live — App Store Connect rejects a duplicate CFBundleVersion within a version).
+# verify-resubmission.sh checks CURRENT_PROJECT_VERSION > ios/.last-shipped-build.
 grep -m1 CURRENT_PROJECT_VERSION ios/App/App.xcodeproj/project.pbxproj
-#   EXPECT: CURRENT_PROJECT_VERSION = 20
+#   EXPECT: CURRENT_PROJECT_VERSION greater than $(cat ios/.last-shipped-build)
+#   (currently pbxproj=25 and last-shipped=25 → run `pnpm resubmit` to bump to 26 first)
 
 # Shell is a BUNDLED app (no server.url) and carries the native OAuth transport
 python3 -c "import json;c=json.load(open('ios/App/App/capacitor.config.json'));print('BUNDLED:', 'server' not in c or not c.get('server',{}).get('url'))"
@@ -106,11 +137,11 @@ Simulator smoke before archive:
 
 ## E. Resubmit in App Store Connect
 
-1. Open the app → the **1.0** version (or create version 1.0 if needed).
-2. **Build** → select the freshly uploaded **1.0.1 (20)**.
+1. Open the app → the current marketing version (**1.1.2**), or create the new version if you ran `pnpm resubmit:release <target>`.
+2. **Build** → select the freshly uploaded build — the `build=<n> marketing=<v>` values `pnpm resubmit` printed (e.g. **1.1.2 (26)**).
 3. **App Review Information**:
    - Sign-In required: **Yes**.
-   - Username: `reviewer@vettrack.uk`  Password: `VetTrack2026!`
+   - Username: `reviewer@vettrack.uk`  Password: *(from your password manager — paste it into this App Store Connect field; never commit it to the repo)*
    - Notes: *"Sign in with Apple/Google open in the system browser per Apple's guidelines. A demo email/password account with full admin access is provided above. The demo account cannot be deleted (protected for review). To test account deletion, sign in with a personal Apple ID, then Settings → Danger zone → Delete account. The app is a native Capacitor app; all features work offline-capable."*
 4. **Confirm Client Trust is permanently off** (§G) before submitting.
 5. **Add for Review → Submit**.
@@ -144,7 +175,7 @@ The Apple-sign-up error had a stack of causes, each hiding the next. All are loa
 - `capacitor.config.ts` bundled mode (no `server.url`) for the shipped archive.
 - Clerk: redirect URLs, `allowed_origins`, Apple/Google OAuth, Client Trust OFF.
 - The native-OAuth chain in §F.
-- Build number stays ≥ 4 (bump for each new upload: `cd ios/App && agvtool new-version -all 5`).
+- Build number is monotonic — bump for each new upload via `pnpm resubmit` (§B.1), never by hand. It must exceed `ios/.last-shipped-build`.
 
 ## J. After acceptance
 

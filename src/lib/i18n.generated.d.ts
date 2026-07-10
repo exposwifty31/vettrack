@@ -838,6 +838,7 @@ export interface TStructure {
     roomReadinessHint: string;
     guidedTitle: string;
     guidedBody: string;
+    inventoryActionHint: string;
   };
   home: {
     equipmentOverview: string;
@@ -2594,6 +2595,7 @@ export interface TStructure {
     endEventChooseOutcome: string;
     managerOnlyHint: string;
     activeSessionExists: string;
+    clinicalAuthorityRequired: string;
     startSessionFailed: string;
     endSessionFailed: string;
     elapsedSinceStart: string;

@@ -89,7 +89,13 @@ export function PreCheckGate({
   const [, navigate] = useLocation();
   const dir = useDirection();
   const inNativeShell = useNativeShellContext();
-  const isEligibleManager = role === "vet" || role === "admin";
+  // Only a vet is auto-assigned as the "responsible vet" event manager. An admin
+  // is NOT auto-filled (an identity-admin is not the clinical event manager) — they
+  // pick the responsible clinician via the manager list. The SERVER stays the
+  // enforcement boundary (`requireClinicalAuthority`, `allowSystemAdmin: false`),
+  // and an admin holding a shift-derived clinical role can still legitimately
+  // initiate, so the start is never hard-blocked here (F3).
+  const isEligibleManager = role === "vet";
   const QUICK_CHECK_ITEMS = [
     { key: "unitReady", label: t.codeBlue.preCheck.unitReady },
     { key: "cartReady", label: t.codeBlue.preCheck.cartReady },
@@ -327,7 +333,7 @@ function ActiveSession() {
       navigate("/home");
     } catch (err) {
       if (err instanceof ApiError) {
-        toast.error(err.message || t.codeBlue.endSessionFailed, {
+        toast.error(t.codeBlue.endSessionFailed, {
           id: "cb-end-failed",
           duration: Infinity,
           action: { label: t.common.tryAgain, onClick: () => setShowOutcomeModal(true) },
@@ -574,12 +580,27 @@ export default function CodeBluePage() {
       // waiting out the 2 s poll. Never flips local session state.
       await refetch();
     } catch (err) {
+      // Localized, non-leaky messages only — never surface the raw server string
+      // or the requestId to the user. A failed emergency action stays visible
+      // longer than a normal toast (F2). The `code` set here is the server's
+      // stable reason, not free-form copy.
       if (err instanceof ApiError) {
-        toast.error(
-          err.status === 409 ? t.codeBlue.activeSessionExists : err.message || t.codeBlue.startSessionFailed,
-        );
+        // Map the server's stable `code` first — a 403 can be a clinical-authority
+        // denial OR a blocked/pending account, which need different messages.
+        // Fall back to status only for the generic cases.
+        const message =
+          err.code === "ACCOUNT_BLOCKED"
+            ? t.auth.guard.blockedTitle
+            : err.code === "ACCOUNT_PENDING_APPROVAL"
+              ? t.auth.guard.pendingTitle
+              : err.code === "INSUFFICIENT_ROLE" || err.code === "MANAGER_NOT_CODE_BLUE_ELIGIBLE"
+                ? t.codeBlue.clinicalAuthorityRequired
+                : err.status === 409
+                  ? t.codeBlue.activeSessionExists
+                  : t.codeBlue.startSessionFailed;
+        toast.error(message, { duration: 8000 });
       } else {
-        toast.error(t.api.networkUnavailable);
+        toast.error(t.api.networkUnavailable, { duration: 8000 });
       }
     } finally {
       setStarting(false);

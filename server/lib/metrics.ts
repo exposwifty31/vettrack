@@ -197,6 +197,15 @@ type MetricName =
   | "display_heartbeats_received_kiosk"
   | "display_heartbeats_received_non_kiosk"
   | "display_wake_lock_reacquire_exhausted"
+  // Phase 10 (F6) — the live-stream display-token revocation recheck threw
+  // (e.g. transient DB error). Bounded counter for observability; the stream is
+  // deliberately kept open on such errors, so a rising count flags a stuck check.
+  | "display_revocation_recheck_error"
+  // Phase 10 (F6) — the live-stream revocation recheck failed N CONSECUTIVE times
+  // (sustained resolver/DB outage), so the stream was closed fail-closed to bound
+  // how long a token revoked mid-outage can keep streaming. Distinct from the
+  // per-error counter so ops can separate an outage-driven close from a real revoke.
+  | "display_revocation_recheck_failclosed"
   // Phase 9 PR 9.4 — Code Blue runtime reliability.
   // Bounded enum labels from §3.9 are fanned out into individual counter
   // names. No PII / userId / clinicId / requestId labels.
@@ -846,6 +855,8 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   display_heartbeats_received_kiosk: 0,
   display_heartbeats_received_non_kiosk: 0,
   display_wake_lock_reacquire_exhausted: 0,
+  display_revocation_recheck_error: 0,
+  display_revocation_recheck_failclosed: 0,
   // Phase 9 PR 9.4 — Code Blue runtime reliability.
   realtime_reconnect_storm_detected: 0,
   realtime_emergency_degraded: 0,

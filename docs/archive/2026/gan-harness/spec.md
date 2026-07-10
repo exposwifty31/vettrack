@@ -15,7 +15,7 @@ Success = **build 1.0.1 (20) accepted by Apple App Review**, with zero re-reject
 four cited guidelines. Concretely, an Apple reviewer can:
 
 1. Open the app and reach `/signin` with a live Clerk card (no blank/white screen, no reload loop).
-2. Sign in with the **demo admin** (`reviewer@vettrack.uk` / `VetTrack2026!`) and land on `/home` with admin features — login status must be `complete`, never `needs_client_trust`.
+2. Sign in with the **demo admin** (`reviewer@vettrack.uk` / *password redacted — see password manager*) and land on `/home` with admin features — login status must be `complete`, never `needs_client_trust`.
 3. Sign up / sign in with **Apple** in the **system browser** (not in-WebView) and return to the app authenticated.
 4. Delete their account via **Settings → Danger zone → Delete account** (personal Apple ID), with Apple token revocation server-side — and confirm the demo account is **protected** (403).
 5. See a real **1024×1024 alpha-stripped VT brand icon**, not the placeholder Capacitor icon.
@@ -141,7 +141,7 @@ and verified in the route matrix.
 
 **S1-6 — Resubmit in App Store Connect (human).**
 - Select build 1.0.1 (20) on the 1.0 version. App Review Information: Sign-In required = Yes;
-  `reviewer@vettrack.uk` / `VetTrack2026!`; reviewer notes (system-browser OAuth, demo admin, demo
+  `reviewer@vettrack.uk` / *password redacted — see password manager*; reviewer notes (system-browser OAuth, demo admin, demo
   account cannot be deleted, personal-Apple-ID deletion path). Confirm Client Trust permanently OFF
   before submit. Add for Review → Submit.
 - **Acceptance:** version status = "Waiting for Review"; reviewer notes include the deletion test steps

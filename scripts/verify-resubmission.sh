@@ -7,6 +7,12 @@ set -uo pipefail
 REPO="${REPO:-/Users/dan/vettrack}"
 cd "$REPO" || { echo "FAIL: repo not found at $REPO"; exit 2; }
 
+# Private temp dir (0700, unpredictable name) for the response bodies + the sign-in
+# JWT this script writes — never predictable world-readable /tmp paths another local
+# user could read or pre-create/symlink. Removed on exit.
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/vt-resubmit.XXXXXX")" || { echo "FAIL: could not create temp dir"; exit 2; }
+trap 'rm -rf "$TMP"' EXIT
+
 # --- secret -----------------------------------------------------------------
 if [ -z "${CLERK_SECRET_KEY:-}" ] && [ -f "$REPO/.env" ]; then
   # Same source the server + build-native-shell already read (gitignored).
@@ -31,24 +37,37 @@ ok(){ echo "  PASS  $1"; PASS=$((PASS+1)); }
 no(){ echo "  FAIL  $1"; FAIL=$((FAIL+1)); }
 hdr(){ echo; echo "== $1 =="; }
 
+# --- demo-reviewer credential (NEVER hardcoded) ------------------------------
+# The password comes from the REVIEWER_PASSWORD env — keep it in your password
+# manager (it also goes into the App Store Connect review notes), never in the repo.
+# Email defaults to the demo account identifier (not a secret). If the account
+# password is ever rotated in Clerk, only the env value changes; this script carries
+# nothing to leak.
+REVIEWER_EMAIL="${REVIEWER_EMAIL:-reviewer@vettrack.uk}"
+REVIEWER_PASSWORD="${REVIEWER_PASSWORD:-}"
+
 # --- [2.1] demo login must COMPLETE (the #1 re-rejection risk) ---------------
 hdr "[2.1] Demo login (must be 'complete')"
-curl -s -D /tmp/vt_h.txt -X POST \
-  "https://clerk.vettrack.uk/v1/client/sign_ins?_is_native=1&_clerk_js_version=5.125.13" \
-  -H "Origin: capacitor://localhost" -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-urlencode "identifier=reviewer@vettrack.uk" -o /tmp/vt_si.json
-JWT=$(grep -i "^authorization:" /tmp/vt_h.txt | cut -d' ' -f2 | tr -d '\r')
-SID=$(python3 -c "import json;print(json.load(open('/tmp/vt_si.json'))['response']['id'])" 2>/dev/null)
-if [ -z "$SID" ]; then no "could not start sign-in (FAPI unreachable or 429 — wait ~3 min)";
+if [ -z "$REVIEWER_PASSWORD" ]; then
+  no "REVIEWER_PASSWORD not set — export it (from your password manager) before running; demo-login gate skipped"
 else
-  STATUS=$(curl -s -X POST \
-    "https://clerk.vettrack.uk/v1/client/sign_ins/${SID}/attempt_first_factor?_is_native=1" \
-    -H "Origin: capacitor://localhost" -H "Authorization: ${JWT}" \
-    -H "Content-Type: application/x-www-form-urlencoded" \
-    --data-urlencode "strategy=password" --data-urlencode "password=VetTrack2026!" \
-    | python3 -c "import json,sys;print(json.load(sys.stdin).get('response',{}).get('status','?'))" 2>/dev/null)
-  if [ "$STATUS" = "complete" ]; then ok "login status = complete";
-  else no "login status = '$STATUS' (needs_client_trust => Client Trust is back ON, see §G)"; fi
+  curl -s -D "$TMP/h.txt" -X POST \
+    "https://clerk.vettrack.uk/v1/client/sign_ins?_is_native=1&_clerk_js_version=5.125.13" \
+    -H "Origin: capacitor://localhost" -H "Content-Type: application/x-www-form-urlencoded" \
+    --data-urlencode "identifier=$REVIEWER_EMAIL" -o "$TMP/si.json"
+  JWT=$(grep -i "^authorization:" "$TMP/h.txt" | cut -d' ' -f2 | tr -d '\r')
+  SID=$(python3 -c "import json;print(json.load(open('$TMP/si.json'))['response']['id'])" 2>/dev/null)
+  if [ -z "$SID" ]; then no "could not start sign-in (FAPI unreachable or 429 — wait ~3 min)";
+  else
+    STATUS=$(curl -s -X POST \
+      "https://clerk.vettrack.uk/v1/client/sign_ins/${SID}/attempt_first_factor?_is_native=1" \
+      -H "Origin: capacitor://localhost" -H "Authorization: ${JWT}" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      --data-urlencode "strategy=password" --data-urlencode "password=$REVIEWER_PASSWORD" \
+      | python3 -c "import json,sys;print(json.load(sys.stdin).get('response',{}).get('status','?'))" 2>/dev/null)
+    if [ "$STATUS" = "complete" ]; then ok "login status = complete";
+    else no "login status = '$STATUS' (needs_client_trust => Client Trust is back ON, see §G)"; fi
+  fi
 fi
 
 # --- [2.1a] Clerk config gating Apple/Google sign-up ------------------------
@@ -82,10 +101,59 @@ if [ -f "$ICON" ]; then
   [ "$A" = "no" ] && [ "$W" = "1024" ] && ok "icon $W px, hasAlpha=$A" || no "icon W=$W hasAlpha=$A (want 1024 / no)"
 else no "icon file missing"; fi
 
-# --- build number >= 4 ------------------------------------------------------
-hdr "[build number]"
-BN=$(grep -m1 CURRENT_PROJECT_VERSION ios/App/App.xcodeproj/project.pbxproj | grep -oE '[0-9]+')
-[ "${BN:-0}" -ge 4 ] && ok "CURRENT_PROJECT_VERSION = $BN (>=4)" || no "build number = ${BN:-?} (<4 — bump: cd ios/App && agvtool new-version -all 5)"
+# --- build number must exceed the last shipped build ------------------------
+# The app is LIVE, so the old fixed ">=4" floor is meaningless (always passes).
+# App Store Connect rejects a duplicate CFBundleVersion within a marketing
+# version, so each submission MUST be strictly greater than the last one shipped.
+# Source of truth: ios/.last-shipped-build (the owner updates it after a
+# successful upload; `resubmit.sh` prints the reminder). Override via
+# LAST_SHIPPED_BUILD env for a one-off check.
+hdr "[build number — must exceed last shipped]"
+BN=$(grep -m1 'CURRENT_PROJECT_VERSION = ' ios/App/App.xcodeproj/project.pbxproj | grep -oE '[0-9]+' | head -1)
+# Read the WHOLE baseline file (stripping surrounding whitespace) — do NOT grep out
+# the first digit run. A malformed file like "build-25-old" must fail the `^[0-9]+$`
+# check below (fail closed), not silently parse to "25".
+FILE_LAST=$(tr -d '[:space:]' < ios/.last-shipped-build 2>/dev/null || true)
+LAST="${LAST_SHIPPED_BUILD:-${FILE_LAST:-}}"
+# Validate both integers before the numeric compare. BN comes from a parsed
+# pbxproj; LAST can come from a hand-set LAST_SHIPPED_BUILD env or a garbled
+# baseline file. A non-numeric value must FAIL the gate — not skew `-gt` (which
+# errors/misbehaves on non-ints) or slip through a `${x:-0}` default.
+if ! [[ "${BN:-}" =~ ^[0-9]+$ ]]; then
+  no "could not parse a numeric CURRENT_PROJECT_VERSION from pbxproj (got '${BN:-<empty>}')"
+elif [ -z "${LAST:-}" ]; then
+  # Fail CLOSED. The app is LIVE, so a missing baseline is a misconfiguration,
+  # not a first submission — without it the "must exceed last shipped" rule can't
+  # be evaluated, and passing anyway could wave a duplicate CFBundleVersion through.
+  no "no last-shipped baseline (ios/.last-shipped-build absent and LAST_SHIPPED_BUILD unset) — record the last build uploaded to App Store Connect there before archiving"
+elif ! [[ "$LAST" =~ ^[0-9]+$ ]]; then
+  no "last-shipped baseline is not a number (got '$LAST') — fix ios/.last-shipped-build or the LAST_SHIPPED_BUILD env"
+elif [ "$BN" -gt "$LAST" ]; then
+  ok "build $BN > last shipped $LAST"
+else
+  no "build ${BN} must be > last shipped $LAST — bump first: pnpm resubmit  (then update ios/.last-shipped-build after upload)"
+fi
+
+# --- no literal CFBundleVersion in any SOURCE bundle plist (app + extensions) ----
+# Every app/extension Info.plist must derive CFBundleVersion from $(CURRENT_PROJECT_VERSION).
+# A literal integer (e.g. the VetTrackControl widget) desyncs from the app the moment
+# resubmit.sh's global build bump runs → ITMS-90473 upload rejection. Scoped to
+# git-TRACKED plists so build output (xcarchive / DerivedData / vendored frameworks,
+# all gitignored — their literal versions are correct and not ours) is never flagged.
+hdr "[no literal CFBundleVersion in source bundle plists]"
+LITERAL_PLISTS=""
+while IFS= read -r plist; do
+  [ -f "$plist" ] || continue
+  val=$(grep -A1 '<key>CFBundleVersion</key>' "$plist" 2>/dev/null | sed -n '2p' | tr -d '[:space:]')
+  case "$val" in
+    *'<string>'[0-9]*) LITERAL_PLISTS="$LITERAL_PLISTS ${plist}=${val}" ;;
+  esac
+done < <(git ls-files ios/App 2>/dev/null | grep -E '/Info\.plist$')
+if [ -z "$LITERAL_PLISTS" ]; then
+  ok "all source bundle Info.plist CFBundleVersion values reference \$(CURRENT_PROJECT_VERSION)"
+else
+  no "literal CFBundleVersion in:$LITERAL_PLISTS — set to \$(CURRENT_PROJECT_VERSION) so the build bump can't desync an extension"
+fi
 
 # --- bundled shell + native clerk chunk -------------------------------------
 hdr "[bundled shell]"
@@ -131,10 +199,10 @@ done
 
 # --- AASA live + entitlements -----------------------------------------------
 hdr "[AASA + entitlements]"
-if curl -sS https://vettrack.uk/.well-known/apple-app-site-association -o /tmp/vt_aasa.json 2>/dev/null; then
+if curl -sS https://vettrack.uk/.well-known/apple-app-site-association -o "$TMP/aasa.json" 2>/dev/null; then
   python3 -c "
 import json, sys
-d = json.load(open('/tmp/vt_aasa.json'))
+d = json.load(open('$TMP/aasa.json'))
 details = d.get('applinks', {}).get('details', [])
 app_ids = details[0].get('appIDs', []) if details else []
 components = details[0].get('components', []) if details else []

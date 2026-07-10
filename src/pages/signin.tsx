@@ -4,6 +4,7 @@ import { Helmet } from "react-helmet-async";
 import { Loader2 } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { VetTrackMark } from "@/components/vettrack-mark";
+import { RoleChips } from "@/features/auth/components/RoleChips";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignIn, useUser } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
 import { PhoneSignIn } from "@/components/phone-sign-in";
@@ -69,22 +70,7 @@ export default function SignInPage() {
             <p className="text-sm text-muted-foreground">{t.authPage.signInSubtitle}</p>
           </div>
 
-          <div className="mb-6 flex flex-col items-center gap-2">
-            <span className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">
-              {t.authPage.roleLabel}
-            </span>
-            <div className="flex flex-wrap justify-center gap-2">
-              <span className="inline-flex h-8 items-center rounded-full border border-primary bg-primary px-3.5 text-xs font-semibold text-primary-foreground">
-                {t.authPage.roleVetTech}
-              </span>
-              <span className="inline-flex h-8 items-center rounded-full border border-border bg-card px-3.5 text-xs font-semibold text-foreground">
-                {t.authPage.roleVeterinarian}
-              </span>
-              <span className="inline-flex h-8 items-center rounded-full border border-border bg-card px-3.5 text-xs font-semibold text-foreground">
-                {t.authPage.roleStudent}
-              </span>
-            </div>
-          </div>
+          <RoleChips />
 
           {CLERK_PUBLISHABLE_KEY ? (
             <div className="flex flex-col items-center gap-4">

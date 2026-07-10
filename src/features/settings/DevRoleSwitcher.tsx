@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { UserCog } from "lucide-react";
 import { SettingsSectionHeader, SettingsSelect } from "@/components/settings-controls";
+import { clearOfflineSession } from "@/lib/offline-session";
 import {
   DEV_OVERRIDE_ROLES,
   DEV_ROLE_OVERRIDE_KEY,
@@ -31,6 +33,7 @@ const ROLE_HINT: Partial<Record<string, string>> = {
  */
 export function DevRoleSwitcher() {
   const [role, setRole] = useState<string>(() => getDevRoleOverride() ?? DEFAULT_OPTION);
+  const queryClient = useQueryClient();
 
   // Hooks run unconditionally above; gate the render below (Rules of Hooks).
   if (!isDevBypassBuild()) return null;
@@ -51,8 +54,13 @@ export function DevRoleSwitcher() {
       /* storage denied — nothing to persist */
     }
     setRole(next);
-    // Re-fetch the session under the new role. The dev user row is rewritten
-    // server-side (ensureDevUserRecord), so a full reload is the clean path.
+    // Fully reset the CLIENT auth view so the impersonated role actually drives
+    // the UI (OBS-1): the persisted offline snapshot (`vt_session`) and any cached
+    // React Query state (incl. /api/users/me) otherwise survive the reload and keep
+    // serving the previous role, so the nav/experience lag. Clear both, then reload
+    // — the dev user row is also rewritten server-side (ensureDevUserRecord).
+    clearOfflineSession();
+    queryClient.clear();
     globalThis.location?.reload();
   };
 

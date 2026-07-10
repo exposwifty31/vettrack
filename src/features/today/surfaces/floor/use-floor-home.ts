@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { getCurrentUserId } from "@/lib/auth-store";
 import { useTodayShift } from "../../hooks/use-today-shift";
-import type { HeroState } from "../OnShiftHero";
+import { deriveHeroState } from "../OnShiftHero";
 
 /**
  * Floor data engine. Wraps the shared {@link useTodayShift} (pulse / tasks /
@@ -14,7 +14,12 @@ export function useFloorHome() {
   const today = useTodayShift();
   const userId = getCurrentUserId();
 
-  const { data: myEquipment, isLoading: myEquipmentLoading } = useQuery({
+  const {
+    data: myEquipment,
+    isLoading: myEquipmentLoading,
+    isError: myEquipmentError,
+    refetch: refetchMyEquipment,
+  } = useQuery({
     // Canonical bare key (matches layout.tsx / my-equipment page) so the cache dedupes.
     queryKey: ["/api/equipment/my"],
     queryFn: api.equipment.listMy,
@@ -26,18 +31,14 @@ export function useFloorHome() {
   const { pulse, pulseLoading } = today;
   // Match the pre-split home: the hero "loading" keys on the PULSE only, so a fast
   // pulse error while tasks/equipment are still in flight shows "noshift", not a skeleton.
-  const heroState: HeroState = pulse
-    ? pulse.shift
-      ? "active"
-      : "noshift"
-    : pulseLoading
-      ? "loading"
-      : "noshift";
+  const heroState = deriveHeroState(pulse, pulseLoading);
 
   return {
     ...today,
     myEquipment,
     myEquipmentLoading,
+    myEquipmentError,
+    refetchMyEquipment,
     heroState,
     totalCount: today.equipment?.length ?? 0,
   };

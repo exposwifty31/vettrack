@@ -7,6 +7,7 @@ import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { useAuth } from "@/hooks/use-auth";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { WebOnlyGuard } from "@/app/platform/guards/WebOnlyGuard";
+import { CustodyGuard } from "@/app/platform/guards/CustodyGuard";
 import { ManagementGuard } from "@/desktop/management";
 import { useIsNativeTablet } from "@/native/tablet/useIsNativeTablet";
 import { hasStoredDisplayToken } from "@/lib/display-token-store";
@@ -157,18 +158,22 @@ export function AppRoutes() {
         <Route path="/equipment/scan"><Redirect to="/equipment?scan=1" replace /></Route>
         <Route path="/equipment/maintenance"><Redirect to="/equipment?status=maintenance" replace /></Route>
         <Route path="/equipment/intelligence"><Redirect to="/equipment" replace /></Route>
-        <Route path="/alerts"><AuthGuard><AlertsPage /></AuthGuard></Route>
+        <Route path="/alerts"><AuthGuard><CustodyGuard><AlertsPage /></CustodyGuard></AuthGuard></Route>
         <Route path="/my-equipment"><AuthGuard><MyEquipmentPage /></AuthGuard></Route>
         <Route path="/my-profile"><AuthGuard><MyProfilePage /></AuthGuard></Route>
-        {isNativeTablet && <Route path="/rooms/:id?"><AuthGuard><RoomsMasterDetail /></AuthGuard></Route>}
-        {!isNativeTablet && <Route path="/rooms"><AuthGuard><RoomsListPage /></AuthGuard></Route>}
-        {!isNativeTablet && <Route path="/rooms/:id"><AuthGuard><RoomRadarPage /></AuthGuard></Route>}
-        {isNativeTablet && <Route path="/locations/:id?"><AuthGuard><RoomsMasterDetail /></AuthGuard></Route>}
-        {!isNativeTablet && <Route path="/locations"><AuthGuard><RoomsListPage /></AuthGuard></Route>}
-        {!isNativeTablet && <Route path="/locations/:id"><AuthGuard><RoomRadarPage /></AuthGuard></Route>}
+        {isNativeTablet && <Route path="/rooms/:id?"><AuthGuard><CustodyGuard><RoomsMasterDetail /></CustodyGuard></AuthGuard></Route>}
+        {!isNativeTablet && <Route path="/rooms"><AuthGuard><CustodyGuard><RoomsListPage /></CustodyGuard></AuthGuard></Route>}
+        {!isNativeTablet && <Route path="/rooms/:id"><AuthGuard><CustodyGuard><RoomRadarPage /></CustodyGuard></AuthGuard></Route>}
+        {isNativeTablet && <Route path="/locations/:id?"><AuthGuard><CustodyGuard><RoomsMasterDetail /></CustodyGuard></AuthGuard></Route>}
+        {!isNativeTablet && <Route path="/locations"><AuthGuard><CustodyGuard><RoomsListPage /></CustodyGuard></AuthGuard></Route>}
+        {!isNativeTablet && <Route path="/locations/:id"><AuthGuard><CustodyGuard><RoomRadarPage /></CustodyGuard></AuthGuard></Route>}
         <Route path="/print"><AuthGuard><WebOnlyGuard><QrPrintPage /></WebOnlyGuard></AuthGuard></Route>
 
         {/* --- Emergency & safety --- */}
+        {/* Code Blue is intentionally NOT CustodyGuard-wrapped (owner decision):
+            students keep emergency-awareness VISIBILITY of an active Code Blue even
+            though custody is their action scope — they are already server-403'd on
+            every CB mutation, so this is view-only. (/alerts + /rooms still redirect.) */}
         <Route path="/code-blue"><AuthGuard><CodeBluePage /></AuthGuard></Route>
         <Route path="/code-blue/display"><AuthGuard><WebOnlyGuard><CodeBlueDisplay /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/crash-cart"><AuthGuard><CrashCartCheckPage /></AuthGuard></Route>

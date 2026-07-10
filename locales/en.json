@@ -834,7 +834,9 @@
     "crashCartHint": "Verify the crash cart is stocked",
     "roomReadinessHint": "Review room verification status",
     "guidedTitle": "Guided mode",
-    "guidedBody": "Work through your tasks and scans step by step. Check with a supervisor before any emergency action."
+    "guidedBody": "Check equipment out and back in, and dispense or restock inventory. Ask a supervisor for anything else.",
+    "inventoryActionHint": "Dispense or restock items",
+    "myEquipmentRefreshFailed": "Couldn't refresh — showing saved items"
   },
   "home": {
     "equipmentOverview": "Equipment overview",
@@ -2591,6 +2593,7 @@
     "endEventChooseOutcome": "End event — choose outcome",
     "managerOnlyHint": "Available to the event manager only",
     "activeSessionExists": "An active Code Blue session is already open.",
+    "clinicalAuthorityRequired": "Only clinical staff on shift can open a Code Blue. Ask the responsible clinician to start the event.",
     "startSessionFailed": "Failed to start Code Blue session",
     "endSessionFailed": "Failed to end Code Blue session",
     "elapsedSinceStart": "Elapsed since event start",
@@ -3741,7 +3744,7 @@
     "createAccount": "Create account",
     "signUpSubtitle": "Sign up to manage your veterinary equipment",
     "signUpLoadError": "The sign-up page failed to load. Check your connection and refresh. If the problem persists, make sure Clerk is configured for this domain and the Publishable Key matches the environment.",
-    "roleLabel": "Role",
+    "roleLabel": "For every role",
     "roleVetTech": "Vet Tech",
     "roleVeterinarian": "Veterinarian",
     "roleStudent": "Student",

@@ -12,6 +12,7 @@ import { MonitorSmartphone, Loader2 } from "lucide-react";
 import { claimDisplayPairing } from "@/lib/api";
 import { setStoredDisplayToken } from "@/lib/display-token-store";
 import { t } from "@/lib/i18n";
+import { useDirection } from "@/hooks/useDirection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -22,6 +23,7 @@ function normalizedLength(raw: string): number {
 
 export default function BoardPairPage() {
   const [, navigate] = useLocation();
+  const dir = useDirection();
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
 
@@ -43,7 +45,7 @@ export default function BoardPairPage() {
 
   return (
     <div
-      dir="rtl"
+      dir={dir}
       data-testid="board-pair"
       className="dark flex min-h-screen w-full items-center justify-center bg-[rgb(var(--ivory-bg))] p-6 text-ivory-text"
     >
