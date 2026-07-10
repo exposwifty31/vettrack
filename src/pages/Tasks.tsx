@@ -51,6 +51,7 @@ import {
   formatScheduledLabel,
   formatTimeHHMM,
   getTaskReasonBullets,
+  isAppointmentConflictError,
   minutesSinceDayStart,
   pixelsPerMinuteFor,
   priorityLabel,
@@ -188,7 +189,7 @@ export default function AppointmentsPage() {
       setFormTaskType("maintenance");
     },
     onError: (error: Error, variables: CreateAppointmentRequest) => {
-      if (error.message === "APPOINTMENT_CONFLICT") {
+      if (isAppointmentConflictError(error)) {
         // Reuse the exact submitted payload (staleness-free + DRY) rather than
         // rebuilding it from live form state, which could drift between submit
         // and the conflict response.

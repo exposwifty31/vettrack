@@ -11,7 +11,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
 import { Helmet } from "react-helmet-async";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,6 +82,7 @@ import {
   type LocalEntityState,
 } from "@/lib/local-entity-sync-state";
 import { useSettings } from "@/hooks/use-settings";
+import { useActiveShift } from "@/hooks/use-active-shift";
 import { cn } from "@/lib/utils";
 import { QrScanner } from "@/components/qr-scanner";
 import { VirtualizedEquipmentList } from "@/components/VirtualizedEquipmentList";
@@ -979,7 +980,8 @@ function EquipmentListPageDesktop() {
   return <AppShell>{pageBody}</AppShell>;
 }
 
-function EquipmentItem({
+// Exported for tests (T3 fail-loud audit — checkout error/off-shift gate coverage).
+export function EquipmentItem({
   equipment: eq,
   selectMode,
   selected,
@@ -996,6 +998,9 @@ function EquipmentItem({
 }) {
   const { settings } = useSettings();
   const { userId, isAdmin } = useAuth();
+  // Off-shift: taking equipment ownership is not permitted (roster-derived),
+  // same gate the equipment detail page enforces (see handleCheckout there).
+  const { hasActiveShift } = useActiveShift();
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
@@ -1044,11 +1049,26 @@ function EquipmentItem({
       queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
       toast.success(`Checked out — ${displayName}`);
     },
-    onError: () => {
+    onError: (err: unknown) => {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
-      toast.error(t.equipmentList.toast.checkoutError);
+      // Surface the server's actual reason (fail-loud doctrine, T3) instead
+      // of a generic message — mirrors equipmentDetail.toast.checkoutFailed.
+      const message = err instanceof ApiError ? err.message : "";
+      toast.error(t.equipmentList.toast.checkoutFailed(message));
     },
   });
+
+  // Single choke point for the list-row checkout affordance — blocks
+  // off-shift ownership before the request fires (parity with the equipment
+  // detail page's handleCheckout), and still fails loud via onError above
+  // for any other 400 the server returns.
+  const handleCheckoutClick = () => {
+    if (!hasActiveShift) {
+      toast.error(t.scan.offShiftBody);
+      return;
+    }
+    checkoutMut.mutate();
+  };
 
   const returnMut = useMutation({
     mutationFn: (payload: { isPluggedIn: boolean; plugInDeadlineMinutes?: number }) =>
@@ -1093,7 +1113,7 @@ function EquipmentItem({
   const quickAction = eq.custodyState === "returned" && eq.status === "ok"
     ? { label: t.dockReturn.submit, icon: LogIn, action: () => setDockReturnOpen(true), pending: false, className: "text-blue-700 border-blue-200 hover:bg-blue-50" }
     : !isCheckedOut && eq.status === "ok"
-    ? { label: t.equipmentList.quickAction.checkout, icon: LogIn, action: () => checkoutMut.mutate(), pending: checkoutMut.isPending, className: "text-emerald-700 border-emerald-200 hover:bg-emerald-50" }
+    ? { label: t.equipmentList.quickAction.checkout, icon: LogIn, action: handleCheckoutClick, pending: checkoutMut.isPending, className: "text-emerald-700 border-emerald-200 hover:bg-emerald-50" }
     : (isCheckedOut && (checkedOutByMe || isAdmin)) && eq.status === "ok"
     ? { label: t.equipmentList.quickAction.return, icon: LogOut, action: () => setReturnDialogOpen(true), pending: returnMut.isPending, className: "text-primary border-primary/30 hover:bg-primary/10" }
     : eq.status === "issue"

@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { t, formatDateTimeByLocale } from "@/lib/i18n";
 import { Input } from "@/components/ui/input";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
+import { ApiError, toApiErrorMessage } from "@/lib/api";
 import type { Appointment, AppointmentStatus, TaskPriority } from "@/types";
 
 export const DEFAULT_DAY_START_HOUR = 8;
@@ -244,17 +245,49 @@ export function statusActions(status: AppointmentStatus): AppointmentStatus[] {
   return [];
 }
 
+/**
+ * Maps a rejected task/appointment mutation to a localized toast message.
+ *
+ * BUG FIX (T3 fail-loud audit): this used to compare `err.message` against
+ * the bare server reason codes ("OUTSIDE_SHIFT", "APPOINTMENT_CONFLICT", …),
+ * but `ApiError.message` is `toApiErrorMessage(status, payload)` — the
+ * server's human-readable text, not the code. None of the branches ever
+ * matched, so every task-create failure (e.g. OUTSIDE_SHIFT) silently fell
+ * through to the raw, unlocalized server string instead of the intended
+ * `t.appointmentsPage.error*` key. Match on `ApiError.code` instead.
+ */
 export function toErrorMessage(err: Error): string {
-  if (err.message === "APPOINTMENT_CONFLICT") return t.appointmentsPage.errorConflict;
-  if (err.message === "OUTSIDE_SHIFT") return t.appointmentsPage.errorOutsideShift;
-  if (err.message === "OVERRIDE_REASON_REQUIRED") return t.appointmentsPage.errorOverrideReason;
-  if (err.message === "TIMEZONE_REQUIRED") return t.appointmentsPage.errorTimezone;
-  if (err.message === "UNAUTHORIZED" || err.message === "Session expired") return t.appointmentsPage.errorSessionExpired;
-  if (err.message === "INSUFFICIENT_ROLE") return t.appointmentsPage.errorInsufficientRole;
-  if (err.message === "VALIDATION_FAILED") return t.appointmentsPage.errorValidationFailed;
-  if (err.message === "TASK_NOT_OWNED_BY_TECH") return t.appointmentsPage.errorTaskNotOwned;
-  if (err.message === "TASK_NOT_ASSIGNED") return t.appointmentsPage.errorTaskNotAssigned;
-  return err.message;
+  if (err.message === "UNAUTHORIZED" || err.message === "Session expired") {
+    return t.appointmentsPage.errorSessionExpired;
+  }
+  if (err instanceof ApiError) {
+    switch (err.code) {
+      case "APPOINTMENT_CONFLICT":
+        return t.appointmentsPage.errorConflict;
+      case "OUTSIDE_SHIFT":
+        return t.appointmentsPage.errorOutsideShift;
+      case "OVERRIDE_REASON_REQUIRED":
+        return t.appointmentsPage.errorOverrideReason;
+      case "TIMEZONE_REQUIRED":
+        return t.appointmentsPage.errorTimezone;
+      case "INSUFFICIENT_ROLE":
+        return t.appointmentsPage.errorInsufficientRole;
+      case "VALIDATION_FAILED":
+        return t.appointmentsPage.errorValidationFailed;
+      case "TASK_NOT_OWNED_BY_TECH":
+        return t.appointmentsPage.errorTaskNotOwned;
+      case "TASK_NOT_ASSIGNED":
+        return t.appointmentsPage.errorTaskNotAssigned;
+      default:
+        return toApiErrorMessage(err.status, err.payload);
+    }
+  }
+  return t.api.serverError;
+}
+
+/** True when a rejected task/appointment mutation is a booking-conflict (409). */
+export function isAppointmentConflictError(err: unknown): boolean {
+  return err instanceof ApiError && err.code === "APPOINTMENT_CONFLICT";
 }
 
 export function canStartTask(a: Appointment, meId: string | undefined, role?: string | null, effectiveRole?: string | null): boolean {

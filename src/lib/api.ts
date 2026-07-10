@@ -129,6 +129,8 @@ function bootstrapHeaders(init: RequestInit): Record<string, string> {
 export {
   request,
   ApiError,
+  toApiErrorMessage,
+  extractApiErrorCode,
   EQUIPMENT_LIST_FETCH_TIMEOUT_MS,
   TASKS_FETCH_TIMEOUT_MS,
 };

@@ -147,6 +147,7 @@ const translations = {
       moveError: d.equipmentList.toast.moveError,
       exportError: d.equipmentList.toast.exportError,
       checkoutError: d.equipmentList.toast.checkoutError,
+      checkoutFailed: (msg: string) => msg || d.equipmentList.toast.checkoutError,
       returnError: d.equipmentList.toast.returnError,
       returnSuccess: (name: string) => tr(d.equipmentList.toast.returnSuccess, { name }),
     },

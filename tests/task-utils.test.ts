@@ -16,8 +16,11 @@ import {
   minutesSinceDayStart,
   statusActions,
   compactMeta,
+  toErrorMessage,
+  isAppointmentConflictError,
 } from "@/pages/tasks/task-utils";
 import { t } from "@/lib/i18n";
+import { ApiError } from "@/lib/api";
 
 const UUID = "3f1a2b4c-1234-4abc-8def-1234567890ab";
 
@@ -87,6 +90,77 @@ describe("task-utils pure helpers", () => {
   describe("compactMeta", () => {
     it("joins present parts with a bullet and drops empties", () => {
       expect(compactMeta("A", null, "B", undefined)).toBe("A • B");
+    });
+  });
+
+  describe("toErrorMessage (T3 fail-loud audit)", () => {
+    // BUG FIX: this used to compare `err.message` against bare server reason
+    // codes ("OUTSIDE_SHIFT", …), but `ApiError.message` is the server's
+    // human-readable text (via toApiErrorMessage), never the code — so every
+    // branch silently fell through to the raw, unlocalized server string.
+    // These pin the fix: match on `ApiError.code`.
+    it("maps OUTSIDE_SHIFT to the localized outside-shift copy", () => {
+      const err = new ApiError(400, "Cannot schedule outside vet shift hours", {
+        code: "OUTSIDE_SHIFT",
+        error: "OUTSIDE_SHIFT",
+        message: "Cannot schedule outside vet shift hours",
+      });
+      expect(toErrorMessage(err)).toBe(t.appointmentsPage.errorOutsideShift);
+    });
+
+    it("maps APPOINTMENT_CONFLICT to the localized conflict copy", () => {
+      const err = new ApiError(409, "Appointment overlaps existing slot", {
+        code: "APPOINTMENT_CONFLICT",
+        error: "APPOINTMENT_CONFLICT",
+        message: "Appointment overlaps existing slot",
+      });
+      expect(toErrorMessage(err)).toBe(t.appointmentsPage.errorConflict);
+    });
+
+    it("maps INSUFFICIENT_ROLE, VALIDATION_FAILED, and the task-ownership codes", () => {
+      const codeToExpected: Array<[string, string]> = [
+        ["INSUFFICIENT_ROLE", t.appointmentsPage.errorInsufficientRole],
+        ["VALIDATION_FAILED", t.appointmentsPage.errorValidationFailed],
+        ["TASK_NOT_OWNED_BY_TECH", t.appointmentsPage.errorTaskNotOwned],
+        ["TASK_NOT_ASSIGNED", t.appointmentsPage.errorTaskNotAssigned],
+        ["OVERRIDE_REASON_REQUIRED", t.appointmentsPage.errorOverrideReason],
+        ["TIMEZONE_REQUIRED", t.appointmentsPage.errorTimezone],
+      ];
+      for (const [code, expected] of codeToExpected) {
+        const err = new ApiError(400, "server text", { code, error: code, message: "server text" });
+        expect(toErrorMessage(err)).toBe(expected);
+      }
+    });
+
+    it("falls back to the server's own (already-localized) message for an unmapped ApiError code", () => {
+      const err = new ApiError(500, "Something else broke", {
+        code: "SOME_OTHER_CODE",
+        error: "SOME_OTHER_CODE",
+        message: "Something else broke",
+      });
+      expect(toErrorMessage(err)).toBe("Something else broke");
+    });
+
+    it("maps a bare Error('UNAUTHORIZED') / 'Session expired' to the session-expired copy", () => {
+      expect(toErrorMessage(new Error("UNAUTHORIZED"))).toBe(t.appointmentsPage.errorSessionExpired);
+      expect(toErrorMessage(new Error("Session expired"))).toBe(t.appointmentsPage.errorSessionExpired);
+    });
+
+    it("falls back to the localized generic server-error copy for a non-ApiError error (never a raw string)", () => {
+      expect(toErrorMessage(new TypeError("Failed to fetch"))).toBe(t.api.serverError);
+    });
+  });
+
+  describe("isAppointmentConflictError", () => {
+    it("is true only for an ApiError with code APPOINTMENT_CONFLICT", () => {
+      const err = new ApiError(409, "conflict", { code: "APPOINTMENT_CONFLICT", error: "APPOINTMENT_CONFLICT" });
+      expect(isAppointmentConflictError(err)).toBe(true);
+    });
+
+    it("is false for any other ApiError code or a non-ApiError error", () => {
+      const err = new ApiError(400, "outside shift", { code: "OUTSIDE_SHIFT", error: "OUTSIDE_SHIFT" });
+      expect(isAppointmentConflictError(err)).toBe(false);
+      expect(isAppointmentConflictError(new Error("APPOINTMENT_CONFLICT"))).toBe(false);
     });
   });
 });
