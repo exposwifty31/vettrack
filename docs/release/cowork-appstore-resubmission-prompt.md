@@ -76,6 +76,14 @@ uploaded build number matches what resubmit.sh set.
     data only (no real client/patient/device records), scoped so the reviewer can
     exercise Code Blue + custody. Never point App Review at a production clinician
     account. Rotate/revoke the credential once the review completes.
+  - Seed the reviewer account with an ACTIVE clinical shift covering the review
+    window: clinical authority (`resolveAuthority()`) requires a vet /
+    senior-technician role PLUS an active roster shift, and rostering is
+    admin-CSV-import only — an unrostered reviewer gets a silent 403
+    (`INSUFFICIENT_CLINICAL_AUTHORITY`) on every Code Blue mutation. The reviewer
+    account's role must therefore be vet or senior/lead technician (NOT admin —
+    admin never resolves clinical authority even with a shift) and the seeded
+    roster must span the full review window (import a wide date range).
   - Submit for review — only after the release quality gate (see notes) is clean.
 
 ## Step 5 — After upload
