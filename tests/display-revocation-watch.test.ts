@@ -20,6 +20,7 @@ let startDisplayRevocationWatch: (
   onRevoked: () => void,
   resolveDisplay?: (r: Request) => Promise<{ ok: boolean }>,
   intervalMs?: number,
+  maxConsecutiveErrors?: number,
 ) => () => void;
 
 beforeAll(async () => {
@@ -88,6 +89,47 @@ describe("startDisplayRevocationWatch (F6 live-stream revocation lifecycle)", ()
     await vi.advanceTimersByTimeAsync(1000);
     expect(onRevoked).not.toHaveBeenCalled(); // a blip must never tear down a live board
     expect(incrementMetric).toHaveBeenCalledWith("display_revocation_recheck_error");
+    stop();
+  });
+
+  it("fails CLOSED after maxConsecutiveErrors consecutive errors (sustained outage)", async () => {
+    const resolve = vi.fn(async () => {
+      throw new Error("db down");
+    });
+    const onRevoked = vi.fn();
+    const stop = startDisplayRevocationWatch(displayReq, onRevoked, resolve, 1000, 3);
+
+    await vi.advanceTimersByTimeAsync(2000); // 2 errors — under the cap of 3
+    expect(onRevoked).not.toHaveBeenCalled();
+    expect(incrementMetric).not.toHaveBeenCalledWith("display_revocation_recheck_failclosed");
+
+    await vi.advanceTimersByTimeAsync(1000); // 3rd consecutive error — hits the cap
+    expect(onRevoked).toHaveBeenCalledTimes(1);
+    expect(incrementMetric).toHaveBeenCalledWith("display_revocation_recheck_failclosed");
+
+    // Once failed-closed the watch is stopped — no further rechecks or callbacks.
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(onRevoked).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it("a successful recheck resets the error streak (no premature fail-closed)", async () => {
+    let mode: "throw" | "ok" = "throw";
+    const resolve = vi.fn(async () => {
+      if (mode === "throw") throw new Error("blip");
+      return { ok: true };
+    });
+    const onRevoked = vi.fn();
+    const stop = startDisplayRevocationWatch(displayReq, onRevoked, resolve, 1000, 3);
+
+    await vi.advanceTimersByTimeAsync(2000); // 2 errors (streak = 2, under cap)
+    mode = "ok";
+    await vi.advanceTimersByTimeAsync(1000); // success → streak resets to 0
+    mode = "throw";
+    await vi.advanceTimersByTimeAsync(2000); // 2 more errors (streak = 2 again, under cap)
+
+    expect(onRevoked).not.toHaveBeenCalled();
+    expect(incrementMetric).not.toHaveBeenCalledWith("display_revocation_recheck_failclosed");
     stop();
   });
 

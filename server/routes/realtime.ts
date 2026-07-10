@@ -17,6 +17,13 @@ const MAX_OUTBOX_REPLAY = 1000;
 // server closes its live connection. Kiosks are few, so a light DB read at this
 // cadence is negligible; aligned with the ~10 s keepalive.
 const DISPLAY_REVOCATION_RECHECK_MS = 10_000;
+// Fail-closed after this many CONSECUTIVE failed re-checks (owner decision). A
+// transient blip keeps the board alive, but a sustained resolver/DB outage lasting
+// ~this×interval (5 × 10 s ≈ 50 s) closes the stream so a token revoked mid-outage
+// cannot keep streaming until the DB recovers. A single successful recheck resets
+// the streak. Accepted tradeoff: a genuine sustained outage also drops live boards
+// after the cap, which then reconnect via the client's /board/pair path.
+const DISPLAY_REVOCATION_MAX_CONSECUTIVE_ERRORS = 5;
 
 /**
  * F6 — periodic revocation watch for a display-authed SSE connection. Every
@@ -24,8 +31,12 @@ const DISPLAY_REVOCATION_RECHECK_MS = 10_000;
  * returns `!ok`) it invokes `onRevoked` (which closes the stream so the client's
  * existing 401 → /board/pair reconnect path takes over). A transient resolver
  * error keeps the stream open and bumps a bounded counter — a rising count flags a
- * persistently-stuck recheck without flooding logs. `resolveDisplay` and
- * `intervalMs` are injectable for tests. Returns a stop function.
+ * persistently-stuck recheck without flooding logs. After
+ * `maxConsecutiveErrors` re-checks fail in a row (sustained outage) the watch fails
+ * CLOSED: it bumps `display_revocation_recheck_failclosed` and invokes `onRevoked`,
+ * bounding how long a token revoked during the outage can survive. Any single
+ * success resets the error streak. `resolveDisplay`, `intervalMs`, and
+ * `maxConsecutiveErrors` are injectable for tests. Returns a stop function.
  *
  * ONLY display-authed connections are watched: a user (Clerk) connection is
  * re-authenticated per request, not here, so this returns a no-op stop for it (the
@@ -38,25 +49,43 @@ export function startDisplayRevocationWatch(
   onRevoked: () => void,
   resolveDisplay: (r: Request) => Promise<{ ok: boolean }> = resolveDisplayAuth,
   intervalMs: number = DISPLAY_REVOCATION_RECHECK_MS,
+  maxConsecutiveErrors: number = DISPLAY_REVOCATION_MAX_CONSECUTIVE_ERRORS,
 ): () => void {
   if (!req.isDisplayAuth) return () => {};
   let inFlight = false;
+  let consecutiveErrors = 0;
+  let stopped = false;
   const timer = setInterval(() => {
-    if (inFlight) return;
+    if (stopped || inFlight) return;
     inFlight = true;
     void resolveDisplay(req)
       .then((check) => {
-        if (!check.ok) onRevoked();
+        consecutiveErrors = 0; // a successful recheck clears the outage streak
+        if (!check.ok) {
+          stopped = true;
+          onRevoked();
+        }
       })
       .catch(() => {
+        consecutiveErrors += 1;
         incrementMetric("display_revocation_recheck_error");
+        if (consecutiveErrors >= maxConsecutiveErrors) {
+          // Sustained outage — fail closed so a revoked-during-outage token cannot
+          // keep streaming indefinitely (distinct counter for ops separation).
+          stopped = true;
+          incrementMetric("display_revocation_recheck_failclosed");
+          onRevoked();
+        }
       })
       .finally(() => {
         inFlight = false;
       });
   }, intervalMs);
   timer.unref?.();
-  return () => clearInterval(timer);
+  return () => {
+    stopped = true;
+    clearInterval(timer);
+  };
 }
 
 function parseLastEventId(header: unknown): number | undefined {
