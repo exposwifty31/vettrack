@@ -19,7 +19,7 @@ Three displays, side by side, all signed into the **same clinic**, ideally showi
 | 3 | **Web** — production | Owner opens **https://vettrack.uk** in a desktop browser at **≥1024px** | `desktop` (and `board` for kiosk routes) | The management-console / large-format surface. Different shell (`WebShell`), different guards (`WebOnlyGuard`). |
 
 **Install on the iPhone (one-time, done *for* the owner).** Get the RC build onto the connected iPhone before the audit — the implementing agent or cowork runs this on the Mac the phone is plugged into:
-- `pnpm cap:build:native --ios` (bakes the `pk_live` Clerk key + `VITE_API_ORIGIN` into the bundle — never a plain `pnpm build`, per CLAUDE.md), then
+- `pnpm cap:build:native` (canonical iOS build — runs `scripts/build-native-shell.sh --ios`; bakes the `pk_live` Clerk key + `VITE_API_ORIGIN` into the bundle — never a plain `pnpm build`, per CLAUDE.md), then
 - open Xcode (`pnpm cap:open:ios`), select the connected iPhone as the run destination, and **Run (⌘R)** to sign + install — or `npx cap run ios --target "<device-id>"` (`xcrun xctrace list devices` to find the id). First install needs the device unlocked + "Trust This Computer", and a signing team set on the App target.
 - Confirm it launches to the sign-in screen on the phone. From here the **owner** operates the phone; nothing else about Display 1 is agent-driven.
 
@@ -187,11 +187,17 @@ E. CODE BLUE / EMERGENCY  (highest severity — audit hardest here)
      `/emergency-equipment-wall`) — legible from across a room, high-contrast,
      auto-updating.
    - OFFLINE TEST — the HUMAN runs this on the iPhone they're holding (a simple
-     toggle now — no mirror to drop): direct them to turn on airplane mode, attempt
-     a Code Blue mutation offline — it must FAIL LOUDLY with a toast, never silently
-     queue — then turn airplane mode off and confirm state reconciles without a
-     manual refresh. Ask for a screenshot of the failure toast. Don't leave this
-     silently unchecked.
+     toggle now — no mirror to drop). Direct them through it precisely:
+     1. Airplane mode ON. Attempt a Code Blue mutation (start a session, or add a
+        log to an active one). It must FAIL LOUDLY with a toast — screenshot it.
+     2. Still offline: confirm NOTHING was created locally — no phantom session,
+        no pending/queued log, no optimistic "started" card. The mutation must be
+        dropped, never buffered for later send (doctrine: no offline emergency
+        queueing).
+     3. Airplane mode OFF. Confirm the app reconciles to the SERVER's state on its
+        own — WITHOUT a manual refresh — and that the failed mutation does NOT
+        replay (no session/log appears after reconnect). If anything the human
+        tried offline shows up post-reconnect, that's a BLOCKING finding.
 
 F. INVENTORY / DISPENSE — containers, items, dispense an item, restock. Numbers
    and quantities in RTL. Dispense on one display reflects on the others.
