@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
+import { useLocation } from "wouter";
 import { RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { t } from "@/lib/i18n";
 import { isServiceWorkerSupported, safeReloadPage } from "@/lib/safe-browser";
-import { isBoardPath } from "@/app/platform";
+import { isBoardPathname } from "@/app/platform";
 
 /**
  * The /board wall kiosk has its own Code-Blue-aware reload owner
@@ -12,13 +13,22 @@ import { isBoardPath } from "@/app/platform";
  * a second, non-Code-Blue-aware surface for the same event. So this banner is
  * a no-op on board/kiosk paths; useBoardAutoReload stays the sole reload owner
  * there. Non-board surfaces (normal staff devices) are unaffected.
+ *
+ * This banner mounts ONCE at the app root (src/main.tsx), so the board-path
+ * check must be reactive to same-tab SPA navigation (e.g. the
+ * /equipment/board, /display, /equipment-board client-side redirects land on
+ * /board without a full page reload). isBoardPathname is read via wouter's
+ * useLocation() — same reactive pattern as usePlatformTarget — so the
+ * suppression re-evaluates on every navigation instead of only at mount.
  */
 export function SwUpdateBanner() {
+  const [pathname] = useLocation();
+  const isBoard = isBoardPathname(pathname);
   const workerRef = useRef<ServiceWorker | null>(null);
   const toastShownRef = useRef(false);
 
   useEffect(() => {
-    if (isBoardPath()) return;
+    if (isBoard) return;
     function handleSwUpdate(event: Event) {
       const customEvent = event as CustomEvent<{ worker: ServiceWorker }>;
       workerRef.current = customEvent.detail.worker;
@@ -60,7 +70,7 @@ export function SwUpdateBanner() {
 
     window.addEventListener("sw-update-available", handleSwUpdate);
     return () => window.removeEventListener("sw-update-available", handleSwUpdate);
-  }, []);
+  }, [isBoard]);
 
   return null;
 }

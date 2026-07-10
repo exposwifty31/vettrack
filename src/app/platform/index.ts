@@ -32,7 +32,7 @@ export function isMarketingPath(): boolean {
  * Do NOT read window.location here — the reactive hook depends on the pathname
  * argument to re-evaluate on wouter navigation into/out of /board.
  */
-function isBoardPathname(pathname: string): boolean {
+export function isBoardPathname(pathname: string): boolean {
   return pathname === "/board" || pathname.startsWith("/board/");
 }
 
