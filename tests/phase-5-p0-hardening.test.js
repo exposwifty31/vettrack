@@ -66,8 +66,14 @@ describe("Phase 5 P0 hardening checks (static)", () => {
 
   it("CI deploy job exports CLERK_WEBHOOK_SECRET and DATA_INTEGRITY_HEALTH_TOKEN", () => {
     const ciWorkflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
-    expect(ciWorkflow).toContain("CLERK_WEBHOOK_SECRET: ${{ secrets.CLERK_WEBHOOK_SECRET }}");
-    expect(ciWorkflow).toContain("DATA_INTEGRITY_HEALTH_TOKEN: ${{ secrets.DATA_INTEGRITY_HEALTH_TOKEN }}");
+    const deployJobStart = ciWorkflow.indexOf("\n  deploy:");
+    const deployJobEnd = ciWorkflow.indexOf("\n  gate:");
+    expect(deployJobStart).toBeGreaterThan(-1);
+    expect(deployJobEnd).toBeGreaterThan(deployJobStart);
+    const deployJob = ciWorkflow.slice(deployJobStart, deployJobEnd);
+    expect(deployJob).toContain("run: bash deploy.sh --no-color");
+    expect(deployJob).toContain("CLERK_WEBHOOK_SECRET: ${{ secrets.CLERK_WEBHOOK_SECRET }}");
+    expect(deployJob).toContain("DATA_INTEGRITY_HEALTH_TOKEN: ${{ secrets.DATA_INTEGRITY_HEALTH_TOKEN }}");
   });
 
   it("deploy.sh declares the pilot-critical preflight vars", () => {
@@ -90,10 +96,15 @@ describe("deploy.sh preflight (behavioral)", () => {
   };
 
   function runPreflight(env) {
-    return spawnSync("bash", [path.join(repoRoot, "deploy.sh"), "--check", "--no-color"], {
+    const result = spawnSync("bash", [path.join(repoRoot, "deploy.sh"), "--check", "--no-color"], {
       env,
       encoding: "utf8",
+      timeout: 15_000,
     });
+    // A timed-out spawn reports status null, which would satisfy `not.toBe(0)`
+    // in the failure-path cases — surface it as an explicit error instead.
+    if (result.error) throw result.error;
+    return result;
   }
 
   it("passes with all required and pilot-critical vars present", () => {
