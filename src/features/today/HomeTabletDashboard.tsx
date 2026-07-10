@@ -323,7 +323,7 @@ export function HomeTabletDashboard() {
 
       {/* Exceptions — worst-first head of the shared controller feed (Phase 3).
           Titled to match the canonical phone/web ExceptionsTile (mobile is the
-          source of truth); "התראות/Alerts" is a separate nav destination. */}
+          source of truth); the Alerts nav entry is a separate destination. */}
       <section style={tileStyle} data-testid="tablet-tile-alerts">
         <TileHeader
           title={t.homeSurface.exceptions}
