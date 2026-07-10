@@ -27,6 +27,10 @@ let createRequireDisplayOrUser: (
   resolveDisplay?: (req: Request) => Promise<DisplayAuthResult>,
   userMiddleware?: (req: Request, res: Response, next: NextFunction) => unknown,
 ) => (req: Request, res: Response, next: NextFunction) => Promise<unknown>;
+let resolveDisplayAuth: (
+  req: Request,
+  lookup?: (tokenHash: string) => Promise<{ id: string; clinicId: string; tokenHash: string } | null>,
+) => Promise<DisplayAuthResult>;
 
 const A_DISPLAY_TOKEN = `vtd_${"A".repeat(43)}`;
 
@@ -38,6 +42,7 @@ beforeAll(async () => {
   resolveAuthUser = mod.resolveAuthUser;
   requireAuth = mod.requireAuth;
   createRequireDisplayOrUser = mod.createRequireDisplayOrUser;
+  resolveDisplayAuth = mod.resolveDisplayAuth;
 }, 30000);
 
 /** Run `fn` with Clerk mode forced on (so resolveAuthUser does NOT dev-bypass). */
@@ -122,6 +127,20 @@ describe("deny-list — requireAuth end-to-end blocks a display token on a non-d
       expect(nextCalled).toBe(false);
       expect(state.statusCode).toBe(401);
     });
+  });
+});
+
+describe("F6 — live-stream revocation predicate: resolveDisplayAuth denies a revoked device", () => {
+  // The realtime /stream handler re-validates a display-authed connection on an
+  // interval by calling resolveDisplayAuth(req); a `!ok` result closes the live
+  // SSE stream. The active-device lookup filters `revoked_at IS NULL`, so a
+  // revoked device returns null — exactly the signal below. This is what stops a
+  // revoked kiosk from streaming operational data on its already-open connection.
+  it("returns !ok/401 when the active-device lookup finds no row (revoked or unknown)", async () => {
+    const req = makeReq({ "x-display-token": A_DISPLAY_TOKEN });
+    const result = await resolveDisplayAuth(req, async () => null);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe(401);
   });
 });
 

@@ -2,7 +2,7 @@ import type { Response } from "express";
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { and, asc, eq, gt, isNotNull, sql } from "drizzle-orm";
-import { requireAuth, requireDisplayOrUser } from "../middleware/auth.js";
+import { requireAuth, requireDisplayOrUser, resolveDisplayAuth } from "../middleware/auth.js";
 import { db, eventOutbox } from "../db.js";
 import { outboxEmitter, type PublishedOutboxRow } from "../lib/event-publisher.js";
 import { incrementMetric } from "../lib/metrics.js";
@@ -11,6 +11,12 @@ import { recordStreamConnect, startKeepalive } from "../lib/code-blue-keepalive.
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 const MAX_OUTBOX_REPLAY = 1000;
+
+// How often a display-authed SSE connection re-checks that its token is still
+// active (F6). Bounds how long a revoked kiosk can keep streaming before the
+// server closes its live connection. Kiosks are few, so a light DB read at this
+// cadence is negligible; aligned with the ~10 s keepalive.
+const DISPLAY_REVOCATION_RECHECK_MS = 10_000;
 
 function parseLastEventId(header: unknown): number | undefined {
   if (typeof header !== "string") return undefined;
@@ -627,10 +633,36 @@ router.get("/stream", requireDisplayOrUser, async (req, res) => {
     recordStreamConnect(clinicId);
     const stopKeepalive = startKeepalive(res, clinicId);
 
+    // Phase 10 (F6) — enforce display-token revocation on the LIVE stream, not
+    // only at connect. A revoked kiosk would otherwise keep receiving operational
+    // data on its already-open SSE connection until it happened to reconnect. For
+    // display-authed connections, re-validate the token on an interval (the
+    // lookup filters `revoked_at IS NULL`); on revocation, close the stream so the
+    // client's existing 401 → /board/pair reconnect path takes over. Additive
+    // auth re-check — no transport, envelope, or keepalive change; user
+    // (non-display) connections are unaffected.
+    let revocationTimer: ReturnType<typeof setInterval> | null = null;
+    if (req.isDisplayAuth) {
+      revocationTimer = setInterval(() => {
+        void resolveDisplayAuth(req)
+          .then((check) => {
+            if (!check.ok) finalize();
+          })
+          .catch(() => {
+            // Best-effort: a transient DB error must never tear down a live board.
+          });
+      }, DISPLAY_REVOCATION_RECHECK_MS);
+      revocationTimer.unref?.();
+    }
+
     finalize = () => {
       if (cleaned) return;
       cleaned = true;
       stopKeepalive();
+      if (revocationTimer !== null) {
+        clearInterval(revocationTimer);
+        revocationTimer = null;
+      }
       outboxEmitter.off(`clinic:${clinicId}`, onOutbox);
       unsubscribe(res);
       try {
