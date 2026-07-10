@@ -1833,3 +1833,19 @@ Each group committed separately, full suite green per group. Audit-report branch
 **Not changed (surfaced for owner decision):** F4/F5 (iPad "Start shift" → /handoff summary; no self-start-shift API exists — `/api/shifts` is admin GET + CSV import only; shift model is a product decision) and the CB active-session 2s poll (`useCodeBlueSession.ts:109` `refetchInterval:2000` — pre-existing frozen Code Blue surface; not altered without owner sign-off).
 
 **Verdict:** VERIFIED (8 findings fixed + suite/gates green); F4/F5 + CB-poll DEFERRED to owner decision.
+
+---
+
+## 2026-07-10 — Phase 10.A: F4 shift-start resolution (owner decision: align iPad to roster-derived hero)
+
+**Finding (F4/F5):** the iPad "Start shift" button opened the /handoff summary sheet and started no shift.
+
+**Investigation:** no self-start-shift API exists — `server/routes/shifts.ts` exposes only admin GET (`/`, line 815) + CSV import (`/import*`); `vt_shifts` (roster, carries `role` → feeds `resolveAuthority`) is admin-scheduled, and `vt_shift_sessions` (clock-in, no role) is documented as the "orphaned/legacy" table (`home-dashboard.ts:18-20`). On-shift is **roster-derived by design**: all four Phase-8 surfaces (Ops/Vet/Tech/Student) render `OnShiftHero` — "no start/end buttons … on-shift is roster-derived server-side" (`OnShiftHero.tsx:31`). Grep proved the iPad `HomeTabletDashboard` was the **only** surface still importing/rendering the legacy button-bearing `ShiftHero` (`grep -rn '<ShiftHero|import { ShiftHero }' src` → 1 hit, HomeTabletDashboard:11).
+
+**Owner decision:** align the iPad to the rest rather than reverse the roster-derived design (build-self-start was reconsidered once the deliberate no-self-start architecture surfaced).
+
+**Change:** `HomeTabletDashboard` renders `OnShiftHero` (heroState derived exactly as `use-ops-home.ts:79`), and `src/features/today/ShiftHero.tsx` deleted (its only consumer). Authority untouched — no clock-in path introduced; `vt_shift_sessions` stays orphaned; `resolveAuthority` stays roster-only.
+
+**Commands:** frontend `tsc --noEmit` exit 0 · `pnpm test` → `446 files / 4224 tests passed` (home-tablet-dashboard, home-surface-fork, epic8-slice1-state-primitives, phase-6-state-consistency incl.) · `pnpm i18n:check` deep parity · `pnpm architecture:gates` G1 passed (0 cycles, dead module removed).
+
+**Verdict:** VERIFIED. F5 (cross-display shift-entry inconsistency) resolves with it — no surface offers self-start now.
