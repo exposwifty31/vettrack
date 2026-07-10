@@ -51,9 +51,11 @@ describe("Stage 4 WebOnlyGuard — viewport guard (BUG-009)", () => {
     expect(guardSrc.includes("t.webOnlyGuard.description")).toBe(true);
     expect(guardSrc.includes("t.webOnlyGuard.cta")).toBe(true);
   });
-  it("the board route routes narrow viewports to /my-equipment", () => {
+  it("the legacy /equipment/board redirects to the canonical /board kiosk (Phase 10)", () => {
+    // Was a WebOnlyGuard render route (narrow → /my-equipment); /board is now the
+    // single board surface and its BoardShell kiosk handles every form factor.
     expect(
-      /path="\/equipment\/board"[^]*?WebOnlyGuard fallback="\/my-equipment"/.test(routesSrc),
+      /path="\/equipment\/board"><RedirectPreserveSearch to="\/board"/.test(routesSrc),
     ).toBe(true);
   });
   it("webOnlyGuard i18n keys exist with en/he parity", () => {

@@ -39,7 +39,6 @@ const CodeBluePage = lazy(() => import("@/pages/code-blue"));
 const CodeBlueDisplay = lazy(() => import("@/pages/code-blue-display"));
 const CrashCartCheckPage = lazy(() => import("@/pages/crash-cart"));
 const CodeBlueHistoryPage = lazy(() => import("@/pages/code-blue-history"));
-const WardDisplayPage = lazy(() => import("@/pages/display"));
 const CommandBoardScreen = lazy(() => import("@/features/command-board"));
 const BoardPairPage = lazy(() => import("@/pages/board-pair"));
 const HandoffPage = lazy(() => import("@/pages/handoff"));
@@ -130,7 +129,10 @@ export function AppRoutes() {
         {!isNativeTablet && <Route path="/equipment"><AuthGuard><EquipmentPage /></AuthGuard></Route>}
         <Route path="/equipment/new"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/tasks"><AuthGuard><AppointmentsPage /></AuthGuard></Route>
-        <Route path="/equipment/board"><AuthGuard><WebOnlyGuard fallback="/my-equipment"><WardDisplayPage /></WebOnlyGuard></AuthGuard></Route>
+        {/* Phase 10: /board is the canonical Command Center (BoardShell kiosk). The
+            legacy /equipment/board web route redirects to it (owner decision), so
+            there is one board surface. Bookmarks/deep-links + ?kiosk=1 preserved. */}
+        <Route path="/equipment/board"><RedirectPreserveSearch to="/board" /></Route>
         {/* Standalone Command Center kiosk. AuthGuard only — the platform target */}
         {/* already does the gating WebOnlyGuard would: native → mobile (NativeShell), */}
         {/* narrow browser at /board → board (full BoardShell kiosk, not the desktop */}
@@ -152,8 +154,8 @@ export function AppRoutes() {
         {/* Legacy aliases → canonicals */}
         <Route path="/appointments"><Redirect to="/equipment/tasks" replace /></Route>
         <Route path="/equipment-tasks"><Redirect to="/equipment/tasks" replace /></Route>
-        <Route path="/display"><RedirectPreserveSearch to="/equipment/board" /></Route>
-        <Route path="/equipment-board"><Redirect to="/equipment/board" replace /></Route>
+        <Route path="/display"><RedirectPreserveSearch to="/board" /></Route>
+        <Route path="/equipment-board"><Redirect to="/board" replace /></Route>
         <Route path="/scan"><AuthGuard><ScanPage /></AuthGuard></Route>
         <Route path="/equipment/scan"><Redirect to="/equipment?scan=1" replace /></Route>
         <Route path="/equipment/maintenance"><Redirect to="/equipment?status=maintenance" replace /></Route>
