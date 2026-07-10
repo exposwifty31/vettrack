@@ -1807,3 +1807,29 @@ Each group committed separately, full suite green per group. Audit-report branch
 **Board flow NOT live-walked** (III.6 deferral stands — no physical display available); this entry claims static + suite + migration evidence. Board canonicalization (`/equipment/board`→`/board`) intentionally deferred to Phase 10.
 
 **Verdict:** VERIFIED (server security core + client plumbing; gates green; existing auth byte-identical).
+
+---
+
+## 2026-07-10 — Phase 10.A: live tri-display cowork audit — findings fix batch (F1/F2/F3/F6/F7/F8/F9/F10)
+
+**Context:** the owner + Claude cowork ran the tri-display audit (`docs/release/live-tri-display-audit-prompt.md`) across iPhone (real device via iPhone Mirroring), iPad (iOS sim), and Web (vettrack.uk), all signed in as admin, Hebrew/RTL, same live backend. Ten findings returned; the two owner-decision items (F4/F5 shift model, CB active-session 2s poll) are surfaced separately, not silently changed. Fixes below verified against real code + suite.
+
+**F1 (MEDIUM) — iPad exceptions title parity.** `use-ops-home.ts:60` `topExceptions` and `HomeTabletDashboard`'s tile render the SAME `alertsCtl.alerts` feed (ack-filtered, worst-first, top-5, badge, `/alerts` link); the `ExceptionsTile` comment says "reimplemented from HomeTabletDashboard's alerts tile". Phone/web title it `t.homeSurface.exceptions`; the iPad kept `t.nav.alerts`. Fix: iPad → `t.homeSurface.exceptions`. Evidence: `ExceptionsTile.tsx:34` vs `HomeTabletDashboard.tsx` tile header; `home-tablet-dashboard`/`home-surface-fork` tests pass.
+
+**F2 (HIGH) — CB 403 leaked English + requestId.** `toApiErrorMessage` (request-core.ts:174) appended `(requestId: …)`; the CB start handler showed raw `err.message`. Fix: `toApiErrorMessage` no longer appends requestId (stays on `ApiError.requestId`, verified `request-core.ts:99 this.requestId = payload.requestId`); CB start/end handlers show localized strings only (new `codeBlue.clinicalAuthorityRequired` he/en, parity green); failed-start toast 8s. Evidence: `code-blue.tsx:582` handler; `phase-5-error-contract`/`phase-5-pr-5-6-error-shape` tests pass (server `body.requestId` contract unchanged).
+
+**F3 (MEDIUM) — admin auto-filled as CB event manager then 403.** `code-blue.tsx:92` was `role === "vet" || role === "admin"`. Server gate is `requireClinicalAuthority({ allow:["vet","senior_technician","technician"], allowSystemAdmin:false })` (code-blue.ts:280) — but an admin with a shift-derived clinical role CAN pass the snapshot path (authority.ts:186–192), so NOT hard-blocked client-side. Fix: `role === "vet"` (admin no longer auto-assigned; picks a clinician via the manager list). Evidence: `code-blue-precheck-gate` test passes.
+
+**F6 (HIGH, security) — revoked display kept streaming.** Revocation was enforced only at connect; the open SSE kept delivering data (+40s observed). Fix: `/stream` (realtime.ts) re-validates a display-authed connection every 10s via `resolveDisplayAuth` (lookup filters `revoked_at IS NULL`, auth.ts:730) and closes on revocation → client's existing 401→/board/pair path. Additive; no transport/envelope/keepalive change; user connections untouched. Evidence: new deny-list test case (`resolveDisplayAuth(req, ()=>null)` → `!ok/401`), 7 tests pass; server tsc exit 0.
+
+**F7+F8 (MEDIUM) — admin registry stale.** `/heartbeat` (display.ts:653, `requireDisplayOrUser`) DOES write `lastSeenAt` (display.ts:311); the board mounts `useDisplayHeartbeat` via `CommandBoardScreen`. Root cause of both "device not appearing on pair" (F7) and "Last seen: Never" (F8) was the admin list never refetching. Fix: `DisplaysConsolePage` devices query gets `refetchInterval: 15s` + `refetchOnWindowFocus`. Evidence: `displays-console` test passes.
+
+**F9 (LOW) — install promo on /board/pair kiosk.** `pwa-install-prompt.tsx` suppressed only emergency routes. Fix: added `/board` to the suppression prefixes (covers `/board` + `/board/pair`).
+
+**F10 (LOW/MEDIUM) — nav through redirecting aliases.** `CANONICAL_HREFS.equipmentBoard/equipmentTasks` held `/equipment-board`,`/equipment-tasks` (redirect aliases; routes.tsx:153,155). Fix: point at canonical `/equipment/board`,`/equipment/tasks` (routes.tsx:131,132). Only `layout.tsx` consumes these keys (href + active-state, same constant) — stays consistent; wedge-smoke tests (assert the alias redirect routes still exist) pass.
+
+**Commands:** `pnpm test` → `446 files / 4224 tests passed` · frontend `tsc --noEmit` exit 0 · server `tsc -p tsconfig.server.json` exit 0 · `pnpm i18n:check` → deep parity · `pnpm architecture:gates` → G1 passed (0 new cycles).
+
+**Not changed (surfaced for owner decision):** F4/F5 (iPad "Start shift" → /handoff summary; no self-start-shift API exists — `/api/shifts` is admin GET + CSV import only; shift model is a product decision) and the CB active-session 2s poll (`useCodeBlueSession.ts:109` `refetchInterval:2000` — pre-existing frozen Code Blue surface; not altered without owner sign-off).
+
+**Verdict:** VERIFIED (8 findings fixed + suite/gates green); F4/F5 + CB-poll DEFERRED to owner decision.
