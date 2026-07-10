@@ -4,7 +4,11 @@ import { useLocation } from "wouter";
 import { usePwaInstall } from "@/hooks/use-pwa-install";
 import { t } from "@/lib/i18n";
 
-const EMERGENCY_ROUTES = ["/code-blue", "/crash-cart"];
+// Routes where the "add to home screen" promo must never appear: emergency flows
+// (never interrupt) and kiosk/display surfaces (a headless board is not a personal
+// device — the banner also overlapped the /board/pair code input, F9). "/board"
+// covers both /board and /board/pair.
+const PROMO_SUPPRESSED_PREFIXES = ["/code-blue", "/crash-cart", "/board"];
 
 // Shows for eligible users who haven't installed the app:
 //   • Android / Chrome  → native "Add to Home Screen" prompt
@@ -18,8 +22,8 @@ export function PwaInstallPrompt() {
   // Session-level dismiss for the Android/Chrome banner (native prompt handles persistence).
   const [androidDismissed, setAndroidDismissed] = useState(false);
 
-  // Never interrupt emergency flows with promotional UI.
-  if (EMERGENCY_ROUTES.some((r) => location.startsWith(r))) return null;
+  // Never show the promo on emergency flows or kiosk/display surfaces.
+  if (PROMO_SUPPRESSED_PREFIXES.some((r) => location.startsWith(r))) return null;
 
   // Already installed — show nothing.
   if (isStandalone) return null;
