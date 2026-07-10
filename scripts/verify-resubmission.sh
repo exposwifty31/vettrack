@@ -82,10 +82,26 @@ if [ -f "$ICON" ]; then
   [ "$A" = "no" ] && [ "$W" = "1024" ] && ok "icon $W px, hasAlpha=$A" || no "icon W=$W hasAlpha=$A (want 1024 / no)"
 else no "icon file missing"; fi
 
-# --- build number >= 4 ------------------------------------------------------
-hdr "[build number]"
-BN=$(grep -m1 CURRENT_PROJECT_VERSION ios/App/App.xcodeproj/project.pbxproj | grep -oE '[0-9]+')
-[ "${BN:-0}" -ge 4 ] && ok "CURRENT_PROJECT_VERSION = $BN (>=4)" || no "build number = ${BN:-?} (<4 — bump: cd ios/App && agvtool new-version -all 5)"
+# --- build number must exceed the last shipped build ------------------------
+# The app is LIVE, so the old fixed ">=4" floor is meaningless (always passes).
+# App Store Connect rejects a duplicate CFBundleVersion within a marketing
+# version, so each submission MUST be strictly greater than the last one shipped.
+# Source of truth: ios/.last-shipped-build (the owner updates it after a
+# successful upload; `resubmit.sh` prints the reminder). Override via
+# LAST_SHIPPED_BUILD env for a one-off check.
+hdr "[build number — must exceed last shipped]"
+BN=$(grep -m1 'CURRENT_PROJECT_VERSION = ' ios/App/App.xcodeproj/project.pbxproj | grep -oE '[0-9]+')
+LAST=$(grep -oE '[0-9]+' ios/.last-shipped-build 2>/dev/null | head -1)
+LAST="${LAST_SHIPPED_BUILD:-${LAST:-}}"
+if [ -z "${LAST:-}" ]; then
+  [ "${BN:-0}" -ge 1 ] \
+    && ok "CURRENT_PROJECT_VERSION = ${BN} (no ios/.last-shipped-build — strict check off)" \
+    || no "build number missing from pbxproj"
+elif [ "${BN:-0}" -gt "$LAST" ]; then
+  ok "build $BN > last shipped $LAST"
+else
+  no "build ${BN:-?} must be > last shipped $LAST — bump first: pnpm resubmit  (then update ios/.last-shipped-build after upload)"
+fi
 
 # --- bundled shell + native clerk chunk -------------------------------------
 hdr "[bundled shell]"

@@ -25,9 +25,35 @@
 - **Code:** account deletion + Playwright CI fixes merged to `github/main` (PR #1). Local `main` synced. Deploy to Railway before App Review (§K).
 - **Production web** (`https://vettrack.uk`): serving the current bundle. The iOS shell is a **bundled app** (no `server.url`) — it does NOT depend on production for the frontend, but the API + Clerk it calls are production.
 - **Clerk (production instance `clerk.vettrack.uk`):** redirect URLs, allowed origins, Apple+Google OAuth, demo account, Client Trust — all configured (verify in §C).
-- **Build number:** `CURRENT_PROJECT_VERSION = 20`, `MARKETING_VERSION = 1.0.1`. Ready to archive as **1.0.1 (20)**.
+- **Version:** the app is **LIVE on the App Store**, so every submission is an update. Version fields are single-sourced (`package.json` = the marketing version of record = **1.1.2**; iOS `MARKETING_VERSION` reconciled to match; `CURRENT_PROJECT_VERSION` = **25**; `Info.plist CFBundleVersion` = `$(CURRENT_PROJECT_VERSION)`, no literal). **Do not hand-edit version fields — use `pnpm resubmit` / `pnpm resubmit:release` (§B.1).**
 - **Synced shell:** `npx cap sync ios` already run from HEAD. `dist/public` == `ios/App/App/public`.
 - **Legal pages:** `/privacy`, `/terms`, and `/support` are implemented — verify all three on production after deploy before setting App Store / Play Console URLs. See `docs/legal-pages.md`.
+
+## B.1. Version bump — one command (`scripts/resubmit.sh`)
+
+The app is live, so bump before every archive. `resubmit.sh` single-sources the
+version across `package.json`, the pbxproj (`CURRENT_PROJECT_VERSION` +
+`MARKETING_VERSION`), and `Info.plist` (`CFBundleVersion = $(CURRENT_PROJECT_VERSION)`),
+then runs the §C verification. It edits version fields only — no app logic.
+
+- **Same version, new binary** (App Store re-upload / fix a rejected build):
+  ```bash
+  pnpm resubmit            # build n -> n+1; marketing version unchanged
+  ```
+- **New product version** (new work shipped — you pick patch/minor/major; reserve
+  major for releases that warrant it, no auto-increment):
+  ```bash
+  pnpm resubmit:release 1.2.0     # sets marketing 1.2.0 + seeds build n+1
+  ```
+
+Then `pnpm cap:build:native` and archive (§C/§D). After a **successful** App Store
+upload, record the shipped build so the next bump is validated against it:
+```bash
+echo <that build number> > ios/.last-shipped-build
+```
+The §C build-number gate fails until the current build exceeds `ios/.last-shipped-build`
+(override for a one-off with `LAST_SHIPPED_BUILD=<n>`). Native builds still go only
+through `scripts/build-native-shell.sh`; the archive/upload is human-run (§D).
 
 ## C. PRE-ARCHIVE VERIFICATION — run these every time before archiving
 
@@ -144,7 +170,7 @@ The Apple-sign-up error had a stack of causes, each hiding the next. All are loa
 - `capacitor.config.ts` bundled mode (no `server.url`) for the shipped archive.
 - Clerk: redirect URLs, `allowed_origins`, Apple/Google OAuth, Client Trust OFF.
 - The native-OAuth chain in §F.
-- Build number stays ≥ 4 (bump for each new upload: `cd ios/App && agvtool new-version -all 5`).
+- Build number is monotonic — bump for each new upload via `pnpm resubmit` (§B.1), never by hand. It must exceed `ios/.last-shipped-build`.
 
 ## J. After acceptance
 
