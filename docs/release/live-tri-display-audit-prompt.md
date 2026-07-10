@@ -2,7 +2,7 @@
 
 > **What this is.** A ready-to-run prompt for **Claude cowork**, driven live by the owner across **three real displays at once**. It is the release gate for the VetTrack transformation program — the single, batched, human-in-the-loop verification that replaces the deferred per-phase iOS sim matrix (Phases 8 & 9 shipped on automated gates only; this is where a human and Claude look at the real thing, hard).
 >
-> **How to use it.** The owner opens the three displays (below), then pastes everything from the `═══ PROMPT STARTS ═══` line down into a Claude cowork session. Cowork drives the audit; the owner is its hands and eyes on the physical iPhone. **Every finding is written in the exact report format at the end and sent back to the implementing agent (me) to fix and re-verify — loop until the board is clean.**
+> **How to use it.** The owner opens the three displays (below) on the Mac, then pastes everything from the `═══ PROMPT STARTS ═══` line down into a Claude cowork session with computer control. **Cowork operates the displays directly** — it drives the iPhone through the iPhone Mirroring window, the iPad through the iOS Simulator window, and the Web app through the browser, all on the same Mac. The owner co-pilots: the physical-only actions (the airplane-mode offline test that drops the mirror, feeling haptics, real multi-touch), judgment calls on subjective polish, and anything cowork can't reach. **Every finding is written in the exact report format at the end and sent back to the implementing agent (me) to fix and re-verify — loop until the board is clean.**
 >
 > **This prompt audits; it does not fix.** Cowork proposes and reproduces; fixes land in the repo through the implementing agent so they pass the III.8 gate and CodeRabbit review. Cowork may hand back a suggested diff, but the source of truth for the fix is the repo, not the cowork session.
 
@@ -45,13 +45,27 @@ inventory/dispense, tasks & shifts) — across THREE live displays simultaneousl
   DISPLAY 2 — iPad  (iOS simulator, Capacitor-native)
   DISPLAY 3 — Web   (vettrack.uk, desktop browser ≥1024px)
 
-I (the human) am your hands and eyes. I will physically drive the iPhone, the
-iPad simulator, and the web browser and describe or screenshot exactly what I
-see. You direct every step. Your job is to find EVERYTHING wrong — not the big
-obvious breakage, but the small, embarrassing, "ship-blocking-in-aggregate"
-details that a tired human misses. Assume the app is 95% right and your entire
-value is the last 5%. Be relentless. Do not reassure me. Do not say "looks good"
-and move on — prove it looks good or record why it doesn't.
+You have COMPUTER CONTROL of the Mac these three displays live on. You operate
+them yourself:
+  - DISPLAY 1 (iPhone) via the iPhone Mirroring window — you tap, type, scroll,
+    and screenshot the real device directly.
+  - DISPLAY 2 (iPad) via the iOS Simulator window — you drive it directly.
+  - DISPLAY 3 (Web) via the browser — you navigate and screenshot directly.
+Take your own screenshots; do not ask the human to describe pixels you can see.
+
+The human is your co-pilot, not your hands. Ask the human ONLY for what you
+genuinely cannot do yourself:
+  - the airplane-mode offline test (it drops the iPhone Mirroring link, so it
+    must be done on the physical phone — see flow E),
+  - confirming a haptic actually fired (can't be felt through the mirror),
+  - a real multi-touch gesture if a click-driven one is inconclusive,
+  - a judgment call on subjective polish, or account/role changes you can't make.
+
+Your job is to find EVERYTHING wrong — not the big obvious breakage, but the
+small, embarrassing, "ship-blocking-in-aggregate" details that a tired human
+misses. Assume the app is 95% right and your entire value is the last 5%. Be
+relentless. Do not reassure the human. Do not say "looks good" and move on —
+prove it looks good with a screenshot, or record why it doesn't.
 
 ## The lens (apply ALL of these to EVERY screen, on EACH of the three displays)
 
@@ -79,7 +93,8 @@ and move on — prove it looks good or record why it doesn't.
    checks "unverified via mirror" or briefly hold the physical phone. Long-press /
    swipe / pinch are click-driven through the mirror — judge the behavior and
    re-check a borderline gesture on the physical phone.)
-5. LATENCY & MOTION — time every meaningful action (I'll count). Flag anything
+5. LATENCY & MOTION — time every meaningful action yourself (screenshot before/
+   after, or watch the mirror). Flag anything
    that feels slow with no spinner/skeleton, janky animation, layout shift as
    content loads (CLS), double-taps registering twice, or a control that looks
    tappable before it's ready.
@@ -186,16 +201,20 @@ J. REDIRECTS & REMOVED SCOPE (a rendered page here = blocking finding)
 Be honest about severity. Do not inflate; do not soften. A "small" RTL mirror bug
 on the primary (Hebrew) locale is HIGH, not LOW.
 
-## How to work with me (the human)
+## How to work (you drive; the human co-pilots)
 
-- Direct me one concrete step at a time. Tell me exactly what to tap/type and on
-  WHICH display. Ask me for a screenshot whenever pixels matter.
-- When I report what I see, INTERROGATE it — don't accept "it's fine." Ask for the
-  specific detail that would confirm or deny a bug.
+- Drive each display yourself: tap/type/scroll in the iPhone Mirroring window, the
+  iPad Simulator window, and the browser. Take your own screenshots whenever pixels
+  matter — don't ask the human to describe what you can see.
+- INTERROGATE your own observations — don't accept "it's fine." Zoom into the
+  screenshot, check the specific detail that would confirm or deny a bug.
+- Hand the human only the co-pilot tasks: the physical-phone offline test, haptic
+  confirmation, an inconclusive multi-touch gesture, subjective-polish calls, and
+  role/account switches you can't perform.
 - Keep a running numbered findings list. At the end of each flow, summarize the new
   findings. Never lose one.
-- When we finish (or when I say stop), output the COMPLETE findings list in the
-  report format below, sorted BLOCKING → HIGH → MEDIUM → LOW, ready for me to paste
+- When the audit is done (or the human says stop), output the COMPLETE findings list
+  in the report format below, sorted BLOCKING → HIGH → MEDIUM → LOW, ready to paste
   back to the implementing agent.
 
 ═══ PROMPT ENDS ═══
