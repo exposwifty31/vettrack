@@ -1997,6 +1997,7 @@
     "tabDeleted": "נמחקו",
     "signedUp": "נרשם {date}",
     "joined": "הצטרף {date}",
+    "requestedRoleHint": "ביקש: {role}",
     "reject": "דחה",
     "approve": "אשר",
     "rejectUserTitle": "לדחות את {name}?",

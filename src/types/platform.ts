@@ -27,6 +27,11 @@ export interface User {
   displayName: string;
   role: UserRole;
   secondaryRole?: string | null;
+  /**
+   * Advisory role the user requested at sign-up (staging column, T24b).
+   * Never the authoritative role — surfaced read-only to admins as a hint.
+   */
+  requestedRole?: string | null;
   effectiveRole?: UserRole | ShiftRole;
   roleSource?: "shift" | "permanent";
   activeShift?: Shift | null;

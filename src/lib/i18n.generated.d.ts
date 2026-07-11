@@ -2000,6 +2000,7 @@ export interface TStructure {
     tabDeleted: string;
     signedUp: string;
     joined: string;
+    requestedRoleHint: string;
     reject: string;
     approve: string;
     rejectUserTitle: string;

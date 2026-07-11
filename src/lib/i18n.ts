@@ -768,6 +768,7 @@ const translations = {
       tr(d.adminPage.logClientPage, { current, total }),
     signedUp: (date: string) => tr(d.adminPage.signedUp, { date }),
     joined: (date: string) => tr(d.adminPage.joined, { date }),
+    requestedRoleHint: (role: string) => tr(d.adminPage.requestedRoleHint, { role }),
     rejectUserTitle: (name: string) => tr(d.adminPage.rejectUserTitle, { name }),
     deleteUserTitle: (name: string) => tr(d.adminPage.deleteUserTitle, { name }),
     deleteFolderTitle: (name: string) => tr(d.adminPage.deleteFolderTitle, { name }),

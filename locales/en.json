@@ -1997,6 +1997,7 @@
     "tabDeleted": "Deleted",
     "signedUp": "Signed up {date}",
     "joined": "Joined {date}",
+    "requestedRoleHint": "Requested: {role}",
     "reject": "Reject",
     "approve": "Approve",
     "rejectUserTitle": "Reject {name}?",
