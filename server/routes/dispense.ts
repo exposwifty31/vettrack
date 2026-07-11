@@ -124,12 +124,13 @@ router.post(
       dispenseEventId: req.params.id,
       confirmedBy: req.authUser!.id,
       confirmedByEmail: req.authUser!.email,
-      actorRole:
-        req.authoritySnapshot?.effectiveClinicalRole ??
-        resolveAuditActorRole(req),
-      authoritySource: req.authoritySnapshot?.source ?? null,
-      authorityReason: req.authoritySnapshot?.reason ?? null,
-      authorityOperationalRole: req.authoritySnapshot?.operationalRole ?? null,
+      // Dispense is now non-clinical (T26 reclassification): no clinical-authority
+      // middleware runs on this route, so there is no `req.authoritySnapshot`. Record the
+      // actor's role directly; a non-clinical dispense carries no clinical-authority source/reason.
+      actorRole: resolveAuditActorRole(req),
+      authoritySource: null,
+      authorityReason: null,
+      authorityOperationalRole: null,
       // Phase 5 PR 5.3 — threaded for the clinical-invariant evaluator
       // wiring inside the confirm tx.
       requestId,
