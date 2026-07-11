@@ -6,7 +6,8 @@ import { t, formatDateTimeByLocale } from "@/lib/i18n";
 import { Input } from "@/components/ui/input";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { ApiError, toApiErrorMessage } from "@/lib/api";
-import type { Appointment, AppointmentStatus, TaskPriority } from "@/types";
+import { getEquipmentDisplayName } from "@/lib/equipment-display";
+import type { Appointment, AppointmentStatus, Equipment, TaskPriority } from "@/types";
 
 export const DEFAULT_DAY_START_HOUR = 8;
 export const DEFAULT_DAY_END_HOUR = 20;
@@ -356,9 +357,26 @@ export function looksLikeUuid(s: string): boolean {
 // /api/appointments contract); in the equipment-first product they carry a
 // device reference and a location label. These render helpers take the wire
 // value under device/location names — client-render clarity only, no wire change.
-export function formatDevice(deviceRef: string | null | undefined): string {
+//
+// T23: the task-create form's device field is now a real vt_equipment picker
+// (EquipmentDeviceField), so `deviceRef` is a `vt_equipment.id` for any task
+// created after this change. `equipmentById` (built from the same shared
+// `["/api/equipment"]` fetch the picker uses) resolves that id back to the
+// equipment's display name. Tasks created before T23 may still carry a plain
+// free-text device string — that legacy value passes through unchanged, and a
+// UUID-shaped value with no match in `equipmentById` (e.g. deleted equipment,
+// or the map hasn't loaded yet) still falls back to the generic linked-device
+// label rather than showing a raw id.
+export function formatDevice(
+  deviceRef: string | null | undefined,
+  equipmentById?: Map<string, Pick<Equipment, "name" | "nameHe">>,
+): string {
   if (!deviceRef) return t.appointmentsPage.unassigned;
-  if (looksLikeUuid(deviceRef)) return t.appointmentsPage.linkedDevice;
+  if (looksLikeUuid(deviceRef)) {
+    const linked = equipmentById?.get(deviceRef);
+    if (linked) return getEquipmentDisplayName(linked);
+    return t.appointmentsPage.linkedDevice;
+  }
   return deviceRef;
 }
 

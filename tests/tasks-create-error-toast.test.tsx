@@ -44,6 +44,13 @@ vi.mock("@/lib/api", async (importOriginal) => {
     api: {
       ...actual.api,
       users: { ...actual.api.users, me: () => Promise.resolve({ id: "u-vet-1", role: "vet" }) },
+      equipment: {
+        ...actual.api.equipment,
+        list: () =>
+          Promise.resolve([
+            { id: "eq-1", name: "ICU Ventilator", nameHe: null, status: "ok", createdAt: "2026-01-01T00:00:00Z" },
+          ]),
+      },
       appointments: {
         ...actual.api.appointments,
         meta: () =>
@@ -90,9 +97,12 @@ async function openBookingDialogAndFillDevice() {
   const openButtons = await screen.findAllByRole("button", { name: t.appointmentsPage.createTask });
   fireEvent.click(openButtons[0]);
   const dialog = await screen.findByRole("dialog");
-  fireEvent.change(within(dialog).getByPlaceholderText(t.appointmentsPage.placeholderDevice), {
-    target: { value: "ICU ventilator" },
-  });
+  // T23: the device field is a real equipment picker (not free text) — open
+  // it, type to filter, and select the matching equipment-record option.
+  const deviceField = within(dialog).getByPlaceholderText(t.appointmentsPage.placeholderDevice);
+  fireEvent.focus(deviceField);
+  fireEvent.change(deviceField, { target: { value: "ICU" } });
+  fireEvent.click(await within(dialog).findByText("ICU Ventilator"));
   return dialog;
 }
 
