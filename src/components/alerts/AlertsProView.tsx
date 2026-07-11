@@ -147,7 +147,7 @@ export function AlertsProView({
                       <div className="flex min-w-0 items-center gap-1.5">
                         <UserCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden />
                         <span className="truncate vt-text-2xs text-ivory-text2">
-                          {ack.acknowledgedByEmail.split("@")[0]} ·{" "}
+                          {ack.acknowledgedByDisplayName || t.appointmentsPage.unknownUser} ·{" "}
                           {formatRelativeTime(new Date(ack.acknowledgedAt))}
                         </span>
                       </div>

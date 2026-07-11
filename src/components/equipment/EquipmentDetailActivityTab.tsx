@@ -106,7 +106,7 @@ export function EquipmentDetailActivityTab({
                       {equipmentStatusLabel(entry.scan.status)}
                     </Badge>
                     <span className="text-xs text-muted-foreground truncate">
-                      {entry.scan.userEmail}
+                      {entry.scan.staffName || t.appointmentsPage.unknownUser}
                     </span>
                   </div>
                   {entry.scan.note && (

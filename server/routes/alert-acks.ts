@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { db, alertAcks, equipment } from "../db.js";
-import { eq, and, isNull } from "drizzle-orm";
+import { db, alertAcks, equipment, users } from "../db.js";
+import { eq, and, isNull, sql } from "drizzle-orm";
 import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { sendPushToOthers, checkDedupe } from "../lib/push.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
@@ -34,7 +34,32 @@ import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 const router = Router();
 
+// Actor identity for display MUST be the display name, never the email — NULLIF
+// collapses the default empty-string vt_users.name to null so the client falls
+// back to a neutral label instead of rendering blank text or the raw email.
+const ACK_COLUMNS = {
+  id: alertAcks.id,
+  clinicId: alertAcks.clinicId,
+  equipmentId: alertAcks.equipmentId,
+  alertType: alertAcks.alertType,
+  acknowledgedById: alertAcks.acknowledgedById,
+  acknowledgedByEmail: alertAcks.acknowledgedByEmail,
+  acknowledgedByDisplayName: sql<string | null>`NULLIF(${users.name}, '')`,
+  acknowledgedAt: alertAcks.acknowledgedAt,
+  remindAt: alertAcks.remindAt,
+  remindedAt: alertAcks.remindedAt,
+  ackStatus: alertAcks.ackStatus,
+  resolvedAt: alertAcks.resolvedAt,
+  resolvedById: alertAcks.resolvedById,
+  resolutionNote: alertAcks.resolutionNote,
+};
 
+// NOTE: each call site below repeats `.select(ACK_COLUMNS).from(alertAcks).leftJoin(users, ...)`
+// rather than sharing one query-builder helper. That's deliberate — a shared helper
+// would collapse every `.from(alertAcks)` into one source-text occurrence, and the
+// P1 cross-tenant structural regression test (tests/cross-tenant-denial.test.ts)
+// locks clinicId scoping by scanning for `.from(alertAcks) ... .where(...)` pairs
+// at each call site. Keep them inline so that guard stays meaningful.
 
 // GET /api/alert-acks — return all current acknowledgments (not resolved unless asked)
 router.get("/", requireAuth, async (req, res) => {
@@ -44,8 +69,9 @@ router.get("/", requireAuth, async (req, res) => {
     const includeResolved = req.query.includeResolved === "true";
 
     const rows = await db
-      .select()
+      .select(ACK_COLUMNS)
       .from(alertAcks)
+      .leftJoin(users, and(eq(alertAcks.acknowledgedById, users.id), eq(users.clinicId, clinicId)))
       .where(
         includeResolved
           ? eq(alertAcks.clinicId, clinicId)
@@ -86,8 +112,9 @@ router.post("/", requireAuth, requireEffectiveRole("senior_technician"), async (
 
     // Check if already acked (upsert: update status back to SEEN if previously resolved and re-triggered)
     const [existing] = await db
-      .select()
+      .select(ACK_COLUMNS)
       .from(alertAcks)
+      .leftJoin(users, and(eq(alertAcks.acknowledgedById, users.id), eq(users.clinicId, clinicId)))
       .where(
         and(
           eq(alertAcks.clinicId, clinicId),
@@ -115,8 +142,9 @@ router.post("/", requireAuth, requireEffectiveRole("senior_technician"), async (
           })
           .where(eq(alertAcks.id, existing.id));
         const [updated] = await db
-          .select()
+          .select(ACK_COLUMNS)
           .from(alertAcks)
+          .leftJoin(users, and(eq(alertAcks.acknowledgedById, users.id), eq(users.clinicId, clinicId)))
           .where(and(eq(alertAcks.clinicId, clinicId), eq(alertAcks.id, existing.id)))
           .limit(1);
         return res.json(updated);
@@ -155,7 +183,9 @@ router.post("/", requireAuth, requireEffectiveRole("senior_technician"), async (
       metadata: { alertType, ackStatus: "SEEN" },
     });
 
-    res.status(201).json(ack);
+    // The acknowledger is always req.authUser here, so the display name is
+    // known without a re-query — never fall back to the raw email.
+    res.status(201).json({ ...ack, acknowledgedByDisplayName: req.authUser!.name || null });
 
     const key = `ack:${equipmentId}:${alertType}`;
     if (!checkDedupe(equipmentId, key)) {
@@ -189,8 +219,9 @@ router.patch("/:id/resolve", requireAuth, requireEffectiveRole("senior_technicia
     const resolutionNote = typeof req.body?.resolutionNote === "string" ? req.body.resolutionNote.trim() : null;
 
     const [existing] = await db
-      .select()
+      .select(ACK_COLUMNS)
       .from(alertAcks)
+      .leftJoin(users, and(eq(alertAcks.acknowledgedById, users.id), eq(users.clinicId, clinicId)))
       .where(and(eq(alertAcks.id, ackId), eq(alertAcks.clinicId, clinicId)))
       .limit(1);
 
@@ -216,8 +247,9 @@ router.patch("/:id/resolve", requireAuth, requireEffectiveRole("senior_technicia
       .where(and(eq(alertAcks.id, ackId), eq(alertAcks.clinicId, clinicId)));
 
     const [updated] = await db
-      .select()
+      .select(ACK_COLUMNS)
       .from(alertAcks)
+      .leftJoin(users, and(eq(alertAcks.acknowledgedById, users.id), eq(users.clinicId, clinicId)))
       .where(and(eq(alertAcks.clinicId, clinicId), eq(alertAcks.id, ackId)))
       .limit(1);
 

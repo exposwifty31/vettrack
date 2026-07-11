@@ -69,3 +69,61 @@ describe("EquipmentDetailActivityTab — room-verified note localization (T7)", 
     expect(screen.getByText("cracked casing")).toBeTruthy();
   });
 });
+
+describe("EquipmentDetailActivityTab — actor label renders displayName, never the email (T13 privacy fix)", () => {
+  it("renders the actor's staffName, not their raw email", () => {
+    const log = {
+      id: "s3",
+      equipmentId: "e1",
+      userId: "u1",
+      userEmail: "danerez5@gmail.com",
+      staffName: "Dana Rez",
+      status: "ok",
+      note: null,
+      timestamp: "2026-07-01T10:10:00.000Z",
+    } as unknown as ScanLog;
+
+    render(
+      <EquipmentDetailActivityTab
+        scanLogs={[log]}
+        transfers={[]}
+        logsLoading={false}
+        transfersLoading={false}
+        hasOlderLogs={false}
+        isFetchingOlderLogs={false}
+        onLoadOlder={() => {}}
+      />,
+    );
+    expect(screen.getByText("Dana Rez")).toBeTruthy();
+    expect(document.body.textContent).not.toContain("danerez5");
+    expect(document.body.textContent).not.toContain("@gmail.com");
+  });
+
+  it("falls back to a neutral label — never the raw email or its local-part — when staffName is absent (e.g. non-admin viewer)", () => {
+    const log = {
+      id: "s4",
+      equipmentId: "e1",
+      userId: "u2",
+      userEmail: "danerez5@gmail.com",
+      // staffName intentionally omitted — mirrors the server stripping it for non-admin viewers.
+      status: "ok",
+      note: null,
+      timestamp: "2026-07-01T10:15:00.000Z",
+    } as unknown as ScanLog;
+
+    render(
+      <EquipmentDetailActivityTab
+        scanLogs={[log]}
+        transfers={[]}
+        logsLoading={false}
+        transfersLoading={false}
+        hasOlderLogs={false}
+        isFetchingOlderLogs={false}
+        onLoadOlder={() => {}}
+      />,
+    );
+    expect(screen.getByText(t.appointmentsPage.unknownUser)).toBeTruthy();
+    expect(document.body.textContent).not.toContain("danerez5");
+    expect(document.body.textContent).not.toContain("@gmail.com");
+  });
+});

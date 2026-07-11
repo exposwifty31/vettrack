@@ -34,6 +34,9 @@ vi.mock("drizzle-orm", () => ({
   desc: (x: unknown) => x,
   inArray: (a: unknown, b: unknown) => ({ _type: "inArray", a, b }),
   isNull: (x: unknown) => ({ _type: "isNull", x }),
+  // Tagged-template pass-through — server/routes/alert-acks.ts builds a
+  // NULLIF(...) display-name column with sql`...` at module load time (T13).
+  sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ _type: "sql", strings, values }),
 }));
 
 // ─── db mock ───────────────────────────────────────────────────────────────
@@ -76,6 +79,9 @@ vi.mock("../server/db.js", () => {
     containerItems: fakeTable,
     inventoryLogs: fakeTable,
     inventoryItems: fakeTable,
+    // alert-acks.ts joins vt_users (clinic-scoped) to serialize the actor
+    // display name instead of the raw email (T13).
+    users: fakeTable,
   };
 });
 
