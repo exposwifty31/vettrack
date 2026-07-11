@@ -4,7 +4,7 @@
 // (the /board route) it wins over the internal ?kiosk=1 URL read; when omitted
 // (/equipment/board) the URL read is byte-identical to the pre-move behavior.
 import { useLocation } from "wouter";
-import { X } from "lucide-react";
+import { Settings2, X } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { EquipmentCommandBoardSnapshot } from "@/types/safety-surfaces";
@@ -46,6 +46,28 @@ function ADRing({ pct, ready, total }: { pct: number; ready: number; total: numb
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
   const dash = (pct / 100) * circ;
+
+  // No critical equipment tagged for this clinic: a "0 / 0 · 0%" ring reads as
+  // an alarm (green numeral over what looks like a failed readiness score).
+  // Render an explicit empty/config state instead of the numeric ring.
+  if (total === 0) {
+    return (
+      <div className="flex flex-col items-center gap-2" data-testid="board-ring-no-critical">
+        <div
+          className="relative flex items-center justify-center rounded-full border-4 border-dashed border-ivory-border"
+          style={{ width: size, height: size }}
+        >
+          <Settings2 className="h-8 w-8 text-ivory-text3" aria-hidden="true" />
+        </div>
+        <div className="max-w-[160px] text-center">
+          <div className="vt-text-sm font-bold text-ivory-text leading-tight">
+            {t.board.noCriticalConfigured}
+          </div>
+          <div className="vt-text-xs text-ivory-text3 mt-0.5">{t.board.noCriticalConfiguredHint}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center gap-2">

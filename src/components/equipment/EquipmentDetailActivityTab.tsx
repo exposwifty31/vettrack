@@ -141,7 +141,7 @@ export function EquipmentDetailActivityTab({
                   </Badge>
                   <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" />
                   <span className="text-sm font-medium truncate">
-                    {entry.transfer.fromFolderName ?? "—"} → {entry.transfer.toFolderName ?? "—"}
+                    {entry.transfer.fromFolderName ?? t.common.unfiled} → {entry.transfer.toFolderName ?? t.common.unfiled}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground shrink-0">

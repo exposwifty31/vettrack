@@ -182,7 +182,17 @@ export function AppRoutes() {
         <Route path="/crash-cart"><AuthGuard><CrashCartCheckPage /></AuthGuard></Route>
         <Route path="/handoff"><AuthGuard><HandoffPage /></AuthGuard></Route>
         <Route path="/admin/code-blue-history"><AuthGuard><CodeBlueHistoryPage /></AuthGuard></Route>
-        {/* Legacy aliases */}
+        {/* Legacy aliases — intentional identical-component mounts, not
+            distinct surfaces (confirmed 2026-07-11 QA audit finding: "/emergency-equipment-wall
+            renders the identical idle screen as /code-blue/display — alias or
+            unbuilt distinct wall?"). CANONICAL_HREFS + ROUTE_ALIAS_GROUPS
+            (src/lib/routes/canonical-hrefs.ts, route-alias-groups.ts) already
+            treat these as one nav destination each; new links generate the
+            canonical href. The legacy path is kept as a live route (not a
+            redirect) deliberately, matching its siblings above, so an
+            existing bookmark or a physical display already pointed at the
+            legacy URL (e.g. a wall-mounted browser on /code-blue/display)
+            never gets an extra navigation hop or a URL change underneath it. */}
         <Route path="/emergency-equipment-log"><AuthGuard><CodeBluePage /></AuthGuard></Route>
         <Route path="/emergency-equipment-wall"><AuthGuard><WebOnlyGuard><CodeBlueDisplay /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/critical-kit-check"><AuthGuard><CrashCartCheckPage /></AuthGuard></Route>

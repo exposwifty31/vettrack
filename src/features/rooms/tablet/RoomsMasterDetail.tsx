@@ -20,7 +20,12 @@ export default function RoomsMasterDetail() {
       masterLabel={t.nav.rooms}
       master={<RoomsListPage singleColumn />}
       detail={id ? <RoomRadarPage /> : null}
-      placeholder={<SelectItemPlaceholder />}
+      placeholder={
+        <SelectItemPlaceholder
+          title={t.roomsListPage.selectRoomTitle}
+          subtitle={t.roomsListPage.selectRoomSubtitle}
+        />
+      }
     />
   );
 }

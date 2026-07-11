@@ -650,6 +650,9 @@ const translations = {
     minutesAgo: (minutes: number) => tr(d.alertsPage.minutesAgo, { minutes }),
     hoursAgo: (hours: number) => tr(d.alertsPage.hoursAgo, { hours }),
     daysAgo: (days: number) => tr(d.alertsPage.daysAgo, { days }),
+    minutesDuration: (minutes: number) => tr(d.alertsPage.minutesDuration, { minutes }),
+    hoursDuration: (hours: number) => tr(d.alertsPage.hoursDuration, { hours }),
+    daysDuration: (days: number) => tr(d.alertsPage.daysDuration, { days }),
     activeCount: (count: number) => tr(d.alertsPage.activeCount, { count }),
     openSummary: (total: number, urgent: number) =>
       tr(d.alertsPage.openSummary, { total, urgent }),
@@ -1085,7 +1088,10 @@ const translations = {
 
   supportPage: d.supportPage,
 
-  whatsNew: d.whatsNew,
+  whatsNew: {
+    ...d.whatsNew,
+    buildLabel: (tag: string) => tr(d.whatsNew.buildLabel, { tag }),
+  },
 
   authPage: d.authPage,
 

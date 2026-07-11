@@ -1324,6 +1324,12 @@ export interface TStructure {
     hoursAgo: string;
     oneDayAgo: string;
     daysAgo: string;
+    oneMinuteDuration: string;
+    minutesDuration: string;
+    oneHourDuration: string;
+    hoursDuration: string;
+    oneDayDuration: string;
+    daysDuration: string;
     title: string;
     metaDescription: string;
     activeCount: string;
@@ -1754,6 +1760,8 @@ export interface TStructure {
     pilotRecent: string;
   };
   roomsListPage: {
+    selectRoomTitle: string;
+    selectRoomSubtitle: string;
     healthRingTitle: string;
     healthRingHelp: string;
     createRoomFailed: string;
@@ -2611,6 +2619,7 @@ export interface TStructure {
     managerLabelShort: string;
     managerInstruction: string;
     loadingManagers: string;
+    checkingActiveSession: string;
     noManagersAvailable: string;
     you: string;
     managerFallbackName: string;
@@ -3719,6 +3728,8 @@ export interface TStructure {
     overdue: string;
     byType: string;
     critical: string;
+    noCriticalConfigured: string;
+    noCriticalConfiguredHint: string;
     allCriticalReady: string;
     loading: string;
     fallbackBoardUnavailable: string;
@@ -3747,7 +3758,6 @@ export interface TStructure {
     heading: string;
     description: string;
     configureAlerts: string;
-    currentVersion: string;
     currentDate: string;
     buildLabel: string;
     items: {

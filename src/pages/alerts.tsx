@@ -1,6 +1,6 @@
 import { t } from "@/lib/i18n";
 import { useMobileShellContext } from "@/shell/mobile/MobileShellContext";
-import { AlertsScreen, useAlertsController, formatRelativeTime } from "@/features/alerts";
+import { AlertsScreen, useAlertsController, formatRelativeTime, formatRelativeDuration } from "@/features/alerts";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { AppShell } from "@/components/layout/AppShell";
@@ -249,7 +249,7 @@ function AlertsPageDesktop() {
                                       className="text-xs text-foreground font-medium"
                                     />
                                     <TruncatedText
-                                      text={`${t.alertsPage.inProgressSince} ${formatRelativeTime(new Date(ack.acknowledgedAt))}`}
+                                      text={`${t.alertsPage.inProgressSince} ${formatRelativeDuration(new Date(ack.acknowledgedAt))}`}
                                       className="text-xs text-muted-foreground"
                                     />
                                   </div>
