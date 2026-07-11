@@ -1996,3 +1996,20 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 - Discrepancy noted (supersedes the plan's R1/R2 ordering): Railway's `serviceInstanceUpdate` nulls `source` when omitted from input — the VetTrack healthcheck update disconnected its GitHub source ahead of schedule. Verified harmless (desired end state); the canary therefore ran with the CLI as the only deployer.
 
 **Verdict:** VERIFIED
+
+## 2026-07-11 — Upgrade & simplify repo scripts + deslop (71d7c23, 9ec9db1)
+
+**Claim:** Removed dead/duplicate npm scripts, fixed the `dev` script drift, and deleted verified-orphan one-off scripts + committed run artifacts, without breaking any CI/code reference.
+
+**Evidence:**
+- `package.json` — Read after edit: scripts count 63 (was 80-adjacent per pre-edit Read showing 80 lines); removed keys confirmed absent via `node -e "require('./package.json').scripts"` (predev:ci, dev:ci, cap:archive:preflight, tenant:lint, knip:production, dev:db:push, test:playwright:chromium, worker:notifications all gone; `dev` now `"pnpm dev:api:watch" "pnpm dev:web"`; `dev:api` byte-identical). No duplicate keys.
+- Command: `grep -rn "pnpm ...(removed names)" .github/ docs/ .env* server/ src/` → 0 remaining code/CI refs for each removed script name (worker:notifications comment in `server/workers/notification.worker.ts:3` and `.env.example:47` both updated to `pnpm worker`).
+- Guardrail check: `grep -rn "dev:api"` → `server/middleware/rate-limiters.ts:15` + `docs/devops/ci-cd.md:54` show Playwright CI runs `pnpm dev:api` expecting non-watching NODE_ENV=development; `dev:api` left unchanged for that reason.
+- Deletions verified orphaned before removal: `grep -rn <basename>` for split-prs.sh, qa-native-ship-{complete,portrait}.sh, backfill-users-email.ts → only hits are `docs/audit/codebase-relevance-classification.json` (generated inventory) + one historical report; no code/CI usage.
+- Restored 2 files after re-check exposed real usage my first grep masked: `scripts/validate-prod.ts:77` spawns `bash scripts/validate-build.sh`; `docs/previews/README.md:11` documents `capture-css-preview-screenshots.ts`. Both restored via `git restore`.
+- `.gitignore` — appended `scripts/wetcheck/results-*.json`; the two committed result JSONs removed via `git rm`.
+- Command: `node -e "JSON.parse(fs.readFileSync('package.json'))"` → parses (valid JSON).
+
+**Not verified (environment limit):** `pnpm typecheck` / `pnpm test` could not run — `pnpm install` fails with 403 fetching the private `@vettrack/contracts` GitHub tarball (`exposwifty31/literate-dollop`), which needs auth unavailable in this sandbox. Changes touch no compilable app surface (script metadata, standalone-script deletions, docs, one comment); no deleted file is imported by any `.ts` or referenced in any `tsconfig*.json` (grep-confirmed).
+
+**Verdict:** VERIFIED (static checks) / PARTIAL (typecheck+tests unrunnable in this environment — pre-existing private-dependency auth block)
