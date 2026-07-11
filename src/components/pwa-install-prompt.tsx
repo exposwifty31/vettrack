@@ -1,7 +1,7 @@
 import { X, Download, Share2, PlusSquare } from "lucide-react";
 import { useLocation } from "wouter";
 import { usePwaInstall } from "@/hooks/use-pwa-install";
-import { isKioskSuppressedPathname } from "@/app/platform";
+import { isKioskSuppressedPathname, usePlatformTarget } from "@/app/platform";
 import { t } from "@/lib/i18n";
 
 // Shows for eligible users who haven't installed the app:
@@ -10,6 +10,8 @@ import { t } from "@/lib/i18n";
 // Hidden when already running as an installed PWA.
 export function PwaInstallPrompt() {
   const [location] = useLocation();
+  const platformTarget = usePlatformTarget();
+  const isDesktop = platformTarget === "desktop";
   const {
     isStandalone,
     isIos,
@@ -50,7 +52,7 @@ export function PwaInstallPrompt() {
               {t.pwa.installTitle}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
-              {t.pwa.installSubtitle}
+              {isDesktop ? t.pwa.installSubtitleDesktop : t.pwa.installSubtitle}
             </p>
             <div className="flex gap-2 mt-3">
               <button

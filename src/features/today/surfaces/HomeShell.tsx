@@ -85,7 +85,7 @@ export function HomeShell({ bare = false, children }: { bare?: boolean; children
   const body = (
     <HomeShellContext.Provider value={ctx}>
       <Helmet>
-        <title>Dashboard — VetTrack</title>
+        <title>{t.layoutHebrew.dashboard} — VetTrack</title>
         <meta
           name="description"
           content="Real-time veterinary equipment dashboard. Track your shift at a glance, scan equipment, and triage critical and overdue items across your clinic."

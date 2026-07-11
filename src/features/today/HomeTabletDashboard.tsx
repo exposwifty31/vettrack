@@ -200,7 +200,7 @@ export function HomeTabletDashboard() {
       }}
     >
       <Helmet>
-        <title>Dashboard — VetTrack</title>
+        <title>{t.layoutHebrew.dashboard} — VetTrack</title>
       </Helmet>
 
       <header style={{ gridColumn: "1 / -1" }}>

@@ -1680,7 +1680,7 @@ function EquipmentDetailPageDesktop() {
                     <p className="font-medium text-foreground">
                       {checkedOutByMe
                         ? t.equipmentDetail.toast.checkedOutByYou
-                        : `In use by ${equipment.checkedOutByEmail || "another user"}`}
+                        : t.equipmentDetail.checkedOutBy(equipment.checkedOutByEmail || t.common.unknown)}
                     </p>
                     {equipment.checkedOutLocation && (
                       <p className="text-primary text-xs mt-0.5">
@@ -1706,7 +1706,7 @@ function EquipmentDetailPageDesktop() {
                         ) : (
                           <LogIn className="w-5 h-5" />
                         )}
-                        Check Out
+                        {t.qrScanner.checkOut}
                       </Button>
                       {offShiftCheckoutNote}
                     </>
@@ -1726,13 +1726,13 @@ function EquipmentDetailPageDesktop() {
                       ) : (
                         <LogOut className="w-5 h-5" />
                       )}
-                      Return
+                      {t.equipmentDetail.actionReturn}
                     </Button>
                   )}
 
                   {isCheckedOut && !checkedOutByMe && !isAdmin && (
                     <div className="bg-[var(--status-stale-bg)] border border-[var(--status-stale-border)] rounded-xl px-3 py-2.5 text-sm text-[var(--status-stale-fg)]">
-                      Only the person who checked this out (or an admin) can return it.
+                      {t.qrScanner.onlyOwnerCanReturn}
                     </div>
                   )}
 
@@ -1747,7 +1747,7 @@ function EquipmentDetailPageDesktop() {
                     data-testid="btn-scan-action-report-issue"
                   >
                     <Wrench className="w-5 h-5" />
-                    Report Issue / Update Status
+                    {t.equipmentDetail.scanSheetReportOrUpdateStatus}
                   </Button>
 
                   <Button
@@ -1759,7 +1759,7 @@ function EquipmentDetailPageDesktop() {
                     }}
                     data-testid="btn-scan-action-dismiss"
                   >
-                    View Full Details
+                    {t.qrScanner.viewFullDetails}
                   </Button>
                 </div>
               </>
@@ -1777,7 +1777,7 @@ function EquipmentDetailPageDesktop() {
                   data-testid="btn-scan-another-item"
                 >
                   <Scan className="w-4 h-4" />
-                  Scan Another Item
+                  {t.equipmentDetail.scanSheetScanAnother}
                 </Button>
                 <Button
                   variant="ghost"
@@ -1787,7 +1787,7 @@ function EquipmentDetailPageDesktop() {
                     setScanActionDone(false);
                   }}
                 >
-                  Stay Here
+                  {t.equipmentDetail.scanSheetStayHere}
                 </Button>
               </div>
             )}

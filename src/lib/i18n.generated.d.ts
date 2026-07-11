@@ -488,6 +488,9 @@ export interface TStructure {
     actionMove: string;
     actionIssue: string;
     actionReturn: string;
+    scanSheetReportOrUpdateStatus: string;
+    scanSheetScanAnother: string;
+    scanSheetStayHere: string;
     activityRoomVerified: string;
     reportIssueTitle: string;
     localStatePendingSync: string;
@@ -4038,6 +4041,7 @@ export interface TStructure {
     installAriaLabel: string;
     installTitle: string;
     installSubtitle: string;
+    installSubtitleDesktop: string;
     install: string;
     notNow: string;
     iosAriaLabel: string;

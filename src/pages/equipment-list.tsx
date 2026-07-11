@@ -433,7 +433,7 @@ function EquipmentListPageDesktop() {
   const pageBody = (
     <>
       <Helmet>
-        <title>Equipment — VetTrack</title>
+        <title>{t.equipment.title} — VetTrack</title>
         <meta name="description" content="Browse, search, and manage all veterinary equipment. Filter by status or folder, bulk-move items, and scan QR codes to quickly locate any asset." />
         <link rel="canonical" href="https://vettrack.replit.app/equipment" />
       </Helmet>
