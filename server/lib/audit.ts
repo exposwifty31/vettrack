@@ -245,7 +245,9 @@ export type AuditActionType =
   | "display_pairing_code_issued"
   | "display_device_paired"
   | "display_device_renamed"
-  | "display_device_revoked";
+  | "display_device_revoked"
+  // Phase 10 (T21) — admin removes a dead (already-revoked) registry row.
+  | "display_device_deleted";
 
 export interface LogAuditParams {
   clinicId: string;

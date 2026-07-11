@@ -1099,6 +1099,12 @@ export const api = {
         request<{ ok: boolean; id: string }>(`/api/display/devices/${id}/revoke`, {
           method: "POST",
         }),
+      // Hard-delete a DEAD (already-revoked) registry row — the server 404s if
+      // the device is still active, so an admin must revoke before deleting.
+      delete: (id: string): Promise<{ ok: boolean; id: string }> =>
+        request<{ ok: boolean; id: string }>(`/api/display/devices/${id}`, {
+          method: "DELETE",
+        }),
     },
   },
   realtime: {

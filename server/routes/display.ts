@@ -2,7 +2,7 @@
 import type { RequestHandler } from "express";
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { and, desc, eq, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, sql } from "drizzle-orm";
 import { fetchLinkedEquipmentForSession } from "../lib/code-blue-linked-equipment.js";
 import {
   db,
@@ -640,6 +640,67 @@ function createDeviceRevokeHandler(): RequestHandler {
   };
 }
 
+/**
+ * DELETE /devices/:id — admin, clinic-scoped hard delete. Only a DEAD row
+ * (already revoked) can be removed — an active device must be revoked first,
+ * so a live pairing can never be deleted out from under a running display.
+ * Hard-deletes the `vt_display_devices` row itself (no FK from audit rows to
+ * it); the audit trail (`display_device_*` rows) is append-only and untouched.
+ */
+function createDeviceDeleteHandler(): RequestHandler {
+  return async (req, res) => {
+    const requestId = resolveRequestId(res, req.headers["x-request-id"]);
+    try {
+      const clinicId = req.clinicId!;
+      const id = req.params.id;
+
+      const [deleted] = await db
+        .delete(displayDevices)
+        .where(
+          and(
+            eq(displayDevices.id, id),
+            eq(displayDevices.clinicId, clinicId),
+            isNotNull(displayDevices.revokedAt),
+          ),
+        )
+        .returning({ id: displayDevices.id });
+
+      if (!deleted) {
+        return res.status(404).json(
+          apiError({
+            code: "NOT_FOUND",
+            reason: "DISPLAY_DEVICE_NOT_FOUND_OR_NOT_REVOKED",
+            message: "Revoked display device not found",
+            requestId,
+          }),
+        );
+      }
+
+      logAudit({
+        clinicId,
+        actionType: "display_device_deleted",
+        performedBy: req.authUser!.id,
+        performedByEmail: req.authUser!.email,
+        targetId: id,
+        targetType: "display_device",
+        actorRole: resolveAuditActorRole(req),
+      });
+
+      res.json({ ok: true, id });
+    } catch (err) {
+      console.error("[display:devices/:id delete]", err);
+      res.status(500).json(
+        apiError({
+          code: "INTERNAL_ERROR",
+          reason: "DEVICE_DELETE_FAILED",
+          message: "Failed to delete display device",
+          requestId,
+        }),
+      );
+    }
+  };
+}
+
 /** Factory — mount a fresh Router per path (never reuse the same instance). */
 export function createDisplayRouter(deps: DisplayRouterDeps = {}): Router {
   const router = Router();
@@ -656,6 +717,7 @@ export function createDisplayRouter(deps: DisplayRouterDeps = {}): Router {
   router.get("/devices", requireAuth, requireAdmin, createDevicesListHandler());
   router.patch("/devices/:id", requireAuth, requireAdmin, createDeviceRenameHandler());
   router.post("/devices/:id/revoke", requireAuth, requireAdmin, createDeviceRevokeHandler());
+  router.delete("/devices/:id", requireAuth, requireAdmin, createDeviceDeleteHandler());
 
   return router;
 }

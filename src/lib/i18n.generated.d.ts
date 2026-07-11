@@ -3477,6 +3477,10 @@ export interface TStructure {
       issueDialogDescription: string;
       codeExpires: string;
       empty: string;
+      delete: string;
+      deleteConfirm: string;
+      deleted: string;
+      deleteError: string;
     };
     colConfigured: string;
     colCredentials: string;
@@ -3666,6 +3670,8 @@ export interface TStructure {
     pairing: string;
     pairButton: string;
     hint: string;
+    revokedNoticeTitle: string;
+    revokedNoticeMessage: string;
   };
   board: {
     deployableNow: string;

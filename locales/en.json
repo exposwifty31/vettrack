@@ -3465,15 +3465,19 @@
       "save": "Save name",
       "renamed": "Display renamed",
       "renameError": "Could not rename the display",
-      "revoke": "Revoke device",
-      "revokeConfirm": "Confirm revoke",
+      "revoke": "Revoke device access",
+      "revokeConfirm": "Confirm revoke access",
       "revoked": "Display revoked",
       "revokeError": "Could not revoke the display",
       "issueError": "Could not issue a pairing code",
       "issueDialogTitle": "Pairing code",
       "issueDialogDescription": "Enter this code on the display at /board/pair. It expires shortly.",
       "codeExpires": "Expires at",
-      "empty": "No paired displays yet"
+      "empty": "No paired displays yet",
+      "delete": "Delete record",
+      "deleteConfirm": "Confirm delete",
+      "deleted": "Display record deleted",
+      "deleteError": "Could not delete the display record"
     },
     "colConfigured": "Configured",
     "colCredentials": "Required credentials",
@@ -3662,7 +3666,9 @@
     "error": "That code didn't work. Ask an admin for a new one.",
     "pairing": "Pairing…",
     "pairButton": "Pair display",
-    "hint": "Ask an admin to issue a code from Displays in the management console."
+    "hint": "Ask an admin to issue a code from Displays in the management console.",
+    "revokedNoticeTitle": "This display's pairing was revoked",
+    "revokedNoticeMessage": "An admin revoked this display's access, or its pairing is no longer valid. Enter a new pairing code to reconnect."
   },
   "board": {
     "deployableNow": "Deployable now",
