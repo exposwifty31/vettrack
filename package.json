@@ -28,6 +28,7 @@
     "cap:open:android": "npx cap open android",
     "start": "cross-env NODE_ENV=production tsx server/index.ts",
     "worker": "tsx server/workers/notification.worker.ts",
+    "worker:notifications": "tsx server/workers/notification.worker.ts",
     "validate:prod": "tsx scripts/validate-prod.ts",
     "auth:preflight": "tsx scripts/auth-preflight.ts",
     "auth:user-status": "tsx scripts/dev-user-status.ts",
