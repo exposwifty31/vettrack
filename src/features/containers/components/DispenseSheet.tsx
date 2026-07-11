@@ -164,6 +164,12 @@ export function DispenseSheet({
     (result: ContainerDispenseSuccessPayload) => {
       idempotencyKeyRef.current = crypto.randomUUID();
       qc.invalidateQueries({ queryKey: ["/api/containers/detail", containerId] });
+      // Same container-item data is also cached under the restock-view key
+      // (inventory-page.tsx's container detail card — per-line qty/expected,
+      // "stocked" badge, and the overall fill %). Without this the parent
+      // page's stock indicator stays stale after a dispense decrements
+      // server-side stock (T17).
+      qc.invalidateQueries({ queryKey: ["/api/restock/container-items", containerId] });
       qc.invalidateQueries({ queryKey: ["/api/shift-handover"] });
       setSuccessData({
         takenBy: result.takenBy,
@@ -188,6 +194,7 @@ export function DispenseSheet({
       api.containers.completeEmergency(completedEventId!, data),
     onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ["/api/containers/detail", containerId] });
+      qc.invalidateQueries({ queryKey: ["/api/restock/container-items", containerId] });
       qc.invalidateQueries({ queryKey: ["/api/shift-handover"] });
       setSuccessData({
         takenBy: result.takenBy,
