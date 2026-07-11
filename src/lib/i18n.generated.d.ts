@@ -321,6 +321,8 @@ export interface TStructure {
     submitRestock: string;
     submitAudit: string;
     loadError: string;
+    restrictedAccessTitle: string;
+    restrictedAccessMessage: string;
     empty: string;
     quickAdd: string;
     quickAddSuccess: string;

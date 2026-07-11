@@ -318,6 +318,8 @@
     "submitRestock": "Confirm Refill",
     "submitAudit": "Save count",
     "loadError": "Load failed",
+    "restrictedAccessTitle": "Inventory needs a clinical assignment",
+    "restrictedAccessMessage": "The container list needs a permission your role doesn't currently have. Ask a supervisor for access.",
     "empty": "No containers yet. Use Quick add or ask an admin.",
     "quickAdd": "Quick add (ICU / internal)",
     "quickAddSuccess": "Default carts and drawers added",

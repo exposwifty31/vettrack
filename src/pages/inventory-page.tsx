@@ -30,6 +30,8 @@ import {
 import { useLocation } from "wouter";
 import { getCurrentUserId } from "@/lib/auth-store";
 import { useAuth } from "@/hooks/use-auth";
+import { useExperience } from "@/hooks/use-experience";
+import { isCustodyOnly } from "@/lib/roles/experience-model";
 import { useNfcSupported } from "@/hooks/use-nfc-supported";
 import { haptics } from "@/lib/haptics";
 import { safeStorageGetItem, safeStorageRemoveItem, safeStorageSetItem } from "@/lib/safe-browser";
@@ -54,6 +56,7 @@ export default function InventoryPage() {
   const p = t.inventoryPage;
   const [location] = useLocation();
   const { userId } = useAuth();
+  const experience = useExperience();
   const [sessionState, dispatch] = useReducer(restockSessionReducer, initialRestockSessionState);
 
   const [dispenseOpen, setDispenseOpen] = useState(false);
@@ -68,6 +71,18 @@ export default function InventoryPage() {
     retry: false,
     refetchOnWindowFocus: false,
   });
+
+  // A custody-only user (student) is never authorized for the full container
+  // list (`requireEffectiveRole("technician")` on GET /api/containers) — that
+  // authorization boundary is intentional and stays server-side. Treat the
+  // resulting 403 as an expected, non-fatal "restricted" state for THIS
+  // archetype only (via the shared capability model, not a role literal) so
+  // the page doesn't blank into a scary "load failed" for a permissions
+  // boundary a retry can never fix. Any other role hitting a real 403/500
+  // still gets the normal fatal ErrorCard below.
+  const containersForbidden =
+    containersQ.error instanceof ApiError && containersQ.error.status === 403;
+  const containersRestrictedForRole = containersForbidden && isCustodyOnly(experience);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -676,9 +691,21 @@ export default function InventoryPage() {
           </div>
         )}
 
-        {/* Fetch error */}
-        {containersQ.isError && (
+        {/* Fetch error — a genuine failure (network/server) still shows the fatal
+            retry card; a role-gated 403 for a custody-only user does not. */}
+        {containersQ.isError && !containersRestrictedForRole && (
           <ErrorCard message={p.loadError} onRetry={() => containersQ.refetch()} />
+        )}
+
+        {/* Restricted state — custody-only role, container list is above their
+            authorization. No retry action: retrying can't change a permission
+            boundary. */}
+        {containersRestrictedForRole && (
+          <EmptyState
+            icon={Package}
+            message={p.restrictedAccessTitle}
+            subMessage={p.restrictedAccessMessage}
+          />
         )}
 
         {/* Empty state */}
