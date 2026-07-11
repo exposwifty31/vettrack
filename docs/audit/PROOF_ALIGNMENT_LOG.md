@@ -2157,3 +2157,59 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 - Scope: no locale JSON changed (no `pnpm i18n:check` needed — no new copy), no server/derivation code changed (client presentation only), no frozen realtime/telemetry/Code-Blue contract touched, no `clinicId`-scoped query modified.
 
 **Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T9: Hebrew singular/plural for count strings (361236ce0)
+
+**Claim:** Count labels rendered the plural Hebrew noun at count=1 ("1 פריטים"); now render the singular at 1 via the EXISTING ICU-plural mechanism, no parallel path.
+**Evidence:** Discovery found `lib/i18n/index.ts` `interpolate()` already supports `{count, plural, one{…} other{…}}`, wired via `tr()` in `src/lib/i18n.ts` (used by `alerts.itemCount` etc.). Fixed 4 keys — `roomsListPage.cardItemCount` (renamed from `cardItemsUnit`, 0 stragglers, `.generated.d.ts` regenerated), `dispense.sheet.itemsSelected`, `managementDashboardPage.itemsUnit`+`usersUnit` — each to `{count} {count, plural, one{…} other{…}}` with he+en parity. New `tests/i18n-hebrew-plural-count-labels.test.ts` (21 tests) asserts count=1→singular, count=2→plural in he+en, and `not.toBe("1 פריטים")` (non-vacuous). `pnpm typecheck` 0 · `pnpm i18n:check` parity ✓ · full `pnpm test` 4372 pass. Task-review Spec ✅ / Quality Approved (reviewer independently reran 21/21 + parity + tsc).
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T12: misc English-on-Hebrew sweep + T7 NFC-sheet residual (aa0b94831)
+
+**Claim:** Five enumerated English/desktop-affordance leaks fixed via the typed `t.*` accessor and existing platform seam.
+**Evidence:** (1) Dashboard/Equipment document titles → `t.layoutHebrew.dashboard`/`t.equipment.title`; (2) haptics toggle gated on `usePlatformTarget()==="mobile"` (existing seam) in `settings.tsx`; (3) install-banner desktop copy via new `pwa.installSubtitleDesktop`, T5 suppression untouched; (4) `nav.criticalKitCheck`→sentence-case, `layout.nav.*` left Title-case (documented); (5) NFC action sheet in `equipment-detail.tsx` fully localized (reused qr-scanner + T7 keys + 3 new `equipmentDetail.scanSheet*`). 24 tests / 4 files. `pnpm typecheck` 0 · `pnpm i18n:check` parity ✓ · full `pnpm test` 4404 pass. Task-review Spec ✅ / Quality Approved (Minor: report mis-stated test count as 34, actual 24 — reviewer reran 24/24).
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T15: coherent status taxonomy + consistent pagination (d217567ac)
+
+**Claim:** "תקין" header over "לא ידוע" pills, and "62 מתוך 62 · עמוד 1 מתוך 7", were two independent display-coherence defects — fixed at root cause without touching grouping logic.
+**Evidence:** Taxonomy: header (`equipmentTriageTier` on `eq.status`) and pill (`DeployabilityBadge` on `eq.readinessState`, legit default "unknown") are different axes; contradiction was a Hebrew locale accident — `equipmentList.triageOperational` reused "תקין" (= `status.ok`); changed ONLY the he value to "תפעולי" (matches en "Operational"). Pagination: `equipment-list.tsx` passed full filtered count as both shown+total-basis while pages=count/9=7; extracted `resolveEquipmentListShownCount()` (new `src/lib/equipment-list-pagination.ts`) returning the page slice. New `tests/t15-status-taxonomy-and-pagination.test.ts` (7 tests); 4/7 fail against pre-fix (reviewer re-verified). `pnpm typecheck` 0 · `pnpm i18n:check` ✓ · full `pnpm test` 4415 pass. Task-review Spec ✅ / Quality Approved. T14 tiles untouched.
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T16: student /inventory degrades gracefully on a role-gated 403 (73cde30cf → integrated 1cef9cf30)
+
+**Claim:** The student `/inventory` fatal "טעינה נכשלה" (from `GET /api/containers` 403ing for a below-technician role) is made non-fatal for custody-only archetypes via the existing capability model; every other role and every non-403 failure keeps the original fatal ErrorCard.
+**Evidence:** `GET /api/containers` (`requireEffectiveRole("technician")`) genuinely 403s for student (role 10 < 20) — server auth confirmed correct, NOT changed. `src/pages/inventory-page.tsx` now detects a 403 for a custody-only archetype (via `useExperience()`/`isCustodyOnly()`, no `role==="student"` literal) and renders an honest EmptyState; non-403 and non-custody keep the fatal ErrorCard. New `tests/inventory-page-student-degradation.test.tsx` (4 tests, non-vacuous — pre-fix reproduction confirmed). `pnpm typecheck` 0 · `pnpm i18n:check` parity ✓. Task-review Spec ✅ / Quality Approved (2 cosmetic Minor). **OWNER-AWARENESS:** the audit premise "custody student can dispense/restock" is FALSE server-side — a committed `STUDENT_NEVER_ELEVATED` invariant (`server/lib/authority.ts`) hard-blocks student dispense and container/restock routes are technician-gated. T16 fixes the loading/UX dead-end only; whether students SHOULD dispense/restock (or the guided card shouldn't route them to `/inventory`) is an owner product decision (students are intended custody-only).
+**Verdict:** VERIFIED (loading/UX gate); owner decision pending on student inventory capability.
+
+---
+
+## 2026-07-11 — T21: display registry — live last-seen, revoke notice, delete dead rows, clear labels (ce7e49e9f → integrated d07c03b9e)
+
+**Claim:** Four display-registry defects addressed without touching the frozen realtime transport.
+**Evidence:** (1) last-seen "never" — investigated STALE: prior commit `747bf986d` (F7/F8) already added `refetchInterval(15s)`+`refetchOnWindowFocus` to the admin registry (surfaces the heartbeat-bumped `lastSeenAt` from the existing `POST /api/display/heartbeat`); T21 added a regression test only — NO new realtime/heartbeat surface. (2) Revoked board → explicit notice via a one-shot sessionStorage flag (`markDisplayRevokedNotice`/`consumeDisplayRevokedNotice`), set before the existing 401 redirect, consumed once by `board-pair.tsx`; F6 stream-termination untouched. (3) New `DELETE /api/display/devices/:id` — admin (`requireAuth,requireAdmin`), `clinicId`-scoped, ONLY deletes already-revoked rows (`isNotNull(revokedAt)`), new `display_device_deleted` appended to the closed `AuditActionType` union; the manifest addition to `PHASE_9_DISPLAY_PAIRING_ROUTES` is a REQUIRED OFF-07 route-ratchet sync (`tests/offline-phase-7-emergency-surface-parity.test.ts`), catalog only — cache-bypass/offline-block semantics unchanged. (4) Revoke vs cancel labels reworded distinct (he+en). Focused 41/41+46/46; `pnpm typecheck` 0 · `pnpm i18n:check` ✓ · `pnpm architecture:gates` G1 ✓. Task-review (opus) Spec ✅ / Quality Approved (0 Crit/Imp, 2 Minor info).
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T22: unify management-surface denial pattern + fix desktop nav overflow/duplication (2c06c42ca → integrated bd03640d1)
+
+**Claim:** The inconsistent non-admin denial across management surfaces (4 patterns: silent redirect, per-page explicit, render-anyway leak, blank `return null` + an admin-shifts "Cancel"-as-denial bug) is unified into one shared component; a genuine access leak is closed; desktop nav de-duplicated and the ~1227px overflow fixed.
+**Evidence:** New shared `src/desktop/management/ManagementAccessDenied.tsx` (+ `console.accessDenied.*` he+en keys); `ManagementGuard` renders it instead of redirecting; the 7 strictly-admin pages keep their narrower `isAdmin` floor but render the shared UI; `admin-shifts.tsx` copy-paste bug fixed. `/procurement`+`/analytics` wrapped in `ManagementGuard` — reviewer independently verified this CLOSES a render-anyway leak, NOT hiding a reachable core page (both `WebOnlyGuard` desktop-only, absent from live `nav-model.ts`/`native-nav-model.ts`, `/analytics` already `management.web`-scoped; admin+lead still reach both). Nav: removed duplicate `IconSidebar` (Topbar sole desktop nav, identical data sources — no destination lost); `Topbar` `min-w-0`+`scrollbar-none` overflow fix (compositor-friendly). No `server/` change, no `clinicId` touched. Tests `management-surface-denial-unification.test.tsx`(14)+`desktop-nav-shell.test.tsx`(9)+`console-management.test.tsx` non-vacuous. `pnpm typecheck` 0 · full `pnpm test` 4384 · `pnpm i18n:check` ✓ · `pnpm architecture:gates` G1 ✓. Task-review (opus) Spec ✅ / Quality Approved (Minor only).
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — Batch integration gate (T16+T21+T22 cherry-picked onto SDD branch bd03640d1)
+
+**Claim:** The three parallel-batch tasks, implemented in isolated worktrees off d217567ac and reviewed on their isolated diffs, integrated onto `claude/phase-10a-audit-fixes` via cherry-pick with no manual conflict resolution and pass all gates together.
+**Evidence:** Cherry-picks: T16→`1cef9cf30`, T21→`d07c03b9e`, T22→`bd03640d1`; `locales/{en,he}.json` + `src/lib/i18n.generated.d.ts` 3-way AUTO-merged (disjoint namespaces), regen of i18n types produced NO diff (auto-merge already correct). Integrated gates: `pnpm i18n:check` parity ✓ · `pnpm typecheck` 0 · full `pnpm test` → **473 files / 4458 tests passed** · `pnpm architecture:gates` → All G1 passed (0 new cycles, baseline violations only).
+**Verdict:** VERIFIED
