@@ -115,8 +115,18 @@ describe("Code Blue page — quick log idempotency", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("Code Blue display page", () => {
-  it.skipIf(display === null)("display page polls /api/code-blue/sessions/active", () => {
-    expect(display).toContain("/api/code-blue/sessions/active");
+  // T20 (frozen-surface audit fix): the wall is driven by the frozen SSE
+  // transport, not by a bare poll on /api/code-blue/sessions/active. It reads
+  // the SSE-fed DISPLAY_SNAPSHOT and mounts the shared realtime client seam
+  // (EventIngestor + connectRealtime). Polling is demoted to the snapshot's
+  // bounded degraded fallback only.
+  it.skipIf(display === null)("display page is SSE-driven (frozen transport), not a bare CB poll", () => {
+    expect(display).toContain("connectRealtime");
+    expect(display).toContain("EventIngestor");
+    expect(display).toContain("DISPLAY_SNAPSHOT_QUERY_KEY");
+    // The old bespoke 2 s poll on the CB-active endpoint is gone as the primary
+    // update path — the wall no longer references it at all.
+    expect(display).not.toContain("/api/code-blue/sessions/active");
   });
 
   it.skipIf(display === null)("display page has no interactive buttons (no onClick that posts)", () => {

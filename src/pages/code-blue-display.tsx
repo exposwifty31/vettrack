@@ -1,11 +1,29 @@
 // src/pages/code-blue-display.tsx
+//
+// T20 (frozen-surface audit fix) — the Code Blue wall display is driven by the
+// frozen SSE transport, exactly like the canonical Command Center board
+// (CommandBoardScreen → CodeBlueOverlay). It reads the SSE-fed DISPLAY_SNAPSHOT
+// (which the event-reducer refetches on CODE_BLUE_STATUS_CHANGED / KEEPALIVE)
+// and mounts the same realtime client seam: an outbox-cursor EventIngestor,
+// connectRealtime + HTTP replay catch-up, visibility/wake reconciliation, and
+// Code Blue keepalive reconciliation. Session start/end propagate via SSE
+// (server-confirmed; never optimistically terminated locally). The snapshot's
+// own bounded poll (2 s during an active event, 5 s idle — the sanctioned board
+// cadence) is the DEGRADED fallback + within-session detail refresh, not the
+// primary transport. No parallel transport, no frozen-internal change.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Shield, Wifi, WifiOff } from "lucide-react";
 import { api } from "@/lib/api";
-import { clearCodeBlueSessionCache } from "@/hooks/useCodeBlueSession";
-import { useAuth } from "@/hooks/use-auth";
-import type { SessionPollResult } from "@/hooks/useCodeBlueSession";
+import {
+  connectRealtime,
+  disconnectRealtime,
+  EventIngestor,
+} from "@/lib/realtime";
+import { DISPLAY_SNAPSHOT_QUERY_KEY } from "@/lib/event-reducer";
+import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
+import { useCodeBlueKeepaliveReconciliation } from "@/hooks/useCodeBlueKeepaliveReconciliation";
+import type { DisplaySnapshot } from "@/types";
 import { t } from "@/lib/i18n";
 
 function formatElapsed(ms: number): string {
@@ -28,28 +46,68 @@ function useElapsed(startedAt: string | null): number {
 }
 
 export default function CodeBlueDisplay() {
-  const { userId } = useAuth();
+  const queryClient = useQueryClient();
 
-  const pollQ = useQuery<SessionPollResult>({
-    queryKey: ["/api/code-blue/sessions/active"],
-    queryFn: async () => {
-      const data = await api.codeBlue.sessions.getActive();
-      if (!data.session || data.session.status !== "active") {
-        clearCodeBlueSessionCache();
+  // Frozen SSE transport — outbox-cursor ingestor drives the DISPLAY_SNAPSHOT
+  // cache (event-reducer applyEvent refetches it on CODE_BLUE_STATUS_CHANGED),
+  // so a Code Blue event propagates to this wall over SSE, not by polling.
+  const realtimeIngestor = useMemo(() => new EventIngestor(queryClient), [queryClient]);
+
+  // Reconnect / wake recovery: replay missed outbox rows + resync the snapshot.
+  useRealtimeReconciliation({ queryClient, ingestor: realtimeIngestor });
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        await realtimeIngestor.replayHttpCatchUpAfter(realtimeIngestor.getLastAppliedEventId());
+      } catch {
+        // Replay is best-effort; SSE + the snapshot query still converge.
       }
-      return data;
+      if (!cancelled) {
+        connectRealtime(() => {}, { queryClient, ingestor: realtimeIngestor });
+      }
+    })();
+    return () => {
+      cancelled = true;
+      disconnectRealtime({ ingestor: realtimeIngestor });
+      realtimeIngestor.dispose();
+    };
+  }, [queryClient, realtimeIngestor]);
+
+  // Bounded DEGRADED fallback + within-session detail refresh. SSE
+  // (CODE_BLUE_STATUS_CHANGED / KEEPALIVE) is the primary propagation path;
+  // this poll only backstops the stream and refreshes the log timeline /
+  // presence (which carry no dedicated outbox event). Same cadence the
+  // canonical board uses (useDisplaySnapshot): 2 s during an active event,
+  // 5 s otherwise.
+  const snapshotQ = useQuery<DisplaySnapshot>({
+    queryKey: DISPLAY_SNAPSHOT_QUERY_KEY,
+    queryFn: () => api.display.snapshot(),
+    refetchInterval: (query) => {
+      const snapshot = query.state.data as DisplaySnapshot | undefined;
+      return snapshot?.codeBlueSession ? 2_000 : 5_000;
     },
-    refetchInterval: 2000,
+    // Always poll even when the tab is in the background (this is a wall display).
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: false,
-    retry: 1,
-    enabled: !!userId,
+    staleTime: 0,
+    placeholderData: (previous) => previous,
+    retry: 2,
   });
 
-  const session = pollQ.data?.session ?? null;
-  const logEntries = pollQ.data?.logEntries ?? [];
-  const presence = pollQ.data?.presence ?? [];
-  const linkedEquipment = pollQ.data?.linkedEquipment ?? [];
+  const session = snapshotQ.data?.codeBlueSession ?? null;
+  const logEntries = session?.logEntries ?? [];
+  const presence = session?.presence ?? [];
+  const linkedEquipment = session?.linkedEquipment ?? [];
+
+  // Server-confirmed session end: the keepalive-driven reconciler forces a
+  // snapshot refetch on persistent divergence — the overlay/wall never
+  // decides locally that a session ended (Phase 9 doctrine).
+  useCodeBlueKeepaliveReconciliation({
+    queryClient,
+    getLocalActiveSessionId: () => session?.id ?? null,
+  });
 
   const startedAtRef = useRef<string | null>(null);
   if (session?.startedAt) {
@@ -73,12 +131,12 @@ export default function CodeBlueDisplay() {
     >
       {/* Connection indicator */}
       <div className="absolute top-2 start-2">
-        {pollQ.isError
+        {snapshotQ.isError
           ? <WifiOff className="h-4 w-4 text-red-400" />
           : <Wifi className="h-4 w-4 text-green-500/50" />
         }
       </div>
-      {pollQ.isError && (
+      {snapshotQ.isError && (
         <div className="text-center text-red-400 text-sm py-1 bg-red-950/30">
           {t.codeBlue.display.connectionLost}
         </div>
@@ -129,8 +187,8 @@ export default function CodeBlueDisplay() {
           <div className="flex-1 px-8 py-6 overflow-y-auto">
             <div className="text-sm text-zinc-500 tracking-widest uppercase mb-4">{t.codeBlue.display.events}</div>
             <div className="flex flex-col gap-4">
-              {recentEntries.map((entry) => (
-                <div key={entry.id} className="flex gap-6 items-baseline">
+              {recentEntries.map((entry, idx) => (
+                <div key={`${entry.elapsedMs}-${idx}`} className="flex gap-6 items-baseline">
                   <span className="text-2xl font-mono text-zinc-600 min-w-[60px]">{formatElapsed(entry.elapsedMs)}</span>
                   <span className="text-2xl text-white">{entry.label}</span>
                   <span className="text-base text-green-400 mr-auto">{entry.loggedByName}</span>
