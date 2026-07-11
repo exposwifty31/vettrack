@@ -26,6 +26,16 @@ export const ALLOWLIST_BY_PATTERN: Record<string, Array<{ path: RegExp; line: Re
       line: /DATABASE_URL=postgres:\/\/[^\s"']+@localhost:5432\/vettrack/i,
     },
   ],
+  // The App Store Connect key bootstrapper validates a user-supplied .p8 by
+  // checking its PEM header prefix — the marker is a startsWith() comparison,
+  // not embedded key material. Scoped to that exact validation line so a real
+  // key pasted into this file would still be flagged.
+  "Private key block": [
+    {
+      path: /^\.agents\/skills\/publish-mobile-app\/scripts\/bootstrap-app-store-key\.ts$/,
+      line: /\.startsWith\("-----BEGIN PRIVATE KEY-----"\)/,
+    },
+  ],
 };
 
 const EXCLUDE_DIRS = ["node_modules", ".git", "dist", ".local", "attached_assets"];
