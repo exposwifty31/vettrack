@@ -21,6 +21,16 @@ vi.mock("../server/middleware/auth.js", () => ({
   requireAuth: (req: Record<string, unknown>, _res: unknown, next: () => void) => {
     req.authUser = { id: "admin-1", email: "admin@test.local", name: "Admin", role: "admin" };
     req.clinicId = "clinic-1";
+    // Real auth.ts resolves req.locale via resolveRequestLocale(); this mock
+    // skips that entirely (req.locale stays undefined → apiError-style
+    // helpers fall back to English), except when a test explicitly opts in
+    // via `x-locale` — needed to exercise the T7 Hebrew-locale CSV-import
+    // localization without pulling in the full auth middleware.
+    const headers = req.headers as Record<string, string | string[] | undefined> | undefined;
+    const localeHeader = headers?.["x-locale"];
+    if (localeHeader === "en" || localeHeader === "he") {
+      req.locale = localeHeader;
+    }
     next();
   },
   requireAdmin: (_req: unknown, _res: unknown, next: () => void) => next(),
@@ -70,10 +80,13 @@ afterAll(async () => {
   });
 });
 
-async function preview(csv: string): Promise<PreviewResponse> {
+async function preview(csv: string, locale?: "en" | "he"): Promise<PreviewResponse> {
   const res = await fetch(`${baseUrl}/api/shifts/import/preview`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(locale ? { "x-locale": locale } : {}),
+    },
     body: JSON.stringify({ csv, filename: "roster.csv" }),
   });
   expect(res.status).toBe(200);
@@ -154,5 +167,39 @@ describe("confirm-path visibility contract", () => {
   it("admin page surfaces skipped rows on confirm instead of a plain success toast", () => {
     expect(adminPageSource).toContain("importSuccessWithSkipped");
     expect(adminPageSource).toContain("skippedRows > 0");
+  });
+});
+
+// T7 (HIGH audit fix): roster CSV import errors ("Missing required columns:
+// employee_name", 'Shift "Ward" is not relevant to VetTrack') were returned
+// as raw English regardless of locale. They now route through the same
+// translate()/getLocaleDictionaries() primitives apiError() uses, keyed on
+// req.locale, via a file-local `tShiftImport` helper (server/routes/shifts.ts).
+describe("shift CSV import errors are localized per req.locale (T7)", () => {
+  it("defaults to English when the request carries no locale (unchanged from before T7)", async () => {
+    const csv = "Employee,Shift,Date,Start"; // missing end_time column
+    const parsed = await preview(csv);
+    expect(parsed.issues[0]?.reason).toBe("Missing required columns: end_time");
+  });
+
+  it("returns Hebrew copy for 'Missing required columns' when req.locale is he", async () => {
+    const csv = "Employee,Shift,Date,Start"; // missing end_time column
+    const parsed = await preview(csv, "he");
+    expect(parsed.issues[0]?.reason).toBe("חסרות עמודות חובה: end_time");
+  });
+
+  it("returns Hebrew copy for the 'not relevant to VetTrack' family when req.locale is he", async () => {
+    const csv = [
+      "Employee,Shift,Date,Start,End",
+      "WC Outside Corp,ניקיון בוקר,2026-07-05,08:00,16:00",
+      "WC Maya Rosen,וטרינר בוקר,2026-07-05,08:00,16:00",
+    ].join("\n");
+    const parsed = await preview(csv, "he");
+
+    const reasonFor = (marker: string) =>
+      parsed.issues.find((i) => String(i.data.shiftName ?? "").includes(marker))?.reason ?? "";
+
+    expect(reasonFor("ניקיון")).toBe('המשמרת "ניקיון בוקר" אינה רלוונטית ל-VetTrack');
+    expect(reasonFor("וטרינר")).toContain("משמרת וטרינר/ית");
   });
 });

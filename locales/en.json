@@ -294,6 +294,18 @@
     "emergencyCountLabel": "Emergency",
     "summaryCountsTitle": "Summary"
   },
+  "shiftImport": {
+    "csvEmpty": "CSV is empty",
+    "missingRequiredColumns": "Missing required columns: {columns}",
+    "missingRequiredValues": "Missing one or more required values",
+    "invalidDate": "Invalid date value \"{value}\"",
+    "invalidStartTime": "Invalid start time \"{value}\"",
+    "invalidEndTime": "Invalid end time \"{value}\"",
+    "shiftNotRelevantVet": "Shift \"{shiftName}\" is a vet shift — doctor schedules import via the doctor CSV (userId column), not the roster CSV",
+    "shiftNotRelevantStudent": "Shift \"{shiftName}\" is a student shift — students are not part of the on-shift roster",
+    "shiftNotRelevant": "Shift \"{shiftName}\" is not relevant to VetTrack",
+    "duplicateRow": "Duplicate shift row in CSV"
+  },
   "inventoryPage": {
     "title": "Inventory & consumables",
     "targetHeading": "Stock target",
@@ -469,6 +481,11 @@
     "checkedOutBy": "Checked out by {email}",
     "updateStatusTitle": "Update status",
     "statusLabel": "Status",
+    "actionInUse": "In Use",
+    "actionMove": "Move",
+    "actionIssue": "Issue",
+    "actionReturn": "Return",
+    "activityRoomVerified": "Room verified: {room}",
     "reportIssueTitle": "Report an issue",
     "localStatePendingSync": "Saved locally · waiting to sync",
     "localStateConflict": "Sync conflict — open queue to resolve",

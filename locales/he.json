@@ -294,6 +294,18 @@
     "emergencyCountLabel": "חירום",
     "summaryCountsTitle": "סיכום"
   },
+  "shiftImport": {
+    "csvEmpty": "קובץ ה-CSV ריק",
+    "missingRequiredColumns": "חסרות עמודות חובה: {columns}",
+    "missingRequiredValues": "חסרים ערכים נדרשים בשורה זו",
+    "invalidDate": "תאריך לא תקין \"{value}\"",
+    "invalidStartTime": "שעת התחלה לא תקינה \"{value}\"",
+    "invalidEndTime": "שעת סיום לא תקינה \"{value}\"",
+    "shiftNotRelevantVet": "המשמרת \"{shiftName}\" היא משמרת וטרינר/ית — משמרות רופאים מיובאות דרך קובץ ה-CSV הייעודי לרופאים (עמודת userId), לא דרך קובץ הסידור",
+    "shiftNotRelevantStudent": "המשמרת \"{shiftName}\" היא משמרת סטודנט/ית — סטודנטים אינם חלק מסידור העבודה",
+    "shiftNotRelevant": "המשמרת \"{shiftName}\" אינה רלוונטית ל-VetTrack",
+    "duplicateRow": "שורת משמרת כפולה בקובץ ה-CSV"
+  },
   "inventoryPage": {
     "title": "מלאי ומתכלים",
     "targetHeading": "יעד מלאי",
@@ -469,6 +481,11 @@
     "checkedOutBy": "בשימוש על ידי {email}",
     "updateStatusTitle": "עדכון סטטוס",
     "statusLabel": "סטטוס",
+    "actionInUse": "בשימוש",
+    "actionMove": "העבר",
+    "actionIssue": "תקלה",
+    "actionReturn": "החזר",
+    "activityRoomVerified": "אימות חדר: {room}",
     "reportIssueTitle": "דיווח על תקלה",
     "localStatePendingSync": "נשמר מקומית · ממתין לסנכרון",
     "localStateConflict": "קונפליקט סנכרון — פתח את התור לפתרון",

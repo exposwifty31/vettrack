@@ -1114,7 +1114,7 @@ function EquipmentDetailPageDesktop() {
                 ) : (
                   <LogIn className="w-4 h-4" />
                 )}
-                In Use
+                {t.equipmentDetail.actionInUse}
               </Button>
               {offShiftCheckoutNote}
             </>
@@ -1131,7 +1131,7 @@ function EquipmentDetailPageDesktop() {
               ) : (
                 <LogOut className="w-4 h-4" />
               )}
-              Return
+              {t.equipmentDetail.actionReturn}
             </Button>
           ) : null}
 
@@ -1149,7 +1149,7 @@ function EquipmentDetailPageDesktop() {
               data-testid="btn-report-issue"
             >
               <AlertTriangle className="w-3.5 h-3.5" />
-              Issue
+              {t.equipmentDetail.actionIssue}
             </Button>
             <Button
               variant="outline"
@@ -1158,7 +1158,7 @@ function EquipmentDetailPageDesktop() {
               data-testid="btn-scan"
             >
               <ClipboardEdit className="w-3.5 h-3.5" />
-              Status
+              {t.equipmentDetail.statusLabel}
             </Button>
             {!isStudentEquipmentRole && (
               <Button
@@ -1168,7 +1168,7 @@ function EquipmentDetailPageDesktop() {
                 data-testid="btn-move-room"
               >
                 <MoveHorizontal className="w-3.5 h-3.5" />
-                Move
+                {t.equipmentDetail.actionMove}
               </Button>
             )}
           </div>
@@ -1184,7 +1184,7 @@ function EquipmentDetailPageDesktop() {
                 {equipment.checkedOutLocation && (
                   <p className="text-xs mt-0.5 opacity-80 truncate">{equipment.checkedOutLocation}</p>
                 )}
-                <p className="text-xs mt-0.5 opacity-70">Since {formatRelativeTime(equipment.checkedOutAt)}</p>
+                <p className="text-xs mt-0.5 opacity-70">{t.shiftSummaryPage.since} {formatRelativeTime(equipment.checkedOutAt)}</p>
               </div>
             </div>
           )}

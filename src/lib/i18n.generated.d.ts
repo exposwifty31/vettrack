@@ -297,6 +297,18 @@ export interface TStructure {
     emergencyCountLabel: string;
     summaryCountsTitle: string;
   };
+  shiftImport: {
+    csvEmpty: string;
+    missingRequiredColumns: string;
+    missingRequiredValues: string;
+    invalidDate: string;
+    invalidStartTime: string;
+    invalidEndTime: string;
+    shiftNotRelevantVet: string;
+    shiftNotRelevantStudent: string;
+    shiftNotRelevant: string;
+    duplicateRow: string;
+  };
   inventoryPage: {
     title: string;
     targetHeading: string;
@@ -472,6 +484,11 @@ export interface TStructure {
     checkedOutBy: string;
     updateStatusTitle: string;
     statusLabel: string;
+    actionInUse: string;
+    actionMove: string;
+    actionIssue: string;
+    actionReturn: string;
+    activityRoomVerified: string;
     reportIssueTitle: string;
     localStatePendingSync: string;
     localStateConflict: string;
@@ -839,6 +856,7 @@ export interface TStructure {
     guidedTitle: string;
     guidedBody: string;
     inventoryActionHint: string;
+    myEquipmentRefreshFailed: string;
   };
   home: {
     equipmentOverview: string;

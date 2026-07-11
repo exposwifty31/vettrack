@@ -7,6 +7,23 @@ import { requireAdmin, requireAuth } from "../middleware/auth.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import { detectDoctorOperationalShiftRole } from "../../shared/doctor-operational-shift.js";
 import { resolveRequestId, apiError } from "../lib/route-utils.js";
+import { getLocaleDictionaries } from "../../lib/i18n/loader.js";
+import { translate, type TranslationParams } from "../../lib/i18n/index.js";
+import type { Locale } from "../../lib/i18n/types.js";
+
+/**
+ * File-local translation helper for shift-CSV-import row issues (mirrors
+ * `tWhatsApp` in whatsapp.ts). `parseShiftsCsvContent` has no `req` access,
+ * so route handlers thread `req.locale` down as a plain parameter; this
+ * keeps the parser's callers in control of localization while producing
+ * already-localized `reason` strings the client can render as-is (HIGH
+ * audit finding: roster CSV import errors were raw English regardless of
+ * `req.locale`).
+ */
+function tShiftImport(locale: Locale, key: string, params?: TranslationParams): string {
+  const { primary, fallback, locale: lc } = getLocaleDictionaries(locale);
+  return translate(primary, `shiftImport.${key}`, params, { fallbackDict: fallback, locale: lc });
+}
 
 type ShiftRole = "technician" | "senior_technician" | "admin";
 
@@ -342,15 +359,15 @@ function classifyUnsupportedRosterRole(shiftName: string): "vet" | "student" | n
   return null;
 }
 
-function skippedRoleReason(shiftName: string): string {
+function skippedRoleReason(shiftName: string, locale: Locale): string {
   const unsupported = classifyUnsupportedRosterRole(shiftName);
   if (unsupported === "vet") {
-    return `Shift "${shiftName}" is a vet shift — doctor schedules import via the doctor CSV (userId column), not the roster CSV`;
+    return tShiftImport(locale, "shiftNotRelevantVet", { shiftName });
   }
   if (unsupported === "student") {
-    return `Shift "${shiftName}" is a student shift — students are not part of the on-shift roster`;
+    return tShiftImport(locale, "shiftNotRelevantStudent", { shiftName });
   }
-  return `Shift "${shiftName}" is not relevant to VetTrack`;
+  return tShiftImport(locale, "shiftNotRelevant", { shiftName });
 }
 
 function resolveHeaderIndex(headers: string[], variants: readonly string[]): number {
@@ -367,11 +384,16 @@ function createShiftDeterministicId(row: Omit<ParsedShiftRow, "rowNumber">): str
   return createHash("sha1").update(key).digest("hex");
 }
 
-function parseShiftsCsvContent(csvContent: string, filename: string): ShiftParseResult {
+function parseShiftsCsvContent(csvContent: string, filename: string, locale: Locale): ShiftParseResult {
   const { headers, rows } = parseCsv(csvContent);
 
   if (headers.length === 0) {
-    return { filename, totalRows: 0, validRows: [], issues: [{ rowNumber: 1, reason: "CSV is empty", data: {} }] };
+    return {
+      filename,
+      totalRows: 0,
+      validRows: [],
+      issues: [{ rowNumber: 1, reason: tShiftImport(locale, "csvEmpty"), data: {} }],
+    };
   }
 
   const dateIdx = resolveHeaderIndex(headers, CSV_HEADER_VARIANTS.date);
@@ -396,7 +418,7 @@ function parseShiftsCsvContent(csvContent: string, filename: string): ShiftParse
       issues: [
         {
           rowNumber: 1,
-          reason: `Missing required columns: ${missingColumns.join(", ")}`,
+          reason: tShiftImport(locale, "missingRequiredColumns", { columns: missingColumns.join(", ") }),
           data: { headers: headers.join(",") },
         },
       ],
@@ -431,31 +453,31 @@ function parseShiftsCsvContent(csvContent: string, filename: string): ShiftParse
     }
 
     if (!dateRaw || !startRaw || !endRaw || !employeeRaw || !shiftNameRaw) {
-      issues.push({ rowNumber, reason: "Missing one or more required values", data: rowData });
+      issues.push({ rowNumber, reason: tShiftImport(locale, "missingRequiredValues"), data: rowData });
       continue;
     }
 
     const parsedDate = parseDate(dateRaw);
     if (!parsedDate) {
-      issues.push({ rowNumber, reason: `Invalid date value "${dateRaw}"`, data: rowData });
+      issues.push({ rowNumber, reason: tShiftImport(locale, "invalidDate", { value: dateRaw }), data: rowData });
       continue;
     }
 
     const parsedStart = parseTime(startRaw);
     if (!parsedStart) {
-      issues.push({ rowNumber, reason: `Invalid start time "${startRaw}"`, data: rowData });
+      issues.push({ rowNumber, reason: tShiftImport(locale, "invalidStartTime", { value: startRaw }), data: rowData });
       continue;
     }
 
     const parsedEnd = parseTime(endRaw);
     if (!parsedEnd) {
-      issues.push({ rowNumber, reason: `Invalid end time "${endRaw}"`, data: rowData });
+      issues.push({ rowNumber, reason: tShiftImport(locale, "invalidEndTime", { value: endRaw }), data: rowData });
       continue;
     }
 
     const role = detectShiftRole(shiftNameRaw);
     if (!role) {
-      issues.push({ rowNumber, reason: skippedRoleReason(shiftNameRaw), data: rowData });
+      issues.push({ rowNumber, reason: skippedRoleReason(shiftNameRaw, locale), data: rowData });
       continue;
     }
 
@@ -471,7 +493,7 @@ function parseShiftsCsvContent(csvContent: string, filename: string): ShiftParse
 
     const dedupeKey = `${parsed.date}|${parsed.startTime}|${parsed.endTime}|${parsed.employeeName.toLowerCase()}|${parsed.role}`;
     if (seen.has(dedupeKey)) {
-      issues.push({ rowNumber, reason: "Duplicate shift row in CSV", data: rowData });
+      issues.push({ rowNumber, reason: tShiftImport(locale, "duplicateRow"), data: rowData });
       continue;
     }
     seen.add(dedupeKey);
@@ -548,7 +570,7 @@ router.post("/import/preview", requireAuth, requireAdmin, uploadCsvFile, async (
       );
     }
 
-    const parsed = parseShiftsCsvContent(csv, filename);
+    const parsed = parseShiftsCsvContent(csv, filename, req.locale);
     return res.json({
       filename: parsed.filename,
       summary: {
@@ -599,7 +621,7 @@ router.post("/import/confirm", requireAuth, requireAdmin, uploadCsvFile, async (
       );
     }
 
-    const parsed = parseShiftsCsvContent(csv, filename);
+    const parsed = parseShiftsCsvContent(csv, filename, req.locale);
     if (parsed.validRows.length === 0) {
       return res.status(400).json({
         ...apiError({
@@ -747,7 +769,7 @@ router.post("/import", requireAuth, requireAdmin, uploadCsvFile, async (req, res
       });
     }
 
-    const parsed = parseShiftsCsvContent(csvText, req.file.originalname || "shifts.csv");
+    const parsed = parseShiftsCsvContent(csvText, req.file.originalname || "shifts.csv", req.locale);
     if (parsed.totalRows === 0) {
       return res.status(400).json(
         apiError({
