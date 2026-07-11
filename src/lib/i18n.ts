@@ -449,7 +449,10 @@ const translations = {
   dispense: {
     errors: d.dispense.errors,
     bypass: d.dispense.bypass,
-    sheet: d.dispense.sheet,
+    sheet: {
+      ...d.dispense.sheet,
+      itemsSelected: (count: number) => tr(d.dispense.sheet.itemsSelected, { count }),
+    },
     errorMessage: (code: string) => {
       const map = d.dispense.errors as Record<string, string>;
       return map[code] ?? map.fallback;
@@ -729,9 +732,14 @@ const translations = {
     ...d.roomsListPage,
     subtitle: (count: number) => tr(d.roomsListPage.subtitle, { count }),
     healthRingTitle: (pct: number) => tr(d.roomsListPage.healthRingTitle, { pct }),
+    cardItemCount: (count: number) => tr(d.roomsListPage.cardItemCount, { count }),
   },
 
-  managementDashboardPage: d.managementDashboardPage,
+  managementDashboardPage: {
+    ...d.managementDashboardPage,
+    usersUnit: (count: number) => tr(d.managementDashboardPage.usersUnit, { count }),
+    itemsUnit: (count: number) => tr(d.managementDashboardPage.itemsUnit, { count }),
+  },
 
   pwa: d.pwa,
 

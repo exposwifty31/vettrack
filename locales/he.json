@@ -965,7 +965,7 @@
       "emergency": "חירום",
       "orSelectItems": "או בחר פריטים",
       "noItemsInContainer": "אין פריטים במכלול זה",
-      "itemsSelected": "פריטים נבחרו",
+      "itemsSelected": "{count} {count, plural, one{פריט נבחר} other{פריטים נבחרו}}",
       "continue": "המשך"
     }
   },
@@ -1758,7 +1758,7 @@
     "summaryInUse": "בשימוש",
     "summaryIssues": "תקלות",
     "summarySynced": "מסונכרן",
-    "cardItemsUnit": "פריטים",
+    "cardItemCount": "{count} {count, plural, one{פריט} other{פריטים}}",
     "cardAvailShort": "זמינים",
     "cardInUseShort": "בשימוש",
     "roomNamePlaceholder": "לדוגמה: חדר ניתוח א'",
@@ -1769,8 +1769,8 @@
     "refresh": "רענן",
     "reportGenerating": "מייצר דוח...",
     "reportButton": "דוח",
-    "usersUnit": "משתמשים",
-    "itemsUnit": "פריטים",
+    "usersUnit": "{count} {count, plural, one{משתמש} other{משתמשים}}",
+    "itemsUnit": "{count} {count, plural, one{פריט} other{פריטים}}",
     "checkedOut": "מושאלים",
     "reportSuccess": "הדוח מוכן",
     "reportError": "לא ניתן לייצר דוח. נא לנסות שוב.",

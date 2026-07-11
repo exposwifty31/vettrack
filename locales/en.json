@@ -965,7 +965,7 @@
       "emergency": "Emergency",
       "orSelectItems": "Or select items",
       "noItemsInContainer": "No items in this container",
-      "itemsSelected": "items selected",
+      "itemsSelected": "{count} {count, plural, one{item selected} other{items selected}}",
       "continue": "Continue"
     }
   },
@@ -1758,7 +1758,7 @@
     "summaryInUse": "In Use",
     "summaryIssues": "Issues",
     "summarySynced": "Synced",
-    "cardItemsUnit": "items",
+    "cardItemCount": "{count} {count, plural, one{item} other{items}}",
     "cardAvailShort": "avail.",
     "cardInUseShort": "in use",
     "roomNamePlaceholder": "e.g. Surgery A",
@@ -1769,8 +1769,8 @@
     "refresh": "Refresh",
     "reportGenerating": "Generating report...",
     "reportButton": "Report",
-    "usersUnit": "users",
-    "itemsUnit": "items",
+    "usersUnit": "{count} {count, plural, one{user} other{users}}",
+    "itemsUnit": "{count} {count, plural, one{item} other{items}}",
     "checkedOut": "checked out",
     "reportSuccess": "Report ready",
     "reportError": "Could not generate report. Please try again.",

@@ -141,7 +141,7 @@ function RoomCard({ room }: { room: Room }) {
                 <span className="truncate">{room.floor}</span>
               </p>
             ) : (
-              <p className="text-[11px] text-muted-foreground mt-0.5">{total} {t.roomsListPage.cardItemsUnit}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{t.roomsListPage.cardItemCount(total)}</p>
             )}
           </div>
 

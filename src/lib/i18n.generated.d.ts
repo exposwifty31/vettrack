@@ -1761,7 +1761,7 @@ export interface TStructure {
     summaryInUse: string;
     summaryIssues: string;
     summarySynced: string;
-    cardItemsUnit: string;
+    cardItemCount: string;
     cardAvailShort: string;
     cardInUseShort: string;
     roomNamePlaceholder: string;

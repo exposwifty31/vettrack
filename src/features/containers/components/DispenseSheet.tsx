@@ -742,7 +742,7 @@ export function DispenseSheet({
           {/* Sticky bottom bar */}
           <div className="sticky bottom-0 bg-background pt-2 pb-2 space-y-2">
             <div className="flex items-center justify-between text-sm text-muted-foreground px-1">
-              <span>{totalSelected} {t.dispense.sheet.itemsSelected}</span>
+              <span>{t.dispense.sheet.itemsSelected(totalSelected)}</span>
               <ChevronRight className="w-4 h-4" />
             </div>
             <Button
