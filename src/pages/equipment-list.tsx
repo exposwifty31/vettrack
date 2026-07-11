@@ -104,6 +104,10 @@ import {
 } from "@/lib/equipment-list-recovery-labels";
 import { EquipmentHeroCoverageStrip } from "@/components/equipment/EquipmentHeroCoverageStrip";
 import { EquipmentRoomSweepSheet } from "@/components/equipment/EquipmentRoomSweepSheet";
+import {
+  EQUIPMENT_LIST_PAGE_SIZE as PAGE_SIZE,
+  resolveEquipmentListShownCount,
+} from "@/lib/equipment-list-pagination";
 
 const VIRTUALIZATION_THRESHOLD = 100;
 const SERVER_PAGE_SIZE = 100;
@@ -115,9 +119,6 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "maintenance", label: t.status.maintenance },
   { value: "sterilized", label: t.status.sterilized },
 ];
-
-// 9 cards per page — DOM never holds more than 9 <div>s regardless of dataset size.
-const PAGE_SIZE = 9;
 
 
 export default function EquipmentListPage() {
@@ -810,7 +811,10 @@ function EquipmentListPageDesktop() {
 
         {/* Count + page info */}
         <p className="vt-text-xs text-muted-foreground -mt-2">
-          {t.equipmentList.paginationCount(displayList.length, totalCount || equipment.length)}
+          {t.equipmentList.paginationCount(
+            resolveEquipmentListShownCount(isVirtualized, displayList.length, pageItems.length),
+            totalCount || equipment.length,
+          )}
           {!isLoading && !isVirtualized && totalPages > 1 && (
             <span className="ms-1">· {t.equipmentList.paginationPage(safePage, totalPages)}</span>
           )}
