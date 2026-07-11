@@ -160,7 +160,10 @@ describe("confirm-path visibility contract", () => {
       shiftsSource.indexOf('router.post("/import",'),
     );
     expect(confirmBlock).toContain("skippedRows: parsed.issues.length");
-    const auditCall = confirmBlock.slice(confirmBlock.indexOf("logAudit("));
+    // T18 added a doctor-CSV branch (with its own logAudit call) ahead of the
+    // roster branch in source order — the roster audit call this test targets
+    // is now the LAST logAudit( in the block, not the first.
+    const auditCall = confirmBlock.slice(confirmBlock.lastIndexOf("logAudit("));
     expect(auditCall.slice(0, auditCall.indexOf("})"))).toContain("skippedRows");
   });
 

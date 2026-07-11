@@ -31,6 +31,7 @@ import type {
   ShiftImport,
   ShiftImportPreview,
   ShiftImportResult,
+  ShiftNameHints,
   ShiftAdjustment,
   ShiftAdjustmentStatus,
   ShiftAdjustmentDecision,
@@ -549,6 +550,7 @@ export const api = {
     list: (date?: string) =>
       request<Shift[]>(date ? `/api/shifts?date=${encodeURIComponent(date)}` : "/api/shifts"),
     imports: () => request<ShiftImport[]>("/api/shifts/imports"),
+    importShiftNameHints: () => request<ShiftNameHints>("/api/shifts/import/shift-names"),
     previewImport: async (file: File) => {
       const form = new FormData();
       form.append("file", file);

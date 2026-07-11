@@ -1299,7 +1299,20 @@
     "endTime": "End time",
     "employeeName": "Employee name",
     "role": "Role",
-    "csvOnly": "Please select a CSV file only."
+    "csvOnly": "Please select a CSV file only.",
+    "doctorImportBadge": "Doctor import",
+    "rosterImportBadge": "Roster import",
+    "userIdColumn": "User ID",
+    "operationalRoleColumn": "Operational role",
+    "operationalRoleAdmission": "Admissions",
+    "operationalRoleWard": "Ward",
+    "operationalRoleSeniorLead": "Senior lead",
+    "operationalRoleNightAdmissionOnly": "Night — admissions only",
+    "operationalRoleNightSeniorNoAdmission": "Night — senior, no admissions",
+    "operationalRoleUnknown": "Unrecognized (won't route)",
+    "acceptedShiftNamesTitle": "Accepted shift names",
+    "acceptedShiftNamesHint": "The roster CSV parser matches a shift name that contains any of these keywords (case-insensitive).",
+    "acceptedShiftNamesLoadFailed": "Failed to load the accepted shift-names list."
   },
   "alertsPage": {
     "oneMinuteAgo": "1 minute ago",

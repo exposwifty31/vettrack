@@ -90,6 +90,7 @@ export const REGISTERED_QUERY_KEYS = [
   "[\"/api/shift-handover/snapshot/latest\"]",
   "[\"/api/shift-handover/summary\"]",
   "[\"/api/shifts\"]",
+  "[\"/api/shifts/import/shift-names\"]",
   "[\"/api/shifts/imports\"]",
   "[\"/api/stability/logs\",\"*\",\"*\"]",
   "[\"/api/stability/logs\"]",

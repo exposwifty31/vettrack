@@ -304,33 +304,38 @@ async function parseDoctorShiftRows(
   return { validRows, issues };
 }
 
+/**
+ * Substring keywords `detectShiftRole` matches against a normalized (lowercased,
+ * whitespace-collapsed) shift-name cell. Named + exported so the import UI can
+ * show admins the accepted-shift-names list (T19) without a parallel/duplicated
+ * copy of these tokens drifting out of sync with the parser.
+ */
+const SENIOR_TECHNICIAN_SHIFT_KEYWORDS = [
+  "בכיר",
+  "senior technician",
+  "senior_technician",
+  "senior-tech",
+  "senior tech",
+  "sr tech",
+  "lead technician",
+] as const;
+
+const ADMIN_SHIFT_KEYWORDS = ["מנהל", "אדמין", "admin", "manager"] as const;
+
+const TECHNICIAN_SHIFT_KEYWORDS = ["טכנאי", "קבלה", "technician", "tech", "reception"] as const;
+
 function detectShiftRole(shiftName: string): ShiftRole | null {
   const normalized = normalizeWhitespace(shiftName).toLowerCase();
 
-  const isSeniorTechnician =
-    normalized.includes("בכיר") ||
-    normalized.includes("senior technician") ||
-    normalized.includes("senior_technician") ||
-    normalized.includes("senior-tech") ||
-    normalized.includes("senior tech") ||
-    normalized.includes("sr tech") ||
-    normalized.includes("lead technician");
-  if (isSeniorTechnician) return "senior_technician";
-
-  const isAdminShift =
-    normalized.includes("מנהל") ||
-    normalized.includes("אדמין") ||
-    normalized.includes("admin") ||
-    normalized.includes("manager");
-  if (isAdminShift) return "admin";
-
-  const isTechnicianShift =
-    normalized.includes("טכנאי") ||
-    normalized.includes("קבלה") ||
-    normalized.includes("technician") ||
-    normalized.includes("tech") ||
-    normalized.includes("reception");
-  if (isTechnicianShift) return "technician";
+  if (SENIOR_TECHNICIAN_SHIFT_KEYWORDS.some((keyword) => normalized.includes(keyword))) {
+    return "senior_technician";
+  }
+  if (ADMIN_SHIFT_KEYWORDS.some((keyword) => normalized.includes(keyword))) {
+    return "admin";
+  }
+  if (TECHNICIAN_SHIFT_KEYWORDS.some((keyword) => normalized.includes(keyword))) {
+    return "technician";
+  }
 
   return null;
 }
@@ -555,6 +560,20 @@ router.get("/imports", requireAuth, requireAdmin, async (_req, res) => {
   }
 });
 
+/**
+ * T19 (LOW): surfaces the roster-CSV shift-name keyword lists so the import UI
+ * can show admins what the parser recognizes instead of failing opaquely.
+ * Returns the exact same arrays `detectShiftRole` matches against — single
+ * source of truth, no parallel/duplicated keyword list to drift.
+ */
+router.get("/import/shift-names", requireAuth, requireAdmin, async (_req, res) => {
+  res.json({
+    technician: [...TECHNICIAN_SHIFT_KEYWORDS],
+    seniorTechnician: [...SENIOR_TECHNICIAN_SHIFT_KEYWORDS],
+    admin: [...ADMIN_SHIFT_KEYWORDS],
+  });
+});
+
 router.post("/import/preview", requireAuth, requireAdmin, uploadCsvFile, async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
@@ -570,8 +589,34 @@ router.post("/import/preview", requireAuth, requireAdmin, uploadCsvFile, async (
       );
     }
 
+    // T18 (HIGH): doctor CSVs (userId column) were always run through the
+    // roster parser here and rejected — the doctor parser was only reachable
+    // via the UI-less legacy POST /import. Branch on the same isDoctorCsv()
+    // shape-detection the legacy endpoint already uses; the roster branch
+    // below is untouched (same call, same parser, same response shape plus
+    // an additive `kind` tag).
+    const { headers, rows } = parseCsv(csv);
+    const normalizedHeaders = headers.map((header) => normalizeHeader(header));
+
+    if (isDoctorCsv(normalizedHeaders)) {
+      const clinicId = req.clinicId!;
+      const { validRows: doctorRows, issues } = await parseDoctorShiftRows(headers, rows, clinicId);
+      return res.json({
+        kind: "doctor",
+        filename,
+        summary: {
+          totalRows: rows.length,
+          validRows: doctorRows.length,
+          skippedRows: issues.length,
+        },
+        rows: doctorRows,
+        issues,
+      });
+    }
+
     const parsed = parseShiftsCsvContent(csv, filename, req.locale);
     return res.json({
+      kind: "roster",
       filename: parsed.filename,
       summary: {
         totalRows: parsed.totalRows,
@@ -619,6 +664,67 @@ router.post("/import/confirm", requireAuth, requireAdmin, uploadCsvFile, async (
           requestId,
         }),
       );
+    }
+
+    // T18 (HIGH): same doctor/roster branch as /import/preview above — a
+    // confirmed doctor CSV must actually write to vt_doctor_shifts (via the
+    // existing doctor parser + insert sequence the legacy POST /import
+    // endpoint already uses) instead of being force-fit through the roster
+    // parser. Roster branch below is unchanged.
+    const { headers, rows } = parseCsv(csv);
+    const normalizedHeaders = headers.map((header) => normalizeHeader(header));
+
+    if (isDoctorCsv(normalizedHeaders)) {
+      const { validRows: doctorRows, issues } = await parseDoctorShiftRows(headers, rows, clinicId);
+      if (doctorRows.length === 0) {
+        return res.status(400).json({
+          ...apiError({
+            code: "VALIDATION_FAILED",
+            reason: "NO_VALID_SHIFT_ROWS",
+            message: "No valid shift rows found for import",
+            requestId,
+          }),
+          issues,
+        });
+      }
+
+      const importId = randomUUID();
+      await db.insert(shiftImports).values({
+        id: importId,
+        clinicId,
+        importedBy: req.authUser!.id,
+        filename,
+        rowCount: doctorRows.length,
+      });
+      await db.insert(doctorShifts).values(
+        doctorRows.map((row) => ({
+          id: randomUUID(),
+          clinicId,
+          userId: row.userId,
+          date: row.date,
+          startTime: row.startTime,
+          endTime: row.endTime,
+          shiftName: row.shiftName,
+          operationalRole: row.operationalRole,
+        })),
+      );
+
+      logAudit({
+        clinicId,
+        actionType: "doctor_shifts_csv_imported",
+        performedBy: req.authUser!.id,
+        performedByEmail: req.authUser!.email ?? "",
+        metadata: { rowCount: doctorRows.length, issueCount: issues.length },
+      });
+
+      return res.json({
+        kind: "doctor",
+        importId,
+        filename,
+        insertedRows: doctorRows.length,
+        skippedRows: issues.length,
+        issues,
+      });
     }
 
     const parsed = parseShiftsCsvContent(csv, filename, req.locale);
@@ -688,6 +794,7 @@ router.post("/import/confirm", requireAuth, requireAdmin, uploadCsvFile, async (
       metadata: { filename: parsed.filename, rowCount: parsed.validRows.length, skippedRows: parsed.issues.length },
     });
     return res.json({
+      kind: "roster",
       importId,
       filename: parsed.filename,
       insertedRows: parsed.validRows.length,

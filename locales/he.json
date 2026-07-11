@@ -1299,7 +1299,20 @@
     "endTime": "שעת סיום",
     "employeeName": "שם עובד",
     "role": "תפקיד",
-    "csvOnly": "בחר קובץ CSV בלבד."
+    "csvOnly": "בחר קובץ CSV בלבד.",
+    "doctorImportBadge": "ייבוא משמרות רופאים",
+    "rosterImportBadge": "ייבוא לוח משמרות",
+    "userIdColumn": "מזהה משתמש",
+    "operationalRoleColumn": "תפקיד תפעולי",
+    "operationalRoleAdmission": "קבלות",
+    "operationalRoleWard": "מחלקה",
+    "operationalRoleSeniorLead": "בכיר אחראי",
+    "operationalRoleNightAdmissionOnly": "לילה — קבלות בלבד",
+    "operationalRoleNightSeniorNoAdmission": "לילה — בכיר, ללא קבלות",
+    "operationalRoleUnknown": "לא מזוהה (לא ינותב)",
+    "acceptedShiftNamesTitle": "שמות משמרות מזוהים",
+    "acceptedShiftNamesHint": "מנתח ה-CSV של לוח המשמרות מזהה שם משמרת המכיל אחת ממילות המפתח הבאות (ללא הבחנה בין אותיות גדולות לקטנות).",
+    "acceptedShiftNamesLoadFailed": "טעינת רשימת שמות המשמרות המזוהים נכשלה."
   },
   "alertsPage": {
     "oneMinuteAgo": "לפני דקה",

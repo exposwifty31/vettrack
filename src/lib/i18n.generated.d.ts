@@ -1303,6 +1303,19 @@ export interface TStructure {
     employeeName: string;
     role: string;
     csvOnly: string;
+    doctorImportBadge: string;
+    rosterImportBadge: string;
+    userIdColumn: string;
+    operationalRoleColumn: string;
+    operationalRoleAdmission: string;
+    operationalRoleWard: string;
+    operationalRoleSeniorLead: string;
+    operationalRoleNightAdmissionOnly: string;
+    operationalRoleNightSeniorNoAdmission: string;
+    operationalRoleUnknown: string;
+    acceptedShiftNamesTitle: string;
+    acceptedShiftNamesHint: string;
+    acceptedShiftNamesLoadFailed: string;
   };
   alertsPage: {
     oneMinuteAgo: string;
