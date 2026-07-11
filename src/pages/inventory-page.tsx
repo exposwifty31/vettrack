@@ -72,14 +72,15 @@ export default function InventoryPage() {
     refetchOnWindowFocus: false,
   });
 
-  // A custody-only user (student) is never authorized for the full container
-  // list (`requireEffectiveRole("technician")` on GET /api/containers) — that
-  // authorization boundary is intentional and stays server-side. Treat the
-  // resulting 403 as an expected, non-fatal "restricted" state for THIS
-  // archetype only (via the shared capability model, not a role literal) so
-  // the page doesn't blank into a scary "load failed" for a permissions
-  // boundary a retry can never fix. Any other role hitting a real 403/500
-  // still gets the normal fatal ErrorCard below.
+  // Defense-in-depth graceful-degrade: if a custody-only archetype ever gets a
+  // 403 on the container list, render an expected, non-fatal "restricted" state
+  // (via the shared capability model, not a role literal) so the page doesn't
+  // blank into a scary "load failed" for a permissions boundary a retry can't
+  // fix. NOTE (T26): the container/dispense/restock routes were reclassified
+  // non-clinical (`requireEffectiveRole("student")`), so a student now gets 200
+  // here — this branch no longer triggers for students under the current auth
+  // config, but stays as a safety net for any residual custody-only 403. Any
+  // other role hitting a real 403/500 still gets the normal fatal ErrorCard.
   const containersForbidden =
     containersQ.error instanceof ApiError && containersQ.error.status === 403;
   const containersRestrictedForRole = containersForbidden && isCustodyOnly(experience);
