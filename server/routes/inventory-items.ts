@@ -51,8 +51,10 @@ export const addPriceSchema = z.object({
   effectiveFrom: z.string().datetime({ offset: true }).optional(),
 }).strict();
 
-// GET /api/inventory-items — list active items for the clinic
-router.get("/", requireAuth, requireEffectiveRole("technician"), async (req, res) => {
+// GET /api/inventory-items — list active items for the clinic. NON-clinical
+// consumables catalog; any authenticated staff (student floor) may read it to
+// dispense/restock. Admin-only mutations stay requireAdmin below.
+router.get("/", requireAuth, requireEffectiveRole("student"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
@@ -96,7 +98,7 @@ router.get("/low-stock", requireAuth, requireAdmin, async (req, res) => {
 });
 
 // GET /api/inventory-items/:id/detail — aggregate facts, container distribution, 7-day usage
-router.get("/:id/detail", requireAuth, requireEffectiveRole("technician"), validateUuid("id"), async (req, res) => {
+router.get("/:id/detail", requireAuth, requireEffectiveRole("student"), validateUuid("id"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
@@ -375,8 +377,9 @@ router.post("/:id/prices", requireAuth, requireAdmin, validateUuid("id"), valida
   }
 });
 
-// GET /api/inventory-items/:id/prices — list all prices for an item
-router.get("/:id/prices", requireAuth, requireEffectiveRole("technician"), validateUuid("id"), async (req, res) => {
+// GET /api/inventory-items/:id/prices — list all prices for an item (read-only;
+// student floor so a dispensing student sees pricing). Price mutations stay requireAdmin.
+router.get("/:id/prices", requireAuth, requireEffectiveRole("student"), validateUuid("id"), async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;

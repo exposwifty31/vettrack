@@ -36,13 +36,15 @@ vi.mock("../server/services/dispense.service.js", () => ({
   },
 }));
 
+// T26: dispense is now reclassified as NON-clinical — the router uses
+// `requireEffectiveRole("student")` (role floor, admits all staff) instead of
+// `requireClinicalUser` + per-route `requireClinicalAuthority`. The confirm
+// handler still reads `req.authoritySnapshot` (injected by these tests) to
+// thread source/reason/operationalRole into the audit row, so the assertions
+// below are unchanged; only the middleware wiring the mock stands in for moved.
 vi.mock("../server/middleware/auth.js", () => ({
   requireAuth: (_req: Request, _res: Response, next: () => void) => next(),
-  requireClinicalUser: (_req: Request, _res: Response, next: () => void) => next(),
-}));
-
-vi.mock("../server/middleware/authority.js", () => ({
-  requireClinicalAuthority:
+  requireEffectiveRole:
     () => (_req: Request, _res: Response, next: () => void) => next(),
 }));
 

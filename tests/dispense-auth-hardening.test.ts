@@ -1,12 +1,18 @@
 /**
- * Static-analysis tests for dispense route auth hardening (PR 1.4).
+ * Static-analysis tests for dispense route auth wiring.
  *
- * Verifies that:
+ * The FIRST block verifies the frozen `requireClinicalUser` middleware itself —
+ * still exported from auth.ts and still used by Code Blue + clinical-check-in
+ * routes, where students MUST stay blocked:
  *  1. requireClinicalUser is exported from server/middleware/auth.ts
  *  2. The Set contains ONLY real normalizeUserRole-emittable roles
  *  3. Phantom roles (lead_technician, vet_tech) are NOT in the Set
- *  4. student is not in the Set (explicitly blocked)
- *  5. dispense.ts uses router-level requireClinicalUser (no per-endpoint duplicates)
+ *  4. student is not in the Set (explicitly blocked — clinical routes)
+ *
+ * The SECOND block verifies dispense.ts wiring AFTER T26 reclassified inventory
+ * dispense as NON-clinical consumables work: the router now gates on
+ * `requireEffectiveRole("student")` (the role floor, admits all staff incl. a
+ * supervised student) and no longer uses requireClinicalUser.
  */
 
 import { describe, it, expect } from "vitest";
@@ -92,13 +98,17 @@ describe("requireClinicalUser — auth middleware", () => {
 // dispense.ts — router-level wiring (no per-endpoint duplication)
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("dispense route — requireClinicalUser wiring", () => {
-  it("imports requireClinicalUser from auth middleware", () => {
-    expect(dispenseRoute).toMatch(/import\s*\{[^}]*requireClinicalUser[^}]*\}/);
+describe("dispense route — non-clinical student-floor wiring (T26)", () => {
+  it("imports requireEffectiveRole from auth middleware", () => {
+    expect(dispenseRoute).toMatch(/import\s*\{[^}]*requireEffectiveRole[^}]*\}/);
   });
 
-  it("applies requireClinicalUser at router level", () => {
-    expect(dispenseRoute).toMatch(/router\.use\([^)]*requireAuth[^)]*requireClinicalUser[^)]*\)/);
+  it("applies requireEffectiveRole(\"student\") at router level (admits all staff, incl. students)", () => {
+    expect(dispenseRoute).toMatch(/router\.use\([^)]*requireAuth[^)]*requireEffectiveRole\(\s*["']student["']\s*\)[^)]*\)/);
+  });
+
+  it("no longer gates students out via requireClinicalUser", () => {
+    expect(dispenseRoute).not.toContain("requireClinicalUser");
   });
 
   it("draft route does not duplicate requireAuth at endpoint level", () => {

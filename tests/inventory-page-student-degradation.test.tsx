@@ -156,6 +156,20 @@ describe("InventoryPage — student (custody-only) graceful degradation", () => 
     expect(await screen.findByText(t.inventoryPage.loadError)).toBeTruthy();
     expect(screen.queryByText(t.inventoryPage.restrictedAccessTitle)).toBeNull();
   });
+
+  it("renders the real dispense/restock UI for a student when the fetch succeeds (T26: students may dispense)", async () => {
+    // After T26 the server no longer 403s a student on GET /api/containers, so
+    // the page renders the full inventory UI (container list + take-consumables)
+    // instead of the graceful-degrade restricted state.
+    listMock.mockResolvedValue([CONTAINER]);
+    containerItemsMock.mockResolvedValue(CONTAINER_VIEW);
+    renderPage();
+
+    expect((await screen.findAllByText("ICU Cart")).length).toBeGreaterThan(0);
+    expect(screen.getByText(t.inventoryPage.takeConsumables)).toBeTruthy();
+    expect(screen.queryByText(t.inventoryPage.restrictedAccessTitle)).toBeNull();
+    expect(screen.queryByText(t.inventoryPage.loadError)).toBeNull();
+  });
 });
 
 describe("InventoryPage — non-student roles are unaffected", () => {

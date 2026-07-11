@@ -182,10 +182,14 @@ function logRestockError(route: string, requestId: string, err: unknown): void {
   });
 }
 
+// Restock is NON-clinical consumables work: the read/act routes below (start,
+// scan, finish, cancel, container-items) admit any authenticated staff member
+// down to the student floor. Only the cross-clinic oversight GET /sessions above
+// stays requireAdmin. This is not a clinical-authority gate.
 router.post(
   "/start",
   requireAuth,
-  requireEffectiveRole("technician"),
+  requireEffectiveRole("student"),
   validateBody(startSchema),
   async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -206,7 +210,7 @@ router.post(
 router.post(
   "/scan",
   requireAuth,
-  requireEffectiveRole("technician"),
+  requireEffectiveRole("student"),
   validateBody(scanSchema),
   async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -248,7 +252,7 @@ router.post(
 router.post(
   "/finish",
   requireAuth,
-  requireEffectiveRole("technician"),
+  requireEffectiveRole("student"),
   validateBody(finishSchema),
   async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -269,7 +273,7 @@ router.post(
 router.post(
   "/cancel",
   requireAuth,
-  requireEffectiveRole("technician"),
+  requireEffectiveRole("student"),
   validateBody(cancelSchema),
   async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -290,7 +294,7 @@ router.post(
 router.post(
   "/container-items",
   requireAuth,
-  requireEffectiveRole("technician"),
+  requireEffectiveRole("student"),
   validateBody(containerItemsSchema),
   async (req, res) => {
     const requestId = resolveRequestId(res, req.headers["x-request-id"]);
