@@ -3784,6 +3784,8 @@ export interface TStructure {
     roleVetTech: string;
     roleVeterinarian: string;
     roleStudent: string;
+    roleSelectLabel: string;
+    roleSelectHint: string;
     devModeNotice: string;
     enterDashboard: string;
     moreAboutVetTrack: string;

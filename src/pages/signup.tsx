@@ -1,10 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { Loader2 } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { VetTrackMark } from "@/components/vettrack-mark";
-import { RoleChips } from "@/features/auth/components/RoleChips";
+import { RoleChips, type SignupRequestedRole } from "@/features/auth/components/RoleChips";
 import { ClerkFailed, ClerkLoaded, ClerkLoading, SignUp } from "@clerk/clerk-react";
 import { useAuth } from "@/hooks/use-auth";
 import { getClerkAppearance, getClerkAppearanceNative } from "@/lib/clerk-appearance";
@@ -21,6 +21,7 @@ export default function SignUpPage() {
   const { isLoaded, isSignedIn } = useAuth();
   const [, navigate] = useLocation();
   const isDark = useIsDarkActive();
+  const [requestedRole, setRequestedRole] = useState<SignupRequestedRole | null>(null);
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
@@ -51,7 +52,7 @@ export default function SignUpPage() {
             <p className="text-sm text-muted-foreground">{t.authPage.signUpSubtitle}</p>
           </div>
 
-          <RoleChips />
+          <RoleChips selectedRole={requestedRole} onSelectRole={setRequestedRole} />
 
           {CLERK_PUBLISHABLE_KEY ? (
             <div className="flex flex-col items-center gap-4 w-full">
@@ -73,6 +74,7 @@ export default function SignUpPage() {
                       routing="hash"
                       signInUrl="/signin"
                       fallbackRedirectUrl="/"
+                      unsafeMetadata={requestedRole ? { requestedRole } : undefined}
                       appearance={isNative ? getClerkAppearanceNative(isDark) : getClerkAppearance(isDark)}
                     />
                   </div>

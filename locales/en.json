@@ -3781,6 +3781,8 @@
     "roleVetTech": "Vet Tech",
     "roleVeterinarian": "Veterinarian",
     "roleStudent": "Student",
+    "roleSelectLabel": "Select your role",
+    "roleSelectHint": "Your clinic admin can adjust this when reviewing your account.",
     "devModeNotice": "Development mode — no authentication required.",
     "enterDashboard": "Enter dashboard",
     "moreAboutVetTrack": "More about VetTrack"
