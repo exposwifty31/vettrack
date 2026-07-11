@@ -18,8 +18,9 @@ This repository is the **production monolith**: React web app, Express API, Post
 | Work | Where |
 |------|--------|
 | Expo / React Native app | [`exposwifty31/literate-dollop`](https://github.com/exposwifty31/literate-dollop) |
-| `@vettrack/contracts` authoring | [`exposwifty31/literate-dollop`](https://github.com/exposwifty31/literate-dollop) `packages/contracts` |
 | Horizon 1+ mobile implementation | literate-dollop agent runbook |
+
+`@vettrack/contracts` is now authored **in this repo** at [`packages/contracts/`](../packages/contracts) — see [Contracts package](#contracts-package) below.
 
 **Porting rule:** copy reference code from this repo into literate-dollop; do not delete production Capacitor paths here until Phase 6 kill-switch (future product decision).
 
@@ -56,13 +57,13 @@ See [`docs/devops/ci-cd.md`](devops/ci-cd.md).
 
 ## Contracts package
 
-`@vettrack/contracts` is **consumed** from [`exposwifty31/literate-dollop`](https://github.com/exposwifty31/literate-dollop) via a `github:` path dependency in root `package.json`. This repo runs parity tests against the installed package; do not add `packages/contracts/` here.
+`@vettrack/contracts` lives **in this repo** as a local pnpm workspace package at [`packages/contracts/`](../packages/contracts), wired via a `workspace:*` dependency in root `package.json`. It was previously consumed from `exposwifty31/literate-dollop` via a `github:` path dependency; it was brought in-repo (2026-07-11) so the build no longer depends on an external private repo. The import specifier (`@vettrack/contracts`) is unchanged, so the emergency-surface parity contract is preserved.
 
 ```json
-"@vettrack/contracts": "github:exposwifty31/literate-dollop#main&path:packages/contracts"
+"@vettrack/contracts": "workspace:*"
 ```
 
-After bumping the dependency, run `bash scripts/ci/contracts-gate.sh`.
+After editing the contracts package, run `bash scripts/ci/contracts-gate.sh`.
 
 ## Related docs
 

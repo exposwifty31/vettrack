@@ -1996,3 +1996,21 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 - Discrepancy noted (supersedes the plan's R1/R2 ordering): Railway's `serviceInstanceUpdate` nulls `source` when omitted from input — the VetTrack healthcheck update disconnected its GitHub source ahead of schedule. Verified harmless (desired end state); the canary therefore ran with the CLI as the only deployer.
 
 **Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — `@vettrack/contracts` brought in-repo as a workspace package (drop `literate-dollop` dep)
+
+**Claim:** `exposwifty31/vettrack` no longer depends on the external private repo `exposwifty31/literate-dollop`. `@vettrack/contracts` now lives in-repo at `packages/contracts/` as a pnpm workspace package (`workspace:*`), replacing the `github:exposwifty31/literate-dollop#main&path:packages/contracts` dependency. The import specifier `@vettrack/contracts` is unchanged, so the frozen Code Blue / emergency-surface contract is behaviorally identical.
+
+**Why:** The sandbox egress proxy injects GitHub credentials only for git-protocol ops, so pnpm's `codeload.github.com` tarball fetch of the private dep 403'd and `pnpm install --frozen-lockfile` could not complete. Owner directed integrating the contracts into the main repo now.
+
+**Evidence (real output):**
+- Byte-parity of vendored source vs the pinned literate-dollop SHA `601595265`: `diff -q` on `src/{index,emergency,pending-sync}.ts` + `tsconfig.json` → all `OK` (identical). Only the package's own `package.json` was rewritten (dropped the unresolvable `typescript@~6.0.3` devDep; root tsc runs the typecheck).
+- Lockfile diff: importer `.` `@vettrack/contracts` `specifier: workspace:*` / `version: link:packages/contracts`; new importer `packages/contracts: {}`; codeload tarball package + snapshot entries removed. `grep -c "literate-dollop\|codeload" pnpm-lock.yaml` → 0.
+- `node_modules/@vettrack/contracts` → symlink `../../packages/contracts`.
+- `pnpm install --frozen-lockfile` → exit 0, "Scope: all 2 workspace projects", no private-repo fetch (the original blocker is resolved).
+- Frozen-surface universal checklist: `npx tsc --noEmit` (frontend) exit 0 · `npx tsc --noEmit --project tsconfig.server-check.json` exit 0 · `bash scripts/ci/contracts-gate.sh` → contracts:typecheck clean + emergency-surface parity `36/36 pass` · `pnpm test` → **448 files / 4250 pass** · `pnpm architecture:gates` → All G1 passed (depcruise 847 modules, same 4 warn / 10 known-baseline; no new violations) · `pnpm build` → built in 43s (vite resolves the workspace package).
+- Docs/comments updated to match reality: `shared/emergency-surfaces.manifest.ts` header, `scripts/ci/contracts-gate.sh` header, `docs/MAINTENANCE_MODE.md` (contracts section + out-of-scope table). Frozen surface touched = **Code Blue online-only path** (§1.3), comment-only + identical constants — no mutation removed from `EMERGENCY_OFFLINE_BLOCK_MUTATIONS` (parity test proves it).
+
+**Verdict:** VERIFIED (all gates green; source byte-identical to prior upstream; external private-repo dependency eliminated). Note: many secondary docs still describe literate-dollop as the contracts-authoring home — not swept here; flagged to owner.

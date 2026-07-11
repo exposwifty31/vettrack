@@ -1,7 +1,7 @@
 /**
  * OFF-07 — Canonical emergency / live API surface catalog (Phase 7).
  *
- * Source of truth: `@vettrack/contracts` from exposwifty31/literate-dollop (`packages/contracts`).
+ * Source of truth: the `@vettrack/contracts` workspace package (`packages/contracts`).
  * This module preserves existing import paths in vettrack and tests.
  */
 import { EMERGENCY_SERVER_ROUTE_ALLOWLIST as BASE_EMERGENCY_SERVER_ROUTE_ALLOWLIST } from "@vettrack/contracts";
