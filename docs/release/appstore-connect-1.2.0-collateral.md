@@ -14,7 +14,7 @@ Hebrew is the default locale — enter it as the primary. Keep both in sync if e
 
 ### Hebrew (he) — primary
 
-```
+```text
 מסכי בית לכל תפקיד — לכל תפקיד (וטרינר/ית, טכנאי/ת, סטודנט/ית, ניהול) מסך פתיחה מותאם לפעולות היומיום שלו.
 
 לוח מרכז הבקרה — תצוגת חדר־בקרה מלאה למסך גדול, לניטור הפעילות במחלקה במבט אחד.
@@ -28,7 +28,7 @@ Hebrew is the default locale — enter it as the primary. Keep both in sync if e
 
 ### English (en)
 
-```
+```text
 Per-role home screens — vets, technicians, students, and managers each get a home surface tuned to their day-to-day work.
 
 Command Center board — a full control-room view for large displays, so the whole department's activity reads at a glance.
@@ -48,7 +48,7 @@ Reliability improvements to Code Blue and right-to-left layout across every scre
 
 Paste into the "Notes" field of the version's "App Review Information". State plainly this is a real native app, and hand the reviewer an isolated, pre-seeded account.
 
-```
+```text
 VetTrack is a native veterinary-hospital operations app (equipment custody, Code
 Blue emergency workflow, inventory). It is NOT a web wrapper: it ships distinct
 native surfaces — a mobile floor UI, an iPad layout, and a large-format Command
