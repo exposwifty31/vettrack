@@ -113,7 +113,7 @@ function computeEffectiveStatus(room: Room): string {
   return room.syncStatus;
 }
 
-function RoomCard({ room }: { room: Room }) {
+export function RoomCard({ room }: { room: Room }) {
   const available = room.availableCount ?? 0;
   const total = room.totalEquipment ?? 0;
   const inUse = room.inUseCount ?? 0;
