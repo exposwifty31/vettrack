@@ -1,8 +1,0 @@
-# VetTrack architecture invariants
-
-This document is a **pointer**. The full text is maintained as Cursor **agent skills** under `.cursor/skills/`:
-
-- **`.cursor/skills/vettrack-project-invariants/SKILL.md`** — authoritative superset (architecture + dead-code policy + `.cursorrules` alignment).
-- **`.cursor/skills/vettrack-architecture-invariants/SKILL.md`** — condensed architecture checklist (companion to the above).
-
-Edit those `SKILL.md` files to change these invariants. Root `.cursorrules` (if present) is separate from Cursor’s rules engine; skills are invoked by description or manually when you need this guidance always available in chat.
