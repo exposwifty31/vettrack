@@ -2237,3 +2237,43 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 **Claim:** After T26 removed `requireClinicalAuthority` from the dispense routes, `POST /api/dispense/:id/confirm` still read `req.authoritySnapshot` (now always `undefined`) for audit context — dead code + a silent audit-field change. The handler now records `actorRole` via `resolveAuditActorRole(req)` and null clinical-authority source/reason/operationalRole explicitly (a non-clinical dispense carries no clinical-authority context).
 **Evidence:** Addresses the opus task-review's one Important finding. `server/routes/dispense.ts` `/:id/confirm` no longer reads `req.authoritySnapshot`; `tests/dispense-audit-authority.test.ts` rewritten to guard the reclassification — the handler IGNORES an injected snapshot (would have asserted "check_in"/"vet" pre-T26; now asserts null + actorRole from resolveAuditActorRole). `pnpm typecheck` 0 · the 6 dispense/authority test files 62/62 · full `pnpm test` → **474 files / 4459 pass** · `pnpm architecture:gates` G1 pass. STUDENT_NEVER_ELEVATED resolver, clinical-authority middleware, and Code Blue remain untouched.
 **Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T17: dispense cart stock indicator refresh (bce2ed8bb → integrated 3866551f8)
+
+**Claim:** The dispense cart stock read "20/20 · מלא · 100%" before AND after dispensing 1. Root cause was a live-stock query-cache-key mismatch — the dispense mutation didn't invalidate the key the stock indicator reads.
+**Evidence:** Two `invalidateQueries(["/api/restock/container-items", containerId])` added in `DispenseSheet.tsx`, reusing the exact key pattern already used by `inventory-page.tsx`/`layout.tsx` (no parallel state store). New `tests/dispense-sheet-stock-refresh.test.tsx` (2) non-vacuous (revert → fails). typecheck 0, i18n parity ✓. Task-review Spec ✅ / Quality Approved (reviewer grep-verified the key exactly matches `inventory-page.tsx`'s `detailsQ`). No auth touch (T26 owns dispense auth).
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T18+T19: doctor CSV import path + roster-import UX (bb4e5c9e3 → integrated 3083dd3f5)
+
+**Claim:** The import UI (`/import/preview`+`/import/confirm`) always used the roster parser, rejecting doctor CSVs. Now branches on `isDoctorCsv()` to route doctor CSVs to the existing doctor parser + a UI kind-badge/columns; roster path byte-identical. T19's row-numbering + history-refresh were found ALREADY-correct and locked with regression tests; accepted-shift-names added via new `GET /import/shift-names`.
+**Evidence:** `server/routes/shifts.ts` doctor branch reuses the pre-existing `isDoctorCsv()`/`parseDoctorShiftRows()` (introduced `ac40a6ca2`, untouched); roster `parseShiftsCsvContent` call unchanged but for an additive `kind:"roster"` field; doctor-only DB lookup provably never fires on roster CSVs. 11 new tests (`shift-csv-doctor-import` 7 + `admin-shifts-import-ux` 4) + a real `indexOf→lastIndexOf` fix to a pre-existing test (doctor `logAudit` now first in source). Full suite 4416, typecheck 0, i18n parity ✓, arch G1. Task-review Spec ✅ / Quality Approved (reviewer independently confirmed roster byte-identical + both "stale" claims genuine, 19/19 pre-fix-fails).
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T20: Code Blue wall display driven by SSE (6fd7e21bb → integrated 6f0fb447d)
+
+**Claim:** The Code Blue wall (`src/pages/code-blue-display.tsx`) drove itself via pure 2s polling with zero SSE — the one CB surface never wired onto the frozen realtime transport. Now a peer of the canonical `/board`: reads the SSE-fed `DISPLAY_SNAPSHOT` and mounts the same reconciliation seam. NO parallel transport, NO frozen-internal change.
+**Evidence:** Commit touches exactly 3 files (the wall page + 2 tests). The wall mounts the SAME seam as `CommandBoardScreen` (`EventIngestor`+`connectRealtime`+`replayHttpCatchUpAfter`+`useRealtimeReconciliation`+`useCodeBlueKeepaliveReconciliation`); `realtime.ts`/`event-reducer.ts`/`sw.js`/server-routes/`metrics.ts`/`offline-emergency-block.ts` confirmed UNCHANGED. Bespoke `/api/code-blue/sessions/active` 2s poll + its `enabled:!!userId` gate removed (latent fix: token-paired displays now refresh); SSE (`CODE_BLUE_STATUS_CHANGED`→snapshot refetch) is primary, the board's bounded snapshot poll is the degraded fallback. Server-confirmed end preserved (wall only reads `snapshot.codeBlueSession`, never optimistic). New `code-blue-wall-sse-primary.test.tsx` non-vacuous + `code-blue-frontend.test.js` strengthened. Full suite 4407, typecheck 0, arch G1. Task-review (opus) Spec ✅ / Quality Approved — frozen transport + Code Blue guarantees CONFIRMED intact. Scoped-out: per-log-entry SSE would need a new outbox event (frozen); session start/end (safety-critical) IS SSE-driven. Live-SSE Playwright verification = follow-up.
+**Verdict:** VERIFIED
+
+---
+
+## 2026-07-11 — T24 (slice): sign-up role chips pre-select + tag requested role (4e0169bf3 → integrated 50d2578d3)
+
+**Claim:** The inert sign-up role chips now form a controlled radiogroup (signup only) that carries the chosen role into Clerk's hosted `<SignUp/>` via `unsafeMetadata.requestedRole`. The requested role is NOT persisted into `vt_users.role` (self-escalation guard) — the grant path was escalated and the owner chose the staging-column approach (see T24b).
+**Evidence:** `RoleChips.tsx` controlled when given props, byte-identical non-interactive spans on signin (unchanged call site). `unsafeMetadata` is Clerk's sanctioned client-data mechanism; no auth-mode/native-transport change; no server change (JIT-provisioning role still hardcoded — reviewer confirmed `server/` diff empty). New i18n keys `authPage.roleSelectLabel`/`roleSelectHint` (he/en parity). New `tests/role-chips-signup.test.tsx` (4) non-vacuous (3/4 fail pre-change). typecheck 0, i18n parity ✓. Task-review Spec ✅ / Quality Approved (security refusal verified real). Important (copy-accuracy: hint implies an admin role-review that doesn't exist yet) → resolved by T24b delivering the admin-visible requested-role at approval.
+**Verdict:** VERIFIED (slice); full requested-role→grant flow delivered by T24b.
+
+---
+
+## 2026-07-11 — Final-batch integration gate (T17+T24slice+T20+T18/19 → SDD 3083dd3f5)
+
+**Claim:** The four parallel-batch tasks integrated onto `claude/phase-10a-audit-fixes` via cherry-pick with no manual conflict resolution and pass all gates together.
+**Evidence:** Cherry-picks T17→`3866551f8`, T24slice→`50d2578d3`, T20→`6f0fb447d`, T18/19→`3083dd3f5`; locales + generated.d.ts multi-way AUTO-merged, regen produced no diff. `pnpm i18n:check` parity ✓ · `pnpm typecheck` 0 · full `pnpm test` → **479 files / 4478 pass** · `pnpm architecture:gates` All G1 passed.
+**Verdict:** VERIFIED
