@@ -10,6 +10,7 @@ import { ErrorCard } from "@/components/ui/error-card";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { ManagementAccessDenied } from "@/desktop/management";
 import { t } from "@/lib/i18n";
 import type { ShiftImportPreview } from "@/types";
 
@@ -83,10 +84,13 @@ export default function AdminShiftsPage() {
     return [...preview.rows].sort((a, b) => a.rowNumber - b.rowNumber);
   }, [preview]);
 
+  // T22: was rendering t.adminPage.cancel ("Cancel") as the denial message — a
+  // copy-paste bug, not a real "not authorized" state. Literal isAdmin stays
+  // (shift-CSV import is admin-only), only the UI is now the shared component.
   if (!isAdmin) {
     return (
       <AppShell title={t.adminShiftsPage.title}>
-        <div className="py-10 text-center text-sm text-muted-foreground">{t.adminPage.cancel}</div>
+        <ManagementAccessDenied />
       </AppShell>
     );
   }

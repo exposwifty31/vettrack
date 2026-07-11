@@ -217,10 +217,16 @@ export function AppRoutes() {
         {isNativeTablet && <Route path="/inventory-items/:id?"><AuthGuard><InventoryItemsMasterDetail /></AuthGuard></Route>}
         {!isNativeTablet && <Route path="/inventory-items/:id"><AuthGuard><InventoryItemDetailPage /></AuthGuard></Route>}
         {!isNativeTablet && <Route path="/inventory-items"><AuthGuard><InventoryItemsPage /></AuthGuard></Route>}
-        <Route path="/procurement"><AuthGuard><WebOnlyGuard><ProcurementPage /></WebOnlyGuard></AuthGuard></Route>
+        {/* T22: previously ungated (rendered to any authenticated role — a leak).
+            Both are management-console-adjacent surfaces (procurement write actions
+            are already admin-only in-page; /analytics is listed under management.web
+            in WEB_MANAGEMENT_NAV but the route itself never enforced it). Gated with
+            the same ManagementGuard as the rest of the console for one consistent
+            denial pattern. */}
+        <Route path="/procurement"><AuthGuard><WebOnlyGuard><ManagementGuard><ProcurementPage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/analytics/outcome-kpi"><Redirect to="/analytics" replace /></Route>
         <Route path="/analytics/shift-leaderboard"><AuthGuard><WebOnlyGuard><ShiftLeaderboardPage /></WebOnlyGuard></AuthGuard></Route>
-        <Route path="/analytics"><AuthGuard><WebOnlyGuard><AnalyticsPage /></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/analytics"><AuthGuard><WebOnlyGuard><ManagementGuard><AnalyticsPage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/dashboard"><AuthGuard><WebOnlyGuard><ManagementGuard><ManagementDashboardPage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/whats-new"><AuthGuard><WhatsNewPage /></AuthGuard></Route>
         <Route path="/shift-chat/:shiftId"><AuthGuard><ShiftChatArchive /></AuthGuard></Route>

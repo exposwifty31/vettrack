@@ -4,7 +4,6 @@ import { Helmet } from "react-helmet-async";
 import { api } from "@/lib/api";
 import { leaderPoll } from "@/lib/leader";
 import { AppShell } from "@/components/layout/AppShell";
-import { Button } from "@/components/ui/button";
 import {
   Shield,
   Users,
@@ -15,9 +14,9 @@ import {
   CalendarClock,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { AdminShiftRequestsSection } from "@/features/shift-adjustments/AdminShiftRequestsSection";
+import { ManagementAccessDenied } from "@/desktop/management";
 import { t } from "@/lib/i18n";
 import { FoldersSection } from "@/pages/admin/FoldersSection";
 import { PendingUsersSection } from "@/pages/admin/PendingUsersSection";
@@ -27,7 +26,6 @@ import { SupportSection } from "@/pages/admin/SupportSection";
 
 export default function AdminPage() {
   const { isAdmin, userId } = useAuth();
-  const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<
     "folders" | "users" | "pending" | "shift-requests" | "support" | "deleted"
   >("folders");
@@ -62,9 +60,12 @@ export default function AdminPage() {
     retry: false,
   });
 
+  // T22: literal isAdmin (not management.web) — this page's data (pending users,
+  // folders, deletions) is genuinely admin-only server-side, narrower than the
+  // lead-inclusive console floor. Only the denial UI is unified.
   if (!isAdmin) {
-    const earlyContent = (
-      <>
+    return (
+      <AppShell>
         <Helmet>
           <title>Admin — VetTrack</title>
           <meta
@@ -72,19 +73,9 @@ export default function AdminPage() {
             content="VetTrack administration panel. Manage equipment folders, user roles, and system settings for your veterinary clinic."
           />
         </Helmet>
-        <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
-          <Shield className="w-12 h-12 text-muted-foreground" />
-          <h1 className="text-2xl font-bold">{t.adminPage.auditLogAdminOnly}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t.adminPage.auditLogAdminOnlyDesc}
-          </p>
-          <Button variant="ghost" onClick={() => navigate("/home")}>
-            {t.adminPage.auditLogGoHome}
-          </Button>
-        </div>
-      </>
+        <ManagementAccessDenied />
+      </AppShell>
     );
-    return <AppShell>{earlyContent}</AppShell>;
   }
 
   const unresolvedCount = supportUnresolved?.count ?? 0;

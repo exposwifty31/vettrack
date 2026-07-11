@@ -3405,6 +3405,11 @@
     "accessPendingServer": "Read access pending server enablement",
     "pendingEndpoint": "Not yet available — pending backend support",
     "retry": "Retry",
+    "accessDenied": {
+      "title": "Not authorized",
+      "description": "Your role doesn't have access to this section.",
+      "cta": "Go home"
+    },
     "state": {
       "loading": "Loading…",
       "empty": "Nothing here yet",

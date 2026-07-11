@@ -3405,6 +3405,11 @@
     "accessPendingServer": "גישת קריאה ממתינה להפעלה בשרת",
     "pendingEndpoint": "עדיין לא זמין — ממתין לתמיכת שרת",
     "retry": "נסה שוב",
+    "accessDenied": {
+      "title": "אין הרשאה",
+      "description": "לתפקיד שלך אין גישה לאזור זה.",
+      "cta": "חזרה לדף הבית"
+    },
     "state": {
       "loading": "טוען…",
       "empty": "אין כאן עדיין כלום",

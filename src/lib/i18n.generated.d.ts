@@ -3408,6 +3408,11 @@ export interface TStructure {
     accessPendingServer: string;
     pendingEndpoint: string;
     retry: string;
+    accessDenied: {
+      title: string;
+      description: string;
+      cta: string;
+    };
     state: {
       loading: string;
       empty: string;

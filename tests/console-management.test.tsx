@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
-import { Router } from "wouter";
+import { Router, useLocation } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import { Boxes } from "lucide-react";
 
@@ -12,6 +12,12 @@ const mockCan = vi.fn<(cap: string) => boolean>();
 vi.mock("@/hooks/use-experience", () => ({
   useExperience: () => ({ archetype: "admin", capabilities: new Set(), can: mockCan }),
 }));
+// AppShell pulls in the real Topbar (useAuth/useQuery/etc.) — every console test
+// in this suite stubs it to a passthrough (see integrations-console.test.tsx etc.);
+// ManagementGuard's denial state now wraps its content in AppShell too (T22).
+vi.mock("@/components/layout/AppShell", () => ({
+  AppShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
 
 import { ManagementGuard } from "@/desktop/management/ManagementGuard";
 import { DataTable, type Column } from "@/desktop/management/DataTable";
@@ -19,9 +25,21 @@ import { DataTable, type Column } from "@/desktop/management/DataTable";
 beforeEach(() => mockCan.mockReset());
 afterEach(() => cleanup());
 
+// Renders the current wouter location so a redirect's absence/presence is
+// assertable directly, not inferred from content disappearing.
+function LocationProbe() {
+  const [loc] = useLocation();
+  return <div data-testid="location">{loc}</div>;
+}
+
 function renderRouted(ui: React.ReactNode, path = "/admin/integrations") {
   const { hook } = memoryLocation({ path });
-  return render(<Router hook={hook}>{ui}</Router>);
+  return render(
+    <Router hook={hook}>
+      {ui}
+      <LocationProbe />
+    </Router>,
+  );
 }
 
 describe("ManagementGuard", () => {
@@ -35,14 +53,21 @@ describe("ManagementGuard", () => {
     expect(screen.getByText("CONSOLE_CONTENT")).toBeTruthy();
   });
 
-  it("redirects (no children) when the user lacks management.web", () => {
+  it("shows the explicit not-authorized state (no children, no redirect) when the user lacks management.web", () => {
+    // T22: this used to <Redirect to="/home"> silently. It now renders the
+    // shared ManagementAccessDenied state in place, so the URL never changes —
+    // this is the SAME unified pattern every other management surface uses.
     mockCan.mockReturnValue(false);
     renderRouted(
       <ManagementGuard>
         <div>CONSOLE_CONTENT</div>
       </ManagementGuard>,
+      "/admin/integrations",
     );
     expect(screen.queryByText("CONSOLE_CONTENT")).toBeNull();
+    expect(screen.getByTestId("management-access-denied")).toBeTruthy();
+    // Not a redirect — the URL stays exactly where the user landed.
+    expect(screen.getByTestId("location").textContent).toBe("/admin/integrations");
   });
 });
 
