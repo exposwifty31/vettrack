@@ -110,6 +110,7 @@ describe("T25.2 — transfer source fallback label", () => {
 
 import { EquipmentGlanceGrid } from "@/features/equipment/detail/EquipmentGlanceGrid";
 import type { Equipment } from "@/types";
+import type { LocationInference } from "@/features/equipment/detail/hooks/use-equipment-detail";
 
 function equipmentFixture(overrides: Partial<Equipment> = {}): Equipment {
   return {
@@ -142,6 +143,37 @@ describe("T25.3 — iPad detail-pane tile truncation", () => {
     );
     const tile = screen.getByTestId("glance-tile-who");
     expect(tile.textContent).toContain("dr.claude@vettrackclinic.com");
+  });
+
+  it("regression: a long mixed-direction value in the narrow RTL layout still gets a 2-line clamp + bdi isolation, not single-line truncation", () => {
+    // Mixed Hebrew/English, long enough to wrap in a narrow iPad split-view
+    // tile — this would fail if the tile ever regresses to single-line
+    // `truncate` or drops the `as="bdi"` isolation.
+    const mixedValue = "ד״ר Claude — Room 12B (ICU North Wing Overflow Bay)";
+    const inference: LocationInference = {
+      inferredLocation: null,
+      confidence: "high",
+      signalSource: "checkout",
+      accountablePerson: { userId: "u1", name: mixedValue, currentRoom: null },
+      lastConfirmedAt: null,
+      reasoning: "checkout",
+    };
+    render(
+      <div dir="rtl" style={{ width: 180 }}>
+        <EquipmentGlanceGrid equipment={equipmentFixture()} inference={inference} />
+      </div>,
+    );
+    const tile = screen.getByTestId("glance-tile-who");
+    const valueEl = tile.querySelector("bdi");
+    expect(valueEl).not.toBeNull();
+    expect(valueEl?.textContent).toBe(mixedValue);
+    // as="bdi": the rendered element is a native <bdi>, not a <span>/<div>.
+    expect(valueEl?.tagName).toBe("BDI");
+    // lines={2}: multi-line clamp styling (webkit-line-clamp), never the
+    // single-line `truncate` class.
+    expect(valueEl?.className).not.toContain("truncate");
+    expect(valueEl?.className).toContain("overflow-hidden");
+    expect((valueEl as HTMLElement).style.WebkitLineClamp).toBe("2");
   });
 });
 
@@ -234,14 +266,19 @@ describe("T25.5 — coverage-tile ambiguous labels", () => {
 import { formatRelativeDuration } from "@/features/alerts";
 
 describe("T25.6 — awkward copy: alert in-progress duration composition", () => {
-  it("formatRelativeDuration omits the 'ago'/'לפני' suffix so the composed chip reads naturally", () => {
+  it("formatRelativeDuration omits the locale 'ago' marker so the composed chip doesn't double up the temporal wording", () => {
     const elevenDaysAgo = new Date(Date.now() - 11 * 24 * 60 * 60 * 1000);
     const duration = formatRelativeDuration(elevenDaysAgo);
     expect(duration).toBe(t.alertsPage.daysDuration(11));
     const composed = `${t.alertsPage.inProgressSince} ${duration}`;
-    // The old bug: composing inProgressSince with formatRelativeTime (which
-    // has its own "ago" suffix) doubled the temporal marker.
-    expect(composed.includes("לפני") && composed.includes("מאז")).toBe(false);
+
+    // Derive the locale's "ago" marker from the real translations (never a
+    // hand-typed Hebrew literal) — the old bug reused `formatRelativeTime`,
+    // which appends this marker, doubling up with `inProgressSince`'s own
+    // "since"/"in progress" framing.
+    const agoMarker = t.alertsPage.daysAgo(11).replace(t.alertsPage.daysDuration(11), "").trim();
+    expect(agoMarker.length).toBeGreaterThan(0);
+    expect(composed).not.toContain(agoMarker);
   });
 });
 
@@ -331,16 +368,26 @@ describe("T25.8 — Code Blue re-entry routes to the active view, never the laun
 // ── Item 9: what's-new sources the version + build tag from the canonical
 //    build-time constants, never a hand-maintained literal ──
 
-import { getBundledAppVersion, getBuildTagSuffix } from "@/lib/app-version";
+import { getBundledAppVersion } from "@/lib/app-version";
 
 describe("T25.9 — what's-new version is sourced from the canonical build tag", () => {
-  it("getBundledAppVersion reflects the real __APP_VERSION__, not a stale locale literal", () => {
+  it("getBundledAppVersion reflects the module-level __APP_VERSION__ constant", () => {
     expect(getBundledAppVersion()).toBe(typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0");
-    expect(getBundledAppVersion()).not.toBe("1.1.0");
   });
 
-  it("the WhatsNewPage version badge renders the live bundled version, not the old '1.1.0' literal", async () => {
+  it("the WhatsNewPage version badge + build label render whatever the canonical helper returns, never a hand-maintained literal", async () => {
     vi.doMock("@capacitor/app", () => ({ App: { getInfo: vi.fn() } }));
+    // Mock the canonical build-info source itself rather than asserting
+    // against a specific "known-stale" string — proves the page is wired to
+    // read live from the helper, for any value it returns.
+    vi.doMock("@/lib/app-version", async () => {
+      const actual = await vi.importActual<typeof import("@/lib/app-version")>("@/lib/app-version");
+      return {
+        ...actual,
+        getBundledAppVersion: () => "9.9.9-mock",
+        getBuildTagSuffix: () => "mockbuild9",
+      };
+    });
     const { default: WhatsNewPage } = await import("@/pages/whats-new");
     const { hook } = memoryLocation({ path: "/whats-new" });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -353,14 +400,9 @@ describe("T25.9 — what's-new version is sourced from the canonical build tag",
         </QueryClientProvider>
       </HelmetProvider>,
     );
-    const version = getBundledAppVersion();
-    expect(screen.getByText(`v${version}`)).toBeTruthy();
-    if (version !== "1.1.0") {
-      expect(screen.queryByText("v1.1.0")).toBeNull();
-    }
-    // Build label is composed from the real build-tag suffix, not "Build 23".
-    expect(screen.queryByText(t.whatsNew.buildLabel("23"))).toBeNull();
-    expect(screen.getByText(t.whatsNew.buildLabel(getBuildTagSuffix()), { exact: false })).toBeTruthy();
+    expect(screen.getByText("v9.9.9-mock")).toBeTruthy();
+    expect(screen.getByText(t.whatsNew.buildLabel("mockbuild9"), { exact: false })).toBeTruthy();
     vi.doUnmock("@capacitor/app");
+    vi.doUnmock("@/lib/app-version");
   });
 });

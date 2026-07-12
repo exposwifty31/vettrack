@@ -27,6 +27,14 @@ import { memoryLocation } from "wouter/memory-location";
 import { t } from "@/lib/i18n";
 import { RoleChips, type SignupRequestedRole } from "@/features/auth/components/RoleChips";
 
+// Controlled via `mockDirection` per-test so the roving-focus keyboard tests
+// below can assert RTL-aware Arrow-key handling deterministically, without
+// depending on the ambient locale/localStorage state.
+let mockDirection: "ltr" | "rtl" = "ltr";
+vi.mock("@/hooks/useDirection", () => ({
+  useDirection: () => mockDirection,
+}));
+
 const capturedSignUpProps: Array<Record<string, unknown>> = [];
 
 // Helmet's title/meta management is irrelevant to the T24 role-wiring
@@ -148,5 +156,85 @@ describe("RoleChips — sign-up role pre-selection (T24)", () => {
     fireEvent.click(studentChip);
     const propsAfterSwitch = capturedSignUpProps.at(-1);
     expect(propsAfterSwitch?.unsafeMetadata).toEqual({ requestedRole: "student" });
+  });
+});
+
+describe("RoleChips — roving-focus keyboard navigation (a11y)", () => {
+  beforeEach(() => {
+    mockDirection = "ltr";
+  });
+
+  it("ArrowRight/ArrowLeft roves focus + selection between chips in LTR, wrapping at the ends", () => {
+    render(<RoleChipsHarness />);
+    const [techChip, vetChip, studentChip] = screen.getAllByRole("radio");
+
+    techChip.focus();
+    expect(document.activeElement).toBe(techChip);
+
+    fireEvent.keyDown(techChip, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(vetChip);
+    expect(vetChip.getAttribute("aria-checked")).toBe("true");
+    expect(techChip.getAttribute("aria-checked")).toBe("false");
+
+    fireEvent.keyDown(vetChip, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(studentChip);
+    expect(studentChip.getAttribute("aria-checked")).toBe("true");
+
+    // Wraps from the last chip back to the first.
+    fireEvent.keyDown(studentChip, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(techChip);
+    expect(techChip.getAttribute("aria-checked")).toBe("true");
+
+    // Wraps backward from the first chip to the last.
+    fireEvent.keyDown(techChip, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(studentChip);
+    expect(studentChip.getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("Home/End jump focus + selection to the first/last chip", () => {
+    render(<RoleChipsHarness />);
+    const [techChip, , studentChip] = screen.getAllByRole("radio");
+
+    techChip.focus();
+    fireEvent.keyDown(techChip, { key: "End" });
+    expect(document.activeElement).toBe(studentChip);
+    expect(studentChip.getAttribute("aria-checked")).toBe("true");
+
+    fireEvent.keyDown(studentChip, { key: "Home" });
+    expect(document.activeElement).toBe(techChip);
+    expect(techChip.getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("in RTL, ArrowLeft advances to the next chip and ArrowRight goes back (reading-direction aware)", () => {
+    mockDirection = "rtl";
+    render(<RoleChipsHarness />);
+    const [techChip, vetChip, studentChip] = screen.getAllByRole("radio");
+
+    techChip.focus();
+    fireEvent.keyDown(techChip, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(vetChip);
+    expect(vetChip.getAttribute("aria-checked")).toBe("true");
+
+    fireEvent.keyDown(vetChip, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(techChip);
+    expect(techChip.getAttribute("aria-checked")).toBe("true");
+
+    // ArrowRight from the first chip in RTL wraps backward to the last.
+    fireEvent.keyDown(techChip, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(studentChip);
+    expect(studentChip.getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("roving tabindex: only the selected (or, before any selection, the first) chip is a Tab stop", () => {
+    render(<RoleChipsHarness />);
+    const [techChip, vetChip, studentChip] = screen.getAllByRole("radio");
+    expect(techChip.tabIndex).toBe(0);
+    expect(vetChip.tabIndex).toBe(-1);
+    expect(studentChip.tabIndex).toBe(-1);
+
+    fireEvent.click(vetChip);
+    expect(techChip.tabIndex).toBe(-1);
+    expect(vetChip.tabIndex).toBe(0);
+    expect(studentChip.tabIndex).toBe(-1);
   });
 });

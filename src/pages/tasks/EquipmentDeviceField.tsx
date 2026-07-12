@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
 import { t } from "@/lib/i18n";
 import { Bdi } from "@/components/ui/bdi";
 import { getEquipmentDisplayName } from "@/lib/equipment-display";
@@ -50,6 +50,12 @@ export function EquipmentDeviceField({ id, equipment, isLoading, value, onChange
     return matched.slice(0, MAX_VISIBLE_RESULTS);
   }, [equipment, query]);
 
+  /** Stable per-option id, keyed to the equipment id (not list position) so it
+   * stays correct across re-sorts/re-filters — target of `aria-activedescendant`. */
+  function optionId(equipmentId: string): string {
+    return `${listId}-option-${equipmentId}`;
+  }
+
   useEffect(() => {
     if (!open) return;
     function onPointerDown(event: PointerEvent) {
@@ -61,6 +67,17 @@ export function EquipmentDeviceField({ id, equipment, isLoading, value, onChange
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open]);
+
+  // Keyboard focus never leaves the input (options aren't independently
+  // tabbable — see the single-option-model note below), so a focusout whose
+  // relatedTarget lands outside the wrapper means focus moved elsewhere
+  // (e.g. Tab to the next field) and the popup must close.
+  function onWrapperBlur(event: FocusEvent<HTMLDivElement>) {
+    if (wrapperRef.current && !wrapperRef.current.contains(event.relatedTarget as Node | null)) {
+      setOpen(false);
+      setActive(-1);
+    }
+  }
 
   function select(eq: Equipment) {
     onChange(eq.id);
@@ -92,15 +109,17 @@ export function EquipmentDeviceField({ id, equipment, isLoading, value, onChange
   }
 
   const displayValue = open ? query : selected ? getEquipmentDisplayName(selected) : "";
+  const activeOptionId = open && active >= 0 && active < results.length ? optionId(results[active].id) : undefined;
 
   return (
-    <div ref={wrapperRef} className="relative">
+    <div ref={wrapperRef} className="relative" onBlur={onWrapperBlur}>
       <input
         id={id}
         role="combobox"
         aria-expanded={open}
         aria-controls={listId}
         aria-autocomplete="list"
+        aria-activedescendant={activeOptionId}
         aria-required={required}
         required={required}
         dir="auto"
@@ -135,28 +154,33 @@ export function EquipmentDeviceField({ id, equipment, isLoading, value, onChange
           ) : (
             results.map((eq, i) => {
               const sub = subtitle(eq);
+              // Single option-interaction model: the <li role="option"> itself is
+              // the clickable/hoverable unit (not a nested tabbable <button>), so
+              // focus always stays on the input and `aria-activedescendant` above
+              // is the only way the active option is exposed to a11y tools.
               return (
-                <li key={eq.id} role="option" aria-selected={eq.id === value}>
-                  <button
-                    type="button"
-                    // Keep focus on the input so onBlur/outside-click doesn't
-                    // close the list before the click registers.
-                    onMouseDown={(e) => e.preventDefault()}
-                    onMouseEnter={() => setActive(i)}
-                    onClick={() => select(eq)}
-                    className={`flex w-full flex-col items-start gap-0.5 rounded px-3 py-2 text-start transition-colors ${
-                      i === active ? "bg-accent" : "hover:bg-accent/60"
-                    }`}
-                  >
-                    <Bdi dir="auto" className="w-full truncate text-sm font-medium text-foreground">
-                      {getEquipmentDisplayName(eq)}
+                <li
+                  key={eq.id}
+                  id={optionId(eq.id)}
+                  role="option"
+                  aria-selected={i === active}
+                  // Keep focus on the input so onBlur/outside-click doesn't
+                  // close the list before the click registers.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseEnter={() => setActive(i)}
+                  onClick={() => select(eq)}
+                  className={`flex w-full cursor-pointer flex-col items-start gap-0.5 rounded px-3 py-2 text-start transition-colors ${
+                    i === active ? "bg-accent" : "hover:bg-accent/60"
+                  }`}
+                >
+                  <Bdi dir="auto" className="w-full truncate text-sm font-medium text-foreground">
+                    {getEquipmentDisplayName(eq)}
+                  </Bdi>
+                  {sub && (
+                    <Bdi dir="auto" className="w-full truncate text-xs text-muted-foreground">
+                      {sub}
                     </Bdi>
-                    {sub && (
-                      <Bdi dir="auto" className="w-full truncate text-xs text-muted-foreground">
-                        {sub}
-                      </Bdi>
-                    )}
-                  </button>
+                  )}
                 </li>
               );
             })

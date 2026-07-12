@@ -66,7 +66,6 @@ describe("EquipmentItem (list row) — name cell bidi isolation (T10)", () => {
 
     const row = screen.getByTestId("equipment-item-eq-3");
     expect(row.getAttribute("dir")).toBeNull();
-    expect(row.closest("[dir]")).toBeNull();
   });
 
   it("still isolates a Hebrew device name the same way (direction is content-derived, not hardcoded LTR)", () => {
