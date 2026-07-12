@@ -12,6 +12,23 @@ const POLL_INTERVAL_OPEN_MS = 3_000;
 const POLL_INTERVAL_CLOSED_MS = 15_000;
 const TYPING_DEBOUNCE_MS = 1_500;
 
+// Patch a single message in the local accumulator by id, leaving every other
+// message untouched. Used by the react/ack mutations (R-SH-01): those
+// mutations target a message that is often already below the strict-`gt` poll
+// cursor, so a `queryClient.invalidateQueries` refetch would never re-deliver
+// it — the open panel must instead merge the change in locally.
+function patchMessageById(
+  messages: ShiftMessage[],
+  id: string,
+  patch: (message: ShiftMessage) => ShiftMessage,
+): ShiftMessage[] {
+  const index = messages.findIndex((m) => m.id === id);
+  if (index === -1) return messages;
+  const next = messages.slice();
+  next[index] = patch(next[index]!);
+  return next;
+}
+
 export function useShiftChat(isOpen: boolean) {
   const { userId } = useAuth();
   const queryClient = useQueryClient();
@@ -104,7 +121,15 @@ export function useShiftChat(isOpen: boolean) {
   const ackMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: "acknowledged" | "snoozed" }) =>
       shiftChatApi.ackMessage(id, status),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+    onSuccess: (_result, { id, status }) => {
+      if (!userId) return;
+      setAllMessages((prev) =>
+        patchMessageById(prev, id, (m) => ({
+          ...m,
+          acks: [...m.acks.filter((a) => a.userId !== userId), { userId, status }],
+        })),
+      );
+    },
     onError: () => {
       toast.error(t.shiftChat.errors.ackFailed);
     },
@@ -129,7 +154,18 @@ export function useShiftChat(isOpen: boolean) {
   const reactMutation = useMutation({
     mutationFn: ({ messageId, emoji }: { messageId: string; emoji: "👍" | "✅" | "👀" }) =>
       shiftChatApi.react(messageId, emoji),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+    onSuccess: (result, { messageId, emoji }) => {
+      if (!userId) return;
+      setAllMessages((prev) =>
+        patchMessageById(prev, messageId, (m) => {
+          const withoutMine = m.reactions.filter((r) => !(r.userId === userId && r.emoji === emoji));
+          return {
+            ...m,
+            reactions: result.action === "removed" ? withoutMine : [...withoutMine, { userId, emoji }],
+          };
+        }),
+      );
+    },
     onError: () => {
       toast.error(t.shiftChat.errors.reactFailed);
     },
