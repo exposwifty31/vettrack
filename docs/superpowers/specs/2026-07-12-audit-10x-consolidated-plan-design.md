@@ -31,14 +31,17 @@ Owner-selected framing:
 ## 2. Execution model (every task obeys this)
 
 ### 2.1 SDD
+
 - Every unit of work is a numbered **Requirement** (`R-<area>-##`) with a precise statement, **testable acceptance criteria**, and **traceability** to its source finding (`CLICK-PATH-###`) or feature (`small-0#` / `medium-0#` / `massive-0#`).
 - The spec is the source of truth. The implementation plan (`writing-plans` output) may only expand requirements into task cards; it may not introduce behavior not in a requirement.
 
 ### 2.2 TDD
+
 - Each requirement carries a **RED test** hook: the test file to create/update and the assertion that must FAIL against current code.
 - Task order is always **RED → GREEN → REFACTOR → verify**. No implementation lands before its failing test exists.
 
 ### 2.3 Sonnet-sized task contract (the important one)
+
 Because the executing agent reasons less, every task card produced from this spec MUST:
 1. Touch **≤ 2 files** for the change + **1 test file** (larger requirements are split until they fit).
 2. Cite **exact anchors** — `file:line` + symbol names. No "find the relevant code."
@@ -47,10 +50,18 @@ Because the executing agent reasons less, every task card produced from this spe
 5. End with a **deterministic verify command** and its expected result (a test that goes RED→GREEN, plus `pnpm typecheck`).
 
 ### 2.4 Complexity gate (honesty about Sonnet's limits)
-A requirement is **directly Sonnet-executable** only if it is a localized change on a non-frozen surface. Requirements that touch a **frozen surface** (SSE/realtime, Code Blue runtime, authority/enforcement, offline/PWA, telemetry enums) or are **net-new features of Medium+ size** are marked `⚠ SUB-SPEC` and MUST get a dedicated SDD spec-plan pass (their own requirements + task cards) before any Sonnet agent executes them. This spec defines them at requirement level only.
+
+A requirement is **directly Sonnet-executable** only if it is a localized change on a non-frozen surface. Requirements that are **net-new features of Medium+ size**, or **net-new / multi-site work on a frozen surface** (SSE/realtime, Code Blue runtime, authority/enforcement, offline/PWA, telemetry enums), are marked `⚠ SUB-SPEC` and MUST get a dedicated SDD spec-plan pass (their own requirements + task cards) before any Sonnet agent executes them. This spec defines them at requirement level only.
+
+**Frozen-but-localized carve-out:** a *single-site wiring fix* on a frozen surface — e.g. **R-SY-01** (pass the QueryClient) or **R-CB-01** (dismiss a modal) — is directly executable at **Tier `S +R`** (Sonnet + a `code-reviewer` gate + the browser drill), because it is a one-site change guarded by a RED test and the frozen doctrine, not net-new frozen logic. `⚠ SUB-SPEC` stays reserved for net-new/multi-site frozen work (e.g. **R-CB-02/03** races). This resolves the apparent tension between "offline/PWA is frozen" and R-SY-01 being executed directly.
+
+**On alternatives:** where a requirement below *sketches* options ("or", "either", "delete-or-wire"), its **plan card picks the single approach** — plan cards are decision-free and are the dispatch source of truth (the spec may sketch; the plan pins).
 
 ### 2.5 Standard feature checklist (inherited by every feature requirement)
-Per `CLAUDE.md` §"Adding a new feature": schema → `npx drizzle-kit generate` → commit SQL → route in `server/routes/` registered in `server/app/routes.ts` → `src/lib/api.ts` fn + `src/types/` type → lazy route in `src/app/routes.tsx` → he+en keys (parity, `pnpm i18n:check`) → audit kind added to the closed `AuditActionType` union → bounded-enum telemetry on client + `server/routes/realtime.ts` → `pnpm typecheck` clean.
+
+Per `CLAUDE.md` §"Adding a new feature", **applied as relevant to each feature** (not every step applies to every feature): schema → `npx drizzle-kit generate` → commit SQL → route in `server/routes/` registered in `server/app/routes.ts` → `src/lib/api.ts` fn + `src/types/` type → lazy route in `src/app/routes.tsx` → he+en keys (parity, `pnpm i18n:check`) → audit kind added to the closed `AuditActionType` union → bounded-enum telemetry on client + `server/routes/realtime.ts` → `pnpm typecheck` clean.
+
+**Conditional steps:** read-only / reused-data features (e.g. **small-01** locate, **small-02** badge) that add **no new table and no new mutation** skip schema/migration, the `AuditActionType` addition, and telemetry — they need only the route + api/type + i18n + typecheck. The full chain (schema → migration → audit kind → telemetry) applies only to features that persist new data or emit new events (e.g. **small-04** damage events, **medium-02** handover). Each feature card states which steps apply.
 
 ---
 
@@ -73,6 +84,7 @@ Finding accounting: 6 HIGH (P0) · 8 MED (P1) + 13 MED (P2) = 21 MED · 9 LOW (P
 ### 4.1 Work-stream 0A — the 6 HIGH fixes (all directly Sonnet-executable)
 
 #### R-CB-01 — Code Blue outcome-sheet "Cancel" must dismiss without ending the session  ·  traces CLICK-PATH-001 (HIGH)
+
 - **Anchors:** `src/pages/code-blue.tsx` — `OutcomeModal` (def ~L237), Cancel button ~L266 (`onClick={() => onClose("")}`), `handleEndSession` ~L326, guard `if (!outcome || !session) return` ~L327, `setShowOutcomeModal(false)` ~L328.
 - **Defect:** Cancel routes `onClose("")` → `handleEndSession("")` → the outcome guard returns *before* the `setShowOutcomeModal(false)` line, so the sheet never closes; there is no backdrop dismiss → the manager is trapped over a live emergency modal (no browser-back chrome in the WKWebView shell).
 - **Fix direction:** Cancel gets its own dismiss that sets `showOutcomeModal=false` independent of the outcome guard (dedicated `closeOutcomeModal()` or set the flag before the guard). **Cancel must NOT end the session.**
@@ -81,6 +93,7 @@ Finding accounting: 6 HIGH (P0) · 8 MED (P1) + 13 MED (P2) = 21 MED · 9 LOW (P
 - **Verify:** `pnpm test -- tests/code-blue-outcome-cancel.test.tsx && pnpm typecheck`.
 
 #### R-EQ-01 — "Dock Return" opens its sheet on the default tab  ·  traces CLICK-PATH-002 (HIGH)
+
 - **Anchors:** `src/pages/equipment-detail.tsx` — button `setDockReturnOpen(true)` L1097; `<DockReturnFlow>` L1361 inside `<TabsContent value="readiness">` L1340.
 - **Defect:** the only `<DockReturnFlow>` consumer is mounted inside an inactive Radix tab (`TabsPrimitive.Content`, no `forceMount`), so on the default `details` tab the state is set with no mounted consumer → silent no-op; later visiting Readiness pops it unexpectedly.
 - **Fix direction:** move `<DockReturnFlow>` (and its sibling in R-EQ-02) to **page level**, alongside the other always-mounted sheets, so it is mounted regardless of active tab. The equipment-list variant already mounts it flat and works — mirror that.
@@ -89,20 +102,23 @@ Finding accounting: 6 HIGH (P0) · 8 MED (P1) + 13 MED (P2) = 21 MED · 9 LOW (P
 - **Verify:** `pnpm test -- tests/equipment-detail-dock-return-mount.test.tsx && pnpm typecheck`.
 
 #### R-EQ-02 — RFID "confirm at dock" opens its sheet on the default tab  ·  traces CLICK-PATH-003 (HIGH)
+
 - **Anchors:** `src/pages/equipment-detail.tsx` — StatusStrip `onRfidAttention={() => setDockReturnNfcOpen(true)}` L1214; `<DockReturnNfc>` L1374 inside the same inactive Readiness `TabsContent`.
 - **Defect / fix / guardrail:** identical root cause and fix as R-EQ-01 — move `<DockReturnNfc>` to page level. **Do together with R-EQ-01** (same file, same mount block) as one card.
 - **RED test:** extend `tests/equipment-detail-dock-return-mount.test.tsx` with the RFID-attention path.
 - **Verify:** same command as R-EQ-01.
 
 #### R-SC-01 — QR auto-decode targets the last physically-scanned tag exactly once  ·  traces CLICK-PATH-004 (HIGH)
+
 - **Anchors:** `src/components/qr-scanner.tsx` — `handleScanResult` L215 (wired L367-368), `if (!eq)` branch L233, `DEBOUNCE_MS` L218.
 - **Defect:** the only re-entry guard is a 300 ms time-debounce; the scanner is not stopped before the awaited `resolveEquipmentId`, so a later, slower resolve can overwrite `setScannedEquipment` (last-resolved-wins) → a custody action can hit the **wrong** equipment; also double-counts `scansToday`.
-- **Fix direction:** add an in-flight request token/ref; stop the scanner **before** the await; early-return while a resolve is pending; guard the `scansToday` increment so it counts once per accepted scan.
+- **Fix direction:** tag each scan with a monotonic sequence token; stop the scanner **before** the await; when a `resolveEquipmentId` settles, **apply it only if its token is still the latest** — a newer scan supersedes an older in-flight resolve (**last physically-scanned wins**); discard stale resolves. Guard the `scansToday` increment so it counts once per *applied* scan. (This is consistent with the RED test: the second, newer decode becomes the final result — the policy cancels the *stale* resolve, it does not block the newer scan.)
 - **RED test:** `tests/qr-scanner-race.test.tsx` — simulate two overlapping decodes where the first resolves slower; assert the final `scannedEquipment` is the second (last-scanned) and the increment fired once. Fails on current code.
 - **Frozen guardrail:** does not touch offline-emergency classifier; scan remains a first-class custody source.
 - **Verify:** `pnpm test -- tests/qr-scanner-race.test.tsx && pnpm typecheck`.
 
 #### R-RM-01 — Room-radar "Return" stays functional after a canceled dialog  ·  traces CLICK-PATH-005 (HIGH)
+
 - **Anchors:** `src/pages/room-radar.tsx` — `busyRef` decl L114; onClick L317-323 (`busyRef.current = true` L319); the reset lives only in `returnMut.onSettled`.
 - **Defect:** tapping Return sets `busyRef=true` but only *opens* `ReturnPlugDialog` (no mutation). Cancel closes the dialog without running `returnMut`, so `onSettled` never resets `busyRef` → the `!busyRef.current` guard blocks every later tap; the button isn't visually disabled (that's tied to `returnMut.isPending`).
 - **Fix direction:** reset `busyRef.current = false` on dialog close (`onOpenChange(o => { setReturnDialogOpen(o); if (!o) busyRef.current = false; })`), OR only set `busyRef` on the mutating path.
@@ -110,6 +126,7 @@ Finding accounting: 6 HIGH (P0) · 8 MED (P1) + 13 MED (P2) = 21 MED · 9 LOW (P
 - **Verify:** `pnpm test -- tests/room-radar-return-busyref.test.tsx && pnpm typecheck`.
 
 #### R-SY-01 — `initSyncEngine()` receives the QueryClient so post-offline-sync caches reconcile  ·  traces CLICK-PATH-006 (HIGH · foundational, **not** a review-risk)
+
 - **Anchors:** `src/hooks/use-sync.tsx:168` `initSyncEngine()` (no arg); `src/lib/sync-engine.ts:480` `export function initSyncEngine(queryClient?: QueryClient)`; guarded invalidations `sync-engine.ts:207-217`, reconciliation bail `:233`, 401 clear `:422`.
 - **Defect:** the sole caller passes no argument, so module-level `queryClientRef` stays `undefined` → post-replay equipment invalidations never fire, the post-sync reconciliation bails, and the 401-path cache clear is a no-op.
 - **Fix direction:** pass the app's QueryClient — `initSyncEngine(queryClient)` from the SyncProvider (it has `useQueryClient()`).
@@ -124,7 +141,7 @@ Finding accounting: 6 HIGH (P0) · 8 MED (P1) + 13 MED (P2) = 21 MED · 9 LOW (P
 
 - **R-AS-01 — Rostered reviewer account.** Provision an isolated synthetic-tenant reviewer with a clinical role (vet/senior_technician) **and an active roster shift spanning the review window** (rostering is admin-CSV-import only). *Verify:* the account can start/end a Code Blue with no `INSUFFICIENT_CLINICAL_AUTHORITY` 403. **This is the single highest-value addition** — fixing R-CB-01 is moot if the reviewer 403s before reaching the outcome sheet.
 - **R-AS-02 — Correct native build.** Archive **only** via `pnpm cap:build:native` (`scripts/build-native-shell.sh`) — bakes `VITE_CLERK_PUBLISHABLE_KEY` + `VITE_API_ORIGIN`, never sets `CAPACITOR_SERVER_URL`. *Verify:* login works in the shipped binary (a plain `pnpm build` → dev-bypass → `useUser` crash).
-- **R-AS-03 — Sign in with Apple live.** Confirm the SIWA button renders and completes in the bundled shell (mandatory under Guideline 4.8 because Clerk offers Google OAuth). Entitlement `com.apple.developer.applesignin` is present — verify runtime.
+- **R-AS-03 — Sign in with Apple live (conditional on the login model).** Confirm the SIWA button renders and completes in the bundled shell. **SIWA is required under Guideline 4.8 *only because the app offers a third-party/social login* (Clerk's Google OAuth); if the login model were email/password-only, SIWA would not be required.** So this gate is conditional on keeping any social-login option — if social login is dropped, drop this gate too. Entitlement `com.apple.developer.applesignin` is present — verify runtime.
 - **R-AS-04 — Privacy manifest reconciliation.** If Sentry is active in the native build, add Crash Data/Diagnostics to `PrivacyInfo.xcprivacy` + App Store Connect privacy answers (currently declares only Email+Name → 5.1 mismatch risk).
 - **R-AS-05 — Camera usage string.** Broaden `NSCameraUsageDescription` (Info.plist ~L52) — it claims "capture photos for equipment records" but the camera also does QR scanning (5.1.1 mismatch).
 - **R-AS-06 — Localize permission prompts.** Info.plist usage strings are English-only on a Hebrew-default app (`CFBundleDevelopmentRegion=en`); add `InfoPlist.strings` (he) for NFC/Camera/Photo.
@@ -134,6 +151,7 @@ Finding accounting: 6 HIGH (P0) · 8 MED (P1) + 13 MED (P2) = 21 MED · 9 LOW (P
 - **R-AS-10 — Review-notes framing.** Frame VetTrack in App Review notes as **internal veterinary equipment/ops tracking** (not patient diagnosis / emergency medical guidance) to pre-empt medical-substantiation questions on "Code Blue."
 
 ### 4.3 Phase 0 exit gate
+
 **On-device drill (real device, shipped-style build):** Sign in with Apple → start a Code Blue → reach and **dismiss** the (now-fixed) outcome sheet → end the session. Passing this simultaneously proves reviewer access (R-AS-01/02/03), the R-CB-01 fix, and the OAuth path. Phase 0 is not "done" until this passes.
 
 ---
@@ -141,6 +159,7 @@ Finding accounting: 6 HIGH (P0) · 8 MED (P1) + 13 MED (P2) = 21 MED · 9 LOW (P
 ## 5. Phase 1 — Do-Now bundles
 
 ### 5.1 Equipment surface (stabilize → extend)
+
 **Stabilize (Sonnet-executable fixes, each RED-test-first):**
 - **R-EQ-03** — checkout must not conflate a *failed* shift query with off-shift. `equipment-detail.tsx:605` ignores `isError` from `useActiveShift`; mirror the equipment-list fix (block client-side only when `!isError && !hasActiveShift`). Traces CLICK-PATH-012. RED: `tests/equipment-detail-shift-error.test.tsx`.
 - **R-EQ-04** — edit-equipment folder Select shows the loaded folder, not "Unfiled". `new-equipment.tsx:434` uses a static `defaultValue`; drive from `value={watch("folderId")}` / `existingEquipment?.folderId`. Traces CLICK-PATH-036. RED: `tests/new-equipment-folder-value.test.tsx`.
@@ -154,6 +173,7 @@ Finding accounting: 6 HIGH (P0) · 8 MED (P1) + 13 MED (P2) = 21 MED · 9 LOW (P
 - **R-EQ-F3 (small-04 damaged-at-check-in)** — add "returned damaged" as a **third choice inside `ReturnPlugDialog`** (convert the phone presentation from centered Dialog → bottom sheet); write a `vt_damage_events` row (new table: `clinicId, equipmentId, reportedBy, at, note, resolvedAt`) + optional `conditionStatus` on equipment; **undoable** via the existing `UNDO_WINDOW_MS` countdown toast + `haptics.warning()` (not a blocking confirm); new `AuditActionType`. **Acceptance:** writes the event + flips condition; device then reads not-ready via readiness rules; damage queryable by clinic+period.
 
 ### 5.2 Shift / Home surface
+
 - **R-SH-01** — shift-chat reactions/acks render live while the panel is open. `useShiftChat.ts:132` invalidate-only over a strict-`gt` incremental poll with an append-only accumulator can't show an edit; patch local state optimistically or reset `afterRef` + merge-by-id. Traces CLICK-PATH-007. RED: `tests/shift-chat-live-reaction.test.tsx`. **Guardrail:** don't add a realtime path — reconcile within the existing poll/accumulator.
 - **R-SH-02** — closing shift chat doesn't spawn a spurious unread badge. `useShiftChat.ts:80` unread-increment effect re-fires on open→close while `data` holds the just-read batch; advance `lastOpenRef` on close / skip the transition edge. Traces CLICK-PATH-017. RED: `tests/shift-chat-unread-badge.test.tsx`.
 - **R-SH-F1 (medium-02 shift handover)** `⚠ SUB-SPEC (LARGE)` — **extends the EXISTING `/handoff`** (`src/pages/handoff.tsx` renders `ShiftSummarySheet` — the brief's "no /handoff exists" premise is stale). Generate a `vt_shift_handover` artifact; **acknowledge = a deliberate confirm** (attestation — the sanctioned exception to undo-first); iPhone consume+ack / iPad two-pane authoring. **Scope resolved (owner) — a SUPERSET of the original brief:**
@@ -165,15 +185,17 @@ Finding accounting: 6 HIGH (P0) · 8 MED (P1) + 13 MED (P2) = 21 MED · 9 LOW (P
 - **R-SH-F2 (small-05 start-of-shift card)** — compose existing per-role surfaces (`src/features/today/surfaces/{Floor,Ops,Vet,Tech,Student}HomeSurface.tsx`, `OnShiftHero.tsx`) into **one focal "what needs me now" + one primary action**, gated by the existing capability union; phone compact / iPad hero band. No new data sources. **Acceptance:** each role's card differs correctly; off-shift renders a sensible idle variant; RTL spot-check.
 
 ### 5.3 Inventory surface
+
 - **R-IN-01** — New Item dialog persists "Billable" + min-capture on create. `inventory-items.tsx:124` `createMut` omits `isBillable`/`minimumDispenseToCapture` (and the api type can't carry them); add to POST body + `api.inventoryItems.create` type + route, OR hide the controls in create mode. Traces CLICK-PATH-018. RED: `tests/inventory-create-fields.test.tsx`.
 - **R-IN-02** — restock +/- burst stays consistent. `inventory-page.tsx:448` buttons aren't disabled while a scanLine is pending and send absolute quantities; serialize per-row (disable while pending) or drop stale responses. Traces CLICK-PATH-019. RED: `tests/inventory-restock-burst.test.tsx`.
 - **R-IN-F1 (small-03 expiry/low-stock nudge)** — route existing `expiryCheckWorker` + `restock.service` output to a **home-surface nudge** for the relevant role (+ optional push), dismissible, links to the action. Bounded-enum telemetry if counters added; no new realtime path. **Acceptance:** nudge appears for the correct role only; dismiss persists; push fires once per event.
 
 ### 5.4 Web platform admin-gating (NEW work-stream — from this session's investigation)
+
 - **R-WEB-01 — desktop web is restricted to the management tier** `⚠ SUB-SPEC` (small).
   - **Anchors:** `src/app/platform/PlatformRouter.tsx:16-28` (desktop branch passthrough L27); `src/desktop/management/ManagementGuard.tsx:17-27` (`can("management.web")` precedent); `src/app/platform/guards/WebOnlyGuard.tsx:22-58` (denial-screen precedent); `src/hooks/use-experience.ts` (`can()`); `src/lib/roles/experience-model.ts` (`management.web` grant: admin + `senior_technician`/`lead_technician` + secondary-admin).
   - **Defect:** `resolvePlatformTarget()` is role-blind; non-management roles resolve `desktop` and get a desktop-chromed **mobile-shaped** content tree (role-forked `FloorHomeSurface`), which is the reported "iPhone+iPad on web."
-  - **Decisions (owner-confirmed):** threshold = **`can("management.web")`** (admin + leads), NOT literal `role==="admin"`. Behavior for non-eligible on desktop = **"use the app" denial screen** (no in-browser mobile fallback).
+  - **Decisions (owner-confirmed):** threshold = **`can("management.web")`** — the precise capability grant is **admin + `senior_technician` + `lead_technician` + secondary-admin** (do **not** collapse it to the lossy "admin + leads", which drops secondary-admin), NOT literal `role==="admin"`. Behavior for non-eligible on desktop = **"use the app" denial screen** (no in-browser mobile fallback).
   - **Fix direction (surgical):** add a guard in the `PlatformRouter` **desktop branch**, mounted **inside `AuthGuard`** (role isn't known pre-auth): if `target === "desktop" && !experience.can("management.web")` → render a `WebOnlyGuard`-style dark full-screen denial ("this workspace is for management — open VetTrack on your device" + CTA). **Do NOT modify `resolvePlatformTarget()`'s synchronous/auth-independent contract.** `/board` (separate target) untouched.
   - **RED test:** `tests/web-platform-management-gate.test.tsx` — render `PlatformRouter` at `target=desktop` for a `vet_tech` (no `management.web`) → assert the denial screen, not app content; for an `admin` and a `lead` → assert normal passthrough. Fails on current code.
   - **Verify:** `pnpm test -- tests/web-platform-management-gate.test.tsx && pnpm typecheck`. Marked `⚠ SUB-SPEC` only because it touches the platform-routing seam — small, but the seam warrants its own reviewed card.
@@ -183,6 +205,7 @@ Finding accounting: 6 HIGH (P0) · 8 MED (P1) + 13 MED (P2) = 21 MED · 9 LOW (P
 ## 6. Phase 2 — Do-Next + native-reachable MED
 
 ### 6.1 Native MED sweep (Sonnet-executable fixes, RED-test-first)
+
 Each traces its CLICK-PATH id; one card each, same contract as Phase 0/1 fixes.
 - **R-CB-02 / R-CB-03** — Code Blue keepalive null-clear grace (CLICK-PATH-010) + quick-log rollback preserves teammates' entries (CLICK-PATH-011). `⚠ SUB-SPEC` — frozen Code Blue surface; these are the **stabilize** step gating medium-01.
 - **R-SC-02** — QR camera resumes after backgrounding (CLICK-PATH-015). **R-SC-03** — failed NFC toggle clears its 8s guard (CLICK-PATH-016).
@@ -191,6 +214,7 @@ Each traces its CLICK-PATH id; one card each, same contract as Phase 0/1 fixes.
 - **R-AD-01..05** — the 5 native-reachable admin MEDs (CLICK-PATH-009 support quick-resolve, 022 settings sound-toggle await, 023 confirm-import re-import guard, 024 folder-dialog Enter guard, 025 secondary-role pending keyed by userId). Each a localized fix; **R-AD-02 (022)** must use an *observable* catch (Sentry), never an empty `catch(()=>{})`.
 
 ### 6.2 Do-Next features (all `⚠ SUB-SPEC`)
+
 - **R-CBF-1 (medium-01 Code Blue one-tap)** — package existing frozen infra into **arm → hold-to-confirm** (~700–900ms hold, escalating haptic + filling ring, always-visible Cancel, ≥56px targets); phone initiates / iPad+board run; soft-reserve = additive custody hint (never a hard lock). Strict frozen doctrine (no new transport, no offline queueing, server-confirmed end, no emergency endpoint cached, bounded telemetry). Gated behind R-CB-01/02/03. Dedicated spec-plan required.
 - **R-BDF-1 (medium-03 ambient board alerts)** — closed bounded set of anomaly rules over the existing snapshot; board-only, single-shot escalation, reduced-motion in calm mode; `/api/display/snapshot` stays cache-denylisted; anomaly types are a bounded enum on client + `server/routes/realtime.ts`. Dedicated spec-plan.
 - **R-PDF-1 (massive-02 predictive readiness)** — `server/services/readiness-forecast.service.ts` (demand → supply → shortfall → surface), read-mostly over existing data, explainable (source rows per warning), conservative (precision over recall), rendered as an Analytics panel + PO recommendations. **Demand model resolved (owner): v1 = inference from historical usage (burn-rate), NO manual template authoring at launch.** Architecture requirement: put the historical-inference logic and the (future) explicit per-procedure template logic **behind a single demand-source interface**, so templates can be introduced per-procedure incrementally — once real usage data shows which procedures warrant hand-authored consumption profiles — with **no rewrite**. Burn-rate window (trailing 7/14/30d) is a spec-plan tuning detail. High effort; dedicated spec-plan.
@@ -198,11 +222,13 @@ Each traces its CLICK-PATH id; one card each, same contract as Phase 0/1 fixes.
 ---
 
 ## 7. Phase 3 — LOW cleanup + web-only (Sonnet-executable)
+
 Nine LOW fixes, one card each: CLICK-PATH-027 (update-banner supersede guard), 028 (dead ScanScreen accountability banner — remove or wire), 029 (shift-chat Enter empty guard), 030 (Add Room Cancel reset), 031 (DispenseSheet Continue preserves patient), 032 (alerts pull-to-refresh awaits refetch), 033 (management-dashboard dead QrScanner — remove or wire; **web-only**), 034 (audit-log Apply commit-on-apply; **web-only**), 035 (Displays drawer derives from live data; **web-only**). Each RED-test-first where it has a runtime surface; 028/033 (dead paths) may be delete-only.
 
 ---
 
 ## 8. Phase 4 — Gated Massives (blocked; all `⚠ SUB-SPEC`)
+
 Do not start code until the owner clears the standing blocker.
 - **massive-01 passive RFID-gate tracking** — **core functionality (owner: not optional); technology LOCKED to RFID-gate** (chokepoint egress / last-seen), **not BLE/RTLS** — owner decision 2026-07-12 per `R-M1-PRE` (lowest TCO at clinic scale; `docs/business-case/2026-07-12-massive-01-passive-tracking-cost-benefit.md`). **Hardware rollout** stays gated on the manager go (owner brings the `R-M1-PRE` §6 clinic numbers). **The read path is ALREADY wired end-to-end (grounded 2026-07-12 — this CORRECTS an earlier "inert scaffolding" claim).** Working today: HMAC-auth, feature-flagged, rate-limited `POST /api/rfid/events` → `ingestRfidBatch` → the real append-only `vt_equipment_rfid_reads` table → evidence resolver → equipment-list "Last seen via RFID near {room}" subtitle + attention badge (working smoke runbook: `docs/rfid-smoke.md`). What is genuinely **inert/missing**: (1) the Command Board `rfid`/`evidenceConflict`/`rfid_reader_offline` contract (`shared/equipment-board.ts`) has **no producer** in `equipment-command-board.service.ts`; (2) reader management is **script + manual DB-flag only** (`/admin/rfid-readers` is read-only); (3) two resolvers **disagree on RFID precedence** (`equipment-location-inference.ts` = lowest-confidence vs evidence-graph `resolver/location.ts` = **outranks the authoritative room**) — a latent bug to reconcile; (4) **no gate direction** (gateway 1:1 room); (5) thin tests. **Scope LOCKED (owner 2026-07-12):**
   - **(A) Managed reader entity** — new `vt_rfid_readers` table (name, physical location, health, provisioning state) + admin **CRUD** + self-serve secret provisioning + per-clinic ingest toggle + reader-offline alerting; replaces the script/manual flow, turns the read-only console into real management.
@@ -232,6 +258,7 @@ Do not start code until the owner clears the standing blocker.
 ---
 
 ## 10. Execution context
+
 - **Branch:** `claude/audit-10x-consolidated-plan` off `main`. New commits only; no amend/force-push/`--no-verify`. Commit per completed requirement.
 - **Frozen surfaces (never weaken):** SSE transport + monotonic outbox cursor; no offline emergency queueing; no emergency endpoint in any cache; bounded-enum telemetry; Strategy A authority safety net; `appointmentsPage.*` / `vt_appointments` / `/api/appointments` names. Any requirement touching these is `⚠ SUB-SPEC`.
 - **Proof:** before marking any requirement done, log verification evidence (the RED→GREEN test run, the command output) in `docs/audit/PROOF_ALIGNMENT_LOG.md` per that file's format.
@@ -246,21 +273,24 @@ Do not start code until the owner clears the standing blocker.
 - Student undo carve-out → **no carve-out; students get undo like everyone** (§9).
 
 **Still open / gated:**
-- **massive-01** — **RFID-gate LOCKED**; scope LOCKED (owner 2026-07-12): **managed reader entity (`vt_rfid_readers` CRUD + provisioning) + true directional gates**. `R-M1-PRE` cost/benefit delivered. Grounding done — the **read path is already wired**; the e2e build = Command-Board surfacing + reader management + resolver-precedence reconciliation + directional-gate semantics + tests. Dedicated plan **`R-M1`** to be authored (scope now set). Hardware rollout still gated on the manager go.
+- **massive-01** — **RFID-gate LOCKED**; scope LOCKED (owner 2026-07-12): **managed reader entity (`vt_rfid_readers` CRUD + provisioning) + true directional gates**. `R-M1-PRE` cost/benefit delivered. Grounding done — the **read path is already wired**; the e2e build = Command-Board surfacing + reader management + resolver-precedence reconciliation + directional-gate semantics + tests. Dedicated plan **`R-M1`** authored (`docs/plans/consolidated-audit-10x/subspecs/R-M1-rfid-gate-e2e.plan.md`). Hardware rollout still gated on the manager go.
 - **massive-03** (clinic network) + **medium-04** (asset copilot/voice) — **on hold, no deadline** (owner). Blockers unchanged: buyer identity + security design pass (massive-03); native-shell sequencing for voice (medium-04).
 
 ---
 
 ## Appendix A — Finding → phase map (all 36)
+
 - **Phase 0 (HIGH):** 001 R-CB-01 · 002 R-EQ-01 · 003 R-EQ-02 · 004 R-SC-01 · 005 R-RM-01 · 006 R-SY-01.
 - **Phase 1 (MED):** 012 R-EQ-03 · 036 R-EQ-04 · 020 R-EQ-05 · 021 R-EQ-06 · 007 R-SH-01 · 017 R-SH-02 · 018 R-IN-01 · 019 R-IN-02.
 - **Phase 2 (MED):** 010 R-CB-02 · 011 R-CB-03 · 015 R-SC-02 · 016 R-SC-03 · 013 R-SY-02 · 014 R-SY-03 · 026 R-SY-04 · 008 R-PR-01 · 009/022/023/024/025 R-AD-01..05.
 - **Phase 3 (LOW):** 027 · 028 · 029 · 030 · 031 · 032 · 033(web-only) · 034(web-only) · 035(web-only).
 
 ## Appendix B — Feature → phase map (all 12)
+
 - **Phase 1:** small-01 R-EQ-F1 · small-02 R-EQ-F2 · small-04 R-EQ-F3 · medium-02 R-SH-F1 · small-05 R-SH-F2 · small-03 R-IN-F1.
 - **Phase 2:** medium-01 R-CBF-1 · medium-03 R-BDF-1 · massive-02 R-PDF-1.
 - **Phase 4 (gated):** massive-01 · massive-03 · medium-04.
 
 ## Appendix C — Grounding status
+
 All 6 HIGH anchors + all 12 feature reuse anchors CONFIRMED on live `main` (2026-07-12). Corrections folded in: (1) 5 of 7 "admin" findings are native-reachable → Phase 2, not deferred; (2) `/handoff` already exists → medium-02 extends it; (3) `StatusBadge` already renders icon+text → small-02 preserves + fixes its i18n leak; (4) "one tap" Code Blue → arm→hold-to-confirm; (5) web platform gating threshold = `can("management.web")`.

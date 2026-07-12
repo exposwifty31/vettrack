@@ -4,6 +4,7 @@
 - **Spec (source of truth):** `../../superpowers/specs/2026-07-12-audit-10x-consolidated-plan-design.md`
 - **Branch:** `claude/audit-10x-consolidated-plan`.
 - **Card contract (spec §2.3):** each card = **RED** (write the failing test) → **GREEN** (minimal impl, ≤2 code files + 1 test) → **verify**. Exact anchors, zero open decisions. Commit per card; log evidence in `docs/audit/PROOF_ALIGNMENT_LOG.md`.
+- **Tier (model routing):** **default = S (Sonnet); unmarked cards run on Sonnet.** Overrides are tagged inline (`Tier: S +R` / `Tier: O +R`); 0B is `Tier: Owner`. `+R` = a `code-reviewer` gate (+ browser drill for realtime/PWA) before commit. See README → "Execution driver".
 
 ## Execution order
 
@@ -18,7 +19,8 @@
 
 ## Phase 0A — HIGH fixes
 
-### T-01 · Code Blue outcome-sheet "Cancel" dismisses without ending the session (R-CB-01 · CLICK-PATH-001 · HIGH)
+### T-01 · Code Blue outcome-sheet "Cancel" dismisses without ending the session (R-CB-01 · CLICK-PATH-001 · HIGH) · **Tier: S +R**
+
 - **Files:** `src/pages/code-blue.tsx` (`OutcomeModal` Cancel ~L266 `onClose("")`; `handleEndSession` ~L326, guard `if (!outcome || !session) return` ~L327, `setShowOutcomeModal(false)` ~L328).
 - **Defect:** Cancel → `onClose("")` → `handleEndSession("")` returns at the outcome guard **before** closing the sheet → manager trapped over a live emergency (no browser-back in WKWebView).
 - **RED:** `tests/code-blue-outcome-cancel.test.tsx` — outcome modal open + active session; click "Cancel"; assert (a) modal removed from DOM, (b) end-session mutation **not** called, (c) focus returns to trigger. Fails now.
@@ -28,6 +30,7 @@
 - **Done when:** RED test passes; the on-device drill (T-16) can open+dismiss the sheet without ending the session.
 
 ### T-02 · Dock-Return + RFID sheets mount at page level, not inside an inactive tab (R-EQ-01/02 · CLICK-PATH-002/003 · HIGH)
+
 - **Files:** `src/pages/equipment-detail.tsx` (`setDockReturnOpen(true)` L1097; `onRfidAttention` L1214; `<DockReturnFlow>` L1361 + `<DockReturnNfc>` L1374 inside `<TabsContent value="readiness">` L1340).
 - **Defect:** the only consumers are mounted inside the inactive Radix Readiness tab (bare `TabsPrimitive.Content`, no `forceMount`), so on the default `details` tab the state is set with no mounted consumer → silent no-op.
 - **RED:** `tests/equipment-detail-dock-return-mount.test.tsx` — on the default tab, trigger Dock Return and the RFID-attention tap; assert each flow renders. Fails now.
@@ -36,21 +39,24 @@
 - **Verify:** `pnpm test -- tests/equipment-detail-dock-return-mount.test.tsx && pnpm typecheck`.
 
 ### T-03 · QR auto-decode targets the last-scanned tag exactly once (R-SC-01 · CLICK-PATH-004 · HIGH)
+
 - **Files:** `src/components/qr-scanner.tsx` (`handleScanResult` L215, wired L367-368; `if (!eq)` L233; `DEBOUNCE_MS` L218).
 - **Defect:** only guard is a 300ms debounce; the scanner isn't stopped before the awaited `resolveEquipmentId`, so a slower earlier resolve overwrites a newer scan (last-resolved-wins) → custody action can hit the **wrong** equipment; also double-counts `scansToday`.
 - **RED:** `tests/qr-scanner-race.test.tsx` — two overlapping decodes, first resolves slower; assert final `scannedEquipment` is the second scan and the increment fired once. Fails now.
-- **GREEN:** add an in-flight request token/ref; stop the scanner **before** the await; early-return while a resolve is pending; guard the `scansToday` increment to once per accepted scan.
+- **GREEN:** tag each scan with a monotonic token; stop the scanner **before** the await; when a `resolveEquipmentId` settles, apply it **only if its token is still the latest** — a newer scan supersedes an older in-flight resolve (last physically-scanned wins); discard stale resolves; guard the `scansToday` increment to once per *applied* scan.
 - **Guardrail:** don't touch `classifyEmergencyEndpoint`/offline block; scan stays a first-class source.
 - **Verify:** `pnpm test -- tests/qr-scanner-race.test.tsx && pnpm typecheck`.
 
 ### T-04 · Room-radar "Return" stays functional after a canceled dialog (R-RM-01 · CLICK-PATH-005 · HIGH)
+
 - **Files:** `src/pages/room-radar.tsx` (`busyRef` L114; onClick L317-323, `busyRef.current = true` L319; reset only in `returnMut.onSettled`).
 - **Defect:** Return sets `busyRef=true` then only *opens* `ReturnPlugDialog`; Cancel closes it without running `returnMut`, so `onSettled` never resets `busyRef` → `!busyRef.current` blocks all later taps (button not visually disabled).
 - **RED:** `tests/room-radar-return-busyref.test.tsx` — tap Return, cancel, tap Return again; assert the dialog opens the second time. Fails now.
-- **GREEN:** reset `busyRef.current = false` on dialog close (`onOpenChange(o => { setReturnDialogOpen(o); if (!o) busyRef.current = false; })`) — or only set `busyRef` on the mutating path.
+- **GREEN:** reset `busyRef.current = false` on dialog close via `onOpenChange(o => { setReturnDialogOpen(o); if (!o) busyRef.current = false; })`.
 - **Verify:** `pnpm test -- tests/room-radar-return-busyref.test.tsx && pnpm typecheck`.
 
-### T-05 · `initSyncEngine()` receives the QueryClient (R-SY-01 · CLICK-PATH-006 · HIGH · foundational)
+### T-05 · `initSyncEngine()` receives the QueryClient (R-SY-01 · CLICK-PATH-006 · HIGH · foundational) · **Tier: S +R**
+
 - **Files:** `src/hooks/use-sync.tsx:168` `initSyncEngine()`; `src/lib/sync-engine.ts:480` `initSyncEngine(queryClient?)`; guarded invalidations `:207-217`, reconcile bail `:233`, 401 clear `:422`.
 - **Defect:** sole caller passes no arg → `queryClientRef` stays `undefined` → post-replay equipment invalidations never fire, reconciliation bails, 401 cache-clear is a no-op.
 - **RED:** `tests/sync-engine-queryclient-wiring.test.ts` — assert `initSyncEngine` is called with a defined QueryClient and a replayed mutation triggers the equipment invalidation. Fails now.
@@ -60,7 +66,7 @@
 
 ## Phase 0B — reviewer-reachability & submission gate (ops/config; binary verification, not TDD)
 
-Each is a checklist card with a pass/fail check (spec §4.2). Owner-executed where hardware/accounts are involved.
+Each is a checklist card with a pass/fail check (spec §4.2). Owner-executed where hardware/accounts are involved. **Tier: Owner** (T-06…T-16) — accounts/build/device/hardware, not a model choice.
 
 - **T-06 (R-AS-01)** Rostered reviewer account — synthetic tenant, vet/senior_technician role, **active roster shift** spanning review window. *Verify:* account starts+ends a Code Blue with no `INSUFFICIENT_CLINICAL_AUTHORITY` 403. **Highest-value item.**
 - **T-07 (R-AS-02)** Build only via `pnpm cap:build:native`. *Verify:* login works in the shipped binary.
@@ -74,6 +80,7 @@ Each is a checklist card with a pass/fail check (spec §4.2). Owner-executed whe
 - **T-15 (R-AS-10)** App Review notes frame VetTrack as internal veterinary equipment/ops tracking.
 
 ### T-16 · Phase 0 exit gate — on-device drill (blocks leaving Phase 0)
+
 Real device, shipped-style build: **SIWA → start a Code Blue → dismiss the (now-fixed T-01) outcome sheet → end the session.** Proves reviewer access + the T-01 fix + OAuth in one pass. Phase 0 is not done until this passes.
 
 ---
@@ -81,6 +88,7 @@ Real device, shipped-style build: **SIWA → start a Code Blue → dismiss the (
 ## Phase 1 — Equipment bundle (stabilize → extend)
 
 ### Fixes
+
 - **T-17 (R-EQ-03 · CLICK-PATH-012):** `src/pages/equipment-detail.tsx:605` — checkout ignores `isError` from `useActiveShift`, rendering a failed shift query as "off-shift". **GREEN:** block client-side only when `!isError && !hasActiveShift` (mirror the equipment-list fix). **RED:** `tests/equipment-detail-shift-error.test.tsx` (transient shift-query error → checkout not disabled). Verify: `pnpm test -- tests/equipment-detail-shift-error.test.tsx && pnpm typecheck`.
 - **T-18 (R-EQ-04 · CLICK-PATH-036):** `src/pages/new-equipment.tsx:434` — folder Select uses static `defaultValue`, shows "Unfiled" for filed items. **GREEN:** drive from `value={watch("folderId")}` / `existingEquipment?.folderId`. **RED:** `tests/new-equipment-folder-value.test.tsx`. 
 - **T-19 (R-EQ-05 · CLICK-PATH-020):** `src/pages/my-equipment.tsx:113` — "Return All" `Promise.all` rejects before invalidations. **GREEN:** `Promise.allSettled` + invalidate after settle. **RED:** `tests/my-equipment-return-all.test.tsx` (one failed return; others still invalidate). 
@@ -88,40 +96,46 @@ Real device, shipped-style build: **SIWA → start a Code Blue → dismiss the (
 - **T-21 (R-EQ-07 · HIG debt):** `src/pages/equipment-detail.tsx` header `size="icon-sm"` controls under 44pt. **GREEN:** ≥44pt hit area (padding). **RED:** `tests/equipment-detail-touch-targets.test.tsx` (computed hit box ≥44).
 
 ### Features (each decomposed into ordered cards; feature-checklist spec §2.5)
-- **T-22 (R-EQ-F1 · small-01 locate):**
-  - **a) backend** — read-only `GET /api/equipment/locate?q=` composing `server/domain/equipment/evidence/resolver/{location,custodian}.ts` → `{ location, custodian, readiness }`; `clinicId`-scoped; rate-limit under the scan/action limiter; register in `server/app/routes.ts`. RED: `tests/equipment-locate-route.test.ts` (seeded device → correct room+custodian; cross-clinic returns nothing).
-  - **b) client wiring** — `src/lib/api.ts` fn + `src/types/` type. RED: type-check + `tests/api-locate.test.ts`.
-  - **c) UI** — bottom-anchored / gesture-summoned search; results in a **bottom sheet**; row deep-links to detail; iPad → existing master-detail. RED: `tests/locate-search.test.tsx` (empty≠zero-results; result count announced `aria-live`; label not placeholder).
+
+- **T-22 (R-EQ-F1 · small-01 locate)** — three dispatchable cards, each ≤2 files + 1 test (read-only feature: no schema/migration/audit/telemetry per spec §2.5):
+  - **T-22a · backend** — read-only `GET /api/equipment/locate?q=` composing `server/domain/equipment/evidence/resolver/{location,custodian}.ts` → `{ location, custodian, readiness }`; `clinicId`-scoped; rate-limit under the scan/action limiter; register in `server/app/routes.ts`. RED: `tests/equipment-locate-route.test.ts` (seeded device → correct room+custodian; cross-clinic returns nothing).
+  - **T-22b · client wiring** — `src/lib/api.ts` fn + `src/types/` type. RED: type-check + `tests/api-locate.test.ts`.
+  - **T-22c · UI** — bottom-anchored / gesture-summoned search; results in a **bottom sheet**; row deep-links to detail; iPad → existing master-detail. RED: `tests/locate-search.test.tsx` (empty≠zero-results; result count announced `aria-live`; label not placeholder).
 - **T-23 (R-EQ-F2 · small-02 readiness badge):**
-  - **a)** expose the already-derived readiness tier (`equipment-readiness-rules.service.ts`) as an additive read field. RED: `tests/equipment-readiness-field.test.ts`.
-  - **b)** one shared **6-status-token → 3-tier bucket helper** (`src/lib/equipment-readiness-tier.ts`), and **fix the English-fallback i18n leak** in `src/components/ui/status-badge.tsx` (`stale/unknown/info/neutral` → `t.status.*`). RED: `tests/readiness-tier-bucket.test.ts` + `tests/status-badge-i18n.test.tsx`.
-  - **c)** drop `<ReadinessBadge>` (shape+glyph+text) into list/detail/home/board/locate. RED: `tests/readiness-badge.test.tsx` (tier contrast ≥3:1 both themes asserted via token check; screen-reader label present).
-- **T-24 (R-EQ-F3 · small-04 damaged-at-check-in):**
-  - **a) schema** — `vt_damage_events` (`clinicId, equipmentId, reportedBy, at, note, resolvedAt`) + optional `conditionStatus` on equipment; `npx drizzle-kit generate` → commit SQL. RED: `tests/migrations/damage-events.test.ts` (DB-integration).
-  - **b) backend + audit** — route (write event + set condition) + `src/lib/api.ts` fn + `src/types/` + new `AuditActionType`. RED: `tests/damage-report-route.test.ts`.
-  - **c) UI** — "returned damaged" as a **third choice inside `ReturnPlugDialog`** (convert the phone presentation dialog → bottom sheet); **undo** via the existing `UNDO_WINDOW_MS` toast + `haptics.warning()`. RED: `tests/return-damaged.test.tsx`.
-  - **d)** device then reads not-ready via readiness rules. RED: assert in `tests/damage-report-route.test.ts`.
+  - **T-23a** — expose the already-derived readiness tier (`equipment-readiness-rules.service.ts`) as an additive read field. RED: `tests/equipment-readiness-field.test.ts`.
+  - **T-23b** — one shared **6-status-token → 3-tier bucket helper** (`src/lib/equipment-readiness-tier.ts`), and **fix the English-fallback i18n leak** in `src/components/ui/status-badge.tsx` (`stale/unknown/info/neutral` → `t.status.*`). RED: `tests/readiness-tier-bucket.test.ts` + `tests/status-badge-i18n.test.tsx`.
+  - **T-23c** — drop `<ReadinessBadge>` (shape+glyph+text) into list/detail/home/board/locate. RED: `tests/readiness-badge.test.tsx` (tier contrast ≥3:1 both themes asserted via token check; screen-reader label present).
+- **T-24 (R-EQ-F3 · small-04 damaged-at-check-in)** — four dispatchable cards, each ≤2 files + 1 test (net-new-data feature: full checklist per spec §2.5):
+  - **T-24a · schema** — `vt_damage_events` (`clinicId, equipmentId, reportedBy, at, note, resolvedAt`) + optional `conditionStatus` on equipment; `npx drizzle-kit generate` → commit SQL. RED: `tests/migrations/damage-events.test.ts` (DB-integration).
+  - **T-24b · backend + audit** — route (write event + set condition) + `src/lib/api.ts` fn + `src/types/` + new `AuditActionType`. RED: `tests/damage-report-route.test.ts`.
+  - **T-24c · UI** — "returned damaged" as a **third choice inside `ReturnPlugDialog`** (convert the phone presentation dialog → bottom sheet); **undo** via the existing `UNDO_WINDOW_MS` toast + `haptics.warning()`. RED: `tests/return-damaged.test.tsx`.
+  - **T-24d** — device then reads not-ready via readiness rules. RED: assert in `tests/damage-report-route.test.ts`.
 
 ---
 
 ## Phase 1 — Shift / Home bundle
-- **T-25 (R-SH-01 · CLICK-PATH-007):** `src/features/shift-chat/hooks/useShiftChat.ts:132` — reactions/acks never render live (invalidate-only over a strict-`gt` poll + append-only accumulator). **GREEN:** patch local state optimistically (or on success) / reset `afterRef` + merge-by-id. **Guardrail:** no new realtime path. **RED:** `tests/shift-chat-live-reaction.test.tsx`.
+
+- **T-25 (R-SH-01 · CLICK-PATH-007):** `src/features/shift-chat/hooks/useShiftChat.ts:132` — reactions/acks never render live (invalidate-only over a strict-`gt` poll + append-only accumulator). **GREEN:** on react/ack success, patch the affected message in local state **by id (merge-by-id)** so the open panel reflects it without a strict-`gt` refetch. **Guardrail:** no new realtime path. **RED:** `tests/shift-chat-live-reaction.test.tsx`. **Tier: S +R** (subtle poll/accumulator reconcile — review before commit).
 - **T-26 (R-SH-02 · CLICK-PATH-017):** `useShiftChat.ts:80` — open→close unread badge counts the just-read batch. **GREEN:** advance `lastOpenRef` on close / skip the transition edge. **RED:** `tests/shift-chat-unread-badge.test.tsx`.
 - **T-27 (R-SH-F2 · small-05 start-of-shift card):** compose existing `src/features/today/surfaces/{Floor,Ops,Vet,Tech,Student}HomeSurface.tsx` + `OnShiftHero.tsx` into one focal "what needs me now" + one primary action, gated by the capability union; phone compact / iPad hero band. **RED:** `tests/start-of-shift-card.test.tsx` (per-role composition differs; off-shift idle variant; RTL).
 - **R-SH-F1 (medium-02 handover)** → **SUB-SPEC**, see `subspecs/R-SH-F1-shift-handover.plan.md` (superset + Priza). Not a card here.
 
 ## Phase 1 — Inventory bundle
-- **T-28 (R-IN-01 · CLICK-PATH-018):** `src/pages/inventory-items.tsx:124` — create dialog drops `isBillable`/`minimumDispenseToCapture`. **GREEN:** add to POST body + `api.inventoryItems.create` type + route (or hide the controls in create mode). **RED:** `tests/inventory-create-fields.test.tsx`.
-- **T-29 (R-IN-02 · CLICK-PATH-019):** `src/pages/inventory-page.tsx:448` — restock +/- burst desyncs (absolute qty, no per-row disable). **GREEN:** serialize per-row (disable while pending) or drop stale responses. **RED:** `tests/inventory-restock-burst.test.tsx`.
+
+- **T-28 (R-IN-01 · CLICK-PATH-018):** `src/pages/inventory-items.tsx:124` — create dialog drops `isBillable`/`minimumDispenseToCapture`. **GREEN:** add the fields to the POST body + `api.inventoryItems.create` type + route (decision: persist them, not hide the controls). **RED:** `tests/inventory-create-fields.test.tsx`.
+- **T-29 (R-IN-02 · CLICK-PATH-019):** `src/pages/inventory-page.tsx:448` — restock +/- burst desyncs (absolute qty, no per-row disable). **GREEN:** serialize per-row — disable the +/- controls while a scanLine mutation is pending. **RED:** `tests/inventory-restock-burst.test.tsx`.
 - **T-30 (R-IN-F1 · small-03 nudge):** route existing `expiryCheckWorker` + `restock.service` output to a dismissible home-surface nudge for the relevant role (+ optional push); bounded-enum telemetry if counters added; no new realtime path. **RED:** `tests/expiry-lowstock-nudge.test.tsx` (correct role only; dismiss persists; push once per event).
 
 ## Phase 1 — Web platform admin-gate
-- **T-31 (R-WEB-01 · SUB-SPEC small):** `src/app/platform/PlatformRouter.tsx` desktop branch (L27 passthrough) — add a guard **inside `AuthGuard`**: if `target === "desktop" && !experience.can("management.web")` → render a `WebOnlyGuard`-style denial ("this workspace is for management — open VetTrack on your device"). Threshold = `can("management.web")` (admin + leads). **Do NOT touch `resolvePlatformTarget()`'s synchronous contract.** `/board` untouched. **RED:** `tests/web-platform-management-gate.test.tsx` (`vet_tech`@desktop → denial; `admin` + `lead` → passthrough). **Verify:** `pnpm test -- tests/web-platform-management-gate.test.tsx && pnpm typecheck`.
+
+- **T-31 (R-WEB-01 · SUB-SPEC small):** `src/app/platform/PlatformRouter.tsx` desktop branch (L27 passthrough) — add a guard **inside `AuthGuard`**: if `target === "desktop" && !experience.can("management.web")` → render a `WebOnlyGuard`-style denial ("this workspace is for management — open VetTrack on your device"). Threshold = `can("management.web")` — grant = **admin + `senior_technician` + `lead_technician` + secondary-admin** (not the lossy "admin + leads"). **Do NOT touch `resolvePlatformTarget()`'s synchronous contract.** `/board` untouched. **RED:** `tests/web-platform-management-gate.test.tsx` (`vet_tech`@desktop → denial; `admin` + `lead` → passthrough). **Verify:** `pnpm test -- tests/web-platform-management-gate.test.tsx && pnpm typecheck`. **Tier: S +R** (platform-routing seam — review before commit).
 
 ---
 
 ## Definition of done (Phase 0 + 1)
-- Every card's RED test written first, then GREEN; `pnpm typecheck` clean.
+
+- **Code cards (all except 0B):** RED test written first, then GREEN; `pnpm typecheck` clean.
+- **0B is different — do not apply RED→GREEN to it.** T-06–T-15 are **binary config/account/build checks** and T-16 is an **on-device drill**; their "done" is the pass/fail verification stated on each card (e.g. "reviewer starts+ends a Code Blue with no 403", "SIWA round-trips on device"), not a unit test.
 - Phase 0 exit drill (T-16) passes on device.
 - `pnpm i18n:check` green for every new string; no hardcoded copy in `.ts/.tsx`.
 - Cross-cutting a11y gates (spec §9) satisfied for touched surfaces (focus/dismiss on sheets, ≥44pt, non-color status, RTL/bidi).

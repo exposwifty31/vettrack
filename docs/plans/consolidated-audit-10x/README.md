@@ -38,3 +38,20 @@ See spec §3 for the authoritative table. In brief: **P0** stabilize + ship-read
 ## How to execute a plan
 
 Each card: **RED** (write the failing test) → **GREEN** (minimal impl) → **verify** (`pnpm test -- <file> && pnpm typecheck`). Log evidence in `docs/audit/PROOF_ALIGNMENT_LOG.md` before marking a requirement done. Commit per requirement; new commits only.
+
+## Execution driver — per-card model routing
+
+Each card carries a **Tier** that selects the model for the **subagent** that executes it. The main-loop model is irrelevant: a card is dispatched to a subagent at its Tier (`Agent(prompt, { model: <tier> })`), so a cheap main loop can still route a frozen card to Opus. (A `fork` can't — it inherits the parent model — so use a fresh subagent, not a fork.)
+
+**Tier legend**
+- **S** — Sonnet. Default for localized, well-anchored fix/feature cards.
+- **S +R** — Sonnet, but a `code-reviewer` pass (and, for realtime/PWA cards, the browser drill) **before commit**. Frozen-but-localized cards.
+- **O +R** — Opus + the `code-reviewer` gate (+ drill). Frozen-subtle cards and **every `⚠ SUB-SPEC` doc**.
+- **Owner** — executed by the owner (account/build/device/hardware), not a model choice (e.g. the 0B submission gate).
+
+**Deterministic routing rule** (a dispatcher applies these in order):
+1. Card has an inline `Tier: …` tag → use it.
+2. Else card is `⚠ FROZEN` or lives in a `⚠ SUB-SPEC` doc → **O +R**.
+3. Else → **S** (the doc default).
+
+**Per card:** dispatch to a subagent at its Tier → RED→GREEN→verify → for any `+R`, run the `code-reviewer` gate (+ browser drill for realtime/PWA) → only then commit → log to the proof log. A frozen card never skips the drill regardless of model.

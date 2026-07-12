@@ -18,7 +18,7 @@
   3. Single-clinic value is proven (the Do-Now/Do-Next features shipped).
 - **Reuse anchors (verify at authoring):** multi-tenant `clinicId` + `vt_clinics`; `server/services/equipment-custody-toggle.service.ts` (a transfer is a custody re-home, not a new concept); `server/integrations/` (cross-boundary patterns).
 - **New surfaces (sketch):** `vt_clinic_groups`, `vt_clinic_group_members`, `vt_equipment_transfers`; a network panel in the web console + mobile request/accept; new `AuditActionType`s for transfer request/accept/reject.
-- **Non-negotiable acceptance bar (the sub-spec must lead with this):** a **negative test** — a clinic **not** in a group can never read another clinic's rows via any network endpoint. Every network query goes through an explicit group-membership check; benchmarks enforce **k-anonymity** server-side (suppress below N peers); no raw peer rows ever returned. Security-reviewer sign-off before merge.
+- **Non-negotiable acceptance bar (the sub-spec must lead with this):** a **negative test** — a clinic **not** in a group can never read another clinic's rows via any network endpoint. Every network read/write must apply **BOTH** (a) an explicit **group-membership check** AND (b) an explicit **target-table `clinicId` filter** constraining rows to the specific clinic set that group grants — **group membership alone does not satisfy tenant isolation; the query must still be `clinicId`-scoped.** Benchmarks enforce **k-anonymity** server-side (suppress below N peers); no raw peer rows ever returned. Security-reviewer sign-off before merge.
 
 ---
 
@@ -37,4 +37,7 @@
 ---
 
 ## When a blocker clears
+
 Author the item's sub-spec at `subspecs/<id>-*.plan.md` following the SDD+TDD+Sonnet contract (spec §2), update the index README status, and — for massive-03 — do the security design pass **first**, as a separate deliverable, before any implementation cards.
+
+**Tier (when built):** every card here is **Tier: O +R** (Opus + `code-reviewer` gate). **massive-03 additionally requires a `security-reviewer` gate on every network card** — cross-tenant is the highest-risk surface in the product.

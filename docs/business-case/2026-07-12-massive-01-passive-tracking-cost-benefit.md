@@ -75,6 +75,8 @@ Passive tracking makes "where is X / who has X" **correct without anyone scannin
 | 4 | **Rental reduction** | Up to **80%** rental cut in documented deployments (one hospital: $32,594 in yr 1) | current rental spend × reduction |
 | 5 | **Soft** | +50% staff satisfaction; faster Code-Blue equipment retrieval (safety) | not dollarized; real for retention/care |
 
+> **Sourcing:** each figure above is an *indicative proxy* from the studies/vendors named inline and consolidated in **§8 Sources** (US hospital/nursing data, scaled directionally to a vet clinic) — planning ranges, not per-figure quotes. Validate against the clinic's own logs (§6) before presenting any figure as firm.
+
 ### Illustrative benefit calc (conservative — replace with real inputs)
 
 > Assumes **10 clinical staff**, 1 shift/day each, **25 min/shift** searching, **40%** reduction, **$25/hr** loaded wage; plus **3 lost items/yr** avoided at **$2,000** each.
@@ -89,7 +91,7 @@ Passive tracking makes "where is X / who has X" **correct without anyone scannin
 
 Using the RFID-gate scenario (lower TCO) at a **mid-range one-time ~$20k** and **~$6k/yr** operating, against the **~$21k/yr** illustrative benefit above:
 
-- **Year 1 net:** ~$21k − ~$6k − ~$20k = **−$5k** (payback in ~**14 months**)
+- **Year 1 net:** ~$21k − ~$6k − ~$20k = **−$5k**; the remaining $5k is recovered ~4 months into year 2 → **payback ≈ 16 months** ($20k initial ÷ $15k/yr net)
 - **Year 2+ net:** ~$21k − ~$6k = **~$15k/yr** positive
 
 > This is a *worked illustration to show the shape of the ROI*, not a promise. The real payback hinges entirely on the §6 inputs — especially your true loss-incident rate and staff count. If the clinic's actual loss/search numbers are lower than these proxies, payback lengthens; if it rents specialty equipment or loses higher-value assets, payback shortens.
