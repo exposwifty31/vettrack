@@ -58,6 +58,10 @@ export function LocateSearch() {
   function close() {
     setOpen(false);
     setQuery("");
+    // Also clear the debounced value — otherwise reopening within
+    // SEARCH_DEBOUNCE_MS reuses the prior debouncedQuery and stale results
+    // can appear beneath an empty input.
+    setDebouncedQuery("");
   }
 
   function goToEquipment(equipmentId: string) {

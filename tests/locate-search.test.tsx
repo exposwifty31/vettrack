@@ -116,6 +116,30 @@ describe("LocateSearch", () => {
     vi.useRealTimers();
   });
 
+  it("clears the debounced search term when the sheet closes, so reopening doesn't show stale results under an empty input", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    locateMock.mockResolvedValue({ query: "pump", results: [resultRow()] });
+    renderLocateSearch();
+    openSheet();
+
+    fireEvent.change(screen.getByLabelText(t.locateSearch.label), { target: { value: "pump" } });
+    await vi.advanceTimersByTimeAsync(300);
+    await vi.waitFor(() => expect(screen.getByText("Infusion Pump")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    openSheet();
+
+    // Reopening reuses the same component instance (no unmount) — the
+    // debounced term must already be cleared synchronously by close(), not
+    // just the immediate `query` state, or the prior "pump" results would
+    // reappear beneath the now-empty input.
+    expect((screen.getByLabelText(t.locateSearch.label) as HTMLInputElement).value).toBe("");
+    expect(screen.queryByText("Infusion Pump")).toBeNull();
+    expect(screen.getByText(t.locateSearch.emptyPrompt)).toBeTruthy();
+
+    vi.useRealTimers();
+  });
+
   it("shows a loading indicator while a search request is in flight", async () => {
     let resolveLocate!: (value: { query: string; results: unknown[] }) => void;
     locateMock.mockReturnValue(
