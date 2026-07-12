@@ -58,7 +58,7 @@ Passive tracking makes **"where did it last pass / did it leave" (RFID-gate) —
 |---|---|---|
 | Software / SaaS | middleware **$1k–5k/yr** (basic) | **$6k–30k/yr** (250 × $2–10/device/mo) |
 | Maintenance (15–25% of **installed project cost**) | **~$2k–9k/yr** | ~$1k–5k/yr |
-| Battery / tag replacement | negligible (passive) | ~$750 every 3–5 yr |
+| Battery / tag replacement | negligible (passive) | ~$750 every 3–5 yr (**excluded from the annual subtotal below — amortized in multi-year TCO/payback at ≈$150–250/yr**) |
 | **Annual subtotal** | **~$3k–14k/yr** | **~$7k–35k/yr** |
 
 **Cost levers that move these most:** (1) **# of chokepoints vs rooms** (readers are the big line — fewer doors = far cheaper RFID); (2) **existing WiFi/PoE** — BLE-capable access points can slash gateway install; (3) **live-location requirement** — the single biggest swing.

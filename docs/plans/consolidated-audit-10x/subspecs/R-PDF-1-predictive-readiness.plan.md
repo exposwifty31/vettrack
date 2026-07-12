@@ -45,6 +45,7 @@ Read-mostly (no new transport) · bounded-enum telemetry if counters added · `c
 - Explainability panel lists source rows for each warning (redacted DTO).
 - No-shortfall clinic shows the calm empty state.
 - **Cross-clinic negative:** seed equivalent rows for **two** clinics; assert demand, supply, shortfalls, and explainability include **only the requested clinic's target-table rows** (every read filters the target table by `clinicId`). Applies to the demand (R-PDF-1.1), supply (R-PDF-1.2), and shortfall (R-PDF-1.3) tests, not only the panel.
+- **Commands:** `npx tsc --noEmit` + `pnpm typecheck` + `pnpm test` + the four RED suites — `tests/readiness-forecast-demand.test.ts`, `tests/readiness-forecast-supply.test.ts`, `tests/readiness-forecast-shortfall.test.ts`, `tests/readiness-forecast-panel.test.ts` — all green before the task is done.
 
 ## Resolved (were open decisions — now pinned)
 

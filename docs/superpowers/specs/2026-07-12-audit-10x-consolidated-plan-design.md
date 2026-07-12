@@ -43,7 +43,7 @@ Owner-selected framing:
 ### 2.3 Sonnet-sized task contract (the important one)
 
 Because the executing agent reasons less, every task card produced from this spec MUST:
-1. Touch **≤ 2 files** for the change + **1 test file** (larger requirements are split until they fit).
+1. Touch **≤ 2 files** for the change + **1 test file** (larger requirements are split until they fit). **Exception — a *mechanical mount fan-out*** (mounting one already-built component at N call sites: a ≤2-line import+render per site, no logic) **is a single recognized card** whose ≤2-file bound applies to **implementation-logic files**, not the trivial per-site mounts; it must still name every site + one test asserting the mount on each. This is the ONLY multi-file exemption.
 2. Cite **exact anchors** — `file:line` + symbol names. No "find the relevant code."
 3. Carry **all context inline** — the defect, the fix direction, and the frozen-surface guardrails — so the card is understandable without reading other cards.
 4. Contain **zero open decisions** — every choice is pre-made here. If a task would require judgment, it is under-specified and must be refined before dispatch.
@@ -192,13 +192,13 @@ Finding accounting: 6 HIGH (P0) · 8 MED (P1) + 13 MED (P2) = 21 MED · 9 LOW (P
 
 ### 5.4 Web platform admin-gating (NEW work-stream — from this session's investigation)
 
-- **R-WEB-01 — desktop web is restricted to the management tier** `⚠ SUB-SPEC` (small).
+- **R-WEB-01 — desktop web is restricted to the management tier** — a localized **`S +R`** card (dispatched as T-31; a single-file `PlatformRouter` guard, **not** a `⚠ SUB-SPEC` doc).
   - **Anchors:** `src/app/platform/PlatformRouter.tsx:16-28` (desktop branch passthrough L27); `src/desktop/management/ManagementGuard.tsx:17-27` (`can("management.web")` precedent); `src/app/platform/guards/WebOnlyGuard.tsx:22-58` (denial-screen precedent); `src/hooks/use-experience.ts` (`can()`); `src/lib/roles/experience-model.ts` (`management.web` grant: admin + `senior_technician`/`lead_technician` + secondary-admin).
   - **Defect:** `resolvePlatformTarget()` is role-blind; non-management roles resolve `desktop` and get a desktop-chromed **mobile-shaped** content tree (role-forked `FloorHomeSurface`), which is the reported "iPhone+iPad on web."
   - **Decisions (owner-confirmed):** threshold = **`can("management.web")`** — the precise capability grant is **admin + `senior_technician` + `lead_technician` + secondary-admin** (do **not** collapse it to the lossy "admin + leads", which drops secondary-admin), NOT literal `role==="admin"`. Behavior for non-eligible on desktop = **"use the app" denial screen** (no in-browser mobile fallback).
   - **Fix direction (surgical):** add a guard in the `PlatformRouter` **desktop branch**, mounted **inside `AuthGuard`** (role isn't known pre-auth): if `target === "desktop" && !experience.can("management.web")` → render a `WebOnlyGuard`-style dark full-screen denial ("this workspace is for management — open VetTrack on your device" + CTA). **Do NOT modify `resolvePlatformTarget()`'s synchronous/auth-independent contract.** `/board` (separate target) untouched.
   - **RED test:** `tests/web-platform-management-gate.test.tsx` — render `PlatformRouter` at `target=desktop` for a `vet_tech` (no `management.web`) → assert the denial screen, not app content; for an `admin` and a `lead` → assert normal passthrough. Fails on current code.
-  - **Verify:** `pnpm test -- tests/web-platform-management-gate.test.tsx && pnpm typecheck`. Marked `⚠ SUB-SPEC` only because it touches the platform-routing seam — small, but the seam warrants its own reviewed card.
+  - **Verify:** `pnpm test -- tests/web-platform-management-gate.test.tsx && pnpm typecheck`. Classified **`S +R`** (dispatched as T-31): a single-file `PlatformRouter` guard — not a `⚠ SUB-SPEC` doc — but the platform-routing seam still gets the `code-reviewer` gate before commit.
 
 ---
 
