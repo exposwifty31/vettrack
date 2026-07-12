@@ -181,6 +181,11 @@ function EquipmentDetailPageDesktop() {
   const undoStateRef = useRef<UndoState | null>(null);
   const [undoCountdown, setUndoCountdown] = useState(0);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // T-24d (R-EQ-F3) — "returned damaged" undo. There is no revert/cancel
+  // endpoint for damage events server-side, so the only safe "undo" is
+  // deferring the actual `reportDamage` call behind the undo window instead
+  // of firing then reverting.
+  const damagedReportTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [editingFloorNote, setEditingFloorNote] = useState(false);
   const [floorNoteText, setFloorNoteText] = useState("");
@@ -676,6 +681,51 @@ function EquipmentDetailPageDesktop() {
     setIsPluggedIn(values.isPluggedIn);
     setPlugInDeadlineMinutes(values.plugInDeadlineMinutes);
     returnMut.mutate(values);
+  }
+
+  // T-24d (R-EQ-F3) — "returned damaged" undo. `reportDamage` has no
+  // revert/cancel endpoint, so canceling within the window must mean the
+  // request never went out at all: defer the call behind the same
+  // UNDO_WINDOW_MS toast pattern used above, and only fire it once the
+  // window elapses without the user hitting Undo.
+  function cancelDamagedReport() {
+    if (damagedReportTimeoutRef.current) {
+      clearTimeout(damagedReportTimeoutRef.current);
+      damagedReportTimeoutRef.current = null;
+    }
+  }
+
+  function startDamagedReportUndo() {
+    cancelDamagedReport();
+    haptics.warning();
+
+    const toastId = `damage-undo-${Date.now()}`;
+    toast("Returned damaged", {
+      id: toastId,
+      duration: UNDO_WINDOW_MS,
+      onDismiss: () => cancelDamagedReport(),
+      action: {
+        label: "Undo",
+        onClick: () => {
+          cancelDamagedReport();
+          toast.dismiss(toastId);
+        },
+      },
+    });
+
+    damagedReportTimeoutRef.current = setTimeout(() => {
+      damagedReportTimeoutRef.current = null;
+      toast.dismiss(toastId);
+      if (!id) return;
+      api.equipment
+        .reportDamage({ equipmentId: id })
+        .then(() => {
+          invalidateAll();
+        })
+        .catch(() => {
+          toast.error("Could not report damage");
+        });
+    }, UNDO_WINDOW_MS);
   }
 
   const deleteMut = useMutation({
@@ -1418,10 +1468,16 @@ function EquipmentDetailPageDesktop() {
         onOpenChange={setReturnDialogOpen}
         equipmentName={equipmentDisplayName}
         isSubmitting={returnMut.isPending}
-        onConfirm={({ isPluggedIn: nextPluggedIn, plugInDeadlineMinutes: nextDeadline }) => {
+        allowDamagedReport
+        onConfirm={(values) => {
+          if (values.damaged) {
+            setReturnDialogOpen(false);
+            startDamagedReportUndo();
+            return;
+          }
           returnMut.mutate({
-            isPluggedIn: nextPluggedIn,
-            plugInDeadlineMinutes: nextDeadline ?? 30,
+            isPluggedIn: values.isPluggedIn,
+            plugInDeadlineMinutes: values.plugInDeadlineMinutes ?? 30,
           });
         }}
       />
