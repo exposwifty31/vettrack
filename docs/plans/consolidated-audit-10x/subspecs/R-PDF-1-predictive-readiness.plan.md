@@ -19,7 +19,7 @@ Read-mostly (no new transport) · bounded-enum telemetry if counters added · `c
 
 ### R-PDF-1.1 · Demand model behind a single interface (inference-first)
 
-- **Goal:** `DemandSource` interface with a v1 **historical-inference** implementation: from `vt_appointments` (scheduled procedures) + trailing usage, derive required equipment/consumables. Template implementation is a *later* impl of the same interface.
+- **Goal:** `DemandSource` interface with a v1 implementation returning **schedule-only demand** — required equipment/consumables from `vt_appointments` (scheduled procedures). **Burn rate is a SEPARATE input to the shortfall equation (R-PDF-1.3), NOT folded into demand** — so `burnRate × horizon` is counted exactly once and historical consumption is never double-counted. Template implementation is a *later* impl of the same interface.
 - **RED:** `tests/readiness-forecast-demand.test.ts` — seeded schedule + usage history → the inferred demand set; swapping in a stub template impl through the same interface yields the same shape (interface contract test).
 - **Guardrail:** v1 adds **no table, column, or mapping schema** — existing fields/configuration only; no per-procedure template authoring; the interface must not leak an inference-only assumption. (Templates = a later impl of the same interface, with their own schema scope.)
 - **Verify:** `pnpm test -- tests/readiness-forecast-demand.test.ts && pnpm typecheck`.

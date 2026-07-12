@@ -26,19 +26,19 @@
 ### R-SH-F1.1 · Schema (`vt_shift_handover`) shaped for Priza
 
 - **Goal:** `vt_shift_handover` (`clinicId, shiftSessionId, deltas (4 types), openItems[], observedSignals, patientWorklist, acknowledgedBy, generatedAt, acknowledgedAt`). **`patientWorklist` is a discriminated, PMS-agnostic union — NOT a bare nullable:** `{ state: 'not_configured' } | { state: 'ready', entries: [{ externalId, display, byTechId }] } | { state: 'error', code }` — **`code` is a closed enum of safe error codes** (`unreachable | auth_failed | timeout | malformed | unknown`), **never a raw PMS message, identifier, URL, or credential** — so a PMS failure can **never** be serialized or read as an empty/ready worklist, and upstream failure detail never leaks into the artifact. External ids + display only — no FKs to removed internal tables. Migrate; new `AuditActionType` for generate + acknowledge.
-- **RED:** `tests/migrations/shift-handover.test.ts` (DB-integration) + a type test that `patientWorklist` is the **discriminated union** (external PMS ids, not internal FKs) and that the **`error` state is distinguishable from `not_configured` and from a `ready` empty list** — an error can never collapse to "empty".
+- **RED:** `tests/migrations/shift-handover.test.ts` (DB-integration) + a type test that `patientWorklist` is the **discriminated union** (external PMS ids, not internal FKs) and that the **`error` state is distinguishable from `not_configured` and from a `ready` empty list** — an error can never collapse to "empty". **+ a runtime serializer/schema (zod) test that rejects an unknown `error.code` and strips any unsafe adapter message BEFORE persistence** — a TS type alone can't stop a raw PMS string being written.
 - **Verify:** DB-integration runner + `pnpm typecheck`.
 
 ### R-SH-F1.2 · Delta generator (all 4 types) at shift end
 
 - **Goal:** a generator that runs at shift end aggregating the shift-window deltas from `vt_audit_logs` + `vt_event_outbox` into a compact artifact + open-items list. **Idempotent per `shiftSessionId`** — a re-run yields the same artifact with **no duplicate deltas**; every delta is scoped to the shift window `[start, end)`.
-- **RED:** `tests/shift-handover-generator.test.ts` — a seeded shift with a known set of custody/task/alert/dispense mutations → the handover lists **exactly** those deltas + open items; **re-running the generator for the same `shiftSessionId` yields an identical artifact (no duplicates)**; deltas outside `[start, end)` are excluded; **cross-clinic negative — same-looking events seeded for another clinic are excluded (the target-table `clinicId` predicate holds on every read)**.
+- **RED:** `tests/shift-handover-generator.test.ts` — a seeded shift with a known set of custody/task/alert/dispense mutations → the handover lists **exactly** those deltas + open items; **re-running the generator for the same `shiftSessionId` yields an identical artifact (no duplicates)**; deltas outside `[start, end)` are excluded; **cross-clinic negative — same-looking events seeded for another clinic are excluded (the target-table `clinicId` predicate holds on every read)**. **A retry returns the PERSISTED snapshot (identical, `generatedAt` unchanged); an intentional regeneration creates a NEW revision preserving the prior artifact** — identity holds via the persisted snapshot, never by re-pulling Priza.
 - **Guardrail:** read from existing audit/outbox; no new realtime path.
 
 ### R-SH-F1.3 · App-observed signals
 
 - **Goal:** add system-derived observations (custody/scan/readiness/alert events attributable to the shift window) beyond manually-logged actions.
-- **RED:** `tests/shift-handover-observed.test.ts` — seeded system events in the window appear as observed signals; events outside the window excluded.
+- **RED:** `tests/shift-handover-observed.test.ts` — seeded system events in the window appear as observed signals; events outside the window excluded; **cross-clinic negative — a same-looking observed event from another clinic is excluded (observed signals have a separate read path; assert the `clinicId` predicate there too)**.
 
 ### R-SH-F1.4 · Patient/animal worklist via the Priza PMS seam
 

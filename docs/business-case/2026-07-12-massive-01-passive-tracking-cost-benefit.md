@@ -3,7 +3,7 @@
 - **Deliverable:** `R-M1-PRE` — prerequisite for **massive-01 (passive location & custody)** in the consolidated plan (`docs/superpowers/specs/2026-07-12-audit-10x-consolidated-plan-design.md`).
 - **Audience:** hospital manager (business-case, not a technical design).
 - **Date:** 2026-07-12
-- **Status:** Draft with **industry-benchmark numbers** + a **parameterized model**. The dollar figures below are *illustrative ranges* — replace the eight inputs in §6 with the clinic's real numbers to produce the final case.
+- **Status:** Draft with **industry-benchmark numbers** + a **parameterized model**. The dollar figures below are *illustrative ranges* — the final case needs **both** the clinic's eight §6 inputs **and** the §3/§8 cost-side assumptions (reader/gateway/tag pricing, installation, middleware, maintenance, SaaS) confirmed; §6 alone does not produce it.
 
 > **Read this first.** Nearly all published benefit data is from **human hospitals / nursing**, used here as a directional proxy for a veterinary clinic. Magnitudes must be scaled down for a single clinic; the *levers* (search-time, loss, over-purchasing) transfer, the *dollar amounts* must be validated locally. Vendor pricing is 2025–2026 and US-centric; RTLS vendors quote per-facility, so treat every table as a **planning range, not a quote**.
 
@@ -11,7 +11,7 @@
 
 ## 1. Executive summary
 
-Passive tracking makes "where is X / who has X" **correct without anyone scanning** — the data-quality foundation every other VetTrack feature (readiness, analytics, loss attribution, Code Blue cart location) depends on. The question for the hospital is not *whether* it helps but *whether the payback justifies the hardware spend*.
+Passive tracking makes **"where is X / where did it last go"** — location + egress evidence, **not "who has X"** (custody/custodian stays a separate, human-confirmed concern; a gate read identifies a *reader/room*, never a person) — **correct without anyone scanning** — the data-quality foundation every other VetTrack feature (readiness, analytics, loss attribution, Code Blue cart location) depends on. The question for the hospital is not *whether* it helps but *whether the payback justifies the hardware spend*.
 
 **The single decision that drives cost:** do we need **live room-level location** (BLE/RTLS) or just **"did it leave / which door did it last pass" (RFID-gate)**?
 
@@ -45,7 +45,7 @@ Passive tracking makes "where is X / who has X" **correct without anyone scannin
 
 | Line item | RFID-gate | BLE / RTLS |
 |---|---|---|
-| Tags (250) | $500–$1,250 (passive $2–5) | $2,500–$10,000 (beacon $10–40) |
+| Tags (250) | $500–$1,250 (equipment-grade on-metal passive **$2–5** — the §1 table's $0.10 floor is generic label stock, unusable on metal medical equipment, so the scenario excludes it) | $2,500–$10,000 (beacon $10–40) |
 | Readers / gateways | 5 readers × $1k–4k = **$5k–20k** | 10–15 gateways × $50–200 = **$0.5k–3k** |
 | Antennas | 10 × $100–250 = $1k–2.5k | (integrated) |
 | Handheld locator (optional) | $1.5k–3k | — |
@@ -129,4 +129,4 @@ Using the RFID-gate scenario (lower TCO) at a **mid-range one-time ~$20k** and *
 
 **Sources (indicative):** Nextwaves (2025), GPX (2026), Airpinpoint BLE & hospital guides (2026), CPCON RFID cost guide (2026), RMS Omega, KoronaPOS, RipplesIoT, Reelables (2025), AAFP, 24x7 Magazine (2024), GE HealthCare, AiRISTA Flow, Cognosos, CenTrak, Link Labs, TRIMEDX, Nursing Times/PubMed (2009), medRxiv ED-RTLS study (2023).
 
-> **Next step:** owner supplies the §6 inputs → this becomes the final numbers to bring to the hospital manager → on a go, massive-01 gets its technical spec-plan pass.
+> **Next step:** owner supplies the §6 inputs **and confirms the §3/§8 cost-side assumptions (reader/gateway/tag pricing, installation, middleware, maintenance, SaaS — these materially drive the totals and payback, and are NOT among the §6 eight inputs)** → this becomes the final numbers to bring to the hospital manager → on a go, massive-01 gets its technical spec-plan pass.

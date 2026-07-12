@@ -26,6 +26,6 @@
 
 ## Definition of done
 
-- Both cards RED→GREEN; **`pnpm typecheck` (frontend + server tsconfigs) + `pnpm test` green** (the repo-wide typecheck — `npx tsc --noEmit` alone misses the server tsconfig); the Code Blue Playwright drill passes.
+- Both cards RED→GREEN; **`pnpm typecheck` + `pnpm test` green** (`pnpm typecheck` runs `tsc --noEmit` on **both** the frontend and server tsconfigs — the repo-canonical equivalent of CLAUDE.md's `npx tsc --noEmit`, which alone misses the server tsconfig); the Code Blue Playwright drill passes.
 - These are **prerequisites for `R-CBF-1` (medium-01)** — that feature is gated behind both being GREEN.
 - Evidence logged in `docs/audit/PROOF_ALIGNMENT_LOG.md`.
