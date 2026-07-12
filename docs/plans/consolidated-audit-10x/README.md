@@ -50,10 +50,12 @@ Each card carries a **Tier** that selects the model for the **subagent** that ex
 - **O +R** — Opus + the `code-reviewer` gate (+ drill). Frozen-subtle cards and **every `⚠ SUB-SPEC` doc**.
 - **Owner** — executed by the owner (account/build/device/hardware), not a model choice (e.g. the 0B submission gate).
 
-**Deterministic routing rule** (a dispatcher applies these in order):
-1. Card has an inline `Tier: …` tag → use it.
-2. Else the card is `⚠ FROZEN` — **including any card under a `⚠ FROZEN`-tagged *section header*; the flag is inherited by every card in that section** — or lives in a `⚠ SUB-SPEC` doc → **O +R**.
-3. Else → **S** (the doc default).
+**Deterministic routing rule** (a dispatcher applies these in order — **protection is a floor the inline tag can raise but never lower**, so an inline `Tier: S` can never downgrade a protected card past its review gate):
+1. **Establish the protection floor first:** a `⚠ SUB-SPEC` doc → floor = **O +R**; a `⚠ FROZEN` card — **including any card under a `⚠ FROZEN`-tagged *section header*; the flag is inherited by every card in that section** — → floor = **S +R**; otherwise floor = **S**.
+2. If the card carries an inline `Tier: …` tag, the effective Tier = **the stronger of {inline tag, floor}** (`O +R` > `S +R` > `S`) — the tag may **raise** above the floor but **never lower below it**, so a frozen/sub-spec card can never resolve to plain `S`.
+3. No inline tag → use the floor.
+
+(This preserves an intentional frozen-but-localized `Tier: S +R` while closing the hole where an inline `Tier: S` on a protected card would skip the reviewer / browser-drill gate.)
 
 **Per card:** dispatch to a subagent at its Tier → RED→GREEN→verify → for any `+R`, run the `code-reviewer` gate (+ browser drill for realtime/PWA) → only then commit → log to the proof log. A frozen card never skips the drill regardless of model.
 
