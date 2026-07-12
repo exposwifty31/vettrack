@@ -627,11 +627,20 @@ export default function CodeBluePage() {
     );
   }
 
-  // A FAILED active-session check is not the same as a confirmed "no active
-  // session" — falling through to the launch form here would let staff open a
-  // duplicate/erroneous session while an existing one is unreachable, or miss
-  // re-entering a genuinely active one. Block on a retryable error state
-  // instead of assuming "none" (2026-07-10 QA audit caveat E-c follow-up).
+  // A confirmed active session always wins — render it even if a subsequent
+  // poll errored. An active Code Blue must stay visible through a transient
+  // blip; TanStack keeps status:'success'/isError:false while real data is
+  // held, so a genuinely active session is reached before the error guard.
+  if (session?.status === "active") {
+    return <ActiveSession />;
+  }
+
+  // With no active session to show, a FAILED active-session check is still not
+  // a confirmed "no active session" — falling through to the launch form here
+  // would let staff open a duplicate/erroneous session while an existing one is
+  // unreachable, or miss re-entering a genuinely active one. Block on a
+  // retryable error state instead of assuming "none" (2026-07-10 QA audit
+  // caveat E-c follow-up).
   if (sessionError) {
     return (
       <div
@@ -646,10 +655,6 @@ export default function CodeBluePage() {
         </Button>
       </div>
     );
-  }
-
-  if (session?.status === "active") {
-    return <ActiveSession />;
   }
 
   return (

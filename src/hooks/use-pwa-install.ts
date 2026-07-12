@@ -137,8 +137,14 @@ export function usePwaInstall(): PwaInstallState {
     try {
       // Store timestamp so we can re-show after IOS_DISMISS_TTL_MS (7 days).
       localStorage.setItem(IOS_DISMISSED_KEY, String(Date.now()));
-    } catch {
-      // storage unavailable — state still held in memory for this session
+    } catch (err) {
+      // Non-fatal — state still held in memory for this session, but a
+      // silently-failed write means the dismissal won't survive a remount
+      // (mirrors dismissAndroidBanner's warning-level capture).
+      Sentry.captureMessage("PWA install: localStorage write failed (iOS guidance)", {
+        level: "warning",
+        extra: { key: IOS_DISMISSED_KEY, error: String(err) },
+      });
     }
   }
 

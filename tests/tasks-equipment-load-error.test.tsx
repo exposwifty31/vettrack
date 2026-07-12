@@ -99,6 +99,9 @@ describe("Tasks — equipment query failure vs. genuinely empty (CodeRabbit)", (
 
     expect(await within(dialog).findByText(t.appointmentsPage.equipmentLoadFailed)).toBeTruthy();
     expect(within(dialog).getByText(t.errorCard.retry)).toBeTruthy();
+    // Negative: a failed fetch must NOT read as "no equipment registered" — the
+    // empty-clinic picker text must be absent from the dialog.
+    expect(within(dialog).queryByText(t.equipmentList.empty.message)).toBeNull();
   });
 
   it("retrying re-issues the equipment fetch", async () => {

@@ -116,6 +116,30 @@ function resolveRequestId(req: Request, res: Response): string {
   return randomUUID();
 }
 
+/**
+ * Shared eligibility check for a permanent-clinical-role fallback — used by BOTH
+ * the legacy-dispense fallback and the Code Blue emergency break-glass branches
+ * (each keeps its own opt-in flag, metric, and audit; only this predicate is
+ * shared). Eligible when the resolver granted no shift-derived clinical
+ * authority (`effectiveClinicalRole === null`, `EZSHIFT_NONE`) yet the account
+ * holds a non-student clinical role the route allows.
+ *
+ * STUDENT_NEVER_ELEVATED: students are excluded here (`clinicalRole !== "student"`),
+ * so neither fallback path can ever elevate a student.
+ */
+function isPermanentRoleFallbackEligible(
+  snapshot: AuthoritySnapshot,
+  allow: readonly ActiveShiftRole[],
+): boolean {
+  return (
+    snapshot.effectiveClinicalRole === null &&
+    snapshot.reason === "EZSHIFT_NONE" &&
+    snapshot.clinicalRole !== null &&
+    snapshot.clinicalRole !== "student" &&
+    allow.some((role) => role === snapshot.clinicalRole)
+  );
+}
+
 export function requireClinicalAuthority(
   opts: RequireClinicalAuthorityOptions,
 ): (req: Request, res: Response, next: NextFunction) => Promise<void> {
@@ -219,13 +243,7 @@ export function requireClinicalAuthority(
       opts.allowPermanentClinicalRoleFallbackForLegacyDispense === true;
 
     if (fallbackOpted) {
-      if (
-        snapshot.effectiveClinicalRole === null &&
-        snapshot.reason === "EZSHIFT_NONE" &&
-        snapshot.clinicalRole !== null &&
-        snapshot.clinicalRole !== "student" &&
-        opts.allow.some((role) => role === snapshot.clinicalRole)
-      ) {
+      if (isPermanentRoleFallbackEligible(snapshot, opts.allow)) {
         incrementMetric("authority_legacy_fallback_used");
         emitDispenseLegacyFallbackAudit({ req, snapshot });
         next();
@@ -242,13 +260,7 @@ export function requireClinicalAuthority(
       opts.allowPermanentClinicalRoleForEmergency === true;
 
     if (emergencyBreakGlassOpted) {
-      if (
-        snapshot.effectiveClinicalRole === null &&
-        snapshot.reason === "EZSHIFT_NONE" &&
-        snapshot.clinicalRole !== null &&
-        snapshot.clinicalRole !== "student" &&
-        opts.allow.some((role) => role === snapshot.clinicalRole)
-      ) {
+      if (isPermanentRoleFallbackEligible(snapshot, opts.allow)) {
         incrementMetric("authority_emergency_break_glass_used");
         emitCodeBlueBreakGlassAudit({ req, snapshot });
         next();

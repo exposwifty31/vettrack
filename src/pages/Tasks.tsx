@@ -1242,6 +1242,7 @@ export default function AppointmentsPage() {
         id={`${bookingFormId}-asset`}
         equipment={equipmentQuery.data ?? []}
         isLoading={equipmentQuery.isLoading}
+        hasError={equipmentQuery.isError}
         value={formDeviceRef}
         onChange={setFormDeviceRef}
         required

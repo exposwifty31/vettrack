@@ -843,26 +843,31 @@ router.post("/import", requireAuth, requireAdmin, uploadCsvFile, async (req, res
       const importId = randomUUID();
 
       if (doctorRows.length > 0) {
-        await db.insert(shiftImports).values({
-          id: importId,
-          clinicId,
-          importedBy: req.authUser!.id,
-          filename: req.file!.originalname,
-          rowCount: doctorRows.length,
-        });
-
-        await db.insert(doctorShifts).values(
-          doctorRows.map((r) => ({
-            id: randomUUID(),
+        // The import record and its shifts must commit or roll back together —
+        // a partial write would leave a shiftImports row with no doctorShifts
+        // (or vice-versa). Mirrors the /import/confirm doctor branch.
+        await db.transaction(async (tx) => {
+          await tx.insert(shiftImports).values({
+            id: importId,
             clinicId,
-            userId: r.userId,
-            date: r.date,
-            startTime: r.startTime,
-            endTime: r.endTime,
-            shiftName: r.shiftName,
-            operationalRole: r.operationalRole,
-          })),
-        );
+            importedBy: req.authUser!.id,
+            filename: req.file!.originalname,
+            rowCount: doctorRows.length,
+          });
+
+          await tx.insert(doctorShifts).values(
+            doctorRows.map((r) => ({
+              id: randomUUID(),
+              clinicId,
+              userId: r.userId,
+              date: r.date,
+              startTime: r.startTime,
+              endTime: r.endTime,
+              shiftName: r.shiftName,
+              operationalRole: r.operationalRole,
+            })),
+          );
+        });
       }
 
       logAudit({

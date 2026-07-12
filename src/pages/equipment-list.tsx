@@ -1009,7 +1009,7 @@ export function EquipmentItem({
   // `hasActiveShift` defaults to false while the shift query is still
   // resolving — without consuming `isLoading` too, a fresh page load would
   // briefly tell an on-shift tech they're off-shift before the query settles.
-  const { hasActiveShift, isLoading: shiftLoading } = useActiveShift();
+  const { hasActiveShift, isLoading: shiftLoading, isError: shiftError } = useActiveShift();
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
@@ -1075,7 +1075,12 @@ export function EquipmentItem({
     // Stay quiet (not a false "off-shift" error) while the shift query is
     // still resolving — the quick-action button is disabled for this window.
     if (shiftLoading) return;
-    if (!hasActiveShift) {
+    // If the shift query itself failed, don't infer "off-shift" from the
+    // missing `shift` — let the request reach the server, which enforces the
+    // authoritative roster gate and fails loud via `onError` for a real
+    // off-shift denial. Only a *successful* query that reports no active shift
+    // blocks client-side.
+    if (!shiftError && !hasActiveShift) {
       toast.error(t.scan.offShiftBody);
       return;
     }

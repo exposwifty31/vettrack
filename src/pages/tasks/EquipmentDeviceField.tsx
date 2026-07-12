@@ -13,6 +13,11 @@ type Props = {
   /** The clinic's equipment records — pass the shared `["/api/equipment"]` query result, don't fetch again here. */
   equipment: Equipment[];
   isLoading?: boolean;
+  /** The equipment query failed. An errored fetch yields an empty `equipment`
+   *  array that would otherwise read as a genuinely empty clinic — when true,
+   *  the picker is disabled so it never shows the "no equipment" empty state
+   *  (the caller surfaces a retry alert alongside it). */
+  hasError?: boolean;
   /** Selected `vt_equipment.id`, or "" when nothing is picked. */
   value: string;
   onChange: (equipmentId: string) => void;
@@ -32,11 +37,12 @@ function subtitle(eq: Equipment): string {
  * same match predicate the topbar equipment search uses, so there's no
  * parallel fetch and no divergent "what counts as a match" logic.
  */
-export function EquipmentDeviceField({ id, equipment, isLoading, value, onChange, required }: Props) {
+export function EquipmentDeviceField({ id, equipment, isLoading, hasError, value, onChange, required }: Props) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   const listId = useId();
 
   const selected = useMemo(() => equipment.find((eq) => eq.id === value) ?? null, [equipment, value]);
@@ -67,6 +73,15 @@ export function EquipmentDeviceField({ id, equipment, isLoading, value, onChange
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open]);
+
+  // Keep the keyboard-active option visible as ArrowUp/Down move it — the
+  // listbox scrolls on its own axis, and `aria-activedescendant` alone does not
+  // scroll the referenced option into view.
+  useEffect(() => {
+    if (!open || active < 0) return;
+    const activeEl = listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    activeEl?.scrollIntoView({ block: "nearest" });
+  }, [active, open]);
 
   // Keyboard focus never leaves the input (options aren't independently
   // tabbable — see the single-option-model note below), so a focusout whose
@@ -122,9 +137,10 @@ export function EquipmentDeviceField({ id, equipment, isLoading, value, onChange
         aria-activedescendant={activeOptionId}
         aria-required={required}
         required={required}
+        disabled={hasError}
         dir="auto"
         autoComplete="off"
-        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
         value={displayValue}
         placeholder={t.appointmentsPage.placeholderDevice}
         onFocus={() => {
@@ -143,6 +159,7 @@ export function EquipmentDeviceField({ id, equipment, isLoading, value, onChange
       />
       {open && (
         <ul
+          ref={listRef}
           id={listId}
           role="listbox"
           className="absolute top-full z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"

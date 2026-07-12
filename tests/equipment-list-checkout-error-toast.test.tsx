@@ -20,13 +20,14 @@ const toastSuccess = vi.fn();
 const checkoutMock = vi.fn();
 let hasActiveShift = true;
 let shiftLoading = false;
+let shiftError = false;
 
 vi.mock("sonner", () => ({
   toast: { error: (...a: unknown[]) => toastError(...a), success: (...a: unknown[]) => toastSuccess(...a) },
 }));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ userId: "u1", isAdmin: false }) }));
 vi.mock("@/hooks/use-active-shift", () => ({
-  useActiveShift: () => ({ hasActiveShift, isLoading: shiftLoading, nextShift: null }),
+  useActiveShift: () => ({ hasActiveShift, isLoading: shiftLoading, isError: shiftError, nextShift: null }),
 }));
 vi.mock("@/lib/haptics", () => ({ haptics: { tap: vi.fn(), error: vi.fn() } }));
 
@@ -73,6 +74,7 @@ describe("EquipmentItem (list row) — checkout error toast (T3 fail-loud)", () 
     vi.clearAllMocks();
     hasActiveShift = true;
     shiftLoading = false;
+    shiftError = false;
   });
   afterEach(() => cleanup());
 
@@ -83,6 +85,23 @@ describe("EquipmentItem (list row) — checkout error toast (T3 fail-loud)", () 
 
     expect(checkoutMock).not.toHaveBeenCalled();
     expect(toastError).toHaveBeenCalledWith(t.scan.offShiftBody);
+  });
+
+  it("shift-query error: checkout reaches the server (not a false off-shift block)", async () => {
+    // A FAILED shift read (not a resolved off-shift) must not block client-side —
+    // the request goes to the server, the authoritative roster gate.
+    hasActiveShift = false;
+    shiftError = true;
+    checkoutMock.mockResolvedValueOnce({
+      equipment: { ...baseEquipment, checkedOutById: "u1" },
+      undoToken: "tok-1",
+    });
+
+    renderItem();
+    fireEvent.click(screen.getByTestId("quick-action-eq-1"));
+
+    await waitFor(() => expect(checkoutMock).toHaveBeenCalledTimes(1));
+    expect(toastError).not.toHaveBeenCalledWith(t.scan.offShiftBody);
   });
 
   it("surfaces the server's actual reason on a rejected checkout (400)", async () => {
@@ -143,6 +162,7 @@ describe("EquipmentItem (list row) — shift-loading gate", () => {
     vi.clearAllMocks();
     hasActiveShift = true;
     shiftLoading = true;
+    shiftError = false;
   });
   afterEach(() => cleanup());
 
