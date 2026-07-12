@@ -1,6 +1,6 @@
 import { t } from "@/lib/i18n";
 import { useMobileShellContext } from "@/shell/mobile/MobileShellContext";
-import { AlertsScreen, useAlertsController, formatRelativeTime, formatRelativeDuration } from "@/features/alerts";
+import { AlertsScreen, useAlertsController, formatRelativeDuration } from "@/features/alerts";
 import { Link, useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { AppShell } from "@/components/layout/AppShell";
@@ -175,7 +175,7 @@ function AlertsPageDesktop() {
             onAck={acknowledgeAlert}
             onUnAck={unacknowledgeAlert}
             canOwn={canOwnAlerts}
-            formatRelativeTime={formatRelativeTime}
+            formatRelativeDuration={formatRelativeDuration}
           />
           </div>
         ) : (

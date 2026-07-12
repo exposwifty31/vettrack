@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { useAlertsController, formatRelativeTime } from "./hooks/use-alerts-controller";
+import { useAlertsController, formatRelativeDuration } from "./hooks/use-alerts-controller";
 import { AlertsProView } from "@/components/alerts/AlertsProView";
 import { LoadingSection } from "@/components/ui/loading-section";
 import { ErrorCard } from "@/components/ui/error-card";
@@ -134,7 +134,7 @@ export function AlertsScreen() {
             onAck={ack}
             onUnAck={unAck}
             canOwn={canOwnAlerts}
-            formatRelativeTime={formatRelativeTime}
+            formatRelativeDuration={formatRelativeDuration}
           />
         </div>
       )}
