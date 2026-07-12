@@ -233,6 +233,8 @@ export default function MyEquipmentPage() {
                     deriveEquipmentRecoverySnapshotFromSource(item),
                   )
                 : null;
+              const isReturningThisItem =
+                returnMut.isPending && returnMut.variables?.id === item.id;
               return (
               <Card key={item.id} className="bg-card border-border/60 shadow-sm">
                 <CardContent className="p-4">
@@ -270,10 +272,10 @@ export default function MyEquipmentPage() {
                         variant="outline"
                         className="border-border/60 text-muted-foreground hover:text-foreground min-h-[44px] px-3"
                         onClick={() => setPendingReturnEquipmentId(item.id)}
-                        disabled={returnMut.isPending}
+                        disabled={isReturningThisItem}
                         data-testid={`btn-return-${item.id}`}
                       >
-                        {returnMut.isPending ? (
+                        {isReturningThisItem ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         ) : (
                           <>
