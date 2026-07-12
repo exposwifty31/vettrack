@@ -164,3 +164,59 @@ describe("SyncStatusBanner — re-shows on a distinct failure signature (T-36 ·
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });
+
+/**
+ * T-36 review CRITICAL (collision) — `structuredError` is DEAD in the real
+ * dead-letter path: retry-exhaustion (network/timeout/5xx,
+ * src/lib/sync-engine.ts:302-309) sets `errorMessage` to the FIXED template
+ * string `"Failed after 5 attempts"` and never sets `structuredError`. Two
+ * DISTINCT queued operations against the SAME endpoint therefore produced the
+ * IDENTICAL `(syncErrorKind, targetResource)` signature — dismissing one
+ * masked the other, unrelated failure for the rest of the session. The fix
+ * folds `clientMutationId` (stable across retries of the SAME row, unique per
+ * distinct queued operation) into the signature.
+ */
+describe("SyncStatusBanner — clientMutationId disambiguates dead-letter collisions (T-36 review Critical)", () => {
+  function deadLetterRow(overrides: Partial<PendingSync> = {}): PendingSync {
+    return row({
+      status: "dead",
+      structuredError: null,
+      errorMessage: "Failed after 5 attempts",
+      endpoint: "/api/equipment/eq-9/return",
+      ...overrides,
+    });
+  }
+
+  it("re-shows for a DIFFERENT clientMutationId sharing the same generic error text + endpoint", () => {
+    mockSyncState = stateWithFailure(deadLetterRow({ clientMutationId: "m1" }));
+    const { rerender } = render(<SyncStatusBanner />);
+    expect(screen.getByRole("alert")).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Dismiss"));
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    // A DIFFERENT queued operation — same generic errorMessage + endpoint,
+    // structuredError still never set — must NOT collide with the first.
+    mockSyncState = stateWithFailure(deadLetterRow({ clientMutationId: "m2" }));
+    rerender(<SyncStatusBanner />);
+    expect(screen.getByRole("alert")).toBeTruthy();
+  });
+
+  it("stays hidden across retries of the SAME row (same clientMutationId, same errorMessage/endpoint)", () => {
+    mockSyncState = stateWithFailure(deadLetterRow({ clientMutationId: "m1" }));
+    const { rerender } = render(<SyncStatusBanner />);
+    fireEvent.click(screen.getByLabelText("Dismiss"));
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    // Same queued operation, further along in its retry history.
+    mockSyncState = stateWithFailure(
+      deadLetterRow({
+        clientMutationId: "m1",
+        retries: 6,
+        updatedAt: new Date("2026-07-01T00:05:00Z"),
+      }),
+    );
+    rerender(<SyncStatusBanner />);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+});

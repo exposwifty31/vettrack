@@ -24,9 +24,20 @@ function pickPrimaryFailingItem(
 
 /**
  * Failure signature the dismissal is keyed to: `(syncErrorKind,
- * targetResource)`. Two banner states share a signature iff BOTH fields are
- * equal — a distinct signature (e.g. a different, more serious failure)
- * must re-show the banner even though an earlier one was dismissed.
+ * targetResource, clientMutationId)`. Two banner states share a signature iff
+ * ALL THREE fields are equal — a distinct signature (e.g. a different, more
+ * serious failure) must re-show the banner even though an earlier one was
+ * dismissed.
+ *
+ * `clientMutationId` is required because the real dead-letter path
+ * (retry-exhaustion — network/timeout/5xx, sync-engine.ts) never sets
+ * `structuredError` and always sets the SAME fixed `errorMessage` template
+ * ("Failed after N attempts"). Without `clientMutationId`, two distinct
+ * queued operations against the same endpoint collapse to an identical
+ * `(syncErrorKind, targetResource)` signature and dismissing one masks the
+ * other for the rest of the session. `clientMutationId` is stable across
+ * retries of the SAME row, so identical-operation retries still collapse to
+ * one signature as intended.
  */
 function deriveDismissalSignature(params: {
   hasFailed: boolean;
@@ -41,7 +52,8 @@ function deriveDismissalSignature(params: {
     const item = pickPrimaryFailingItem(deadLetterItems, retryableFailedItems);
     const syncErrorKind = item?.structuredError?.code ?? item?.errorMessage ?? "unknown_error";
     const targetResource = item?.endpoint ?? item?.type ?? "unknown_resource";
-    return `${syncErrorKind}::${targetResource}`;
+    const mutationId = item?.clientMutationId ?? "";
+    return `${syncErrorKind}::${targetResource}::${mutationId}`;
   }
   if (isCircuitOpen) return "circuit_open::queue";
   if (hasPending) return "pending::queue";
