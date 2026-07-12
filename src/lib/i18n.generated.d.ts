@@ -3779,7 +3779,6 @@ export interface TStructure {
   managementWebGate: {
     title: string;
     description: string;
-    cta: string;
   };
   whatsNew: {
     title: string;

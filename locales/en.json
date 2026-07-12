@@ -3775,8 +3775,7 @@
   },
   "managementWebGate": {
     "title": "This workspace is for management",
-    "description": "This workspace is for management. Open VetTrack on your device to continue.",
-    "cta": "Go to my equipment"
+    "description": "This workspace is for management. Open VetTrack on your device to continue."
   },
   "whatsNew": {
     "title": "What's New — VetTrack",

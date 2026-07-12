@@ -1,9 +1,7 @@
-import { useLocation } from "wouter";
 import { Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
 import { t } from "@/lib/i18n";
-
-type Props = { fallback?: string };
 
 /**
  * T-31 (R-WEB-01) — capability gate for the desktop web shell.
@@ -16,13 +14,15 @@ type Props = { fallback?: string };
  * signed-out states AuthGuard itself owns would misfire against this check) when
  * `target === "desktop" && !experience.can("management.web")`.
  *
- * Reuses the `WebOnlyGuard` denial pattern (dark full-bleed screen, icon, title,
- * description, CTA back to `fallback`) with copy specific to this gate — it is a
- * distinct surface from `WebOnlyGuard` (which gates on screen size, not capability),
- * not a variant of it, so `WebOnlyGuard` itself is left untouched.
+ * The action is **sign out**, matching AuthGuard's sibling denial states
+ * (pending / blocked / accessDenied). It deliberately does NOT offer an in-app
+ * navigation CTA: this check lives inside `AuthGuard`, which wraps essentially
+ * every route, so there is no reachable destination that escapes the same gate —
+ * a "go to X" button would loop straight back to this screen. The path forward is
+ * to open VetTrack on a device (per the description) or switch accounts via sign-out.
  */
-export function ManagementWebGate({ fallback = "/home" }: Props) {
-  const [, navigate] = useLocation();
+export function ManagementWebGate() {
+  const { signOut } = useAuth();
   return (
     <div
       className="dark fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 bg-background px-8 text-center text-foreground"
@@ -40,10 +40,10 @@ export function ManagementWebGate({ fallback = "/home" }: Props) {
       <Button
         size="lg"
         className="w-full max-w-xs"
-        onClick={() => navigate(fallback)}
+        onClick={signOut}
         data-testid="management-web-gate-cta"
       >
-        {t.managementWebGate.cta}
+        {t.auth.guard.signOut}
       </Button>
     </div>
   );
