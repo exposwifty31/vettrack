@@ -71,7 +71,7 @@ Per `CLAUDE.md` §"Adding a new feature", **applied as relevant to each feature*
 |---|---|---|---|
 | **0 — Stabilize + Ship-ready** | Pass iOS re-review | **0A** 6 HIGH fixes · **0B** reviewer-reachability & submission gate · **exit:** on-device drill | 0A yes · 0B mixed (ops) |
 | **1 — Do-Now bundles** | Mine existing data (native-safe) | **Equipment** (fixes + small-01/02/04) · **Shift/Home** (fixes + medium-02/small-05) · **Inventory** (fixes + small-03) · **Web platform admin-gating** (NEW) | fixes yes · features small = yes · medium-02 `⚠ SUB-SPEC` |
-| **2 — Do-Next + native MED** | Extend irreplaceable surfaces | **Code Blue** (fixes + medium-01) · **Board** (medium-03) · **Predictive** (massive-02) · **Native MED sweep** (12 fixes incl. 5 reclassified admin) | fixes yes · features `⚠ SUB-SPEC` |
+| **2 — Do-Next + native MED** | Extend irreplaceable surfaces | **Code Blue** (2 race fixes R-CB-02/03 + medium-01) · **Board** (medium-03) · **Predictive** (massive-02) · **Native MED sweep** (11 fixes: R-SC-02/03 · R-SY-02/03/04 · R-PR-01 · R-AD-01..05 incl. 5 reclassified admin) — **13 P2 MED total** (Appendix A) | fixes yes · features `⚠ SUB-SPEC` |
 | **3 — Cleanup + web-only** | Low visibility/severity | 9 LOW fixes (incl. the 3 genuinely web-only) | yes |
 | **4 — Gated Massives** | Owner-decision-blocked | massive-01 passive BLE/RFID · massive-03 clinic network · medium-04 copilot/voice | all `⚠ SUB-SPEC` + blocked |
 
