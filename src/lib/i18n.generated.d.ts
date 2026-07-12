@@ -4123,6 +4123,7 @@ export interface TStructure {
     title: string;
     emptyPrompt: string;
     noResults: string;
+    searching: string;
     resultsCount: string;
   };
   homeNudges: {

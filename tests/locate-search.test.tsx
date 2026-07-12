@@ -94,4 +94,44 @@ describe("LocateSearch", () => {
     fireEvent.click(await screen.findByText("Infusion Pump"));
     await waitFor(() => expect(navigateMock).toHaveBeenCalledWith("/equipment/e1"));
   });
+
+  it("debounces the search query — typing several characters in quick succession fires exactly one network request, for the final value", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    locateMock.mockResolvedValue({ query: "pump", results: [] });
+    renderLocateSearch();
+    openSheet();
+
+    const input = screen.getByLabelText(t.locateSearch.label);
+    fireEvent.change(input, { target: { value: "p" } });
+    fireEvent.change(input, { target: { value: "pu" } });
+    fireEvent.change(input, { target: { value: "pum" } });
+    fireEvent.change(input, { target: { value: "pump" } });
+
+    expect(locateMock).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(locateMock).toHaveBeenCalledTimes(1);
+    expect(locateMock).toHaveBeenCalledWith("pump");
+    vi.useRealTimers();
+  });
+
+  it("shows a loading indicator while a search request is in flight", async () => {
+    let resolveLocate!: (value: { query: string; results: unknown[] }) => void;
+    locateMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveLocate = resolve;
+      }),
+    );
+    renderLocateSearch();
+    openSheet();
+    fireEvent.change(screen.getByLabelText(t.locateSearch.label), { target: { value: "pump" } });
+
+    await screen.findByText(t.locateSearch.searching);
+    expect(screen.queryByText(t.locateSearch.noResults)).toBeNull();
+
+    resolveLocate({ query: "pump", results: [] });
+    await screen.findByText(t.locateSearch.noResults);
+    expect(screen.queryByText(t.locateSearch.searching)).toBeNull();
+  });
 });

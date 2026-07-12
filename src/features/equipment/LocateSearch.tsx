@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { MapPin, Search } from "lucide-react";
@@ -24,12 +24,23 @@ function subtitle(result: EquipmentLocateResult): string {
   return [result.location.summary, custodian, result.readiness].filter(Boolean).join(" · ");
 }
 
+/** Debounce delay before a typed query triggers a network search. */
+const SEARCH_DEBOUNCE_MS = 250;
+
 export function LocateSearch() {
   const [, navigate] = useLocation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const inputId = useId();
-  const trimmed = query.trim();
+  // The debounced value drives the query key/fetch trigger; the <input> below
+  // stays bound to the immediate `query` state so typing feels responsive.
+  const trimmed = debouncedQuery.trim();
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [query]);
 
   const { data, isFetching } = useQuery({
     queryKey: ["/api/equipment/locate", trimmed],
@@ -40,6 +51,7 @@ export function LocateSearch() {
 
   const results: EquipmentLocateResult[] = trimmed.length > 0 ? (data?.results ?? []) : [];
   const showEmptyPrompt = trimmed.length === 0;
+  const showLoading = !showEmptyPrompt && isFetching && results.length === 0;
   const showNoResults = !showEmptyPrompt && !isFetching && results.length === 0;
   const liveMessage = !showEmptyPrompt && !isFetching ? t.locateSearch.resultsCount(results.length) : "";
 
@@ -73,8 +85,7 @@ export function LocateSearch() {
           <label htmlFor={inputId} className="sr-only">
             {t.locateSearch.label}
           </label>
-          <div
-            role="search"
+          <search
             className="mt-3 flex h-10 items-center gap-2 rounded-[10px] border border-border bg-muted px-3"
           >
             <Search size={16} strokeWidth={2} className="shrink-0 text-muted-foreground" aria-hidden />
@@ -87,14 +98,15 @@ export function LocateSearch() {
               placeholder={t.locateSearch.placeholder}
               className="min-w-0 flex-1 border-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground [appearance:none] [&::-webkit-search-cancel-button]:hidden"
             />
-          </div>
+          </search>
 
-          <div role="status" aria-live="polite" className="sr-only">
+          <output aria-live="polite" className="sr-only">
             {liveMessage}
-          </div>
+          </output>
 
           <div className="mt-3 flex flex-1 flex-col gap-2 overflow-y-auto pb-6">
             {showEmptyPrompt && <p className="text-sm text-muted-foreground">{t.locateSearch.emptyPrompt}</p>}
+            {showLoading && <p className="text-sm text-muted-foreground">{t.locateSearch.searching}</p>}
             {showNoResults && <p className="text-sm text-muted-foreground">{t.locateSearch.noResults}</p>}
             {results.map((result) => (
               <button

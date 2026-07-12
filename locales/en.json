@@ -4120,6 +4120,7 @@
     "title": "Locate Equipment",
     "emptyPrompt": "Search by name, location, or custodian to find equipment fast.",
     "noResults": "No equipment found matching your search.",
+    "searching": "Searching…",
     "resultsCount": "{count, plural, one{# result found} other{# results found}}"
   },
   "homeNudges": {

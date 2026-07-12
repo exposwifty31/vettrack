@@ -1120,6 +1120,7 @@ const translations = {
     title: d.locateSearch.title,
     emptyPrompt: d.locateSearch.emptyPrompt,
     noResults: d.locateSearch.noResults,
+    searching: d.locateSearch.searching,
     resultsCount: (count: number) => tr(d.locateSearch.resultsCount, { count }),
   },
 

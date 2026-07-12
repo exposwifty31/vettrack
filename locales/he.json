@@ -4120,6 +4120,7 @@
     "title": "איתור ציוד",
     "emptyPrompt": "חפשו לפי שם, מיקום או מחזיק כדי למצוא ציוד במהירות.",
     "noResults": "לא נמצא ציוד התואם לחיפוש.",
+    "searching": "מחפש…",
     "resultsCount": "{count, plural, one{תוצאה אחת נמצאה} other{# תוצאות נמצאו}}"
   },
   "homeNudges": {
