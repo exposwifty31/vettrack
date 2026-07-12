@@ -1,5 +1,5 @@
 // src/pages/code-blue.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useSearch } from "wouter";
 import { AlertTriangle, ArrowRight, CheckCircle2, Circle, Loader2, Package, Shield, StickyNote } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -234,7 +234,7 @@ export function PreCheckGate({
 
 // ─── Outcome modal ───────────────────────────────────────────────────────────
 
-function OutcomeModal({ onClose }: { onClose: (outcome: string) => void }) {
+function OutcomeModal({ onSelect, onCancel }: { onSelect: (outcome: string) => void; onCancel: () => void }) {
   const dir = useDirection();
   const OUTCOMES = [
     { value: "rosc", label: t.codeBlue.outcome.rosc },
@@ -251,7 +251,7 @@ function OutcomeModal({ onClose }: { onClose: (outcome: string) => void }) {
             <button
               key={o.value}
               type="button"
-              onClick={() => onClose(o.value)}
+              onClick={() => onSelect(o.value)}
               className={cn(
                 "p-3 min-h-[44px] rounded-lg border text-sm font-semibold transition-colors text-end",
                 o.value === "died"
@@ -263,7 +263,7 @@ function OutcomeModal({ onClose }: { onClose: (outcome: string) => void }) {
             </button>
           ))}
         </div>
-        <button type="button" className="w-full mt-3 min-h-[44px] text-xs text-emergency-text2/80" onClick={() => onClose("")}>{t.common.cancel}</button>
+        <button type="button" className="w-full mt-3 min-h-[44px] text-xs text-emergency-text2/80" onClick={onCancel}>{t.common.cancel}</button>
       </div>
     </div>
   );
@@ -320,9 +320,18 @@ function ActiveSession() {
   const [showEquipPicker, setShowEquipPicker] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
   const [, navigate] = useLocation();
+  const outcomeTriggerRef = useRef<HTMLButtonElement>(null);
 
   const isManager = session?.managerUserId === userId;
   const equipmentLogCount = logEntries.filter((e) => e.category === "equipment").length;
+
+  // Dedicated Cancel path — independent of the outcome guard below, so Cancel
+  // always closes the sheet and never falls through into the end-session
+  // mutation. Focus returns to the button that opened the sheet.
+  const closeOutcomeModal = () => {
+    setShowOutcomeModal(false);
+    outcomeTriggerRef.current?.focus();
+  };
 
   const handleEndSession = async (outcome: string) => {
     if (!outcome || !session) return;
@@ -524,6 +533,7 @@ function ActiveSession() {
       <div className="p-4">
         {isManager ? (
           <Button
+            ref={outcomeTriggerRef}
             className="w-full bg-emergency-border hover:bg-emergency-borderMd text-white font-bold py-4"
             onClick={() => setShowOutcomeModal(true)}
           >
@@ -536,7 +546,7 @@ function ActiveSession() {
         )}
       </div>
 
-      {showOutcomeModal && <OutcomeModal onClose={handleEndSession} />}
+      {showOutcomeModal && <OutcomeModal onSelect={handleEndSession} onCancel={closeOutcomeModal} />}
       </div>
     </div>
   );
