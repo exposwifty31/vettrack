@@ -2448,3 +2448,19 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 - **Batch gate (integrated branch):** `pnpm typecheck` 0 errors (frontend + server tsconfigs); full `pnpm test` = **492 files / 4552 tests, 0 fail** (37s) — +4 test files / +5 tests over the T-05 baseline, no regressions. Worktrees `wt-t01…t04` removed post-integration.
 
 **Verdict:** VERIFIED — Phase 0A CODE work complete (T-01…T-05). Remaining Phase 0: **0B (T-06…T-16) is `Tier: Owner`** (accounts/build/device/hardware) — delivered separately as an owner checklist; not agent-executable.
+
+---
+
+## 2026-07-12 — Consolidated Audit × 10x — Phase 1 Equipment bundle · FIXES: T-17…T-21
+
+**Claim:** The five Phase-1 equipment-bundle FIXES are implemented RED-first, integrated, and pass the full-suite batch gate. Executed as 3 file-grouped parallel worktrees off `584783000` (same-file cards done sequentially within a stream); all `Tier: S`; cherry-picked in order.
+
+**Evidence (per card — each RED confirmed failing first, then GREEN, typecheck 0):**
+- **T-17** (R-EQ-03 · CLICK-PATH-012): `src/pages/equipment-detail.tsx` — checkout ignored `isError` from `useActiveShift`, rendering a transient shift-query failure as "off-shift". GREEN: gate client-side block on `!shiftError && !hasActiveShift` (both `disabled` expressions + the off-shift note), mirroring the merged equipment-list pattern → on a shift-query error the client defers to the server's authoritative roster gate. RED `tests/equipment-detail-shift-error.test.tsx`. Commit `e64238861` → cherry-pick `d80e06883`.
+- **T-18** (R-EQ-04 · CLICK-PATH-036): `src/pages/new-equipment.tsx` — folder `Select` used a static `defaultValue={prefill.folderId}` (empty on edit routes), so edited items always showed "Unfiled". GREEN: controlled `value={watch("folderId")}` seeded from the form's `defaultValues.folderId`; create/copy modes preserved. RED `tests/new-equipment-folder-value.test.tsx`. Commit `886d8876` → cherry-pick `65011feaf`.
+- **T-19** (R-EQ-05 · CLICK-PATH-020): `src/pages/my-equipment.tsx` — "Return All" used `Promise.all`, so a single failed return rejected before the cache invalidations ran (successful returns went stale). GREEN: `Promise.allSettled` + unconditional post-settle invalidation, then throw for the partial-error toast. RED `tests/my-equipment-return-all.test.tsx`. Commit `5b14e8355` → cherry-pick `c5def4d8f`.
+- **T-20** (R-EQ-06 · CLICK-PATH-021): `src/pages/my-equipment.tsx` — one shared `returnMut.isPending` spun/disabled every row. GREEN: per-row `isReturningThisItem = returnMut.isPending && returnMut.variables?.id === item.id` drives the spinner/disable; siblings stay interactive. RED `tests/my-equipment-row-scope.test.tsx`. Commit `edef56c15` → cherry-pick `eaa3e4b29`.
+- **T-21** (R-EQ-07 · HIG debt): `src/pages/equipment-detail.tsx` — four header `size="icon-sm"` controls rendered under 44pt. GREEN: `h-11 w-11` (44px) hit area on `btn-back`/`btn-duplicate`/`btn-edit`/`btn-equipment-tools` (`btn-delete` already compliant); glyph sizes untouched. RED `tests/equipment-detail-touch-targets.test.tsx` asserts the concrete hit-area classes (jsdom has no layout engine to measure rendered px). Commit `c716d90b3` → cherry-pick `593a7d58d`.
+- **Batch gate (integrated branch):** `pnpm typecheck` 0 errors; full `pnpm test` = **497 files / 4557 tests, 0 fail** (34.6s) — +5 files / +5 tests over the Phase-0A baseline, no regressions. Worktrees `wt-eqd`/`wt-myeq`/`wt-neweq` removed.
+
+**Verdict:** VERIFIED — Phase 1 equipment FIXES complete (stabilize done). Next in the bundle: FEATURES T-22 (locate), T-23 (readiness badge), T-24 (damaged-at-check-in — DB-integration now runnable against the live migrated dev DB).
