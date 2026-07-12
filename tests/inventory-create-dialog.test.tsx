@@ -45,6 +45,16 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
+const toastError = vi.fn();
+const toastSuccess = vi.fn();
+
+vi.mock("sonner", () => ({
+  toast: {
+    error: (...a: unknown[]) => toastError(...a),
+    success: (...a: unknown[]) => toastSuccess(...a),
+  },
+}));
+
 // Imported AFTER the mocks above so the component resolves the mocked modules.
 import InventoryItemsPage from "@/pages/inventory-items";
 
@@ -112,5 +122,32 @@ describe("inventory items — create dialog sends isBillable + minimumDispenseTo
     const payload = createMock.mock.calls[0][0];
     expect(payload).toHaveProperty("isBillable", false);
     expect(payload).toHaveProperty("minimumDispenseToCapture");
+  });
+
+  it("keeps the dialog open with entered values retained and shows error feedback when the create call rejects", async () => {
+    const p = t.inventoryItemsPage;
+    createMock.mockRejectedValueOnce(new Error("network error"));
+    renderPage();
+
+    await waitFor(() => expect(listMock).toHaveBeenCalled());
+
+    fireEvent.click(await screen.findByRole("button", { name: p.newItem }));
+
+    const codeField = screen.getByLabelText(p.fieldCode);
+    const labelField = screen.getByLabelText(p.fieldLabel);
+    fireEvent.change(codeField, { target: { value: "NEW_ITEM" } });
+    fireEvent.change(labelField, { target: { value: "New Item" } });
+
+    fireEvent.click(screen.getByRole("button", { name: p.save }));
+
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(p.itemCreateFailed));
+    expect(toastSuccess).not.toHaveBeenCalled();
+
+    // The dialog must stay open (no close-on-error) with the entered values
+    // retained — the mutation's onError never calls setFormOpen(false).
+    expect((screen.getByLabelText(p.fieldCode) as HTMLInputElement).value).toBe("NEW_ITEM");
+    expect((screen.getByLabelText(p.fieldLabel) as HTMLInputElement).value).toBe("New Item");
+    expect(screen.getByRole("button", { name: p.save })).toBeTruthy();
   });
 });
