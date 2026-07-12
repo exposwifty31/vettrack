@@ -50,6 +50,7 @@ vi.mock("drizzle-orm", () => ({
   eq: (a: unknown, b: unknown) => ({ _type: "eq", a, b }),
   and: (...args: unknown[]) => ({ _type: "and", args }),
   isNull: (x: unknown) => ({ _type: "isNull", x }),
+  sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ _type: "sql", strings, values }),
 }));
 
 // ── audit mock ────────────────────────────────────────────────────────────────
@@ -67,6 +68,7 @@ vi.mock("../server/lib/audit.js", () => ({
 let selectResolvesTo: Array<{ id: string }> = [];
 let insertedDamageEvents: Array<Record<string, unknown>> = [];
 let equipmentUpdates: Array<Record<string, unknown>> = [];
+let equipmentUpdateWherePredicates: unknown[] = [];
 
 vi.mock("../server/db.js", () => ({
   db: {
@@ -88,7 +90,12 @@ vi.mock("../server/db.js", () => ({
         update: () => ({
           set: (v: Record<string, unknown>) => {
             equipmentUpdates.push(v);
-            return { where: () => Promise.resolve() };
+            return {
+              where: (predicate: unknown) => {
+                equipmentUpdateWherePredicates.push(predicate);
+                return Promise.resolve();
+              },
+            };
           },
         }),
       };
@@ -171,6 +178,7 @@ beforeEach(() => {
   selectResolvesTo = [];
   insertedDamageEvents = [];
   equipmentUpdates = [];
+  equipmentUpdateWherePredicates = [];
   loggedAuditCalls = [];
 });
 
@@ -207,6 +215,11 @@ describe("POST /api/equipment/:id/damage — reporting damage (R-EQ-F3)", () => 
     expect(equipmentUpdates[0].conditionStatus).not.toBe("ok");
     expect(typeof equipmentUpdates[0].conditionStatus).toBe("string");
     expect((equipmentUpdates[0].conditionStatus as string).length).toBeGreaterThan(0);
+    // R-EQ-F3 review fix: bump optimistic-lock version and re-guard against a
+    // soft-delete race, matching every other equipment-mutating route.
+    expect(equipmentUpdates[0].version).toMatchObject({ _type: "sql" });
+    expect(equipmentUpdateWherePredicates).toHaveLength(1);
+    expect(JSON.stringify(equipmentUpdateWherePredicates[0])).toContain("isNull");
 
     expect(loggedAuditCalls).toHaveLength(1);
     expect(loggedAuditCalls[0]).toMatchObject({

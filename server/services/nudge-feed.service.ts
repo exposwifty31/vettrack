@@ -71,6 +71,9 @@ async function fetchExpiringEquipment(clinicId: string): Promise<ExpiringEquipme
         isNotNull(equipment.expiryDate),
         lte(equipment.expiryDate, sql`(CURRENT_DATE + INTERVAL '7 days')::date`),
       ),
+      // Drizzle infers expiryDate as `string | null` (the column is nullable);
+      // the isNotNull() filter above guarantees non-null at runtime but can't
+      // narrow the inferred select type, hence the cast.
     ) as Promise<ExpiringEquipmentRow[]>;
 }
 

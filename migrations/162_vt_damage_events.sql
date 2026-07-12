@@ -10,7 +10,12 @@
 -- "ok" vocabulary (server/schema/equipment.ts) so every pre-existing
 -- vt_equipment row backfills as not-damaged with no manual data migration.
 
-ALTER TABLE vt_equipment ADD COLUMN IF NOT EXISTS condition_status VARCHAR(20) NOT NULL DEFAULT 'ok';
+ALTER TABLE vt_equipment ADD COLUMN IF NOT EXISTS condition_status TEXT NOT NULL DEFAULT 'ok';
+-- Only 'ok' and 'damaged' are produced anywhere in the codebase today
+-- (server/routes/equipment-damage.ts); extend this list (NOT VALID + VALIDATE
+-- for a large table) if a future migration introduces another condition value.
+ALTER TABLE vt_equipment ADD CONSTRAINT chk_vt_equipment_condition_status
+  CHECK (condition_status IN ('ok', 'damaged'));
 
 CREATE TABLE IF NOT EXISTS vt_damage_events (
   id            TEXT PRIMARY KEY,

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db, equipment, damageEvents } from "../db.js";
 import { requireAuth } from "../middleware/auth.js";
 import { writeLimiter } from "../middleware/rate-limiters.js";
@@ -33,6 +33,16 @@ router.post("/:id/damage", requireAuth, writeLimiter, async (req, res) => {
         message: "Unauthorized",
         requestId,
       }),
+    );
+    return;
+  }
+
+  // requireAuth guarantees authUser is populated for active users; narrow once
+  // here instead of asserting `!` at each use site below.
+  const authUser = req.authUser;
+  if (!authUser) {
+    res.status(401).json(
+      apiError({ code: "UNAUTHORIZED", reason: "UNAUTHORIZED", message: "Unauthorized", requestId }),
     );
     return;
   }
@@ -75,23 +85,29 @@ router.post("/:id/damage", requireAuth, writeLimiter, async (req, res) => {
         id: damageEventId,
         clinicId,
         equipmentId,
-        reportedBy: req.authUser!.id,
+        reportedBy: authUser.id,
         at: now,
         note,
       });
 
       await tx
         .update(equipment)
-        .set({ conditionStatus: DAMAGED_CONDITION_STATUS })
-        .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, equipmentId)));
+        .set({ conditionStatus: DAMAGED_CONDITION_STATUS, version: sql`${equipment.version} + 1` })
+        .where(
+          and(
+            eq(equipment.clinicId, clinicId),
+            eq(equipment.id, equipmentId),
+            isNull(equipment.deletedAt),
+          ),
+        );
     });
 
     logAudit({
       actorRole: resolveAuditActorRole(req),
       clinicId,
       actionType: "equipment_damage_reported",
-      performedBy: req.authUser!.id,
-      performedByEmail: req.authUser!.email,
+      performedBy: authUser.id,
+      performedByEmail: authUser.email,
       targetId: equipmentId,
       targetType: "equipment",
       metadata: { damageEventId, note },
@@ -101,7 +117,7 @@ router.post("/:id/damage", requireAuth, writeLimiter, async (req, res) => {
       damageEvent: {
         id: damageEventId,
         equipmentId,
-        reportedBy: req.authUser!.id,
+        reportedBy: authUser.id,
         at: now.toISOString(),
         note,
       },

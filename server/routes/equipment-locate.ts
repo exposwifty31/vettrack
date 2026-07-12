@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { and, eq, ilike, isNull, or } from "drizzle-orm";
+import { and, asc, eq, ilike, isNull, or } from "drizzle-orm";
 import { db, equipment } from "../db.js";
 import { requireAuth } from "../middleware/auth.js";
 import { scanLimiter } from "../middleware/rate-limiters.js";
@@ -63,6 +63,10 @@ router.get("/locate", requireAuth, scanLimiter, async (req, res) => {
           ),
         ),
       )
+      // Stable ordering before the cap — without it, Postgres may return an
+      // arbitrary subset of matches (and a different subset across requests)
+      // when more than LOCATE_MATCH_LIMIT rows match.
+      .orderBy(asc(equipment.name), asc(equipment.id))
       .limit(LOCATE_MATCH_LIMIT);
 
     const results = await Promise.all(

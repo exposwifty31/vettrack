@@ -55,20 +55,29 @@ vi.mock("drizzle-orm", () => ({
   or: (...args: unknown[]) => ({ _type: "or", args }),
   ilike: (a: unknown, b: unknown) => ({ _type: "ilike", a, b }),
   isNull: (x: unknown) => ({ _type: "isNull", x }),
+  asc: (x: unknown) => ({ _type: "asc", x }),
 }));
 
 // ── DB mock — equipment search query only ────────────────────────────────────
 // The test controls what the clinicId-scoped search resolves to per scenario
 // (same convention as tests/cross-tenant-denial.test.ts).
 let searchResolvesTo: Array<{ id: string; name: string }> = [];
+// Captures the predicate passed to .where() so tests can assert the clinicId
+// scoping condition was actually included, not just trust searchResolvesTo.
+let capturedWherePredicate: unknown = null;
 
 vi.mock("../server/db.js", () => ({
   db: {
     select: () => ({
       from: () => ({
-        where: () => ({
-          limit: () => Promise.resolve(searchResolvesTo),
-        }),
+        where: (predicate: unknown) => {
+          capturedWherePredicate = predicate;
+          return {
+            orderBy: () => ({
+              limit: () => Promise.resolve(searchResolvesTo),
+            }),
+          };
+        },
       }),
     }),
   },
@@ -191,6 +200,7 @@ beforeEach(() => {
     role: "vet",
   };
   searchResolvesTo = [];
+  capturedWherePredicate = null;
   for (const key of Object.keys(graphs)) delete graphs[key];
 });
 
@@ -258,5 +268,10 @@ describe("GET /api/equipment/locate — matching device (R-EQ-F1)", () => {
     expect(captured.statusCode).toBe(200);
     const body = captured.body as { results: Array<Record<string, unknown>> };
     expect(body.results).toEqual([]);
+
+    // Assert the clinicId predicate was actually built into the query, not
+    // merely inferred from searchResolvesTo being empty — clinicId scoping is
+    // a security-critical invariant repo-wide.
+    expect(JSON.stringify(capturedWherePredicate)).toContain("clinic-1");
   });
 });

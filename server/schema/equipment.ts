@@ -114,8 +114,10 @@ export const equipment = vtTable("vt_equipment", {
   folderId: text("folder_id").references(() => folders.id, { onDelete: "set null" }),
   roomId: text("room_id").references(() => rooms.id, { onDelete: "set null" }),
   status: varchar("status", { length: 20 }).notNull().default("ok"),
-  /** Additive damage-tracking status (R-EQ-F3); "ok" preserves existing rows as not-damaged. */
-  conditionStatus: varchar("condition_status", { length: 20 }).notNull().default("ok"),
+  /** Additive damage-tracking status (R-EQ-F3); "ok" preserves existing rows as not-damaged.
+   * TEXT + DB-level CHECK (migrations/162_vt_damage_events.sql) rather than VARCHAR(n): resizing a
+   * varchar bound later takes an ACCESS EXCLUSIVE lock on this production clinical table. */
+  conditionStatus: text("condition_status").notNull().default("ok"),
   lastSeen: timestamp("last_seen"),
   lastStatus: varchar("last_status", { length: 20 }),
   lastMaintenanceDate: timestamp("last_maintenance_date"),
