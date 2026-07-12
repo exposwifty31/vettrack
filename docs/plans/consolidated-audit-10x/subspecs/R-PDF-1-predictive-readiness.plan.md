@@ -36,7 +36,7 @@ Read-mostly (no new transport) · bounded-enum telemetry if counters added · `c
 
 ### R-PDF-1.4 · Surface (Analytics panel + PO recommendations)
 
-- **Goal:** an Analytics console panel; a "no shortfall" clinic shows a **calm, empty** state (no false alarms). **Explainability = a redacted, `clinicId`-scoped DTO** (source-row references + counts, never raw PII). **PO recommendations are READ-ONLY** — the panel renders a recommendation; rendering/refresh **creates no PO**; a PO is created/submitted **only** through the existing explicit user confirmation + authorization checks. Optional home-surface summary tile.
+- **Goal:** an Analytics console panel; a "no shortfall" clinic shows a **calm, empty** state (no false alarms). **Explainability = a redacted, `clinicId`-scoped DTO** (source-row references + counts, never raw PII). **PO recommendations are READ-ONLY** — the panel renders a recommendation; rendering/refresh **creates no PO**; a PO is created/submitted **only** through the existing explicit user confirmation + authorization checks. **No new surface family** — everything renders inside the **existing Analytics console**; **no home-surface tile in v1** (that would violate the §3 "do not add a new surface family" guardrail).
 - **RED:** `tests/readiness-forecast-panel.test.tsx` — warnings render with the **redacted explainability DTO** (source-row refs + counts, no PII); **rendering or refreshing the panel writes ZERO POs** (assert no PO mutation); a PO is created **only after** the existing explicit confirmation + authorization; empty state on a healthy clinic; he+en; RTL.
 
 ### R-PDF-1.5 · Verification (acceptance bar)

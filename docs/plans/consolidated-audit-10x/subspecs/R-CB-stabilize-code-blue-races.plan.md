@@ -10,8 +10,8 @@
 
 - **File:** `src/hooks/useCodeBlueSession.ts:121`.
 - **Defect:** a stale/racing `activeCodeBlueSessionId=null` keepalive immediately `clearCachedSession()` + `setQueryData(session:null)`, flipping a just-started session back to the launch form (an optimistic end in all but name).
-- **GREEN:** on a null keepalive, **refetch to confirm before clearing** — mirror `useCodeBlueKeepaliveReconciliation`'s `RECONCILE_GRACE_MS` grace window; clear **only** if the confirming refetch also returns no active session.
-- **RED:** `tests/code-blue-null-keepalive-grace.test.tsx` — a null keepalive within the grace window after a local start does **not** clear the session; a confirmed-null (grace elapsed + refetch returns null) does.
+- **GREEN (grace retains FIRST, then confirm):** a null keepalive **within** the `RECONCILE_GRACE_MS` grace window is **ignored** — the session is retained, and a refetch is **not** allowed to clear during grace even if it would return null. **Only after the grace window elapses** may a **confirming refetch** run, clearing only if it too returns no active session. Order is strict: grace-retain precedes the confirming refetch; the refetch never short-circuits the grace.
+- **RED:** `tests/code-blue-null-keepalive-grace.test.tsx` — a null keepalive within the grace window **does not clear even when a refetch would return null**; only a confirmed-null **after** the grace window elapses (grace expired + confirming refetch returns null) clears; no clearing refetch is issued during grace.
 - **Guardrail:** server-confirmed end only; no new transport.
 
 ## R-CB-03 · Quick-log rollback must not erase teammates' entries (CLICK-PATH-011)

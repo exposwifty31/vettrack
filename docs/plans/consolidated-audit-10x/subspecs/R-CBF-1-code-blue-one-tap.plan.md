@@ -48,9 +48,9 @@ No new transport (SSE only) · **no offline queueing** (emergency mutations fail
 
 ### R-CBF-1.4 · Inline drug-dose reference in the timed log
 
-- **Goal:** reference data (not a new domain) shown inline in the timed-log view.
-- **RED:** `tests/code-blue-drug-reference.test.tsx` — the reference renders in the log; he+en; no PII; no network dependency if static.
-- **Source (pinned):** a static, versioned in-app table (no network); clinic-config deferred beyond v1.
+- **Goal:** a **static, versioned, clinician-approved** drug-dose reference shown inline in the timed-log view (reference data, not a new domain). **Clinical provenance is MANDATORY — rendering alone is insufficient (this is clinical-critical):** each entry carries a **named clinician-approved source**, a **version + effective date**, explicit **species / weight-band / concentration / unit** scope, and a **named review/update owner**; the bundled table is versioned and its provenance is shown with the reference.
+- **RED:** `tests/code-blue-drug-reference.test.tsx` — the reference renders with its **source + version/effective-date + species/weight/concentration/unit scope + review owner**; an entry **missing any provenance field FAILS validation** (unsourced or scope-less dose guidance cannot ship); he+en; no PII; no network dependency.
+- **Guardrail (clinical safety):** stale or unsourced dose guidance is a safety defect — provenance fields are enforced, not optional; clinic-configurability deferred beyond v1.
 
 ### R-CBF-1.5 · e2e drill + doctrine verification (acceptance bar)
 

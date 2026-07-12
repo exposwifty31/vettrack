@@ -42,8 +42,8 @@
 
 ### R-SH-F1.4 · Patient/animal worklist via the Priza PMS seam
 
-- **Goal:** populate `patientWorklist` from the external PMS through `server/integrations/` (Priza adapter). **Two distinct states (pinned):** *not configured* → **empty** worklist (graceful, no error); ***configured but failing*** → an **explicit error state** on the artifact — never silently show empty on failure.
-- **RED:** `tests/shift-handover-patient-worklist.test.ts` — a **mocked Priza feed** populates the worklist per tech; **no PMS configured → empty worklist + the rest of the handover still generates; configured-but-failing adapter → an explicit error state (not empty)**.
+- **Goal:** populate `patientWorklist` from the external PMS through `server/integrations/` (Priza adapter). **Two distinct states (pinned):** *not configured* → **empty** worklist (graceful, no error); ***configured but failing*** → an **explicit error state** on the artifact — never silently show empty on failure. **The rest of the handover (deltas, open-items, observed-signals) still generates normally; only `patientWorklist` carries the error state** — a PMS failure never blocks the whole artifact.
+- **RED:** `tests/shift-handover-patient-worklist.test.ts` — a **mocked Priza feed** populates the worklist per tech; **no PMS configured → empty worklist + the rest of the handover still generates; configured-but-failing adapter → an explicit error state on `patientWorklist` (not empty) while deltas/open-items/observed-signals still generate**.
 - **Guardrail:** no internal patient model; the adapter boundary is the only patient-data source.
 
 ### R-SH-F1.5 · Surface — extend `/handoff` + acknowledge + push
