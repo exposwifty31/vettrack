@@ -952,6 +952,7 @@ function EquipmentDetailPageDesktop() {
             <Button
               variant="ghost"
               size="icon-sm"
+              className="h-11 w-11"
               onClick={() => navigate("/equipment")}
               data-testid="btn-back"
               aria-label={t.equipmentDetail.backToList}
@@ -973,6 +974,7 @@ function EquipmentDetailPageDesktop() {
               <Button
                 variant="ghost"
                 size="icon-sm"
+                className="h-11 w-11"
                 onClick={handleDuplicate}
                 title={t.equipmentDetail.toast.duplicateEquipment}
                 aria-label={t.equipmentDetail.ariaDuplicate}
@@ -985,6 +987,7 @@ function EquipmentDetailPageDesktop() {
               <Button
                 variant="ghost"
                 size="icon-sm"
+                className="h-11 w-11"
                 onClick={() => navigate(`/equipment/${id}/edit`)}
                 aria-label={t.equipmentDetail.ariaEdit}
                 data-testid="btn-edit"
@@ -995,6 +998,7 @@ function EquipmentDetailPageDesktop() {
             <Button
               variant="ghost"
               size="icon-sm"
+              className="h-11 w-11"
               onClick={() => setToolsSheetOpen(true)}
               aria-label={t.equipmentDetail.toolsSheetTitle}
               data-testid="btn-equipment-tools"
