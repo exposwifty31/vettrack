@@ -101,4 +101,57 @@ describe("computeNudgesForUser — expiry nudges (T-30a1-i · R-IN-F1)", () => {
 
     expect(nudges).toEqual([]);
   });
+
+  it("excludes equipment with no expiry date set", async () => {
+    equipmentRows = [
+      {
+        id: "eq-1",
+        clinicId: "clinic-1",
+        name: "Autoclave",
+        expiryDate: null as unknown as string,
+        deletedAt: null,
+      },
+    ];
+
+    const nudges = await computeNudgesForUser("clinic-1", "technician");
+
+    expect(nudges).toEqual([]);
+  });
+
+  it("excludes equipment expiring more than 7 days out", async () => {
+    const farOut = new Date();
+    farOut.setDate(farOut.getDate() + 30);
+    equipmentRows = [
+      {
+        id: "eq-1",
+        clinicId: "clinic-1",
+        name: "Autoclave",
+        expiryDate: farOut.toISOString().slice(0, 10),
+        deletedAt: null,
+      },
+    ];
+
+    const nudges = await computeNudgesForUser("clinic-1", "technician");
+
+    expect(nudges).toEqual([]);
+  });
+
+  it("includes equipment that has already expired (still within the lte bound)", async () => {
+    const alreadyExpired = new Date();
+    alreadyExpired.setDate(alreadyExpired.getDate() - 5);
+    equipmentRows = [
+      {
+        id: "eq-1",
+        clinicId: "clinic-1",
+        name: "Autoclave",
+        expiryDate: alreadyExpired.toISOString().slice(0, 10),
+        deletedAt: null,
+      },
+    ];
+
+    const nudges = await computeNudgesForUser("clinic-1", "technician");
+
+    expect(nudges).toHaveLength(1);
+    expect(nudges[0]).toMatchObject({ kind: "expiry", entityId: "eq-1" });
+  });
 });
