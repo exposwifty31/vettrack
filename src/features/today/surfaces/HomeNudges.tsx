@@ -4,17 +4,20 @@ import { X } from "lucide-react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { safeStorageGetItem, safeStorageSetItem } from "@/lib/safe-browser";
-import { getCurrentUserId } from "@/lib/auth-store";
+import { getCurrentClinicId, getCurrentUserId } from "@/lib/auth-store";
 import { reportNudgeShown } from "@/lib/realtime";
 import type { Nudge } from "@/types/nudges";
 
 const DISMISSED_NUDGES_STORAGE_KEY = "vt_dismissed_nudge_ids";
 
-// Scoped per signed-in user — otherwise one staff member dismissing a nudge
-// on a shared tablet would hide it for the next person too, since the raw
-// key is shared across every user of that browser profile.
+// Scoped per signed-in user AND clinic — otherwise one staff member
+// dismissing a nudge on a shared tablet would hide it for the next person
+// too (raw key shared across every user of that browser profile), and the
+// same clinicId-scoping discipline every server query already applies
+// (CLAUDE.md: "Every query must filter by clinicId. No exceptions.") keeps a
+// dismissal from one clinic from ever suppressing a same-id nudge at another.
 function dismissedIdsStorageKey(): string {
-  return `${DISMISSED_NUDGES_STORAGE_KEY}:${getCurrentUserId()}`;
+  return `${DISMISSED_NUDGES_STORAGE_KEY}:${getCurrentUserId()}:${getCurrentClinicId()}`;
 }
 
 function readDismissedIds(): Set<string> {

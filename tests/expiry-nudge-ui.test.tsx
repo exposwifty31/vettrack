@@ -23,7 +23,7 @@ vi.mock("@/lib/realtime", () => ({
 }));
 
 import { HomeNudges } from "@/features/today/surfaces/HomeNudges";
-import { setAuthState } from "@/lib/auth-store";
+import { setAuthState, setCurrentClinicId } from "@/lib/auth-store";
 
 const EXPIRY_NUDGE: Nudge = {
   id: "expiry:eq-1",
@@ -47,6 +47,7 @@ beforeEach(() => {
   reportNudgeShownMock.mockReset();
   window.localStorage.clear();
   setAuthState({ userId: "user-a", email: "a@clinic.test", name: "User A", bearerToken: null });
+  setCurrentClinicId();
 });
 
 afterEach(() => cleanup());
@@ -107,6 +108,27 @@ describe("HomeNudges — dismiss persists across a remount", () => {
       expect(screen.getByTestId(`home-nudge-${EXPIRY_NUDGE.id}`)).toBeTruthy(),
     );
   });
+
+  it("does not hide a nudge for the same user id at a different clinic", async () => {
+    listMock.mockResolvedValue({ nudges: [EXPIRY_NUDGE] });
+    setCurrentClinicId("clinic-a");
+    const { unmount } = renderNudges();
+
+    await waitFor(() =>
+      expect(screen.getByTestId(`home-nudge-${EXPIRY_NUDGE.id}`)).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByTestId(`home-nudge-dismiss-${EXPIRY_NUDGE.id}`));
+    expect(screen.queryByTestId(`home-nudge-${EXPIRY_NUDGE.id}`)).toBeNull();
+    unmount();
+
+    // Same user id, different active clinic — the same entity id producing
+    // the same nudge id at another clinic must not read as already-dismissed.
+    setCurrentClinicId("clinic-b");
+    renderNudges();
+    await waitFor(() =>
+      expect(screen.getByTestId(`home-nudge-${EXPIRY_NUDGE.id}`)).toBeTruthy(),
+    );
+  });
 });
 
 describe("HomeNudges — feed fetch failure", () => {
@@ -122,10 +144,10 @@ describe("HomeNudges — feed fetch failure", () => {
 });
 
 describe("HomeNudges — reportNudgeShown telemetry", () => {
-  it("reports a nudge as shown exactly once, even across rerenders", async () => {
+  it("reports a nudge as shown exactly once, even once the query refetches a freshly-allocated array for the same nudge id", async () => {
     listMock.mockResolvedValue({ nudges: [EXPIRY_NUDGE] });
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const { rerender } = render(
+    render(
       <QueryClientProvider client={qc}>
         <HomeNudges />
       </QueryClientProvider>,
@@ -137,12 +159,16 @@ describe("HomeNudges — reportNudgeShown telemetry", () => {
     await waitFor(() => expect(reportNudgeShownMock).toHaveBeenCalledTimes(1));
     expect(reportNudgeShownMock).toHaveBeenCalledWith("expiry");
 
-    // Force a rerender with the same underlying query data — must not
-    // double-report the same nudge id.
-    rerender(
-      <QueryClientProvider client={qc}>
-        <HomeNudges />
-      </QueryClientProvider>,
+    // Push a brand-new nudges array (new object/array identity, same nudge
+    // id) directly into the query cache — a plain rerender() with an
+    // unchanged QueryClient keeps the exact same cached data reference, so
+    // the effect never re-runs and this test would pass even if the
+    // reportedShownIds dedupe guard were removed entirely. setQueryData
+    // forces React Query to actually push new data through the component,
+    // the way a real refetch/reconciliation would.
+    qc.setQueryData(["/api/nudges"], { nudges: [{ ...EXPIRY_NUDGE }] });
+    await waitFor(() =>
+      expect(screen.getByTestId(`home-nudge-${EXPIRY_NUDGE.id}`)).toBeTruthy(),
     );
     expect(reportNudgeShownMock).toHaveBeenCalledTimes(1);
   });
