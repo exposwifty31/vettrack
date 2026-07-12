@@ -114,6 +114,8 @@ export const equipment = vtTable("vt_equipment", {
   folderId: text("folder_id").references(() => folders.id, { onDelete: "set null" }),
   roomId: text("room_id").references(() => rooms.id, { onDelete: "set null" }),
   status: varchar("status", { length: 20 }).notNull().default("ok"),
+  /** Additive damage-tracking status (R-EQ-F3); "ok" preserves existing rows as not-damaged. */
+  conditionStatus: varchar("condition_status", { length: 20 }).notNull().default("ok"),
   lastSeen: timestamp("last_seen"),
   lastStatus: varchar("last_status", { length: 20 }),
   lastMaintenanceDate: timestamp("last_maintenance_date"),
@@ -410,3 +412,23 @@ export const equipmentReadinessConfig = vtTable(
     clinicKeyPk: primaryKey({ columns: [table.clinicId, table.key] }),
   }),
 );
+
+/** Damage report log for equipment (T-24a · R-EQ-F3). */
+export const damageEvents = vtTable(
+  "vt_damage_events",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id").notNull().references(() => clinics.id, { onDelete: "restrict" }),
+    equipmentId: text("equipment_id").notNull().references(() => equipment.id, { onDelete: "cascade" }),
+    reportedBy: text("reported_by").notNull(),
+    at: timestamp("at").defaultNow().notNull(),
+    note: text("note"),
+    resolvedAt: timestamp("resolved_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    clinicEquipmentIdx: index("idx_vt_damage_events_clinic_equipment").on(t.clinicId, t.equipmentId),
+  }),
+);
+export type DamageEvent = typeof damageEvents.$inferSelect;
+export type NewDamageEvent = typeof damageEvents.$inferInsert;
