@@ -241,6 +241,8 @@ export type AuditActionType =
   | "equipment_stale_checkout_nudged"
   // Sprint 1.7 — inference engine fires when no location signal exists for a device.
   | "equipment_location_unknown"
+  // T-24b — damage report flips conditionStatus to a non-"ok" value (R-EQ-F3).
+  | "equipment_damage_reported"
   // Phase 9 — Display device pairing
   | "display_pairing_code_issued"
   | "display_device_paired"

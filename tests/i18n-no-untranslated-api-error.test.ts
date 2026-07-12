@@ -53,6 +53,7 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "server/routes/dispense.ts", // owner: dispense (PR 6.10 target)
   "server/routes/display.ts", // owner: display
   "server/routes/equipment-copilot.ts", // owner: equipment
+  "server/routes/equipment-damage.ts", // owner: equipment (damage-report POST; uses equipment-route-utils apiError like sibling equipment-locate.ts)
   "server/routes/equipment-locate.ts", // owner: equipment (read-only locate; uses equipment-route-utils apiError like sibling equipment routes)
   "server/routes/equipment-operational-state.ts", // owner: equipment-ops-v2 (V2 procedure-bind; will be i18n'd in שלב 5)
   "server/routes/equipment.ts", // owner: equipment
