@@ -128,6 +128,8 @@ export default function InventoryItemsPage() {
         label: form.label.trim(),
         category: form.category || undefined,
         nfcTagId: form.nfcTagId.trim() || undefined,
+        isBillable: form.isBillable,
+        minimumDispenseToCapture: form.minimumDispenseToCapture,
         parLevel: parseOptCount(form.parLevel),
         reorderPoint: parseOptCount(form.reorderPoint),
       }),
