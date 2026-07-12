@@ -242,7 +242,7 @@ Do not start code until the owner clears the standing blocker.
 - Student undo carve-out → **no carve-out; students get undo like everyone** (§9).
 
 **Still open / gated:**
-- **massive-01** — core, not optional; **immediate prerequisite is the `R-M1-PRE` cost/benefit analysis** (manager-facing numbers) before its technical spec-plan. Research for this deliverable is in progress.
+- **massive-01** — core, not optional; **immediate prerequisite is the `R-M1-PRE` cost/benefit analysis** (manager-facing numbers) before its technical spec-plan. **Delivered:** `docs/business-case/2026-07-12-massive-01-passive-tracking-cost-benefit.md` (benchmark ranges + parameterized model; owner supplies the 8 clinic inputs in its §6 to finalize the numbers).
 - **massive-03** (clinic network) + **medium-04** (asset copilot/voice) — **on hold, no deadline** (owner). Blockers unchanged: buyer identity + security design pass (massive-03); native-shell sequencing for voice (medium-04).
 
 ---
