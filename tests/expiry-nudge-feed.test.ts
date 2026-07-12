@@ -15,64 +15,19 @@
  * stand-in.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import {
+  drizzleOrmPredicateMock,
+  makeEquipmentDbMock,
+  type EquipmentFixtureRow,
+} from "./helpers/nudge-feed-db-mock.js";
 
 // ─── drizzle-orm — pass-through predicate builders ─────────────────────────
-vi.mock("drizzle-orm", () => ({
-  eq: (a: unknown, b: unknown) => ({ _type: "eq", a, b }),
-  and: (...args: unknown[]) => ({ _type: "and", args }),
-  isNull: (x: unknown) => ({ _type: "isNull", x }),
-  isNotNull: (x: unknown) => ({ _type: "isNotNull", x }),
-  lte: (a: unknown, b: unknown) => ({ _type: "lte", a, b }),
-  sql: (strings: TemplateStringsArray, ...exprs: unknown[]) => ({ _type: "sql", strings, exprs }),
-}));
+vi.mock("drizzle-orm", () => drizzleOrmPredicateMock);
 
 // ─── db mock — equipment table, clinicId-scoped ────────────────────────────
-type EquipmentFixtureRow = {
-  id: string;
-  clinicId: string;
-  name: string;
-  expiryDate: string;
-  deletedAt: string | null;
-};
-
 let equipmentRows: EquipmentFixtureRow[] = [];
 
-type MockCondition =
-  | { _type: "and"; args: MockCondition[] }
-  | { _type: "eq"; a: { _column?: string }; b: unknown }
-  | { _type: "isNull" | "isNotNull"; x: unknown }
-  | { _type: "lte"; a: unknown; b: unknown }
-  | undefined;
-
-function extractClinicId(condition: MockCondition): string | undefined {
-  if (!condition) return undefined;
-  if (condition._type === "and") {
-    for (const c of condition.args) {
-      const found = extractClinicId(c);
-      if (found) return found;
-    }
-    return undefined;
-  }
-  if (condition._type === "eq" && condition.a?._column === "clinicId") {
-    return condition.b as string;
-  }
-  return undefined;
-}
-
-vi.mock("../server/db.js", () => ({
-  db: {
-    select: () => ({
-      from: () => ({
-        where: (condition: MockCondition) => {
-          const clinicId = extractClinicId(condition);
-          const rows = equipmentRows.filter((r) => r.clinicId === clinicId && !r.deletedAt);
-          return Promise.resolve(rows.map((r) => ({ id: r.id, name: r.name, expiryDate: r.expiryDate })));
-        },
-      }),
-    }),
-  },
-  equipment: new Proxy({}, { get: (_t, prop) => ({ _column: String(prop) }) }),
-}));
+vi.mock("../server/db.js", () => makeEquipmentDbMock(() => equipmentRows));
 
 // computeNudgesForUser also derives "restock" nudges (T-30a1-ii) via
 // listLowStockItems — irrelevant to this file's expiry-only assertions, so
