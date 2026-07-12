@@ -67,11 +67,8 @@ export default function AdminPage() {
     return (
       <AppShell>
         <Helmet>
-          <title>Admin — VetTrack</title>
-          <meta
-            name="description"
-            content="VetTrack administration panel. Manage equipment folders, user roles, and system settings for your veterinary clinic."
-          />
+          <title>{t.adminPage.pageHeading} — VetTrack</title>
+          <meta name="description" content={t.adminPage.metaDescription} />
         </Helmet>
         <ManagementAccessDenied />
       </AppShell>
@@ -85,11 +82,8 @@ export default function AdminPage() {
   const pageContent = (
     <>
       <Helmet>
-        <title>Admin — VetTrack</title>
-        <meta
-          name="description"
-          content="VetTrack administration panel. Manage equipment folders, user roles, and system settings for your veterinary clinic."
-        />
+        <title>{t.adminPage.pageHeading} — VetTrack</title>
+        <meta name="description" content={t.adminPage.metaDescription} />
         <link rel="canonical" href="https://vettrack.replit.app/admin" />
       </Helmet>
       <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-4 pb-24 pt-3 animate-fade-in sm:px-6 lg:max-w-[1120px]">

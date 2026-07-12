@@ -550,7 +550,7 @@ export default function CodeBluePage() {
   const params = new URLSearchParams(search);
   const initEquipmentId = params.get("equipmentId") ?? undefined;
 
-  const { session, isLoading: sessionLoading, refetch } = useCodeBlueSession();
+  const { session, isLoading: sessionLoading, isError: sessionError, refetch } = useCodeBlueSession();
   const [starting, setStarting] = useState(false);
 
   const primaryEquipQ = useQuery<{ name: string } | null>({
@@ -623,6 +623,27 @@ export default function CodeBluePage() {
       >
         <Loader2 className="h-6 w-6 animate-spin text-emergency-text2" aria-hidden />
         <p className="text-sm text-emergency-text2">{t.codeBlue.checkingActiveSession}</p>
+      </div>
+    );
+  }
+
+  // A FAILED active-session check is not the same as a confirmed "no active
+  // session" — falling through to the launch form here would let staff open a
+  // duplicate/erroneous session while an existing one is unreachable, or miss
+  // re-entering a genuinely active one. Block on a retryable error state
+  // instead of assuming "none" (2026-07-10 QA audit caveat E-c follow-up).
+  if (sessionError) {
+    return (
+      <div
+        data-testid="code-blue-session-error"
+        className="flex flex-col items-center justify-center gap-3 bg-emergency-bg w-full p-6 text-center"
+        style={{ height: "100%", paddingTop: "env(safe-area-inset-top)" }}
+      >
+        <AlertTriangle className="h-6 w-6 text-emergency-amber" aria-hidden />
+        <p className="text-sm text-emergency-text2">{t.codeBlue.sessionCheckFailed}</p>
+        <Button variant="secondary" onClick={() => refetch()}>
+          {t.errorCard.retry}
+        </Button>
       </div>
     );
   }

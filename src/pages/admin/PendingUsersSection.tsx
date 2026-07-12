@@ -81,7 +81,9 @@ export function PendingUsersSection() {
           </p>
         ) : (
           <div className="flex flex-col gap-2">
-            {pendingUsers.map((user) => (
+            {pendingUsers.map((user) => {
+              const roleLabel = requestedRoleLabel(user.requestedRole);
+              return (
               <div
                 key={user.id}
                 data-testid={`pending-user-row-${user.id}`}
@@ -101,12 +103,12 @@ export function PendingUsersSection() {
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {t.adminPage.signedUp(formatDateByLocale(user.createdAt))}
                   </p>
-                  {requestedRoleLabel(user.requestedRole) && (
+                  {roleLabel && (
                     <p
                       className="text-xs text-muted-foreground mt-0.5"
                       data-testid={`requested-role-hint-${user.id}`}
                     >
-                      {t.adminPage.requestedRoleHint(requestedRoleLabel(user.requestedRole)!)}
+                      {t.adminPage.requestedRoleHint(roleLabel)}
                     </p>
                   )}
                 </div>
@@ -148,7 +150,8 @@ export function PendingUsersSection() {
                   </Button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardContent>

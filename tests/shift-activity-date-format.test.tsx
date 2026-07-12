@@ -9,9 +9,9 @@
  * this locks that the profile shift-activity row now reuses it too.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
-import { setStoredLocale } from "@/lib/i18n";
+import { setStoredLocale, t } from "@/lib/i18n";
 
 const shiftActivityMock = vi.fn();
 
@@ -70,5 +70,31 @@ describe("ShiftActivityList — locale-aware date formatting", () => {
 
     const dateText = await screen.findByText("May 13, 2026");
     expect(dateText.textContent).toBe("May 13, 2026");
+  });
+});
+
+describe("ShiftActivityList — failure path", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+  afterEach(() => {
+    cleanup();
+    setStoredLocale("he");
+  });
+
+  it("shows the error state (not a date-formatted row) when the fetch fails, and retry re-issues it", async () => {
+    shiftActivityMock.mockRejectedValueOnce(new Error("network down"));
+    shiftActivityMock.mockResolvedValueOnce([SESSION]);
+
+    renderList();
+
+    const errorText = await screen.findByText(t.profile.shiftActivityError);
+    expect(errorText).toBeTruthy();
+    expect(screen.queryByText("13 במאי 2026")).toBeNull();
+
+    fireEvent.click(screen.getByText(t.common.tryAgain));
+
+    await waitFor(() => expect(shiftActivityMock).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText("13 במאי 2026")).toBeTruthy();
   });
 });

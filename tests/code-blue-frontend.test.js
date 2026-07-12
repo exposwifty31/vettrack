@@ -115,12 +115,20 @@ describe("Code Blue page — quick log idempotency", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("Code Blue display page", () => {
+  // The TDD-red-state skipIf guards this file was written under are stale —
+  // src/pages/code-blue-display.tsx is a load-bearing frozen surface now, not
+  // a not-yet-created file. A missing/renamed page must fail this suite
+  // loudly, not silently skip every assertion below.
+  it("code-blue-display.tsx exists", () => {
+    expect(display).not.toBeNull();
+  });
+
   // T20 (frozen-surface audit fix): the wall is driven by the frozen SSE
   // transport, not by a bare poll on /api/code-blue/sessions/active. It reads
   // the SSE-fed DISPLAY_SNAPSHOT and mounts the shared realtime client seam
   // (EventIngestor + connectRealtime). Polling is demoted to the snapshot's
   // bounded degraded fallback only.
-  it.skipIf(display === null)("display page is SSE-driven (frozen transport), not a bare CB poll", () => {
+  it("display page is SSE-driven (frozen transport), not a bare CB poll", () => {
     expect(display).toContain("connectRealtime");
     expect(display).toContain("EventIngestor");
     expect(display).toContain("DISPLAY_SNAPSHOT_QUERY_KEY");
@@ -129,12 +137,12 @@ describe("Code Blue display page", () => {
     expect(display).not.toContain("/api/code-blue/sessions/active");
   });
 
-  it.skipIf(display === null)("display page has no interactive buttons (no onClick that posts)", () => {
+  it("display page has no interactive buttons (no onClick that posts)", () => {
     expect(display).not.toContain('"POST"');
     expect(display).not.toContain("useMutation");
   });
 
-  it.skipIf(display === null)("display page shows standby message when no session", () => {
+  it("display page shows standby message when no session", () => {
     // Phase 6 PR 6.7 migrated the literal "ממתין לאירוע..." to
     // t.codeBlue.display.awaitingEvent. Assert the accessor + locale
     // dict are wired up.

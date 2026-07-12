@@ -249,7 +249,6 @@ function EquipmentListPageDesktop() {
   });
 
   const equipment = equipmentPage?.items ?? [];
-  const totalCount = equipmentPage?.total ?? 0;
 
   /** Clears paginated equipment cache, resets local UI state, and runs a fresh fetch (used by ErrorCard retry). */
   const refetchAll = useCallback(async () => {
@@ -809,11 +808,14 @@ function EquipmentListPageDesktop() {
           )}
         </div>
 
-        {/* Count + page info */}
+        {/* Count + page info — both numbers derive from the same locally-loaded
+            `displayList`, the pager's actual data source. Mixing this with the
+            server's filtered-total (which can exceed the fixed page:1/100-item
+            batch actually fetched) would contradict "page X of Y" below. */}
         <p className="vt-text-xs text-muted-foreground -mt-2">
           {t.equipmentList.paginationCount(
             resolveEquipmentListShownCount(isVirtualized, displayList.length, pageItems.length),
-            totalCount || equipment.length,
+            displayList.length,
           )}
           {!isLoading && !isVirtualized && totalPages > 1 && (
             <span className="ms-1">· {t.equipmentList.paginationPage(safePage, totalPages)}</span>
@@ -1004,7 +1006,10 @@ export function EquipmentItem({
   const { userId, isAdmin } = useAuth();
   // Off-shift: taking equipment ownership is not permitted (roster-derived),
   // same gate the equipment detail page enforces (see handleCheckout there).
-  const { hasActiveShift } = useActiveShift();
+  // `hasActiveShift` defaults to false while the shift query is still
+  // resolving — without consuming `isLoading` too, a fresh page load would
+  // briefly tell an on-shift tech they're off-shift before the query settles.
+  const { hasActiveShift, isLoading: shiftLoading } = useActiveShift();
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
@@ -1067,6 +1072,9 @@ export function EquipmentItem({
   // detail page's handleCheckout), and still fails loud via onError above
   // for any other 400 the server returns.
   const handleCheckoutClick = () => {
+    // Stay quiet (not a false "off-shift" error) while the shift query is
+    // still resolving — the quick-action button is disabled for this window.
+    if (shiftLoading) return;
     if (!hasActiveShift) {
       toast.error(t.scan.offShiftBody);
       return;
@@ -1117,7 +1125,7 @@ export function EquipmentItem({
   const quickAction = eq.custodyState === "returned" && eq.status === "ok"
     ? { label: t.dockReturn.submit, icon: LogIn, action: () => setDockReturnOpen(true), pending: false, className: "text-blue-700 border-blue-200 hover:bg-blue-50" }
     : !isCheckedOut && eq.status === "ok"
-    ? { label: t.equipmentList.quickAction.checkout, icon: LogIn, action: handleCheckoutClick, pending: checkoutMut.isPending, className: "text-emerald-700 border-emerald-200 hover:bg-emerald-50" }
+    ? { label: t.equipmentList.quickAction.checkout, icon: LogIn, action: handleCheckoutClick, pending: checkoutMut.isPending || shiftLoading, className: "text-emerald-700 border-emerald-200 hover:bg-emerald-50" }
     : (isCheckedOut && (checkedOutByMe || isAdmin)) && eq.status === "ok"
     ? { label: t.equipmentList.quickAction.return, icon: LogOut, action: () => setReturnDialogOpen(true), pending: returnMut.isPending, className: "text-primary border-primary/30 hover:bg-primary/10" }
     : eq.status === "issue"

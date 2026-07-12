@@ -1,6 +1,6 @@
 import { createRoot, type Root } from "react-dom/client";
-import { ClerkProvider, type ClerkProp } from "@clerk/clerk-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { type ClerkProp } from "@clerk/clerk-react";
+import { useEffect, useState } from "react";
 import App from "./App";
 import "./index.css";
 import "./instrument";
@@ -28,12 +28,8 @@ import {
   registerServiceWorkerSafe,
 } from "@/lib/safe-browser";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
-import {
-  clerkLocalizationForLocale,
-  clerkProviderPropsForRuntime,
-  type ClerkProviderRuntimeProps,
-} from "@/lib/clerk-capacitor-config";
-import { getCurrentLocale, type Locale } from "@/lib/i18n";
+import { clerkProviderPropsForRuntime } from "@/lib/clerk-capacitor-config";
+import { ClerkLocaleBridge } from "@/components/clerk-locale-bridge";
 import { NativeClerkGate } from "@/components/native-clerk-gate";
 import { primeNfcSupportCache } from "@/lib/nfc-platform";
 import { usePlatformTarget } from "@/app/platform";
@@ -191,38 +187,6 @@ function AppBootstrap() {
   }, []);
 
   return <App key={`locale-${localeVersion}`} />;
-}
-
-/**
- * Wraps ClerkProvider so the Clerk sign-in card's locale tracks the app's
- * current locale live, not just at boot (T8 — the card previously always
- * rendered in English regardless of the surrounding Hebrew chrome).
- * Re-derives on the same "vettrack:locale-changed" event AppBootstrap
- * already listens to, so a mid-session locale switch updates the card
- * without a full reload. `runtimeProps.localization` (from
- * `clerkProviderPropsForRuntime`) is the boot-time snapshot; this overrides
- * it on every render with the live value.
- */
-function ClerkLocaleBridge({
-  runtimeProps,
-  nativeClerk,
-  children,
-}: {
-  runtimeProps: ClerkProviderRuntimeProps;
-  nativeClerk?: ClerkProp;
-  children: ReactNode;
-}) {
-  const [locale, setLocale] = useState<Locale>(() => getCurrentLocale());
-  useEffect(() => {
-    const handler = () => setLocale(getCurrentLocale());
-    window.addEventListener("vettrack:locale-changed", handler);
-    return () => window.removeEventListener("vettrack:locale-changed", handler);
-  }, []);
-  return (
-    <ClerkProvider {...runtimeProps} localization={clerkLocalizationForLocale(locale)} Clerk={nativeClerk}>
-      {children}
-    </ClerkProvider>
-  );
 }
 
 if (!rootEl) {

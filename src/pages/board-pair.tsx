@@ -5,12 +5,16 @@
 // we redeem it for a durable device token (POST /api/display/pair/claim),
 // persist the token, and hand off to /board. Renders inside BoardShell (dark,
 // full-bleed kiosk chrome) because /board/pair matches `isBoardPathname`.
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { MonitorSmartphone, Loader2, TriangleAlert } from "lucide-react";
 import { claimDisplayPairing } from "@/lib/api";
-import { setStoredDisplayToken, consumeDisplayRevokedNotice } from "@/lib/display-token-store";
+import {
+  setStoredDisplayToken,
+  consumeDisplayRevokedNotice,
+  peekDisplayRevokedNotice,
+} from "@/lib/display-token-store";
 import { t } from "@/lib/i18n";
 import { useDirection } from "@/hooks/useDirection";
 import { Button } from "@/components/ui/button";
@@ -26,9 +30,16 @@ export default function BoardPairPage() {
   const dir = useDirection();
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
-  // Consumed exactly once on mount — a lazy initializer so the flag is read
-  // and cleared before the first paint, not in a post-mount effect.
-  const [wasRevoked] = useState(() => consumeDisplayRevokedNotice());
+  // A pure peek in the lazy initializer — reading without clearing keeps this
+  // safe under React StrictMode's double-invocation of state initializers
+  // (double-consuming a read+clear initializer would drop the notice on the
+  // second, already-cleared call). The flag is actually cleared exactly once
+  // in the post-mount effect below.
+  const [wasRevoked] = useState(() => peekDisplayRevokedNotice());
+
+  useEffect(() => {
+    if (wasRevoked) consumeDisplayRevokedNotice();
+  }, [wasRevoked]);
 
   const mutation = useMutation({
     mutationFn: () => claimDisplayPairing(code.trim(), name.trim() || undefined),

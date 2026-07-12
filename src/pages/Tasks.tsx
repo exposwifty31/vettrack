@@ -1227,7 +1227,7 @@ export default function AppointmentsPage() {
           required select had zero options and submit stayed disabled with
           no explanation. */}
       {(metaQuery.isError ||
-        (metaQuery.isSuccess && (metaQuery.data?.vets ?? []).length === 0)) && (
+        (metaQuery.isSuccess && assignees.length === 0)) && (
         <p className="mt-1 text-xs text-destructive" role="alert">
           {t.appointmentsPage.noEligibleTechnicians}
         </p>
@@ -1246,6 +1246,22 @@ export default function AppointmentsPage() {
         onChange={setFormDeviceRef}
         required
       />
+      {/* A failed fetch must not read as "no equipment registered" — an
+          empty `equipment` array from an errored query looks identical to a
+          genuinely empty clinic otherwise. Retries are exhausted via the
+          shared queryClient default before `isError` settles. */}
+      {equipmentQuery.isError && (
+        <p className="mt-1 text-xs text-destructive" role="alert">
+          {t.appointmentsPage.equipmentLoadFailed}{" "}
+          <button
+            type="button"
+            onClick={() => equipmentQuery.refetch()}
+            className="underline"
+          >
+            {t.errorCard.retry}
+          </button>
+        </p>
+      )}
     </div>
 
     <div>

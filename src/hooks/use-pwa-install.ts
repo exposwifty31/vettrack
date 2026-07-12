@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import * as Sentry from "@sentry/react";
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -67,7 +68,14 @@ const ANDROID_DISMISSED_KEY = "vt_pwa_android_banner_dismissed";
 function isAndroidBannerSuppressed(): boolean {
   try {
     return sessionStorage.getItem(ANDROID_DISMISSED_KEY) === "1";
-  } catch {
+  } catch (err) {
+    // Non-fatal: fall back to "not suppressed" so the banner still offers
+    // install, but surface the storage failure instead of swallowing it —
+    // a silently-broken read here means a dismissed banner keeps reappearing.
+    Sentry.captureMessage("PWA install: sessionStorage read failed (Android banner)", {
+      level: "warning",
+      extra: { key: ANDROID_DISMISSED_KEY, error: String(err) },
+    });
     return false;
   }
 }
@@ -114,8 +122,13 @@ export function usePwaInstall(): PwaInstallState {
     setAndroidDismissed(true);
     try {
       sessionStorage.setItem(ANDROID_DISMISSED_KEY, "1");
-    } catch {
-      // storage unavailable — state still held in memory for this session
+    } catch (err) {
+      // Non-fatal — state still held in memory for this session, but a
+      // silently-failed write means the dismissal won't survive a remount.
+      Sentry.captureMessage("PWA install: sessionStorage write failed (Android banner)", {
+        level: "warning",
+        extra: { key: ANDROID_DISMISSED_KEY, error: String(err) },
+      });
     }
   }
 

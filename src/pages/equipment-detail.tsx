@@ -1184,7 +1184,7 @@ function EquipmentDetailPageDesktop() {
                 {equipment.checkedOutLocation && (
                   <p className="text-xs mt-0.5 opacity-80 truncate">{equipment.checkedOutLocation}</p>
                 )}
-                <p className="text-xs mt-0.5 opacity-70">{t.shiftSummaryPage.since} {formatRelativeTime(equipment.checkedOutAt)}</p>
+                <p className="text-xs mt-0.5 opacity-70">{t.equipmentDetail.since} {formatRelativeTime(equipment.checkedOutAt)}</p>
               </div>
             </div>
           )}

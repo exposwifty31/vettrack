@@ -7,9 +7,11 @@
  * dependencies too heavy for a focused render test, so — mirroring the
  * existing "confirm-path visibility contract" pattern in
  * tests/shift-csv-role-labels.test.ts — this is a source contract: each
- * action button must resolve its label from a `t.equipmentDetail.*` (or
- * shared `t.shiftSummaryPage.since`) accessor, and the bare English JSX
- * text nodes must be gone.
+ * action button (and the in-use "Since {time}" indicator, via its own
+ * `t.equipmentDetail.since` key — CodeRabbit PR #83, no longer borrowed from
+ * `t.shiftSummaryPage.since`) must resolve its label from a
+ * `t.equipmentDetail.*` accessor, and the bare English JSX text nodes must
+ * be gone.
  */
 import { describe, expect, it } from "vitest";
 import fs from "fs";
@@ -62,8 +64,9 @@ describe("equipment-detail quick action bar — i18n source contract (T7)", () =
     expect(blockAfter("btn-move-room", 150)).toContain("t.equipmentDetail.actionMove");
   });
 
-  it("the in-use context indicator's 'Since {time}' reuses t.shiftSummaryPage.since", () => {
-    expect(source).toContain("{t.shiftSummaryPage.since} {formatRelativeTime(equipment.checkedOutAt)}");
+  it("the in-use context indicator's 'Since {time}' resolves from an equipmentDetail-scoped accessor (not borrowed from shiftSummaryPage)", () => {
+    expect(source).toContain("{t.equipmentDetail.since} {formatRelativeTime(equipment.checkedOutAt)}");
+    expect(source).not.toContain("t.shiftSummaryPage.since");
   });
 
   it("no longer renders the raw English action-bar literals as bare JSX text (scoped to quick-action-bar)", () => {

@@ -16,6 +16,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import { t } from "@/lib/i18n";
 
 const importsMock = vi.fn();
 const hintsMock = vi.fn();
@@ -208,5 +209,65 @@ describe("AdminShiftsPage — doctor vs roster import is visible in the preview 
     // Doctor rows render the userId, not an employeeName column.
     expect(screen.getByText("user-1")).toBeTruthy();
     expect(screen.queryByText("WC A")).toBeNull();
+  });
+});
+
+describe("AdminShiftsPage — failure paths (CodeRabbit PR #83 coverage)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    importsMock.mockResolvedValue([]);
+  });
+  afterEach(() => cleanup());
+
+  it("shows an ErrorCard (not a silent empty state) when the accepted-shift-names fetch fails", async () => {
+    hintsMock.mockRejectedValue(new Error("hints down"));
+    renderPage();
+
+    await waitFor(() => expect(hintsMock).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(t.adminShiftsPage.acceptedShiftNamesLoadFailed)).toBeTruthy();
+  });
+
+  it("surfaces a toast (not a silent no-op) when CSV preview generation fails", async () => {
+    hintsMock.mockResolvedValue({ technician: [], seniorTechnician: [], admin: [] });
+    previewMock.mockRejectedValueOnce(new Error("Malformed CSV header"));
+    const { container } = renderPage();
+
+    const file = new File(["x"], "roster.csv", { type: "text/csv" });
+    fireEvent.change(fileInput(container), { target: { files: [file] } });
+    fireEvent.click(screen.getByTestId("btn-preview-shifts-csv"));
+
+    await waitFor(() => expect(previewMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("Malformed CSV header"));
+    // No stale preview card should render off a failed preview call.
+    expect(screen.queryByTestId("shift-import-kind-badge")).toBeNull();
+  });
+
+  it("surfaces a toast (not a silent no-op) when import confirm fails", async () => {
+    hintsMock.mockResolvedValue({ technician: [], seniorTechnician: [], admin: [] });
+    previewMock.mockResolvedValue({
+      kind: "roster",
+      filename: "roster.csv",
+      summary: { totalRows: 1, validRows: 1, skippedRows: 0 },
+      rows: [
+        { rowNumber: 2, date: "2026-07-05", startTime: "08:00", endTime: "16:00", employeeName: "WC A", shiftName: "טכנאי בוקר", role: "technician" },
+      ],
+      issues: [],
+    });
+    confirmMock.mockRejectedValueOnce(new Error("Server rejected the import"));
+    const { container } = renderPage();
+
+    const file = new File(["x"], "roster.csv", { type: "text/csv" });
+    fireEvent.change(fileInput(container), { target: { files: [file] } });
+    fireEvent.click(screen.getByTestId("btn-preview-shifts-csv"));
+    await waitFor(() =>
+      expect((screen.getByTestId("btn-confirm-shifts-import") as HTMLButtonElement).disabled).toBe(false),
+    );
+
+    fireEvent.click(screen.getByTestId("btn-confirm-shifts-import"));
+
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+    // Preview succeeding has its own (unrelated) success toast — only the
+    // confirm-failure toast matters here.
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("Server rejected the import"));
   });
 });

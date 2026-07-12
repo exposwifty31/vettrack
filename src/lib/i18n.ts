@@ -253,6 +253,7 @@ const translations = {
     describeIssue: d.equipmentDetail.describeIssue,
     addObservations: d.equipmentDetail.addObservations,
     checkedOutBy: (email: string) => tr(d.equipmentDetail.checkedOutBy, { email }),
+    since: d.equipmentDetail.since,
     updateStatusTitle: d.equipmentDetail.updateStatusTitle,
     statusLabel: d.equipmentDetail.statusLabel,
     actionInUse: d.equipmentDetail.actionInUse,

@@ -484,6 +484,7 @@ export interface TStructure {
     describeIssue: string;
     addObservations: string;
     checkedOutBy: string;
+    since: string;
     updateStatusTitle: string;
     statusLabel: string;
     actionInUse: string;
@@ -1893,6 +1894,7 @@ export interface TStructure {
   };
   adminPage: {
     pageHeading: string;
+    metaDescription: string;
     tabShifts: string;
     tabFolders: string;
     tabPending: string;
@@ -2423,6 +2425,7 @@ export interface TStructure {
     staffMember: string;
     unassigned: string;
     linkedDevice: string;
+    equipmentLoadFailed: string;
     linkedOwner: string;
     unknownUser: string;
     scheduledAt: string;
@@ -2620,6 +2623,7 @@ export interface TStructure {
     managerInstruction: string;
     loadingManagers: string;
     checkingActiveSession: string;
+    sessionCheckFailed: string;
     noManagersAvailable: string;
     you: string;
     managerFallbackName: string;

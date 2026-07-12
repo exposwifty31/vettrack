@@ -19,12 +19,15 @@ const toastError = vi.fn();
 const toastSuccess = vi.fn();
 const checkoutMock = vi.fn();
 let hasActiveShift = true;
+let shiftLoading = false;
 
 vi.mock("sonner", () => ({
   toast: { error: (...a: unknown[]) => toastError(...a), success: (...a: unknown[]) => toastSuccess(...a) },
 }));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ userId: "u1", isAdmin: false }) }));
-vi.mock("@/hooks/use-active-shift", () => ({ useActiveShift: () => ({ hasActiveShift, isLoading: false, nextShift: null }) }));
+vi.mock("@/hooks/use-active-shift", () => ({
+  useActiveShift: () => ({ hasActiveShift, isLoading: shiftLoading, nextShift: null }),
+}));
 vi.mock("@/lib/haptics", () => ({ haptics: { tap: vi.fn(), error: vi.fn() } }));
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -69,6 +72,7 @@ describe("EquipmentItem (list row) — checkout error toast (T3 fail-loud)", () 
   beforeEach(() => {
     vi.clearAllMocks();
     hasActiveShift = true;
+    shiftLoading = false;
   });
   afterEach(() => cleanup());
 
@@ -123,5 +127,43 @@ describe("EquipmentItem (list row) — checkout error toast (T3 fail-loud)", () 
     await waitFor(() => expect(checkoutMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
     expect(toastError).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * CodeRabbit PR #83 finding (equipment-list.tsx ~1005-1007) — `hasActiveShift`
+ * defaults to `false` while the shift query is still resolving, so gating the
+ * checkout action on `hasActiveShift` alone (ignoring `isLoading`) would
+ * flash a false "you're off-shift" error at an on-shift tech before the
+ * query settles. The quick-action button must stay disabled (no click
+ * side-effect at all) until the shift query resolves.
+ */
+describe("EquipmentItem (list row) — shift-loading gate", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hasActiveShift = true;
+    shiftLoading = true;
+  });
+  afterEach(() => cleanup());
+
+  it("disables the checkout quick-action while the shift query is still loading", () => {
+    renderItem();
+    const button = screen.getByTestId("quick-action-eq-1") as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+  });
+
+  it("clicking while loading calls neither the checkout API nor the off-shift toast", () => {
+    renderItem();
+    fireEvent.click(screen.getByTestId("quick-action-eq-1"));
+
+    expect(checkoutMock).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalledWith(t.scan.offShiftBody);
+  });
+
+  it("re-enables and behaves normally once the shift query resolves", () => {
+    shiftLoading = false;
+    renderItem();
+    const button = screen.getByTestId("quick-action-eq-1") as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
   });
 });

@@ -171,6 +171,8 @@ describe("Code Blue wall display — driven by frozen SSE transport (T20)", () =
       outboxId: 7,
       eventVersion: 1,
     };
+    // Non-null assertion is safe here: the `waitFor` above already asserted
+    // `capturedIngestor` is an `EventIngestor` instance before this line runs.
     capturedIngestor!.ingest(event);
 
     // Wall flips to the active surface — driven by the SSE event, not a poll.

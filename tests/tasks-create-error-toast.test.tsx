@@ -108,7 +108,10 @@ async function openBookingDialogAndFillDevice() {
 
 describe("AppointmentsPage — task-create error toast (T3 fail-loud)", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    // resetAllMocks (not clearAllMocks) — also drops any queued
+    // mockRejectedValueOnce/mockResolvedValueOnce so an unconsumed
+    // one-time implementation from a prior test can't leak into this one.
+    vi.resetAllMocks();
   });
   afterEach(() => cleanup());
 

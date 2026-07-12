@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Upload, CheckCircle2, AlertTriangle, History, Tags } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
@@ -32,6 +32,43 @@ function operationalRoleLabel(role: string): string {
     default:
       return t.adminShiftsPage.operationalRoleUnknown;
   }
+}
+
+/** Stable row order for the CSV preview table regardless of server response order. */
+function sortPreviewRows<T extends { rowNumber: number }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => a.rowNumber - b.rowNumber);
+}
+
+/** Shared shell for the doctor/roster preview tables — same structure, different columns. */
+function ShiftImportPreviewTable<T extends { rowNumber: number }>({
+  headers,
+  rows,
+  renderCells,
+}: {
+  headers: string[];
+  rows: T[];
+  renderCells: (row: T) => ReactNode;
+}) {
+  return (
+    <table className="w-full text-xs">
+      <thead className="bg-muted/60">
+        <tr>
+          <th className="text-start p-2">#</th>
+          {headers.map((header) => (
+            <th key={header} className="text-start p-2">{header}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={`preview-${row.rowNumber}`} className="border-t border-border hover:bg-muted/50 transition-colors">
+            <td className="p-2">{row.rowNumber}</td>
+            {renderCells(row)}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
 }
 
 export default function AdminShiftsPage() {
@@ -282,67 +319,53 @@ export default function AdminShiftsPage() {
 
               <div className="overflow-auto rounded-xl border border-border">
                 {preview.kind === "doctor" ? (
-                  <table className="w-full text-xs">
-                    <thead className="bg-muted/60">
-                      <tr>
-                        <th className="text-start p-2">#</th>
-                        <th className="text-start p-2">{t.adminShiftsPage.date}</th>
-                        <th className="text-start p-2">{t.adminShiftsPage.startTime}</th>
-                        <th className="text-start p-2">{t.adminShiftsPage.endTime}</th>
-                        <th className="text-start p-2">{t.adminShiftsPage.userIdColumn}</th>
-                        <th className="text-start p-2">{t.adminShiftsPage.operationalRoleColumn}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...preview.rows]
-                        .sort((a, b) => a.rowNumber - b.rowNumber)
-                        .map((row) => (
-                          <tr key={`preview-${row.rowNumber}`} className="border-t border-border hover:bg-muted/50 transition-colors">
-                            <td className="p-2">{row.rowNumber}</td>
-                            <td className="p-2">{row.date}</td>
-                            <td className="p-2">{row.startTime}</td>
-                            <td className="p-2">{row.endTime}</td>
-                            <td className="p-2">
-                              <Bdi dir="ltr">{row.userId}</Bdi>
-                            </td>
-                            <td className="p-2">{operationalRoleLabel(row.operationalRole)}</td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
+                  <ShiftImportPreviewTable
+                    headers={[
+                      t.adminShiftsPage.date,
+                      t.adminShiftsPage.startTime,
+                      t.adminShiftsPage.endTime,
+                      t.adminShiftsPage.userIdColumn,
+                      t.adminShiftsPage.operationalRoleColumn,
+                    ]}
+                    rows={sortPreviewRows(preview.rows)}
+                    renderCells={(row) => (
+                      <>
+                        <td className="p-2">{row.date}</td>
+                        <td className="p-2">{row.startTime}</td>
+                        <td className="p-2">{row.endTime}</td>
+                        <td className="p-2">
+                          <Bdi dir="ltr">{row.userId}</Bdi>
+                        </td>
+                        <td className="p-2">{operationalRoleLabel(row.operationalRole)}</td>
+                      </>
+                    )}
+                  />
                 ) : (
-                  <table className="w-full text-xs">
-                    <thead className="bg-muted/60">
-                      <tr>
-                        <th className="text-start p-2">#</th>
-                        <th className="text-start p-2">{t.adminShiftsPage.date}</th>
-                        <th className="text-start p-2">{t.adminShiftsPage.startTime}</th>
-                        <th className="text-start p-2">{t.adminShiftsPage.endTime}</th>
-                        <th className="text-start p-2">{t.adminShiftsPage.employeeName}</th>
-                        <th className="text-start p-2">{t.adminShiftsPage.role}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...preview.rows]
-                        .sort((a, b) => a.rowNumber - b.rowNumber)
-                        .map((row) => (
-                          <tr key={`preview-${row.rowNumber}`} className="border-t border-border hover:bg-muted/50 transition-colors">
-                            <td className="p-2">{row.rowNumber}</td>
-                            <td className="p-2">{row.date}</td>
-                            <td className="p-2">{row.startTime}</td>
-                            <td className="p-2">{row.endTime}</td>
-                            <td className="p-2">{row.employeeName}</td>
-                            <td className="p-2">
-                              {row.role === "senior_technician"
-                                ? t.adminPage.roleSeniorTechnician
-                                : row.role === "admin"
-                                ? t.adminPage.roleAdminShift
-                                : t.adminPage.roleTechnician}
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
+                  <ShiftImportPreviewTable
+                    headers={[
+                      t.adminShiftsPage.date,
+                      t.adminShiftsPage.startTime,
+                      t.adminShiftsPage.endTime,
+                      t.adminShiftsPage.employeeName,
+                      t.adminShiftsPage.role,
+                    ]}
+                    rows={sortPreviewRows(preview.rows)}
+                    renderCells={(row) => (
+                      <>
+                        <td className="p-2">{row.date}</td>
+                        <td className="p-2">{row.startTime}</td>
+                        <td className="p-2">{row.endTime}</td>
+                        <td className="p-2">{row.employeeName}</td>
+                        <td className="p-2">
+                          {row.role === "senior_technician"
+                            ? t.adminPage.roleSeniorTechnician
+                            : row.role === "admin"
+                            ? t.adminPage.roleAdminShift
+                            : t.adminPage.roleTechnician}
+                        </td>
+                      </>
+                    )}
+                  />
                 )}
               </div>
 

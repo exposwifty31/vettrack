@@ -76,3 +76,11 @@ export function consumeDisplayRevokedNotice(): boolean {
   if (flagged) safeStorageRemoveItem(DISPLAY_REVOKED_NOTICE_KEY, "session");
   return flagged;
 }
+
+/** Pure, non-clearing read of the revoked-notice flag. Safe to call from a
+ *  render-phase lazy initializer (including React StrictMode's double-invoke)
+ *  since it has no side effect — pair with `consumeDisplayRevokedNotice()` in
+ *  a post-mount effect to actually clear the flag exactly once. */
+export function peekDisplayRevokedNotice(): boolean {
+  return safeStorageGetItem(DISPLAY_REVOKED_NOTICE_KEY, "session") === "1";
+}
