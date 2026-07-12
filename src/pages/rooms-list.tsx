@@ -113,7 +113,7 @@ function computeEffectiveStatus(room: Room): string {
   return room.syncStatus;
 }
 
-function RoomCard({ room }: { room: Room }) {
+export function RoomCard({ room }: { room: Room }) {
   const available = room.availableCount ?? 0;
   const total = room.totalEquipment ?? 0;
   const inUse = room.inUseCount ?? 0;
@@ -141,7 +141,7 @@ function RoomCard({ room }: { room: Room }) {
                 <span className="truncate">{room.floor}</span>
               </p>
             ) : (
-              <p className="text-[11px] text-muted-foreground mt-0.5">{total} {t.roomsListPage.cardItemsUnit}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{t.roomsListPage.cardItemCount(total)}</p>
             )}
           </div>
 

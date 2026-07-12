@@ -297,6 +297,18 @@ export interface TStructure {
     emergencyCountLabel: string;
     summaryCountsTitle: string;
   };
+  shiftImport: {
+    csvEmpty: string;
+    missingRequiredColumns: string;
+    missingRequiredValues: string;
+    invalidDate: string;
+    invalidStartTime: string;
+    invalidEndTime: string;
+    shiftNotRelevantVet: string;
+    shiftNotRelevantStudent: string;
+    shiftNotRelevant: string;
+    duplicateRow: string;
+  };
   inventoryPage: {
     title: string;
     targetHeading: string;
@@ -309,6 +321,8 @@ export interface TStructure {
     submitRestock: string;
     submitAudit: string;
     loadError: string;
+    restrictedAccessTitle: string;
+    restrictedAccessMessage: string;
     empty: string;
     quickAdd: string;
     quickAddSuccess: string;
@@ -470,8 +484,17 @@ export interface TStructure {
     describeIssue: string;
     addObservations: string;
     checkedOutBy: string;
+    since: string;
     updateStatusTitle: string;
     statusLabel: string;
+    actionInUse: string;
+    actionMove: string;
+    actionIssue: string;
+    actionReturn: string;
+    scanSheetReportOrUpdateStatus: string;
+    scanSheetScanAnother: string;
+    scanSheetStayHere: string;
+    activityRoomVerified: string;
     reportIssueTitle: string;
     localStatePendingSync: string;
     localStateConflict: string;
@@ -839,6 +862,7 @@ export interface TStructure {
     guidedTitle: string;
     guidedBody: string;
     inventoryActionHint: string;
+    myEquipmentRefreshFailed: string;
   };
   home: {
     equipmentOverview: string;
@@ -1280,6 +1304,19 @@ export interface TStructure {
     employeeName: string;
     role: string;
     csvOnly: string;
+    doctorImportBadge: string;
+    rosterImportBadge: string;
+    userIdColumn: string;
+    operationalRoleColumn: string;
+    operationalRoleAdmission: string;
+    operationalRoleWard: string;
+    operationalRoleSeniorLead: string;
+    operationalRoleNightAdmissionOnly: string;
+    operationalRoleNightSeniorNoAdmission: string;
+    operationalRoleUnknown: string;
+    acceptedShiftNamesTitle: string;
+    acceptedShiftNamesHint: string;
+    acceptedShiftNamesLoadFailed: string;
   };
   alertsPage: {
     oneMinuteAgo: string;
@@ -1288,6 +1325,12 @@ export interface TStructure {
     hoursAgo: string;
     oneDayAgo: string;
     daysAgo: string;
+    oneMinuteDuration: string;
+    minutesDuration: string;
+    oneHourDuration: string;
+    hoursDuration: string;
+    oneDayDuration: string;
+    daysDuration: string;
     title: string;
     metaDescription: string;
     activeCount: string;
@@ -1718,6 +1761,8 @@ export interface TStructure {
     pilotRecent: string;
   };
   roomsListPage: {
+    selectRoomTitle: string;
+    selectRoomSubtitle: string;
     healthRingTitle: string;
     healthRingHelp: string;
     createRoomFailed: string;
@@ -1743,7 +1788,7 @@ export interface TStructure {
     summaryInUse: string;
     summaryIssues: string;
     summarySynced: string;
-    cardItemsUnit: string;
+    cardItemCount: string;
     cardAvailShort: string;
     cardInUseShort: string;
     roomNamePlaceholder: string;
@@ -1849,6 +1894,7 @@ export interface TStructure {
   };
   adminPage: {
     pageHeading: string;
+    metaDescription: string;
     tabShifts: string;
     tabFolders: string;
     tabPending: string;
@@ -1964,6 +2010,7 @@ export interface TStructure {
     tabDeleted: string;
     signedUp: string;
     joined: string;
+    requestedRoleHint: string;
     reject: string;
     approve: string;
     rejectUserTitle: string;
@@ -2378,6 +2425,7 @@ export interface TStructure {
     staffMember: string;
     unassigned: string;
     linkedDevice: string;
+    equipmentLoadFailed: string;
     linkedOwner: string;
     unknownUser: string;
     scheduledAt: string;
@@ -2574,6 +2622,8 @@ export interface TStructure {
     managerLabelShort: string;
     managerInstruction: string;
     loadingManagers: string;
+    checkingActiveSession: string;
+    sessionCheckFailed: string;
     noManagersAvailable: string;
     you: string;
     managerFallbackName: string;
@@ -3385,6 +3435,11 @@ export interface TStructure {
     accessPendingServer: string;
     pendingEndpoint: string;
     retry: string;
+    accessDenied: {
+      title: string;
+      description: string;
+      cta: string;
+    };
     state: {
       loading: string;
       empty: string;
@@ -3454,6 +3509,10 @@ export interface TStructure {
       issueDialogDescription: string;
       codeExpires: string;
       empty: string;
+      delete: string;
+      deleteConfirm: string;
+      deleted: string;
+      deleteError: string;
     };
     colConfigured: string;
     colCredentials: string;
@@ -3643,6 +3702,8 @@ export interface TStructure {
     pairing: string;
     pairButton: string;
     hint: string;
+    revokedNoticeTitle: string;
+    revokedNoticeMessage: string;
   };
   board: {
     deployableNow: string;
@@ -3671,6 +3732,8 @@ export interface TStructure {
     overdue: string;
     byType: string;
     critical: string;
+    noCriticalConfigured: string;
+    noCriticalConfiguredHint: string;
     allCriticalReady: string;
     loading: string;
     fallbackBoardUnavailable: string;
@@ -3699,7 +3762,6 @@ export interface TStructure {
     heading: string;
     description: string;
     configureAlerts: string;
-    currentVersion: string;
     currentDate: string;
     buildLabel: string;
     items: {
@@ -3750,6 +3812,8 @@ export interface TStructure {
     roleVetTech: string;
     roleVeterinarian: string;
     roleStudent: string;
+    roleSelectLabel: string;
+    roleSelectHint: string;
     devModeNotice: string;
     enterDashboard: string;
     moreAboutVetTrack: string;
@@ -4020,6 +4084,7 @@ export interface TStructure {
     installAriaLabel: string;
     installTitle: string;
     installSubtitle: string;
+    installSubtitleDesktop: string;
     install: string;
     notNow: string;
     iosAriaLabel: string;

@@ -4,12 +4,14 @@ import { CalendarClock } from "lucide-react";
 import { QrScanner } from "@/components/qr-scanner";
 import { AccountabilityConfirm } from "./AccountabilityConfirm";
 import { useActiveShift } from "@/hooks/use-active-shift";
+import { useAuth } from "@/hooks/use-auth";
 import { t, formatDateTimeByLocale } from "@/lib/i18n";
 
 export function ScanScreen() {
   const [, navigate] = useLocation();
   const [confirmedName, setConfirmedName] = useState<string | null>(null);
   const { hasActiveShift, isLoading: shiftLoading, nextShift } = useActiveShift();
+  const { isAdmin } = useAuth();
 
   const handleClose = useCallback(() => {
     navigate("/home");
@@ -17,7 +19,9 @@ export function ScanScreen() {
 
   // Off-shift: scanning (and the equipment ownership it captures) is not allowed.
   // The camera must never mount here — roster-derived authority denies it server-side too.
-  const scanBlocked = !shiftLoading && !hasActiveShift;
+  // Admins are exempt from the shift gate (owner decision, 2026-07) — they can
+  // scan without an active roster shift. Non-admin behavior is unchanged.
+  const scanBlocked = !shiftLoading && !hasActiveShift && !isAdmin;
 
   return (
     <div

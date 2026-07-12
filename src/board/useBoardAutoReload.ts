@@ -11,7 +11,8 @@ type SwUpdateDetail = { worker?: ServiceWorker | null; buildTag?: string | null 
  * (main.tsx:139-143: worker = registration.active, buildTag = a real string the
  * main.tsx guard already proved ≠ the bundle tag). Excludes the two other emitters
  * of the same event:
- *   - waiting-worker (main.tsx:158-162): buildTag is null.
+ *   - waiting-worker (main.tsx:158-162): buildTag is null. See isWaitingWorkerUpdate
+ *     below — the hook now reloads on this variant too, via a separate discriminator.
  *   - peer split-version gossip (realtime.ts:232): worker is null — and its
  *     buildTag IS a real remote string, so ONLY the worker check excludes it.
  * The `typeof ServiceWorker` guard keeps this safe on browsers without SW support
@@ -25,6 +26,30 @@ export function isConfirmedNewWorker(detail: SwUpdateDetail | undefined | null):
     detail.worker instanceof ServiceWorker &&
     typeof detail.buildTag === "string" &&
     detail.buildTag !== bundleTag
+  );
+}
+
+/**
+ * True for the waiting-worker source of `sw-update-available` (main.tsx:149-166):
+ * `worker = registration.waiting`, a real ServiceWorker instance, but `buildTag`
+ * is always `null` — main.tsx only uses the waiting worker's script-URL tag to
+ * bail out on a same-tag no-op; it never forwards the tag itself in the event.
+ * A real `worker` + `buildTag === null` is therefore unambiguous:
+ *   - excludes peer split-version gossip (realtime.ts:232), which always carries
+ *     `worker: null` and a real (truthy) string `buildTag` — the opposite shape.
+ *   - excludes the confirmed-new-worker variant above, whose `buildTag` is always
+ *     a string.
+ * This is the residual case the kiosk audit found: a new SW was already waiting
+ * when the tab loaded (e.g. an old tab left open), so `SW_UPDATED` never fires and
+ * only this notifyIfWaiting path does — previously ignored by this hook, so only
+ * the un-gated SwUpdateBanner click-to-refresh toast fired, and nobody taps a wall.
+ */
+export function isWaitingWorkerUpdate(detail: SwUpdateDetail | undefined | null): boolean {
+  if (!detail) return false;
+  return (
+    typeof ServiceWorker !== "undefined" &&
+    detail.worker instanceof ServiceWorker &&
+    detail.buildTag === null
   );
 }
 
@@ -46,12 +71,16 @@ function useEmergencyActive(): boolean {
 
 /**
  * Kiosk auto-reload for the /board wall display. On a confirmed byte-different
- * service worker, reload so the kiosk never drifts a stale build — BUT defer while
- * a Code Blue is active and reload only once the server snapshot drops the session
- * ("calm"; never a local timer or keepalive-inferred signal, which would be
- * de-facto optimistic termination). The loop guard is the existing
- * CHUNK_RECOVERY_GUARD_KEY: at most one auto-reload per tab session across all
- * triggers (the owner-approved posture for an unattended wall display).
+ * service worker OR an already-waiting service worker (isConfirmedNewWorker OR
+ * isWaitingWorkerUpdate — see both above), reload so the kiosk never drifts a
+ * stale build — BUT defer while a Code Blue is active and reload only once the
+ * server snapshot drops the session ("calm"; never a local timer or
+ * keepalive-inferred signal, which would be de-facto optimistic termination).
+ * Peer split-version gossip is still excluded from both discriminators — a peer
+ * tab's report of a mismatch is not this tab's own confirmed/waiting SW state.
+ * The loop guard is the existing CHUNK_RECOVERY_GUARD_KEY: at most one
+ * auto-reload per tab session across all triggers (the owner-approved posture
+ * for an unattended wall display).
  *
  * Consumes only the existing `sw-update-available` window event — it adds no
  * second navigator.serviceWorker message listener and never calls
@@ -105,7 +134,7 @@ export function useBoardAutoReload(): void {
     if (typeof window === "undefined") return;
     function onSwUpdate(event: Event): void {
       const detail = (event as CustomEvent<SwUpdateDetail>).detail;
-      if (!isConfirmedNewWorker(detail)) return;
+      if (!isConfirmedNewWorker(detail) && !isWaitingWorkerUpdate(detail)) return;
       if (emergencyActiveRef.current) {
         // Defer — never reload during an active Code Blue. No telemetry: there is
         // no bounded "deferred" enum and inventing one is out of fence.

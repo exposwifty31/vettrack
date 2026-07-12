@@ -72,6 +72,35 @@ function normalizeUserRole(role: string | null | undefined): UserRole {
   return "student";
 }
 
+/** Roles a user may self-request on the sign-up chips (see `SignupRequestedRole`). */
+const SELF_REQUESTABLE_ROLES = new Set(["technician", "vet", "student"]);
+
+/**
+ * Validate a self-requested role captured at sign-up (Clerk
+ * `unsafeMetadata.requestedRole`) down to a known self-selectable `UserRole`,
+ * or `null` for anything else.
+ *
+ * SECURITY: this is the self-escalation guard. Only the three self-selectable
+ * roles are accepted; privileged values ("admin", "senior_technician") and any
+ * junk are rejected to `null`. The result is stored ONLY in the advisory
+ * `requestedRole` staging column — it never becomes the authoritative `role`.
+ */
+export function sanitizeRequestedRole(value: unknown): "technician" | "vet" | "student" | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  return SELF_REQUESTABLE_ROLES.has(normalized)
+    ? (normalized as "technician" | "vet" | "student")
+    : null;
+}
+
+/** Read a `requestedRole` field off an unsafe-metadata bag without trusting its shape. */
+function readRequestedRoleFromMetadata(meta: unknown): unknown {
+  if (meta && typeof meta === "object") {
+    return (meta as Record<string, unknown>).requestedRole;
+  }
+  return undefined;
+}
+
 const DEV_USER: AuthUser = {
   id: "dev-admin-001",
   clerkId: "dev-admin-001",
@@ -375,11 +404,20 @@ export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
     (sessionClaims?.locale as string | undefined) ??
     (sessionClaims?.["https://clerk.dev/locale"] as string | undefined);
   const clerkLocale = normalizeLocale(clerkLocaleClaim);
+  // ADVISORY-ONLY: self-requested role from sign-up. Read from the session
+  // claims if a JWT template exposes them, otherwise from the Clerk user object
+  // we already fetch below for profile enrichment (no extra API round-trip).
+  let requestedRoleRaw: unknown = readRequestedRoleFromMetadata(
+    sessionClaims?.unsafeMetadata ?? sessionClaims?.unsafe_metadata,
+  );
   if (!clerkEmail) {
     try {
       const clerkUser = await clerkClient.users.getUser(clerkUserId);
       clerkEmail = clerkUser.emailAddresses?.[0]?.emailAddress ?? "";
       clerkName = `${clerkUser.firstName ?? ""} ${clerkUser.lastName ?? ""}`.trim();
+      if (requestedRoleRaw === undefined) {
+        requestedRoleRaw = readRequestedRoleFromMetadata(clerkUser.unsafeMetadata);
+      }
     } catch (err) {
       console.error("[auth] Clerk profile enrichment failed for new-user bootstrap", { clerkUserId, err });
       incrementMetric("auth_clerk_profile_fetch_failed");
@@ -394,6 +432,8 @@ export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
   const adminEmail = clerkEmail ? isAdminEmail(clerkEmail) : false;
   const defaultStatus = adminEmail ? "active" : "pending";
   const defaultRole: UserRole = adminEmail ? "admin" : "technician";
+  // Staging column, captured at first-login only. NOT the authoritative role.
+  const requestedRole = sanitizeRequestedRole(requestedRoleRaw);
 
   // Guarantee the clinic row exists before inserting the user. A new Clerk
   // organization has no matching vt_clinics row until this fires; without it
@@ -414,6 +454,9 @@ export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
       name: clerkName,
       displayName: clerkName || clerkEmail,
       role: defaultRole,
+      // Advisory staging value — set on first insert only. Excluded from the
+      // onConflictDoUpdate set below so a later sign-in can never re-stage it.
+      requestedRole,
       status: defaultStatus,
     })
     .onConflictDoUpdate({

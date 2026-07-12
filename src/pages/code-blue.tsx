@@ -550,7 +550,7 @@ export default function CodeBluePage() {
   const params = new URLSearchParams(search);
   const initEquipmentId = params.get("equipmentId") ?? undefined;
 
-  const { session, refetch } = useCodeBlueSession();
+  const { session, isLoading: sessionLoading, isError: sessionError, refetch } = useCodeBlueSession();
   const [starting, setStarting] = useState(false);
 
   const primaryEquipQ = useQuery<{ name: string } | null>({
@@ -607,8 +607,55 @@ export default function CodeBluePage() {
     }
   };
 
+  // Re-entering /code-blue while a session is active must land on the live
+  // ActiveSession view, never the launch form. `session` is `null` (not yet
+  // "unknown") while the active-session query is still pending — without this
+  // guard, a re-entry with no cached placeholder (fresh app launch, a device
+  // that hasn't polled this session yet, cache cleared) would fall through to
+  // the launch form for one query cycle before correcting itself (2026-07-10
+  // QA audit caveat E-c).
+  if (sessionLoading) {
+    return (
+      <div
+        data-testid="code-blue-loading"
+        className="flex flex-col items-center justify-center gap-3 bg-emergency-bg w-full"
+        style={{ height: "100%", paddingTop: "env(safe-area-inset-top)" }}
+      >
+        <Loader2 className="h-6 w-6 animate-spin text-emergency-text2" aria-hidden />
+        <p className="text-sm text-emergency-text2">{t.codeBlue.checkingActiveSession}</p>
+      </div>
+    );
+  }
+
+  // A held active session always wins — render it even if a subsequent poll
+  // errored. An active Code Blue must stay visible through a transient blip, so
+  // the active-session check runs BEFORE the error guard below: any held session
+  // (including cached `placeholderData` from the hook) renders instead of the
+  // retry card.
   if (session?.status === "active") {
     return <ActiveSession />;
+  }
+
+  // With no active session to show, a FAILED active-session check is still not
+  // a confirmed "no active session" — falling through to the launch form here
+  // would let staff open a duplicate/erroneous session while an existing one is
+  // unreachable, or miss re-entering a genuinely active one. Block on a
+  // retryable error state instead of assuming "none" (2026-07-10 QA audit
+  // caveat E-c follow-up).
+  if (sessionError) {
+    return (
+      <div
+        data-testid="code-blue-session-error"
+        className="flex flex-col items-center justify-center gap-3 bg-emergency-bg w-full p-6 text-center"
+        style={{ height: "100%", paddingTop: "env(safe-area-inset-top)" }}
+      >
+        <AlertTriangle className="h-6 w-6 text-emergency-amber" aria-hidden />
+        <p className="text-sm text-emergency-text2">{t.codeBlue.sessionCheckFailed}</p>
+        <Button variant="secondary" onClick={() => refetch()}>
+          {t.errorCard.retry}
+        </Button>
+      </div>
+    );
   }
 
   return (

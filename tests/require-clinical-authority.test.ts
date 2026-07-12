@@ -124,6 +124,34 @@ describe("requireClinicalAuthority — factory validation", () => {
       }),
     ).toThrow();
   });
+
+  it("throws synchronously when BOTH permanent-role fallbacks are enabled (mutually exclusive)", () => {
+    expect(() =>
+      requireClinicalAuthority({
+        allow: ["vet"],
+        allowPermanentClinicalRoleFallbackForLegacyDispense: true,
+        allowPermanentClinicalRoleForEmergency: true,
+      }),
+    ).toThrow(/mutually exclusive/);
+  });
+
+  it("does NOT throw when only the emergency break-glass flag is enabled", () => {
+    expect(() =>
+      requireClinicalAuthority({
+        allow: ["vet"],
+        allowPermanentClinicalRoleForEmergency: true,
+      }),
+    ).not.toThrow();
+  });
+
+  it("does NOT throw when only the legacy-dispense fallback flag is enabled", () => {
+    expect(() =>
+      requireClinicalAuthority({
+        allow: ["vet"],
+        allowPermanentClinicalRoleFallbackForLegacyDispense: true,
+      }),
+    ).not.toThrow();
+  });
 });
 
 describe("requireClinicalAuthority — authentication", () => {
@@ -504,6 +532,134 @@ describe("requireClinicalAuthority — dispense transitional fallback", () => {
     const res = makeRes();
     const next = vi.fn();
     await mw(req as never, res as never, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(403);
+  });
+});
+
+describe("requireClinicalAuthority — emergency break-glass (Code Blue initiation)", () => {
+  const EMERGENCY_ALLOW: ActiveShiftRole[] = [
+    "vet",
+    "senior_technician",
+    "technician",
+  ];
+
+  async function runEmergencyGate(
+    snapshot: AuthoritySnapshot,
+    identityRole: string,
+    opts: { flag: boolean; allow?: ActiveShiftRole[] } = { flag: true },
+  ): Promise<{ next: ReturnType<typeof vi.fn>; res: FakeRes }> {
+    resolveAuthorityMock.mockResolvedValue(snapshot);
+    const mw = requireClinicalAuthority({
+      allow: opts.allow ?? EMERGENCY_ALLOW,
+      ...(opts.flag ? { allowPermanentClinicalRoleForEmergency: true } : {}),
+    });
+    const req = makeReq({
+      authUser: { ...(makeReq().authUser as object), role: identityRole },
+    });
+    const res = makeRes();
+    const next = vi.fn();
+    await mw(req as never, res as never, next);
+    return { next, res };
+  }
+
+  it("allows a vet identity with no active shift (effectiveClinicalRole=null, reason=EZSHIFT_NONE)", async () => {
+    const { next, res } = await runEmergencyGate(
+      makeSnapshot({
+        effectiveClinicalRole: null,
+        clinicalRole: "vet",
+        reason: "EZSHIFT_NONE",
+      }),
+      "vet",
+    );
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(res.statusCode).toBeUndefined();
+  });
+
+  it("allows a technician identity with no active shift", async () => {
+    const { next, res } = await runEmergencyGate(
+      makeSnapshot({
+        effectiveClinicalRole: null,
+        clinicalRole: "technician",
+        reason: "EZSHIFT_NONE",
+      }),
+      "technician",
+    );
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(res.statusCode).toBeUndefined();
+  });
+
+  it("allows a senior_technician identity with no active shift", async () => {
+    const { next, res } = await runEmergencyGate(
+      makeSnapshot({
+        effectiveClinicalRole: null,
+        clinicalRole: "senior_technician",
+        reason: "EZSHIFT_NONE",
+      }),
+      "senior_technician",
+    );
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(res.statusCode).toBeUndefined();
+  });
+
+  it("denies a student with no active shift — never elevated (clinicalRole=student, reason=EZSHIFT_NONE)", async () => {
+    const { next, res } = await runEmergencyGate(
+      makeSnapshot({
+        effectiveClinicalRole: null,
+        clinicalRole: "student",
+        reason: "EZSHIFT_NONE",
+      }),
+      "student",
+    );
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toMatchObject({
+      code: "INSUFFICIENT_ROLE",
+      reason: "INSUFFICIENT_CLINICAL_AUTHORITY",
+    });
+  });
+
+  it("denies the SAME null/EZSHIFT_NONE snapshot on a gate WITHOUT the emergency flag (scope proof — existing gates unchanged)", async () => {
+    const { next, res } = await runEmergencyGate(
+      makeSnapshot({
+        effectiveClinicalRole: null,
+        clinicalRole: "vet",
+        reason: "EZSHIFT_NONE",
+      }),
+      "vet",
+      { flag: false },
+    );
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toMatchObject({
+      code: "INSUFFICIENT_ROLE",
+      reason: "INSUFFICIENT_CLINICAL_AUTHORITY",
+    });
+  });
+
+  it("denies when reason is not EZSHIFT_NONE even with the emergency flag (no stale/revoked resurrection)", async () => {
+    const { next, res } = await runEmergencyGate(
+      makeSnapshot({
+        effectiveClinicalRole: null,
+        clinicalRole: "vet",
+        reason: "CHECKED_IN_STALE",
+      }),
+      "vet",
+    );
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("denies when the permanent clinicalRole is not in allow[] under the emergency flag", async () => {
+    const { next, res } = await runEmergencyGate(
+      makeSnapshot({
+        effectiveClinicalRole: null,
+        clinicalRole: "technician",
+        reason: "EZSHIFT_NONE",
+      }),
+      "technician",
+      { flag: true, allow: ["vet"] },
+    );
     expect(next).not.toHaveBeenCalled();
     expect(res.statusCode).toBe(403);
   });

@@ -11,11 +11,19 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ManagementAccessDenied } from "@/desktop/management";
 import type { Dock, Room } from "@/types";
 
 export default function AdminDocksPage() {
   const { role } = useAuth();
-  if (role !== "admin") return null;
+  // T22: was a blank `return null` — no explicit signal a non-admin was denied.
+  if (role !== "admin") {
+    return (
+      <AppShell>
+        <ManagementAccessDenied />
+      </AppShell>
+    );
+  }
 
   return <AdminDocksContent />;
 }

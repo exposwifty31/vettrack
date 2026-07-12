@@ -2,8 +2,7 @@ import type { Request, Response } from "express";
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { requireAuth, requireClinicalUser } from "../middleware/auth.js";
-import { requireClinicalAuthority } from "../middleware/authority.js";
+import { requireAuth, requireEffectiveRole } from "../middleware/auth.js";
 import { validateBody, validateUuid } from "../middleware/validate.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
 import {
@@ -23,7 +22,13 @@ import { resolveRequestId, apiError } from "../lib/route-utils.js";
 
 const router = Router();
 
-router.use(requireAuth, requireClinicalUser);
+// Inventory dispense is CONSUMABLES-only (drug formulary removed, migrations
+// 142-143), so it is NON-clinical: any authenticated staff member — including a
+// supervised student — may dispense. `requireEffectiveRole("student")` is the
+// role floor, so it admits all authenticated staff. This is NOT a clinical
+// authority gate: STUDENT_NEVER_ELEVATED and the clinical-authority middleware
+// remain in force for Code Blue and genuinely-clinical routes.
+router.use(requireAuth, requireEffectiveRole("student"));
 
 const itemSchema = z.object({
   itemId: z.string().min(1),
@@ -83,10 +88,6 @@ function sendError(req: Request, res: Response, err: unknown, requestId: string)
 /** POST /api/dispense/draft — create a DRAFT (structure validation only, no stock mutation) */
 router.post(
   "/draft",
-  requireClinicalAuthority({
-    allow: ["vet", "senior_technician", "technician"],
-    allowPermanentClinicalRoleFallbackForLegacyDispense: true,
-  }),
   validateBody(draftSchema),
   async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -114,10 +115,6 @@ router.post(
 /** POST /api/dispense/:id/confirm — confirm a DRAFT; billing in TX; async inventory deduction after commit */
 router.post(
   "/:id/confirm",
-  requireClinicalAuthority({
-    allow: ["vet", "senior_technician", "technician"],
-    allowPermanentClinicalRoleFallbackForLegacyDispense: true,
-  }),
   validateUuid("id"),
   async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
@@ -127,12 +124,13 @@ router.post(
       dispenseEventId: req.params.id,
       confirmedBy: req.authUser!.id,
       confirmedByEmail: req.authUser!.email,
-      actorRole:
-        req.authoritySnapshot?.effectiveClinicalRole ??
-        resolveAuditActorRole(req),
-      authoritySource: req.authoritySnapshot?.source ?? null,
-      authorityReason: req.authoritySnapshot?.reason ?? null,
-      authorityOperationalRole: req.authoritySnapshot?.operationalRole ?? null,
+      // Dispense is now non-clinical (T26 reclassification): no clinical-authority
+      // middleware runs on this route, so there is no `req.authoritySnapshot`. Record the
+      // actor's role directly; a non-clinical dispense carries no clinical-authority source/reason.
+      actorRole: resolveAuditActorRole(req),
+      authoritySource: null,
+      authorityReason: null,
+      authorityOperationalRole: null,
       // Phase 5 PR 5.3 — threaded for the clinical-invariant evaluator
       // wiring inside the confirm tx.
       requestId,
@@ -153,10 +151,6 @@ router.post(
 /** POST /api/dispense/emergency — EMERGENCY_PENDING (no stock mutation, minimal validation) */
 router.post(
   "/emergency",
-  requireClinicalAuthority({
-    allow: ["vet", "senior_technician", "technician"],
-    allowPermanentClinicalRoleFallbackForLegacyDispense: true,
-  }),
   validateBody(emergencySchema),
   async (req, res) => {
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);

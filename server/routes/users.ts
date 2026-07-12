@@ -304,7 +304,9 @@ router.get("/pending", requireAuth, requireAdmin, async (req, res) => {
   try {
     const clinicId = req.clinicId!;
     const pendingUsers = await db
-      .select(userFields)
+      // requestedRole is the advisory sign-up hint (T24b): shown read-only to
+      // the admin; approval never auto-applies it as the authoritative role.
+      .select({ ...userFields, requestedRole: users.requestedRole })
       .from(users)
       .where(and(eq(users.clinicId, clinicId), eq(users.status, "pending"), isNull(users.deletedAt)))
       .orderBy(users.createdAt);

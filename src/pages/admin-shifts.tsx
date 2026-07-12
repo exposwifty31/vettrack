@@ -1,17 +1,75 @@
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Upload, CheckCircle2, AlertTriangle, History } from "lucide-react";
+import { Upload, CheckCircle2, AlertTriangle, History, Tags } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorCard } from "@/components/ui/error-card";
+import { Badge } from "@/components/ui/badge";
+import { Bdi } from "@/components/ui/bdi";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { ManagementAccessDenied } from "@/desktop/management";
 import { t } from "@/lib/i18n";
 import type { ShiftImportPreview } from "@/types";
+
+/** T18: labels for the doctor-CSV operational-role column (DoctorOperationalShiftRole). */
+function operationalRoleLabel(role: string): string {
+  switch (role) {
+    case "admission":
+      return t.adminShiftsPage.operationalRoleAdmission;
+    case "ward":
+      return t.adminShiftsPage.operationalRoleWard;
+    case "senior_lead":
+      return t.adminShiftsPage.operationalRoleSeniorLead;
+    case "night_admission_only":
+      return t.adminShiftsPage.operationalRoleNightAdmissionOnly;
+    case "night_senior_no_admission":
+      return t.adminShiftsPage.operationalRoleNightSeniorNoAdmission;
+    default:
+      return t.adminShiftsPage.operationalRoleUnknown;
+  }
+}
+
+/** Stable row order for the CSV preview table regardless of server response order. */
+function sortPreviewRows<T extends { rowNumber: number }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => a.rowNumber - b.rowNumber);
+}
+
+/** Shared shell for the doctor/roster preview tables — same structure, different columns. */
+function ShiftImportPreviewTable<T extends { rowNumber: number }>({
+  headers,
+  rows,
+  renderCells,
+}: {
+  headers: string[];
+  rows: T[];
+  renderCells: (row: T) => ReactNode;
+}) {
+  return (
+    <table className="w-full text-xs">
+      <thead className="bg-muted/60">
+        <tr>
+          <th className="text-start p-2">#</th>
+          {headers.map((header) => (
+            <th key={header} className="text-start p-2">{header}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={`preview-${row.rowNumber}`} className="border-t border-border hover:bg-muted/50 transition-colors">
+            <td className="p-2">{row.rowNumber}</td>
+            {renderCells(row)}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
 export default function AdminShiftsPage() {
   const { isAdmin, userId } = useAuth();
@@ -37,6 +95,16 @@ export default function AdminShiftsPage() {
     refetchOnWindowFocus: false,
     queryKey: ["/api/shifts/imports"],
     queryFn: api.shifts.imports,
+    enabled: isAdmin && !!userId,
+  });
+
+  // T19 (LOW): surface the accepted-shift-names keyword list so an admin
+  // knows what the roster parser recognizes instead of a CSV failing opaquely.
+  const shiftNameHintsQuery = useQuery({
+    retry: false,
+    refetchOnWindowFocus: false,
+    queryKey: ["/api/shifts/import/shift-names"],
+    queryFn: api.shifts.importShiftNameHints,
     enabled: isAdmin && !!userId,
   });
 
@@ -78,15 +146,13 @@ export default function AdminShiftsPage() {
   const canPreview = Boolean(selectedFile) && !previewMut.isPending;
   const canImport = Boolean(selectedFile) && Boolean(preview && preview.summary.validRows > 0) && !confirmMut.isPending;
 
-  const sortedPreviewRows = useMemo(() => {
-    if (!preview) return [];
-    return [...preview.rows].sort((a, b) => a.rowNumber - b.rowNumber);
-  }, [preview]);
-
+  // T22: was rendering t.adminPage.cancel ("Cancel") as the denial message — a
+  // copy-paste bug, not a real "not authorized" state. Literal isAdmin stays
+  // (shift-CSV import is admin-only), only the UI is now the shared component.
   if (!isAdmin) {
     return (
       <AppShell title={t.adminShiftsPage.title}>
-        <div className="py-10 text-center text-sm text-muted-foreground">{t.adminPage.cancel}</div>
+        <ManagementAccessDenied />
       </AppShell>
     );
   }
@@ -144,6 +210,7 @@ export default function AdminShiftsPage() {
                 onClick={() => {
                   if (selectedFile) previewMut.mutate(selectedFile);
                 }}
+                data-testid="btn-preview-shifts-csv"
               >
                 {t.adminShiftsPage.previewButton}
               </Button>
@@ -155,6 +222,7 @@ export default function AdminShiftsPage() {
                 onClick={() => {
                   if (selectedFile) confirmMut.mutate(selectedFile);
                 }}
+                data-testid="btn-confirm-shifts-import"
               >
                 {confirmMut.isPending ? t.adminShiftsPage.confirmImporting : t.adminShiftsPage.confirmImportButton}
               </Button>
@@ -176,12 +244,61 @@ export default function AdminShiftsPage() {
           </CardContent>
         </Card>
 
+        <Card className="bg-card border-border/60 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Tags className="w-4 h-4 text-muted-foreground" />
+              {t.adminShiftsPage.acceptedShiftNamesTitle}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <p className="text-xs text-muted-foreground">{t.adminShiftsPage.acceptedShiftNamesHint}</p>
+            {shiftNameHintsQuery.isLoading ? (
+              <Skeleton className="h-16 rounded-lg" />
+            ) : shiftNameHintsQuery.isError ? (
+              <ErrorCard
+                message={t.adminShiftsPage.acceptedShiftNamesLoadFailed}
+                onRetry={() => shiftNameHintsQuery.refetch()}
+              />
+            ) : shiftNameHintsQuery.data ? (
+              <div className="flex flex-col gap-2">
+                {(
+                  [
+                    { label: t.adminPage.roleTechnician, keywords: shiftNameHintsQuery.data.technician },
+                    { label: t.adminPage.roleSeniorTechnician, keywords: shiftNameHintsQuery.data.seniorTechnician },
+                    { label: t.adminPage.roleAdminShift, keywords: shiftNameHintsQuery.data.admin },
+                  ] as const
+                ).map((group) => (
+                  <div key={group.label} className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-xs font-semibold text-foreground shrink-0">{group.label}:</span>
+                    {group.keywords.map((keyword) => (
+                      <Badge key={keyword} variant="secondary" className="font-normal">
+                        <Bdi>{keyword}</Bdi>
+                      </Badge>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
         {preview && (
           <Card className="bg-card border-border/60 shadow-sm">
             <CardHeader>
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-muted-foreground" />
                 {t.adminShiftsPage.previewSummaryTitle}
+                {/* T18: the doctor/roster branch is otherwise invisible to the admin —
+                    this badge is the "UI control" surfacing which import path a
+                    given CSV is about to take through /import/preview + /import/confirm. */}
+                <Badge
+                  variant={preview.kind === "doctor" ? "default" : "secondary"}
+                  className="ms-auto font-normal"
+                  data-testid="shift-import-kind-badge"
+                >
+                  {preview.kind === "doctor" ? t.adminShiftsPage.doctorImportBadge : t.adminShiftsPage.rosterImportBadge}
+                </Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
@@ -201,21 +318,40 @@ export default function AdminShiftsPage() {
               </div>
 
               <div className="overflow-auto rounded-xl border border-border">
-                <table className="w-full text-xs">
-                  <thead className="bg-muted/60">
-                    <tr>
-                      <th className="text-start p-2">#</th>
-                      <th className="text-start p-2">{t.adminShiftsPage.date}</th>
-                      <th className="text-start p-2">{t.adminShiftsPage.startTime}</th>
-                      <th className="text-start p-2">{t.adminShiftsPage.endTime}</th>
-                      <th className="text-start p-2">{t.adminShiftsPage.employeeName}</th>
-                      <th className="text-start p-2">{t.adminShiftsPage.role}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedPreviewRows.map((row) => (
-                      <tr key={`preview-${row.rowNumber}`} className="border-t border-border hover:bg-muted/50 transition-colors">
-                        <td className="p-2">{row.rowNumber}</td>
+                {preview.kind === "doctor" ? (
+                  <ShiftImportPreviewTable
+                    headers={[
+                      t.adminShiftsPage.date,
+                      t.adminShiftsPage.startTime,
+                      t.adminShiftsPage.endTime,
+                      t.adminShiftsPage.userIdColumn,
+                      t.adminShiftsPage.operationalRoleColumn,
+                    ]}
+                    rows={sortPreviewRows(preview.rows)}
+                    renderCells={(row) => (
+                      <>
+                        <td className="p-2">{row.date}</td>
+                        <td className="p-2">{row.startTime}</td>
+                        <td className="p-2">{row.endTime}</td>
+                        <td className="p-2">
+                          <Bdi dir="ltr">{row.userId}</Bdi>
+                        </td>
+                        <td className="p-2">{operationalRoleLabel(row.operationalRole)}</td>
+                      </>
+                    )}
+                  />
+                ) : (
+                  <ShiftImportPreviewTable
+                    headers={[
+                      t.adminShiftsPage.date,
+                      t.adminShiftsPage.startTime,
+                      t.adminShiftsPage.endTime,
+                      t.adminShiftsPage.employeeName,
+                      t.adminShiftsPage.role,
+                    ]}
+                    rows={sortPreviewRows(preview.rows)}
+                    renderCells={(row) => (
+                      <>
                         <td className="p-2">{row.date}</td>
                         <td className="p-2">{row.startTime}</td>
                         <td className="p-2">{row.endTime}</td>
@@ -227,10 +363,10 @@ export default function AdminShiftsPage() {
                             ? t.adminPage.roleAdminShift
                             : t.adminPage.roleTechnician}
                         </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                      </>
+                    )}
+                  />
+                )}
               </div>
 
               {preview.issues.length > 0 && (

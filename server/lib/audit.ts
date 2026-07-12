@@ -162,6 +162,12 @@ export type AuditActionType =
   | "authority_denied"
   | "authority_resolution_failed"
   | "dispense_legacy_role_fallback_used"
+  // Phase 10a T1 — Code Blue emergency break-glass grant. Emitted when the
+  // POST /code-blue/sessions gate admits a clinical-non-student identity with
+  // no active shift via the `allowPermanentClinicalRoleForEmergency` opt-in.
+  // Distinct from `dispense_legacy_role_fallback_used` so audit dashboards can
+  // separate emergency break-glass from legacy dispense compatibility grants.
+  | "code_blue_break_glass_used"
   | "authority_enforcement_denied_stale"
   | "authority_enforcement_denied_oprole"
   | "MANUAL_OWNERSHIP_CONFIRMATION"
@@ -239,7 +245,9 @@ export type AuditActionType =
   | "display_pairing_code_issued"
   | "display_device_paired"
   | "display_device_renamed"
-  | "display_device_revoked";
+  | "display_device_revoked"
+  // Phase 10 (T21) — admin removes a dead (already-revoked) registry row.
+  | "display_device_deleted";
 
 export interface LogAuditParams {
   clinicId: string;

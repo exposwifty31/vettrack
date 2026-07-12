@@ -5,7 +5,9 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { t, formatDateTimeByLocale } from "@/lib/i18n";
 import { Input } from "@/components/ui/input";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
-import type { Appointment, AppointmentStatus, TaskPriority } from "@/types";
+import { ApiError, toApiErrorMessage } from "@/lib/api";
+import { getEquipmentDisplayName } from "@/lib/equipment-display";
+import type { Appointment, AppointmentStatus, Equipment, TaskPriority } from "@/types";
 
 export const DEFAULT_DAY_START_HOUR = 8;
 export const DEFAULT_DAY_END_HOUR = 20;
@@ -244,17 +246,49 @@ export function statusActions(status: AppointmentStatus): AppointmentStatus[] {
   return [];
 }
 
+/**
+ * Maps a rejected task/appointment mutation to a localized toast message.
+ *
+ * BUG FIX (T3 fail-loud audit): this used to compare `err.message` against
+ * the bare server reason codes ("OUTSIDE_SHIFT", "APPOINTMENT_CONFLICT", …),
+ * but `ApiError.message` is `toApiErrorMessage(status, payload)` — the
+ * server's human-readable text, not the code. None of the branches ever
+ * matched, so every task-create failure (e.g. OUTSIDE_SHIFT) silently fell
+ * through to the raw, unlocalized server string instead of the intended
+ * `t.appointmentsPage.error*` key. Match on `ApiError.code` instead.
+ */
 export function toErrorMessage(err: Error): string {
-  if (err.message === "APPOINTMENT_CONFLICT") return t.appointmentsPage.errorConflict;
-  if (err.message === "OUTSIDE_SHIFT") return t.appointmentsPage.errorOutsideShift;
-  if (err.message === "OVERRIDE_REASON_REQUIRED") return t.appointmentsPage.errorOverrideReason;
-  if (err.message === "TIMEZONE_REQUIRED") return t.appointmentsPage.errorTimezone;
-  if (err.message === "UNAUTHORIZED" || err.message === "Session expired") return t.appointmentsPage.errorSessionExpired;
-  if (err.message === "INSUFFICIENT_ROLE") return t.appointmentsPage.errorInsufficientRole;
-  if (err.message === "VALIDATION_FAILED") return t.appointmentsPage.errorValidationFailed;
-  if (err.message === "TASK_NOT_OWNED_BY_TECH") return t.appointmentsPage.errorTaskNotOwned;
-  if (err.message === "TASK_NOT_ASSIGNED") return t.appointmentsPage.errorTaskNotAssigned;
-  return err.message;
+  if (err.message === "UNAUTHORIZED" || err.message === "Session expired") {
+    return t.appointmentsPage.errorSessionExpired;
+  }
+  if (err instanceof ApiError) {
+    switch (err.code) {
+      case "APPOINTMENT_CONFLICT":
+        return t.appointmentsPage.errorConflict;
+      case "OUTSIDE_SHIFT":
+        return t.appointmentsPage.errorOutsideShift;
+      case "OVERRIDE_REASON_REQUIRED":
+        return t.appointmentsPage.errorOverrideReason;
+      case "TIMEZONE_REQUIRED":
+        return t.appointmentsPage.errorTimezone;
+      case "INSUFFICIENT_ROLE":
+        return t.appointmentsPage.errorInsufficientRole;
+      case "VALIDATION_FAILED":
+        return t.appointmentsPage.errorValidationFailed;
+      case "TASK_NOT_OWNED_BY_TECH":
+        return t.appointmentsPage.errorTaskNotOwned;
+      case "TASK_NOT_ASSIGNED":
+        return t.appointmentsPage.errorTaskNotAssigned;
+      default:
+        return toApiErrorMessage(err.status, err.payload);
+    }
+  }
+  return t.api.serverError;
+}
+
+/** True when a rejected task/appointment mutation is a booking-conflict (409). */
+export function isAppointmentConflictError(err: unknown): boolean {
+  return err instanceof ApiError && err.code === "APPOINTMENT_CONFLICT";
 }
 
 export function canStartTask(a: Appointment, meId: string | undefined, role?: string | null, effectiveRole?: string | null): boolean {
@@ -323,9 +357,26 @@ export function looksLikeUuid(s: string): boolean {
 // /api/appointments contract); in the equipment-first product they carry a
 // device reference and a location label. These render helpers take the wire
 // value under device/location names — client-render clarity only, no wire change.
-export function formatDevice(deviceRef: string | null | undefined): string {
+//
+// T23: the task-create form's device field is now a real vt_equipment picker
+// (EquipmentDeviceField), so `deviceRef` is a `vt_equipment.id` for any task
+// created after this change. `equipmentById` (built from the same shared
+// `["/api/equipment"]` fetch the picker uses) resolves that id back to the
+// equipment's display name. Tasks created before T23 may still carry a plain
+// free-text device string — that legacy value passes through unchanged, and a
+// UUID-shaped value with no match in `equipmentById` (e.g. deleted equipment,
+// or the map hasn't loaded yet) still falls back to the generic linked-device
+// label rather than showing a raw id.
+export function formatDevice(
+  deviceRef: string | null | undefined,
+  equipmentById?: Map<string, Pick<Equipment, "name" | "nameHe">>,
+): string {
   if (!deviceRef) return t.appointmentsPage.unassigned;
-  if (looksLikeUuid(deviceRef)) return t.appointmentsPage.linkedDevice;
+  if (looksLikeUuid(deviceRef)) {
+    const linked = equipmentById?.get(deviceRef);
+    if (linked) return getEquipmentDisplayName(linked);
+    return t.appointmentsPage.linkedDevice;
+  }
   return deviceRef;
 }
 

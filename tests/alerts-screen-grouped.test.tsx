@@ -76,3 +76,46 @@ describe("AlertsScreen — H2 grouped, navigable, acknowledgeable", () => {
     await waitFor(() => expect(ackSpy).toHaveBeenCalledWith("eq-issue", "issue"));
   });
 });
+
+describe("AlertsScreen — claim chip renders displayName, never the email (T13 privacy fix)", () => {
+  afterEach(() => {
+    cleanup();
+    window.history.pushState({}, "", "/alerts");
+  });
+
+  it("shows the acknowledger's display name, not their email or its local-part", async () => {
+    acksList.mockResolvedValueOnce([
+      {
+        id: "ack-1",
+        equipmentId: "eq-issue",
+        alertType: "issue",
+        acknowledgedById: "u-dana",
+        acknowledgedByEmail: "danerez5@gmail.com",
+        acknowledgedByDisplayName: "Dana Cohen",
+        acknowledgedAt: new Date().toISOString(),
+      },
+    ]);
+    renderScreen();
+    expect(await screen.findByText(/Dana Cohen/)).toBeTruthy();
+    expect(document.body.textContent).not.toContain("danerez5");
+    expect(document.body.textContent).not.toContain("@gmail.com");
+  });
+
+  it("falls back to a neutral label — never the email — when no display name is available", async () => {
+    acksList.mockResolvedValueOnce([
+      {
+        id: "ack-2",
+        equipmentId: "eq-stale",
+        alertType: "inactive",
+        acknowledgedById: "u-ghost",
+        acknowledgedByEmail: "ghost@clinic.test",
+        acknowledgedByDisplayName: null,
+        acknowledgedAt: new Date().toISOString(),
+      },
+    ]);
+    renderScreen();
+    expect(await screen.findByText(new RegExp(t.appointmentsPage.unknownUser))).toBeTruthy();
+    expect(document.body.textContent).not.toContain("ghost");
+    expect(document.body.textContent).not.toContain("@clinic.test");
+  });
+});

@@ -2,11 +2,19 @@ import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/hooks/use-auth";
 import { AppShell } from "@/components/layout/AppShell";
 import { OperationalMetricsDashboard } from "@/components/equipment/OperationalMetricsDashboard";
+import { ManagementAccessDenied } from "@/desktop/management";
 import { t } from "@/lib/i18n";
 
 export default function OperationalMetricsDashboardPage() {
   const { role } = useAuth();
-  if (role !== "admin") return null;
+  // T22: was a blank `return null` — no explicit signal a non-admin was denied.
+  if (role !== "admin") {
+    return (
+      <AppShell>
+        <ManagementAccessDenied />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title={t.operationalMetrics.title}>

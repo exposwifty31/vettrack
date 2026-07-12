@@ -185,6 +185,14 @@ export function HomeTabletDashboard() {
   });
 
   const availability = equipmentFigures?.availabilityPct ?? null;
+  // Same reconciliation as the native EquipmentLargeTitle (T14): availability
+  // (operational health) and verification (freshness) are distinct metrics, so
+  // a high availability figure must not read as an all-clear when nothing has
+  // been validated. Only paint the celebratory green when the verification
+  // dimension has confirmed at least one item; a known-zero degrades to the
+  // caution tone even at 100%.
+  const availabilityCelebrated =
+    availability !== null && availability >= 80 && equipmentFigures?.verified !== 0;
 
   return (
     <div
@@ -200,7 +208,7 @@ export function HomeTabletDashboard() {
       }}
     >
       <Helmet>
-        <title>Dashboard — VetTrack</title>
+        <title>{t.layoutHebrew.dashboard} — VetTrack</title>
       </Helmet>
 
       <header style={{ gridColumn: "1 / -1" }}>
@@ -284,6 +292,9 @@ export function HomeTabletDashboard() {
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
           <span
             data-testid="tablet-equipment-availability"
+            data-availability-tone={
+              availability === null ? "idle" : availabilityCelebrated ? "ok" : "caution"
+            }
             style={{
               fontFamily: "var(--font-num)",
               fontSize: 40,
@@ -293,7 +304,7 @@ export function HomeTabletDashboard() {
               color:
                 availability === null
                   ? "hsl(var(--muted-foreground))"
-                  : availability >= 80
+                  : availabilityCelebrated
                     ? "rgb(var(--sys-green))"
                     : "rgb(var(--sys-orange))",
             }}

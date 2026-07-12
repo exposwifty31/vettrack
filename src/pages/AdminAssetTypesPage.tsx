@@ -9,12 +9,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ManagementAccessDenied } from "@/desktop/management";
 import { t } from "@/lib/i18n";
 import type { AssetType, AssetTypeCondition } from "@/types";
 
 export default function AdminAssetTypesPage() {
   const { role } = useAuth();
-  if (role !== "admin") return null;
+  // T22: was a blank `return null` — no explicit signal a non-admin was denied.
+  if (role !== "admin") {
+    return (
+      <AppShell>
+        <ManagementAccessDenied />
+      </AppShell>
+    );
+  }
 
   return <AdminAssetTypesContent />;
 }

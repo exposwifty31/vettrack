@@ -28,7 +28,9 @@ interface AlertsProViewProps {
   /** Ownership (take/release) is restricted to the equipment-management tier. When
    *  false, status stays visible (who's handling) but the claim/release controls hide. */
   canOwn: boolean;
-  formatRelativeTime: (date: Date) => string;
+  /** Suffix-free duration formatter ("5 minutes"), matching the desktop
+   *  "in progress since …" wording — not the "… ago" relative-time form. */
+  formatRelativeDuration: (date: Date) => string;
 }
 
 /** Mobile Alerts Pro — worst-first hero + triage sections (design handoff). */
@@ -41,7 +43,7 @@ export function AlertsProView({
   onAck,
   onUnAck,
   canOwn,
-  formatRelativeTime,
+  formatRelativeDuration,
 }: AlertsProViewProps) {
   const enterOnce = useEnterOnce("alerts");
   const rise = enterOnce ? "vt-pro-rise" : "";
@@ -147,8 +149,8 @@ export function AlertsProView({
                       <div className="flex min-w-0 items-center gap-1.5">
                         <UserCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden />
                         <span className="truncate vt-text-2xs text-ivory-text2">
-                          {ack.acknowledgedByEmail.split("@")[0]} ·{" "}
-                          {formatRelativeTime(new Date(ack.acknowledgedAt))}
+                          {ack.acknowledgedByDisplayName || t.appointmentsPage.unknownUser} ·{" "}
+                          {formatRelativeDuration(new Date(ack.acknowledgedAt))}
                         </span>
                       </div>
                       {canOwn && (

@@ -20,6 +20,10 @@ import {
 
 export const DISPLAY_TOKEN_STORAGE_KEY = "vt_display_token";
 export const DISPLAY_CLINIC_STORAGE_KEY = "vt_display_clinic_id";
+/** Session-scoped (per tab), one-shot flag: set right before the 401 → /board/pair
+ *  redirect so the pairing screen can show an explicit notice instead of silently
+ *  reverting to a bare form. See auth-fetch.ts + board-pair.tsx. */
+export const DISPLAY_REVOKED_NOTICE_KEY = "vt_display_revoked_notice";
 
 /** Matches the server's `vtd_` device-token shape (see server/lib/display-token). */
 const DISPLAY_TOKEN_PREFIX = "vtd_";
@@ -57,4 +61,26 @@ export function getStoredDisplayClinicId(): string | null {
 export function clearStoredDisplayToken(): void {
   safeStorageRemoveItem(DISPLAY_TOKEN_STORAGE_KEY, "local");
   safeStorageRemoveItem(DISPLAY_CLINIC_STORAGE_KEY, "local");
+}
+
+/** Mark that the stored device token was just rejected (401) so the pairing
+ *  screen can explain why it's showing instead of silently reverting to a bare
+ *  form. Call immediately before redirecting to /board/pair. */
+export function markDisplayRevokedNotice(): void {
+  safeStorageSetItem(DISPLAY_REVOKED_NOTICE_KEY, "1", "session");
+}
+
+/** Read-and-clear the revoked-notice flag so it surfaces exactly once. */
+export function consumeDisplayRevokedNotice(): boolean {
+  const flagged = safeStorageGetItem(DISPLAY_REVOKED_NOTICE_KEY, "session") === "1";
+  if (flagged) safeStorageRemoveItem(DISPLAY_REVOKED_NOTICE_KEY, "session");
+  return flagged;
+}
+
+/** Pure, non-clearing read of the revoked-notice flag. Safe to call from a
+ *  render-phase lazy initializer (including React StrictMode's double-invoke)
+ *  since it has no side effect — pair with `consumeDisplayRevokedNotice()` in
+ *  a post-mount effect to actually clear the flag exactly once. */
+export function peekDisplayRevokedNotice(): boolean {
+  return safeStorageGetItem(DISPLAY_REVOKED_NOTICE_KEY, "session") === "1";
 }

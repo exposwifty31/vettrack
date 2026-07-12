@@ -14,6 +14,21 @@ type ActivityEntry =
   | { kind: "scan"; id: string; at: Date; scan: ScanLog }
   | { kind: "transfer"; id: string; at: Date; transfer: TransferLog };
 
+// The bulk room-verify endpoint (POST /api/equipment/bulk-verify-room) writes
+// a fixed-format English note ("Room verified: {room}") to scan logs — the
+// same prefix `src/pages/room-radar.tsx` matches on to detect this event
+// type. That prefix is a load-bearing identifier (server-stored, matched
+// elsewhere), so it stays English; only the DISPLAY is localized here by
+// extracting the room name and rendering it through a translated template.
+const ROOM_VERIFIED_NOTE_PREFIX = "Room verified: ";
+
+function scanNoteDisplay(note: string): string {
+  if (note.startsWith(ROOM_VERIFIED_NOTE_PREFIX)) {
+    return t.equipmentDetail.activityRoomVerified(note.slice(ROOM_VERIFIED_NOTE_PREFIX.length));
+  }
+  return note;
+}
+
 interface EquipmentDetailActivityTabProps {
   scanLogs: ScanLog[] | undefined;
   transfers: TransferLog[] | undefined;
@@ -91,11 +106,11 @@ export function EquipmentDetailActivityTab({
                       {equipmentStatusLabel(entry.scan.status)}
                     </Badge>
                     <span className="text-xs text-muted-foreground truncate">
-                      {entry.scan.userEmail}
+                      {entry.scan.staffName || t.appointmentsPage.unknownUser}
                     </span>
                   </div>
                   {entry.scan.note && (
-                    <p className="text-xs text-muted-foreground mt-1">{entry.scan.note}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{scanNoteDisplay(entry.scan.note)}</p>
                   )}
                   {entry.scan.photoUrl && (
                     <img
@@ -126,7 +141,7 @@ export function EquipmentDetailActivityTab({
                   </Badge>
                   <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" />
                   <span className="text-sm font-medium truncate">
-                    {entry.transfer.fromFolderName ?? "—"} → {entry.transfer.toFolderName ?? "—"}
+                    {entry.transfer.fromFolderName ?? t.common.unfiled} → {entry.transfer.toFolderName ?? t.common.unfiled}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground shrink-0">

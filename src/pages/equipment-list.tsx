@@ -11,7 +11,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
 import { Helmet } from "react-helmet-async";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,6 +82,7 @@ import {
   type LocalEntityState,
 } from "@/lib/local-entity-sync-state";
 import { useSettings } from "@/hooks/use-settings";
+import { useActiveShift } from "@/hooks/use-active-shift";
 import { cn } from "@/lib/utils";
 import { QrScanner } from "@/components/qr-scanner";
 import { VirtualizedEquipmentList } from "@/components/VirtualizedEquipmentList";
@@ -103,6 +104,10 @@ import {
 } from "@/lib/equipment-list-recovery-labels";
 import { EquipmentHeroCoverageStrip } from "@/components/equipment/EquipmentHeroCoverageStrip";
 import { EquipmentRoomSweepSheet } from "@/components/equipment/EquipmentRoomSweepSheet";
+import {
+  EQUIPMENT_LIST_PAGE_SIZE as PAGE_SIZE,
+  resolveEquipmentListShownCount,
+} from "@/lib/equipment-list-pagination";
 
 const VIRTUALIZATION_THRESHOLD = 100;
 const SERVER_PAGE_SIZE = 100;
@@ -114,9 +119,6 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "maintenance", label: t.status.maintenance },
   { value: "sterilized", label: t.status.sterilized },
 ];
-
-// 9 cards per page — DOM never holds more than 9 <div>s regardless of dataset size.
-const PAGE_SIZE = 9;
 
 
 export default function EquipmentListPage() {
@@ -144,6 +146,9 @@ function EquipmentListPageDesktop() {
     () => buildLocalEntityStateByEquipmentId(syncQueueItems),
     [syncQueueItems],
   );
+  // Roster-derived shift state, resolved once here and threaded into every
+  // EquipmentItem — one shared React Query observer instead of one per row.
+  const { hasActiveShift, isLoading: shiftLoading, isError: shiftError } = useActiveShift();
   const [, navigate] = useLocation();
   const searchStr = useSearch();
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -247,7 +252,6 @@ function EquipmentListPageDesktop() {
   });
 
   const equipment = equipmentPage?.items ?? [];
-  const totalCount = equipmentPage?.total ?? 0;
 
   /** Clears paginated equipment cache, resets local UI state, and runs a fresh fetch (used by ErrorCard retry). */
   const refetchAll = useCallback(async () => {
@@ -419,12 +423,15 @@ function EquipmentListPageDesktop() {
           selectMode={false}
           selected={false}
           onToggleSelect={() => {}}
+          hasActiveShift={hasActiveShift}
+          shiftLoading={shiftLoading}
+          shiftError={shiftError}
           virtualized
           localSyncState={localSyncByEquipmentId.get(eq.id) ?? "synced"}
         />
       </div>
     ),
-    [localSyncByEquipmentId],
+    [localSyncByEquipmentId, hasActiveShift, shiftLoading, shiftError],
   );
 
   const manualFolders = folders?.filter((f) => f.type !== "smart") || [];
@@ -432,7 +439,7 @@ function EquipmentListPageDesktop() {
   const pageBody = (
     <>
       <Helmet>
-        <title>Equipment — VetTrack</title>
+        <title>{t.equipment.title} — VetTrack</title>
         <meta name="description" content="Browse, search, and manage all veterinary equipment. Filter by status or folder, bulk-move items, and scan QR codes to quickly locate any asset." />
         <link rel="canonical" href="https://vettrack.replit.app/equipment" />
       </Helmet>
@@ -807,9 +814,15 @@ function EquipmentListPageDesktop() {
           )}
         </div>
 
-        {/* Count + page info */}
+        {/* Count + page info — both numbers derive from the same locally-loaded
+            `displayList`, the pager's actual data source. Mixing this with the
+            server's filtered-total (which can exceed the fixed page:1/100-item
+            batch actually fetched) would contradict "page X of Y" below. */}
         <p className="vt-text-xs text-muted-foreground -mt-2">
-          {t.equipmentList.paginationCount(displayList.length, totalCount || equipment.length)}
+          {t.equipmentList.paginationCount(
+            resolveEquipmentListShownCount(isVirtualized, displayList.length, pageItems.length),
+            displayList.length,
+          )}
           {!isLoading && !isVirtualized && totalPages > 1 && (
             <span className="ms-1">· {t.equipmentList.paginationPage(safePage, totalPages)}</span>
           )}
@@ -925,6 +938,9 @@ function EquipmentListPageDesktop() {
                         selectMode={selectMode}
                         selected={selected.has(eq.id)}
                         onToggleSelect={() => toggleSelect(eq.id)}
+                        hasActiveShift={hasActiveShift}
+                        shiftLoading={shiftLoading}
+                        shiftError={shiftError}
                         localSyncState={localSyncByEquipmentId.get(eq.id) ?? "synced"}
                       />
                     )),
@@ -979,11 +995,15 @@ function EquipmentListPageDesktop() {
   return <AppShell>{pageBody}</AppShell>;
 }
 
-function EquipmentItem({
+// Exported for tests (T3 fail-loud audit — checkout error/off-shift gate coverage).
+export function EquipmentItem({
   equipment: eq,
   selectMode,
   selected,
   onToggleSelect,
+  hasActiveShift,
+  shiftLoading,
+  shiftError,
   virtualized = false,
   localSyncState = "synced",
 }: {
@@ -991,6 +1011,15 @@ function EquipmentItem({
   selectMode: boolean;
   selected: boolean;
   onToggleSelect: () => void;
+  // Roster-derived shift state, resolved ONCE in the parent page and passed
+  // down. Do not call useActiveShift() per row — that creates one React Query
+  // observer per list item on the shared dashboard query. Off-shift: taking
+  // equipment ownership is not permitted (same gate the detail page enforces);
+  // `hasActiveShift` is false while the query resolves, so the checkout
+  // quick-action stays disabled for that window (see `shiftLoading`).
+  hasActiveShift: boolean;
+  shiftLoading: boolean;
+  shiftError: boolean;
   virtualized?: boolean;
   localSyncState?: LocalEntityState;
 }) {
@@ -1044,11 +1073,34 @@ function EquipmentItem({
       queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
       toast.success(`Checked out — ${displayName}`);
     },
-    onError: () => {
+    onError: (err: unknown) => {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
-      toast.error(t.equipmentList.toast.checkoutError);
+      // Surface the server's actual reason (fail-loud doctrine, T3) instead
+      // of a generic message — mirrors equipmentDetail.toast.checkoutFailed.
+      const message = err instanceof ApiError ? err.message : "";
+      toast.error(t.equipmentList.toast.checkoutFailed(message));
     },
   });
+
+  // Single choke point for the list-row checkout affordance — blocks
+  // off-shift ownership before the request fires (parity with the equipment
+  // detail page's handleCheckout), and still fails loud via onError above
+  // for any other 400 the server returns.
+  const handleCheckoutClick = () => {
+    // Stay quiet (not a false "off-shift" error) while the shift query is
+    // still resolving — the quick-action button is disabled for this window.
+    if (shiftLoading) return;
+    // If the shift query itself failed, don't infer "off-shift" from the
+    // missing `shift` — let the request reach the server, which enforces the
+    // authoritative roster gate and fails loud via `onError` for a real
+    // off-shift denial. Only a *successful* query that reports no active shift
+    // blocks client-side.
+    if (!shiftError && !hasActiveShift) {
+      toast.error(t.scan.offShiftBody);
+      return;
+    }
+    checkoutMut.mutate();
+  };
 
   const returnMut = useMutation({
     mutationFn: (payload: { isPluggedIn: boolean; plugInDeadlineMinutes?: number }) =>
@@ -1093,7 +1145,7 @@ function EquipmentItem({
   const quickAction = eq.custodyState === "returned" && eq.status === "ok"
     ? { label: t.dockReturn.submit, icon: LogIn, action: () => setDockReturnOpen(true), pending: false, className: "text-blue-700 border-blue-200 hover:bg-blue-50" }
     : !isCheckedOut && eq.status === "ok"
-    ? { label: t.equipmentList.quickAction.checkout, icon: LogIn, action: () => checkoutMut.mutate(), pending: checkoutMut.isPending, className: "text-emerald-700 border-emerald-200 hover:bg-emerald-50" }
+    ? { label: t.equipmentList.quickAction.checkout, icon: LogIn, action: handleCheckoutClick, pending: checkoutMut.isPending || shiftLoading, className: "text-emerald-700 border-emerald-200 hover:bg-emerald-50" }
     : (isCheckedOut && (checkedOutByMe || isAdmin)) && eq.status === "ok"
     ? { label: t.equipmentList.quickAction.return, icon: LogOut, action: () => setReturnDialogOpen(true), pending: returnMut.isPending, className: "text-primary border-primary/30 hover:bg-primary/10" }
     : eq.status === "issue"

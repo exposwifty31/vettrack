@@ -1,6 +1,8 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { enUS, heIL } from "@clerk/localizations";
 import {
   CLERK_NATIVE_REDIRECT_ORIGINS,
+  clerkLocalizationForLocale,
   clerkProviderPropsForRuntime,
 } from "../src/lib/clerk-capacitor-config";
 
@@ -37,5 +39,29 @@ describe("clerkProviderPropsForRuntime", () => {
 
   it("leaves the web runtime in default (cookie) mode", () => {
     expect(clerkProviderPropsForRuntime("pk_live_test").standardBrowser).toBeUndefined();
+  });
+
+  it("passes the Hebrew Clerk localization (heIL) when the app locale is Hebrew", () => {
+    expect(clerkProviderPropsForRuntime("pk_live_test", "he").localization).toBe(heIL);
+  });
+
+  it("passes the English Clerk localization (enUS) when the app locale is English", () => {
+    expect(clerkProviderPropsForRuntime("pk_live_test", "en").localization).toBe(enUS);
+  });
+
+  it("wires the same localization for the native-shell runtime", () => {
+    vi.mocked(isCapacitorNative).mockReturnValue(true);
+    expect(clerkProviderPropsForRuntime("pk_live_test", "he").localization).toBe(heIL);
+    expect(clerkProviderPropsForRuntime("pk_live_test", "en").localization).toBe(enUS);
+  });
+});
+
+describe("clerkLocalizationForLocale", () => {
+  it("returns heIL for the Hebrew locale", () => {
+    expect(clerkLocalizationForLocale("he")).toBe(heIL);
+  });
+
+  it("returns enUS for the English locale", () => {
+    expect(clerkLocalizationForLocale("en")).toBe(enUS);
   });
 });

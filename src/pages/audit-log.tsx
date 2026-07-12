@@ -16,7 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Shield,
   ClipboardList,
   AlertTriangle,
   RefreshCw,
@@ -27,7 +26,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
-import { useLocation } from "wouter";
+import { ManagementAccessDenied } from "@/desktop/management";
 import type { AuditLog } from "@/types";
 import { t } from "@/lib/i18n";
 
@@ -463,20 +462,18 @@ export function SharedAuditLogsPanel({
 
 export default function AuditLogPage() {
   const { isAdmin } = useAuth();
-  const [, navigate] = useLocation();
 
+  // T22: the server audit-log endpoint is requireAdmin-only (stricter than
+  // management.web, which also admits lead) — this floor is genuinely narrower
+  // than the rest of the console, so it stays a literal isAdmin check. Only the
+  // denial UI is unified (ManagementAccessDenied), not the eligibility rule.
   if (!isAdmin) {
     return (
       <AppShell>
         <Helmet>
           <title>{t.adminPage.auditLogTitle} — VetTrack</title>
         </Helmet>
-        <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
-          <Shield className="w-12 h-12 text-muted-foreground" />
-          <h1 className="text-2xl font-bold">{t.adminPage.auditLogAdminOnly}</h1>
-          <p className="text-sm text-muted-foreground">{t.adminPage.auditLogAdminOnlyDesc}</p>
-          <Button variant="ghost" onClick={() => navigate("/home")}>{t.adminPage.auditLogGoHome}</Button>
-        </div>
+        <ManagementAccessDenied />
       </AppShell>
     );
   }

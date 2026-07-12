@@ -5,12 +5,16 @@
 // we redeem it for a durable device token (POST /api/display/pair/claim),
 // persist the token, and hand off to /board. Renders inside BoardShell (dark,
 // full-bleed kiosk chrome) because /board/pair matches `isBoardPathname`.
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
-import { MonitorSmartphone, Loader2 } from "lucide-react";
+import { MonitorSmartphone, Loader2, TriangleAlert } from "lucide-react";
 import { claimDisplayPairing } from "@/lib/api";
-import { setStoredDisplayToken } from "@/lib/display-token-store";
+import {
+  setStoredDisplayToken,
+  consumeDisplayRevokedNotice,
+  peekDisplayRevokedNotice,
+} from "@/lib/display-token-store";
 import { t } from "@/lib/i18n";
 import { useDirection } from "@/hooks/useDirection";
 import { Button } from "@/components/ui/button";
@@ -26,6 +30,16 @@ export default function BoardPairPage() {
   const dir = useDirection();
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  // A pure peek in the lazy initializer — reading without clearing keeps this
+  // safe under React StrictMode's double-invocation of state initializers
+  // (double-consuming a read+clear initializer would drop the notice on the
+  // second, already-cleared call). The flag is actually cleared exactly once
+  // in the post-mount effect below.
+  const [wasRevoked] = useState(() => peekDisplayRevokedNotice());
+
+  useEffect(() => {
+    if (wasRevoked) consumeDisplayRevokedNotice();
+  }, [wasRevoked]);
 
   const mutation = useMutation({
     mutationFn: () => claimDisplayPairing(code.trim(), name.trim() || undefined),
@@ -57,6 +71,25 @@ export default function BoardPairPage() {
           <h1 className="text-2xl font-bold">{t.boardPair.title}</h1>
           <p className="text-sm text-ivory-text3">{t.boardPair.subtitle}</p>
         </div>
+
+        {wasRevoked && (
+          <div
+            role="alert"
+            data-testid="board-pair-revoked-notice"
+            className="mb-6 flex items-start gap-2.5 rounded-xl border border-emergency-amber/40 bg-emergency-amber/10 px-4 py-3 text-start"
+          >
+            <TriangleAlert
+              className="mt-0.5 h-4 w-4 shrink-0 text-emergency-amber"
+              aria-hidden="true"
+            />
+            <div>
+              <p className="text-sm font-semibold text-emergency-amber">
+                {t.boardPair.revokedNoticeTitle}
+              </p>
+              <p className="mt-0.5 text-xs text-ivory-text2">{t.boardPair.revokedNoticeMessage}</p>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">

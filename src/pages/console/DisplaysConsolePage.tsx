@@ -45,11 +45,13 @@ function statusMeta(device: DisplayDevice): { label: string; variant: "ok" | "is
     : { label: t.console.displays.statusActive, variant: "ok" };
 }
 
-/** Manage drawer — rename an active device or revoke it. Both are two-step guarded. */
+/** Manage drawer — rename/revoke an active device, or delete a dead (already
+ *  revoked) row. All three are two-step guarded. */
 function ManageDeviceSheet({ device, onClose }: { device: DisplayDevice; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState(device.name);
   const [confirmingRevoke, setConfirmingRevoke] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const isRevoked = device.revokedAt != null;
 
   const renameMut = useMutation({
@@ -70,6 +72,19 @@ function ManageDeviceSheet({ device, onClose }: { device: DisplayDevice; onClose
       onClose();
     },
     onError: () => toast.error(t.console.displays.revokeError),
+  });
+
+  // Item 3 (T21) — dead (already-revoked) rows can be removed from the
+  // registry. The server 404s if the device is still active, so this is
+  // only ever offered once isRevoked.
+  const deleteMut = useMutation({
+    mutationFn: () => api.display.devices.delete(device.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: DEVICES_KEY });
+      toast.success(t.console.displays.deleted);
+      onClose();
+    },
+    onError: () => toast.error(t.console.displays.deleteError),
   });
 
   const trimmed = name.trim();
@@ -124,6 +139,20 @@ function ManageDeviceSheet({ device, onClose }: { device: DisplayDevice; onClose
                 {t.console.displays.revoke}
               </Button>
             ))}
+          {isRevoked &&
+            (confirmingDelete ? (
+              <Button
+                variant="destructive"
+                onClick={() => deleteMut.mutate()}
+                disabled={deleteMut.isPending}
+              >
+                {t.console.displays.deleteConfirm}
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => setConfirmingDelete(true)}>
+                {t.console.displays.delete}
+              </Button>
+            ))}
           <Button variant="ghost" onClick={onClose}>
             {t.common.cancel}
           </Button>
@@ -163,8 +192,9 @@ function IssuedCodeDialog({ issued, onClose }: { issued: DisplayPairingCode; onC
  * Displays console (Phase 9) — the admin registry for paired Department Display
  * devices. Reads + writes are `requireAuth + requireAdmin` server-side, so a lead
  * (management.web, no webWrite) sees the chrome + an honest "pending server
- * enablement" state rather than a 403'd fetch. Issue pairing codes, rename, and
- * revoke devices; the token is never listed.
+ * enablement" state rather than a 403'd fetch. Issue pairing codes, rename,
+ * revoke devices, and delete dead (already-revoked) rows; the token is never
+ * listed.
  */
 export default function DisplaysConsolePage() {
   const experience = useExperience();

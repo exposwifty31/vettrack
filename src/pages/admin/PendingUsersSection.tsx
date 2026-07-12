@@ -12,6 +12,24 @@ import { useConfirm } from "@/hooks/use-confirm";
 import { t, formatDateByLocale } from "@/lib/i18n";
 import { haptics } from "@/lib/haptics";
 
+/**
+ * Localized label for the advisory role a user requested at sign-up (T24b).
+ * Read-only hint only — the admin still grants the real role separately.
+ * Returns null for absent/unknown values so no hint is shown.
+ */
+function requestedRoleLabel(requestedRole: string | null | undefined): string | null {
+  switch (requestedRole) {
+    case "vet":
+      return t.adminPage.roleVet;
+    case "technician":
+      return t.adminPage.roleTechnician;
+    case "student":
+      return t.adminPage.roleStudent;
+    default:
+      return null;
+  }
+}
+
 export function PendingUsersSection() {
   const confirm = useConfirm();
   const { userId } = useAuth();
@@ -63,7 +81,9 @@ export function PendingUsersSection() {
           </p>
         ) : (
           <div className="flex flex-col gap-2">
-            {pendingUsers.map((user) => (
+            {pendingUsers.map((user) => {
+              const roleLabel = requestedRoleLabel(user.requestedRole);
+              return (
               <div
                 key={user.id}
                 data-testid={`pending-user-row-${user.id}`}
@@ -83,6 +103,14 @@ export function PendingUsersSection() {
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {t.adminPage.signedUp(formatDateByLocale(user.createdAt))}
                   </p>
+                  {roleLabel && (
+                    <p
+                      className="text-xs text-muted-foreground mt-0.5"
+                      data-testid={`requested-role-hint-${user.id}`}
+                    >
+                      {t.adminPage.requestedRoleHint(roleLabel)}
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <Button
@@ -122,7 +150,8 @@ export function PendingUsersSection() {
                   </Button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardContent>

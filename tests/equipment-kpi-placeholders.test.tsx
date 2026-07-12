@@ -72,6 +72,51 @@ describe("EquipmentLargeTitle — C2 placeholder + H1 readout", () => {
   });
 });
 
+describe("EquipmentLargeTitle — T14 no false all-clear", () => {
+  afterEach(() => cleanup());
+
+  const base = {
+    title: "ציוד",
+    count: 62,
+    availabilityPct: 100,
+    isLoading: false,
+    verifiedCount: 0,
+    notVerifiedCount: 62,
+  };
+
+  // The audit scenario: 100% availability sits next to "0 תקין · 62 לא אומתו".
+  // The two figures are different metrics (operational health vs freshness), so
+  // 100% must NOT paint the celebratory all-clear tone when nothing is verified.
+  it("does not celebrate 100% availability when nothing has been verified", () => {
+    render(<EquipmentLargeTitle {...base} />);
+    const pct = screen.getByTestId("equipment-availability");
+    // Both dimensions are shown, but the availability figure is the caution
+    // tone (amber), never the celebratory green (var(--action)).
+    expect(pct.getAttribute("data-availability-tone")).toBe("caution");
+    expect(pct.getAttribute("style")).not.toContain("var(--action)");
+    // The verification split is still rendered next to it.
+    expect(screen.getByTestId("equipment-verified-split")).toBeTruthy();
+  });
+
+  it("celebrates 100% availability once verification confirms items", () => {
+    render(<EquipmentLargeTitle {...base} verifiedCount={62} notVerifiedCount={0} />);
+    const pct = screen.getByTestId("equipment-availability");
+    expect(pct.getAttribute("data-availability-tone")).toBe("ok");
+    expect(pct.getAttribute("style")).toContain("var(--action)");
+  });
+
+  it("treats unknown (null) verification as not-yet-loaded, keeping the tone", () => {
+    // While the full-list verification query is still resolving we don't know
+    // that nothing is verified — the gate must only trip on a KNOWN zero.
+    render(
+      <EquipmentLargeTitle {...base} verifiedCount={null} notVerifiedCount={null} />,
+    );
+    expect(
+      screen.getByTestId("equipment-availability").getAttribute("data-availability-tone"),
+    ).toBe("ok");
+  });
+});
+
 describe("EquipmentStatStrip — calm zero + no duplicate availability", () => {
   afterEach(() => cleanup());
 

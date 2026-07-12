@@ -251,7 +251,7 @@ export default function ManagementDashboardPage() {
               {t.managementDashboardPage.whoHasWhat}
               {userGroups.length > 0 && (
                 <span className="ms-auto text-xs text-muted-foreground">
-                  {userGroups.length} {t.managementDashboardPage.usersUnit}
+                  {t.managementDashboardPage.usersUnit(userGroups.length)}
                 </span>
               )}
             </CardTitle>
@@ -282,7 +282,7 @@ export default function ManagementDashboardPage() {
                         <div className="min-w-0">
                           <p className="font-semibold text-sm truncate">{group.userEmail}</p>
                           <p className="text-xs text-muted-foreground">
-                            {group.items.length} {t.managementDashboardPage.itemsUnit} {t.managementDashboardPage.checkedOut}
+                            {t.managementDashboardPage.itemsUnit(group.items.length)} {t.managementDashboardPage.checkedOut}
                           </p>
                         </div>
                         {isExpanded ? (
@@ -350,7 +350,7 @@ export default function ManagementDashboardPage() {
                     <div key={group.location} className="flex flex-col gap-1.5">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">{group.location}</span>
-                        <span className="text-xs text-muted-foreground">{group.count} {t.managementDashboardPage.itemsUnit}</span>
+                        <span className="text-xs text-muted-foreground">{t.managementDashboardPage.itemsUnit(group.count)}</span>
                       </div>
                       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                         <div

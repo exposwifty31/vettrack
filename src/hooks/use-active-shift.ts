@@ -16,10 +16,14 @@ import type { HomeDashboardPulse } from "@/types/tasks";
 export function useActiveShift(): {
   hasActiveShift: boolean;
   isLoading: boolean;
+  /** The shift query itself failed. Distinct from off-shift: consumers must not
+   *  infer "off-shift" from a missing `shift` when the read errored — defer the
+   *  gate to the server (which enforces the authoritative roster) instead. */
+  isError: boolean;
   nextShift: HomeDashboardPulse["nextShift"];
 } {
   const userId = getCurrentUserId();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["/api/home/dashboard"],
     queryFn: () => api.home.dashboard(),
     enabled: !!userId,
@@ -27,5 +31,5 @@ export function useActiveShift(): {
     refetchOnWindowFocus: false,
     staleTime: 60_000,
   });
-  return { hasActiveShift: !!data?.shift, isLoading, nextShift: data?.nextShift ?? null };
+  return { hasActiveShift: !!data?.shift, isLoading, isError, nextShift: data?.nextShift ?? null };
 }

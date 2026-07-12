@@ -444,6 +444,7 @@ export interface AlertAcknowledgment {
   alertType: string;
   acknowledgedById: string;
   acknowledgedByEmail: string;
+  acknowledgedByDisplayName: string | null;
   acknowledgedAt: string;
 }
 

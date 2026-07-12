@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import * as Sentry from "@sentry/react";
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -17,6 +18,9 @@ export interface PwaInstallState {
   canInstall: boolean;
   /** Trigger the native install prompt. Returns the user's choice. */
   promptInstall: () => Promise<"accepted" | "dismissed" | "unavailable">;
+  /** True once the user has dismissed the Android/Chrome install banner (session-scoped) */
+  androidDismissed: boolean;
+  dismissAndroidBanner: () => void;
   /** True once the user has dismissed the iOS guidance banner */
   iosGuidanceDismissed: boolean;
   dismissIosGuidance: () => void;
@@ -55,6 +59,27 @@ function isIosGuidanceSuppressed(): boolean {
   }
 }
 
+// Session-scoped: a dismissed Android/Chrome banner must stay dismissed across
+// in-app navigation/remount for the rest of the browser tab's lifetime, but is
+// free to reappear on the next fresh session (unlike the iOS guidance, which
+// uses a 7-day TTL because it has no native re-trigger).
+const ANDROID_DISMISSED_KEY = "vt_pwa_android_banner_dismissed";
+
+function isAndroidBannerSuppressed(): boolean {
+  try {
+    return sessionStorage.getItem(ANDROID_DISMISSED_KEY) === "1";
+  } catch (err) {
+    // Non-fatal: fall back to "not suppressed" so the banner still offers
+    // install, but surface the storage failure instead of swallowing it —
+    // a silently-broken read here means a dismissed banner keeps reappearing.
+    Sentry.captureMessage("PWA install: sessionStorage read failed (Android banner)", {
+      level: "warning",
+      extra: { key: ANDROID_DISMISSED_KEY, error: String(err) },
+    });
+    return false;
+  }
+}
+
 export function usePwaInstall(): PwaInstallState {
   const promptRef = useRef<BeforeInstallPromptEvent | null>(null);
   const [canInstall, setCanInstall] = useState(false);
@@ -63,6 +88,7 @@ export function usePwaInstall(): PwaInstallState {
     return mode === "standalone" || mode === "fullscreen";
   });
   const [isIos] = useState(isIosSafari);
+  const [androidDismissed, setAndroidDismissed] = useState(isAndroidBannerSuppressed);
   const [iosGuidanceDismissed, setIosGuidanceDismissed] = useState(isIosGuidanceSuppressed);
 
   useEffect(() => {
@@ -92,13 +118,33 @@ export function usePwaInstall(): PwaInstallState {
     return outcome;
   }
 
+  function dismissAndroidBanner() {
+    setAndroidDismissed(true);
+    try {
+      sessionStorage.setItem(ANDROID_DISMISSED_KEY, "1");
+    } catch (err) {
+      // Non-fatal — state still held in memory for this session, but a
+      // silently-failed write means the dismissal won't survive a remount.
+      Sentry.captureMessage("PWA install: sessionStorage write failed (Android banner)", {
+        level: "warning",
+        extra: { key: ANDROID_DISMISSED_KEY, error: String(err) },
+      });
+    }
+  }
+
   function dismissIosGuidance() {
     setIosGuidanceDismissed(true);
     try {
       // Store timestamp so we can re-show after IOS_DISMISS_TTL_MS (7 days).
       localStorage.setItem(IOS_DISMISSED_KEY, String(Date.now()));
-    } catch {
-      // storage unavailable — state still held in memory for this session
+    } catch (err) {
+      // Non-fatal — state still held in memory for this session, but a
+      // silently-failed write means the dismissal won't survive a remount
+      // (mirrors dismissAndroidBanner's warning-level capture).
+      Sentry.captureMessage("PWA install: localStorage write failed (iOS guidance)", {
+        level: "warning",
+        extra: { key: IOS_DISMISSED_KEY, error: String(err) },
+      });
     }
   }
 
@@ -107,6 +153,8 @@ export function usePwaInstall(): PwaInstallState {
     isIos,
     canInstall,
     promptInstall,
+    androidDismissed,
+    dismissAndroidBanner,
     iosGuidanceDismissed,
     dismissIosGuidance,
   };

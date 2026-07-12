@@ -1,5 +1,6 @@
 import { t } from "@/lib/i18n";
 import { formatRelativeTime } from "@/lib/utils";
+import { TruncatedText } from "@/components/ui/truncated-text";
 import type { Equipment } from "@/types";
 import type { LocationInference } from "./hooks/use-equipment-detail";
 
@@ -69,6 +70,7 @@ export function EquipmentGlanceGrid({ equipment, inference }: Props) {
         {facts.map((f) => (
           <div
             key={f.key}
+            data-testid={`glance-tile-${f.key}`}
             style={{
               display: "flex",
               flexDirection: "column",
@@ -91,18 +93,17 @@ export function EquipmentGlanceGrid({ equipment, inference }: Props) {
             >
               {f.label}
             </span>
-            <span
-              style={{
-                fontSize: "var(--text-sm)",
-                fontWeight: 600,
-                color: "hsl(var(--foreground))",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {f.value}
-            </span>
+            {/* Two-line clamp (not single-line ellipsis): the 2-up grid narrows
+                enough on iPad's split-view detail pane that even short facts
+                (e.g. the localized "Unassigned" value) were cutting off.
+                `as="bdi"` isolates LTR runs (emails, English room names)
+                inside the RTL grid. */}
+            <TruncatedText
+              text={f.value}
+              lines={2}
+              as="bdi"
+              className="text-sm font-semibold text-foreground"
+            />
           </div>
         ))}
       </div>

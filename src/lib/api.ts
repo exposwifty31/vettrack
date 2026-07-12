@@ -31,6 +31,7 @@ import type {
   ShiftImport,
   ShiftImportPreview,
   ShiftImportResult,
+  ShiftNameHints,
   ShiftAdjustment,
   ShiftAdjustmentStatus,
   ShiftAdjustmentDecision,
@@ -129,6 +130,8 @@ function bootstrapHeaders(init: RequestInit): Record<string, string> {
 export {
   request,
   ApiError,
+  toApiErrorMessage,
+  extractApiErrorCode,
   EQUIPMENT_LIST_FETCH_TIMEOUT_MS,
   TASKS_FETCH_TIMEOUT_MS,
 };
@@ -547,6 +550,7 @@ export const api = {
     list: (date?: string) =>
       request<Shift[]>(date ? `/api/shifts?date=${encodeURIComponent(date)}` : "/api/shifts"),
     imports: () => request<ShiftImport[]>("/api/shifts/imports"),
+    importShiftNameHints: () => request<ShiftNameHints>("/api/shifts/import/shift-names"),
     previewImport: async (file: File) => {
       const form = new FormData();
       form.append("file", file);
@@ -1096,6 +1100,12 @@ export const api = {
       revoke: (id: string): Promise<{ ok: boolean; id: string }> =>
         request<{ ok: boolean; id: string }>(`/api/display/devices/${id}/revoke`, {
           method: "POST",
+        }),
+      // Hard-delete a DEAD (already-revoked) registry row — the server 404s if
+      // the device is still active, so an admin must revoke before deleting.
+      delete: (id: string): Promise<{ ok: boolean; id: string }> =>
+        request<{ ok: boolean; id: string }>(`/api/display/devices/${id}`, {
+          method: "DELETE",
         }),
     },
   },

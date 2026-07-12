@@ -77,9 +77,10 @@ const OpsHealthConsolePage = lazy(() => import("@/pages/console/OpsHealthConsole
 const PeopleRolesConsolePage = lazy(() => import("@/pages/console/PeopleRolesConsolePage"));
 const DisplaysConsolePage = lazy(() => import("@/pages/console/DisplaysConsolePage"));
 
-function RedirectPreserveSearch({ to }: { to: string }) {
+export function RedirectPreserveSearch({ to }: { to: string }) {
   const search = useSearch();
-  return <Redirect to={`${to}${search}`} replace />;
+  const query = search ? (search.startsWith("?") ? search : `?${search}`) : "";
+  return <Redirect to={`${to}${query}`} replace />;
 }
 
 /** `/` — signed-in users go to `/home`; everyone else goes to `/signin`. */
@@ -181,7 +182,17 @@ export function AppRoutes() {
         <Route path="/crash-cart"><AuthGuard><CrashCartCheckPage /></AuthGuard></Route>
         <Route path="/handoff"><AuthGuard><HandoffPage /></AuthGuard></Route>
         <Route path="/admin/code-blue-history"><AuthGuard><CodeBlueHistoryPage /></AuthGuard></Route>
-        {/* Legacy aliases */}
+        {/* Legacy aliases — intentional identical-component mounts, not
+            distinct surfaces (confirmed 2026-07-11 QA audit finding: "/emergency-equipment-wall
+            renders the identical idle screen as /code-blue/display — alias or
+            unbuilt distinct wall?"). CANONICAL_HREFS + ROUTE_ALIAS_GROUPS
+            (src/lib/routes/canonical-hrefs.ts, route-alias-groups.ts) already
+            treat these as one nav destination each; new links generate the
+            canonical href. The legacy path is kept as a live route (not a
+            redirect) deliberately, matching its siblings above, so an
+            existing bookmark or a physical display already pointed at the
+            legacy URL (e.g. a wall-mounted browser on /code-blue/display)
+            never gets an extra navigation hop or a URL change underneath it. */}
         <Route path="/emergency-equipment-log"><AuthGuard><CodeBluePage /></AuthGuard></Route>
         <Route path="/emergency-equipment-wall"><AuthGuard><WebOnlyGuard><CodeBlueDisplay /></WebOnlyGuard></AuthGuard></Route>
         <Route path="/critical-kit-check"><AuthGuard><CrashCartCheckPage /></AuthGuard></Route>
@@ -216,10 +227,16 @@ export function AppRoutes() {
         {isNativeTablet && <Route path="/inventory-items/:id?"><AuthGuard><InventoryItemsMasterDetail /></AuthGuard></Route>}
         {!isNativeTablet && <Route path="/inventory-items/:id"><AuthGuard><InventoryItemDetailPage /></AuthGuard></Route>}
         {!isNativeTablet && <Route path="/inventory-items"><AuthGuard><InventoryItemsPage /></AuthGuard></Route>}
-        <Route path="/procurement"><AuthGuard><WebOnlyGuard><ProcurementPage /></WebOnlyGuard></AuthGuard></Route>
+        {/* T22: previously ungated (rendered to any authenticated role — a leak).
+            Both are management-console-adjacent surfaces (procurement write actions
+            are already admin-only in-page; /analytics is listed under management.web
+            in WEB_MANAGEMENT_NAV but the route itself never enforced it). Gated with
+            the same ManagementGuard as the rest of the console for one consistent
+            denial pattern. */}
+        <Route path="/procurement"><AuthGuard><WebOnlyGuard><ManagementGuard><ProcurementPage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/analytics/outcome-kpi"><Redirect to="/analytics" replace /></Route>
         <Route path="/analytics/shift-leaderboard"><AuthGuard><WebOnlyGuard><ShiftLeaderboardPage /></WebOnlyGuard></AuthGuard></Route>
-        <Route path="/analytics"><AuthGuard><WebOnlyGuard><AnalyticsPage /></WebOnlyGuard></AuthGuard></Route>
+        <Route path="/analytics"><AuthGuard><WebOnlyGuard><ManagementGuard><AnalyticsPage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/dashboard"><AuthGuard><WebOnlyGuard><ManagementGuard><ManagementDashboardPage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>
         <Route path="/whats-new"><AuthGuard><WhatsNewPage /></AuthGuard></Route>
         <Route path="/shift-chat/:shiftId"><AuthGuard><ShiftChatArchive /></AuthGuard></Route>
