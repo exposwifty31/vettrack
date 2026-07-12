@@ -14,7 +14,8 @@ export type BundleReadinessResult =
         | "CUSTODY_CHAIN_BROKEN"
         | "NO_ASSET_TYPE_DEFINED"
         | "NO_CONDITIONS_DEFINED"
-        | "CONDITIONS_NOT_MET";
+        | "CONDITIONS_NOT_MET"
+        | "CONDITION_STATUS_NOT_CLEAR";
       failedConditions: string[];
       staleConditions: string[];
       unknownConditions: string[];
@@ -27,6 +28,8 @@ export type UsageState = "available" | "staged" | "in_use" | "emergency_use" | "
 export interface DeployabilityInput {
   custodyState: string;
   assetTypeId: string | null | undefined;
+  /** Damage-tracking status (R-EQ-F3); a non-"ok" value forces not-ready regardless of other signals. */
+  conditionStatus?: string | null;
 }
 
 function isStale(verifiedAt: Date, staleAfterMinutes: number, now: Date): boolean {
@@ -40,6 +43,16 @@ export function computeBundleReadinessGate(
   assetTypeConditions: AssetTypeCondition[],
   now: Date,
 ): BundleReadinessResult {
+  if (equipment.conditionStatus != null && equipment.conditionStatus !== "ok") {
+    return {
+      ok: false,
+      reason: "CONDITION_STATUS_NOT_CLEAR",
+      failedConditions: [],
+      staleConditions: [],
+      unknownConditions: [],
+    };
+  }
+
   if (equipment.custodyState !== "docked") {
     return {
       ok: false,
