@@ -3776,6 +3776,11 @@ export interface TStructure {
     description: string;
     cta: string;
   };
+  managementWebGate: {
+    title: string;
+    description: string;
+    cta: string;
+  };
   whatsNew: {
     title: string;
     heading: string;
