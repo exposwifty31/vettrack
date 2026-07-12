@@ -4,10 +4,7 @@
 - **Coordinates with `R-M1.3`:** both write to `equipment-command-board.service.ts`. RFID `reader-offline` (from R-M1) is **one anomaly source** feeding this general anomaly pass — share the board-producer seam; don't build two.
 - **Card contract:** RED→GREEN→verify; frozen board/PWA guardrails per card.
 - **Tier (model routing):** **O +R** — Opus + `code-reviewer` gate + the board drill (frozen snapshot/telemetry surface). See README → "Execution driver".
-- **Review resolutions (decisions pinned, not open):**
-  1. **v1 rule set is FIXED:** `battery_critical`, `cart_unverified`, `rfid_reader_offline` — three high-precision rules with fixed thresholds. R-BDF-1.1's RED test is normative against exactly these; more rules are a later expansion.
-  2. **Single-shot state machine:** dedup key = `(anomalyType, unitId)`; per-key states `absent → active (fire once) → cleared`; re-fire only after a `cleared` transition; a snapshot where the condition no longer holds transitions the key to `cleared`.
-  3. **Telemetry is in-scope for v1** (not conditional): anomaly types are a closed enum on client + `server/routes/realtime.ts`; R-BDF-1.3's closed-enum rejection test is unconditional.
+- **All decisions are pinned in the cards below** (the fixed 3-rule v1 set + thresholds + anomaly-object shape; the single-shot dedup/reset state machine; unconditional bounded-enum telemetry; board-only fan-out) — no open choices.
 
 ## Frozen guardrails (every card)
 
@@ -21,21 +18,21 @@
 
 ### R-BDF-1.1 · Closed, bounded anomaly-rule set over the existing snapshot
 
-- **Goal:** a rules pass deriving anomalies from data already in the snapshot — a **closed set** of rule types: `empty_dock_too_long`, `battery_critical`, `cart_unverified`, `waitlist_backing_up`, `rfid_reader_offline` (from R-M1). Start with a **few high-precision rules**; expand once trusted.
-- **RED:** `tests/board-anomaly-rules.test.ts` — seeded anomalous state → exactly the right anomaly objects; a healthy clinic → none. Each rule's threshold asserted.
+- **Goal:** a rules pass deriving anomalies from data already in the snapshot — a **FIXED v1 closed set of exactly three high-precision rules**: `battery_critical` (device battery ≤ the critical threshold from `equipment-readiness-rules.service.ts`), `cart_unverified` (crash cart last-verified **> 7 days**), `rfid_reader_offline` (from R-M1.1d — no heartbeat within the reader-offline threshold). **No other rules in v1** (empty-dock / waitlist are a later, trust-earned expansion). **Anomaly object shape (fixed):** `{ type: <closed enum>, unitId, severity: calm|pressure, since: ISO, sourceRef }`.
+- **RED:** `tests/board-anomaly-rules.test.ts` — seeded state that trips each of the three rules → exactly one anomaly object per trip with the correct `type`/`unitId`/`since`; a healthy clinic → none; **each rule's threshold value is asserted against its named source** (battery / 7-day verification age / heartbeat window).
 - **Guardrail:** derivation lives in the board service; no new tables; no new fetch.
 - **Verify:** `pnpm test -- tests/board-anomaly-rules.test.ts && pnpm typecheck`.
 
 ### R-BDF-1.2 · Board "attention" section (calm/pressure-aware, single-shot)
 
-- **Goal:** render anomalies as calm, ranked cards; **calm mode** stays quiet + honors reduced-motion; **pressure mode** escalates **once** (color+motion+size) and holds — no looping flash. A Code Blue push (R-CBF-1) is the one always-loud event.
-- **RED:** `tests/board-attention-render.test.tsx` — anomalies render ranked; calm vs pressure differ; reduced-motion swaps motion for a static/cross-fade variant.
+- **Goal:** render anomalies as calm, ranked cards; **calm mode** stays quiet + honors reduced-motion; **pressure mode** escalates **once** (color+motion+size) and holds — no looping flash. **Single-shot state machine (pinned):** dedup key = `(type, unitId)`; per-key states `absent → active (fire once) → cleared`; a snapshot where the condition no longer holds transitions the key to `cleared`; re-fire only on a subsequent `cleared → active`. A Code Blue push (R-CBF-1) is the one always-loud event.
+- **RED:** `tests/board-attention-render.test.tsx` + `tests/board-anomaly-statemachine.test.ts` — anomalies render ranked; calm vs pressure differ; reduced-motion swaps motion for a static/cross-fade variant; **state-machine cases: initial fire; repeated identical snapshots do NOT re-fire; clear when the condition is gone; reappearance re-fires only after a clear; distinct `(type, unitId)` keys are independent; mode changes do NOT re-fire.**
 - **Guardrail:** glance-only — no interactive targets added to the board.
 
 ### R-BDF-1.3 · Bounded-enum telemetry
 
-- **Goal:** if counters are added, anomaly types are a closed enum on both client and `server/routes/realtime.ts` (+ `incrementMetric()` union in `server/lib/metrics.ts`).
-- **RED:** `tests/board-anomaly-telemetry.test.ts` — an out-of-enum anomaly type is rejected by the closed-union check.
+- **Goal (mandatory in v1, not conditional):** anomaly types are a **closed enum** on both client and `server/routes/realtime.ts`, plus the `incrementMetric()` union in `server/lib/metrics.ts`. Telemetry ships with the feature — it is not "if counters are added."
+- **RED:** `tests/board-anomaly-telemetry.test.ts` — the closed-enum rejection is **unconditional**: an out-of-enum anomaly type is rejected by the closed-union check on both client and server.
 
 ### R-BDF-1.4 · Verification (acceptance bar)
 
@@ -43,7 +40,7 @@
 - **Snapshot stays uncached** — assert the denylist path is untouched.
 - Calm vs pressure rendering spot-check (+ the board Playwright drill if rendering changed).
 
-## Open decisions (confirm at build)
+## Resolved (were open decisions — now pinned)
 
-- Which anomaly rules ship v1, and their thresholds — owner-configurable or fixed.
-- Do anomalies also fan out to a role's mobile home, or board-only for v1 (recommended board-only).
+- **v1 rules + thresholds:** the fixed three (`battery_critical`, `cart_unverified` >7d, `rfid_reader_offline`) with **fixed** thresholds (not owner-configurable in v1) — R-BDF-1.1.
+- **Fan-out:** **board-only for v1** (no mobile-home fan-out); a targeted mobile push is a later addition.

@@ -5,11 +5,7 @@
 - **Bias:** conservative — **precision over recall**. Noisy predictions get ignored (same failure mode as a noisy alert).
 - **Card contract:** RED→GREEN→verify; read-mostly guardrails per card.
 - **Tier (model routing):** **O +R** — Opus + `code-reviewer` gate (net-new engine; explainability + precision are easy to get subtly wrong). Read-mostly, so no browser drill required. See README → "Execution driver".
-- **Review resolutions (decisions pinned):**
-  1. **v1 schema boundary:** **no new table in v1.** The `equipment.requires[]` / procedure-template mapping is a **later** addition behind the demand-source interface (R-PDF-1.1) — this resolves the "no schema mutation" ↔ "optional mapping table" contradiction in favour of no mutation.
-  2. **Shortfall equation + horizon:** `shortfall(t) = demand(scheduleWindow) − (readySupply + incomingStock) − burnRate × horizon`; **horizon = the next scheduled-procedure window (default 24h)**; reserved/allocated units are subtracted from `readySupply`.
-  3. **Explainability is a redacted, `clinicId`-scoped DTO** — source-row references + counts, never raw PII.
-  4. **PO recommendations are READ-ONLY until user confirmation** — the engine renders a recommendation; it never auto-creates or mutates a PO.
+- **All decisions are pinned in the cards below** (v1 adds no schema; burn-rate INCREASES required qty; trailing-14-day window; redacted `clinicId`-scoped explainability DTO; read-only PO recommendations gated on authorization) — no open choices.
 
 ## Reuse anchors (verify at build)
 
@@ -17,7 +13,7 @@
 
 ## Frozen guardrails (every card)
 
-Read-mostly (no new transport) · bounded-enum telemetry if counters added · `clinicId` on **every** read · no schema mutation for v1 (optional small procedure→requirement mapping decided in PDF.1).
+Read-mostly (no new transport) · bounded-enum telemetry if counters added · `clinicId` on **every** read · **v1 adds NO table, column, or mapping schema** — existing fields/configuration only. (The procedure-template mapping is a later addition behind the R-PDF-1.1 interface, with its own schema scope + migration **then**, not now.)
 
 ---
 
@@ -25,7 +21,7 @@ Read-mostly (no new transport) · bounded-enum telemetry if counters added · `c
 
 - **Goal:** `DemandSource` interface with a v1 **historical-inference** implementation: from `vt_appointments` (scheduled procedures) + trailing usage, derive required equipment/consumables. Template implementation is a *later* impl of the same interface.
 - **RED:** `tests/readiness-forecast-demand.test.ts` — seeded schedule + usage history → the inferred demand set; swapping in a stub template impl through the same interface yields the same shape (interface contract test).
-- **Guardrail:** no per-procedure template authoring in v1; the interface must not leak an inference-only assumption.
+- **Guardrail:** v1 adds **no table, column, or mapping schema** — existing fields/configuration only; no per-procedure template authoring; the interface must not leak an inference-only assumption. (Templates = a later impl of the same interface, with their own schema scope.)
 - **Verify:** `pnpm test -- tests/readiness-forecast-demand.test.ts && pnpm typecheck`.
 
 ### R-PDF-1.2 · Supply model
@@ -35,22 +31,22 @@ Read-mostly (no new transport) · bounded-enum telemetry if counters added · `c
 
 ### R-PDF-1.3 · Shortfall join + burn-rate projection
 
-- **Goal:** demand − supply + burn-rate projection → conservative, explainable shortfalls (e.g. "short 4 IV sets by 14:00 at current burn"). **Every warning carries its source rows.**
-- **RED:** `tests/readiness-forecast-shortfall.test.ts` — seeded schedule+stock+burn → exactly the expected shortfalls; each shortfall exposes the source appointment/stock/burn rows.
-- **Open decision:** burn-rate window (trailing 7/14/30d) — pick one, make it explicit.
+- **Goal — shortfall equation (pinned; burn-rate INCREASES required quantity, it does not reduce shortfall):** `requiredThroughHorizon = demand(scheduleWindow) + burnRate × horizon`; `shortfall = max(0, requiredThroughHorizon − (readySupply + incomingStock))`. **horizon = the next scheduled-procedure window (default 24h); burn-rate window = trailing 14 days;** reserved/allocated units are excluded from `readySupply`. Conservative + explainable ("short 4 IV sets by 14:00 at current burn"); every warning carries its source rows.
+- **RED:** `tests/readiness-forecast-shortfall.test.ts` — seeded schedule+stock+burn → exactly the expected shortfalls **with the sign correct** (a higher burn rate *raises* the shortfall); `max(0, …)` never yields a negative shortfall; each shortfall exposes the source appointment/stock/burn rows.
 
 ### R-PDF-1.4 · Surface (Analytics panel + PO recommendations)
 
-- **Goal:** an Analytics console panel + **pre-filled PO recommendations** that flow into the existing `restock`/PO path; explainability panel lists the source rows per warning; a "no shortfall" clinic shows a **calm, empty** state (no false alarms). Optional home-surface summary tile.
-- **RED:** `tests/readiness-forecast-panel.test.tsx` — warnings render with source rows; PO recommendation pre-fills the existing flow; empty state on a healthy clinic; he+en; RTL.
+- **Goal:** an Analytics console panel; a "no shortfall" clinic shows a **calm, empty** state (no false alarms). **Explainability = a redacted, `clinicId`-scoped DTO** (source-row references + counts, never raw PII). **PO recommendations are READ-ONLY** — the panel renders a recommendation; rendering/refresh **creates no PO**; a PO is created/submitted **only** through the existing explicit user confirmation + authorization checks. Optional home-surface summary tile.
+- **RED:** `tests/readiness-forecast-panel.test.tsx` — warnings render with the **redacted explainability DTO** (source-row refs + counts, no PII); **rendering or refreshing the panel writes ZERO POs** (assert no PO mutation); a PO is created **only after** the existing explicit confirmation + authorization; empty state on a healthy clinic; he+en; RTL.
 
 ### R-PDF-1.5 · Verification (acceptance bar)
 
-- Seeded schedule + stock → engine emits exactly the expected shortfalls (precision-first).
-- Explainability panel lists source rows for each warning.
+- Seeded schedule + stock → engine emits exactly the expected shortfalls (precision-first, correct sign).
+- Explainability panel lists source rows for each warning (redacted DTO).
 - No-shortfall clinic shows the calm empty state.
+- **Cross-clinic negative:** seed equivalent rows for **two** clinics; assert demand, supply, shortfalls, and explainability include **only the requested clinic's target-table rows** (every read filters the target table by `clinicId`). Applies to the demand (R-PDF-1.1), supply (R-PDF-1.2), and shortfall (R-PDF-1.3) tests, not only the panel.
 
-## Open decisions (confirm at build)
+## Resolved (were open decisions — now pinned)
 
-- Burn-rate window (7/14/30d).
-- Optional `equipment.requires[]` / procedure-template mapping to model demand cleanly — decide during PDF.1 (default: pure inference, no new table).
+- **Burn-rate window:** trailing **14 days** (R-PDF-1.3).
+- **Procedure-template mapping:** **not in v1** — v1 uses existing fields/configuration only and adds no table/column/mapping; templates are a later impl of the R-PDF-1.1 interface with their own schema scope + migration.

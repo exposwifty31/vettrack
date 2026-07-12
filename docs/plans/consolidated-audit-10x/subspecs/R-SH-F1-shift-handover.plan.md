@@ -4,11 +4,7 @@
 - **Extends the EXISTING `/handoff`** — `src/pages/handoff.tsx` renders `ShiftSummarySheet` today (the brief's "no /handoff exists" premise is stale). Do NOT create a second route.
 - **Card contract:** RED→GREEN→verify; standard feature checklist (spec §2.5); frozen guardrails per card.
 - **Tier (model routing):** **O +R** — Opus + `code-reviewer` gate (LARGE; new table + generator + the Priza PMS-integration seam). See README → "Execution driver".
-- **Review resolutions (decisions pinned):**
-  1. **Generator is idempotent per `shiftSessionId`** (re-run yields the same artifact, no duplicate deltas); every delta is scoped to the shift window `[start, end)`.
-  2. **Priza adapter distinguishes states:** *not configured* → empty worklist (graceful, no error); *configured but failing* → an explicit error state on the artifact — never silently show empty on failure.
-  3. **Incoming-shift notification semantics:** the push targets the users rostered on the **next** shift for that clinic, fired **once** on generate; acknowledgement clears it.
-  4. **RED suite expands** to cover all 4 delta types + observed signals + the patient worklist (matching the acceptance bar), not only ack / headings / deep-link / bidi.
+- **All decisions are pinned in the cards below** (generator idempotent per `shiftSessionId`; Priza adapter error-vs-not-connected; incoming-shift push semantics; full RED coverage of the acceptance bar) — no open choices.
 
 ## Locked scope (owner) — four dimensions
 
@@ -35,8 +31,8 @@
 
 ### R-SH-F1.2 · Delta generator (all 4 types) at shift end
 
-- **Goal:** a generator that runs at shift end aggregating the shift-window deltas from `vt_audit_logs` + `vt_event_outbox` into a compact artifact + open-items list.
-- **RED:** `tests/shift-handover-generator.test.ts` — a seeded shift with a known set of custody/task/alert/dispense mutations → the handover lists **exactly** those deltas + open items.
+- **Goal:** a generator that runs at shift end aggregating the shift-window deltas from `vt_audit_logs` + `vt_event_outbox` into a compact artifact + open-items list. **Idempotent per `shiftSessionId`** — a re-run yields the same artifact with **no duplicate deltas**; every delta is scoped to the shift window `[start, end)`.
+- **RED:** `tests/shift-handover-generator.test.ts` — a seeded shift with a known set of custody/task/alert/dispense mutations → the handover lists **exactly** those deltas + open items; **re-running the generator for the same `shiftSessionId` yields an identical artifact (no duplicates)**; deltas outside `[start, end)` are excluded.
 - **Guardrail:** read from existing audit/outbox; no new realtime path.
 
 ### R-SH-F1.3 · App-observed signals
@@ -46,14 +42,14 @@
 
 ### R-SH-F1.4 · Patient/animal worklist via the Priza PMS seam
 
-- **Goal:** populate `patientWorklist` from the external PMS through `server/integrations/` (Priza adapter). **v1 degrades gracefully** if Priza is not connected (empty worklist, not an error).
-- **RED:** `tests/shift-handover-patient-worklist.test.ts` — a **mocked Priza feed** populates the worklist per tech; with no PMS configured, the worklist is empty and the rest of the handover still generates.
+- **Goal:** populate `patientWorklist` from the external PMS through `server/integrations/` (Priza adapter). **Two distinct states (pinned):** *not configured* → **empty** worklist (graceful, no error); ***configured but failing*** → an **explicit error state** on the artifact — never silently show empty on failure.
+- **RED:** `tests/shift-handover-patient-worklist.test.ts` — a **mocked Priza feed** populates the worklist per tech; **no PMS configured → empty worklist + the rest of the handover still generates; configured-but-failing adapter → an explicit error state (not empty)**.
 - **Guardrail:** no internal patient model; the adapter boundary is the only patient-data source.
 
 ### R-SH-F1.5 · Surface — extend `/handoff` + acknowledge + push
 
-- **Goal:** render the artifact on the existing `/handoff` (`ShiftSummarySheet`); **iPhone = consume + acknowledge** (deliberate confirm, `aria-pressed`, reversible within the shift), **iPad = two-pane authoring**; push to the incoming shift; single `<h1>` + logical heading hierarchy; deep-link entry falls back to `/home` (covered by test); RTL + he/en parity.
-- **RED:** `tests/shift-handover-surface.test.tsx` — ack records `acknowledgedBy` + fires the push; heading hierarchy; deep-link fallback; RTL bidi-isolation of LTR staff names.
+- **Goal:** render the artifact on the existing `/handoff` (`ShiftSummarySheet`); **iPhone = consume + acknowledge** (deliberate confirm, `aria-pressed`, reversible within the shift), **iPad = two-pane authoring**. **Notification semantics (pinned):** the push targets the users rostered on the **next** shift for that clinic, fired **once** on generate; acknowledgement clears it. Single `<h1>` + logical heading hierarchy; deep-link entry falls back to `/home`; RTL + he/en parity.
+- **RED (full acceptance bar):** `tests/shift-handover-surface.test.tsx` — ack records `acknowledgedBy` + fires the push **once to the next-shift roster** (not the current shift); **default / empty / loading / error states each render and are announced**; **iPhone consume+ack vs iPad two-pane** compositions differ; single `<h1>` + heading hierarchy; deep-link fallback to `/home`; RTL bidi-isolation of LTR staff names; he/en parity.
 
 ### R-SH-F1.6 · Verification (acceptance bar)
 
@@ -62,7 +58,7 @@
 - Patient worklist populates from a mocked Priza feed; empty-safe with no PMS.
 - RTL spot-check of `/handoff` (default + empty + loading + error states).
 
-## Open decisions (confirm at build)
+## Resolved (were open decisions — now pinned)
 
-- Auto-generate at shift end only, or also an on-demand "handover now" button?
-- Priza feed timing/availability — real-time vs end-of-shift pull; the adapter contract shape.
+- **Generation trigger:** **auto-generate at shift end** in v1; an on-demand "handover now" button is a later addition.
+- **Priza feed:** an **end-of-shift pull** through the `server/integrations/` adapter (not a realtime feed in v1); the adapter contract is PMS-agnostic (external ids + display), with error-vs-not-connected distinguished (R-SH-F1.4).

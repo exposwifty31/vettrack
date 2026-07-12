@@ -23,6 +23,7 @@ Single front door for the consolidated remediation + 10x feature program. The **
 | `phase-4.plan.md` | **Phase 4** — massive-03 (clinic network) + medium-04 (copilot/voice) | ✅ authored · 🚧 on hold (entry conditions) |
 | `subspecs/R-M1-rfid-gate-e2e.plan.md` | **massive-01** RFID-gate e2e — managed reader entity + directional gates + board surfacing + resolver reconciliation | ✅ authored (R-M1.0…M1.5) |
 | `subspecs/R-CBF-1-code-blue-one-tap.plan.md` | medium-01 (frozen Code Blue surface) | ✅ authored (R-CBF-1.1…1.5) |
+| `subspecs/R-CB-stabilize-code-blue-races.plan.md` | R-CB-02/03 — frozen Code Blue race fixes (gate medium-01) | ✅ authored |
 | `subspecs/R-BDF-1-ambient-board-alerts.plan.md` | medium-03 (board anomaly rules; shares the R-M1.3 board seam) | ✅ authored (R-BDF-1.1…1.4) |
 | `subspecs/R-SH-F1-shift-handover.plan.md` | medium-02 (superset + Priza integration) | ✅ authored (R-SH-F1.1…1.6) |
 | `subspecs/R-PDF-1-predictive-readiness.plan.md` | massive-02 (inference-first demand model) | ✅ authored (R-PDF-1.1…1.5) |
@@ -51,7 +52,7 @@ Each card carries a **Tier** that selects the model for the **subagent** that ex
 
 **Deterministic routing rule** (a dispatcher applies these in order):
 1. Card has an inline `Tier: …` tag → use it.
-2. Else card is `⚠ FROZEN` or lives in a `⚠ SUB-SPEC` doc → **O +R**.
+2. Else the card is `⚠ FROZEN` — **including any card under a `⚠ FROZEN`-tagged *section header*; the flag is inherited by every card in that section** — or lives in a `⚠ SUB-SPEC` doc → **O +R**.
 3. Else → **S** (the doc default).
 
 **Per card:** dispatch to a subagent at its Tier → RED→GREEN→verify → for any `+R`, run the `code-reviewer` gate (+ browser drill for realtime/PWA) → only then commit → log to the proof log. A frozen card never skips the drill regardless of model.

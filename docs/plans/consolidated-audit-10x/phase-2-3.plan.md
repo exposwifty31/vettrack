@@ -4,7 +4,7 @@
 - **Spec:** `../../superpowers/specs/2026-07-12-audit-10x-consolidated-plan-design.md` · **Precedes:** Phase 0+1 (`phase-0-1.plan.md`) — do those first (stabilize before extend).
 - **Card contract:** RED→GREEN→verify, ≤2 code files + 1 test, exact anchors. Commit per card; log to `docs/audit/PROOF_ALIGNMENT_LOG.md`.
 - **Tier (model routing):** **default = S (Sonnet).** `⚠ FROZEN` cards are tagged inline (`Tier: O +R` / `Tier: S +R`); `+R` = a `code-reviewer` gate (+ browser drill for realtime/PWA) before commit. See README → "Execution driver".
-- **Card IDs continue the program sequence:** T-32…T-53.
+- **Card IDs continue the program sequence:** T-34…T-53 (T-32/T-33 moved to `subspecs/R-CB-stabilize-code-blue-races.plan.md` as R-CB-02/03).
 
 > **Frozen-surface flags:** cards tagged `⚠ FROZEN` touch Code Blue / SSE / PWA. They are localized fixes, but each requires the doctrine check + (for PWA/SW) a browser drill, and must NOT be one-shot blindly. Treat them as careful cards; if execution reveals deeper reconciliation is needed, escalate to a mini-sub-spec.
 
@@ -14,10 +14,9 @@
 
 > All 13 are native-reachable (grounding: 5 "admin" findings are NOT web-only). Fix before their surface's Do-Next feature.
 
-### Code Blue (stabilize step gating medium-01) — `⚠ FROZEN`
+### Code Blue stabilize (gates medium-01) — `⚠ SUB-SPEC` (moved out)
 
-- **T-32 (R-CB-02 · CLICK-PATH-010):** `src/hooks/useCodeBlueSession.ts:121` — a stale/racing `activeCodeBlueSessionId=null` keepalive immediately `clearCachedSession()` + `setQueryData(session:null)`, flipping a just-started session back to the launch form (optimistic end in all but name). **GREEN:** on null keepalive, invalidate/refetch to confirm (mirror `useCodeBlueKeepaliveReconciliation`'s `RECONCILE_GRACE_MS` — refetch to confirm before clearing). **RED:** `tests/code-blue-null-keepalive-grace.test.tsx`. **Guardrail:** server-confirmed end only; no new transport. **Tier: O +R** (frozen Code Blue race — Opus + review + drill).
-- **T-33 (R-CB-03 · CLICK-PATH-011):** `src/hooks/useCodeBlueSession.ts:192` — `logEntry` snapshots the whole session cache and restores it on failure, discarding teammates' entries that arrived during the request. **GREEN:** `cancelQueries` before the optimistic write; on error remove only the optimistic entry. **RED:** `tests/code-blue-logentry-rollback.test.tsx`. **Guardrail:** frozen surface; no offline queueing. **Tier: O +R** (frozen Code Blue race — Opus + review + drill).
+- **R-CB-02 / R-CB-03** (the two frozen Code Blue races, CLICK-PATH-010/011 — formerly T-32/T-33) are now a **dedicated SUB-SPEC** → **`subspecs/R-CB-stabilize-code-blue-races.plan.md`**. Per §2.4, subtle races on the frozen Code Blue runtime get their own spec-plan, not inline cards. They **gate medium-01** (`R-CBF-1`) and must be GREEN first.
 
 ### Scan
 
@@ -44,7 +43,7 @@
 
 ## Phase 2 — Do-Next features (SUB-SPEC; each authored separately before execution)
 
-- **R-CBF-1 (medium-01 Code Blue one-tap)** → `subspecs/R-CBF-1-code-blue-one-tap.plan.md` — arm→hold-to-confirm; gated behind T-32/T-33 stabilize. Frozen doctrine.
+- **R-CBF-1 (medium-01 Code Blue one-tap)** → `subspecs/R-CBF-1-code-blue-one-tap.plan.md` — arm→hold-to-confirm; gated behind **R-CB-stabilize** (R-CB-02/03, `subspecs/R-CB-stabilize-code-blue-races.plan.md`). Frozen doctrine.
 - **R-BDF-1 (medium-03 ambient board alerts)** → `subspecs/R-BDF-1-ambient-board-alerts.plan.md` — closed bounded anomaly-rule set over the existing snapshot; `/api/display/snapshot` stays cache-denylisted.
 - **R-PDF-1 (massive-02 predictive readiness)** → `subspecs/R-PDF-1-predictive-readiness.plan.md` — inference-first demand model behind one interface (spec §6.2).
 
