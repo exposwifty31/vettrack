@@ -260,7 +260,7 @@ Do not start code until the owner clears the standing blocker.
 ## 10. Execution context
 
 - **Branch:** `claude/audit-10x-consolidated-plan` off `main`. New commits only; no amend/force-push/`--no-verify`. Commit per completed requirement.
-- **Frozen surfaces (never weaken):** SSE transport + monotonic outbox cursor; no offline emergency queueing; no emergency endpoint in any cache; bounded-enum telemetry; Strategy A authority safety net; `appointmentsPage.*` / `vt_appointments` / `/api/appointments` names. Any requirement touching these is `⚠ SUB-SPEC`.
+- **Frozen surfaces (never weaken):** SSE transport + monotonic outbox cursor; no offline emergency queueing; no emergency endpoint in any cache; bounded-enum telemetry; Strategy A authority safety net; `appointmentsPage.*` / `vt_appointments` / `/api/appointments` names. **Net-new or multi-site work on these is `⚠ SUB-SPEC`; a localized wiring fix (e.g. R-SY-01, R-CB-01) stays `S +R` per §2.4** — the carve-out is not weakened.
 - **Proof:** before marking any requirement done, log verification evidence (the RED→GREEN test run, the command output) in `docs/audit/PROOF_ALIGNMENT_LOG.md` per that file's format.
 - **Gates before merge:** `pnpm typecheck`, the requirement's test, and (for realtime/PWA/Code-Blue-adjacent work) the Playwright drills.
 - **The 10x briefs** (`.claude/docs/ai/vettrack/10x/`) reach `main` via their own PR; this spec references them but does not commit them.

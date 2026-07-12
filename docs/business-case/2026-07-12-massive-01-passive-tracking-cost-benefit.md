@@ -11,7 +11,7 @@
 
 ## 1. Executive summary
 
-Passive tracking makes **"where is X / where did it last go"** — location + egress evidence, **not "who has X"** (custody/custodian stays a separate, human-confirmed concern; a gate read identifies a *reader/room*, never a person) — **correct without anyone scanning** — the data-quality foundation every other VetTrack feature (readiness, analytics, loss attribution, Code Blue cart location) depends on. The question for the hospital is not *whether* it helps but *whether the payback justifies the hardware spend*.
+Passive tracking makes **"where did it last pass / did it leave" (RFID-gate) — or live room-level "where is it now" (BLE/RTLS)** — location + egress evidence, **not "who has X"** (custody/custodian stays a separate, human-confirmed concern; a gate read identifies a *reader/room*, never a person) — **correct without anyone scanning** — the data-quality foundation every other VetTrack feature (readiness, analytics, loss attribution, Code Blue cart location) depends on. The question for the hospital is not *whether* it helps but *whether the payback justifies the hardware spend*.
 
 **The single decision that drives cost:** do we need **live room-level location** (BLE/RTLS) or just **"did it leave / which door did it last pass" (RFID-gate)**?
 
@@ -57,7 +57,7 @@ Passive tracking makes **"where is X / where did it last go"** — location + eg
 | Line item | RFID-gate | BLE / RTLS |
 |---|---|---|
 | Software / SaaS | middleware **$1k–5k/yr** (basic) | **$6k–30k/yr** (250 × $2–10/device/mo) |
-| Maintenance (15–25% of hardware) | **~$2k–9k/yr** | ~$1k–5k/yr |
+| Maintenance (15–25% of **installed project cost**) | **~$2k–9k/yr** | ~$1k–5k/yr |
 | Battery / tag replacement | negligible (passive) | ~$750 every 3–5 yr |
 | **Annual subtotal** | **~$3k–14k/yr** | **~$7k–35k/yr** |
 
