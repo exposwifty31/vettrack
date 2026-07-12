@@ -27,6 +27,8 @@ export const createItemSchema = z.object({
   unit: z.string().min(1).max(30).optional().nullable(),
   category: z.string().max(100).optional(),
   nfcTagId: z.string().max(200).optional().nullable(),
+  isBillable: z.boolean().optional(),
+  minimumDispenseToCapture: z.number().int().min(1).optional(),
   parLevel: z.number().int().min(0).optional().nullable(),
   reorderPoint: z.number().int().min(0).optional().nullable(),
 }).strict();
@@ -189,6 +191,10 @@ router.post("/", requireAuth, requireAdmin, validateBody(createItemSchema), asyn
       unit: b.unit?.trim() || null,
       category: b.category?.trim() || null,
       nfcTagId: b.nfcTagId?.trim() || null,
+      ...(b.isBillable !== undefined ? { isBillable: b.isBillable } : {}),
+      ...(b.minimumDispenseToCapture !== undefined
+        ? { minimumDispenseToCapture: b.minimumDispenseToCapture }
+        : {}),
       parLevel: b.parLevel ?? null,
       reorderPoint: b.reorderPoint ?? null,
       isActive: true,
