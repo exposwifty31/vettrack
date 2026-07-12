@@ -32,6 +32,28 @@ export function wasNfcToggleFiredRecently(equipmentId: string): boolean {
   }
 }
 
+/**
+ * T-35 (R-SC-03): clears the 8s success guard on every `runEquipmentQuickToggle`
+ * failure path (network / 409 / rethrow) so a genuine retry isn't silently
+ * dropped for the remainder of the 8s window. Callers still absorb hardware
+ * re-fires for the same tap via the short `NFC_REFIRE_DEBOUNCE_MS` debounce.
+ */
+export function clearNfcToggleFired(equipmentId: string): void {
+  try {
+    sessionStorage.removeItem(nfcToggleGuardKey(equipmentId));
+  } catch {
+    /* sessionStorage unavailable */
+  }
+}
+
+/**
+ * Pinned short debounce for hardware-reader re-fires (multiple `onRead` events
+ * per physical tap). Deliberately distinct from the 8s `NFC_TOGGLE_GUARD_TTL_MS`
+ * success guard — this only absorbs near-instant duplicate reads, not repeat
+ * taps after the app has actually responded.
+ */
+export const NFC_REFIRE_DEBOUNCE_MS = 500;
+
 // Logged-out NFC scan toast guard. Mirrors the toggle guard but with a FIXED key — the sign-in
 // toast is global (not per-equipment). D6: an 8s sessionStorage time-window that RE-ARMS, so a
 // later logged-out scan (sign in → sign out → re-tap on a long-lived native process) re-explains
@@ -84,16 +106,19 @@ export async function runEquipmentQuickToggle(
   } catch (err) {
     haptics.error();
     if (isNetworkError(err)) {
+      clearNfcToggleFired(equipmentId);
       toast.error(t.equipmentNfc.onlineRequired);
       return;
     }
     if (err instanceof ApiError && err.status === 409) {
+      clearNfcToggleFired(equipmentId);
       const email =
         (typeof err.payload.checkedOutByEmail === "string" && err.payload.checkedOutByEmail) ||
         t.common.unknown;
       toast.error(t.equipmentNfc.toggleBlocked(email));
       return;
     }
+    clearNfcToggleFired(equipmentId);
     throw err;
   }
 }
