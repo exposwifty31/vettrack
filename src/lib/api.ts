@@ -1169,6 +1169,9 @@ export const api = {
       /** SYNC-TEL — event-driven sync engine signals (strict booleans). */
       syncPermanentFailure?: boolean;
       syncCircuitOpen?: boolean;
+      // T-30a2-ii — bounded enum: which nudge-feed kind was shown. Mirrors
+      // the server's closed ALLOWED_NUDGE_SHOWN enum (T-30a2-i).
+      nudgeShown?: "expiry" | "restock";
     }) =>
       request<{ ok: boolean }>("/api/realtime/telemetry", {
         method: "POST",
