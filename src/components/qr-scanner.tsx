@@ -435,19 +435,36 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
     };
   }, []);
 
-  // Kill camera immediately when the app is backgrounded or the screen is locked.
-  // Prevents the persistent iOS PWA "Recording" orange dot on minimize/lock.
+  // Kill camera immediately when the app is backgrounded or the screen is locked
+  // (prevents the persistent iOS PWA "Recording" orange dot on minimize/lock), and
+  // resume it on return. visibilitychange covers the common tab/app-switch case;
+  // pageshow additionally covers BFCache restores that don't always re-fire
+  // visibilitychange. Only resumes while still in the live-camera "scanning"
+  // phase, and only if the camera isn't already running — guards against both
+  // events firing for the same resume and mirrors the existing start path.
   useEffect(() => {
+    const resumeCameraIfNeeded = () => {
+      if (phase === "scanning" && !scannerRef.current) {
+        startScanner();
+      }
+    };
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
         stopScannerRef.current();
+      } else if (document.visibilityState === "visible") {
+        resumeCameraIfNeeded();
       }
     };
+    const handlePageShow = () => {
+      resumeCameraIfNeeded();
+    };
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pageshow", handlePageShow);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pageshow", handlePageShow);
     };
-  }, []);
+  }, [phase, startScanner]);
 
   const toggleTorch = async () => {
     if (!scannerRef.current) return;
