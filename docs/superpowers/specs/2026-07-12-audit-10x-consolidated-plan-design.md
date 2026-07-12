@@ -156,7 +156,12 @@ Finding accounting: 6 HIGH (P0) · 8 MED (P1) + 13 MED (P2) = 21 MED · 9 LOW (P
 ### 5.2 Shift / Home surface
 - **R-SH-01** — shift-chat reactions/acks render live while the panel is open. `useShiftChat.ts:132` invalidate-only over a strict-`gt` incremental poll with an append-only accumulator can't show an edit; patch local state optimistically or reset `afterRef` + merge-by-id. Traces CLICK-PATH-007. RED: `tests/shift-chat-live-reaction.test.tsx`. **Guardrail:** don't add a realtime path — reconcile within the existing poll/accumulator.
 - **R-SH-02** — closing shift chat doesn't spawn a spurious unread badge. `useShiftChat.ts:80` unread-increment effect re-fires on open→close while `data` holds the just-read batch; advance `lastOpenRef` on close / skip the transition edge. Traces CLICK-PATH-017. RED: `tests/shift-chat-unread-badge.test.tsx`.
-- **R-SH-F1 (medium-02 shift handover)** `⚠ SUB-SPEC` — **extends the EXISTING `/handoff`** (`src/pages/handoff.tsx` renders `ShiftSummarySheet` — the brief's "no /handoff exists" premise is stale). Generate a `vt_shift_handover` artifact from existing audit/outbox deltas; **acknowledge = a deliberate confirm** (attestation — the sanctioned exception to undo-first); iPhone consume+ack / iPad two-pane authoring. Needs its own spec-plan pass (delta-scope decision, new table+route+audit kind).
+- **R-SH-F1 (medium-02 shift handover)** `⚠ SUB-SPEC (LARGE)` — **extends the EXISTING `/handoff`** (`src/pages/handoff.tsx` renders `ShiftSummarySheet` — the brief's "no /handoff exists" premise is stale). Generate a `vt_shift_handover` artifact; **acknowledge = a deliberate confirm** (attestation — the sanctioned exception to undo-first); iPhone consume+ack / iPad two-pane authoring. **Scope resolved (owner) — a SUPERSET of the original brief:**
+  - **All 4 delta types** (custody moves, task state, alerts, dispenses) — not a subset.
+  - **Per-technician patient/animal worklist** — which animals each tech worked on during the shift. ⚠ **Data-source constraint:** VetTrack removed internal patient/ER tables (migrations 142–143), so this dimension is expected to be **sourced from the external PMS, not a reintroduced internal patient model** — see Priza below.
+  - **App-observed signals** — system-derived observations during the shift (not just manually-logged actions): custody/scan/readiness/alert events attributable to the shift window.
+  - **Future-integration constraint — Priza:** an eventual integration with the external system **Priza** is a first-class design input. Shape the `vt_shift_handover` schema + generator so the patient/animal and observed-signal dimensions can be sourced from / exported to Priza **without a rewrite** (stable, integration-friendly contract; don't hard-couple to internal-only sources).
+  Its dedicated spec-plan is **larger than a normal SUB-SPEC** (new table + generator + route + audit kind + the PMS-integration seam); whoever writes it must scope for the Priza integration point up front.
 - **R-SH-F2 (small-05 start-of-shift card)** — compose existing per-role surfaces (`src/features/today/surfaces/{Floor,Ops,Vet,Tech,Student}HomeSurface.tsx`, `OnShiftHero.tsx`) into **one focal "what needs me now" + one primary action**, gated by the existing capability union; phone compact / iPad hero band. No new data sources. **Acceptance:** each role's card differs correctly; off-shift renders a sensible idle variant; RTL spot-check.
 
 ### 5.3 Inventory surface
@@ -188,7 +193,7 @@ Each traces its CLICK-PATH id; one card each, same contract as Phase 0/1 fixes.
 ### 6.2 Do-Next features (all `⚠ SUB-SPEC`)
 - **R-CBF-1 (medium-01 Code Blue one-tap)** — package existing frozen infra into **arm → hold-to-confirm** (~700–900ms hold, escalating haptic + filling ring, always-visible Cancel, ≥56px targets); phone initiates / iPad+board run; soft-reserve = additive custody hint (never a hard lock). Strict frozen doctrine (no new transport, no offline queueing, server-confirmed end, no emergency endpoint cached, bounded telemetry). Gated behind R-CB-01/02/03. Dedicated spec-plan required.
 - **R-BDF-1 (medium-03 ambient board alerts)** — closed bounded set of anomaly rules over the existing snapshot; board-only, single-shot escalation, reduced-motion in calm mode; `/api/display/snapshot` stays cache-denylisted; anomaly types are a bounded enum on client + `server/routes/realtime.ts`. Dedicated spec-plan.
-- **R-PDF-1 (massive-02 predictive readiness)** — `server/services/readiness-forecast.service.ts` (demand → supply → shortfall → surface), read-mostly over existing data, explainable (source rows per warning), conservative (precision over recall), rendered as an Analytics panel + PO recommendations. High effort; dedicated spec-plan.
+- **R-PDF-1 (massive-02 predictive readiness)** — `server/services/readiness-forecast.service.ts` (demand → supply → shortfall → surface), read-mostly over existing data, explainable (source rows per warning), conservative (precision over recall), rendered as an Analytics panel + PO recommendations. **Demand model resolved (owner): v1 = inference from historical usage (burn-rate), NO manual template authoring at launch.** Architecture requirement: put the historical-inference logic and the (future) explicit per-procedure template logic **behind a single demand-source interface**, so templates can be introduced per-procedure incrementally — once real usage data shows which procedures warrant hand-authored consumption profiles — with **no rewrite**. Burn-rate window (trailing 7/14/30d) is a spec-plan tuning detail. High effort; dedicated spec-plan.
 
 ---
 
@@ -199,7 +204,7 @@ Nine LOW fixes, one card each: CLICK-PATH-027 (update-banner supersede guard), 0
 
 ## 8. Phase 4 — Gated Massives (blocked; all `⚠ SUB-SPEC`)
 Do not start code until the owner clears the standing blocker.
-- **massive-01 passive BLE/RFID** — blocker: hardware capital + per-clinic install. Additive `vt_location_signals`; scan path byte-for-byte unaffected (golden test is the bar).
+- **massive-01 passive BLE/RFID** — **core functionality (owner: not optional)**, but rollout is gated on a hardware-capital + per-clinic-install decision. **Prerequisite deliverable before its spec-plan pass → `R-M1-PRE` cost/benefit analysis** (manager-facing *numbers*, not a technical design): (a) **hardware cost per clinic** — readers/gateways, tags, installation; (b) **ongoing costs** — maintenance, tag replacement, battery/hardware lifecycle; (c) **quantified benefit** — time saved per shift, reduction in lost-equipment incidents, plus any other business-case metric the data supports. Only after the owner brings this to the hospital manager and gets a go does the technical spec-plan begin. Technical shape (unchanged): additive `vt_location_signals`; scan path byte-for-byte unaffected (golden test is the bar).
 - **massive-03 clinic network** — blocker: buyer identity (single vs multi-site) + a dedicated security design pass. Cross-tenant is the highest-risk surface; negative test (a non-group clinic can never read another's rows) is the acceptance bar.
 - **medium-04 asset copilot / voice** — blocker (voice only): native shell sequencing; text copilot not blocked. Keep the mandatory citation + AI-safety validators; sequence after the data-quality wins.
 
@@ -207,7 +212,7 @@ Do not start code until the owner clears the standing blocker.
 
 ## 9. Cross-cutting acceptance gates (every work-stream inherits)
 
-**Interaction / mobile (HIG):** destructive/weighty actions get **Undo via the existing countdown toast**, not a blocking confirm — the only exceptions are attestations (medium-02 ack) and irreversible commits (medium-01 hold-to-start); primary actions in the thumb arc; routine hands-full choices are bottom sheets with detents, alerts/mode-changes are centered/full-screen.
+**Interaction / mobile (HIG):** destructive/weighty actions get **Undo via the existing countdown toast**, not a blocking confirm — the only exceptions are attestations (medium-02 ack) and irreversible commits (medium-01 hold-to-start); **undo applies to all roles including students (no role carve-out)**; primary actions in the thumb arc; routine hands-full choices are bottom sheets with detents, alerts/mode-changes are centered/full-screen.
 
 **Accessibility (WCAG 2.2 AA — pass/fail):**
 - Every interactive control ≥ **44×44 CSS px** hit area (48 preferred); ≥8px spacing when either adjacent target is undersized.
@@ -230,10 +235,15 @@ Do not start code until the owner clears the standing blocker.
 - **The 10x briefs** (`.claude/docs/ai/vettrack/10x/`) reach `main` via their own PR; this spec references them but does not commit them.
 
 ## 11. Owner-gated decisions & open questions
-- **Massives' blockers** (§8) — hardware appetite, buyer identity + security pass, native-shell sequencing.
-- **medium-02 delta scope** — which delta types are v1 handover-worthy (all four, or custody + open tasks first).
-- **massive-02 demand model** — explicit per-procedure templates vs inferred from historical usage; burn-rate window.
-- **Student undo carve-out** — decide deliberately whether students get the undo-toast affordance (don't inherit by accident).
+
+**Resolved (2026-07-12, owner) — folded into the requirements above:**
+- medium-02 delta scope → **all 4 deltas + per-tech patient/animal worklist + app-observed signals + Priza integration constraint** (R-SH-F1).
+- massive-02 demand model → **inference-first (burn-rate), evolving to per-procedure templates behind one interface** (R-PDF-1).
+- Student undo carve-out → **no carve-out; students get undo like everyone** (§9).
+
+**Still open / gated:**
+- **massive-01** — core, not optional; **immediate prerequisite is the `R-M1-PRE` cost/benefit analysis** (manager-facing numbers) before its technical spec-plan. Research for this deliverable is in progress.
+- **massive-03** (clinic network) + **medium-04** (asset copilot/voice) — **on hold, no deadline** (owner). Blockers unchanged: buyer identity + security design pass (massive-03); native-shell sequencing for voice (medium-04).
 
 ---
 
