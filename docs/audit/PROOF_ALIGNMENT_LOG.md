@@ -2555,3 +2555,22 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 - **Batch gate:** `pnpm typecheck` 0; full `pnpm test` = **517 files / 4671 tests, 0 fail**. (First gate run showed the T-31 test file failing as a block — an i18n-codegen first-run artifact; ruled out via 3× isolated + 3× full green.)
 
 **Verdict:** VERIFIED — Web-gate T-31 complete. **Only T-30 (nudge feature, 6 sub-cards) remains in Phase 1** (compute-on-read plan pinned in the SDD ledger). Then Phase 2 (T-34…44), Phase 3 (T-45…53), O+R sub-specs.
+
+---
+
+## 2026-07-12 — Consolidated Audit × 10x — Phase 1 Inventory FEATURE · T-30 nudge (a1-i, a1-ii, a2-i, a2-ii, b, c) — ★ PHASE 1 COMPLETE
+
+**Claim:** The T-30 nudge feature (6 sub-cards, 2 waves) is implemented RED-first, integrated, batch-gate green — completing all of Phase 1. **Architecture decision (controller):** compute-on-read feed (the expiryCheckWorker runs in a separate process; a push+store or new table is heavier than this "small" feature warrants), so the read feed derives nudges from existing rows; the worker keeps its own push path.
+
+**Evidence (I1 off `ae6607b8e`, I2 off `4b19da058`; all `Tier: S`):**
+- **T-30a1-i** (feed + read): new `server/services/nudge-feed.service.ts` `computeNudgesForUser(clinicId, role)` derives **expiry** nudges from `vt_equipment` (reusing `expiryCheckWorker`'s `expiryDate<=now+7d` window, clinicId-scoped, per-nudge `targetRole` tag + role filter; `targetRole="technician"`) + GET `server/routes/nudges.ts` (governance gates handled) + `src/lib/api.ts` `api.nudges.list()` + `src/types/nudges.ts`. RED `tests/expiry-nudge-feed.test.ts`. `3d1f8f08d` → cp.
+- **T-30a1-ii** (restock producer): extended the feed to also derive **restock** nudges via the existing `listLowStockItems()` (par-level rule), `kind:"restock"`, `targetRole="technician"`. RED `tests/restock-nudge-feed.test.ts`. `b47c1434d` → cp `fc5e3765f`.
+- **T-30a2-i** (telemetry server): closed enum `ALLOWED_NUDGE_SHOWN=["expiry","restock"]` + guard in `server/routes/realtime.ts`; `MetricName`/`DEFAULT_COUNTERS` gain `nudge_shown_expiry|nudge_shown_restock`; out-of-enum → the shared `telemetry_payload_rejected_enum_mismatch` (no new series). RED `tests/expiry-nudge-telemetry-server.test.ts`. `b094629c9` → cp `e165891b2`.
+- **T-30a2-ii** (telemetry client): `classifyNudgeShown` + `reportNudgeShown` in `src/lib/realtime.ts` (only ever posts an in-enum value) + `nudgeShown?` on the `api.realtime.telemetry` payload type — matches the server enum exactly. RED `tests/expiry-nudge-telemetry-client.test.ts`. `42b5f2cb8` → cp `ec15e42ec`.
+- **T-30b** (UI): new `src/features/today/surfaces/HomeNudges.tsx` — fetches via `api.nudges.list` (TanStack Query), renders per-kind localized copy, **dismiss persists via localStorage** (tested across a simulated reload); mounted once in `HomeShell`'s `HomeChrome` (all role homes). i18n keys + hand accessor + regen. RED `tests/expiry-nudge-ui.test.tsx`. `8b933aede` → cp `1c0a50ff7`.
+- **T-30c** (push): **test-only** (`test:` commit) — the once-per-event expiry push ALREADY holds (`expiryCheckWorker` filters `expiryNotifiedAt IS NULL` + `markNotified` stamps; second sweep sends zero), teeth-verified by temporarily removing the filter (2/4 broke). Regression lock `tests/expiry-nudge-push.test.ts`. `ad897290d` → cp `796ec81ee`.
+- **Controller type fix:** widened `NudgeKind` → `"expiry" | "restock"` (client type was stale vs the merged restock producer — a real API-vs-type mismatch).
+- **Batch gate:** `pnpm typecheck` 0; full `pnpm test` = **523 files / 4699 tests, 0 fail** (37.8s). Worktrees removed.
+- **T-30 documented follow-ups (non-blocking):** (1) HomeNudges doesn't yet CALL `reportNudgeShown` — the a2-i/a2-ii telemetry is built + tested but has no caller (currently dead code); a small UI wiring completes the loop. (2) Restock nudge PUSH has no worker path (only expiry pushes) — new-feature scope. (3) Restock UI copy path is exercised only once restock nudges surface for a role.
+
+**Verdict:** VERIFIED — ★★★ **PHASE 1 COMPLETE** (Equipment T-17…24, Shift/Home T-25…27, Inventory T-28…30, Web-gate T-31). Phase 0 (0A code + 0B owner checklist) + Phase 1 all done, full suite green throughout. Next: Phase 2 (T-34…44 native-reachable MED sweep + `⚠ FROZEN` PWA cards), Phase 3 (T-45…53 LOW cleanup), then the O+R sub-specs. (R-SH-F1 handover deferred O+R sub-spec.)
