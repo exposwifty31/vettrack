@@ -186,7 +186,7 @@ Highest-leverage cluster: **always-visible triggers driving sheets mounted insid
 ### CLICK-PATH-022 [MEDIUM · Missing Transition] — Sound-feedback await can silently swallow a settings toggle `NEW`
 
 - **Flow:** Settings — Critical Alerts + role-notification toggles (admin-console; ADMIN-CONSOLE-2) — `src/pages/settings.tsx:124`
-- `await playFeedbackTone()` (no catch) runs **before** the persist; if `AudioContext.resume()` rejects (iOS WKWebView), the preference write is skipped and the switch snaps back with no feedback. The sibling `handleSoundToggle` was deliberately written fire-and-forget — these two weren't. **Fix:** `void playFeedbackTone().catch(()=>{})` or try/catch around the tone.
+- `await playFeedbackTone()` (no catch) runs **before** the persist; if `AudioContext.resume()` rejects (iOS WKWebView), the preference write is skipped and the switch snaps back with no feedback. The sibling `handleSoundToggle` was deliberately written fire-and-forget — these two weren't. **Fix:** fire the tone without awaiting so the persist always commits, and catch **observably** rather than swallowing — e.g. `void playFeedbackTone().catch((e) => Sentry.captureMessage("settings feedback tone failed", { extra: { error: String(e) } }))` (mirrors the `use-pwa-install.ts` storage-failure reporting pattern); a try/catch that logs before proceeding to `update()`/`syncRoleNotificationSettings()` is equally acceptable. Do not use an empty `catch(()=>{})`.
 
 ### CLICK-PATH-023 [MEDIUM · Missing Transition] — "Confirm Import" stays armed after success; second click re-imports the same roster CSV `NEW`
 

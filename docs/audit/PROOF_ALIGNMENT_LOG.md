@@ -2405,3 +2405,15 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 - **Verification-scope clarity (valid):** the header's "8/8 crit-high findings survived" read as covering all HIGHs including CLICK-PATH-006. Scoped the claim to workflow (batch) findings in the header, HIGH section heading, refuted appendix, and coverage table (added footnote ¹); CLICK-PATH-006 now consistently labeled controller-verified / not adversarially verified in all four places.
 - **Validation (scripted):** MD022 = NONE; CLICK-PATH ids 001–036 contiguous; no stale broad claims remain; scoped claims present.
 **Verdict:** VERIFIED — both fixed, report internally consistent.
+
+---
+
+## 2026-07-12 — CodeRabbit PR #84 round 2: 1 finding — doc fixed, code change skipped (out of scope)
+
+**Claim:** The round-2 comment (anchored on the report's CLICK-PATH-022 entry) was triaged: the report's suggested fix no longer recommends silent error swallowing; the actual `settings.tsx` change is deferred with reason.
+**Evidence:**
+- **Verified against current code:** `src/pages/settings.tsx` `handleCriticalAlertsToggle` still `await playFeedbackTone()` with no catch before `update()` (read lines 104-136) — the underlying finding remains valid.
+- **SKIPPED (code change):** implementing the settings.tsx fix in this PR would violate the approved audit plan and the PR's own contract ("Docs only — no code changes"; fixes are the follow-up task). Deferred to that task.
+- **FIXED (doc):** the report's CLICK-PATH-022 Suggested-fix previously recommended `void playFeedbackTone().catch(()=>{})` — an empty catch contradicting the repo's never-silently-swallow rule and CodeRabbit's point. Reworded to: fire-and-forget so the persist always commits + **observable** catch (Sentry.captureMessage, mirroring the use-pwa-install storage-failure pattern) or a logging try/catch; explicit "Do not use an empty catch".
+- **Validation (scripted):** MD022 = NONE; ids 001–036 contiguous; empty-catch recommendation absent.
+**Verdict:** VERIFIED — doc corrected; code fix remains a follow-up-task item with an improved spec.
