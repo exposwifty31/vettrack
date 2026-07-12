@@ -15,7 +15,7 @@ function roleLabel(role: UserRole): string {
 }
 
 export function ProfileHeroZone() {
-  const { name, role, userId } = useAuth();
+  const { name, role, userId, refreshAuth } = useAuth();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name ?? "");
@@ -75,6 +75,7 @@ export function ProfileHeroZone() {
     try {
       await api.users.updateDisplayName(userId, draft.trim());
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+      refreshAuth();
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
       setEditing(false);
