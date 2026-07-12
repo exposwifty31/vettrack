@@ -30,10 +30,10 @@ const STATUS_LABELS: Record<StatusKind, () => string> = {
   issue:       () => t.status.issue,
   maintenance: () => t.status.maintenance,
   sterilized:  () => t.status.sterilized,
-  stale:       () => (t.status as Record<string, string>)["stale"] ?? "Stale",
-  unknown:     () => (t.status as Record<string, string>)["unknown"] ?? "Unknown",
-  info:        () => (t.status as Record<string, string>)["info"] ?? "Info",
-  neutral:     () => (t.status as Record<string, string>)["neutral"] ?? "Unknown",
+  stale:       () => t.status.stale,
+  unknown:     () => t.status.unknown,
+  info:        () => t.status.info,
+  neutral:     () => t.status.neutral,
 };
 
 export interface StatusBadgeProps
