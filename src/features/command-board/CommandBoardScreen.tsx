@@ -38,6 +38,27 @@ interface CommandBoardScreenProps {
   kioskMode?: boolean;
 }
 
+// eq.status on the fallback pane below is the raw vt_equipment.status column
+// (loosely typed `string` on DisplaySnapshotEquipment) — validate before
+// handing it to ReadinessBadge, which indexes READINESS_GLYPH by tier and
+// throws if given a status outside the known EquipmentStatus union.
+const KNOWN_EQUIPMENT_STATUSES = new Set<EquipmentStatus>([
+  "ok",
+  "issue",
+  "maintenance",
+  "sterilized",
+  "critical",
+  "needs_attention",
+]);
+
+function toKnownEquipmentStatus(status: string): EquipmentStatus {
+  return KNOWN_EQUIPMENT_STATUSES.has(status as EquipmentStatus)
+    ? (status as EquipmentStatus)
+    : // Fail cautious on this wall display: an unrecognized status renders as
+      // the most attention-grabbing tier, never a falsely-reassuring "ready".
+      "critical";
+}
+
 function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProps) {
   const qc = useQueryClient();
   const realtimeIngestor = useMemo(() => new EventIngestor(qc), [qc]);
@@ -179,8 +200,10 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
               <span className="flex-1 vt-text-sm font-semibold text-ivory-text">{eq.name}</span>
               {/* eq.status is the raw vt_equipment.status (server/routes/display.ts),
                   loosely typed as `string` on DisplaySnapshotEquipment — glance-only,
-                  additive; this fallback pane owns no interactivity or reload logic. */}
-              <ReadinessBadge status={eq.status as EquipmentStatus} />
+                  additive; this fallback pane owns no interactivity or reload logic.
+                  toKnownEquipmentStatus guards ReadinessBadge against a value
+                  outside EquipmentStatus (see comment above KNOWN_EQUIPMENT_STATUSES). */}
+              <ReadinessBadge status={toKnownEquipmentStatus(eq.status)} />
               <span
                 data-testid={`ward-display-equipment-deployable-${eq.id}`}
                 className={cn(

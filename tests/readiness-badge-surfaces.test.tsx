@@ -367,4 +367,46 @@ describe("ReadinessBadge fan-out — CommandBoardScreen board fallback pane", ()
     await screen.findByTestId("ward-display-equipment-pane");
     expect(readinessTiers(container)).toContain("not_ready");
   });
+
+  it("does not crash on a status outside the known EquipmentStatus union — renders the not_ready tier instead", async () => {
+    useDisplaySnapshotMock.mockReturnValue({
+      currentTime: new Date().toISOString(),
+      currentShift: [],
+      hospitalizations: [],
+      equipment: [
+        {
+          id: "eq-board-2",
+          name: "Legacy Monitor",
+          // Not one of the six EquipmentStatus literals — e.g. stale data from
+          // a pre-migration row or a future value this client doesn't know yet.
+          status: "unrecognized_legacy_value",
+          inUse: false,
+          heldBy: null,
+          lastCheckInAt: null,
+          probableLocation: null,
+          isDeployable: false,
+          custodyState: "docked",
+          readinessState: "unknown",
+          usageState: "available",
+        },
+      ],
+      upcomingTasks: [],
+      overdueTasks: [],
+      activeAlertCount: 0,
+      totalOverdueCount: 0,
+      crashCartStatus: null,
+      codeBlueSession: null,
+      commandBoard: null,
+    } satisfies DisplaySnapshot);
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { container } = render(
+      <QueryClientProvider client={client}>
+        <CommandBoardScreen />
+      </QueryClientProvider>,
+    );
+    await screen.findByTestId("ward-display-equipment-pane");
+    // Fails cautious — an unrecognized status must never render as "ready".
+    expect(readinessTiers(container)).toContain("not_ready");
+  });
 });
