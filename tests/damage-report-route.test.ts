@@ -69,6 +69,9 @@ let selectResolvesTo: Array<{ id: string }> = [];
 let insertedDamageEvents: Array<Record<string, unknown>> = [];
 let equipmentUpdates: Array<Record<string, unknown>> = [];
 let equipmentUpdateWherePredicates: unknown[] = [];
+// Simulates the guarded UPDATE's affected-row count — 0 reproduces a
+// soft-delete landing between the preflight SELECT and this transaction.
+let equipmentUpdateRowCount = 1;
 
 vi.mock("../server/db.js", () => ({
   db: {
@@ -93,7 +96,7 @@ vi.mock("../server/db.js", () => ({
             return {
               where: (predicate: unknown) => {
                 equipmentUpdateWherePredicates.push(predicate);
-                return Promise.resolve();
+                return Promise.resolve({ rowCount: equipmentUpdateRowCount });
               },
             };
           },
@@ -179,6 +182,7 @@ beforeEach(() => {
   insertedDamageEvents = [];
   equipmentUpdates = [];
   equipmentUpdateWherePredicates = [];
+  equipmentUpdateRowCount = 1;
   loggedAuditCalls = [];
 });
 
@@ -241,6 +245,24 @@ describe("POST /api/equipment/:id/damage — reporting damage (R-EQ-F3)", () => 
     expect(captured.statusCode).toBe(404);
     expect(insertedDamageEvents).toHaveLength(0);
     expect(equipmentUpdates).toHaveLength(0);
+    expect(loggedAuditCalls).toHaveLength(0);
+  });
+
+  it("aborts and returns 404 when a soft-delete races between the preflight SELECT and the guarded UPDATE (no damage event is recorded)", async () => {
+    // The preflight SELECT still finds the row (not yet soft-deleted)...
+    selectResolvesTo = [{ id: "eq-1" }];
+    // ...but by the time the transaction's guarded UPDATE runs, a concurrent
+    // soft-delete has made `isNull(deletedAt)` no longer match — 0 rows affected.
+    equipmentUpdateRowCount = 0;
+
+    const req = makeReq({ id: "eq-1" }, { note: "Cracked screen" });
+    const { res, captured } = makeRes();
+    await dispatch(req, res);
+
+    expect(captured.statusCode).toBe(404);
+    // The transaction must roll back as a whole: no orphaned damage event for
+    // an equipment row whose conditionStatus was never actually flipped.
+    expect(insertedDamageEvents).toHaveLength(0);
     expect(loggedAuditCalls).toHaveLength(0);
   });
 });

@@ -5,6 +5,7 @@ import { db, equipment, damageEvents } from "../db.js";
 import { requireAuth } from "../middleware/auth.js";
 import { writeLimiter } from "../middleware/rate-limiters.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
+import { pgUpdateMatchedZeroRows } from "../lib/pg-result.js";
 import { apiError, resolveRequestId } from "./equipment/equipment-route-utils.js";
 
 /** Non-"ok" condition value applied to equipment on a damage report (R-EQ-F3). */
@@ -81,16 +82,11 @@ router.post("/:id/damage", requireAuth, writeLimiter, async (req, res) => {
     const now = new Date();
 
     await db.transaction(async (tx) => {
-      await tx.insert(damageEvents).values({
-        id: damageEventId,
-        clinicId,
-        equipmentId,
-        reportedBy: authUser.id,
-        at: now,
-        note,
-      });
-
-      await tx
+      // Guard against a soft-delete landing between the preflight SELECT
+      // above and this UPDATE: if the row no longer matches, abort the whole
+      // transaction (including the damage-event insert below) instead of
+      // recording a damage event for an equipment row that was never flipped.
+      const updateResult = await tx
         .update(equipment)
         .set({ conditionStatus: DAMAGED_CONDITION_STATUS, version: sql`${equipment.version} + 1` })
         .where(
@@ -100,6 +96,19 @@ router.post("/:id/damage", requireAuth, writeLimiter, async (req, res) => {
             isNull(equipment.deletedAt),
           ),
         );
+
+      if (pgUpdateMatchedZeroRows(updateResult)) {
+        throw new Error("EQUIPMENT_NOT_FOUND");
+      }
+
+      await tx.insert(damageEvents).values({
+        id: damageEventId,
+        clinicId,
+        equipmentId,
+        reportedBy: authUser.id,
+        at: now,
+        note,
+      });
     });
 
     logAudit({
@@ -124,6 +133,17 @@ router.post("/:id/damage", requireAuth, writeLimiter, async (req, res) => {
       conditionStatus: DAMAGED_CONDITION_STATUS,
     });
   } catch (err) {
+    if (err instanceof Error && err.message === "EQUIPMENT_NOT_FOUND") {
+      res.status(404).json(
+        apiError({
+          code: "NOT_FOUND",
+          reason: "EQUIPMENT_NOT_FOUND",
+          message: "Equipment not found",
+          requestId,
+        }),
+      );
+      return;
+    }
     console.error("[equipment-damage] report failed", {
       at: new Date().toISOString(),
       clinicId,
