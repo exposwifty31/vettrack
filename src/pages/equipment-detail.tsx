@@ -1357,31 +1357,6 @@ function EquipmentDetailPageDesktop() {
                   </Button>
                 )}
               </div>
-
-              <DockReturnFlow
-                equipment={equipment}
-                open={dockReturnOpen}
-                onClose={() => setDockReturnOpen(false)}
-                onSuccess={() => {
-                  queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
-                  queryClient.invalidateQueries({ queryKey: ["deployability", id] });
-                  queryClient.invalidateQueries({ queryKey: ["condition-states", id] });
-                  queryClient.invalidateQueries({ queryKey: ["staging-queue", id] });
-                  setDockReturnOpen(false);
-                }}
-              />
-
-              <DockReturnNfc
-                equipment={equipment}
-                open={dockReturnNfcOpen}
-                onClose={() => setDockReturnNfcOpen(false)}
-                onSuccess={() => {
-                  queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
-                  queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
-                  setDockReturnNfcOpen(false);
-                }}
-              />
-
             </TabsContent>
           )}
 
@@ -1397,6 +1372,36 @@ function EquipmentDetailPageDesktop() {
           )}
         </Tabs>
       </div>
+
+      {/* Dock-Return + RFID sheets — page-level (not inside a TabsContent) so
+          they stay mounted regardless of which detail tab is active. */}
+      {equipment && (
+        <DockReturnFlow
+          equipment={equipment}
+          open={dockReturnOpen}
+          onClose={() => setDockReturnOpen(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
+            queryClient.invalidateQueries({ queryKey: ["deployability", id] });
+            queryClient.invalidateQueries({ queryKey: ["condition-states", id] });
+            queryClient.invalidateQueries({ queryKey: ["staging-queue", id] });
+            setDockReturnOpen(false);
+          }}
+        />
+      )}
+
+      {equipment && (
+        <DockReturnNfc
+          equipment={equipment}
+          open={dockReturnNfcOpen}
+          onClose={() => setDockReturnNfcOpen(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
+            queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+            setDockReturnNfcOpen(false);
+          }}
+        />
+      )}
 
       <ReturnPlugDialog
         open={returnDialogOpen}
