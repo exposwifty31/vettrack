@@ -274,7 +274,7 @@ export default function MyEquipmentPage() {
                         variant="outline"
                         className="border-border/60 text-muted-foreground hover:text-foreground min-h-[44px] px-3"
                         onClick={() => setPendingReturnEquipmentId(item.id)}
-                        disabled={isReturningThisItem}
+                        disabled={returningAll || isReturningThisItem}
                         data-testid={`btn-return-${item.id}`}
                       >
                         {isReturningThisItem ? (

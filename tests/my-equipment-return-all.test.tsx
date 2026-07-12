@@ -128,4 +128,34 @@ describe("my-equipment — Return All invalidates after allSettled (T-19)", () =
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["/api/equipment"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["/api/activity"] });
   });
+
+  it("disables individual return buttons while Return All is in flight", async () => {
+    const pendingResolvers: Array<() => void> = [];
+    returnMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          pendingResolvers.push(() =>
+            resolve({ equipment: { status: "returned" }, undoToken: undefined }),
+          );
+        }),
+    );
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderPage(client);
+
+    const returnAllButton = await screen.findByTestId("btn-return-all");
+    const individualButton = await screen.findByTestId("btn-return-eq-1");
+    expect(individualButton.hasAttribute("disabled")).toBe(false);
+
+    fireEvent.click(returnAllButton);
+
+    // The bulk operation submits every item's return call before any of
+    // them resolve — an individual return button must not remain clickable
+    // and let the same equipment be submitted a second time concurrently.
+    await waitFor(() => expect(returnMock).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(individualButton.hasAttribute("disabled")).toBe(true));
+
+    pendingResolvers.forEach((resolve) => resolve());
+    await waitFor(() => expect(individualButton.hasAttribute("disabled")).toBe(false));
+  });
 });
