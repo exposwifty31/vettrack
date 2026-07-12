@@ -25,8 +25,8 @@
 
 ### R-SH-F1.1 · Schema (`vt_shift_handover`) shaped for Priza
 
-- **Goal:** `vt_shift_handover` (`clinicId, shiftSessionId, deltas (4 types), openItems[], observedSignals, patientWorklist (nullable — PMS-sourced), acknowledgedBy, generatedAt, acknowledgedAt`). Migrate; new `AuditActionType` for generate + acknowledge. The `patientWorklist` shape must be a **PMS-agnostic contract** (external ids + display), not FKs to removed internal tables.
-- **RED:** `tests/migrations/shift-handover.test.ts` (DB-integration) + a type test that `patientWorklist` carries external PMS ids, not internal patient FKs.
+- **Goal:** `vt_shift_handover` (`clinicId, shiftSessionId, deltas (4 types), openItems[], observedSignals, patientWorklist, acknowledgedBy, generatedAt, acknowledgedAt`). **`patientWorklist` is a discriminated, PMS-agnostic union — NOT a bare nullable:** `{ state: 'not_configured' } | { state: 'ready', entries: [{ externalId, display, byTechId }] } | { state: 'error', reason }`, so a PMS failure can **never** be serialized or read as an empty/ready worklist. External ids + display only — no FKs to removed internal tables. Migrate; new `AuditActionType` for generate + acknowledge.
+- **RED:** `tests/migrations/shift-handover.test.ts` (DB-integration) + a type test that `patientWorklist` is the **discriminated union** (external PMS ids, not internal FKs) and that the **`error` state is distinguishable from `not_configured` and from a `ready` empty list** — an error can never collapse to "empty".
 - **Verify:** DB-integration runner + `pnpm typecheck`.
 
 ### R-SH-F1.2 · Delta generator (all 4 types) at shift end
