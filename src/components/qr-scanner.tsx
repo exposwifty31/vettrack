@@ -402,7 +402,13 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
         // Superseded by a stopScanner()/newer startScanner() call while
         // scanner.start() was in flight — tear this instance down instead of
         // adopting scannerRef/"scanning" phase (see scannerGenerationRef).
-        await scanner.stop().catch(() => {});
+        // A failed stop() here is not silently ignored: it means this
+        // generation's camera instance may still be active even though a
+        // newer generation has taken over, so surface it for diagnosis rather
+        // than treating teardown as having succeeded.
+        await scanner.stop().catch((stopErr: unknown) => {
+          console.error("[qr-scanner] failed to stop superseded scanner instance", stopErr);
+        });
         return;
       }
 
