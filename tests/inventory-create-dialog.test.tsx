@@ -97,8 +97,8 @@ describe("inventory items — create dialog sends isBillable + minimumDispenseTo
 
     fireEvent.click(await screen.findByRole("button", { name: p.newItem }));
 
-    const inputs = screen.getAllByRole("textbox");
-    const [codeField, labelField] = inputs;
+    const codeField = screen.getByLabelText(p.fieldCode);
+    const labelField = screen.getByLabelText(p.fieldLabel);
     fireEvent.change(codeField, { target: { value: "NEW_ITEM" } });
     fireEvent.change(labelField, { target: { value: "New Item" } });
 
