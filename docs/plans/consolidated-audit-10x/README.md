@@ -22,9 +22,10 @@ Single front door for the consolidated remediation + 10x feature program. The **
 | `phase-2-3.plan.md` | **Phase 2** native-reachable MED sweep + **Phase 3** LOW cleanup (+ pointers to feature sub-specs) | ✅ authored (T-32…T-53) |
 | `phase-4.plan.md` | **Phase 4** — massive-03 (clinic network) + medium-04 (copilot/voice) | ✅ authored · 🚧 on hold (entry conditions) |
 | `subspecs/R-M1-rfid-gate-e2e.plan.md` | **massive-01** RFID-gate e2e — managed reader entity + directional gates + board surfacing + resolver reconciliation | ✅ authored (R-M1.0…M1.5) |
-| `subspecs/R-CBF-1-code-blue-one-tap.plan.md` | medium-01 (frozen Code Blue surface) | ▫ later |
-| `subspecs/R-SH-F1-shift-handover.plan.md` | medium-02 (superset + Priza integration) | ▫ later |
-| `subspecs/R-PDF-1-predictive-readiness.plan.md` | massive-02 (inference-first demand model) | ▫ later |
+| `subspecs/R-CBF-1-code-blue-one-tap.plan.md` | medium-01 (frozen Code Blue surface) | ✅ authored (R-CBF-1.1…1.5) |
+| `subspecs/R-BDF-1-ambient-board-alerts.plan.md` | medium-03 (board anomaly rules; shares the R-M1.3 board seam) | ✅ authored (R-BDF-1.1…1.4) |
+| `subspecs/R-SH-F1-shift-handover.plan.md` | medium-02 (superset + Priza integration) | ✅ authored (R-SH-F1.1…1.6) |
+| `subspecs/R-PDF-1-predictive-readiness.plan.md` | massive-02 (inference-first demand model) | ✅ authored (R-PDF-1.1…1.5) |
 
 ## Why phase plans and sub-specs are separate
 
