@@ -1,6 +1,6 @@
 /**
  * BullMQ worker: notifications queue + overdue reminder scheduler.
- * Run as a separate process: pnpm run worker:notifications
+ * Run as a separate process: pnpm run worker
  */
 import "../lib/env-bootstrap.js";
 

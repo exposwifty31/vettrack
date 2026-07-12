@@ -2301,3 +2301,22 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 **Claim:** All 25 planned tasks (T1–T25) + 2 owner-directed additions (T26 inventory-dispense reclassification; T24b requested-role staging column) are implemented, per-task-reviewed, and integrated on `claude/phase-10a-audit-fixes`; the whole branch is green.
 **Evidence:** SDD head `b1cc3ffed`. Integrated final tally: `pnpm i18n:check` parity ✓ · `pnpm typecheck` 0 · full `pnpm test` → **482 files / 4512 pass** · `pnpm architecture:gates` All G1 passed (0 new cycles). Each task carries its own proof entry above; each passed an independent task-review (Spec + Quality), frozen-surface tasks (T1 break-glass, T6/T20 realtime, T26/T24b authority) reviewed on the most capable model with the frozen invariants verified intact. Whole-branch final review pending.
 **Verdict:** VERIFIED (pending whole-branch final review)
+
+---
+
+## 2026-07-11 — Upgrade & simplify repo scripts + deslop (71d7c23, 9ec9db1)
+
+**Claim:** Removed dead/duplicate npm scripts, fixed the `dev` script drift, and deleted verified-orphan one-off scripts + committed run artifacts, without breaking any CI/code reference.
+
+**Evidence:**
+- `package.json` — Read after edit: scripts count 63 (was 80-adjacent per pre-edit Read showing 80 lines); removed keys confirmed absent via `node -e "require('./package.json').scripts"` (predev:ci, dev:ci, cap:archive:preflight, tenant:lint, knip:production, dev:db:push, test:playwright:chromium, worker:notifications all gone; `dev` now `"pnpm dev:api:watch" "pnpm dev:web"`; `dev:api` byte-identical). No duplicate keys.
+- Command: `grep -rn "pnpm ...(removed names)" .github/ docs/ .env* server/ src/` → 0 remaining code/CI refs for each removed script name (worker:notifications comment in `server/workers/notification.worker.ts:3` and `.env.example:47` both updated to `pnpm worker`).
+- Guardrail check: `grep -rn "dev:api"` → `server/middleware/rate-limiters.ts:15` + `docs/devops/ci-cd.md:54` show Playwright CI runs `pnpm dev:api` expecting non-watching NODE_ENV=development; `dev:api` left unchanged for that reason.
+- Deletions verified orphaned before removal: `grep -rn <basename>` for split-prs.sh, qa-native-ship-{complete,portrait}.sh, backfill-users-email.ts → only hits are `docs/audit/codebase-relevance-classification.json` (generated inventory) + one historical report; no code/CI usage.
+- Restored 2 files after re-check exposed real usage my first grep masked: `scripts/validate-prod.ts:77` spawns `bash scripts/validate-build.sh`; `docs/previews/README.md:11` documents `capture-css-preview-screenshots.ts`. Both restored via `git restore`.
+- `.gitignore` — appended `scripts/wetcheck/results-*.json`; the two committed result JSONs removed via `git rm`.
+- Command: `node -e "JSON.parse(fs.readFileSync('package.json'))"` → parses (valid JSON).
+
+**Not verified (environment limit):** `pnpm typecheck` / `pnpm test` could not run — `pnpm install` fails with 403 fetching the private `@vettrack/contracts` GitHub tarball (`exposwifty31/literate-dollop`), which needs auth unavailable in this sandbox. Changes touch no compilable app surface (script metadata, standalone-script deletions, docs, one comment); no deleted file is imported by any `.ts` or referenced in any `tsconfig*.json` (grep-confirmed).
+
+**Verdict:** VERIFIED (static checks) / PARTIAL (typecheck+tests unrunnable in this environment — pre-existing private-dependency auth block)

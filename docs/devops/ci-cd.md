@@ -77,7 +77,6 @@ All nightlies are **non-blocking** (`continue-on-error` or observational only).
 
 No automated iOS simulator screenshots or macOS Capacitor builds in CI today. Pre-release:
 
-- `scripts/qa-native-ship-complete.sh` (local simulator captures)
 - `scripts/build-native-shell.sh`, `scripts/verify-resubmission.sh`
 
 See [`docs/capacitor-native-app.md`](../capacitor-native-app.md) and [`docs/mobile/release.md`](../mobile/release.md).

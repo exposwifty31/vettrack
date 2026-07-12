@@ -109,3 +109,6 @@ locales/*.zip
 /all-files.md
 /screenshot*.png
 *-this-session-is-being-continued-*.txt
+
+# Wetcheck simulation run artifacts (timestamped output — never commit)
+scripts/wetcheck/results-*.json
