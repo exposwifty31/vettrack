@@ -2417,3 +2417,19 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 - **FIXED (doc):** the report's CLICK-PATH-022 Suggested-fix previously recommended `void playFeedbackTone().catch(()=>{})` — an empty catch contradicting the repo's never-silently-swallow rule and CodeRabbit's point. Reworded to: fire-and-forget so the persist always commits + **observable** catch (Sentry.captureMessage, mirroring the use-pwa-install storage-failure pattern) or a logging try/catch; explicit "Do not use an empty catch".
 - **Validation (scripted):** MD022 = NONE; ids 001–036 contiguous; empty-catch recommendation absent.
 **Verdict:** VERIFIED — doc corrected; code fix remains a follow-up-task item with an improved spec.
+
+---
+
+## 2026-07-12 — Consolidated Audit × 10x — Phase 0A · T-05 (R-SY-01 · CLICK-PATH-006): QueryClient wired into initSyncEngine
+
+**Claim:** The sync engine's post-offline cache invalidations, reconciliation, and 401 cache-clear are no longer dead — `initSyncEngine()` now receives the app QueryClient. RED-first, reviewed clean (Tier S +R).
+
+**Evidence:**
+- **RED first (non-vacuous):** new `tests/sync-engine-queryclient-wiring.test.ts` (renders the real `SyncProvider` inside a real `QueryClientProvider`, drives the real `processQueue()` from `src/lib/sync-engine.ts`; only deps mocked). Three assertions failed against pre-fix code: (1) `initSyncEngine` received `undefined`; (2) equipment `invalidateQueries` fired 0×; (3) 401 `clear()` never called. Failing output captured.
+- **GREEN (wiring only):** `src/hooks/use-sync.tsx` — `useQueryClient()` added and forwarded via `initSyncEngine(queryClient)`; effect dep array `[]`→`[queryClient]`. `src/lib/sync-engine.ts` UNCHANGED (its `initSyncEngine(queryClient?)` signature already accepted the arg). ≤2 code files + 1 test.
+- **Verify:** `pnpm test -- tests/sync-engine-queryclient-wiring.test.ts` green; `pnpm typecheck` 0 errors (frontend + server tsconfigs); full `pnpm test` = 488 files / 4547 tests, 0 fail (no regressions in the pre-existing sync/offline suites).
+- **`+R` review gate (independent `code-reviewer`):** APPROVE — Spec ✅, Quality Approved, 0 Critical/Important. Confirmed the test is non-vacuous (each assertion traced to the real guarded branch: `sync-engine.ts:207-218` invalidation, `:233/:245` reconcile gate, `:422` 401-clear — all dead pre-fix), and the dep-array change is safe (single module-level `queryClient` behind one `QueryClientProvider` at `main.tsx:196` → stable reference → no re-init / listener leak). Guardrails held: wiring-only, no queue/circuit-breaker change, no emergency endpoint cached.
+- **Minor (deferred to final whole-branch review):** dead `import "fake-indexeddb/auto"` in the new test (dexie is fully mocked there) — harmless leftover.
+- **Commit:** `b79f0819a` — `fix: pass QueryClient into initSyncEngine (T-05 · R-SY-01)` (staged by explicit path; unrelated untracked files untouched).
+
+**Verdict:** VERIFIED — T-05 DONE (foundational sync card; unblocks the offline-adjacent Phase-0A/1 cards).
