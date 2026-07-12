@@ -26,9 +26,6 @@ vi.mock("sonner", () => ({
   toast: { error: (...a: unknown[]) => toastError(...a), success: (...a: unknown[]) => toastSuccess(...a) },
 }));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ userId: "u1", isAdmin: false }) }));
-vi.mock("@/hooks/use-active-shift", () => ({
-  useActiveShift: () => ({ hasActiveShift, isLoading: shiftLoading, isError: shiftError, nextShift: null }),
-}));
 vi.mock("@/lib/haptics", () => ({ haptics: { tap: vi.fn(), error: vi.fn() } }));
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -64,6 +61,9 @@ function renderItem(equipment: Partial<Equipment> = baseEquipment) {
         selectMode={false}
         selected={false}
         onToggleSelect={() => {}}
+        hasActiveShift={hasActiveShift}
+        shiftLoading={shiftLoading}
+        shiftError={shiftError}
       />
     </QueryClientProvider>,
   );

@@ -18,9 +18,6 @@ import type { Equipment } from "@/types";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ userId: "u1", isAdmin: false }) }));
-vi.mock("@/hooks/use-active-shift", () => ({
-  useActiveShift: () => ({ hasActiveShift: true, isLoading: false, nextShift: null }),
-}));
 vi.mock("@/lib/haptics", () => ({ haptics: { tap: vi.fn(), error: vi.fn() } }));
 
 import { EquipmentItem } from "@/pages/equipment-list";
@@ -36,6 +33,9 @@ function renderItem(equipment: Partial<Equipment>) {
         selectMode={false}
         selected={false}
         onToggleSelect={() => {}}
+        hasActiveShift
+        shiftLoading={false}
+        shiftError={false}
       />
     </QueryClientProvider>,
   );

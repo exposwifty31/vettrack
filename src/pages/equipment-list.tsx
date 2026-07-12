@@ -146,6 +146,9 @@ function EquipmentListPageDesktop() {
     () => buildLocalEntityStateByEquipmentId(syncQueueItems),
     [syncQueueItems],
   );
+  // Roster-derived shift state, resolved once here and threaded into every
+  // EquipmentItem — one shared React Query observer instead of one per row.
+  const { hasActiveShift, isLoading: shiftLoading, isError: shiftError } = useActiveShift();
   const [, navigate] = useLocation();
   const searchStr = useSearch();
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -420,12 +423,15 @@ function EquipmentListPageDesktop() {
           selectMode={false}
           selected={false}
           onToggleSelect={() => {}}
+          hasActiveShift={hasActiveShift}
+          shiftLoading={shiftLoading}
+          shiftError={shiftError}
           virtualized
           localSyncState={localSyncByEquipmentId.get(eq.id) ?? "synced"}
         />
       </div>
     ),
-    [localSyncByEquipmentId],
+    [localSyncByEquipmentId, hasActiveShift, shiftLoading, shiftError],
   );
 
   const manualFolders = folders?.filter((f) => f.type !== "smart") || [];
@@ -932,6 +938,9 @@ function EquipmentListPageDesktop() {
                         selectMode={selectMode}
                         selected={selected.has(eq.id)}
                         onToggleSelect={() => toggleSelect(eq.id)}
+                        hasActiveShift={hasActiveShift}
+                        shiftLoading={shiftLoading}
+                        shiftError={shiftError}
                         localSyncState={localSyncByEquipmentId.get(eq.id) ?? "synced"}
                       />
                     )),
@@ -992,6 +1001,9 @@ export function EquipmentItem({
   selectMode,
   selected,
   onToggleSelect,
+  hasActiveShift,
+  shiftLoading,
+  shiftError,
   virtualized = false,
   localSyncState = "synced",
 }: {
@@ -999,17 +1011,20 @@ export function EquipmentItem({
   selectMode: boolean;
   selected: boolean;
   onToggleSelect: () => void;
+  // Roster-derived shift state, resolved ONCE in the parent page and passed
+  // down. Do not call useActiveShift() per row — that creates one React Query
+  // observer per list item on the shared dashboard query. Off-shift: taking
+  // equipment ownership is not permitted (same gate the detail page enforces);
+  // `hasActiveShift` is false while the query resolves, so the checkout
+  // quick-action stays disabled for that window (see `shiftLoading`).
+  hasActiveShift: boolean;
+  shiftLoading: boolean;
+  shiftError: boolean;
   virtualized?: boolean;
   localSyncState?: LocalEntityState;
 }) {
   const { settings } = useSettings();
   const { userId, isAdmin } = useAuth();
-  // Off-shift: taking equipment ownership is not permitted (roster-derived),
-  // same gate the equipment detail page enforces (see handleCheckout there).
-  // `hasActiveShift` defaults to false while the shift query is still
-  // resolving — without consuming `isLoading` too, a fresh page load would
-  // briefly tell an on-shift tech they're off-shift before the query settles.
-  const { hasActiveShift, isLoading: shiftLoading, isError: shiftError } = useActiveShift();
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);

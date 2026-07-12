@@ -627,10 +627,11 @@ export default function CodeBluePage() {
     );
   }
 
-  // A confirmed active session always wins — render it even if a subsequent
-  // poll errored. An active Code Blue must stay visible through a transient
-  // blip; TanStack keeps status:'success'/isError:false while real data is
-  // held, so a genuinely active session is reached before the error guard.
+  // A held active session always wins — render it even if a subsequent poll
+  // errored. An active Code Blue must stay visible through a transient blip, so
+  // the active-session check runs BEFORE the error guard below: any held session
+  // (including cached `placeholderData` from the hook) renders instead of the
+  // retry card.
   if (session?.status === "active") {
     return <ActiveSession />;
   }
