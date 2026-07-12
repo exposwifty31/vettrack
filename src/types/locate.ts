@@ -19,7 +19,9 @@ export interface EquipmentLocateResult {
     unknowns: string[];
     lastCorroboratedAt: string | null;
   };
-  readiness: string;
+  // Mirrors server/routes/equipment-locate.ts's `graph.equipment?.readinessState ?? "unknown"` —
+  // always one of these three, matching Equipment.readinessState's tri-state union.
+  readiness: "ready" | "not_ready" | "unknown";
 }
 
 export interface EquipmentLocateResponse {

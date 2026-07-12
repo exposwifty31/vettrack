@@ -79,9 +79,9 @@ export function FoldersSection() {
     const trimmedName = folderName.trim();
     if (!trimmedName || isSaving) return;
     if (editFolder) {
-      updateMut.mutate({ id: editFolder.id, name: folderName });
+      updateMut.mutate({ id: editFolder.id, name: trimmedName });
     } else {
-      createMut.mutate(folderName);
+      createMut.mutate(trimmedName);
     }
   };
 

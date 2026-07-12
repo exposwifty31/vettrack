@@ -129,4 +129,21 @@ describe("FoldersSection — Enter handler reuses the guarded submit (T-43 · R-
     await waitFor(() => expect(screen.queryByTestId("input-folder-name")).toBeNull());
     expect(createMock).toHaveBeenCalledTimes(1);
   });
+
+  it("persists the trimmed name, not the raw input with leading/trailing whitespace", async () => {
+    createMock.mockResolvedValue({
+      id: "f1",
+      name: "Surgery Room 1",
+      type: "manual",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    renderSection();
+    await openCreateDialog();
+
+    fireEvent.change(nameInput(), { target: { value: "  Surgery Room 1  " } });
+    fireEvent.click(saveButton());
+
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+    expect(createMock).toHaveBeenCalledWith("Surgery Room 1");
+  });
 });

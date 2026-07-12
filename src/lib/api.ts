@@ -65,6 +65,7 @@ import type {
   DisplayPairingCode,
   DisplayPairClaim,
   NudgeFeedResponse,
+  NudgeKind,
 } from "@/types";
 import type { AuthoritySnapshot } from "../../shared/authority.js";
 
@@ -1171,7 +1172,7 @@ export const api = {
       syncCircuitOpen?: boolean;
       // T-30a2-ii — bounded enum: which nudge-feed kind was shown. Mirrors
       // the server's closed ALLOWED_NUDGE_SHOWN enum (T-30a2-i).
-      nudgeShown?: "expiry" | "restock";
+      nudgeShown?: NudgeKind;
     }) =>
       request<{ ok: boolean }>("/api/realtime/telemetry", {
         method: "POST",

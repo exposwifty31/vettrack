@@ -9,6 +9,11 @@ export type NudgeKind = "expiry" | "restock";
 export interface Nudge {
   id: string;
   kind: NudgeKind;
+  // Mirrors server UserRole (server/services/nudge-feed.service.ts); kept as
+  // `string` rather than importing the server type, per this file's header
+  // (no ./index.ts / server imports) — a future server-side role addition
+  // won't surface as a client type error, but avoids coupling this file to
+  // server code.
   targetRole: string;
   entityId: string;
   message?: string;
