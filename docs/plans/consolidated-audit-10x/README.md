@@ -19,8 +19,8 @@ Single front door for the consolidated remediation + 10x feature program. The **
 | Plan | Covers | Status |
 |---|---|---|
 | `phase-0-1.plan.md` | **Phase 0** (6 HIGH fixes + 0B submission gate) + **Phase 1** (equipment/shift/inventory fixes + small features + web admin-gate) | ✅ authored (31 cards / T-01…T-31) |
-| `phase-2-3.plan.md` | **Phase 2** native-reachable MED sweep + **Phase 3** LOW cleanup (+ pointers to feature sub-specs) | ⏳ pending |
-| `phase-4.plan.md` | **Phase 4** — massive-03 (clinic network) + medium-04 (copilot/voice) | 🚧 on hold (owner) |
+| `phase-2-3.plan.md` | **Phase 2** native-reachable MED sweep + **Phase 3** LOW cleanup (+ pointers to feature sub-specs) | ✅ authored (T-32…T-53) |
+| `phase-4.plan.md` | **Phase 4** — massive-03 (clinic network) + medium-04 (copilot/voice) | ✅ authored · 🚧 on hold (entry conditions) |
 | `subspecs/R-M1-rfid-gate-e2e.plan.md` | **massive-01** RFID-gate e2e — managed reader entity + directional gates + board surfacing + resolver reconciliation | ✅ authored (R-M1.0…M1.5) |
 | `subspecs/R-CBF-1-code-blue-one-tap.plan.md` | medium-01 (frozen Code Blue surface) | ▫ later |
 | `subspecs/R-SH-F1-shift-handover.plan.md` | medium-02 (superset + Priza integration) | ▫ later |
