@@ -13,7 +13,7 @@ No new transport (SSE only) · **no offline queueing** (emergency mutations fail
 
 ## Design (from the mobile/HIG lens): arm → hold-to-confirm
 
-"One tap" literally = an accidental-Code-Blue generator (phone in a scrub pocket) and fights Apple's deliberate-confirmation rule. Resolution (Apple Emergency-SOS precedent): **tap = arm** (navigate to a full-screen armed screen, unswipeable) → **commit = a ~700–900ms press-and-hold** with an escalating haptic ramp + a filling ring, always-visible **Cancel**. Reads as one gesture, instant under stress, pocket-proof.
+"One tap" literally = an accidental-Code-Blue generator (phone in a scrub pocket) and fights Apple's deliberate-confirmation rule. Resolution (Apple Emergency-SOS precedent): **tap = arm** (navigate to a full-screen armed screen, unswipeable) → **commit = an exactly-800ms press-and-hold** with an escalating haptic ramp + a filling ring, always-visible **Cancel**. Reads as one gesture, instant under stress, pocket-proof.
 
 ## Reuse anchors (verify at build)
 
@@ -42,8 +42,8 @@ No new transport (SSE only) · **no offline queueing** (emergency mutations fail
 
 ### R-CBF-1.3 · Client arm→hold-to-confirm (the safe "one tap")
 
-- **Goal:** tab-bar emergency slot / `HomeChrome` banner → **full-screen armed screen** (reuse checklist-gated `code-blue.tsx`) → **hold-to-start** control (~700–900ms, `haptics.warning()`→`haptics.locked()` ramp, filling ring) that **generates the per-gesture idempotency token** (R-CBF-1.1) → fires R-CBF-1.1 on commit; always-visible Cancel (never traps — ties to the R-CB-01 fix). Phone *initiates*; iPad/board *run*.
-- **RED (a11y + hold-boundary are executable, not prose):** `tests/code-blue-hold-to-confirm.test.tsx` — assert: a single tap does NOT create a session; a **completed** hold does (one token); **early release before the ~700–900ms threshold does NOT fire**; Cancel dismisses without starting; the control is operable by **keyboard/switch activation** (not pointer-only); **focus enters the armed screen on open and returns to the trigger on cancel/close**; live-log `aria-live` announcements are **throttled/batched** (not one-per-entry); ≥56px targets; reduced-motion fallback for the ring.
+- **Goal:** tab-bar emergency slot / `HomeChrome` banner → **full-screen armed screen** (reuse checklist-gated `code-blue.tsx`) → **hold-to-start** control (**exactly 800ms**, `haptics.warning()`→`haptics.locked()` ramp, filling ring) that **generates the per-gesture idempotency token** (R-CBF-1.1) → fires R-CBF-1.1 on commit; always-visible Cancel (never traps — ties to the R-CB-01 fix). Phone *initiates*; iPad/board *run*.
+- **RED (a11y + hold-boundary are executable, not prose):** `tests/code-blue-hold-to-confirm.test.tsx` — assert: a single tap does NOT create a session; a **completed** hold does (one token); **early release before 800ms does NOT fire (fake-timer boundary: 799ms → no fire, 800ms → fire)**; Cancel dismisses without starting; the control is operable by **keyboard/switch activation** (not pointer-only); **focus enters the armed screen on open and returns to the trigger on cancel/close**; live-log `aria-live` announcements are **throttled/batched** (not one-per-entry); ≥56px targets; reduced-motion fallback for the ring.
 - **Guardrail:** every a11y assertion above is test-enforced (emergency flow — no gesture-only or hover-only affordance).
 
 ### R-CBF-1.4 · Inline drug-dose reference in the timed log

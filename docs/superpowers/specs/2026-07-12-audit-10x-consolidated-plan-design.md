@@ -152,7 +152,7 @@ Finding accounting: 6 HIGH (P0) · 8 MED (P1) + 13 MED (P2) = 21 MED · 9 LOW (P
 
 ### 4.3 Phase 0 exit gate
 
-**On-device drill (real device, shipped-style build):** Sign in with Apple → start a Code Blue → reach and **dismiss** the (now-fixed) outcome sheet → end the session. Passing this simultaneously proves reviewer access (R-AS-01/02/03), the R-CB-01 fix, and the OAuth path. Phase 0 is not "done" until this passes.
+**On-device drill (real device, shipped-style build):** **Sign in with Apple (only if social login is retained — R-AS-03; if the app is email/password-only, use that login instead)** → start a Code Blue → reach and **dismiss** the (now-fixed) outcome sheet → end the session. Passing this simultaneously proves reviewer access (R-AS-01/02/03), the R-CB-01 fix, and the OAuth path. Phase 0 is not "done" until this passes.
 
 ---
 

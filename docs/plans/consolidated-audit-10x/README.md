@@ -56,3 +56,5 @@ Each card carries a **Tier** that selects the model for the **subagent** that ex
 3. Else → **S** (the doc default).
 
 **Per card:** dispatch to a subagent at its Tier → RED→GREEN→verify → for any `+R`, run the `code-reviewer` gate (+ browser drill for realtime/PWA) → only then commit → log to the proof log. A frozen card never skips the drill regardless of model.
+
+**Exception — operational cards:** Tier `Owner` cards (the Phase-0 0B submission gate T-06–T-15 and the T-16 on-device drill) are **binary / on-device checks, not RED→GREEN** — their "done" is the pass/fail verification stated on each card, not a unit test.

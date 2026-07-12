@@ -19,13 +19,13 @@
 
 ## Frozen guardrails (every card)
 
-**Every read from `vt_audit_logs`/`vt_event_outbox` and every write to `vt_shift_handover` carries an explicit target-table `clinicId` predicate** (not merely "clinicId-scoped") · deltas read from existing audit/outbox — **no new realtime path** · **ack = a deliberate confirm** (attestation — the sanctioned exception to undo-first) · the Priza contract stays stable/integration-friendly (no internal-only hard-coupling) · no reintroduced internal patient model.
+**Every read/write to any table this workflow touches — `vt_audit_logs`, `vt_event_outbox`, `vt_shifts`/`vt_shift_sessions`, the notification + Priza-integration tables, and `vt_shift_handover` (+ its ack) — carries an explicit target-table `clinicId` predicate** (not merely "clinicId-scoped") · deltas read from existing audit/outbox — **no new realtime path** · **ack = a deliberate confirm** (attestation — the sanctioned exception to undo-first) · the Priza contract stays stable/integration-friendly (no internal-only hard-coupling) · no reintroduced internal patient model.
 
 ---
 
 ### R-SH-F1.1 · Schema (`vt_shift_handover`) shaped for Priza
 
-- **Goal:** `vt_shift_handover` (`clinicId, shiftSessionId, deltas (4 types), openItems[], observedSignals, patientWorklist, acknowledgedBy, generatedAt, acknowledgedAt`). **`patientWorklist` is a discriminated, PMS-agnostic union — NOT a bare nullable:** `{ state: 'not_configured' } | { state: 'ready', entries: [{ externalId, display, byTechId }] } | { state: 'error', reason }`, so a PMS failure can **never** be serialized or read as an empty/ready worklist. External ids + display only — no FKs to removed internal tables. Migrate; new `AuditActionType` for generate + acknowledge.
+- **Goal:** `vt_shift_handover` (`clinicId, shiftSessionId, deltas (4 types), openItems[], observedSignals, patientWorklist, acknowledgedBy, generatedAt, acknowledgedAt`). **`patientWorklist` is a discriminated, PMS-agnostic union — NOT a bare nullable:** `{ state: 'not_configured' } | { state: 'ready', entries: [{ externalId, display, byTechId }] } | { state: 'error', code }` — **`code` is a closed enum of safe error codes** (`unreachable | auth_failed | timeout | malformed | unknown`), **never a raw PMS message, identifier, URL, or credential** — so a PMS failure can **never** be serialized or read as an empty/ready worklist, and upstream failure detail never leaks into the artifact. External ids + display only — no FKs to removed internal tables. Migrate; new `AuditActionType` for generate + acknowledge.
 - **RED:** `tests/migrations/shift-handover.test.ts` (DB-integration) + a type test that `patientWorklist` is the **discriminated union** (external PMS ids, not internal FKs) and that the **`error` state is distinguishable from `not_configured` and from a `ready` empty list** — an error can never collapse to "empty".
 - **Verify:** DB-integration runner + `pnpm typecheck`.
 
@@ -49,7 +49,7 @@
 ### R-SH-F1.5 · Surface — extend `/handoff` + acknowledge + push
 
 - **Goal:** render the artifact on the existing `/handoff` (`ShiftSummarySheet`); **iPhone = consume + acknowledge** (deliberate confirm, `aria-pressed`, reversible within the shift), **iPad = two-pane authoring**. **Notification semantics (pinned):** the push targets the users rostered on the **next** shift for that clinic, fired **once** on generate; acknowledgement clears it. Single `<h1>` + logical heading hierarchy; deep-link entry falls back to `/home`; RTL + he/en parity.
-- **RED (full acceptance bar):** `tests/shift-handover-surface.test.tsx` — ack records `acknowledgedBy` + fires the push **once to the next-shift roster** (not the current shift); **default / empty / loading / error states each render and are announced**; **iPhone consume+ack vs iPad two-pane** compositions differ; single `<h1>` + heading hierarchy; deep-link fallback to `/home`; RTL bidi-isolation of LTR staff names; he/en parity.
+- **RED (full acceptance bar):** `tests/shift-handover-surface.test.tsx` — **generate** fires the push **once** to the next-shift roster (not the current shift); **ack records `acknowledgedBy` and CLEARS the push — ack does not fire it**; **default / empty / loading / error states each render and are announced**; **iPhone consume+ack vs iPad two-pane** compositions differ; single `<h1>` + heading hierarchy; deep-link fallback to `/home`; RTL bidi-isolation of LTR staff names; he/en parity.
 
 ### R-SH-F1.6 · Verification (acceptance bar)
 

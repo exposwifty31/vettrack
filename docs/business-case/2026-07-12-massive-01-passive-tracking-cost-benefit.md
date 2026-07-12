@@ -24,7 +24,7 @@ Passive tracking makes "where is X / who has X" **correct without anyone scannin
 | One-time (250-asset scenario) | **~$13k–37k** | **~$8k–23k** |
 | Multi-year TCO at 250 assets | **lower** | higher (SaaS scales with fleet) |
 
-**Recommendation (this analysis):** start with an **RFID-gate pilot in one clinic**. At a clinic's asset count (hundreds, not thousands), gate-based egress/last-seen tracking captures the biggest wins — theft/loss reduction and "did it leave the building" — at a **materially lower total cost of ownership**, because passive tags are near-free and the cost sits in a handful of readers rather than a per-device monthly SaaS bill. Add BLE/RTLS later *only* for the specific high-value assets that genuinely need live room-level location. This matches the plan's staged doctrine: **prove the value in one clinic before spending fleet-wide capital.**
+**Recommendation (this analysis):** start with an **RFID-gate pilot in one clinic**. At a clinic's asset count (hundreds, not thousands), gate-based egress/last-seen tracking captures the biggest wins — theft/loss reduction and "did it leave the building" — at a **materially lower *multi-year* total cost of ownership** — its one-time cost is *higher* than BLE/RTLS ($13k–37k vs $8k–23k), but its near-zero recurring (no per-device SaaS) wins over a 3–5-year horizon, because passive tags are near-free and the cost sits in a handful of readers rather than a per-device monthly SaaS bill. Add BLE/RTLS later *only* for the specific high-value assets that genuinely need live room-level location. This matches the plan's staged doctrine: **prove the value in one clinic before spending fleet-wide capital.**
 
 ---
 

@@ -4,6 +4,7 @@
 - **Spec (source of truth):** `../../superpowers/specs/2026-07-12-audit-10x-consolidated-plan-design.md`
 - **Branch:** `claude/audit-10x-consolidated-plan`.
 - **Card contract (spec §2.3):** each card = **RED** (write the failing test) → **GREEN** (minimal impl, ≤2 code files + 1 test) → **verify**. Exact anchors, zero open decisions. Commit per card; log evidence in `docs/audit/PROOF_ALIGNMENT_LOG.md`.
+- **Verify convention (every code card):** unless a card states otherwise, its **Verify** command is `pnpm test -- <the card's RED test file> && pnpm typecheck` (repo-wide frontend+server typecheck); DB-integration cards use the DB-integration runner, PWA/realtime cards add the browser drill, delete-only cards use the `knip`/`grep` command on the card. **0B is exempt** (binary/on-device — see §"Definition of done").
 - **Tier (model routing):** **default = S (Sonnet); unmarked cards run on Sonnet.** Overrides are tagged inline (`Tier: S +R` / `Tier: O +R`); 0B is `Tier: Owner`. `+R` = a `code-reviewer` gate (+ browser drill for realtime/PWA) before commit. See README → "Execution driver".
 
 ## Execution order
@@ -70,7 +71,7 @@ Each is a checklist card with a pass/fail check (spec §4.2). Owner-executed whe
 
 - **T-06 (R-AS-01)** Rostered reviewer account — synthetic tenant, vet/senior_technician role, **active roster shift** spanning review window. *Verify:* account starts+ends a Code Blue with no `INSUFFICIENT_CLINICAL_AUTHORITY` 403. **Highest-value item.**
 - **T-07 (R-AS-02)** Build only via `pnpm cap:build:native`. *Verify:* login works in the shipped binary.
-- **T-08 (R-AS-03)** Sign-in-with-Apple renders + completes in the bundled shell. *Verify:* SIWA round-trip on device.
+- **T-08 (R-AS-03) — conditional on social login:** **if the app retains a third-party/social login (Clerk Google OAuth), Sign-in-with-Apple must render + complete in the bundled shell** (mandatory under 4.8); if login is email/password-only, this card is N/A. *Verify:* SIWA round-trip on device (when applicable).
 - **T-09 (R-AS-04)** Sentry → `PrivacyInfo.xcprivacy` + ASC privacy answers include Crash Data/Diagnostics.
 - **T-10 (R-AS-05)** Broaden `NSCameraUsageDescription` (also used for QR). *Verify:* Info.plist string mentions scanning.
 - **T-11 (R-AS-06)** Localize permission prompts (`InfoPlist.strings`, he) on the Hebrew-default app.
@@ -81,7 +82,7 @@ Each is a checklist card with a pass/fail check (spec §4.2). Owner-executed whe
 
 ### T-16 · Phase 0 exit gate — on-device drill (blocks leaving Phase 0)
 
-Real device, shipped-style build: **SIWA → start a Code Blue → dismiss the (now-fixed T-01) outcome sheet → end the session.** Proves reviewer access + the T-01 fix + OAuth in one pass. Phase 0 is not done until this passes.
+Real device, shipped-style build: **sign in (SIWA if social login is retained — T-08/R-AS-03; else email/password) → start a Code Blue → dismiss the (now-fixed T-01) outcome sheet → end the session.** Proves reviewer access + the T-01 fix + OAuth in one pass. Phase 0 is not done until this passes.
 
 ---
 
@@ -101,15 +102,18 @@ Real device, shipped-style build: **SIWA → start a Code Blue → dismiss the (
   - **T-22a · backend** — read-only `GET /api/equipment/locate?q=` composing `server/domain/equipment/evidence/resolver/{location,custodian}.ts` → `{ location, custodian, readiness }`; `clinicId`-scoped; rate-limit under the scan/action limiter; register in `server/app/routes.ts`. RED: `tests/equipment-locate-route.test.ts` (seeded device → correct room+custodian; cross-clinic returns nothing).
   - **T-22b · client wiring** — `src/lib/api.ts` fn + `src/types/` type. RED: type-check + `tests/api-locate.test.ts`.
   - **T-22c · UI** — bottom-anchored / gesture-summoned search; results in a **bottom sheet**; row deep-links to detail; iPad → existing master-detail. RED: `tests/locate-search.test.tsx` (empty≠zero-results; result count announced `aria-live`; label not placeholder).
-- **T-23 (R-EQ-F2 · small-02 readiness badge):**
+- **T-23 (R-EQ-F2 · small-02 readiness badge)** — five dispatchable cards, each ≤2 files + 1 test:
   - **T-23a** — expose the already-derived readiness tier (`equipment-readiness-rules.service.ts`) as an additive read field. RED: `tests/equipment-readiness-field.test.ts`.
-  - **T-23b** — one shared **6-status-token → 3-tier bucket helper** (`src/lib/equipment-readiness-tier.ts`), and **fix the English-fallback i18n leak** in `src/components/ui/status-badge.tsx` (`stale/unknown/info/neutral` → `t.status.*`). RED: `tests/readiness-tier-bucket.test.ts` + `tests/status-badge-i18n.test.tsx`.
-  - **T-23c** — drop `<ReadinessBadge>` (shape+glyph+text) into list/detail/home/board/locate. RED: `tests/readiness-badge.test.tsx` (tier contrast ≥3:1 both themes asserted via token check; screen-reader label present).
-- **T-24 (R-EQ-F3 · small-04 damaged-at-check-in)** — four dispatchable cards, each ≤2 files + 1 test (net-new-data feature: full checklist per spec §2.5):
+  - **T-23b** — the shared **6-status-token → 3-tier bucket helper** (`src/lib/equipment-readiness-tier.ts`). RED: `tests/readiness-tier-bucket.test.ts`.
+  - **T-23c** — **fix the English-fallback i18n leak** in `src/components/ui/status-badge.tsx` (`stale/unknown/info/neutral` → `t.status.*`). RED: `tests/status-badge-i18n.test.tsx`.
+  - **T-23d** — the `<ReadinessBadge>` component (shape+glyph+text, from the tier helper). RED: `tests/readiness-badge.test.tsx` (tier contrast ≥3:1 both themes; screen-reader label present).
+  - **T-23e (mechanical fan-out)** — mount `<ReadinessBadge>` at each call site (list, detail, home, board, locate) — a 1–2 line import+render per surface; dispatch per-surface if the ≤2-file bound is enforced strictly. RED: `tests/readiness-badge-surfaces.test.tsx` (badge renders on each surface).
+- **T-24 (R-EQ-F3 · small-04 damaged-at-check-in)** — five dispatchable cards, each ≤2 files + 1 test (net-new-data feature: full checklist per spec §2.5):
   - **T-24a · schema** — `vt_damage_events` (`clinicId, equipmentId, reportedBy, at, note, resolvedAt`) + optional `conditionStatus` on equipment; `npx drizzle-kit generate` → commit SQL. RED: `tests/migrations/damage-events.test.ts` (DB-integration).
-  - **T-24b · backend + audit** — route (write event + set condition) + `src/lib/api.ts` fn + `src/types/` + new `AuditActionType`. RED: `tests/damage-report-route.test.ts`.
-  - **T-24c · UI** — "returned damaged" as a **third choice inside `ReturnPlugDialog`** (convert the phone presentation dialog → bottom sheet); **undo** via the existing `UNDO_WINDOW_MS` toast + `haptics.warning()`. RED: `tests/return-damaged.test.tsx`.
-  - **T-24d** — device then reads not-ready via readiness rules. RED: assert in `tests/damage-report-route.test.ts`.
+  - **T-24b · route + audit** — route (write event + set condition) + new `AuditActionType`. RED: `tests/damage-report-route.test.ts`.
+  - **T-24c · api + types** — `src/lib/api.ts` fn + `src/types/` type. RED: type-check + `tests/api-damage.test.ts`.
+  - **T-24d · UI** — "returned damaged" as a **third choice inside `ReturnPlugDialog`** (convert the phone dialog → bottom sheet); **undo** via the existing `UNDO_WINDOW_MS` toast + `haptics.warning()`. RED: `tests/return-damaged.test.tsx`.
+  - **T-24e** — **GREEN:** readiness rules read the new `conditionStatus` so a damaged device reads not-ready. RED: `tests/damage-report-route.test.ts` asserts not-ready after a damage report.
 
 ---
 
@@ -117,18 +121,18 @@ Real device, shipped-style build: **SIWA → start a Code Blue → dismiss the (
 
 - **T-25 (R-SH-01 · CLICK-PATH-007):** `src/features/shift-chat/hooks/useShiftChat.ts:132` — reactions/acks never render live (invalidate-only over a strict-`gt` poll + append-only accumulator). **GREEN:** on react/ack success, patch the affected message in local state **by id (merge-by-id)** so the open panel reflects it without a strict-`gt` refetch. **Guardrail:** no new realtime path. **RED:** `tests/shift-chat-live-reaction.test.tsx`. **Tier: S +R** (subtle poll/accumulator reconcile — review before commit).
 - **T-26 (R-SH-02 · CLICK-PATH-017):** `useShiftChat.ts:80` — open→close unread badge counts the just-read batch. **GREEN:** advance `lastOpenRef` on close / skip the transition edge. **RED:** `tests/shift-chat-unread-badge.test.tsx`.
-- **T-27 (R-SH-F2 · small-05 start-of-shift card):** compose existing `src/features/today/surfaces/{Floor,Ops,Vet,Tech,Student}HomeSurface.tsx` + `OnShiftHero.tsx` into one focal "what needs me now" + one primary action, gated by the capability union; phone compact / iPad hero band. **RED:** `tests/start-of-shift-card.test.tsx` (per-role composition differs; off-shift idle variant; RTL).
+- **T-27 (R-SH-F2 · small-05 start-of-shift card)** — **T-27a:** build one `StartOfShiftCard` component (one focal "what needs me now" + one primary action, gated by the capability union; phone compact / iPad hero band), composed from existing per-role data. RED: `tests/start-of-shift-card.test.tsx` (per-role composition differs; off-shift idle variant; RTL). **T-27b (mechanical):** mount it in the role home surfaces (`src/features/today/surfaces/{Floor,Ops,Vet,Tech,Student}HomeSurface.tsx` + `OnShiftHero.tsx`) — a 1-line mount each.
 - **R-SH-F1 (medium-02 handover)** → **SUB-SPEC**, see `subspecs/R-SH-F1-shift-handover.plan.md` (superset + Priza). Not a card here.
 
 ## Phase 1 — Inventory bundle
 
 - **T-28 (R-IN-01 · CLICK-PATH-018):** `src/pages/inventory-items.tsx:124` — create dialog drops `isBillable`/`minimumDispenseToCapture`. **GREEN:** add the fields to the POST body + `api.inventoryItems.create` type + route (decision: persist them, not hide the controls). **RED:** `tests/inventory-create-fields.test.tsx`.
 - **T-29 (R-IN-02 · CLICK-PATH-019):** `src/pages/inventory-page.tsx:448` — restock +/- burst desyncs (absolute qty, no per-row disable). **GREEN:** serialize per-row — disable the +/- controls while a scanLine mutation is pending. **RED:** `tests/inventory-restock-burst.test.tsx`.
-- **T-30 (R-IN-F1 · small-03 nudge):** route existing `expiryCheckWorker` + `restock.service` output to a dismissible home-surface nudge for the relevant role (+ optional push); bounded-enum telemetry if counters added; no new realtime path. **RED:** `tests/expiry-lowstock-nudge.test.tsx` (correct role only; dismiss persists; push once per event).
+- **T-30 (R-IN-F1 · small-03 nudge):** route existing `expiryCheckWorker` + `restock.service` output to a dismissible home-surface nudge for the relevant role. **Decisions pinned:** **push IS sent in v1 (once per event) via `notification.worker`**; **bounded-enum telemetry IS added in v1** (closed enum on client + `server/routes/realtime.ts`); no new realtime path. **RED:** `tests/expiry-lowstock-nudge.test.tsx` (correct role only; dismiss persists; push once per event; telemetry rejects out-of-enum).
 
 ## Phase 1 — Web platform admin-gate
 
-- **T-31 (R-WEB-01 · SUB-SPEC small):** `src/app/platform/PlatformRouter.tsx` desktop branch (L27 passthrough) — add a guard **inside `AuthGuard`**: if `target === "desktop" && !experience.can("management.web")` → render a `WebOnlyGuard`-style denial ("this workspace is for management — open VetTrack on your device"). Threshold = `can("management.web")` — grant = **admin + `senior_technician` + `lead_technician` + secondary-admin** (not the lossy "admin + leads"). **Do NOT touch `resolvePlatformTarget()`'s synchronous contract.** `/board` untouched. **RED:** `tests/web-platform-management-gate.test.tsx` (`vet_tech`@desktop → denial; `admin` + `lead` → passthrough). **Verify:** `pnpm test -- tests/web-platform-management-gate.test.tsx && pnpm typecheck`. **Tier: S +R** (platform-routing seam — review before commit).
+- **T-31 (R-WEB-01 · SUB-SPEC small):** `src/app/platform/PlatformRouter.tsx` desktop branch (L27 passthrough) — add a guard **inside `AuthGuard`**: if `target === "desktop" && !experience.can("management.web")` → render a `WebOnlyGuard`-style denial ("this workspace is for management — open VetTrack on your device"). Threshold = `can("management.web")` — grant = **admin + `senior_technician` + `lead_technician` + secondary-admin** (not the lossy "admin + leads"). **Do NOT touch `resolvePlatformTarget()`'s synchronous contract.** `/board` untouched. **RED:** `tests/web-platform-management-gate.test.tsx` — **every `management.web` grant covered**: `vet_tech` + `student`@desktop → denial; `admin` + `senior_technician` + `lead_technician` + **secondary-admin**@desktop → passthrough. **Verify:** `pnpm test -- tests/web-platform-management-gate.test.tsx && pnpm typecheck`. **Tier: S +R** (platform-routing seam — review before commit).
 
 ---
 
