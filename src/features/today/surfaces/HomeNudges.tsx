@@ -1,15 +1,24 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { safeStorageGetItem, safeStorageSetItem } from "@/lib/safe-browser";
+import { getCurrentUserId } from "@/lib/auth-store";
+import { reportNudgeShown } from "@/lib/realtime";
 import type { Nudge } from "@/types/nudges";
 
 const DISMISSED_NUDGES_STORAGE_KEY = "vt_dismissed_nudge_ids";
 
+// Scoped per signed-in user — otherwise one staff member dismissing a nudge
+// on a shared tablet would hide it for the next person too, since the raw
+// key is shared across every user of that browser profile.
+function dismissedIdsStorageKey(): string {
+  return `${DISMISSED_NUDGES_STORAGE_KEY}:${getCurrentUserId()}`;
+}
+
 function readDismissedIds(): Set<string> {
-  const raw = safeStorageGetItem(DISMISSED_NUDGES_STORAGE_KEY);
+  const raw = safeStorageGetItem(dismissedIdsStorageKey());
   if (!raw) return new Set();
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -21,7 +30,7 @@ function readDismissedIds(): Set<string> {
 }
 
 function persistDismissedIds(ids: Set<string>): void {
-  safeStorageSetItem(DISMISSED_NUDGES_STORAGE_KEY, JSON.stringify(Array.from(ids)));
+  safeStorageSetItem(dismissedIdsStorageKey(), JSON.stringify(Array.from(ids)));
 }
 
 /**
@@ -50,18 +59,37 @@ function nudgeMessage(nudge: Nudge): string {
  */
 export function HomeNudges() {
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => readDismissedIds());
+  const reportedShownIds = useRef<Set<string>>(new Set());
 
-  const { data } = useQuery({
+  const { data, isError, error } = useQuery({
     queryKey: ["/api/nudges"],
     queryFn: api.nudges.list,
     retry: false,
     refetchOnWindowFocus: false,
   });
 
+  useEffect(() => {
+    if (isError) {
+      // Nudges are glance-only and non-critical — degrade to rendering
+      // nothing (same as a genuinely empty feed), but log so a broken
+      // /api/nudges route doesn't silently look identical to "no nudges".
+      console.error("[HomeNudges] failed to load nudge feed", error);
+    }
+  }, [isError, error]);
+
   const visible = useMemo(
     () => (data?.nudges ?? []).filter((nudge) => !dismissedIds.has(nudge.id)),
     [data, dismissedIds],
   );
+
+  useEffect(() => {
+    for (const nudge of visible) {
+      if (!reportedShownIds.current.has(nudge.id)) {
+        reportedShownIds.current.add(nudge.id);
+        reportNudgeShown(nudge.kind);
+      }
+    }
+  }, [visible]);
 
   if (visible.length === 0) return null;
 
@@ -77,9 +105,8 @@ export function HomeNudges() {
   return (
     <div className="flex flex-col gap-2" data-testid="home-nudges">
       {visible.map((nudge) => (
-        <div
+        <output
           key={nudge.id}
-          role="status"
           data-testid={`home-nudge-${nudge.id}`}
           className="flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-sm font-medium"
           style={{ background: "#fffbeb", borderColor: "#fde68a", color: "#78350f" }}
@@ -95,7 +122,7 @@ export function HomeNudges() {
           >
             <X className="h-4 w-4" aria-hidden />
           </button>
-        </div>
+        </output>
       ))}
     </div>
   );

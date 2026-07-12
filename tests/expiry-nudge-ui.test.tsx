@@ -17,7 +17,13 @@ vi.mock("@/lib/api", () => ({
   api: { nudges: { list: (...a: unknown[]) => listMock(...a) } },
 }));
 
+const reportNudgeShownMock = vi.fn();
+vi.mock("@/lib/realtime", () => ({
+  reportNudgeShown: (...args: unknown[]) => reportNudgeShownMock(...args),
+}));
+
 import { HomeNudges } from "@/features/today/surfaces/HomeNudges";
+import { setAuthState } from "@/lib/auth-store";
 
 const EXPIRY_NUDGE: Nudge = {
   id: "expiry:eq-1",
@@ -38,7 +44,9 @@ function renderNudges() {
 
 beforeEach(() => {
   listMock.mockReset();
+  reportNudgeShownMock.mockReset();
   window.localStorage.clear();
+  setAuthState({ userId: "user-a", email: "a@clinic.test", name: "User A", bearerToken: null });
 });
 
 afterEach(() => cleanup());
@@ -78,5 +86,64 @@ describe("HomeNudges — dismiss persists across a remount", () => {
     renderNudges();
     await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
     expect(screen.queryByTestId(`home-nudge-${EXPIRY_NUDGE.id}`)).toBeNull();
+  });
+
+  it("does not hide a nudge for a different signed-in user on the same device", async () => {
+    listMock.mockResolvedValue({ nudges: [EXPIRY_NUDGE] });
+    const { unmount } = renderNudges();
+
+    await waitFor(() =>
+      expect(screen.getByTestId(`home-nudge-${EXPIRY_NUDGE.id}`)).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByTestId(`home-nudge-dismiss-${EXPIRY_NUDGE.id}`));
+    expect(screen.queryByTestId(`home-nudge-${EXPIRY_NUDGE.id}`)).toBeNull();
+    unmount();
+
+    // A second user signs in on the same shared tablet — their dismissed set
+    // must be independent of user A's.
+    setAuthState({ userId: "user-b", email: "b@clinic.test", name: "User B", bearerToken: null });
+    renderNudges();
+    await waitFor(() =>
+      expect(screen.getByTestId(`home-nudge-${EXPIRY_NUDGE.id}`)).toBeTruthy(),
+    );
+  });
+});
+
+describe("HomeNudges — feed fetch failure", () => {
+  it("renders nothing (no crash) and logs when the feed fetch rejects", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    listMock.mockRejectedValue(new Error("network error"));
+    renderNudges();
+    await waitFor(() => expect(listMock).toHaveBeenCalled());
+    await waitFor(() => expect(consoleErrorSpy).toHaveBeenCalled());
+    expect(screen.queryByTestId("home-nudges")).toBeNull();
+    consoleErrorSpy.mockRestore();
+  });
+});
+
+describe("HomeNudges — reportNudgeShown telemetry", () => {
+  it("reports a nudge as shown exactly once, even across rerenders", async () => {
+    listMock.mockResolvedValue({ nudges: [EXPIRY_NUDGE] });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { rerender } = render(
+      <QueryClientProvider client={qc}>
+        <HomeNudges />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId(`home-nudge-${EXPIRY_NUDGE.id}`)).toBeTruthy(),
+    );
+    await waitFor(() => expect(reportNudgeShownMock).toHaveBeenCalledTimes(1));
+    expect(reportNudgeShownMock).toHaveBeenCalledWith("expiry");
+
+    // Force a rerender with the same underlying query data — must not
+    // double-report the same nudge id.
+    rerender(
+      <QueryClientProvider client={qc}>
+        <HomeNudges />
+      </QueryClientProvider>,
+    );
+    expect(reportNudgeShownMock).toHaveBeenCalledTimes(1);
   });
 });
