@@ -3,6 +3,7 @@ import { Package } from "lucide-react";
 import { Bdi } from "@/components/ui/bdi";
 import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { LoadingSection } from "@/components/ui/loading-section";
+import { ReadinessBadge } from "@/components/ui/readiness-badge";
 import { t } from "@/lib/i18n";
 import type { Equipment } from "@/types";
 
@@ -55,6 +56,7 @@ export function MyEquipmentCard({
               <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ivory-text">
                 <Bdi>{item.name}</Bdi>
               </span>
+              <ReadinessBadge status={item.status} />
               <ReadinessChip state={item.readinessState} />
               <ForwardChevron className="h-4 w-4 shrink-0 opacity-40" aria-hidden />
             </Link>

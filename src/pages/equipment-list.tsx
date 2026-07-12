@@ -36,6 +36,7 @@ import {
   EquipmentTriageList,
 } from "@/components/equipment/EquipmentTriageList";
 import { DeployabilityBadge } from "@/components/equipment/DeployabilityBadge";
+import { ReadinessBadge } from "@/components/ui/readiness-badge";
 import {
   isRfidSubtitleFresh,
   shouldShowRfidAttentionBadge,
@@ -1316,6 +1317,7 @@ export function EquipmentItem({
                       compact
                     />
                   )}
+                  <ReadinessBadge status={eq.status} />
                   {recoveryBadgeKey && (
                     <Badge
                       variant="outline"

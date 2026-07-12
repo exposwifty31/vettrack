@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { equipmentStatusLabel } from "@/lib/equipment-status-label";
 import { formatRelativeTime } from "@/lib/utils";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
+import { ReadinessBadge } from "@/components/ui/readiness-badge";
 import {
   PackageOpen,
   MapPin,
@@ -247,6 +248,7 @@ export default function MyEquipmentPage() {
                         <Badge variant={statusToBadgeVariant(item.status)} className="shrink-0 text-[10px] px-2 py-0.5">
                           {equipmentStatusLabel(item.status)}
                         </Badge>
+                        <ReadinessBadge status={item.status} />
                         {recoveryBadgeKey && (
                           <Badge
                             variant="outline"

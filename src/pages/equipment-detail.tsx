@@ -63,6 +63,7 @@ import {
   isSterilizationDue,
 } from "@/lib/utils";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
+import { ReadinessBadge } from "@/components/ui/readiness-badge";
 import { toast } from "sonner";
 import { toastSuccess } from "@/lib/ui-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -1011,6 +1012,7 @@ function EquipmentDetailPageDesktop() {
             </Button>
             <div>
               <h1 className="vt-page-title leading-tight"><Bdi>{equipmentDisplayName}</Bdi></h1>
+              <ReadinessBadge status={equipment.status} className="mt-0.5" />
               {equipment.folderName && (
                 <span className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                   <FolderOpen className="w-3 h-3" />

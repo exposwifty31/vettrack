@@ -27,6 +27,8 @@ import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
 import { useCodeBlueKeepaliveReconciliation } from "@/hooks/useCodeBlueKeepaliveReconciliation";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { ReadinessBadge } from "@/components/ui/readiness-badge";
+import type { EquipmentStatus } from "@/types";
 import { STATUS_BG } from "./status-tokens";
 import { CommandBoard } from "./components/CommandBoard";
 import { CodeBlueOverlay } from "./components/CodeBlueOverlay";
@@ -175,6 +177,10 @@ function CommandBoardScreen({ kioskMode: kioskModeProp }: CommandBoardScreenProp
               className="rounded-lg border border-ivory-border bg-[rgb(var(--ivory-surface))] px-3 py-2.5 flex items-center gap-3 min-h-11"
             >
               <span className="flex-1 vt-text-sm font-semibold text-ivory-text">{eq.name}</span>
+              {/* eq.status is the raw vt_equipment.status (server/routes/display.ts),
+                  loosely typed as `string` on DisplaySnapshotEquipment — glance-only,
+                  additive; this fallback pane owns no interactivity or reload logic. */}
+              <ReadinessBadge status={eq.status as EquipmentStatus} />
               <span
                 data-testid={`ward-display-equipment-deployable-${eq.id}`}
                 className={cn(
