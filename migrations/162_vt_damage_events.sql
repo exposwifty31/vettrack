@@ -14,8 +14,14 @@ ALTER TABLE vt_equipment ADD COLUMN IF NOT EXISTS condition_status TEXT NOT NULL
 -- Only 'ok' and 'damaged' are produced anywhere in the codebase today
 -- (server/routes/equipment-damage.ts); extend this list (NOT VALID + VALIDATE
 -- for a large table) if a future migration introduces another condition value.
+-- NOT VALID: a plain ADD CONSTRAINT ... CHECK scans every existing row under
+-- an ACCESS EXCLUSIVE lock before commit, which can block writes on this
+-- production clinical table. NOT VALID skips that scan (new/updated rows are
+-- still enforced immediately); a later migration can VALIDATE CONSTRAINT to
+-- backfill-check historical rows under the much lighter SHARE UPDATE
+-- EXCLUSIVE lock.
 ALTER TABLE vt_equipment ADD CONSTRAINT chk_vt_equipment_condition_status
-  CHECK (condition_status IN ('ok', 'damaged'));
+  CHECK (condition_status IN ('ok', 'damaged')) NOT VALID;
 
 CREATE TABLE IF NOT EXISTS vt_damage_events (
   id            TEXT PRIMARY KEY,
