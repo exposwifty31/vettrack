@@ -2394,3 +2394,14 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 - Reconciliation: verifiers carried the intent digest — zero findings re-litigate documented deliberate behaviors; report tags every finding NEW/OVERLAPS/BY-DESIGN/TOUCHES-RECENT-FIX; completeness check: 36 CLICK-PATH headers, all 35 batch ids present, ids 001–036 contiguous (scripted grep).
 - Commit is docs-only: this file + the report, added by explicit path. Note: PR #83 merged (de9e97d9a) while this report was being assembled; these audit docs land on the branch post-merge for a follow-up PR alongside the fix task.
 **Verdict:** VERIFIED — report complete and reconciled; fixes deferred to a follow-up task per the approved plan.
+
+---
+
+## 2026-07-12 — CodeRabbit PR #84 triage: 2 findings, both fixed (docs-only)
+
+**Claim:** Both round-1 CodeRabbit findings on PR #84 verified against the current report and fixed minimally; document validated.
+**Evidence:**
+- **MD022 heading spacing (valid):** `### CLICK-PATH-*` headings lacked blank lines after (HIGH/MEDIUM entries) and between (LOW entries). Fixed by a mechanical blank-line normalization around all headings — content byte-identical otherwise. Scripted re-check: 0 MD022 violations across 38 headings.
+- **Verification-scope clarity (valid):** the header's "8/8 crit-high findings survived" read as covering all HIGHs including CLICK-PATH-006. Scoped the claim to workflow (batch) findings in the header, HIGH section heading, refuted appendix, and coverage table (added footnote ¹); CLICK-PATH-006 now consistently labeled controller-verified / not adversarially verified in all four places.
+- **Validation (scripted):** MD022 = NONE; CLICK-PATH ids 001–036 contiguous; no stale broad claims remain; scoped claims present.
+**Verdict:** VERIFIED — both fixed, report internally consistent.
