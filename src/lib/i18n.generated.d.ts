@@ -523,6 +523,9 @@ export interface TStructure {
       issueReported: string;
       issueWhatsAppOffline: string;
       reportFailedDefault: string;
+      damageReported: string;
+      damageReportUndo: string;
+      damageReportFailed: string;
     };
     backToList: string;
     notFound: string;

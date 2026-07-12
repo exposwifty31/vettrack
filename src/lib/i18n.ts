@@ -337,6 +337,9 @@ const translations = {
       issueReported: d.equipmentDetail.toast.issueReported,
       issueWhatsAppOffline: d.equipmentDetail.toast.issueWhatsAppOffline,
       reportFailed: (msg: string) => msg || d.equipmentDetail.toast.reportFailedDefault,
+      damageReported: d.equipmentDetail.toast.damageReported,
+      damageReportUndo: d.equipmentDetail.toast.damageReportUndo,
+      damageReportFailed: d.equipmentDetail.toast.damageReportFailed,
     },
     locationCard: {
       title: d.equipmentDetail.locationCard.title,

@@ -519,7 +519,10 @@
       "deleteFailed": "Deletion failed",
       "issueReported": "Issue reported",
       "issueWhatsAppOffline": "WhatsApp message will be sent when connected.",
-      "reportFailedDefault": "Report failed"
+      "reportFailedDefault": "Report failed",
+      "damageReported": "Returned damaged",
+      "damageReportUndo": "Undo",
+      "damageReportFailed": "Could not report damage"
     },
     "backToList": "Back to list",
     "notFound": "Equipment not found",

@@ -701,12 +701,12 @@ function EquipmentDetailPageDesktop() {
     haptics.warning();
 
     const toastId = `damage-undo-${Date.now()}`;
-    toast("Returned damaged", {
+    toast(t.equipmentDetail.toast.damageReported, {
       id: toastId,
       duration: UNDO_WINDOW_MS,
       onDismiss: () => cancelDamagedReport(),
       action: {
-        label: "Undo",
+        label: t.equipmentDetail.toast.damageReportUndo,
         onClick: () => {
           cancelDamagedReport();
           toast.dismiss(toastId);
@@ -722,9 +722,11 @@ function EquipmentDetailPageDesktop() {
         .reportDamage({ equipmentId: id })
         .then(() => {
           invalidateAll();
+          queryClient.invalidateQueries({ queryKey: ["deployability", id] });
+          queryClient.invalidateQueries({ queryKey: ["condition-states", id] });
         })
         .catch(() => {
-          toast.error("Could not report damage");
+          toast.error(t.equipmentDetail.toast.damageReportFailed);
         });
     }, UNDO_WINDOW_MS);
   }

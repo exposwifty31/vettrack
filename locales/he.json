@@ -519,7 +519,10 @@
       "issueReported": "תקלה דווחה",
       "issueWhatsAppOffline": "הודעת WhatsApp תישלח כשתתחבר.",
       "reportFailedDefault": "הדיווח נכשל",
-      "chargeAlertScheduled": "התראה תישלח לאחר {minutes} דקות אם לא יחובר"
+      "chargeAlertScheduled": "התראה תישלח לאחר {minutes} דקות אם לא יחובר",
+      "damageReported": "הוחזר פגום",
+      "damageReportUndo": "בטל",
+      "damageReportFailed": "לא ניתן היה לדווח על נזק"
     },
     "backToList": "חזרה לרשימה",
     "notFound": "הציוד לא נמצא",

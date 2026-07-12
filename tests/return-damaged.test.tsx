@@ -172,6 +172,7 @@ async function renderDetailPage(equipment: Equipment) {
     </HelmetProvider>,
   );
   await screen.findByTestId("quick-action-bar");
+  return { client };
 }
 
 describe("ReturnPlugDialog — 'Returned damaged' third choice + undo (T-24d)", () => {
@@ -193,7 +194,8 @@ describe("ReturnPlugDialog — 'Returned damaged' third choice + undo (T-24d)", 
 
   it("does not submit a damage report immediately on confirm — only after the undo window elapses", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    await renderDetailPage(baseEquipment());
+    const { client } = await renderDetailPage(baseEquipment());
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
 
     fireEvent.click(screen.getByTestId("btn-return"));
     fireEvent.click(screen.getByTestId("btn-returned-damaged"));
@@ -207,6 +209,14 @@ describe("ReturnPlugDialog — 'Returned damaged' third choice + undo (T-24d)", 
 
     expect(reportDamageMock).toHaveBeenCalledTimes(1);
     expect(reportDamageMock).toHaveBeenCalledWith(expect.objectContaining({ equipmentId: "eq1" }));
+    // The damaged-return path never calls the plain return endpoint (see
+    // ESCALATE note in the PR #86 triage — pinning current behavior, not a
+    // decision that this is definitely the right product behavior).
+    expect(returnMock).not.toHaveBeenCalled();
+    // Readiness caches must refresh after the condition flip or the
+    // equipment-truth/readiness tab can stay stale.
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["deployability", "eq1"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["condition-states", "eq1"] });
   });
 
   it("undo within the window cancels the damage report — reportDamage is never called", async () => {
@@ -221,6 +231,8 @@ describe("ReturnPlugDialog — 'Returned damaged' third choice + undo (T-24d)", 
       (call) => (call[1] as { action?: { label?: string } } | undefined)?.action?.label,
     );
     expect(undoCall).toBeTruthy();
+    // Non-null: the toBeTruthy() above is a runtime check only — TypeScript
+    // can't narrow `undoCall` (an Array.find result) past it.
     const options = undoCall![1] as { action: { onClick: () => void } };
     options.action.onClick();
 
