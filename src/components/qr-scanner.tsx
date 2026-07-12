@@ -128,6 +128,14 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
   // still-in-flight resolve from an earlier one, so the last PHYSICALLY
   // scanned tag always wins, never the last one to finish resolving.
   const scanTokenRef = useRef<number>(0);
+  // Monotonic token identifying the current start-scanner attempt. Bumped by
+  // both startScanner (new attempt) and stopScanner (invalidates any attempt
+  // still awaiting scanner.start()). If a start's await resolves after it's
+  // been superseded, it tears itself down instead of adopting scannerRef /
+  // "scanning" phase — otherwise a late resolve can leave a second, orphaned
+  // camera instance running while the resume-on-visibility effect starts yet
+  // another one (it only checks `!scannerRef.current`).
+  const scannerGenerationRef = useRef(0);
   const stopScannerRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -294,6 +302,10 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
   );
 
   const stopScanner = useCallback(async () => {
+    // Invalidate any startScanner() attempt still awaiting scanner.start() —
+    // see scannerGenerationRef comment above.
+    scannerGenerationRef.current++;
+
     // Nuclear first: kill all camera tracks before anything else so the iOS
     // orange dot disappears immediately, even if the library teardown is slow.
     killAllCameras();
@@ -331,6 +343,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
   stopScannerRef.current = stopScanner;
 
   const startScanner = useCallback(async () => {
+    const myGeneration = ++scannerGenerationRef.current;
     setPhase("init");
 
     // Heavy scanning lib (html5-qrcode) is loaded on demand so it stays out of
@@ -384,6 +397,14 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
         },
         () => {}
       );
+
+      if (scannerGenerationRef.current !== myGeneration) {
+        // Superseded by a stopScanner()/newer startScanner() call while
+        // scanner.start() was in flight — tear this instance down instead of
+        // adopting scannerRef/"scanning" phase (see scannerGenerationRef).
+        await scanner.stop().catch(() => {});
+        return;
+      }
 
       if (initTimeoutRef.current) {
         clearTimeout(initTimeoutRef.current);
