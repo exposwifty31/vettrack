@@ -4086,5 +4086,14 @@
     "notNow": "Not now",
     "iosAriaLabel": "Add VetTrack to Home Screen",
     "iosTagline": "Works offline · Full-screen · No App Store needed"
+  },
+  "locateSearch": {
+    "openButtonLabel": "Locate equipment",
+    "label": "Search equipment",
+    "placeholder": "Search by name, location, or custodian",
+    "title": "Locate Equipment",
+    "emptyPrompt": "Search by name, location, or custodian to find equipment fast.",
+    "noResults": "No equipment found matching your search.",
+    "resultsCount": "{count, plural, one{# result found} other{# results found}}"
   }
 }

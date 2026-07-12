@@ -4086,5 +4086,14 @@
     "notNow": "לא עכשיו",
     "iosAriaLabel": "הוספת VetTrack למסך הבית",
     "iosTagline": "עובד לא מקוון · מסך מלא · ללא צורך ב-App Store"
+  },
+  "locateSearch": {
+    "openButtonLabel": "איתור ציוד",
+    "label": "חיפוש ציוד",
+    "placeholder": "חיפוש לפי שם, מיקום או מחזיק",
+    "title": "איתור ציוד",
+    "emptyPrompt": "חפשו לפי שם, מיקום או מחזיק כדי למצוא ציוד במהירות.",
+    "noResults": "לא נמצא ציוד התואם לחיפוש.",
+    "resultsCount": "{count, plural, one{תוצאה אחת נמצאה} other{# תוצאות נמצאו}}"
   }
 }

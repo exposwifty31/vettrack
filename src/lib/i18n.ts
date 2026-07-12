@@ -1108,6 +1108,16 @@ const translations = {
 
   crashCartAdmin: d.crashCartAdmin,
 
+  locateSearch: {
+    openButtonLabel: d.locateSearch.openButtonLabel,
+    label: d.locateSearch.label,
+    placeholder: d.locateSearch.placeholder,
+    title: d.locateSearch.title,
+    emptyPrompt: d.locateSearch.emptyPrompt,
+    noResults: d.locateSearch.noResults,
+    resultsCount: (count: number) => tr(d.locateSearch.resultsCount, { count }),
+  },
+
 } as const;
 
 return stripInternalKeys(translations) as typeof translations;

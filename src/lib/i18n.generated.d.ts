@@ -4090,4 +4090,13 @@ export interface TStructure {
     iosAriaLabel: string;
     iosTagline: string;
   };
+  locateSearch: {
+    openButtonLabel: string;
+    label: string;
+    placeholder: string;
+    title: string;
+    emptyPrompt: string;
+    noResults: string;
+    resultsCount: string;
+  };
 }
