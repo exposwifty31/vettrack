@@ -555,7 +555,7 @@ function EquipmentDetailPageDesktop() {
   });
 
   // Off-shift: taking equipment ownership is not permitted (roster-derived).
-  const { hasActiveShift } = useActiveShift();
+  const { hasActiveShift, isError: shiftError } = useActiveShift();
 
   const checkoutMut = useMutation({
     mutationFn: async () => {
@@ -601,8 +601,12 @@ function EquipmentDetailPageDesktop() {
   });
 
   // Single choke point for every checkout affordance — blocks off-shift ownership.
+  // If the shift query itself failed, don't infer "off-shift" from the missing
+  // `shift` — let the request reach the server, which enforces the authoritative
+  // roster gate and fails loud via `onError` for a real off-shift denial. Only a
+  // *successful* query that reports no active shift blocks client-side.
   const handleCheckout = () => {
-    if (!hasActiveShift) {
+    if (!shiftError && !hasActiveShift) {
       toast.error(t.scan.offShiftBody);
       return;
     }
@@ -611,7 +615,9 @@ function EquipmentDetailPageDesktop() {
 
   // Reason shown beside the (disabled) checkout buttons so an off-shift tech knows
   // why the action is unavailable — a disabled button can't surface the toast itself.
-  const offShiftCheckoutNote = !hasActiveShift ? (
+  // Same isError guard as handleCheckout: don't show "off-shift" on a shift-query
+  // error, since that state is unknown, not confirmed off-shift.
+  const offShiftCheckoutNote = !shiftError && !hasActiveShift ? (
     <p className="px-2 text-center text-xs text-muted-foreground" data-testid="checkout-offshift-note">
       {t.scan.offShiftBody}
     </p>
@@ -1106,7 +1112,7 @@ function EquipmentDetailPageDesktop() {
                 variant="outline"
                 className="w-full h-12 gap-2 text-sm font-semibold rounded-2xl active:scale-[0.98] transition-all border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 onClick={handleCheckout}
-                disabled={checkoutMut.isPending || !hasActiveShift}
+                disabled={checkoutMut.isPending || (!shiftError && !hasActiveShift)}
                 data-testid="btn-checkout"
               >
                 {checkoutMut.isPending ? (
@@ -1703,7 +1709,7 @@ function EquipmentDetailPageDesktop() {
                         size="lg"
                         className="w-full gap-2.5"
                         onClick={handleCheckout}
-                        disabled={checkoutMut.isPending || returnMut.isPending || !hasActiveShift}
+                        disabled={checkoutMut.isPending || returnMut.isPending || (!shiftError && !hasActiveShift)}
                         data-testid="btn-scan-action-checkout"
                       >
                         {checkoutMut.isPending ? (
