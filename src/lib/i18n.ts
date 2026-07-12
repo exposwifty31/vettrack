@@ -1079,6 +1079,8 @@ const translations = {
 
   webOnlyGuard: d.webOnlyGuard,
 
+  managementWebGate: d.managementWebGate,
+
   legalFooter: d.legalFooter,
 
   legalPage: d.legalPage,
