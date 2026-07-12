@@ -4,7 +4,7 @@
  * No imports from ./index.ts.
  */
 
-export type NudgeKind = "expiry";
+export type NudgeKind = "expiry" | "restock";
 
 export interface Nudge {
   id: string;
