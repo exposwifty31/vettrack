@@ -124,6 +124,34 @@ describe("requireClinicalAuthority — factory validation", () => {
       }),
     ).toThrow();
   });
+
+  it("throws synchronously when BOTH permanent-role fallbacks are enabled (mutually exclusive)", () => {
+    expect(() =>
+      requireClinicalAuthority({
+        allow: ["vet"],
+        allowPermanentClinicalRoleFallbackForLegacyDispense: true,
+        allowPermanentClinicalRoleForEmergency: true,
+      }),
+    ).toThrow(/mutually exclusive/);
+  });
+
+  it("does NOT throw when only the emergency break-glass flag is enabled", () => {
+    expect(() =>
+      requireClinicalAuthority({
+        allow: ["vet"],
+        allowPermanentClinicalRoleForEmergency: true,
+      }),
+    ).not.toThrow();
+  });
+
+  it("does NOT throw when only the legacy-dispense fallback flag is enabled", () => {
+    expect(() =>
+      requireClinicalAuthority({
+        allow: ["vet"],
+        allowPermanentClinicalRoleFallbackForLegacyDispense: true,
+      }),
+    ).not.toThrow();
+  });
 });
 
 describe("requireClinicalAuthority — authentication", () => {

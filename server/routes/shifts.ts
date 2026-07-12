@@ -689,31 +689,36 @@ router.post("/import/confirm", requireAuth, requireAdmin, uploadCsvFile, async (
       }
 
       const importId = randomUUID();
-      await db.insert(shiftImports).values({
-        id: importId,
-        clinicId,
-        importedBy: req.authUser!.id,
-        filename,
-        rowCount: doctorRows.length,
-      });
-      await db.insert(doctorShifts).values(
-        doctorRows.map((row) => ({
-          id: randomUUID(),
+      await db.transaction(async (tx) => {
+        await tx.insert(shiftImports).values({
+          id: importId,
           clinicId,
-          userId: row.userId,
-          date: row.date,
-          startTime: row.startTime,
-          endTime: row.endTime,
-          shiftName: row.shiftName,
-          operationalRole: row.operationalRole,
-        })),
-      );
+          importedBy: req.authUser!.id,
+          filename,
+          rowCount: doctorRows.length,
+        });
+        await tx.insert(doctorShifts).values(
+          doctorRows.map((row) => ({
+            id: randomUUID(),
+            clinicId,
+            userId: row.userId,
+            date: row.date,
+            startTime: row.startTime,
+            endTime: row.endTime,
+            shiftName: row.shiftName,
+            operationalRole: row.operationalRole,
+          })),
+        );
+      });
 
       logAudit({
+        actorRole: resolveAuditActorRole(req),
         clinicId,
         actionType: "doctor_shifts_csv_imported",
         performedBy: req.authUser!.id,
         performedByEmail: req.authUser!.email ?? "",
+        targetId: importId,
+        targetType: "shift_import",
         metadata: { rowCount: doctorRows.length, issueCount: issues.length },
       });
 

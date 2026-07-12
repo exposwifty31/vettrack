@@ -4,5 +4,8 @@
 -- `role` column. Advisory only: it is NEVER auto-applied as `role` and never
 -- feeds clinical authority — an admin sees it as a hint and grants the real
 -- role through the existing role-change flow. Nullable: sign-ups that did not
--- pick a chip (or picked an invalid value) leave it NULL.
-ALTER TABLE vt_users ADD COLUMN IF NOT EXISTS requested_role VARCHAR(20);
+-- pick a chip (or picked an invalid value) leave it NULL. A CHECK restricts the
+-- stored value to the three self-selectable roles the sign-up chips + the
+-- `sanitizeRequestedRole` guard emit (technician/vet/student) — privileged roles
+-- (admin, senior_technician, lead_technician) can never be staged here.
+ALTER TABLE vt_users ADD COLUMN IF NOT EXISTS requested_role TEXT CHECK (requested_role IN ('technician', 'vet', 'student') OR requested_role IS NULL);

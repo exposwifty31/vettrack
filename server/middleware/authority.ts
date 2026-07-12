@@ -132,6 +132,20 @@ export function requireClinicalAuthority(
     }
   }
 
+  // The legacy-dispense fallback and the Code Blue emergency break-glass are
+  // INDEPENDENT opt-ins with distinct metrics/audits. A single gate must never
+  // enable both: the dispense branch runs first, so a Code Blue request would be
+  // consumed (and mis-attributed) by the legacy-dispense path before break-glass
+  // is reached. Reject the conflicting config at construction time.
+  if (
+    opts.allowPermanentClinicalRoleFallbackForLegacyDispense === true &&
+    opts.allowPermanentClinicalRoleForEmergency === true
+  ) {
+    throw new Error(
+      "requireClinicalAuthority: allowPermanentClinicalRoleFallbackForLegacyDispense and allowPermanentClinicalRoleForEmergency are mutually exclusive",
+    );
+  }
+
   return async function requireClinicalAuthorityMiddleware(
     req: Request,
     res: Response,
@@ -210,7 +224,7 @@ export function requireClinicalAuthority(
         snapshot.reason === "EZSHIFT_NONE" &&
         snapshot.clinicalRole !== null &&
         snapshot.clinicalRole !== "student" &&
-        opts.allow.includes(snapshot.clinicalRole as ActiveShiftRole)
+        opts.allow.some((role) => role === snapshot.clinicalRole)
       ) {
         incrementMetric("authority_legacy_fallback_used");
         emitDispenseLegacyFallbackAudit({ req, snapshot });
@@ -233,7 +247,7 @@ export function requireClinicalAuthority(
         snapshot.reason === "EZSHIFT_NONE" &&
         snapshot.clinicalRole !== null &&
         snapshot.clinicalRole !== "student" &&
-        opts.allow.includes(snapshot.clinicalRole as ActiveShiftRole)
+        opts.allow.some((role) => role === snapshot.clinicalRole)
       ) {
         incrementMetric("authority_emergency_break_glass_used");
         emitCodeBlueBreakGlassAudit({ req, snapshot });
