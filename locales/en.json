@@ -4118,5 +4118,10 @@
     "emptyPrompt": "Search by name, location, or custodian to find equipment fast.",
     "noResults": "No equipment found matching your search.",
     "resultsCount": "{count, plural, one{# result found} other{# results found}}"
+  },
+  "homeNudges": {
+    "expiryMessage": "Equipment expiring soon — check inventory",
+    "restockMessage": "Item running low — check restock",
+    "dismissAria": "Dismiss this reminder"
   }
 }

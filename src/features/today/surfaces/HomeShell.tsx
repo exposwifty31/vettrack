@@ -11,6 +11,7 @@ import { useScanAffordance } from "@/lib/scan-affordance";
 import { subscribeKeepalive } from "@/lib/realtime";
 import { t } from "@/lib/i18n";
 import { LocateSearch } from "@/features/equipment/LocateSearch";
+import { HomeNudges } from "./HomeNudges";
 
 /**
  * Shared host for the Phase-3 home surfaces (ops / floor). Owns the page-level
@@ -159,6 +160,8 @@ export function HomeChrome() {
           />
         </Link>
       )}
+
+      <HomeNudges />
     </>
   );
 }

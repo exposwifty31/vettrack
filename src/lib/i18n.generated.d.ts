@@ -4122,4 +4122,9 @@ export interface TStructure {
     noResults: string;
     resultsCount: string;
   };
+  homeNudges: {
+    expiryMessage: string;
+    restockMessage: string;
+    dismissAria: string;
+  };
 }

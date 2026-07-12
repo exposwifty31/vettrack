@@ -1120,6 +1120,8 @@ const translations = {
     resultsCount: (count: number) => tr(d.locateSearch.resultsCount, { count }),
   },
 
+  homeNudges: d.homeNudges,
+
 } as const;
 
 return stripInternalKeys(translations) as typeof translations;
