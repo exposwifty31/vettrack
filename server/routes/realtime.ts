@@ -353,6 +353,16 @@ function isAllowedPropagationBucket(value: unknown): value is CbPropagationBucke
   return typeof value === "string" && (ALLOWED_CB_PROPAGATION_BUCKETS as readonly string[]).includes(value);
 }
 
+// T-30a2-i — nudge telemetry accepted via the existing telemetry endpoint.
+// The set of allowed values is a closed enum; anything else is silently
+// rejected (no new metric series) — mirrors ALLOWED_CB_PROPAGATION_BUCKETS.
+const ALLOWED_NUDGE_SHOWN = ["expiry", "restock"] as const;
+type NudgeShown = (typeof ALLOWED_NUDGE_SHOWN)[number];
+
+function isAllowedNudgeShown(value: unknown): value is NudgeShown {
+  return typeof value === "string" && (ALLOWED_NUDGE_SHOWN as readonly string[]).includes(value);
+}
+
 // Phase 9 PR 9.5 — offline emergency mutation blocking. Bounded enum; the
 // sessionStorage buffer itself is never posted, only the endpoint class.
 const ALLOWED_EMERGENCY_BLOCKED_CLASSES = ["start", "log", "end", "presence"] as const;
@@ -461,6 +471,7 @@ router.post("/telemetry", requireAuth, (req, res) => {
       duplicateDrop?: unknown;
       gapResync?: unknown;
       codeBluePropagationBucket?: unknown;
+      nudgeShown?: unknown;
       codeBlueWakeRecovery?: unknown;
       codeBlueSnapshotFallback?: unknown;
       emergencyDegradedEntered?: unknown;
@@ -500,6 +511,19 @@ router.post("/telemetry", requireAuth, (req, res) => {
         else if (bucket === "lt_3s") incrementMetric("code_blue_propagation_observed_lt_3s");
         else if (bucket === "lt_15s") incrementMetric("code_blue_propagation_observed_lt_15s");
         else if (bucket === "gte_15s") incrementMetric("code_blue_propagation_observed_gte_15s");
+      } else {
+        incrementMetric("telemetry_payload_rejected_enum_mismatch");
+      }
+    }
+    // T-30a2-i — bounded enum validation for nudge telemetry. Invalid
+    // nudgeShown values are dropped without creating new metric series;
+    // the mismatch is recorded in the same shared enum-mismatch counter
+    // as every other bounded-enum field in this handler.
+    if (body?.nudgeShown !== undefined) {
+      if (isAllowedNudgeShown(body.nudgeShown)) {
+        const bucket = body.nudgeShown;
+        if (bucket === "expiry") incrementMetric("nudge_shown_expiry");
+        else if (bucket === "restock") incrementMetric("nudge_shown_restock");
       } else {
         incrementMetric("telemetry_payload_rejected_enum_mismatch");
       }

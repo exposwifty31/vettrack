@@ -307,7 +307,14 @@ type MetricName =
   | "stale_checkout_nudged"
   | "stale_checkout_skipped"
   | "dock_return_nfc_confirmed"
-  | "auth_clerk_profile_fetch_failed";
+  | "auth_clerk_profile_fetch_failed"
+  // T-30a2-i — nudge telemetry closed enum (nudgeShown: "expiry" | "restock").
+  // Mirrors the ALLOWED_CB_PROPAGATION_BUCKETS pattern: an in-enum value
+  // increments its own counter; out-of-enum values are rejected via the
+  // existing telemetry_payload_rejected_enum_mismatch counter (no new
+  // metric series is created for unknown values).
+  | "nudge_shown_expiry"
+  | "nudge_shown_restock";
 
 type MetricBuckets = Record<MetricName, number>;
 
@@ -946,6 +953,9 @@ const DEFAULT_COUNTERS: MetricBuckets = {
   stale_checkout_skipped: 0,
   dock_return_nfc_confirmed: 0,
   auth_clerk_profile_fetch_failed: 0,
+  // T-30a2-i — nudge telemetry closed enum counters.
+  nudge_shown_expiry: 0,
+  nudge_shown_restock: 0,
 };
 
 const metrics: MetricBuckets = { ...DEFAULT_COUNTERS };
