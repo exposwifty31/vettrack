@@ -8,6 +8,7 @@ import { UrgentCountChips } from "../UrgentCountChips";
 import { HomeShell, HomeChrome } from "./HomeShell";
 import { HomeGreeting } from "./HomeGreeting";
 import { OnShiftHero } from "./OnShiftHero";
+import { StartOfShiftCard } from "./StartOfShiftCard";
 import { GetStartedCard } from "./GetStartedCard";
 import { RecentActivityCard } from "./RecentActivityCard";
 import { useOpsHome } from "./ops/use-ops-home";
@@ -47,6 +48,16 @@ export function OpsHomeSurface() {
               itemsOut={home.itemsOut}
               inUse={home.inUse}
               isLoading={home.isLoading}
+            />
+
+            <StartOfShiftCard
+              heroState={home.heroState}
+              pulse={home.pulse}
+              criticalCount={home.criticalCount}
+              overdueCount={home.overdueCount}
+              itemsOutCount={home.itemsOut}
+              activeAlertCount={home.activeAlertCount}
+              isTablet={isDesktop}
             />
 
             <UrgentCountChips criticalCount={home.criticalCount} overdueCount={home.overdueCount} />

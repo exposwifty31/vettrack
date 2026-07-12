@@ -10,6 +10,7 @@ import { QuickScanCard } from "../QuickScanCard";
 import { HomeShell, HomeChrome } from "./HomeShell";
 import { HomeGreeting } from "./HomeGreeting";
 import { OnShiftHero } from "./OnShiftHero";
+import { StartOfShiftCard } from "./StartOfShiftCard";
 import { useFloorHome } from "./floor/use-floor-home";
 import { MyEquipmentCard } from "./floor/MyEquipmentCard";
 
@@ -64,6 +65,14 @@ export function StudentHomeSurface({ isTablet }: { isTablet: boolean }) {
               heroState={home.heroState}
               emphasis="primary"
               className={rise}
+            />
+            <StartOfShiftCard
+              heroState={home.heroState}
+              pulse={home.pulse}
+              criticalCount={home.criticalCount}
+              overdueCount={home.overdueCount}
+              itemsOutCount={home.itemsOutCount}
+              isTablet={isTablet}
             />
             <QuickScanCard />
             <MyEquipmentCard
