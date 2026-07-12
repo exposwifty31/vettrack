@@ -2373,3 +2373,24 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 - **DEFERRED (Minor):** EquipmentGlanceGrid extra `lines={2}`/`as="bdi"` test assertions; Tasks task-card placeholder-on-failure (secondary display degradation).
 - **FALSE POSITIVE (persisted):** equipment-list-checkout-error-toast "duplicate toast property" — single `toast` key at line 26, typecheck clean.
 **Verdict:** VERIFIED — one valid finding fixed; no blocking issues remain. CodeRabbit CHANGES_REQUESTED is stale/nit-driven → to be dismissed after CodeRabbit re-reviews the new head, then owner-authorized merge.
+
+---
+
+## 2026-07-12 — PR #83 MERGED (merge commit de9e97d9a)
+
+**Claim:** PR #83 (Phase 10.A tri-display audit fix cycle) merged to main after owner-authorized triage of the CodeRabbit CHANGES_REQUESTED.
+**Evidence:** Head 9b813e0ea — CI fully green (Tests & typecheck, Architecture gates G1, Playwright ×2, Integration ops, Merge gate, Vercel all pass); CodeRabbit re-review completed on head; branch 0 commits behind main. All 20 unresolved review threads investigated: 1 valid functional finding fixed (AlertsProView duration formatter), remainder = accepted test-fixture-cast pattern / reasoned test-methodology skips / already-fixed / nitpicks — none blocking. 5 stale CodeRabbit CHANGES_REQUESTED reviews dismissed via REST with a documented message; reviewDecision cleared; merged via `gh pr merge --merge` → merge commit de9e97d9a on origin/main; main-push deploy pipeline triggered.
+**Verdict:** VERIFIED — merged; deploy in progress.
+
+---
+
+## 2026-07-12 — Behavioral flow audit (click-path) across all 9 surface batches — report only
+
+**Claim:** Every user-facing flow was statically traced touchpoint-by-touchpoint (click-path-audit method: Sequential Undo / Async Race / Stale Closure / Missing Transition / Dead Path / useEffect Interference / Broken Redirect); every CRITICAL/HIGH finding was adversarially re-traced by an independent refuter armed with a known-intent digest (41 commit bodies + proof log + release-QA baseline); report written to `docs/audit/flow-audit-behavioral-2026-07-11.md`. No code changes.
+**Evidence:**
+- Workflow run `wf_af513824-72e` (3 checkpointed waves × 3 batch agents + per-finding verifiers): 18 agents, 0 errors, 592 touchpoints traced, 2.47M subagent tokens; logs show all 9 batches returned (journal: session dir `subagents/workflows/wf_af513824-72e/journal.jsonl`).
+- Findings: 36 total (6 HIGH / 21 MEDIUM / 9 LOW). 8/8 crit-high confirmed by verifiers, 0 refuted, 5 severity corrections applied (2 CRITICAL→HIGH, 3 HIGH→MEDIUM). One additional HIGH (`initSyncEngine()` called with no QueryClient at `src/hooks/use-sync.tsx:168` → post-offline-sync invalidations never fire) verified by controller read of `sync-engine.ts:480/207-217/233/422`.
+- Drift pass (sync mandate): tree moved mid-audit (`bd8deca33` 09:19, `9b813e0ea` 09:43 — CodeRabbit r3 fixes); both findings citing those files (CLICK-PATH-001 code-blue.tsx Cancel dead-path, CLICK-PATH-032 AlertsScreen refetch) re-verified against HEAD `9b813e0ea` by direct read (guard-before-close and un-awaited `refetch()` both present). Report header records base/HEAD; pre-commit fetch confirms local == origin (0/0).
+- Reconciliation: verifiers carried the intent digest — zero findings re-litigate documented deliberate behaviors; report tags every finding NEW/OVERLAPS/BY-DESIGN/TOUCHES-RECENT-FIX; completeness check: 36 CLICK-PATH headers, all 35 batch ids present, ids 001–036 contiguous (scripted grep).
+- Commit is docs-only: this file + the report, added by explicit path. Note: PR #83 merged (de9e97d9a) while this report was being assembled; these audit docs land on the branch post-merge for a follow-up PR alongside the fix task.
+**Verdict:** VERIFIED — report complete and reconciled; fixes deferred to a follow-up task per the approved plan.
