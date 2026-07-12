@@ -6,12 +6,10 @@ import type { Capability } from "@/lib/roles/experience-model";
 import { ForwardChevron } from "@/components/ui/directional-chevron";
 import { t } from "@/lib/i18n";
 import type { HeroState } from "./OnShiftHero";
-import type { HomeDashboardPulse } from "@/types/tasks";
 
 export interface StartOfShiftCardProps {
   /** Roster-derived shift state — the shared contract with {@link OnShiftHero}. */
   heroState: HeroState;
-  pulse: HomeDashboardPulse | undefined;
   /** Equipment needing attention (same triage tier the ops coverage card / vet readiness glance use). */
   criticalCount: number;
   /** Overdue task count — `taskDashboard.counts.overdue`, shared across floor + ops home engines. */

@@ -26,7 +26,6 @@ function renderCard(props: Partial<StartOfShiftCardProps> = {}) {
   const { hook } = memoryLocation({ path: "/home" });
   const defaults: StartOfShiftCardProps = {
     heroState: "active",
-    pulse: undefined,
     criticalCount: 0,
     overdueCount: 0,
     itemsOutCount: 0,

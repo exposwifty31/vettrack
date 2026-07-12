@@ -49,7 +49,6 @@ export function TechHomeSurface({ isTablet }: { isTablet: boolean }) {
             />
             <StartOfShiftCard
               heroState={home.heroState}
-              pulse={home.pulse}
               criticalCount={home.criticalCount}
               overdueCount={home.overdueCount}
               itemsOutCount={home.itemsOutCount}
