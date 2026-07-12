@@ -859,7 +859,26 @@
     "guidedTitle": "Guided mode",
     "guidedBody": "Check equipment out and back in, and dispense or restock inventory. Ask a supervisor for anything else.",
     "inventoryActionHint": "Dispense or restock items",
-    "myEquipmentRefreshFailed": "Couldn't refresh — showing saved items"
+    "myEquipmentRefreshFailed": "Couldn't refresh — showing saved items",
+    "startOfShift": {
+      "idleTitle": "Nothing needs you right now",
+      "opsExceptions": "Equipment exceptions need review",
+      "opsExceptionsAction": "Review exceptions",
+      "opsAllClear": "Fleet coverage looks good",
+      "opsAllClearAction": "View coverage",
+      "vetReview": "Equipment issues need your review",
+      "vetReviewAction": "Review equipment",
+      "vetReady": "Crash cart ready to verify",
+      "vetReadyAction": "Check crash cart",
+      "techOverdue": "Overdue tasks need you",
+      "techOverdueAction": "View tasks",
+      "techCaughtUp": "You're all caught up",
+      "techCaughtUpAction": "Scan equipment",
+      "itemsCheckedOut": "Items checked out to you",
+      "itemsCheckedOutAction": "Return equipment",
+      "studentReady": "Ready to start your shift",
+      "studentReadyAction": "Scan to check out"
+    }
   },
   "home": {
     "equipmentOverview": "Equipment overview",

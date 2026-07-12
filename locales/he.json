@@ -859,7 +859,26 @@
     "guidedTitle": "מצב מודרך",
     "guidedBody": "השאילו והחזירו ציוד, ונפקו או חדשו מלאי. לכל דבר אחר פנו למפקח/ת.",
     "inventoryActionHint": "ניפוק או חידוש פריטים",
-    "myEquipmentRefreshFailed": "לא ניתן לרענן — מוצג מידע שמור"
+    "myEquipmentRefreshFailed": "לא ניתן לרענן — מוצג מידע שמור",
+    "startOfShift": {
+      "idleTitle": "אין כרגע דבר שדורש תשומת לב",
+      "opsExceptions": "חריגות בציוד דורשות בדיקה",
+      "opsExceptionsAction": "בדיקת חריגות",
+      "opsAllClear": "כיסוי הציוד תקין",
+      "opsAllClearAction": "צפייה בכיסוי",
+      "vetReview": "בעיות ציוד דורשות את בדיקתך",
+      "vetReviewAction": "בדיקת ציוד",
+      "vetReady": "עגלת ההחייאה מוכנה לאימות",
+      "vetReadyAction": "בדיקת עגלת החייאה",
+      "techOverdue": "משימות באיחור דורשות אותך",
+      "techOverdueAction": "צפייה במשימות",
+      "techCaughtUp": "הכל מעודכן",
+      "techCaughtUpAction": "סריקת ציוד",
+      "itemsCheckedOut": "פריטים מושאלים אצלך",
+      "itemsCheckedOutAction": "החזרת ציוד",
+      "studentReady": "מוכן להתחיל את המשמרת",
+      "studentReadyAction": "סריקה להשאלה"
+    }
   },
   "home": {
     "equipmentOverview": "סקירת ציוד",

@@ -863,6 +863,25 @@ export interface TStructure {
     guidedBody: string;
     inventoryActionHint: string;
     myEquipmentRefreshFailed: string;
+    startOfShift: {
+      idleTitle: string;
+      opsExceptions: string;
+      opsExceptionsAction: string;
+      opsAllClear: string;
+      opsAllClearAction: string;
+      vetReview: string;
+      vetReviewAction: string;
+      vetReady: string;
+      vetReadyAction: string;
+      techOverdue: string;
+      techOverdueAction: string;
+      techCaughtUp: string;
+      techCaughtUpAction: string;
+      itemsCheckedOut: string;
+      itemsCheckedOutAction: string;
+      studentReady: string;
+      studentReadyAction: string;
+    };
   };
   home: {
     equipmentOverview: string;
