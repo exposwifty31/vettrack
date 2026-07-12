@@ -28,7 +28,16 @@ export type UsageState = "available" | "staged" | "in_use" | "emergency_use" | "
 export interface DeployabilityInput {
   custodyState: string;
   assetTypeId: string | null | undefined;
-  /** Damage-tracking status (R-EQ-F3); a non-"ok" value forces not-ready regardless of other signals. */
+  /**
+   * Damage-tracking status (R-EQ-F3); a non-"ok" value forces not-ready
+   * regardless of other signals. Optional here (not tightened to the
+   * schema's NOT NULL column) so synthetic test fixtures across the
+   * evidence-graph/copilot suite don't all need an explicit value — every
+   * real caller sources this from a DB row (`vt_equipment.condition_status`
+   * is NOT NULL DEFAULT 'ok') or the evidence graph, which always populates
+   * it. If a caller ever constructs this object by hand instead of from a
+   * real row, an omitted value is treated as "ok" (see the check below).
+   */
   conditionStatus?: string | null;
 }
 
