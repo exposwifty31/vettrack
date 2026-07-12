@@ -4123,5 +4123,10 @@
     "expiryMessage": "Equipment expiring soon — check inventory",
     "restockMessage": "Item running low — check restock",
     "dismissAria": "Dismiss this reminder"
+  },
+  "returnPlugDialog": {
+    "damagedButton": "Damaged",
+    "damageWarning": "A damage report will be filed for this equipment. You can undo this right after confirming.",
+    "confirmReturnedDamaged": "Confirm — Returned Damaged"
   }
 }

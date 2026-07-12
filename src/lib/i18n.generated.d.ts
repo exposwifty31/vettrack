@@ -4127,4 +4127,9 @@ export interface TStructure {
     restockMessage: string;
     dismissAria: string;
   };
+  returnPlugDialog: {
+    damagedButton: string;
+    damageWarning: string;
+    confirmReturnedDamaged: string;
+  };
 }

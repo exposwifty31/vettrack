@@ -4123,5 +4123,10 @@
     "expiryMessage": "ציוד פג תוקף בקרוב — בדקו את המלאי",
     "restockMessage": "פריט עומד להיגמר — בדקו חידוש מלאי",
     "dismissAria": "התעלמות מהתזכורת"
+  },
+  "returnPlugDialog": {
+    "damagedButton": "פגום",
+    "damageWarning": "דוח נזק יוגש עבור ציוד זה. ניתן לבטל מיד לאחר האישור.",
+    "confirmReturnedDamaged": "אישור — הוחזר פגום"
   }
 }

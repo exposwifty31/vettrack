@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { t } from "@/lib/i18n";
 import {
   Sheet,
   SheetContent,
@@ -133,7 +134,7 @@ export function ReturnPlugDialog({
                 data-testid="btn-returned-damaged"
               >
                 <AlertTriangle className="h-4 w-4" aria-hidden />
-                Damaged
+                {t.returnPlugDialog.damagedButton}
               </Button>
             )}
           </div>
@@ -168,7 +169,7 @@ export function ReturnPlugDialog({
               className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive"
               data-testid="return-damaged-warning"
             >
-              A damage report will be filed for this equipment. You can undo this right after confirming.
+              {t.returnPlugDialog.damageWarning}
             </div>
           )}
         </div>
@@ -179,7 +180,7 @@ export function ReturnPlugDialog({
           </Button>
           <Button onClick={handleConfirm} disabled={isBusy} data-testid="btn-confirm-return-plug">
             {returnedDamaged
-              ? "Confirm — Returned Damaged"
+              ? t.returnPlugDialog.confirmReturnedDamaged
               : isPluggedIn
                 ? "Confirm — Plugged In ✓"
                 : "Set Alert & Return"}

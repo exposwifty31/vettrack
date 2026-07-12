@@ -1122,6 +1122,8 @@ const translations = {
 
   homeNudges: d.homeNudges,
 
+  returnPlugDialog: d.returnPlugDialog,
+
 } as const;
 
 return stripInternalKeys(translations) as typeof translations;
