@@ -110,10 +110,18 @@ export default function MyEquipmentPage() {
     try {
       await withToast(
         async () => {
-          await Promise.all(items.map((item) => api.equipment.return(item.id, { isPluggedIn: false })));
+          const results = await Promise.allSettled(
+            items.map((item) => api.equipment.return(item.id, { isPluggedIn: false })),
+          );
+          // Invalidate regardless of partial failure — the items that DID
+          // return successfully must not be left stale just because a
+          // sibling return call rejected.
           queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
           queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
           queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
+          if (results.some((result) => result.status === "rejected")) {
+            throw new Error("partial_return_failure");
+          }
         },
         {
           success: t.myEquipment.toast.returnAllSuccess(count),
