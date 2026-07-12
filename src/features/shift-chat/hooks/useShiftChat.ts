@@ -85,13 +85,21 @@ export function useShiftChat(isOpen: boolean) {
 
   // ── Unread count ───────────────────────────────────────────────────────────
   const lastOpenRef  = useRef<number>(0);
+  const wasOpenRef   = useRef<boolean>(isOpen);
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     if (isOpen) {
       lastOpenRef.current = Date.now();
       setUnreadCount(0);
+    } else if (wasOpenRef.current) {
+      // Just closed: everything delivered while the panel was open has
+      // already been read (live), so advance the read cursor to "now" —
+      // otherwise the very next unread-count pass below would recount that
+      // batch as unread against the stale open-time cursor (T-26 · R-SH-02).
+      lastOpenRef.current = Date.now();
     }
+    wasOpenRef.current = isOpen;
   }, [isOpen]);
 
   useEffect(() => {
