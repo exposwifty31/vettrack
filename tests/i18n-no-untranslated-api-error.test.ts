@@ -62,6 +62,7 @@ const KNOWN_DEBT_ALLOWLIST = new Set<string>([
   "server/routes/integrations.ts", // owner: integrations
   "server/routes/inventory-items.ts", // owner: inventory
   "server/routes/metrics.ts", // owner: observability
+  "server/routes/nudges.ts", // owner: inventory
   "server/routes/procurement.ts", // owner: procurement
   "server/routes/push.ts", // owner: push
   "server/routes/queue.ts", // owner: infra

@@ -59,6 +59,7 @@ const EXPECTED_MOUNT_PATHS = [
   "/api/containers",
   "/api/restock",
   "/api/inventory-items",
+  "/api/nudges", // nudgesRoutes (T-30a1-i)
   "/api/procurement",
   "/api/clinical",
   "/api/dispense",

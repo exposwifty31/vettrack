@@ -64,6 +64,7 @@ import type {
   DisplayDevice,
   DisplayPairingCode,
   DisplayPairClaim,
+  NudgeFeedResponse,
 } from "@/types";
 import type { AuthoritySnapshot } from "../../shared/authority.js";
 
@@ -402,6 +403,9 @@ export const api = {
   },
   home: {
     dashboard: () => request<HomeDashboardPulse>("/api/home/dashboard"),
+  },
+  nudges: {
+    list: () => request<NudgeFeedResponse>("/api/nudges"),
   },
   analytics: {
     summary: () => request<AnalyticsSummary>("/api/analytics"),

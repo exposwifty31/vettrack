@@ -55,6 +55,7 @@ import tasksRoutes from "../routes/tasks.js";
 import containersRoutes from "../routes/containers.js";
 import restockRoutes from "../routes/restock.js";
 import inventoryItemsRoutes from "../routes/inventory-items.js";
+import nudgesRoutes from "../routes/nudges.js";
 import procurementRoutes from "../routes/procurement.js";
 import clinicalCheckInRoutes from "../routes/clinical-check-in.js";
 import dispenseRoutes from "../routes/dispense.js";
@@ -133,6 +134,7 @@ function registerPlatformRoutes(app: express.Express) {
   app.use("/api/containers", containersRoutes);
   app.use("/api/restock", restockRoutes);
   app.use("/api/inventory-items", inventoryItemsRoutes);
+  app.use("/api/nudges", nudgesRoutes);
   app.use("/api/procurement", procurementRoutes);
   app.use("/api/clinical", clinicalCheckInRoutes);
   app.use("/api/dispense", dispenseRoutes);
