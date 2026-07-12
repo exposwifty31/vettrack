@@ -2525,3 +2525,17 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 - **Batch gate:** `pnpm typecheck` 0; full `pnpm test` = **513 files / 4660 tests, 0 fail** (32s). Worktrees removed.
 
 **Verdict:** VERIFIED — Phase 1 Shift/Home bundle complete. Next: Phase 1 Inventory bundle (T-28a/b, T-29, T-30 nudge sub-cards) → Web-gate (T-31). (R-SH-F1 handover = deferred O+R sub-spec.)
+
+---
+
+## 2026-07-12 — Consolidated Audit × 10x — Phase 1 Inventory FIXES (T-28a, T-28b, T-29)
+
+**Claim:** The three Inventory *fix* cards are implemented RED-first, integrated, batch-gate green. 2 parallel worktrees off `b5fc18a02`; all `Tier: S`. (T-30 nudge FEATURE is the remaining Inventory work — see next.)
+
+**Evidence:**
+- **T-28a** (R-IN-01 · CLICK-PATH-018 · server): `server/routes/inventory-items.ts` — added `isBillable` + `minimumDispenseToCapture` optional fields to `createItemSchema` (they existed only on `updateItemSchema`) and conditional-spread them into the create insert (omitting still uses DB defaults). RED `tests/inventory-create-fields.test.ts` (the `.strict()` schema returned 400 pre-fix). Mocked-unit. `1cb884933` → cp `89f5492aa`.
+- **T-28b** (R-IN-01 · client): `src/lib/api.ts` `inventoryItems.create` payload type + `src/pages/inventory-items.tsx` create mutation now forward the two fields. **Pure wiring** — the dialog UI (checkbox + input) was already built and shared with edit; only the create mutation dropped them. No new i18n keys (already present). RED `tests/inventory-create-dialog.test.tsx`. `ec3d8d3dd` → cp `3be497fd2`.
+- **T-29** (R-IN-02 · CLICK-PATH-019): `src/pages/inventory-page.tsx` — the +/- restock controls now disable while that row's `scanLine` mutation is pending (gated on the existing per-row `rowPendingByCode[line.code] > 0`), so a burst can't race a stale base. 2-line fix. RED `tests/inventory-restock-burst.test.tsx`. `ca9abfc93` → cp `72a746103`. Minor follow-up: the "Full restock" + quantity-edit buttons on the same row could race similarly (out of card scope).
+- **Batch gate:** `pnpm typecheck` 0; full `pnpm test` = **516 files / 4664 tests, 0 fail**. Worktrees removed.
+
+**Verdict:** VERIFIED — Inventory FIXES complete. Remaining Inventory work: **T-30 nudge feature (6 sub-cards)** — see the ledger for the pinned execution plan (feed read-path + client↔server telemetry enum contract). Then Web-gate T-31.
