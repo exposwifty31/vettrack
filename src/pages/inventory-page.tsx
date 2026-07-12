@@ -923,7 +923,7 @@ export default function InventoryPage() {
                               variant="outline"
                               size="icon"
                               className="h-11 w-11 rounded-xl shrink-0"
-                              disabled={otherUserHasSession}
+                              disabled={otherUserHasSession || pendingOps > 0}
                               onClick={() => scanLine(line.itemId, line.code, line.label, -1)}
                               aria-label={`Decrement ${line.label}`}
                             >
@@ -969,7 +969,7 @@ export default function InventoryPage() {
                               variant="outline"
                               size="icon"
                               className="h-11 w-11 rounded-xl shrink-0"
-                              disabled={otherUserHasSession}
+                              disabled={otherUserHasSession || pendingOps > 0}
                               onClick={() => scanLine(line.itemId, line.code, line.label, +1)}
                               aria-label={`Increment ${line.label}`}
                             >
