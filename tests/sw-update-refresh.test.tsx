@@ -104,6 +104,10 @@ describe("SwUpdateBanner — Refresh deterministically reloads exactly once (T-3
     clickRefresh();
 
     expect(safeReloadPageMock).toHaveBeenCalledTimes(1);
+    // This is an explicit user-triggered refresh — it must bypass the global
+    // reload-guard throttle (shared across unrelated silent reload callers),
+    // not be silently swallowed by it.
+    expect(safeReloadPageMock).toHaveBeenCalledWith({ minIntervalMs: 0 });
     expect(worker.postMessage).not.toHaveBeenCalled();
   });
 
@@ -122,6 +126,7 @@ describe("SwUpdateBanner — Refresh deterministically reloads exactly once (T-3
     vi.advanceTimersByTime(1000);
     container.fireControllerChange();
     expect(safeReloadPageMock).toHaveBeenCalledTimes(1);
+    expect(safeReloadPageMock).toHaveBeenCalledWith({ minIntervalMs: 0 });
 
     // The timeout must have been cleared — advancing past the original
     // 3000ms window must not trigger a second (fallback) reload.
@@ -143,6 +148,7 @@ describe("SwUpdateBanner — Refresh deterministically reloads exactly once (T-3
 
     vi.advanceTimersByTime(1);
     expect(safeReloadPageMock).toHaveBeenCalledTimes(1);
+    expect(safeReloadPageMock).toHaveBeenCalledWith({ minIntervalMs: 0 });
   });
 
   it("never double-reloads — a late controllerchange arriving after the timeout fallback is a no-op", () => {

@@ -19,6 +19,14 @@ import { isBoardPathname } from "@/app/platform";
  * An already-controller result or controllerchange wins over the timeout;
  * the reload runs exactly once (guard flag), and the timeout + listener are
  * always cleared once resolved (or on unmount).
+ *
+ * Every safeReloadPage() call in this file passes `minIntervalMs: 0`: the
+ * global 5s reload-guard (shared sessionStorage key across the whole app)
+ * exists to stop unrelated silent auto-reloads from stacking, not to
+ * throttle this explicit, user-clicked "רענן" action. Without the bypass,
+ * a reload from any other guarded path in the last 5s would make
+ * safeReloadPage() return false here — reloadOnce() had already cleared its
+ * own timeout/listener, so the stale bundle would stay loaded with no retry.
  */
 const SW_UPDATE_RELOAD_TIMEOUT_MS = 3000;
 
@@ -31,7 +39,7 @@ function scheduleDeterministicReload(worker: ServiceWorker): PendingReloadHandle
   const noopHandle: PendingReloadHandle = { cleanup: () => {} };
 
   if (!isServiceWorkerSupported()) {
-    safeReloadPage();
+    safeReloadPage({ minIntervalMs: 0 });
     return noopHandle;
   }
 
@@ -39,14 +47,14 @@ function scheduleDeterministicReload(worker: ServiceWorker): PendingReloadHandle
   try {
     container = navigator.serviceWorker;
   } catch {
-    safeReloadPage();
+    safeReloadPage({ minIntervalMs: 0 });
     return noopHandle;
   }
 
   // (a) The new worker has already claimed this page — reload immediately
   // instead of posting SKIP_WAITING to an already-active worker (a no-op).
   if (container.controller === worker) {
-    safeReloadPage();
+    safeReloadPage({ minIntervalMs: 0 });
     return noopHandle;
   }
 
@@ -62,7 +70,7 @@ function scheduleDeterministicReload(worker: ServiceWorker): PendingReloadHandle
     } catch {
       // ignore — container is already gone
     }
-    safeReloadPage();
+    safeReloadPage({ minIntervalMs: 0 });
   }
 
   function onControllerChange(): void {
@@ -138,7 +146,7 @@ export function SwUpdateBanner() {
           onClick: () => {
             const worker = workerRef.current;
             if (!worker) {
-              safeReloadPage();
+              safeReloadPage({ minIntervalMs: 0 });
               return;
             }
             pendingReloadRef.current?.cleanup();
