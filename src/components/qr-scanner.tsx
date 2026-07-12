@@ -121,6 +121,13 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const lastScanRef = useRef<number>(0);
+  // Monotonic token identifying the current physical scan. Bumped on every
+  // decode that clears the debounce, BEFORE the (possibly slow) network
+  // resolve is awaited. A resolve is only applied if this ref still equals
+  // the token it captured — a later scan bumping the token supersedes any
+  // still-in-flight resolve from an earlier one, so the last PHYSICALLY
+  // scanned tag always wins, never the last one to finish resolving.
+  const scanTokenRef = useRef<number>(0);
   const stopScannerRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -229,15 +236,25 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
         return;
       }
 
+      // Claim this physical scan's token before the async resolve starts.
+      const token = ++scanTokenRef.current;
+
       setPhase("resolving");
+      // Stop the camera BEFORE awaiting the network resolve — narrows the
+      // window in which another decode can fire while this one is in flight.
+      // The token check below is the actual last-scanned-wins guarantee.
+      await stopScannerRef.current();
+
       const eq = await resolveEquipmentId(equipmentId);
+      if (scanTokenRef.current !== token) return; // superseded by a newer scan — discard
+
       if (!eq) {
         // Equipment not found — try resolving as an inventory container.
         // If successful, hand off to the dispense flow immediately (zero extra taps).
         if (onDispense) {
           const containerId = await resolveAsContainer(equipmentId);
+          if (scanTokenRef.current !== token) return; // superseded while resolving container
           if (containerId) {
-            await stopScannerRef.current();
             haptics.scanSuccess();
             // Parent closes the scanner via state after onDispense — do not call onClose()
             // here or it may clear page-held context (e.g. ER quick-scan patient) before onDispense runs.
@@ -246,12 +263,10 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
           }
         }
         setNotFoundId(equipmentId);
-        await stopScannerRef.current();
         setPhase("not_found");
         return;
       }
 
-      await stopScannerRef.current();
       setConfirmFlash(true);
       setTimeout(() => setConfirmFlash(false), 260);
       setScannedEquipment(eq);
