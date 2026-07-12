@@ -3,14 +3,10 @@
  *
  * T-24c — client api + types for the damage-report feature (R-EQ-F3). Mocks
  * the fetch layer and asserts `api.equipment.reportDamage()` POSTs the
- * equipmentId + note payload to the flat locate-style mount
- * `/api/equipment/damage-reports` (mirrors the `/api/equipment/locate`
- * precedent in server/routes/equipment-locate.ts — both are "cross equipment"
- * reads/writes mounted at the equipment base path rather than nested under
- * `:id`) and returns the typed `{ damageEvent, conditionStatus }` shape. The
- * backend route (T-24b) lands in a sibling card — this locks the contract the
- * schema (T-24a, `vt_damage_events`: id/clinicId/equipmentId/reportedBy/at/
- * note/resolvedAt/createdAt) implies.
+ * optional `note` to the nested route `/api/equipment/:id/damage` — the
+ * equipmentId is the PATH param, reconciled to the merged T-24b backend
+ * route (server/routes/equipment-damage.ts) — and returns the typed
+ * `{ damageEvent, conditionStatus }` shape.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
@@ -29,7 +25,7 @@ describe("api.equipment.reportDamage", () => {
     vi.unstubAllGlobals();
   });
 
-  it("POSTs { equipmentId, note } to /api/equipment/damage-reports and returns the typed shape", async () => {
+  it("POSTs { note } to /api/equipment/:id/damage and returns the typed shape", async () => {
     const damageEvent: DamageReport = {
       id: "dmg-1",
       clinicId: "clinic-1",
@@ -50,9 +46,9 @@ describe("api.equipment.reportDamage", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("/api/equipment/damage-reports");
+    expect(url).toBe("/api/equipment/eq-1/damage");
     expect(init.method).toBe("POST");
-    expect(JSON.parse(init.body as string)).toEqual({ equipmentId: "eq-1", note: "Cracked housing" });
+    expect(JSON.parse(init.body as string)).toEqual({ note: "Cracked housing" });
     expect(result).toEqual(responseBody);
   });
 
@@ -67,7 +63,8 @@ describe("api.equipment.reportDamage", () => {
 
     await api.equipment.reportDamage({ equipmentId: "eq-2" });
 
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(JSON.parse(init.body as string)).toEqual({ equipmentId: "eq-2" });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/equipment/eq-2/damage");
+    expect(JSON.parse(init.body as string)).toEqual({});
   });
 });

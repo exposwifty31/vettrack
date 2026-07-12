@@ -263,16 +263,19 @@ export const equipmentApi = {
     locate: (q: string) =>
       request<EquipmentLocateResponse>(`/api/equipment/locate?q=${encodeURIComponent(q)}`),
     /**
-     * Damaged-at-check-in report (T-24c · R-EQ-F3) — POST /api/equipment/damage-reports.
-     * Flat mount (like `locate` above) since the payload already carries
-     * `equipmentId`; the route (T-24b) writes a `vt_damage_events` row and
-     * flips the equipment's `conditionStatus`.
+     * Damaged-at-check-in report (T-24c · R-EQ-F3) — POST /api/equipment/:id/damage.
+     * The route (T-24b) writes a `vt_damage_events` row and flips the
+     * equipment's `conditionStatus`. `equipmentId` is the path param; the
+     * request body carries only the optional `note`.
      */
-    reportDamage: (data: CreateDamageReportRequest) =>
-      request<CreateDamageReportResponse>("/api/equipment/damage-reports", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
+    reportDamage: ({ equipmentId, note }: CreateDamageReportRequest) =>
+      request<CreateDamageReportResponse>(
+        `/api/equipment/${encodeURIComponent(equipmentId)}/damage`,
+        {
+          method: "POST",
+          body: JSON.stringify({ note }),
+        },
+      ),
     confirmInRoom: (id: string, body: { roomId: string }) =>
       request<{ equipmentId: string; roomId: string; roomName: string; status: string }>(
         `/api/equipment/${encodeURIComponent(id)}/confirm-in-room`,
