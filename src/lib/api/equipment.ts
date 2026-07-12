@@ -19,6 +19,7 @@ import type {
   DeletedEquipment,
   QuickScanToggleResult,
   QuickScanToggleAction,
+  EquipmentLocateResponse,
 } from "@/types";
 import type { EquipmentWaitlistSnapshot } from "../../../shared/equipment-waitlist.js";
 import type { EquipmentTruthResponse } from "../../../shared/equipment-truth.js";
@@ -256,6 +257,9 @@ export const equipmentApi = {
     },
     truth: (id: string) =>
       request<EquipmentTruthResponse>(`/api/equipment/${encodeURIComponent(id)}/truth`),
+    /** Read-only search (T-22b · R-EQ-F1) — GET /api/equipment/locate?q= */
+    locate: (q: string) =>
+      request<EquipmentLocateResponse>(`/api/equipment/locate?q=${encodeURIComponent(q)}`),
     confirmInRoom: (id: string, body: { roomId: string }) =>
       request<{ equipmentId: string; roomId: string; roomName: string; status: string }>(
         `/api/equipment/${encodeURIComponent(id)}/confirm-in-room`,
