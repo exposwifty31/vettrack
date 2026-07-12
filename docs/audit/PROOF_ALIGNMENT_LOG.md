@@ -2433,3 +2433,18 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 - **Commit:** `b79f0819a` — `fix: pass QueryClient into initSyncEngine (T-05 · R-SY-01)` (staged by explicit path; unrelated untracked files untouched).
 
 **Verdict:** VERIFIED — T-05 DONE (foundational sync card; unblocks the offline-adjacent Phase-0A/1 cards).
+
+---
+
+## 2026-07-12 — Consolidated Audit × 10x — Phase 0A batch: T-01·T-02·T-03·T-04 (HIGH fixes)
+
+**Claim:** The remaining four Phase-0A HIGH fixes are implemented RED-first, integrated, and pass the full-suite batch gate. Executed as 4 parallel subagents in isolated git worktrees off T-05 (`69d5fd5ee`), cherry-picked onto the execution branch.
+
+**Evidence (per card — each RED confirmed failing first, then GREEN, typecheck 0):**
+- **T-01** (R-CB-01 · CLICK-PATH-001 · Code Blue outcome Cancel · **S +R**): `src/pages/code-blue.tsx` — split `OutcomeModal`'s single `onClose(outcome)` into `onSelect(outcome)` (outcome buttons) + `onCancel()` (Cancel → dedicated `closeOutcomeModal()` that closes the sheet independent of the empty-outcome guard + restores focus). `handleEndSession` byte-identical (server-confirmed end intact). RED `tests/code-blue-outcome-cancel.test.tsx` (sheet stays open pre-fix). **`+R` review: APPROVE, 0 findings** — reviewer traced every button's wiring (no swap, `OUTCOMES` unchanged), confirmed Cancel fully decoupled from the end path, test non-vacuous (hand-trace + direct run). Guardrails: no SSE/keepalive/optimistic-end. Commit `bb148cb3` → cherry-pick `b3c1f2e66`.
+- **T-02** (R-EQ-01/02 · CLICK-PATH-002/003 · dock-return/RFID sheet mount · S): `src/pages/equipment-detail.tsx` — moved `<DockReturnFlow>` + `<DockReturnNfc>` out of the inactive `<TabsContent value="readiness">` (bare `TabsPrimitive.Content`, no `forceMount`) to page level (guarded `{equipment && …}`, mirroring the other always-mounted sheets). Pure relocation — same props/state, no custody-mutation change. RED `tests/equipment-detail-dock-return-mount.test.tsx` (2 tests; sheets never surface on the default tab pre-fix). Commit `364d21cfd` → cherry-pick `78c94841c`.
+- **T-03** (R-SC-01 · CLICK-PATH-004 · QR last-scan race · S): `src/components/qr-scanner.tsx` — monotonic `scanTokenRef` captured before async work; `stopScanner()` moved before the `resolveEquipmentId` await; stale resolves discarded (`scanTokenRef.current !== token`); `scansToday` increment gated behind the token check (once per applied scan). RED `tests/qr-scanner-race.test.tsx` (slower earlier resolve overwrote newer scan pre-fix). Guardrail: `classifyEmergencyEndpoint`/offline block untouched. Commit `4a1a75cc3` → cherry-pick `e451f0743`. Minor→final review: test uses a ~350ms real-time debounce wait (resolve ordering still deterministic via a deferred promise).
+- **T-04** (R-RM-01 · CLICK-PATH-005 · room-radar busyRef · S): `src/pages/room-radar.tsx` — `ReturnPlugDialog` `onOpenChange` now resets `busyRef.current=false` on close, so a canceled dialog no longer permanently blocks later Return taps (`returnMut.onSettled` was the only reset path). One-line handler + a `RadarEquipmentCard` export for testability. RED `tests/room-radar-return-busyref.test.tsx`. Commit `332c311d2` → cherry-pick `9edf4845d`.
+- **Batch gate (integrated branch):** `pnpm typecheck` 0 errors (frontend + server tsconfigs); full `pnpm test` = **492 files / 4552 tests, 0 fail** (37s) — +4 test files / +5 tests over the T-05 baseline, no regressions. Worktrees `wt-t01…t04` removed post-integration.
+
+**Verdict:** VERIFIED — Phase 0A CODE work complete (T-01…T-05). Remaining Phase 0: **0B (T-06…T-16) is `Tier: Owner`** (accounts/build/device/hardware) — delivered separately as an owner checklist; not agent-executable.
