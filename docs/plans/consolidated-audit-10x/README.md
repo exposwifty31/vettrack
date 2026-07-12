@@ -18,8 +18,8 @@ Single front door for the consolidated remediation + 10x feature program. The **
 
 | Plan | Covers | Status |
 |---|---|---|
-| `phase-0-1.plan.md` | **Phase 0** (6 HIGH fixes + 0B submission gate) + **Phase 1** (equipment/shift/inventory fixes + small features + web admin-gate) | ✅ authored (31 **top-level requirements** T-01…T-31; several decompose into dispatchable subcards — e.g. T-22a–c, T-23a–e, T-24a–e, T-28a–b, T-30a–c) |
-| `phase-2-3.plan.md` | **Phase 2** native-reachable MED sweep + **Phase 3** LOW cleanup (+ pointers to feature sub-specs) | ✅ authored (T-32…T-53) |
+| `phase-0-1.plan.md` | **Phase 0** (6 HIGH fixes + 0B submission gate) + **Phase 1** (equipment/shift/inventory fixes + small features + web admin-gate) | ✅ authored (31 **top-level requirements** T-01…T-31; several decompose into dispatchable subcards — e.g. T-22a–c, T-23a–e, T-24a–e, T-28a–b, T-30a1-i/-ii · T-30a2-i/-ii · T-30b · T-30c) |
+| `phase-2-3.plan.md` | **Phase 2** native-reachable MED sweep + **Phase 3** LOW cleanup (+ pointers to feature sub-specs) | ✅ authored (T-34…T-53; T-32/T-33 moved to the R-CB-stabilize sub-spec) |
 | `phase-4.plan.md` | **Phase 4** — massive-03 (clinic network) + medium-04 (copilot/voice) | ✅ authored · 🚧 on hold (entry conditions) |
 | `subspecs/R-M1-rfid-gate-e2e.plan.md` | **massive-01** RFID-gate e2e — managed reader entity + directional gates + board surfacing + resolver reconciliation | ✅ authored (R-M1.0…M1.5) |
 | `subspecs/R-CBF-1-code-blue-one-tap.plan.md` | medium-01 (frozen Code Blue surface) | ✅ authored (R-CBF-1.1…1.5) |

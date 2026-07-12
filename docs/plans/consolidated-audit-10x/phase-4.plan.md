@@ -24,15 +24,26 @@
 
 ## medium-04 — Asset Copilot (ops Q&A) + hands-free chaos mode
 
-- **Status:** 🚧 on hold. **Standing blocker (voice only):** voice mode needs the native shell — gated on the Expo / native-app sequencing. **The text copilot is NOT blocked by that** — it is gated only by the data-quality sequencing below.
-- **Why sequenced late:** answer quality is bounded by data quality — sequence **after** the data-quality wins (small-01 locate, small-02 badge, R-M1 RFID-gate) and the Code Blue packaging, so it answers from trustworthy inputs.
+- **Status:** 🚧 on hold. Split into **two dependent cards** — **medium-04a** (text-command path), gated only by the data-quality sequencing, and **medium-04b** (voice/ASR path), additionally gated on the native shell and dependent on 04a. Both stay **parked/owner-gated**; each earns its own SDD sub-spec when its entry conditions clear (per "When a blocker clears" / spec §2).
+- **Why sequenced late (both cards):** answer quality is bounded by data quality — sequence **after** the data-quality wins (small-01 locate, small-02 badge, R-M1 RFID-gate) and the Code Blue packaging, so it answers from trustworthy inputs.
+- **Reuse anchors (shared; substantial scaffolding already exists — verify at authoring):** `server/services/asset-copilot-orchestrator.service.ts` + `asset-copilot-resolve.service.ts`; `server/routes/equipment-copilot.ts`; `server/domain/equipment/copilot/{answer.types,ai-safety-validator,citation-validator}.ts`; `server/domain/equipment/evidence/resolver/*`; `docs/PH-01-operational-assistance-during-chaos.md`.
+- **Frozen constraints (both cards; the sub-spec must enforce):** citations mandatory (no uncited answers); `clinicId` scoping on every evidence source; the AI-safety validator gates every response (no bypass for new sources); cross-clinic questions never leak another clinic's rows (golden negative test).
+
+### medium-04a — Text-command path (ships first)
+
+- **Standing blocker:** none from the native shell — gated **only** by the data-quality sequencing above; the text copilot is fully useful alone.
 - **Entry conditions:**
-  1. **Text copilot:** may be authored once the Phase 1 data-quality features (small-01/02) have shipped — its answers need them.
-  2. **Voice mode:** waits on the native-shell sequencing (deferred).
-  3. Read the **`claude-api` skill** before wiring any LLM provider/model + prompt-caching.
-- **Reuse anchors (substantial scaffolding already exists — verify at authoring):** `server/services/asset-copilot-orchestrator.service.ts` + `asset-copilot-resolve.service.ts`; `server/routes/equipment-copilot.ts`; `server/domain/equipment/copilot/{answer.types,ai-safety-validator,citation-validator}.ts`; `server/domain/equipment/evidence/resolver/*`; `docs/PH-01-operational-assistance-during-chaos.md`.
-- **Approach (sketch):** widen the resolver's evidence sources from equipment-only to **inventory + shifts + schedule**; keep the **mandatory citation + AI-safety validators unchanged** (every answer must cite); voice = a native-shell add-on layered later (STT in, TTS out) — the text path ships first and is fully useful alone.
-- **Frozen constraints (the sub-spec must enforce):** citations mandatory (no uncited answers); `clinicId` scoping on every evidence source; the AI-safety validator gates every response (no bypass for new sources); cross-clinic questions never leak another clinic's rows (golden negative test).
+  1. The Phase 1 data-quality features (small-01 locate, small-02 badge) have shipped — the copilot's answers need them.
+  2. Read the **`claude-api` skill** before wiring any LLM provider/model + prompt-caching.
+- **Scope:** widen the resolver's evidence sources from equipment-only to **inventory + shifts + schedule**; keep the **mandatory citation + AI-safety validators unchanged** (every answer must cite). Text query in, cited text answer out — no voice surface.
+
+### medium-04b — Voice / hands-free chaos mode (ASR/STT + TTS; after 04a)
+
+- **Standing blocker (voice only):** the native shell — gated on the Expo / native-app sequencing (deferred). **Depends on medium-04a** — voice is a presentation layer over the text path and does not ship before the text path is proven.
+- **Entry conditions:**
+  1. medium-04a (text path) has shipped and is proven.
+  2. The native-shell sequencing has cleared (STT capture + TTS playback require the native shell).
+- **Scope:** a native-shell add-on layered over 04a — **STT in, TTS out** — routed through the **same** orchestrator, citations, and AI-safety validator as the text path (no new evidence source beyond what 04a already vetted, no validator bypass).
 
 ---
 
