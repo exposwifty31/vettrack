@@ -3,6 +3,50 @@ import { AlertTriangle, CloudOff, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { t } from "@/lib/i18n";
+import type { PendingSync } from "@/lib/offline-db";
+
+/**
+ * Picks the row that represents the CURRENT failure state: permanent
+ * failures (dead-letter / conflict) outrank still-retrying ones, and within
+ * a group the most recently updated row wins — that's the freshest failure
+ * signature (T-36 · R-SY-02).
+ */
+function pickPrimaryFailingItem(
+  deadLetterItems: PendingSync[],
+  retryableFailedItems: PendingSync[],
+): PendingSync | undefined {
+  const byRecency = (a: PendingSync, b: PendingSync) =>
+    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  if (deadLetterItems.length > 0) return [...deadLetterItems].sort(byRecency)[0];
+  if (retryableFailedItems.length > 0) return [...retryableFailedItems].sort(byRecency)[0];
+  return undefined;
+}
+
+/**
+ * Failure signature the dismissal is keyed to: `(syncErrorKind,
+ * targetResource)`. Two banner states share a signature iff BOTH fields are
+ * equal — a distinct signature (e.g. a different, more serious failure)
+ * must re-show the banner even though an earlier one was dismissed.
+ */
+function deriveDismissalSignature(params: {
+  hasFailed: boolean;
+  isCircuitOpen: boolean;
+  hasPending: boolean;
+  deadLetterItems: PendingSync[];
+  retryableFailedItems: PendingSync[];
+}): string {
+  const { hasFailed, isCircuitOpen, hasPending, deadLetterItems, retryableFailedItems } = params;
+
+  if (hasFailed) {
+    const item = pickPrimaryFailingItem(deadLetterItems, retryableFailedItems);
+    const syncErrorKind = item?.structuredError?.code ?? item?.errorMessage ?? "unknown_error";
+    const targetResource = item?.endpoint ?? item?.type ?? "unknown_resource";
+    return `${syncErrorKind}::${targetResource}`;
+  }
+  if (isCircuitOpen) return "circuit_open::queue";
+  if (hasPending) return "pending::queue";
+  return "none::none";
+}
 
 /**
  * Sticky banner shown when the offline sync queue has pending or failed items.
@@ -11,13 +55,32 @@ import { t } from "@/lib/i18n";
  * state and gives staff a one-tap path to retry or review.
  */
 export function SyncStatusBanner() {
-  const { pendingCount, failedCount, isSyncing, isCircuitOpen, triggerSync } = useSync();
-  const [dismissed, setDismissed] = useState(false);
+  const {
+    pendingCount,
+    failedCount,
+    isSyncing,
+    isCircuitOpen,
+    triggerSync,
+    deadLetterItems,
+    retryableFailedItems,
+  } = useSync();
+  const [dismissedSignatures, setDismissedSignatures] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
 
   const hasFailed  = failedCount > 0;
   const hasPending = pendingCount > 0;
 
-  if (dismissed || (!hasFailed && !hasPending)) return null;
+  const signature = deriveDismissalSignature({
+    hasFailed,
+    isCircuitOpen,
+    hasPending,
+    deadLetterItems,
+    retryableFailedItems,
+  });
+  const isDismissed = dismissedSignatures.has(signature);
+
+  if (isDismissed || (!hasFailed && !hasPending)) return null;
 
   const isFailing = hasFailed || isCircuitOpen;
 
@@ -61,7 +124,13 @@ export function SyncStatusBanner() {
         type="button"
         aria-label="Dismiss"
         className="shrink-0 rounded p-0.5 opacity-60 hover:opacity-100"
-        onClick={() => setDismissed(true)}
+        onClick={() =>
+          setDismissedSignatures((prev) => {
+            const next = new Set(prev);
+            next.add(signature);
+            return next;
+          })
+        }
       >
         <X className="h-3.5 w-3.5" />
       </button>
