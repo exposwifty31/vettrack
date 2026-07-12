@@ -61,6 +61,9 @@ async function loadTelemetryHandler(): Promise<
     (l) => l.route?.path === "/telemetry" && l.route.methods.post,
   );
   if (!layer?.route) throw new Error("POST /telemetry handler not found");
+  // Non-null: `layer.route` is guaranteed above; the last entry is the
+  // terminal handler, but TypeScript cannot statically prove the matched
+  // route's stack array is non-empty.
   return layer.route.stack[layer.route.stack.length - 1]!.handle;
 }
 

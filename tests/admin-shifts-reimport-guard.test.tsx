@@ -152,4 +152,20 @@ describe("AdminShiftsPage — re-import guard (T-42 · R-AD-03)", () => {
     fireEvent.click(confirmButton());
     await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(2));
   });
+
+  it("surfaces an error toast and re-enables Import (not stuck disabled) when confirm fails", async () => {
+    const { container } = renderPage();
+    const file = new File(["x"], "roster.csv", { type: "text/csv" });
+    fireEvent.change(fileInput(container), { target: { files: [file] } });
+    fireEvent.click(screen.getByTestId("btn-preview-shifts-csv"));
+    await waitFor(() => expect(confirmButton().disabled).toBe(false));
+
+    confirmMock.mockRejectedValueOnce(new Error("import failed"));
+    fireEvent.click(confirmButton());
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+
+    // A rejected confirm must not be treated as "already imported" — the
+    // same file can be retried.
+    expect(confirmButton().disabled).toBe(false);
+  });
 });

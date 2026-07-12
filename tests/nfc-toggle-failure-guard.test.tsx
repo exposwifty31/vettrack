@@ -122,6 +122,9 @@ async function renderAndCaptureOnRead(): Promise<(payload: NfcReadPayload) => Pr
 
   fireEvent.click(screen.getByTestId("nfc-toggle"));
   await waitFor(() => expect(captured).not.toBeNull());
+  // Non-null: the waitFor above guarantees startNfcScanSessionMock's onRead
+  // callback was captured at runtime, but TypeScript can't narrow a
+  // closure-assigned `let` past a runtime assertion.
   return captured!;
 }
 

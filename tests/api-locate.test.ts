@@ -64,4 +64,16 @@ describe("api.equipment.locate", () => {
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(`/api/equipment/locate?q=${encodeURIComponent("a b/c?")}`);
   });
+
+  it("rejects when the server returns a non-200 response", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ message: "boom" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(api.equipment.locate("stryker")).rejects.toThrow();
+  });
 });

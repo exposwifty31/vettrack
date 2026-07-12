@@ -18,6 +18,8 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Router } from "wouter";
+import { memoryLocation } from "wouter/memory-location";
 import { t } from "@/lib/i18n";
 
 const endMock = vi.fn();
@@ -75,9 +77,12 @@ import CodeBluePage from "@/pages/code-blue";
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const { hook } = memoryLocation({ path: "/code-blue" });
   return render(
     <QueryClientProvider client={client}>
-      <CodeBluePage />
+      <Router hook={hook}>
+        <CodeBluePage />
+      </Router>
     </QueryClientProvider>,
   );
 }
