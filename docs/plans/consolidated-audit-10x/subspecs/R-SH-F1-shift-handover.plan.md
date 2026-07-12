@@ -19,7 +19,7 @@
 
 ## Frozen guardrails (every card)
 
-`clinicId`-scoped · deltas read from existing audit/outbox — **no new realtime path** · **ack = a deliberate confirm** (attestation — the sanctioned exception to undo-first) · the Priza contract stays stable/integration-friendly (no internal-only hard-coupling) · no reintroduced internal patient model.
+**Every read from `vt_audit_logs`/`vt_event_outbox` and every write to `vt_shift_handover` carries an explicit target-table `clinicId` predicate** (not merely "clinicId-scoped") · deltas read from existing audit/outbox — **no new realtime path** · **ack = a deliberate confirm** (attestation — the sanctioned exception to undo-first) · the Priza contract stays stable/integration-friendly (no internal-only hard-coupling) · no reintroduced internal patient model.
 
 ---
 
@@ -32,7 +32,7 @@
 ### R-SH-F1.2 · Delta generator (all 4 types) at shift end
 
 - **Goal:** a generator that runs at shift end aggregating the shift-window deltas from `vt_audit_logs` + `vt_event_outbox` into a compact artifact + open-items list. **Idempotent per `shiftSessionId`** — a re-run yields the same artifact with **no duplicate deltas**; every delta is scoped to the shift window `[start, end)`.
-- **RED:** `tests/shift-handover-generator.test.ts` — a seeded shift with a known set of custody/task/alert/dispense mutations → the handover lists **exactly** those deltas + open items; **re-running the generator for the same `shiftSessionId` yields an identical artifact (no duplicates)**; deltas outside `[start, end)` are excluded.
+- **RED:** `tests/shift-handover-generator.test.ts` — a seeded shift with a known set of custody/task/alert/dispense mutations → the handover lists **exactly** those deltas + open items; **re-running the generator for the same `shiftSessionId` yields an identical artifact (no duplicates)**; deltas outside `[start, end)` are excluded; **cross-clinic negative — same-looking events seeded for another clinic are excluded (the target-table `clinicId` predicate holds on every read)**.
 - **Guardrail:** read from existing audit/outbox; no new realtime path.
 
 ### R-SH-F1.3 · App-observed signals
