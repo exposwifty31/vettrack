@@ -2539,3 +2539,19 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 - **Batch gate:** `pnpm typecheck` 0; full `pnpm test` = **516 files / 4664 tests, 0 fail**. Worktrees removed.
 
 **Verdict:** VERIFIED — Inventory FIXES complete. Remaining Inventory work: **T-30 nudge feature (6 sub-cards)** — see the ledger for the pinned execution plan (feed read-path + client↔server telemetry enum contract). Then Web-gate T-31.
+
+---
+
+## 2026-07-12 — Consolidated Audit × 10x — Phase 1 Web-gate (T-31 · R-WEB-01)
+
+**Claim:** The desktop web shell is now gated on the `management.web` capability. RED-first, `+R`-reviewed clean. Executed solo in the main tree (no parallel work).
+
+**Evidence:**
+- **GREEN:** `src/features/auth/components/AuthGuard.tsx` — a guard clause added **after** every existing auth-state branch (loading/signed-out→/signin/pending/blocked/accessDenied): `if (platformTarget === "desktop" && !experience.can("management.web")) return <ManagementWebGate/>`. Hooks (`usePlatformTarget`, `useExperience`) called unconditionally at top (rules-of-hooks). New `src/app/platform/guards/ManagementWebGate.tsx` (reuses `WebOnlyGuard`'s dark full-bleed denial pattern; `WebOnlyGuard` untouched). `resolvePlatformTarget()` sync contract + `/board` + mobile all unchanged.
+- **Capability set:** `experience.can("management.web")` grants to EXACTLY **admin + senior_technician + lead_technician + secondary-admin** (verified against `src/lib/roles/experience-model.ts` — admin direct, lead archetype = senior/lead_technician, secondary-admin via `SECONDARY_ADMIN_CAPS` when `secondaryRole==="admin"`); vet/vet_tech/technician/student denied. Matches the owner-confirmed spec ("do NOT collapse to lossy admin+leads"). The capability map pre-existed and was reused, not re-derived.
+- **RED:** `tests/web-platform-management-gate.test.tsx` — vet_tech + student @desktop → denial; admin + senior_technician + lead_technician + **secondary-admin** @desktop → passthrough; a denied role on mobile is NOT gated. Real `experience-model.ts` (only `useAuth`/capacitor mocked). 7 tests.
+- **`+R` review: APPROVE** (0 Crit/High). Confirmed exact capability set, guard placement (signed-out still gets sign-in), guardrails, non-vacuous tests. **1 MEDIUM fixed in-cycle:** the reused `WebOnlyGuard` CTA ("Go to my equipment"→`/home`) was a dead-end — `/home` is itself under `AuthGuard` and re-hits the same gate → looped back to the denial. Fixed to **sign-out** (matching AuthGuard's sibling denial states), dropped the now-unused `managementWebGate.cta` key.
+- **Commits:** `804bdffa7` (guard + component) + `964d949b0` (i18n `.d.ts` regen) + `43d05a611` (CTA→signOut fix).
+- **Batch gate:** `pnpm typecheck` 0; full `pnpm test` = **517 files / 4671 tests, 0 fail**. (First gate run showed the T-31 test file failing as a block — an i18n-codegen first-run artifact; ruled out via 3× isolated + 3× full green.)
+
+**Verdict:** VERIFIED — Web-gate T-31 complete. **Only T-30 (nudge feature, 6 sub-cards) remains in Phase 1** (compute-on-read plan pinned in the SDD ledger). Then Phase 2 (T-34…44), Phase 3 (T-45…53), O+R sub-specs.
