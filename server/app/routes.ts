@@ -15,6 +15,7 @@ import testRoutes from "../routes/test.js";
 import healthRoutes from "../routes/health.js";
 
 // --- Equipment core ---
+import equipmentLocateRoutes from "../routes/equipment-locate.js";
 import equipmentRoutes from "../routes/equipment.js";
 import equipmentOperationalStateRoutes from "../routes/equipment-operational-state.js";
 import operationalMetricsRoutes from "../routes/operational-metrics.js";
@@ -77,6 +78,9 @@ function registerInfrastructureRoutes(app: express.Express) {
 }
 
 function registerEquipmentCoreRoutes(app: express.Express) {
+  // Locate mounts before the main equipment router: /locate is a single path
+  // segment and would otherwise match equipmentRoutes' generic GET /:id first.
+  app.use("/api/equipment", equipmentLocateRoutes);
   // Main equipment router first; copilot nested routes (/:id/copilot/*) pass through when
   // unmatched. Copilot middleware is scoped to POST /:id/copilot/explain only.
   app.use("/api/equipment", equipmentRoutes);
