@@ -2510,3 +2510,18 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 - **Batch gate:** `pnpm typecheck` 0; full `pnpm test` = **509 files / 4633 tests, 0 fail** (34s). Worktrees removed.
 
 **Verdict:** VERIFIED — ★ **Phase 1 Equipment bundle COMPLETE** (T-17…T-24: 5 fixes + 8 feature sub-cards + 5 mounted surfaces). Documented follow-ups: LocateSearch readiness badge (data-model), return-dialog i18n, damaged-branch check-in intent. Next: Phase 1 Shift/Home bundle (T-25, T-26, T-27).
+
+---
+
+## 2026-07-12 — Consolidated Audit × 10x — Phase 1 Shift/Home bundle (T-25, T-26, T-27)
+
+**Claim:** The Shift/Home bundle is implemented RED-first, integrated, batch-gate green. 2 parallel worktrees off `bd856dd9c`. T-25 is `S +R` (reviewed clean); rest `Tier: S`.
+
+**Evidence:**
+- **T-25** (R-SH-01 · CLICK-PATH-007 · **S +R**): `useShiftChat.ts` — reactions/acks now render live via a **merge-by-id local patch** on the react/ack mutation `onSuccess` (was invalidate-only over a strict-`gt` poll, so a reaction on an already-loaded message never rendered). RED `tests/shift-chat-live-reaction.test.tsx`. **Review APPROVE (0 findings):** reviewer traced the patch vs the actual server semantics (`server/routes/shift-chat.ts` — reactions toggle per `(messageId,userId,emoji)`, acks upsert per `(messageId,userId)`), confirmed teammates' reactions/acks survive the merge, correct toggle both directions, writes to the same accumulator the poll dedupes by id (no resurrection), non-vacuous. **Guardrail held:** no new realtime path — background poll untouched. `0fbfba006` → cp `7cc54213b`.
+- **T-26** (R-SH-02 · CLICK-PATH-017): `useShiftChat.ts` — unread badge no longer counts the just-read batch on open→close (`wasOpenRef` advances `lastOpenRef` on the close edge; genuinely-new-after-close still counts). RED `tests/shift-chat-unread-badge.test.tsx`. `9a26f2a78` → cp `90a85f234`.
+- **T-27a** (R-SH-F2 · small-05): new `src/features/today/surfaces/StartOfShiftCard.tsx` — one focal "what needs me now" + one primary action, **capability-gated** via `useExperience().can()` (branch order mirrors `experience-model.ts`: management.web→ops, equipment.vetActions→vet, codeBlue.manage→tech, else→student), off-shift idle variant, phone-compact/iPad-hero via `isTablet`. i18n keys + parity ✓. 16 tests. `1c33a784c` → cp `4a5e15821`.
+- **T-27b** (R-SH-F2 · mount fan-out): mounted `<StartOfShiftCard>` in Ops/Vet/Tech/Student home surfaces (each passes its own computed `home.*` values). 7 tests, 45/45 no-regression. `8e67b5b98` → cp `5ae8df8db`. **Deviations (documented):** `FloorHomeSurface` NOT mounted (pure archetype dispatcher → covered transitively, asserted); `OnShiftHero` NOT mounted (its signature carries no per-role capability/count data → a real API change across 5 call sites, not a mechanical mount). **Follow-up:** iPad `HomeTabletDashboard` (uses `OnShiftHero`) does not yet show the card.
+- **Batch gate:** `pnpm typecheck` 0; full `pnpm test` = **513 files / 4660 tests, 0 fail** (32s). Worktrees removed.
+
+**Verdict:** VERIFIED — Phase 1 Shift/Home bundle complete. Next: Phase 1 Inventory bundle (T-28a/b, T-29, T-30 nudge sub-cards) → Web-gate (T-31). (R-SH-F1 handover = deferred O+R sub-spec.)
