@@ -20,6 +20,8 @@ import type {
   QuickScanToggleResult,
   QuickScanToggleAction,
   EquipmentLocateResponse,
+  CreateDamageReportRequest,
+  CreateDamageReportResponse,
 } from "@/types";
 import type { EquipmentWaitlistSnapshot } from "../../../shared/equipment-waitlist.js";
 import type { EquipmentTruthResponse } from "../../../shared/equipment-truth.js";
@@ -260,6 +262,17 @@ export const equipmentApi = {
     /** Read-only search (T-22b · R-EQ-F1) — GET /api/equipment/locate?q= */
     locate: (q: string) =>
       request<EquipmentLocateResponse>(`/api/equipment/locate?q=${encodeURIComponent(q)}`),
+    /**
+     * Damaged-at-check-in report (T-24c · R-EQ-F3) — POST /api/equipment/damage-reports.
+     * Flat mount (like `locate` above) since the payload already carries
+     * `equipmentId`; the route (T-24b) writes a `vt_damage_events` row and
+     * flips the equipment's `conditionStatus`.
+     */
+    reportDamage: (data: CreateDamageReportRequest) =>
+      request<CreateDamageReportResponse>("/api/equipment/damage-reports", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
     confirmInRoom: (id: string, body: { roomId: string }) =>
       request<{ equipmentId: string; roomId: string; roomName: string; status: string }>(
         `/api/equipment/${encodeURIComponent(id)}/confirm-in-room`,
