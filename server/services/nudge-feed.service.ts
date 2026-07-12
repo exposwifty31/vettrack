@@ -1,19 +1,21 @@
 import { and, eq, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { db, equipment } from "../db.js";
 import type { UserRole } from "../middleware/auth.js";
+import { listLowStockItems } from "./inventory-console.service.js";
 
 /**
- * Role-scoped nudge feed — compute-on-read (T-30a1-i · R-IN-F1 · small-03).
+ * Role-scoped nudge feed — compute-on-read (T-30a1-i, T-30a1-ii · R-IN-F1 · small-03).
  *
  * ARCHITECTURE: `expiryCheckWorker` (server/workers/expiryCheckWorker.ts) runs
  * in a separate process from the API, so an in-memory push feed can't bridge
  * them, and a new table is heavier than this feature warrants. This service
- * derives nudges fresh from existing clinicId-scoped rows on every read —
- * it is NOT a worker-pushed store. Do not wire expiryCheckWorker to push
- * into this module and do not add a table for it.
+ * derives nudges fresh from existing clinicId-scoped rows/services on every
+ * read — it is NOT a worker-pushed store. Do not wire expiryCheckWorker to
+ * push into this module and do not add a table for it. The restock kind
+ * reuses `listLowStockItems` rather than re-deriving its aggregation query.
  */
 
-export type NudgeKind = "expiry";
+export type NudgeKind = "expiry" | "restock";
 
 export interface Nudge {
   id: string;
@@ -31,6 +33,15 @@ export interface Nudge {
  * for day-to-day inventory management duties.
  */
 const EXPIRY_NUDGE_TARGET_ROLE: UserRole = "technician";
+
+/**
+ * The role that should see restock nudges — same day-to-day inventory
+ * operational floor as the expiry path. Mirrors `requireEffectiveRole("technician")`
+ * on server/routes/procurement.ts's view/receive endpoints (the admin-gated
+ * `/api/inventory-items/low-stock` console route is a separate oversight
+ * consumer of the same underlying restock-needed rule, not this nudge feed).
+ */
+const RESTOCK_NUDGE_TARGET_ROLE: UserRole = "technician";
 
 type ExpiringEquipmentRow = {
   id: string;
@@ -65,18 +76,36 @@ async function fetchExpiringEquipment(clinicId: string): Promise<ExpiringEquipme
 
 /**
  * Computes the nudge feed for one clinic + role. Derives "expiry" nudges from
- * `vt_equipment` rows expiring within the worker's threshold, tags each with
- * the role responsible for acting on it, then returns only the nudges whose
- * `targetRole` matches the requesting user's role.
+ * `vt_equipment` rows expiring within the worker's threshold, and "restock"
+ * nudges by reusing `listLowStockItems` (server/services/inventory-console.service.ts)
+ * — the codebase's existing clinicId-scoped restock-needed rule: an item has
+ * a par level and its summed on-hand across containers is below it. Each
+ * nudge is tagged with the role responsible for acting on it, then only the
+ * nudges whose `targetRole` matches the requesting user's role are returned.
  */
 export async function computeNudgesForUser(clinicId: string, role: string): Promise<Nudge[]> {
-  const rows = await fetchExpiringEquipment(clinicId);
-  const nudges: Nudge[] = rows.map((row) => ({
+  const [expiringRows, lowStockRows] = await Promise.all([
+    fetchExpiringEquipment(clinicId),
+    listLowStockItems(clinicId),
+  ]);
+
+  const createdAt = new Date().toISOString();
+
+  const expiryNudges: Nudge[] = expiringRows.map((row) => ({
     id: `expiry:${row.id}`,
     kind: "expiry",
     targetRole: EXPIRY_NUDGE_TARGET_ROLE,
     entityId: row.id,
-    createdAt: new Date().toISOString(),
+    createdAt,
   }));
-  return nudges.filter((nudge) => nudge.targetRole === role);
+
+  const restockNudges: Nudge[] = lowStockRows.map((row) => ({
+    id: `restock:${row.itemId}`,
+    kind: "restock",
+    targetRole: RESTOCK_NUDGE_TARGET_ROLE,
+    entityId: row.itemId,
+    createdAt,
+  }));
+
+  return [...expiryNudges, ...restockNudges].filter((nudge) => nudge.targetRole === role);
 }
