@@ -449,6 +449,11 @@ function EquipmentDetailPageDesktop() {
     queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
     queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
     queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
+    // F-3: the custodian/location summary (EquipmentTruthCard) and the
+    // readiness gate read the evidence-graph queries — refresh them too so a
+    // return/checkout doesn't leave a stale "אחראי" custodian on the detail.
+    queryClient.invalidateQueries({ queryKey: ["equipment-truth", id] });
+    queryClient.invalidateQueries({ queryKey: ["deployability", id] });
   }
 
   async function handleConfirmHere() {
