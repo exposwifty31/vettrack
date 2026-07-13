@@ -777,6 +777,8 @@ const translations = {
     signedUp: (date: string) => tr(d.adminPage.signedUp, { date }),
     joined: (date: string) => tr(d.adminPage.joined, { date }),
     requestedRoleHint: (role: string) => tr(d.adminPage.requestedRoleHint, { role }),
+    vetLicenseHint: (number: string) => tr(d.adminPage.vetLicenseHint, { number }),
+    approveAsRole: (role: string) => tr(d.adminPage.approveAsRole, { role }),
     rejectUserTitle: (name: string) => tr(d.adminPage.rejectUserTitle, { name }),
     deleteUserTitle: (name: string) => tr(d.adminPage.deleteUserTitle, { name }),
     deleteFolderTitle: (name: string) => tr(d.adminPage.deleteFolderTitle, { name }),
@@ -1127,7 +1129,20 @@ const translations = {
 
   homeNudges: d.homeNudges,
 
-  returnPlugDialog: d.returnPlugDialog,
+  returnPlugDialog: {
+    ...d.returnPlugDialog,
+    description: (name?: string | null) =>
+      name
+        ? tr(d.returnPlugDialog.descriptionWithName, { name })
+        : d.returnPlugDialog.descriptionNoName,
+    plugAlertWarning: (minutes: number) =>
+      tr(
+        minutes === 1
+          ? d.returnPlugDialog.plugAlertWarningOne
+          : d.returnPlugDialog.plugAlertWarningOther,
+        { minutes },
+      ),
+  },
 
 } as const;
 

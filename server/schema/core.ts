@@ -26,6 +26,13 @@ export const users = vtTable("vt_users", {
    * never propagated to clinical authority (`resolveAuthority`).
    */
   requestedRole: varchar("requested_role", { length: 20 }),
+  /**
+   * Doctor/license number captured at sign-up when the self-requested role is
+   * `vet` (Clerk `unsafeMetadata.vetLicenseNumber`). Verification artifact only:
+   * the admin reviews it before approving the vet grant (see `resolveApprovalRole`).
+   * Not authoritative on its own; presence is required to auto-apply `vet` on approval.
+   */
+  vetLicenseNumber: varchar("vet_license_number", { length: 40 }),
   allowedOperationalRoles: jsonb("allowed_operational_roles").notNull().default(sql`'[]'::jsonb`),
   status: varchar("status", { length: 20 }).notNull().default("active"),
   preferredLocale: varchar("preferred_locale", { length: 10 }).notNull().default("he"),

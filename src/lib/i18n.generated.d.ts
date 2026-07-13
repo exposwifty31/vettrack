@@ -784,6 +784,9 @@ export interface TStructure {
       signOut: string;
       loadingApp: string;
       nativeClerkFailed: string;
+      offlineTitle: string;
+      offlineBody: string;
+      offlineRetry: string;
       reasons: {
         missingClinicId: string;
         dbFallbackDisabled: string;
@@ -2034,6 +2037,10 @@ export interface TStructure {
     signedUp: string;
     joined: string;
     requestedRoleHint: string;
+    vetLicenseHint: string;
+    approveAsRole: string;
+    grantRoleLabel: string;
+    vetLicenseRequiredError: string;
     reject: string;
     approve: string;
     rejectUserTitle: string;
@@ -3841,6 +3848,10 @@ export interface TStructure {
     roleStudent: string;
     roleSelectLabel: string;
     roleSelectHint: string;
+    vetLicenseLabel: string;
+    vetLicensePlaceholder: string;
+    vetLicenseHint: string;
+    vetLicenseRequired: string;
     devModeNotice: string;
     enterDashboard: string;
     moreAboutVetTrack: string;
@@ -4133,6 +4144,17 @@ export interface TStructure {
     dismissAria: string;
   };
   returnPlugDialog: {
+    title: string;
+    descriptionWithName: string;
+    descriptionNoName: string;
+    pluggedIn: string;
+    notPluggedIn: string;
+    plugAlertWarningOne: string;
+    plugAlertWarningOther: string;
+    deadlineLabel: string;
+    cancel: string;
+    confirmPluggedIn: string;
+    confirmSetAlert: string;
     damagedButton: string;
     damageWarning: string;
     confirmReturnedDamaged: string;

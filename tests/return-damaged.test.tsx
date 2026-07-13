@@ -19,7 +19,7 @@
  * double undo affordance.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Router, Route } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
@@ -196,6 +196,38 @@ describe("ReturnPlugDialog — 'Returned damaged' third choice + undo (T-24d)", 
     fireEvent.click(screen.getByTestId("btn-return"));
 
     expect(screen.getByTestId("btn-returned-damaged")).toBeTruthy();
+  });
+
+  // F-3 (device audit 2026-07-13): a normal return must refresh the
+  // evidence-graph custodian summary (EquipmentTruthCard reads the
+  // ["equipment-truth", id] query). invalidateAll() previously omitted it,
+  // so the "אחראי" custodian text stayed stale after a return.
+  it("invalidates the equipment-truth query on a normal return (F-3)", async () => {
+    returnMock.mockResolvedValue({
+      equipment: {
+        ...baseEquipment(),
+        custodyState: "available",
+        checkedOutById: null,
+        checkedOutByEmail: null,
+        checkedOutAt: null,
+      },
+      undoToken: "undo-normal",
+    });
+    const { client } = await renderDetailPage(baseEquipment());
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+
+    fireEvent.click(screen.getByTestId("btn-return"));
+    fireEvent.click(screen.getByTestId("btn-confirm-return-plug"));
+
+    await waitFor(() => expect(returnMock).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: ["equipment-truth", "eq1"] }),
+      ),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ["deployability", "eq1"] }),
+    );
   });
 
   it("releases custody immediately on confirm — only the damage report is deferred until the undo window elapses", async () => {

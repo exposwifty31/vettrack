@@ -8,12 +8,11 @@ import { useDirection } from "@/hooks/useDirection";
  * values (see `UserRole` in server/middleware/auth.ts) so a downstream
  * consumer of the requested-role tag never needs to remap them.
  */
-export type SignupRequestedRole = "technician" | "vet" | "student";
+export type SignupRequestedRole = "technician" | "vet";
 
 const ROLE_OPTIONS: { role: SignupRequestedRole; label: () => string }[] = [
   { role: "technician", label: () => t.authPage.roleVetTech },
   { role: "vet", label: () => t.authPage.roleVeterinarian },
-  { role: "student", label: () => t.authPage.roleStudent },
 ];
 
 interface RoleChipsProps {

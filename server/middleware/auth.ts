@@ -101,6 +101,27 @@ function readRequestedRoleFromMetadata(meta: unknown): unknown {
   return undefined;
 }
 
+/** Read the vet license number off an unsafe-metadata bag without trusting its shape. */
+function readVetLicenseFromMetadata(meta: unknown): unknown {
+  if (meta && typeof meta === "object") {
+    return (meta as Record<string, unknown>).vetLicenseNumber;
+  }
+  return undefined;
+}
+
+/**
+ * Sanitize a self-supplied vet license/doctor number (Clerk
+ * `unsafeMetadata.vetLicenseNumber`) to a trimmed, length-bounded string or
+ * `null`. Verification artifact only — the admin reviews it before approving a
+ * vet grant; it never confers authority on its own.
+ */
+export function sanitizeVetLicense(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (trimmed.length < 3 || trimmed.length > 40) return null;
+  return trimmed;
+}
+
 const DEV_USER: AuthUser = {
   id: "dev-admin-001",
   clerkId: "dev-admin-001",
@@ -410,6 +431,9 @@ export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
   let requestedRoleRaw: unknown = readRequestedRoleFromMetadata(
     sessionClaims?.unsafeMetadata ?? sessionClaims?.unsafe_metadata,
   );
+  let vetLicenseRaw: unknown = readVetLicenseFromMetadata(
+    sessionClaims?.unsafeMetadata ?? sessionClaims?.unsafe_metadata,
+  );
   if (!clerkEmail) {
     try {
       const clerkUser = await clerkClient.users.getUser(clerkUserId);
@@ -417,6 +441,9 @@ export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
       clerkName = `${clerkUser.firstName ?? ""} ${clerkUser.lastName ?? ""}`.trim();
       if (requestedRoleRaw === undefined) {
         requestedRoleRaw = readRequestedRoleFromMetadata(clerkUser.unsafeMetadata);
+      }
+      if (vetLicenseRaw === undefined) {
+        vetLicenseRaw = readVetLicenseFromMetadata(clerkUser.unsafeMetadata);
       }
     } catch (err) {
       console.error("[auth] Clerk profile enrichment failed for new-user bootstrap", { clerkUserId, err });
@@ -434,6 +461,8 @@ export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
   const defaultRole: UserRole = adminEmail ? "admin" : "technician";
   // Staging column, captured at first-login only. NOT the authoritative role.
   const requestedRole = sanitizeRequestedRole(requestedRoleRaw);
+  // Verification artifact — only meaningful when the user self-requested `vet`.
+  const vetLicenseNumber = requestedRole === "vet" ? sanitizeVetLicense(vetLicenseRaw) : null;
 
   // Guarantee the clinic row exists before inserting the user. A new Clerk
   // organization has no matching vt_clinics row until this fires; without it
@@ -457,6 +486,8 @@ export async function resolveAuthUser(req: Request): Promise<ResolveResult> {
       // Advisory staging value — set on first insert only. Excluded from the
       // onConflictDoUpdate set below so a later sign-in can never re-stage it.
       requestedRole,
+      // Vet license (verification artifact) — first insert only, same as above.
+      vetLicenseNumber,
       status: defaultStatus,
     })
     .onConflictDoUpdate({

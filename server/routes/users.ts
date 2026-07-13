@@ -17,6 +17,7 @@ import {
 } from "../lib/apple-auth.js";
 import { deleteOwnAccount, AccountDeletionProtectedError } from "../services/account-deletion.service.js";
 import { logAudit, resolveAuditActorRole } from "../lib/audit.js";
+import { resolveApprovalRole } from "../lib/approval-role.js";
 import { resolveCurrentRole } from "../lib/role-resolution.js";
 import { resolveAuthority } from "../lib/authority.js";
 import { invalidateForUser } from "../lib/authority-cache.js";
@@ -66,6 +67,9 @@ const patchRoleSchema = z.object({
 
 const patchStatusSchema = z.object({
   status: z.enum(VALID_STATUSES, { required_error: "status is required" }),
+  // Optional role to grant on approval (pending → active). Omitted: the user's
+  // self-requested role is auto-applied. Provided: admin override wins (C3).
+  role: z.enum(VALID_ROLES).optional(),
 });
 
 const patchDisplayNameSchema = z.object({
@@ -304,9 +308,13 @@ router.get("/pending", requireAuth, requireAdmin, async (req, res) => {
   try {
     const clinicId = req.clinicId!;
     const pendingUsers = await db
-      // requestedRole is the advisory sign-up hint (T24b): shown read-only to
-      // the admin; approval never auto-applies it as the authoritative role.
-      .select({ ...userFields, requestedRole: users.requestedRole })
+      // requestedRole is the self-requested role (C3): the admin verifies the
+      // vet license below, then approval auto-applies the requested role.
+      .select({
+        ...userFields,
+        requestedRole: users.requestedRole,
+        vetLicenseNumber: users.vetLicenseNumber,
+      })
       .from(users)
       .where(and(eq(users.clinicId, clinicId), eq(users.status, "pending"), isNull(users.deletedAt)))
       .orderBy(users.createdAt);
@@ -458,7 +466,7 @@ router.patch("/:id/status", requireAuth, requireAdmin, validateUuid("id"), valid
   const requestId = resolveRequestId(res, req.headers["x-request-id"]);
   try {
     const clinicId = req.clinicId!;
-    const { status } = req.body as z.infer<typeof patchStatusSchema>;
+    const { status, role: overrideRole } = req.body as z.infer<typeof patchStatusSchema>;
 
     const [existing] = await db
       .select()
@@ -466,13 +474,7 @@ router.patch("/:id/status", requireAuth, requireAdmin, validateUuid("id"), valid
       .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
       .limit(1);
 
-    const [user] = await db
-      .update(users)
-      .set({ status })
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
-      .returning();
-
-    if (!user) {
+    if (!existing) {
       return res.status(404).json(
         apiError({
           code: "NOT_FOUND",
@@ -483,6 +485,60 @@ router.patch("/:id/status", requireAuth, requireAdmin, validateUuid("id"), valid
       );
     }
 
+    // C3: on approval (pending → active), promote to the self-requested role so
+    // the admin doesn't re-select it. Vet is gated on a doctor/license number.
+    const approval = resolveApprovalRole({
+      currentStatus: existing.status,
+      newStatus: status,
+      requestedRole: existing.requestedRole,
+      overrideRole: overrideRole ?? null,
+      vetLicenseNumber: existing.vetLicenseNumber,
+    });
+    if (!approval.ok) {
+      return res.status(422).json(
+        apiError({
+          code: "VET_LICENSE_REQUIRED",
+          reason: "VET_LICENSE_REQUIRED",
+          message: "A doctor/license number is required to approve a veterinarian",
+          requestId,
+        }),
+      );
+    }
+
+    // Guard the update on the status we reviewed: two admins can both observe
+    // `pending`, and without this predicate the second write would clobber the
+    // first (overwriting a block, or re-granting a role). A null result on a
+    // row we already fetched means the status changed concurrently → 409.
+    const [user] = await db
+      .update(users)
+      .set(approval.roleToApply ? { status, role: approval.roleToApply } : { status })
+      .where(
+        and(
+          eq(users.clinicId, clinicId),
+          eq(users.id, req.params.id),
+          eq(users.status, existing.status),
+          isNull(users.deletedAt),
+        ),
+      )
+      .returning();
+
+    if (!user) {
+      return res.status(409).json(
+        apiError({
+          code: "CONFLICT",
+          reason: "USER_STATUS_CONFLICT",
+          message: "User status changed concurrently; reload and retry",
+          requestId,
+        }),
+      );
+    }
+
+    // A granted role changes clinical capabilities — drop the authority cache so
+    // the new role takes effect immediately (mirrors PATCH /:id/role).
+    if (approval.roleToApply) {
+      invalidateForUser(clinicId, user.id);
+    }
+
     logAudit({
       actorRole: resolveAuditActorRole(req),
       clinicId,
@@ -491,7 +547,12 @@ router.patch("/:id/status", requireAuth, requireAdmin, validateUuid("id"), valid
       performedByEmail: req.authUser!.email,
       targetId: req.params.id,
       targetType: "user",
-      metadata: { previousStatus: existing?.status, newStatus: status, targetEmail: user.email },
+      metadata: {
+        previousStatus: existing.status,
+        newStatus: status,
+        targetEmail: user.email,
+        ...(approval.roleToApply ? { grantedRole: approval.roleToApply } : {}),
+      },
     });
 
     res.json(user);
