@@ -16,6 +16,7 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
+import { t } from "@/lib/i18n";
 import type { Equipment } from "@/types";
 
 const returnMock = vi.fn();
@@ -73,7 +74,7 @@ describe("RadarEquipmentCard — Return stays functional after a canceled dialog
     expect(screen.getByTestId("btn-confirm-return-plug")).toBeTruthy();
 
     // Cancel — closes without ever calling returnMut.mutate (no onSettled).
-    fireEvent.click(screen.getByText("Cancel"));
+    fireEvent.click(screen.getByText(t.returnPlugDialog.cancel));
     expect(screen.queryByTestId("btn-confirm-return-plug")).toBeNull();
     expect(returnMock).not.toHaveBeenCalled();
 
