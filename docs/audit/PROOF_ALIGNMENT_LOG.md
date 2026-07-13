@@ -2598,3 +2598,40 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 - **Batch gate (integrated branch):** `pnpm typecheck` 0; full `pnpm test` = **534 files / 4733 tests, 0 fail** (38s). Worktrees removed.
 
 **Verdict:** VERIFIED — ★ **Phase 2 native-reachable MED sweep FIXES complete (T-34…T-44).** Stopping here per user directive ("stop after phase 2"). **NOT done (remaining):** R-CB-stabilize (R-CB-02/03 Code Blue races, O+R sub-spec, nominally Phase 2, gates medium-01); Phase 3 (T-45…53 LOW cleanup); O+R sub-specs (R-M1, R-CBF-1, R-BDF-1, R-SH-F1, R-PDF-1); Phase 4 (parked). Open follow-ups tracked in the SDD ledger. Next action per user: commit + push + open PR.
+
+---
+
+## Device Audit — Phases 0–2 on-device (2026-07-13)
+
+**Claim:** ran an on-device behavioral audit of the merged Phase 0–2 code (`main` @ `b6856f921`) in the **native Capacitor shell** on the **iOS Simulator — iPhone 17 Pro + iPad Pro 11-inch** — against local `pnpm dev` (dev-bypass), driving a high-value subset of the playbook drills with screenshot + DB/API cross-checks. Playbook: `docs/audit/phase-0-2-device-audit-playbook.md`; report: `docs/audit/phase-0-2-device-audit-2026-07-13.md`; evidence: `docs/audit/device-audit-evidence/{iphone,ipad}/`.
+
+**Evidence checked (not asserted):**
+- **T-22 locate — PASS (iPhone, full E2E):** `LocateSearch` opens; empty-state helper ≠ zero-results "no equipment found"; matching rows show location·custodian·readiness; row deep-links to detail. Backend `GET /api/equipment/locate` returns the evidence-graph composition. Shots: `iphone-D12-locate-results.png`, `iphone-D12-deeplink-detail.png`.
+- **T-27 start-of-shift — PASS:** idle variant on iPhone home; **iPad hero-band variant** (`ipad-home-sidebar-bento-startofshift.png`).
+- **T-24 damaged-return custody (owner decision):** LOGIC **PASS** — `tests/return-damaged.test.tsx` 4/4 (custody released + reportDamage-never-called on undo; offline branch). Return path PASS on device (DB `checked_out→returned`). **On-device damaged button INCONCLUSIVE** — did not render in the shell dialog despite present source + passing test; assessed as a WKWebView bundle-cache artifact on the concurrently-advancing `main` worktree (F-2), not a source defect. Shots: `iphone-D14-*`.
+- **Tablet master-detail — PASS (iPad):** sidebar nav (RTL-correct); Equipment list → detail-pane select (`ipad-equipment-master-detail-{empty,loaded}.png`).
+- **Custody state machine + scan + anomalies feed — PASS (iPhone):** `untracked→docked→checked_out→returned` DB-confirmed; `CUSTODY_CHAIN_BROKEN` gate correct; scan manual-entry + `ScanResultCard` actions work; anomalies feed compute-on-read decrement 2→1.
+
+**Findings:** F-1 (MEDIUM) return-plug-dialog copy hardcoded English on Hebrew app; F-3 (LOW) post-return "אחראי" custodian text stale (iPhone+iPad); F-4 (LOW) possible redundant iPad nav; F-2 follow-up (verify damaged button on clean `cap:build:native`).
+
+**Caveats:** shared `main` worktree advanced under audit (`b6856f921↔2a200cdf0`); WKWebView HMR staleness needed relaunch; Hebrew IME needed clipboard workaround; thin seed required additive test data (rooms + docked baseline) in `dev-clinic-default`. Ran a **subset** — remaining drills DEFERRED, itemized in the report coverage table (no implied passes).
+
+**Verdict:** VERIFIED (device audit executed; report + evidence + proof logged). Report-only — no source changes.
+
+---
+
+## Device-audit fixes + gated role-onboarding (PR #89, 2026-07-13)
+
+**Claim:** fixed the device-audit findings and added the owner-requested gated role-onboarding flow, on branch `fix/device-audit-findings` → PR #89 (off `main` @ `b6856f921`). TDD throughout.
+
+**Evidence checked (not asserted):**
+- **F-1** (i18n): `git show`/read — `return-plug-dialog.tsx` now uses `t.returnPlugDialog.*` for title/plug-choices/warning/label/cancel/confirms; keys added to en+he (parity ✓); `tr()` functions for the two interpolated strings. RED test `tests/return-plug-dialog-i18n.test.tsx` (Hebrew rendered, no English) GREEN. Commit `0ec6ef404`.
+- **F-3** (custodian staleness): `invalidateAll()` adds `["equipment-truth", id]` + `["deployability", id]`. RED test in `return-damaged.test.tsx` (normal return invalidates equipment-truth) GREEN. Commit `d5f41a7cc`.
+- **F-2**: verified correct via `return-damaged.test.tsx` 4/4 + jsdom render; on-device miss = WKWebView cache artifact. No code change.
+- **F-4**: refuted from source (`NativeShell.tsx:61-103` tablet branch renders only the sidebar). No code change.
+- **Role-onboarding (C)**: schema col `vet_license_number` (migration 163, applied + column confirmed via psql); `sanitizeVetLicense` + ingest in `auth.ts`; `resolveApprovalRole` (server/lib) with 6 unit tests (tech/vet-with-license/vet-without-license-422/override/non-approval/none); `PATCH /:id/status` applies role + vet gate; RoleChips 2-option; signup vet-license field → `unsafeMetadata`; signin carries pre-choice; `PendingUsersSection` approve-as-role + license display + override. Tests: `approval-role` 6/6, `role-chips-signup` (2-option + license field), `pending-users-requested-role` (approve-promotes + override + license), `requested-role-provisioning` (+2 license-ingest). Commit `33182464f`.
+- **Batch gate:** full `pnpm test` = **537 files / 4766 tests, 0 fail**; frontend+server `tsc` 0; `i18n:check` parity ✓; `architecture:gates` G1 pass; migration 163 applied.
+
+**Not done / honest gaps:** on-device re-confirmation of the return dialog + the full deferred device-drill sweep (Workstream D) blocked by the simulator Hebrew-IME text-entry friction; the Clerk-gated sign-up flow isn't exercisable under dev-bypass (unit-covered instead). Security note logged in the report + PR: the auto-promote-on-approval intentionally reverses the T24b advisory-only guard, mitigated by vet/tech self-select cap + vet license gate + admin approve/override.
+
+**Verdict:** VERIFIED (fixes implemented + unit/typecheck/arch/parity green; PR #89 open, CI + CodeRabbit polling). Device sweep partial (documented).
