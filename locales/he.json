@@ -522,7 +522,8 @@
       "chargeAlertScheduled": "התראה תישלח לאחר {minutes} דקות אם לא יחובר",
       "damageReported": "הוחזר פגום",
       "damageReportUndo": "בטל",
-      "damageReportFailed": "לא ניתן היה לדווח על נזק"
+      "damageReportFailed": "לא ניתן היה לדווח על נזק",
+      "damageReportOffline": "הוחזר פגום — במצב לא מקוון, כך שדיווח הנזק לא נשלח. התחבר ודווח שוב."
     },
     "backToList": "חזרה לרשימה",
     "notFound": "הציוד לא נמצא",

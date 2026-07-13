@@ -522,7 +522,8 @@
       "reportFailedDefault": "Report failed",
       "damageReported": "Returned damaged",
       "damageReportUndo": "Undo",
-      "damageReportFailed": "Could not report damage"
+      "damageReportFailed": "Could not report damage",
+      "damageReportOffline": "Returned damaged — offline, so the damage report wasn't sent. Reconnect and report it again."
     },
     "backToList": "Back to list",
     "notFound": "Equipment not found",

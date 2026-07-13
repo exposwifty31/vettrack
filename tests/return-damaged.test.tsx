@@ -26,6 +26,7 @@ import { memoryLocation } from "wouter/memory-location";
 import { HelmetProvider } from "react-helmet-async";
 import type { Equipment } from "@/types";
 import type { ReactNode } from "react";
+import { t } from "@/lib/i18n";
 
 afterEach(() => {
   cleanup();
@@ -277,5 +278,37 @@ describe("ReturnPlugDialog — 'Returned damaged' third choice + undo (T-24d)", 
     // return. Custody stays released, matching how a normal return isn't
     // casually reverted by this same gesture.
     expect(returnMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("when the return itself was queued OFFLINE, never fires the online-only reportDamage — surfaces an offline message instead (CodeRabbit Major)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    returnMock.mockResolvedValue({
+      equipment: {
+        ...baseEquipment(),
+        custodyState: "available",
+        checkedOutById: null,
+        checkedOutByEmail: null,
+        checkedOutAt: null,
+      },
+      undoToken: undefined,
+      pendingSyncId: 42,
+    });
+    await renderDetailPage(baseEquipment());
+
+    fireEvent.click(screen.getByTestId("btn-return"));
+    fireEvent.click(screen.getByTestId("btn-returned-damaged"));
+    fireEvent.click(screen.getByTestId("btn-confirm-return-plug"));
+
+    await vi.waitFor(() => expect(returnMock).toHaveBeenCalledTimes(1));
+
+    // Let the undo window (that would normally fire the deferred damage
+    // report) fully elapse.
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    // The return was queued offline — the damage report must never be
+    // attempted, or it silently fails against the network (data loss: the
+    // return is queued but the damage report is dropped).
+    expect(reportDamageMock).not.toHaveBeenCalled();
+    expect(toastMock.error).toHaveBeenCalledWith(t.equipmentDetail.toast.damageReportOffline);
   });
 });

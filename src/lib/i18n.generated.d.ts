@@ -526,6 +526,7 @@ export interface TStructure {
       damageReported: string;
       damageReportUndo: string;
       damageReportFailed: string;
+      damageReportOffline: string;
     };
     backToList: string;
     notFound: string;

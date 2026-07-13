@@ -340,6 +340,7 @@ const translations = {
       damageReported: d.equipmentDetail.toast.damageReported,
       damageReportUndo: d.equipmentDetail.toast.damageReportUndo,
       damageReportFailed: d.equipmentDetail.toast.damageReportFailed,
+      damageReportOffline: d.equipmentDetail.toast.damageReportOffline,
     },
     locationCard: {
       title: d.equipmentDetail.locationCard.title,

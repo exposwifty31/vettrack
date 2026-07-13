@@ -1496,7 +1496,20 @@ function EquipmentDetailPageDesktop() {
                 plugInDeadlineMinutes: values.plugInDeadlineMinutes ?? 30,
                 suppressUndoToast: true,
               },
-              { onSuccess: () => startDamagedReportUndo() },
+              {
+                onSuccess: ({ result }) => {
+                  // The return may have been queued OFFLINE (result.pendingSyncId
+                  // set). reportDamage has no offline queue of its own — firing it
+                  // after the undo window would just fail against the network and
+                  // silently drop the damage report. Only defer the online-only
+                  // report when the return itself actually went out online.
+                  if (result.pendingSyncId === undefined) {
+                    startDamagedReportUndo();
+                  } else {
+                    toast.error(t.equipmentDetail.toast.damageReportOffline);
+                  }
+                },
+              },
             );
             return;
           }
