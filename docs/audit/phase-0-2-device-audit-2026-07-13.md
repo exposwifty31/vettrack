@@ -19,7 +19,7 @@
 |---|---|
 | **F-1** i18n (return dialog English on Hebrew app) | **FIXED** — `return-plug-dialog.tsx` localized to `t.returnPlugDialog.*` (en+he parity; interpolated strings via `tr()`). RED test `return-plug-dialog-i18n.test.tsx` renders the Hebrew dialog + asserts no English literal. |
 | **F-3** custodian summary stale after return | **FIXED** — `invalidateAll()` now invalidates `["equipment-truth", id]` + `["deployability", id]`. RED test in `return-damaged.test.tsx`. |
-| **F-2** damaged-return third button on-device | **SOURCE VERIFIED · on-device INCONCLUSIVE** — the button code is unconditional + `return-damaged.test.tsx` 4/4 + renders in jsdom, so the *source* is correct; the on-device non-render is **most likely** a WKWebView bundle-cache artifact but was **not** re-confirmed on a clean `cap:build:native`. No code change. |
+| **F-2** damaged-return third button on-device | **SOURCE VERIFIED · on-device INCONCLUSIVE · clean-build re-verification pending** — the button code is unconditional + `return-damaged.test.tsx` 4/4 + renders in jsdom, so the *source* is correct; the on-device non-render was not reproduced against a specific served bundle/commit and no clean `cap:build:native` run was done, so no cause is claimed. No code change. |
 | **F-4** iPad redundant nav | **REFUTED** — `NativeShell.tsx:61-103` renders the tablet branch with only `NativeTabSidebar`; `NativeTabBar` is phone-only (L136). The bottom bar seen was the adjacent iPhone-simulator window. No code change. |
 | **Role-onboarding** (owner request) | **SHIPPED** — two-option chips (vet/tech), vet gated on a doctor/license number, auto-promote-on-approval with admin override + `422 VET_LICENSE_REQUIRED` gate, migration 163. **Security-relevant:** this intentionally reverses the prior advisory-only role guard (T24b) — mitigated by the vet/tech self-select cap (`sanitizeRequestedRole` + resolver boundary), server-side vet license presence/format validation (a self-supplied number the admin reviews — not an authoritative registry lookup), and the admin approve/reject/override gate. Unit-covered (approval-role, role-chips, pending-users, provisioning). |
 
@@ -45,7 +45,7 @@
 
 - **Return path (device):** checking out QA Test Monitor → detail exposes **"החזרה" (Return)** → `ReturnPlugDialog` → Confirm → green "הציוד זמין" toast; **backend confirms `custody_state: checked_out → returned`, in-use count 0**. Return releases custody end-to-end.
 - **Owner decision (damaged-return releases custody):** **LOGIC VERIFIED** — `tests/return-damaged.test.tsx` **4/4 green**, incl. "custody stays released and reportDamage is never called" on undo, and the offline branch that surfaces a message instead of firing an online-only report. Code at `equipment-detail.tsx:1486-1514` matches.
-- **On-device damaged path: INCONCLUSIVE.** The "Returned damaged" third choice did **not** render in the shell's `ReturnPlugDialog` (only the two plug-status choices), across multiple loads incl. a fresh app relaunch. The served module (`/src/components/return-plug-dialog.tsx`) **does** contain `btn-returned-damaged` + `allowDamagedReport`, the call site passes `allowDamagedReport` unconditionally, the i18n keys exist, and the unit test renders the button — so this is most likely a **Capacitor WKWebView bundle-cache artifact on the concurrently-mutated `main` worktree, not a source defect.** Follow-up: re-verify on a clean `pnpm cap:build:native` bundle.
+- **On-device damaged path: INCONCLUSIVE.** The "Returned damaged" third choice did **not** render in the shell's `ReturnPlugDialog` (only the two plug-status choices), across multiple loads incl. a fresh app relaunch. The served module (`/src/components/return-plug-dialog.tsx`) **does** contain `btn-returned-damaged` + `allowDamagedReport`, the call site passes `allowDamagedReport` unconditionally, the i18n keys exist, and the unit test renders the button — so the **source is verified and the on-device result is inconclusive**. It was not reproduced against a specific served bundle/commit, so no cause is asserted. Follow-up: re-verify on a clean `pnpm cap:build:native` bundle.
 - Evidence: `iphone-D14-pre-return-custodian-devadmin.png`, `iphone-D14-post-return-released.png`.
 - Bonus: after **cancelling** the Return dialog, the Return button still re-opened it (the `T-04` "action survives a cancelled dialog" pattern).
 
@@ -77,7 +77,7 @@
 
 ### F-2 (follow-up, not a confirmed defect) · Verify the damaged-return button on a clean native build
 
-See D14 above — the "Returned damaged" choice did not render on-device despite present source + passing test. Re-verify on `pnpm cap:build:native` (bundled shell) or after a hard WKWebView cache clear to distinguish a runtime gating bug from the observed bundle-cache/HMR artifact on the shared worktree.
+See D14 above — the "Returned damaged" choice did not render on-device despite present source + passing test. **Status: source verified; on-device inconclusive; clean-build re-verification pending.** Re-verify on `pnpm cap:build:native` (bundled shell) to determine whether the on-device behavior matches the source.
 
 ---
 
