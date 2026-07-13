@@ -68,6 +68,30 @@ describe("resolveApprovalRole (C3)", () => {
     ).toEqual({ ok: true, roleToApply: null });
   });
 
+  it("never auto-applies a requested role outside the vet/technician boundary (e.g. legacy 'student')", () => {
+    expect(
+      resolveApprovalRole({
+        currentStatus: "pending",
+        newStatus: "active",
+        requestedRole: "student",
+        overrideRole: null,
+        vetLicenseNumber: null,
+      }),
+    ).toEqual({ ok: true, roleToApply: null });
+  });
+
+  it("still honors an explicit admin override outside the self-selection boundary", () => {
+    expect(
+      resolveApprovalRole({
+        currentStatus: "pending",
+        newStatus: "active",
+        requestedRole: "student",
+        overrideRole: "senior_technician",
+        vetLicenseNumber: null,
+      }),
+    ).toEqual({ ok: true, roleToApply: "senior_technician" });
+  });
+
   it("applies no role when there is neither a requested role nor an override", () => {
     expect(
       resolveApprovalRole({

@@ -505,21 +505,38 @@ router.patch("/:id/status", requireAuth, requireAdmin, validateUuid("id"), valid
       );
     }
 
+    // Guard the update on the status we reviewed: two admins can both observe
+    // `pending`, and without this predicate the second write would clobber the
+    // first (overwriting a block, or re-granting a role). A null result on a
+    // row we already fetched means the status changed concurrently → 409.
     const [user] = await db
       .update(users)
       .set(approval.roleToApply ? { status, role: approval.roleToApply } : { status })
-      .where(and(eq(users.clinicId, clinicId), eq(users.id, req.params.id), isNull(users.deletedAt)))
+      .where(
+        and(
+          eq(users.clinicId, clinicId),
+          eq(users.id, req.params.id),
+          eq(users.status, existing.status),
+          isNull(users.deletedAt),
+        ),
+      )
       .returning();
 
     if (!user) {
-      return res.status(404).json(
+      return res.status(409).json(
         apiError({
-          code: "NOT_FOUND",
-          reason: "USER_NOT_FOUND",
-          message: "User not found",
+          code: "CONFLICT",
+          reason: "USER_STATUS_CONFLICT",
+          message: "User status changed concurrently; reload and retry",
           requestId,
         }),
       );
+    }
+
+    // A granted role changes clinical capabilities — drop the authority cache so
+    // the new role takes effect immediately (mirrors PATCH /:id/role).
+    if (approval.roleToApply) {
+      invalidateForUser(clinicId, user.id);
     }
 
     logAudit({

@@ -13,6 +13,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { ApiError } from "@/lib/request-core";
 import { t } from "@/lib/i18n";
 
 const listPendingMock = vi.fn();
@@ -73,6 +75,7 @@ function pendingUser(overrides: Record<string, unknown>) {
 beforeEach(() => {
   listPendingMock.mockReset();
   updateStatusMock.mockReset().mockResolvedValue({});
+  vi.mocked(toast.error).mockClear();
 });
 
 afterEach(() => cleanup());
@@ -122,5 +125,19 @@ describe("PendingUsersSection — role-preselect approval (C3)", () => {
     fireEvent.click(screen.getByTestId("btn-approve-user-u-4"));
 
     await waitFor(() => expect(updateStatusMock).toHaveBeenCalledWith("u-4", "active", "technician"));
+  });
+
+  it("surfaces the VET_LICENSE_REQUIRED error as a specific toast", async () => {
+    listPendingMock.mockResolvedValue([pendingUser({ id: "u-6", vetLicenseNumber: null })]);
+    updateStatusMock.mockRejectedValue(
+      new ApiError(422, "license required", { code: "VET_LICENSE_REQUIRED" }),
+    );
+    renderSection();
+
+    fireEvent.click(await screen.findByTestId("btn-approve-user-u-6"));
+
+    await waitFor(() =>
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith(t.adminPage.vetLicenseRequiredError),
+    );
   });
 });

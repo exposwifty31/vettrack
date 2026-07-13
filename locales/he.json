@@ -3845,6 +3845,7 @@
     "vetLicenseLabel": "מספר רישיון / רופא",
     "vetLicensePlaceholder": "לדוגמה 12345",
     "vetLicenseHint": "נדרש לאימות וטרינר/ית. המנהל/ת בודק/ת זאת לפני אישור החשבון.",
+    "vetLicenseRequired": "יש להזין מספר רישיון / רופא למעלה כדי להמשיך כווטרינר/ית.",
     "devModeNotice": "מצב פיתוח — אין צורך באימות.",
     "enterDashboard": "כניסה ללוח הבקרה",
     "moreAboutVetTrack": "עוד על VetTrack"

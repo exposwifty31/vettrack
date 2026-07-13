@@ -225,6 +225,9 @@ describe("ReturnPlugDialog — 'Returned damaged' third choice + undo (T-24d)", 
         expect.objectContaining({ queryKey: ["equipment-truth", "eq1"] }),
       ),
     );
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ["deployability", "eq1"] }),
+    );
   });
 
   it("releases custody immediately on confirm — only the damage report is deferred until the undo window elapses", async () => {

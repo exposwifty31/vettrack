@@ -3848,6 +3848,7 @@ export interface TStructure {
     vetLicenseLabel: string;
     vetLicensePlaceholder: string;
     vetLicenseHint: string;
+    vetLicenseRequired: string;
     devModeNotice: string;
     enterDashboard: string;
     moreAboutVetTrack: string;

@@ -27,13 +27,26 @@ export type ApprovalRoleResult =
   | { ok: true; roleToApply: string | null }
   | { ok: false; error: "VET_LICENSE_REQUIRED" };
 
+/** Roles a user may self-select at sign-up and have auto-granted on approval. */
+const SELF_APPLICABLE_ROLES = new Set(["vet", "technician"]);
+
 export function resolveApprovalRole(input: ApprovalRoleInput): ApprovalRoleResult {
   const isApproval = input.currentStatus === "pending" && input.newStatus === "active";
   if (!isApproval) {
     return { ok: true, roleToApply: null };
   }
 
-  const roleToApply = input.overrideRole ?? input.requestedRole;
+  // An explicit admin override is a deliberate choice and may be any valid role.
+  // A self-requested role is auto-applied ONLY within the self-selection
+  // boundary (vet | technician) — a stale/legacy "student" (or anything else)
+  // that reached the staging column is never auto-granted here.
+  let roleToApply: string | null = null;
+  if (input.overrideRole) {
+    roleToApply = input.overrideRole;
+  } else if (input.requestedRole && SELF_APPLICABLE_ROLES.has(input.requestedRole)) {
+    roleToApply = input.requestedRole;
+  }
+
   if (!roleToApply) {
     return { ok: true, roleToApply: null };
   }

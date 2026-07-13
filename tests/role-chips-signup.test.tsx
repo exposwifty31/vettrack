@@ -126,39 +126,51 @@ describe("RoleChips — sign-up role pre-selection (C3)", () => {
     expect(screen.getByText(t.authPage.roleVeterinarian).tagName).toBe("SPAN");
   });
 
-  it("carries the selected role into the sign-up submission (Clerk unsafeMetadata)", async () => {
+  it("carries the selected role (technician, no license needed) into the sign-up submission", async () => {
     await renderSignUpPage();
 
-    const initialProps = capturedSignUpProps.at(-1);
-    expect(initialProps).toBeDefined();
-    expect(
-      (initialProps?.unsafeMetadata as Record<string, unknown> | undefined)?.requestedRole,
-    ).toBeUndefined();
+    // Before any selection, no requested role is attached to the sign-up call.
+    expect(capturedSignUpProps.at(-1)?.unsafeMetadata).toBeUndefined();
 
-    fireEvent.click(screen.getByTestId("role-chip-vet"));
-    const propsAfterSelect = capturedSignUpProps.at(-1);
-    expect(propsAfterSelect?.unsafeMetadata).toEqual({ requestedRole: "vet" });
-
+    // Technician needs no license, so the Clerk form carries the role directly.
     fireEvent.click(screen.getByTestId("role-chip-technician"));
-    const propsAfterSwitch = capturedSignUpProps.at(-1);
-    expect(propsAfterSwitch?.unsafeMetadata).toEqual({ requestedRole: "technician" });
+    expect(capturedSignUpProps.at(-1)?.unsafeMetadata).toEqual({ requestedRole: "technician" });
   });
 
-  it("shows the vet license field only when vet is selected and carries it into the submission", async () => {
+  it("shows the vet license field when vet is selected and carries it into the submission", async () => {
     await renderSignUpPage();
     expect(screen.queryByTestId("vet-license-input")).toBeNull();
 
     fireEvent.click(screen.getByTestId("role-chip-vet"));
-    const licenseInput = screen.getByTestId("vet-license-input") as HTMLInputElement;
-    fireEvent.change(licenseInput, { target: { value: "MD-9911" } });
+    fireEvent.change(screen.getByTestId("vet-license-input"), { target: { value: "MD-9911" } });
 
-    const props = capturedSignUpProps.at(-1);
-    expect(props?.unsafeMetadata).toEqual({ requestedRole: "vet", vetLicenseNumber: "MD-9911" });
+    expect(capturedSignUpProps.at(-1)?.unsafeMetadata).toEqual({
+      requestedRole: "vet",
+      vetLicenseNumber: "MD-9911",
+    });
 
     // Switching to tech drops both the field and the license from the submission.
     fireEvent.click(screen.getByTestId("role-chip-technician"));
     expect(screen.queryByTestId("vet-license-input")).toBeNull();
     expect(capturedSignUpProps.at(-1)?.unsafeMetadata).toEqual({ requestedRole: "technician" });
+  });
+
+  it("gates the sign-up form: vet with no (or too-short) license shows the gate, not the Clerk form", async () => {
+    await renderSignUpPage();
+
+    fireEvent.click(screen.getByTestId("role-chip-vet"));
+    // Vet selected, license empty → the gate replaces the Clerk sign-up form.
+    expect(screen.getByTestId("vet-license-gate")).toBeTruthy();
+    expect(screen.queryByTestId("clerk-sign-up-stub")).toBeNull();
+
+    // A too-short license is still gated.
+    fireEvent.change(screen.getByTestId("vet-license-input"), { target: { value: "x" } });
+    expect(screen.getByTestId("vet-license-gate")).toBeTruthy();
+
+    // A valid license opens the form.
+    fireEvent.change(screen.getByTestId("vet-license-input"), { target: { value: "MD-100" } });
+    expect(screen.queryByTestId("vet-license-gate")).toBeNull();
+    expect(screen.getByTestId("clerk-sign-up-stub")).toBeTruthy();
   });
 });
 

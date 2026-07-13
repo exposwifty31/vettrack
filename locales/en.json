@@ -3845,6 +3845,7 @@
     "vetLicenseLabel": "Doctor / license number",
     "vetLicensePlaceholder": "e.g. 12345",
     "vetLicenseHint": "Required to verify a veterinarian. Your admin reviews this before approving your account.",
+    "vetLicenseRequired": "Enter your doctor / license number above to continue as a veterinarian.",
     "devModeNotice": "Development mode — no authentication required.",
     "enterDashboard": "Enter dashboard",
     "moreAboutVetTrack": "More about VetTrack"

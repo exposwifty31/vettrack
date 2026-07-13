@@ -27,6 +27,11 @@ export default function SignUpPage() {
   const [requestedRole, setRequestedRole] = useState<SignupRequestedRole | null>(() => readCarriedRole());
   const [vetLicenseNumber, setVetLicenseNumber] = useState("");
   const trimmedLicense = vetLicenseNumber.trim();
+  // The license field sits outside Clerk's form, so `required` can't block its
+  // submit. Gate the Clerk sign-up (and the social buttons) on a valid license
+  // when vet is requested, so a vet can't complete sign-up without one — which
+  // would otherwise strand them at the pending→active approval gate.
+  const vetLicenseReady = requestedRole !== "vet" || trimmedLicense.length >= 3;
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
@@ -94,23 +99,34 @@ export default function SignUpPage() {
               <ClerkLoaded>
                 <ClerkAuthFormShell>
                   <div className="w-full min-h-[24rem] flex flex-col items-center justify-start gap-4">
-                    {isNative ? <NativeSocialButtons mode="signUp" /> : null}
-                    <SignUp
-                      routing="hash"
-                      signInUrl="/signin"
-                      fallbackRedirectUrl="/"
-                      unsafeMetadata={
-                        requestedRole
-                          ? {
-                              requestedRole,
-                              ...(requestedRole === "vet" && trimmedLicense
-                                ? { vetLicenseNumber: trimmedLicense }
-                                : {}),
-                            }
-                          : undefined
-                      }
-                      appearance={isNative ? getClerkAppearanceNative(isDark) : getClerkAppearance(isDark)}
-                    />
+                    {!vetLicenseReady ? (
+                      <p
+                        className="text-sm text-center text-muted-foreground px-2 py-8"
+                        data-testid="vet-license-gate"
+                      >
+                        {t.authPage.vetLicenseRequired}
+                      </p>
+                    ) : (
+                      <>
+                        {isNative ? <NativeSocialButtons mode="signUp" /> : null}
+                        <SignUp
+                          routing="hash"
+                          signInUrl="/signin"
+                          fallbackRedirectUrl="/"
+                          unsafeMetadata={
+                            requestedRole
+                              ? {
+                                  requestedRole,
+                                  ...(requestedRole === "vet" && trimmedLicense
+                                    ? { vetLicenseNumber: trimmedLicense }
+                                    : {}),
+                                }
+                              : undefined
+                          }
+                          appearance={isNative ? getClerkAppearanceNative(isDark) : getClerkAppearance(isDark)}
+                        />
+                      </>
+                    )}
                   </div>
                 </ClerkAuthFormShell>
               </ClerkLoaded>
