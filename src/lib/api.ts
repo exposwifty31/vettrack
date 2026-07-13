@@ -446,10 +446,14 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ secondaryRole }),
       }),
-    updateStatus: (id: string, status: "pending" | "active" | "blocked") =>
+    updateStatus: (
+      id: string,
+      status: "pending" | "active" | "blocked",
+      role?: "admin" | "vet" | "technician" | "senior_technician" | "student",
+    ) =>
       request<User>(
         `/api/users/${id}/status`,
-        { method: "PATCH", body: JSON.stringify({ status }) }
+        { method: "PATCH", body: JSON.stringify(role ? { status, role } : { status }) }
       ),
     delete: (id: string) =>
       request<User>(`/api/users/${id}/delete`, { method: "PATCH" }),

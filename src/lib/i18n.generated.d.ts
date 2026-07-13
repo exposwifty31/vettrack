@@ -2034,6 +2034,10 @@ export interface TStructure {
     signedUp: string;
     joined: string;
     requestedRoleHint: string;
+    vetLicenseHint: string;
+    approveAsRole: string;
+    grantRoleLabel: string;
+    vetLicenseRequiredError: string;
     reject: string;
     approve: string;
     rejectUserTitle: string;
@@ -3841,6 +3845,9 @@ export interface TStructure {
     roleStudent: string;
     roleSelectLabel: string;
     roleSelectHint: string;
+    vetLicenseLabel: string;
+    vetLicensePlaceholder: string;
+    vetLicenseHint: string;
     devModeNotice: string;
     enterDashboard: string;
     moreAboutVetTrack: string;

@@ -223,6 +223,48 @@ describe("resolveAuthUser — requested-role capture (secure separation)", () =>
     expect(insert).toMatchObject({ role: "technician", requestedRole: "vet", status: "pending" });
   });
 
+  it("captures the vet license number from unsafeMetadata on a vet sign-up (C3)", async () => {
+    mockClerkUser({ requestedRole: "vet", vetLicenseNumber: "MD-555" });
+    queueClinicThenUser({
+      id: "user-new-1",
+      clerkId: "clerk-new-1",
+      email: "newvet@clinic.example",
+      name: "New Vet",
+      role: "technician",
+      requestedRole: "vet",
+      status: "pending",
+      clinicId: "clinic-prod-1",
+      deletedAt: null,
+      secondaryRole: null,
+    });
+
+    await resolveAuthUser(makeReq());
+
+    const insert = findUserInsert();
+    expect(insert).toMatchObject({ requestedRole: "vet", vetLicenseNumber: "MD-555" });
+  });
+
+  it("ignores a license number when the requested role is not vet (C3)", async () => {
+    mockClerkUser({ requestedRole: "technician", vetLicenseNumber: "MD-555" });
+    queueClinicThenUser({
+      id: "user-new-1",
+      clerkId: "clerk-new-1",
+      email: "newtech@clinic.example",
+      name: "New Tech",
+      role: "technician",
+      requestedRole: "technician",
+      status: "pending",
+      clinicId: "clinic-prod-1",
+      deletedAt: null,
+      secondaryRole: null,
+    });
+
+    await resolveAuthUser(makeReq());
+
+    const insert = findUserInsert();
+    expect(insert).toMatchObject({ requestedRole: "technician", vetLicenseNumber: null });
+  });
+
   it("an invalid/privileged requested role ('admin') is dropped to requestedRole=null", async () => {
     mockClerkUser({ requestedRole: "admin" });
     queueClinicThenUser({

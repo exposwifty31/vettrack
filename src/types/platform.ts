@@ -28,10 +28,12 @@ export interface User {
   role: UserRole;
   secondaryRole?: string | null;
   /**
-   * Advisory role the user requested at sign-up (staging column, T24b).
-   * Never the authoritative role — surfaced read-only to admins as a hint.
+   * Role the user requested at sign-up (staging column). Auto-applied on admin
+   * approval (C3); vet is gated on `vetLicenseNumber`.
    */
   requestedRole?: string | null;
+  /** Doctor/license number captured when the requested role is `vet` (C3). */
+  vetLicenseNumber?: string | null;
   effectiveRole?: UserRole | ShiftRole;
   roleSource?: "shift" | "permanent";
   activeShift?: Shift | null;
