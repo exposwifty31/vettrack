@@ -114,6 +114,51 @@ const CASES: GoldenCase[] = [
     },
   },
   {
+    id: "deploy-04",
+    category: "deployability",
+    // Regression: the evidence-graph deployability path must see conditionStatus,
+    // not just the direct-HTTP path (server/routes/equipment-operational-state.ts).
+    graph: buildSyntheticEvidenceGraph({
+      clinicId: CLINIC,
+      equipmentId: EQ,
+      equipment: baseEquipment({ assetTypeId: "at-golden", conditionStatus: "damaged" }),
+      assetTypeConditions: [
+        {
+          id: "cond-g4",
+          clinicId: CLINIC,
+          assetTypeId: "at-golden",
+          conditionName: "Battery",
+          verificationMethod: "visual",
+          staleAfterMinutes: 60,
+          displayOrder: 0,
+          createdAt: NOW,
+        },
+      ],
+      unitConditionStates: [
+        {
+          id: "ucs-g4",
+          clinicId: CLINIC,
+          equipmentId: EQ,
+          conditionId: "cond-g4",
+          verified: true,
+          verifiedAt: new Date(NOW.getTime() - 5 * 60_000),
+          verifiedById: null,
+          notes: null,
+          updatedAt: NOW,
+        },
+      ],
+    }),
+    async assert() {
+      const r = await resolveDeployability(ctx(), this.graph);
+      // fullDeployable tracks only custody/readiness/usage (parity with the HTTP
+      // path) — damage is a separate, additive gate surfaced via bundleGate.
+      expect(r.bundleGate.ok).toBe(false);
+      if (r.bundleGate.ok === false) {
+        expect(r.bundleGate.reason).toBe("CONDITION_STATUS_NOT_CLEAR");
+      }
+    },
+  },
+  {
     id: "rfid-01",
     category: "rfid",
     graph: buildSyntheticEvidenceGraph({
@@ -642,8 +687,8 @@ function ctx(viewerUserId?: string) {
   return { clinicId: CLINIC, equipmentId: EQ, now: NOW, viewerUserId };
 }
 
-describe("asset copilot resolver golden (n=30)", () => {
-  expect(CASES.length).toBe(30);
+describe("asset copilot resolver golden (n=31)", () => {
+  expect(CASES.length).toBe(31);
 
   for (const testCase of CASES) {
     it(`${testCase.category} / ${testCase.id}`, async () => {

@@ -523,6 +523,10 @@ export interface TStructure {
       issueReported: string;
       issueWhatsAppOffline: string;
       reportFailedDefault: string;
+      damageReported: string;
+      damageReportUndo: string;
+      damageReportFailed: string;
+      damageReportOffline: string;
     };
     backToList: string;
     notFound: string;
@@ -863,6 +867,25 @@ export interface TStructure {
     guidedBody: string;
     inventoryActionHint: string;
     myEquipmentRefreshFailed: string;
+    startOfShift: {
+      idleTitle: string;
+      opsExceptions: string;
+      opsExceptionsAction: string;
+      opsAllClear: string;
+      opsAllClearAction: string;
+      vetReview: string;
+      vetReviewAction: string;
+      vetReady: string;
+      vetReadyAction: string;
+      techOverdue: string;
+      techOverdueAction: string;
+      techCaughtUp: string;
+      techCaughtUpAction: string;
+      itemsCheckedOut: string;
+      itemsCheckedOutAction: string;
+      studentReady: string;
+      studentReadyAction: string;
+    };
   };
   home: {
     equipmentOverview: string;
@@ -3757,6 +3780,10 @@ export interface TStructure {
     description: string;
     cta: string;
   };
+  managementWebGate: {
+    title: string;
+    description: string;
+  };
   whatsNew: {
     title: string;
     heading: string;
@@ -4089,5 +4116,25 @@ export interface TStructure {
     notNow: string;
     iosAriaLabel: string;
     iosTagline: string;
+  };
+  locateSearch: {
+    openButtonLabel: string;
+    label: string;
+    placeholder: string;
+    title: string;
+    emptyPrompt: string;
+    noResults: string;
+    searching: string;
+    resultsCount: string;
+  };
+  homeNudges: {
+    expiryMessage: string;
+    restockMessage: string;
+    dismissAria: string;
+  };
+  returnPlugDialog: {
+    damagedButton: string;
+    damageWarning: string;
+    confirmReturnedDamaged: string;
   };
 }

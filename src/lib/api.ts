@@ -64,6 +64,8 @@ import type {
   DisplayDevice,
   DisplayPairingCode,
   DisplayPairClaim,
+  NudgeFeedResponse,
+  NudgeKind,
 } from "@/types";
 import type { AuthoritySnapshot } from "../../shared/authority.js";
 
@@ -402,6 +404,9 @@ export const api = {
   },
   home: {
     dashboard: () => request<HomeDashboardPulse>("/api/home/dashboard"),
+  },
+  nudges: {
+    list: () => request<NudgeFeedResponse>("/api/nudges"),
   },
   analytics: {
     summary: () => request<AnalyticsSummary>("/api/analytics"),
@@ -987,7 +992,7 @@ export const api = {
     lowStock: () =>
       request<{ items: import("@/types").LowStockRow[] }>("/api/inventory-items/low-stock"),
     detail: (id: string) => request<InventoryItemDetail>(`/api/inventory-items/${id}/detail`),
-    create: (data: { code: string; label: string; category?: string; nfcTagId?: string | null; parLevel?: number | null; reorderPoint?: number | null }) =>
+    create: (data: { code: string; label: string; category?: string; nfcTagId?: string | null; isBillable?: boolean; minimumDispenseToCapture?: number; parLevel?: number | null; reorderPoint?: number | null }) =>
       request<InventoryItem>("/api/inventory-items", { method: "POST", body: JSON.stringify(data) }),
     update: (id: string, data: { label?: string; category?: string | null; nfcTagId?: string | null; isBillable?: boolean; minimumDispenseToCapture?: number; parLevel?: number | null; reorderPoint?: number | null }) =>
       request<InventoryItem>(`/api/inventory-items/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
@@ -1165,6 +1170,9 @@ export const api = {
       /** SYNC-TEL — event-driven sync engine signals (strict booleans). */
       syncPermanentFailure?: boolean;
       syncCircuitOpen?: boolean;
+      // T-30a2-ii — bounded enum: which nudge-feed kind was shown. Mirrors
+      // the server's closed ALLOWED_NUDGE_SHOWN enum (T-30a2-i).
+      nudgeShown?: NudgeKind;
     }) =>
       request<{ ok: boolean }>("/api/realtime/telemetry", {
         method: "POST",

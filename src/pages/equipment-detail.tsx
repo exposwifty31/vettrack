@@ -63,6 +63,7 @@ import {
   isSterilizationDue,
 } from "@/lib/utils";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
+import { ReadinessBadge } from "@/components/ui/readiness-badge";
 import { toast } from "sonner";
 import { toastSuccess } from "@/lib/ui-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -181,6 +182,11 @@ function EquipmentDetailPageDesktop() {
   const undoStateRef = useRef<UndoState | null>(null);
   const [undoCountdown, setUndoCountdown] = useState(0);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // T-24d (R-EQ-F3) — "returned damaged" undo. There is no revert/cancel
+  // endpoint for damage events server-side, so the only safe "undo" is
+  // deferring the actual `reportDamage` call behind the undo window instead
+  // of firing then reverting.
+  const damagedReportTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [editingFloorNote, setEditingFloorNote] = useState(false);
   const [floorNoteText, setFloorNoteText] = useState("");
@@ -555,7 +561,7 @@ function EquipmentDetailPageDesktop() {
   });
 
   // Off-shift: taking equipment ownership is not permitted (roster-derived).
-  const { hasActiveShift } = useActiveShift();
+  const { hasActiveShift, isError: shiftError } = useActiveShift();
 
   const checkoutMut = useMutation({
     mutationFn: async () => {
@@ -601,8 +607,12 @@ function EquipmentDetailPageDesktop() {
   });
 
   // Single choke point for every checkout affordance — blocks off-shift ownership.
+  // If the shift query itself failed, don't infer "off-shift" from the missing
+  // `shift` — let the request reach the server, which enforces the authoritative
+  // roster gate and fails loud via `onError` for a real off-shift denial. Only a
+  // *successful* query that reports no active shift blocks client-side.
   const handleCheckout = () => {
-    if (!hasActiveShift) {
+    if (!shiftError && !hasActiveShift) {
       toast.error(t.scan.offShiftBody);
       return;
     }
@@ -611,22 +621,28 @@ function EquipmentDetailPageDesktop() {
 
   // Reason shown beside the (disabled) checkout buttons so an off-shift tech knows
   // why the action is unavailable — a disabled button can't surface the toast itself.
-  const offShiftCheckoutNote = !hasActiveShift ? (
+  // Same isError guard as handleCheckout: don't show "off-shift" on a shift-query
+  // error, since that state is unknown, not confirmed off-shift.
+  const offShiftCheckoutNote = !shiftError && !hasActiveShift ? (
     <p className="px-2 text-center text-xs text-muted-foreground" data-testid="checkout-offshift-note">
       {t.scan.offShiftBody}
     </p>
   ) : null;
 
   const returnMut = useMutation({
-    mutationFn: async ({ isPluggedIn: nextPluggedIn, plugInDeadlineMinutes: nextDeadline }: { isPluggedIn: boolean; plugInDeadlineMinutes: number }) => {
+    mutationFn: async ({
+      isPluggedIn: nextPluggedIn,
+      plugInDeadlineMinutes: nextDeadline,
+      suppressUndoToast,
+    }: { isPluggedIn: boolean; plugInDeadlineMinutes: number; suppressUndoToast?: boolean }) => {
       const prev = queryClient.getQueryData<Equipment>([`/api/equipment/${id}`]);
       const result = await api.equipment.return(id!, {
         isPluggedIn: nextPluggedIn,
         plugInDeadlineMinutes: nextPluggedIn ? undefined : nextDeadline,
       });
-      return { result, prev, usedPluggedIn: nextPluggedIn, usedDeadline: nextDeadline };
+      return { result, prev, usedPluggedIn: nextPluggedIn, usedDeadline: nextDeadline, suppressUndoToast };
     },
-    onSuccess: ({ result, prev, usedPluggedIn, usedDeadline }) => {
+    onSuccess: ({ result, prev, usedPluggedIn, usedDeadline, suppressUndoToast }) => {
       haptics.tap();
       const { equipment: updated, undoToken } = result;
       const wasOffline = result.pendingSyncId !== undefined;
@@ -636,7 +652,7 @@ function EquipmentDetailPageDesktop() {
 
       if (wasOffline) {
         toast.info(t.equipmentDetail.toast.savedOffline);
-        if (prev) {
+        if (prev && !suppressUndoToast) {
           startUndoTimer({
             actionLabel: t.equipmentDetail.toast.returned,
             previousEquipment: prev,
@@ -652,7 +668,13 @@ function EquipmentDetailPageDesktop() {
         toast.warning(`An alert will be sent after ${usedDeadline} minute${usedDeadline !== 1 ? "s" : ""} if not plugged in.`);
       }
 
-      if (prev && !isStudentEquipmentRole) {
+      // T-24d (owner override) — "returned damaged" releases custody through
+      // this same mutation but reports the damage via its own deferred undo
+      // toast (see startDamagedReportUndo). Showing this mutation's "returned"
+      // undo toast too would leave two competing undo affordances for one
+      // gesture, so the damaged caller sets suppressUndoToast and relies on
+      // its own toast as the single undo surface.
+      if (prev && !isStudentEquipmentRole && !suppressUndoToast) {
         startUndoTimer({
           actionLabel: t.equipmentDetail.toast.returned,
           previousEquipment: prev,
@@ -670,6 +692,53 @@ function EquipmentDetailPageDesktop() {
     setIsPluggedIn(values.isPluggedIn);
     setPlugInDeadlineMinutes(values.plugInDeadlineMinutes);
     returnMut.mutate(values);
+  }
+
+  // T-24d (R-EQ-F3) — "returned damaged" undo. `reportDamage` has no
+  // revert/cancel endpoint, so canceling within the window must mean the
+  // request never went out at all: defer the call behind the same
+  // UNDO_WINDOW_MS toast pattern used above, and only fire it once the
+  // window elapses without the user hitting Undo.
+  function cancelDamagedReport() {
+    if (damagedReportTimeoutRef.current) {
+      clearTimeout(damagedReportTimeoutRef.current);
+      damagedReportTimeoutRef.current = null;
+    }
+  }
+
+  function startDamagedReportUndo() {
+    cancelDamagedReport();
+    haptics.warning();
+
+    const toastId = `damage-undo-${Date.now()}`;
+    toast(t.equipmentDetail.toast.damageReported, {
+      id: toastId,
+      duration: UNDO_WINDOW_MS,
+      onDismiss: () => cancelDamagedReport(),
+      action: {
+        label: t.equipmentDetail.toast.damageReportUndo,
+        onClick: () => {
+          cancelDamagedReport();
+          toast.dismiss(toastId);
+        },
+      },
+    });
+
+    damagedReportTimeoutRef.current = setTimeout(() => {
+      damagedReportTimeoutRef.current = null;
+      toast.dismiss(toastId);
+      if (!id) return;
+      api.equipment
+        .reportDamage({ equipmentId: id })
+        .then(() => {
+          invalidateAll();
+          queryClient.invalidateQueries({ queryKey: ["deployability", id] });
+          queryClient.invalidateQueries({ queryKey: ["condition-states", id] });
+        })
+        .catch(() => {
+          toast.error(t.equipmentDetail.toast.damageReportFailed);
+        });
+    }, UNDO_WINDOW_MS);
   }
 
   const deleteMut = useMutation({
@@ -946,6 +1015,7 @@ function EquipmentDetailPageDesktop() {
             <Button
               variant="ghost"
               size="icon-sm"
+              className="h-11 w-11"
               onClick={() => navigate("/equipment")}
               data-testid="btn-back"
               aria-label={t.equipmentDetail.backToList}
@@ -954,6 +1024,7 @@ function EquipmentDetailPageDesktop() {
             </Button>
             <div>
               <h1 className="vt-page-title leading-tight"><Bdi>{equipmentDisplayName}</Bdi></h1>
+              <ReadinessBadge status={equipment.status} className="mt-0.5" />
               {equipment.folderName && (
                 <span className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                   <FolderOpen className="w-3 h-3" />
@@ -967,6 +1038,7 @@ function EquipmentDetailPageDesktop() {
               <Button
                 variant="ghost"
                 size="icon-sm"
+                className="h-11 w-11"
                 onClick={handleDuplicate}
                 title={t.equipmentDetail.toast.duplicateEquipment}
                 aria-label={t.equipmentDetail.ariaDuplicate}
@@ -979,6 +1051,7 @@ function EquipmentDetailPageDesktop() {
               <Button
                 variant="ghost"
                 size="icon-sm"
+                className="h-11 w-11"
                 onClick={() => navigate(`/equipment/${id}/edit`)}
                 aria-label={t.equipmentDetail.ariaEdit}
                 data-testid="btn-edit"
@@ -989,6 +1062,7 @@ function EquipmentDetailPageDesktop() {
             <Button
               variant="ghost"
               size="icon-sm"
+              className="h-11 w-11"
               onClick={() => setToolsSheetOpen(true)}
               aria-label={t.equipmentDetail.toolsSheetTitle}
               data-testid="btn-equipment-tools"
@@ -1106,7 +1180,7 @@ function EquipmentDetailPageDesktop() {
                 variant="outline"
                 className="w-full h-12 gap-2 text-sm font-semibold rounded-2xl active:scale-[0.98] transition-all border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 onClick={handleCheckout}
-                disabled={checkoutMut.isPending || !hasActiveShift}
+                disabled={checkoutMut.isPending || (!shiftError && !hasActiveShift)}
                 data-testid="btn-checkout"
               >
                 {checkoutMut.isPending ? (
@@ -1357,31 +1431,6 @@ function EquipmentDetailPageDesktop() {
                   </Button>
                 )}
               </div>
-
-              <DockReturnFlow
-                equipment={equipment}
-                open={dockReturnOpen}
-                onClose={() => setDockReturnOpen(false)}
-                onSuccess={() => {
-                  queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
-                  queryClient.invalidateQueries({ queryKey: ["deployability", id] });
-                  queryClient.invalidateQueries({ queryKey: ["condition-states", id] });
-                  queryClient.invalidateQueries({ queryKey: ["staging-queue", id] });
-                  setDockReturnOpen(false);
-                }}
-              />
-
-              <DockReturnNfc
-                equipment={equipment}
-                open={dockReturnNfcOpen}
-                onClose={() => setDockReturnNfcOpen(false)}
-                onSuccess={() => {
-                  queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
-                  queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
-                  setDockReturnNfcOpen(false);
-                }}
-              />
-
             </TabsContent>
           )}
 
@@ -1398,15 +1447,75 @@ function EquipmentDetailPageDesktop() {
         </Tabs>
       </div>
 
+      {/* Dock-Return + RFID sheets — page-level (not inside a TabsContent) so
+          they stay mounted regardless of which detail tab is active. */}
+      {equipment && (
+        <DockReturnFlow
+          equipment={equipment}
+          open={dockReturnOpen}
+          onClose={() => setDockReturnOpen(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
+            queryClient.invalidateQueries({ queryKey: ["deployability", id] });
+            queryClient.invalidateQueries({ queryKey: ["condition-states", id] });
+            queryClient.invalidateQueries({ queryKey: ["staging-queue", id] });
+            setDockReturnOpen(false);
+          }}
+        />
+      )}
+
+      {equipment && (
+        <DockReturnNfc
+          equipment={equipment}
+          open={dockReturnNfcOpen}
+          onClose={() => setDockReturnNfcOpen(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: [`/api/equipment/${id}`] });
+            queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+            setDockReturnNfcOpen(false);
+          }}
+        />
+      )}
+
       <ReturnPlugDialog
         open={returnDialogOpen}
         onOpenChange={setReturnDialogOpen}
         equipmentName={equipmentDisplayName}
         isSubmitting={returnMut.isPending}
-        onConfirm={({ isPluggedIn: nextPluggedIn, plugInDeadlineMinutes: nextDeadline }) => {
+        allowDamagedReport
+        onConfirm={(values) => {
+          if (values.damaged) {
+            // Owner override (T-24d): "returned damaged" releases custody
+            // exactly like the other two return choices, then defers the
+            // damage report behind its own undo window once the return
+            // succeeds (see returnMut's suppressUndoToast branch above for
+            // why the return doesn't also show its own undo toast here).
+            returnMut.mutate(
+              {
+                isPluggedIn: values.isPluggedIn,
+                plugInDeadlineMinutes: values.plugInDeadlineMinutes ?? 30,
+                suppressUndoToast: true,
+              },
+              {
+                onSuccess: ({ result }) => {
+                  // The return may have been queued OFFLINE (result.pendingSyncId
+                  // set). reportDamage has no offline queue of its own — firing it
+                  // after the undo window would just fail against the network and
+                  // silently drop the damage report. Only defer the online-only
+                  // report when the return itself actually went out online.
+                  if (result.pendingSyncId === undefined) {
+                    startDamagedReportUndo();
+                  } else {
+                    toast.error(t.equipmentDetail.toast.damageReportOffline);
+                  }
+                },
+              },
+            );
+            return;
+          }
           returnMut.mutate({
-            isPluggedIn: nextPluggedIn,
-            plugInDeadlineMinutes: nextDeadline ?? 30,
+            isPluggedIn: values.isPluggedIn,
+            plugInDeadlineMinutes: values.plugInDeadlineMinutes ?? 30,
           });
         }}
       />
@@ -1698,7 +1807,7 @@ function EquipmentDetailPageDesktop() {
                         size="lg"
                         className="w-full gap-2.5"
                         onClick={handleCheckout}
-                        disabled={checkoutMut.isPending || returnMut.isPending || !hasActiveShift}
+                        disabled={checkoutMut.isPending || returnMut.isPending || (!shiftError && !hasActiveShift)}
                         data-testid="btn-scan-action-checkout"
                       >
                         {checkoutMut.isPending ? (

@@ -76,6 +76,11 @@ export default function AdminShiftsPage() {
   const queryClient = useQueryClient();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ShiftImportPreview | null>(null);
+  // T-42 (R-AD-03): tracks whether the currently-selected file was already
+  // confirmed. Reset on every new file pick (even re-picking the same file)
+  // so canImport can't stay true across a second click on the same accepted
+  // file, which previously re-imported the same roster CSV (duplicate shifts).
+  const [hasImportedSelectedFile, setHasImportedSelectedFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   /** Shared file intake for both the file picker and drag-and-drop. */
@@ -84,10 +89,12 @@ export default function AdminShiftsPage() {
       toast.error(t.adminShiftsPage.csvOnly);
       setSelectedFile(null);
       setPreview(null);
+      setHasImportedSelectedFile(false);
       return;
     }
     setSelectedFile(file ?? null);
     setPreview(null);
+    setHasImportedSelectedFile(false);
   }
 
   const importsQuery = useQuery({
@@ -131,7 +138,9 @@ export default function AdminShiftsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/shifts/imports"] });
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
       // Keep selected file + preview visible after confirm so admins can
-      // still see exactly which CSV/rows were imported.
+      // still see exactly which CSV/rows were imported — but mark it as
+      // imported so canImport gates a re-click on the same file (T-42).
+      setHasImportedSelectedFile(true);
       if (import.meta.env.DEV) {
         console.log(
           `[admin shifts] confirmed import filename=${result.filename} inserted=${result.insertedRows} skipped=${result.skippedRows}`
@@ -144,7 +153,11 @@ export default function AdminShiftsPage() {
   });
 
   const canPreview = Boolean(selectedFile) && !previewMut.isPending;
-  const canImport = Boolean(selectedFile) && Boolean(preview && preview.summary.validRows > 0) && !confirmMut.isPending;
+  const canImport =
+    Boolean(selectedFile) &&
+    Boolean(preview && preview.summary.validRows > 0) &&
+    !confirmMut.isPending &&
+    !hasImportedSelectedFile;
 
   // T22: was rendering t.adminPage.cancel ("Cancel") as the denial message — a
   // copy-paste bug, not a real "not authorized" state. Literal isAdmin stays
@@ -234,6 +247,7 @@ export default function AdminShiftsPage() {
                 onClick={() => {
                   setSelectedFile(null);
                   setPreview(null);
+                  setHasImportedSelectedFile(false);
                   if (fileInputRef.current) fileInputRef.current.value = "";
                 }}
                 data-testid="btn-clear-shifts-upload"

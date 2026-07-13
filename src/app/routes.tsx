@@ -147,6 +147,13 @@ export function AppRoutes() {
         {/* Clerk user; it redeems a pairing code for a device token, then → /board. */}
         {/* Matches isBoardPathname (/board/*) so it renders inside BoardShell. */}
         <Route path="/board/pair"><BoardPairPage /></Route>
+        {/* T-38 (R-SY-04): these three alias redirects MUST be declared above the
+            dynamic /equipment/:id route below — wouter's <Switch> matches top-down,
+            so if :id came first it would match "scan"/"maintenance"/"intelligence"
+            as an equipment id and the redirects would never fire. */}
+        <Route path="/equipment/scan"><Redirect to="/equipment?scan=1" replace /></Route>
+        <Route path="/equipment/maintenance"><Redirect to="/equipment?status=maintenance" replace /></Route>
+        <Route path="/equipment/intelligence"><Redirect to="/equipment" replace /></Route>
         <Route path="/equipment/:id/edit"><AuthGuard><NewEquipmentPage /></AuthGuard></Route>
         <Route path="/equipment/:id/qr"><AuthGuard><WebOnlyGuard><EquipmentQrPrintPage /></WebOnlyGuard></AuthGuard></Route>
         {isNativeTablet
@@ -158,9 +165,6 @@ export function AppRoutes() {
         <Route path="/display"><RedirectPreserveSearch to="/board" /></Route>
         <Route path="/equipment-board"><RedirectPreserveSearch to="/board" /></Route>
         <Route path="/scan"><AuthGuard><ScanPage /></AuthGuard></Route>
-        <Route path="/equipment/scan"><Redirect to="/equipment?scan=1" replace /></Route>
-        <Route path="/equipment/maintenance"><Redirect to="/equipment?status=maintenance" replace /></Route>
-        <Route path="/equipment/intelligence"><Redirect to="/equipment" replace /></Route>
         <Route path="/alerts"><AuthGuard><CustodyGuard><AlertsPage /></CustodyGuard></AuthGuard></Route>
         <Route path="/my-equipment"><AuthGuard><MyEquipmentPage /></AuthGuard></Route>
         <Route path="/my-profile"><AuthGuard><MyProfilePage /></AuthGuard></Route>

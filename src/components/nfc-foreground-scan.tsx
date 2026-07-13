@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { haptics } from "@/lib/haptics";
 import {
   markNfcToggleFired,
+  NFC_REFIRE_DEBOUNCE_MS,
   runEquipmentQuickToggle,
   wasNfcToggleFiredRecently,
 } from "@/lib/nfc-equipment-toggle";
@@ -33,6 +34,11 @@ export function NfcForegroundScan({ renderTrigger }: { renderTrigger: (args: Nfc
   const handlerRef = useRef<(equipmentId: string) => void>(() => {});
   const scanAbortRef = useRef<AbortController | null>(null);
   const sessionStopRef = useRef<(() => Promise<void>) | null>(null);
+  // Hardware-reader re-fire debounce (T-35) — distinct from the 8s success guard.
+  // Absorbs multiple onRead events for the same physical tap without re-blocking
+  // a genuine retry for the full 8s window after a failure.
+  const lastAttemptIdRef = useRef<string | null>(null);
+  const lastAttemptAtRef = useRef<number | null>(null);
 
   const stopScan = useCallback(() => {
     scanAbortRef.current?.abort();
@@ -45,7 +51,17 @@ export function NfcForegroundScan({ renderTrigger }: { renderTrigger: (args: Nfc
 
   const handleEquipmentId = useCallback(
     async (equipmentId: string) => {
+      const now = Date.now();
+      if (
+        lastAttemptIdRef.current === equipmentId &&
+        lastAttemptAtRef.current !== null &&
+        now - lastAttemptAtRef.current < NFC_REFIRE_DEBOUNCE_MS
+      ) {
+        return;
+      }
       if (wasNfcToggleFiredRecently(equipmentId)) return;
+      lastAttemptIdRef.current = equipmentId;
+      lastAttemptAtRef.current = now;
       markNfcToggleFired(equipmentId);
       const cached = await getCachedEquipmentById(equipmentId).catch(() => undefined);
       const name = cached?.name ?? equipmentId;

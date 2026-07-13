@@ -19,6 +19,9 @@ import type {
   DeletedEquipment,
   QuickScanToggleResult,
   QuickScanToggleAction,
+  EquipmentLocateResponse,
+  CreateDamageReportRequest,
+  CreateDamageReportResponse,
 } from "@/types";
 import type { EquipmentWaitlistSnapshot } from "../../../shared/equipment-waitlist.js";
 import type { EquipmentTruthResponse } from "../../../shared/equipment-truth.js";
@@ -256,6 +259,23 @@ export const equipmentApi = {
     },
     truth: (id: string) =>
       request<EquipmentTruthResponse>(`/api/equipment/${encodeURIComponent(id)}/truth`),
+    /** Read-only search (T-22b · R-EQ-F1) — GET /api/equipment/locate?q= */
+    locate: (q: string) =>
+      request<EquipmentLocateResponse>(`/api/equipment/locate?q=${encodeURIComponent(q)}`),
+    /**
+     * Damaged-at-check-in report (T-24c · R-EQ-F3) — POST /api/equipment/:id/damage.
+     * The route (T-24b) writes a `vt_damage_events` row and flips the
+     * equipment's `conditionStatus`. `equipmentId` is the path param; the
+     * request body carries only the optional `note`.
+     */
+    reportDamage: ({ equipmentId, note }: CreateDamageReportRequest) =>
+      request<CreateDamageReportResponse>(
+        `/api/equipment/${encodeURIComponent(equipmentId)}/damage`,
+        {
+          method: "POST",
+          body: JSON.stringify({ note }),
+        },
+      ),
     confirmInRoom: (id: string, body: { roomId: string }) =>
       request<{ equipmentId: string; roomId: string; roomName: string; status: string }>(
         `/api/equipment/${encodeURIComponent(id)}/confirm-in-room`,

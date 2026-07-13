@@ -15,6 +15,7 @@ import testRoutes from "../routes/test.js";
 import healthRoutes from "../routes/health.js";
 
 // --- Equipment core ---
+import equipmentLocateRoutes from "../routes/equipment-locate.js";
 import equipmentRoutes from "../routes/equipment.js";
 import equipmentOperationalStateRoutes from "../routes/equipment-operational-state.js";
 import operationalMetricsRoutes from "../routes/operational-metrics.js";
@@ -28,6 +29,7 @@ import { createDisplayRouter } from "../routes/display.js";
 import platformCapabilitiesRoutes from "../routes/platform-capabilities.js";
 import equipmentCopilotRoutes from "../routes/equipment-copilot.js";
 import equipmentInferenceRoutes from "../routes/equipment-inference.js";
+import equipmentDamageRoutes from "../routes/equipment-damage.js";
 
 // --- Safety surfaces ---
 import codeBlueRoutes from "../routes/code-blue.js";
@@ -53,6 +55,7 @@ import tasksRoutes from "../routes/tasks.js";
 import containersRoutes from "../routes/containers.js";
 import restockRoutes from "../routes/restock.js";
 import inventoryItemsRoutes from "../routes/inventory-items.js";
+import nudgesRoutes from "../routes/nudges.js";
 import procurementRoutes from "../routes/procurement.js";
 import clinicalCheckInRoutes from "../routes/clinical-check-in.js";
 import dispenseRoutes from "../routes/dispense.js";
@@ -77,11 +80,16 @@ function registerInfrastructureRoutes(app: express.Express) {
 }
 
 function registerEquipmentCoreRoutes(app: express.Express) {
+  // Locate mounts before the main equipment router: /locate is a single path
+  // segment and would otherwise match equipmentRoutes' generic GET /:id first.
+  app.use("/api/equipment", equipmentLocateRoutes);
   // Main equipment router first; copilot nested routes (/:id/copilot/*) pass through when
   // unmatched. Copilot middleware is scoped to POST /:id/copilot/explain only.
   app.use("/api/equipment", equipmentRoutes);
   app.use("/api/equipment", equipmentCopilotRoutes);
   app.use("/api/equipment", equipmentInferenceRoutes);
+  // Damage-report sub-resource (POST /:id/damage) — T-24b.
+  app.use("/api/equipment", equipmentDamageRoutes);
   // Bare /api mounts: operational-state and operational-metrics attach to the shared
   // /api prefix. Keep them immediately after /api/equipment and before narrower paths.
   app.use("/api", equipmentOperationalStateRoutes);
@@ -126,6 +134,7 @@ function registerPlatformRoutes(app: express.Express) {
   app.use("/api/containers", containersRoutes);
   app.use("/api/restock", restockRoutes);
   app.use("/api/inventory-items", inventoryItemsRoutes);
+  app.use("/api/nudges", nudgesRoutes);
   app.use("/api/procurement", procurementRoutes);
   app.use("/api/clinical", clinicalCheckInRoutes);
   app.use("/api/dispense", dispenseRoutes);

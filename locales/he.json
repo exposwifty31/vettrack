@@ -519,7 +519,11 @@
       "issueReported": "תקלה דווחה",
       "issueWhatsAppOffline": "הודעת WhatsApp תישלח כשתתחבר.",
       "reportFailedDefault": "הדיווח נכשל",
-      "chargeAlertScheduled": "התראה תישלח לאחר {minutes} דקות אם לא יחובר"
+      "chargeAlertScheduled": "התראה תישלח לאחר {minutes} דקות אם לא יחובר",
+      "damageReported": "הוחזר פגום",
+      "damageReportUndo": "בטל",
+      "damageReportFailed": "לא ניתן היה לדווח על נזק",
+      "damageReportOffline": "הוחזר פגום — במצב לא מקוון, כך שדיווח הנזק לא נשלח. התחבר ודווח שוב."
     },
     "backToList": "חזרה לרשימה",
     "notFound": "הציוד לא נמצא",
@@ -859,7 +863,26 @@
     "guidedTitle": "מצב מודרך",
     "guidedBody": "השאילו והחזירו ציוד, ונפקו או חדשו מלאי. לכל דבר אחר פנו למפקח/ת.",
     "inventoryActionHint": "ניפוק או חידוש פריטים",
-    "myEquipmentRefreshFailed": "לא ניתן לרענן — מוצג מידע שמור"
+    "myEquipmentRefreshFailed": "לא ניתן לרענן — מוצג מידע שמור",
+    "startOfShift": {
+      "idleTitle": "אין כרגע דבר שדורש תשומת לב",
+      "opsExceptions": "חריגות בציוד דורשות בדיקה",
+      "opsExceptionsAction": "בדיקת חריגות",
+      "opsAllClear": "כיסוי הציוד תקין",
+      "opsAllClearAction": "צפייה בכיסוי",
+      "vetReview": "בעיות ציוד דורשות את בדיקתך",
+      "vetReviewAction": "בדיקת ציוד",
+      "vetReady": "עגלת ההחייאה מוכנה לאימות",
+      "vetReadyAction": "בדיקת עגלת החייאה",
+      "techOverdue": "משימות באיחור דורשות אותך",
+      "techOverdueAction": "צפייה במשימות",
+      "techCaughtUp": "הכל מעודכן",
+      "techCaughtUpAction": "סריקת ציוד",
+      "itemsCheckedOut": "פריטים מושאלים אצלך",
+      "itemsCheckedOutAction": "החזרת ציוד",
+      "studentReady": "מוכן להתחיל את המשמרת",
+      "studentReadyAction": "סריקה להשאלה"
+    }
   },
   "home": {
     "equipmentOverview": "סקירת ציוד",
@@ -3754,6 +3777,10 @@
     "description": "תצוגה זו מותאמת למחשב ולמסכי טאבלט רחבים. פִּתחו אותה במחשב, או המשיכו בתצוגה המותאמת לנייד.",
     "cta": "למעבר לציוד שלי"
   },
+  "managementWebGate": {
+    "title": "סביבת עבודה זו מיועדת לניהול",
+    "description": "סביבת עבודה זו מיועדת לניהול. פִּתחו את VetTrack במכשיר שלכם כדי להמשיך."
+  },
   "whatsNew": {
     "title": "מה חדש — VetTrack",
     "heading": "מה חדש",
@@ -4086,5 +4113,25 @@
     "notNow": "לא עכשיו",
     "iosAriaLabel": "הוספת VetTrack למסך הבית",
     "iosTagline": "עובד לא מקוון · מסך מלא · ללא צורך ב-App Store"
+  },
+  "locateSearch": {
+    "openButtonLabel": "איתור ציוד",
+    "label": "חיפוש ציוד",
+    "placeholder": "חיפוש לפי שם, מיקום או מחזיק",
+    "title": "איתור ציוד",
+    "emptyPrompt": "חפשו לפי שם, מיקום או מחזיק כדי למצוא ציוד במהירות.",
+    "noResults": "לא נמצא ציוד התואם לחיפוש.",
+    "searching": "מחפש…",
+    "resultsCount": "{count, plural, one{תוצאה אחת נמצאה} other{# תוצאות נמצאו}}"
+  },
+  "homeNudges": {
+    "expiryMessage": "ציוד פג תוקף בקרוב — בדקו את המלאי",
+    "restockMessage": "פריט עומד להיגמר — בדקו חידוש מלאי",
+    "dismissAria": "התעלמות מהתזכורת"
+  },
+  "returnPlugDialog": {
+    "damagedButton": "פגום",
+    "damageWarning": "דוח נזק יוגש עבור ציוד זה. ניתן לבטל מיד לאחר האישור.",
+    "confirmReturnedDamaged": "אישור — הוחזר פגום"
   }
 }

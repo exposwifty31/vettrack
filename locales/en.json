@@ -519,7 +519,11 @@
       "deleteFailed": "Deletion failed",
       "issueReported": "Issue reported",
       "issueWhatsAppOffline": "WhatsApp message will be sent when connected.",
-      "reportFailedDefault": "Report failed"
+      "reportFailedDefault": "Report failed",
+      "damageReported": "Returned damaged",
+      "damageReportUndo": "Undo",
+      "damageReportFailed": "Could not report damage",
+      "damageReportOffline": "Returned damaged — offline, so the damage report wasn't sent. Reconnect and report it again."
     },
     "backToList": "Back to list",
     "notFound": "Equipment not found",
@@ -859,7 +863,26 @@
     "guidedTitle": "Guided mode",
     "guidedBody": "Check equipment out and back in, and dispense or restock inventory. Ask a supervisor for anything else.",
     "inventoryActionHint": "Dispense or restock items",
-    "myEquipmentRefreshFailed": "Couldn't refresh — showing saved items"
+    "myEquipmentRefreshFailed": "Couldn't refresh — showing saved items",
+    "startOfShift": {
+      "idleTitle": "Nothing needs you right now",
+      "opsExceptions": "Equipment exceptions need review",
+      "opsExceptionsAction": "Review exceptions",
+      "opsAllClear": "Fleet coverage looks good",
+      "opsAllClearAction": "View coverage",
+      "vetReview": "Equipment issues need your review",
+      "vetReviewAction": "Review equipment",
+      "vetReady": "Crash cart ready to verify",
+      "vetReadyAction": "Check crash cart",
+      "techOverdue": "Overdue tasks need you",
+      "techOverdueAction": "View tasks",
+      "techCaughtUp": "You're all caught up",
+      "techCaughtUpAction": "Scan equipment",
+      "itemsCheckedOut": "Items checked out to you",
+      "itemsCheckedOutAction": "Return equipment",
+      "studentReady": "Ready to start your shift",
+      "studentReadyAction": "Scan to check out"
+    }
   },
   "home": {
     "equipmentOverview": "Equipment overview",
@@ -3754,6 +3777,10 @@
     "description": "This view is built for desktop and wide tablet displays. Open it on a computer, or continue with the mobile-optimized view.",
     "cta": "Go to my equipment"
   },
+  "managementWebGate": {
+    "title": "This workspace is for management",
+    "description": "This workspace is for management. Open VetTrack on your device to continue."
+  },
   "whatsNew": {
     "title": "What's New — VetTrack",
     "heading": "What's New",
@@ -4086,5 +4113,25 @@
     "notNow": "Not now",
     "iosAriaLabel": "Add VetTrack to Home Screen",
     "iosTagline": "Works offline · Full-screen · No App Store needed"
+  },
+  "locateSearch": {
+    "openButtonLabel": "Locate equipment",
+    "label": "Search equipment",
+    "placeholder": "Search by name, location, or custodian",
+    "title": "Locate Equipment",
+    "emptyPrompt": "Search by name, location, or custodian to find equipment fast.",
+    "noResults": "No equipment found matching your search.",
+    "searching": "Searching…",
+    "resultsCount": "{count, plural, one{# result found} other{# results found}}"
+  },
+  "homeNudges": {
+    "expiryMessage": "Equipment expiring soon — check inventory",
+    "restockMessage": "Item running low — check restock",
+    "dismissAria": "Dismiss this reminder"
+  },
+  "returnPlugDialog": {
+    "damagedButton": "Damaged",
+    "damageWarning": "A damage report will be filed for this equipment. You can undo this right after confirming.",
+    "confirmReturnedDamaged": "Confirm — Returned Damaged"
   }
 }

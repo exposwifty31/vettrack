@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useMemo, useCallback, useRef, type ReactNode } from "react";
 import { liveQuery } from "dexie";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   offlineDb,
   updatePendingSync,
@@ -59,6 +60,7 @@ const SyncContext = createContext<SyncState>({
 });
 
 export function SyncProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [allItems, setAllItems] = useState<PendingSync[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [justSynced, setJustSynced] = useState(false);
@@ -165,9 +167,9 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const cleanup = initSyncEngine();
+    const cleanup = initSyncEngine(queryClient);
     return cleanup;
-  }, []);
+  }, [queryClient]);
 
   const triggerSync = useCallback(async () => {
     await processQueue();

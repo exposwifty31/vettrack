@@ -10,6 +10,8 @@ import { useRealtimeReconciliation } from "@/hooks/useRealtimeReconciliation";
 import { useScanAffordance } from "@/lib/scan-affordance";
 import { subscribeKeepalive } from "@/lib/realtime";
 import { t } from "@/lib/i18n";
+import { LocateSearch } from "@/features/equipment/LocateSearch";
+import { HomeNudges } from "./HomeNudges";
 
 /**
  * Shared host for the Phase-3 home surfaces (ops / floor). Owns the page-level
@@ -20,6 +22,9 @@ import { t } from "@/lib/i18n";
  *  - the `?scan=1` deep-link → in-page `QrScanner` (web: ignored when no scan affordance)
  *  - `useEnterOnce("home")` → the `rise` enter-animation class
  *  - the `AppShell` (web) vs bare (iPad-native, NativeShell provides chrome) wrapper
+ *  - `LocateSearch` (T-22c · R-EQ-F1) — a single floating entry point reachable
+ *    from every archetype's home, so the read-only locate search doesn't need a
+ *    per-surface mount
  *
  * Exactly one surface mounts at a time (the home fork is a component swap), so the
  * run-once contract holds. Banners are rendered by {@link HomeChrome} which each
@@ -94,6 +99,7 @@ export function HomeShell({ bare = false, children }: { bare?: boolean; children
       </Helmet>
       {children}
       {scannerOpen && <QrScanner onClose={() => setScannerOpen(false)} />}
+      <LocateSearch />
     </HomeShellContext.Provider>
   );
 
@@ -154,6 +160,8 @@ export function HomeChrome() {
           />
         </Link>
       )}
+
+      <HomeNudges />
     </>
   );
 }

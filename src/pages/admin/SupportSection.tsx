@@ -111,7 +111,15 @@ export function SupportSection() {
       queryClient.invalidateQueries({
         queryKey: ["/api/support/unresolved-count"],
       });
-      setSelectedTicket(updated);
+      // Only pop/refresh the detail editor when one is already open — an
+      // in-row quick-Resolve reuses this mutation but must not surface the
+      // editor. When it IS open, re-seed the local fields from the server
+      // response so they never show contradictory (stale) state.
+      if (selectedTicket) {
+        setSelectedTicket(updated);
+        setDetailStatus(updated.status);
+        setDetailNote(updated.adminNote || "");
+      }
       toast.success(t.adminPage.ticketUpdated);
     },
     onError: () => toast.error(t.adminPage.ticketUpdateFailed),

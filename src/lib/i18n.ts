@@ -337,6 +337,10 @@ const translations = {
       issueReported: d.equipmentDetail.toast.issueReported,
       issueWhatsAppOffline: d.equipmentDetail.toast.issueWhatsAppOffline,
       reportFailed: (msg: string) => msg || d.equipmentDetail.toast.reportFailedDefault,
+      damageReported: d.equipmentDetail.toast.damageReported,
+      damageReportUndo: d.equipmentDetail.toast.damageReportUndo,
+      damageReportFailed: d.equipmentDetail.toast.damageReportFailed,
+      damageReportOffline: d.equipmentDetail.toast.damageReportOffline,
     },
     locationCard: {
       title: d.equipmentDetail.locationCard.title,
@@ -1079,6 +1083,8 @@ const translations = {
 
   webOnlyGuard: d.webOnlyGuard,
 
+  managementWebGate: d.managementWebGate,
+
   legalFooter: d.legalFooter,
 
   legalPage: d.legalPage,
@@ -1107,6 +1113,21 @@ const translations = {
   conditionChecklist: d.conditionChecklist,
 
   crashCartAdmin: d.crashCartAdmin,
+
+  locateSearch: {
+    openButtonLabel: d.locateSearch.openButtonLabel,
+    label: d.locateSearch.label,
+    placeholder: d.locateSearch.placeholder,
+    title: d.locateSearch.title,
+    emptyPrompt: d.locateSearch.emptyPrompt,
+    noResults: d.locateSearch.noResults,
+    searching: d.locateSearch.searching,
+    resultsCount: (count: number) => tr(d.locateSearch.resultsCount, { count }),
+  },
+
+  homeNudges: d.homeNudges,
+
+  returnPlugDialog: d.returnPlugDialog,
 
 } as const;
 

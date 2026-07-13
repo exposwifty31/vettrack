@@ -1,0 +1,70 @@
+/**
+ * @vitest-environment happy-dom
+ *
+ * T-24c — client api + types for the damage-report feature (R-EQ-F3). Mocks
+ * the fetch layer and asserts `api.equipment.reportDamage()` POSTs the
+ * optional `note` to the nested route `/api/equipment/:id/damage` — the
+ * equipmentId is the PATH param, reconciled to the merged T-24b backend
+ * route (server/routes/equipment-damage.ts) — and returns the typed
+ * `{ damageEvent, conditionStatus }` shape.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { api } from "@/lib/api";
+import { setAuthState } from "@/lib/auth-store";
+import type { DamageReport } from "@/types";
+
+describe("api.equipment.reportDamage", () => {
+  beforeEach(() => {
+    // A JWT-shaped (3-part) bearer token satisfies authFetch's isValidJwt check
+    // regardless of whether this environment resolves Clerk-enabled or
+    // dev-bypass — this test only cares about the URL/payload/response shape.
+    setAuthState({ userId: "dev-user-1", email: "tech@clinic.test", name: "Tech", bearerToken: "aaa.bbb.ccc" });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("POSTs { note } to /api/equipment/:id/damage and returns the typed shape", async () => {
+    const damageEvent: DamageReport = {
+      id: "dmg-1",
+      clinicId: "clinic-1",
+      equipmentId: "eq-1",
+      reportedBy: "dev-user-1",
+      at: "2026-07-12T00:00:00.000Z",
+      note: "Cracked housing",
+      resolvedAt: null,
+      createdAt: "2026-07-12T00:00:00.000Z",
+    };
+    const responseBody = { damageEvent, conditionStatus: "damaged" };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(responseBody), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await api.equipment.reportDamage({ equipmentId: "eq-1", note: "Cracked housing" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/equipment/eq-1/damage");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ note: "Cracked housing" });
+    expect(result).toEqual(responseBody);
+  });
+
+  it("omits note from the payload when not provided", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ damageEvent: {}, conditionStatus: "damaged" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.equipment.reportDamage({ equipmentId: "eq-2" });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/equipment/eq-2/damage");
+    expect(JSON.parse(init.body as string)).toEqual({});
+  });
+});

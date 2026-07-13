@@ -37,7 +37,7 @@ function resolveDeployabilityFromGraph(
   }
 
   const bundleGate = computeBundleReadinessGate(
-    { custodyState: eq.custodyState, assetTypeId: eq.assetTypeId },
+    { custodyState: eq.custodyState, assetTypeId: eq.assetTypeId, conditionStatus: eq.conditionStatus },
     graph.unitConditionStates,
     graph.assetTypeConditions,
     ctx.now,

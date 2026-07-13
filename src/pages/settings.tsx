@@ -42,12 +42,29 @@ import {
   Type,
 } from "lucide-react";
 import { Link } from "wouter";
+import * as Sentry from "@sentry/react";
 import { playFeedbackTone, playMuteTone } from "@/lib/sounds";
 import { toast } from "sonner";
 import { t } from "@/lib/i18n";
 import type { ShiftRole, UserRole } from "@/types";
 import { safeReloadPage } from "@/lib/safe-browser";
 import { usePlatformTarget } from "@/app/platform";
+
+/**
+ * Fire a settings feedback tone without awaiting it, so a rejected
+ * AudioContext.resume() (observed on iOS WKWebView) can never block the
+ * settings persist that follows. The failure is reported observably instead
+ * of swallowed silently (mirrors the use-pwa-install storage-failure
+ * pattern).
+ */
+function fireSettingsFeedbackTone(tone: Promise<void>): void {
+  void tone.catch((error) => {
+    Sentry.captureMessage("settings feedback tone failed", {
+      level: "warning",
+      extra: { error: String(error) },
+    });
+  });
+}
 
 export default function SettingsPage() {
   const confirm = useConfirm();
@@ -119,13 +136,9 @@ export default function SettingsPage() {
     }
   };
 
-  const handleCriticalAlertsToggle = async (v: boolean) => {
+  const handleCriticalAlertsToggle = (v: boolean) => {
     if (settings.soundEnabled) {
-      if (v) {
-        await playFeedbackTone();
-      } else {
-        await playMuteTone();
-      }
+      fireSettingsFeedbackTone(v ? playFeedbackTone() : playMuteTone());
     }
     update({ criticalAlertsSound: v });
     if (push.subscribed) {
@@ -144,11 +157,7 @@ export default function SettingsPage() {
     value: boolean
   ) => {
     if (settings.soundEnabled) {
-      if (value) {
-        await playFeedbackTone();
-      } else {
-        await playMuteTone();
-      }
+      fireSettingsFeedbackTone(value ? playFeedbackTone() : playMuteTone());
     }
     await syncRoleNotificationSettings({ [key]: value });
   };

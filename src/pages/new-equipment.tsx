@@ -125,6 +125,7 @@ export default function NewEquipmentPage() {
     register,
     handleSubmit,
     setValue,
+    watch,
     reset,
     formState: { errors },
   } = useForm<FormValues>({
@@ -432,8 +433,7 @@ export default function NewEquipmentPage() {
               <div className="flex flex-col gap-2">
                 <Label className="text-sm font-medium">Folder / Category</Label>
                 <Select
-                  defaultValue={prefill.folderId || "none"}
-                  key={isEditing ? (existingEquipment?.folderId ?? "none") : undefined}
+                  value={watch("folderId") || "none"}
                   onValueChange={(v) => setValue("folderId", v)}
                 >
                   <SelectTrigger className="h-12 rounded-xl border-border/60 bg-background text-base" data-testid="select-folder">
