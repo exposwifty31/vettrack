@@ -66,11 +66,14 @@
 
 ## Findings
 
-### F-1 · i18n leak: Return dialog is hardcoded English on a Hebrew app — MEDIUM
+> **Status — read the Resolution table above first.** The entries below are the **original pre-fix observations** (the as-found record). Their disposition is already applied in PR #89: **F-1 FIXED**, **F-3 FIXED**, **F-4 REFUTED**, **F-2** source-verified / on-device-inconclusive. They are kept here for traceability, not as open issues.
 
-`src/components/return-plug-dialog.tsx` renders its plug-status copy as **hardcoded English string literals** — "Return Equipment" (L89), "Was … plugged in after returning?" (L92-93), "Plugged In" (L110), "Not Plugged In" (L124), "Confirm — Plugged In ✓" (L185), "Cancel", "Alert deadline (minutes)" (L143), and the amber "An alert will be sent after N minutes…" (L110-ish). Only the *new* damaged copy (`t.returnPlugDialog.damagedButton` / `damageWarning`) is localized. On the Hebrew-default clinical app the entire return dialog therefore appears in English.
+### F-1 · i18n leak: Return dialog was hardcoded English on a Hebrew app — MEDIUM · ✅ RESOLVED (PR #89)
+
+**As found (now fixed):** `src/components/return-plug-dialog.tsx` rendered its plug-status copy as **hardcoded English string literals** — "Return Equipment" (L89), "Was … plugged in after returning?" (L92-93), "Plugged In" (L110), "Not Plugged In" (L124), "Confirm — Plugged In ✓" (L185), "Cancel", "Alert deadline (minutes)" (L143), and the amber "An alert will be sent after N minutes…" (L110-ish). Only the *new* damaged copy (`t.returnPlugDialog.damagedButton` / `damageWarning`) is localized. On the Hebrew-default clinical app the entire return dialog therefore appears in English.
 - **Failure scenario:** a Hebrew-only technician opens Return on any checked-out device and sees an all-English dialog.
 - **Likely pre-existing** (the dialog predates Phase 0–2); surfaced by the device audit. Note: `tests/i18n-no-hebrew-in-source.test.ts` catches *Hebrew* literals in source but nothing catches *English* UI literals, so this class slips through.
+- **✅ Fixed in PR #89:** all copy localized to `t.returnPlugDialog.*` (en/he parity, interpolated strings via `tr()`); `tests/return-plug-dialog-i18n.test.tsx` renders the Hebrew dialog and asserts no English literal.
 
 ### F-2 (follow-up, not a confirmed defect) · Verify the damaged-return button on a clean native build
 
@@ -110,8 +113,8 @@ See D14 above — the "Returned damaged" choice did not render on-device despite
 - **Equipment master-detail:** the Equipment screen is a genuine master-detail — master list on the right, detail pane on the left with a **"בחר פריט" (Select an item)** empty state; selecting a row loads its detail **into the pane** while the list stays visible (not a full-screen push). Evidence: `ipad-equipment-master-detail-empty.png`, `ipad-equipment-master-detail-loaded.png`.
 
 **iPad observations (minor):**
-- **F-3 · Post-return custodian staleness (also seen on iPhone) — LOW.** After returning a device (`custody_state: returned`, DB-confirmed), the detail view's **"אחראי" (responsible)** field still shows the prior holder ("Dev Admin") instead of unassigned. The Return button correctly disappears, so custody *is* released server-side — the detail-view custodian text just doesn't refresh. Minor UI cache-invalidation nit on both devices.
-- **F-4 · Possible redundant navigation on iPad — LOW (verify).** The iPad appeared to render **both** the right sidebar **and** a bottom tab bar simultaneously. Could not fully disambiguate the bottom bar from the adjacent iPhone-simulator window; flag to confirm on a single-window capture.
+- **F-3 · Post-return custodian staleness (also seen on iPhone) — LOW · ✅ RESOLVED (PR #89).** As found: after returning a device (`custody_state: returned`, DB-confirmed), the detail view's **"אחראי" (responsible)** field still showed the prior holder instead of unassigned, because `invalidateAll()` didn't refresh the evidence-graph query. **Fixed:** `invalidateAll()` now invalidates `["equipment-truth", id]` + `["deployability", id]` (RED test in `return-damaged.test.tsx`).
+- **F-4 · Possible redundant navigation on iPad — LOW · ❌ REFUTED.** The iPad *appeared* to render both a sidebar and a bottom tab bar, but the code proves otherwise: `NativeShell.tsx` renders the tablet branch with **only** `NativeTabSidebar` (the `NativeTabBar` is phone-branch-only). The bottom bar seen was the adjacent iPhone-simulator window. No code change.
 
 ---
 
