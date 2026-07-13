@@ -784,6 +784,9 @@ export interface TStructure {
       signOut: string;
       loadingApp: string;
       nativeClerkFailed: string;
+      offlineTitle: string;
+      offlineBody: string;
+      offlineRetry: string;
       reasons: {
         missingClinicId: string;
         dbFallbackDisabled: string;

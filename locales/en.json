@@ -781,6 +781,9 @@
       "signOut": "Sign out",
       "loadingApp": "Loading system...",
       "nativeClerkFailed": "Authentication did not initialize in the native app. Allow capacitor://localhost in the Clerk dashboard (Native applications), then rebuild and try again.",
+      "offlineTitle": "You're offline",
+      "offlineBody": "Connect to the internet to sign in. We'll retry automatically when you're back online.",
+      "offlineRetry": "Try again",
       "reasons": {
         "missingClinicId": "User is not assigned to a clinic. Sign out and sign in again, then contact admin if this continues.",
         "dbFallbackDisabled": "Clinic context is required. Ensure your Clerk session has an organization, or contact your administrator.",

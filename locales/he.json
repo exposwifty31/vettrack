@@ -781,6 +781,9 @@
       "signOut": "התנתק",
       "loadingApp": "המערכת בטעינה...",
       "nativeClerkFailed": "האימות לא אותחל באפליקציה המקומית. הוסף את capacitor://localhost בלוח Clerk (Native applications), בנה מחדש ונסה שוב.",
+      "offlineTitle": "אין חיבור לאינטרנט",
+      "offlineBody": "התחבר/י לאינטרנט כדי להיכנס. ננסה שוב אוטומטית כשהחיבור יחזור.",
+      "offlineRetry": "נסה שוב",
       "reasons": {
         "missingClinicId": "המשתמש לא משויך למרפאה. התנתק והתחבר מחדש, ואם הבעיה נמשכת פנה למנהל המערכת.",
         "dbFallbackDisabled": "נדרש הקשר מרפאה. ודא שחשבון Clerk משויך לארגון, או פנה למנהל המערכת.",
