@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "VetTrack משתמשת במצלמה לסריקת קודי QR של ציוד ולצילום תמונות עבור רשומות הציוד.";
+"NFCReaderUsageDescription" = "VetTrack קוראת תגי NFC לזיהוי ציוד בעמדת העגינה ולצד המיטה.";
+"NSPhotoLibraryUsageDescription" = "VetTrack קוראת תמונות מהספרייה שלך כדי לצרף אותן לרשומות הציוד.";
+"NSPhotoLibraryAddUsageDescription" = "VetTrack שומרת תמונות ציוד שצולמו בספריית התמונות שלך.";
