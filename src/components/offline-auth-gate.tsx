@@ -1,0 +1,50 @@
+import { useEffect, useState, type ReactNode } from "react";
+import { t } from "@/lib/i18n";
+import { isOnline, safeReloadPage } from "@/lib/safe-browser";
+import { Button } from "@/components/ui/button";
+
+/**
+ * Wraps a Clerk auth form (`<SignIn>` / `<SignUp>`) on the sign-in/sign-up pages.
+ *
+ * While the device is offline it renders the graceful "connect to sign in"
+ * prompt INSTEAD of its children, so clerk-js never mounts and therefore never
+ * fires its own "No Internet Connection" toast over a blank form (real-device
+ * finding). It auto-reloads to retry when connectivity returns.
+ *
+ * This complements `NativeClerkGate`, which covers the earlier
+ * still-`ClerkLoading` path; this gate covers the case where clerk-js was
+ * already cached, so the shell reached `ClerkLoaded` and the auth form mounted.
+ */
+export function OfflineAuthGate({ children }: { children: ReactNode }) {
+  const [offline, setOffline] = useState(() => !isOnline());
+
+  useEffect(() => {
+    // Re-sync in case connectivity changed between the initializer and mount.
+    setOffline(!isOnline());
+    const handleOffline = () => setOffline(true);
+    const handleOnline = () => safeReloadPage();
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, []);
+
+  if (!offline) {
+    return <>{children}</>;
+  }
+
+  return (
+    <div
+      className="w-full flex flex-col items-center justify-center gap-4 py-12 px-2 text-center"
+      data-testid="offline-auth-gate"
+    >
+      <p className="text-base font-semibold text-foreground">{t.auth.guard.offlineTitle}</p>
+      <p className="text-sm text-muted-foreground max-w-md">{t.auth.guard.offlineBody}</p>
+      <Button type="button" variant="outline" onClick={() => safeReloadPage()}>
+        {t.auth.guard.offlineRetry}
+      </Button>
+    </div>
+  );
+}

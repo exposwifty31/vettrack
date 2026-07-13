@@ -15,6 +15,7 @@ import { useIsDarkActive } from "@/hooks/use-settings";
 import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { ClerkAuthFormShell } from "@/components/clerk-auth-form-shell";
 import { NativeSocialButtons } from "@/components/native-social-buttons";
+import { OfflineAuthGate } from "@/components/offline-auth-gate";
 import { LegalFooterLinks } from "@/components/legal-footer-links";
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
@@ -99,6 +100,7 @@ export default function SignUpPage() {
               </ClerkFailed>
               <ClerkLoaded>
                 <ClerkAuthFormShell>
+                  <OfflineAuthGate>
                   <div className="w-full min-h-[24rem] flex flex-col items-center justify-start gap-4">
                     {!vetLicenseReady ? (
                       <p
@@ -129,6 +131,7 @@ export default function SignUpPage() {
                       </>
                     )}
                   </div>
+                  </OfflineAuthGate>
                 </ClerkAuthFormShell>
               </ClerkLoaded>
             </div>

@@ -15,6 +15,7 @@ import { isCapacitorNative } from "@/lib/capacitor-runtime";
 import { ClerkAuthFormShell } from "@/components/clerk-auth-form-shell";
 import { AuthBootstrapSpinner } from "@/components/native-clerk-gate";
 import { NativeSocialButtons } from "@/components/native-social-buttons";
+import { OfflineAuthGate } from "@/components/offline-auth-gate";
 import { LegalFooterLinks } from "@/components/legal-footer-links";
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
@@ -108,15 +109,17 @@ export default function SignInPage() {
                   </ClerkFailed>
                   <ClerkLoaded>
                     <ClerkAuthFormShell>
-                      <div className="w-full min-h-[24rem] flex flex-col items-center justify-start gap-4">
-                        {isNative ? <NativeSocialButtons mode="signIn" /> : null}
-                        <SignIn
-                          routing="hash"
-                          signUpUrl="/signup"
-                          fallbackRedirectUrl="/home"
-                          appearance={isNative ? getClerkAppearanceNative(isDark) : getClerkAppearance(isDark)}
-                        />
-                      </div>
+                      <OfflineAuthGate>
+                        <div className="w-full min-h-[24rem] flex flex-col items-center justify-start gap-4">
+                          {isNative ? <NativeSocialButtons mode="signIn" /> : null}
+                          <SignIn
+                            routing="hash"
+                            signUpUrl="/signup"
+                            fallbackRedirectUrl="/home"
+                            appearance={isNative ? getClerkAppearanceNative(isDark) : getClerkAppearance(isDark)}
+                          />
+                        </div>
+                      </OfflineAuthGate>
                     </ClerkAuthFormShell>
                   </ClerkLoaded>
                   <p className="text-xs text-muted-foreground text-center max-w-xs">
