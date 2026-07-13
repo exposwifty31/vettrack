@@ -1127,7 +1127,20 @@ const translations = {
 
   homeNudges: d.homeNudges,
 
-  returnPlugDialog: d.returnPlugDialog,
+  returnPlugDialog: {
+    ...d.returnPlugDialog,
+    description: (name?: string | null) =>
+      name
+        ? tr(d.returnPlugDialog.descriptionWithName, { name })
+        : d.returnPlugDialog.descriptionNoName,
+    plugAlertWarning: (minutes: number) =>
+      tr(
+        minutes === 1
+          ? d.returnPlugDialog.plugAlertWarningOne
+          : d.returnPlugDialog.plugAlertWarningOther,
+        { minutes },
+      ),
+  },
 
 } as const;
 

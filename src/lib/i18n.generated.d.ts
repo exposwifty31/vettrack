@@ -4133,6 +4133,17 @@ export interface TStructure {
     dismissAria: string;
   };
   returnPlugDialog: {
+    title: string;
+    descriptionWithName: string;
+    descriptionNoName: string;
+    pluggedIn: string;
+    notPluggedIn: string;
+    plugAlertWarningOne: string;
+    plugAlertWarningOther: string;
+    deadlineLabel: string;
+    cancel: string;
+    confirmPluggedIn: string;
+    confirmSetAlert: string;
     damagedButton: string;
     damageWarning: string;
     confirmReturnedDamaged: string;

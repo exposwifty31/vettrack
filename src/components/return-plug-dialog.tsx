@@ -86,12 +86,8 @@ export function ReturnPlugDialog({
     <Sheet open={open} onOpenChange={resetState}>
       <SheetContent side="bottom" className="rounded-t-2xl max-h-[90dvh] overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>Return Equipment</SheetTitle>
-          <SheetDescription>
-            {equipmentName
-              ? `Was "${equipmentName}" plugged in after returning?`
-              : "Was the equipment plugged in after returning?"}
-          </SheetDescription>
+          <SheetTitle>{t.returnPlugDialog.title}</SheetTitle>
+          <SheetDescription>{t.returnPlugDialog.description(equipmentName)}</SheetDescription>
         </SheetHeader>
 
         <div className="flex flex-col gap-3 py-2">
@@ -108,7 +104,7 @@ export function ReturnPlugDialog({
               data-testid="btn-plugged-yes"
             >
               <Plug className="h-4 w-4" aria-hidden />
-              Plugged In
+              {t.returnPlugDialog.pluggedIn}
             </Button>
             <Button
               type="button"
@@ -122,7 +118,7 @@ export function ReturnPlugDialog({
               data-testid="btn-plugged-no"
             >
               <BatteryWarning className="h-4 w-4" aria-hidden />
-              Not Plugged In
+              {t.returnPlugDialog.notPluggedIn}
             </Button>
             {allowDamagedReport && (
               <Button
@@ -141,13 +137,13 @@ export function ReturnPlugDialog({
 
           {!returnedDamaged && !isPluggedIn && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800" data-testid="return-plug-warning">
-              An alert will be sent after {deadlineMinutes} minute{deadlineMinutes !== 1 ? "s" : ""} if not plugged in.
+              {t.returnPlugDialog.plugAlertWarning(deadlineMinutes)}
             </div>
           )}
 
           {!returnedDamaged && !isPluggedIn && (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="plugInDeadlineMinutes">Alert deadline (minutes)</Label>
+              <Label htmlFor="plugInDeadlineMinutes">{t.returnPlugDialog.deadlineLabel}</Label>
               <Input
                 id="plugInDeadlineMinutes"
                 type="number"
@@ -176,14 +172,14 @@ export function ReturnPlugDialog({
 
         <SheetFooter>
           <Button variant="outline" onClick={() => resetState(false)} disabled={isBusy}>
-            Cancel
+            {t.returnPlugDialog.cancel}
           </Button>
           <Button onClick={handleConfirm} disabled={isBusy} data-testid="btn-confirm-return-plug">
             {returnedDamaged
               ? t.returnPlugDialog.confirmReturnedDamaged
               : isPluggedIn
-                ? "Confirm — Plugged In ✓"
-                : "Set Alert & Return"}
+                ? t.returnPlugDialog.confirmPluggedIn
+                : t.returnPlugDialog.confirmSetAlert}
           </Button>
         </SheetFooter>
       </SheetContent>

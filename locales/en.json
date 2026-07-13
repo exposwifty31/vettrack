@@ -4130,6 +4130,17 @@
     "dismissAria": "Dismiss this reminder"
   },
   "returnPlugDialog": {
+    "title": "Return Equipment",
+    "descriptionWithName": "Was \"{name}\" plugged in after returning?",
+    "descriptionNoName": "Was the equipment plugged in after returning?",
+    "pluggedIn": "Plugged In",
+    "notPluggedIn": "Not Plugged In",
+    "plugAlertWarningOne": "An alert will be sent after {minutes} minute if not plugged in.",
+    "plugAlertWarningOther": "An alert will be sent after {minutes} minutes if not plugged in.",
+    "deadlineLabel": "Alert deadline (minutes)",
+    "cancel": "Cancel",
+    "confirmPluggedIn": "Confirm — Plugged In ✓",
+    "confirmSetAlert": "Set Alert & Return",
     "damagedButton": "Damaged",
     "damageWarning": "A damage report will be filed for this equipment. You can undo this right after confirming.",
     "confirmReturnedDamaged": "Confirm — Returned Damaged"
