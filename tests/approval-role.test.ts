@@ -44,6 +44,30 @@ describe("resolveApprovalRole (C3)", () => {
     ).toEqual({ ok: false, error: "VET_LICENSE_REQUIRED" });
   });
 
+  it("blocks an admin override to vet when no license number is present (the gate is source-agnostic)", () => {
+    expect(
+      resolveApprovalRole({
+        currentStatus: "pending",
+        newStatus: "active",
+        requestedRole: "technician",
+        overrideRole: "vet",
+        vetLicenseNumber: null,
+      }),
+    ).toEqual({ ok: false, error: "VET_LICENSE_REQUIRED" });
+  });
+
+  it("allows an admin override to vet when a license number is present", () => {
+    expect(
+      resolveApprovalRole({
+        currentStatus: "pending",
+        newStatus: "active",
+        requestedRole: "technician",
+        overrideRole: "vet",
+        vetLicenseNumber: "MD-77",
+      }),
+    ).toEqual({ ok: true, roleToApply: "vet" });
+  });
+
   it("lets an admin override the requested role (vet request → grant tech)", () => {
     expect(
       resolveApprovalRole({

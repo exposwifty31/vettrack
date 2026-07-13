@@ -2630,8 +2630,22 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 - **F-2**: **source verified** via `return-damaged.test.tsx` 4/4 + jsdom render; on-device **INCONCLUSIVE** — a WKWebView bundle-cache artifact is the most-likely cause but was not re-confirmed on a clean build. No code change.
 - **F-4**: refuted from source (`NativeShell.tsx:61-103` tablet branch renders only the sidebar). No code change.
 - **Role-onboarding (C)**: schema col `vet_license_number` (migration 163, applied + column confirmed via psql); `sanitizeVetLicense` + ingest in `auth.ts`; `resolveApprovalRole` (server/lib) with 6 unit tests (tech/vet-with-license/vet-without-license-422/override/non-approval/none); `PATCH /:id/status` applies role + vet gate; RoleChips 2-option; signup vet-license field → `unsafeMetadata`; signin carries pre-choice; `PendingUsersSection` approve-as-role + license display + override. Tests: `approval-role` 6/6, `role-chips-signup` (2-option + license field), `pending-users-requested-role` (approve-promotes + override + license), `requested-role-provisioning` (+2 license-ingest). Commit `33182464f`.
-- **Batch gate:** full `pnpm test` = **537 files / 4766 tests, 0 fail**; frontend+server `tsc` 0; `i18n:check` parity ✓; `architecture:gates` G1 pass; migration 163 applied.
+- **Batch gate (at `50ecaeb0d`):** full `pnpm test` = **537 files / 4766 tests, 0 fail**; frontend+server `tsc` 0; `i18n:check` parity ✓; `architecture:gates` G1 pass; migration 163 applied. Later commits add tests (CodeRabbit-round + T-12 offline gate + override-gate), raising the count — the definitive final count is recorded in the CodeRabbit re-review entry below.
 
 **Not done / honest gaps:** on-device re-confirmation of the return dialog + the full deferred device-drill sweep (Workstream D) blocked by the simulator Hebrew-IME text-entry friction; the Clerk-gated sign-up flow isn't exercisable under dev-bypass (unit-covered instead). Security note logged in the report + PR: the auto-promote-on-approval intentionally reverses the T24b advisory-only guard, mitigated by vet/tech self-select cap + vet license gate + admin approve/override.
 
 **Verdict:** VERIFIED (fixes implemented + unit/typecheck/arch/parity green; PR #89 open, CI + CodeRabbit polling). Device sweep partial (documented).
+
+---
+
+## CodeRabbit re-review round + T-12 offline gate (PR #89, 2026-07-13)
+
+**Definitive batch gate (PR #89 head):** full `pnpm test` = **538 files / 4774 tests, 0 fail**; frontend+server `tsc` 0; `i18n:check` parity ✓; `architecture:gates` G1 pass; migration 163 applied. (Supersedes the interim 4766 count.)
+
+**Round-1 CodeRabbit (15 findings) — addressed** in `50ecaeb0d`: vet-license gates the Clerk sign-up form (was bypassable); auto-applied role capped to vet/technician; `/status` approval guarded on reviewed status (409) + authority-cache invalidation on grant; migration `lock_timeout`; Hebrew literal → ASCII; deployability assertion; localized-branch coverage; unsafe casts removed; VET_LICENSE_REQUIRED toast test; F-2 wording softened; security-reversal note. Deferred (investigated): drizzle-baseline reconciliation (#1, repo-wide standing debt) + reciprocal English-literal linter (#14).
+
+**T-12 (real-device offline cold-start)** in `e6ee83ed9`: native Clerk gate now shows a "connect to sign in" prompt (immediate `navigator.onLine` + `offline` event + 8s timeout, auto-reload on reconnect) instead of an infinite skeleton. RED test `native-clerk-gate-offline.test.tsx`.
+
+**Round-2 CodeRabbit (11 findings, re-review of the fixes) — addressed** this commit: vet-license input `maxLength=40` (aligns with the varchar(40) column); regression test for **admin-override-to-vet-without-license → 422** (source-agnostic gate, the most security-sensitive branch); playbook — do not equate dev-bypass with DB isolation (require NODE_ENV non-prod + DATABASE_URL + dev clinic before destructive drills); report — vet-license wording ("presence/format validation," not "verification"); added T-28/T-29 coverage-table dispositions; reconciled the test count (4774); clarified live-reload vs `cap:build:native`; markdown-lint (heading blank lines MD022, fence languages MD040). **Refuted:** `User`-interface "3-copy" DRY claim (#3568814185) — `interface User` is defined only in `src/types/platform.ts`; api.ts imports it, so adding `vetLicenseNumber` there introduces no drift.
+
+**Verdict:** VERIFIED — round-2 real findings fixed, doc claims corrected, markdown-lint addressed; residual = the two documented deferrals. Full suite 538f/4774t green.

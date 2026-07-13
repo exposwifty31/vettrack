@@ -75,6 +75,7 @@ export default function SignUpPage() {
                 inputMode="text"
                 autoComplete="off"
                 required
+                maxLength={40}
                 value={vetLicenseNumber}
                 onChange={(event) => setVetLicenseNumber(event.target.value)}
                 placeholder={t.authPage.vetLicensePlaceholder}

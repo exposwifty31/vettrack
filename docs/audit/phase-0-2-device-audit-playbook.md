@@ -26,12 +26,12 @@ Bundling via `scripts/build-native-shell.sh` reads `.env` only (ignores `.env.lo
 2. **Confirm seed data exists** (locate/return/dispense drills need equipment, rooms, containers). If empty: `pnpm seed:dev` (idempotent). Record counts.
 3. **iOS ATS for cleartext localhost** — the sim reaches the Mac at `http://localhost:5000`. If `ios/App/App/Info.plist` lacks an ATS exception, add a **dev-only** `NSAppTransportSecurity → NSAllowsLocalNetworking = true` (revert before any commit; ios build files are never committed by this audit).
 4. **Sync + launch** per device (installs pods on first `sync`):
-   ```
+   ```bash
    CAPACITOR_SERVER_URL=http://localhost:5000 npx cap sync ios
    CAPACITOR_SERVER_URL=http://localhost:5000 npx cap run ios --target 9821AC5F-F618-4608-8CF5-7DB435BC874C   # iPhone 17 Pro
    CAPACITOR_SERVER_URL=http://localhost:5000 npx cap run ios --target 8B8E788A-B932-4DAC-BE21-C89B752F5012   # iPad Pro 11"
    ```
-   `cap sync` needs `dist/public` to exist; if absent, `pnpm build` once (bundle is ignored at runtime — the WebView loads the URL).
+   `cap sync` needs `dist/public` to exist; if absent, run a **plain `pnpm build`** once (never `pnpm cap:build:native`, which is prohibited here — it bakes the Clerk key and produces the bundled shell). The plain build is only a prerequisite for `cap sync`; that bundle is **not** what the live-reload WebView serves — it loads `CAPACITOR_SERVER_URL` at runtime.
 5. **Drive with computer-use** (`request_access` for Simulator; it is full-tier — click/type/screenshot allowed). Verify the app loaded the **dev-bypass** UI (admin home, no sign-in wall).
 6. **Fallback (only if native build blocks after ~3 attempts):** open the URL in the sim's Mobile Safari and audit there — record the deviation loudly (this exercises the mobile web shell via touch-narrow, NOT the Capacitor native shell; native-only surfaces — status bar inset, NFC, haptics — become CANNOT-VERIFY).
 
@@ -117,5 +117,5 @@ Run every ✅ drill on **iPhone**; re-run the **iPad-divergent** ones (D12, D13,
 - **Report-only.** A FAIL is documented, not fixed here (fixes are a follow-up task). The one allowed mutation is the dev-only ATS Info.plist toggle, reverted before finishing.
 - **Do not disrupt concurrent agents:** reuse the running dev server; never `pnpm dev` (kills their ports) or restart Postgres.
 - **Never commit iOS build artifacts** (`ios/App/Pods`, `Podfile.lock`, `.xcworkspace`, `dist/`) or the ATS toggle. If committing, `git add` only the report + evidence dir + proof-log append.
-- **dev-bypass tenant only** (`dev-clinic-default`) — destructive drills (returns, damage, dispense, Code Blue) are safe here; they would not be on production.
+- **Confirm database isolation before any destructive drill.** Auth mode (dev-bypass) does **not** guarantee DB isolation. Before returns, damage, dispense, or Code Blue drills, verify the target is a local dev database, not production: `NODE_ENV` is non-production, `DATABASE_URL` points to the intended local DB, and the active clinic is `dev-clinic-default`. Only then are the destructive drills safe.
 - **No silent truncation:** a card not driven is `DEFERRED-STATIC` or `CANNOT-VERIFY` with a reason — never an implied pass.

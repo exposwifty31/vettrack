@@ -76,7 +76,7 @@ Then append one `PROOF_ALIGNMENT_LOG.md` entry (claim: audit executed over `T-01
 
 ## Worked example finding (format + rigor bar)
 
-```
+```text
 AUDIT-0-2-014 · HIGH · test-teeth
 Card: T-36 (sync-status-banner) · Dimension: TDD authenticity
 File: tests/sync-status-banner.test.tsx:42
