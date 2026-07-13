@@ -118,38 +118,35 @@ describe("ActiveSession — outcome sheet Cancel (T-01 · R-CB-01)", () => {
 });
 
 /**
- * T-16 device regression (2026-07-13, real iPhone 16 Plus): the outcome sheet
- * is `z-50` + `items-end`, but the native `NativeTabBar` is `fixed bottom-0
- * z-[52]` (68px tall). 52 > 50, so the tab bar painted OVER the bottom of the
+ * T-16 device regression (2026-07-13, real iPhone 16 Plus): the Code Blue page
+ * renders inside NativeShell's `flex-1` scroll container; NativeTabBar is a flex
+ * SIBLING below it carrying `backdrop-filter: blur(12px)`. On WebKit a
+ * backdrop-filter element composites ABOVE a fixed-position sibling regardless
+ * of z-index, so the tab bar painted over the bottom of the `items-end` outcome
  * sheet and swallowed the Cancel button — the manager saw the four outcome
  * options but no Cancel, making the T-01 fix physically unreachable on device.
- * jsdom has no tab bar or home indicator, so the logic test above stays green.
+ * You cannot out-z-index a backdrop-filter compositing layer; the deterministic
+ * fix is to pad the sheet's bottom so its last child (Cancel) clears the tab bar
+ * height. jsdom has no tab bar, so the logic test above stays green.
  *
- * Guard the two structural properties that keep Cancel reachable in the shell:
- *   (1) the overlay stacks ABOVE the z-[52] tab bar, and
- *   (2) the sheet carries safe-area bottom padding so its last child (Cancel)
- *       clears the tab bar + home indicator.
+ * Guard the property that keeps Cancel reachable: the sheet reserves bottom
+ * padding that clears the native tab bar (the codebase's 68px + safe-area
+ * clearance constant), not merely the home-indicator inset.
  */
 describe("outcome sheet reachability over the native tab bar (T-16)", () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => cleanup());
 
-  const TAB_BAR_Z = 52; // src/components/layout.tsx bottom-bar is z-[52]
-
-  it("renders the outcome overlay above the tab bar with safe-area bottom padding", () => {
+  it("pads the outcome sheet to clear the native tab bar so Cancel is reachable", () => {
     renderPage();
     fireEvent.click(screen.getByText(t.codeBlue.endEventChooseOutcome).closest("button") as HTMLButtonElement);
 
     const heading = screen.getByText(t.codeBlue.selectOutcome);
     const sheet = heading.closest("div") as HTMLElement;
-    const overlay = sheet.parentElement as HTMLElement;
 
-    // (1) Overlay must out-stack the tab bar. Parse the z-[NN] arbitrary class.
-    const zMatch = overlay.className.match(/z-\[(\d+)\]/);
-    expect(zMatch, `overlay className "${overlay.className}" has no z-[NN]`).toBeTruthy();
-    expect(Number(zMatch![1])).toBeGreaterThan(TAB_BAR_Z);
-
-    // (2) Sheet must reserve safe-area bottom space so Cancel is not clipped.
-    expect(sheet.className).toContain("env(safe-area-inset-bottom)");
+    // The sheet's bottom padding must clear the tab bar height (68px) PLUS the
+    // safe-area inset — safe-area alone (~34px) leaves Cancel behind the ~56px
+    // tab bar. This is the property that was missing when Cancel was swallowed.
+    expect(sheet.className).toMatch(/pb-\[calc\(68px\+env\(safe-area-inset-bottom\)/);
   });
 });

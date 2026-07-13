@@ -244,7 +244,7 @@ function OutcomeModal({ onSelect, onCancel }: { onSelect: (outcome: string) => v
   ];
   return (
     <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-[60] p-4" dir={dir}>
-      <div className="w-full max-w-md bg-emergency-surface rounded-t-2xl border border-emergency-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="w-full max-w-md bg-emergency-surface rounded-t-2xl border border-emergency-border p-4 pb-[calc(68px+env(safe-area-inset-bottom)+0.5rem)]">
         <h2 className="text-base font-bold text-white mb-4 text-center">{t.codeBlue.selectOutcome}</h2>
         <div className="flex flex-col gap-2">
           {OUTCOMES.map((o) => (
@@ -288,7 +288,7 @@ function EquipmentPicker({ onSelect, onClose }: { onSelect: (item: EquipmentItem
   });
   return (
     <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-[60] p-4" dir={dir}>
-      <div className="w-full max-w-md bg-emergency-surface rounded-t-2xl border border-emergency-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="w-full max-w-md bg-emergency-surface rounded-t-2xl border border-emergency-border p-4 pb-[calc(68px+env(safe-area-inset-bottom)+0.5rem)]">
         <h2 className="text-base font-bold text-white mb-4">{t.codeBlue.selectEquipment}</h2>
         <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
           {equipQ.data?.map((item) => (
