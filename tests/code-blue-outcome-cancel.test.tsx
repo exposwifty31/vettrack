@@ -116,3 +116,40 @@ describe("ActiveSession — outcome sheet Cancel (T-01 · R-CB-01)", () => {
     expect(document.activeElement).toBe(trigger);
   });
 });
+
+/**
+ * T-16 device regression (2026-07-13, real iPhone 16 Plus): the outcome sheet
+ * is `z-50` + `items-end`, but the native `NativeTabBar` is `fixed bottom-0
+ * z-[52]` (68px tall). 52 > 50, so the tab bar painted OVER the bottom of the
+ * sheet and swallowed the Cancel button — the manager saw the four outcome
+ * options but no Cancel, making the T-01 fix physically unreachable on device.
+ * jsdom has no tab bar or home indicator, so the logic test above stays green.
+ *
+ * Guard the two structural properties that keep Cancel reachable in the shell:
+ *   (1) the overlay stacks ABOVE the z-[52] tab bar, and
+ *   (2) the sheet carries safe-area bottom padding so its last child (Cancel)
+ *       clears the tab bar + home indicator.
+ */
+describe("outcome sheet reachability over the native tab bar (T-16)", () => {
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => cleanup());
+
+  const TAB_BAR_Z = 52; // src/components/layout.tsx bottom-bar is z-[52]
+
+  it("renders the outcome overlay above the tab bar with safe-area bottom padding", () => {
+    renderPage();
+    fireEvent.click(screen.getByText(t.codeBlue.endEventChooseOutcome).closest("button") as HTMLButtonElement);
+
+    const heading = screen.getByText(t.codeBlue.selectOutcome);
+    const sheet = heading.closest("div") as HTMLElement;
+    const overlay = sheet.parentElement as HTMLElement;
+
+    // (1) Overlay must out-stack the tab bar. Parse the z-[NN] arbitrary class.
+    const zMatch = overlay.className.match(/z-\[(\d+)\]/);
+    expect(zMatch, `overlay className "${overlay.className}" has no z-[NN]`).toBeTruthy();
+    expect(Number(zMatch![1])).toBeGreaterThan(TAB_BAR_Z);
+
+    // (2) Sheet must reserve safe-area bottom space so Cancel is not clipped.
+    expect(sheet.className).toContain("env(safe-area-inset-bottom)");
+  });
+});
