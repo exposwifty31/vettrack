@@ -630,15 +630,19 @@ function EquipmentDetailPageDesktop() {
   ) : null;
 
   const returnMut = useMutation({
-    mutationFn: async ({ isPluggedIn: nextPluggedIn, plugInDeadlineMinutes: nextDeadline }: { isPluggedIn: boolean; plugInDeadlineMinutes: number }) => {
+    mutationFn: async ({
+      isPluggedIn: nextPluggedIn,
+      plugInDeadlineMinutes: nextDeadline,
+      suppressUndoToast,
+    }: { isPluggedIn: boolean; plugInDeadlineMinutes: number; suppressUndoToast?: boolean }) => {
       const prev = queryClient.getQueryData<Equipment>([`/api/equipment/${id}`]);
       const result = await api.equipment.return(id!, {
         isPluggedIn: nextPluggedIn,
         plugInDeadlineMinutes: nextPluggedIn ? undefined : nextDeadline,
       });
-      return { result, prev, usedPluggedIn: nextPluggedIn, usedDeadline: nextDeadline };
+      return { result, prev, usedPluggedIn: nextPluggedIn, usedDeadline: nextDeadline, suppressUndoToast };
     },
-    onSuccess: ({ result, prev, usedPluggedIn, usedDeadline }) => {
+    onSuccess: ({ result, prev, usedPluggedIn, usedDeadline, suppressUndoToast }) => {
       haptics.tap();
       const { equipment: updated, undoToken } = result;
       const wasOffline = result.pendingSyncId !== undefined;
@@ -648,7 +652,7 @@ function EquipmentDetailPageDesktop() {
 
       if (wasOffline) {
         toast.info(t.equipmentDetail.toast.savedOffline);
-        if (prev) {
+        if (prev && !suppressUndoToast) {
           startUndoTimer({
             actionLabel: t.equipmentDetail.toast.returned,
             previousEquipment: prev,
@@ -664,7 +668,13 @@ function EquipmentDetailPageDesktop() {
         toast.warning(`An alert will be sent after ${usedDeadline} minute${usedDeadline !== 1 ? "s" : ""} if not plugged in.`);
       }
 
-      if (prev && !isStudentEquipmentRole) {
+      // T-24d (owner override) — "returned damaged" releases custody through
+      // this same mutation but reports the damage via its own deferred undo
+      // toast (see startDamagedReportUndo). Showing this mutation's "returned"
+      // undo toast too would leave two competing undo affordances for one
+      // gesture, so the damaged caller sets suppressUndoToast and relies on
+      // its own toast as the single undo surface.
+      if (prev && !isStudentEquipmentRole && !suppressUndoToast) {
         startUndoTimer({
           actionLabel: t.equipmentDetail.toast.returned,
           previousEquipment: prev,
@@ -1475,8 +1485,19 @@ function EquipmentDetailPageDesktop() {
         allowDamagedReport
         onConfirm={(values) => {
           if (values.damaged) {
-            setReturnDialogOpen(false);
-            startDamagedReportUndo();
+            // Owner override (T-24d): "returned damaged" releases custody
+            // exactly like the other two return choices, then defers the
+            // damage report behind its own undo window once the return
+            // succeeds (see returnMut's suppressUndoToast branch above for
+            // why the return doesn't also show its own undo toast here).
+            returnMut.mutate(
+              {
+                isPluggedIn: values.isPluggedIn,
+                plugInDeadlineMinutes: values.plugInDeadlineMinutes ?? 30,
+                suppressUndoToast: true,
+              },
+              { onSuccess: () => startDamagedReportUndo() },
+            );
             return;
           }
           returnMut.mutate({

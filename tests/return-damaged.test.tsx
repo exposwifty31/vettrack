@@ -5,13 +5,18 @@
  * ReturnPlugDialog + undo, wired at the equipment-detail.tsx return call
  * site.
  *
- * Picking the third "Damaged" choice and confirming does NOT call
- * `api.equipment.reportDamage` immediately — it defers the call behind the
- * same `UNDO_WINDOW_MS` undo toast used elsewhere in this file. If the user
- * never hits Undo, the report fires once the window elapses. If the user
- * hits Undo within the window, the report never fires at all (no
- * revert/cancel endpoint exists server-side for damage events — the only
- * safe "undo" is not having submitted yet).
+ * OWNER override (2026-07-13): picking "Damaged" and confirming now releases
+ * custody immediately, exactly like the other two return choices —
+ * `api.equipment.return` fires right away. Only the damage report itself
+ * stays deferred behind the same `UNDO_WINDOW_MS` undo toast used elsewhere
+ * in this file: if the user never hits Undo, `reportDamage` fires once the
+ * window elapses; if the user hits Undo within the window, the report never
+ * fires at all (no revert/cancel endpoint exists server-side for damage
+ * events — the only safe "undo" is not having submitted yet). Undoing the
+ * damage report does not revert the return — custody stays released. Only
+ * one undo toast is shown for the gesture (the damage-report one); the
+ * return's own "returned" undo toast is suppressed to avoid a confusing
+ * double undo affordance.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -192,8 +197,18 @@ describe("ReturnPlugDialog — 'Returned damaged' third choice + undo (T-24d)", 
     expect(screen.getByTestId("btn-returned-damaged")).toBeTruthy();
   });
 
-  it("does not submit a damage report immediately on confirm — only after the undo window elapses", async () => {
+  it("releases custody immediately on confirm — only the damage report is deferred until the undo window elapses", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    returnMock.mockResolvedValue({
+      equipment: {
+        ...baseEquipment(),
+        custodyState: "available",
+        checkedOutById: null,
+        checkedOutByEmail: null,
+        checkedOutAt: null,
+      },
+      undoToken: "undo-1",
+    });
     const { client } = await renderDetailPage(baseEquipment());
     const invalidateSpy = vi.spyOn(client, "invalidateQueries");
 
@@ -201,31 +216,50 @@ describe("ReturnPlugDialog — 'Returned damaged' third choice + undo (T-24d)", 
     fireEvent.click(screen.getByTestId("btn-returned-damaged"));
     fireEvent.click(screen.getByTestId("btn-confirm-return-plug"));
 
+    // Custody release is not deferred — it fires as soon as the return
+    // choice is confirmed, same as the other two return choices.
+    await vi.waitFor(() => expect(returnMock).toHaveBeenCalledTimes(1));
+    expect(returnMock).toHaveBeenCalledWith("eq1", expect.objectContaining({ isPluggedIn: true }));
     expect(reportDamageMock).not.toHaveBeenCalled();
-    expect(returnMock).not.toHaveBeenCalled();
     expect(hapticsWarningMock).toHaveBeenCalledTimes(1);
+
+    // Exactly one undo affordance for this gesture — the damage-report
+    // undo toast. returnMut's own "returned" undo toast must be suppressed
+    // here, or the user would see two competing undo toasts for one tap.
+    const actionToasts = toastMock.mock.calls.filter(
+      (call) => (call[1] as { action?: unknown } | undefined)?.action,
+    );
+    expect(actionToasts).toHaveLength(1);
 
     await vi.advanceTimersByTimeAsync(15_000);
 
     expect(reportDamageMock).toHaveBeenCalledTimes(1);
     expect(reportDamageMock).toHaveBeenCalledWith(expect.objectContaining({ equipmentId: "eq1" }));
-    // The damaged-return path never calls the plain return endpoint (see
-    // ESCALATE note in the PR #86 triage — pinning current behavior, not a
-    // decision that this is definitely the right product behavior).
-    expect(returnMock).not.toHaveBeenCalled();
     // Readiness caches must refresh after the condition flip or the
     // equipment-truth/readiness tab can stay stale.
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["deployability", "eq1"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["condition-states", "eq1"] });
   });
 
-  it("undo within the window cancels the damage report — reportDamage is never called", async () => {
+  it("undo within the window cancels only the damage report — custody stays released and reportDamage is never called", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    returnMock.mockResolvedValue({
+      equipment: {
+        ...baseEquipment(),
+        custodyState: "available",
+        checkedOutById: null,
+        checkedOutByEmail: null,
+        checkedOutAt: null,
+      },
+      undoToken: "undo-1",
+    });
     await renderDetailPage(baseEquipment());
 
     fireEvent.click(screen.getByTestId("btn-return"));
     fireEvent.click(screen.getByTestId("btn-returned-damaged"));
     fireEvent.click(screen.getByTestId("btn-confirm-return-plug"));
+
+    await vi.waitFor(() => expect(returnMock).toHaveBeenCalledTimes(1));
 
     const undoCall = toastMock.mock.calls.find(
       (call) => (call[1] as { action?: { label?: string } } | undefined)?.action?.label,
@@ -239,5 +273,9 @@ describe("ReturnPlugDialog — 'Returned damaged' third choice + undo (T-24d)", 
     await vi.advanceTimersByTimeAsync(15_000);
 
     expect(reportDamageMock).not.toHaveBeenCalled();
+    // Undo only cancels the deferred damage report — it does not revert the
+    // return. Custody stays released, matching how a normal return isn't
+    // casually reverted by this same gesture.
+    expect(returnMock).toHaveBeenCalledTimes(1);
   });
 });
