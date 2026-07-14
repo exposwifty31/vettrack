@@ -36,15 +36,26 @@ const createDockSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(500).optional(),
   roomId: z.string().optional(),
+  assetTypeId: z.string().optional(),
+  capacity: z.number().int().min(1).max(999).optional(),
 });
 
 router.post("/docks", requireAuth, requireAdmin, validateBody(createDockSchema), async (req, res) => {
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
-  const { name, description, roomId } = req.body as z.infer<typeof createDockSchema>;
+  const { name, description, roomId, assetTypeId, capacity } = req.body as z.infer<typeof createDockSchema>;
 
   const id = randomUUID();
-  await db.insert(docks).values({ id, clinicId, name, description: description ?? null, roomId: roomId ?? null });
+  try {
+    await db.insert(docks).values({
+      id, clinicId, name,
+      description: description ?? null, roomId: roomId ?? null,
+      assetTypeId: assetTypeId ?? null, capacity: capacity ?? null,
+    });
+  } catch (e) {
+    if (isPostgresUniqueViolation(e)) return apiError(req, res, "errors.docking.duplicateStation", undefined, 409);
+    throw e;
+  }
   logAudit({ clinicId, actionType: "equipment_updated", performedBy: userId, performedByEmail: email, targetId: id, metadata: { action: "dock_created", name } });
 
   const [dock] = await db.select().from(docks).where(eq(docks.id, id));
@@ -54,7 +65,17 @@ router.post("/docks", requireAuth, requireAdmin, validateBody(createDockSchema),
 router.get("/docks", requireAuth, async (req, res) => {
   const clinicId = req.clinicId!;
 
-  const rows = await db.select().from(docks).where(eq(docks.clinicId, clinicId));
+  const rows = await db
+    .select({
+      id: docks.id, clinicId: docks.clinicId, name: docks.name,
+      description: docks.description, roomId: docks.roomId,
+      assetTypeId: docks.assetTypeId, capacity: docks.capacity,
+      createdAt: docks.createdAt,
+      assetTypeName: assetTypes.name,
+    })
+    .from(docks)
+    .leftJoin(assetTypes, eq(docks.assetTypeId, assetTypes.id))
+    .where(eq(docks.clinicId, clinicId));
   res.json(rows);
 });
 

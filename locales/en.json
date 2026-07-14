@@ -2922,6 +2922,9 @@
       "idRequired": "Equipment id is required.",
       "notFound": "Equipment not found.",
       "unavailable": "Could not retrieve location inference."
+    },
+    "docking": {
+      "duplicateStation": "A station for this category already exists in this room."
     }
   },
   "push": {
