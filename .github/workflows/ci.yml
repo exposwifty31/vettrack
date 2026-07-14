@@ -44,7 +44,7 @@ jobs:
 
     steps:
       - name: ⬇️ Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 📦 pnpm
         uses: pnpm/action-setup@v6
@@ -108,7 +108,7 @@ jobs:
 
     steps:
       - name: ⬇️ Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 📦 pnpm
         uses: pnpm/action-setup@v6
@@ -137,7 +137,7 @@ jobs:
 
     steps:
       - name: ⬇️ Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -226,7 +226,7 @@ jobs:
       # Pinned SHA + no persisted credentials: this job holds RAILWAY_TOKEN and
       # uploads the checkout to Railway — keep the git credential out of it.
       - name: ⬇️ Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
