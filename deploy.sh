@@ -134,6 +134,32 @@ if [ "$CHECK_MODE" = false ]; then
     echo "✅ Healthcheck OK"
   fi
 
+  # Readiness gate: /api/healthz above proves the process is alive, not that the
+  # runtime DB pool actually works. A broken pool (e.g. PGBOUNCER_URL pointing at a
+  # host that doesn't resolve) still passes liveness and would otherwise ship "green"
+  # — the 2026-07-14 prod outage. Require /api/health to report checks.db == "ok".
+  # Scoped to `db` on purpose: vapid/worker can flap transiently during a rolling
+  # deploy and must not fail an otherwise-healthy ship.
+  READINESS_URL="${READINESS_URL:-https://vettrack.uk/api/health}"
+  if [ -n "$READINESS_URL" ]; then
+    echo "🩺 Verifying DB readiness at $READINESS_URL (checks.db == ok)..."
+    db_ready=false
+    for _ in $(seq 1 12); do
+      db_status=$(curl -sS --max-time 10 "$READINESS_URL" 2>/dev/null | jq -r '.checks.db // empty' 2>/dev/null || true)
+      if [ "$db_status" = "ok" ]; then
+        db_ready=true
+        break
+      fi
+      echo "⏳ DB readiness: ${db_status:-unreachable} — waiting..."
+      sleep 10
+    done
+    if [ "$db_ready" != true ]; then
+      echo "❌ Post-deploy DB readiness failed: $READINESS_URL reported checks.db != ok"
+      exit 1
+    fi
+    echo "✅ DB readiness OK"
+  fi
+
   if [ -n "$RAILWAY_WORKER_SERVICE" ]; then
     deploy_service "$RAILWAY_WORKER_SERVICE"
   else
