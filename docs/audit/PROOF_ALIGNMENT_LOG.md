@@ -2672,3 +2672,20 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 **Explicitly NOT changed (triaged as correct, not silenced):** `Blocked request: missing userId` (real auth-fetch warn on unauth'd render tests), intentional error-path logs (`requireAuth error`, `sync network error`, `PageErrorBoundary`, `db down`, `evaluator threw`, `DATA_CORRUPTION`), and info-level operational logs — these are the code behaving correctly under tests that deliberately exercise those paths. The `DialogContent` missing-`Description` a11y warning (~7 dialogs) is a real but separate a11y workstream, left for a decision rather than blanket-silenced.
 
 **Verdict:** VERIFIED — two real defects fixed RED-first, gate green, typechecks clean; remaining noise triaged as expected/correct.
+
+---
+
+## CodeRabbit round — offline-auth-gate hardening (PR #90, 2026-07-14)
+
+**Claim:** addressed the three unresolved CodeRabbit findings on PR #90 (`fix/offline-auth-gate`), TDD (RED→GREEN).
+
+**Evidence checked (not asserted):**
+- **Finding 1** (Stability, `offline-auth-gate.tsx:30`): `safeReloadPage()` returns `false` when its 5s guard suppresses the reload (verified `safe-browser.ts:164`); the `online` handler + Retry button ignored it, so a suppressed reload stranded the user on the offline screen. Fix: `retryConnection` (useCallback) now re-syncs `setOffline(!isOnline())` when the reload is refused; wired to both the `online` listener and the Retry button. RED test `unblocks (shows children) when the reconnect reload is suppressed but connectivity is back` failed pre-fix, GREEN post-fix; companion `stays on the offline prompt when …still offline` guards the negative.
+- **Finding 2** (Functional Correctness — Major, `signin.tsx:122`): the `usePhoneFlow` branch mounted `<PhoneSignIn/>` (clerk-js `useSignIn`) OUTSIDE `OfflineAuthGate`, reopening the offline-toast leak via the always-available phone-sign-in button. Verified `signup.tsx` has **no** phone flow (only gated `<SignUp/>`) → sign-in-only. Fix: wrapped `<PhoneSignIn/>` in `OfflineAuthGate`. RED source-structure test `wraps the phone sign-in flow in OfflineAuthGate` (in `native-auth-surface.test.ts`, the repo's established home for signin structural contracts) failed pre-fix, GREEN post-fix; `wraps the regular <SignIn/> form` guards the pre-existing wrap (comment `<SignIn>` false-match avoided via `/<Name(?![A-Za-z0-9>])/`).
+- **Finding 3** (Maintainability, `offline-auth-gate.test.tsx:50`): suite only tested initial state. Added behavioral coverage: `offline`-event child-swap, `online`-event reload attempt, Retry-button reload attempt, plus the two reconnect-suppression cases above (`safeReloadPage` now a spy via the mock).
+
+**Gate:** `vitest tests/offline-auth-gate.test.tsx tests/native-auth-surface.test.ts` = **14/14 pass**; frontend `tsc --noEmit` = **0 errors**. No new i18n keys (reused `t.auth.guard.*`). Files touched: `offline-auth-gate.tsx`, `signin.tsx`, `offline-auth-gate.test.tsx`, `native-auth-surface.test.ts` (file-scoped adds only).
+
+**Verdict:** VERIFIED — three findings fixed RED-first, gate green, typecheck clean.
+
+**Addendum (re-review round, `9c820fc4d`→next):** CodeRabbit re-review of the fixes flipped #90 to **APPROVED** and surfaced one new outside-diff finding (Trivial, a11y): the offline-state container wasn't a live region, so screen-reader users on the auth path aren't told the form was swapped for the offline message. Fixed: added `role="status"` + `aria-live="polite"` to the `offline-auth-gate` container. RED test `announces the offline prompt to assistive tech (live region)` failed pre-fix, GREEN post-fix. Gate: 15/15 vitest, frontend tsc 0.
