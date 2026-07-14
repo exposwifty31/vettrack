@@ -1,6 +1,7 @@
 import { Worker, type Job } from "bullmq";
 import type { Redis } from "ioredis";
 import { incrementMetric } from "../lib/metrics.js";
+import { withJobLatency } from "../lib/job-latency.js";
 import { createRedisConnection } from "../lib/redis.js";
 import { startWorkerHeartbeat, stopWorkerHeartbeat } from "../lib/worker-heartbeat.js";
 import { processChargeAlertJob, bindChargeAlertProducerQueue } from "../workers/chargeAlertWorker.js";
@@ -75,31 +76,35 @@ async function runPilotJob(queueName: string, job: Job): Promise<void> {
     );
   }
 
-  const ctx = buildJobContext(job);
+  // Time the whole dispatch (success or failure) under the job's bounded kind —
+  // surfaced via getMetricsSnapshot().jobLatency, no new route.
+  return withJobLatency(definition.kind, async () => {
+    const ctx = buildJobContext(job);
 
-  if (queueName === CHARGE_ALERT_QUEUE_NAME) {
-    await processChargeAlertJob(job.data as ChargeAlertJobPayload);
-    return;
-  }
+    if (queueName === CHARGE_ALERT_QUEUE_NAME) {
+      await processChargeAlertJob(job.data as ChargeAlertJobPayload);
+      return;
+    }
 
-  if (queueName === EXPIRY_CHECK_QUEUE_NAME) {
-    await runExpiryCheckWorker();
-    return;
-  }
+    if (queueName === EXPIRY_CHECK_QUEUE_NAME) {
+      await runExpiryCheckWorker();
+      return;
+    }
 
-  if (queueName === STALE_CHECKIN_SWEEP_QUEUE_NAME) {
-    await runStaleCheckInSweep();
-    return;
-  }
+    if (queueName === STALE_CHECKIN_SWEEP_QUEUE_NAME) {
+      await runStaleCheckInSweep();
+      return;
+    }
 
-  if (definition.handler) {
-    await definition.handler(job.data, ctx);
-    return;
-  }
+    if (definition.handler) {
+      await definition.handler(job.data, ctx);
+      return;
+    }
 
-  throw new Error(
-    `No pilot handler wired for queue=${queueName} job.name=${job.name}`,
-  );
+    throw new Error(
+      `No pilot handler wired for queue=${queueName} job.name=${job.name}`,
+    );
+  });
 }
 
 async function ensureQueueCronRepeatJob(

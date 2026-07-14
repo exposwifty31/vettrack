@@ -2777,3 +2777,19 @@ The 8 PASS include the load-bearing ones: `build 26 > last shipped 25`, no liter
 **ASC collateral authored:** `docs/release/appstore-connect-1.2.0-collateral.md` — "What's New" he (primary) + en, App Review notes (real-native-app / 4.2 framing + isolated reviewer account), reviewer-account seeding (vet role + wide active roster shift so Code Blue doesn't silently 403), and the Mac-side pre-submit checklist. All claims map to shipped Phase 10.A work; no credential written to any tracked file.
 
 **Verdict:** VERIFIED for the repo-side slice (version bump correct + committed-ready; secret scan clean; typecheck + suite + parity green; collateral drafted). NOT a completed submission — archive/upload + the required clean live tri-display audit are owner-run on a Mac and cannot be done in this Linux sandbox.
+
+---
+
+## Job-latency metrics (Workstream C, clean rebuild of #94's idea) (2026-07-14)
+
+**Claim:** per-job-kind p50/p95/p99 completion latency, bounded, surfaced through the existing metrics snapshot — not the bot's broken code, not a new route. TDD.
+
+**Evidence checked:**
+- `server/lib/job-latency.ts` (new): `recordJobLatency(kind, ms)` + `getJobLatencySnapshot()` — bounded ring buffer (≤200 samples) **per closed `JobKind`** (7 kinds); a compile-time `_ExhaustiveCheck` fails the build if a `JobKind` is added without being tracked. Ignores unknown kinds (no high-cardinality leakage) and non-finite/negative durations (fail-safe). Nearest-rank percentiles.
+- `server/jobs/runtime.ts`: `runPilotJob` wraps the whole dispatch in a `try/finally` → `recordJobLatency(definition.kind, Date.now() - startedAt)` — every branch (charge-alert/expiry/stale-checkin/handler), success OR failure, one wiring point.
+- `server/lib/metrics.ts`: added `jobLatency: Record<string, JobLatencyStats>` to `MetricsSnapshot` + both return sites (`getJobLatencySnapshot()` in the try, `{}` in the catch fallback). Served by the **existing** `server/routes/metrics.ts` — **no new route** (kept off `routes.ts`, the docking-agent merge surface).
+- **RED→GREEN** `tests/job-latency.test.ts` (8): percentile math on a known distribution, per-kind isolation, bounded window, unknown-kind + non-finite guards, reset, and a source guard that `runPilotJob` records by `definition.kind`.
+
+**Gate:** job-latency + f1/f2b/f2c/f2d/runtime = 39/39; server + frontend `tsc` 0. Scope guard honored: job-latency only (no DB-per-query timing, backups, or admin route fleet). Did not touch `server/app/routes.ts`.
+
+**Verdict:** VERIFIED.

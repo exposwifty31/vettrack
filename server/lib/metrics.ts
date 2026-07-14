@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { getRuntimeReadiness } from "../jobs/runtime-readiness.js";
 import { getAliveCount as getDisplayHeartbeatsAlive } from "./display-heartbeat-store.js";
+import { getJobLatencySnapshot, type JobLatencyStats } from "./job-latency.js";
 
 type MetricName =
   | "tasks_created"
@@ -720,6 +721,8 @@ export interface MetricsSnapshot {
       workers: Array<{ name: string; ok: boolean }>;
     };
   };
+  /** Per-job-kind completion-latency percentiles (bounded kinds; may be empty). */
+  jobLatency: Record<string, JobLatencyStats>;
   timestamp: string;
 }
 
@@ -1398,6 +1401,7 @@ export function getMetricsSnapshot(): MetricsSnapshot {
         },
       },
       jobRegistry: buildJobRegistryMetrics(),
+      jobLatency: getJobLatencySnapshot(),
       timestamp: new Date().toISOString(),
     };
   } catch {
@@ -1609,6 +1613,7 @@ export function getMetricsSnapshot(): MetricsSnapshot {
         jobEnqueueSucceeded: 0,
         runtimeReadiness: JOB_REGISTRY_RUNTIME_READINESS_FALLBACK,
       },
+      jobLatency: {},
       timestamp: new Date().toISOString(),
     };
   }
