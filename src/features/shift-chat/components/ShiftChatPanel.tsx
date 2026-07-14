@@ -80,7 +80,7 @@ export function ShiftChatPanel({ isOpen, onClose, chat }: ShiftChatPanelProps) {
 
   const handleSend = useCallback(() => {
     const trimmed = body.trim();
-    if (!trimmed && !showBroadcast) return;
+    if (!trimmed) return;
 
     sendMessage({
       body: trimmed,
