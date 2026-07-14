@@ -2793,3 +2793,44 @@ The 8 PASS include the load-bearing ones: `build 26 > last shipped 25`, no liter
 **Gate:** job-latency + f1/f2b/f2c/f2d/runtime = 39/39; server + frontend `tsc` 0. Scope guard honored: job-latency only (no DB-per-query timing, backups, or admin route fleet). Did not touch `server/app/routes.ts`.
 
 **Verdict:** VERIFIED.
+
+---
+
+## 2026-07-14 — Land mobile-detail Checkout (Take) on `main`: cherry-pick d84cb64f7 + fix stale token-consistency lock (e56d26bc0, fcc1d314c)
+
+**Claim:** the mobile equipment-detail screen (`EquipmentActions.tsx`) gains a "Check out" (take) action for an available, on-shift item — closing the search → detail → dead-end gap — landed cleanly on a fresh branch off `origin/main` (repo work happened in an isolated worktree at `/Users/dan/Developer/active/vettrack-ios-checkout`, branch `feat/mobile-detail-checkout`, never touching the shared `vettrack-ship` checkout or its branch `fix/ios-phase0b-permission-prompts`).
+
+**Investigation before acting:**
+- `git show --stat d84cb64f7` — commit touches exactly 2 files: `src/features/equipment/detail/EquipmentActions.tsx` (+111/-29) and `tests/equipment-actions.test.tsx` (+75). Self-contained, no dependency commits.
+- `diff <(git show d84cb64f7^:src/features/equipment/detail/EquipmentActions.tsx) src/features/equipment/detail/EquipmentActions.tsx` on `origin/main` → **empty diff** — main's pre-commit state is byte-identical to the commit's parent. Same empty-diff result for `tests/equipment-actions.test.tsx`. Confirmed clean cherry-pick was possible before attempting it.
+- Verified every symbol the commit introduces already exists on `main` (so the commit isn't secretly dependent on other unmerged work): `src/hooks/use-active-shift.ts` (`useActiveShift` returning `{hasActiveShift, isLoading, isError, nextShift}`) exists; `api.equipment.checkout(id, location?)` exists at `src/lib/api/equipment.ts:464` returning `{equipment, undoToken, pendingSyncId}` via `handleOptimisticMutation`; `ApiError` is exported from `src/lib/api.ts:136`; i18n keys `equipmentList.quickAction.checkout`, `scanner.toast.checkedOut`, `scan.offShiftBody` present in both `locales/en.json`/`locales/he.json` (parity-checked); `t.equipmentDetail.toast.checkoutFailed` is a hand-built function at `src/lib/i18n.ts:332` (`(msg) => msg || d.equipmentDetail.toast.checkoutFailedDefault`) — not a raw JSON key, matches the existing `returnFailed` pattern at line 334.
+
+**Action taken:** `git cherry-pick d84cb64f7` onto `feat/mobile-detail-checkout` (branched from `origin/main` @ `6ca1ee9be`) — applied clean, no conflicts (commit `e56d26bc0`).
+
+**Evidence:**
+- `npx tsc --noEmit` (frontend) → exit 0, no output.
+- `npx tsc -p tsconfig.server.json --noEmit` → exit 0, no output.
+- `pnpm test -- tests/equipment-actions.test.tsx --reporter=verbose` → 11/11 pass (matches the commit message's claimed 11/11).
+- `pnpm test` (full suite, before fixing the stale lock) → **2 failures** in `tests/stage-6-equipment-detail-token-consistency.test.js`: `only offers return to the holder or an admin` (regex `/if\s*\(!canReturn\)\s*return null/` no longer matches — guard is now `if (!canReturn && !canCheckout) return null`) and `does NOT shift-gate return` (blanket `actions.includes("hasActiveShift") === false` now false, since checkout legitimately introduces shift-gating in the same file). Read the source at `src/features/equipment/detail/EquipmentActions.tsx:35` — confirmed `canReturn`'s own expression (`isCheckedOut && (checkedOutByMe || isAdmin)`) is byte-identical to before; only the file-wide early-return guard combined it with `canCheckout`. Confirmed `returnMut` (lines 39-54) has zero reference to `hasActiveShift`/`shiftError`/`shiftLoading` — only `checkoutMut`/`handleCheckout` (lines 56-87) do. This is a stale test assumption, not a regression.
+- Fixed the lock test (commit `fcc1d314c`): narrowed the "only offers return..." check to the unchanged `canReturn` expression text; narrowed the shift-gate check to slice out just the `returnMut` block (`actions.slice(indexOf("const returnMut ="), indexOf("const checkoutMut ="))`) and assert no shift references inside that slice specifically; added a new `describe` block locking the Checkout action's own invariants (real `api.equipment.checkout` wiring, the availability gate expression, and that shift-gating exists for checkout).
+- `pnpm test -- tests/stage-6-equipment-detail-token-consistency.test.js --reporter=verbose` → 19/19 pass (16 original + 3 new).
+- `pnpm test` (full suite, after fix) → **557/557 test files, 4899/4899 tests pass, 0 failures**.
+- `pnpm i18n:check` → "locales/en.json and locales/he.json are in deep key parity."
+- `pnpm architecture:gates` → "[architecture-gates] All G1 checks passed." (4 pre-existing warn-level dependency-cruiser findings on unrelated `rooms`/`inventory` tablet files, not touched by this change; madge cycle baseline unchanged).
+
+**Verdict:** VERIFIED.
+
+---
+
+## 2026-07-14 — PR #101 CodeRabbit review response: shift-error bypass test + custody-gate justification (2fe724c6e)
+
+**Claim:** addressed both CodeRabbit findings on PR #101 — added behavioral coverage for the fail-loud shift gate (finding #2, Minor), and justified keeping `custodyState !== "returned"` over the requested `=== "docked"` (finding #1, Major) with concrete evidence rather than making a change that would regress the feature.
+
+**Evidence:**
+- **Finding #2 (fixed):** added `tests/equipment-actions.test.tsx` case "bypasses the client shift-block and still calls the API when the shift query errored" — sets `shiftValue = { hasActiveShift: false, isError: true }`, clicks checkout, asserts `checkoutMock` called with `"eq-1"` and `toastError` NOT called. Traced the code path at `src/features/equipment/detail/EquipmentActions.tsx:82` (`if (!shiftError && !hasActiveShift)`) — `!shiftError` is false when the query errored, so the block is skipped and `mutate()` runs. Confirmed the test is a real lock: a fail-closed guard (`if (!hasActiveShift)`) would make it fail.
+- **Finding #1 (justify, not change):** `grep custody_state server/schema/equipment.ts` → line 158 `custodyState: text("custody_state").notNull().default("untracked")` — the schema default is `untracked`, not `docked`. Read `src/pages/equipment-list.tsx:1146-1149` — the list routes `custodyState === "returned"` to a Dock-Return action and offers **Checkout** for every other `!isCheckedOut && status === "ok"` item (docked/untracked/null). So `=== "docked"` would (a) hide Checkout on the detail for the default `untracked` state — reopening the search→detail→take dead-end this PR closes — and (b) diverge from the list for the same item. Locked the intent with two new tests: "shows Checkout for an untracked available item" and "shows Checkout for an available item with no custody state (custodyState null)".
+- **Tests:** `pnpm test -- tests/equipment-actions.test.tsx` → 14/14 pass. `pnpm test -- tests/stage-6-equipment-detail-token-consistency.test.js` → 19/19 pass.
+- **Typecheck:** `npx tsc --noEmit` exit 0; `npx tsc -p tsconfig.server.json --noEmit` exit 0.
+- Justification posted to the PR thread: `https://github.com/exposwifty31/vettrack/pull/101#issuecomment-4971778916`.
+
+**Verdict:** VERIFIED (finding #2 fixed + tested; finding #1 justified with schema/list evidence and regression-guarded).
