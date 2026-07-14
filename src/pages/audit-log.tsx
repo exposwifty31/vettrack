@@ -184,10 +184,17 @@ export function SharedAuditLogsPanel({
   // Client-side page within the current server page's result set
   const [clientPage, setClientPage] = useState(1);
 
-  const actionKey = actionType || "";
-  const performedKey = performedBy.trim() || "";
-  const fromKey = from || "";
-  const toKey = to || "";
+  // Committed filter state: the query keys off THESE, not the live inputs, so
+  // typing doesn't refetch — Apply commits the pending inputs (commit-on-apply).
+  const [appliedActionType, setAppliedActionType] = useState<string>("");
+  const [appliedPerformedBy, setAppliedPerformedBy] = useState("");
+  const [appliedFrom, setAppliedFrom] = useState("");
+  const [appliedTo, setAppliedTo] = useState("");
+
+  const actionKey = appliedActionType || "";
+  const performedKey = appliedPerformedBy.trim() || "";
+  const fromKey = appliedFrom || "";
+  const toKey = appliedTo || "";
 
   const { data, isLoading, isError, isRefetching, refetch } = useQuery({
     queryKey: ["/api/audit-logs", actionKey, performedKey, fromKey, toKey, serverPage],
@@ -222,6 +229,11 @@ export function SharedAuditLogsPanel({
   }, [data]);
 
   function handleFilter() {
+    // Commit the pending inputs into the query's committed filter state.
+    setAppliedActionType(actionType);
+    setAppliedPerformedBy(performedBy);
+    setAppliedFrom(from);
+    setAppliedTo(to);
     setServerPage(1);
     setClientPage(1);
   }
@@ -231,6 +243,10 @@ export function SharedAuditLogsPanel({
     setPerformedBy("");
     setFrom("");
     setTo("");
+    setAppliedActionType("");
+    setAppliedPerformedBy("");
+    setAppliedFrom("");
+    setAppliedTo("");
     setServerPage(1);
     setClientPage(1);
   }

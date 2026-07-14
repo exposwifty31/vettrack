@@ -30,18 +30,15 @@ import {
   ChevronDown,
   ChevronUp,
   RefreshCw,
-  QrCode,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { statusToBadgeVariant } from "@/lib/design-tokens";
-import { QrScanner } from "@/components/qr-scanner";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function ManagementDashboardPage() {
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
-  const [scannerOpen, setScannerOpen] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const { userId } = useAuth();
 
@@ -368,9 +365,6 @@ export default function ManagementDashboardPage() {
 
       </div>
 
-      {scannerOpen && (
-        <QrScanner onClose={() => setScannerOpen(false)} />
-      )}
     </AppShell>
   );
 }

@@ -1,15 +1,13 @@
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import { useLocation } from "wouter";
 import { CalendarClock } from "lucide-react";
 import { QrScanner } from "@/components/qr-scanner";
-import { AccountabilityConfirm } from "./AccountabilityConfirm";
 import { useActiveShift } from "@/hooks/use-active-shift";
 import { useAuth } from "@/hooks/use-auth";
 import { t, formatDateTimeByLocale } from "@/lib/i18n";
 
 export function ScanScreen() {
   const [, navigate] = useLocation();
-  const [confirmedName, setConfirmedName] = useState<string | null>(null);
   const { hasActiveShift, isLoading: shiftLoading, nextShift } = useActiveShift();
   const { isAdmin } = useAuth();
 
@@ -138,13 +136,6 @@ export function ScanScreen() {
           <QrScanner onClose={handleClose} />
         )}
       </div>
-
-      {confirmedName && (
-        <AccountabilityConfirm
-          equipmentName={confirmedName}
-          onDismiss={() => setConfirmedName(null)}
-        />
-      )}
     </div>
   );
 }

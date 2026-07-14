@@ -756,7 +756,9 @@ export function DispenseSheet({
               className="w-full min-h-[52px] text-lg font-bold rounded-xl"
               {...fieldProps({ disabled: totalSelected === 0 })}
               onClick={() => {
-                setSelectedAnimalId(undefined);
+                // Preserve a prop-provided patient (e.g. ER quick-scan pre-select)
+                // across the items→confirm step instead of clearing it.
+                setSelectedAnimalId(patientIdProp !== undefined ? patientIdProp : undefined);
                 setShowBypassOptions(false);
                 setBypassReason(null);
                 setIsEmergency(false);

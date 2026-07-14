@@ -44,7 +44,7 @@ export function AlertsScreen() {
     if (pullDelta >= PULL_THRESHOLD && !refreshing) {
       setRefreshing(true);
       try {
-        refetch();
+        await refetch();
       } finally {
         setRefreshing(false);
       }
