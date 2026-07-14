@@ -105,7 +105,7 @@ export default function NewEquipmentPage() {
   const isCopy = !isEditing && !!prefill.copiedFrom;
   const showExpectedReturnField = isAdmin;
 
-  const { data: folders } = useQuery({
+  const { data: folders, isLoading: foldersLoading } = useQuery({
     queryKey: ["/api/folders"],
     queryFn: api.folders.list,
     enabled: !!userId,
@@ -432,22 +432,30 @@ export default function NewEquipmentPage() {
 
               <div className="flex flex-col gap-2">
                 <Label className="text-sm font-medium">Folder / Category</Label>
-                <Select
-                  value={watch("folderId") || "none"}
-                  onValueChange={(v) => setValue("folderId", v)}
-                >
-                  <SelectTrigger className="h-12 rounded-xl border-border/60 bg-background text-base" data-testid="select-folder">
-                    <SelectValue placeholder={t.newEquipment.fields.folder.placeholder} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">{t.newEquipment.fields.folder.none}</SelectItem>
-                    {manualFolders.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {f.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {foldersLoading ? (
+                  // Cold-cache race guard (T-18b): mounting the Select with
+                  // folderId already set but zero options strands a filed item
+                  // on "Unfiled" and risks a save that silently un-files it.
+                  // Wait for the options to load before mounting the Select.
+                  <Skeleton className="h-12 w-full rounded-xl" data-testid="select-folder-loading" />
+                ) : (
+                  <Select
+                    value={watch("folderId") || "none"}
+                    onValueChange={(v) => setValue("folderId", v)}
+                  >
+                    <SelectTrigger className="h-12 rounded-xl border-border/60 bg-background text-base" data-testid="select-folder">
+                      <SelectValue placeholder={t.newEquipment.fields.folder.placeholder} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">{t.newEquipment.fields.folder.none}</SelectItem>
+                      {manualFolders.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {f.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               <div className="flex flex-col gap-2">

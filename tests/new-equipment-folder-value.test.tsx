@@ -119,4 +119,51 @@ describe("new-equipment edit form — folder Select reflects the item's actual f
     });
     expect(select.textContent).not.toContain(t.newEquipment.fields.folder.none);
   });
+
+  /**
+   * T-18b (device sweep 2026-07-13) — the COLD-CACHE race the test above
+   * misses. When the folders query resolves AFTER the equipment query (fresh
+   * app launch, nothing cached), the form renders with `folderId` already set
+   * but the folder `<SelectItem>` options not yet mounted. A controlled Radix
+   * Select given a value with no matching item falls back to "Unfiled" and
+   * sticks there until the user interacts — so a save that never touched the
+   * field silently UN-FILES the equipment. The folder Select must not mount
+   * until its options have loaded.
+   */
+  it("does not mount the folder Select with a value before its options load (cold-cache race)", async () => {
+    let resolveFolders!: (v: Folder[]) => void;
+    foldersListMock.mockReturnValue(
+      new Promise<Folder[]>((res) => {
+        resolveFolders = res;
+      }),
+    );
+    equipmentGetMock.mockResolvedValue(baseEquipment({ folderId: "folder-2" }));
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { hook } = memoryLocation({ path: "/equipment/eq1/edit" });
+    render(
+      <HelmetProvider>
+        <QueryClientProvider client={client}>
+          <Router hook={hook}>
+            <Route path="/equipment/:id/edit">
+              <NewEquipmentPage />
+            </Route>
+          </Router>
+        </QueryClientProvider>
+      </HelmetProvider>,
+    );
+
+    // Equipment has resolved but folders is still pending: the folder Select
+    // must NOT be mounted yet (mounting it with folderId set but zero options
+    // is exactly what strands it on "Unfiled").
+    await expect(
+      screen.findByTestId("select-folder", {}, { timeout: 600 }),
+    ).rejects.toThrow();
+
+    // Once folders load, the Select appears and reflects the real folder.
+    resolveFolders(FOLDERS);
+    const select = await screen.findByTestId("select-folder");
+    await waitFor(() => expect(select.textContent).toContain("Anesthesia Cart"));
+    expect(select.textContent).not.toContain(t.newEquipment.fields.folder.none);
+  });
 });
