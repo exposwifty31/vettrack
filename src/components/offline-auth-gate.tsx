@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { t } from "@/lib/i18n";
 import { isOnline, safeReloadPage } from "@/lib/safe-browser";
 import { Button } from "@/components/ui/button";
@@ -18,18 +18,26 @@ import { Button } from "@/components/ui/button";
 export function OfflineAuthGate({ children }: { children: ReactNode }) {
   const [offline, setOffline] = useState(() => !isOnline());
 
+  // Reload to pick up the freshly-online clerk-js. `safeReloadPage()` can refuse
+  // (its 5s guard returns false) — in that case, don't leave the user stranded
+  // on the offline screen: re-sync the block from live connectivity instead.
+  const retryConnection = useCallback(() => {
+    if (!safeReloadPage()) {
+      setOffline(!isOnline());
+    }
+  }, []);
+
   useEffect(() => {
     // Re-sync in case connectivity changed between the initializer and mount.
     setOffline(!isOnline());
     const handleOffline = () => setOffline(true);
-    const handleOnline = () => safeReloadPage();
     window.addEventListener("offline", handleOffline);
-    window.addEventListener("online", handleOnline);
+    window.addEventListener("online", retryConnection);
     return () => {
       window.removeEventListener("offline", handleOffline);
-      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("online", retryConnection);
     };
-  }, []);
+  }, [retryConnection]);
 
   if (!offline) {
     return <>{children}</>;
@@ -42,7 +50,7 @@ export function OfflineAuthGate({ children }: { children: ReactNode }) {
     >
       <p className="text-base font-semibold text-foreground">{t.auth.guard.offlineTitle}</p>
       <p className="text-sm text-muted-foreground max-w-md">{t.auth.guard.offlineBody}</p>
-      <Button type="button" variant="outline" onClick={() => safeReloadPage()}>
+      <Button type="button" variant="outline" onClick={retryConnection}>
         {t.auth.guard.offlineRetry}
       </Button>
     </div>

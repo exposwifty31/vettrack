@@ -86,7 +86,9 @@ export default function SignInPage() {
             <div className="flex flex-col items-center gap-4">
               {usePhoneFlow ? (
                 <>
-                  <PhoneSignIn />
+                  <OfflineAuthGate>
+                    <PhoneSignIn />
+                  </OfflineAuthGate>
                   <button
                     type="button"
                     onClick={() => setUsePhoneFlow(false)}

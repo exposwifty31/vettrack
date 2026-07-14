@@ -2649,3 +2649,18 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 **Round-2 CodeRabbit (11 findings, re-review of the fixes) — addressed** this commit: vet-license input `maxLength=40` (aligns with the varchar(40) column); regression test for **admin-override-to-vet-without-license → 422** (source-agnostic gate, the most security-sensitive branch); playbook — do not equate dev-bypass with DB isolation (require NODE_ENV non-prod + DATABASE_URL + dev clinic before destructive drills); report — vet-license wording ("presence/format validation," not "verification"); added T-28/T-29 coverage-table dispositions; reconciled the test count (4774); clarified live-reload vs `cap:build:native`; markdown-lint (heading blank lines MD022, fence languages MD040). **Refuted:** `User`-interface "3-copy" DRY claim (#3568814185) — `interface User` is defined only in `src/types/platform.ts`; api.ts imports it, so adding `vetLicenseNumber` there introduces no drift.
 
 **Verdict:** VERIFIED — round-2 real findings fixed, doc claims corrected, markdown-lint addressed; residual = the two documented deferrals. Full suite 538f/4774t green.
+
+---
+
+## CodeRabbit round — offline-auth-gate hardening (PR #90, 2026-07-14)
+
+**Claim:** addressed the three unresolved CodeRabbit findings on PR #90 (`fix/offline-auth-gate`), TDD (RED→GREEN).
+
+**Evidence checked (not asserted):**
+- **Finding 1** (Stability, `offline-auth-gate.tsx:30`): `safeReloadPage()` returns `false` when its 5s guard suppresses the reload (verified `safe-browser.ts:164`); the `online` handler + Retry button ignored it, so a suppressed reload stranded the user on the offline screen. Fix: `retryConnection` (useCallback) now re-syncs `setOffline(!isOnline())` when the reload is refused; wired to both the `online` listener and the Retry button. RED test `unblocks (shows children) when the reconnect reload is suppressed but connectivity is back` failed pre-fix, GREEN post-fix; companion `stays on the offline prompt when …still offline` guards the negative.
+- **Finding 2** (Functional Correctness — Major, `signin.tsx:122`): the `usePhoneFlow` branch mounted `<PhoneSignIn/>` (clerk-js `useSignIn`) OUTSIDE `OfflineAuthGate`, reopening the offline-toast leak via the always-available phone-sign-in button. Verified `signup.tsx` has **no** phone flow (only gated `<SignUp/>`) → sign-in-only. Fix: wrapped `<PhoneSignIn/>` in `OfflineAuthGate`. RED source-structure test `wraps the phone sign-in flow in OfflineAuthGate` (in `native-auth-surface.test.ts`, the repo's established home for signin structural contracts) failed pre-fix, GREEN post-fix; `wraps the regular <SignIn/> form` guards the pre-existing wrap (comment `<SignIn>` false-match avoided via `/<Name(?![A-Za-z0-9>])/`).
+- **Finding 3** (Maintainability, `offline-auth-gate.test.tsx:50`): suite only tested initial state. Added behavioral coverage: `offline`-event child-swap, `online`-event reload attempt, Retry-button reload attempt, plus the two reconnect-suppression cases above (`safeReloadPage` now a spy via the mock).
+
+**Gate:** `vitest tests/offline-auth-gate.test.tsx tests/native-auth-surface.test.ts` = **14/14 pass**; frontend `tsc --noEmit` = **0 errors**. No new i18n keys (reused `t.auth.guard.*`). Files touched: `offline-auth-gate.tsx`, `signin.tsx`, `offline-auth-gate.test.tsx`, `native-auth-surface.test.ts` (file-scoped adds only).
+
+**Verdict:** VERIFIED — three findings fixed RED-first, gate green, typecheck clean.

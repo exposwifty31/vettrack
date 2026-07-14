@@ -8,16 +8,25 @@
  * the Clerk component while offline, so clerk-js never mounts and never toasts.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { t } from "@/lib/i18n";
 
 const isOnlineMock = vi.fn();
+const safeReloadPageMock = vi.fn();
 vi.mock("@/lib/safe-browser", () => ({
   isOnline: () => isOnlineMock(),
-  safeReloadPage: vi.fn(),
+  safeReloadPage: (...args: unknown[]) => safeReloadPageMock(...args),
 }));
 
 import { OfflineAuthGate } from "@/components/offline-auth-gate";
+
+function renderGate() {
+  return render(
+    <OfflineAuthGate>
+      <div data-testid="clerk-form">clerk</div>
+    </OfflineAuthGate>,
+  );
+}
 
 afterEach(() => {
   cleanup();
@@ -40,12 +49,74 @@ describe("OfflineAuthGate", () => {
 
   it("renders the children (auth form) while online", () => {
     isOnlineMock.mockReturnValue(true);
-    render(
-      <OfflineAuthGate>
-        <div data-testid="clerk-form">clerk</div>
-      </OfflineAuthGate>,
-    );
+    renderGate();
     expect(screen.getByTestId("clerk-form")).toBeTruthy();
     expect(screen.queryByTestId("offline-auth-gate")).toBeNull();
+  });
+
+  it("swaps the children for the offline prompt when an `offline` event fires", () => {
+    isOnlineMock.mockReturnValue(true);
+    renderGate();
+    expect(screen.getByTestId("clerk-form")).toBeTruthy();
+
+    act(() => {
+      window.dispatchEvent(new Event("offline"));
+    });
+
+    expect(screen.getByTestId("offline-auth-gate")).toBeTruthy();
+    expect(screen.queryByTestId("clerk-form")).toBeNull();
+  });
+
+  it("attempts a reload when an `online` event fires", () => {
+    isOnlineMock.mockReturnValue(false);
+    safeReloadPageMock.mockReturnValue(true);
+    renderGate();
+    expect(screen.getByTestId("offline-auth-gate")).toBeTruthy();
+
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+
+    expect(safeReloadPageMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("attempts a reload when the Retry button is pressed", () => {
+    isOnlineMock.mockReturnValue(false);
+    safeReloadPageMock.mockReturnValue(true);
+    renderGate();
+
+    fireEvent.click(screen.getByText(t.auth.guard.offlineRetry));
+
+    expect(safeReloadPageMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("unblocks (shows children) when the reconnect reload is suppressed but connectivity is back", () => {
+    // The 5s reload guard returns false; the gate must not stay stuck offline.
+    isOnlineMock.mockReturnValue(false);
+    safeReloadPageMock.mockReturnValue(false);
+    renderGate();
+    expect(screen.getByTestId("offline-auth-gate")).toBeTruthy();
+
+    isOnlineMock.mockReturnValue(true);
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+
+    expect(screen.getByTestId("clerk-form")).toBeTruthy();
+    expect(screen.queryByTestId("offline-auth-gate")).toBeNull();
+  });
+
+  it("stays on the offline prompt when the reload is suppressed and still offline", () => {
+    isOnlineMock.mockReturnValue(false);
+    safeReloadPageMock.mockReturnValue(false);
+    renderGate();
+    expect(screen.getByTestId("offline-auth-gate")).toBeTruthy();
+
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+
+    expect(screen.getByTestId("offline-auth-gate")).toBeTruthy();
+    expect(screen.queryByTestId("clerk-form")).toBeNull();
   });
 });

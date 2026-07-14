@@ -47,6 +47,37 @@ describe("NativeShell — auth routes render without app chrome", () => {
   });
 });
 
+describe("Sign-in — every clerk-js form is behind OfflineAuthGate", () => {
+  const source = read("src/pages/signin.tsx");
+
+  // Locate a JSX opening tag `<Name` for the real element, skipping any `<Name>`
+  // that appears inside a prose code comment (e.g. "Do NOT mount `<SignIn>`").
+  // A mounted component's tag is followed by whitespace/`/` (attributes or
+  // self-close), never immediately by `>` or another identifier char.
+  const openTagIdx = (name: string) => {
+    const match = new RegExp(`<${name}(?![A-Za-z0-9>])`).exec(source);
+    return match ? match.index : -1;
+  };
+  const assertWrappedByGate = (idx: number) => {
+    expect(idx).toBeGreaterThan(-1);
+    expect(source.lastIndexOf("<OfflineAuthGate>", idx)).toBeGreaterThan(-1);
+    expect(source.indexOf("</OfflineAuthGate>", idx)).toBeGreaterThan(idx);
+  };
+
+  // The phone-flow branch mounts <PhoneSignIn/>, which uses clerk-js (useSignIn)
+  // and would otherwise fire Clerk's own "No Internet Connection" toast while
+  // offline — the exact leak this PR closes for the regular <SignIn/> form. The
+  // phone form must sit inside OfflineAuthGate too, or the offline hole reopens
+  // through the always-available "use phone sign-in" button.
+  it("wraps the phone sign-in flow in OfflineAuthGate", () => {
+    assertWrappedByGate(openTagIdx("PhoneSignIn"));
+  });
+
+  it("wraps the regular <SignIn/> form in OfflineAuthGate", () => {
+    assertWrappedByGate(openTagIdx("SignIn"));
+  });
+});
+
 describe("Clerk appearance — dark palette selected when dark is active", () => {
   it("swaps variables for dark and keeps element classes", () => {
     const dark = getClerkAppearance(true);
