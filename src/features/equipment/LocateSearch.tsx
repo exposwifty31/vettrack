@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { MapPin, Search } from "lucide-react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { EquipmentLocateResult } from "@/types/locate";
 
 /**
@@ -84,6 +84,7 @@ export function LocateSearch() {
         <SheetContent side="bottom" className="flex max-h-[85dvh] flex-col rounded-t-2xl">
           <SheetHeader>
             <SheetTitle>{t.locateSearch.title}</SheetTitle>
+            <SheetDescription className="sr-only">{t.locateSearch.label}</SheetDescription>
           </SheetHeader>
 
           <label htmlFor={inputId} className="sr-only">

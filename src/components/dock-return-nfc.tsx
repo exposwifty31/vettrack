@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { api, ApiError } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConditionChecklist } from "@/components/equipment/ConditionChecklist";
 import { useNfcSupported } from "@/hooks/use-nfc-supported";
@@ -140,6 +140,7 @@ export function DockReturnNfc({ equipment, open, onClose, onSuccess }: DockRetur
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t.dockReturn.nfcConfirmTitle}</DialogTitle>
+            <DialogDescription className="sr-only">{t.dockReturn.scanDockMasterTag}</DialogDescription>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">{t.dockReturn.noAssetTypeBlocked}</p>
           <Button variant="outline" onClick={() => { onClose(); navigate("/admin/asset-types"); }}>
@@ -158,6 +159,7 @@ export function DockReturnNfc({ equipment, open, onClose, onSuccess }: DockRetur
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{t.dockReturn.nfcConfirmTitle}</DialogTitle>
+          <DialogDescription className="sr-only">{t.dockReturn.scanDockMasterTag}</DialogDescription>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">{t.dockReturn.scanDockMasterTag}</p>
 
