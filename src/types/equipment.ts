@@ -569,6 +569,26 @@ export interface DockingReconciliation {
   byDock: Array<{ dock: Dock; expectedFill: number; capacity: number | null }>;
 }
 
+/**
+ * The item's current (or superseded) home-station assertion (P2 docking §3.3).
+ * Never expires by time — only by contradiction; `invalidatedAt` null means
+ * the anchor is currently open. Returned by
+ * POST /api/docking/equipment/:id/citizen-anchor.
+ */
+export interface EquipmentAnchor {
+  id: string;
+  clinicId: string;
+  equipmentId: string;
+  dockId: string | null;
+  roomId: string | null;
+  assertedById: string | null;
+  assertedAt: string;
+  source: "return_toggle" | "sweep" | "citizen" | "smart_charger";
+  invalidatedAt: string | null;
+  invalidatedReason: string | null;
+  createdAt: string;
+}
+
 export type QuickScanToggleAction = "checkout" | "return" | "blocked";
 
 export interface QuickScanToggleResult {

@@ -250,6 +250,13 @@ export type AuditActionType =
   // them separate audit kinds lets reconciliation reporting attribute
   // "who reassigned this item's home" without wading through custody noise.
   | "equipment_home_assigned"
+  // P2 T2.5 — docking-as-first-class citizen-driven anchor lifecycle.
+  // `_created`: anyone confirms a resting item is at its home station
+  // (createAnchor source:"citizen"), healing the map. `_contradicted`:
+  // a seeker reports a claimed/expected item missing
+  // (invalidateCurrentAnchor reason:"not_found_here").
+  | "equipment_anchor_created"
+  | "equipment_anchor_contradicted"
   // Phase 9 — Display device pairing
   | "display_pairing_code_issued"
   | "display_device_paired"
