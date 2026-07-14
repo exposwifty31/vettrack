@@ -2926,6 +2926,12 @@ export interface TStructure {
       notFound: string;
       unavailable: string;
     };
+    docking: {
+      duplicateStation: string;
+      duplicateName: string;
+      invalidReference: string;
+      invalidEquipmentIds: string;
+    };
   };
   push: {
     role: {
@@ -4102,6 +4108,39 @@ export interface TStructure {
     namePlaceholder: string;
     descriptionPlaceholder: string;
     roomPlaceholder: string;
+    categoryPlaceholder: string;
+    capacityPlaceholder: string;
+    noCategory: string;
+    capacityLabel: string;
+    invalidCapacity: string;
+    categoryLoadError: string;
+  };
+  adminHomeAssignment: {
+    title: string;
+    categoryLabel: string;
+    categoryPlaceholder: string;
+    allCategories: string;
+    homeRoomLabel: string;
+    homeRoomPlaceholder: string;
+    equipmentListLabel: string;
+    noEquipment: string;
+    assignBulkButton: string;
+    assignSuccess: string;
+    assignError: string;
+    pickRoomFirst: string;
+    unassignedTitle: string;
+    unassignedHint: string;
+    noUnassigned: string;
+    oneTapAssignButton: string;
+    needsCategoryHint: string;
+    noStationTitle: string;
+    noStationHint: string;
+    noNoStation: string;
+    manageDocksLink: string;
+    categoryUnavailable: string;
+    categoryLoadError: string;
+    roomsLoadError: string;
+    reconciliationLoadError: string;
   };
   adminAssetTypesPage: {
     typePlaceholder: string;

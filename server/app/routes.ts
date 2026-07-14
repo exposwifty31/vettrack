@@ -30,6 +30,7 @@ import platformCapabilitiesRoutes from "../routes/platform-capabilities.js";
 import equipmentCopilotRoutes from "../routes/equipment-copilot.js";
 import equipmentInferenceRoutes from "../routes/equipment-inference.js";
 import equipmentDamageRoutes from "../routes/equipment-damage.js";
+import dockingRoutes from "../routes/docking.js";
 
 // --- Safety surfaces ---
 import codeBlueRoutes from "../routes/code-blue.js";
@@ -102,6 +103,9 @@ function registerEquipmentCoreRoutes(app: express.Express) {
   app.use("/api/home", homeDashboardRoutes);
   app.use("/api/display", createDisplayRouter());
   app.use("/api/equipment-board", createDisplayRouter());
+  // Docking ownership (T1.4) — Home Room assignment + reconciliation reads.
+  // Own /api/docking prefix: no path collision with /api/equipment/* above.
+  app.use("/api/docking", dockingRoutes);
 }
 
 function registerSafetySurfaceRoutes(app: express.Express) {

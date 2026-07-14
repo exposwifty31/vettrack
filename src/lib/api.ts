@@ -60,6 +60,8 @@ import type {
   StagingClaim,
   DeployabilityResponse,
   Dock,
+  DockingReconciliation,
+  Equipment,
   OperationalMetricsSummary,
   DisplayDevice,
   DisplayPairingCode,
@@ -1200,7 +1202,7 @@ export const api = {
       }),
     listDocks: () =>
       request<Dock[]>("/api/docks"),
-    createDock: (data: { name: string; description?: string; roomId?: string }) =>
+    createDock: (data: { name: string; description?: string; roomId?: string; assetTypeId?: string; capacity?: number }) =>
       request<Dock>("/api/docks", { method: "POST", body: JSON.stringify(data) }),
     deployability: (id: string) =>
       request<DeployabilityResponse>(`/api/equipment/${id}/deployability`),
@@ -1237,6 +1239,14 @@ export const api = {
       const query = qs.toString() ? `?${qs.toString()}` : "";
       return request<OperationalMetricsSummary>(`/api/operational-metrics/summary${query}`);
     },
+  },
+  docking: {
+    assignHome: (id: string, data: { homeRoomId: string | null; assetTypeId?: string | null }) =>
+      request<Equipment>(`/api/docking/equipment/${id}/home`, { method: "PATCH", body: JSON.stringify(data) }),
+    assignHomeBulk: (data: { ids: string[]; homeRoomId: string | null; assetTypeId?: string | null }) =>
+      request<{ updated: number }>("/api/docking/equipment/home/bulk", { method: "POST", body: JSON.stringify(data) }),
+    reconciliation: () =>
+      request<DockingReconciliation>("/api/docking/reconciliation"),
   },
   platform: {
     capabilities: () =>

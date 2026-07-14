@@ -2922,6 +2922,12 @@
       "idRequired": "Equipment id is required.",
       "notFound": "Equipment not found.",
       "unavailable": "Could not retrieve location inference."
+    },
+    "docking": {
+      "duplicateStation": "A station for this category already exists in this room.",
+      "duplicateName": "A dock with this name already exists.",
+      "invalidReference": "The room or category does not belong to this clinic.",
+      "invalidEquipmentIds": "Some equipment IDs do not exist, are deleted, or belong to another clinic."
     }
   },
   "push": {
@@ -4098,7 +4104,40 @@
   "adminDocks": {
     "namePlaceholder": "Dock name",
     "descriptionPlaceholder": "Description (optional)",
-    "roomPlaceholder": "Room (optional)"
+    "roomPlaceholder": "Room (optional)",
+    "categoryPlaceholder": "Category (optional)",
+    "capacityPlaceholder": "Capacity (optional)",
+    "noCategory": "No category",
+    "capacityLabel": "cap",
+    "invalidCapacity": "Capacity must be a whole number greater than 0",
+    "categoryLoadError": "Failed to load categories"
+  },
+  "adminHomeAssignment": {
+    "title": "Home Assignment",
+    "categoryLabel": "Category",
+    "categoryPlaceholder": "Category",
+    "allCategories": "All categories",
+    "homeRoomLabel": "Home Room",
+    "homeRoomPlaceholder": "Home Room",
+    "equipmentListLabel": "Equipment",
+    "noEquipment": "No equipment in this category",
+    "assignBulkButton": "Assign Home Room",
+    "assignSuccess": "Home Room assigned",
+    "assignError": "Failed to assign Home Room",
+    "pickRoomFirst": "Choose a Home Room first",
+    "unassignedTitle": "Unassigned",
+    "unassignedHint": "Missing a Home Room or Category",
+    "noUnassigned": "No unassigned equipment",
+    "oneTapAssignButton": "Assign home",
+    "needsCategoryHint": "Set a category first (bulk flow above or dock setup)",
+    "noStationTitle": "No Station",
+    "noStationHint": "Home Room and Category are set, but no dock exists for that pair yet",
+    "noNoStation": "Every homed item has a station",
+    "manageDocksLink": "Manage docks",
+    "categoryUnavailable": "Categories are unavailable right now — you can still assign a Home Room",
+    "categoryLoadError": "Failed to load categories",
+    "roomsLoadError": "Failed to load rooms",
+    "reconciliationLoadError": "Failed to load reconciliation data"
   },
   "adminAssetTypesPage": {
     "typePlaceholder": "Type name",

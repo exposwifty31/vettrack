@@ -2922,6 +2922,12 @@
       "idRequired": "נדרש מזהה ציוד.",
       "notFound": "הציוד לא נמצא.",
       "unavailable": "לא ניתן לאחזר את הסקת המיקום."
+    },
+    "docking": {
+      "duplicateStation": "כבר קיימת עמדה לקטגוריה זו בחדר זה.",
+      "duplicateName": "כבר קיימת עמדת עגינה בשם זה.",
+      "invalidReference": "החדר או הקטגוריה אינם שייכים למרפאה זו.",
+      "invalidEquipmentIds": "חלק ממזהי הציוד אינם קיימים, נמחקו, או שייכים למרפאה אחרת."
     }
   },
   "push": {
@@ -4098,7 +4104,40 @@
   "adminDocks": {
     "namePlaceholder": "שם עגינה",
     "descriptionPlaceholder": "תיאור (אופציונלי)",
-    "roomPlaceholder": "חדר (אופציונלי)"
+    "roomPlaceholder": "חדר (אופציונלי)",
+    "categoryPlaceholder": "קטגוריה (אופציונלי)",
+    "capacityPlaceholder": "קיבולת (אופציונלי)",
+    "noCategory": "ללא קטגוריה",
+    "capacityLabel": "קיבולת",
+    "invalidCapacity": "הקיבולת חייבת להיות מספר שלם גדול מ-0",
+    "categoryLoadError": "טעינת הקטגוריות נכשלה"
+  },
+  "adminHomeAssignment": {
+    "title": "שיוך חדר בית",
+    "categoryLabel": "קטגוריה",
+    "categoryPlaceholder": "קטגוריה",
+    "allCategories": "כל הקטגוריות",
+    "homeRoomLabel": "חדר בית",
+    "homeRoomPlaceholder": "חדר בית",
+    "equipmentListLabel": "ציוד",
+    "noEquipment": "אין ציוד בקטגוריה זו",
+    "assignBulkButton": "שייך חדר בית",
+    "assignSuccess": "חדר הבית שויך",
+    "assignError": "נכשל שיוך חדר הבית",
+    "pickRoomFirst": "יש לבחור חדר בית תחילה",
+    "unassignedTitle": "לא משויך",
+    "unassignedHint": "חסר חדר בית או קטגוריה",
+    "noUnassigned": "אין ציוד לא משויך",
+    "oneTapAssignButton": "שייך בית",
+    "needsCategoryHint": "יש להגדיר קטגוריה תחילה (זרימת השיוך המרוכז למעלה או הגדרת עגינות)",
+    "noStationTitle": "אין תחנה",
+    "noStationHint": "חדר בית וקטגוריה מוגדרים, אך אין עגינה עבור הצירוף הזה",
+    "noNoStation": "לכל פריט משויך יש תחנה",
+    "manageDocksLink": "ניהול עגינות",
+    "categoryUnavailable": "הקטגוריות אינן זמינות כעת — עדיין ניתן לשייך חדר בית",
+    "categoryLoadError": "טעינת הקטגוריות נכשלה",
+    "roomsLoadError": "טעינת החדרים נכשלה",
+    "reconciliationLoadError": "טעינת נתוני ההתאמה נכשלה"
   },
   "adminAssetTypesPage": {
     "typePlaceholder": "שם סוג",
