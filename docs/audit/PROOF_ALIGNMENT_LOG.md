@@ -2652,6 +2652,29 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 
 ---
 
+## CI test-log noise — leaked worker heartbeat + incomplete redis mocks (2026-07-14)
+
+**Claim:** removed the scary `[job-runtime] heartbeat tick failed Error: No "getRedis" export` lines (and a `<search>` tag warning) from CI's green test output, via systematic-debugging root-cause analysis.
+
+**Root cause (investigated, not guessed):**
+- `server/lib/worker-heartbeat.ts` started a module-singleton `setInterval`; its only cleanup, `stopWorkerHeartbeatForTests`, was **defined but never exported and never called** (dead code, confirmed via `grep`). So once any test called `startJobRuntime` (→ `startWorkerHeartbeat`, `runtime.ts:295`), the interval ticked for the whole suite. Reproduces only under full-suite timing, never in isolation (`vitest run tests/jobs/runtime.test.ts` → 0 error lines) — the signature of a leaked singleton interval.
+- The heartbeat tick calls `getRedis()`, but the redis mocks in `tests/jobs/runtime.test.ts` and `tests/f2b-job-registry-readiness-metrics.test.ts` omitted `getRedis`, so ticks threw vitest's "No getRedis export" and the catch logged a fake "Error".
+
+**Fix (evidence checked):**
+- `worker-heartbeat.ts`: promoted the dead cleanup to an exported `stopWorkerHeartbeat()` and `.unref()`'d the interval (never holds the event loop / test teardown).
+- `runtime.ts` `closeJobRuntime()`: now calls `stopWorkerHeartbeat()` — a closed runtime stops its own heartbeat (production correctness + stops the test leak).
+- Both redis mocks: added `getRedis: vi.fn().mockResolvedValue(null)` → tick hits its `if (!redis) return` guard, clean no-op.
+- `LocateSearch.tsx`: `<search>` → `<div role="search">` (react-dom 18 doesn't recognize `<search>` yet; role is equivalent).
+- RED-first unit test `tests/jobs/worker-heartbeat.test.ts` (fake timers): failed pre-fix (`stopWorkerHeartbeat is not a function`), GREEN post-fix — proves ticks stop after `stopWorkerHeartbeat()` and the singleton guard holds.
+
+**Gate:** `tests/jobs/` 42/42 (10 files) + `locate-search` 8/8, **0** `heartbeat tick failed` lines, **0** `<search> is unrecognized` warnings; frontend `tsc` 0, server `tsc` 0.
+
+**Explicitly NOT changed (triaged as correct, not silenced):** `Blocked request: missing userId` (real auth-fetch warn on unauth'd render tests), intentional error-path logs (`requireAuth error`, `sync network error`, `PageErrorBoundary`, `db down`, `evaluator threw`, `DATA_CORRUPTION`), and info-level operational logs — these are the code behaving correctly under tests that deliberately exercise those paths. The `DialogContent` missing-`Description` a11y warning (~7 dialogs) is a real but separate a11y workstream, left for a decision rather than blanket-silenced.
+
+**Verdict:** VERIFIED — two real defects fixed RED-first, gate green, typechecks clean; remaining noise triaged as expected/correct.
+
+---
+
 ## CodeRabbit round — offline-auth-gate hardening (PR #90, 2026-07-14)
 
 **Claim:** addressed the three unresolved CodeRabbit findings on PR #90 (`fix/offline-auth-gate`), TDD (RED→GREEN).

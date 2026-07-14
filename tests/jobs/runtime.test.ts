@@ -44,6 +44,9 @@ vi.mock("bullmq", () => {
 vi.mock("../../server/lib/redis.js", () => ({
   createRedisConnection: vi.fn(),
   getRedisUrl: vi.fn().mockReturnValue("redis://127.0.0.1:6379"),
+  // The worker heartbeat (started by startJobRuntime) calls getRedis(); without
+  // it the tick throws "No getRedis export" and logs a spurious CI error.
+  getRedis: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("../../server/workers/expiryCheckWorker.js", async (importOriginal) => {
