@@ -248,6 +248,13 @@ export default function DisplaysConsolePage() {
     [],
   );
 
+  // Derive the drawer's device from live query data by id, so an open drawer
+  // reflects background polls (revoke/rename) instead of the click-time snapshot.
+  // Fall back to the snapshot if the row momentarily drops out of the list.
+  const managedDevice = managing
+    ? (devicesQ.data?.find((d) => d.id === managing.id) ?? managing)
+    : null;
+
   return (
     <AppShell>
       <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-6">
@@ -278,7 +285,7 @@ export default function DisplaysConsolePage() {
           <EmptyState icon={MonitorSmartphone} message={t.console.accessPendingServer} />
         )}
       </div>
-      {managing && <ManageDeviceSheet device={managing} onClose={() => setManaging(null)} />}
+      {managedDevice && <ManageDeviceSheet device={managedDevice} onClose={() => setManaging(null)} />}
       {issuedCode && <IssuedCodeDialog issued={issuedCode} onClose={() => setIssuedCode(null)} />}
     </AppShell>
   );
