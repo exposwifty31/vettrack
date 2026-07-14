@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { LogIn, LogOut } from "lucide-react";
+import { LogIn, LogOut, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UnifiedReturnDialog } from "@/components/equipment/UnifiedReturnDialog";
 import { useAuth } from "@/hooks/use-auth";
@@ -42,6 +42,9 @@ export function EquipmentActions({ equipment }: Props) {
   const canReturn = isCheckedOut && (checkedOutByMe || isAdmin);
   const canCheckout =
     !isCheckedOut && equipment.status === "ok" && equipment.custodyState !== "returned";
+  // Resting + homed only — a held item is accounted for, and hidden for
+  // non-docking clinics (no homeRoomId means no home station to report against).
+  const canReportNotFound = !isCheckedOut && !!equipment.homeRoomId;
 
   const returnMut = useMutation({
     mutationFn: (values: { isPluggedIn: boolean; plugInDeadlineMinutes?: number }) =>
@@ -81,6 +84,17 @@ export function EquipmentActions({ equipment }: Props) {
     },
   });
 
+  const notFoundMut = useMutation({
+    mutationFn: () => api.docking.notFoundHere(equipment.id),
+    onSuccess: () => {
+      haptics.tap();
+      queryClient.invalidateQueries({ queryKey: [`/api/equipment/${equipment.id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      toast.success(t.equipmentDetail.toast.reportedNotFound);
+    },
+    onError: () => toast.error(t.equipmentDetail.toast.returnFailed("")),
+  });
+
   // Off-shift ownership is not permitted (roster gate). Stay quiet while the
   // shift query resolves; only a *successful* no-shift read blocks client-side —
   // a shift-query error defers to the server's authoritative gate (fail loud).
@@ -93,7 +107,7 @@ export function EquipmentActions({ equipment }: Props) {
     checkoutMut.mutate();
   };
 
-  if (!canReturn && !canCheckout) return null;
+  if (!canReturn && !canCheckout && !canReportNotFound) return null;
 
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -122,6 +136,20 @@ export function EquipmentActions({ equipment }: Props) {
         >
           <LogOut className="h-5 w-5" />
           {t.equipmentDetail.checkIn}
+        </Button>
+      )}
+
+      {canReportNotFound && (
+        <Button
+          variant="outline"
+          size="lg"
+          className="w-full gap-2"
+          onClick={() => notFoundMut.mutate()}
+          disabled={notFoundMut.isPending}
+          data-testid="btn-detail-not-found-here"
+        >
+          <SearchX className="h-5 w-5" />
+          {t.equipmentDetail.notFoundHere}
         </Button>
       )}
 

@@ -523,7 +523,8 @@
       "damageReported": "הוחזר פגום",
       "damageReportUndo": "בטל",
       "damageReportFailed": "לא ניתן היה לדווח על נזק",
-      "damageReportOffline": "הוחזר פגום — במצב לא מקוון, כך שדיווח הנזק לא נשלח. התחבר ודווח שוב."
+      "damageReportOffline": "הוחזר פגום — במצב לא מקוון, כך שדיווח הנזק לא נשלח. התחבר ודווח שוב.",
+      "reportedNotFound": "דווח — מעדכן מיקום"
     },
     "backToList": "חזרה לרשימה",
     "notFound": "הציוד לא נמצא",
@@ -537,6 +538,7 @@
     "floorNoteSaveFailed": "שמירת הערת המיקום נכשלה",
     "confirmHere": "אשר כאן",
     "confirmedHere": "אושר!",
+    "notFoundHere": "לא נמצא כאן",
     "scanCount": "אושר {count} פעמים",
     "scanCountOnce": "אושר פעם אחת",
     "scanLogTab": "יומן סריקה",
@@ -1097,7 +1099,10 @@
     "viewFullDetails": "פרטים מלאים",
     "markedOk": "{name} סומן כתקין",
     "statusUpdateFailed": "עדכון סטטוס נכשל",
-    "subtitleEquipmentQr": "ציוד QR"
+    "subtitleEquipmentQr": "ציוד QR",
+    "confirmHere": "לא לוקח — מאשר שנמצא כאן",
+    "confirmedHere": "אושר בעמדה",
+    "confirmHereFailed": "לא ניתן היה לאשר"
   },
   "onboarding": {
     "step1": {
