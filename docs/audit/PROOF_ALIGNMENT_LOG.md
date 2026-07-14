@@ -2819,3 +2819,18 @@ The 8 PASS include the load-bearing ones: `build 26 > last shipped 25`, no liter
 - `pnpm architecture:gates` → "[architecture-gates] All G1 checks passed." (4 pre-existing warn-level dependency-cruiser findings on unrelated `rooms`/`inventory` tablet files, not touched by this change; madge cycle baseline unchanged).
 
 **Verdict:** VERIFIED.
+
+---
+
+## 2026-07-14 — PR #101 CodeRabbit review response: shift-error bypass test + custody-gate justification (2fe724c6e)
+
+**Claim:** addressed both CodeRabbit findings on PR #101 — added behavioral coverage for the fail-loud shift gate (finding #2, Minor), and justified keeping `custodyState !== "returned"` over the requested `=== "docked"` (finding #1, Major) with concrete evidence rather than making a change that would regress the feature.
+
+**Evidence:**
+- **Finding #2 (fixed):** added `tests/equipment-actions.test.tsx` case "bypasses the client shift-block and still calls the API when the shift query errored" — sets `shiftValue = { hasActiveShift: false, isError: true }`, clicks checkout, asserts `checkoutMock` called with `"eq-1"` and `toastError` NOT called. Traced the code path at `src/features/equipment/detail/EquipmentActions.tsx:82` (`if (!shiftError && !hasActiveShift)`) — `!shiftError` is false when the query errored, so the block is skipped and `mutate()` runs. Confirmed the test is a real lock: a fail-closed guard (`if (!hasActiveShift)`) would make it fail.
+- **Finding #1 (justify, not change):** `grep custody_state server/schema/equipment.ts` → line 158 `custodyState: text("custody_state").notNull().default("untracked")` — the schema default is `untracked`, not `docked`. Read `src/pages/equipment-list.tsx:1146-1149` — the list routes `custodyState === "returned"` to a Dock-Return action and offers **Checkout** for every other `!isCheckedOut && status === "ok"` item (docked/untracked/null). So `=== "docked"` would (a) hide Checkout on the detail for the default `untracked` state — reopening the search→detail→take dead-end this PR closes — and (b) diverge from the list for the same item. Locked the intent with two new tests: "shows Checkout for an untracked available item" and "shows Checkout for an available item with no custody state (custodyState null)".
+- **Tests:** `pnpm test -- tests/equipment-actions.test.tsx` → 14/14 pass. `pnpm test -- tests/stage-6-equipment-detail-token-consistency.test.js` → 19/19 pass.
+- **Typecheck:** `npx tsc --noEmit` exit 0; `npx tsc -p tsconfig.server.json --noEmit` exit 0.
+- Justification posted to the PR thread: `https://github.com/exposwifty31/vettrack/pull/101#issuecomment-4971778916`.
+
+**Verdict:** VERIFIED (finding #2 fixed + tested; finding #1 justified with schema/list evidence and regression-guarded).
