@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { LogIn, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ReturnPlugDialog } from "@/components/return-plug-dialog";
+import { UnifiedReturnDialog } from "@/components/equipment/UnifiedReturnDialog";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveShift } from "@/hooks/use-active-shift";
 import { api, ApiError } from "@/lib/api";
@@ -18,7 +18,14 @@ type Props = {
 /**
  * Mobile detail actions. Two equipment-scoped mutations, gated by custody state:
  *  - "Check in" (return) for an item the viewer holds (or any item, for admins);
- *    NOT shift-gated — you can always hand equipment back.
+ *    NOT shift-gated — you can always hand equipment back. Opens
+ *    `UnifiedReturnDialog` (T2.3-mobile, docking P2): a home-station toggle
+ *    collapses the plain return and dock-return flows into one sheet —
+ *    checked routes to the online-only dock-return endpoint (handled
+ *    entirely inside the dialog); unchecked routes back through this file's
+ *    own `returnMut` (`onConfirmReturn`) so the offline-capable
+ *    `api.equipment.return` path (pendingSyncId / savedOffline toast) is
+ *    preserved exactly as before.
  *  - "Check out" (take) for an available item at its dock — mirrors the
  *    equipment-list quick-action gate: not held, status ok, not `returned`
  *    (that path prompts Dock Return first), and on an active roster shift.
@@ -119,12 +126,24 @@ export function EquipmentActions({ equipment }: Props) {
       )}
 
       {canReturn && (
-        <ReturnPlugDialog
+        <UnifiedReturnDialog
           open={returnOpen}
+          equipment={equipment}
           equipmentName={equipment.name}
           isSubmitting={returnMut.isPending}
           onOpenChange={setReturnOpen}
-          onConfirm={(values) => returnMut.mutate(values)}
+          // Unchecked (no home-station) path — routed through the same
+          // offline-capable returnMut as before (api.equipment.return,
+          // pendingSyncId/savedOffline toast). Do NOT let the dialog own this
+          // path itself; the checked (dock-return) path below is online-only
+          // and stays fully inside UnifiedReturnDialog.
+          onConfirmReturn={(values) => returnMut.mutate(values)}
+          onDockReturnSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: [`/api/equipment/${equipment.id}`] });
+            queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/equipment/my"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
+          }}
         />
       )}
     </section>

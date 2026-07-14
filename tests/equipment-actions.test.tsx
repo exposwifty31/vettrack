@@ -2,9 +2,12 @@
  * @vitest-environment happy-dom
  *
  * Stage 6 increment 3 — behavioral verification of the mobile detail "Check in"
- * (return) action. Drives the real wrapper: gating → ReturnPlugDialog →
- * api.equipment.return. (The mobile screen can't be driven in plain Chrome —
- * it needs the native shell — so this jsdom test IS the behavior check.)
+ * (return) action. Drives the real wrapper: gating → UnifiedReturnDialog
+ * (unchecked/no-home-station path, T2.3-mobile) → api.equipment.return.
+ * (The mobile screen can't be driven in plain Chrome — it needs the native
+ * shell — so this jsdom test IS the behavior check.) See
+ * tests/equipment-actions-unified-return.test.tsx for the dock-return
+ * (checked-toggle) path and the offline pendingSyncId preservation check.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
@@ -13,6 +16,10 @@ import type { Equipment } from "@/types";
 
 const returnMock = vi.fn();
 const checkoutMock = vi.fn();
+const listDocksMock = vi.fn();
+const listConditionsMock = vi.fn();
+const conditionStatesMock = vi.fn();
+const dockReturnMock = vi.fn();
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
 let authValue: { userId: string | null; isAdmin: boolean } = { userId: "admin-1", isAdmin: true };
@@ -29,15 +36,28 @@ vi.mock("sonner", () => ({
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => authValue }));
 vi.mock("@/hooks/use-active-shift", () => ({ useActiveShift: () => shiftValue }));
 vi.mock("@/lib/haptics", () => ({ haptics: { tap: vi.fn() } }));
-vi.mock("@/lib/api", () => ({
-  api: {
-    equipment: {
-      return: (...a: unknown[]) => returnMock(...a),
-      checkout: (...a: unknown[]) => checkoutMock(...a),
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      equipment: {
+        ...actual.api.equipment,
+        return: (...a: unknown[]) => returnMock(...a),
+        checkout: (...a: unknown[]) => checkoutMock(...a),
+      },
+      operationalState: {
+        ...actual.api.operationalState,
+        listDocks: (...a: unknown[]) => listDocksMock(...a),
+        listConditions: (...a: unknown[]) => listConditionsMock(...a),
+        conditionStates: (...a: unknown[]) => conditionStatesMock(...a),
+        dockReturn: (...a: unknown[]) => dockReturnMock(...a),
+      },
     },
-  },
-  ApiError: class ApiError extends Error {},
-}));
+    ApiError: class ApiError extends Error {},
+  };
+});
 
 import { EquipmentActions } from "@/features/equipment/detail/EquipmentActions";
 
@@ -67,6 +87,10 @@ describe("EquipmentActions — Stage 6 check-in", () => {
     shiftValue = { hasActiveShift: true, isLoading: false, isError: false, nextShift: null };
     returnMock.mockResolvedValue({ equipment: { ...available }, undoToken: undefined });
     checkoutMock.mockResolvedValue({ equipment: { ...dockedAvailable, checkedOutById: "admin-1" } });
+    listDocksMock.mockResolvedValue([]);
+    listConditionsMock.mockResolvedValue([]);
+    conditionStatesMock.mockResolvedValue([]);
+    dockReturnMock.mockResolvedValue({ equipmentId: "eq-1", readinessState: "ready", custodyState: "docked" });
   });
   afterEach(() => cleanup());
 
