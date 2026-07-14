@@ -48,7 +48,7 @@ jobs:
           # the staging ref so the Playwright runner code matches it.
           ref: staging
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           run_install: false
 
