@@ -118,7 +118,7 @@
     "dotenv": "^16.4.7",
     "drizzle-orm": "0.45.2",
     "express": "^4.21.0",
-    "express-rate-limit": "^8.3.2",
+    "express-rate-limit": "^8.5.2",
     "helmet": "^8.1.0",
     "html-to-image": "^1.11.13",
     "html5-qrcode": "^2.3.8",
