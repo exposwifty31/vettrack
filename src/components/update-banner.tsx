@@ -21,15 +21,22 @@ export function UpdateBanner() {
 
   useEffect(() => {
     if (!isSignedIn || !userId) return;
+    // Supersede guard: a version fetch in flight when this effect re-runs (auth
+    // change) or unmounts must not set state from the stale run.
+    let ignore = false;
     void (async () => {
       const displayVersion = resolvePlatformTarget() === "mobile"
         ? await resolveDisplayAppVersion()
         : (await resolveServerAppVersion()) ?? getBundledAppVersion();
+      if (ignore) return;
       const lastSeen = safeStorageGetItem(STORAGE_KEY);
       if (!lastSeen || compareVersions(displayVersion, lastSeen) > 0) {
         setBannerVersion(displayVersion);
       }
     })();
+    return () => {
+      ignore = true;
+    };
   }, [isSignedIn, userId]);
 
   const dismiss = () => {
