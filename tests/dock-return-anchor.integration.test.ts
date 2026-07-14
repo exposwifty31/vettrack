@@ -237,7 +237,9 @@ describe.skipIf(!DATABASE_URL)("dock-return writes a return_toggle anchor (T2.4)
     await seedUser(ctx.userId, ctx.clinicId);
     await seedRoom(ctx.roomId, ctx.clinicId);
     await seedAssetType(ctx.assetTypeId, ctx.clinicId);
-    await seedDock(ctx.dockId, ctx.clinicId);
+    // Docks live in rooms — seed the shared dock IN ctx.roomId so the anchor
+    // inherits the dock's room legitimately (not via a stale-room fallback).
+    await seedDock(ctx.dockId, ctx.clinicId, "Dock A", ctx.roomId);
   });
 
   afterEach(async () => {

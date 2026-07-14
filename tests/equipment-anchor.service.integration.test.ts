@@ -229,6 +229,8 @@ describe.skipIf(!DATABASE_URL)("equipment-anchor.service integration", () => {
     const idA = randomUUID();
     const idB = randomUUID();
 
+    // probePool is initialized in beforeAll and this test only runs past the
+    // DB-availability skip guard, so it is non-null here.
     const clientA = await probePool!.connect();
     const clientB = await probePool!.connect();
     let bRejected = false;

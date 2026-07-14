@@ -48,6 +48,7 @@ vi.mock("sonner", () => ({
 import { UnifiedReturnDialog } from "@/components/equipment/UnifiedReturnDialog";
 import { resolveHomeDock } from "@/lib/dock-resolution";
 import { toast } from "sonner";
+import { t } from "@/lib/i18n";
 
 const HOME_DOCK: Dock = {
   id: "dock-1",
@@ -270,7 +271,7 @@ describe("UnifiedReturnDialog", () => {
       fireEvent.click(screen.getByTestId("btn-confirm-return-plug"));
 
       await waitFor(() => expect(dockReturnMock).toHaveBeenCalledTimes(1));
-      await waitFor(() => expect(toast.error).toHaveBeenCalled());
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith(t.dockReturn.notReadyAfterReturn));
     });
   });
 
