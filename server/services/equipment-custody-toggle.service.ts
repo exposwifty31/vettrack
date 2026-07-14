@@ -22,6 +22,7 @@ import {
 import { promoteStagingQueueNext } from "../lib/staging-promotion.js";
 import { notifyWaitlistPromoted } from "../lib/equipment-waitlist-promotion.js";
 import { logAudit } from "../lib/audit.js";
+import { invalidateCurrentAnchor } from "./equipment-anchor.service.js";
 import { invalidateAnalyticsCache } from "../lib/analytics-cache.js";
 import { trackSyncSuccess } from "../lib/sync-metrics.js";
 import { scheduleSmartReturnReminder, cancelSmartReturnReminder } from "../lib/role-notification-scheduler.js";
@@ -340,6 +341,13 @@ export async function performEquipmentCheckout(
       throw new CheckoutConflictError(existing.checkedOutByEmail ?? "unknown");
     }
   }
+
+  // D-13 anchor contradiction: the item is now in custody, so it is no
+  // longer at its station. Fire-and-forget via `db` (not `tx`) so a failure
+  // here can never poison or roll back the checkout transaction.
+  void invalidateCurrentAnchor(db, { clinicId, equipmentId, reason: "checkout" }).catch((err) => {
+    console.error("[docking] anchor invalidation failed (checkout, non-fatal):", err);
+  });
 
   const checkoutLogId = randomUUID();
 
