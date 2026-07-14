@@ -10,10 +10,12 @@
  * fixing it. Source-structure assertions (readFileSync, no rendering) following
  * the precedent in tests/native-auth-surface.test.ts.
  *
- * The assertions are per-content-block (not a global per-file count) so a
- * description placed in the WRONG dialog, a titled block with NO description, or
- * a description pointing at an UNDEFINED key all fail. `<AlertDialog*>` is out of
- * scope (its own Radix primitive, already carries AlertDialogDescription).
+ * The per-block check lives in ONE function — `validateTitledBlock` — used by
+ * both the real-component suite and the regression fixtures, so the same logic
+ * that green-lights the components is the logic proven to reject the failure
+ * modes (missing / mis-scoped / undefined-key / unknown-alias descriptions).
+ * `<AlertDialog*>` is out of scope (its own Radix primitive, already carries an
+ * AlertDialogDescription).
  */
 
 import { describe, it, expect } from "vitest";
@@ -43,13 +45,38 @@ function aliasMap(src: string): Map<string, string> {
   return m;
 }
 
+type Block = { type: "Dialog" | "Sheet"; body: string };
+
 /** Extract each <Dialog|SheetContent>…</…Content> block (not nested, not AlertDialog). */
-function contentBlocks(src: string): Array<{ type: "Dialog" | "Sheet"; body: string }> {
-  const blocks: Array<{ type: "Dialog" | "Sheet"; body: string }> = [];
+function contentBlocks(src: string): Block[] {
+  const blocks: Block[] = [];
   for (const m of src.matchAll(/<(Dialog|Sheet)Content\b[\s\S]*?<\/\1Content>/g)) {
     blocks.push({ type: m[1] as "Dialog" | "Sheet", body: m[0] });
   }
   return blocks;
+}
+
+const isTitled = (b: Block): boolean => new RegExp(`<${b.type}Title\\b`).test(b.body);
+
+/**
+ * The single source of truth for "is this titled content block accessible?":
+ * it must contain its OWN scoped Description that references an i18n accessor
+ * resolving to a defined, non-empty string. Returns `.ok` + a human `.reason`.
+ */
+function validateTitledBlock(b: Block, aliases: Map<string, string>): { ok: boolean; reason?: string } {
+  const dm = b.body.match(new RegExp(`<${b.type}Description\\b[^>]*>\\s*\\{([^}]+)\\}`));
+  if (!dm) return { ok: false, reason: `titled ${b.type}Content has no scoped ${b.type}Description` };
+
+  const expr = dm[1].trim();
+  if (!/^[a-z]\w*\./i.test(expr)) return { ok: false, reason: `description is a raw string, not an i18n accessor: ${expr}` };
+
+  const keyPath = resolveKeyPath(expr, aliases);
+  if (!keyPath) return { ok: false, reason: `unresolved accessor (unknown alias?): ${expr}` };
+
+  const value = lookup(keyPath);
+  if (typeof value !== "string" || value.length === 0) return { ok: false, reason: `i18n key ${keyPath} is not a defined string` };
+
+  return { ok: true };
 }
 
 const COMPONENTS = [
@@ -66,34 +93,17 @@ describe("dialog/sheet a11y — every titled content block carries a scoped, def
     describe(path, () => {
       const src = read(path);
       const aliases = aliasMap(src);
-      const blocks = contentBlocks(src);
-      const titled = blocks.filter((b) => new RegExp(`<${b.type}Title\\b`).test(b.body));
+      const titled = contentBlocks(src).filter(isTitled);
 
       it("has at least one titled Dialog/Sheet content block", () => {
         expect(titled.length).toBeGreaterThan(0);
       });
 
-      it("each titled content block contains its own Description, keyed to a defined translation", () => {
+      it("each titled content block passes validateTitledBlock (scoped, defined-key description)", () => {
         for (const b of titled) {
-          const descRe = new RegExp(`<${b.type}Description\\b[^>]*>\\s*\\{([^}]+)\\}`);
-          const dm = b.body.match(descRe);
-          // Missing / mis-scoped description → this titled block has none.
-          expect(dm, `${b.type}Content is titled but has no scoped ${b.type}Description`).not.toBeNull();
-
-          const expr = dm![1].trim();
-          expect(expr, `Description must use an i18n accessor, got: ${expr}`).toMatch(/^[a-z]\w*\./i);
-
-          const keyPath = resolveKeyPath(expr, aliases);
-          expect(keyPath, `could not resolve i18n key path for: ${expr}`).not.toBeNull();
-          const value = lookup(keyPath!);
-          expect(typeof value, `i18n key ${keyPath} is not a defined string`).toBe("string");
-          expect((value as string).length).toBeGreaterThan(0);
+          const r = validateTitledBlock(b, aliases);
+          expect(r.ok, r.reason).toBe(true);
         }
-      });
-
-      it("has one scoped Description per titled content block (no missing, no stray extras)", () => {
-        const describedTitled = titled.filter((b) => new RegExp(`<${b.type}Description\\b`).test(b.body));
-        expect(describedTitled.length).toBe(titled.length);
       });
 
       it("does not silence the warning with aria-describedby={undefined}", () => {
@@ -103,32 +113,60 @@ describe("dialog/sheet a11y — every titled content block carries a scoped, def
   }
 });
 
-// The suite above only proves the real components pass. These fixtures prove the
-// checks actually REJECT the failure modes CodeRabbit called out — otherwise a
-// green suite would be meaningless.
-describe("dialog a11y checks — regression: reject bad descriptions", () => {
-  it("a titled content block with no scoped Description is caught (missing)", () => {
-    const [b] = contentBlocks(`<DialogContent><DialogTitle>{t.a.b}</DialogTitle></DialogContent>`);
-    expect(/<DialogTitle\b/.test(b.body)).toBe(true);
-    expect(/<DialogDescription\b/.test(b.body)).toBe(false);
+// Prove the same `validateTitledBlock` used above actually REJECTS the failure
+// modes — otherwise a green suite over the real components would be meaningless.
+describe("validateTitledBlock — rejects bad descriptions", () => {
+  const noAlias = new Map<string, string>();
+  const block = (jsx: string): Block => contentBlocks(jsx)[0];
+
+  it("missing description (titled block, no Description)", () => {
+    const r = validateTitledBlock(block(`<DialogContent><DialogTitle>{t.a.b}</DialogTitle></DialogContent>`), noAlias);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/no scoped DialogDescription/);
   });
 
-  it("a Description placed OUTSIDE the titled content block is not credited (mis-scoped)", () => {
+  it("mis-scoped description (placed OUTSIDE the content block)", () => {
     const src = `<DialogContent><DialogTitle>{t.a.b}</DialogTitle></DialogContent><DialogDescription className="sr-only">{t.x.y}</DialogDescription>`;
-    const [b] = contentBlocks(src);
-    // Only one content block; the stray Description sits after </DialogContent>.
-    expect(contentBlocks(src)).toHaveLength(1);
-    expect(/<DialogDescription\b/.test(b.body)).toBe(false);
+    expect(contentBlocks(src)).toHaveLength(1); // the stray Description is not part of any block
+    const r = validateTitledBlock(block(src), noAlias);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/no scoped DialogDescription/);
   });
 
-  it("a Description pointing at an undefined i18n key is caught (unrelated/typo)", () => {
-    expect(lookup("dockReturn.scanDockMasterTag")).toBeTypeOf("string"); // real key resolves
-    expect(lookup("dockReturn.totallyNotAKey")).toBeUndefined(); // typo does not
+  it("undefined / typo i18n key", () => {
+    const r = validateTitledBlock(
+      block(`<DialogContent><DialogTitle>{t.a.b}</DialogTitle><DialogDescription>{t.dockReturn.totallyNotAKey}</DialogDescription></DialogContent>`),
+      noAlias,
+    );
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/not a defined string/);
   });
 
-  it("resolves aliased accessors (const p = t.ns) and rejects unknown aliases", () => {
+  it("raw string instead of an accessor", () => {
+    const r = validateTitledBlock(
+      block(`<DialogContent><DialogTitle>{t.a.b}</DialogTitle><DialogDescription>{"just a string"}</DialogDescription></DialogContent>`),
+      noAlias,
+    );
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/raw string/);
+  });
+
+  it("resolves an aliased accessor to a defined key (const p = t.ns) …", () => {
     const aliases = aliasMap("const p = t.inventoryItemsPage;");
-    expect(resolveKeyPath("p.createDialogDescription", aliases)).toBe("inventoryItemsPage.createDialogDescription");
-    expect(resolveKeyPath("q.whatever", aliases)).toBeNull();
+    const r = validateTitledBlock(
+      block(`<DialogContent><DialogTitle>{t.a.b}</DialogTitle><DialogDescription>{p.createDialogDescription}</DialogDescription></DialogContent>`),
+      aliases,
+    );
+    expect(r.ok, r.reason).toBe(true);
+  });
+
+  it("… and rejects an unknown alias", () => {
+    const aliases = aliasMap("const p = t.inventoryItemsPage;");
+    const r = validateTitledBlock(
+      block(`<DialogContent><DialogTitle>{t.a.b}</DialogTitle><DialogDescription>{q.whatever}</DialogDescription></DialogContent>`),
+      aliases,
+    );
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/unresolved accessor/);
   });
 });
