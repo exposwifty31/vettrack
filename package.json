@@ -61,6 +61,7 @@
     "i18n:generate-types": "tsx scripts/i18n/generate-types.ts",
     "db:migrate": "tsx scripts/run-migrations.ts",
     "migrate": "tsx scripts/run-migrations.ts",
+    "db:analyze-indexes": "tsx server/scripts/analyze-missing-indexes.ts",
     "db:push": "drizzle-kit push",
     "seed:dev": "tsx server/seed.ts",
     "seed:dev:e2e": "tsx scripts/seed-dev.ts",
