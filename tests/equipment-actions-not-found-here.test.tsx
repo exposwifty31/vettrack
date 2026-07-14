@@ -15,6 +15,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { t } from "@/lib/i18n";
 import type { Equipment } from "@/types";
 
 const returnMock = vi.fn();
@@ -163,5 +164,13 @@ describe("EquipmentActions — Not Found Here (T2.5-mobile)", () => {
     await waitFor(() => expect(notFoundHereMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(toastError).toHaveBeenCalled());
     expect(toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("M-4 (P2 review) — error toast uses the dedicated notFoundFailed copy, not returnFailed", async () => {
+    notFoundHereMock.mockRejectedValueOnce(new Error("network down"));
+    renderActions(restingHomed);
+    fireEvent.click(screen.getByTestId("btn-detail-not-found-here"));
+    await waitFor(() => expect(notFoundHereMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(t.equipmentDetail.toast.notFoundFailed));
   });
 });

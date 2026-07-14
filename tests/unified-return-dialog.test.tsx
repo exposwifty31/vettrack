@@ -219,4 +219,67 @@ describe("UnifiedReturnDialog", () => {
 
     expect(await screen.findByText("Battery charged")).toBeTruthy();
   });
+
+  describe("I-1 (P2 review) — offline-safe dock-return default", () => {
+    afterEach(() => {
+      Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
+    });
+
+    it("homed + ONLINE still defaults to the dock-return path (locks the existing branch)", async () => {
+      Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
+      listDocksMock.mockResolvedValue([HOME_DOCK]);
+
+      const { onConfirmReturn } = renderDialog({
+        equipment: baseEquipment({ homeRoomId: "room-1", assetTypeId: "asset-pump" }),
+      });
+
+      await screen.findByText("ICU Charging Station", { exact: false });
+      expect(screen.getByTestId("unified-return-dock-body")).toBeTruthy();
+      const toggle = screen.getByTestId("toggle-return-to-station") as HTMLInputElement;
+      expect(toggle.checked).toBe(true);
+
+      fireEvent.click(screen.getByTestId("btn-confirm-return-plug"));
+
+      await waitFor(() => expect(dockReturnMock).toHaveBeenCalledTimes(1));
+      expect(onConfirmReturn).not.toHaveBeenCalled();
+    });
+
+    it("homed + OFFLINE routes to the offline-capable plain return, NOT dockReturn", async () => {
+      Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
+      listDocksMock.mockResolvedValue([HOME_DOCK]);
+
+      const { onConfirmReturn } = renderDialog({
+        equipment: baseEquipment({ homeRoomId: "room-1", assetTypeId: "asset-pump" }),
+      });
+
+      // Plain-return body (PlugStatusFields) renders — the dock body does not,
+      // even though this item has a resolvable home dock.
+      const plugYes = await screen.findByTestId("btn-plugged-yes");
+      expect(plugYes).toBeTruthy();
+      expect(screen.queryByTestId("unified-return-dock-body")).toBeNull();
+      expect(screen.getByTestId("unified-return-offline-hint")).toBeTruthy();
+
+      // Confirm is NOT stuck disabled behind the unresolved-dock guard.
+      const confirmBtn = screen.getByTestId("btn-confirm-return-plug") as HTMLButtonElement;
+      expect(confirmBtn.disabled).toBe(false);
+
+      fireEvent.click(confirmBtn);
+
+      await waitFor(() => expect(onConfirmReturn).toHaveBeenCalledTimes(1));
+      expect(dockReturnMock).not.toHaveBeenCalled();
+    });
+
+    it("offline + homed disables the dock-toggle checkbox (can't turn dock-return on)", async () => {
+      Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
+      listDocksMock.mockResolvedValue([HOME_DOCK]);
+
+      renderDialog({
+        equipment: baseEquipment({ homeRoomId: "room-1", assetTypeId: "asset-pump" }),
+      });
+
+      const toggle = (await screen.findByTestId("toggle-return-to-station")) as HTMLInputElement;
+      expect(toggle.checked).toBe(false);
+      expect(toggle.disabled).toBe(true);
+    });
+  });
 });

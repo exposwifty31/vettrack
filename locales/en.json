@@ -524,7 +524,8 @@
       "damageReportUndo": "Undo",
       "damageReportFailed": "Could not report damage",
       "damageReportOffline": "Returned damaged — offline, so the damage report wasn't sent. Reconnect and report it again.",
-      "reportedNotFound": "Reported — updating location"
+      "reportedNotFound": "Reported — updating location",
+      "notFoundFailed": "Couldn't report — try again"
     },
     "backToList": "Back to list",
     "notFound": "Equipment not found",
@@ -4207,6 +4208,7 @@
     "toggleLabelStation": "Returned to {station}, plugged in",
     "toggleLabelGeneric": "Returned to its station, plugged in",
     "noHomeHint": "No home station assigned yet — ask an admin to set one",
-    "stationUnresolvedHint": "This item's home dock isn't set up yet — use Dock Return from the Readiness tab instead"
+    "stationUnresolvedHint": "This item's home station isn't set up yet — uncheck to return without docking",
+    "offlineDockHint": "Dock return needs a connection — returning without docking for now"
   }
 }

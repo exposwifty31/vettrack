@@ -385,5 +385,19 @@ describe.skipIf(!DATABASE_URL)("docking citizen-anchor + not-found-here (T2.5) i
       const current = await getCurrentAnchor(ctx.clinicId, eqId);
       expect(current).toBeNull();
     });
+
+    it("M-3 (P2 review) — rejects a nonexistent id with 404 and does NOT invalidate/audit", async () => {
+      const eqId = randomUUID(); // never seeded — no matching row in this clinic
+
+      logAudit.mockClear();
+      const res = await api(`/api/docking/equipment/${eqId}/not-found-here`, "POST");
+
+      expect(res.status).toBe(404);
+      expect(isRecord(res.json)).toBe(true);
+      if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+      expect(getString(res.json, "code")).toBe("errors.notFound");
+
+      expect(logAudit).not.toHaveBeenCalled();
+    });
   });
 });

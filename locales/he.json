@@ -524,7 +524,8 @@
       "damageReportUndo": "בטל",
       "damageReportFailed": "לא ניתן היה לדווח על נזק",
       "damageReportOffline": "הוחזר פגום — במצב לא מקוון, כך שדיווח הנזק לא נשלח. התחבר ודווח שוב.",
-      "reportedNotFound": "דווח — מעדכן מיקום"
+      "reportedNotFound": "דווח — מעדכן מיקום",
+      "notFoundFailed": "לא ניתן היה לדווח — נסה שוב"
     },
     "backToList": "חזרה לרשימה",
     "notFound": "הציוד לא נמצא",
@@ -4207,6 +4208,7 @@
     "toggleLabelStation": "הוחזר ל{station}, מחובר לחשמל",
     "toggleLabelGeneric": "הוחזר לעמדתו, מחובר לחשמל",
     "noHomeHint": "לא הוגדרה עמדת בית לציוד זה — בקש ממנהל להגדיר אחת",
-    "stationUnresolvedHint": "עמדת הבית של הציוד עדיין לא הוגדרה — השתמש בהחזרה לעגינה מלשונית המוכנות"
+    "stationUnresolvedHint": "עמדת הבית של הציוד עדיין לא הוגדרה — בטל את הסימון כדי להחזיר ללא עגינה",
+    "offlineDockHint": "החזרה לעגינה דורשת חיבור לרשת — מוחזר כעת ללא עגינה"
   }
 }

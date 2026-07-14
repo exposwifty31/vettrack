@@ -248,6 +248,13 @@ router.post("/equipment/:id/not-found-here", requireAuth, async (req, res) => {
   const { id: userId, email } = req.authUser!;
   const { id } = req.params;
 
+  const [item] = await db
+    .select()
+    .from(equipment)
+    .where(and(eq(equipment.clinicId, clinicId), eq(equipment.id, id), isNull(equipment.deletedAt)));
+
+  if (!item) return apiError(req, res, "errors.notFound", undefined, 404);
+
   await invalidateCurrentAnchor(db, { clinicId, equipmentId: id, reason: "not_found_here" });
 
   logAudit({

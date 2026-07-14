@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -79,6 +79,26 @@ export function UnifiedReturnDialog({
   const [deadlineMinutes, setDeadlineMinutes] = useState(defaultDeadlineMinutes);
   const [verifications, setVerifications] = useState<ConditionEntry[]>([]);
 
+  // I-1 (P2 review) — dock-return is a server at-station assertion; it
+  // genuinely cannot happen offline. `dockToggleOn` stays the raw user-intent
+  // state, but every behavioral read routes through `effectiveDockOn` so an
+  // offline (or no-home) return always falls back to the offline-capable
+  // plain return instead of the online-only dockReturn endpoint.
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
+  useEffect(() => {
+    const on = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
+
+  const canDock = hasHomeRoom && isOnline;
+  const effectiveDockOn = dockToggleOn && canDock;
+
   const docksQ = useQuery({
     queryKey: ["/api/docks"],
     queryFn: api.operationalState.listDocks,
@@ -97,12 +117,12 @@ export function UnifiedReturnDialog({
   const conditionsQ = useQuery({
     queryKey: ["/api/asset-types", equipment.assetTypeId, "conditions"],
     queryFn: () => api.operationalState.listConditions(equipment.assetTypeId!),
-    enabled: open && dockToggleOn && !!equipment.assetTypeId,
+    enabled: open && effectiveDockOn && !!equipment.assetTypeId,
   });
   const conditionStatesQ = useQuery({
     queryKey: ["condition-states", equipment.id],
     queryFn: () => api.operationalState.conditionStates(equipment.id),
-    enabled: open && dockToggleOn && !!equipment.assetTypeId,
+    enabled: open && effectiveDockOn && !!equipment.assetTypeId,
   });
 
   const dockReturnMut = useMutation({
@@ -137,7 +157,7 @@ export function UnifiedReturnDialog({
   }
 
   function handleConfirm() {
-    if (dockToggleOn) {
+    if (effectiveDockOn) {
       if (!resolvedDock) return;
       dockReturnMut.mutate();
       return;
@@ -170,22 +190,22 @@ export function UnifiedReturnDialog({
         <div className="flex flex-col gap-3 py-2">
           <div
             className={
-              dockToggleOn
+              effectiveDockOn
                 ? "flex items-start gap-3 rounded-lg border border-[rgb(var(--sys-blue)/0.3)] bg-[rgb(var(--sys-blue)/0.08)] p-3"
                 : "flex items-start gap-3 rounded-lg border p-3"
             }
           >
             <Checkbox
               id="unified-return-dock-toggle"
-              checked={dockToggleOn}
-              disabled={isBusy || !hasHomeRoom}
+              checked={effectiveDockOn}
+              disabled={isBusy || !canDock}
               onCheckedChange={(checked) => setDockToggleOn(Boolean(checked))}
               data-testid="toggle-return-to-station"
             />
             <div className="flex-1 min-w-0">
               <Label
                 htmlFor="unified-return-dock-toggle"
-                className={dockToggleOn ? "text-sm font-medium cursor-pointer text-[rgb(var(--sys-blue))]" : "text-sm font-medium cursor-pointer"}
+                className={effectiveDockOn ? "text-sm font-medium cursor-pointer text-[rgb(var(--sys-blue))]" : "text-sm font-medium cursor-pointer"}
               >
                 {resolvedDock
                   ? t.returnPlugDialog.toggleLabelStation(resolvedDock.name)
@@ -196,10 +216,15 @@ export function UnifiedReturnDialog({
                   {t.returnPlugDialog.noHomeHint}
                 </p>
               )}
+              {hasHomeRoom && !isOnline && (
+                <p className="text-xs text-muted-foreground mt-0.5" data-testid="unified-return-offline-hint">
+                  {t.returnPlugDialog.offlineDockHint}
+                </p>
+              )}
             </div>
           </div>
 
-          {dockToggleOn ? (
+          {effectiveDockOn ? (
             <div className="flex flex-col gap-2" data-testid="unified-return-dock-body">
               {!resolvedDock ? (
                 <p className="text-xs text-[var(--status-stale-fg)]" data-testid="unified-return-dock-unresolved-hint">
@@ -237,10 +262,10 @@ export function UnifiedReturnDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={isBusy || (dockToggleOn && !resolvedDock)}
+            disabled={isBusy || (effectiveDockOn && !resolvedDock)}
             data-testid="btn-confirm-return-plug"
           >
-            {dockToggleOn
+            {effectiveDockOn
               ? t.dockReturn.submit
               : returnedDamaged
                 ? t.returnPlugDialog.confirmReturnedDamaged

@@ -343,6 +343,7 @@ const translations = {
       damageReportFailed: d.equipmentDetail.toast.damageReportFailed,
       damageReportOffline: d.equipmentDetail.toast.damageReportOffline,
       reportedNotFound: d.equipmentDetail.toast.reportedNotFound,
+      notFoundFailed: d.equipmentDetail.toast.notFoundFailed,
     },
     locationCard: {
       title: d.equipmentDetail.locationCard.title,
