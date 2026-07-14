@@ -13,12 +13,32 @@
 -- how `equipment.asset_type_id` (server/schema/equipment.ts:148) stays
 -- nullable. A later migration can tighten to NOT NULL once every dock has
 -- been assigned a category.
+--
+-- Lock-safety: the migration runner wraps every file in a single
+-- BEGIN/COMMIT (server/migrate.ts), so `CREATE INDEX CONCURRENTLY` cannot be
+-- used here — both indexes below build under a standard lock, which is
+-- acceptable at per-clinic table sizes. The two new foreign keys are instead
+-- added column-first then `NOT VALID`: this skips the validating table scan
+-- (irrelevant anyway since both columns are brand-new and NULL on every
+-- existing row) and keeps the `ADD CONSTRAINT` step a fast metadata-only
+-- change rather than a `SHARE ROW EXCLUSIVE` scan lock. The constraint still
+-- enforces normally on all writes going forward — only the initial-rows
+-- validation scan is skipped.
 
-ALTER TABLE vt_docks ADD COLUMN IF NOT EXISTS asset_type_id TEXT
-  REFERENCES vt_asset_types (id) ON DELETE SET NULL;
+ALTER TABLE vt_docks ADD COLUMN IF NOT EXISTS asset_type_id TEXT;
+ALTER TABLE vt_docks
+  ADD CONSTRAINT vt_docks_asset_type_id_fkey
+  FOREIGN KEY (asset_type_id) REFERENCES vt_asset_types (id) ON DELETE SET NULL
+  NOT VALID;
+
 ALTER TABLE vt_docks ADD COLUMN IF NOT EXISTS capacity INTEGER;
-ALTER TABLE vt_equipment ADD COLUMN IF NOT EXISTS home_room_id TEXT
-  REFERENCES vt_rooms (id) ON DELETE SET NULL;
+
+ALTER TABLE vt_equipment ADD COLUMN IF NOT EXISTS home_room_id TEXT;
+ALTER TABLE vt_equipment
+  ADD CONSTRAINT vt_equipment_home_room_id_fkey
+  FOREIGN KEY (home_room_id) REFERENCES vt_rooms (id) ON DELETE SET NULL
+  NOT VALID;
+
 CREATE UNIQUE INDEX IF NOT EXISTS vt_docks_clinic_room_assettype_uq
   ON vt_docks (clinic_id, room_id, asset_type_id) WHERE asset_type_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_vt_equipment_clinic_home_room

@@ -243,7 +243,12 @@ export type AuditActionType =
   | "equipment_location_unknown"
   // T-24b — damage report flips conditionStatus to a non-"ok" value (R-EQ-F3).
   | "equipment_damage_reported"
-  // T1.4 — docking-as-first-class: admin assigns/reassigns an item's Home Room + Category.
+  // T1.4 — docking-as-first-class: admin assigns/reassigns an item's Home
+  // Room + Category (ownership metadata). Distinct from custody events
+  // (checkout/return/dock-return) — ownership answers "where does this item
+  // belong", custody answers "where is it / who has it right now" — keeping
+  // them separate audit kinds lets reconciliation reporting attribute
+  // "who reassigned this item's home" without wading through custody noise.
   | "equipment_home_assigned"
   // Phase 9 — Display device pairing
   | "display_pairing_code_issued"

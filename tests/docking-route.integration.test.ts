@@ -288,6 +288,52 @@ describe.skipIf(!DATABASE_URL)("docking route integration", () => {
     expect(code).not.toBe("errors.docking.duplicateStation");
   });
 
+  it("rejects a roomId belonging to another clinic with 400 (cross-clinic reference)", async () => {
+    const otherClinicId = randomUUID();
+    const otherRoomId = randomUUID();
+    await seedClinic(otherClinicId);
+    await seedRoom(otherRoomId, otherClinicId, "Other Clinic Room");
+
+    try {
+      const res = await api("/api/docks", "POST", {
+        name: "Cross-Clinic Room Dock",
+        roomId: otherRoomId,
+        assetTypeId: ctx.assetTypeId,
+        capacity: 2,
+      });
+
+      expect(res.status).toBe(400);
+      expect(isRecord(res.json)).toBe(true);
+      if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+      expect(getString(res.json, "code")).toBe("errors.docking.invalidReference");
+    } finally {
+      await purgeClinic(otherClinicId);
+    }
+  });
+
+  it("rejects an assetTypeId belonging to another clinic with 400 (cross-clinic reference)", async () => {
+    const otherClinicId = randomUUID();
+    const otherAssetTypeId = randomUUID();
+    await seedClinic(otherClinicId);
+    await seedAssetType(otherAssetTypeId, otherClinicId, "Other Clinic Type");
+
+    try {
+      const res = await api("/api/docks", "POST", {
+        name: "Cross-Clinic Type Dock",
+        roomId: ctx.roomId,
+        assetTypeId: otherAssetTypeId,
+        capacity: 2,
+      });
+
+      expect(res.status).toBe(400);
+      expect(isRecord(res.json)).toBe(true);
+      if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+      expect(getString(res.json, "code")).toBe("errors.docking.invalidReference");
+    } finally {
+      await purgeClinic(otherClinicId);
+    }
+  });
+
   it("includes assetTypeName and roomName on list (M1)", async () => {
     const created = await api("/api/docks", "POST", {
       name: "Pump Station A",

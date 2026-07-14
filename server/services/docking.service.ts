@@ -16,6 +16,14 @@ export function dockExpectedFill(
   return equipment.filter((e) => e.homeRoomId === dock.roomId && e.assetTypeId === dock.assetTypeId).length;
 }
 
-export function roomExpected(roomId: string, equipment: Array<{ homeRoomId: string | null }>): number {
-  return equipment.filter((e) => e.homeRoomId === roomId).length;
+/**
+ * Room readiness (design doc §6.4) is present-vs-expected per category, so
+ * an item that's home-roomed but has no category is "Unassigned" (§6.2),
+ * not part of a room's expected fill — exclude category-less equipment.
+ */
+export function roomExpected(
+  roomId: string,
+  equipment: Array<{ homeRoomId: string | null; assetTypeId: string | null }>,
+): number {
+  return equipment.filter((e) => e.homeRoomId === roomId && e.assetTypeId !== null).length;
 }

@@ -23,6 +23,7 @@ import {
   isEquipmentFullyDeployable,
 } from "../services/equipment-operational-state.service.js";
 import { apiError } from "../lib/apiError.js";
+import { referencedIdsBelongToClinic } from "../lib/clinic-scoped-refs.js";
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
 import { promoteStagingQueueNext } from "../lib/staging-promotion.js";
 import { promoteEquipmentWaitlistWithNotify } from "../lib/equipment-waitlist-promotion.js";
@@ -45,6 +46,10 @@ router.post("/docks", requireAuth, requireAdmin, validateBody(createDockSchema),
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
   const { name, description, roomId, assetTypeId, capacity } = req.body as z.infer<typeof createDockSchema>;
+
+  if (!(await referencedIdsBelongToClinic(clinicId, roomId, assetTypeId))) {
+    return apiError(req, res, "errors.docking.invalidReference", undefined, 400);
+  }
 
   const id = randomUUID();
   try {

@@ -21,29 +21,6 @@ import { i18nMiddleware } from "../lib/i18n/middleware.js";
 
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
 let probePool: Pool | null = null;
-let dbReachable = false;
-
-if (DATABASE_URL) {
-  probePool = new Pool({ connectionString: DATABASE_URL, connectionTimeoutMillis: 2000, max: 2 });
-  try {
-    await probePool.query("SELECT 1");
-    const { rows: homeRoomCol } = await probePool.query<{ column_name: string }>(
-      `SELECT column_name FROM information_schema.columns
-       WHERE table_name='vt_equipment' AND column_name='home_room_id'`,
-    );
-    const { rows: assetTypeCol } = await probePool.query<{ column_name: string }>(
-      `SELECT column_name FROM information_schema.columns
-       WHERE table_name='vt_docks' AND column_name='asset_type_id'`,
-    );
-    const { rows: capacityCol } = await probePool.query<{ column_name: string }>(
-      `SELECT column_name FROM information_schema.columns
-       WHERE table_name='vt_docks' AND column_name='capacity'`,
-    );
-    dbReachable = homeRoomCol.length === 1 && assetTypeCol.length === 1 && capacityCol.length === 1;
-  } catch {
-    dbReachable = false;
-  }
-}
 
 let currentClinicId = "";
 let currentUserId = "";
@@ -78,23 +55,44 @@ function buildApp() {
 let server: Server;
 let baseUrl: string;
 
-type JsonObj = Record<string, unknown>;
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return val !== null && typeof val === "object" && !Array.isArray(val);
+}
+
+function isArray(val: unknown): val is unknown[] {
+  return Array.isArray(val);
+}
+
+function getString(obj: Record<string, unknown>, key: string): string | undefined {
+  const val = obj[key];
+  return typeof val === "string" ? val : undefined;
+}
+
+function getNumber(obj: Record<string, unknown>, key: string): number | undefined {
+  const val = obj[key];
+  return typeof val === "number" ? val : undefined;
+}
+
+function getRecord(obj: Record<string, unknown>, key: string): Record<string, unknown> | undefined {
+  const val = obj[key];
+  return isRecord(val) ? val : undefined;
+}
 
 async function api(
   path: string,
   method: "GET" | "POST" | "PATCH" | "DELETE" = "GET",
-  body?: JsonObj,
-): Promise<{ status: number; json: JsonObj }> {
+  body?: Record<string, unknown>,
+): Promise<{ status: number; json: unknown }> {
   const res = await fetch(`${baseUrl}${path}`, {
     method,
     headers: { "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
   });
-  let json: JsonObj = {};
+  let json: unknown = {};
   const text = await res.text();
   if (text) {
     try {
-      json = JSON.parse(text) as JsonObj;
+      json = JSON.parse(text);
     } catch {
       json = { raw: text };
     }
@@ -143,6 +141,14 @@ async function seedDock(
   );
 }
 
+// Column identifiers can't be parameterized ($1, $2, ...) — that binding only
+// covers values. `overrides` is only ever supplied by trusted test code
+// today, but allowlist the columns anyway so a future caller can't smuggle
+// an arbitrary identifier into the query string.
+const SEED_EQUIPMENT_ALLOWED_COLUMNS = new Set([
+  "id", "clinic_id", "name", "status", "version", "home_room_id", "asset_type_id",
+]);
+
 async function seedEquipment(eqId: string, clinicId: string, overrides: Record<string, unknown> = {}) {
   const defaults: Record<string, unknown> = {
     id: eqId,
@@ -152,6 +158,9 @@ async function seedEquipment(eqId: string, clinicId: string, overrides: Record<s
     version: 1,
   };
   const row = { ...defaults, ...overrides };
+  for (const key of Object.keys(row)) {
+    if (!SEED_EQUIPMENT_ALLOWED_COLUMNS.has(key)) throw new Error(`seedEquipment: unexpected column "${key}"`);
+  }
   const keys = Object.keys(row).join(", ");
   const vals = Object.keys(row).map((_, i) => `$${i + 1}`).join(", ");
   await probePool!.query(`INSERT INTO vt_equipment (${keys}) VALUES (${vals})`, Object.values(row));
@@ -187,9 +196,40 @@ interface Ctx {
 
 let ctx: Ctx;
 
-describe.skipIf(!dbReachable)("docking home-assignment + reconciliation integration", () => {
+describe.skipIf(!DATABASE_URL)("docking home-assignment + reconciliation integration", () => {
   beforeAll(async () => {
-    if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL required");
+    if (!DATABASE_URL) {
+      throw new Error("DATABASE_URL required");
+    }
+
+    probePool = new Pool({ connectionString: DATABASE_URL, connectionTimeoutMillis: 2000, max: 2 });
+
+    try {
+      await probePool.query("SELECT 1");
+      const { rows: homeRoomCol } = await probePool.query<{ column_name: string }>(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_name='vt_equipment' AND column_name='home_room_id'`,
+      );
+      const { rows: assetTypeCol } = await probePool.query<{ column_name: string }>(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_name='vt_docks' AND column_name='asset_type_id'`,
+      );
+      const { rows: capacityCol } = await probePool.query<{ column_name: string }>(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_name='vt_docks' AND column_name='capacity'`,
+      );
+
+      if (homeRoomCol.length !== 1 || assetTypeCol.length !== 1 || capacityCol.length !== 1) {
+        throw new Error("Database schema validation failed: missing required columns (migration 164 not applied?)");
+      }
+    } catch (err) {
+      if (probePool) {
+        await probePool.end();
+        probePool = null;
+      }
+      throw new Error(`Database connection or schema validation failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
     const app = buildApp();
     server = createServer(app);
     await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -202,7 +242,10 @@ describe.skipIf(!dbReachable)("docking home-assignment + reconciliation integrat
     await new Promise<void>((resolve, reject) => {
       server.close((err) => (err ? reject(err) : resolve()));
     });
-    if (probePool) await probePool.end();
+    if (probePool) {
+      await probePool.end();
+      probePool = null;
+    }
   });
 
   beforeEach(async () => {
@@ -234,8 +277,10 @@ describe.skipIf(!dbReachable)("docking home-assignment + reconciliation integrat
     });
 
     expect(res.status).toBe(200);
-    expect(res.json.homeRoomId).toBe(ctx.roomId);
-    expect(res.json.assetTypeId).toBe(ctx.assetTypeId);
+    expect(isRecord(res.json)).toBe(true);
+    if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+    expect(getString(res.json, "homeRoomId")).toBe(ctx.roomId);
+    expect(getString(res.json, "assetTypeId")).toBe(ctx.assetTypeId);
 
     const row = await equipmentRow(eqId);
     expect(row?.home_room_id).toBe(ctx.roomId);
@@ -248,7 +293,65 @@ describe.skipIf(!dbReachable)("docking home-assignment + reconciliation integrat
       homeRoomId: ctx.roomId,
     });
     expect(res.status).toBe(404);
-    expect(res.json.code).toBe("errors.notFound");
+    expect(isRecord(res.json)).toBe(true);
+    if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+    expect(getString(res.json, "code")).toBe("errors.notFound");
+  });
+
+  it("PATCH rejects a homeRoomId belonging to another clinic with 400 (cross-clinic reference)", async () => {
+    const eqId = randomUUID();
+    await seedEquipment(eqId, ctx.clinicId);
+
+    const otherClinicId = randomUUID();
+    const otherRoomId = randomUUID();
+    await seedClinic(otherClinicId);
+    await seedRoom(otherRoomId, otherClinicId, "Other Clinic Room");
+
+    try {
+      const res = await api(`/api/docking/equipment/${eqId}/home`, "PATCH", {
+        homeRoomId: otherRoomId,
+        assetTypeId: ctx.assetTypeId,
+      });
+
+      expect(res.status).toBe(400);
+      expect(isRecord(res.json)).toBe(true);
+      if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+      expect(getString(res.json, "code")).toBe("errors.docking.invalidReference");
+
+      // No write leaked through.
+      const row = await equipmentRow(eqId);
+      expect(row?.home_room_id).toBeNull();
+    } finally {
+      await purgeClinic(otherClinicId);
+    }
+  });
+
+  it("PATCH rejects an assetTypeId belonging to another clinic with 400 (cross-clinic reference)", async () => {
+    const eqId = randomUUID();
+    await seedEquipment(eqId, ctx.clinicId);
+
+    const otherClinicId = randomUUID();
+    const otherAssetTypeId = randomUUID();
+    await seedClinic(otherClinicId);
+    await seedAssetType(otherAssetTypeId, otherClinicId, "Other Clinic Type");
+
+    try {
+      const res = await api(`/api/docking/equipment/${eqId}/home`, "PATCH", {
+        homeRoomId: ctx.roomId,
+        assetTypeId: otherAssetTypeId,
+      });
+
+      expect(res.status).toBe(400);
+      expect(isRecord(res.json)).toBe(true);
+      if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+      expect(getString(res.json, "code")).toBe("errors.docking.invalidReference");
+
+      const row = await equipmentRow(eqId);
+      expect(row?.home_room_id).toBeNull();
+      expect(row?.asset_type_id).toBeNull();
+    } finally {
+      await purgeClinic(otherClinicId);
+    }
   });
 
   it("bulk-assigns home to multiple ids in one call", async () => {
@@ -265,7 +368,9 @@ describe.skipIf(!dbReachable)("docking home-assignment + reconciliation integrat
     });
 
     expect(res.status).toBe(200);
-    expect(res.json.updated).toBe(2);
+    expect(isRecord(res.json)).toBe(true);
+    if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+    expect(getNumber(res.json, "updated")).toBe(2);
 
     const row1 = await equipmentRow(eqId1);
     const row2 = await equipmentRow(eqId2);
@@ -274,7 +379,12 @@ describe.skipIf(!dbReachable)("docking home-assignment + reconciliation integrat
 
     // M4: audit metadata carries `count`, not the full `ids` array.
     expect(logAudit).toHaveBeenCalledTimes(1);
-    const metadata = logAudit.mock.calls[0][0].metadata as Record<string, unknown>;
+    const call = logAudit.mock.calls[0]?.[0] as unknown;
+    expect(isRecord(call)).toBe(true);
+    if (!isRecord(call)) throw new Error("Expected logAudit call arg to be an object");
+    const metadata = call.metadata;
+    expect(isRecord(metadata)).toBe(true);
+    if (!isRecord(metadata)) throw new Error("Expected metadata to be an object");
     expect(metadata).toEqual({ homeRoomId: ctx.roomId, assetTypeId: ctx.assetTypeId, count: 2 });
     expect(metadata).not.toHaveProperty("ids");
   });
@@ -291,14 +401,71 @@ describe.skipIf(!dbReachable)("docking home-assignment + reconciliation integrat
     expect(res.status).toBe(400);
   });
 
+  it("bulk rejects an assetTypeId belonging to another clinic with 400, no partial write (cross-clinic reference)", async () => {
+    const eqId1 = randomUUID();
+    const eqId2 = randomUUID();
+    await seedEquipment(eqId1, ctx.clinicId);
+    await seedEquipment(eqId2, ctx.clinicId);
+
+    const otherClinicId = randomUUID();
+    const otherAssetTypeId = randomUUID();
+    await seedClinic(otherClinicId);
+    await seedAssetType(otherAssetTypeId, otherClinicId, "Other Clinic Type");
+
+    try {
+      const res = await api(`/api/docking/equipment/home/bulk`, "POST", {
+        ids: [eqId1, eqId2],
+        homeRoomId: ctx.roomId,
+        assetTypeId: otherAssetTypeId,
+      });
+
+      expect(res.status).toBe(400);
+      expect(isRecord(res.json)).toBe(true);
+      if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+      expect(getString(res.json, "code")).toBe("errors.docking.invalidReference");
+
+      const row1 = await equipmentRow(eqId1);
+      const row2 = await equipmentRow(eqId2);
+      expect(row1?.home_room_id).toBeNull();
+      expect(row2?.home_room_id).toBeNull();
+    } finally {
+      await purgeClinic(otherClinicId);
+    }
+  });
+
+  it("bulk rejects the whole batch with 409 when one id doesn't exist — no partial write", async () => {
+    const eqId1 = randomUUID();
+    const missingId = randomUUID();
+    await seedEquipment(eqId1, ctx.clinicId);
+
+    const res = await api(`/api/docking/equipment/home/bulk`, "POST", {
+      ids: [eqId1, missingId],
+      homeRoomId: ctx.roomId,
+      assetTypeId: ctx.assetTypeId,
+    });
+
+    expect(res.status).toBe(409);
+    expect(isRecord(res.json)).toBe(true);
+    if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+    expect(getString(res.json, "code")).toBe("errors.docking.invalidEquipmentIds");
+
+    // eqId1 was valid, but the batch must roll back in full — no partial write.
+    const row1 = await equipmentRow(eqId1);
+    expect(row1?.home_room_id).toBeNull();
+  });
+
   it("reconciliation.unassigned includes an item with homeRoomId IS NULL", async () => {
     const eqId = randomUUID();
     await seedEquipment(eqId, ctx.clinicId);
 
     const res = await api(`/api/docking/reconciliation`, "GET");
     expect(res.status).toBe(200);
-    const unassigned = res.json.unassigned as Array<{ id: string }>;
-    expect(unassigned.some((e) => e.id === eqId)).toBe(true);
+    expect(isRecord(res.json)).toBe(true);
+    if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+    const unassigned = res.json.unassigned;
+    expect(isArray(unassigned)).toBe(true);
+    if (!isArray(unassigned)) throw new Error("Expected unassigned to be an array");
+    expect(unassigned.some((e) => isRecord(e) && getString(e, "id") === eqId)).toBe(true);
   });
 
   it("reconciliation.noStation includes an item homed to a (room, category) with no dock", async () => {
@@ -310,10 +477,15 @@ describe.skipIf(!dbReachable)("docking home-assignment + reconciliation integrat
 
     const res = await api(`/api/docking/reconciliation`, "GET");
     expect(res.status).toBe(200);
-    const noStation = res.json.noStation as Array<{ id: string }>;
-    const unassigned = res.json.unassigned as Array<{ id: string }>;
-    expect(noStation.some((e) => e.id === eqId)).toBe(true);
-    expect(unassigned.some((e) => e.id === eqId)).toBe(false);
+    expect(isRecord(res.json)).toBe(true);
+    if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+    const noStation = res.json.noStation;
+    const unassigned = res.json.unassigned;
+    expect(isArray(noStation)).toBe(true);
+    expect(isArray(unassigned)).toBe(true);
+    if (!isArray(noStation) || !isArray(unassigned)) throw new Error("Expected buckets to be arrays");
+    expect(noStation.some((e) => isRecord(e) && getString(e, "id") === eqId)).toBe(true);
+    expect(unassigned.some((e) => isRecord(e) && getString(e, "id") === eqId)).toBe(false);
   });
 
   it("reconciliation.noStation excludes an item homed to a (room, category) that HAS a dock", async () => {
@@ -327,14 +499,25 @@ describe.skipIf(!dbReachable)("docking home-assignment + reconciliation integrat
 
     const res = await api(`/api/docking/reconciliation`, "GET");
     expect(res.status).toBe(200);
-    const noStation = res.json.noStation as Array<{ id: string }>;
-    expect(noStation.some((e) => e.id === eqId)).toBe(false);
+    expect(isRecord(res.json)).toBe(true);
+    if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+    const noStation = res.json.noStation;
+    expect(isArray(noStation)).toBe(true);
+    if (!isArray(noStation)) throw new Error("Expected noStation to be an array");
+    expect(noStation.some((e) => isRecord(e) && getString(e, "id") === eqId)).toBe(false);
 
-    const byDock = res.json.byDock as Array<{ dock: { id: string }; expectedFill: number; capacity: number }>;
-    const entry = byDock.find((d) => d.dock.id === dockId);
+    const byDock = res.json.byDock;
+    expect(isArray(byDock)).toBe(true);
+    if (!isArray(byDock)) throw new Error("Expected byDock to be an array");
+    const entry = byDock.find((d) => {
+      if (!isRecord(d)) return false;
+      const dockRec = getRecord(d, "dock");
+      return dockRec !== undefined && getString(dockRec, "id") === dockId;
+    });
     expect(entry).toBeDefined();
-    expect(entry?.expectedFill).toBe(1);
-    expect(entry?.capacity).toBe(4);
+    if (!isRecord(entry)) throw new Error("Expected byDock entry to be an object");
+    expect(getNumber(entry, "expectedFill")).toBe(1);
+    expect(getNumber(entry, "capacity")).toBe(4);
   });
 
   it("reconciliation is clinic-scoped — another clinic's items never appear", async () => {
@@ -351,8 +534,12 @@ describe.skipIf(!dbReachable)("docking home-assignment + reconciliation integrat
     try {
       const res = await api(`/api/docking/reconciliation`, "GET");
       expect(res.status).toBe(200);
-      const unassigned = res.json.unassigned as Array<{ id: string }>;
-      expect(unassigned.some((e) => e.id === otherEqId)).toBe(false);
+      expect(isRecord(res.json)).toBe(true);
+      if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+      const unassigned = res.json.unassigned;
+      expect(isArray(unassigned)).toBe(true);
+      if (!isArray(unassigned)) throw new Error("Expected unassigned to be an array");
+      expect(unassigned.some((e) => isRecord(e) && getString(e, "id") === otherEqId)).toBe(false);
     } finally {
       await purgeClinic(otherClinicId);
     }

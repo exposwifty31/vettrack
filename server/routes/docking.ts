@@ -16,6 +16,7 @@ import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { logAudit } from "../lib/audit.js";
 import { apiError } from "../lib/apiError.js";
+import { referencedIdsBelongToClinic } from "../lib/clinic-scoped-refs.js";
 import { resolveHomeDock, dockExpectedFill } from "../services/docking.service.js";
 
 const router = Router();
@@ -44,6 +45,10 @@ router.patch(
     const { id: userId, email } = req.authUser!;
     const { id } = req.params;
     const { homeRoomId, assetTypeId } = req.body as z.infer<typeof assignHomeSchema>;
+
+    if (!(await referencedIdsBelongToClinic(clinicId, homeRoomId, assetTypeId))) {
+      return apiError(req, res, "errors.docking.invalidReference", undefined, 400);
+    }
 
     const [updated] = await db
       .update(equipment)
@@ -87,36 +92,41 @@ router.post(
     const { id: userId, email } = req.authUser!;
     const { ids, homeRoomId, assetTypeId } = req.body as z.infer<typeof bulkAssignHomeSchema>;
 
-    // Reject duplicate IDs
-    const uniqueIds = new Set(ids);
-    if (uniqueIds.size !== ids.length) {
-      return res.status(400).json(apiError(req, "DUPLICATE_IDS", "Request contains duplicate equipment IDs"));
+    // Dedupe — a client resubmitting the same id twice should not be treated
+    // as a partial-bulk failure below.
+    const uniqueIds = Array.from(new Set(ids));
+
+    if (!(await referencedIdsBelongToClinic(clinicId, homeRoomId, assetTypeId))) {
+      return apiError(req, res, "errors.docking.invalidReference", undefined, 400);
     }
 
-    // Validate all IDs exist and are non-deleted in this clinic
-    const validEquipment = await db
-      .select({ id: equipment.id })
-      .from(equipment)
-      .where(and(eq(equipment.clinicId, clinicId), inArray(equipment.id, ids), isNull(equipment.deletedAt)));
+    let updatedCount = 0;
+    try {
+      await db.transaction(async (tx) => {
+        const updatedRows = await tx
+          .update(equipment)
+          .set({
+            homeRoomId: homeRoomId ?? null,
+            ...(assetTypeId !== undefined && { assetTypeId: assetTypeId ?? null }),
+            version: sql`${equipment.version} + 1`,
+          })
+          .where(and(eq(equipment.clinicId, clinicId), inArray(equipment.id, uniqueIds), isNull(equipment.deletedAt)))
+          .returning({ id: equipment.id });
 
-    if (validEquipment.length !== ids.length) {
-      return res.status(409).json(apiError(req, "INVALID_EQUIPMENT_IDS", "Some equipment IDs do not exist or are deleted"));
-    }
-
-    // Perform the update transactionally
-    const updatedRows = await db
-      .update(equipment)
-      .set({
-        homeRoomId: homeRoomId ?? null,
-        ...(assetTypeId !== undefined && { assetTypeId: assetTypeId ?? null }),
-        version: sql`${equipment.version} + 1`,
-      })
-      .where(and(eq(equipment.clinicId, clinicId), inArray(equipment.id, ids), isNull(equipment.deletedAt)))
-      .returning({ id: equipment.id });
-
-    // Ensure update affected all expected rows
-    if (updatedRows.length !== ids.length) {
-      return res.status(409).json(apiError(req, "UPDATE_MISMATCH", "Not all equipment records were updated"));
+        // A short count means some ids don't exist, are deleted, or belong
+        // to another clinic (the WHERE above is clinic-scoped, so a
+        // cross-clinic id simply doesn't match). Roll back the whole batch
+        // instead of silently applying a partial update.
+        if (updatedRows.length !== uniqueIds.length) {
+          throw new Error("PARTIAL_BULK");
+        }
+        updatedCount = updatedRows.length;
+      });
+    } catch (err) {
+      if (err instanceof Error && err.message === "PARTIAL_BULK") {
+        return apiError(req, res, "errors.docking.invalidEquipmentIds", undefined, 409);
+      }
+      throw err;
     }
 
     logAudit({
@@ -125,10 +135,10 @@ router.post(
       performedBy: userId,
       performedByEmail: email,
       targetId: null,
-      metadata: { homeRoomId, assetTypeId, count: updatedRows.length },
+      metadata: { homeRoomId, assetTypeId, count: updatedCount },
     });
 
-    res.json({ updated: updatedRows.length });
+    res.json({ updated: updatedCount });
   },
 );
 
