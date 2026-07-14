@@ -61,6 +61,21 @@ export function recordJobLatency(kind: JobKind, durationMs: number): void {
   if (arr.length > MAX_SAMPLES) arr.shift();
 }
 
+/**
+ * Time an async job body with a MONOTONIC clock (`performance.now()` — immune to
+ * wall-clock adjustments) and record its duration under `kind` on success OR
+ * failure (finally). The single place job latency is measured; the error
+ * propagates unchanged.
+ */
+export async function withJobLatency<T>(kind: JobKind, fn: () => Promise<T>): Promise<T> {
+  const startedAt = performance.now();
+  try {
+    return await fn();
+  } finally {
+    recordJobLatency(kind, performance.now() - startedAt);
+  }
+}
+
 /** Nearest-rank percentile over a sorted ascending array. */
 function percentile(sorted: number[], p: number): number {
   const idx = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));

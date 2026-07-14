@@ -9,6 +9,7 @@ import { resolve } from "path";
 import type { JobKind } from "../server/jobs/registry.js";
 import {
   recordJobLatency,
+  withJobLatency,
   getJobLatencySnapshot,
   resetJobLatencyForTests,
 } from "../server/lib/job-latency.js";
@@ -42,16 +43,19 @@ describe("job-latency", () => {
     expect(Object.keys(snap).sort()).toEqual(["check-expiry", "check-plug"]);
   });
 
-  it("is bounded: keeps only the most recent samples", () => {
+  it("is bounded: keeps exactly the most recent MAX_SAMPLES (200)", () => {
     for (let i = 0; i < 300; i++) recordJobLatency("check-plug", i);
     const snap = getJobLatencySnapshot();
-    expect(snap["check-plug"].count).toBeLessThanOrEqual(200);
-    // the oldest samples (0..99) are evicted, so min reflects the retained window
-    expect(snap["check-plug"].minMs).toBeGreaterThanOrEqual(100);
+    // 300 samples (0..299), cap 200 → retains exactly the last 200 (100..299).
+    expect(snap["check-plug"].count).toBe(200);
+    expect(snap["check-plug"].minMs).toBe(100);
     expect(snap["check-plug"].maxMs).toBe(299);
   });
 
   it("ignores an unknown (non-enum) kind — no high-cardinality leakage", () => {
+    // Cast is intentional: it bypasses the compile-time union to exercise the
+    // RUNTIME allowlist guard (the whole point of this test). Safe — the value
+    // never leaves this assertion.
     recordJobLatency("totally-bogus" as JobKind, 42);
     expect(getJobLatencySnapshot()).toEqual({});
   });
@@ -70,9 +74,32 @@ describe("job-latency", () => {
   });
 });
 
+describe("withJobLatency — records on success AND failure (finally)", () => {
+  it("records a sample when the job body resolves", async () => {
+    await withJobLatency("check-plug", async () => "ok");
+    expect(getJobLatencySnapshot()["check-plug"].count).toBe(1);
+  });
+
+  it("records a sample even when the job body rejects, and re-throws the error", async () => {
+    await expect(
+      withJobLatency("check-expiry", async () => {
+        throw new Error("boom");
+      }),
+    ).rejects.toThrow("boom");
+    // The whole point: the finally block records latency on the failure path too.
+    expect(getJobLatencySnapshot()["check-expiry"].count).toBe(1);
+  });
+
+  it("returns the body's resolved value unchanged", async () => {
+    expect(await withJobLatency("check-plug", async () => 42)).toBe(42);
+  });
+});
+
 describe("runtime wiring", () => {
+  // Behavior is proven above; this just guards that runPilotJob still routes
+  // its dispatch through withJobLatency (the timing can't be silently dropped).
   const src = readFileSync(resolve(process.cwd(), "server/jobs/runtime.ts"), "utf-8");
-  it("runPilotJob records latency keyed by the job's kind", () => {
-    expect(src).toMatch(/recordJobLatency\(\s*definition\.kind/);
+  it("runPilotJob times the dispatch via withJobLatency(definition.kind)", () => {
+    expect(src).toMatch(/withJobLatency\(\s*definition\.kind/);
   });
 });

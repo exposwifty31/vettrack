@@ -1,7 +1,7 @@
 import { Worker, type Job } from "bullmq";
 import type { Redis } from "ioredis";
 import { incrementMetric } from "../lib/metrics.js";
-import { recordJobLatency } from "../lib/job-latency.js";
+import { withJobLatency } from "../lib/job-latency.js";
 import { createRedisConnection } from "../lib/redis.js";
 import { startWorkerHeartbeat, stopWorkerHeartbeat } from "../lib/worker-heartbeat.js";
 import { processChargeAlertJob, bindChargeAlertProducerQueue } from "../workers/chargeAlertWorker.js";
@@ -76,10 +76,9 @@ async function runPilotJob(queueName: string, job: Job): Promise<void> {
     );
   }
 
-  // Time the whole dispatch (success or failure) and record it under the job's
-  // bounded kind — surfaced via getMetricsSnapshot().jobLatency, no new route.
-  const startedAt = Date.now();
-  try {
+  // Time the whole dispatch (success or failure) under the job's bounded kind —
+  // surfaced via getMetricsSnapshot().jobLatency, no new route.
+  return withJobLatency(definition.kind, async () => {
     const ctx = buildJobContext(job);
 
     if (queueName === CHARGE_ALERT_QUEUE_NAME) {
@@ -105,9 +104,7 @@ async function runPilotJob(queueName: string, job: Job): Promise<void> {
     throw new Error(
       `No pilot handler wired for queue=${queueName} job.name=${job.name}`,
     );
-  } finally {
-    recordJobLatency(definition.kind, Date.now() - startedAt);
-  }
+  });
 }
 
 async function ensureQueueCronRepeatJob(
