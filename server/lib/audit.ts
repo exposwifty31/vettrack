@@ -243,6 +243,8 @@ export type AuditActionType =
   | "equipment_location_unknown"
   // T-24b — damage report flips conditionStatus to a non-"ok" value (R-EQ-F3).
   | "equipment_damage_reported"
+  // T1.4 — docking-as-first-class: admin assigns/reassigns an item's Home Room + Category.
+  | "equipment_home_assigned"
   // Phase 9 — Display device pairing
   | "display_pairing_code_issued"
   | "display_device_paired"

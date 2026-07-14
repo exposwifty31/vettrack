@@ -39,6 +39,7 @@ const EXPECTED_MOUNT_PATHS = [
   "/api/home",
   "/api/display",
   "/api/equipment-board",
+  "/api/docking", // dockingRoutes (T1.4)
   "/api/code-blue",
   "/api/crash-cart",
   "/api/admin",
