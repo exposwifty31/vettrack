@@ -546,7 +546,25 @@ export interface Dock {
   description?: string | null;
   roomId?: string | null;
   roomName?: string | null;
+  assetTypeId?: string | null;
+  assetTypeName?: string | null;
+  capacity?: number | null;
   createdAt: string;
+}
+
+/** A single item in a docking reconciliation bucket (small projection). */
+export interface DockingReconciliationItem {
+  id: string;
+  name: string;
+  homeRoomId: string | null;
+  assetTypeId: string | null;
+}
+
+/** GET /api/docking/reconciliation response — P1 ownership-derivable buckets. */
+export interface DockingReconciliation {
+  unassigned: DockingReconciliationItem[];
+  noStation: DockingReconciliationItem[];
+  byDock: Array<{ dock: Dock; expectedFill: number; capacity: number | null }>;
 }
 
 export type QuickScanToggleAction = "checkout" | "return" | "blocked";
