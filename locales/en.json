@@ -2924,7 +2924,8 @@
       "unavailable": "Could not retrieve location inference."
     },
     "docking": {
-      "duplicateStation": "A station for this category already exists in this room."
+      "duplicateStation": "A station for this category already exists in this room.",
+      "duplicateName": "A dock with this name already exists."
     }
   },
   "push": {

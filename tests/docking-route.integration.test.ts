@@ -221,6 +221,34 @@ describe.skipIf(!dbReachable)("docking route integration", () => {
     expect(second.json.code).toBe("errors.docking.duplicateStation");
   });
 
+  it("rejects a second dock with a duplicate name (distinct room/category) as 409 duplicateName", async () => {
+    const first = await api("/api/docks", "POST", {
+      name: "Shared Dock Name",
+      roomId: ctx.roomId,
+      assetTypeId: ctx.assetTypeId,
+      capacity: 4,
+    });
+    expect(first.status).toBe(201);
+
+    // Different room AND different category → the (room, category) index cannot
+    // fire, so a 409 here is attributable only to the name unique constraint.
+    const otherRoomId = randomUUID();
+    const otherAssetTypeId = randomUUID();
+    await seedRoom(otherRoomId, ctx.clinicId, "Recovery");
+    await seedAssetType(otherAssetTypeId, ctx.clinicId, "Monitor");
+
+    const second = await api("/api/docks", "POST", {
+      name: "Shared Dock Name",
+      roomId: otherRoomId,
+      assetTypeId: otherAssetTypeId,
+      capacity: 2,
+    });
+
+    expect(second.status).toBe(409);
+    expect(second.json.code).toBe("errors.docking.duplicateName");
+    expect(second.json.code).not.toBe("errors.docking.duplicateStation");
+  });
+
   it("includes assetTypeName on list", async () => {
     const created = await api("/api/docks", "POST", {
       name: "Pump Station A",

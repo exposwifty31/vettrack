@@ -25,7 +25,7 @@ import { apiError } from "../lib/apiError.js";
 import { recordOperationalMetric } from "../services/operational-metrics.service.js";
 import { promoteStagingQueueNext } from "../lib/staging-promotion.js";
 import { promoteEquipmentWaitlistWithNotify } from "../lib/equipment-waitlist-promotion.js";
-import { isPostgresUniqueViolation, pgUpdateMatchedZeroRows } from "../lib/pg-result.js";
+import { isPostgresUniqueViolation, pgUpdateMatchedZeroRows, getPostgresConstraintName } from "../lib/pg-result.js";
 import { incrementMetric } from "../lib/metrics.js";
 
 const router = Router();
@@ -53,7 +53,11 @@ router.post("/docks", requireAuth, requireAdmin, validateBody(createDockSchema),
       assetTypeId: assetTypeId ?? null, capacity: capacity ?? null,
     });
   } catch (e) {
-    if (isPostgresUniqueViolation(e)) return apiError(req, res, "errors.docking.duplicateStation", undefined, 409);
+    if (isPostgresUniqueViolation(e)) {
+      const constraint = getPostgresConstraintName(e);
+      if (constraint === "vt_docks_clinic_room_assettype_uq") return apiError(req, res, "errors.docking.duplicateStation", undefined, 409);
+      if (constraint === "vt_docks_clinic_name_unique") return apiError(req, res, "errors.docking.duplicateName", undefined, 409);
+    }
     throw e;
   }
   logAudit({ clinicId, actionType: "equipment_updated", performedBy: userId, performedByEmail: email, targetId: id, metadata: { action: "dock_created", name } });
