@@ -89,7 +89,10 @@ export function LocateSearch() {
           <label htmlFor={inputId} className="sr-only">
             {t.locateSearch.label}
           </label>
-          <search
+          {/* role="search" instead of the <search> element: react-dom 18 doesn't
+              recognize the <search> tag yet and warns; the role is equivalent. */}
+          <div
+            role="search"
             className="mt-3 flex h-10 items-center gap-2 rounded-[10px] border border-border bg-muted px-3"
           >
             <Search size={16} strokeWidth={2} className="shrink-0 text-muted-foreground" aria-hidden />
@@ -102,7 +105,7 @@ export function LocateSearch() {
               placeholder={t.locateSearch.placeholder}
               className="min-w-0 flex-1 border-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground [appearance:none] [&::-webkit-search-cancel-button]:hidden"
             />
-          </search>
+          </div>
 
           <output aria-live="polite" className="sr-only">
             {liveMessage}

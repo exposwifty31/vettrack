@@ -13,6 +13,9 @@ vi.mock("bullmq", () => {
 
 vi.mock("../server/lib/redis.js", () => ({
   createRedisConnection: vi.fn(),
+  // startJobRuntime starts the worker heartbeat, whose tick calls getRedis();
+  // resolve null so the tick is a clean no-op instead of throwing a CI error.
+  getRedis: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("../server/jobs/queue-factory.js", () => ({
