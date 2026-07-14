@@ -94,11 +94,30 @@ describe("Stage 6 detail — actions (Check in)", () => {
   });
   it("only offers return to the holder or an admin", () => {
     expect(actions.includes("checkedOutByMe")).toBe(true);
-    expect(/if\s*\(!canReturn\)\s*return null/.test(actions)).toBe(true);
+    expect(actions.includes("const canReturn = isCheckedOut && (checkedOutByMe || isAdmin);")).toBe(true);
   });
   it("does NOT shift-gate return (you can always hand equipment back)", () => {
-    expect(actions.includes("hasActiveShift")).toBe(false);
-    expect(actions.includes("offShift")).toBe(false);
+    const returnMutBlock = actions.slice(actions.indexOf("const returnMut ="), actions.indexOf("const checkoutMut ="));
+    expect(returnMutBlock.includes("hasActiveShift")).toBe(false);
+    expect(returnMutBlock.includes("offShift")).toBe(false);
+  });
+});
+
+describe("Stage 6 detail — actions (Checkout / take)", () => {
+  it("wires a real checkout via api.equipment.checkout", () => {
+    expect(actions.includes("api.equipment.checkout")).toBe(true);
+    expect(actions.includes("t.equipmentList.quickAction.checkout")).toBe(true);
+  });
+  it("gates checkout on availability (not held, status ok, not returned)", () => {
+    expect(
+      actions.includes(
+        'const canCheckout =\n    !isCheckedOut && equipment.status === "ok" && equipment.custodyState !== "returned";',
+      ),
+    ).toBe(true);
+  });
+  it("shift-gates checkout only (roster gate), deferring to the server on a shift-query error", () => {
+    expect(actions.includes("hasActiveShift")).toBe(true);
+    expect(actions.includes("t.scan.offShiftBody")).toBe(true);
   });
 });
 
