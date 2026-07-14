@@ -28,5 +28,12 @@ CREATE TABLE IF NOT EXISTS vt_equipment_anchors (
 );
 CREATE INDEX IF NOT EXISTS idx_vt_equipment_anchors_clinic_equipment_asserted
   ON vt_equipment_anchors (clinic_id, equipment_id, asserted_at);
-CREATE INDEX IF NOT EXISTS idx_vt_equipment_anchors_current
+
+-- Current-anchor index is UNIQUE: "at most one open anchor per item" is a DB
+-- guarantee, not just an application-level convention enforced by
+-- createAnchor's supersede-then-insert pair running inside a transaction.
+-- Safe swap in case an earlier dev run already created the non-unique
+-- version of this index.
+DROP INDEX IF EXISTS idx_vt_equipment_anchors_current;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_vt_equipment_anchors_current
   ON vt_equipment_anchors (clinic_id, equipment_id) WHERE invalidated_at IS NULL;

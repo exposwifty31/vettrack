@@ -13,6 +13,7 @@ import { z } from "zod";
 import { db, equipment, docks } from "../db.js";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import { writeLimiter } from "../middleware/rate-limiters.js";
 import { validateBody } from "../middleware/validate.js";
 import { logAudit } from "../lib/audit.js";
 import { apiError } from "../lib/apiError.js";
@@ -191,7 +192,7 @@ router.get("/reconciliation", requireAuth, async (req, res) => {
  * dock (T1.2 resolveHomeDock) — both failure modes collapse to the same 409
  * (there is nowhere to anchor it).
  */
-router.post("/equipment/:id/citizen-anchor", requireAuth, async (req, res) => {
+router.post("/equipment/:id/citizen-anchor", requireAuth, writeLimiter, async (req, res) => {
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
   const { id } = req.params;
@@ -214,14 +215,16 @@ router.post("/equipment/:id/citizen-anchor", requireAuth, async (req, res) => {
     return apiError(req, res, "errors.docking.noHomeStation", undefined, 409);
   }
 
-  const anchor = await createAnchor(db, {
-    clinicId,
-    equipmentId: id,
-    dockId: homeDock.id,
-    roomId: homeDock.roomId,
-    assertedById: userId,
-    source: "citizen",
-  });
+  const anchor = await db.transaction(async (tx) =>
+    createAnchor(tx, {
+      clinicId,
+      equipmentId: id,
+      dockId: homeDock.id,
+      roomId: homeDock.roomId,
+      assertedById: userId,
+      source: "citizen",
+    }),
+  );
 
   logAudit({
     clinicId,
@@ -243,7 +246,7 @@ router.post("/equipment/:id/citizen-anchor", requireAuth, async (req, res) => {
  * (T2.2 invalidateCurrentAnchor, reason "not_found_here"). Idempotent — a
  * no-op (still 200) when no anchor is currently open.
  */
-router.post("/equipment/:id/not-found-here", requireAuth, async (req, res) => {
+router.post("/equipment/:id/not-found-here", requireAuth, writeLimiter, async (req, res) => {
   const clinicId = req.clinicId!;
   const { id: userId, email } = req.authUser!;
   const { id } = req.params;

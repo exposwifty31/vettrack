@@ -42,6 +42,13 @@ export type CreateAnchorInput = {
  * Creates a new open anchor, superseding any prior open anchor for this
  * item (invalidated_at set, invalidated_reason left NULL — NULL reason
  * means "superseded", not a contradiction).
+ *
+ * MUST be called within a transaction (pass `tx`, not `db`): the
+ * supersede-UPDATE and the INSERT must commit atomically, or a concurrent
+ * caller can race between them and leave two open anchors for the same
+ * item — which the current-anchor UNIQUE index would then reject on the
+ * second commit instead of serializing cleanly under the first caller's
+ * transaction.
  */
 export async function createAnchor(tx: Tx | typeof db, input: CreateAnchorInput): Promise<EquipmentAnchor> {
   await tx

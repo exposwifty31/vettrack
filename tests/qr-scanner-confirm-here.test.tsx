@@ -98,7 +98,13 @@ vi.mock("wouter", () => ({
   useLocation: () => ["/scan", vi.fn()],
 }));
 
+vi.mock("sonner", () => ({
+  toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }),
+}));
+
 import { QrScanner } from "@/components/qr-scanner";
+import { toast } from "sonner";
+import { t } from "@/lib/i18n";
 
 function makeEquipment(overrides: Partial<Equipment>): Equipment {
   return {
@@ -131,6 +137,7 @@ async function scanInto(equipment: Equipment) {
   });
 
   await waitFor(() => expect(screen.getByTestId("scan-inline-sheet")).toBeTruthy());
+  return qc;
 }
 
 describe("QrScanner — citizen-anchor 'confirm here' action (T2.5-mobile)", () => {
@@ -140,6 +147,8 @@ describe("QrScanner — citizen-anchor 'confirm here' action (T2.5-mobile)", () 
     getByNfcTagMock.mockReset();
     dashboardMock.mockReset();
     citizenAnchorMock.mockReset();
+    vi.mocked(toast.error).mockReset();
+    vi.mocked(toast.success).mockReset();
   });
 
   afterEach(() => {
@@ -170,5 +179,46 @@ describe("QrScanner — citizen-anchor 'confirm here' action (T2.5-mobile)", () 
     await scanInto(equipment);
 
     expect(screen.queryByTestId("btn-scan-inline-confirm-here")).toBeNull();
+  });
+
+  it("#13 — success invalidates the equipment-detail and equipment-list caches (anchor changes derived location)", async () => {
+    citizenAnchorMock.mockResolvedValue({ id: "anchor-1" });
+    const equipment = makeEquipment({ homeRoomId: "room-1" });
+    const qc = await scanInto(equipment);
+    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
+
+    fireEvent.click(screen.getByTestId("btn-scan-inline-confirm-here"));
+    await waitFor(() => expect(citizenAnchorMock).toHaveBeenCalledWith("eq-1"));
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: [`/api/equipment/${equipment.id}`] }),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["/api/equipment"] });
+  });
+
+  it("#23 — citizenAnchor failure fires the error toast and resets isActing (spinner clears, button re-enabled)", async () => {
+    citizenAnchorMock.mockRejectedValue(new Error("boom"));
+    const equipment = makeEquipment({ homeRoomId: "room-1" });
+    await scanInto(equipment);
+
+    const btn = screen.getByTestId("btn-scan-inline-confirm-here") as HTMLButtonElement;
+    fireEvent.click(btn);
+
+    await waitFor(() => expect(citizenAnchorMock).toHaveBeenCalledWith("eq-1"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("boom"));
+
+    // isActing resets — the button is enabled again (not stuck mid-action).
+    await waitFor(() => expect(btn.disabled).toBe(false));
+  });
+
+  it("#23 — citizenAnchor failure without an Error instance falls back to the localized confirmHereFailed copy", async () => {
+    citizenAnchorMock.mockRejectedValue("not an Error instance");
+    const equipment = makeEquipment({ homeRoomId: "room-1" });
+    await scanInto(equipment);
+
+    fireEvent.click(screen.getByTestId("btn-scan-inline-confirm-here"));
+
+    await waitFor(() => expect(citizenAnchorMock).toHaveBeenCalledWith("eq-1"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(t.qrScanner.confirmHereFailed));
   });
 });

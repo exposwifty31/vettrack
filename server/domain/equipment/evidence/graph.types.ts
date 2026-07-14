@@ -5,6 +5,7 @@ import type {
   UnitConditionState,
 } from "../../../db.js";
 import type { EquipmentWaitlistSnapshot } from "../../../../shared/equipment-waitlist.js";
+import type { AnchorSource } from "../../../services/equipment-anchor.service.js";
 
 /** Clinic-scoped raw evidence — no interpretation. */
 export interface EvidenceEquipmentRow {
@@ -89,7 +90,7 @@ export interface EvidenceCurrentAnchor {
   roomId: string | null;
   assertedAt: Date;
   assertedById: string | null;
-  source: string;
+  source: AnchorSource;
 }
 
 export interface EvidenceGraph {
@@ -107,8 +108,8 @@ export interface EvidenceGraph {
   supersessionEvents: SupersessionEvent[];
   waitlist: EquipmentWaitlistSnapshot | null;
   activeStaging: StagingQueueRow[];
-  /** Latest OPEN anchor (docking P2) or null — see EvidenceCurrentAnchor. */
-  currentAnchor?: EvidenceCurrentAnchor | null;
+  /** Latest OPEN anchor (docking P2) or null — see EvidenceCurrentAnchor. Always set by both loadEvidenceGraph and buildSyntheticEvidenceGraph (never left undefined). */
+  currentAnchor: EvidenceCurrentAnchor | null;
 }
 
 export interface ResolverContext {

@@ -12,61 +12,22 @@
  * — the offline-capable path (`pendingSyncId` / savedOffline toast) — not some
  * internal plain-return the dialog might otherwise own.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { t } from "@/lib/i18n";
 import type { Dock, Equipment } from "@/types";
-
-const returnMock = vi.fn();
-const checkoutMock = vi.fn();
-const listDocksMock = vi.fn();
-const listConditionsMock = vi.fn();
-const conditionStatesMock = vi.fn();
-const dockReturnMock = vi.fn();
-const toastSuccess = vi.fn();
-const toastError = vi.fn();
-const toastInfo = vi.fn();
-let authValue: { userId: string | null; isAdmin: boolean } = { userId: "admin-1", isAdmin: true };
-let shiftValue: { hasActiveShift: boolean; isLoading: boolean; isError: boolean; nextShift: null } = {
-  hasActiveShift: true,
-  isLoading: false,
-  isError: false,
-  nextShift: null,
-};
-
-vi.mock("sonner", () => ({
-  toast: {
-    success: (...a: unknown[]) => toastSuccess(...a),
-    error: (...a: unknown[]) => toastError(...a),
-    info: (...a: unknown[]) => toastInfo(...a),
-  },
-}));
-vi.mock("@/hooks/use-auth", () => ({ useAuth: () => authValue }));
-vi.mock("@/hooks/use-active-shift", () => ({ useActiveShift: () => shiftValue }));
-vi.mock("@/lib/haptics", () => ({ haptics: { tap: vi.fn() } }));
-vi.mock("@/lib/api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/api")>();
-  return {
-    ...actual,
-    api: {
-      ...actual.api,
-      equipment: {
-        ...actual.api.equipment,
-        return: (...a: unknown[]) => returnMock(...a),
-        checkout: (...a: unknown[]) => checkoutMock(...a),
-      },
-      operationalState: {
-        ...actual.api.operationalState,
-        listDocks: (...a: unknown[]) => listDocksMock(...a),
-        listConditions: (...a: unknown[]) => listConditionsMock(...a),
-        conditionStates: (...a: unknown[]) => conditionStatesMock(...a),
-        dockReturn: (...a: unknown[]) => dockReturnMock(...a),
-      },
-    },
-    ApiError: class ApiError extends Error {},
-  };
-});
+import {
+  checkoutMock,
+  conditionStatesMock,
+  dockReturnMock,
+  listConditionsMock,
+  listDocksMock,
+  resetEquipmentActionsMocks,
+  returnMock,
+  toastError,
+  toastSuccess,
+} from "./helpers/equipment-actions-mocks";
 
 import { EquipmentActions } from "@/features/equipment/detail/EquipmentActions";
 
@@ -112,9 +73,7 @@ const dockedAvailable: Partial<Equipment> = {
 
 describe("EquipmentActions — T2.3-mobile UnifiedReturnDialog", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    authValue = { userId: "admin-1", isAdmin: true };
-    shiftValue = { hasActiveShift: true, isLoading: false, isError: false, nextShift: null };
+    resetEquipmentActionsMocks();
     returnMock.mockResolvedValue({ equipment: { ...dockedAvailable }, undoToken: undefined });
     checkoutMock.mockResolvedValue({ equipment: { ...dockedAvailable, checkedOutById: "admin-1" } });
     listDocksMock.mockResolvedValue([]);
@@ -187,5 +146,36 @@ describe("EquipmentActions — T2.3-mobile UnifiedReturnDialog", () => {
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
     expect(returnMock).not.toHaveBeenCalled();
     expect(dockReturnMock).not.toHaveBeenCalled();
+  });
+
+  it("#21 (P2 review) — dockReturn failure surfaces the error toast, not a silent close/success", async () => {
+    listDocksMock.mockResolvedValue([HOME_DOCK]);
+    dockReturnMock.mockRejectedValueOnce(new Error("dock unreachable"));
+    renderActions(checkedOutWithHome);
+    fireEvent.click(screen.getByTestId("btn-detail-checkin"));
+
+    await screen.findByText("ICU Charging Station", { exact: false });
+    fireEvent.click(screen.getByTestId("btn-confirm-return-plug"));
+
+    await waitFor(() => expect(dockReturnMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("dock unreachable"));
+    expect(toastSuccess).not.toHaveBeenCalled();
+    // Dialog stays open on failure — not silently closed/succeeded.
+    expect(screen.getByTestId("toggle-return-to-station")).toBeTruthy();
+  });
+
+  it("#21 (P2 review) — plain return failure (unchecked path) surfaces the error toast, not a silent close/success", async () => {
+    returnMock.mockRejectedValueOnce(new Error("server unavailable"));
+    renderActions(checkedOutNoHome);
+    fireEvent.click(screen.getByTestId("btn-detail-checkin"));
+
+    await screen.findByTestId("unified-return-no-home-hint");
+    fireEvent.click(screen.getByTestId("btn-confirm-return-plug"));
+
+    await waitFor(() => expect(returnMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(toastSuccess).not.toHaveBeenCalled();
+    // Dialog stays open on failure — not silently closed/succeeded.
+    expect(screen.getByTestId("btn-confirm-return-plug")).toBeTruthy();
   });
 });

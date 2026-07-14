@@ -376,11 +376,21 @@ router.post("/equipment/:equipmentId/dock-return", requireAuth, validateBody(doc
       // Reaching the docked transition is an accountable at-station assertion —
       // create an anchor in the same transaction so a rolled-back return leaves
       // no anchor (toggle ⇒ anchor ⇒ docked).
+      //
+      // The anchor's roomId must be the DOCK's room, not the equipment's
+      // assigned room (eq_row.roomId) — those can diverge, and the anchor is
+      // asserting where the item physically is (at the dock), not where it's
+      // administratively homed. Read fresh inside the tx rather than reusing
+      // the pre-transaction `dock` lookup above.
+      const [dockRow] = await tx
+        .select({ roomId: docks.roomId })
+        .from(docks)
+        .where(and(eq(docks.id, dockId), eq(docks.clinicId, clinicId)));
       await createAnchor(tx, {
         clinicId,
         equipmentId,
         dockId,
-        roomId: eq_row.roomId,
+        roomId: dockRow?.roomId ?? eq_row.roomId,
         assertedById: userId,
         source: "return_toggle",
       });

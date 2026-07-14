@@ -92,7 +92,8 @@ export function EquipmentActions({ equipment }: Props) {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       toast.success(t.equipmentDetail.toast.reportedNotFound);
     },
-    onError: () => toast.error(t.equipmentDetail.toast.notFoundFailed),
+    onError: (err: unknown) =>
+      toast.error(err instanceof ApiError ? err.message : t.equipmentDetail.toast.notFoundFailed),
   });
 
   // Off-shift ownership is not permitted (roster gate). Stay quiet while the

@@ -47,6 +47,7 @@ vi.mock("sonner", () => ({
 
 import { UnifiedReturnDialog } from "@/components/equipment/UnifiedReturnDialog";
 import { resolveHomeDock } from "@/lib/dock-resolution";
+import { toast } from "sonner";
 
 const HOME_DOCK: Dock = {
   id: "dock-1",
@@ -86,7 +87,7 @@ function renderDialog(props: Partial<ComponentProps<typeof UnifiedReturnDialog>>
       />
     </QueryClientProvider>,
   );
-  return { onOpenChange, onConfirmReturn, onDockReturnSuccess };
+  return { client, onOpenChange, onConfirmReturn, onDockReturnSuccess };
 }
 
 describe("resolveHomeDock (client mirror of server/services/docking.service.ts)", () => {
@@ -218,6 +219,59 @@ describe("UnifiedReturnDialog", () => {
     });
 
     expect(await screen.findByText("Battery charged")).toBeTruthy();
+  });
+
+  describe("CodeRabbit #11/#12 (P2 review) — dock-return cache invalidation + error surfacing", () => {
+    it("#11 — dockReturn success invalidates the real equipment-detail query key (templated string, not a 2-element array)", async () => {
+      listDocksMock.mockResolvedValue([HOME_DOCK]);
+      dockReturnMock.mockResolvedValue({ equipmentId: "eq1", readinessState: "ready", custodyState: "docked" });
+
+      const { client } = renderDialog({
+        equipment: baseEquipment({ homeRoomId: "room-1", assetTypeId: "asset-pump" }),
+      });
+      const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+
+      await screen.findByText("ICU Charging Station", { exact: false });
+      fireEvent.click(screen.getByTestId("btn-confirm-return-plug"));
+
+      await waitFor(() => expect(dockReturnMock).toHaveBeenCalledTimes(1));
+
+      // The real detail query key is `[`/api/equipment/${id}`]` (a single
+      // templated string) — a 2-element `["/api/equipment", id]` key never
+      // prefix-matches it and silently no-ops.
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["/api/equipment/eq1"] });
+      expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["/api/equipment", "eq1"] });
+    });
+
+    it("#12 — dockReturn failure surfaces the real error message instead of the generic fallback", async () => {
+      listDocksMock.mockResolvedValue([HOME_DOCK]);
+      dockReturnMock.mockRejectedValue(new Error("dock is full"));
+
+      renderDialog({
+        equipment: baseEquipment({ homeRoomId: "room-1", assetTypeId: "asset-pump" }),
+      });
+
+      await screen.findByText("ICU Charging Station", { exact: false });
+      fireEvent.click(screen.getByTestId("btn-confirm-return-plug"));
+
+      await waitFor(() => expect(dockReturnMock).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith("dock is full"));
+    });
+
+    it("#12 — dockReturn failure without a message falls back to the generic copy", async () => {
+      listDocksMock.mockResolvedValue([HOME_DOCK]);
+      dockReturnMock.mockRejectedValue("not an Error instance");
+
+      renderDialog({
+        equipment: baseEquipment({ homeRoomId: "room-1", assetTypeId: "asset-pump" }),
+      });
+
+      await screen.findByText("ICU Charging Station", { exact: false });
+      fireEvent.click(screen.getByTestId("btn-confirm-return-plug"));
+
+      await waitFor(() => expect(dockReturnMock).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    });
   });
 
   describe("I-1 (P2 review) — offline-safe dock-return default", () => {

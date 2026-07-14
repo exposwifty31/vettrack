@@ -108,10 +108,10 @@ async function seedAssetType(atId: string, clinicId: string, name = "Infusion Pu
   );
 }
 
-async function seedDock(dockId: string, clinicId: string, name = "Dock A") {
+async function seedDock(dockId: string, clinicId: string, name = "Dock A", roomId: string | null = null) {
   await probePool!.query(
-    `INSERT INTO vt_docks (id, clinic_id, name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-    [dockId, clinicId, name],
+    `INSERT INTO vt_docks (id, clinic_id, name, room_id) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+    [dockId, clinicId, name, roomId],
   );
 }
 
@@ -268,6 +268,32 @@ describe.skipIf(!DATABASE_URL)("dock-return writes a return_toggle anchor (T2.4)
     expect(anchor?.assertedById).toBe(ctx.userId);
     expect(anchor?.roomId).toBe(ctx.roomId);
     expect(anchor?.invalidatedAt).toBeNull();
+  });
+
+  it("#7 (P2 review) — anchor roomId is the DOCK's room, not the equipment's assigned room, when they diverge", async () => {
+    const dockRoomId = randomUUID();
+    await seedRoom(dockRoomId, ctx.clinicId, "Surgery Suite");
+    const dockInAnotherRoom = randomUUID();
+    await seedDock(dockInAnotherRoom, ctx.clinicId, "Dock In Surgery", dockRoomId);
+
+    // Equipment is administratively homed to ctx.roomId, but returns to a
+    // dock physically located in a DIFFERENT room (dockRoomId).
+    await seedEquipment(ctx.eqId, ctx.clinicId, {
+      asset_type_id: ctx.assetTypeId,
+      custody_state: "returned",
+      room_id: ctx.roomId,
+    });
+
+    const res = await api(`/api/equipment/${ctx.eqId}/dock-return`, "POST", {
+      dockId: dockInAnotherRoom,
+      conditionVerifications: [],
+    });
+
+    expect(res.status).toBe(200);
+    const anchor = await getCurrentAnchor(ctx.clinicId, ctx.eqId);
+    expect(anchor?.dockId).toBe(dockInAnotherRoom);
+    expect(anchor?.roomId).toBe(dockRoomId);
+    expect(anchor?.roomId).not.toBe(ctx.roomId);
   });
 
   it("dock-return superseded a prior open anchor for the same item (only one open anchor at a time)", async () => {

@@ -585,7 +585,7 @@ export interface EquipmentAnchor {
   assertedAt: string;
   source: "return_toggle" | "sweep" | "citizen" | "smart_charger";
   invalidatedAt: string | null;
-  invalidatedReason: string | null;
+  invalidatedReason: "checkout" | "rfid_elsewhere" | "sweep_missing" | "not_found_here" | null;
   createdAt: string;
 }
 

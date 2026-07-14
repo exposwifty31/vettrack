@@ -9,55 +9,23 @@
  * tests/equipment-actions-unified-return.test.tsx for the dock-return
  * (checked-toggle) path and the offline pendingSyncId preservation check.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Equipment } from "@/types";
-
-const returnMock = vi.fn();
-const checkoutMock = vi.fn();
-const listDocksMock = vi.fn();
-const listConditionsMock = vi.fn();
-const conditionStatesMock = vi.fn();
-const dockReturnMock = vi.fn();
-const toastSuccess = vi.fn();
-const toastError = vi.fn();
-let authValue: { userId: string | null; isAdmin: boolean } = { userId: "admin-1", isAdmin: true };
-let shiftValue: { hasActiveShift: boolean; isLoading: boolean; isError: boolean; nextShift: null } = {
-  hasActiveShift: true,
-  isLoading: false,
-  isError: false,
-  nextShift: null,
-};
-
-vi.mock("sonner", () => ({
-  toast: { success: (...a: unknown[]) => toastSuccess(...a), error: (...a: unknown[]) => toastError(...a) },
-}));
-vi.mock("@/hooks/use-auth", () => ({ useAuth: () => authValue }));
-vi.mock("@/hooks/use-active-shift", () => ({ useActiveShift: () => shiftValue }));
-vi.mock("@/lib/haptics", () => ({ haptics: { tap: vi.fn() } }));
-vi.mock("@/lib/api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/api")>();
-  return {
-    ...actual,
-    api: {
-      ...actual.api,
-      equipment: {
-        ...actual.api.equipment,
-        return: (...a: unknown[]) => returnMock(...a),
-        checkout: (...a: unknown[]) => checkoutMock(...a),
-      },
-      operationalState: {
-        ...actual.api.operationalState,
-        listDocks: (...a: unknown[]) => listDocksMock(...a),
-        listConditions: (...a: unknown[]) => listConditionsMock(...a),
-        conditionStates: (...a: unknown[]) => conditionStatesMock(...a),
-        dockReturn: (...a: unknown[]) => dockReturnMock(...a),
-      },
-    },
-    ApiError: class ApiError extends Error {},
-  };
-});
+import {
+  authState,
+  checkoutMock,
+  dockReturnMock,
+  conditionStatesMock,
+  listConditionsMock,
+  listDocksMock,
+  resetEquipmentActionsMocks,
+  returnMock,
+  shiftState,
+  toastError,
+  toastSuccess,
+} from "./helpers/equipment-actions-mocks";
 
 import { EquipmentActions } from "@/features/equipment/detail/EquipmentActions";
 
@@ -82,9 +50,7 @@ const dockedAvailable: Partial<Equipment> = {
 
 describe("EquipmentActions — Stage 6 check-in", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    authValue = { userId: "admin-1", isAdmin: true };
-    shiftValue = { hasActiveShift: true, isLoading: false, isError: false, nextShift: null };
+    resetEquipmentActionsMocks();
     returnMock.mockResolvedValue({ equipment: { ...available }, undoToken: undefined });
     checkoutMock.mockResolvedValue({ equipment: { ...dockedAvailable, checkedOutById: "admin-1" } });
     listDocksMock.mockResolvedValue([]);
@@ -105,13 +71,13 @@ describe("EquipmentActions — Stage 6 check-in", () => {
   });
 
   it("renders nothing for a non-admin who is not the holder", () => {
-    authValue = { userId: "someone-else", isAdmin: false };
+    authState.value = { userId: "someone-else", isAdmin: false };
     renderActions(checkedOut);
     expect(screen.queryByTestId("btn-detail-checkin")).toBeNull();
   });
 
   it("shows Check in to the holder even when not admin", () => {
-    authValue = { userId: "u2", isAdmin: false };
+    authState.value = { userId: "u2", isAdmin: false };
     renderActions(checkedOut);
     expect(screen.getByTestId("btn-detail-checkin")).toBeTruthy();
   });
@@ -147,9 +113,7 @@ describe("EquipmentActions — Stage 6 check-in", () => {
  */
 describe("EquipmentActions — detail checkout", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    authValue = { userId: "admin-1", isAdmin: true };
-    shiftValue = { hasActiveShift: true, isLoading: false, isError: false, nextShift: null };
+    resetEquipmentActionsMocks();
     checkoutMock.mockResolvedValue({ equipment: { ...dockedAvailable, checkedOutById: "admin-1" } });
   });
   afterEach(() => cleanup());
@@ -178,7 +142,7 @@ describe("EquipmentActions — detail checkout", () => {
   });
 
   it("blocks checkout off-shift with an error toast and never calls the API", () => {
-    shiftValue = { hasActiveShift: false, isLoading: false, isError: false, nextShift: null };
+    shiftState.value = { hasActiveShift: false, isLoading: false, isError: false, nextShift: null };
     renderActions(dockedAvailable);
     fireEvent.click(screen.getByTestId("btn-detail-checkout"));
     expect(toastError).toHaveBeenCalled();
@@ -192,7 +156,7 @@ describe("EquipmentActions — detail checkout", () => {
   // fires the checkout. (Token-consistency asserts the source shape; this proves
   // the runtime behavior.)
   it("bypasses the client shift-block and still calls the API when the shift query errored", async () => {
-    shiftValue = { hasActiveShift: false, isLoading: false, isError: true, nextShift: null };
+    shiftState.value = { hasActiveShift: false, isLoading: false, isError: true, nextShift: null };
     renderActions(dockedAvailable);
     fireEvent.click(screen.getByTestId("btn-detail-checkout"));
     await waitFor(() => expect(checkoutMock).toHaveBeenCalledWith("eq-1"));

@@ -116,6 +116,7 @@ export function UnifiedReturnDialog({
 
   const conditionsQ = useQuery({
     queryKey: ["/api/asset-types", equipment.assetTypeId, "conditions"],
+    // Non-null: query is gated by `enabled: ... && !!equipment.assetTypeId` above.
     queryFn: () => api.operationalState.listConditions(equipment.assetTypeId!),
     enabled: open && effectiveDockOn && !!equipment.assetTypeId,
   });
@@ -127,12 +128,14 @@ export function UnifiedReturnDialog({
 
   const dockReturnMut = useMutation({
     mutationFn: () =>
+      // Non-null: only invoked from handleConfirm's `if (!resolvedDock) return;`
+      // guard, and the confirm button is disabled while resolvedDock is unset.
       api.operationalState.dockReturn(equipment.id, {
         dockId: resolvedDock!.id,
         conditionVerifications: verifications,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/equipment", equipment.id] });
+      queryClient.invalidateQueries({ queryKey: [`/api/equipment/${equipment.id}`] });
       queryClient.invalidateQueries({ queryKey: ["deployability", equipment.id] });
       queryClient.invalidateQueries({ queryKey: ["condition-states", equipment.id] });
       queryClient.invalidateQueries({ queryKey: ["staging-queue", equipment.id] });
@@ -140,7 +143,7 @@ export function UnifiedReturnDialog({
       resetState(false);
       onDockReturnSuccess?.();
     },
-    onError: () => toast.error(t.dockReturn.notReadyAfterReturn),
+    onError: (err) => toast.error(err instanceof Error && err.message ? err.message : t.dockReturn.notReadyAfterReturn),
   });
 
   const isBusy = isSubmitting || dockReturnMut.isPending;

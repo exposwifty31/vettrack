@@ -257,7 +257,7 @@ export const equipmentAnchors = vtTable(
   },
   (t) => ({
     clinicEquipmentAssertedIdx: index("idx_vt_equipment_anchors_clinic_equipment_asserted").on(t.clinicId, t.equipmentId, t.assertedAt),
-    currentIdx: index("idx_vt_equipment_anchors_current").on(t.clinicId, t.equipmentId).where(sql`${t.invalidatedAt} IS NULL`),
+    currentIdx: uniqueIndex("idx_vt_equipment_anchors_current").on(t.clinicId, t.equipmentId).where(sql`${t.invalidatedAt} IS NULL`),
   }),
 );
 export type EquipmentAnchor = typeof equipmentAnchors.$inferSelect;

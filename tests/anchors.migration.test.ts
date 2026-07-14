@@ -16,6 +16,10 @@ describe("165_equipment_anchors migration", () => {
   });
   it("indexes by (clinic, equipment, asserted_at) and a partial current-anchor index", () => {
     expect(sql).toMatch(/CREATE INDEX IF NOT EXISTS idx_vt_equipment_anchors_clinic_equipment_asserted[\s\S]*\(clinic_id, equipment_id, asserted_at\)/i);
-    expect(sql).toMatch(/CREATE INDEX IF NOT EXISTS idx_vt_equipment_anchors_current[\s\S]*\(clinic_id, equipment_id\)[\s\S]*WHERE invalidated_at IS NULL/i);
+    expect(sql).toMatch(/CREATE UNIQUE INDEX IF NOT EXISTS idx_vt_equipment_anchors_current[\s\S]*\(clinic_id, equipment_id\)[\s\S]*WHERE invalidated_at IS NULL/i);
+  });
+  it("#9 (P2 review) — current-anchor index is UNIQUE (DB-enforced one-open-anchor-per-item), with a safe drop-if-exists swap", () => {
+    expect(sql).toMatch(/DROP INDEX IF EXISTS idx_vt_equipment_anchors_current/i);
+    expect(sql).toMatch(/CREATE UNIQUE INDEX IF NOT EXISTS idx_vt_equipment_anchors_current/i);
   });
 });

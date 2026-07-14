@@ -577,6 +577,10 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
       await api.docking.citizenAnchor(scannedEquipment.id);
       haptics.tap();
       toast.success(t.qrScanner.confirmedHere);
+      // The anchor changes this item's derived location — refresh both the
+      // detail cache and any equipment list views.
+      queryClient.invalidateQueries({ queryKey: [`/api/equipment/${scannedEquipment.id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : t.qrScanner.confirmHereFailed;
       toast.error(msg);
@@ -1047,6 +1051,7 @@ export function QrScanner({ onClose, onDispense }: QrScannerProps) {
                   disabled={isActing}
                   data-testid="btn-scan-inline-confirm-here"
                 >
+                  {isActing ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
                   {t.qrScanner.confirmHere}
                 </Button>
               )}

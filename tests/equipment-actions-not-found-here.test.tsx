@@ -64,11 +64,19 @@ vi.mock("@/lib/api", async (importOriginal) => {
         notFoundHere: (...a: unknown[]) => notFoundHereMock(...a),
       },
     },
-    ApiError: class ApiError extends Error {},
+    // Simplified test-local stand-in: only .message + instanceof matter here,
+    // not the real (status, message, payload) constructor shape.
+    ApiError: class ApiError extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = "ApiError";
+      }
+    },
   };
 });
 
 import { EquipmentActions } from "@/features/equipment/detail/EquipmentActions";
+import { ApiError } from "@/lib/api";
 
 function renderActions(equipment: Partial<Equipment>) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -172,5 +180,13 @@ describe("EquipmentActions — Not Found Here (T2.5-mobile)", () => {
     fireEvent.click(screen.getByTestId("btn-detail-not-found-here"));
     await waitFor(() => expect(notFoundHereMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(toastError).toHaveBeenCalledWith(t.equipmentDetail.toast.notFoundFailed));
+  });
+
+  it("#15 (P2 review) — an ApiError's real message surfaces instead of the generic notFoundFailed copy", async () => {
+    notFoundHereMock.mockRejectedValueOnce(new ApiError("dock unreachable"));
+    renderActions(restingHomed);
+    fireEvent.click(screen.getByTestId("btn-detail-not-found-here"));
+    await waitFor(() => expect(notFoundHereMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("dock unreachable"));
   });
 });

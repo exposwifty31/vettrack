@@ -14,7 +14,9 @@ import {
   unitConditionStates,
 } from "../../../db.js";
 import { buildWaitlistSnapshot } from "../../../services/equipment-waitlist.service.js";
+import type { AnchorSource } from "../../../services/equipment-anchor.service.js";
 import type {
+  EvidenceCurrentAnchor,
   EvidenceGraph,
   EvidenceReturnRow,
   EvidenceScanRow,
@@ -239,7 +241,12 @@ export async function loadEvidenceGraph(
     .orderBy(desc(equipmentAnchors.assertedAt))
     .limit(1);
 
-  const currentAnchor = anchorRow ?? null;
+  // `equipmentAnchors.source` is a plain `text` column (DB-enforced via CHECK,
+  // not a Drizzle pgEnum) — narrow the select result to the AnchorSource
+  // literal union here rather than widening EvidenceCurrentAnchor's type.
+  const currentAnchor: EvidenceCurrentAnchor | null = anchorRow
+    ? { ...anchorRow, source: anchorRow.source as AnchorSource }
+    : null;
 
   const waitlist =
     viewerUserId != null
