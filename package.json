@@ -1,6 +1,6 @@
 {
   "name": "vettrack",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "type": "module",
   "private": true,
   "packageManager": "pnpm@9.15.9",
@@ -104,7 +104,7 @@
     "@types/multer": "^2.1.0",
     "@types/react-window": "^1.8.8",
     "@types/web-push": "^3.6.4",
-    "@vettrack/contracts": "github:exposwifty31/literate-dollop#main&path:packages/contracts",
+    "@vettrack/contracts": "workspace:*",
     "bullmq": "^5.74.1",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
