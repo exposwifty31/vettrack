@@ -47,6 +47,8 @@ export function OfflineAuthGate({ children }: { children: ReactNode }) {
     <div
       className="w-full flex flex-col items-center justify-center gap-4 py-12 px-2 text-center"
       data-testid="offline-auth-gate"
+      role="status"
+      aria-live="polite"
     >
       <p className="text-base font-semibold text-foreground">{t.auth.guard.offlineTitle}</p>
       <p className="text-sm text-muted-foreground max-w-md">{t.auth.guard.offlineBody}</p>

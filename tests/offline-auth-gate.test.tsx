@@ -47,6 +47,16 @@ describe("OfflineAuthGate", () => {
     expect(screen.queryByTestId("clerk-form")).toBeNull();
   });
 
+  it("announces the offline prompt to assistive tech (live region)", () => {
+    // Critical auth path: a screen-reader user must be told the form was
+    // swapped for the offline message, not left on a silent blank region.
+    isOnlineMock.mockReturnValue(false);
+    renderGate();
+    const gate = screen.getByTestId("offline-auth-gate");
+    expect(gate.getAttribute("role")).toBe("status");
+    expect(gate.getAttribute("aria-live")).toBe("polite");
+  });
+
   it("renders the children (auth form) while online", () => {
     isOnlineMock.mockReturnValue(true);
     renderGate();

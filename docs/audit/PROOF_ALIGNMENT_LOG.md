@@ -2664,3 +2664,5 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 **Gate:** `vitest tests/offline-auth-gate.test.tsx tests/native-auth-surface.test.ts` = **14/14 pass**; frontend `tsc --noEmit` = **0 errors**. No new i18n keys (reused `t.auth.guard.*`). Files touched: `offline-auth-gate.tsx`, `signin.tsx`, `offline-auth-gate.test.tsx`, `native-auth-surface.test.ts` (file-scoped adds only).
 
 **Verdict:** VERIFIED — three findings fixed RED-first, gate green, typecheck clean.
+
+**Addendum (re-review round, `9c820fc4d`→next):** CodeRabbit re-review of the fixes flipped #90 to **APPROVED** and surfaced one new outside-diff finding (Trivial, a11y): the offline-state container wasn't a live region, so screen-reader users on the auth path aren't told the form was swapped for the offline message. Fixed: added `role="status"` + `aria-live="polite"` to the `offline-auth-gate` container. RED test `announces the offline prompt to assistive tech (live region)` failed pre-fix, GREEN post-fix. Gate: 15/15 vitest, frontend tsc 0.
