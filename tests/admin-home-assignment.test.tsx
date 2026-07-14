@@ -175,6 +175,37 @@ describe("AdminHomeAssignmentPage — bulk home assignment + reconciliation buck
     expect(call.homeRoomId).toBe("room-1");
   });
 
+  it("assigns category to uncategorized equipment when category is selected", async () => {
+    const uncategorized: Equipment = {
+      id: "eq-3",
+      name: "Uncategorized Device",
+      assetTypeId: null,
+      status: "available",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    } as Equipment;
+    listEquipmentMock.mockResolvedValue([...pumps, uncategorized]);
+    assignHomeBulkMock.mockResolvedValue({ updated: 1 });
+
+    renderPage();
+
+    const categorySelect = (await screen.findByTestId("home-assignment-category-select")) as HTMLSelectElement;
+    fireEvent.change(categorySelect, { target: { value: "at-1" } });
+
+    const uncategorizedCheckbox = await screen.findByRole("checkbox", { name: "Uncategorized Device" });
+    fireEvent.click(uncategorizedCheckbox);
+
+    const roomSelect = (await screen.findByTestId("home-assignment-room-select")) as HTMLSelectElement;
+    fireEvent.change(roomSelect, { target: { value: "room-1" } });
+
+    fireEvent.click(screen.getByTestId("btn-assign-home-bulk"));
+
+    await waitFor(() => expect(assignHomeBulkMock).toHaveBeenCalledTimes(1));
+    const call = assignHomeBulkMock.mock.calls[0][0];
+    expect(call.ids).toEqual(["eq-3"]);
+    expect(call.homeRoomId).toBe("room-1");
+    expect(call.assetTypeId).toBe("at-1");
+  });
+
   it("renders the Unassigned section with reconciliation.unassigned items", async () => {
     renderPage();
 

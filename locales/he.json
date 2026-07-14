@@ -2925,7 +2925,7 @@
     },
     "docking": {
       "duplicateStation": "כבר קיימת עמדה לקטגוריה זו בחדר זה.",
-      "duplicateName": "כבר קיים עמדת עגינה בשם זה."
+      "duplicateName": "כבר קיימת עמדת עגינה בשם זה."
     }
   },
   "push": {
@@ -4119,6 +4119,7 @@
     "noEquipment": "אין ציוד בקטגוריה זו",
     "assignBulkButton": "שייך חדר בית",
     "assignSuccess": "חדר הבית שויך",
+    "assignError": "נכשל שיוך חדר הבית",
     "pickRoomFirst": "יש לבחור חדר בית תחילה",
     "unassignedTitle": "לא משויך",
     "unassignedHint": "חסר חדר בית או קטגוריה",

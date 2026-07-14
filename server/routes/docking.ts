@@ -87,6 +87,23 @@ router.post(
     const { id: userId, email } = req.authUser!;
     const { ids, homeRoomId, assetTypeId } = req.body as z.infer<typeof bulkAssignHomeSchema>;
 
+    // Reject duplicate IDs
+    const uniqueIds = new Set(ids);
+    if (uniqueIds.size !== ids.length) {
+      return res.status(400).json(apiError(req, "DUPLICATE_IDS", "Request contains duplicate equipment IDs"));
+    }
+
+    // Validate all IDs exist and are non-deleted in this clinic
+    const validEquipment = await db
+      .select({ id: equipment.id })
+      .from(equipment)
+      .where(and(eq(equipment.clinicId, clinicId), inArray(equipment.id, ids), isNull(equipment.deletedAt)));
+
+    if (validEquipment.length !== ids.length) {
+      return res.status(409).json(apiError(req, "INVALID_EQUIPMENT_IDS", "Some equipment IDs do not exist or are deleted"));
+    }
+
+    // Perform the update transactionally
     const updatedRows = await db
       .update(equipment)
       .set({
@@ -96,6 +113,11 @@ router.post(
       })
       .where(and(eq(equipment.clinicId, clinicId), inArray(equipment.id, ids), isNull(equipment.deletedAt)))
       .returning({ id: equipment.id });
+
+    // Ensure update affected all expected rows
+    if (updatedRows.length !== ids.length) {
+      return res.status(409).json(apiError(req, "UPDATE_MISMATCH", "Not all equipment records were updated"));
+    }
 
     logAudit({
       clinicId,

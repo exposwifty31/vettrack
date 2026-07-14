@@ -58,12 +58,15 @@ function AdminHomeAssignmentContent() {
       setSelectedIds(new Set());
       toast.success(t.adminHomeAssignment.assignSuccess);
     },
+    onError: (error: ApiError) => {
+      toast.error(error.message || t.adminHomeAssignment.assignError);
+    },
   });
 
   const filteredEquipment = useMemo(() => {
     const items = equipmentQ.data ?? [];
     if (!categoryFilter) return items;
-    return items.filter((item) => item.assetTypeId === categoryFilter);
+    return items.filter((item) => item.assetTypeId === categoryFilter || item.assetTypeId === null);
   }, [equipmentQ.data, categoryFilter]);
 
   const toggleSelected = (id: string, checked: boolean) => {
@@ -80,7 +83,7 @@ function AdminHomeAssignmentContent() {
     assignMut.mutate({
       ids: Array.from(selectedIds),
       homeRoomId,
-      assetTypeId: categoryFilter || undefined,
+      ...(categoryFilter ? { assetTypeId: categoryFilter } : {}),
     });
   };
 

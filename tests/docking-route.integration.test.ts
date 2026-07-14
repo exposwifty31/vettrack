@@ -20,28 +20,6 @@ import { i18nMiddleware } from "../lib/i18n/middleware.js";
 
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
 let probePool: Pool | null = null;
-let dbReachable = false;
-
-if (DATABASE_URL) {
-  probePool = new Pool({ connectionString: DATABASE_URL, connectionTimeoutMillis: 2000, max: 2 });
-  try {
-    await probePool.query("SELECT 1");
-    const { rows: assetTypeCol } = await probePool.query<{ column_name: string }>(
-      `SELECT column_name FROM information_schema.columns
-       WHERE table_name='vt_docks' AND column_name='asset_type_id'`,
-    );
-    const { rows: capacityCol } = await probePool.query<{ column_name: string }>(
-      `SELECT column_name FROM information_schema.columns
-       WHERE table_name='vt_docks' AND column_name='capacity'`,
-    );
-    const { rows: uniqueIdx } = await probePool.query<{ indexname: string }>(
-      `SELECT indexname FROM pg_indexes WHERE tablename='vt_docks' AND indexname='vt_docks_clinic_room_assettype_uq'`,
-    );
-    dbReachable = assetTypeCol.length === 1 && capacityCol.length === 1 && uniqueIdx.length === 1;
-  } catch {
-    dbReachable = false;
-  }
-}
 
 let currentClinicId = "";
 let currentUserId = "";
@@ -75,23 +53,39 @@ function buildApp() {
 let server: Server;
 let baseUrl: string;
 
-type JsonObj = Record<string, unknown>;
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return val !== null && typeof val === "object" && !Array.isArray(val);
+}
+
+function isArray(val: unknown): val is unknown[] {
+  return Array.isArray(val);
+}
+
+function getString(obj: Record<string, unknown>, key: string): string | undefined {
+  const val = obj[key];
+  return typeof val === "string" ? val : undefined;
+}
+
+function getNumber(obj: Record<string, unknown>, key: string): number | undefined {
+  const val = obj[key];
+  return typeof val === "number" ? val : undefined;
+}
 
 async function api(
   path: string,
   method: "GET" | "POST" | "DELETE" = "GET",
-  body?: JsonObj,
-): Promise<{ status: number; json: JsonObj }> {
+  body?: Record<string, unknown>,
+): Promise<{ status: number; json: unknown }> {
   const res = await fetch(`${baseUrl}${path}`, {
     method,
     headers: { "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
   });
-  let json: JsonObj = {};
+  let json: unknown = {};
   const text = await res.text();
   if (text) {
     try {
-      json = JSON.parse(text) as JsonObj;
+      json = JSON.parse(text);
     } catch {
       json = { raw: text };
     }
@@ -144,9 +138,40 @@ interface Ctx {
 
 let ctx: Ctx;
 
-describe.skipIf(!dbReachable)("docking route integration", () => {
+describe.skipIf(!DATABASE_URL)("docking route integration", () => {
   beforeAll(async () => {
-    if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL required");
+    if (!DATABASE_URL) {
+      throw new Error("DATABASE_URL required");
+    }
+
+    probePool = new Pool({ connectionString: DATABASE_URL, connectionTimeoutMillis: 2000, max: 2 });
+
+    try {
+      await probePool.query("SELECT 1");
+
+      const { rows: assetTypeCol } = await probePool.query<{ column_name: string }>(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_name='vt_docks' AND column_name='asset_type_id'`,
+      );
+      const { rows: capacityCol } = await probePool.query<{ column_name: string }>(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_name='vt_docks' AND column_name='capacity'`,
+      );
+      const { rows: uniqueIdx } = await probePool.query<{ indexname: string }>(
+        `SELECT indexname FROM pg_indexes WHERE tablename='vt_docks' AND indexname='vt_docks_clinic_room_assettype_uq'`,
+      );
+
+      if (assetTypeCol.length !== 1 || capacityCol.length !== 1 || uniqueIdx.length !== 1) {
+        throw new Error("Database schema validation failed: missing required columns or indexes");
+      }
+    } catch (err) {
+      if (probePool) {
+        await probePool.end();
+        probePool = null;
+      }
+      throw new Error(`Database connection or schema validation failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
     const app = buildApp();
     server = createServer(app);
     await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -159,7 +184,10 @@ describe.skipIf(!dbReachable)("docking route integration", () => {
     await new Promise<void>((resolve, reject) => {
       server.close((err) => (err ? reject(err) : resolve()));
     });
-    if (probePool) await probePool.end();
+    if (probePool) {
+      await probePool.end();
+      probePool = null;
+    }
   });
 
   beforeEach(async () => {
@@ -190,12 +218,18 @@ describe.skipIf(!dbReachable)("docking route integration", () => {
     });
 
     expect(res.status).toBe(201);
-    expect(res.json.assetTypeId).toBe(ctx.assetTypeId);
-    expect(res.json.capacity).toBe(4);
+    expect(isRecord(res.json)).toBe(true);
+    if (!isRecord(res.json)) throw new Error("Expected response to be an object");
+
+    expect(getString(res.json, "assetTypeId")).toBe(ctx.assetTypeId);
+    expect(getNumber(res.json, "capacity")).toBe(4);
+
+    const dockId = getString(res.json, "id");
+    expect(dockId).toBeDefined();
 
     const { rows } = await probePool!.query<{ asset_type_id: string; capacity: number }>(
       `SELECT asset_type_id, capacity FROM vt_docks WHERE id = $1`,
-      [res.json.id],
+      [dockId],
     );
     expect(rows[0]?.asset_type_id).toBe(ctx.assetTypeId);
     expect(rows[0]?.capacity).toBe(4);
@@ -218,7 +252,9 @@ describe.skipIf(!dbReachable)("docking route integration", () => {
     });
 
     expect(second.status).toBe(409);
-    expect(second.json.code).toBe("errors.docking.duplicateStation");
+    expect(isRecord(second.json)).toBe(true);
+    if (!isRecord(second.json)) throw new Error("Expected response to be an object");
+    expect(getString(second.json, "code")).toBe("errors.docking.duplicateStation");
   });
 
   it("rejects a second dock with a duplicate name (distinct room/category) as 409 duplicateName", async () => {
@@ -245,8 +281,11 @@ describe.skipIf(!dbReachable)("docking route integration", () => {
     });
 
     expect(second.status).toBe(409);
-    expect(second.json.code).toBe("errors.docking.duplicateName");
-    expect(second.json.code).not.toBe("errors.docking.duplicateStation");
+    expect(isRecord(second.json)).toBe(true);
+    if (!isRecord(second.json)) throw new Error("Expected response to be an object");
+    const code = getString(second.json, "code");
+    expect(code).toBe("errors.docking.duplicateName");
+    expect(code).not.toBe("errors.docking.duplicateStation");
   });
 
   it("includes assetTypeName and roomName on list (M1)", async () => {
@@ -260,10 +299,18 @@ describe.skipIf(!dbReachable)("docking route integration", () => {
 
     const list = await api("/api/docks", "GET");
     expect(list.status).toBe(200);
-    const rows = list.json as unknown as Array<Record<string, unknown>>;
-    const row = rows.find((r) => r.id === created.json.id);
+    expect(isArray(list.json)).toBe(true);
+    if (!isArray(list.json)) throw new Error("Expected response to be an array");
+
+    expect(isRecord(created.json)).toBe(true);
+    if (!isRecord(created.json)) throw new Error("Expected created response to be an object");
+    const createdId = getString(created.json, "id");
+
+    const row = list.json.find((r) => isRecord(r) && getString(r, "id") === createdId);
     expect(row).toBeDefined();
-    expect(row?.assetTypeName).toBe("Infusion Pump");
-    expect(row?.roomName).toBe("ICU");
+    expect(isRecord(row)).toBe(true);
+    if (!isRecord(row)) throw new Error("Expected row to be an object");
+    expect(getString(row, "assetTypeName")).toBe("Infusion Pump");
+    expect(getString(row, "roomName")).toBe("ICU");
   });
 });

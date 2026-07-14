@@ -4119,6 +4119,7 @@
     "noEquipment": "No equipment in this category",
     "assignBulkButton": "Assign Home Room",
     "assignSuccess": "Home Room assigned",
+    "assignError": "Failed to assign Home Room",
     "pickRoomFirst": "Choose a Home Room first",
     "unassignedTitle": "Unassigned",
     "unassignedHint": "Missing a Home Room or Category",

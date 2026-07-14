@@ -114,32 +114,41 @@ function AdminDocksContent() {
                   ))}
                 </SelectContent>
               </Select>
-              <Select
-                value={newAssetTypeId || "__none__"}
-                onValueChange={(v) => setNewAssetTypeId(v === "__none__" ? "" : v)}
-              >
-                <SelectTrigger data-testid="dock-category-select">
-                  <SelectValue placeholder={t.adminDocks.categoryPlaceholder} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">{t.adminDocks.noCategory}</SelectItem>
-                  {(assetTypesQ.data ?? []).map((assetType: AssetType) => (
-                    <SelectItem key={assetType.id} value={assetType.id}>
-                      {assetType.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <label htmlFor="dock-capacity" className="sr-only">Capacity</label>
-              <Input
-                id="dock-capacity"
-                data-testid="dock-capacity-input"
-                type="number"
-                min={1}
-                placeholder={t.adminDocks.capacityPlaceholder}
-                value={newCapacity}
-                onChange={(e) => setNewCapacity(e.target.value)}
-              />
+              <div>
+                <label htmlFor="dock-category-select" className="sr-only">
+                  {t.adminDocks.categoryPlaceholder}
+                </label>
+                <Select
+                  value={newAssetTypeId || "__none__"}
+                  onValueChange={(v) => setNewAssetTypeId(v === "__none__" ? "" : v)}
+                >
+                  <SelectTrigger id="dock-category-select" data-testid="dock-category-select">
+                    <SelectValue placeholder={t.adminDocks.categoryPlaceholder} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">{t.adminDocks.noCategory}</SelectItem>
+                    {(assetTypesQ.data ?? []).map((assetType: AssetType) => (
+                      <SelectItem key={assetType.id} value={assetType.id}>
+                        {assetType.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label htmlFor="dock-capacity" className="sr-only">
+                  {t.adminDocks.capacityPlaceholder}
+                </label>
+                <Input
+                  id="dock-capacity"
+                  data-testid="dock-capacity-input"
+                  type="number"
+                  min={1}
+                  placeholder={t.adminDocks.capacityPlaceholder}
+                  value={newCapacity}
+                  onChange={(e) => setNewCapacity(e.target.value)}
+                />
+              </div>
               <Button
                 data-testid="btn-add-dock"
                 onClick={() => createMut.mutate()}
