@@ -48,11 +48,11 @@ jobs:
           # the staging ref so the Playwright runner code matches it.
           ref: staging
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           run_install: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: ".nvmrc"
           cache: "pnpm"
@@ -67,7 +67,7 @@ jobs:
 
       - name: Upload artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: workday-simulation-artifacts
           path: artifacts/

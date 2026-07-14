@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared gate for @vettrack/contracts (sourced from exposwifty31/literate-dollop).
+# Shared gate for @vettrack/contracts (local workspace package: packages/contracts).
 set -euo pipefail
 
 pnpm run contracts:typecheck

@@ -26,6 +26,16 @@ export const ALLOWLIST_BY_PATTERN: Record<string, Array<{ path: RegExp; line: Re
       line: /DATABASE_URL=postgres:\/\/[^\s"']+@localhost:5432\/vettrack/i,
     },
   ],
+  // The App Store Connect key bootstrapper validates a user-supplied .p8 by
+  // checking its PEM header prefix — the marker is a startsWith() comparison,
+  // not embedded key material. Scoped to that exact validation line so a real
+  // key pasted into this file would still be flagged.
+  "Private key block": [
+    {
+      path: /^\.agents\/skills\/publish-mobile-app\/scripts\/bootstrap-app-store-key\.ts$/,
+      line: /\.startsWith\("-----BEGIN PRIVATE KEY-----"\)/,
+    },
+  ],
 };
 
 const EXCLUDE_DIRS = ["node_modules", ".git", "dist", ".local", "attached_assets"];
@@ -56,7 +66,21 @@ export function shouldExclude(filePath: string): boolean {
 export function isAllowedHit(pattern: string, relPath: string, line: string): boolean {
   const allowlisted = ALLOWLIST_BY_PATTERN[pattern];
   if (!allowlisted) return false;
-  return allowlisted.some((rule) => rule.path.test(relPath) && rule.line.test(line));
+  const patternDef = PATTERNS.find((p) => p.name === pattern);
+  return allowlisted.some((rule) => {
+    if (!rule.path.test(relPath) || !rule.line.test(line)) return false;
+    // Token-specific allowlist: the exception excuses ONLY the matched
+    // validation expression, not the whole line. Strip every occurrence of that
+    // expression and re-scan the remainder — if the secret pattern still hits, a
+    // real secret is hiding on the same line, so the line is NOT allowlisted.
+    if (patternDef) {
+      const stripFlags = rule.line.flags.includes("g") ? rule.line.flags : `${rule.line.flags}g`;
+      const remainder = line.replace(new RegExp(rule.line.source, stripFlags), "");
+      const secretCheck = new RegExp(patternDef.regex.source, patternDef.regex.flags.replace("g", ""));
+      if (secretCheck.test(remainder)) return false;
+    }
+    return true;
+  });
 }
 
 export function scanFile(filePath: string, relPath: string): Array<{ pattern: string; line: number; content: string }> {

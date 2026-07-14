@@ -32,6 +32,26 @@ describe("scan-secrets allowlist", () => {
       ),
     ).toBe(false);
   });
+
+  it("allows the genuine PEM-header startsWith validation line", () => {
+    expect(
+      isAllowedHit(
+        "Private key block",
+        ".agents/skills/publish-mobile-app/scripts/bootstrap-app-store-key.ts",
+        'if (!pem.startsWith("-----BEGIN PRIVATE KEY-----")) throw new Error("bad key");',
+      ),
+    ).toBe(true);
+  });
+
+  it("does not allow a real PEM hiding on the same line as the startsWith validation", () => {
+    expect(
+      isAllowedHit(
+        "Private key block",
+        ".agents/skills/publish-mobile-app/scripts/bootstrap-app-store-key.ts",
+        'if (key.startsWith("-----BEGIN PRIVATE KEY-----")) return; const leaked = "-----BEGIN RSA PRIVATE KEY-----MIIEvQ";',
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("scan-secrets exclusions", () => {
