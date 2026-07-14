@@ -42,9 +42,13 @@ describe("Return plug dialog UI tests", () => {
     expect(dialogSource).toContain("...(isPluggedIn ? {} : { plugInDeadlineMinutes: normalizedDeadline })");
   });
 
-  it("Equipment detail return action opens the plug dialog", () => {
+  // T2.3 (docking P2): the equipment-detail return action now opens
+  // UnifiedReturnDialog (home-station toggle), which composes
+  // ReturnPlugDialog's extracted PlugStatusFields for its unchecked
+  // (plain-return) path instead of mounting <ReturnPlugDialog> directly.
+  it("Equipment detail return action opens the unified return dialog", () => {
     expect(
-      detailSource.includes("<ReturnPlugDialog") &&
+      detailSource.includes("<UnifiedReturnDialog") &&
         detailSource.includes("data-testid=\"btn-return\"") &&
         detailSource.includes("onClick={handleOpenReturnDialog}"),
     ).toBe(true);

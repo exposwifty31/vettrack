@@ -71,7 +71,7 @@ import { useExperience } from "@/hooks/use-experience";
 import { useActiveShift } from "@/hooks/use-active-shift";
 import { usePendingSyncForEquipment, useSyncQueue } from "@/hooks/use-sync";
 import { MoveRoomSheet } from "@/components/move-room-sheet";
-import { ReturnPlugDialog } from "@/components/return-plug-dialog";
+import { UnifiedReturnDialog } from "@/components/equipment/UnifiedReturnDialog";
 import { EquipmentTruthCard } from "@/components/equipment/EquipmentTruthCard";
 import { AssetCopilotPanel } from "@/components/equipment/AssetCopilotPanel";
 import { EquipmentDetailStatusStrip } from "@/components/equipment/EquipmentDetailStatusStrip";
@@ -1169,17 +1169,7 @@ function EquipmentDetailPageDesktop() {
             />
           )}
 
-          {equipment.custodyState === "returned" && equipment.status === "ok" ? (
-            <Button
-              variant="outline"
-              className="w-full h-12 gap-2 text-sm font-semibold rounded-2xl active:scale-[0.98] transition-all text-[rgb(var(--sys-blue))] border-[rgb(var(--sys-blue)/0.3)] hover:bg-[rgb(var(--sys-blue)/0.08)]"
-              onClick={() => setDockReturnOpen(true)}
-              data-testid="btn-dock-return"
-            >
-              <LogIn className="w-4 h-4" />
-              {t.dockReturn.submit}
-            </Button>
-          ) : !isCheckedOut ? (
+          {!isCheckedOut ? (
             <>
               <Button
                 variant="outline"
@@ -1431,7 +1421,11 @@ function EquipmentDetailPageDesktop() {
 
               <div className="flex flex-col gap-2">
                 {equipment.custodyState === "returned" && (
-                  <Button variant="outline" onClick={() => setDockReturnOpen(true)}>
+                  <Button
+                    variant="outline"
+                    onClick={() => setDockReturnOpen(true)}
+                    data-testid="btn-dock-return-readiness"
+                  >
                     {t.dockReturn.title}
                   </Button>
                 )}
@@ -1482,48 +1476,55 @@ function EquipmentDetailPageDesktop() {
         />
       )}
 
-      <ReturnPlugDialog
-        open={returnDialogOpen}
-        onOpenChange={setReturnDialogOpen}
-        equipmentName={equipmentDisplayName}
-        isSubmitting={returnMut.isPending}
-        allowDamagedReport
-        onConfirm={(values) => {
-          if (values.damaged) {
-            // Owner override (T-24d): "returned damaged" releases custody
-            // exactly like the other two return choices, then defers the
-            // damage report behind its own undo window once the return
-            // succeeds (see returnMut's suppressUndoToast branch above for
-            // why the return doesn't also show its own undo toast here).
-            returnMut.mutate(
-              {
-                isPluggedIn: values.isPluggedIn,
-                plugInDeadlineMinutes: values.plugInDeadlineMinutes ?? 30,
-                suppressUndoToast: true,
-              },
-              {
-                onSuccess: ({ result }) => {
-                  // The return may have been queued OFFLINE (result.pendingSyncId
-                  // set). reportDamage has no offline queue of its own — firing it
-                  // after the undo window would just fail against the network and
-                  // silently drop the damage report. Only defer the online-only
-                  // report when the return itself actually went out online.
-                  if (result.pendingSyncId === undefined) {
-                    startDamagedReportUndo();
-                  } else {
-                    toast.error(t.equipmentDetail.toast.damageReportOffline);
-                  }
+      {equipment && (
+        <UnifiedReturnDialog
+          open={returnDialogOpen}
+          equipment={equipment}
+          onOpenChange={setReturnDialogOpen}
+          equipmentName={equipmentDisplayName}
+          isSubmitting={returnMut.isPending}
+          allowDamagedReport
+          onDockReturnSuccess={() => {
+            invalidateAll();
+            setScanActionDone(true);
+          }}
+          onConfirmReturn={(values) => {
+            if (values.damaged) {
+              // Owner override (T-24d): "returned damaged" releases custody
+              // exactly like the other two return choices, then defers the
+              // damage report behind its own undo window once the return
+              // succeeds (see returnMut's suppressUndoToast branch above for
+              // why the return doesn't also show its own undo toast here).
+              returnMut.mutate(
+                {
+                  isPluggedIn: values.isPluggedIn,
+                  plugInDeadlineMinutes: values.plugInDeadlineMinutes ?? 30,
+                  suppressUndoToast: true,
                 },
-              },
-            );
-            return;
-          }
-          returnMut.mutate({
-            isPluggedIn: values.isPluggedIn,
-            plugInDeadlineMinutes: values.plugInDeadlineMinutes ?? 30,
-          });
-        }}
-      />
+                {
+                  onSuccess: ({ result }) => {
+                    // The return may have been queued OFFLINE (result.pendingSyncId
+                    // set). reportDamage has no offline queue of its own — firing it
+                    // after the undo window would just fail against the network and
+                    // silently drop the damage report. Only defer the online-only
+                    // report when the return itself actually went out online.
+                    if (result.pendingSyncId === undefined) {
+                      startDamagedReportUndo();
+                    } else {
+                      toast.error(t.equipmentDetail.toast.damageReportOffline);
+                    }
+                  },
+                },
+              );
+              return;
+            }
+            returnMut.mutate({
+              isPluggedIn: values.isPluggedIn,
+              plugInDeadlineMinutes: values.plugInDeadlineMinutes ?? 30,
+            });
+          }}
+        />
+      )}
 
       {/* Update Status dialog */}
       <Dialog open={scanDialogOpen} onOpenChange={setScanDialogOpen}>

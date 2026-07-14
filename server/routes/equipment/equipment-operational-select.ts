@@ -7,4 +7,8 @@ export const equipmentOperationalStateSelect = {
   usageState: equipment.usageState,
   assetTypeId: equipment.assetTypeId,
   dockId: equipment.dockId,
+  // T2.3 (docking P2) — the unified return dialog derives the item's home
+  // dock client-side (homeRoomId + assetTypeId matched against listDocks()),
+  // so it needs homeRoomId on the same reads as assetTypeId.
+  homeRoomId: equipment.homeRoomId,
 } as const;

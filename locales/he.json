@@ -4197,6 +4197,10 @@
     "confirmSetAlert": "הגדרת התראה והחזרה",
     "damagedButton": "פגום",
     "damageWarning": "דוח נזק יוגש עבור ציוד זה. ניתן לבטל מיד לאחר האישור.",
-    "confirmReturnedDamaged": "אישור — הוחזר פגום"
+    "confirmReturnedDamaged": "אישור — הוחזר פגום",
+    "toggleLabelStation": "הוחזר ל{station}, מחובר לחשמל",
+    "toggleLabelGeneric": "הוחזר לעמדתו, מחובר לחשמל",
+    "noHomeHint": "לא הוגדרה עמדת בית לציוד זה — בקש ממנהל להגדיר אחת",
+    "stationUnresolvedHint": "עמדת הבית של הציוד עדיין לא הוגדרה — השתמש בהחזרה לעגינה מלשונית המוכנות"
   }
 }

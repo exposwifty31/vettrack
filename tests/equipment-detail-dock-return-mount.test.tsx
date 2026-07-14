@@ -18,7 +18,7 @@
  * scoped to the mount-location defect, not their own data fetching.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Router, Route } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
@@ -174,18 +174,32 @@ describe("equipment-detail — Dock-Return + RFID sheets mount at page level (T-
     vi.clearAllMocks();
   });
 
-  it("Dock Return sheet renders from the DEFAULT (details) tab, not just the readiness tab", async () => {
+  it("Dock Return sheet still renders at page level via the readiness-tab trigger (T2.3 retired the quick-action btn-dock-return button)", async () => {
+    // T2.3 (docking P2 — unified return dialog) collapsed the quick-action
+    // "Return" + "Dock return" buttons into one home-station toggle inside
+    // UnifiedReturnDialog, and removed the standalone btn-dock-return quick
+    // action. DockReturnFlow stays mounted at page level (T-02, unchanged)
+    // and is still reachable via the readiness tab's own trigger — verify
+    // that path is still not a silent no-op once that tab is active.
     const equipment = baseEquipment({ custodyState: "returned", status: "ok" });
     await renderDetailPage(equipment);
 
-    // Sanity: we're on the default tab — the readiness tab trigger exists,
-    // but its panel is not the active one, and nothing from it is in the DOM.
+    expect(screen.queryByTestId("btn-dock-return")).toBeNull();
     expect(screen.getByTestId("tab-readiness")).toBeTruthy();
     expect(screen.queryByText(t.dockReturn.title)).toBeNull();
 
-    fireEvent.click(screen.getByTestId("btn-dock-return"));
+    // Radix Tabs' default "automatic" activation mode switches on focus, not
+    // click (see @radix-ui/react-tabs Trigger's onFocus handler) — a plain
+    // fireEvent.click doesn't also focus the element in jsdom/happy-dom the
+    // way a real click does, so the tab switch needs an explicit focus.
+    fireEvent.focus(screen.getByTestId("tab-readiness"));
+    fireEvent.click(await screen.findByTestId("btn-dock-return-readiness"));
 
-    expect(await screen.findByText(t.dockReturn.title)).toBeTruthy();
+    // The readiness-tab trigger button's own label is t.dockReturn.title
+    // too, so once the sheet opens there are two matches for that string —
+    // scope the assertion to the dialog itself.
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(t.dockReturn.title)).toBeTruthy();
   });
 
   it("RFID-attention tap opens the DockReturnNfc sheet from the DEFAULT (details) tab", async () => {

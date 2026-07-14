@@ -4197,6 +4197,10 @@
     "confirmSetAlert": "Set Alert & Return",
     "damagedButton": "Damaged",
     "damageWarning": "A damage report will be filed for this equipment. You can undo this right after confirming.",
-    "confirmReturnedDamaged": "Confirm — Returned Damaged"
+    "confirmReturnedDamaged": "Confirm — Returned Damaged",
+    "toggleLabelStation": "Returned to {station}, plugged in",
+    "toggleLabelGeneric": "Returned to its station, plugged in",
+    "noHomeHint": "No home station assigned yet — ask an admin to set one",
+    "stationUnresolvedHint": "This item's home dock isn't set up yet — use Dock Return from the Readiness tab instead"
   }
 }

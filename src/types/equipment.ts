@@ -168,6 +168,8 @@ export interface Equipment {
   dockConfirmedReadyAt?: string | null;
   emergencyOverrideAt?: string | null;
   procedureBoundHospitalizationId?: string | null;
+  /** Home room assignment (docking P1) — paired with assetTypeId to derive the item's home dock client-side. */
+  homeRoomId?: string | null;
 }
 
 export interface CreateEquipmentRequest {

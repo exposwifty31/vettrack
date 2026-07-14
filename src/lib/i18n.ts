@@ -1144,6 +1144,8 @@ const translations = {
           : d.returnPlugDialog.plugAlertWarningOther,
         { minutes },
       ),
+    // T2.3 (docking P2) — unified return dialog's home-station toggle label.
+    toggleLabelStation: (station: string) => tr(d.returnPlugDialog.toggleLabelStation, { station }),
   },
 
 } as const;
