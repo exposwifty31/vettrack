@@ -53,10 +53,15 @@ export const docks = vtTable(
     name: text("name").notNull(),
     description: text("description"),
     roomId: text("room_id").references(() => rooms.id, { onDelete: "set null" }),
+    assetTypeId: text("asset_type_id").references(() => assetTypes.id, { onDelete: "set null" }),
+    capacity: integer("capacity"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => ({
     clinicNameUnique: uniqueIndex("vt_docks_clinic_name_unique").on(t.clinicId, t.name),
+    clinicRoomAssetTypeUnique: uniqueIndex("vt_docks_clinic_room_assettype_uq")
+      .on(t.clinicId, t.roomId, t.assetTypeId)
+      .where(sql`${t.assetTypeId} IS NOT NULL`),
   }),
 );
 export type Dock = typeof docks.$inferSelect;
@@ -142,6 +147,7 @@ export const equipment = vtTable("vt_equipment", {
   deletedAt: timestamp("deleted_at"),
   deletedBy: text("deleted_by"),
   usuallyFoundHere: text("usually_found_here"),
+  homeRoomId: text("home_room_id").references(() => rooms.id, { onDelete: "set null" }),
   searchAlias: text("search_alias"),
   staffNote: text("staff_note"),
   // Operational state — V1
