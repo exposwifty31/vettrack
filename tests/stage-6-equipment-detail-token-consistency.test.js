@@ -87,9 +87,13 @@ describe("Stage 6 detail — actions (Check in)", () => {
   it("is rendered from the detail screen", () => {
     expect(screen.includes("EquipmentActions")).toBe(true);
   });
-  it("wires a real return via api.equipment.return + the shared ReturnPlugDialog", () => {
+  it("wires a real return via api.equipment.return + the shared UnifiedReturnDialog", () => {
+    // Docking P2 (T2.3-mobile): the standalone ReturnPlugDialog was collapsed
+    // into UnifiedReturnDialog on the mobile detail (home-station toggle). The
+    // unchecked/plain-return path still routes through this file's own returnMut
+    // → api.equipment.return, so the behavioral guarantee is unchanged.
     expect(actions.includes("api.equipment.return")).toBe(true);
-    expect(actions.includes("ReturnPlugDialog")).toBe(true);
+    expect(actions.includes("UnifiedReturnDialog")).toBe(true);
     expect(actions.includes("t.equipmentDetail.checkIn")).toBe(true);
   });
   it("only offers return to the holder or an admin", () => {
