@@ -1020,6 +1020,7 @@
   },
   "reportIssueDialog": {
     "title": "Report an issue",
+    "description": "Describe the problem so the team can help.",
     "issueTitle": "Title",
     "issueTitlePlaceholder": "Brief description of the issue",
     "issueDetails": "Issue details",
@@ -1977,10 +1978,12 @@
     "userRestoreFailed": "Failed to restore user",
     "folderNew": "New",
     "folderNamePlaceholder": "e.g. Surgery Room 1",
+    "folderDialogDescription": "Name this folder to organize equipment.",
     "userDeleteFailed": "Failed to delete user",
     "secondaryRoleNone": "Secondary: None",
     "ticketResolve": "Resolve",
     "ticketDescription": "Description",
+    "ticketDetailDescription": "Review and update this support ticket.",
     "ticketSubmittedBy": "Submitted by",
     "ticketDate": "Date",
     "ticketPageUrl": "Page URL",
@@ -2248,6 +2251,7 @@
   },
   "inventoryItemsPage": {
     "title": "Inventory items",
+    "createDialogDescription": "Fill in the details to add or edit an inventory item.",
     "newItem": "New item",
     "editItem": "Edit item",
     "itemCreated": "Item created",

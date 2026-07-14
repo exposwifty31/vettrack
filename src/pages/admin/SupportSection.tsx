@@ -15,6 +15,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -233,6 +234,7 @@ export function SupportSection() {
               <DialogTitle className="pr-6 leading-tight">
                 {selectedTicket.title}
               </DialogTitle>
+              <DialogDescription className="sr-only">{t.adminPage.ticketDetailDescription}</DialogDescription>
             </DialogHeader>
 
             <div className="flex flex-col gap-4">

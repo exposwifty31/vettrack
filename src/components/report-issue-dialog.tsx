@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -72,6 +73,7 @@ export function ReportIssueDialog({ open, onOpenChange }: ReportIssueDialogProps
             <Bug className="w-4 h-4 text-primary" />
             {t.reportIssueDialog.title}
           </DialogTitle>
+          <DialogDescription className="sr-only">{t.reportIssueDialog.description}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">

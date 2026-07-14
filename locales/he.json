@@ -1020,6 +1020,7 @@
   },
   "reportIssueDialog": {
     "title": "דיווח על תקלה",
+    "description": "תארו את התקלה כדי שנוכל לעזור.",
     "issueTitle": "כותרת",
     "issueTitlePlaceholder": "תיאור קצר של התקלה",
     "issueDetails": "פירוט התקלה",
@@ -1977,10 +1978,12 @@
     "userRestoreFailed": "שחזור המשתמש נכשל",
     "folderNew": "חדש",
     "folderNamePlaceholder": "לדוגמה: חדר ניתוח 1",
+    "folderDialogDescription": "תנו שם לתיקייה כדי לארגן ציוד.",
     "userDeleteFailed": "מחיקת המשתמש נכשלה",
     "secondaryRoleNone": "משני: ללא",
     "ticketResolve": "פתור",
     "ticketDescription": "תיאור",
+    "ticketDetailDescription": "צפייה ועדכון של פניית התמיכה.",
     "ticketSubmittedBy": "הוגש על ידי",
     "ticketDate": "תאריך",
     "ticketPageUrl": "כתובת הדף",
@@ -2248,6 +2251,7 @@
   },
   "inventoryItemsPage": {
     "title": "פריטי מלאי",
+    "createDialogDescription": "מלאו את הפרטים כדי להוסיף או לערוך פריט מלאי.",
     "newItem": "פריט חדש",
     "editItem": "ערוך פריט",
     "itemCreated": "פריט נוצר",

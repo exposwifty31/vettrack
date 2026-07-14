@@ -1023,6 +1023,7 @@ export interface TStructure {
   };
   reportIssueDialog: {
     title: string;
+    description: string;
     issueTitle: string;
     issueTitlePlaceholder: string;
     issueDetails: string;
@@ -1980,10 +1981,12 @@ export interface TStructure {
     userRestoreFailed: string;
     folderNew: string;
     folderNamePlaceholder: string;
+    folderDialogDescription: string;
     userDeleteFailed: string;
     secondaryRoleNone: string;
     ticketResolve: string;
     ticketDescription: string;
+    ticketDetailDescription: string;
     ticketSubmittedBy: string;
     ticketDate: string;
     ticketPageUrl: string;
@@ -2251,6 +2254,7 @@ export interface TStructure {
   };
   inventoryItemsPage: {
     title: string;
+    createDialogDescription: string;
     newItem: string;
     editItem: string;
     itemCreated: string;

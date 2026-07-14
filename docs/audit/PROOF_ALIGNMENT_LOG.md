@@ -2689,3 +2689,26 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 **Verdict:** VERIFIED — three findings fixed RED-first, gate green, typecheck clean.
 
 **Addendum (re-review round, `9c820fc4d`→next):** CodeRabbit re-review of the fixes flipped #90 to **APPROVED** and surfaced one new outside-diff finding (Trivial, a11y): the offline-state container wasn't a live region, so screen-reader users on the auth path aren't told the form was swapped for the offline message. Fixed: added `role="status"` + `aria-live="polite"` to the `offline-auth-gate` container. RED test `announces the offline prompt to assistive tech (live region)` failed pre-fix, GREEN post-fix. Gate: 15/15 vitest, frontend tsc 0.
+
+---
+
+## Dialog a11y descriptions — Radix "Missing Description" warning (PR pending, 2026-07-14)
+
+**Claim:** removed the `Missing \`Description\` or \`aria-describedby={undefined}\` for {DialogContent}` warning across 6 dialogs by adding real sr-only descriptions (not silencing).
+
+**Evidence checked (independently re-run, not asserted from the implementer):**
+- Diff scope = 8 source/locale/generated files + 1 new test; `DispenseSheet.tsx` (a concurrent branch's file) NOT touched (`git status` grep = 0). No `aria-describedby={undefined}` introduced.
+- Each dialog gained a `<Sheet|DialogDescription className="sr-only">` wired to an i18n accessor: LocateSearch (`t.locateSearch.label`), dock-return-nfc ×2 (`t.dockReturn.scanDockMasterTag`) — reused existing purpose-copy; FoldersSection/SupportSection/report-issue/inventory-create — 4 new bilingual keys (en+he).
+- **Corrected an i18n classification:** `adminPage` is actually a spread accessor (`...d.adminPage,` at i18n.ts:772), not hand-listed — so no accessor lines were needed (would have been dead code). Verified by reading the block.
+- New keys present in BOTH locales (parity confirmed per-key via node).
+- RED-first `tests/dialog-a11y-descriptions.test.ts`: 12 failed → 18 passed.
+
+**Gate (re-run in this worktree):** `pnpm i18n:check` deep parity ✓; `tests/i18n-no-hebrew-in-source` 2/2; frontend `tsc` 0 errors; a11y test + the 6 previously-warning component tests = **37/37 (7 files)** with **0** `Missing Description` warnings.
+
+**Verdict:** VERIFIED — real a11y descriptions added RED-first, gates green, subagent output independently re-verified.
+
+**CodeRabbit round (PR #93, 2026-07-14):** two findings, both verified valid + fixed.
+- `dock-return-nfc.tsx:143` — the **blocked** branch (`!equipment.assetTypeId`, no scanning happens; body shows `noAssetTypeBlocked` + "go to setup") wrongly described itself as `scanDockMasterTag`. Changed to `t.dockReturn.noAssetTypeBlocked`; the real scan dialog (line 162) keeps `scanDockMasterTag`. Confirmed by reading both branches.
+- `tests/dialog-a11y-descriptions.test.ts` — replaced the global per-file Description count with **per-content-block** assertions: each titled `Dialog/SheetContent` must contain its OWN Description (regex-scoped to that block's body), keyed to an i18n accessor that **resolves to a defined string in en.json** (alias-aware: `const p = t.ns`). Added a regression `describe` proving the checks reject the failure modes (missing description, mis-scoped description outside the block, undefined/typo key, unknown alias). Gate: a11y test 28/28, the 6 component tests 47/47 with 0 `Missing Description` warnings, frontend tsc 0.
+
+**CodeRabbit round 2 (PR #93, 1 actionable):** extracted the per-block validation into a single `validateTitledBlock(block, aliases) => {ok, reason}`; the real-component suite and every regression fixture now call it (missing / mis-scoped / undefined-key / raw-string / alias-resolved / unknown-alias). Same logic that green-lights components is the logic proven to reject failures. Gate: a11y test 24/24, component tests 34/34, 0 `Missing Description` warnings, tsc 0.

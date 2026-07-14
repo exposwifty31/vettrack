@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -189,6 +190,7 @@ export function FoldersSection() {
             <DialogTitle>
               {editFolder ? t.adminPage.editFolder : t.adminPage.createFolder}
             </DialogTitle>
+            <DialogDescription className="sr-only">{t.adminPage.folderDialogDescription}</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3 py-1">
             <Label htmlFor="folderName">{t.adminPage.folderName}</Label>
