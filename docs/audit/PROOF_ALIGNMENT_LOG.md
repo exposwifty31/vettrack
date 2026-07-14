@@ -2666,3 +2666,20 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 **Verdict:** VERIFIED — three findings fixed RED-first, gate green, typecheck clean.
 
 **Addendum (re-review round, `9c820fc4d`→next):** CodeRabbit re-review of the fixes flipped #90 to **APPROVED** and surfaced one new outside-diff finding (Trivial, a11y): the offline-state container wasn't a live region, so screen-reader users on the auth path aren't told the form was swapped for the offline message. Fixed: added `role="status"` + `aria-live="polite"` to the `offline-auth-gate` container. RED test `announces the offline prompt to assistive tech (live region)` failed pre-fix, GREEN post-fix. Gate: 15/15 vitest, frontend tsc 0.
+
+---
+
+## Dialog a11y descriptions — Radix "Missing Description" warning (PR pending, 2026-07-14)
+
+**Claim:** removed the `Missing \`Description\` or \`aria-describedby={undefined}\` for {DialogContent}` warning across 6 dialogs by adding real sr-only descriptions (not silencing).
+
+**Evidence checked (independently re-run, not asserted from the implementer):**
+- Diff scope = 8 source/locale/generated files + 1 new test; `DispenseSheet.tsx` (a concurrent branch's file) NOT touched (`git status` grep = 0). No `aria-describedby={undefined}` introduced.
+- Each dialog gained a `<Sheet|DialogDescription className="sr-only">` wired to an i18n accessor: LocateSearch (`t.locateSearch.label`), dock-return-nfc ×2 (`t.dockReturn.scanDockMasterTag`) — reused existing purpose-copy; FoldersSection/SupportSection/report-issue/inventory-create — 4 new bilingual keys (en+he).
+- **Corrected an i18n classification:** `adminPage` is actually a spread accessor (`...d.adminPage,` at i18n.ts:772), not hand-listed — so no accessor lines were needed (would have been dead code). Verified by reading the block.
+- New keys present in BOTH locales (parity confirmed per-key via node).
+- RED-first `tests/dialog-a11y-descriptions.test.ts`: 12 failed → 18 passed.
+
+**Gate (re-run in this worktree):** `pnpm i18n:check` deep parity ✓; `tests/i18n-no-hebrew-in-source` 2/2; frontend `tsc` 0 errors; a11y test + the 6 previously-warning component tests = **37/37 (7 files)** with **0** `Missing Description` warnings.
+
+**Verdict:** VERIFIED — real a11y descriptions added RED-first, gates green, subagent output independently re-verified.
