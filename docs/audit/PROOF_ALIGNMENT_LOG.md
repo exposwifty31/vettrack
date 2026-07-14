@@ -2712,3 +2712,20 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 - `tests/dialog-a11y-descriptions.test.ts` — replaced the global per-file Description count with **per-content-block** assertions: each titled `Dialog/SheetContent` must contain its OWN Description (regex-scoped to that block's body), keyed to an i18n accessor that **resolves to a defined string in en.json** (alias-aware: `const p = t.ns`). Added a regression `describe` proving the checks reject the failure modes (missing description, mis-scoped description outside the block, undefined/typo key, unknown alias). Gate: a11y test 28/28, the 6 component tests 47/47 with 0 `Missing Description` warnings, frontend tsc 0.
 
 **CodeRabbit round 2 (PR #93, 1 actionable):** extracted the per-block validation into a single `validateTitledBlock(block, aliases) => {ok, reason}`; the real-component suite and every regression fixture now call it (missing / mis-scoped / undefined-key / raw-string / alias-resolved / unknown-alias). Same logic that green-lights components is the logic proven to reject failures. Gate: a11y test 24/24, component tests 34/34, 0 `Missing Description` warnings, tsc 0.
+
+---
+
+## PGBOUNCER_URL support + migration direct-connection carve-out (2026-07-14)
+
+**Claim:** the runtime pool uses PgBouncer when `PGBOUNCER_URL` is set; migrations stay on a direct connection (session advisory-lock safety). TDD.
+
+**Evidence checked:**
+- `server/lib/postgresql.ts`: `getPostgresqlConnectionString()` now prefers `PGBOUNCER_URL` → `POSTGRES_URL` → `DATABASE_URL`; new `getDirectPostgresqlConnectionString()` returns `POSTGRES_URL || DATABASE_URL` only (ignores PgBouncer); `isPostgresqlConfigured()` counts `PGBOUNCER_URL`. The `POSTGRES_URL/DATABASE_URL` "unsafe if different" guard is preserved (shared `assertPgDbConsistent`) and is NOT tripped by `PGBOUNCER_URL` (which is an intentional override).
+- `server/migrate.ts`: `runMigrations()` now builds a dedicated **direct** `pg` Pool (`createDirectMigrationPool`, SSL policy mirrors `db.ts`, `max: 3`, `pool.end()` in finally) — the session-level `pg_advisory_lock` + all migration DDL run off PgBouncer. Verified migrate.ts no longer imports the shared `./db.js` pool; only `server/index.ts` imports `runMigrations`. Runtime is PgBouncer-safe (grep-confirmed: poll-based outbox, no LISTEN/NOTIFY, no named prepared statements, no session `SET`, all runtime advisory locks are `pg_advisory_xact_lock`).
+- **RED→GREEN** `tests/postgresql-connection.test.ts` (11 tests): PGBOUNCER precedence; fallback; direct helper ignores PgBouncer; guard fires on pg/db mismatch but not on PGBOUNCER override; `isPostgresqlConfigured` counts PGBOUNCER; + source guards that migrate.ts uses the direct helper and not `./db.js`.
+
+**Gate:** postgresql-connection 11/11; server `tsc` 0; frontend `tsc` 0.
+
+**Deploy-verification pending (documented in plan):** SSL against the internal `pgbouncer.railway.internal` host (db.ts forces SSL in prod) — confirm connectivity post-deploy; remediate with `?sslmode=disable` on the var or a `*.railway.internal` SSL carve-out if negotiation fails.
+
+**Verdict:** VERIFIED — code + unit gate green; production SSL cutover check tracked.
