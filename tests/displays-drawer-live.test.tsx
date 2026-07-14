@@ -11,11 +11,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { t } from "@/lib/i18n";
+import React from "react";
 
 vi.mock("@/hooks/use-experience", () => ({ useExperience: () => ({ can: () => true }) }));
 vi.mock("@/components/layout/AppShell", () => ({
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  AppShell: ({ children }: any) => <>{children}</>,
+  AppShell: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const listMock = vi.fn();

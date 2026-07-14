@@ -11,17 +11,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { t } from "@/lib/i18n";
+import React from "react";
 
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ isAdmin: true, userId: "u1" }) }));
 vi.mock("@/components/layout/AppShell", () => ({
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  AppShell: ({ children }: any) => <>{children}</>,
+  AppShell: ({ children }: React.PropsWithChildren) => <>{children}</>,
 }));
 vi.mock("react-helmet-async", () => ({ Helmet: () => null }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("wouter", () => ({
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Link: ({ children }: any) => <a>{children}</a>,
+  Link: ({ children }: React.PropsWithChildren) => <a>{children}</a>,
   useLocation: () => ["/rooms", vi.fn()],
 }));
 vi.mock("@/lib/api", () => ({
@@ -51,15 +50,25 @@ describe("RoomsListPage — Add Room Cancel resets the form (T-48)", () => {
 
     // Open → type a name.
     fireEvent.click(screen.getByText(t.roomsListPage.addRoom));
-    const nameInput = () => screen.getByLabelText(t.roomsListPage.roomName) as HTMLInputElement;
+    const nameInput = () => screen.getByLabelText<HTMLInputElement>(t.roomsListPage.roomName);
+    const floorInput = () => screen.getByLabelText<HTMLInputElement>(t.roomsListPage.roomFloorOptional);
+    const gatewayInput = () => screen.getByTestId<HTMLInputElement>("input-room-gateway-code");
+
     fireEvent.change(nameInput(), { target: { value: "Test Room" } });
+    fireEvent.change(floorInput(), { target: { value: "Floor 2" } });
+    fireEvent.change(gatewayInput(), { target: { value: "GW123" } });
+
     expect(nameInput().value).toBe("Test Room");
+    expect(floorInput().value).toBe("Floor 2");
+    expect(gatewayInput().value).toBe("GW123");
 
     // Cancel closes the dialog.
     fireEvent.click(screen.getByText("Cancel"));
 
-    // Reopen — the field must be reset, not carrying the stale value.
+    // Reopen — all fields must be reset, not carrying stale values.
     fireEvent.click(screen.getByText(t.roomsListPage.addRoom));
     expect(nameInput().value).toBe("");
+    expect(floorInput().value).toBe("");
+    expect(gatewayInput().value).toBe("");
   });
 });

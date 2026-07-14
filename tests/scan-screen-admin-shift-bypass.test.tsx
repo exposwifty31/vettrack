@@ -21,9 +21,10 @@ import { t } from "@/lib/i18n";
 
 let hasActiveShift = false;
 let isAdmin = false;
+let shiftLoading = false;
 
 vi.mock("@/hooks/use-active-shift", () => ({
-  useActiveShift: () => ({ hasActiveShift, isLoading: false, nextShift: null }),
+  useActiveShift: () => ({ hasActiveShift, isLoading: shiftLoading, nextShift: null }),
 }));
 vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => ({ isAdmin }),
@@ -42,6 +43,7 @@ describe("ScanScreen — admin shift-gate bypass (T2)", () => {
     cleanup();
     hasActiveShift = false;
     isAdmin = false;
+    shiftLoading = false;
   });
 
   it("admin with NO active shift is not blocked — scanner renders", () => {
@@ -81,6 +83,17 @@ describe("ScanScreen — admin shift-gate bypass (T2)", () => {
     render(<ScanScreen />);
 
     expect(screen.getByTestId("qr-scanner-stub")).toBeTruthy();
+    expect(screen.queryByText(t.scan.offShiftTitle)).toBeNull();
+  });
+
+  it("scanner does not mount while shift query is pending", () => {
+    hasActiveShift = false;
+    isAdmin = false;
+    shiftLoading = true;
+
+    render(<ScanScreen />);
+
+    expect(screen.queryByTestId("qr-scanner-stub")).toBeNull();
     expect(screen.queryByText(t.scan.offShiftTitle)).toBeNull();
   });
 });

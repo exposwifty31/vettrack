@@ -11,6 +11,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { t } from "@/lib/i18n";
+import type { ComponentProps } from "react";
 
 const sendMessage = vi.fn();
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ userId: "u1" }) }));
@@ -18,7 +19,7 @@ vi.mock("@/hooks/use-experience", () => ({ useExperience: () => ({ can: () => tr
 
 import { ShiftChatPanel } from "@/features/shift-chat/components/ShiftChatPanel";
 
-const chat = {
+const chat: ComponentProps<typeof ShiftChatPanel>["chat"] = {
   sendMessage,
   isSending: false,
   notifyTyping: vi.fn(),
@@ -30,8 +31,7 @@ const chat = {
   onlineUserIds: [],
   pinnedMessage: null,
   typing: [],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-} as any;
+};
 
 afterEach(() => {
   cleanup();
@@ -59,5 +59,13 @@ describe("ShiftChatPanel — empty-message guard (T-47)", () => {
     fireEvent.keyDown(textarea, { key: "Enter" });
     expect(sendMessage).toHaveBeenCalledTimes(1);
     expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({ body: "hello" }));
+  });
+
+  it("does not send a whitespace-only message on Enter", () => {
+    render(<ShiftChatPanel isOpen onClose={() => {}} chat={chat} />);
+    const textarea = screen.getByPlaceholderText(t.shiftChat.panel.placeholder);
+    fireEvent.change(textarea, { target: { value: "   \n\t  " } });
+    fireEvent.keyDown(textarea, { key: "Enter" });
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 });

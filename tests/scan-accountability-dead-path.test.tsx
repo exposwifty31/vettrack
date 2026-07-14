@@ -13,13 +13,13 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-const src = readFileSync(
-  path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../src/features/scan/ScanScreen.tsx"),
-  "utf8",
-);
-
 describe("ScanScreen — dead AccountabilityConfirm path removed (T-46)", () => {
   it("no longer references AccountabilityConfirm or the dead confirmedName state", () => {
+    const src = readFileSync(
+      path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../src/features/scan/ScanScreen.tsx"),
+      "utf8",
+    );
+
     expect(src).not.toContain("AccountabilityConfirm");
     expect(src).not.toContain("confirmedName");
   });

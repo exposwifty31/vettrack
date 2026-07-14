@@ -246,10 +246,7 @@ export default function RoomsListPage({ singleColumn = false }: { singleColumn?:
     onSuccess: (room) => {
       queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
       toast.success(`"${room.name}" created`);
-      setCreateOpen(false);
-      setRoomName("");
-      setRoomFloor("");
-      setRoomGatewayCode("");
+      closeCreateDialog();
     },
     onError: (err: Error) => toast.error(err.message || t.roomsListPage.createRoomFailed),
   });
