@@ -160,4 +160,35 @@ describe("EquipmentActions — detail checkout", () => {
     expect(toastError).toHaveBeenCalled();
     expect(checkoutMock).not.toHaveBeenCalled();
   });
+
+  // Fail-loud (not fail-closed): a *failed* shift read must NOT be read as
+  // "off-shift". `hasActiveShift` is false while the query errors, but the
+  // client block keys on `!shiftError && !hasActiveShift` — so on a shift-query
+  // error the client defers to the server's authoritative roster gate and still
+  // fires the checkout. (Token-consistency asserts the source shape; this proves
+  // the runtime behavior.)
+  it("bypasses the client shift-block and still calls the API when the shift query errored", async () => {
+    shiftValue = { hasActiveShift: false, isLoading: false, isError: true, nextShift: null };
+    renderActions(dockedAvailable);
+    fireEvent.click(screen.getByTestId("btn-detail-checkout"));
+    await waitFor(() => expect(checkoutMock).toHaveBeenCalledWith("eq-1"));
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  // The gate is availability (`!isCheckedOut && status ok && not returned`), NOT
+  // "confirmed docked". `custody_state` defaults to "untracked" server-side
+  // (server/schema/equipment.ts) and the equipment-list quick action offers
+  // Checkout for the same non-returned/available set — so an untracked or
+  // custody-null available item must still show Checkout, or the search →
+  // detail → take dead-end this feature closes would reopen for the default
+  // custody state.
+  it("shows Checkout for an untracked available item (mirrors the list gate; docked is not required)", () => {
+    renderActions({ ...dockedAvailable, custodyState: "untracked" });
+    expect(screen.getByTestId("btn-detail-checkout")).toBeTruthy();
+  });
+
+  it("shows Checkout for an available item with no custody state (custodyState null)", () => {
+    renderActions({ ...dockedAvailable, custodyState: null });
+    expect(screen.getByTestId("btn-detail-checkout")).toBeTruthy();
+  });
 });
