@@ -4108,6 +4108,27 @@
     "noCategory": "ללא קטגוריה",
     "capacityLabel": "קיבולת"
   },
+  "adminHomeAssignment": {
+    "title": "שיוך חדר בית",
+    "categoryLabel": "קטגוריה",
+    "categoryPlaceholder": "קטגוריה",
+    "allCategories": "כל הקטגוריות",
+    "homeRoomLabel": "חדר בית",
+    "homeRoomPlaceholder": "חדר בית",
+    "equipmentListLabel": "ציוד",
+    "noEquipment": "אין ציוד בקטגוריה זו",
+    "assignBulkButton": "שייך חדר בית",
+    "assignSuccess": "חדר הבית שויך",
+    "pickRoomFirst": "יש לבחור חדר בית תחילה",
+    "unassignedTitle": "לא משויך",
+    "unassignedHint": "חסר חדר בית או קטגוריה",
+    "noUnassigned": "אין ציוד לא משויך",
+    "oneTapAssignButton": "שייך בית",
+    "noStationTitle": "אין תחנה",
+    "noStationHint": "חדר בית וקטגוריה מוגדרים, אך אין עגינה עבור הצירוף הזה",
+    "noNoStation": "לכל פריט משויך יש תחנה",
+    "manageDocksLink": "ניהול עגינות"
+  },
   "adminAssetTypesPage": {
     "typePlaceholder": "שם סוג",
     "conditionNamePlaceholder": "שם מצב",

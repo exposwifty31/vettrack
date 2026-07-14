@@ -52,6 +52,7 @@ const ManagementDashboardPage = lazy(() => import("@/pages/management-dashboard"
 const AdminShiftsPage = lazy(() => import("@/pages/admin-shifts"));
 const AdminAssetTypesPage = lazy(() => import("@/pages/AdminAssetTypesPage"));
 const AdminDocksPage = lazy(() => import("@/pages/AdminDocksPage"));
+const AdminHomeAssignmentPage = lazy(() => import("@/pages/AdminHomeAssignmentPage"));
 const OperationalMetricsDashboardPage = lazy(() => import("@/pages/OperationalMetricsDashboardPage"));
 const AppointmentsPage = lazy(() => import("@/pages/Tasks"));
 const AuditLogPage = lazy(() => import("@/pages/audit-log"));
@@ -207,6 +208,7 @@ export function AppRoutes() {
         <Route path="/admin/shifts"><AuthGuard><AdminShiftsPage /></AuthGuard></Route>
         <Route path="/admin/asset-types"><AuthGuard><AdminAssetTypesPage /></AuthGuard></Route>
         <Route path="/admin/docks"><AuthGuard><AdminDocksPage /></AuthGuard></Route>
+        <Route path="/admin/home-assignment"><AuthGuard><AdminHomeAssignmentPage /></AuthGuard></Route>
         <Route path="/admin/metrics"><AuthGuard><OperationalMetricsDashboardPage /></AuthGuard></Route>
         {/* Web management console (Phase 6) — desktop-only, capability-gated (management.web) */}
         <Route path="/admin/integrations"><AuthGuard><WebOnlyGuard><ManagementGuard><IntegrationsConsolePage /></ManagementGuard></WebOnlyGuard></AuthGuard></Route>

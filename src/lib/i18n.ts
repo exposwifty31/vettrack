@@ -1110,6 +1110,8 @@ const translations = {
 
   adminDocks: d.adminDocks,
 
+  adminHomeAssignment: d.adminHomeAssignment,
+
   adminAssetTypesPage: d.adminAssetTypesPage,
 
   conditionChecklist: d.conditionChecklist,

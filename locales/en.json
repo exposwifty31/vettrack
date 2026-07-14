@@ -4108,6 +4108,27 @@
     "noCategory": "No category",
     "capacityLabel": "cap"
   },
+  "adminHomeAssignment": {
+    "title": "Home Assignment",
+    "categoryLabel": "Category",
+    "categoryPlaceholder": "Category",
+    "allCategories": "All categories",
+    "homeRoomLabel": "Home Room",
+    "homeRoomPlaceholder": "Home Room",
+    "equipmentListLabel": "Equipment",
+    "noEquipment": "No equipment in this category",
+    "assignBulkButton": "Assign Home Room",
+    "assignSuccess": "Home Room assigned",
+    "pickRoomFirst": "Choose a Home Room first",
+    "unassignedTitle": "Unassigned",
+    "unassignedHint": "Missing a Home Room or Category",
+    "noUnassigned": "No unassigned equipment",
+    "oneTapAssignButton": "Assign home",
+    "noStationTitle": "No Station",
+    "noStationHint": "Home Room and Category are set, but no dock exists for that pair yet",
+    "noNoStation": "Every homed item has a station",
+    "manageDocksLink": "Manage docks"
+  },
   "adminAssetTypesPage": {
     "typePlaceholder": "Type name",
     "conditionNamePlaceholder": "Condition name",

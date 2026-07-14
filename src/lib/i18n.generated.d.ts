@@ -4111,6 +4111,27 @@ export interface TStructure {
     noCategory: string;
     capacityLabel: string;
   };
+  adminHomeAssignment: {
+    title: string;
+    categoryLabel: string;
+    categoryPlaceholder: string;
+    allCategories: string;
+    homeRoomLabel: string;
+    homeRoomPlaceholder: string;
+    equipmentListLabel: string;
+    noEquipment: string;
+    assignBulkButton: string;
+    assignSuccess: string;
+    pickRoomFirst: string;
+    unassignedTitle: string;
+    unassignedHint: string;
+    noUnassigned: string;
+    oneTapAssignButton: string;
+    noStationTitle: string;
+    noStationHint: string;
+    noNoStation: string;
+    manageDocksLink: string;
+  };
   adminAssetTypesPage: {
     typePlaceholder: string;
     conditionNamePlaceholder: string;
