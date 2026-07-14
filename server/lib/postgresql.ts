@@ -11,12 +11,29 @@
  * So migrations always take a direct `POSTGRES_URL || DATABASE_URL` connection.
  */
 
+// Fires whenever POSTGRES_URL and DATABASE_URL are BOTH set and disagree — a real
+// misconfiguration regardless of runtime routing, because migrations read those
+// two directly (getDirectPostgresqlConnectionString) even when PGBOUNCER_URL is
+// the runtime pool's URL. So it intentionally throws even if PGBOUNCER_URL is set
+// and would have been used exclusively. Locked in by a test.
 function assertPgDbConsistent(pg: string | undefined, db: string | undefined): void {
   if (pg && db && pg !== db) {
     throw new Error(
       "Both POSTGRES_URL and DATABASE_URL are set with different values. This is unsafe.",
     );
   }
+}
+
+/**
+ * SSL config for a `pg` Pool, shared by the runtime pool (`db.ts`) and the
+ * migration pool (`migrate.ts`) so the policy can't drift: SSL on in production
+ * or when the URL asks for it via `sslmode`; off otherwise.
+ */
+export function getPgSslConfig(url: string): false | { rejectUnauthorized: boolean } {
+  const urlRequiresSsl = /[?&]sslmode=(require|verify-ca|verify-full)\b/i.test(url);
+  return process.env.NODE_ENV === "production" || urlRequiresSsl
+    ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === "true" }
+    : false;
 }
 
 export function isPostgresqlConfigured(): boolean {

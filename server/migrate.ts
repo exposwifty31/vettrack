@@ -1,5 +1,5 @@
 import { Pool } from "pg";
-import { getDirectPostgresqlConnectionString } from "./lib/postgresql.js";
+import { getDirectPostgresqlConnectionString, getPgSslConfig } from "./lib/postgresql.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -15,13 +15,9 @@ const MIGRATION_ADVISORY_LOCK_ID = 123456;
  */
 function createDirectMigrationPool(): Pool {
   const url = getDirectPostgresqlConnectionString();
-  const urlRequiresSsl = /[?&]sslmode=(require|verify-ca|verify-full)\b/i.test(url);
   return new Pool({
     connectionString: url,
-    ssl:
-      process.env.NODE_ENV === "production" || urlRequiresSsl
-        ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === "true" }
-        : false,
+    ssl: getPgSslConfig(url),
     max: 3,
   });
 }
@@ -52,7 +48,7 @@ export async function runMigrations(): Promise<void> {
       await lockClient.query("SELECT pg_advisory_lock($1)", [MIGRATION_ADVISORY_LOCK_ID]);
 
       await ensureMigrationsTable(pool);
-      let applied = await getAppliedMigrations(pool);
+      const applied = await getAppliedMigrations(pool);
 
       const migrationsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "../migrations");
       if (!fs.existsSync(migrationsDir)) {
@@ -88,7 +84,7 @@ export async function runMigrations(): Promise<void> {
           await client.query("INSERT INTO vt_migrations (filename) VALUES ($1)", [filename]);
           await client.query("COMMIT");
           console.log(`✅ Applied migration: ${filename}`);
-          applied = await getAppliedMigrations(pool);
+          applied.add(filename);
         } catch (error) {
           await client.query("ROLLBACK");
           console.error(`❌ Migration failed: ${filename}`);

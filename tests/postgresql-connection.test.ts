@@ -58,6 +58,13 @@ describe("getPostgresqlConnectionString — PGBOUNCER_URL precedence (runtime po
     expect(() => getPostgresqlConnectionString()).toThrow(/unsafe/i);
   });
 
+  it("still throws on a POSTGRES_URL/DATABASE_URL mismatch even when PGBOUNCER_URL is set (mismatch is a real misconfig — migrations read those two directly)", () => {
+    process.env.PGBOUNCER_URL = "postgres://pooled/db";
+    process.env.POSTGRES_URL = "postgres://a/db";
+    process.env.DATABASE_URL = "postgres://b/db";
+    expect(() => getPostgresqlConnectionString()).toThrow(/unsafe/i);
+  });
+
   it("throws when nothing is configured", () => {
     expect(() => getPostgresqlConnectionString()).toThrow(/not set/i);
   });
