@@ -140,7 +140,7 @@ export function DockReturnNfc({ equipment, open, onClose, onSuccess }: DockRetur
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t.dockReturn.nfcConfirmTitle}</DialogTitle>
-            <DialogDescription className="sr-only">{t.dockReturn.scanDockMasterTag}</DialogDescription>
+            <DialogDescription className="sr-only">{t.dockReturn.noAssetTypeBlocked}</DialogDescription>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">{t.dockReturn.noAssetTypeBlocked}</p>
           <Button variant="outline" onClick={() => { onClose(); navigate("/admin/asset-types"); }}>

@@ -2683,3 +2683,7 @@ The "CodeRabbit / Review" check showed **neutral** (its non-blocking completed s
 **Gate (re-run in this worktree):** `pnpm i18n:check` deep parity ✓; `tests/i18n-no-hebrew-in-source` 2/2; frontend `tsc` 0 errors; a11y test + the 6 previously-warning component tests = **37/37 (7 files)** with **0** `Missing Description` warnings.
 
 **Verdict:** VERIFIED — real a11y descriptions added RED-first, gates green, subagent output independently re-verified.
+
+**CodeRabbit round (PR #93, 2026-07-14):** two findings, both verified valid + fixed.
+- `dock-return-nfc.tsx:143` — the **blocked** branch (`!equipment.assetTypeId`, no scanning happens; body shows `noAssetTypeBlocked` + "go to setup") wrongly described itself as `scanDockMasterTag`. Changed to `t.dockReturn.noAssetTypeBlocked`; the real scan dialog (line 162) keeps `scanDockMasterTag`. Confirmed by reading both branches.
+- `tests/dialog-a11y-descriptions.test.ts` — replaced the global per-file Description count with **per-content-block** assertions: each titled `Dialog/SheetContent` must contain its OWN Description (regex-scoped to that block's body), keyed to an i18n accessor that **resolves to a defined string in en.json** (alias-aware: `const p = t.ns`). Added a regression `describe` proving the checks reject the failure modes (missing description, mis-scoped description outside the block, undefined/typo key, unknown alias). Gate: a11y test 28/28, the 6 component tests 47/47 with 0 `Missing Description` warnings, frontend tsc 0.
