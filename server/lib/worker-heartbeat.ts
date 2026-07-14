@@ -25,9 +25,12 @@ export function startWorkerHeartbeat(source = "worker"): void {
       console.error(`[${source}] heartbeat tick failed`, err);
     });
   }, WORKER_HEARTBEAT_INTERVAL_MS);
+  // Never let the heartbeat hold the event loop open (clean process/test exit).
+  (heartbeatTimer as { unref?: () => void })?.unref?.();
 }
 
-function stopWorkerHeartbeatForTests(): void {
+/** Clear the heartbeat interval. Called by `closeJobRuntime`; safe to call twice. */
+export function stopWorkerHeartbeat(): void {
   if (heartbeatTimer) {
     clearInterval(heartbeatTimer);
     heartbeatTimer = null;
