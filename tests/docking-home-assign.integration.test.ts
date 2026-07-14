@@ -65,6 +65,7 @@ vi.mock("../server/middleware/auth.js", () => ({
 }));
 
 const dockingRoutes = (await import("../server/routes/docking.js")).default;
+const { logAudit } = (await import("../server/lib/audit.js")) as unknown as { logAudit: ReturnType<typeof vi.fn> };
 
 function buildApp() {
   const app = express();
@@ -256,6 +257,7 @@ describe.skipIf(!dbReachable)("docking home-assignment + reconciliation integrat
     await seedEquipment(eqId1, ctx.clinicId);
     await seedEquipment(eqId2, ctx.clinicId);
 
+    logAudit.mockClear();
     const res = await api(`/api/docking/equipment/home/bulk`, "POST", {
       ids: [eqId1, eqId2],
       homeRoomId: ctx.roomId,
@@ -269,6 +271,24 @@ describe.skipIf(!dbReachable)("docking home-assignment + reconciliation integrat
     const row2 = await equipmentRow(eqId2);
     expect(row1?.home_room_id).toBe(ctx.roomId);
     expect(row2?.home_room_id).toBe(ctx.roomId);
+
+    // M4: audit metadata carries `count`, not the full `ids` array.
+    expect(logAudit).toHaveBeenCalledTimes(1);
+    const metadata = logAudit.mock.calls[0][0].metadata as Record<string, unknown>;
+    expect(metadata).toEqual({ homeRoomId: ctx.roomId, assetTypeId: ctx.assetTypeId, count: 2 });
+    expect(metadata).not.toHaveProperty("ids");
+  });
+
+  it("rejects a bulk request with more than 500 ids with 400 (M4)", async () => {
+    const ids = Array.from({ length: 501 }, () => randomUUID());
+
+    const res = await api(`/api/docking/equipment/home/bulk`, "POST", {
+      ids,
+      homeRoomId: ctx.roomId,
+      assetTypeId: ctx.assetTypeId,
+    });
+
+    expect(res.status).toBe(400);
   });
 
   it("reconciliation.unassigned includes an item with homeRoomId IS NULL", async () => {

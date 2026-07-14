@@ -138,7 +138,10 @@ const pumps: Equipment[] = [
 ];
 
 const reconciliation: DockingReconciliation = {
-  unassigned: [{ id: "un-1", name: "Unassigned Monitor", homeRoomId: null, assetTypeId: null }],
+  unassigned: [
+    { id: "un-1", name: "Unassigned Monitor", homeRoomId: null, assetTypeId: null },
+    { id: "un-2", name: "Unassigned Pump", homeRoomId: null, assetTypeId: "at-1" },
+  ],
   noStation: [{ id: "ns-1", name: "No-Station Otoscope", homeRoomId: "room-1", assetTypeId: "at-1" }],
   byDock: [],
 };
@@ -182,5 +185,34 @@ describe("AdminHomeAssignmentPage — bulk home assignment + reconciliation buck
     renderPage();
 
     expect(await screen.findByText("No-Station Otoscope")).toBeTruthy();
+  });
+
+  it("disables one-tap Assign home for a category-less Unassigned item (I1)", async () => {
+    renderPage();
+
+    const btn = (await screen.findByTestId("btn-assign-home-un-1")) as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+
+    fireEvent.click(btn);
+    expect(assignHomeBulkMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps one-tap Assign home enabled for an Unassigned item only missing a home room (I1)", async () => {
+    renderPage();
+
+    // Wait for the reconciliation-derived button first, same as roomsQ this
+    // gives react-query enough ticks to resolve so the room <option> exists
+    // before we try to select it.
+    const btn = (await screen.findByTestId("btn-assign-home-un-2")) as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+
+    const roomSelect = (await screen.findByTestId("home-assignment-room-select")) as HTMLSelectElement;
+    await waitFor(() => expect(roomSelect.querySelector('option[value="room-1"]')).toBeTruthy());
+    fireEvent.change(roomSelect, { target: { value: "room-1" } });
+
+    fireEvent.click(btn);
+
+    await waitFor(() => expect(assignHomeBulkMock).toHaveBeenCalledTimes(1));
+    expect(assignHomeBulkMock).toHaveBeenCalledWith({ ids: ["un-2"], homeRoomId: "room-1" });
   });
 });

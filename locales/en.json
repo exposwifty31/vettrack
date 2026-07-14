@@ -4124,6 +4124,7 @@
     "unassignedHint": "Missing a Home Room or Category",
     "noUnassigned": "No unassigned equipment",
     "oneTapAssignButton": "Assign home",
+    "needsCategoryHint": "Set a category first (bulk flow above or dock setup)",
     "noStationTitle": "No Station",
     "noStationHint": "Home Room and Category are set, but no dock exists for that pair yet",
     "noNoStation": "Every homed item has a station",

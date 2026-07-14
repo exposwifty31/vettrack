@@ -71,7 +71,7 @@ router.patch(
 );
 
 const bulkAssignHomeSchema = z.object({
-  ids: z.array(z.string()).min(1),
+  ids: z.array(z.string()).min(1).max(500),
   homeRoomId: z.string().nullable(),
   assetTypeId: z.string().nullable().optional(),
 });
@@ -103,7 +103,7 @@ router.post(
       performedBy: userId,
       performedByEmail: email,
       targetId: null,
-      metadata: { homeRoomId, assetTypeId, count: updatedRows.length, ids },
+      metadata: { homeRoomId, assetTypeId, count: updatedRows.length },
     });
 
     res.json({ updated: updatedRows.length });

@@ -189,17 +189,33 @@ function AdminHomeAssignmentContent() {
           hint={t.adminHomeAssignment.unassignedHint}
           items={reconciliationQ.data?.unassigned ?? []}
           emptyLabel={t.adminHomeAssignment.noUnassigned}
-          renderAction={(item) => (
-            <Button
-              size="sm"
-              variant="outline"
-              data-testid={`btn-assign-home-${item.id}`}
-              onClick={() => handleOneTapAssign(item)}
-              disabled={assignMut.isPending}
-            >
-              {t.adminHomeAssignment.oneTapAssignButton}
-            </Button>
-          )}
+          renderAction={(item) =>
+            item.assetTypeId === null ? (
+              <div className="flex flex-col items-end gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  data-testid={`btn-assign-home-${item.id}`}
+                  disabled
+                >
+                  {t.adminHomeAssignment.oneTapAssignButton}
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {t.adminHomeAssignment.needsCategoryHint}
+                </span>
+              </div>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid={`btn-assign-home-${item.id}`}
+                onClick={() => handleOneTapAssign(item)}
+                disabled={assignMut.isPending}
+              >
+                {t.adminHomeAssignment.oneTapAssignButton}
+              </Button>
+            )
+          }
         />
 
         <ReconciliationSection

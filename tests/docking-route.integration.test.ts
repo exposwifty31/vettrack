@@ -249,7 +249,7 @@ describe.skipIf(!dbReachable)("docking route integration", () => {
     expect(second.json.code).not.toBe("errors.docking.duplicateStation");
   });
 
-  it("includes assetTypeName on list", async () => {
+  it("includes assetTypeName and roomName on list (M1)", async () => {
     const created = await api("/api/docks", "POST", {
       name: "Pump Station A",
       roomId: ctx.roomId,
@@ -264,5 +264,6 @@ describe.skipIf(!dbReachable)("docking route integration", () => {
     const row = rows.find((r) => r.id === created.json.id);
     expect(row).toBeDefined();
     expect(row?.assetTypeName).toBe("Infusion Pump");
+    expect(row?.roomName).toBe("ICU");
   });
 });

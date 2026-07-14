@@ -4124,6 +4124,7 @@
     "unassignedHint": "חסר חדר בית או קטגוריה",
     "noUnassigned": "אין ציוד לא משויך",
     "oneTapAssignButton": "שייך בית",
+    "needsCategoryHint": "יש להגדיר קטגוריה תחילה (זרימת השיוך המרוכז למעלה או הגדרת עגינות)",
     "noStationTitle": "אין תחנה",
     "noStationHint": "חדר בית וקטגוריה מוגדרים, אך אין עגינה עבור הצירוף הזה",
     "noNoStation": "לכל פריט משויך יש תחנה",

@@ -10,6 +10,7 @@ import {
   unitConditionStates,
   stagingQueue,
   users,
+  rooms,
 } from "../db.js";
 import { eq, and, inArray, sql, asc } from "drizzle-orm";
 import { requireAuth, requireAdmin, requireEffectiveRole } from "../middleware/auth.js";
@@ -76,9 +77,11 @@ router.get("/docks", requireAuth, async (req, res) => {
       assetTypeId: docks.assetTypeId, capacity: docks.capacity,
       createdAt: docks.createdAt,
       assetTypeName: assetTypes.name,
+      roomName: rooms.name,
     })
     .from(docks)
     .leftJoin(assetTypes, eq(docks.assetTypeId, assetTypes.id))
+    .leftJoin(rooms, eq(docks.roomId, rooms.id))
     .where(eq(docks.clinicId, clinicId));
   res.json(rows);
 });
