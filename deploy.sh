@@ -141,10 +141,21 @@ if [ "$CHECK_MODE" = false ]; then
   # unless /api/health reports checks.db == "ok".
   #
   # The default target is DERIVED from HEALTHCHECK_URL (the same deployment target,
-  # not a hardcoded prod URL) by swapping the liveness path segment for the readiness
-  # one. The default applies only when READINESS_URL is UNSET; export READINESS_URL=""
-  # to disable the gate.
-  READINESS_URL="${READINESS_URL-${HEALTHCHECK_URL%healthz}health}"
+  # not a hardcoded prod URL) by swapping the liveness path segment (/healthz) for the
+  # readiness one (/health). Deriving only makes sense when HEALTHCHECK_URL ends in
+  # /healthz — otherwise we fail closed and ask for an explicit READINESS_URL rather
+  # than probing a bogus path. The default applies only when READINESS_URL is UNSET;
+  # export READINESS_URL="" to disable the gate, or a full URL to override.
+  if [ -z "${READINESS_URL+x}" ]; then
+    case "$HEALTHCHECK_URL" in
+      */healthz) READINESS_URL="${HEALTHCHECK_URL%/healthz}/health" ;;
+      *)
+        echo "❌ Cannot derive READINESS_URL from HEALTHCHECK_URL='$HEALTHCHECK_URL' (expected a URL ending in /healthz)."
+        echo "   Set READINESS_URL explicitly, or READINESS_URL='' to disable the DB-readiness gate."
+        exit 1
+        ;;
+    esac
+  fi
   if [ -n "$READINESS_URL" ]; then
     echo "🩺 Verifying DB readiness at $READINESS_URL (checks.db == ok)..."
     # set -e aborts the deploy if the gate exits non-zero.

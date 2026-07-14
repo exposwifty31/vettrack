@@ -26,6 +26,17 @@ const hasJq = (() => {
   }
 })();
 
+if (!hasJq) {
+  // Loud signal on skip: this suite is the safety net after an outage that shipped
+  // past a liveness-only gate. jq is a hard dependency of deploy.sh and is present on
+  // CI runners, so a silent skip here (especially in CI) would quietly zero out the
+  // gate's coverage — exactly the class of invisible gap we're guarding against.
+  console.warn(
+    "[deploy-db-readiness] jq not found on PATH — SKIPPING the DB-readiness gate suite. " +
+      "This must run in CI (deploy.sh requires jq); investigate if you see this in CI logs.",
+  );
+}
+
 type StubMode = "ok" | "fail" | "unreachable" | "malformed" | "recovery";
 
 // Runs the gate with a fake `curl` (and its own fresh counter file) on PATH.
