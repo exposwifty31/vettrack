@@ -1,6 +1,6 @@
 # Docking as a First-Class Concept — Design (v2)
 
-**Status:** Proposed v2 (interaction model converged 2026-07-14; no code written)
+**Status:** Proposed v2 (interaction model converged 2026-07-14) — **P1 (Ownership) is implemented** (PR #98: migration, schema, derivation service, dock 409 route, `/api/docking`, client wiring, two Manager pages — see `docs/audit/docking-review-findings.md`). P2–P4 remain proposed/not started.
 **Owner:** Equipment Manager (product) · P0-2 audit lane (engineering)
 **Related:** `docs/design/program-plan.md`, the a51de1ee docking reality-map, `docs/audit/PROOF_ALIGNMENT_LOG.md`
 **v2 change:** replaces v1's per-dock NFC "location proof" with an **evidence-stream model**. v1 designed the sensing before the workflow; v2 designs the effortless interaction first and derives the minimum sensing it needs. Docks carry **zero hardware** and are **never scanned**.
@@ -46,7 +46,7 @@ The current code already agrees at the deepest level — `isEquipmentFullyDeploy
 ### 3.2 Core invariants
 
 1. **Docks are organized by category** — intentional standardization. One station per `(room, category)`: "the ICU Infusion-Pump Station." More demand ⇒ larger **capacity**, not a second station.
-2. **Single ownership** — every item has exactly **one** Home Room and (derived) **one** Home Dock. Using it elsewhere is a normal `checked_out`; ownership is never ambiguous.
+2. **Single ownership (target state)** — every *assigned* item has exactly **one** Home Room and (derived) **one** Home Dock. Using it elsewhere is a normal `checked_out`; ownership is never ambiguous. P1 ships invariant 7 (nullable-until-assigned) as the transitional reality — an item with no Home Room/Category yet has no ownership to be ambiguous about.
 3. **Home Dock derives** — the dock where `room = home_room AND category = asset_type`. The Manager assigns *Home Room + Category*; the dock follows. No per-item dock assignment.
 4. **Home ⟺ resting with a current at-station anchor at the home dock.**
 5. **Return clears custody; being *home* requires an anchor.** Pressing "Return" in the wrong place never makes an item home.
@@ -55,9 +55,11 @@ The current code already agrees at the deepest level — `isEquipmentFullyDeploy
 
 ### 3.3 Stored vs derived
 
-```
+```text
 STORED (new / changed)
-  docks.asset_type_id     NEW  · the dock's category (NOT NULL)
+  docks.asset_type_id     NEW  · the dock's category (nullable during P1 — a dock can be created before
+                                 its category is decided; TARGET state is NOT NULL, tightened once every
+                                 dock is categorized)
   docks.capacity          NEW  · configured physical slots (int)
   UNIQUE(clinic_id, room_id, asset_type_id) on docks   · one station per (room, category)
   equipment.home_room_id  NEW  · ownership (nullable-until-assigned → rooms)
@@ -191,24 +193,28 @@ Room readiness becomes **present-vs-expected**: `at_home / expected_fill` per ca
 Each phase independently shippable, RED-test-first, in **equipment schema / return route+service / room-radar / new files — never `src/pages/rooms-list.tsx`** (Phase-3 fork lane, T-48).
 
 ### P1 — Ownership (establish the source of truth)
-- Schema (migrations `164+`, hand-authored): `docks.asset_type_id NOT NULL`, `docks.capacity`, `UNIQUE(clinic_id, room_id, asset_type_id)`, `equipment.home_room_id` (nullable).
+
+- Schema (migrations `164+`, hand-authored): `docks.asset_type_id` (nullable in P1; TARGET is `NOT NULL`), `docks.capacity`, `UNIQUE(clinic_id, room_id, asset_type_id)`, `equipment.home_room_id` (nullable). **Implemented — PR #98.**
 - Manager UI: define a room's category-stations (capacity); assign items Home Room + Category (bulk by category); home dock derives + displays.
 - Derived reads: `resolveHomeDock`, `dockExpectedFill`, `roomExpected`.
 - Tests: derivation (unique; null when unset / no station); constraint; aggregation. No behavior change to custody.
 
 ### P2 — Unified return + anchors + contradictions
+
 - One return dialog with the home-station toggle (plug ≐ station for powered); toggle ⇒ anchor ⇒ `docked`; else `returned`. Collapse the separate dock-return ceremony into it (condition quick-check preserved for asset-typed items).
 - Anchor evidence storage + the contradiction events (checkout, RFID-elsewhere, sweep-missing, Not-Found-Here) as the *only* invalidators; anchor provenance (who/when/age) surfaced on the detail.
 - Scan flow: state-machine disambiguation; available item ⇒ Details ⇒ **Take** ⇒ undo; "Not taking — confirming it's here" secondary (citizen anchor); **"Not Found Here"** on claimed items.
 - Tests: state-machine meanings; anchor create/invalidate matrix (each contradiction type; time alone never invalidates); wrong-room return lands "away/unverified"; emergency never blocked.
 
 ### P3 — Room Sweep + reconciliation (solve the drift)
+
 - Sweep mode (per station checklist, confirm/flag, checked-out shown accounted); sweep state on room cards; Equipment-Technician-per-shift designation with Shift-Lead fallback.
 - Buckets (§6.2) per room + per item; present-vs-expected room readiness replacing the scan-% ring (room-radar + home ops tile — new components).
 - A `staleReturnedSweep`-style nudge for `returned`-unverified items (parallels `staleCheckoutSweepWorker`) — nudges, never mutates.
 - Tests: bucket classification (checked-out excluded from missing); sweep re-anchoring; expected-vs-present math; designation fallback.
 
 ### P4 — Charging integration
+
 - Now: plug-in assertion ≐ station anchor for powered categories; existing charge-alert (`chargeAlertWorker:109-142`) keyed off the unified return toggle.
 - Later (optional hardware): smart charging stations as an automatic anchor source; docked-unplugged-at-station nudges.
 - Tests: powered vs unpowered toggle semantics; charge-alert parity with today's behavior.

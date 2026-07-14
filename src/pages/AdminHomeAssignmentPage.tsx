@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorCard } from "@/components/ui/error-card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ManagementAccessDenied } from "@/desktop/management";
 import { t } from "@/lib/i18n";
@@ -69,6 +70,17 @@ function AdminHomeAssignmentContent() {
     return items.filter((item) => item.assetTypeId === categoryFilter || item.assetTypeId === null);
   }, [equipmentQ.data, categoryFilter]);
 
+  // categoryFilter changes (or an equipment refetch) can drop items from the
+  // visible list; prune selectedIds to what's still visible so a bulk assign
+  // never silently recategorizes an item the admin can no longer see.
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const validIds = new Set(filteredEquipment.map((item) => item.id));
+      const next = new Set([...prev].filter((id) => validIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [filteredEquipment]);
+
   const toggleSelected = (id: string, checked: boolean) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -98,7 +110,10 @@ function AdminHomeAssignmentContent() {
     assignMut.mutate({ ids: [item.id], homeRoomId });
   };
 
-  if (assetTypesQ.error instanceof ApiError && assetTypesQ.error.status === 501) return null;
+  // Categories are an optional enhancement on this page (home-room assignment
+  // still works without them) — degrade to a visible notice instead of
+  // blanking the whole page when the asset-types endpoint isn't deployed yet.
+  const categoriesUnavailable = assetTypesQ.error instanceof ApiError && assetTypesQ.error.status === 501;
 
   return (
     <AppShell title={t.adminHomeAssignment.title}>
@@ -116,43 +131,65 @@ function AdminHomeAssignmentContent() {
                 <label htmlFor="home-assignment-category" className="text-sm font-medium">
                   {t.adminHomeAssignment.categoryLabel}
                 </label>
-                <Select
-                  value={categoryFilter || "__all__"}
-                  onValueChange={(v) => setCategoryFilter(v === "__all__" ? "" : v)}
-                >
-                  <SelectTrigger id="home-assignment-category" data-testid="home-assignment-category-select">
-                    <SelectValue placeholder={t.adminHomeAssignment.categoryPlaceholder} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">{t.adminHomeAssignment.allCategories}</SelectItem>
-                    {(assetTypesQ.data ?? []).map((assetType: AssetType) => (
-                      <SelectItem key={assetType.id} value={assetType.id}>
-                        {assetType.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {categoriesUnavailable ? (
+                  <p className="text-sm text-muted-foreground" data-testid="home-assignment-category-unavailable">
+                    {t.adminHomeAssignment.categoryUnavailable}
+                  </p>
+                ) : assetTypesQ.isLoading ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : assetTypesQ.isError ? (
+                  <ErrorCard
+                    message={t.adminHomeAssignment.categoryLoadError}
+                    onRetry={() => assetTypesQ.refetch()}
+                  />
+                ) : (
+                  <Select
+                    value={categoryFilter || "__all__"}
+                    onValueChange={(v) => setCategoryFilter(v === "__all__" ? "" : v)}
+                  >
+                    <SelectTrigger id="home-assignment-category" data-testid="home-assignment-category-select">
+                      <SelectValue placeholder={t.adminHomeAssignment.categoryPlaceholder} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">{t.adminHomeAssignment.allCategories}</SelectItem>
+                      {(assetTypesQ.data ?? []).map((assetType: AssetType) => (
+                        <SelectItem key={assetType.id} value={assetType.id}>
+                          {assetType.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="space-y-1.5">
                 <label htmlFor="home-assignment-room" className="text-sm font-medium">
                   {t.adminHomeAssignment.homeRoomLabel}
                 </label>
-                <Select
-                  value={homeRoomId || "__none__"}
-                  onValueChange={(v) => setHomeRoomId(v === "__none__" ? "" : v)}
-                >
-                  <SelectTrigger id="home-assignment-room" data-testid="home-assignment-room-select">
-                    <SelectValue placeholder={t.adminHomeAssignment.homeRoomPlaceholder} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">{t.adminHomeAssignment.homeRoomPlaceholder}</SelectItem>
-                    {(roomsQ.data ?? []).map((room: Room) => (
-                      <SelectItem key={room.id} value={room.id}>
-                        {room.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {roomsQ.isLoading ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : roomsQ.isError ? (
+                  <ErrorCard
+                    message={t.adminHomeAssignment.roomsLoadError}
+                    onRetry={() => roomsQ.refetch()}
+                  />
+                ) : (
+                  <Select
+                    value={homeRoomId || "__none__"}
+                    onValueChange={(v) => setHomeRoomId(v === "__none__" ? "" : v)}
+                  >
+                    <SelectTrigger id="home-assignment-room" data-testid="home-assignment-room-select">
+                      <SelectValue placeholder={t.adminHomeAssignment.homeRoomPlaceholder} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">{t.adminHomeAssignment.homeRoomPlaceholder}</SelectItem>
+                      {(roomsQ.data ?? []).map((room: Room) => (
+                        <SelectItem key={room.id} value={room.id}>
+                          {room.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             </div>
 
@@ -192,6 +229,9 @@ function AdminHomeAssignmentContent() {
           hint={t.adminHomeAssignment.unassignedHint}
           items={reconciliationQ.data?.unassigned ?? []}
           emptyLabel={t.adminHomeAssignment.noUnassigned}
+          isLoading={reconciliationQ.isLoading}
+          isError={reconciliationQ.isError}
+          onRetry={() => reconciliationQ.refetch()}
           renderAction={(item) =>
             item.assetTypeId === null ? (
               <div className="flex flex-col items-end gap-1">
@@ -226,6 +266,9 @@ function AdminHomeAssignmentContent() {
           hint={t.adminHomeAssignment.noStationHint}
           items={reconciliationQ.data?.noStation ?? []}
           emptyLabel={t.adminHomeAssignment.noNoStation}
+          isLoading={reconciliationQ.isLoading}
+          isError={reconciliationQ.isError}
+          onRetry={() => reconciliationQ.refetch()}
           renderAction={() => (
             <Link href="/admin/docks" className="text-sm text-primary underline">
               {t.adminHomeAssignment.manageDocksLink}
@@ -242,12 +285,18 @@ function ReconciliationSection({
   hint,
   items,
   emptyLabel,
+  isLoading,
+  isError,
+  onRetry,
   renderAction,
 }: {
   title: string;
   hint: string;
   items: DockingReconciliationItem[];
   emptyLabel: string;
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
   renderAction: (item: DockingReconciliationItem) => ReactNode;
 }) {
   return (
@@ -257,7 +306,11 @@ function ReconciliationSection({
         <p className="text-xs text-muted-foreground">{hint}</p>
       </CardHeader>
       <CardContent className="space-y-1.5">
-        {items.length === 0 ? (
+        {isLoading ? (
+          <Skeleton className="h-16 w-full" />
+        ) : isError ? (
+          <ErrorCard message={t.adminHomeAssignment.reconciliationLoadError} onRetry={onRetry} />
+        ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground">{emptyLabel}</p>
         ) : (
           items.map((item) => (

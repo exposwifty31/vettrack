@@ -16,8 +16,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HelmetProvider } from "react-helmet-async";
+import { toast } from "sonner";
 import * as React from "react";
 import { t } from "@/lib/i18n";
+import { ApiError } from "@/lib/api";
 import type { AssetType, Dock, Room } from "@/types";
 
 afterEach(() => cleanup());
@@ -197,5 +199,39 @@ describe("AdminDocksPage — Category + Capacity (T1.6)", () => {
         }),
       ),
     );
+  });
+
+  it("shows an error toast when createDock rejects with a duplicate-station 409", async () => {
+    createDockMock.mockRejectedValueOnce(
+      new ApiError(409, "A station for this category already exists in this room.", {
+        code: "errors.docking.duplicateStation",
+      }),
+    );
+    renderPage();
+
+    const nameInput = await screen.findByPlaceholderText(t.adminDocks.namePlaceholder);
+    fireEvent.change(nameInput, { target: { value: "New Dock" } });
+
+    fireEvent.click(screen.getByTestId("btn-add-dock"));
+
+    await waitFor(() => expect(createDockMock).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("A station for this category already exists in this room."),
+    );
+  });
+
+  it("rejects a non-integer capacity instead of silently truncating it", async () => {
+    renderPage();
+
+    const nameInput = await screen.findByPlaceholderText(t.adminDocks.namePlaceholder);
+    fireEvent.change(nameInput, { target: { value: "New Dock" } });
+
+    const capacityInput = screen.getByTestId("dock-capacity-input") as HTMLInputElement;
+    fireEvent.change(capacityInput, { target: { value: "1.5" } });
+
+    fireEvent.click(screen.getByTestId("btn-add-dock"));
+
+    expect(await screen.findByTestId("dock-capacity-error")).toBeTruthy();
+    expect(createDockMock).not.toHaveBeenCalled();
   });
 });

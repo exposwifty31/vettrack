@@ -4108,7 +4108,9 @@
     "categoryPlaceholder": "Category (optional)",
     "capacityPlaceholder": "Capacity (optional)",
     "noCategory": "No category",
-    "capacityLabel": "cap"
+    "capacityLabel": "cap",
+    "invalidCapacity": "Capacity must be a whole number greater than 0",
+    "categoryLoadError": "Failed to load categories"
   },
   "adminHomeAssignment": {
     "title": "Home Assignment",
@@ -4131,7 +4133,11 @@
     "noStationTitle": "No Station",
     "noStationHint": "Home Room and Category are set, but no dock exists for that pair yet",
     "noNoStation": "Every homed item has a station",
-    "manageDocksLink": "Manage docks"
+    "manageDocksLink": "Manage docks",
+    "categoryUnavailable": "Categories are unavailable right now — you can still assign a Home Room",
+    "categoryLoadError": "Failed to load categories",
+    "roomsLoadError": "Failed to load rooms",
+    "reconciliationLoadError": "Failed to load reconciliation data"
   },
   "adminAssetTypesPage": {
     "typePlaceholder": "Type name",

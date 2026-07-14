@@ -1,6 +1,6 @@
 # Docking First-Class — Consolidated Review Findings
 
-Branch: `feat/docking-first-class` (isolated worktree). Plan: `/Users/dan/.claude/plans/greedy-imagining-blossom.md`.
+Branch: `feat/docking-first-class` (isolated worktree). Plan: the docking-as-first-class implementation plan.
 Execution: subagent-driven development with TDD, per-task review + per-phase review gate. This doc is the running record of every review finding and its resolution across all phases (P1–P4).
 
 ---
@@ -12,6 +12,7 @@ Execution: subagent-driven development with TDD, per-task review + per-phase rev
 **Phase-gate status:** i18n parity ✓ · `architecture:gates` all-pass (tsc frontend+server clean; 4 depcruise warnings pre-existing in rooms/inventory tablet features, not docking; madge cycles = baseline) · full suite 4810/4812 (the single failing file `tests/stage-6-equipment-detail-token-consistency.test.js` is **pre-existing** — the P1 diff manifest touches none of stage-6/equipment-detail/shift-gating).
 
 ### Per-task review outcomes
+
 | Task | Reviewer | Verdict | Findings → resolution |
 |---|---|---|---|
 | T1.1 schema/migration | subagent (sonnet) | Spec ✅ / Approved | Implementer self-caught: test wrongly placed under excluded `tests/migrations/**` → **relocated** to top-level `tests/` so `pnpm test` runs it (commit `4225638`). |
@@ -23,6 +24,7 @@ Execution: subagent-driven development with TDD, per-task review + per-phase rev
 | T1.7 AdminHomeAssignmentPage | controller + phase | Spec ✅ / Approved | `WebOnlyGuard` omitted (matches real AdminDocksPage) — phase review **adjudicated: not an overflow risk** (single-column `max-w-3xl`, degrades cleanly). |
 
 ### Phase review (opus) — APPROVE WITH NITS · 0 Critical · 1 Important · 6 Minor
+
 **Adjudications (confirmed sound):** multi-tenancy clean across both route files; migration additive-safe (nullable adds, no rewrite); custody states + frozen surfaces untouched; 409 disambiguation correct (`err.constraint` = index name, incl. partial); reconciliation = 2 queries + in-memory derivation, no N+1; `GET /reconciliation` `requireAuth` (not admin) acceptable (within-clinic read already available via `/api/equipment`); i18n `adminHomeAssignment` hand-wired at `i18n.ts:1113`, `errors` wired wholesale — no undefined-at-runtime trap.
 
 | ID | Sev | Finding | Resolution |
@@ -42,13 +44,17 @@ Execution: subagent-driven development with TDD, per-task review + per-phase rev
 ---
 
 ## P2 — Unified return + anchors + contradictions
+
 _pending (phase not started)_
 
 ## P3 — Room Sweep + reconciliation
+
 _pending_
 
 ## P4 — Charging integration
+
 _pending_
 
 ## Final whole-branch review
+
 _pending_

@@ -15,7 +15,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HelmetProvider } from "react-helmet-async";
+import { toast } from "sonner";
 import * as React from "react";
+import { ApiError } from "@/lib/api";
 import type { AssetType, DockingReconciliation, Equipment, Room } from "@/types";
 
 afterEach(() => cleanup());
@@ -204,6 +206,22 @@ describe("AdminHomeAssignmentPage — bulk home assignment + reconciliation buck
     expect(call.ids).toEqual(["eq-3"]);
     expect(call.homeRoomId).toBe("room-1");
     expect(call.assetTypeId).toBe("at-1");
+  });
+
+  it("shows an error toast when assignHomeBulk rejects instead of failing silently", async () => {
+    assignHomeBulkMock.mockRejectedValueOnce(new ApiError(500, "Failed to assign Home Room", {}));
+    renderPage();
+
+    const pumpACheckbox = await screen.findByRole("checkbox", { name: "Pump A" });
+    fireEvent.click(pumpACheckbox);
+
+    const roomSelect = (await screen.findByTestId("home-assignment-room-select")) as HTMLSelectElement;
+    fireEvent.change(roomSelect, { target: { value: "room-1" } });
+
+    fireEvent.click(screen.getByTestId("btn-assign-home-bulk"));
+
+    await waitFor(() => expect(assignHomeBulkMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Failed to assign Home Room"));
   });
 
   it("renders the Unassigned section with reconciliation.unassigned items", async () => {
