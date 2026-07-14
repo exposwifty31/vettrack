@@ -123,10 +123,7 @@ export function useAlertsController() {
     hasAckError,
     hasFatalError: equipmentQ.isError,
     isLoading: equipmentQ.isLoading || acksQ.isLoading,
-    refetch: () => {
-      void equipmentQ.refetch();
-      void acksQ.refetch();
-    },
+    refetch: () => Promise.all([equipmentQ.refetch(), acksQ.refetch()]),
     ack: (equipmentId: string, alertType: string) => ackMut.mutate({ equipmentId, alertType }),
     unAck: (equipmentId: string, alertType: string) => unAckMut.mutate({ equipmentId, alertType }),
   };
